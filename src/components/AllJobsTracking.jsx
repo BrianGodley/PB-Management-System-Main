@@ -50,7 +50,7 @@ export default function AllJobsTracking({ jobs = [], statusFilter = 'open', onSe
           <p className="text-sm">No {statusFilter === 'closed' ? 'closed' : 'open'} jobs.</p>
         </div>
       ) : (
-        <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-gray-200 bg-white">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden rounded-xl border border-gray-200 bg-white">
           <table className="w-full text-sm table-fixed">
             <thead className="sticky top-0 z-10 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500 border-b border-gray-200">
               <tr>

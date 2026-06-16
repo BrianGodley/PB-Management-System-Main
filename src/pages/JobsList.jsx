@@ -1342,8 +1342,37 @@ export default function JobsList() {
         )}
       </div>
 
-      {/* ── Mobile: job selector dropdown ─────────────────────── */}
-      <div className="lg:hidden mb-2 flex-shrink-0">
+      {/* ── Mobile: dual Open/Closed toggle + text search + job dropdown ── */}
+      <div className="lg:hidden mb-2 flex-shrink-0 space-y-1.5">
+        {/* Open / Closed dual toggle */}
+        <div className="flex gap-1">
+          {[
+            { key: 'open', label: 'Open Jobs' },
+            { key: 'closed', label: 'Closed Jobs' },
+          ].map(opt => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => setStatusFilter(opt.key)}
+              className={`flex-1 text-xs font-semibold px-2 py-1.5 rounded-md border transition-colors ${
+                statusFilter === opt.key
+                  ? 'bg-green-700 text-white border-green-700'
+                  : 'bg-white text-gray-600 border-gray-200'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        {/* Text search */}
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search by name, address, or client…"
+          className="input text-sm w-full"
+        />
+        {/* Job dropdown — reflects the toggle + search above */}
         <select
           value={selectedJob}
           onChange={e => {

@@ -87,12 +87,10 @@ function GpCard({ estGP, actGP, estPct, actPct }) {
         <div>
           <p className="text-[10px] text-gray-400">Estimated</p>
           <p className="text-base font-bold text-gray-800">{fmt(estGP)}</p>
-          <p className="text-[10px] text-gray-400">{estPct.toFixed(1)}% margin</p>
         </div>
         <div className="text-right">
           <p className="text-[10px] text-gray-400">Actual</p>
           <p className={`text-base font-bold ${color}`}>{fmt(actGP)}</p>
-          <p className="text-[10px] text-gray-400">{actPct.toFixed(1)}% margin</p>
         </div>
       </div>
     </div>

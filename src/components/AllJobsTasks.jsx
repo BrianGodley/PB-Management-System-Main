@@ -43,6 +43,9 @@ export default function AllJobsTasks({ jobs = [], statusFilter = 'open', onSelec
   const { user } = useAuth()
 
   const [filterKey, setFilterKey] = useState('all-open')
+  const [showNewTaskPicker, setShowNewTaskPicker] = useState(false)
+  const [taskJobSearch, setTaskJobSearch] = useState('')
+  const [addingForJob, setAddingForJob] = useState(false)
   // undefined = not resolved yet, null = account not linked to an employee.
   const [myEmployeeId, setMyEmployeeId] = useState(undefined)
   const [jobIdsWithTasks, setJobIdsWithTasks] = useState(null) // null = loading
@@ -204,6 +207,35 @@ export default function AllJobsTasks({ jobs = [], statusFilter = 'open', onSelec
     }))
   }
 
+  // New Task flow (All Jobs view): pick a job from the popup, insert a blank
+  // task for it, then open that job's Tasks panel so the user can fill it in.
+  async function addTaskForJob(jobId) {
+    if (!jobId || addingForJob) return
+    setAddingForJob(true)
+    const existing = tasksByJob[jobId] || []
+    const minOrder = existing.length ? Math.min(...existing.map(t => t.sort_order ?? 0)) : 0
+    const { error } = await supabase
+      .from('job_tasks')
+      .insert({ job_id: jobId, task_name: '', status: 'pending', sort_order: minOrder - 1 })
+    setAddingForJob(false)
+    if (error) {
+      alert('Could not add task: ' + error.message)
+      return
+    }
+    setShowNewTaskPicker(false)
+    setTaskJobSearch('')
+    onSelectJob?.(jobId) // jump into that job's Tasks panel to edit the new row
+  }
+
+  // Jobs available to add a task to — sorted alphanumerically, optional search.
+  const jobName = j => j.name || j.client_name || 'Untitled job'
+  const pickerJobs = [...jobs]
+    .sort((a, b) => jobName(a).localeCompare(jobName(b), undefined, { numeric: true, sensitivity: 'base' }))
+    .filter(j => {
+      const q = taskJobSearch.trim().toLowerCase()
+      return !q || jobName(j).toLowerCase().includes(q)
+    })
+
   const empName = e => `${e.first_name} ${e.last_name}`.trim()
   const noEmployeeLink = filterDef.scope === 'my' && myEmployeeId === null
 
@@ -214,23 +246,82 @@ export default function AllJobsTasks({ jobs = [], statusFilter = 'open', onSelec
   return (
     <div className="flex flex-col h-full">
 
-      {/* Filter bar — My / All x Open / Closed / Both */}
-      <div className="mb-3 mt-3 flex flex-wrap gap-1.5 flex-shrink-0">
-        {TASK_FILTERS.map(f => (
-          <button
-            key={f.key}
-            type="button"
-            onClick={() => setFilterKey(f.key)}
-            className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
-              filterKey === f.key
-                ? 'bg-green-700 text-white'
-                : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      {/* Filter dropdown + New Task */}
+      <div className="mb-3 mt-3 flex items-center gap-2 flex-shrink-0">
+        <select
+          value={filterKey}
+          onChange={e => setFilterKey(e.target.value)}
+          className="text-xs font-semibold border border-gray-200 rounded-md px-2.5 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600"
+        >
+          {TASK_FILTERS.map(f => (
+            <option key={f.key} value={f.key}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={() => setShowNewTaskPicker(true)}
+          className="ml-auto mr-6 text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
+        >
+          + New Task
+        </button>
       </div>
+
+      {/* New Task — job picker popup */}
+      {showNewTaskPicker && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4"
+          onMouseDown={e => {
+            if (e.target === e.currentTarget) {
+              setShowNewTaskPicker(false)
+              setTaskJobSearch('')
+            }
+          }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[80vh] overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
+              <h2 className="text-base font-bold text-gray-900">Pick a job for the new task</h2>
+              <button
+                onClick={() => {
+                  setShowNewTaskPicker(false)
+                  setTaskJobSearch('')
+                }}
+                className="text-gray-300 hover:text-gray-500 text-xl leading-none"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="px-5 py-3 flex-shrink-0">
+              <input
+                type="text"
+                autoFocus
+                value={taskJobSearch}
+                onChange={e => setTaskJobSearch(e.target.value)}
+                placeholder="Search jobs…"
+                className="input text-sm w-full"
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto px-3 pb-3">
+              {pickerJobs.length === 0 ? (
+                <p className="px-2 py-4 text-sm text-gray-400 text-center">No jobs match.</p>
+              ) : (
+                pickerJobs.map(j => (
+                  <button
+                    key={j.id}
+                    type="button"
+                    disabled={addingForJob}
+                    onClick={() => addTaskForJob(j.id)}
+                    className="block w-full text-left px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-green-50 disabled:opacity-50"
+                  >
+                    {jobName(j)}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Shared datalist for description autocomplete */}
       <datalist id={DESC_LIST_ID}>
