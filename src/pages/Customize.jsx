@@ -15,6 +15,9 @@ import {
   MODULE_BG_LS_KEY,
   SIDEBAR_KEY,
   SIDEBAR_COLORS,
+  HEADER_KEY,
+  HEADER_COLORS,
+  HEADER_DEFAULT,
   readModuleBackgrounds,
 } from '../lib/dashboardBackgrounds'
 
@@ -32,6 +35,8 @@ export default function Customize() {
       : CUSTOMIZE_MODULES.find(m => m.key === selected)?.label || selected
   const currentBg = selected === 'all' ? null : map[selected] || 'none'
   const currentSidebar = map[SIDEBAR_KEY] ?? null
+  // Undefined (never set) → default green; explicit null → Clear.
+  const currentHeader = map[HEADER_KEY] !== undefined ? map[HEADER_KEY] : HEADER_DEFAULT
 
   function pickBackground(bgId) {
     setMap(m => {
@@ -49,6 +54,11 @@ export default function Customize() {
 
   function pickSidebar(value) {
     setMap(m => ({ ...m, [SIDEBAR_KEY]: value }))
+    setSavedMsg('')
+  }
+
+  function pickHeader(value) {
+    setMap(m => ({ ...m, [HEADER_KEY]: value }))
     setSavedMsg('')
   }
 
@@ -103,6 +113,7 @@ export default function Customize() {
         {[
           { id: 'backgrounds', label: 'Backgrounds' },
           { id: 'menu', label: 'Left Menu' },
+          { id: 'header', label: 'Header Bar' },
         ].map(t => (
           <button
             key={t.id}
@@ -135,13 +146,13 @@ export default function Customize() {
               <button
                 key={mod.key}
                 onClick={() => setSelected(mod.key)}
-                className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${
+                className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ${
                   isSel
-                    ? 'bg-green-700 text-white border-green-700'
-                    : 'bg-white text-gray-700 border-gray-300 hover:border-green-400'
+                    ? 'bg-green-700 text-white border-2 border-black'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:border-green-400'
                 }`}
               >
-                {mod.label}
+                {isSel ? '✓ ' : ''}{mod.label}
               </button>
             )
           })}
@@ -207,6 +218,42 @@ export default function Customize() {
                 key={c.id}
                 onClick={() => pickSidebar(c.value)}
                 className={`flex flex-col items-center gap-1 ${isSel ? '' : ''}`}
+              >
+                <span
+                  className={`w-10 h-10 rounded-full border flex items-center justify-center ${
+                    isSel
+                      ? 'ring-2 ring-green-600 ring-offset-1 border-green-600'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                  style={{ backgroundColor: c.value || '#ffffff' }}
+                >
+                  {!c.value && <span className="text-[10px] text-gray-400">∅</span>}
+                </span>
+                <span className="text-[11px] text-gray-600">{c.label}</span>
+              </button>
+            )
+          })}
+        </div>
+        </>
+        )}
+
+        {tab === 'header' && (
+        <>
+        {/* ── Top header bar color ── */}
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Header bar</h2>
+        <p className="text-sm text-gray-500 mb-3">
+          Set the color of the top bar (logo, Sam, Customize). Pick <strong>Default (green)</strong>,
+          <strong> Clear</strong> to let the page background show through, or another color. The
+          header text auto-adjusts for readability.
+        </p>
+        <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-wrap gap-3">
+          {HEADER_COLORS.map(c => {
+            const isSel = (currentHeader ?? null) === (c.value ?? null)
+            return (
+              <button
+                key={c.id}
+                onClick={() => pickHeader(c.value)}
+                className="flex flex-col items-center gap-1"
               >
                 <span
                   className={`w-10 h-10 rounded-full border flex items-center justify-center ${

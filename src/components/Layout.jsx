@@ -10,6 +10,9 @@ import {
   MODULE_BG_LS_KEY,
   SIDEBAR_KEY,
   sidebarNavColor,
+  HEADER_KEY,
+  HEADER_DEFAULT,
+  headerNavColor,
   bgIdForPath,
   BACKGROUNDS,
 } from '../lib/dashboardBackgrounds'
@@ -157,6 +160,15 @@ export default function Layout() {
       return null
     }
   })
+  // Top header bar color. Undefined in the map = never set → default green.
+  const [headerBg, setHeaderBg] = useState(() => {
+    try {
+      const m = readModuleBackgrounds()
+      return m[HEADER_KEY] !== undefined ? m[HEADER_KEY] : HEADER_DEFAULT
+    } catch {
+      return HEADER_DEFAULT
+    }
+  })
   // Background id of the current route's module (for nav contrast when the
   // sidebar is Clear and showing the page background).
   const [currentBgId, setCurrentBgId] = useState('none')
@@ -218,6 +230,7 @@ export default function Layout() {
         }
         applyBackgroundForPath(window.location.pathname, map)
         setSidebarBg(map[SIDEBAR_KEY] || null)
+        setHeaderBg(map[HEADER_KEY] !== undefined ? map[HEADER_KEY] : HEADER_DEFAULT)
         setCurrentBgId(bgIdForPath(window.location.pathname, map))
       })
   }, [user?.id])
@@ -228,6 +241,7 @@ export default function Layout() {
     const map = readModuleBackgrounds()
     applyBackgroundForPath(location.pathname, map)
     setSidebarBg(map[SIDEBAR_KEY] || null)
+    setHeaderBg(map[HEADER_KEY] !== undefined ? map[HEADER_KEY] : HEADER_DEFAULT)
     setCurrentBgId(bgIdForPath(location.pathname, map))
   }, [location.pathname])
   useEffect(() => {
@@ -251,6 +265,18 @@ export default function Layout() {
   const navActivePill = navTheme.dark ? 'bg-white/20' : 'bg-black/10'
   const navHoverPill = navTheme.dark ? 'hover:bg-white/15' : 'hover:bg-black/5'
   const navTextStyle = navTheme.text ? { color: navTheme.text } : undefined
+
+  // Auto header text/tint: from the header color if set, else (Clear) from the
+  // page background's darkness. Mirrors the sidebar's auto-contrast.
+  const headerTheme = headerBg
+    ? headerNavColor(headerBg)
+    : BACKGROUNDS.find(b => b.id === currentBgId)?.dark
+      ? { text: '#f9fafb', dark: true }
+      : { text: '#1f2937', dark: false }
+  const headerText = headerTheme.text || '#ffffff'
+  const headerTextStyle = { color: headerText }
+  const headerActiveBg = headerTheme.dark ? 'rgba(0,0,0,0.28)' : 'rgba(0,0,0,0.10)'
+  const headerHoverPill = headerTheme.dark ? 'hover:bg-black/20' : 'hover:bg-black/10'
 
   useEffect(() => {
     const handler = () => fetchCompanyLogo()
@@ -422,7 +448,7 @@ export default function Layout() {
 
       {/* ── TOP BAR ── */}
       <header
-        style={{ backgroundColor: forestGreen }}
+        style={{ backgroundColor: headerBg || 'transparent' }}
         className="w-full flex-shrink-0 sticky top-0 z-50 shadow-md"
       >
         <div className="relative flex items-center h-11 px-4 gap-4">
@@ -436,7 +462,10 @@ export default function Layout() {
                 e.target.style.display = 'none'
               }}
             />
-            <span className="text-white font-semibold text-sm tracking-wide hidden sm:inline">
+            <span
+              style={headerTextStyle}
+              className="font-semibold text-sm tracking-wide hidden sm:inline"
+            >
               Picture Build System
             </span>
           </Link>
@@ -448,7 +477,10 @@ export default function Layout() {
           {/* Mobile: screen name truly centered across the full bar (absolute so
               it doesn't shift with the left/right button widths). */}
           {screenTitle(location.pathname) && (
-            <span className="lg:hidden absolute left-1/2 -translate-x-1/2 text-white font-semibold text-sm truncate max-w-[60%] text-center pointer-events-none">
+            <span
+              style={headerTextStyle}
+              className="lg:hidden absolute left-1/2 -translate-x-1/2 font-semibold text-sm truncate max-w-[60%] text-center pointer-events-none"
+            >
               {screenTitle(location.pathname)}
             </span>
           )}
@@ -461,7 +493,8 @@ export default function Layout() {
             <button
               onClick={() => navigate(-1)}
               aria-label="Close"
-              className="lg:hidden ml-auto w-8 h-8 rounded-full text-white/90 hover:bg-black/15 flex items-center justify-center text-lg flex-shrink-0"
+              style={headerTextStyle}
+              className="lg:hidden ml-auto w-8 h-8 rounded-full hover:bg-black/15 flex items-center justify-center text-lg flex-shrink-0"
             >
               ✕
             </button>
@@ -472,8 +505,8 @@ export default function Layout() {
             {/* Top-bar Customize link (pick per-module backgrounds). */}
             <Link
               to="/customize"
-              style={isActive('/customize') ? { backgroundColor: forestGreenDark } : {}}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-white/80 hover:text-white hover:bg-black/20 transition-colors"
+              style={{ color: headerText, ...(isActive('/customize') ? { backgroundColor: headerActiveBg } : {}) }}
+              className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${headerHoverPill}`}
             >
               🎨 <span className="hidden sm:inline">Customize</span>
             </Link>
@@ -481,8 +514,8 @@ export default function Layout() {
                 the main menu (gated by isAdmin). */}
             <Link
               to="/admin"
-              style={isActive('/admin') ? { backgroundColor: forestGreenDark } : {}}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-white/80 hover:text-white hover:bg-black/20 transition-colors"
+              style={{ color: headerText, ...(isActive('/admin') ? { backgroundColor: headerActiveBg } : {}) }}
+              className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${headerHoverPill}`}
             >
               🛡️ <span className="hidden sm:inline">Admin</span>
             </Link>
@@ -492,14 +525,14 @@ export default function Layout() {
             <div ref={helpMenuRef} className="relative hidden sm:block">
               <button
                 onClick={() => setShowHelpMenu(v => !v)}
-                style={isActive('/help') || isActive('/documentation') || isActive('/video-guides')
-                  ? { backgroundColor: forestGreenDark } : {}}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-white/80 hover:text-white hover:bg-black/20 transition-colors"
+                style={{ color: headerText, ...(isActive('/help') || isActive('/documentation') || isActive('/video-guides')
+                  ? { backgroundColor: headerActiveBg } : {}) }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${headerHoverPill}`}
                 aria-haspopup="true"
                 aria-expanded={showHelpMenu}
               >
                 🛟 <span className="hidden sm:inline">Help</span>
-                <span className="text-white/40 text-[10px]">▾</span>
+                <span className="text-[10px] opacity-50">▾</span>
               </button>
               {showHelpMenu && (
                 <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
@@ -558,8 +591,8 @@ export default function Layout() {
                     user?.email?.[0]?.toUpperCase() || 'U'
                   )}
                 </div>
-                <span className="text-white/60 text-xs truncate max-w-[140px]">{user?.email}</span>
-                <span className="text-white/40 text-xs">▾</span>
+                <span style={headerTextStyle} className="text-xs truncate max-w-[140px] opacity-80">{user?.email}</span>
+                <span style={headerTextStyle} className="text-xs opacity-50">▾</span>
               </button>
 
               {showUserMenu && (

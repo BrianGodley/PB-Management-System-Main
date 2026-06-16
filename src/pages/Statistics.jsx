@@ -10518,7 +10518,7 @@ export default function Statistics() {
                   so the slider scrubber sits flush against the x-axis. */}
                 <div
                   ref={chartPrintRef}
-                  className="flex-1 max-h-[50vh] sm:max-h-none px-1 sm:px-4 pt-4 pb-0 sm:pb-4 overflow-hidden relative bg-white"
+                  className="flex-1 max-h-[50vh] sm:max-h-none px-1 sm:px-4 pt-4 pb-0 sm:pb-4 sm:mr-3 sm:rounded-xl overflow-hidden relative bg-white"
                 >
                   {selectedStat.stat_category === 'overlay' ? (
                     /* ── Overlay chart ─────────────────────────────────────── */

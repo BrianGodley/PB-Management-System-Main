@@ -32,6 +32,7 @@ export const CUSTOMIZE_MODULES = [
   { key: '/jobs', label: 'Jobs' },
   { key: '/equipment-tracking', label: 'Equipment' },
   { key: '/statistics', label: 'Statistics' },
+  { key: '/portal/subs', label: 'Subs & Vendors' },
   { key: '/customize', label: 'Customize' },
   { key: '/admin', label: 'Admin' },
   { key: '/help', label: 'Help Desk' },
@@ -42,6 +43,27 @@ export const MODULE_BG_LS_KEY = 'pbs:moduleBackgrounds'
 
 // Reserved (non-route) key in the same map that stores the left menu bar color.
 export const SIDEBAR_KEY = '__sidebar'
+
+// Reserved (non-route) key that stores the top header bar color. Undefined in
+// the map means "never set" → fall back to the default green (HEADER_DEFAULT).
+export const HEADER_KEY = '__header'
+export const HEADER_DEFAULT = '#4E7B4C'
+
+// Top header bar color options. The current default green is first; 'Clear'
+// makes the bar transparent (page background shows through). Header text
+// auto-contrasts to the chosen color (see headerNavColor).
+export const HEADER_COLORS = [
+  { id: 'default', label: 'Default (green)', value: HEADER_DEFAULT },
+  { id: 'clear', label: 'Clear', value: null },
+  { id: 'white', label: 'White', value: '#ffffff' },
+  { id: 'sand', label: 'Sand', value: '#f7f1e6' },
+  { id: 'blue', label: 'Blue', value: '#2563eb' },
+  { id: 'slate', label: 'Slate', value: '#334155' },
+  { id: 'graphite', label: 'Graphite', value: '#475569' },
+  { id: 'forest', label: 'Forest', value: '#3a5038' },
+  { id: 'navy', label: 'Navy', value: '#1e3a5f' },
+  { id: 'charcoal', label: 'Charcoal', value: '#1f2937' },
+]
 
 // Left menu bar color options. 'Clear' keeps the transparent look; the rest
 // span light → dark. Nav text auto-contrasts to the chosen color (see
@@ -75,6 +97,16 @@ export function sidebarNavColor(hex) {
   const L = luminance(hex)
   const text = L < 0.4 ? '#ffffff' : L < 0.72 ? '#374151' : '#111827'
   return { text, dark: L < 0.5 }
+}
+
+// Auto header text color for a header background: white on dark/medium, near
+// black on light. Threshold is higher than the sidebar's so the default green
+// (#4E7B4C) keeps white text. Returns { text, dark }.
+export function headerNavColor(hex) {
+  if (!hex) return { text: undefined, dark: false }
+  const L = luminance(hex)
+  const text = L < 0.6 ? '#ffffff' : '#1f2937'
+  return { text, dark: L < 0.6 }
 }
 
 // The background id that the current route's module maps to.
