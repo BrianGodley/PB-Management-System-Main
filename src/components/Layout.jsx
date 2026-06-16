@@ -18,6 +18,7 @@ import {
   headerNavColor,
   bgIdForPath,
   BACKGROUNDS,
+  withDefaults,
 } from '../lib/dashboardBackgrounds'
 import SamChat from './SamChat'
 import ReportIssueModal from './ReportIssueModal'
@@ -242,7 +243,7 @@ export default function Layout() {
       .eq('user_id', user.id)
       .maybeSingle()
       .then(({ data }) => {
-        const map = data?.module_backgrounds || {}
+        const map = withDefaults(data?.module_backgrounds || {})
         try {
           localStorage.setItem(MODULE_BG_LS_KEY, JSON.stringify(map))
         } catch {

@@ -274,12 +274,39 @@ export function bgIdForPath(pathname, map) {
   return (key && map?.[key]) || 'none'
 }
 
+// ── App-wide DEFAULT appearance ────────────────────────────────────────────
+// These apply to every user *before* they make their own choices on the
+// Customize page. Anything a user explicitly saves overrides the matching
+// default (see withDefaults below); modules they never touch fall back here.
+//   • Forest background on all modules
+//   • Left menu bar: Clear        • Header bar: Clear
+//   • Menu font: Segoe Print, size M, no bold/italic, icons shown
+export const DEFAULT_PREFS = (() => {
+  const m = {}
+  CUSTOMIZE_MODULES.forEach(mod => {
+    m[mod.key] = 'green' // Forest
+  })
+  m[SIDEBAR_KEY] = null // Clear left menu bar
+  m[HEADER_KEY] = null // Clear header bar
+  m[SIDEBAR_ICONS_KEY] = true // Show icons
+  m[SIDEBAR_FONT_KEY] = { family: '"Segoe Print", cursive', size: '', bold: false, italic: false }
+  return m
+})()
+
+// Layer a user's saved preferences on top of the app-wide defaults so unset
+// values fall back to DEFAULT_PREFS. Saved keys (including an explicit null,
+// e.g. a deliberately Clear bar) win over the default.
+export function withDefaults(stored) {
+  const s = stored && typeof stored === 'object' ? stored : {}
+  return { ...DEFAULT_PREFS, ...s }
+}
+
 export function readModuleBackgrounds() {
   try {
     const v = JSON.parse(localStorage.getItem(MODULE_BG_LS_KEY) || '{}')
-    return v && typeof v === 'object' ? v : {}
+    return withDefaults(v && typeof v === 'object' ? v : {})
   } catch {
-    return {}
+    return withDefaults({})
   }
 }
 
