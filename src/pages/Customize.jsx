@@ -14,12 +14,75 @@ import {
   CUSTOMIZE_MODULES,
   MODULE_BG_LS_KEY,
   SIDEBAR_KEY,
-  SIDEBAR_COLORS,
   HEADER_KEY,
-  HEADER_COLORS,
   HEADER_DEFAULT,
   readModuleBackgrounds,
 } from '../lib/dashboardBackgrounds'
+import { COLOR_LIBRARY } from '../lib/colorLibrary'
+
+// Shared color picker for the Left Menu bar and the Header bar. Offers a
+// "Clear" option (plus an optional "Default" for the header), then the full
+// app color library (same swatches as Org Chart › Edit Area › Color).
+function BarPalette({ value, onChange, includeDefault }) {
+  const norm = (value || '').toLowerCase()
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-4">
+        <SpecialSwatch label="Clear" clear selected={value == null} onClick={() => onChange(null)} />
+        {includeDefault && (
+          <SpecialSwatch
+            label="Default"
+            color={HEADER_DEFAULT}
+            selected={norm === HEADER_DEFAULT.toLowerCase()}
+            onClick={() => onChange(HEADER_DEFAULT)}
+          />
+        )}
+      </div>
+      <div className="space-y-1.5">
+        {COLOR_LIBRARY.map(fam => (
+          <div key={fam.family} className="flex items-center gap-2">
+            <span className="w-14 text-[10px] uppercase tracking-wide text-gray-500 font-medium flex-shrink-0">
+              {fam.family}
+            </span>
+            <div className="flex gap-1 flex-wrap">
+              {fam.shades.map(s => {
+                const isSel = norm === s.hex.toLowerCase()
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => onChange(s.hex)}
+                    title={`${s.id} • ${s.hex}`}
+                    style={{ backgroundColor: s.hex }}
+                    className={`w-7 h-7 rounded-md border transition-transform hover:scale-110 ${
+                      isSel ? 'border-black ring-2 ring-black' : 'border-gray-200'
+                    }`}
+                  />
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function SpecialSwatch({ label, color, selected, onClick, clear }) {
+  return (
+    <button type="button" onClick={onClick} className="flex flex-col items-center gap-1">
+      <span
+        className={`w-10 h-10 rounded-full border flex items-center justify-center ${
+          selected ? 'ring-2 ring-black border-black' : 'border-gray-300 hover:border-gray-400'
+        }`}
+        style={{ backgroundColor: color || '#ffffff' }}
+      >
+        {clear && <span className="text-[10px] text-gray-400">∅</span>}
+      </span>
+      <span className="text-[11px] text-gray-600">{label}</span>
+    </button>
+  )
+}
 
 export default function Customize() {
   const { user } = useAuth()
@@ -210,29 +273,8 @@ export default function Customize() {
           Give the menu a background color, or <strong>Clear</strong> to let the page background show
           through.
         </p>
-        <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-wrap gap-3">
-          {SIDEBAR_COLORS.map(c => {
-            const isSel = (currentSidebar ?? null) === (c.value ?? null)
-            return (
-              <button
-                key={c.id}
-                onClick={() => pickSidebar(c.value)}
-                className={`flex flex-col items-center gap-1 ${isSel ? '' : ''}`}
-              >
-                <span
-                  className={`w-10 h-10 rounded-full border flex items-center justify-center ${
-                    isSel
-                      ? 'ring-2 ring-green-600 ring-offset-1 border-green-600'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
-                  style={{ backgroundColor: c.value || '#ffffff' }}
-                >
-                  {!c.value && <span className="text-[10px] text-gray-400">∅</span>}
-                </span>
-                <span className="text-[11px] text-gray-600">{c.label}</span>
-              </button>
-            )
-          })}
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <BarPalette value={currentSidebar} onChange={pickSidebar} />
         </div>
         </>
         )}
@@ -246,29 +288,8 @@ export default function Customize() {
           <strong> Clear</strong> to let the page background show through, or another color. The
           header text auto-adjusts for readability.
         </p>
-        <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-wrap gap-3">
-          {HEADER_COLORS.map(c => {
-            const isSel = (currentHeader ?? null) === (c.value ?? null)
-            return (
-              <button
-                key={c.id}
-                onClick={() => pickHeader(c.value)}
-                className="flex flex-col items-center gap-1"
-              >
-                <span
-                  className={`w-10 h-10 rounded-full border flex items-center justify-center ${
-                    isSel
-                      ? 'ring-2 ring-green-600 ring-offset-1 border-green-600'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
-                  style={{ backgroundColor: c.value || '#ffffff' }}
-                >
-                  {!c.value && <span className="text-[10px] text-gray-400">∅</span>}
-                </span>
-                <span className="text-[11px] text-gray-600">{c.label}</span>
-              </button>
-            )
-          })}
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <BarPalette value={currentHeader} onChange={pickHeader} includeDefault />
         </div>
         </>
         )}
