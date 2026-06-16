@@ -4,12 +4,14 @@
 // matching one to the app shell (#app-shell) based on the current route,
 // replacing the default grey.
 
+// `dark: true` marks a predominantly dark background (used to pick light nav
+// text when the sidebar is Clear and showing the page background).
 export const BACKGROUNDS = [
   { id: 'none', label: 'Default (grey)', swatch: '#eceef1', url: null },
   { id: 'waves-blue', label: 'Blue Waves', swatch: '#9cc0ec', url: '/backgrounds/waves-blue.svg' },
   { id: 'green', label: 'Forest', swatch: '#8fbf8c', url: '/backgrounds/green.svg' },
   { id: 'sunset', label: 'Sunset', swatch: '#f3a07e', url: '/backgrounds/sunset.svg' },
-  { id: 'aurora', label: 'Aurora', swatch: '#23406a', url: '/backgrounds/aurora.svg' },
+  { id: 'aurora', label: 'Aurora', swatch: '#23406a', url: '/backgrounds/aurora.svg', dark: true },
   { id: 'mesh', label: 'Mesh', swatch: '#e7ebf2', url: '/backgrounds/mesh.svg' },
 ]
 
@@ -38,8 +40,9 @@ export const MODULE_BG_LS_KEY = 'pbs:moduleBackgrounds'
 // Reserved (non-route) key in the same map that stores the left menu bar color.
 export const SIDEBAR_KEY = '__sidebar'
 
-// Left menu bar color options. 'Clear' keeps the floating transparent look;
-// the rest are light tints so the dark nav text stays readable.
+// Left menu bar color options. 'Clear' keeps the transparent look; the rest
+// span light → dark. Nav text auto-contrasts to the chosen color (see
+// sidebarNavColor below), so dark options stay readable.
 export const SIDEBAR_COLORS = [
   { id: 'clear', label: 'Clear', value: null },
   { id: 'white', label: 'White', value: '#ffffff' },
@@ -47,9 +50,35 @@ export const SIDEBAR_COLORS = [
   { id: 'blue', label: 'Blue', value: '#e6effb' },
   { id: 'green', label: 'Green', value: '#e9f3e8' },
   { id: 'sand', label: 'Sand', value: '#f7f1e6' },
-  { id: 'lavender', label: 'Lavender', value: '#efeaf9' },
-  { id: 'rose', label: 'Rose', value: '#fbeef0' },
+  { id: 'graphite', label: 'Graphite', value: '#475569' },
+  { id: 'charcoal', label: 'Charcoal', value: '#1f2937' },
+  { id: 'forest', label: 'Forest', value: '#3a5038' },
+  { id: 'navy', label: 'Navy', value: '#1e3a5f' },
 ]
+
+// Relative luminance (0 = black, 1 = white) of a #rrggbb color.
+export function luminance(hex) {
+  if (!hex || typeof hex !== 'string' || hex[0] !== '#' || hex.length < 7) return 1
+  const r = parseInt(hex.slice(1, 3), 16) / 255
+  const g = parseInt(hex.slice(3, 5), 16) / 255
+  const b = parseInt(hex.slice(5, 7), 16) / 255
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+// Auto nav text color for a sidebar background: white on dark, grey on mid,
+// near-black on light. Returns { text, dark }. dark drives hover/active tints.
+export function sidebarNavColor(hex) {
+  if (!hex) return { text: undefined, dark: false }
+  const L = luminance(hex)
+  const text = L < 0.4 ? '#ffffff' : L < 0.72 ? '#374151' : '#111827'
+  return { text, dark: L < 0.5 }
+}
+
+// The background id that the current route's module maps to.
+export function bgIdForPath(pathname, map) {
+  const key = matchModuleKey(pathname)
+  return (key && map?.[key]) || 'none'
+}
 
 export function readModuleBackgrounds() {
   try {

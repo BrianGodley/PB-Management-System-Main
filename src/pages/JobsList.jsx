@@ -1410,24 +1410,6 @@ export default function JobsList() {
         </div>
       )}
 
-      {/* Month/Week/Day picker — sits above BOTH the jobs box and the calendar,
-          centered over the calendar area (schedule tab, desktop only). */}
-      {tab === 'schedule' && (
-        <div className="hidden lg:flex flex-shrink-0 pt-1">
-          <div className="w-[248px] flex-shrink-0" />
-          <div className="flex-1 flex justify-center">
-            <select
-              value={scheduleView}
-              onChange={e => setScheduleView(e.target.value)}
-              className="text-xs font-semibold text-gray-700 border border-gray-300 rounded-md px-2 py-1 bg-white shadow-sm focus:outline-none focus:border-green-600 cursor-pointer"
-            >
-              <option value="month">Month</option>
-              <option value="week">Week</option>
-              <option value="day">Day</option>
-            </select>
-          </div>
-        </div>
-      )}
 
       {/* Main content: sidebar + right panel (non-settings tabs) */}
       {tab !== 'settings' && (

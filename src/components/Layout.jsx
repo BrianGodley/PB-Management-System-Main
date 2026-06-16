@@ -9,6 +9,9 @@ import {
   readModuleBackgrounds,
   MODULE_BG_LS_KEY,
   SIDEBAR_KEY,
+  sidebarNavColor,
+  bgIdForPath,
+  BACKGROUNDS,
 } from '../lib/dashboardBackgrounds'
 import SamChat from './SamChat'
 import ReportIssueModal from './ReportIssueModal'
@@ -154,6 +157,9 @@ export default function Layout() {
       return null
     }
   })
+  // Background id of the current route's module (for nav contrast when the
+  // sidebar is Clear and showing the page background).
+  const [currentBgId, setCurrentBgId] = useState('none')
   const [companyLogoUrl, setCompanyLogoUrl] = useState(null)
   const userMenuRef = useRef(null)
   const helpMenuRef = useRef(null)
@@ -212,6 +218,7 @@ export default function Layout() {
         }
         applyBackgroundForPath(window.location.pathname, map)
         setSidebarBg(map[SIDEBAR_KEY] || null)
+        setCurrentBgId(bgIdForPath(window.location.pathname, map))
       })
   }, [user?.id])
 
@@ -221,16 +228,29 @@ export default function Layout() {
     const map = readModuleBackgrounds()
     applyBackgroundForPath(location.pathname, map)
     setSidebarBg(map[SIDEBAR_KEY] || null)
+    setCurrentBgId(bgIdForPath(location.pathname, map))
   }, [location.pathname])
   useEffect(() => {
     const handler = () => {
       const map = readModuleBackgrounds()
       applyBackgroundForPath(window.location.pathname, map)
       setSidebarBg(map[SIDEBAR_KEY] || null)
+      setCurrentBgId(bgIdForPath(window.location.pathname, map))
     }
     window.addEventListener('module-backgrounds-updated', handler)
     return () => window.removeEventListener('module-backgrounds-updated', handler)
   }, [])
+
+  // Auto nav text/tint: from the sidebar color if set, else from the page
+  // background's darkness when the sidebar is Clear.
+  const navTheme = sidebarBg
+    ? sidebarNavColor(sidebarBg)
+    : BACKGROUNDS.find(b => b.id === currentBgId)?.dark
+      ? { text: '#f9fafb', dark: true }
+      : { text: undefined, dark: false }
+  const navActivePill = navTheme.dark ? 'bg-white/20' : 'bg-black/10'
+  const navHoverPill = navTheme.dark ? 'hover:bg-white/15' : 'hover:bg-black/5'
+  const navTextStyle = navTheme.text ? { color: navTheme.text } : undefined
 
   useEffect(() => {
     const handler = () => fetchCompanyLogo()
@@ -581,7 +601,8 @@ export default function Layout() {
           <button
             onClick={() => setNavCollapsed(v => !v)}
             title={navCollapsed ? 'Expand menu' : 'Collapse menu'}
-            className="self-end m-1 p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-white/40 opacity-0 group-hover:opacity-100 transition-opacity"
+            style={navTextStyle}
+            className={`self-end m-1 p-1 rounded-md text-gray-400 ${navHoverPill} opacity-0 group-hover:opacity-100 transition-opacity`}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {navCollapsed ? (
@@ -613,10 +634,9 @@ export default function Layout() {
                   setNavTip({ label: item.label, top: r.top + r.height / 2 })
                 }}
                 onMouseLeave={() => setNavTip(null)}
-                className={`flex items-center ${navCollapsed ? 'justify-center' : 'gap-2'} px-2 py-2 rounded-lg text-xs font-semibold transition-colors drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)] ${
-                  isActive(item.path)
-                    ? 'bg-white/45 text-gray-900'
-                    : 'text-gray-800 hover:bg-white/30 hover:text-gray-900'
+                style={navTextStyle}
+                className={`flex items-center ${navCollapsed ? 'justify-center' : 'gap-2'} px-2 py-2 rounded-lg text-xs font-semibold text-gray-800 transition-colors ${
+                  isActive(item.path) ? navActivePill : navHoverPill
                 }`}
               >
                 <span className="text-sm">{item.icon}</span>
@@ -624,7 +644,7 @@ export default function Layout() {
               </Link>
             ))}
           </nav>
-          <div className="px-1.5 py-3 border-t border-white/20">
+          <div className={`px-1.5 py-3 border-t ${navTheme.dark ? 'border-white/20' : 'border-black/10'}`}>
             <button
               onClick={handleSignOut}
               onMouseEnter={e => {
@@ -633,7 +653,8 @@ export default function Layout() {
                 setNavTip({ label: 'Sign Out', top: r.top + r.height / 2 })
               }}
               onMouseLeave={() => setNavTip(null)}
-              className={`w-full flex items-center ${navCollapsed ? 'justify-center' : 'gap-2'} px-2 py-2 rounded-lg text-xs font-semibold text-gray-800 hover:bg-white/30 hover:text-gray-900 transition-colors drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]`}
+              style={navTextStyle}
+              className={`w-full flex items-center ${navCollapsed ? 'justify-center' : 'gap-2'} px-2 py-2 rounded-lg text-xs font-semibold text-gray-800 transition-colors ${navHoverPill}`}
             >
               <span>🚪</span>
               {!navCollapsed && <span>Sign Out</span>}

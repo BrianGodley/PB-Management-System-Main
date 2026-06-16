@@ -2069,9 +2069,12 @@ export default function ScheduleCalendar({
         {inline && (
           <span
             aria-hidden="true"
-            className="invisible text-xs font-semibold px-2.5 py-1 rounded-md border mr-2"
+            className="invisible inline-flex items-center rounded-md border text-[11px] font-semibold mr-2"
           >
-            Today
+            <span className="px-2.5 py-1">Month</span>
+            <span className="px-2.5 py-1">Week</span>
+            <span className="px-2.5 py-1">Day</span>
+            <span className="px-2.5 py-1 border-l">Today</span>
           </span>
         )}
         <button onClick={goPrev} className={btn} title="Previous">
@@ -2092,18 +2095,48 @@ export default function ScheduleCalendar({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </button>
-        <button
-          onClick={goTodayView}
-          disabled={navIsCurrent}
-          className={`ml-2 text-xs font-semibold px-2.5 py-1 rounded-md border transition-colors ${
-            navIsCurrent
-              ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-default'
-              : 'border-green-700 text-green-700 hover:bg-green-50'
-          }`}
-          title="Jump to today"
-        >
-          Today
-        </button>
+        {inline ? (
+          <div className="ml-2 inline-flex items-center rounded-md border border-gray-300 overflow-hidden text-[11px] font-semibold flex-shrink-0">
+            {['month', 'week', 'day'].map(v => (
+              <button
+                key={v}
+                onClick={() => setViewMode(v)}
+                className={`px-2.5 py-1 capitalize ${
+                  viewMode === v
+                    ? 'bg-green-700 text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {v}
+              </button>
+            ))}
+            <button
+              onClick={goTodayView}
+              disabled={navIsCurrent}
+              title="Jump to today"
+              className={`px-2.5 py-1 border-l border-gray-300 ${
+                navIsCurrent
+                  ? 'bg-gray-50 text-gray-400 cursor-default'
+                  : 'bg-white text-green-700 hover:bg-green-50'
+              }`}
+            >
+              Today
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={goTodayView}
+            disabled={navIsCurrent}
+            className={`ml-2 text-xs font-semibold px-2.5 py-1 rounded-md border transition-colors ${
+              navIsCurrent
+                ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-default'
+                : 'border-green-700 text-green-700 hover:bg-green-50'
+            }`}
+            title="Jump to today"
+          >
+            Today
+          </button>
+        )}
       </div>
     )
   }
