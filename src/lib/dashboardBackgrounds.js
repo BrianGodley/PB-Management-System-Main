@@ -193,14 +193,17 @@ export const SIDEBAR_FONT_SIZES = [
 ]
 
 // Build an inline style object for the menu text from saved font settings.
+// fontWeight and fontStyle are emitted explicitly (normal when off) so they
+// override the nav links' base `font-semibold` class — otherwise toggling
+// bold off would leave the text stuck at semibold and italic wouldn't apply.
 export function sidebarFontStyle(font) {
   if (!font || typeof font !== 'object') return undefined
   const s = {}
   if (font.family) s.fontFamily = font.family
   if (font.size) s.fontSize = font.size
-  if (font.bold) s.fontWeight = 700
-  if (font.italic) s.fontStyle = 'italic'
-  return Object.keys(s).length ? s : undefined
+  s.fontWeight = font.bold ? 700 : 400
+  s.fontStyle = font.italic ? 'italic' : 'normal'
+  return s
 }
 
 // Reserved (non-route) key that stores the top header bar color. Undefined in
@@ -280,7 +283,7 @@ export function bgIdForPath(pathname, map) {
 // default (see withDefaults below); modules they never touch fall back here.
 //   • Forest background on all modules
 //   • Left menu bar: Clear        • Header bar: Clear
-//   • Menu font: Segoe Print, size M, no bold/italic, icons shown
+//   • Menu font: Comic Sans MS, size L, no bold/italic, icons shown
 export const DEFAULT_PREFS = (() => {
   const m = {}
   CUSTOMIZE_MODULES.forEach(mod => {
@@ -289,7 +292,7 @@ export const DEFAULT_PREFS = (() => {
   m[SIDEBAR_KEY] = null // Clear left menu bar
   m[HEADER_KEY] = null // Clear header bar
   m[SIDEBAR_ICONS_KEY] = true // Show icons
-  m[SIDEBAR_FONT_KEY] = { family: '"Segoe Print", cursive', size: '', bold: false, italic: false }
+  m[SIDEBAR_FONT_KEY] = { family: '"Comic Sans MS", "Comic Sans", cursive', size: '13px', bold: false, italic: false }
   return m
 })()
 
