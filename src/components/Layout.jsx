@@ -617,7 +617,7 @@ export default function Layout() {
                         color: headerText,
                         ...(isActive(it.path) ? { backgroundColor: headerActiveBg } : {}),
                       }}
-                      className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xl font-semibold whitespace-nowrap ${headerHoverPill}`}
+                      className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-lg font-semibold whitespace-nowrap ${headerHoverPill}`}
                     >
                       {it.label}
                     </Link>
@@ -631,7 +631,7 @@ export default function Layout() {
                         color: headerText,
                         ...(groupActive ? { backgroundColor: headerActiveBg } : {}),
                       }}
-                      className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xl font-semibold whitespace-nowrap ${headerHoverPill}`}
+                      className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-lg font-semibold whitespace-nowrap ${headerHoverPill}`}
                     >
                       {g.label}
                       <span className="text-sm opacity-50">▾</span>
