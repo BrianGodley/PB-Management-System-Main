@@ -112,39 +112,39 @@ function PositionView({ node, resolveNodeHolder }) {
   }, [node.id, node.position_id])
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-        <p className="text-xs uppercase tracking-wide text-slate-400 font-semibold">Position</p>
-        <p className="text-lg font-bold text-slate-800">{positionTitle}</p>
-        <p className="text-xs uppercase tracking-wide text-slate-400 font-semibold mt-2">
+    <div className="space-y-5">
+      <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4">
+        <p className="text-sm uppercase tracking-wide text-slate-400 font-semibold">Position</p>
+        <p className="text-2xl font-bold text-slate-800">{positionTitle}</p>
+        <p className="text-sm uppercase tracking-wide text-slate-400 font-semibold mt-3">
           Assigned Employee
         </p>
-        <p className="text-sm font-medium text-slate-700">{displayName}</p>
+        <p className="text-lg font-medium text-slate-700">{displayName}</p>
       </div>
 
       <div>
-        <p className="text-sm font-bold text-slate-700 mb-2">
+        <p className="text-lg font-bold text-slate-700 mb-3">
           Stats assigned to this position
         </p>
         {loading ? (
-          <p className="text-sm text-slate-400">Loading stats…</p>
+          <p className="text-base text-slate-400">Loading stats…</p>
         ) : stats.length === 0 ? (
-          <p className="text-sm text-slate-400 italic">
+          <p className="text-base text-slate-400 italic">
             No statistics are assigned to this position.
           </p>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {stats.map(stat => {
               const syn = synopses[stat.id] || {}
               return (
-                <div key={stat.id} className="rounded-lg border border-slate-200 px-3 py-2">
+                <div key={stat.id} className="rounded-lg border border-slate-200 px-4 py-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-slate-800">{stat.name}</span>
-                    <span className="text-[10px] uppercase tracking-wide text-slate-400">
+                    <span className="text-base font-semibold text-slate-800">{stat.name}</span>
+                    <span className="text-xs uppercase tracking-wide text-slate-400">
                       {stat.stat_type || ''} · {stat.tracking || ''}
                     </span>
                   </div>
-                  <div className="mt-1 text-xs text-slate-600">
+                  <div className="mt-1.5 text-sm text-slate-600">
                     <span className="font-semibold" style={{ color: FG }}>
                       Sam:{' '}
                     </span>
@@ -406,7 +406,7 @@ export default function ItemInfoModal({ node, nodes, resolveNodeHolder, onClose 
     <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
       <div
         className={`bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden ${
-          isArea ? 'w-[92vw] max-w-[1400px] h-[90vh]' : 'w-full max-w-lg max-h-[92vh]'
+          isArea ? 'w-[92vw] max-w-[1400px] h-[90vh]' : 'w-full max-w-5xl h-[85vh] max-h-[92vh]'
         }`}
         onClick={e => e.stopPropagation()}
       >
