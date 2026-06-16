@@ -18,6 +18,7 @@ import { useAuth } from '../contexts/AuthContext'
 import EDocFieldEditor from '../components/edoc/EDocFieldEditor'
 import EDocDocumentModal from '../components/edoc/EDocDocumentModal'
 import FileManager from '../components/files/FileManager'
+import GoogleDriveBrowser from '../components/files/GoogleDriveBrowser'
 
 const STORAGE_BUCKET = 'edocuments'
 
@@ -108,6 +109,7 @@ export default function EDocuments({ clientId = null, embedded = false }) {
     ['files', '📁 Files'],
     ['photos', '🖼️ Photos'],
     ['videos', '🎞️ Videos'],
+    ['gdrive', '🔵 Google Drive'],
     ['edocuments', '✍️ E-Documents'],
   ]
   return (
@@ -135,6 +137,7 @@ export default function EDocuments({ clientId = null, embedded = false }) {
         {mainTab === 'files' && <FileManager root="files" />}
         {mainTab === 'photos' && <FileManager root="photos" accept="image/*" />}
         {mainTab === 'videos' && <FileManager root="videos" accept="video/*" />}
+        {mainTab === 'gdrive' && <GoogleDriveBrowser />}
         {mainTab === 'edocuments' && eDocsContent}
       </div>
     </div>
