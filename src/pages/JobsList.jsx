@@ -107,6 +107,7 @@ function JobItem({
   onMove,
   clientPhoneMap = { byId: {}, byName: {} },
   respInitials = '',
+  offFilter = false,
 }) {
   const [showMoveModal, setShowMoveModal] = useState(false)
   // Mouse-tracking tooltip state: { x, y } when active, null when hidden.
@@ -169,6 +170,16 @@ function JobItem({
                 <span className="mr-1 text-gray-500 font-normal">({respInitials})</span>
               )}
             {(job.name || job.client_name || '').replace(/\s*\([A-Za-z]{1,3}\)\s*$/, '')}
+            {/* When a search surfaces a job that's hidden by the current
+                Open/Closed filter, flag it so it's clear the result is
+                off-filter. */}
+            {offFilter && (
+              <span className="ml-1.5 inline-block rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700 align-middle">
+                {job.status === 'active' || job.status === 'on_hold' || !job.status
+                  ? 'Open'
+                  : 'Closed'}
+              </span>
+            )}
           </p>
         </button>
 
@@ -1251,8 +1262,13 @@ export default function JobsList() {
   // for the filter to apply.
   const filterActive = Boolean(filterRole && filterEmployee)
   const filterEmpLc = (filterEmployee || '').trim().toLowerCase()
+  // When a search query is present, search ACROSS all jobs (open + closed) so a
+  // job hidden by the current Open/Closed filter still surfaces. Off-filter
+  // results are tagged so the row can flag them (see _offFilter below).
+  const searchActive = Boolean(search.trim())
   const sorted = [...jobs]
     .filter(j => {
+      if (searchActive) return true
       const status = j.status || 'active'
       const isOpen = status === 'active' || status === 'on_hold'
       return statusFilter === 'closed' ? !isOpen : isOpen
@@ -1745,6 +1761,13 @@ export default function JobsList() {
                                   initialsByEmpId[job.responsible_employee_id] ||
                                   ''
                                 }
+                                offFilter={
+                                  searchActive &&
+                                  (job.status === 'active' ||
+                                    job.status === 'on_hold' ||
+                                    !job.status) !==
+                                    (statusFilter === 'open')
+                                }
                               />
                             ))}
                             {stageJobs.length === 0 && isOver && (
@@ -1834,6 +1857,13 @@ export default function JobsList() {
                                   supervisorInitials(job.job_supervisor) ||
                                   initialsByEmpId[job.responsible_employee_id] ||
                                   ''
+                                }
+                                offFilter={
+                                  searchActive &&
+                                  (job.status === 'active' ||
+                                    job.status === 'on_hold' ||
+                                    !job.status) !==
+                                    (statusFilter === 'open')
                                 }
                               />
                             ))}

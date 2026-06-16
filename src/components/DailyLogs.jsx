@@ -362,7 +362,7 @@ export default function DailyLogs({
     <div className="flex flex-col h-full">
       {/* Header — on mobile the title/count are hidden and the New Daily Log
           button stretches full width. */}
-      <div className="flex items-center justify-end mb-4 flex-shrink-0">
+      <div className="flex items-center justify-end mb-4 mt-3 flex-shrink-0">
         <button
           onClick={openNew}
           className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 w-full lg:w-auto lg:mr-6"
@@ -609,7 +609,9 @@ function JobPicker({ jobs, value, onChange, rightSlot }) {
   const [open, setOpen] = useState(false)
   const [filter, setFilter] = useState('open') // 'open' | 'closed'
 
-  const pool = jobs.filter(j => (filter === 'open' ? isOpenJob(j) : !isOpenJob(j)))
+  const pool = jobs
+    .filter(j => (filter === 'open' ? isOpenJob(j) : !isOpenJob(j)))
+    .sort((a, b) => jobName(a).localeCompare(jobName(b), undefined, { numeric: true, sensitivity: 'base' }))
   const q = query.trim().toLowerCase()
   const matches = q ? pool.filter(j => jobName(j).toLowerCase().includes(q)) : pool
 

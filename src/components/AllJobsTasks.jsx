@@ -42,7 +42,7 @@ const DESC_LIST_ID = 'all-jobs-task-desc-suggestions'
 export default function AllJobsTasks({ jobs = [], statusFilter = 'open', onSelectJob }) {
   const { user } = useAuth()
 
-  const [filterKey, setFilterKey] = useState('all-both')
+  const [filterKey, setFilterKey] = useState('all-open')
   // undefined = not resolved yet, null = account not linked to an employee.
   const [myEmployeeId, setMyEmployeeId] = useState(undefined)
   const [jobIdsWithTasks, setJobIdsWithTasks] = useState(null) // null = loading
@@ -56,7 +56,7 @@ export default function AllJobsTasks({ jobs = [], statusFilter = 'open', onSelec
   const [descPresets, setDescPresets] = useState([])
   const [employees, setEmployees] = useState([])
 
-  const filterDef = TASK_FILTERS.find(f => f.key === filterKey) || TASK_FILTERS[5]
+  const filterDef = TASK_FILTERS.find(f => f.key === filterKey) || TASK_FILTERS[3]
 
   // Resolve which employee record is the logged-in account (employees.user_id).
   useEffect(() => {
