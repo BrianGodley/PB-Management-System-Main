@@ -2254,8 +2254,8 @@ export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open'
       <div className="sticky top-0 z-20 bg-white pt-3 pb-3">
         {/* Summary bar — single uniform row, centered over the work orders */}
         <div className="mb-3 ml-[18px] flex justify-center">
-        <div className="rounded-xl bg-gray-900 overflow-hidden shadow-sm w-1/2">
-        <div className="flex flex-wrap items-center gap-0 divide-x divide-gray-700">
+        <div className="rounded-xl bg-gray-900 overflow-hidden shadow-sm w-full sm:w-1/2">
+        <div className="flex flex-nowrap items-center gap-0 divide-x divide-gray-700">
           <div className="px-2 py-1 flex-1 min-w-0">
             <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block">
               Total Man Days

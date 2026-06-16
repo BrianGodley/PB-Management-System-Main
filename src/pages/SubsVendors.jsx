@@ -637,7 +637,7 @@ export default function SubsVendors() {
 
             {/* Import / Export */}
             {svSettingsTab === 'import-export' && (
-              <div className="max-w-lg">
+              <div className="w-full">
                 <h2 className="text-sm font-semibold text-gray-800 mb-4">Import / Export</h2>
 
                 {/* Type selector */}

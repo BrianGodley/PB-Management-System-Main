@@ -1700,7 +1700,7 @@ export default function HR() {
 
               {/* ── New Employee template ── */}
               {settingsTab === 'new-employee' && (
-                <div className="max-w-xl">
+                <div className="w-full">
                   <div className="bg-white border border-gray-200 rounded-xl p-5">
                     <h3 className="font-semibold text-gray-900 mb-1">Employee File Template</h3>
                     <p className="text-sm text-gray-500 mb-4">

@@ -53,11 +53,7 @@ function DeltaBadge({ est, act, currency = false, inverse = false }) {
   )
 }
 
-function KpiCard({ label, est, act, currency = false, inverse = false, sub }) {
-  const delta = act - est
-  const over = inverse ? delta > 0 : delta < 0
-  const deltaColor =
-    delta === 0 ? 'text-gray-400' : over ? 'text-red-600 bg-red-50' : 'text-green-700 bg-green-50'
+function KpiCard({ label, est, act, currency = false }) {
   const display = v => (currency ? fmt(v) : fmtD(v))
   return (
     <div className="bg-white rounded-xl border border-gray-200 px-3 py-2 flex flex-col gap-0.5 min-w-0 overflow-hidden">
@@ -72,16 +68,8 @@ function KpiCard({ label, est, act, currency = false, inverse = false, sub }) {
         <div className="text-right min-w-0 flex-1">
           <p className="text-[10px] text-gray-400">Actual</p>
           <p className="text-sm sm:text-base font-bold text-gray-900 truncate">{display(act)}</p>
-          {delta !== 0 && (
-            <div
-              className={`inline-block text-[10px] sm:text-[11px] font-semibold px-1.5 sm:px-2 py-0.5 rounded mt-1 ${deltaColor} max-w-full truncate`}
-            >
-              {delta > 0 ? '▲' : '▼'} {display(Math.abs(delta))} {over ? '(over)' : '(under)'}
-            </div>
-          )}
         </div>
       </div>
-      {sub && <p className="text-[10px] text-gray-400 mt-0.5 truncate">{sub}</p>}
     </div>
   )
 }
@@ -105,13 +93,6 @@ function GpCard({ estGP, actGP, estPct, actPct }) {
           <p className="text-[10px] text-gray-400">Actual</p>
           <p className={`text-base font-bold ${color}`}>{fmt(actGP)}</p>
           <p className="text-[10px] text-gray-400">{actPct.toFixed(1)}% margin</p>
-          {delta !== 0 && (
-            <div
-              className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded mt-1 ${delta > 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}
-            >
-              {delta > 0 ? '▲' : '▼'} {fmt(Math.abs(delta))} {delta > 0 ? 'above' : 'below'}
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -950,9 +931,9 @@ export default function JobComparison({ job }) {
       {/* ── OVERALL TAB ── */}
       {tab === 'overall' && (
         <>
-          {/* Frozen — KPI summary cards + payroll bar stay put while the
-              detail below scrolls. */}
-          <div className="flex-shrink-0 space-y-3 mt-4">
+          {/* KPI summary cards + payroll bar scroll together with the detail
+              below (no longer frozen). */}
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-4 mt-4">
             {/* KPI cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <KpiCard
@@ -1009,11 +990,8 @@ export default function JobComparison({ job }) {
               )}
             </div>
           )}
-          </div>
 
-          {/* Scrolls below the payroll bar */}
-          <div className="flex-1 min-h-0 overflow-y-auto space-y-4 mt-4">
-            {/* Module table */}
+          {/* Module table */}
             {workOrders.length > 0 && (
               <ModuleTable
                 workOrders={workOrders}

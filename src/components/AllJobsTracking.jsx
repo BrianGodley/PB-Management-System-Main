@@ -51,13 +51,13 @@ export default function AllJobsTracking({ jobs = [], statusFilter = 'open', onSe
         </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-gray-200 bg-white">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-fixed">
             <thead className="sticky top-0 z-10 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-2.5">Job</th>
-                <th className="px-4 py-2.5 text-right">Contract Price</th>
-                <th className="px-4 py-2.5 text-right">Costs</th>
-                <th className="px-4 py-2.5 text-right">Gross</th>
+                <th className="px-4 py-2.5 w-[34%]">Job</th>
+                <th className="px-4 py-2.5 text-right w-[22%]">Contract Price</th>
+                <th className="px-4 py-2.5 text-right w-[22%]">Costs</th>
+                <th className="px-4 py-2.5 text-right w-[22%]">Gross</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -67,15 +67,15 @@ export default function AllJobsTracking({ jobs = [], statusFilter = 'open', onSe
                     <button
                       type="button"
                       onClick={() => onSelectJob?.(r.id)}
-                      className="text-left font-medium text-green-700 hover:underline"
+                      className="block w-full truncate text-left font-medium text-green-700 hover:underline"
                     >
                       {r.name}
                     </button>
                   </td>
-                  <td className="px-4 py-2.5 text-right text-gray-700">{money(r.price)}</td>
-                  <td className="px-4 py-2.5 text-right text-gray-700">{money(r.cost)}</td>
+                  <td className="px-4 py-2.5 text-right text-gray-700 whitespace-nowrap">{money(r.price)}</td>
+                  <td className="px-4 py-2.5 text-right text-gray-700 whitespace-nowrap">{money(r.cost)}</td>
                   <td
-                    className={`px-4 py-2.5 text-right font-semibold ${
+                    className={`px-4 py-2.5 text-right font-semibold whitespace-nowrap ${
                       r.gross < 0 ? 'text-red-600' : 'text-gray-900'
                     }`}
                   >

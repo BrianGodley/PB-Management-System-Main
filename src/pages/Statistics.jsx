@@ -7673,7 +7673,7 @@ function StatisticsSettingsView({
           settings forms. */}
         <div
           className={
-            settingsSubTab === 'master' || settingsSubTab === 'reminders' ? '' : 'max-w-xl'
+            settingsSubTab === 'master' || settingsSubTab === 'reminders' ? '' : 'w-full'
           }
         >
           {/* ── TRACKING SUB-TAB ── */}

@@ -1369,7 +1369,7 @@ export default function Contacts() {
           </div>
           <div className="bg-gray-50 px-6 py-6 flex-1 overflow-y-auto rounded-xl">
             {settingsSubTab === 'import' && (
-              <div className="max-w-2xl">
+              <div className="w-full">
                 <ImportModal
                   inline
                   onDone={() => {
@@ -1383,7 +1383,7 @@ export default function Contacts() {
             )}
 
             {settingsSubTab === 'export' && (
-              <div className="max-w-lg">
+              <div className="w-full">
                 <ExportModal inline contacts={exportContacts} onClose={null} />
               </div>
             )}

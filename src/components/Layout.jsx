@@ -134,10 +134,10 @@ export default function Layout() {
 
   // Translated dock + main-menu items (re-computed whenever t() changes)
   const DOCK_ITEMS = [
-    { to: '/daily-logs', label: t('dailyLogs'), icon: '📋' },
-    { to: '/timeclock', label: t('timeClock'), icon: '⏱️' },
     { key: 'schedule', label: 'Schedule', icon: '📅', onClick: () => setShowSchedule(true) },
-    { to: '/info', label: 'Job Info', icon: 'ℹ️' },
+    { to: '/timeclock', label: t('timeClock'), icon: '⏱️' },
+    { to: '/jobs', label: t('jobs'), icon: '🏡' },
+    { to: '/daily-logs', label: t('dailyLogs'), icon: '📋' },
     { key: 'main', label: 'More', icon: '⊞', onClick: () => setShowMainMenu(v => !v) },
   ]
 
@@ -145,12 +145,12 @@ export default function Layout() {
   const isAdmin = userRole === 'admin' || userRole === 'super_admin'
   const MAIN_MENU_ITEMS = [
     { path: '/', label: 'Dashboard', icon: <DashboardIcon /> },
+    { path: '/info', label: 'Job Info', icon: 'ℹ️' },
     { key: 'change-orders', label: 'Change Orders', icon: '🔄', onClick: () => setShowCONav(true) },
     { path: '/contacts', label: 'Contacts', icon: <ContactsIcon /> },
     { path: '/clients', label: t('clients'), icon: '👥' },
     { path: '/design', label: 'Design', icon: '📐' },
     { path: '/bids', label: 'Bids', icon: '📋' },
-    { path: '/jobs', label: t('jobs'), icon: '🏡' },
     { path: '/statistics', label: t('statistics'), icon: '📈' },
     { path: '/portal/subs', label: t('subsVendors'), icon: '🧑‍🔧' },
     { path: '/hr', label: 'Employees', icon: '🏢' },
@@ -792,6 +792,16 @@ export default function Layout() {
             style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
           >
             <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+            {/* Close (X) — upper right */}
+            <button
+              onClick={() => setShowMainMenu(false)}
+              aria-label="Close menu"
+              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 px-1">
               {t('mainMenu')}
             </p>

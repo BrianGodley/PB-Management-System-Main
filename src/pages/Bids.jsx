@@ -1241,7 +1241,7 @@ function FinanceSettingsCard() {
   const dirty = pct !== original
 
   return (
-    <div className="max-w-2xl">
+    <div className="w-full">
       <div className="bg-white border border-gray-200 rounded-xl p-6">
         <h2 className="text-base font-semibold text-gray-800 mb-1 flex items-center gap-2">
           <span>💰</span> Finance OAC Markup
