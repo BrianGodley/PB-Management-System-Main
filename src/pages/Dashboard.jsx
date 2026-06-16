@@ -11,7 +11,7 @@
 //   • company_settings.weather_location — company-wide weather location (text)
 // Run the SQL provided alongside this file before using the Settings tab.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -100,7 +100,7 @@ function SaveMsg({ msg }) {
 // WEATHER WIDGET — current conditions + 5-day outlook from the keyless
 // Open-Meteo API. `location` is a free-text place name (city/state or ZIP).
 // ═════════════════════════════════════════════════════════════════════════════
-function WeatherWidget({ location, onSaveLocation, bgColor }) {
+function WeatherWidget({ location, onSaveLocation }) {
   const [wx, setWx] = useState({ status: 'loading', current: null, days: [], place: '' })
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -196,7 +196,7 @@ function WeatherWidget({ location, onSaveLocation, bgColor }) {
   const sel = dayIdx != null ? wx.days[dayIdx] : null
 
   return (
-    <div className="card" style={bgColor ? { backgroundColor: bgColor } : undefined}>
+    <div className="card">
       {/* Header — title + editable per-user location */}
       <div className="flex items-center justify-between mb-3 gap-2">
         <h3 className="text-sm font-bold text-gray-800 flex-shrink-0">Weather</h3>
@@ -332,7 +332,7 @@ function WeatherWidget({ location, onSaveLocation, bgColor }) {
 // ═════════════════════════════════════════════════════════════════════════════
 // STAT MINI-GRAPH — a small trend line for one statistic from the stat system.
 // ═════════════════════════════════════════════════════════════════════════════
-function StatMiniGraph({ stat, allStats = [], bgColor }) {
+function StatMiniGraph({ stat, allStats = [] }) {
   const [points, setPoints] = useState(null)
 
   useEffect(() => {
@@ -366,7 +366,7 @@ function StatMiniGraph({ stat, allStats = [], bgColor }) {
   }, [stat?.id, allStats])
 
   return (
-    <div className="card" style={bgColor ? { backgroundColor: bgColor } : undefined}>
+    <div className="card">
       <h3 className="text-sm font-bold text-gray-800 mb-1 truncate">
         {stat ? stat.name : 'Stat'}
       </h3>
@@ -546,71 +546,12 @@ async function fetchDashboardData(userId) {
 // ═════════════════════════════════════════════════════════════════════════════
 // MAIN DASHBOARD
 // ═════════════════════════════════════════════════════════════════════════════
-// Dashboard background options. Files live in /public/backgrounds. 'none' keeps
-// the default grey. The choice is saved per-browser (localStorage) and applied
-// to <body> while the Dashboard is mounted, then restored when leaving.
-const DASH_BACKGROUNDS = [
-  { id: 'none', label: 'Default', swatch: '#eceef1', url: null },
-  { id: 'waves-blue', label: 'Blue Waves', swatch: '#9cc0ec', url: '/backgrounds/waves-blue.svg' },
-  { id: 'green', label: 'Forest', swatch: '#8fbf8c', url: '/backgrounds/green.svg' },
-  { id: 'sunset', label: 'Sunset', swatch: '#f3a07e', url: '/backgrounds/sunset.svg' },
-  { id: 'aurora', label: 'Aurora', swatch: '#23406a', url: '/backgrounds/aurora.svg' },
-  { id: 'mesh', label: 'Mesh', swatch: '#e7ebf2', url: '/backgrounds/mesh.svg' },
-]
-
-function applyDashBackground(id) {
-  const opt = DASH_BACKGROUNDS.find(b => b.id === id)
-  // Target the app shell (its bg-gray-100 is what's actually visible behind the
-  // transparent <main>); setting it on <body> alone is hidden by the shell.
-  const el = document.getElementById('app-shell') || document.body
-  const s = el.style
-  if (opt?.url) {
-    s.backgroundImage = `url('${opt.url}')`
-    s.backgroundSize = 'cover'
-    s.backgroundPosition = 'center'
-    s.backgroundRepeat = 'no-repeat'
-  } else {
-    s.backgroundImage = ''
-    s.backgroundSize = ''
-    s.backgroundPosition = ''
-    s.backgroundRepeat = ''
-  }
-}
-
-// The customizable dashboard areas (modules) + the light background-color
-// palette offered for each. 'page' is the whole dashboard background.
-const MODULE_AREAS = [
-  { id: 'page', label: 'Dashboard background' },
-  { id: 'weather', label: 'Weather' },
-  { id: 'stat1', label: 'Stat graph 1' },
-  { id: 'stat2', label: 'Stat graph 2' },
-  { id: 'quicklinks', label: 'Quick Links' },
-]
-const MODULE_COLOR_OPTIONS = [
-  { id: 'default', label: 'Default', value: null, swatch: '#ffffff' },
-  { id: 'slate', label: 'Slate', value: '#f1f5f9' },
-  { id: 'blue', label: 'Blue', value: '#eff6ff' },
-  { id: 'sky', label: 'Sky', value: '#e0f2fe' },
-  { id: 'green', label: 'Green', value: '#ecfdf5' },
-  { id: 'amber', label: 'Amber', value: '#fffbeb' },
-  { id: 'rose', label: 'Rose', value: '#fff1f2' },
-  { id: 'violet', label: 'Violet', value: '#f5f3ff' },
-]
-
 export default function Dashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [tab, setTab] = useState('dashboard')
-  const [dashBg, setDashBg] = useState(() => localStorage.getItem('pbs:dashboardBg') || 'none')
-  const [moduleColors, setModuleColors] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('pbs:dashModuleColors') || '{}')
-    } catch {
-      return {}
-    }
-  })
-  // Page backgrounds are now applied app-wide by Layout (per module, via the
-  // Customize page). The Dashboard no longer touches the app-shell background.
+  // Page backgrounds are applied app-wide by Layout (per module, via the
+  // Customize page); the Dashboard no longer manages backgrounds.
   const [showAddEmp, setShowAddEmp] = useState(false)
   const [showTraining, setShowTraining] = useState(false)
   const [trainingAssignment, setTrainingAssignment] = useState(null)
@@ -799,138 +740,6 @@ export default function Dashboard() {
           onSaved={refresh}
         />
       )}
-    </div>
-  )
-}
-
-// ── Customize: pick a dashboard background ────────────────────────────────────
-function ColorSwatches({ selected, onPick }) {
-  return (
-    <div className="flex items-center gap-1.5 flex-wrap">
-      {MODULE_COLOR_OPTIONS.map(c => {
-        const isSel = (selected ?? null) === (c.value ?? null)
-        return (
-          <button
-            key={c.id}
-            title={c.label}
-            onClick={() => onPick(c.value)}
-            className={`w-7 h-7 rounded-full border flex items-center justify-center transition-all ${
-              isSel
-                ? 'ring-2 ring-green-600 ring-offset-1 border-green-600'
-                : 'border-gray-300 hover:border-gray-400'
-            }`}
-            style={{ backgroundColor: c.value || '#ffffff' }}
-          >
-            {!c.value && <span className="text-[9px] text-gray-400">∅</span>}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
-function DashboardCustomize({
-  value,
-  onPreview,
-  moduleColors = {},
-  onModuleColor,
-  onAllColors,
-  onSave,
-}) {
-  const [savedMsg, setSavedMsg] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  async function handleSave() {
-    setSaving(true)
-    const ok = await onSave()
-    setSaving(false)
-    setSavedMsg(ok ? '✓ Saved — applied across your devices.' : 'Could not save — try again.')
-    if (ok) setTimeout(() => setSavedMsg(''), 4000)
-  }
-
-  return (
-    <div className="max-w-3xl">
-      {/* Background image */}
-      <h2 className="text-lg font-bold text-gray-900 mb-1">Dashboard background</h2>
-      <p className="text-sm text-gray-500 mb-4">
-        Pick a background image to preview it instantly. Click <strong>Save</strong> to keep your
-        choices across devices.
-      </p>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        {DASH_BACKGROUNDS.map(bg => {
-          const selected = value === bg.id
-          return (
-            <button
-              key={bg.id}
-              onClick={() => {
-                onPreview(bg.id)
-                setSavedMsg('')
-              }}
-              className={`group text-left rounded-xl overflow-hidden border-2 transition-all ${
-                selected ? 'border-green-600 ring-2 ring-green-600/30' : 'border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              <div
-                className="h-24 w-full"
-                style={
-                  bg.url
-                    ? { backgroundImage: `url('${bg.url}')`, backgroundSize: 'cover', backgroundPosition: 'center' }
-                    : { backgroundColor: bg.swatch }
-                }
-              />
-              <div className="flex items-center justify-between px-3 py-2 bg-white">
-                <span className="text-sm font-medium text-gray-700">{bg.label}</span>
-                {selected && <span className="text-green-600 text-sm">✓</span>}
-              </div>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Module colors */}
-      <div className="border-t border-gray-200 mt-8 pt-6">
-        <h2 className="text-lg font-bold text-gray-900 mb-1">Module colors</h2>
-        <p className="text-sm text-gray-500 mb-4">
-          Set a background color for each area, or use <strong>All areas</strong> to apply one color
-          to everything at once.
-        </p>
-        <div className="space-y-1">
-          <div className="flex items-center justify-between gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
-            <span className="text-sm font-semibold text-gray-800">All areas</span>
-            <ColorSwatches
-              selected="__mixed__"
-              onPick={v => {
-                onAllColors(v)
-                setSavedMsg('')
-              }}
-            />
-          </div>
-          {MODULE_AREAS.map(a => (
-            <div key={a.id} className="flex items-center justify-between gap-3 px-4 py-2">
-              <span className="text-sm text-gray-700">{a.label}</span>
-              <ColorSwatches
-                selected={moduleColors[a.id] ?? null}
-                onPick={v => {
-                  onModuleColor(a.id, v)
-                  setSavedMsg('')
-                }}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Save */}
-      <div className="flex items-center gap-3 mt-8">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="bg-green-700 text-white text-sm font-semibold px-6 py-2.5 rounded-lg hover:bg-green-800 disabled:opacity-50"
-        >
-          {saving ? 'Saving…' : '💾 Save'}
-        </button>
-        {savedMsg && <span className="text-sm text-green-700 font-medium">{savedMsg}</span>}
-      </div>
     </div>
   )
 }
