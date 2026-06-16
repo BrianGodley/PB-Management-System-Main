@@ -34,6 +34,7 @@ export default function Customize() {
       /* ignore */
     }
     let ok = true
+    let errMsg = ''
     if (user?.id) {
       const { error } = await supabase
         .from('dashboard_preferences')
@@ -42,10 +43,18 @@ export default function Customize() {
           { onConflict: 'user_id' }
         )
       ok = !error
+      errMsg = error?.message || ''
     }
     setSaving(false)
-    setSavedMsg(ok ? '✓ Saved — applied across your devices.' : 'Could not save — try again.')
-    if (ok) setTimeout(() => setSavedMsg(''), 4000)
+    if (ok) {
+      setSavedMsg('✓ Saved — applied across your devices.')
+      setTimeout(() => setSavedMsg(''), 4000)
+    } else {
+      const hint = /module_backgrounds/.test(errMsg)
+        ? ' (run supabase-update-106.sql)'
+        : ''
+      setSavedMsg(`Could not save: ${errMsg || 'unknown error'}${hint}`)
+    }
   }
 
   return (

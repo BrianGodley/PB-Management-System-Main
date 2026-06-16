@@ -9897,7 +9897,7 @@ export default function Statistics() {
        URL-bar collapse — without this the bottom nav dock appears to shift
        when scrolling. lg+ sticks with 100vh since desktop browsers don\'t
        have the same dynamic-viewport behavior. */
-    <div className="h-[calc(100dvh-2.75rem)] lg:h-[calc(100vh-2.75rem)] -m-4 lg:-m-6 flex flex-col overflow-hidden bg-gray-100">
+    <div className="h-[calc(100dvh-2.75rem)] lg:h-[calc(100vh-2.75rem)] -m-4 lg:-m-6 flex flex-col overflow-hidden">
       {/* ── MODE TABS — portalled into the green app header bar ─── */}
       {/* On phones we drop the verbose labels so all six tabs fit; the icons
           are kept (they double as a visual key the user can tap). Tablets and
@@ -9967,7 +9967,7 @@ export default function Statistics() {
         ))}
       </div>
       {/* ── COMBINED MODULE HEADER ───────────────────────────────────────── */}
-      <div className="flex items-center gap-2 flex-wrap px-3 sm:px-6 pt-3 sm:pt-6 pb-2 sm:pb-4 bg-gray-50 border-b border-gray-200 flex-shrink-0">
+      <div className="flex items-center gap-2 flex-wrap px-3 sm:px-6 pt-3 sm:pt-6 pb-2 sm:pb-4 border-b border-gray-200/60 flex-shrink-0">
         <h1 className="hidden lg:block text-base sm:text-xl font-bold text-gray-900 flex-shrink-0">Statistics</h1>
         {viewMode === 'graphs' && selectedStat && (
           <>
