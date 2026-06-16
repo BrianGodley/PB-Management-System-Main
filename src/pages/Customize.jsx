@@ -419,7 +419,7 @@ export default function Customize() {
         </div>
 
         {/* ── Left menu bar color ── */}
-        <h2 className="text-lg font-bold text-gray-900 mt-6 mb-1">Left menu bar</h2>
+        <h2 className="text-lg font-bold text-gray-900 mt-6 mb-1">Menu Background</h2>
         <p className="text-sm text-gray-500 mb-3">
           Give the menu a background color, or <strong>Clear</strong> to let the page background show
           through.

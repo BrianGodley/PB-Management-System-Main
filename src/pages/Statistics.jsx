@@ -9976,7 +9976,7 @@ export default function Statistics() {
         ))}
       </div>
       {/* ── COMBINED MODULE HEADER (white tab bar) ───────────────────────── */}
-      <div className="flex items-center gap-2 flex-wrap px-3 sm:px-6 py-2.5 bg-white border border-gray-200 rounded-xl flex-shrink-0 ml-0 mr-2 sm:mr-3 mt-4 sm:mt-6 mb-3">
+      <div className="relative flex items-center gap-2 flex-wrap px-3 sm:px-6 py-0 min-h-[44px] bg-white border border-gray-200 rounded-xl flex-shrink-0 ml-0 mr-2 sm:mr-3 mt-4 sm:mt-6 mb-3">
         {viewMode === 'graphs' && selectedStat && (
           <>
             {/* ── Mobile-only: Edits + Entry buttons next to the title ── */}
@@ -10038,8 +10038,9 @@ export default function Statistics() {
             </button>
           </>
         )}
-        {/* View-mode tabs — centered over the graph/detail area (desktop). */}
-        <div className="hidden lg:flex flex-1 min-w-0 items-center justify-center gap-0.5">
+        {/* View-mode tabs — absolutely centered so they stay in the same spot
+            on every view (edit links / Add button no longer shift them). */}
+        <div className="hidden lg:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-0.5">
           {[
             { id: 'graphs', icon: '📈', label: 'Graphs' },
             { id: 'multiple-entry', icon: '📝', label: 'Multiple Entry' },
@@ -10071,7 +10072,7 @@ export default function Statistics() {
              on the stat-list view). Desktop always shows it. */
           <button
             onClick={() => setShowTypeSelector(true)}
-            className={`btn-primary text-xs px-3 py-1.5 rounded-lg flex-shrink-0 ${selectedStat ? 'hidden sm:inline-flex' : ''}`}
+            className={`btn-primary text-xs px-3 py-1.5 rounded-lg flex-shrink-0 ml-auto ${selectedStat ? 'hidden sm:inline-flex' : ''}`}
           >
             <span className="sm:hidden">＋ Add</span>
             <span className="hidden sm:inline">+ Add Statistic</span>
