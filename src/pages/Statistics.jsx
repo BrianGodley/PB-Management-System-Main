@@ -7647,9 +7647,9 @@ function StatisticsSettingsView({
   const masterStats = masterSubTab === 'archive' ? masterArchive : masterCurrent
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50">
+    <div className="flex-1 overflow-y-auto bg-gray-50 mr-2 sm:mr-3">
       {/* Sub-tab bar */}
-      <div className="flex justify-center border-b border-gray-200 bg-white px-6 rounded-xl">
+      <div className="flex justify-center border-b border-gray-200 bg-white px-6 rounded-xl mb-2">
         {SUB_TABS.map(t => (
           <button
             key={t.key}
@@ -7665,7 +7665,7 @@ function StatisticsSettingsView({
         ))}
       </div>
 
-      <div className="px-6 py-6">
+      <div className="px-6 pb-6">
         {/* The Master sub-tab needs the full width — its table has 5 columns
           and gets clipped by the narrow max-w-xl that's used for the
           settings forms. */}
