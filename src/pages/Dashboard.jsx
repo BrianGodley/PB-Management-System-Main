@@ -560,17 +560,20 @@ const DASH_BACKGROUNDS = [
 
 function applyDashBackground(id) {
   const opt = DASH_BACKGROUNDS.find(b => b.id === id)
-  const b = document.body.style
+  // Target the app shell (its bg-gray-100 is what's actually visible behind the
+  // transparent <main>); setting it on <body> alone is hidden by the shell.
+  const el = document.getElementById('app-shell') || document.body
+  const s = el.style
   if (opt?.url) {
-    b.backgroundImage = `url('${opt.url}')`
-    b.backgroundSize = 'cover'
-    b.backgroundPosition = 'center'
-    b.backgroundAttachment = 'fixed'
+    s.backgroundImage = `url('${opt.url}')`
+    s.backgroundSize = 'cover'
+    s.backgroundPosition = 'center'
+    s.backgroundRepeat = 'no-repeat'
   } else {
-    b.backgroundImage = ''
-    b.backgroundSize = ''
-    b.backgroundPosition = ''
-    b.backgroundAttachment = ''
+    s.backgroundImage = ''
+    s.backgroundSize = ''
+    s.backgroundPosition = ''
+    s.backgroundRepeat = ''
   }
 }
 
@@ -620,18 +623,20 @@ export default function Dashboard() {
     if (prefs.background) setDashBg(prefs.background)
   }, [data, prefs.background])
 
-  // Persist a background choice to the user's dashboard_preferences row.
-  function changeDashBg(id) {
+  // Live preview a background (applies immediately; not yet persisted).
+  function previewDashBg(id) {
     setDashBg(id)
-    if (user?.id) {
-      supabase
-        .from('dashboard_preferences')
-        .upsert(
-          { user_id: user.id, background: id, updated_at: new Date().toISOString() },
-          { onConflict: 'user_id' }
-        )
-        .then(() => {})
-    }
+  }
+  // Persist the current background to the user's dashboard_preferences row.
+  async function saveDashBg(id) {
+    if (!user?.id) return true
+    const { error } = await supabase
+      .from('dashboard_preferences')
+      .upsert(
+        { user_id: user.id, background: id, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id' }
+      )
+    return !error
   }
 
   // Persist this user's chosen weather location (per-user, in dashboard_preferences).
@@ -783,7 +788,9 @@ export default function Dashboard() {
         </>
       )}
 
-      {tab === 'customize' && <DashboardCustomize value={dashBg} onChange={changeDashBg} />}
+      {tab === 'customize' && (
+        <DashboardCustomize value={dashBg} onPreview={previewDashBg} onSave={saveDashBg} />
+      )}
 
       {tab === 'settings' && (
         <DashboardSettings
@@ -801,13 +808,24 @@ export default function Dashboard() {
 }
 
 // ── Customize: pick a dashboard background ────────────────────────────────────
-function DashboardCustomize({ value, onChange }) {
+function DashboardCustomize({ value, onPreview, onSave }) {
+  const [savedMsg, setSavedMsg] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function handleSave() {
+    setSaving(true)
+    const ok = await onSave(value)
+    setSaving(false)
+    setSavedMsg(ok ? '✓ Saved — your background is set across your devices.' : 'Could not save — try again.')
+    if (ok) setTimeout(() => setSavedMsg(''), 4000)
+  }
+
   return (
     <div className="max-w-3xl">
       <h2 className="text-lg font-bold text-gray-900 mb-1">Dashboard background</h2>
       <p className="text-sm text-gray-500 mb-4">
-        Choose a background for your dashboard. It replaces the grey behind the page and is saved
-        on this device.
+        Pick a background to preview it instantly, then click <strong>Save</strong> to keep it. Your
+        choice follows you on any device.
       </p>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {DASH_BACKGROUNDS.map(bg => {
@@ -815,7 +833,10 @@ function DashboardCustomize({ value, onChange }) {
           return (
             <button
               key={bg.id}
-              onClick={() => onChange(bg.id)}
+              onClick={() => {
+                onPreview(bg.id)
+                setSavedMsg('')
+              }}
               className={`group text-left rounded-xl overflow-hidden border-2 transition-all ${
                 selected ? 'border-green-600 ring-2 ring-green-600/30' : 'border-gray-200 hover:border-gray-300'
               }`}
@@ -835,6 +856,17 @@ function DashboardCustomize({ value, onChange }) {
             </button>
           )
         })}
+      </div>
+
+      <div className="flex items-center gap-3 mt-5">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="bg-green-700 text-white text-sm font-semibold px-6 py-2.5 rounded-lg hover:bg-green-800 disabled:opacity-50"
+        >
+          {saving ? 'Saving…' : '💾 Save background'}
+        </button>
+        {savedMsg && <span className="text-sm text-green-700 font-medium">{savedMsg}</span>}
       </div>
     </div>
   )

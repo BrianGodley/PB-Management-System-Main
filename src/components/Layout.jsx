@@ -326,7 +326,7 @@ export default function Layout() {
        the page itself never scrolls and drags the header — only <main> scrolls.
        Inline style wins on modern browsers; the h-screen class is the fallback
        where dvh isn't supported. */
-    <div className="h-screen flex flex-col bg-gray-100" style={{ height: '100dvh' }}>
+    <div id="app-shell" className="h-screen flex flex-col bg-gray-100" style={{ height: '100dvh' }}>
       {/* Floating tooltip portal — attached to <body> so the sidebar's
           overflow-y-auto can't clip it. Driven by hover on each collapsed
           nav item. left: 56 = w-12 sidebar (48px) + 8px margin. */}
