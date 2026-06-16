@@ -647,7 +647,7 @@ export default function Bids() {
     )
 
   return (
-    <div>
+    <div className="h-full flex flex-col">
       {/* ── Sold → Create Job Modal ─────────────────────────────────── */}
       {soldModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -871,7 +871,7 @@ export default function Bids() {
 
       {/* ── Settings ── */}
       {bidTab === 'settings' && (
-        <div className="mt-3">
+        <div className="mt-3 flex-1 min-h-0 overflow-y-auto thin-scroll">
           <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
             {[
               { key: 'general', label: '⚙️ General' },
@@ -910,7 +910,7 @@ export default function Bids() {
       {bidTab === 'bids' && (
         <>
           {/* Summary — sized so values up to $10,000,000.00 fit without overlap */}
-          <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-6 mt-4">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-6 mt-4 flex-shrink-0">
             <div className="card text-center px-2 py-3 sm:px-4 sm:py-4 min-w-0">
               <p className="text-[10px] sm:text-xs text-gray-500 mb-1 truncate">Pipeline Value</p>
               <p className="font-bold text-gray-900 text-sm sm:text-lg leading-tight break-words">
@@ -932,7 +932,7 @@ export default function Bids() {
           </div>
 
           {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+          <div className="flex flex-col sm:flex-row gap-3 mb-4 flex-shrink-0">
             <input
               type="text"
               placeholder="Search bids..."
@@ -959,9 +959,9 @@ export default function Bids() {
               <p className="text-gray-500 mb-4">No bids found.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="thin-scroll flex-1 min-h-0 overflow-auto rounded-xl border border-gray-200 bg-white">
               <table className="w-full text-sm border-collapse">
-                <thead>
+                <thead className="sticky top-0 z-10">
                   <tr className="bg-gray-50 border-b border-gray-200">
                     {[
                       {
