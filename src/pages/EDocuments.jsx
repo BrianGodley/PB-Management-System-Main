@@ -190,13 +190,11 @@ function DashboardTab({ userId, userName }) {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-4">Welcome back, {userName}</h2>
-
-      {/* You — ~3in tall, blue flowing-waves background */}
+      {/* You — ~2.5in tall, blue flowing-waves background */}
       <div
         className="relative rounded-2xl overflow-hidden border border-blue-100 mb-5"
         style={{
-          height: '3in',
+          height: '2.5in',
           backgroundImage: "url('/edoc-dashboard-bg.svg')",
           backgroundSize: 'cover',
           backgroundPosition: 'center',

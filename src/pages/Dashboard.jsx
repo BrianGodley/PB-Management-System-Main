@@ -546,10 +546,45 @@ async function fetchDashboardData(userId) {
 // ═════════════════════════════════════════════════════════════════════════════
 // MAIN DASHBOARD
 // ═════════════════════════════════════════════════════════════════════════════
+// Dashboard background options. Files live in /public/backgrounds. 'none' keeps
+// the default grey. The choice is saved per-browser (localStorage) and applied
+// to <body> while the Dashboard is mounted, then restored when leaving.
+const DASH_BACKGROUNDS = [
+  { id: 'none', label: 'Default', swatch: '#eceef1', url: null },
+  { id: 'waves-blue', label: 'Blue Waves', swatch: '#9cc0ec', url: '/backgrounds/waves-blue.svg' },
+  { id: 'green', label: 'Forest', swatch: '#8fbf8c', url: '/backgrounds/green.svg' },
+  { id: 'sunset', label: 'Sunset', swatch: '#f3a07e', url: '/backgrounds/sunset.svg' },
+  { id: 'aurora', label: 'Aurora', swatch: '#23406a', url: '/backgrounds/aurora.svg' },
+  { id: 'mesh', label: 'Mesh', swatch: '#e7ebf2', url: '/backgrounds/mesh.svg' },
+]
+
+function applyDashBackground(id) {
+  const opt = DASH_BACKGROUNDS.find(b => b.id === id)
+  const b = document.body.style
+  if (opt?.url) {
+    b.backgroundImage = `url('${opt.url}')`
+    b.backgroundSize = 'cover'
+    b.backgroundPosition = 'center'
+    b.backgroundAttachment = 'fixed'
+  } else {
+    b.backgroundImage = ''
+    b.backgroundSize = ''
+    b.backgroundPosition = ''
+    b.backgroundAttachment = ''
+  }
+}
+
 export default function Dashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [tab, setTab] = useState('dashboard')
+  const [dashBg, setDashBg] = useState(() => localStorage.getItem('pbs:dashboardBg') || 'none')
+  useEffect(() => {
+    localStorage.setItem('pbs:dashboardBg', dashBg)
+    applyDashBackground(dashBg)
+    // Restore the default grey when navigating away from the dashboard.
+    return () => applyDashBackground('none')
+  }, [dashBg])
   const [showAddEmp, setShowAddEmp] = useState(false)
   const [showTraining, setShowTraining] = useState(false)
   const [trainingAssignment, setTrainingAssignment] = useState(null)
@@ -607,6 +642,7 @@ export default function Dashboard() {
       <div className="bg-white border-b border-gray-200 flex gap-0 mb-5">
         {[
           { key: 'dashboard', label: '🏠 Dashboard' },
+          { key: 'customize', label: '🎨 Customize' },
           { key: 'settings', label: '⚙️ Settings' },
         ].map(t => (
           <button
@@ -723,6 +759,8 @@ export default function Dashboard() {
         </>
       )}
 
+      {tab === 'customize' && <DashboardCustomize value={dashBg} onChange={setDashBg} />}
+
       {tab === 'settings' && (
         <DashboardSettings
           prefs={prefs}
@@ -734,6 +772,46 @@ export default function Dashboard() {
           onSaved={refresh}
         />
       )}
+    </div>
+  )
+}
+
+// ── Customize: pick a dashboard background ────────────────────────────────────
+function DashboardCustomize({ value, onChange }) {
+  return (
+    <div className="max-w-3xl">
+      <h2 className="text-lg font-bold text-gray-900 mb-1">Dashboard background</h2>
+      <p className="text-sm text-gray-500 mb-4">
+        Choose a background for your dashboard. It replaces the grey behind the page and is saved
+        on this device.
+      </p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        {DASH_BACKGROUNDS.map(bg => {
+          const selected = value === bg.id
+          return (
+            <button
+              key={bg.id}
+              onClick={() => onChange(bg.id)}
+              className={`group text-left rounded-xl overflow-hidden border-2 transition-all ${
+                selected ? 'border-green-600 ring-2 ring-green-600/30' : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div
+                className="h-24 w-full"
+                style={
+                  bg.url
+                    ? { backgroundImage: `url('${bg.url}')`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                    : { backgroundColor: bg.swatch }
+                }
+              />
+              <div className="flex items-center justify-between px-3 py-2 bg-white">
+                <span className="text-sm font-medium text-gray-700">{bg.label}</span>
+                {selected && <span className="text-green-600 text-sm">✓</span>}
+              </div>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
