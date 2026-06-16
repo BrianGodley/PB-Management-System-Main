@@ -1325,21 +1325,6 @@ export default function JobsList() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* ── Breadcrumb: Jobs / <tab> / <selection> ──────────────── */}
-      <div className="mb-3 flex-shrink-0 hidden lg:flex items-baseline gap-2 min-w-0">
-        <span className="text-lg font-semibold text-gray-500 flex-shrink-0">{tabName}</span>
-        {tab !== 'settings' && (
-          <>
-            <span className="text-gray-300 flex-shrink-0">/</span>
-            <span className="text-lg font-semibold text-green-700 truncate">
-              {selectedJob === ALL_JOBS
-                ? 'All Jobs'
-                : selectedJobObj?.name || selectedJobObj?.client_name || '—'}
-            </span>
-          </>
-        )}
-      </div>
-
       {/* ── Mobile: dual Open/Closed toggle + text search + job dropdown ── */}
       <div className="lg:hidden mb-2 flex-shrink-0 space-y-1.5">
         {/* Open / Closed dual toggle */}
@@ -1406,6 +1391,21 @@ export default function JobsList() {
             {t.label}
           </button>
         ))}
+      </div>
+
+      {/* ── Page navigator: <tab> / <selection> — sits under the tab bar ── */}
+      <div className="mb-3 flex-shrink-0 hidden lg:flex items-baseline gap-2 min-w-0">
+        <span className="text-lg font-semibold text-gray-500 flex-shrink-0">{tabName}</span>
+        {tab !== 'settings' && (
+          <>
+            <span className="text-gray-300 flex-shrink-0">/</span>
+            <span className="text-lg font-semibold text-green-700 truncate">
+              {selectedJob === ALL_JOBS
+                ? 'All Jobs'
+                : selectedJobObj?.name || selectedJobObj?.client_name || '—'}
+            </span>
+          </>
+        )}
       </div>
 
       {/* Mobile: small docked buttons under the job picker. Schedule, Change

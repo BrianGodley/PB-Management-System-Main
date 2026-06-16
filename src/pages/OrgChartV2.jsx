@@ -1914,7 +1914,7 @@ export default function OrgChartV2() {
                      edit mode: + Item
             CENTER — chart name + Edit/Save (and rename/delete in edit mode)
             RIGHT  — zoom + + Chart (view mode only) */}
-      <div className="grid grid-cols-3 items-center gap-3 px-4 py-1.5 bg-white border border-slate-200 shrink-0 mb-0 -mr-4 rounded-xl">
+      <div className="grid grid-cols-3 items-center gap-3 px-4 py-0 min-h-[44px] bg-white border border-slate-200 shrink-0 mb-0 -mr-4 rounded-xl">
         {/* LEFT */}
         <div className="flex items-center gap-2 relative">
           {!editMode && (

@@ -10071,7 +10071,7 @@ export default function Statistics() {
              on the stat-list view). Desktop always shows it. */
           <button
             onClick={() => setShowTypeSelector(true)}
-            className={`btn-primary text-sm px-3 py-1.5 flex-shrink-0 ${selectedStat ? 'hidden sm:inline-flex' : ''}`}
+            className={`btn-primary text-xs px-2.5 py-1 flex-shrink-0 ${selectedStat ? 'hidden sm:inline-flex' : ''}`}
           >
             <span className="sm:hidden">＋ Add</span>
             <span className="hidden sm:inline">+ Add Statistic</span>

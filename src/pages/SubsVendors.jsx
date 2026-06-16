@@ -581,10 +581,10 @@ export default function SubsVendors() {
         </div>
         <div className="flex items-center gap-2 pr-2 flex-shrink-0">
           <button onClick={() => openNew('sub')} className="btn-primary text-xs px-3 py-1.5 whitespace-nowrap">
-            + Sub
+            + Add Subcontractor
           </button>
           <button onClick={() => openNew('vendor')} className="btn-primary text-xs px-3 py-1.5 whitespace-nowrap">
-            + Vendor
+            + Add Vendor
           </button>
         </div>
       </div>
