@@ -11,6 +11,7 @@ import {
   SIDEBAR_KEY,
   SIDEBAR_ICONS_KEY,
   SIDEBAR_FONT_KEY,
+  MENU_POS_KEY,
   sidebarFontStyle,
   sidebarNavColor,
   HEADER_KEY,
@@ -51,6 +52,40 @@ const navItems = [
   { path: '/statistics', label: 'Statistics', icon: '📈' },
 ]
 
+// Grouped nav for the "Top" menu position — collapses the flat list into a
+// handful of header dropdowns. Items reference the same paths/icons/labels as
+// navItems above.
+const _navByPath = Object.fromEntries(navItems.map(i => [i.path, i]))
+const NAV_GROUPS = [
+  { type: 'single', item: _navByPath['/'] },
+  {
+    type: 'group',
+    label: 'Admin',
+    icon: '🛡️',
+    items: ['/org-chart', '/hr', '/edocuments'].map(p => _navByPath[p]).filter(Boolean),
+  },
+  {
+    type: 'group',
+    label: 'Sales',
+    icon: '💼',
+    items: ['/contacts', '/clients', '/design', '/bids'].map(p => _navByPath[p]).filter(Boolean),
+  },
+  { type: 'single', item: _navByPath['/training'] },
+  {
+    type: 'group',
+    label: 'Finances',
+    icon: '💰',
+    items: ['/collections', '/accounting'].map(p => _navByPath[p]).filter(Boolean),
+  },
+  {
+    type: 'group',
+    label: 'Job Management',
+    icon: '🗂️',
+    items: ['/jobs', '/equipment-tracking', '/portal/subs'].map(p => _navByPath[p]).filter(Boolean),
+  },
+  { type: 'single', item: _navByPath['/statistics'] },
+]
+
 // Dock and main menu labels are computed inside the component via t()
 // so they update when the user's language changes.
 
@@ -73,6 +108,13 @@ const SCREEN_TITLES = [
   ['/jobs', 'Jobs'],
   ['/info', 'Job Info'],
   ['/hr', 'Employees'],
+  ['/org-chart', 'Org Chart'],
+  ['/training', 'Training'],
+  ['/accounting', 'Accounting'],
+  ['/equipment-tracking', 'Equipment'],
+  ['/admin', 'Admin'],
+  ['/customize', 'Customize'],
+  ['/help', 'Help Desk'],
 ]
 function screenTitle(path) {
   if (path === '/') return 'Dashboard'
@@ -190,6 +232,16 @@ export default function Layout() {
       return HEADER_DEFAULT
     }
   })
+  // Desktop menu position: 'left' | 'top' | 'right' | 'bottom'.
+  const [menuPos, setMenuPos] = useState(() => {
+    try {
+      return readModuleBackgrounds()[MENU_POS_KEY] || 'left'
+    } catch {
+      return 'left'
+    }
+  })
+  // Which header nav group dropdown is open (Top menu mode).
+  const [openNavGroup, setOpenNavGroup] = useState(null)
   // Background id of the current route's module (for nav contrast when the
   // sidebar is Clear and showing the page background).
   const [currentBgId, setCurrentBgId] = useState('none')
@@ -197,6 +249,7 @@ export default function Layout() {
   const userMenuRef = useRef(null)
   const helpMenuRef = useRef(null)
   const mainMenuRef = useRef(null)
+  const navGroupRef = useRef(null)
 
   // Fetch profile (admin status + avatar)
   const fetchProfile = () => {
@@ -253,6 +306,7 @@ export default function Layout() {
         setSidebarBg(map[SIDEBAR_KEY] || null)
         setHeaderBg(map[HEADER_KEY] !== undefined ? map[HEADER_KEY] : HEADER_DEFAULT)
         setSidebarIcons(map[SIDEBAR_ICONS_KEY] !== false); setSidebarFont(map[SIDEBAR_FONT_KEY] || null)
+        setMenuPos(map[MENU_POS_KEY] || 'left')
         setCurrentBgId(bgIdForPath(window.location.pathname, map))
       })
   }, [user?.id])
@@ -265,6 +319,7 @@ export default function Layout() {
     setSidebarBg(map[SIDEBAR_KEY] || null)
     setHeaderBg(map[HEADER_KEY] !== undefined ? map[HEADER_KEY] : HEADER_DEFAULT)
     setSidebarIcons(map[SIDEBAR_ICONS_KEY] !== false); setSidebarFont(map[SIDEBAR_FONT_KEY] || null)
+    setMenuPos(map[MENU_POS_KEY] || 'left')
     setCurrentBgId(bgIdForPath(location.pathname, map))
   }, [location.pathname])
   useEffect(() => {
@@ -274,6 +329,7 @@ export default function Layout() {
       setSidebarBg(map[SIDEBAR_KEY] || null)
       setHeaderBg(map[HEADER_KEY] !== undefined ? map[HEADER_KEY] : HEADER_DEFAULT)
       setSidebarIcons(map[SIDEBAR_ICONS_KEY] !== false); setSidebarFont(map[SIDEBAR_FONT_KEY] || null)
+      setMenuPos(map[MENU_POS_KEY] || 'left')
       setCurrentBgId(bgIdForPath(window.location.pathname, map))
     }
     window.addEventListener('module-backgrounds-updated', handler)
@@ -293,6 +349,13 @@ export default function Layout() {
   const navFontStyle = sidebarFontStyle(sidebarFont)
   const navItemStyle =
     navTextStyle || navFontStyle ? { ...navTextStyle, ...navFontStyle } : undefined
+
+  // Desktop menu-position derived flags.
+  const menuOnRight = menuPos === 'right'
+  const menuOnTop = menuPos === 'top'
+  const menuOnBottom = menuPos === 'bottom'
+  const showSidebar = menuPos === 'left' || menuOnRight // vertical sidebar modes
+  const desktopTitle = screenTitle(location.pathname)
 
   // Auto header text/tint: from the header color if set, else (Clear) from the
   // page background's darkness. Mirrors the sidebar's auto-contrast.
@@ -366,6 +429,16 @@ export default function Layout() {
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [showHelpMenu])
+
+  // Close the Top-menu nav-group dropdown on outside click.
+  useEffect(() => {
+    if (!openNavGroup) return
+    function handleClick(e) {
+      if (navGroupRef.current && !navGroupRef.current.contains(e.target)) setOpenNavGroup(null)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [openNavGroup])
 
   // Close main menu on outside click
   useEffect(() => {
@@ -513,6 +586,81 @@ export default function Layout() {
             </span>
           )}
 
+          {/* Desktop page title — for Left/Right/Bottom menu positions the page
+              title moves up into the header, center-justified. */}
+          {!menuOnTop && desktopTitle && (
+            <span
+              style={headerTextStyle}
+              className="hidden lg:block absolute left-1/2 -translate-x-1/2 font-semibold text-sm text-center pointer-events-none truncate max-w-[40%]"
+            >
+              {desktopTitle}
+            </span>
+          )}
+
+          {/* Top menu position — grouped nav dropdowns live in the header. */}
+          {menuOnTop && (
+            <nav
+              ref={navGroupRef}
+              className="hidden lg:flex items-center gap-0.5 min-w-0 overflow-x-auto"
+            >
+              {NAV_GROUPS.map(g => {
+                if (g.type === 'single') {
+                  const it = g.item
+                  if (!it) return null
+                  return (
+                    <Link
+                      key={it.path}
+                      to={it.path}
+                      style={{
+                        color: headerText,
+                        ...(isActive(it.path) ? { backgroundColor: headerActiveBg } : {}),
+                      }}
+                      className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium whitespace-nowrap ${headerHoverPill}`}
+                    >
+                      {it.label}
+                    </Link>
+                  )
+                }
+                const open = openNavGroup === g.label
+                const groupActive = g.items.some(it => isActive(it.path))
+                return (
+                  <div key={g.label} className="relative">
+                    <button
+                      onClick={() => setOpenNavGroup(o => (o === g.label ? null : g.label))}
+                      style={{
+                        color: headerText,
+                        ...(groupActive ? { backgroundColor: headerActiveBg } : {}),
+                      }}
+                      className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium whitespace-nowrap ${headerHoverPill}`}
+                    >
+                      {g.label}
+                      <span className="text-[10px] opacity-50">▾</span>
+                    </button>
+                    {open && (
+                      <div className="absolute left-0 top-full mt-2 w-52 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
+                        {g.items.map(it => (
+                          <Link
+                            key={it.path}
+                            to={it.path}
+                            onClick={() => setOpenNavGroup(null)}
+                            className={`flex items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-gray-50 ${
+                              isActive(it.path)
+                                ? 'text-green-700 font-semibold bg-green-50'
+                                : 'text-gray-700'
+                            }`}
+                          >
+                            <span className="w-4 inline-flex justify-center">{it.icon}</span>
+                            {it.label}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </nav>
+          )}
+
           {/* Centre slot — pages portal content here (desktop). */}
           <div className="flex-1 flex justify-center items-center min-w-0" id="app-header-center" />
 
@@ -649,11 +797,14 @@ export default function Layout() {
       </header>
 
       {/* ── BODY: sidebar + content ── */}
-      <div className="flex flex-1 min-h-0">
-        {/* LEFT SIDEBAR — desktop only */}
+      <div className={`flex flex-1 min-h-0 ${menuOnBottom ? 'flex-col' : ''}`}>
+        {/* SIDEBAR — desktop only, shown for Left/Right menu positions.
+            order-last shifts it to the right edge when menuPos === 'right'. */}
         <aside
           style={sidebarBg ? { backgroundColor: sidebarBg } : undefined}
-          className={`group hidden lg:flex flex-col bg-transparent sticky top-11 h-[calc(100vh-2.75rem)] overflow-y-auto transition-[width] duration-200 ${
+          className={`group ${showSidebar ? 'hidden lg:flex' : 'hidden'} ${
+            menuOnRight ? 'order-last' : ''
+          } flex-col bg-transparent sticky top-11 h-[calc(100vh-2.75rem)] overflow-y-auto transition-[width] duration-200 ${
             navCollapsed ? 'w-12' : 'w-32'
           }`}
         >
@@ -726,9 +877,42 @@ export default function Layout() {
         {/* overflow-x-hidden: a too-wide page (e.g. a detail view) can't push the
             layout — and the fixed bottom dock — wider than the screen.
             overscroll-none: the scroll box stops rubber-banding off the header. */}
-        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden overscroll-none p-2 pb-24 lg:p-6 lg:pb-6">
+        <main
+          className={`flex-1 min-w-0 overflow-y-auto overflow-x-hidden overscroll-none p-2 pb-24 lg:px-6 lg:pb-6 ${
+            menuPos === 'left' ? 'lg:pt-6' : 'lg:pt-2'
+          }`}
+        >
           <Outlet />
         </main>
+
+        {/* DESKTOP BOTTOM NAV — horizontal menu bar for the Bottom position. */}
+        {menuOnBottom && (
+          <nav
+            style={sidebarBg ? { backgroundColor: sidebarBg } : undefined}
+            className="hidden lg:flex flex-shrink-0 items-center gap-1 overflow-x-auto border-t border-black/10 px-3 py-1.5"
+          >
+            {navItems.map(item => (
+              <Link
+                key={item.path}
+                to={item.path}
+                style={navItemStyle}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex-shrink-0 text-gray-800 transition-colors ${
+                  isActive(item.path) ? navActivePill : navHoverPill
+                }`}
+              >
+                {sidebarIcons && <span className="text-sm">{item.icon}</span>}
+                {item.label}
+              </Link>
+            ))}
+            <button
+              onClick={handleSignOut}
+              style={navTextStyle}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex-shrink-0 text-gray-800 transition-colors ${navHoverPill}`}
+            >
+              <span>🚪</span> Sign Out
+            </button>
+          </nav>
+        )}
       </div>
 
       {/* ── MOBILE BOTTOM DOCK ──

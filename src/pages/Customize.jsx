@@ -20,6 +20,8 @@ import {
   SIDEBAR_FONT_SIZES,
   HEADER_KEY,
   HEADER_DEFAULT,
+  MENU_POS_KEY,
+  MENU_POSITIONS,
   readModuleBackgrounds,
 } from '../lib/dashboardBackgrounds'
 import { COLOR_LIBRARY } from '../lib/colorLibrary'
@@ -115,6 +117,7 @@ export default function Customize() {
   const currentHeader = map[HEADER_KEY] !== undefined ? map[HEADER_KEY] : HEADER_DEFAULT
   const showIcons = map[SIDEBAR_ICONS_KEY] !== false
   const font = map[SIDEBAR_FONT_KEY] || {}
+  const menuPos = map[MENU_POS_KEY] || 'left'
 
   function pickBackground(bgId) {
     setMap(m => {
@@ -142,6 +145,11 @@ export default function Customize() {
 
   function setIcons(show) {
     setMap(m => ({ ...m, [SIDEBAR_ICONS_KEY]: show }))
+    setSavedMsg('')
+  }
+
+  function setMenuPos(pos) {
+    setMap(m => ({ ...m, [MENU_POS_KEY]: pos }))
     setSavedMsg('')
   }
 
@@ -292,6 +300,31 @@ export default function Customize() {
 
         {tab === 'menu' && (
         <>
+        {/* ── Menu location (desktop) ── */}
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Menu location</h2>
+        <p className="text-sm text-gray-500 mb-3">
+          Where the navigation menu sits on desktop. <strong>Top</strong> groups the menu into
+          dropdowns in the header bar. (Mobile always uses the bottom dock.)
+        </p>
+        <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6 flex flex-wrap gap-2">
+          {MENU_POSITIONS.map(opt => {
+            const isSel = menuPos === opt.id
+            return (
+              <button
+                key={opt.id}
+                onClick={() => setMenuPos(opt.id)}
+                className={`text-sm font-semibold px-4 py-2 rounded-lg border transition-colors ${
+                  isSel
+                    ? 'bg-green-700 text-white border-2 border-black'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:border-green-400'
+                }`}
+              >
+                {isSel ? '✓ ' : ''}{opt.icon} {opt.label}
+              </button>
+            )
+          })}
+        </div>
+
         {/* ── Left menu icons ── */}
         <h2 className="text-lg font-bold text-gray-900 mb-1">Menu icons</h2>
         <p className="text-sm text-gray-500 mb-3">

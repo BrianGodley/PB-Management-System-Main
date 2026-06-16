@@ -51,6 +51,16 @@ export const SIDEBAR_ICONS_KEY = '__sidebarIcons'
 // Reserved key: left menu font settings { family, size, bold, italic }.
 export const SIDEBAR_FONT_KEY = '__sidebarFont'
 
+// Reserved key: desktop menu position — 'left' | 'top' | 'right' | 'bottom'.
+// Default 'left' (the classic sidebar). Mobile always uses its bottom dock.
+export const MENU_POS_KEY = '__menuPos'
+export const MENU_POSITIONS = [
+  { id: 'left', label: 'Left', icon: '⬅️' },
+  { id: 'top', label: 'Top', icon: '⬆️' },
+  { id: 'right', label: 'Right', icon: '➡️' },
+  { id: 'bottom', label: 'Bottom', icon: '⬇️' },
+]
+
 // A broad set of the fonts that ship with Microsoft Office / Windows, in the
 // same spirit as Word's font menu. NOTE: a font only renders if it's actually
 // installed on the viewer's device (web apps can't bundle proprietary Office
@@ -293,6 +303,7 @@ export const DEFAULT_PREFS = (() => {
   m[HEADER_KEY] = null // Clear header bar
   m[SIDEBAR_ICONS_KEY] = true // Show icons
   m[SIDEBAR_FONT_KEY] = { family: '"Comic Sans MS", "Comic Sans", cursive', size: '13px', bold: false, italic: false }
+  m[MENU_POS_KEY] = 'left' // Classic left sidebar
   return m
 })()
 
