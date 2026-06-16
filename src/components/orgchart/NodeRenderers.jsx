@@ -191,6 +191,8 @@ export function ContainerNode({
   const fill = noColor ? 'none' : solid ? color : '#FFFFFF'
   const borderColor = noColor ? '#111111' : solid ? 'rgba(0,0,0,0.12)' : color
   const borderW = solid ? 1 : noColor ? 1.5 : Number.isFinite(bs.borderWidth) ? bs.borderWidth : 2
+  // Corner radius: 'square' = sharp corners, default = rounded.
+  const cornerR = bs.corners === 'square' ? 0 : 10
   const textColor = solid ? pickTextColor(color) : '#1E293B'
   const cx = box.x + box.width / 2
   const fs = node.font_sizes || {}
@@ -230,8 +232,8 @@ export function ContainerNode({
         y={box.y}
         width={box.width}
         height={box.height}
-        rx={10}
-        ry={10}
+        rx={cornerR}
+        ry={cornerR}
         fill={fill}
         pointerEvents="all"
         stroke={borderColor}

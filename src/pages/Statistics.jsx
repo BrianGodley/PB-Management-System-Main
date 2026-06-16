@@ -10083,7 +10083,7 @@ export default function Statistics() {
             screen — the list slides out of the way and the user gets back to
             it via the chart-header back arrow. Desktop keeps both visible. */}
           <aside
-            className={`${selectedStat ? 'hidden md:flex' : 'flex'} w-full md:w-56 xl:w-64 md:flex-shrink-0 flex-col bg-white border-r border-gray-200 overflow-hidden`}
+            className={`${selectedStat ? 'hidden md:flex' : 'flex'} w-full md:w-56 xl:w-64 md:flex-shrink-0 flex-col bg-white border border-gray-200 overflow-hidden rounded-l-xl`}
           >
             {/* Folder rows — hidden entirely when admin disables the archive folder */}
             {showStatArchiveFolder && (

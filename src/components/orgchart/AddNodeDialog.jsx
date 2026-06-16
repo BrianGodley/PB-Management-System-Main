@@ -1149,6 +1149,31 @@ export default function AddNodeDialog({
                 </div>
               </div>
             )}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Corners</label>
+              <div className="flex items-center gap-2">
+                {[
+                  { v: 'rounded', label: 'Rounded' },
+                  { v: 'square', label: 'Square' },
+                ].map(o => {
+                  const cur = boxStyle.corners === 'square' ? 'square' : 'rounded'
+                  return (
+                    <button
+                      key={o.v}
+                      type="button"
+                      onClick={() => setBoxStyle(s => ({ ...s, corners: o.v }))}
+                      className={`flex-1 py-1.5 rounded-md border text-xs ${
+                        cur === o.v
+                          ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
+                          : 'border-gray-200 hover:bg-gray-50 text-gray-600'
+                      }`}
+                    >
+                      {o.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Box Width</label>
