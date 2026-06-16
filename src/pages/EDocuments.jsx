@@ -197,14 +197,18 @@ function DashboardTab({ userId, userName }) {
 
   return (
     <div>
-      {/* You — ~2.5in tall, blue flowing-waves background */}
+      {/* You — ~2.5in tall, aurora-colored background */}
       <div
-        className="relative rounded-2xl overflow-hidden border border-blue-100 mb-5"
+        className="relative rounded-2xl overflow-hidden border border-emerald-100 mb-5"
         style={{
           height: '2.5in',
-          backgroundImage: "url('/edoc-dashboard-bg.svg')",
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
+          backgroundColor: '#0b1120',
+          backgroundImage:
+            'radial-gradient(at 18% 22%, #6ee7b7 0px, transparent 55%), ' +
+            'radial-gradient(at 78% 8%, #22d3ee 0px, transparent 50%), ' +
+            'radial-gradient(at 5% 78%, #3b82f6 0px, transparent 55%), ' +
+            'radial-gradient(at 88% 92%, #a78bfa 0px, transparent 55%), ' +
+            'radial-gradient(at 55% 50%, #34d399 0px, transparent 60%)',
         }}
       >
         <div className="absolute top-4 left-4 flex items-center gap-3">
@@ -215,20 +219,29 @@ function DashboardTab({ userId, userName }) {
               (userName?.[0] || 'U').toUpperCase()
             )}
           </div>
-          <h3 className="text-lg font-bold text-gray-800">You</h3>
+          <h3 className="text-lg font-bold text-white drop-shadow">You</h3>
         </div>
         <div className="absolute inset-x-4 bottom-4">
           <StageTiles docs={myDocs} />
         </div>
       </div>
 
-      {/* Team — matches the You height (2.5in) */}
+      {/* Team — matches the You height (2.5in), aurora-colored background */}
       <div
-        className="relative rounded-2xl overflow-hidden border border-gray-200 bg-gradient-to-br from-slate-50 to-slate-100"
-        style={{ height: '2.5in' }}
+        className="relative rounded-2xl overflow-hidden border border-violet-100"
+        style={{
+          height: '2.5in',
+          backgroundColor: '#0b1120',
+          backgroundImage:
+            'radial-gradient(at 22% 18%, #818cf8 0px, transparent 55%), ' +
+            'radial-gradient(at 82% 12%, #c084fc 0px, transparent 50%), ' +
+            'radial-gradient(at 8% 82%, #22d3ee 0px, transparent 55%), ' +
+            'radial-gradient(at 90% 88%, #34d399 0px, transparent 55%), ' +
+            'radial-gradient(at 50% 55%, #6366f1 0px, transparent 60%)',
+        }}
       >
         <div className="absolute top-4 left-4">
-          <h3 className="text-lg font-bold text-gray-700">Team</h3>
+          <h3 className="text-lg font-bold text-white drop-shadow">Team</h3>
         </div>
         <div className="absolute inset-x-4 bottom-4">
           <StageTiles docs={docs} />
