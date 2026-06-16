@@ -1564,7 +1564,7 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
   const allGroups = [...Object.entries(grouped), ...(noManager.length ? [['', noManager]] : [])]
 
   return (
-    <div className="flex-1 overflow-auto rounded-xl border border-gray-200 shadow-sm">
+    <div className="thin-scroll flex-1 overflow-auto rounded-xl border border-gray-200 shadow-sm">
       <table className="text-xs w-full table-fixed" style={{ minWidth: '1120px' }}>
         <colgroup>
           <col style={{ width: '115px' }} />

@@ -825,7 +825,7 @@ export default function HR() {
       )}
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden pt-4 pb-3 sm:pb-6">
+      <div className="thin-scroll flex-1 overflow-y-auto overflow-x-hidden pt-4 pb-3 sm:pb-6">
         {loading ? (
           <div className="flex items-center justify-center py-12 text-gray-400">Loading…</div>
         ) : /* ── EMPLOYEES TAB ── */

@@ -1585,7 +1585,7 @@ export default function Clients() {
                 )}
               </div>
             ) : (
-              <div className="bg-white rounded-xl border border-gray-200 flex-1 min-h-0 overflow-x-hidden overflow-y-auto lg:overflow-auto overscroll-contain">
+              <div className="thin-scroll bg-white rounded-xl border border-gray-200 flex-1 min-h-0 overflow-x-hidden overflow-y-auto lg:overflow-auto overscroll-contain">
                 <table className="w-full text-xs table-fixed lg:table-auto lg:min-w-[900px]">
                   <thead className="sticky top-0 z-20">
                     <tr className="bg-gray-50 border-b border-gray-200">
