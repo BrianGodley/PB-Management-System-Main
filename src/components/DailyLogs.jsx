@@ -708,6 +708,16 @@ function LogModal({
   const cameraRef = useRef(null)
   const alertSelected = alertEmployees.filter(e => alertUserIds?.has(e.id))
   const empName = e => `${e.first_name || ''} ${e.last_name || ''}`.trim() || 'Unnamed'
+  // Searchable alert-people picker.
+  const [alertQuery, setAlertQuery] = useState('')
+  const [alertOpen, setAlertOpen] = useState(false)
+  const alertCandidates = alertEmployees
+    .filter(e => !alertUserIds?.has(e.id))
+    .filter(e => {
+      const q = alertQuery.trim().toLowerCase()
+      return !q || empName(e).toLowerCase().includes(q)
+    })
+    .sort((a, b) => empName(a).localeCompare(empName(b), undefined, { numeric: true, sensitivity: 'base' }))
 
   return (
     <div
@@ -888,24 +898,43 @@ function LogModal({
                   </div>
                 )}
 
-                {/* Add person */}
-                <select
-                  value=""
-                  onChange={e => {
-                    if (e.target.value) toggleAlertUser(e.target.value)
-                  }}
-                  className="input text-sm w-full"
-                >
-                  <option value="">+ Add a person to alert…</option>
-                  {alertEmployees
-                    .filter(e => !alertUserIds?.has(e.id))
-                    .map(e => (
-                      <option key={e.id} value={e.id}>
-                        {empName(e)}
-                        {e.email || e.cell_phone ? '' : ' (no contact info)'}
-                      </option>
-                    ))}
-                </select>
+                {/* Add person — searchable dropdown picker */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={alertQuery}
+                    onChange={e => {
+                      setAlertQuery(e.target.value)
+                      setAlertOpen(true)
+                    }}
+                    onFocus={() => setAlertOpen(true)}
+                    onBlur={() => setTimeout(() => setAlertOpen(false), 150)}
+                    placeholder="Search people to alert…"
+                    className="input text-sm w-full"
+                  />
+                  {alertOpen && (
+                    <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                      {alertCandidates.length === 0 ? (
+                        <p className="px-3 py-2 text-xs text-gray-400">No people match.</p>
+                      ) : (
+                        alertCandidates.map(e => (
+                          <button
+                            key={e.id}
+                            type="button"
+                            onMouseDown={() => {
+                              toggleAlertUser(e.id)
+                              setAlertQuery('')
+                            }}
+                            className="block w-full text-left px-3 py-1.5 text-sm hover:bg-green-50"
+                          >
+                            {empName(e)}
+                            {e.email || e.cell_phone ? '' : ' (no contact info)'}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 {/* Method — only relevant once someone is selected */}
                 {alertSelected.length > 0 && (

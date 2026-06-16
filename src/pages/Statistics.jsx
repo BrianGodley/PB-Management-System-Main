@@ -7560,11 +7560,13 @@ function StatisticsSettingsView({
   positions,
   isAdmin,
   onEditStat,
+  onOpenShares,
   onRestored,
   showStatArchiveFolder,
   onShowStatArchiveFolderChange,
 }) {
   const [settingsSubTab, setSettingsSubTab] = useState('tracking')
+  const [shareSearch, setShareSearch] = useState('')
 
   const [wedDay, setWedDay] = useState(weekEndingDay ?? 5)
   const [saving, setSaving] = useState(false)
@@ -7602,6 +7604,7 @@ function StatisticsSettingsView({
     { key: 'tracking', label: '📅 Tracking' },
     { key: 'general', label: '📖 General' },
     { key: 'groups', label: '📂 Stat Groups' },
+    { key: 'sharing', label: '🔒 Sharing' },
     ...(isAdmin ? [{ key: 'reminders', label: '🔔 Reminders' }] : []),
     ...(isAdmin ? [{ key: 'master', label: '👑 Master' }] : []),
     ...(isAdmin ? [{ key: 'archive', label: '📦 Archive' }] : []),
@@ -7647,11 +7650,11 @@ function StatisticsSettingsView({
   const masterStats = masterSubTab === 'archive' ? masterArchive : masterCurrent
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50 mr-2 sm:mr-3 -mt-1">
-      {/* Sub-tab bar — nudged up ~1/16"; the gap BELOW it is created with
-          padding on the content wrapper (padding can't margin-collapse, so it
-          reliably renders) and is kept equal to the gap above the bar. */}
-      <div className="flex justify-center border border-gray-200 bg-white px-6 rounded-xl">
+    <div className="flex-1 overflow-y-auto bg-gray-50 mr-2 sm:mr-3">
+      {/* Sub-tab bar — sticky so the content below scrolls UNDER it (never
+          rides up over it). mb-3 gives a fixed gap to the content; no negative
+          margins so the spacing can't collapse/“reverse”. */}
+      <div className="sticky top-0 z-10 flex justify-center border border-gray-200 bg-white px-6 rounded-xl mb-3">
         {SUB_TABS.map(t => (
           <button
             key={t.key}
@@ -7667,7 +7670,7 @@ function StatisticsSettingsView({
         ))}
       </div>
 
-      <div className="px-6 pt-2 pb-6">
+      <div className="px-6 pb-6">
         {/* The Master sub-tab needs the full width — its table has 5 columns
           and gets clipped by the narrow max-w-xl that's used for the
           settings forms. */}
@@ -7832,6 +7835,51 @@ function StatisticsSettingsView({
 
           {/* ── STAT GROUPS SUB-TAB ── */}
           {settingsSubTab === 'groups' && <StatGroups stats={stats} />}
+
+          {/* ── SHARING SUB-TAB — pick a stat, edit who can view/edit it ── */}
+          {settingsSubTab === 'sharing' && (
+            <div className="w-full">
+              <p className="text-sm text-gray-500 mb-3">
+                Choose a statistic to manage which users can <strong>view</strong> or{' '}
+                <strong>edit</strong> it. Owners (by user or position) always have full access.
+              </p>
+              <input
+                type="text"
+                value={shareSearch}
+                onChange={e => setShareSearch(e.target.value)}
+                placeholder="Search statistics…"
+                className="w-full max-w-md border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600"
+              />
+              <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100 overflow-hidden">
+                {(stats || [])
+                  .filter(s => {
+                    const q = shareSearch.trim().toLowerCase()
+                    return !q || (s.name || '').toLowerCase().includes(q)
+                  })
+                  .sort((a, b) =>
+                    (a.name || '').localeCompare(b.name || '', undefined, {
+                      numeric: true,
+                      sensitivity: 'base',
+                    })
+                  )
+                  .map(s => (
+                    <div key={s.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                      <span className="text-sm font-medium text-gray-800 truncate">{s.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => onOpenShares?.(s.id, s.name)}
+                        className="flex-shrink-0 text-xs px-3 py-1.5 rounded-lg border-2 border-green-700 text-green-700 font-semibold hover:bg-green-50 transition-colors"
+                      >
+                        🔒 View / Edit Sharing
+                      </button>
+                    </div>
+                  ))}
+                {(stats || []).length === 0 && (
+                  <p className="px-4 py-6 text-sm text-gray-400 text-center">No statistics yet.</p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* ── MASTER SUB-TAB — admin-only listing of every stat ── */}
           {settingsSubTab === 'master' && isAdmin && (
@@ -9965,9 +10013,9 @@ export default function Statistics() {
                 }}
                 className="hidden sm:inline-flex text-sm font-medium text-blue-600 hover:text-blue-800 underline underline-offset-2 transition-colors flex-shrink-0"
               >
-                {selectedStat?.stat_category === 'auto_internal'
-                  ? 'View Value History'
-                  : 'Edit Value History'}
+                {canEditSelectedStat && selectedStat?.stat_category !== 'auto_internal'
+                  ? 'Edit Value History'
+                  : 'View Value History'}
               </button>
             )}
             {canEditSelectedStat && (
@@ -10055,6 +10103,7 @@ export default function Statistics() {
           positions={positions}
           isAdmin={isCurrentUserAdmin}
           onEditStat={editStatById}
+          onOpenShares={openShares}
           onRestored={() => {
             fetchAll()
           }}
@@ -11040,7 +11089,7 @@ export default function Statistics() {
           onClose={() => setShowEditHistory(false)}
           onRefresh={refreshValues}
           weekEndingDay={weekEndingDay}
-          readOnly={selectedStat.stat_category === 'auto_internal'}
+          readOnly={selectedStat.stat_category === 'auto_internal' || !canEditSelectedStat}
         />
       )}
       {/* Print orientation picker */}
@@ -11346,13 +11395,13 @@ export default function Statistics() {
                   className="w-full text-left px-3 py-3 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm font-semibold text-blue-700 flex items-center gap-2"
                 >
                   📅{' '}
-                  {selectedStat?.stat_category === 'auto_internal'
-                    ? 'View Value History'
-                    : 'Edit Value History'}
+                  {canEditSelectedStat && selectedStat?.stat_category !== 'auto_internal'
+                    ? 'Edit Value History'
+                    : 'View Value History'}
                   <span className="text-xs text-gray-400 ml-auto">
-                    {selectedStat?.stat_category === 'auto_internal'
-                      ? 'Auto-filled · read only'
-                      : 'View & tweak past entries'}
+                    {canEditSelectedStat && selectedStat?.stat_category !== 'auto_internal'
+                      ? 'View & tweak past entries'
+                      : 'Read only'}
                   </span>
                 </button>
               )}
