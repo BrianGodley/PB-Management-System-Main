@@ -53,11 +53,22 @@ export const SIDEBAR_FONT_KEY = '__sidebarFont'
 
 export const SIDEBAR_FONTS = [
   { id: 'default', label: 'Default', value: '' },
-  { id: 'sans', label: 'Sans', value: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' },
-  { id: 'serif', label: 'Serif', value: 'Georgia, "Times New Roman", serif' },
-  { id: 'mono', label: 'Mono', value: 'ui-monospace, "SF Mono", Menlo, monospace' },
-  { id: 'rounded', label: 'Rounded', value: '"Trebuchet MS", "Segoe UI", Verdana, sans-serif' },
-  { id: 'condensed', label: 'Condensed', value: '"Arial Narrow", "Helvetica Neue", sans-serif' },
+  { id: 'system', label: 'System Sans', value: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' },
+  { id: 'arial', label: 'Arial', value: 'Arial, Helvetica, sans-serif' },
+  { id: 'helvetica', label: 'Helvetica', value: '"Helvetica Neue", Helvetica, Arial, sans-serif' },
+  { id: 'verdana', label: 'Verdana', value: 'Verdana, Geneva, sans-serif' },
+  { id: 'tahoma', label: 'Tahoma', value: 'Tahoma, Geneva, sans-serif' },
+  { id: 'trebuchet', label: 'Trebuchet MS', value: '"Trebuchet MS", Tahoma, sans-serif' },
+  { id: 'calibri', label: 'Calibri', value: 'Calibri, Candara, Segoe, sans-serif' },
+  { id: 'segoe', label: 'Segoe UI', value: '"Segoe UI", Tahoma, sans-serif' },
+  { id: 'georgia', label: 'Georgia', value: 'Georgia, "Times New Roman", serif' },
+  { id: 'times', label: 'Times New Roman', value: '"Times New Roman", Times, serif' },
+  { id: 'garamond', label: 'Garamond', value: 'Garamond, "Times New Roman", serif' },
+  { id: 'palatino', label: 'Palatino', value: '"Palatino Linotype", "Book Antiqua", Palatino, serif' },
+  { id: 'courier', label: 'Courier', value: '"Courier New", Courier, monospace' },
+  { id: 'mono', label: 'Monospace', value: 'ui-monospace, "SF Mono", Menlo, monospace' },
+  { id: 'comic', label: 'Comic Sans', value: '"Comic Sans MS", "Comic Sans", cursive' },
+  { id: 'impact', label: 'Impact', value: 'Impact, Haettenschweiler, sans-serif' },
 ]
 
 // Sizes are kept modest (≤14px) so the menu never gets oversized.

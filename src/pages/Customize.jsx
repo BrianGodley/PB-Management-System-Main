@@ -310,41 +310,24 @@ export default function Customize() {
           })}
         </div>
 
-        {/* ── Left menu bar color ── */}
-        <h2 className="text-lg font-bold text-gray-900 mb-1">Left menu bar</h2>
-        <p className="text-sm text-gray-500 mb-3">
-          Give the menu a background color, or <strong>Clear</strong> to let the page background show
-          through.
-        </p>
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <BarPalette value={currentSidebar} onChange={pickSidebar} />
-        </div>
-
         {/* ── Menu font ── */}
-        <h2 className="text-lg font-bold text-gray-900 mt-6 mb-1">Menu font</h2>
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Menu font</h2>
         <p className="text-sm text-gray-500 mb-3">Change the menu text font, size, and style.</p>
         <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">
           <div>
             <p className="text-xs font-semibold text-gray-500 mb-1.5">Font</p>
-            <div className="flex flex-wrap gap-2">
-              {SIDEBAR_FONTS.map(f => {
-                const isSel = (font.family || '') === f.value
-                return (
-                  <button
-                    key={f.id}
-                    onClick={() => setFont({ family: f.value })}
-                    style={f.value ? { fontFamily: f.value } : undefined}
-                    className={`text-sm px-3 py-1.5 rounded-lg transition-colors ${
-                      isSel
-                        ? 'bg-green-700 text-white border-2 border-black'
-                        : 'bg-white text-gray-700 border border-gray-300 hover:border-green-400'
-                    }`}
-                  >
-                    {f.label}
-                  </button>
-                )
-              })}
-            </div>
+            <select
+              value={font.family || ''}
+              onChange={e => setFont({ family: e.target.value })}
+              className="w-full max-w-xs border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600"
+              style={font.family ? { fontFamily: font.family } : undefined}
+            >
+              {SIDEBAR_FONTS.map(f => (
+                <option key={f.id} value={f.value} style={f.value ? { fontFamily: f.value } : undefined}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <p className="text-xs font-semibold text-gray-500 mb-1.5">Size</p>
@@ -392,6 +375,16 @@ export default function Customize() {
               </button>
             </div>
           </div>
+        </div>
+
+        {/* ── Left menu bar color ── */}
+        <h2 className="text-lg font-bold text-gray-900 mt-6 mb-1">Left menu bar</h2>
+        <p className="text-sm text-gray-500 mb-3">
+          Give the menu a background color, or <strong>Clear</strong> to let the page background show
+          through.
+        </p>
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <BarPalette value={currentSidebar} onChange={pickSidebar} />
         </div>
         </>
         )}
