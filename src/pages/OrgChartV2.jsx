@@ -1908,13 +1908,13 @@ export default function OrgChartV2() {
   const selectedNode = nodes.find(n => n.id === selectedNodeId) || null
 
   return (
-    <div className="h-full flex flex-col bg-slate-50">
+    <div className="h-full flex flex-col">
       {/* Top bar:
             LEFT   — view mode: Select-charts popover
                      edit mode: + Item
             CENTER — chart name + Edit/Save (and rename/delete in edit mode)
             RIGHT  — zoom + + Chart (view mode only) */}
-      <div className="grid grid-cols-3 items-center gap-3 px-4 py-3 bg-white border-b border-slate-200 shrink-0">
+      <div className="grid grid-cols-3 items-center gap-3 px-4 py-3 bg-white border border-slate-200 shrink-0 m-2 mb-0 rounded-xl">
         {/* LEFT */}
         <div className="flex items-center gap-2 relative">
           {!editMode && (

@@ -9,6 +9,7 @@ import {
   readModuleBackgrounds,
   MODULE_BG_LS_KEY,
   SIDEBAR_KEY,
+  SIDEBAR_ICONS_KEY,
   sidebarNavColor,
   HEADER_KEY,
   HEADER_DEFAULT,
@@ -61,6 +62,7 @@ const SCREEN_TITLES = [
   ['/timeclock', 'Time Clock'],
   ['/contacts', 'Contacts'],
   ['/clients', 'Opportunities'],
+  ['/collections', 'Weekly FP'],
   ['/edocuments', 'Documents'],
   ['/statistics', 'Statistics'],
   ['/design', 'Design'],
@@ -160,6 +162,14 @@ export default function Layout() {
       return null
     }
   })
+  // Whether the left menu shows icons (default true).
+  const [sidebarIcons, setSidebarIcons] = useState(() => {
+    try {
+      return readModuleBackgrounds()[SIDEBAR_ICONS_KEY] !== false
+    } catch {
+      return true
+    }
+  })
   // Top header bar color. Undefined in the map = never set → default green.
   const [headerBg, setHeaderBg] = useState(() => {
     try {
@@ -231,6 +241,7 @@ export default function Layout() {
         applyBackgroundForPath(window.location.pathname, map)
         setSidebarBg(map[SIDEBAR_KEY] || null)
         setHeaderBg(map[HEADER_KEY] !== undefined ? map[HEADER_KEY] : HEADER_DEFAULT)
+        setSidebarIcons(map[SIDEBAR_ICONS_KEY] !== false)
         setCurrentBgId(bgIdForPath(window.location.pathname, map))
       })
   }, [user?.id])
@@ -242,6 +253,7 @@ export default function Layout() {
     applyBackgroundForPath(location.pathname, map)
     setSidebarBg(map[SIDEBAR_KEY] || null)
     setHeaderBg(map[HEADER_KEY] !== undefined ? map[HEADER_KEY] : HEADER_DEFAULT)
+    setSidebarIcons(map[SIDEBAR_ICONS_KEY] !== false)
     setCurrentBgId(bgIdForPath(location.pathname, map))
   }, [location.pathname])
   useEffect(() => {
@@ -249,6 +261,8 @@ export default function Layout() {
       const map = readModuleBackgrounds()
       applyBackgroundForPath(window.location.pathname, map)
       setSidebarBg(map[SIDEBAR_KEY] || null)
+      setHeaderBg(map[HEADER_KEY] !== undefined ? map[HEADER_KEY] : HEADER_DEFAULT)
+      setSidebarIcons(map[SIDEBAR_ICONS_KEY] !== false)
       setCurrentBgId(bgIdForPath(window.location.pathname, map))
     }
     window.addEventListener('module-backgrounds-updated', handler)
@@ -672,7 +686,7 @@ export default function Layout() {
                   isActive(item.path) ? navActivePill : navHoverPill
                 }`}
               >
-                <span className="text-sm">{item.icon}</span>
+                {(sidebarIcons || navCollapsed) && <span className="text-sm">{item.icon}</span>}
                 {!navCollapsed && item.label}
               </Link>
             ))}

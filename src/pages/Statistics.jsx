@@ -9966,8 +9966,8 @@ export default function Statistics() {
           </button>
         ))}
       </div>
-      {/* ── COMBINED MODULE HEADER ───────────────────────────────────────── */}
-      <div className="flex items-center gap-2 flex-wrap px-3 sm:px-6 pt-3 sm:pt-6 pb-2 sm:pb-4 border-b border-gray-200/60 flex-shrink-0">
+      {/* ── COMBINED MODULE HEADER (white tab bar) ───────────────────────── */}
+      <div className="flex items-center gap-2 flex-wrap px-3 sm:px-6 py-2.5 bg-white border border-gray-200 rounded-xl flex-shrink-0 mx-2 sm:mx-3 mt-2 sm:mt-3 mb-2">
         <h1 className="hidden lg:block text-base sm:text-xl font-bold text-gray-900 flex-shrink-0">Statistics</h1>
         {viewMode === 'graphs' && selectedStat && (
           <>

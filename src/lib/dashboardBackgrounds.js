@@ -44,6 +44,10 @@ export const MODULE_BG_LS_KEY = 'pbs:moduleBackgrounds'
 // Reserved (non-route) key in the same map that stores the left menu bar color.
 export const SIDEBAR_KEY = '__sidebar'
 
+// Reserved key: whether to show icons in the left menu (default true). When
+// false, the nav shows text labels only and they shift left.
+export const SIDEBAR_ICONS_KEY = '__sidebarIcons'
+
 // Reserved (non-route) key that stores the top header bar color. Undefined in
 // the map means "never set" → fall back to the default green (HEADER_DEFAULT).
 export const HEADER_KEY = '__header'

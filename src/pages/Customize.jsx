@@ -14,6 +14,7 @@ import {
   CUSTOMIZE_MODULES,
   MODULE_BG_LS_KEY,
   SIDEBAR_KEY,
+  SIDEBAR_ICONS_KEY,
   HEADER_KEY,
   HEADER_DEFAULT,
   readModuleBackgrounds,
@@ -100,6 +101,7 @@ export default function Customize() {
   const currentSidebar = map[SIDEBAR_KEY] ?? null
   // Undefined (never set) → default green; explicit null → Clear.
   const currentHeader = map[HEADER_KEY] !== undefined ? map[HEADER_KEY] : HEADER_DEFAULT
+  const showIcons = map[SIDEBAR_ICONS_KEY] !== false
 
   function pickBackground(bgId) {
     setMap(m => {
@@ -122,6 +124,11 @@ export default function Customize() {
 
   function pickHeader(value) {
     setMap(m => ({ ...m, [HEADER_KEY]: value }))
+    setSavedMsg('')
+  }
+
+  function setIcons(show) {
+    setMap(m => ({ ...m, [SIDEBAR_ICONS_KEY]: show }))
     setSavedMsg('')
   }
 
@@ -267,6 +274,33 @@ export default function Customize() {
 
         {tab === 'menu' && (
         <>
+        {/* ── Left menu icons ── */}
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Menu icons</h2>
+        <p className="text-sm text-gray-500 mb-3">
+          Show or hide the icons next to each menu item. With icons off, the labels shift left.
+        </p>
+        <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6 flex gap-2">
+          {[
+            { id: true, label: 'Show icons' },
+            { id: false, label: 'Hide icons' },
+          ].map(opt => {
+            const isSel = showIcons === opt.id
+            return (
+              <button
+                key={String(opt.id)}
+                onClick={() => setIcons(opt.id)}
+                className={`text-sm font-semibold px-4 py-2 rounded-lg border transition-colors ${
+                  isSel
+                    ? 'bg-green-700 text-white border-2 border-black'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:border-green-400'
+                }`}
+              >
+                {isSel ? '✓ ' : ''}{opt.label}
+              </button>
+            )
+          })}
+        </div>
+
         {/* ── Left menu bar color ── */}
         <h2 className="text-lg font-bold text-gray-900 mb-1">Left menu bar</h2>
         <p className="text-sm text-gray-500 mb-3">

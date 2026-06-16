@@ -785,7 +785,7 @@ export default function HR() {
 
       {/* Search + filter bar — hidden on Settings and Positions tabs */}
       {tab !== 'settings' && tab !== 'positions' && (
-        <div className="mb-4 mt-4 flex items-center gap-3 flex-shrink-0">
+        <div className="mt-4 flex items-center gap-3 flex-shrink-0">
           <input
             type="text"
             value={search}
@@ -825,7 +825,7 @@ export default function HR() {
       )}
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden py-3 sm:py-6">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden pt-4 pb-3 sm:pb-6">
         {loading ? (
           <div className="flex items-center justify-center py-12 text-gray-400">Loading…</div>
         ) : /* ── EMPLOYEES TAB ── */
