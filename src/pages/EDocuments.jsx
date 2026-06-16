@@ -49,7 +49,7 @@ const fmtMoney = n =>
 
 export default function EDocuments({ clientId = null, embedded = false }) {
   const { user } = useAuth()
-  const [subTab, setSubTab] = useState('contracts')
+  const [subTab, setSubTab] = useState(embedded ? 'contracts' : 'dashboard')
   const [mainTab, setMainTab] = useState('files')
 
   // Friendly first name for the New Document dashboard greeting.
@@ -66,6 +66,7 @@ export default function EDocuments({ clientId = null, embedded = false }) {
     <>
       <div className="flex items-center gap-1 border-b border-gray-200 mb-4">
         {[
+          ...(embedded ? [] : [['dashboard', 'Dashboard']]),
           ['contracts', 'Created Contracts'],
           ['templates', 'Templates'],
           ['new', '+ New Document'],
@@ -83,6 +84,7 @@ export default function EDocuments({ clientId = null, embedded = false }) {
           </button>
         ))}
       </div>
+      {subTab === 'dashboard' && <DashboardTab userId={user?.id} userName={firstName} />}
       {subTab === 'contracts' && (
         <ContractsTab clientId={clientId} userId={user?.id} embedded={embedded} />
       )}
@@ -132,6 +134,100 @@ export default function EDocuments({ clientId = null, embedded = false }) {
         {mainTab === 'photos' && <FileManager root="photos" accept="image/*" />}
         {mainTab === 'videos' && <FileManager root="videos" accept="video/*" />}
         {mainTab === 'edocuments' && eDocsContent}
+      </div>
+    </div>
+  )
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+const DASH_STAGES = [
+  { id: 'drafts', label: 'Drafts', match: s => s === 'draft' },
+  { id: 'waiting', label: 'Waiting for others', match: s => s === 'sent' || s === 'viewed' },
+  { id: 'finalized', label: 'Finalized', match: s => s === 'completed' || s === 'paid' },
+  { id: 'rejected', label: 'Rejected', match: s => s === 'declined' || s === 'voided' },
+]
+
+function StageTiles({ docs }) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {DASH_STAGES.map(st => {
+        const n = docs.filter(d => st.match(d.status)).length
+        return (
+          <div
+            key={st.id}
+            className="rounded-xl px-4 py-3 bg-white/80 backdrop-blur-sm border border-white/70 shadow-sm"
+          >
+            <p className="text-3xl font-bold text-gray-900 leading-none">{n}</p>
+            <p className="text-xs text-gray-600 mt-1">{st.label}</p>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function DashboardTab({ userId, userName }) {
+  const [docs, setDocs] = useState([])
+  const [avatarUrl, setAvatarUrl] = useState(null)
+
+  useEffect(() => {
+    supabase
+      .from('edoc_documents')
+      .select('id, status, created_by')
+      .then(({ data }) => setDocs(data || []))
+  }, [])
+  useEffect(() => {
+    if (!userId) return
+    supabase
+      .from('profiles')
+      .select('avatar_url')
+      .eq('id', userId)
+      .single()
+      .then(({ data }) => setAvatarUrl(data?.avatar_url || null))
+  }, [userId])
+
+  const myDocs = docs.filter(d => d.created_by === userId)
+
+  return (
+    <div>
+      <h2 className="text-2xl font-bold text-gray-900 mb-4">Welcome back, {userName}</h2>
+
+      {/* You — ~3in tall, blue flowing-waves background */}
+      <div
+        className="relative rounded-2xl overflow-hidden border border-blue-100 mb-5"
+        style={{
+          height: '3in',
+          backgroundImage: "url('/edoc-dashboard-bg.svg')",
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
+        <div className="absolute top-4 left-4 flex items-center gap-3">
+          <div className="w-12 h-12 rounded-full overflow-hidden bg-green-800 text-white flex items-center justify-center font-bold ring-2 ring-white/80">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              (userName?.[0] || 'U').toUpperCase()
+            )}
+          </div>
+          <h3 className="text-lg font-bold text-gray-800">You</h3>
+        </div>
+        <div className="absolute inset-x-4 bottom-4">
+          <StageTiles docs={myDocs} />
+        </div>
+      </div>
+
+      {/* Team — ~4in tall */}
+      <div
+        className="relative rounded-2xl overflow-hidden border border-gray-200 bg-gradient-to-br from-slate-50 to-slate-100"
+        style={{ height: '4in' }}
+      >
+        <div className="absolute top-4 left-4">
+          <h3 className="text-lg font-bold text-gray-700">Team</h3>
+        </div>
+        <div className="absolute inset-x-4 bottom-4">
+          <StageTiles docs={docs} />
+        </div>
       </div>
     </div>
   )
@@ -538,7 +634,7 @@ function NewDocumentTab({ clientId, userId, userName, onCreated }) {
 
       {/* Greeting + Document button */}
       <div className="flex items-center justify-between gap-3 mb-3">
-        <h2 className="text-2xl font-bold text-gray-900">Welcome back, {userName}</h2>
+        <h2 className="text-xl font-bold text-gray-900">Your documents</h2>
         <button
           onClick={() => setView('create')}
           className="inline-flex items-center gap-1.5 bg-green-700 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-green-800"
