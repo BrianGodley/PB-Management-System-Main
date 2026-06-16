@@ -512,7 +512,7 @@ export default function Layout() {
       <div className="flex flex-1 min-h-0">
         {/* LEFT SIDEBAR — desktop only */}
         <aside
-          className={`hidden lg:flex flex-col bg-white/70 backdrop-blur-md border-r border-white/40 sticky top-11 h-[calc(100vh-2.75rem)] overflow-y-auto transition-[width] duration-200 ${
+          className={`group hidden lg:flex flex-col bg-white/25 backdrop-blur-md border-r border-white/30 shadow-sm sticky top-11 h-[calc(100vh-2.75rem)] overflow-y-auto transition-[width] duration-200 ${
             navCollapsed ? 'w-12' : 'w-32'
           }`}
         >
@@ -520,7 +520,7 @@ export default function Layout() {
           <button
             onClick={() => setNavCollapsed(v => !v)}
             title={navCollapsed ? 'Expand menu' : 'Collapse menu'}
-            className="self-end m-1 p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+            className="self-end m-1 p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-white/40 opacity-0 group-hover:opacity-100 transition-opacity"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {navCollapsed ? (
