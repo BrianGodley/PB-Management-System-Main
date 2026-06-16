@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy as reactLazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { LanguageProvider } from './contexts/LanguageContext'
@@ -6,6 +6,34 @@ import { RateIconsProvider } from './contexts/RateIconsContext'
 import Layout from './components/Layout'
 import ErrorBoundary from './components/ErrorBoundary'
 import Login from './pages/Login'
+
+// Wrap React.lazy so a failed/stale chunk import does a single auto-reload
+// instead of crashing the route. After a new deploy the old hashed chunk file
+// no longer exists; on Vercel the request falls back to index.html, so the
+// dynamic import resolves to a module with no `default` export → the classic
+// "Cannot read properties of undefined (reading 'default')" crash. Reloading
+// once pulls the fresh build. A 10s guard prevents an infinite reload loop if
+// the failure is a genuine error rather than a stale chunk.
+function lazy(factory) {
+  return reactLazy(async () => {
+    const KEY = 'pb:chunkReloadAt'
+    try {
+      const mod = await factory()
+      if (!mod || !mod.default) throw new Error('stale-chunk: missing default export')
+      sessionStorage.removeItem(KEY)
+      return mod
+    } catch (err) {
+      const last = Number(sessionStorage.getItem(KEY) || 0)
+      if (Date.now() - last > 10000) {
+        sessionStorage.setItem(KEY, String(Date.now()))
+        window.location.reload()
+        return { default: () => null }
+      }
+      throw err
+    }
+  })
+}
+
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Clients = lazy(() => import('./pages/Clients'))
 const ClientDetail = lazy(() => import('./pages/ClientDetail'))
