@@ -135,6 +135,31 @@ input[type='number'],
   background: transparent;
 }
 
+/* Same slim/rounded scrollbar but with a white track (used in Weekly FP). */
+.thin-scroll-white {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #ffffff;
+}
+.thin-scroll-white::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.thin-scroll-white::-webkit-scrollbar-track {
+  background: #ffffff;
+}
+.thin-scroll-white::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 9999px;
+  border: 3px solid #ffffff;
+  background-clip: padding-box;
+}
+.thin-scroll-white::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8;
+}
+.thin-scroll-white::-webkit-scrollbar-corner {
+  background: #ffffff;
+}
+
 @layer components {
   .btn-primary {
     @apply bg-green-700 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;

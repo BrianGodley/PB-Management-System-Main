@@ -1307,7 +1307,7 @@ export default function Collections() {
 
           {/* ── Payables ───────────────────────────────────────────────────── */}
           {mainTab === 'payables' && (
-            <div className="flex-1 overflow-y-auto pt-4">
+            <div className="thin-scroll-white flex-1 overflow-y-auto pt-4">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-4 items-start">
                 {PAY_CATS.map(cat => (
                   <PayableTable
@@ -1326,7 +1326,7 @@ export default function Collections() {
 
           {/* ── Financial Planning ─────────────────────────────────────────── */}
           {mainTab === 'financial' && (
-            <div className="flex-1 overflow-y-auto pt-4">
+            <div className="thin-scroll-white flex-1 overflow-y-auto pt-4">
               <div className="flex gap-4 pb-4 items-start">
                 {/* Left column: sections 1, 2, 3 */}
                 <div className="flex-1 flex flex-col gap-4">
@@ -1524,7 +1524,7 @@ export default function Collections() {
                   </button>
                 ))}
               </div>
-              <div className="bg-gray-50 px-6 py-6 flex-1 overflow-y-auto">
+              <div className="thin-scroll-white bg-gray-50 px-6 py-6 flex-1 overflow-y-auto">
                 {collSettingsTab === 'general' && (
                   <div className="flex items-center justify-center py-20 text-center">
                     <div>
@@ -1564,7 +1564,7 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
   const allGroups = [...Object.entries(grouped), ...(noManager.length ? [['', noManager]] : [])]
 
   return (
-    <div className="thin-scroll flex-1 overflow-auto rounded-xl border border-gray-200 shadow-sm">
+    <div className="thin-scroll-white flex-1 overflow-auto rounded-xl border border-gray-200 shadow-sm">
       <table className="text-xs w-full table-fixed" style={{ minWidth: '1120px' }}>
         <colgroup>
           <col style={{ width: '115px' }} />
