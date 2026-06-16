@@ -362,10 +362,7 @@ export default function DailyLogs({
     <div className="flex flex-col h-full">
       {/* Header — on mobile the title/count are hidden and the New Daily Log
           button stretches full width. */}
-      <div className="flex items-center justify-between mb-4 flex-shrink-0">
-        <h2 className="hidden lg:block text-sm font-semibold text-gray-700">
-          {totalCount > 0 && <span className="text-gray-400 font-normal">({totalCount})</span>}
-        </h2>
+      <div className="flex items-center justify-end mb-4 flex-shrink-0">
         <button
           onClick={openNew}
           className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 w-full lg:w-auto lg:mr-6"

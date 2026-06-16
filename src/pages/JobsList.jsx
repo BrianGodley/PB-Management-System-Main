@@ -5024,11 +5024,6 @@ function JobFilesPanel({ job }) {
         />
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-gray-700">Files</h2>
-      </div>
-
       {/* Sub-tabs + root toolbar (same horizontal row) */}
       <div className="flex items-center justify-between border-b border-gray-200 mb-4">
         <div className="flex gap-1">
@@ -5569,8 +5564,7 @@ function JobChangeOrdersPanel({ job, coDeepLink = null, newCoDeepLink = null }) 
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-semibold text-gray-700">Change Orders</h2>
+      <div className="flex items-center justify-end mb-4">
         <div className="flex items-center gap-2 mr-6">
           <button
             onClick={createCOWithEstimator}
@@ -5848,14 +5842,7 @@ function JobTasksPanel({ job }) {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-semibold text-gray-700">
-          {tasks.length > 0 && (
-            <span className="text-gray-400 font-normal">
-              ({completed}/{tasks.length})
-            </span>
-          )}
-        </h2>
+      <div className="flex items-center justify-end mb-4">
         <div className="flex items-center gap-2 mr-6">
           {tasks.length > 0 && (
             <button
