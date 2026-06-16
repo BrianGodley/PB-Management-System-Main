@@ -785,8 +785,8 @@ export default function SubsVendors() {
           ) : (
             <>
               {/* ── Desktop table ─────────────────────────────────── */}
-              <div className="hidden lg:block overflow-auto rounded-xl border border-gray-200 shadow-sm flex-1">
-                <table className="w-full text-sm min-w-[960px] table-fixed">
+              <div className="thin-scroll hidden lg:block overflow-x-hidden overflow-y-auto rounded-xl border border-gray-200 shadow-sm flex-1">
+                <table className="w-full text-sm table-fixed">
                   <colgroup>
                     <col style={{ width: '36px' }} /> {/* checkbox */}
                     <col style={{ width: '22%' }} /> {/* company name */}
