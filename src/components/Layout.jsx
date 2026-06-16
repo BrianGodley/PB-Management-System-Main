@@ -597,11 +597,13 @@ export default function Layout() {
             </span>
           )}
 
-          {/* Top menu position — grouped nav dropdowns live in the header. */}
+          {/* Top menu position — grouped nav lives centered in the header.
+              Groups open their dropdown on hover; the dropdown is flush under
+              the label so the cursor can travel into it. */}
           {menuOnTop && (
             <nav
               ref={navGroupRef}
-              className="hidden lg:flex items-center gap-0.5 min-w-0 overflow-x-auto"
+              className="hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center gap-1"
             >
               {NAV_GROUPS.map(g => {
                 if (g.type === 'single') {
@@ -615,46 +617,41 @@ export default function Layout() {
                         color: headerText,
                         ...(isActive(it.path) ? { backgroundColor: headerActiveBg } : {}),
                       }}
-                      className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium whitespace-nowrap ${headerHoverPill}`}
+                      className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xl font-semibold whitespace-nowrap ${headerHoverPill}`}
                     >
                       {it.label}
                     </Link>
                   )
                 }
-                const open = openNavGroup === g.label
                 const groupActive = g.items.some(it => isActive(it.path))
                 return (
-                  <div key={g.label} className="relative">
+                  <div key={g.label} className="relative group">
                     <button
-                      onClick={() => setOpenNavGroup(o => (o === g.label ? null : g.label))}
                       style={{
                         color: headerText,
                         ...(groupActive ? { backgroundColor: headerActiveBg } : {}),
                       }}
-                      className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium whitespace-nowrap ${headerHoverPill}`}
+                      className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xl font-semibold whitespace-nowrap ${headerHoverPill}`}
                     >
                       {g.label}
-                      <span className="text-[10px] opacity-50">▾</span>
+                      <span className="text-sm opacity-50">▾</span>
                     </button>
-                    {open && (
-                      <div className="absolute left-0 top-full mt-2 w-52 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
-                        {g.items.map(it => (
-                          <Link
-                            key={it.path}
-                            to={it.path}
-                            onClick={() => setOpenNavGroup(null)}
-                            className={`flex items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-gray-50 ${
-                              isActive(it.path)
-                                ? 'text-green-700 font-semibold bg-green-50'
-                                : 'text-gray-700'
-                            }`}
-                          >
-                            <span className="w-4 inline-flex justify-center">{it.icon}</span>
-                            {it.label}
-                          </Link>
-                        ))}
-                      </div>
-                    )}
+                    <div className="hidden group-hover:block absolute left-1/2 -translate-x-1/2 top-full w-56 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
+                      {g.items.map(it => (
+                        <Link
+                          key={it.path}
+                          to={it.path}
+                          className={`flex items-center gap-2.5 px-4 py-2.5 text-base hover:bg-gray-50 ${
+                            isActive(it.path)
+                              ? 'text-green-700 font-semibold bg-green-50'
+                              : 'text-gray-700'
+                          }`}
+                        >
+                          <span className="w-5 inline-flex justify-center">{it.icon}</span>
+                          {it.label}
+                        </Link>
+                      ))}
+                    </div>
                   </div>
                 )
               })}
