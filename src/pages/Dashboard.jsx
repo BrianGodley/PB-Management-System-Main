@@ -610,7 +610,7 @@ export default function Dashboard() {
       </div>
 
       {/* Tab bar */}
-      <div className="bg-white border-b border-gray-200 flex gap-0 mb-5">
+      <div className="bg-white border-b border-gray-200 flex justify-center gap-0 mb-5 rounded-xl">
         {[
           { key: 'dashboard', label: '🏠 Dashboard' },
           { key: 'settings', label: '⚙️ Settings' },

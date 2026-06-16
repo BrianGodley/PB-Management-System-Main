@@ -64,7 +64,7 @@ export default function EDocuments({ clientId = null, embedded = false }) {
   // the E-Documents tab) and embedded in an opportunity.
   const eDocsContent = (
     <>
-      <div className="flex items-center gap-1 border-b border-gray-200 mb-4">
+      <div className="flex items-center justify-center gap-1 border-b border-gray-200 mb-4">
         {[
           ...(embedded ? [] : [['dashboard', 'Dashboard']]),
           ['contracts', 'Created Contracts'],
@@ -118,7 +118,7 @@ export default function EDocuments({ clientId = null, embedded = false }) {
       </div>
 
       {/* Tab bar */}
-      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 overflow-x-auto">
+      <div className="bg-white border-b border-gray-200 flex justify-center gap-0 flex-shrink-0 overflow-x-auto rounded-xl">
         {MAIN_TABS.map(([key, label]) => (
           <button
             key={key}

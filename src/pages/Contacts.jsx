@@ -1319,7 +1319,7 @@ export default function Contacts() {
       </div>
 
       {/* Tab bar */}
-      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0">
+      <div className="bg-white border-b border-gray-200 flex justify-center gap-0 flex-shrink-0 rounded-xl">
         {[
           { id: 'individuals', label: `👤 Individuals (${contactsTotal.toLocaleString()})` },
           { id: 'companies', label: `🏢 Companies (${companiesTotal.toLocaleString()})` },

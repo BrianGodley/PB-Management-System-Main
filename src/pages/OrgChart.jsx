@@ -488,7 +488,7 @@ export default function OrgChart() {
       </div>
 
       {/* BODY: left panel + canvas */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden rounded-xl border border-gray-200">
         {/* LEFT PANEL */}
         <div className="w-60 flex-shrink-0 bg-white border-r border-gray-200 overflow-y-auto flex flex-col">
           {/* NODE TYPES SECTION */}

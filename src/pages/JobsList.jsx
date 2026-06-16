@@ -1349,7 +1349,7 @@ export default function JobsList() {
 
       {/* ── Tabs — Contacts-style white bar in the page body (desktop). Mobile
              keeps the docked button strip below. ── */}
-      <div className="hidden lg:flex bg-white border-b border-gray-200 gap-0 flex-shrink-0 overflow-x-auto rounded-t-xl mb-3">
+      <div className="hidden lg:flex justify-center bg-white border-b border-gray-200 gap-0 flex-shrink-0 overflow-x-auto rounded-xl mb-3">
         {TABS.map(t => (
           <button
             key={t.key}

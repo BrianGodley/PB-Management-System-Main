@@ -7649,7 +7649,7 @@ function StatisticsSettingsView({
   return (
     <div className="flex-1 overflow-y-auto bg-gray-50">
       {/* Sub-tab bar */}
-      <div className="flex border-b border-gray-200 bg-white px-6">
+      <div className="flex justify-center border-b border-gray-200 bg-white px-6 rounded-xl">
         {SUB_TABS.map(t => (
           <button
             key={t.key}

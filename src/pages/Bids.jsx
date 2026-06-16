@@ -850,7 +850,7 @@ export default function Bids() {
       </div>
 
       {/* ── Module tabs ── */}
-      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0">
+      <div className="bg-white border-b border-gray-200 flex justify-center gap-0 flex-shrink-0 rounded-xl">
         {[
           { key: 'bids', label: `📋 Bids (${bids.length})` },
           { key: 'settings', label: '⚙️ Settings' },

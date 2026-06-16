@@ -1408,7 +1408,7 @@ export default function Clients() {
       {/* ── Active / Inactive / Settings tabs ── */}
       {/* The strip scrolls horizontally on its own (mobile) so the tabs never
           push the page wide; tabs don't shrink or wrap. */}
-      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 overflow-x-auto">
+      <div className="bg-white border-b border-gray-200 flex justify-center gap-0 flex-shrink-0 overflow-x-auto rounded-xl">
         {[
           { key: 'individuals', label: '👤 Individuals', count: tabCounts.individuals },
           { key: 'companies',   label: '🏢 Companies',   count: tabCounts.companies },

@@ -749,7 +749,7 @@ export default function HR() {
 
       {/* Tab bar — desktop only; on mobile the More > Employees screen shows
           just the employee table (no Employees/Applicants/Settings bar). */}
-      <div className="bg-white border-b border-gray-200 px-2 sm:px-6 hidden lg:flex gap-0 flex-shrink-0 overflow-x-auto">
+      <div className="bg-white border-b border-gray-200 px-2 sm:px-6 hidden lg:flex justify-center gap-0 flex-shrink-0 overflow-x-auto rounded-xl">
         {[
           {
             key: 'employees',
@@ -842,7 +842,7 @@ export default function HR() {
               </button>
             </div>
           ) : (
-            <div className="bg-white overflow-x-hidden lg:overflow-x-auto -mx-2 sm:mx-0 sm:rounded-xl border-y sm:border border-gray-200">
+            <div className="bg-white rounded-xl border border-gray-200 overflow-x-hidden lg:overflow-auto overscroll-contain">
               <table className="hr-emp-table w-full text-xs table-fixed lg:table-auto lg:min-w-[860px]">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">

@@ -24,6 +24,7 @@ export default function Customize() {
   const [selected, setSelected] = useState('all') // 'all' | module route key
   const [saving, setSaving] = useState(false)
   const [savedMsg, setSavedMsg] = useState('')
+  const [tab, setTab] = useState('backgrounds') // 'backgrounds' | 'menu'
 
   const selectedLabel =
     selected === 'all'
@@ -97,7 +98,29 @@ export default function Customize() {
         </div>
       </div>
 
+      {/* Tab bar */}
+      <div className="flex justify-center bg-white border border-gray-200 rounded-xl mb-4 flex-shrink-0 overflow-hidden">
+        {[
+          { id: 'backgrounds', label: 'Backgrounds' },
+          { id: 'menu', label: 'Left Menu' },
+        ].map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`px-6 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+              tab === t.id
+                ? 'border-green-600 text-green-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       <div className="flex-1 min-h-0 overflow-y-auto pb-8">
+        {tab === 'backgrounds' && (
+        <>
         {/* ── Module backgrounds ── */}
         <h2 className="text-lg font-bold text-gray-900 mb-1">Page backgrounds</h2>
         <p className="text-sm text-gray-500 mb-3">
@@ -165,7 +188,11 @@ export default function Customize() {
             })}
           </div>
         </div>
+        </>
+        )}
 
+        {tab === 'menu' && (
+        <>
         {/* ── Left menu bar color ── */}
         <h2 className="text-lg font-bold text-gray-900 mb-1">Left menu bar</h2>
         <p className="text-sm text-gray-500 mb-3">
@@ -196,6 +223,8 @@ export default function Customize() {
             )
           })}
         </div>
+        </>
+        )}
       </div>
     </div>
   )

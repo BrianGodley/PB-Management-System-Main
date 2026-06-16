@@ -32,6 +32,9 @@ export const CUSTOMIZE_MODULES = [
   { key: '/jobs', label: 'Jobs' },
   { key: '/equipment-tracking', label: 'Equipment' },
   { key: '/statistics', label: 'Statistics' },
+  { key: '/customize', label: 'Customize' },
+  { key: '/admin', label: 'Admin' },
+  { key: '/help', label: 'Help Desk' },
 ]
 
 // The localStorage cache key for the route→background map.
