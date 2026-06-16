@@ -729,7 +729,7 @@ export default function ContactDetail() {
   return (
     <div className="flex flex-col h-full">
       {/* Top nav bar — sits on the main page background */}
-      <div className="flex items-center gap-2 px-6 py-3 bg-white border-b border-gray-200 flex-shrink-0">
+      <div className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 rounded-xl flex-shrink-0 mx-3 mt-3">
         <button
           onClick={() => navigate('/contacts')}
           className="text-gray-900 hover:text-gray-600 text-sm font-medium"
