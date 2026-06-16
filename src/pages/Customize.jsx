@@ -190,8 +190,7 @@ export default function Customize() {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
-        <h1 className="text-xl font-bold text-gray-900">Customize</h1>
+      <div className="flex items-center justify-end mb-3 flex-shrink-0 gap-3">
         <div className="flex items-center gap-3">
           {savedMsg && <span className="text-sm text-green-700 font-medium">{savedMsg}</span>}
           <button

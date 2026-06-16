@@ -4041,9 +4041,8 @@ export default function Admin() {
   return (
     <div className="w-full">
       {/* Page header */}
-      <div className="mb-5">
-        <h1 className="text-2xl font-bold text-gray-900">Admin</h1>
-        <p className="text-sm text-gray-500 mt-0.5">System overview and management</p>
+      <div className="mb-3">
+        <p className="text-sm text-gray-500">System overview and management</p>
       </div>
 
       {/* Tab bar */}

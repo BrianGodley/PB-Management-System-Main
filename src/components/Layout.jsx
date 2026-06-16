@@ -591,7 +591,7 @@ export default function Layout() {
           {!menuOnTop && desktopTitle && (
             <span
               style={headerTextStyle}
-              className="hidden lg:block absolute left-1/2 -translate-x-1/2 font-semibold text-sm text-center pointer-events-none truncate max-w-[40%]"
+              className="hidden lg:block absolute left-1/2 -translate-x-1/2 text-xl font-bold text-center pointer-events-none truncate max-w-[40%]"
             >
               {desktopTitle}
             </span>
@@ -877,11 +877,7 @@ export default function Layout() {
         {/* overflow-x-hidden: a too-wide page (e.g. a detail view) can't push the
             layout — and the fixed bottom dock — wider than the screen.
             overscroll-none: the scroll box stops rubber-banding off the header. */}
-        <main
-          className={`flex-1 min-w-0 overflow-y-auto overflow-x-hidden overscroll-none p-2 pb-24 lg:px-6 lg:pb-6 ${
-            menuPos === 'left' ? 'lg:pt-6' : 'lg:pt-2'
-          }`}
-        >
+        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden overscroll-none p-2 pb-24 lg:px-6 lg:pb-6 lg:pt-3">
           <Outlet />
         </main>
 

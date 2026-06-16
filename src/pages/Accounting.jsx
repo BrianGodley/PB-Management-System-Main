@@ -4004,11 +4004,6 @@ export default function Accounting() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Page header */}
-      <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
-        <h1 className="text-xl font-bold text-gray-900">Accounting</h1>
-      </div>
-
       {/* Tab bar */}
       <div className="bg-white border-b border-gray-200 flex justify-center gap-0 flex-shrink-0 rounded-xl">
         {TABS.map(t => (

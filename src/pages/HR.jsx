@@ -698,8 +698,7 @@ export default function HR() {
         </div>
       )}
       {/* Header */}
-      <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
-        <h1 className="hidden lg:block text-xl font-bold text-gray-900">Human Resources</h1>
+      <div className="flex items-center justify-end mb-3 flex-shrink-0 gap-3">
         <div className="flex gap-2 flex-1 lg:flex-none">
           {tab === 'employees' && (
             <button
