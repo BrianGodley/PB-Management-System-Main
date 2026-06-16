@@ -1227,7 +1227,7 @@ export default function Collections() {
       ) : (
         <>
           {/* ── Main tabs ──────────────────────────────────────────────────── */}
-          <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0">
+          <div className="bg-white border-b border-gray-200 flex justify-center gap-0 flex-shrink-0 rounded-xl">
             {[
               { key: 'collections', label: '💰 Collections' },
               { key: 'payables', label: '💳 Payables' },
@@ -1237,7 +1237,7 @@ export default function Collections() {
               <button
                 key={t.key}
                 onClick={() => setMainTab(t.key)}
-                className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+                className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                   mainTab === t.key
                     ? 'border-green-700 text-green-700'
                     : 'border-transparent text-gray-500 hover:text-gray-700'

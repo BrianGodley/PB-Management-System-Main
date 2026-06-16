@@ -124,7 +124,7 @@ export default function EDocuments({ clientId = null, embedded = false }) {
             key={key}
             type="button"
             onClick={() => setMainTab(key)}
-            className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
               mainTab === key
                 ? 'border-green-700 text-green-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700'

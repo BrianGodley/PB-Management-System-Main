@@ -772,7 +772,7 @@ export default function HR() {
               setTab(t.key)
               setSearch('')
             }}
-            className={`${t.mobileHide ? 'hidden lg:flex' : 'flex'} flex-shrink-0 whitespace-nowrap items-center gap-1.5 px-2.5 sm:px-5 py-2 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors ${
+            className={`${t.mobileHide ? 'hidden lg:flex' : 'flex'} flex-shrink-0 whitespace-nowrap items-center gap-1.5 px-2.5 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-medium border-b-2 transition-colors ${
               tab === t.key
                 ? 'border-green-700 text-green-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -842,9 +842,9 @@ export default function HR() {
               </button>
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-x-hidden lg:overflow-auto overscroll-contain">
+            <div className="bg-white rounded-xl border border-gray-200 overscroll-contain">
               <table className="hr-emp-table w-full text-xs table-fixed lg:table-auto lg:min-w-[860px]">
-                <thead>
+                <thead className="sticky top-0 z-20 bg-gray-50">
                   <tr className="bg-gray-50 border-b border-gray-200">
                     <SortTh col="name" label="Name" sticky />
                     <SortTh col="address" label="Address" />
