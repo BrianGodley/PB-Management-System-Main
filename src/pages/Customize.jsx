@@ -208,7 +208,7 @@ export default function Customize() {
       <div className="flex justify-center bg-white border border-gray-200 rounded-xl mb-4 flex-shrink-0 overflow-hidden">
         {[
           { id: 'backgrounds', label: 'Backgrounds' },
-          { id: 'menu', label: 'Left Menu' },
+          { id: 'menu', label: 'Menu' },
           { id: 'header', label: 'Header Bar' },
         ].map(t => (
           <button

@@ -1387,8 +1387,7 @@ export default function Clients() {
       )}
 
       {/* Page header */}
-      <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
-        <h1 className="hidden lg:block text-xl font-bold text-gray-900">Opportunities</h1>
+      <div className="flex items-center justify-between mb-3 flex-shrink-0 gap-3">
         <div className="flex items-center gap-2 flex-1 lg:flex-none">
           <button
             onClick={() => setClientModal('individual')}

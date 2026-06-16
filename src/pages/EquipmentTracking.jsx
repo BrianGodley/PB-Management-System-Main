@@ -345,8 +345,7 @@ export default function EquipmentTracking() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4 flex-shrink-0">
-        <h1 className="text-xl font-bold text-gray-900">Equipment</h1>
+      <div className="flex items-center justify-end mb-3 flex-shrink-0">
         {eqTab === 'equipment' && (
           <button
             onClick={() => {

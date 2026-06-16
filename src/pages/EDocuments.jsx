@@ -112,11 +112,6 @@ export default function EDocuments({ clientId = null, embedded = false }) {
   ]
   return (
     <div className="h-full flex flex-col">
-      {/* Header — matches Contacts/Opportunities exactly */}
-      <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
-        <h1 className="hidden lg:block text-xl font-bold text-gray-900">Documents</h1>
-      </div>
-
       {/* Tab bar */}
       <div className="bg-white border-b border-gray-200 flex justify-center gap-0 flex-shrink-0 overflow-x-auto rounded-xl">
         {MAIN_TABS.map(([key, label]) => (

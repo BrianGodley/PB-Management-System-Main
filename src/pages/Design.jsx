@@ -102,11 +102,6 @@ export default function Design() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Page title */}
-      <div className="mb-4 flex-shrink-0">
-        <h1 className="hidden lg:block text-xl font-bold text-gray-900">Design</h1>
-      </div>
-
       {/* Tab bar */}
       <div className="bg-white border-b border-gray-200 flex justify-center gap-0 flex-shrink-0 rounded-xl">
         {TABS.map(t => (
