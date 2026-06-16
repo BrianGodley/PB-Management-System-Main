@@ -1347,30 +1347,23 @@ export default function JobsList() {
         </select>
       </div>
 
-      {/* ── Tabs — portalled into the green app header bar (desktop only; the
-             header slot is too cramped on phones, so mobile gets a full-width
-             scrollable strip in the page body below). ── */}
-      {headerSlot &&
-        createPortal(
-          <div className="hidden lg:flex items-center gap-0.5 overflow-x-auto max-w-full">
-            {TABS.map(t => (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className={`${
-                  t.key === 'info' ? 'hidden lg:block ' : ''
-                }px-2 sm:px-2.5 py-1 rounded-md text-[11px] sm:text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-colors ${
-                  tab === t.key
-                    ? 'bg-black/20 text-white'
-                    : 'text-white/80 hover:text-white hover:bg-black/15'
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>,
-          headerSlot
-        )}
+      {/* ── Tabs — Contacts-style white bar in the page body (desktop). Mobile
+             keeps the docked button strip below. ── */}
+      <div className="hidden lg:flex bg-white border-b border-gray-200 gap-0 flex-shrink-0 overflow-x-auto rounded-t-xl mb-3">
+        {TABS.map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+              tab === t.key
+                ? 'border-green-700 text-green-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
       {/* Mobile: small docked buttons under the job picker. Schedule, Change
           Orders and Finance are intentionally excluded on phones (Schedule +
@@ -1440,7 +1433,7 @@ export default function JobsList() {
       {tab !== 'settings' && (
         <div className="flex gap-2 flex-1 min-h-0 pt-2">
           {/* Jobs sidebar — desktop only */}
-          <div className="hidden lg:flex w-[260px] -ml-[12px] flex-shrink-0 flex-col min-h-0 bg-white border-r border-gray-200">
+          <div className="hidden lg:flex w-[260px] flex-shrink-0 flex-col min-h-0 bg-white rounded-xl border border-gray-200 overflow-hidden">
             {/* Inner column: 90% wide, centered */}
             <div className="flex flex-col w-[90%] mx-auto mt-2 flex-shrink-0">
               {/* ── User-specific Filter button (above Open/Closed) ──────
@@ -1897,7 +1890,7 @@ export default function JobsList() {
 
           {/* Right panel — only thing that scrolls. overflow-x-hidden traps any
             tiny horizontal overflow from inner cards on mobile. */}
-          <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden lg:-mr-[18px]">
+          <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden rounded-xl border border-gray-200 bg-white">
             {tab === 'info' &&
               (selectedJobObj ? (
                 <JobInfoModal
