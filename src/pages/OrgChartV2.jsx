@@ -2378,7 +2378,7 @@ export default function OrgChartV2() {
           onDeleteSubcategory={deleteTemplateSubcategory}
         />
       ) : (
-      <div className="flex-1 overflow-auto relative">
+      <div className="flex-1 overflow-auto relative m-2 rounded-xl border border-slate-200 bg-white">
         {chartId ? (
           <TierCanvas
             nodes={nodes}
