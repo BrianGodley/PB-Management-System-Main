@@ -9989,8 +9989,8 @@ export default function Statistics() {
             </button>
           </>
         )}
-        {/* View-mode tabs — moved here from the green app header (desktop). */}
-        <div className="hidden lg:flex items-center gap-0.5 flex-shrink-0">
+        {/* View-mode tabs — centered over the graph/detail area (desktop). */}
+        <div className="hidden lg:flex flex-1 min-w-0 items-center justify-center gap-0.5">
           {[
             { id: 'graphs', icon: '📈', label: 'Graphs' },
             { id: 'multiple-entry', icon: '📝', label: 'Multiple Entry' },
@@ -10016,7 +10016,7 @@ export default function Statistics() {
             </button>
           ))}
         </div>
-        <div className="flex-1 min-w-0" />
+        <div className="flex-1 min-w-0 lg:hidden" />
         {viewMode !== 'print-multiple' && (
           /* Mobile: only show Add when there's no selected stat (i.e. user is
              on the stat-list view). Desktop always shows it. */
