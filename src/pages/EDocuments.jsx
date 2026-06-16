@@ -17,6 +17,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import EDocFieldEditor from '../components/edoc/EDocFieldEditor'
 import EDocDocumentModal from '../components/edoc/EDocDocumentModal'
+import FileManager from '../components/files/FileManager'
 
 const STORAGE_BUCKET = 'edocuments'
 
@@ -49,28 +50,12 @@ const fmtMoney = n =>
 export default function EDocuments({ clientId = null, embedded = false }) {
   const { user } = useAuth()
   const [subTab, setSubTab] = useState('contracts')
+  const [mainTab, setMainTab] = useState('files')
 
-  return (
-    <div className={embedded ? '' : 'p-4 max-w-6xl mx-auto'}>
-      {!embedded && (
-        <>
-          <h1 className="text-2xl font-bold text-gray-900 mb-3">Documents</h1>
-          {/* Top-level white tab bar (matches Opportunities / Contacts). The
-              E-Documents area lives under its own tab so more document types
-              can be added here later. */}
-          <div className="bg-white border border-gray-200 rounded-t-lg flex gap-0 -mb-px">
-            <button
-              type="button"
-              className="flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 border-green-700 text-green-700"
-            >
-              ✍️ E-Documents
-            </button>
-          </div>
-        </>
-      )}
-
-      <div className={embedded ? '' : 'bg-white border border-gray-200 rounded-b-lg rounded-tr-lg p-4'}>
-      {/* Sub-tab bar */}
+  // The E-Documents area (sub-tab bar + content). Reused at top-level (under
+  // the E-Documents tab) and embedded in an opportunity.
+  const eDocsContent = (
+    <>
       <div className="flex items-center gap-1 border-b border-gray-200 mb-4">
         {[
           ['contracts', 'Created Contracts'],
@@ -90,7 +75,6 @@ export default function EDocuments({ clientId = null, embedded = false }) {
           </button>
         ))}
       </div>
-
       {subTab === 'contracts' && (
         <ContractsTab clientId={clientId} userId={user?.id} embedded={embedded} />
       )}
@@ -98,6 +82,43 @@ export default function EDocuments({ clientId = null, embedded = false }) {
       {subTab === 'new' && (
         <NewDocumentTab clientId={clientId} userId={user?.id} onCreated={() => setSubTab('contracts')} />
       )}
+    </>
+  )
+
+  // Embedded in an opportunity: just the E-Documents area (no file manager).
+  if (embedded) return <div>{eDocsContent}</div>
+
+  // Top-level Documents page: white tab bar with the file managers + E-Documents.
+  const MAIN_TABS = [
+    ['files', '📁 Files'],
+    ['photos', '🖼️ Photos'],
+    ['videos', '🎞️ Videos'],
+    ['edocuments', '✍️ E-Documents'],
+  ]
+  return (
+    <div className="p-4 max-w-6xl mx-auto">
+      <h1 className="text-2xl font-bold text-gray-900 mb-3">Documents</h1>
+      <div className="bg-white border border-gray-200 rounded-t-lg flex gap-0 -mb-px overflow-x-auto">
+        {MAIN_TABS.map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setMainTab(key)}
+            className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+              mainTab === key
+                ? 'border-green-700 text-green-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="bg-white border border-gray-200 rounded-b-lg rounded-tr-lg p-4">
+        {mainTab === 'files' && <FileManager root="files" />}
+        {mainTab === 'photos' && <FileManager root="photos" accept="image/*" />}
+        {mainTab === 'videos' && <FileManager root="videos" accept="video/*" />}
+        {mainTab === 'edocuments' && eDocsContent}
       </div>
     </div>
   )
