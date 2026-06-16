@@ -697,54 +697,17 @@ export default function HR() {
           </button>
         </div>
       )}
-      {/* Header */}
-      <div className="flex items-center justify-end mb-3 flex-shrink-0 gap-3">
-        <div className="flex gap-2 flex-1 lg:flex-none">
-          {tab === 'employees' && (
-            <button
-              onClick={() => setShowAddEmp(true)}
-              className="btn-primary text-sm px-3 py-1.5 w-full lg:hidden"
-            >
-              + Add Employee
-            </button>
-          )}
-          {tab === 'applicants' && (
-            <>
-              <button
-                onClick={copyApplicationLink}
-                className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${linkCopied ? 'bg-green-700 text-white border-green-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-              >
-                {linkCopied ? '✓ Link Copied!' : '🔗 Copy Apply Link'}
-              </button>
-              <button
-                onClick={() => setShowAddApp(true)}
-                className="btn-primary text-sm px-3 py-1.5"
-              >
-                + Add Applicant
-              </button>
-            </>
-          )}
-          {tab === 'positions' && (
-            <button
-              onClick={openNewPosition}
-              className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800"
-            >
-              + New Position
-            </button>
-          )}
-          {tab === 'forms' && (
-            <button
-              onClick={() => {
-                setEditForm(null)
-                setShowBuilder(true)
-              }}
-              className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800"
-            >
-              + New Review Form
-            </button>
-          )}
+      {/* Mobile-only Add Employee (desktop has it in the tab bar's right side). */}
+      {tab === 'employees' && (
+        <div className="lg:hidden mb-3 flex-shrink-0">
+          <button
+            onClick={() => setShowAddEmp(true)}
+            className="btn-primary text-sm px-3 py-1.5 w-full"
+          >
+            + Add Employee
+          </button>
         </div>
-      </div>
+      )}
 
       {/* Tab bar — desktop only; on mobile the More > Employees screen shows
           just the employee table (no Employees/Applicants/Settings bar). */}
@@ -789,6 +752,41 @@ export default function HR() {
               className="btn-primary text-xs px-3 py-1.5"
             >
               + Add Employee
+            </button>
+          )}
+          {tab === 'applicants' && (
+            <>
+              <button
+                onClick={copyApplicationLink}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${linkCopied ? 'bg-green-700 text-white border-green-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+              >
+                {linkCopied ? '✓ Link Copied!' : '🔗 Copy Apply Link'}
+              </button>
+              <button
+                onClick={() => setShowAddApp(true)}
+                className="btn-primary text-xs px-3 py-1.5"
+              >
+                + Add Applicant
+              </button>
+            </>
+          )}
+          {tab === 'positions' && (
+            <button
+              onClick={openNewPosition}
+              className="px-3 py-1.5 bg-green-700 text-white rounded-lg text-xs font-semibold hover:bg-green-800"
+            >
+              + New Position
+            </button>
+          )}
+          {tab === 'forms' && (
+            <button
+              onClick={() => {
+                setEditForm(null)
+                setShowBuilder(true)
+              }}
+              className="px-3 py-1.5 bg-green-700 text-white rounded-lg text-xs font-semibold hover:bg-green-800"
+            >
+              + New Review Form
             </button>
           )}
         </div>
