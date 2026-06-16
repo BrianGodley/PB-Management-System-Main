@@ -3183,8 +3183,8 @@ function getWeekRangeStr(startDay) {
 function SchedulingAssistanceSettings() {
   const [tab, setTab] = useState('start-locations')
   return (
-    <div className="max-w-2xl space-y-4">
-      <div className="flex border-b border-gray-200">
+    <div className="w-full space-y-4">
+      <div className="flex border border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0 rounded-xl">
         {[
           { key: 'start-locations', label: '📍 Start Locations' },
           { key: 'supervisor-positions', label: '👥 Supervisor Assignment' },
@@ -3211,8 +3211,8 @@ function SchedulingAssistanceSettings() {
 function TaskListsSettings() {
   const [tab, setTab] = useState('categories') // 'categories' | 'descriptions'
   return (
-    <div className="max-w-2xl space-y-4">
-      <div className="flex border-b border-gray-200">
+    <div className="w-full space-y-4">
+      <div className="flex border border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0 rounded-xl">
         {[
           { key: 'categories', label: 'Task Categories' },
           { key: 'descriptions', label: 'Task Descriptions' },
@@ -3507,7 +3507,7 @@ function JobScheduleSettings({
         {settingsTab === 'crews' && <MasterCrews />}
 
         {settingsTab === 'general' && (
-          <div className="max-w-2xl space-y-6">
+          <div className="w-full space-y-6">
             {/* Default color */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <h2 className="text-base font-bold text-gray-800 mb-1">
@@ -3573,7 +3573,7 @@ function JobScheduleSettings({
         {settingsTab === 'scheduling-assistance' && <SchedulingAssistanceSettings />}
 
         {settingsTab === 'stages' && (
-          <div className="max-w-2xl space-y-6">
+          <div className="w-full space-y-6">
             {/* Job Stages */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <h2 className="text-base font-bold text-gray-800 mb-1">Job Stages</h2>
@@ -5105,6 +5105,14 @@ function JobFilesPanel({ job }) {
             >
               {addingFolder ? '✕ Cancel' : '+ Add Folder'}
             </button>
+            {/* Apply Folder Template — creates the template's folders (and tasks)
+                for this job. Moved here from the Tasks tab. */}
+            <button
+              onClick={() => setShowModal(true)}
+              className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 font-medium hover:bg-gray-50 hover:text-gray-800 transition-colors"
+            >
+              📋 Apply Folder Template
+            </button>
           </div>
         )}
       </div>
@@ -5315,7 +5323,7 @@ function JobFilesPanel({ job }) {
                 onClick={() => setShowModal(true)}
                 className="flex items-center gap-2 text-sm px-4 py-2 rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 transition-colors"
               >
-                <span>📋</span> Apply Template
+                <span>📋</span> Apply Folder Template
               </button>
             </div>
           )}
@@ -5764,7 +5772,6 @@ function JobTasksPanel({ job }) {
   const [descPresets, setDescPresets] = useState([])
   const [employees, setEmployees] = useState([])
   const [loading, setLoading] = useState(false)
-  const [showModal, setShowModal] = useState(false)
   const [adding, setAdding] = useState(false)
 
   useEffect(() => {
@@ -5860,28 +5867,9 @@ function JobTasksPanel({ job }) {
 
   return (
     <div>
-      {showModal && (
-        <ApplyTemplateModal
-          job={job}
-          onClose={() => setShowModal(false)}
-          onApplied={() => {
-            setShowModal(false)
-            fetchTasks(job.id)
-          }}
-        />
-      )}
-
       {/* Header */}
       <div className="flex items-center justify-end mb-4 mt-3">
         <div className="flex items-center gap-2 mr-6">
-          {tasks.length > 0 && (
-            <button
-              onClick={() => setShowModal(true)}
-              className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 font-medium hover:bg-gray-50 hover:text-gray-800 transition-colors"
-            >
-              📋 Apply Template
-            </button>
-          )}
           <button
             onClick={addTask}
             disabled={adding}
@@ -5908,15 +5896,8 @@ function JobTasksPanel({ job }) {
           <p className="text-4xl mb-3">✅</p>
           <p className="text-sm font-medium text-gray-500">No tasks yet</p>
           <p className="text-xs mt-1 mb-5 text-center max-w-xs">
-            Click "+ Add Task" to start, or apply a template to create folders and tasks all at
-            once.
+            Click "+ Add Task" to start. Folder/task templates can be applied from the Files tab.
           </p>
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 text-sm px-4 py-2 rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 transition-colors"
-          >
-            <span>📋</span> Apply Template
-          </button>
         </div>
       ) : (
         <div className="overflow-x-auto bg-white border border-gray-200 rounded-xl">
