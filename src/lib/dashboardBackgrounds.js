@@ -35,6 +35,22 @@ export const CUSTOMIZE_MODULES = [
 // The localStorage cache key for the route→background map.
 export const MODULE_BG_LS_KEY = 'pbs:moduleBackgrounds'
 
+// Reserved (non-route) key in the same map that stores the left menu bar color.
+export const SIDEBAR_KEY = '__sidebar'
+
+// Left menu bar color options. 'Clear' keeps the floating transparent look;
+// the rest are light tints so the dark nav text stays readable.
+export const SIDEBAR_COLORS = [
+  { id: 'clear', label: 'Clear', value: null },
+  { id: 'white', label: 'White', value: '#ffffff' },
+  { id: 'slate', label: 'Slate', value: '#eef1f5' },
+  { id: 'blue', label: 'Blue', value: '#e6effb' },
+  { id: 'green', label: 'Green', value: '#e9f3e8' },
+  { id: 'sand', label: 'Sand', value: '#f7f1e6' },
+  { id: 'lavender', label: 'Lavender', value: '#efeaf9' },
+  { id: 'rose', label: 'Rose', value: '#fbeef0' },
+]
+
 export function readModuleBackgrounds() {
   try {
     const v = JSON.parse(localStorage.getItem(MODULE_BG_LS_KEY) || '{}')

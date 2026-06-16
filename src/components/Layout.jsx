@@ -8,6 +8,7 @@ import {
   applyBackgroundForPath,
   readModuleBackgrounds,
   MODULE_BG_LS_KEY,
+  SIDEBAR_KEY,
 } from '../lib/dashboardBackgrounds'
 import SamChat from './SamChat'
 import ReportIssueModal from './ReportIssueModal'
@@ -145,6 +146,14 @@ export default function Layout() {
   ]
   const [showMainMenu, setShowMainMenu] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState(null)
+  // Left menu bar color (from the per-user appearance map; null = transparent).
+  const [sidebarBg, setSidebarBg] = useState(() => {
+    try {
+      return readModuleBackgrounds()[SIDEBAR_KEY] || null
+    } catch {
+      return null
+    }
+  })
   const [companyLogoUrl, setCompanyLogoUrl] = useState(null)
   const userMenuRef = useRef(null)
   const helpMenuRef = useRef(null)
@@ -202,16 +211,23 @@ export default function Layout() {
           /* ignore */
         }
         applyBackgroundForPath(window.location.pathname, map)
+        setSidebarBg(map[SIDEBAR_KEY] || null)
       })
   }, [user?.id])
 
   // Re-apply on every route change + when the Customize page saves (it writes
   // localStorage and dispatches 'module-backgrounds-updated').
   useEffect(() => {
-    applyBackgroundForPath(location.pathname, readModuleBackgrounds())
+    const map = readModuleBackgrounds()
+    applyBackgroundForPath(location.pathname, map)
+    setSidebarBg(map[SIDEBAR_KEY] || null)
   }, [location.pathname])
   useEffect(() => {
-    const handler = () => applyBackgroundForPath(window.location.pathname, readModuleBackgrounds())
+    const handler = () => {
+      const map = readModuleBackgrounds()
+      applyBackgroundForPath(window.location.pathname, map)
+      setSidebarBg(map[SIDEBAR_KEY] || null)
+    }
     window.addEventListener('module-backgrounds-updated', handler)
     return () => window.removeEventListener('module-backgrounds-updated', handler)
   }, [])
@@ -556,6 +572,7 @@ export default function Layout() {
       <div className="flex flex-1 min-h-0">
         {/* LEFT SIDEBAR — desktop only */}
         <aside
+          style={sidebarBg ? { backgroundColor: sidebarBg } : undefined}
           className={`group hidden lg:flex flex-col bg-transparent sticky top-11 h-[calc(100vh-2.75rem)] overflow-y-auto transition-[width] duration-200 ${
             navCollapsed ? 'w-12' : 'w-32'
           }`}
