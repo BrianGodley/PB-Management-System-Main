@@ -1399,7 +1399,7 @@ export default function JobsList() {
 
       {/* Settings panel — full-width, no sidebar */}
       {tab === 'settings' && (
-        <div className="-mb-6 mt-3 -mr-3 flex-1 flex flex-col overflow-hidden">
+        <div className="-mb-6 -mr-3 flex-1 flex flex-col overflow-hidden">
           <JobScheduleSettings
             stages={stages}
             onAddStage={addStage}

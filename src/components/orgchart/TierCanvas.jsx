@@ -66,7 +66,7 @@ export default function TierCanvas({
   // Small hardcoded left margin so the leftmost item never sits flush against
   // the edge. (The right margin already varies with content width; the left
   // start can otherwise go to 0 once an item is dragged left.)
-  const LEFT_MARGIN = 24
+  const LEFT_MARGIN = 14
 
   function toSvgCoords(clientX, clientY) {
     const svg = svgRef.current

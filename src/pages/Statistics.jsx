@@ -7649,7 +7649,7 @@ function StatisticsSettingsView({
   return (
     <div className="flex-1 overflow-y-auto bg-gray-50 mr-2 sm:mr-3">
       {/* Sub-tab bar */}
-      <div className="flex justify-center border-b border-gray-200 bg-white px-6 rounded-xl mb-2">
+      <div className="flex justify-center border border-gray-200 bg-white px-6 rounded-xl mb-3">
         {SUB_TABS.map(t => (
           <button
             key={t.key}
@@ -9926,7 +9926,7 @@ export default function Statistics() {
         ))}
       </div>
       {/* ── COMBINED MODULE HEADER (white tab bar) ───────────────────────── */}
-      <div className="flex items-center gap-2 flex-wrap px-3 sm:px-6 py-2.5 bg-white border border-gray-200 rounded-xl flex-shrink-0 ml-0 mr-2 sm:mr-3 mt-2 sm:mt-3 mb-2">
+      <div className="flex items-center gap-2 flex-wrap px-3 sm:px-6 py-2.5 bg-white border border-gray-200 rounded-xl flex-shrink-0 ml-0 mr-2 sm:mr-3 mt-2 sm:mt-3 mb-3">
         <h1 className="hidden lg:block text-base sm:text-xl font-bold text-gray-900 flex-shrink-0">Statistics</h1>
         {viewMode === 'graphs' && selectedStat && (
           <>
