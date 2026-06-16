@@ -5025,7 +5025,7 @@ function JobFilesPanel({ job }) {
       )}
 
       {/* Sub-tabs + root toolbar (same horizontal row) */}
-      <div className="flex items-center justify-between border-b border-gray-200 mb-4">
+      <div className="flex items-center justify-between border-b border-gray-200 mb-4 mt-3">
         <div className="flex gap-1">
           {[
             { key: 'documents', label: '📄 Documents' },
@@ -5564,7 +5564,7 @@ function JobChangeOrdersPanel({ job, coDeepLink = null, newCoDeepLink = null }) 
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-end mb-4">
+      <div className="flex items-center justify-end mb-4 mt-3">
         <div className="flex items-center gap-2 mr-6">
           <button
             onClick={createCOWithEstimator}
