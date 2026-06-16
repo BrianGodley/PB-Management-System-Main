@@ -96,7 +96,7 @@ export default function EDocuments({ clientId = null, embedded = false }) {
     ['edocuments', '✍️ E-Documents'],
   ]
   return (
-    <div className="p-4 max-w-6xl mx-auto">
+    <div className="p-4">
       <h1 className="text-2xl font-bold text-gray-900 mb-3">Documents</h1>
       <div className="bg-white border border-gray-200 rounded-t-lg flex gap-0 -mb-px overflow-x-auto">
         {MAIN_TABS.map(([key, label]) => (
