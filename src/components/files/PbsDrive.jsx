@@ -42,7 +42,7 @@ export default function PbsDrive() {
       pm[m.drive_id] = m.permission
     })
     setMyPerms(pm)
-    setView(v => v || (dr && dr[0] ? dr[0].id : admin ? 'settings' : null))
+    setView(v => v || 'mydrive') // everyone starts on their personal My Drive
     setLoading(false)
   }, [user?.id])
 
@@ -65,7 +65,16 @@ export default function PbsDrive() {
     <div className="flex gap-3 h-full min-h-0">
       {/* Drives rail */}
       <div className="w-52 flex-shrink-0 bg-white border border-gray-200 rounded-xl p-2 overflow-y-auto flex flex-col">
-        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide px-2 py-1">PBS Drives</p>
+        {/* Personal drive — always available to every user */}
+        <button
+          onClick={() => setView('mydrive')}
+          className={`w-full text-left text-sm px-2 py-1.5 rounded-lg truncate mb-1 ${
+            view === 'mydrive' ? 'bg-green-50 text-green-800 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          🏠 My Drive
+        </button>
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide px-2 py-1">Shared Drives</p>
         {drives.length === 0 && (
           <p className="px-2 py-3 text-xs text-gray-400">
             {isAdmin ? 'No drives yet — create one in Settings.' : 'You have no drives yet.'}
@@ -96,7 +105,13 @@ export default function PbsDrive() {
 
       {/* Main panel */}
       <div className="flex-1 min-w-0 overflow-y-auto">
-        {view === 'settings' && isAdmin ? (
+        {view === 'mydrive' ? (
+          <FileManager
+            root={`mydrive/${user.id}`}
+            rootLabel="My Drive"
+            canEdit={true}
+          />
+        ) : view === 'settings' && isAdmin ? (
           <PbsDriveSettings drives={drives} onChange={loadDrives} />
         ) : activeDrive ? (
           <FileManager
@@ -147,6 +162,45 @@ function PbsDriveSettings({ drives, onChange }) {
     onChange()
   }
 
+  // Copy the names of the Shared Drives from the connected Google Drive into
+  // PBS (creates a matching PBS drive for each new name). Uses the Google
+  // access token cached by the Google Drive tab.
+  async function importFromGoogle() {
+    let stored
+    try {
+      stored = JSON.parse(localStorage.getItem('gdrive:token') || 'null')
+    } catch {
+      stored = null
+    }
+    if (!stored?.access_token || !stored.expiry || stored.expiry < Date.now()) {
+      alert('Open the Google Drive tab and click “Connect Google Drive” first, then come back here.')
+      return
+    }
+    setBusy(true)
+    try {
+      const res = await fetch('https://www.googleapis.com/drive/v3/drives?pageSize=100&fields=drives(name)', {
+        headers: { Authorization: `Bearer ${stored.access_token}` },
+      })
+      if (!res.ok) throw new Error(`Google Drive error ${res.status}`)
+      const data = await res.json()
+      const names = (data.drives || []).map(d => d.name).filter(Boolean)
+      const existing = new Set(drives.map(d => d.name.toLowerCase()))
+      const toAdd = names.filter(n => !existing.has(n.toLowerCase()))
+      if (!toAdd.length) {
+        alert('No new Google Drive names to import (they all already exist).')
+        return
+      }
+      const { error } = await supabase.from('pbs_drives').insert(toAdd.map(name => ({ name })))
+      if (error) throw error
+      alert(`Imported ${toAdd.length} drive name(s) from Google Drive.`)
+      onChange()
+    } catch (e) {
+      alert('Import failed: ' + e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="w-full space-y-5">
       {/* Create */}
@@ -167,6 +221,18 @@ function PbsDriveSettings({ drives, onChange }) {
           >
             + Create
           </button>
+        </div>
+        <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2">
+          <button
+            onClick={importFromGoogle}
+            disabled={busy}
+            className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 font-semibold hover:bg-gray-50 disabled:opacity-50"
+          >
+            🔵 Import drive names from Google Drive
+          </button>
+          <span className="text-xs text-gray-400">
+            Creates a matching PBS drive for each of your Google Shared Drives.
+          </span>
         </div>
       </div>
 
