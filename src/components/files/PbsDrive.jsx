@@ -286,9 +286,21 @@ function PbsDriveSettings({ drives, onChange }) {
 function MembersModal({ drive, onClose }) {
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
-  const [email, setEmail] = useState('')
   const [perm, setPerm] = useState('viewer')
   const [busy, setBusy] = useState(false)
+  // Employee picker
+  const [allUsers, setAllUsers] = useState([])
+  const [pickQuery, setPickQuery] = useState('')
+  const [pickOpen, setPickOpen] = useState(false)
+  const [selected, setSelected] = useState(null)
+
+  useEffect(() => {
+    supabase
+      .from('profiles')
+      .select('id, full_name, email')
+      .order('full_name')
+      .then(({ data }) => setAllUsers(data || []))
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -313,35 +325,28 @@ function MembersModal({ drive, onClose }) {
   }, [load])
 
   async function addMember() {
-    const e = email.trim().toLowerCase()
-    if (!e) return
+    if (!selected) return
     setBusy(true)
     try {
-      const { data: prof } = await supabase
-        .from('profiles')
-        .select('id, full_name, email')
-        .ilike('email', e)
-        .maybeSingle()
-      if (!prof) {
-        alert('No PBS user found with that email.')
-        return
-      }
       const { error } = await supabase
         .from('pbs_drive_members')
-        .upsert({ drive_id: drive.id, user_id: prof.id, permission: perm }, { onConflict: 'drive_id,user_id' })
+        .upsert({ drive_id: drive.id, user_id: selected.id, permission: perm }, { onConflict: 'drive_id,user_id' })
       if (error) throw error
       // Invite email (best-effort).
-      sendEmail({
-        to: prof.email || e,
-        subject: `You've been added to the "${drive.name}" drive`,
-        html: `<div style="font-family:sans-serif;font-size:15px;color:#374151;">
-          <p>Hi ${prof.full_name || 'there'},</p>
-          <p>You now have <strong>${perm}</strong> access to the <strong>${drive.name}</strong> drive in Picture Build System.</p>
-          <p>Open <strong>Documents → PBS Drive</strong> to see it.</p>
-          <p style="margin-top:16px;"><a href="${window.location.origin}/edocuments" style="background:#3A5038;color:#fff;text-decoration:none;padding:10px 22px;border-radius:8px;font-weight:700;">Open PBS Drive</a></p>
-        </div>`,
-      })
-      setEmail('')
+      if (selected.email) {
+        sendEmail({
+          to: selected.email,
+          subject: `You've been added to the "${drive.name}" drive`,
+          html: `<div style="font-family:sans-serif;font-size:15px;color:#374151;">
+            <p>Hi ${selected.full_name || 'there'},</p>
+            <p>You now have <strong>${perm}</strong> access to the <strong>${drive.name}</strong> drive in Picture Build System.</p>
+            <p>Open <strong>Documents → PBS Drive</strong> to see it.</p>
+            <p style="margin-top:16px;"><a href="${window.location.origin}/edocuments" style="background:#3A5038;color:#fff;text-decoration:none;padding:10px 22px;border-radius:8px;font-weight:700;">Open PBS Drive</a></p>
+          </div>`,
+        })
+      }
+      setSelected(null)
+      setPickQuery('')
       await load()
     } catch (err) {
       alert('Could not add member: ' + err.message)
@@ -349,6 +354,16 @@ function MembersModal({ drive, onClose }) {
       setBusy(false)
     }
   }
+
+  const memberIds = new Set(members.map(m => m.user_id))
+  const pickName = u => u.full_name || u.email || u.id
+  const pickMatches = allUsers
+    .filter(u => !memberIds.has(u.id))
+    .filter(u => {
+      const q = pickQuery.trim().toLowerCase()
+      return !q || pickName(u).toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q)
+    })
+    .slice(0, 50)
 
   async function changePerm(m, permission) {
     await supabase.from('pbs_drive_members').update({ permission }).eq('id', m.id)
@@ -371,17 +386,46 @@ function MembersModal({ drive, onClose }) {
           <button onClick={onClose} className="text-gray-300 hover:text-gray-500 text-xl leading-none">✕</button>
         </div>
 
-        {/* Add member */}
+        {/* Add member — searchable employee picker */}
         <div className="px-5 py-3 border-b border-gray-100 flex-shrink-0 space-y-2">
-          <p className="text-xs font-semibold text-gray-500">Add a member by email</p>
+          <p className="text-xs font-semibold text-gray-500">Add a member</p>
           <div className="flex gap-2">
-            <input
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="user@company.com"
-              className="input text-sm flex-1"
-              onKeyDown={e => e.key === 'Enter' && addMember()}
-            />
+            <div className="relative flex-1">
+              <input
+                value={selected ? pickName(selected) : pickQuery}
+                onChange={e => {
+                  setSelected(null)
+                  setPickQuery(e.target.value)
+                  setPickOpen(true)
+                }}
+                onFocus={() => setPickOpen(true)}
+                onBlur={() => setTimeout(() => setPickOpen(false), 150)}
+                placeholder="Search employees…"
+                className="input text-sm w-full"
+              />
+              {pickOpen && !selected && (
+                <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                  {pickMatches.length === 0 ? (
+                    <p className="px-3 py-2 text-xs text-gray-400">No employees match.</p>
+                  ) : (
+                    pickMatches.map(u => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onMouseDown={() => {
+                          setSelected(u)
+                          setPickOpen(false)
+                        }}
+                        className="block w-full text-left px-3 py-1.5 text-sm hover:bg-green-50"
+                      >
+                        {pickName(u)}
+                        {u.email && <span className="text-gray-400"> · {u.email}</span>}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
             <select value={perm} onChange={e => setPerm(e.target.value)} className="input text-sm w-40">
               {PERMISSIONS.map(p => (
                 <option key={p.id} value={p.id}>
@@ -389,7 +433,7 @@ function MembersModal({ drive, onClose }) {
                 </option>
               ))}
             </select>
-            <button onClick={addMember} disabled={busy || !email.trim()} className="btn-primary text-sm px-4 py-2 rounded-lg disabled:opacity-50">
+            <button onClick={addMember} disabled={busy || !selected} className="btn-primary text-sm px-4 py-2 rounded-lg disabled:opacity-50">
               Add
             </button>
           </div>
