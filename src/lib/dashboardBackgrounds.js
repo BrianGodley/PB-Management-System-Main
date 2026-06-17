@@ -470,17 +470,25 @@ export function applyAppBackground(id, map) {
   const opt = resolveBackground(id, map)
   const el = document.getElementById('app-shell') || document.body
   if (!el) return
+  const url = opt?.url || ''
+  // Skip re-applying the same image on every route change. Re-setting
+  // background-image forces the browser to re-decode the (potentially large)
+  // photo, which is the main source of navigation lag. No-op when unchanged.
+  if (el.dataset.bgUrl === url) return
+  el.dataset.bgUrl = url
   const s = el.style
-  if (opt?.url) {
-    s.backgroundImage = `url('${opt.url}')`
+  if (url) {
+    s.backgroundImage = `url('${url}')`
     s.backgroundSize = 'cover'
     s.backgroundPosition = 'center'
     s.backgroundRepeat = 'no-repeat'
+    s.backgroundAttachment = 'fixed' // paint once; avoids re-rasterizing on scroll
   } else {
     s.backgroundImage = ''
     s.backgroundSize = ''
     s.backgroundPosition = ''
     s.backgroundRepeat = ''
+    s.backgroundAttachment = ''
   }
 }
 

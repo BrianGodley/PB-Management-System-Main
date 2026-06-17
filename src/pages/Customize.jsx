@@ -476,9 +476,12 @@ export default function Customize() {
                     }`}
                   >
                     <button onClick={() => setBgPreview(bg)} className="block w-full text-left">
-                      <div
-                        className="h-14 w-full"
-                        style={{ backgroundImage: `url('${bg.url}')`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+                      <img
+                        src={bg.url}
+                        alt={bg.label}
+                        loading="lazy"
+                        decoding="async"
+                        className="aspect-square w-full object-cover bg-gray-100"
                       />
                       <div className="flex items-center justify-between px-2 py-1 bg-white">
                         <span className="text-[11px] font-medium text-gray-600 truncate">{bg.label}</span>
