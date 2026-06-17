@@ -302,7 +302,7 @@ export default function Customize() {
       let mainBlob = file
       let thumbBlob = null
       try {
-        mainBlob = (await downscaleImage(file, 1920, 0.82)) || file
+        mainBlob = (await downscaleImage(file, 2560, 0.9)) || file
         thumbBlob = await downscaleImage(file, 480, 0.7)
       } catch { /* use original */ }
 
@@ -342,8 +342,9 @@ export default function Customize() {
 
   function removeCustomBackground(id) {
     const item = customBgs.find(b => b.id === id)
-    if (item?.storage_path) {
-      supabase.storage.from('company-assets').remove([item.storage_path]).then(() => {}, () => {})
+    const paths = [item?.storage_path, item?.thumb_path].filter(Boolean)
+    if (paths.length) {
+      supabase.storage.from('company-assets').remove(paths).then(() => {}, () => {})
     }
     setMap(m => {
       const list = (Array.isArray(m[CUSTOM_BG_KEY]) ? m[CUSTOM_BG_KEY] : []).filter(b => b.id !== id)
@@ -548,35 +549,45 @@ export default function Customize() {
               const isSel = currentBg === bg.id
               const isPhoto = String(bg.id).startsWith('custom-')
               return (
-                <button
+                <div
                   key={bg.id}
-                  onClick={() => setBgPreview(bg)}
-                  className={`relative text-left rounded-lg overflow-hidden border-2 transition-all ${
+                  className={`relative rounded-lg overflow-hidden border-2 transition-all ${
                     isSel ? 'border-black ring-2 ring-black/20' : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  {bg.url ? (
-                    <img
-                      src={bg.thumbUrl || bg.url}
-                      alt={bg.label}
-                      loading="lazy"
-                      decoding="async"
-                      className="aspect-square w-full object-cover bg-gray-100"
-                    />
-                  ) : (
-                    <div className="aspect-square w-full" style={{ backgroundColor: bg.swatch }} />
-                  )}
-                  {/* Photos show no label; presets keep their name + check. */}
-                  {!isPhoto && (
-                    <div className="flex items-center justify-between px-2 py-1 bg-white">
-                      <span className="text-[11px] font-medium text-gray-600 truncate">{bg.label}</span>
-                      {isSel && <span className="text-black text-xs">✓</span>}
-                    </div>
-                  )}
+                  <button onClick={() => setBgPreview(bg)} className="block w-full text-left">
+                    {bg.url ? (
+                      <img
+                        src={bg.thumbUrl || bg.url}
+                        alt={bg.label}
+                        loading="lazy"
+                        decoding="async"
+                        className="aspect-square w-full object-cover bg-gray-100"
+                      />
+                    ) : (
+                      <div className="aspect-square w-full" style={{ backgroundColor: bg.swatch }} />
+                    )}
+                    {/* Photos show no label; presets keep their name + check. */}
+                    {!isPhoto && (
+                      <div className="flex items-center justify-between px-2 py-1 bg-white">
+                        <span className="text-[11px] font-medium text-gray-600 truncate">{bg.label}</span>
+                        {isSel && <span className="text-black text-xs">✓</span>}
+                      </div>
+                    )}
+                  </button>
                   {isPhoto && isSel && (
-                    <span className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded-full bg-black text-white text-[11px] shadow">✓</span>
+                    <span className="absolute top-1 left-1 w-5 h-5 flex items-center justify-center rounded-full bg-black text-white text-[11px] shadow">✓</span>
                   )}
-                </button>
+                  {isPhoto && (
+                    <button
+                      onClick={() => removeCustomBackground(bg.id)}
+                      title="Delete photo"
+                      className="absolute top-1 right-1 w-6 h-6 flex items-center justify-center rounded-full bg-white/90 text-gray-500 hover:text-red-600 shadow text-sm"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
               )
             }
             return sections.map(section =>
