@@ -311,6 +311,10 @@ export const HEADER_DEFAULT = '#4E7B4C'
 // Reserved key: which header-bar items show, and which render icon-only.
 //   logo / brand / help  → show or hide
 //   adminIconOnly / profileIconOnly → drop the text label, keep the icon
+// Reserved key: user-uploaded photo backgrounds. Array of { id, label, url }.
+// Declared here (before DEFAULT_PREFS) so the defaults IIFE can reference it.
+export const CUSTOM_BG_KEY = '__customBackgrounds'
+
 export const HEADER_ITEMS_KEY = '__headerItems'
 export const HEADER_ITEMS_DEFAULT = {
   logo: true,
@@ -448,9 +452,6 @@ export function matchModuleKey(pathname) {
   return best
 }
 
-// Reserved key: user-uploaded photo backgrounds. Array of { id, label, url }.
-// These behave like presets but live in the user's saved preferences.
-export const CUSTOM_BG_KEY = '__customBackgrounds'
 export function readCustomBackgrounds(map) {
   const v = map?.[CUSTOM_BG_KEY]
   return Array.isArray(v) ? v : []
