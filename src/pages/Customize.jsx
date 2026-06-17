@@ -99,20 +99,23 @@ function SpecialSwatch({ label, color, selected, onClick, clear }) {
 // for a visual sample).
 const PREVIEW_ICONS = {
   '/': '🏠', '/org-chart': '🏢', '/hr': '👥', '/training': '🎓',
-  '/contacts': '📇', '/clients': '💡', '/edocuments': '✍️', '/accounting': '🧮',
+  '/contacts': '📇', '/clients': '💡', '/edocuments': '📄', '/accounting': '🧮',
   '/collections': '💰', '/design': '📐', '/bids': '📋', '/jobs': '🏡',
   '/equipment-tracking': '🚜', '/portal/subs': '🧑‍🔧', '/statistics': '📈',
 }
 const PREVIEW_ITEMS = MENU_ITEMS.map(i => ({ ...i, icon: PREVIEW_ICONS[i.path] || '•' }))
 
 // A compact, live sample of the menu. Reflects the chosen font, icon
-// visibility, bar color, and (optionally) custom groups. Used by the Menu
-// icons, Menu Background, and Menu grouping previews.
-function MenuPreview({ font, showIcons, barColor, groups, max = 99 }) {
-  const bg = barColor || '#1f2d24'
-  const theme = sidebarNavColor(bg)
-  const textColor = theme.text || '#ffffff'
-  const structure = buildMenuStructure(PREVIEW_ITEMS, groups || []).slice(0, max)
+// visibility, bar color, custom groups, and — when the bar is Clear — the
+// user's current page background (so they see how Clear actually looks). All
+// previews share one fixed width/height so they line up identically.
+function MenuPreview({ font, showIcons, barColor, bgUrl, bgSwatch, bgDark, groups }) {
+  const clear = !barColor
+  const baseColor = clear ? (bgSwatch || '#eceef1') : barColor
+  const textColor = clear
+    ? (bgDark ? '#ffffff' : '#1f2937')
+    : (sidebarNavColor(barColor).text || '#ffffff')
+  const structure = buildMenuStructure(PREVIEW_ITEMS, groups || [])
   const Row = ({ item, indent }) => (
     <div className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 ${indent ? 'ml-3' : ''}`}>
       {showIcons && <span className="text-sm leading-none w-4 text-center">{item.icon}</span>}
@@ -120,22 +123,52 @@ function MenuPreview({ font, showIcons, barColor, groups, max = 99 }) {
     </div>
   )
   return (
-    <div className="rounded-md p-2 w-44" style={{ backgroundColor: bg }}>
-      {structure.map(e =>
-        e.type === 'single' ? (
-          <Row key={e.item.path} item={e.item} />
-        ) : (
-          <div key={e.id} className="mb-0.5">
-            <div className="flex items-center gap-1 px-2.5 py-1.5">
-              <span className="text-[10px] opacity-60" style={{ color: textColor }}>▾</span>
-              <span className="font-bold text-[11px] uppercase tracking-wide" style={{ color: textColor }}>
-                {e.label}
-              </span>
+    <div
+      className="rounded-md w-44 h-[360px] overflow-y-auto border border-gray-200"
+      style={{
+        backgroundColor: baseColor,
+        backgroundImage: clear && bgUrl ? `url(${bgUrl})` : undefined,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
+    >
+      <div className="p-2">
+        {structure.map(e =>
+          e.type === 'single' ? (
+            <Row key={e.item.path} item={e.item} />
+          ) : (
+            <div key={e.id} className="mb-0.5">
+              <div className="flex items-center gap-1 px-2.5 py-1.5">
+                <span className="text-[10px] opacity-60" style={{ color: textColor }}>▾</span>
+                <span className="font-bold text-[11px] uppercase tracking-wide" style={{ color: textColor }}>
+                  {e.label}
+                </span>
+              </div>
+              {e.items.map(it => <Row key={it.path} item={it} indent />)}
             </div>
-            {e.items.map(it => <Row key={it.path} item={it} indent />)}
-          </div>
-        )
-      )}
+          )
+        )}
+      </div>
+    </div>
+  )
+}
+
+// A small layout diagram showing where the menu sits for a given position:
+// a vertical bar for Left/Right, a horizontal bar for Top/Bottom.
+function LocationDiagram({ pos, selected }) {
+  const content = <div className="flex-1 bg-gray-200 rounded-sm" />
+  const vertical = pos === 'left' || pos === 'right'
+  return (
+    <div
+      className={`w-full h-16 rounded-md p-1 flex gap-1 ${
+        vertical ? 'flex-row' : 'flex-col'
+      } ${selected ? 'bg-green-50' : 'bg-gray-100'}`}
+    >
+      {pos === 'left' && <div className="w-1/4 bg-green-600 rounded-sm" />}
+      {pos === 'top' && <div className="h-1/4 bg-green-600 rounded-sm" />}
+      {content}
+      {pos === 'right' && <div className="w-1/4 bg-green-600 rounded-sm" />}
+      {pos === 'bottom' && <div className="h-1/4 bg-green-600 rounded-sm" />}
     </div>
   )
 }
@@ -172,6 +205,20 @@ export default function Customize() {
   const byPath = Object.fromEntries(MENU_ITEMS.map(i => [i.path, i]))
   const groupNameByPath = {}
   menuGroups.forEach(g => (g.items || []).forEach(p => { groupNameByPath[p] = g.name }))
+
+  // When the menu bar is Clear, previews show the user's current page
+  // background so they see how Clear actually looks.
+  const previewBg = BACKGROUNDS.find(b => b.id === (currentBg || 'none')) || BACKGROUNDS[0]
+  // Shared props so every preview is identical and reflects every change.
+  const previewProps = {
+    font,
+    showIcons,
+    barColor: currentSidebar,
+    bgUrl: previewBg.url,
+    bgSwatch: previewBg.swatch,
+    bgDark: previewBg.dark,
+    groups: menuGroups,
+  }
 
   function pickBackground(bgId) {
     setMap(m => {
@@ -388,20 +435,23 @@ export default function Customize() {
           Where the navigation menu sits on desktop. <strong>Top</strong> groups the menu into
           dropdowns in the header bar. (Mobile always uses the bottom dock.)
         </p>
-        <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6 flex flex-wrap gap-2">
+        <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
           {MENU_POSITIONS.map(opt => {
             const isSel = menuPos === opt.id
             return (
               <button
                 key={opt.id}
                 onClick={() => setMenuPos(opt.id)}
-                className={`text-sm font-semibold px-4 py-2 rounded-lg border transition-colors ${
+                className={`flex flex-col gap-2 p-2 rounded-lg border transition-colors ${
                   isSel
-                    ? 'bg-green-700 text-white border-2 border-black'
-                    : 'bg-white text-gray-700 border border-gray-300 hover:border-green-400'
+                    ? 'border-2 border-black bg-green-50'
+                    : 'border border-gray-300 hover:border-green-400'
                 }`}
               >
-                {isSel ? '✓ ' : ''}{opt.icon} {opt.label}
+                <LocationDiagram pos={opt.id} selected={isSel} />
+                <span className="text-sm font-semibold text-gray-700">
+                  {isSel ? '✓ ' : ''}{opt.label}
+                </span>
               </button>
             )
           })}
@@ -437,7 +487,7 @@ export default function Customize() {
             </div>
             <div>
               <p className="text-xs font-semibold text-gray-500 mb-1.5">Preview</p>
-              <MenuPreview font={font} showIcons={showIcons} barColor={currentSidebar} groups={[]} max={6} />
+              <MenuPreview {...previewProps} />
             </div>
           </div>
         </div>
@@ -515,27 +565,7 @@ export default function Customize() {
             {/* live sample — updates as the font/size/style change */}
             <div>
               <p className="text-xs font-semibold text-gray-500 mb-1.5">Preview</p>
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                <div className="rounded-md bg-[#1f2d24] p-2.5">
-                  {[
-                    ['🏠', 'Dashboard'],
-                    ['👥', 'Contacts'],
-                    ['💡', 'Opportunities'],
-                    ['🏗️', 'Jobs'],
-                    ['📊', 'Statistics'],
-                  ].map(([icon, label], i) => (
-                    <div
-                      key={label}
-                      className={`flex items-center gap-2 rounded-md px-3 py-2 ${
-                        i === 3 ? 'bg-white/15' : ''
-                      }`}
-                    >
-                      {showIcons && <span className="text-sm leading-none">{icon}</span>}
-                      <span className="text-white" style={sidebarFontStyle(font)}>{label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <MenuPreview {...previewProps} />
               <p className="text-[11px] text-gray-400 mt-1.5">Sample updates live as you change the font.</p>
             </div>
           </div>
@@ -552,7 +582,7 @@ export default function Customize() {
             <BarPalette value={currentSidebar} onChange={pickSidebar} />
             <div>
               <p className="text-xs font-semibold text-gray-500 mb-1.5">Preview</p>
-              <MenuPreview font={font} showIcons={showIcons} barColor={currentSidebar} groups={[]} max={6} />
+              <MenuPreview {...previewProps} />
             </div>
           </div>
         </div>
@@ -640,7 +670,7 @@ export default function Customize() {
             {/* preview */}
             <div>
               <p className="text-xs font-semibold text-gray-500 mb-1.5">Preview</p>
-              <MenuPreview font={font} showIcons={showIcons} barColor={currentSidebar} groups={menuGroups} />
+              <MenuPreview {...previewProps} />
               <p className="text-[11px] text-gray-400 mt-1.5">
                 Ungrouped items appear on their own; groups show as collapsible sections here (dropdowns
                 in the Top/Bottom menus).

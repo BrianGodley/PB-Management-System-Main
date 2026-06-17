@@ -43,7 +43,7 @@ const navItems = [
   { path: '/training', label: 'Training', icon: '🎓' },
   { path: '/contacts', label: 'Contacts', icon: <ContactsIcon /> },
   { path: '/clients', label: 'Opportunities', icon: <OpportunitiesIcon /> },
-  { path: '/edocuments', label: 'Documents', icon: '✍️' },
+  { path: '/edocuments', label: 'Documents', icon: '📄' },
   { path: '/accounting', label: 'Accounting', icon: <AccountingIcon /> },
   { path: '/collections', label: 'Weekly FP', icon: <WeeklyFPIcon /> },
   { path: '/design', label: 'Design', icon: '📐' },
