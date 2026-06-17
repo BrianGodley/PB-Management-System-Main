@@ -216,10 +216,11 @@ export default function Layout() {
       return []
     }
   })
-  // Collapsed state of sidebar groups, keyed by group id (default expanded).
-  const [collapsedGroups, setCollapsedGroups] = useState({})
-  const isGroupOpen = id => !collapsedGroups[id]
-  const toggleGroup = id => setCollapsedGroups(s => ({ ...s, [id]: !s[id] }))
+  // Sidebar group popup (Left/Right modes): clicking a group title opens a
+  // floating menu of its items, mirroring the Top/Bottom dropdowns. Rendered
+  // via a body portal (fixed-position) so the sidebar's overflow can't clip it.
+  // { id, label, items, top, left } | null
+  const [groupPopup, setGroupPopup] = useState(null)
   // Which header nav group dropdown is open (Top menu mode).
   const [openNavGroup, setOpenNavGroup] = useState(null)
   // Background id of the current route's module (for nav contrast when the
@@ -445,9 +446,10 @@ export default function Layout() {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [showMainMenu])
 
-  // Close main menu on route change
+  // Close main menu + sidebar group popup on route change
   useEffect(() => {
     setShowMainMenu(false)
+    setGroupPopup(null)
   }, [location.pathname])
 
   // Turn off the browser's autofill / contact-suggestion overlay on every form
@@ -563,6 +565,34 @@ export default function Layout() {
           >
             {navTip.label}
           </div>,
+          document.body
+        )}
+
+      {/* Sidebar group popup portal — clicking a grouped title opens this
+          floating menu of the group's items beside the sidebar. */}
+      {groupPopup &&
+        createPortal(
+          <>
+            <div className="fixed inset-0 z-[9998]" onClick={() => setGroupPopup(null)} />
+            <div
+              style={{ position: 'fixed', top: groupPopup.top, left: groupPopup.left, zIndex: 9999 }}
+              className="w-52 bg-white rounded-xl shadow-lg border border-gray-200 py-1 max-h-[80vh] overflow-y-auto"
+            >
+              {groupPopup.items.map(it => (
+                <Link
+                  key={it.path}
+                  to={it.path}
+                  onClick={() => setGroupPopup(null)}
+                  className={`flex items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-gray-50 ${
+                    isActive(it.path) ? 'text-green-700 font-semibold bg-green-50' : 'text-gray-700'
+                  }`}
+                >
+                  {sidebarIcons && <span className="w-5 inline-flex justify-center">{it.icon}</span>}
+                  {it.label}
+                </Link>
+              ))}
+            </div>
+          </>,
           document.body
         )}
 
@@ -859,21 +889,28 @@ export default function Layout() {
                   e.type === 'single' ? (
                     renderNavLink(e.item)
                   ) : (
-                    <div key={e.id}>
-                      <button
-                        onClick={() => toggleGroup(e.id)}
-                        style={navItemStyle}
-                        className={`w-full flex items-center justify-between px-2 py-2 rounded-lg text-xs font-semibold text-gray-800 transition-colors ${navHoverPill}`}
-                      >
-                        <span className="truncate">{e.label}</span>
-                        <span className="text-[10px] opacity-60 ml-1">{isGroupOpen(e.id) ? '▾' : '▸'}</span>
-                      </button>
-                      {isGroupOpen(e.id) && (
-                        <div className="space-y-0.5 mt-0.5">
-                          {e.items.map(it => renderNavLink(it, true))}
-                        </div>
-                      )}
-                    </div>
+                    <button
+                      key={e.id}
+                      onClick={ev => {
+                        if (groupPopup?.id === e.id) { setGroupPopup(null); return }
+                        const r = ev.currentTarget.getBoundingClientRect()
+                        const width = 208 // w-52
+                        setGroupPopup({
+                          id: e.id,
+                          label: e.label,
+                          items: e.items,
+                          top: r.top,
+                          left: menuOnRight ? r.left - width - 4 : r.right + 4,
+                        })
+                      }}
+                      style={navItemStyle}
+                      className={`w-full flex items-center justify-between px-2 py-2 rounded-lg text-xs font-semibold text-gray-800 transition-colors ${
+                        groupPopup?.id === e.id ? navActivePill : navHoverPill
+                      }`}
+                    >
+                      <span className="truncate">{e.label}</span>
+                      <span className="text-[10px] opacity-60 ml-1">{menuOnRight ? '◂' : '▸'}</span>
+                    </button>
                   )
                 )
               : navItems.map(item => renderNavLink(item))}
