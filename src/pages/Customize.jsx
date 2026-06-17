@@ -178,6 +178,27 @@ function LocationDiagram({ pos, selected }) {
   )
 }
 
+// Background picker sections (ordered). Any preset not listed falls into a
+// final "Other" group so nothing ever disappears.
+const BG_SECTIONS = [
+  {
+    title: 'Colorized',
+    ids: ['none', 'waves-blue', 'green', 'sunset', 'aurora', 'lavender', 'peach', 'sky', 'mint', 'sunrise', 'rose-gold', 'slate', 'ocean', 'midnight', 'carbon', 'plum', 'emerald-night'],
+  },
+  {
+    title: 'Patterns',
+    ids: ['mesh', 'graphite-grid', 'dots', 'crosshatch', 'sand-topo', 'honeycomb', 'chevron', 'triangles', 'diagonal-stripes', 'plus-grid', 'waves-soft'],
+  },
+  {
+    title: 'Multi Colored',
+    ids: ['rainbow-pastel', 'holographic', 'cotton-candy', 'citrus', 'prism'],
+  },
+  {
+    title: 'Interest Items',
+    ids: ['mountains', 'beach', 'desert', 'tropical-sea', 'balloons', 'cityscape', 'townscape', 'meadow'],
+  },
+]
+
 export default function Customize() {
   const { user } = useAuth()
   const [map, setMap] = useState(() => readModuleBackgrounds())
@@ -449,28 +470,29 @@ export default function Customize() {
               ? 'Choose a background to apply to every module:'
               : `Background for ${selectedLabel}:`}
           </p>
-          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-            {BACKGROUNDS.map(bg => {
+          {(() => {
+            const byId = Object.fromEntries(BACKGROUNDS.map(b => [b.id, b]))
+            const claimed = new Set(BG_SECTIONS.flatMap(s => s.ids))
+            const leftover = BACKGROUNDS.filter(b => !claimed.has(b.id))
+            const sections = [
+              ...BG_SECTIONS.map(s => ({ title: s.title, items: s.ids.map(id => byId[id]).filter(Boolean) })),
+              ...(leftover.length ? [{ title: 'Other', items: leftover }] : []),
+            ]
+            const Tile = bg => {
               const isSel = currentBg === bg.id
               return (
                 <button
                   key={bg.id}
                   onClick={() => pickBackground(bg.id)}
                   className={`text-left rounded-lg overflow-hidden border-2 transition-all ${
-                    isSel
-                      ? 'border-black ring-2 ring-black/20'
-                      : 'border-gray-200 hover:border-gray-300'
+                    isSel ? 'border-black ring-2 ring-black/20' : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
                   <div
                     className="h-14 w-full"
                     style={
                       bg.url
-                        ? {
-                            backgroundImage: `url('${bg.url}')`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                          }
+                        ? { backgroundImage: `url('${bg.url}')`, backgroundSize: 'cover', backgroundPosition: 'center' }
                         : { backgroundColor: bg.swatch }
                     }
                   />
@@ -480,8 +502,18 @@ export default function Customize() {
                   </div>
                 </button>
               )
-            })}
-          </div>
+            }
+            return sections.map(section =>
+              section.items.length ? (
+                <div key={section.title} className="mb-5 last:mb-0">
+                  <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">{section.title}</p>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+                    {section.items.map(Tile)}
+                  </div>
+                </div>
+              ) : null
+            )
+          })()}
         </div>
 
         {/* ── My Photos (uploaded backgrounds) ── */}
