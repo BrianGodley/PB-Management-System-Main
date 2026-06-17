@@ -124,6 +124,7 @@ export default function GoogleDriveBrowser() {
   const [pbsPath, setPbsPath] = useState([]) // folders under the PBS Files root
   const [pbsEntries, setPbsEntries] = useState([])
   const [pbsLoading, setPbsLoading] = useState(false)
+  const [mirror, setMirror] = useState('') // progress text while copying all → PBS
   const fileRef = useRef(null)
 
   useEffect(() => {
@@ -356,6 +357,99 @@ export default function GoogleDriveBrowser() {
     }
   }
 
+  // ── Copy ALL Shared Drives → PBS Drives (folders + files, same names) ───────
+  // Find an existing PBS drive by name, or create one; returns its id.
+  async function ensurePbsDrive(name) {
+    const { data: existing } = await supabase.from('pbs_drives').select('id').eq('name', name).limit(1)
+    if (existing && existing[0]) return existing[0].id
+    const { data, error } = await supabase.from('pbs_drives').insert({ name }).select('id').single()
+    if (error) throw error
+    return data.id
+  }
+  // All children of a Drive folder (handles paging).
+  async function listAllChildren(parentId, driveId) {
+    const out = []
+    let pageToken = ''
+    do {
+      const params = new URLSearchParams({
+        q: `'${parentId}' in parents and trashed=false`,
+        fields: FILE_FIELDS,
+        pageSize: '500',
+        supportsAllDrives: 'true',
+        includeItemsFromAllDrives: 'true',
+        corpora: 'drive',
+        driveId,
+      })
+      if (pageToken) params.set('pageToken', pageToken)
+      const data = await driveJson(`files?${params.toString()}`)
+      out.push(...(data.files || []))
+      pageToken = data.nextPageToken || ''
+    } while (pageToken)
+    return out
+  }
+  // Recursively mirror a Drive folder into drives/<pbsId>/<relPath> storage.
+  async function mirrorFolder(parentId, driveId, pbsId, relPath, stats) {
+    if (relPath) {
+      await supabase.storage
+        .from(PBS_BUCKET)
+        .upload(`drives/${pbsId}/${relPath}/.keep`, new Blob([''], { type: 'text/plain' }), { upsert: true })
+        .catch(() => {})
+    }
+    const children = await listAllChildren(parentId, driveId)
+    for (const c of children) {
+      if (c.mimeType === FOLDER_MIME) {
+        await mirrorFolder(c.id, driveId, pbsId, relPath ? `${relPath}/${c.name}` : c.name, stats)
+      } else {
+        try {
+          const { blob, isNative } = await fetchBlob(c)
+          const fname = isNative ? `${c.name}.pdf` : c.name
+          const path = `drives/${pbsId}/${relPath ? relPath + '/' : ''}${fname}`
+          const { error } = await supabase.storage
+            .from(PBS_BUCKET)
+            .upload(path, blob, { upsert: true, contentType: blob.type || undefined })
+          if (error) throw error
+          stats.files++
+          setMirror(`Copying… ${stats.files} files (${c.name})`)
+        } catch {
+          stats.errors++
+        }
+      }
+    }
+  }
+  async function copyAllToPbs() {
+    if (!token) return
+    if (
+      !window.confirm(
+        'Copy ALL Shared Drives (folders + files) into PBS Drives with the same names? Large drives can take a while.'
+      )
+    )
+      return
+    setMirror('Loading Shared Drives…')
+    try {
+      const data = await driveJson('drives?pageSize=100&fields=drives(id,name)')
+      const shared = data.drives || []
+      if (!shared.length) {
+        setMirror('')
+        alert('No Shared Drives found on your Google account.')
+        return
+      }
+      const stats = { files: 0, errors: 0 }
+      for (const d of shared) {
+        setMirror(`Drive “${d.name}”…`)
+        const pbsId = await ensurePbsDrive(d.name)
+        await mirrorFolder(d.id, d.id, pbsId, '', stats)
+      }
+      setMirror('')
+      alert(
+        `Done — copied ${stats.files} file(s) across ${shared.length} Shared Drive(s) into PBS Drives` +
+          (stats.errors ? `; ${stats.errors} item(s) skipped due to errors.` : '.')
+      )
+    } catch (e) {
+      setMirror('')
+      alert('Copy failed: ' + (e.message || 'unknown error'))
+    }
+  }
+
   // Upload a Blob into the CURRENT Drive folder (create metadata → PATCH bytes).
   async function uploadBlobToDrive(name, blob) {
     const meta = await driveJson('files?supportsAllDrives=true', {
@@ -544,6 +638,14 @@ export default function GoogleDriveBrowser() {
             title="Upload a file from PBS Files into this Drive folder"
           >
             📤 From PBS
+          </button>
+          <button
+            onClick={copyAllToPbs}
+            disabled={!!busy || !!mirror || searching}
+            className="text-xs px-3 py-1.5 rounded-lg border border-green-300 text-green-700 hover:bg-green-50 disabled:opacity-50"
+            title="Copy every Shared Drive (folders + files) into PBS Drives with the same names"
+          >
+            {mirror ? mirror : '⧉ Copy all → PBS'}
           </button>
         </div>
 
