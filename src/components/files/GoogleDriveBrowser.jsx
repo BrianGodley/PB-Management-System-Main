@@ -120,6 +120,10 @@ export default function GoogleDriveBrowser() {
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false)
   const [viewFile, setViewFile] = useState(null) // file open in the in-app viewer
+  const [pbsPicker, setPbsPicker] = useState(false) // PBS → Drive upload picker
+  const [pbsPath, setPbsPath] = useState([]) // folders under the PBS Files root
+  const [pbsEntries, setPbsEntries] = useState([])
+  const [pbsLoading, setPbsLoading] = useState(false)
   const fileRef = useRef(null)
 
   useEffect(() => {
@@ -352,6 +356,58 @@ export default function GoogleDriveBrowser() {
     }
   }
 
+  // Upload a Blob into the CURRENT Drive folder (create metadata → PATCH bytes).
+  async function uploadBlobToDrive(name, blob) {
+    const meta = await driveJson('files?supportsAllDrives=true', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, parents: [current.id] }),
+    })
+    await driveApi(
+      `files/${meta.id}?uploadType=media&supportsAllDrives=true`,
+      { method: 'PATCH', headers: { 'Content-Type': blob.type || 'application/octet-stream' }, body: blob },
+      'https://www.googleapis.com/upload/drive/v3/'
+    )
+  }
+
+  // ── PBS Files → Drive ───────────────────────────────────────────────────────
+  const loadPbs = useCallback(async () => {
+    setPbsLoading(true)
+    const prefix = [PBS_ROOT, ...pbsPath].join('/')
+    const { data } = await supabase.storage.from(PBS_BUCKET).list(prefix, {
+      limit: 1000,
+      sortBy: { column: 'name', order: 'asc' },
+    })
+    const list = (data || [])
+      .filter(e => e.name !== '.keep')
+      .map(e => ({ name: e.name, isFolder: e.id == null, size: e.metadata?.size }))
+      .sort((a, b) => (a.isFolder !== b.isFolder ? (a.isFolder ? -1 : 1) : a.name.localeCompare(b.name)))
+    setPbsEntries(list)
+    setPbsLoading(false)
+  }, [pbsPath])
+
+  useEffect(() => {
+    if (pbsPicker) loadPbs()
+  }, [pbsPicker, loadPbs])
+
+  async function sendPbsFileToDrive(entry) {
+    setBusy(`Uploading "${entry.name}" to Drive…`)
+    try {
+      const path = [PBS_ROOT, ...pbsPath, entry.name].join('/')
+      const { data, error: dlErr } = await supabase.storage.from(PBS_BUCKET).download(path)
+      if (dlErr || !data) throw dlErr || new Error('Could not read the PBS file.')
+      await uploadBlobToDrive(entry.name, data)
+      setPbsPicker(false)
+      setPbsPath([])
+      await loadFolder()
+      alert(`Uploaded "${entry.name}" to ${current.name} in Google Drive.`)
+    } catch (e) {
+      alert('Upload to Drive failed: ' + (e.message || 'unknown error'))
+    } finally {
+      setBusy('')
+    }
+  }
+
   // ── Search (across all drives) ─────────────────────────────────────────────
   async function runSearch(e) {
     e?.preventDefault?.()
@@ -478,6 +534,17 @@ export default function GoogleDriveBrowser() {
             ⬆ Upload
             <input ref={fileRef} type="file" multiple className="hidden" onChange={uploadFiles} disabled={!!busy || searching} />
           </label>
+          <button
+            onClick={() => {
+              setPbsPath([])
+              setPbsPicker(true)
+            }}
+            disabled={!!busy || searching}
+            className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+            title="Upload a file from PBS Files into this Drive folder"
+          >
+            📤 From PBS
+          </button>
         </div>
 
         {/* Breadcrumb */}
@@ -592,6 +659,80 @@ export default function GoogleDriveBrowser() {
               className="flex-1 w-full border-0"
               allow="autoplay"
             />
+          </div>
+        </div>
+      )}
+
+      {/* PBS → Drive picker — choose a PBS file to upload into the current
+          Drive folder. */}
+      {pbsPicker && (
+        <div
+          className="fixed inset-0 z-[80] bg-black/40 flex items-center justify-center p-4"
+          onMouseDown={e => {
+            if (e.target === e.currentTarget) setPbsPicker(false)
+          }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
+              <div className="min-w-0">
+                <h2 className="text-base font-bold text-gray-900">Upload from PBS Files</h2>
+                <p className="text-xs text-gray-400 truncate">
+                  → into “{current?.name}” in Google Drive
+                </p>
+              </div>
+              <button onClick={() => setPbsPicker(false)} className="text-gray-300 hover:text-gray-500 text-xl leading-none">
+                ✕
+              </button>
+            </div>
+            {/* PBS breadcrumb */}
+            <div className="flex items-center gap-1 flex-wrap px-4 py-2 border-b border-gray-100 text-sm flex-shrink-0">
+              <button
+                onClick={() => setPbsPath([])}
+                className={`hover:underline ${pbsPath.length === 0 ? 'font-semibold text-gray-800' : 'text-green-700'}`}
+              >
+                Files
+              </button>
+              {pbsPath.map((seg, i) => (
+                <span key={i} className="flex items-center gap-1">
+                  <span className="text-gray-300">/</span>
+                  <button
+                    onClick={() => setPbsPath(p => p.slice(0, i + 1))}
+                    className={`hover:underline ${i === pbsPath.length - 1 ? 'font-semibold text-gray-800' : 'text-green-700'}`}
+                  >
+                    {seg}
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {pbsLoading ? (
+                <div className="flex justify-center py-10">
+                  <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-green-700" />
+                </div>
+              ) : pbsEntries.length === 0 ? (
+                <p className="px-4 py-8 text-center text-sm text-gray-400">This folder is empty.</p>
+              ) : (
+                <ul className="divide-y divide-gray-50">
+                  {pbsEntries.map(e => (
+                    <li key={e.name}>
+                      <button
+                        onClick={() =>
+                          e.isFolder ? setPbsPath(p => [...p, e.name]) : sendPbsFileToDrive(e)
+                        }
+                        disabled={!!busy}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-green-50 disabled:opacity-50"
+                      >
+                        <span className="w-4 text-center flex-shrink-0">{e.isFolder ? '📁' : '📄'}</span>
+                        <span className="flex-1 min-w-0 truncate text-sm text-gray-800">{e.name}</span>
+                        {!e.isFolder && (
+                          <span className="text-xs text-green-700 flex-shrink-0">Upload ↗</span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         </div>
       )}

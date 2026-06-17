@@ -48,7 +48,7 @@ function iconFor(entry) {
   return '📄'
 }
 
-export default function FileManager({ bucket = 'company-files', root = 'files', accept }) {
+export default function FileManager({ bucket = 'company-files', root = 'files', accept, canEdit = true, rootLabel }) {
   const [path, setPath] = useState([]) // segments under root
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
@@ -184,7 +184,7 @@ export default function FileManager({ bucket = 'company-files', root = 'files', 
             onClick={() => setPath([])}
             className={`hover:text-gray-900 ${path.length === 0 ? 'font-semibold text-gray-900' : ''}`}
           >
-            🏠 {root.charAt(0).toUpperCase() + root.slice(1)}
+            🏠 {rootLabel || root.charAt(0).toUpperCase() + root.slice(1)}
           </button>
           {path.map((seg, i) => (
             <span key={i} className="flex items-center gap-1">
@@ -199,20 +199,24 @@ export default function FileManager({ bucket = 'company-files', root = 'files', 
           ))}
         </div>
         <input ref={fileRef} type="file" multiple accept={accept} onChange={handleUpload} className="hidden" />
-        <button
-          onClick={newFolder}
-          disabled={busy}
-          className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 disabled:opacity-50"
-        >
-          ＋ New Folder
-        </button>
-        <button
-          onClick={() => fileRef.current?.click()}
-          disabled={busy}
-          className="text-xs px-3 py-1.5 rounded-lg bg-green-700 text-white font-semibold hover:bg-green-800 disabled:opacity-50"
-        >
-          {busy ? 'Working…' : '⬆ Upload'}
-        </button>
+        {canEdit && (
+          <>
+            <button
+              onClick={newFolder}
+              disabled={busy}
+              className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 disabled:opacity-50"
+            >
+              ＋ New Folder
+            </button>
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={busy}
+              className="text-xs px-3 py-1.5 rounded-lg bg-green-700 text-white font-semibold hover:bg-green-800 disabled:opacity-50"
+            >
+              {busy ? 'Working…' : '⬆ Upload'}
+            </button>
+          </>
+        )}
       </div>
 
       <div className="border border-gray-200 rounded-xl overflow-hidden">
@@ -269,13 +273,15 @@ export default function FileManager({ bucket = 'company-files', root = 'files', 
                     )}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    <button
-                      onClick={() => removeEntry(entry)}
-                      className="text-gray-300 hover:text-red-500 text-sm"
-                      title="Delete"
-                    >
-                      🗑
-                    </button>
+                    {canEdit && (
+                      <button
+                        onClick={() => removeEntry(entry)}
+                        className="text-gray-300 hover:text-red-500 text-sm"
+                        title="Delete"
+                      >
+                        🗑
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))
