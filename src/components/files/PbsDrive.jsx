@@ -19,7 +19,7 @@ const PERMISSIONS = [
   { id: 'manager', label: 'Manager (also manage members)' },
 ]
 
-export default function PbsDrive() {
+export default function PbsDrive({ settingsOnly = false }) {
   const { user } = useAuth()
   const [isAdmin, setIsAdmin] = useState(false)
   const [drives, setDrives] = useState([])
@@ -61,10 +61,26 @@ export default function PbsDrive() {
     )
   }
 
+  // Standalone settings (rendered as the Documents → Settings tab).
+  if (settingsOnly) {
+    if (!isAdmin) {
+      return (
+        <div className="rounded-xl border border-gray-200 bg-white px-5 py-6 text-sm text-gray-500">
+          PBS Drive settings are available to admins only.
+        </div>
+      )
+    }
+    return (
+      <div className="w-full">
+        <PbsDriveSettings drives={drives} onChange={loadDrives} />
+      </div>
+    )
+  }
+
   return (
     <div className="flex gap-3 h-full min-h-0">
       {/* Drives rail */}
-      <div className="w-52 flex-shrink-0 bg-white border border-gray-200 rounded-xl p-2 overflow-y-auto flex flex-col">
+      <div className="w-[232px] flex-shrink-0 bg-white border border-gray-200 rounded-xl p-2 overflow-y-auto flex flex-col">
         {/* Personal drive — always available to every user */}
         <button
           onClick={() => setView('mydrive')}

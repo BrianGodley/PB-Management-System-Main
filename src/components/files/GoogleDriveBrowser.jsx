@@ -484,7 +484,7 @@ export default function GoogleDriveBrowser() {
   return (
     <div className="flex gap-3 h-full min-h-0">
       {/* Drives rail */}
-      <div className="w-48 flex-shrink-0 bg-white border border-gray-200 rounded-xl p-2 overflow-y-auto">
+      <div className="w-[216px] flex-shrink-0 bg-white border border-gray-200 rounded-xl p-2 overflow-y-auto">
         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide px-2 py-1">Drives</p>
         {drives.map(d => (
           <button

@@ -53,6 +53,17 @@ export default function EDocuments({ clientId = null, embedded = false }) {
   const { user } = useAuth()
   const [subTab, setSubTab] = useState(embedded ? 'contracts' : 'dashboard')
   const [mainTab, setMainTab] = useState('edocuments')
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  useEffect(() => {
+    if (!user?.id) return
+    supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle()
+      .then(({ data }) => setIsAdmin(data?.role === 'admin' || data?.role === 'super_admin'))
+  }, [user?.id])
 
   // Friendly first name for the New Document dashboard greeting.
   const firstName = (() => {
@@ -112,6 +123,7 @@ export default function EDocuments({ clientId = null, embedded = false }) {
     ['gdrive', '🔵 Google Drive'],
     ['photos', '🖼️ Photos'],
     ['videos', '🎞️ Videos'],
+    ...(isAdmin ? [['settings', '⚙️ Settings']] : []),
   ]
   return (
     <div className="h-full flex flex-col">
@@ -139,6 +151,7 @@ export default function EDocuments({ clientId = null, embedded = false }) {
         {mainTab === 'photos' && <FileManager root="photos" accept="image/*" />}
         {mainTab === 'videos' && <FileManager root="videos" accept="video/*" />}
         {mainTab === 'gdrive' && <GoogleDriveBrowser />}
+        {mainTab === 'settings' && <PbsDrive settingsOnly />}
         {mainTab === 'edocuments' && eDocsContent}
       </div>
     </div>

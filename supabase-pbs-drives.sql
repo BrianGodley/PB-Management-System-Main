@@ -4,6 +4,9 @@
 -- storage bucket at  drives/<drive_id>/...  ; membership is enforced in the app
 -- (admins manage drives; members see the drives they belong to).
 --
+-- The admin check is inlined against profiles.role in each policy (no
+-- dollar-quoted function, which some SQL editors mishandle).
+--
 -- Run this once in the Supabase SQL editor.
 
 -- ── Tables ──────────────────────────────────────────────────────────────────
@@ -28,35 +31,30 @@ create table if not exists pbs_drive_members (
 create index if not exists pbs_drive_members_drive_idx on pbs_drive_members(drive_id);
 create index if not exists pbs_drive_members_user_idx  on pbs_drive_members(user_id);
 
--- ── Helper: is the current user an app admin? ───────────────────────────────
-create or replace function is_pbs_admin() returns boolean
-  language sql stable security definer set search_path = public as $$
-  select exists (
-    select 1 from profiles p
-    where p.id = auth.uid() and p.role in ('admin','super_admin')
-  );
-$$;
-
 -- ── RLS ─────────────────────────────────────────────────────────────────────
 alter table pbs_drives        enable row level security;
 alter table pbs_drive_members enable row level security;
 
--- Drives: a user sees a drive if they're a member or an admin. Admins create /
--- edit / delete drives.
+-- Drives: a user sees a drive if they're a member or an admin. Admins manage.
 drop policy if exists pbs_drives_select on pbs_drives;
 create policy pbs_drives_select on pbs_drives for select using (
-  is_pbs_admin()
+  exists (select 1 from profiles p where p.id = auth.uid() and p.role in ('admin','super_admin'))
   or exists (select 1 from pbs_drive_members m where m.drive_id = pbs_drives.id and m.user_id = auth.uid())
 );
+
 drop policy if exists pbs_drives_admin_all on pbs_drives;
 create policy pbs_drives_admin_all on pbs_drives for all
-  using (is_pbs_admin()) with check (is_pbs_admin());
+  using      (exists (select 1 from profiles p where p.id = auth.uid() and p.role in ('admin','super_admin')))
+  with check (exists (select 1 from profiles p where p.id = auth.uid() and p.role in ('admin','super_admin')));
 
 -- Members: a user sees their own membership rows; admins see/manage all.
 drop policy if exists pbs_members_select on pbs_drive_members;
 create policy pbs_members_select on pbs_drive_members for select using (
-  is_pbs_admin() or user_id = auth.uid()
+  exists (select 1 from profiles p where p.id = auth.uid() and p.role in ('admin','super_admin'))
+  or user_id = auth.uid()
 );
+
 drop policy if exists pbs_members_admin_all on pbs_drive_members;
 create policy pbs_members_admin_all on pbs_drive_members for all
-  using (is_pbs_admin()) with check (is_pbs_admin());
+  using      (exists (select 1 from profiles p where p.id = auth.uid() and p.role in ('admin','super_admin')))
+  with check (exists (select 1 from profiles p where p.id = auth.uid() and p.role in ('admin','super_admin')));
