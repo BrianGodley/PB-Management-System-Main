@@ -110,6 +110,21 @@ const NODE_SIZE = {
 }
 const sizeOf = s => NODE_SIZE[s.kind] || NODE_SIZE.person
 
+// Where an arrow should attach on a node's box: the point on the perimeter in
+// the direction of a target point (the other node's center). This makes start
+// and end points auto-adjust as nodes are dragged around.
+function edgePoint(box, towardX, towardY) {
+  const cx = box.x + box.w / 2
+  const cy = box.y + box.h / 2
+  const dx = towardX - cx
+  const dy = towardY - cy
+  if (dx === 0 && dy === 0) return { x: cx, y: cy }
+  const hw = box.w / 2
+  const hh = box.h / 2
+  const scale = 1 / Math.max(Math.abs(dx) / hw, Math.abs(dy) / hh)
+  return { x: cx + dx * scale, y: cy + dy * scale }
+}
+
 // Stacked vertical layout centered around x≈360.
 function autoLayout(steps) {
   const pos = {}
@@ -160,11 +175,25 @@ function FlowCanvas({ steps, positions, setPositions }) {
     if (!pa || !pb) return
     const sa = sizeOf(a)
     const sb = sizeOf(b)
-    const x1 = pa.x + sa.w / 2
-    const y1 = pa.y + sa.h
-    const x2 = pb.x + sb.w / 2
-    const y2 = pb.y
-    edges.push({ key: a.id + '_' + b.id + '_' + (label || ''), x1, y1, x2, y2, label, mx: (x1 + x2) / 2, my: (y1 + y2) / 2 })
+    const boxA = { x: pa.x, y: pa.y, w: sa.w, h: sa.h }
+    const boxB = { x: pb.x, y: pb.y, w: sb.w, h: sb.h }
+    const cAx = boxA.x + boxA.w / 2
+    const cAy = boxA.y + boxA.h / 2
+    const cBx = boxB.x + boxB.w / 2
+    const cBy = boxB.y + boxB.h / 2
+    // Start on A's edge facing B; end on B's edge facing A — auto-adjusts on drag.
+    const p1 = edgePoint(boxA, cBx, cBy)
+    const p2 = edgePoint(boxB, cAx, cAy)
+    edges.push({
+      key: a.id + '_' + b.id + '_' + (label || ''),
+      x1: p1.x,
+      y1: p1.y,
+      x2: p2.x,
+      y2: p2.y,
+      label,
+      mx: (p1.x + p2.x) / 2,
+      my: (p1.y + p2.y) / 2,
+    })
   }
   const hasExplicit = steps.some(s => (s.next || []).some(c => c.to))
   if (hasExplicit) {
