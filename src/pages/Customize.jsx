@@ -18,6 +18,7 @@ import {
   SIDEBAR_FONT_KEY,
   SIDEBAR_FONTS,
   SIDEBAR_FONT_SIZES,
+  sidebarFontStyle,
   HEADER_KEY,
   HEADER_DEFAULT,
   MENU_POS_KEY,
@@ -354,66 +355,98 @@ export default function Customize() {
         {/* ── Menu font ── */}
         <h2 className="text-lg font-bold text-gray-900 mb-1">Menu font</h2>
         <p className="text-sm text-gray-500 mb-3">Change the menu text font, size, and style.</p>
-        <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">
-          <div>
-            <p className="text-xs font-semibold text-gray-500 mb-1.5">Font</p>
-            <select
-              value={font.family || ''}
-              onChange={e => setFont({ family: e.target.value })}
-              className="w-full max-w-xs border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600"
-              style={font.family ? { fontFamily: font.family } : undefined}
-            >
-              {SIDEBAR_FONTS.map(f => (
-                <option key={f.id} value={f.value} style={f.value ? { fontFamily: f.value } : undefined}>
-                  {f.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <p className="text-xs font-semibold text-gray-500 mb-1.5">Size</p>
-            <div className="flex flex-wrap gap-2">
-              {SIDEBAR_FONT_SIZES.map(s => {
-                const isSel = (font.size || '') === s.value
-                return (
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="grid md:grid-cols-2 gap-5">
+            {/* controls */}
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-semibold text-gray-500 mb-1.5">Font</p>
+                <select
+                  value={font.family || ''}
+                  onChange={e => setFont({ family: e.target.value })}
+                  className="w-full max-w-xs border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600"
+                  style={font.family ? { fontFamily: font.family } : undefined}
+                >
+                  {SIDEBAR_FONTS.map(f => (
+                    <option key={f.id} value={f.value} style={f.value ? { fontFamily: f.value } : undefined}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-500 mb-1.5">Size</p>
+                <div className="flex flex-wrap gap-2">
+                  {SIDEBAR_FONT_SIZES.map(s => {
+                    const isSel = (font.size || '') === s.value
+                    return (
+                      <button
+                        key={s.id}
+                        onClick={() => setFont({ size: s.value })}
+                        className={`text-sm w-10 py-1.5 rounded-lg transition-colors ${
+                          isSel
+                            ? 'bg-green-700 text-white border-2 border-black'
+                            : 'bg-white text-gray-700 border border-gray-300 hover:border-green-400'
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-500 mb-1.5">Style</p>
+                <div className="flex gap-2">
                   <button
-                    key={s.id}
-                    onClick={() => setFont({ size: s.value })}
-                    className={`text-sm w-10 py-1.5 rounded-lg transition-colors ${
-                      isSel
+                    onClick={() => setFont({ bold: !font.bold })}
+                    className={`w-10 py-1.5 rounded-lg font-bold transition-colors ${
+                      font.bold
                         ? 'bg-green-700 text-white border-2 border-black'
                         : 'bg-white text-gray-700 border border-gray-300 hover:border-green-400'
                     }`}
                   >
-                    {s.label}
+                    B
                   </button>
-                )
-              })}
+                  <button
+                    onClick={() => setFont({ italic: !font.italic })}
+                    className={`w-10 py-1.5 rounded-lg italic transition-colors ${
+                      font.italic
+                        ? 'bg-green-700 text-white border-2 border-black'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:border-green-400'
+                    }`}
+                  >
+                    I
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-          <div>
-            <p className="text-xs font-semibold text-gray-500 mb-1.5">Style</p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setFont({ bold: !font.bold })}
-                className={`w-10 py-1.5 rounded-lg font-bold transition-colors ${
-                  font.bold
-                    ? 'bg-green-700 text-white border-2 border-black'
-                    : 'bg-white text-gray-700 border border-gray-300 hover:border-green-400'
-                }`}
-              >
-                B
-              </button>
-              <button
-                onClick={() => setFont({ italic: !font.italic })}
-                className={`w-10 py-1.5 rounded-lg italic transition-colors ${
-                  font.italic
-                    ? 'bg-green-700 text-white border-2 border-black'
-                    : 'bg-white text-gray-700 border border-gray-300 hover:border-green-400'
-                }`}
-              >
-                I
-              </button>
+
+            {/* live sample — updates as the font/size/style change */}
+            <div>
+              <p className="text-xs font-semibold text-gray-500 mb-1.5">Preview</p>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <div className="rounded-md bg-[#1f2d24] p-2.5">
+                  {[
+                    ['🏠', 'Dashboard'],
+                    ['👥', 'Contacts'],
+                    ['💡', 'Opportunities'],
+                    ['🏗️', 'Jobs'],
+                    ['📊', 'Statistics'],
+                  ].map(([icon, label], i) => (
+                    <div
+                      key={label}
+                      className={`flex items-center gap-2 rounded-md px-3 py-2 ${
+                        i === 3 ? 'bg-white/15' : ''
+                      }`}
+                    >
+                      {showIcons && <span className="text-sm leading-none">{icon}</span>}
+                      <span className="text-white" style={sidebarFontStyle(font)}>{label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <p className="text-[11px] text-gray-400 mt-1.5">Sample updates live as you change the font.</p>
             </div>
           </div>
         </div>
