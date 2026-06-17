@@ -25,6 +25,9 @@ const STEP_KINDS = [
   { id: 'document', label: 'Document' },
   { id: 'organization', label: 'Organization' },
   { id: 'decision', label: 'Decision' },
+  { id: 'merge', label: 'Merge' },
+  { id: 'delay', label: 'Delay' },
+  { id: 'datastore', label: 'Data Storage' },
 ]
 
 // Workflow category — required when creating a workflow; shown as the first
@@ -93,6 +96,41 @@ function FlowNode({ step }) {
       </div>
     )
   }
+  if (step.kind === 'merge') {
+    // Upward triangle merge symbol.
+    return (
+      <div className="relative w-32 h-24 flex items-end justify-center">
+        <svg viewBox="0 0 100 80" className="absolute inset-0 w-full h-full">
+          <polygon points="50,4 96,76 4,76" fill="#fef3c7" stroke="#d97706" strokeWidth="3" />
+        </svg>
+        <span className="relative text-[10px] font-semibold text-amber-800 text-center px-2 pb-1 leading-tight">{label}</span>
+      </div>
+    )
+  }
+  if (step.kind === 'delay') {
+    // Rectangle with a curved right edge (D-shape).
+    return (
+      <div
+        className="h-14 w-40 bg-white border-2 border-purple-500 flex items-center gap-2 pl-3 pr-6"
+        style={{ borderRadius: '6px 28px 28px 6px' }}
+      >
+        <span className="text-lg">⏳</span>
+        <span className="text-sm font-semibold text-purple-800 leading-tight truncate">{label}</span>
+      </div>
+    )
+  }
+  if (step.kind === 'datastore') {
+    // Database cylinder.
+    return (
+      <div className="relative w-32 h-[88px]">
+        <svg viewBox="0 0 100 80" className="absolute inset-0 w-full h-full">
+          <path d="M8 14 V66 A42 12 0 0 0 92 66 V14" fill="#e0f2fe" stroke="#0284c7" strokeWidth="3" />
+          <ellipse cx="50" cy="14" rx="42" ry="12" fill="#e0f2fe" stroke="#0284c7" strokeWidth="3" />
+        </svg>
+        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-sky-800 text-center px-3 pt-3 leading-tight">{label}</span>
+      </div>
+    )
+  }
   // person
   return (
     <div className="w-52 rounded-xl border-2 border-blue-500 bg-blue-50 px-3 py-2 flex items-center gap-2">
@@ -111,6 +149,9 @@ const NODE_SIZE = {
   organization: { w: 208, h: 56 },
   document: { w: 128, h: 160 },
   decision: { w: 128, h: 128 },
+  merge: { w: 128, h: 96 },
+  delay: { w: 168, h: 56 },
+  datastore: { w: 128, h: 88 },
 }
 const sizeOf = s => NODE_SIZE[s.kind] || NODE_SIZE.person
 
