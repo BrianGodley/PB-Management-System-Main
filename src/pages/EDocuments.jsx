@@ -214,12 +214,21 @@ function StageTiles({ docs }) {
 function DashboardTab({ userId, userName }) {
   const [docs, setDocs] = useState([])
   const [avatarUrl, setAvatarUrl] = useState(null)
+  const [workflows, setWorkflows] = useState([])
+  const [flowId, setFlowId] = useState('') // '' = all documents
 
   useEffect(() => {
     supabase
       .from('edoc_documents')
-      .select('id, status, created_by')
+      .select('id, name, status, created_by')
       .then(({ data }) => setDocs(data || []))
+  }, [])
+  useEffect(() => {
+    supabase
+      .from('edoc_workflows')
+      .select('id, name, steps')
+      .order('created_at', { ascending: false })
+      .then(({ data }) => setWorkflows(data || []))
   }, [])
   useEffect(() => {
     if (!userId) return
@@ -231,10 +240,35 @@ function DashboardTab({ userId, userName }) {
       .then(({ data }) => setAvatarUrl(data?.avatar_url || null))
   }, [userId])
 
-  const myDocs = docs.filter(d => d.created_by === userId)
+  const docById = Object.fromEntries(docs.map(d => [d.id, d]))
+  const selectedFlow = workflows.find(w => w.id === flowId) || null
+  // Document nodes in the flow that reference real docs.
+  const flowDocSteps = (selectedFlow?.steps || []).filter(
+    s => s.kind === 'document' && (s.docLinks || []).length
+  )
+  const referencedIds = new Set(flowDocSteps.flatMap(s => (s.docLinks || []).map(l => l.id)))
+  // When a flow is selected, scope the You/Team tiles to its referenced docs.
+  const scopedAll = selectedFlow ? docs.filter(d => referencedIds.has(d.id)) : docs
+  const teamDocs = scopedAll
+  const myDocs = scopedAll.filter(d => d.created_by === userId)
 
   return (
     <div>
+      {/* Document-flow picker — scopes the You/Team tiles to a workflow's docs. */}
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-sm font-semibold text-gray-700">Document flow:</span>
+        <select
+          value={flowId}
+          onChange={e => setFlowId(e.target.value)}
+          className="input text-sm py-1.5 w-64"
+        >
+          <option value="">All documents</option>
+          {workflows.map(w => (
+            <option key={w.id} value={w.id}>{w.name}</option>
+          ))}
+        </select>
+      </div>
+
       {/* You — ~2.5in tall, aurora-colored background */}
       <div
         className="relative rounded-2xl overflow-hidden border border-emerald-100 mb-5"
@@ -282,9 +316,42 @@ function DashboardTab({ userId, userName }) {
           <h3 className="text-lg font-bold text-white drop-shadow">Team</h3>
         </div>
         <div className="absolute inset-x-4 bottom-4">
-          <StageTiles docs={docs} />
+          <StageTiles docs={teamDocs} />
         </div>
       </div>
+
+      {/* Per-step breakdown (the "by step" view) — only when a flow is chosen. */}
+      {selectedFlow && (
+        <div className="mt-5 bg-white border border-gray-200 rounded-2xl p-4">
+          <p className="text-sm font-bold text-gray-800 mb-1">{selectedFlow.name} — by step</p>
+          {flowDocSteps.length === 0 ? (
+            <p className="text-sm text-gray-400">
+              This workflow has no document steps linked to existing documents yet.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {flowDocSteps.map((s, i) => (
+                <div key={s.id || i} className="border border-gray-100 rounded-lg p-2.5">
+                  <p className="text-xs font-semibold text-gray-600 mb-1">
+                    📄 {s.label || `Document step ${i + 1}`}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {(s.docLinks || []).map(l => {
+                      const d = docById[l.id]
+                      return (
+                        <span key={l.id} className="inline-flex items-center gap-1.5 text-xs text-gray-700">
+                          {l.name}
+                          {d ? <StatusBadge status={d.status} /> : <span className="text-[11px] text-gray-400">(not found)</span>}
+                        </span>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
