@@ -56,6 +56,36 @@ function previewUrl(f) {
   return `https://drive.google.com/file/d/${f.id}/preview`
 }
 
+// Persist the short-lived access token (with expiry) so flipping tabs doesn't
+// force a fresh sign-in every time. Tokens last ~1h; we reuse until expiry.
+const TOKEN_KEY = 'gdrive:token'
+function readStoredToken() {
+  try {
+    const v = JSON.parse(localStorage.getItem(TOKEN_KEY) || 'null')
+    if (v && v.access_token && v.expiry && v.expiry > Date.now() + 30000) return v.access_token
+  } catch {
+    /* ignore */
+  }
+  return null
+}
+function storeToken(access_token, expires_in) {
+  try {
+    localStorage.setItem(
+      TOKEN_KEY,
+      JSON.stringify({ access_token, expiry: Date.now() + (Number(expires_in) || 3600) * 1000 })
+    )
+  } catch {
+    /* ignore */
+  }
+}
+function clearStoredToken() {
+  try {
+    localStorage.removeItem(TOKEN_KEY)
+  } catch {
+    /* ignore */
+  }
+}
+
 function useGisScript() {
   const [ready, setReady] = useState(!!window.google?.accounts?.oauth2)
   useEffect(() => {
@@ -78,7 +108,7 @@ function useGisScript() {
 
 export default function GoogleDriveBrowser() {
   const gisReady = useGisScript()
-  const [token, setToken] = useState(null)
+  const [token, setToken] = useState(() => readStoredToken())
   const [tokenClient, setTokenClient] = useState(null)
   const [drives, setDrives] = useState([])
   const [activeDrive, setActiveDrive] = useState(null)
@@ -99,6 +129,7 @@ export default function GoogleDriveBrowser() {
       scope: SCOPE,
       callback: resp => {
         if (resp?.access_token) {
+          storeToken(resp.access_token, resp.expires_in)
           setToken(resp.access_token)
           setError('')
         } else setError('Google sign-in was cancelled or failed.')
@@ -109,7 +140,9 @@ export default function GoogleDriveBrowser() {
 
   const connect = () => {
     setError('')
-    tokenClient?.requestAccessToken({ prompt: token ? '' : 'consent' })
+    // Empty prompt reuses the existing grant silently when possible (no repeat
+    // consent screen); Google only prompts if access was never granted.
+    tokenClient?.requestAccessToken({ prompt: '' })
   }
 
   // Authed Drive API request. Re-prompts for a token on 401.
@@ -120,6 +153,7 @@ export default function GoogleDriveBrowser() {
         headers: { Authorization: `Bearer ${token}`, ...(opts.headers || {}) },
       })
       if (res.status === 401) {
+        clearStoredToken()
         setToken(null)
         throw new Error('Session expired — click Connect to reauthorize.')
       }
