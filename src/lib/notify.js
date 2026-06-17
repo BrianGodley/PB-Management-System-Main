@@ -200,7 +200,7 @@ export async function sendWelcomeEmail({ to, fullName, username, password, login
         Please log in and change your password as soon as possible.
       </p>`,
     buttonText: 'Log In Now',
-    buttonUrl: loginUrl || 'https://your-app-url.com/login',
+    buttonUrl: loginUrl || 'https://pbs.picturebuild.com/login',
   })
   return sendEmail({ to, subject, html })
 }

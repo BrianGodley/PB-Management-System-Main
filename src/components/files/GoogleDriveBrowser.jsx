@@ -126,6 +126,10 @@ export default function GoogleDriveBrowser() {
   const [pbsLoading, setPbsLoading] = useState(false)
   const [mirror, setMirror] = useState('') // progress text while copying all → PBS
   const fileRef = useRef(null)
+  // Always-current token (so a long mirror run reads the latest after refresh).
+  const tokenRef = useRef(token)
+  useEffect(() => { tokenRef.current = token }, [token])
+  const refreshResolverRef = useRef(null) // resolves a pending silent token refresh
 
   useEffect(() => {
     if (!gisReady || !CLIENT_ID || tokenClient) return
@@ -135,9 +139,20 @@ export default function GoogleDriveBrowser() {
       callback: resp => {
         if (resp?.access_token) {
           storeToken(resp.access_token, resp.expires_in)
+          tokenRef.current = resp.access_token
           setToken(resp.access_token)
           setError('')
-        } else setError('Google sign-in was cancelled or failed.')
+          if (refreshResolverRef.current) {
+            refreshResolverRef.current(resp.access_token)
+            refreshResolverRef.current = null
+          }
+        } else {
+          setError('Google sign-in was cancelled or failed.')
+          if (refreshResolverRef.current) {
+            refreshResolverRef.current(null)
+            refreshResolverRef.current = null
+          }
+        }
       },
     })
     setTokenClient(client)
@@ -358,6 +373,69 @@ export default function GoogleDriveBrowser() {
   }
 
   // ── Copy ALL Shared Drives → PBS Drives (folders + files, same names) ───────
+  // Silently request a fresh access token; resolves with the new token (or null).
+  function refreshToken() {
+    return new Promise(resolve => {
+      refreshResolverRef.current = resolve
+      try {
+        tokenClient?.requestAccessToken({ prompt: '' })
+      } catch {
+        refreshResolverRef.current = null
+        resolve(null)
+      }
+      // Safety net so a stuck prompt can't hang the run forever.
+      setTimeout(() => {
+        if (refreshResolverRef.current === resolve) {
+          refreshResolverRef.current = null
+          resolve(tokenRef.current || null)
+        }
+      }, 15000)
+    })
+  }
+  // Resilient Drive fetch: reads the latest token, refreshes on 401, retries
+  // transient errors/timeouts with backoff.
+  async function gFetch(path, opts = {}, base = 'https://www.googleapis.com/drive/v3/') {
+    let lastErr
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const ctrl = new AbortController()
+      const timer = setTimeout(() => ctrl.abort(), 60000)
+      try {
+        const res = await fetch(`${base}${path}`, {
+          ...opts,
+          signal: ctrl.signal,
+          headers: { Authorization: `Bearer ${tokenRef.current}`, ...(opts.headers || {}) },
+        })
+        clearTimeout(timer)
+        if (res.status === 401) {
+          const t = await refreshToken()
+          if (!t) throw new Error('Session expired — click Connect to reauthorize.')
+          continue
+        }
+        if (res.status === 429 || res.status >= 500) {
+          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
+          continue
+        }
+        if (!res.ok) throw new Error(`Drive API error ${res.status}`)
+        return res
+      } catch (e) {
+        clearTimeout(timer)
+        lastErr = e
+        if (/Session expired/.test(e.message)) throw e
+        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
+      }
+    }
+    throw lastErr || new Error('Drive request failed')
+  }
+  const gJson = async path => (await gFetch(path)).json()
+  async function gBlob(f) {
+    const isNative = f.mimeType?.startsWith('application/vnd.google-apps')
+    const path = isNative
+      ? `files/${f.id}/export?mimeType=application/pdf&supportsAllDrives=true`
+      : `files/${f.id}?alt=media&supportsAllDrives=true`
+    const res = await gFetch(path)
+    return { blob: await res.blob(), isNative }
+  }
+
   // Find an existing PBS drive by name, or create one; returns its id.
   async function ensurePbsDrive(name) {
     const { data: existing } = await supabase.from('pbs_drives').select('id').eq('name', name).limit(1)
@@ -381,11 +459,17 @@ export default function GoogleDriveBrowser() {
         driveId,
       })
       if (pageToken) params.set('pageToken', pageToken)
-      const data = await driveJson(`files?${params.toString()}`)
+      const data = await gJson(`files?${params.toString()}`)
       out.push(...(data.files || []))
       pageToken = data.nextPageToken || ''
     } while (pageToken)
     return out
+  }
+  // Names already present in a PBS folder (so re-runs skip what's done).
+  async function listPbsNames(pbsId, relPath) {
+    const prefix = `drives/${pbsId}${relPath ? '/' + relPath : ''}`
+    const { data } = await supabase.storage.from(PBS_BUCKET).list(prefix, { limit: 1000 })
+    return new Set((data || []).map(e => e.name))
   }
   // Recursively mirror a Drive folder into drives/<pbsId>/<relPath> storage.
   async function mirrorFolder(parentId, driveId, pbsId, relPath, stats) {
@@ -396,21 +480,27 @@ export default function GoogleDriveBrowser() {
         .catch(() => {})
     }
     const children = await listAllChildren(parentId, driveId)
+    const existing = await listPbsNames(pbsId, relPath)
     for (const c of children) {
       if (c.mimeType === FOLDER_MIME) {
         await mirrorFolder(c.id, driveId, pbsId, relPath ? `${relPath}/${c.name}` : c.name, stats)
       } else {
+        const fname = c.mimeType?.startsWith('application/vnd.google-apps') ? `${c.name}.pdf` : c.name
+        if (existing.has(fname)) {
+          stats.skipped++
+          continue
+        }
         try {
-          const { blob, isNative } = await fetchBlob(c)
-          const fname = isNative ? `${c.name}.pdf` : c.name
+          const { blob } = await gBlob(c)
           const path = `drives/${pbsId}/${relPath ? relPath + '/' : ''}${fname}`
           const { error } = await supabase.storage
             .from(PBS_BUCKET)
             .upload(path, blob, { upsert: true, contentType: blob.type || undefined })
           if (error) throw error
           stats.files++
-          setMirror(`Copying… ${stats.files} files (${c.name})`)
-        } catch {
+          setMirror(`Copying… ${stats.files} new, ${stats.skipped} skipped (${c.name})`)
+        } catch (e) {
+          if (/Session expired/.test(e.message || '')) throw e
           stats.errors++
         }
       }
@@ -420,20 +510,21 @@ export default function GoogleDriveBrowser() {
     if (!token) return
     if (
       !window.confirm(
-        'Copy ALL Shared Drives (folders + files) into PBS Drives with the same names? Large drives can take a while.'
+        'Copy ALL Shared Drives (folders + files) into PBS Drives with the same names? Large drives can take a while. ' +
+          'You can re-run anytime — it skips files already copied.'
       )
     )
       return
     setMirror('Loading Shared Drives…')
     try {
-      const data = await driveJson('drives?pageSize=100&fields=drives(id,name)')
+      const data = await gJson('drives?pageSize=100&fields=drives(id,name)')
       const shared = data.drives || []
       if (!shared.length) {
         setMirror('')
         alert('No Shared Drives found on your Google account.')
         return
       }
-      const stats = { files: 0, errors: 0 }
+      const stats = { files: 0, skipped: 0, errors: 0 }
       for (const d of shared) {
         setMirror(`Drive “${d.name}”…`)
         const pbsId = await ensurePbsDrive(d.name)
@@ -441,12 +532,16 @@ export default function GoogleDriveBrowser() {
       }
       setMirror('')
       alert(
-        `Done — copied ${stats.files} file(s) across ${shared.length} Shared Drive(s) into PBS Drives` +
-          (stats.errors ? `; ${stats.errors} item(s) skipped due to errors.` : '.')
+        `Done — ${stats.files} file(s) copied, ${stats.skipped} already present, across ${shared.length} Shared Drive(s)` +
+          (stats.errors ? `; ${stats.errors} skipped due to errors (re-run to retry).` : '.')
       )
     } catch (e) {
       setMirror('')
-      alert('Copy failed: ' + (e.message || 'unknown error'))
+      if (/Session expired/.test(e.message || '')) {
+        alert('Google session expired and could not refresh. Click Connect, then run Copy all → PBS again — it resumes where it left off.')
+      } else {
+        alert('Copy failed: ' + (e.message || 'unknown error'))
+      }
     }
   }
 
