@@ -205,6 +205,8 @@ export default function Customize() {
   const [selected, setSelected] = useState('all') // 'all' | module route key
   const [saving, setSaving] = useState(false)
   const [uploadingBg, setUploadingBg] = useState(false)
+  // Background being previewed in the large pop-up (with Apply / Close).
+  const [bgPreview, setBgPreview] = useState(null)
   const [savedMsg, setSavedMsg] = useState('')
   const [tab, setTab] = useState('backgrounds') // 'backgrounds' | 'menu'
 
@@ -282,12 +284,11 @@ export default function Customize() {
       const label = (file.name.replace(/\.[^.]+$/, '') || 'Photo').slice(0, 40)
       setMap(m => {
         const list = Array.isArray(m[CUSTOM_BG_KEY]) ? m[CUSTOM_BG_KEY] : []
-        const next = { ...m, [CUSTOM_BG_KEY]: [...list, { id, label, url, storage_path: path }] }
-        if (selected === 'all') CUSTOMIZE_MODULES.forEach(mod => { next[mod.key] = id })
-        else next[selected] = id
-        return next
+        return { ...m, [CUSTOM_BG_KEY]: [...list, { id, label, url, storage_path: path }] }
       })
       setSavedMsg('')
+      // Show the big preview so the user can Apply (or just close).
+      setBgPreview({ id, label, url })
     } catch (e) {
       setSavedMsg('Upload failed: ' + (e?.message || 'unknown error'))
     } finally {
@@ -483,7 +484,7 @@ export default function Customize() {
               return (
                 <button
                   key={bg.id}
-                  onClick={() => pickBackground(bg.id)}
+                  onClick={() => setBgPreview(bg)}
                   className={`text-left rounded-lg overflow-hidden border-2 transition-all ${
                     isSel ? 'border-black ring-2 ring-black/20' : 'border-gray-200 hover:border-gray-300'
                   }`}
@@ -546,7 +547,7 @@ export default function Customize() {
                       isSel ? 'border-black ring-2 ring-black/20' : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <button onClick={() => pickBackground(bg.id)} className="block w-full text-left">
+                    <button onClick={() => setBgPreview(bg)} className="block w-full text-left">
                       <div
                         className="h-14 w-full"
                         style={{ backgroundImage: `url('${bg.url}')`, backgroundSize: 'cover', backgroundPosition: 'center' }}
@@ -904,6 +905,45 @@ export default function Customize() {
         </>
         )}
       </div>
+
+      {/* Large background preview pop-up — appears when a tile is clicked. */}
+      {bgPreview && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4"
+          onClick={() => setBgPreview(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-[90vw] max-w-3xl overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div
+              className="h-[60vh] w-full bg-gray-100"
+              style={
+                bgPreview.url
+                  ? { backgroundImage: `url('${bgPreview.url}')`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                  : { backgroundColor: bgPreview.swatch || '#eceef1' }
+              }
+            />
+            <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200">
+              <span className="text-sm font-semibold text-gray-800 truncate">{bgPreview.label}</span>
+              <div className="flex gap-2 flex-shrink-0">
+                <button
+                  onClick={() => setBgPreview(null)}
+                  className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => { pickBackground(bgPreview.id); setBgPreview(null) }}
+                  className="px-4 py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800"
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
