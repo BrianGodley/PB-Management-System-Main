@@ -139,7 +139,7 @@ function autoLayout(steps) {
 
 // Interactive canvas — drag nodes to reposition; arrows auto-route between
 // consecutive steps. Positions are lifted up so they can be saved.
-function FlowCanvas({ steps, positions, setPositions }) {
+function FlowCanvas({ steps, positions, setPositions, readOnly = false }) {
   const ref = useRef(null)
 
   function startDrag(e, id) {
@@ -250,8 +250,8 @@ function FlowCanvas({ steps, positions, setPositions }) {
         return (
           <div
             key={s.id}
-            onMouseDown={e => startDrag(e, s.id)}
-            className="absolute cursor-move select-none"
+            onMouseDown={readOnly ? undefined : e => startDrag(e, s.id)}
+            className={`absolute select-none ${readOnly ? '' : 'cursor-move'}`}
             style={{ left: p.x, top: p.y }}
           >
             <FlowNode step={s} />
@@ -276,6 +276,10 @@ function WorkflowBuilder({ workflow, userId, onClose, onSaved }) {
   const [people, setPeople] = useState([]) // name suggestions (employees + clients)
   const [docs, setDocs] = useState([]) // existing documents to link (kept separate)
   const [saving, setSaving] = useState(false)
+  // New workflows open straight into editing; existing ones open in view mode
+  // (diagram only) until the user clicks Edit.
+  const [editMode, setEditMode] = useState(!workflow)
+  const [savedId, setSavedId] = useState(workflow?.id || null)
 
   // Existing documents a Document node can reference (they stay separate).
   useEffect(() => {
@@ -335,19 +339,24 @@ function WorkflowBuilder({ workflow, userId, onClose, onSaved }) {
 
   const toggleModule = m => setModules(prev => (prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]))
   const addStep = kind =>
-    setSteps(prev => [
-      ...prev,
-      {
-        id: newId(),
-        kind,
-        label: '',
-        multi: false,
-        entityType: 'employee',
-        orgType: 'division',
-        // No connection by default — the user adds connections between items.
-        next: [],
-      },
-    ])
+    setSteps(prev => {
+      // Decisions get a sequential default name (Decision 1, 2, 3…) so they're
+      // easy to follow on the chart and in the connection chooser lists.
+      const label = kind === 'decision' ? `Decision ${prev.filter(s => s.kind === 'decision').length + 1}` : ''
+      return [
+        ...prev,
+        {
+          id: newId(),
+          kind,
+          label,
+          multi: false,
+          entityType: 'employee',
+          orgType: 'division',
+          // No connection by default — the user adds connections between items.
+          next: [],
+        },
+      ]
+    })
   const updateStep = (id, patch) => setSteps(prev => prev.map(s => (s.id === id ? { ...s, ...patch } : s)))
   const removeStep = id =>
     setSteps(prev =>
@@ -411,19 +420,26 @@ function WorkflowBuilder({ workflow, userId, onClose, onSaved }) {
       graph: { positions },
       updated_at: new Date().toISOString(),
     }
+    const id = workflow?.id || savedId
     let error
-    if (workflow?.id) {
-      ;({ error } = await supabase.from('edoc_workflows').update(payload).eq('id', workflow.id))
+    if (id) {
+      ;({ error } = await supabase.from('edoc_workflows').update(payload).eq('id', id))
     } else {
-      ;({ error } = await supabase
+      const res = await supabase
         .from('edoc_workflows')
-        .insert({ ...payload, created_by: userId || null }))
+        .insert({ ...payload, created_by: userId || null })
+        .select('id')
+        .single()
+      error = res.error
+      if (res.data?.id) setSavedId(res.data.id)
     }
     setSaving(false)
     if (error) {
       alert('Save failed: ' + error.message)
       return
     }
+    // Stay open in view mode (button flips to Edit); refresh the table behind.
+    setEditMode(false)
     onSaved?.()
   }
 
@@ -434,16 +450,32 @@ function WorkflowBuilder({ workflow, userId, onClose, onSaved }) {
       </datalist>
       <div className="flex items-center justify-between mb-3">
         <button onClick={onClose} className="text-sm text-gray-500 hover:text-gray-700">← Back to workflows</button>
-        <button
-          onClick={save}
-          disabled={saving}
-          className="text-sm bg-green-700 text-white font-semibold px-5 py-2 rounded-lg hover:bg-green-800 disabled:opacity-50"
-        >
-          {saving ? 'Saving…' : '💾 Save Workflow'}
-        </button>
+        {editMode ? (
+          <button
+            onClick={save}
+            disabled={saving}
+            className="text-sm bg-green-700 text-white font-semibold px-5 py-2 rounded-lg hover:bg-green-800 disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : '💾 Save Workflow'}
+          </button>
+        ) : (
+          <button
+            onClick={() => setEditMode(true)}
+            className="text-sm bg-green-700 text-white font-semibold px-5 py-2 rounded-lg hover:bg-green-800"
+          >
+            ✎ Edit
+          </button>
+        )}
       </div>
 
-      {/* Typed wizard */}
+      {/* View mode: show the workflow name as a heading (wizard hidden). */}
+      {!editMode && (
+        <h2 className="text-lg font-bold text-gray-900 mb-1">{name || 'Untitled Workflow'}</h2>
+      )}
+      {!editMode && notes && <p className="text-sm text-gray-500 mb-3">{notes}</p>}
+
+      {/* Typed wizard — only in edit mode */}
+      {editMode && (
       <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
         <div className="grid md:grid-cols-2 gap-4">
           <label className="block">
@@ -615,12 +647,15 @@ function WorkflowBuilder({ workflow, userId, onClose, onSaved }) {
           </div>
         </div>
       </div>
+      )}
 
-      {/* Visual diagram — drag nodes to arrange */}
+      {/* Visual diagram — always shown; draggable only while editing */}
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
         <div className="flex items-center justify-between mb-1">
-          <p className="text-[11px] font-semibold text-gray-500 uppercase">Flow diagram — drag nodes to arrange</p>
-          {steps.length > 0 && (
+          <p className="text-[11px] font-semibold text-gray-500 uppercase">
+            {editMode ? 'Flow diagram — drag nodes to arrange' : 'Flow diagram'}
+          </p>
+          {editMode && steps.length > 0 && (
             <button
               onClick={() => setPositions(autoLayout(steps))}
               className="text-[11px] px-2 py-1 rounded-lg border border-gray-300 text-gray-600 hover:bg-white"
@@ -629,7 +664,7 @@ function WorkflowBuilder({ workflow, userId, onClose, onSaved }) {
             </button>
           )}
         </div>
-        <FlowCanvas steps={steps} positions={positions} setPositions={setPositions} />
+        <FlowCanvas steps={steps} positions={positions} setPositions={setPositions} readOnly={!editMode} />
       </div>
     </div>
   )
@@ -671,10 +706,7 @@ export default function WorkflowsTab({ userId }) {
         workflow={editing === 'new' ? null : editing}
         userId={userId}
         onClose={() => setEditing(null)}
-        onSaved={() => {
-          setEditing(null)
-          load()
-        }}
+        onSaved={() => load()}
       />
     )
   }
