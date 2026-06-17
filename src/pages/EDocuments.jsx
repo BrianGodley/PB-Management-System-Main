@@ -51,7 +51,7 @@ const fmtMoney = n =>
 export default function EDocuments({ clientId = null, embedded = false }) {
   const { user } = useAuth()
   const [subTab, setSubTab] = useState(embedded ? 'contracts' : 'dashboard')
-  const [mainTab, setMainTab] = useState('files')
+  const [mainTab, setMainTab] = useState('edocuments')
 
   // Friendly first name for the New Document dashboard greeting.
   const firstName = (() => {
@@ -106,11 +106,11 @@ export default function EDocuments({ clientId = null, embedded = false }) {
 
   // Top-level Documents page: white tab bar with the file managers + E-Documents.
   const MAIN_TABS = [
+    ['edocuments', '✍️ E-Documents'],
     ['files', '📁 Files'],
+    ['gdrive', '🔵 Google Drive'],
     ['photos', '🖼️ Photos'],
     ['videos', '🎞️ Videos'],
-    ['gdrive', '🔵 Google Drive'],
-    ['edocuments', '✍️ E-Documents'],
   ]
   return (
     <div className="h-full flex flex-col">
