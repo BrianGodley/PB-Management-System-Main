@@ -8,7 +8,7 @@
 //   • Decision                                        — diamond
 // Auto connectors link the steps top→bottom. Manual drag editing + branching
 // is phase 2; positions will be saved to edoc_workflows.graph then.
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 
 const fmtDate = d =>
@@ -74,16 +74,75 @@ function FlowNode({ step }) {
   )
 }
 
-function Connector() {
-  return (
-    <div className="flex flex-col items-center text-gray-400 my-1" aria-hidden>
-      <div className="w-px h-5 bg-gray-400" />
-      <div className="-mt-2 leading-none text-xs">▼</div>
-    </div>
-  )
+// Approximate node footprint (for arrow anchors + auto-layout).
+const NODE_SIZE = {
+  person: { w: 208, h: 56 },
+  organization: { w: 208, h: 56 },
+  document: { w: 128, h: 160 },
+  decision: { w: 128, h: 128 },
+}
+const sizeOf = s => NODE_SIZE[s.kind] || NODE_SIZE.person
+
+// Stacked vertical layout centered around x≈360.
+function autoLayout(steps) {
+  const pos = {}
+  let y = 24
+  steps.forEach(s => {
+    const { w, h } = sizeOf(s)
+    pos[s.id] = { x: Math.round(360 - w / 2), y }
+    y += h + 56
+  })
+  return pos
 }
 
-function WorkflowDiagram({ steps }) {
+// Interactive canvas — drag nodes to reposition; arrows auto-route between
+// consecutive steps. Positions are lifted up so they can be saved.
+function FlowCanvas({ steps, positions, setPositions }) {
+  const ref = useRef(null)
+
+  function startDrag(e, id) {
+    e.preventDefault()
+    const start = positions[id] || { x: 0, y: 0 }
+    const sx = e.clientX
+    const sy = e.clientY
+    function move(ev) {
+      setPositions(p => ({
+        ...p,
+        [id]: { x: Math.max(0, start.x + (ev.clientX - sx)), y: Math.max(0, start.y + (ev.clientY - sy)) },
+      }))
+    }
+    function up() {
+      window.removeEventListener('mousemove', move)
+      window.removeEventListener('mouseup', up)
+    }
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', up)
+  }
+
+  const maxY = steps.reduce((m, s) => {
+    const p = positions[s.id]
+    return p ? Math.max(m, p.y + sizeOf(s).h) : m
+  }, 0)
+  const height = Math.max(360, maxY + 40)
+
+  const edges = []
+  for (let i = 0; i < steps.length - 1; i++) {
+    const a = steps[i]
+    const b = steps[i + 1]
+    const pa = positions[a.id]
+    const pb = positions[b.id]
+    if (!pa || !pb) continue
+    const sa = sizeOf(a)
+    const sb = sizeOf(b)
+    edges.push({
+      key: a.id + '_' + b.id,
+      x1: pa.x + sa.w / 2,
+      y1: pa.y + sa.h,
+      x2: pb.x + sb.w / 2,
+      y2: pb.y,
+    })
+  }
+
   if (!steps.length) {
     return (
       <p className="text-center text-sm text-gray-400 py-10">
@@ -91,14 +150,41 @@ function WorkflowDiagram({ steps }) {
       </p>
     )
   }
+
   return (
-    <div className="flex flex-col items-center py-6">
-      {steps.map((s, i) => (
-        <div key={s.id} className="flex flex-col items-center">
-          <FlowNode step={s} />
-          {i < steps.length - 1 && <Connector />}
-        </div>
-      ))}
+    <div ref={ref} className="relative w-full overflow-auto bg-white rounded-lg border border-gray-200" style={{ height }}>
+      <svg className="absolute inset-0 w-full pointer-events-none" style={{ height }}>
+        <defs>
+          <marker id="wf-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L8,3 L0,6 Z" fill="#9ca3af" />
+          </marker>
+        </defs>
+        {edges.map(e => (
+          <line
+            key={e.key}
+            x1={e.x1}
+            y1={e.y1}
+            x2={e.x2}
+            y2={e.y2}
+            stroke="#9ca3af"
+            strokeWidth="1.5"
+            markerEnd="url(#wf-arrow)"
+          />
+        ))}
+      </svg>
+      {steps.map(s => {
+        const p = positions[s.id] || { x: 0, y: 0 }
+        return (
+          <div
+            key={s.id}
+            onMouseDown={e => startDrag(e, s.id)}
+            className="absolute cursor-move select-none"
+            style={{ left: p.x, top: p.y }}
+          >
+            <FlowNode step={s} />
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -111,7 +197,33 @@ function WorkflowBuilder({ workflow, userId, onClose, onSaved }) {
     Array.isArray(workflow?.module_integrations) ? workflow.module_integrations : []
   )
   const [steps, setSteps] = useState(Array.isArray(workflow?.steps) ? workflow.steps : [])
+  const [positions, setPositions] = useState(
+    workflow?.graph?.positions && typeof workflow.graph.positions === 'object' ? workflow.graph.positions : {}
+  )
   const [saving, setSaving] = useState(false)
+
+  // Keep a position for every step: preserve moved nodes, append new ones
+  // below, drop removed ones.
+  useEffect(() => {
+    setPositions(prev => {
+      const next = {}
+      let maxY = 24
+      steps.forEach(s => {
+        if (prev[s.id]) {
+          next[s.id] = prev[s.id]
+          maxY = Math.max(maxY, prev[s.id].y + sizeOf(s).h + 56)
+        }
+      })
+      steps.forEach(s => {
+        if (!next[s.id]) {
+          const { w, h } = sizeOf(s)
+          next[s.id] = { x: Math.round(360 - w / 2), y: maxY }
+          maxY += h + 56
+        }
+      })
+      return next
+    })
+  }, [steps])
 
   const toggleModule = m => setModules(prev => (prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]))
   const addStep = kind => setSteps(prev => [...prev, { id: newId(), kind, label: '', multi: false }])
@@ -134,6 +246,7 @@ function WorkflowBuilder({ workflow, userId, onClose, onSaved }) {
       notes,
       module_integrations: modules,
       steps,
+      graph: { positions },
       updated_at: new Date().toISOString(),
     }
     let error
@@ -248,10 +361,20 @@ function WorkflowBuilder({ workflow, userId, onClose, onSaved }) {
         </div>
       </div>
 
-      {/* Visual diagram */}
+      {/* Visual diagram — drag nodes to arrange */}
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
-        <p className="text-[11px] font-semibold text-gray-500 uppercase mb-1">Flow diagram</p>
-        <WorkflowDiagram steps={steps} />
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-[11px] font-semibold text-gray-500 uppercase">Flow diagram — drag nodes to arrange</p>
+          {steps.length > 0 && (
+            <button
+              onClick={() => setPositions(autoLayout(steps))}
+              className="text-[11px] px-2 py-1 rounded-lg border border-gray-300 text-gray-600 hover:bg-white"
+            >
+              ⤢ Auto-arrange
+            </button>
+          )}
+        </div>
+        <FlowCanvas steps={steps} positions={positions} setPositions={setPositions} />
       </div>
     </div>
   )
