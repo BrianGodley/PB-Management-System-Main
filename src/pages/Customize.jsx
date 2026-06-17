@@ -502,11 +502,12 @@ export default function Customize() {
             ]
             const Tile = bg => {
               const isSel = currentBg === bg.id
+              const isPhoto = String(bg.id).startsWith('custom-')
               return (
                 <button
                   key={bg.id}
                   onClick={() => setBgPreview(bg)}
-                  className={`text-left rounded-lg overflow-hidden border-2 transition-all ${
+                  className={`relative text-left rounded-lg overflow-hidden border-2 transition-all ${
                     isSel ? 'border-black ring-2 ring-black/20' : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
@@ -516,15 +517,21 @@ export default function Customize() {
                       alt={bg.label}
                       loading="lazy"
                       decoding="async"
-                      className="h-14 w-full object-cover bg-gray-100"
+                      className="aspect-square w-full object-cover bg-gray-100"
                     />
                   ) : (
-                    <div className="h-14 w-full" style={{ backgroundColor: bg.swatch }} />
+                    <div className="aspect-square w-full" style={{ backgroundColor: bg.swatch }} />
                   )}
-                  <div className="flex items-center justify-between px-2 py-1 bg-white">
-                    <span className="text-[11px] font-medium text-gray-600 truncate">{bg.label}</span>
-                    {isSel && <span className="text-black text-xs">✓</span>}
-                  </div>
+                  {/* Photos show no label; presets keep their name + check. */}
+                  {!isPhoto && (
+                    <div className="flex items-center justify-between px-2 py-1 bg-white">
+                      <span className="text-[11px] font-medium text-gray-600 truncate">{bg.label}</span>
+                      {isSel && <span className="text-black text-xs">✓</span>}
+                    </div>
+                  )}
+                  {isPhoto && isSel && (
+                    <span className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded-full bg-black text-white text-[11px] shadow">✓</span>
+                  )}
                 </button>
               )
             }
