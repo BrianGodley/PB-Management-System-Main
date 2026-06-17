@@ -125,22 +125,31 @@ function FlowCanvas({ steps, positions, setPositions }) {
   }, 0)
   const height = Math.max(360, maxY + 40)
 
+  const byId = Object.fromEntries(steps.map(s => [s.id, s]))
   const edges = []
-  for (let i = 0; i < steps.length - 1; i++) {
-    const a = steps[i]
-    const b = steps[i + 1]
+  const pushEdge = (a, b, label) => {
     const pa = positions[a.id]
     const pb = positions[b.id]
-    if (!pa || !pb) continue
+    if (!pa || !pb) return
     const sa = sizeOf(a)
     const sb = sizeOf(b)
-    edges.push({
-      key: a.id + '_' + b.id,
-      x1: pa.x + sa.w / 2,
-      y1: pa.y + sa.h,
-      x2: pb.x + sb.w / 2,
-      y2: pb.y,
-    })
+    const x1 = pa.x + sa.w / 2
+    const y1 = pa.y + sa.h
+    const x2 = pb.x + sb.w / 2
+    const y2 = pb.y
+    edges.push({ key: a.id + '_' + b.id + '_' + (label || ''), x1, y1, x2, y2, label, mx: (x1 + x2) / 2, my: (y1 + y2) / 2 })
+  }
+  const hasExplicit = steps.some(s => (s.next || []).some(c => c.to))
+  if (hasExplicit) {
+    steps.forEach(a =>
+      (a.next || []).forEach(c => {
+        const b = byId[c.to]
+        if (b) pushEdge(a, b, c.label)
+      })
+    )
+  } else {
+    // Older workflows (no saved connections) show a simple top→bottom chain.
+    for (let i = 0; i < steps.length - 1; i++) pushEdge(steps[i], steps[i + 1], '')
   }
 
   if (!steps.length) {
@@ -160,16 +169,29 @@ function FlowCanvas({ steps, positions, setPositions }) {
           </marker>
         </defs>
         {edges.map(e => (
-          <line
-            key={e.key}
-            x1={e.x1}
-            y1={e.y1}
-            x2={e.x2}
-            y2={e.y2}
-            stroke="#9ca3af"
-            strokeWidth="1.5"
-            markerEnd="url(#wf-arrow)"
-          />
+          <g key={e.key}>
+            <line
+              x1={e.x1}
+              y1={e.y1}
+              x2={e.x2}
+              y2={e.y2}
+              stroke="#9ca3af"
+              strokeWidth="1.5"
+              markerEnd="url(#wf-arrow)"
+            />
+            {e.label && (
+              <text
+                x={e.mx}
+                y={e.my}
+                fontSize="10"
+                textAnchor="middle"
+                fill="#6b7280"
+                style={{ paintOrder: 'stroke', stroke: '#fff', strokeWidth: 3 }}
+              >
+                {e.label}
+              </text>
+            )}
+          </g>
         ))}
       </svg>
       {steps.map(s => {
@@ -226,9 +248,26 @@ function WorkflowBuilder({ workflow, userId, onClose, onSaved }) {
   }, [steps])
 
   const toggleModule = m => setModules(prev => (prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]))
-  const addStep = kind => setSteps(prev => [...prev, { id: newId(), kind, label: '', multi: false }])
+  const addStep = kind =>
+    setSteps(prev => [
+      ...prev,
+      {
+        id: newId(),
+        kind,
+        label: '',
+        multi: false,
+        // Decision nodes branch (Yes/No); others have a single onward link.
+        next: kind === 'decision' ? [{ to: '', label: 'Yes' }, { to: '', label: 'No' }] : [{ to: '', label: '' }],
+      },
+    ])
   const updateStep = (id, patch) => setSteps(prev => prev.map(s => (s.id === id ? { ...s, ...patch } : s)))
-  const removeStep = id => setSteps(prev => prev.filter(s => s.id !== id))
+  const removeStep = id =>
+    setSteps(prev =>
+      prev
+        .filter(s => s.id !== id)
+        // also drop any links that pointed at the removed step
+        .map(s => ({ ...s, next: (s.next || []).map(c => (c.to === id ? { ...c, to: '' } : c)) }))
+    )
   const moveStep = (id, dir) =>
     setSteps(prev => {
       const i = prev.findIndex(s => s.id === id)
@@ -238,6 +277,25 @@ function WorkflowBuilder({ workflow, userId, onClose, onSaved }) {
       ;[next[i], next[j]] = [next[j], next[i]]
       return next
     })
+
+  // Per-step connections (arrows). Each entry: { to: <stepId|''>, label }.
+  const addConnection = id =>
+    setSteps(prev => prev.map(s => (s.id === id ? { ...s, next: [...(s.next || []), { to: '', label: '' }] } : s)))
+  const updateConnection = (id, idx, patch) =>
+    setSteps(prev =>
+      prev.map(s => (s.id === id ? { ...s, next: (s.next || []).map((c, i) => (i === idx ? { ...c, ...patch } : c)) } : s))
+    )
+  const removeConnection = (id, idx) =>
+    setSteps(prev => prev.map(s => (s.id === id ? { ...s, next: (s.next || []).filter((_, i) => i !== idx) } : s)))
+  // Quick-start: link each step's first connection to the next step in order.
+  const connectInSequence = () =>
+    setSteps(prev =>
+      prev.map((s, i) => {
+        const to = prev[i + 1]?.id || ''
+        const first = (s.next && s.next[0]) || { to: '', label: s.kind === 'decision' ? 'Yes' : '' }
+        return { ...s, next: [{ ...first, to }, ...(s.next || []).slice(1)] }
+      })
+    )
 
   async function save() {
     setSaving(true)
@@ -311,9 +369,17 @@ function WorkflowBuilder({ workflow, userId, onClose, onSaved }) {
         </div>
 
         <div className="mt-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-1.5">
             <span className="text-[11px] font-semibold text-gray-500 uppercase">Steps</span>
-            <div className="flex gap-1.5">
+            <div className="flex gap-1.5 flex-wrap">
+              {steps.length > 1 && (
+                <button
+                  onClick={connectInSequence}
+                  className="text-xs px-2.5 py-1 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50"
+                >
+                  🔗 Connect in sequence
+                </button>
+              )}
               {STEP_KINDS.map(k => (
                 <button
                   key={k.id}
@@ -331,30 +397,66 @@ function WorkflowBuilder({ workflow, userId, onClose, onSaved }) {
               <p className="text-xs text-gray-400">Add a Person, Document, Organization, or Decision step.</p>
             )}
             {steps.map((s, i) => (
-              <div key={s.id} className="flex items-center gap-2 border border-gray-200 rounded-lg p-2">
-                <span className="text-[11px] text-gray-400 w-5 text-center">{i + 1}</span>
-                <select
-                  value={s.kind}
-                  onChange={e => updateStep(s.id, { kind: e.target.value })}
-                  className="input text-xs py-1 w-32"
-                >
-                  {STEP_KINDS.map(k => <option key={k.id} value={k.id}>{k.label}</option>)}
-                </select>
-                <input
-                  value={s.label}
-                  onChange={e => updateStep(s.id, { label: e.target.value })}
-                  placeholder={s.kind === 'decision' ? 'Approved?' : 'Label'}
-                  className="input text-xs py-1 flex-1"
-                />
-                {s.kind === 'document' && (
-                  <label className="flex items-center gap-1 text-[11px] text-gray-500 whitespace-nowrap">
-                    <input type="checkbox" checked={!!s.multi} onChange={e => updateStep(s.id, { multi: e.target.checked })} className="accent-green-700" />
-                    multiple
-                  </label>
-                )}
-                <button onClick={() => moveStep(s.id, -1)} className="text-gray-400 hover:text-gray-700 px-1" title="Move up">↑</button>
-                <button onClick={() => moveStep(s.id, 1)} className="text-gray-400 hover:text-gray-700 px-1" title="Move down">↓</button>
-                <button onClick={() => removeStep(s.id)} className="text-gray-400 hover:text-red-600 px-1" title="Remove">×</button>
+              <div key={s.id} className="border border-gray-200 rounded-lg p-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-gray-400 w-5 text-center">{i + 1}</span>
+                  <select
+                    value={s.kind}
+                    onChange={e => updateStep(s.id, { kind: e.target.value })}
+                    className="input text-xs py-1 w-32"
+                  >
+                    {STEP_KINDS.map(k => <option key={k.id} value={k.id}>{k.label}</option>)}
+                  </select>
+                  <input
+                    value={s.label}
+                    onChange={e => updateStep(s.id, { label: e.target.value })}
+                    placeholder={s.kind === 'decision' ? 'Approved?' : 'Label'}
+                    className="input text-xs py-1 flex-1"
+                  />
+                  {s.kind === 'document' && (
+                    <label className="flex items-center gap-1 text-[11px] text-gray-500 whitespace-nowrap">
+                      <input type="checkbox" checked={!!s.multi} onChange={e => updateStep(s.id, { multi: e.target.checked })} className="accent-green-700" />
+                      multiple
+                    </label>
+                  )}
+                  <button onClick={() => moveStep(s.id, -1)} className="text-gray-400 hover:text-gray-700 px-1" title="Move up">↑</button>
+                  <button onClick={() => moveStep(s.id, 1)} className="text-gray-400 hover:text-gray-700 px-1" title="Move down">↓</button>
+                  <button onClick={() => removeStep(s.id)} className="text-gray-400 hover:text-red-600 px-1" title="Remove">×</button>
+                </div>
+
+                {/* Connections (arrows out of this step) */}
+                <div className="mt-1.5 pl-7 space-y-1">
+                  {(s.next || []).map((c, idx) => (
+                    <div key={idx} className="flex items-center gap-1.5 text-[11px]">
+                      <span className="text-gray-400">→</span>
+                      <input
+                        value={c.label}
+                        onChange={e => updateConnection(s.id, idx, { label: e.target.value })}
+                        placeholder="label"
+                        className="input text-[11px] py-0.5 w-24"
+                      />
+                      <span className="text-gray-400">to</span>
+                      <select
+                        value={c.to}
+                        onChange={e => updateConnection(s.id, idx, { to: e.target.value })}
+                        className="input text-[11px] py-0.5 flex-1"
+                      >
+                        <option value="">(end)</option>
+                        {steps
+                          .filter(o => o.id !== s.id)
+                          .map(o => (
+                            <option key={o.id} value={o.id}>
+                              {o.label || STEP_KINDS.find(k => k.id === o.kind)?.label}
+                            </option>
+                          ))}
+                      </select>
+                      <button onClick={() => removeConnection(s.id, idx)} className="text-gray-400 hover:text-red-600 px-1">×</button>
+                    </div>
+                  ))}
+                  <button onClick={() => addConnection(s.id)} className="text-[11px] text-green-700 hover:underline">
+                    + connection
+                  </button>
+                </div>
               </div>
             ))}
           </div>
