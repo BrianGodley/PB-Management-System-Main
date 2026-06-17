@@ -241,14 +241,12 @@ export const SIDEBAR_FONTS = [
   { id: 'wide-latin', label: 'Wide Latin', value: '"Wide Latin", serif' },
 ]
 
-// Five steps from extra-small to extra-large, evenly spaced by 2px.
-export const SIDEBAR_FONT_SIZES = [
-  { id: 'xs', label: 'XS', value: '10.5px' },
-  { id: 'sm', label: 'S', value: '12.5px' },
-  { id: 'md', label: 'M', value: '14.5px' },
-  { id: 'lg', label: 'L', value: '16.5px' },
-  { id: 'xl', label: 'XL', value: '18.5px' },
-]
+// Exact pixel sizes 10–20; the label is the number and the value is that many
+// pixels, so the menu text matches the chosen number precisely.
+export const SIDEBAR_FONT_SIZES = Array.from({ length: 11 }, (_, i) => {
+  const px = 10 + i
+  return { id: `px${px}`, label: String(px), value: `${px}px` }
+})
 
 // Build an inline style object for the menu text from saved font settings.
 // fontWeight and fontStyle are emitted explicitly (normal when off) so they
@@ -350,7 +348,7 @@ export const DEFAULT_PREFS = (() => {
   m[SIDEBAR_KEY] = null // Clear left menu bar
   m[HEADER_KEY] = null // Clear header bar
   m[SIDEBAR_ICONS_KEY] = true // Show icons
-  m[SIDEBAR_FONT_KEY] = { family: '"Comic Sans MS", "Comic Sans", cursive', size: '16.5px', bold: false, italic: false }
+  m[SIDEBAR_FONT_KEY] = { family: '"Comic Sans MS", "Comic Sans", cursive', size: '16px', bold: false, italic: false }
   m[MENU_POS_KEY] = 'left' // Classic left sidebar
   m[MENU_GROUPS_KEY] = [] // No custom menu groups by default
   return m
