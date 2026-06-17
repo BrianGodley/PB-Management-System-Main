@@ -107,7 +107,6 @@ export default function EDocuments({ clientId = null, embedded = false }) {
         {[
           ...(embedded ? [] : [['dashboard', 'Home']]),
           ['contracts', 'Created Contracts'],
-          ['workflows', 'Document Workflows'],
           ['new', '+ New Document'],
         ].map(([key, label]) => (
           <button
@@ -127,7 +126,6 @@ export default function EDocuments({ clientId = null, embedded = false }) {
       {subTab === 'contracts' && (
         <ContractsTab clientId={clientId} userId={user?.id} embedded={embedded} />
       )}
-      {subTab === 'workflows' && <WorkflowsTab userId={user?.id} />}
       {subTab === 'new' && (
         <NewDocumentTab
           clientId={clientId}
@@ -145,6 +143,7 @@ export default function EDocuments({ clientId = null, embedded = false }) {
   // Top-level Documents page: white tab bar with the file managers + E-Documents.
   const MAIN_TABS = [
     ['edocuments', '✍️ E-Documents'],
+    ['workflows', '🔀 Document Workflows'],
     ['files', '🗂️ PBS Drive'],
     ['gdrive', '🔵 Google Drive'],
     ['photos', '🖼️ Photos'],
@@ -178,6 +177,7 @@ export default function EDocuments({ clientId = null, embedded = false }) {
         {mainTab === 'videos' && <FileManager root="videos" accept="video/*" />}
         {mainTab === 'gdrive' && <GoogleDriveBrowser />}
         {mainTab === 'settings' && <DocsSettings userId={user?.id} />}
+        {mainTab === 'workflows' && <WorkflowsTab userId={user?.id} />}
         {mainTab === 'edocuments' && eDocsContent}
       </div>
     </div>
