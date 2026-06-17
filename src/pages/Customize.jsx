@@ -266,25 +266,69 @@ export default function Customize() {
     setSavedMsg('')
   }
 
-  // Upload a photo to the public bucket, register it as a custom background,
-  // and select it for the current target. Persisted when the user clicks Save.
+  // Shrink an image in the browser to a max dimension and re-encode as JPEG.
+  // This is the key to fast rendering: a multi-MB photo becomes a few hundred KB.
+  async function downscaleImage(file, maxDim, quality) {
+    const dataUrl = await new Promise((res, rej) => {
+      const fr = new FileReader()
+      fr.onload = () => res(fr.result)
+      fr.onerror = rej
+      fr.readAsDataURL(file)
+    })
+    const img = await new Promise((res, rej) => {
+      const i = new Image()
+      i.onload = () => res(i)
+      i.onerror = rej
+      i.src = dataUrl
+    })
+    const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
+    const w = Math.max(1, Math.round(img.width * scale))
+    const h = Math.max(1, Math.round(img.height * scale))
+    const canvas = document.createElement('canvas')
+    canvas.width = w
+    canvas.height = h
+    canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+    return await new Promise(res => canvas.toBlob(b => res(b), 'image/jpeg', quality))
+  }
+
+  // Upload a photo (compressed) + a small thumbnail, register as a custom
+  // background. Persisted when the user clicks Save.
   async function addCustomBackground(file) {
     if (!file || !user?.id) return
     setUploadingBg(true)
     try {
-      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-      const path = `backgrounds/${user.id}/${Date.now()}-${safe}`
+      // Compress to a sensible background size + a light thumbnail. Fall back to
+      // the original file if the browser can't process it (e.g. exotic format).
+      let mainBlob = file
+      let thumbBlob = null
+      try {
+        mainBlob = (await downscaleImage(file, 1920, 0.82)) || file
+        thumbBlob = await downscaleImage(file, 480, 0.7)
+      } catch { /* use original */ }
+
+      const base = `backgrounds/${user.id}/${Date.now()}`
+      const mainPath = `${base}.jpg`
       const { error } = await supabase.storage
         .from('company-assets')
-        .upload(path, file, { upsert: true, contentType: file.type })
+        .upload(mainPath, mainBlob, { upsert: true, contentType: mainBlob.type || 'image/jpeg' })
       if (error) throw error
-      const { data } = supabase.storage.from('company-assets').getPublicUrl(path)
-      const url = data?.publicUrl
+      const url = supabase.storage.from('company-assets').getPublicUrl(mainPath).data?.publicUrl
+
+      let thumbUrl = url
+      let thumbPath = null
+      if (thumbBlob) {
+        thumbPath = `${base}.thumb.jpg`
+        const { error: tErr } = await supabase.storage
+          .from('company-assets')
+          .upload(thumbPath, thumbBlob, { upsert: true, contentType: 'image/jpeg' })
+        if (!tErr) thumbUrl = supabase.storage.from('company-assets').getPublicUrl(thumbPath).data?.publicUrl
+      }
+
       const id = 'custom-' + Date.now()
       const label = (file.name.replace(/\.[^.]+$/, '') || 'Photo').slice(0, 40)
       setMap(m => {
         const list = Array.isArray(m[CUSTOM_BG_KEY]) ? m[CUSTOM_BG_KEY] : []
-        return { ...m, [CUSTOM_BG_KEY]: [...list, { id, label, url, storage_path: path }] }
+        return { ...m, [CUSTOM_BG_KEY]: [...list, { id, label, url, thumbUrl, storage_path: mainPath, thumb_path: thumbPath }] }
       })
       setSavedMsg('')
       // Show the big preview so the user can Apply (or just close).
@@ -513,7 +557,7 @@ export default function Customize() {
                 >
                   {bg.url ? (
                     <img
-                      src={bg.url}
+                      src={bg.thumbUrl || bg.url}
                       alt={bg.label}
                       loading="lazy"
                       decoding="async"
