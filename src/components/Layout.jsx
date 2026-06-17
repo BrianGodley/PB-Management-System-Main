@@ -54,40 +54,6 @@ const navItems = [
   { path: '/statistics', label: 'Statistics', icon: '📈' },
 ]
 
-// Grouped nav for the "Top" menu position — collapses the flat list into a
-// handful of header dropdowns. Items reference the same paths/icons/labels as
-// navItems above.
-const _navByPath = Object.fromEntries(navItems.map(i => [i.path, i]))
-const NAV_GROUPS = [
-  { type: 'single', item: _navByPath['/'] },
-  {
-    type: 'group',
-    label: 'Admin',
-    icon: '🛡️',
-    items: ['/org-chart', '/hr', '/edocuments'].map(p => _navByPath[p]).filter(Boolean),
-  },
-  {
-    type: 'group',
-    label: 'Sales',
-    icon: '💼',
-    items: ['/contacts', '/clients', '/design', '/bids'].map(p => _navByPath[p]).filter(Boolean),
-  },
-  { type: 'single', item: _navByPath['/training'] },
-  {
-    type: 'group',
-    label: 'Finances',
-    icon: '💰',
-    items: ['/collections', '/accounting'].map(p => _navByPath[p]).filter(Boolean),
-  },
-  {
-    type: 'group',
-    label: 'Job Management',
-    icon: '🗂️',
-    items: ['/jobs', '/equipment-tracking', '/portal/subs'].map(p => _navByPath[p]).filter(Boolean),
-  },
-  { type: 'single', item: _navByPath['/statistics'] },
-]
-
 // Dock and main menu labels are computed inside the component via t()
 // so they update when the user's language changes.
 
@@ -378,8 +344,9 @@ export default function Layout() {
   // otherwise each position falls back to its built-in layout.
   const useCustomGroups = Array.isArray(menuGroups) && menuGroups.length > 0
   const menuStructure = buildMenuStructure(navItems, menuGroups)
-  // Top-position entries: custom groups when defined, else the built-in groups.
-  const topEntries = useCustomGroups ? menuStructure : NAV_GROUPS
+  // Top-position entries: driven entirely by the user's Menu grouping. With no
+  // groups defined every item shows flat (no hard-coded preset groups).
+  const topEntries = menuStructure
 
   // In Top menu mode the nav lives in the header, so the Menu Background color
   // colors the header bar itself (falling back to the Header bar color when no
