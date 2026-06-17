@@ -18,6 +18,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import EDocFieldEditor from '../components/edoc/EDocFieldEditor'
 import EDocDocumentModal from '../components/edoc/EDocDocumentModal'
+import WorkflowsTab from '../components/edoc/WorkflowsTab'
 import FileManager from '../components/files/FileManager'
 import GoogleDriveBrowser from '../components/files/GoogleDriveBrowser'
 import PbsDrive from '../components/files/PbsDrive'
@@ -104,9 +105,9 @@ export default function EDocuments({ clientId = null, embedded = false }) {
     <>
       <div className="flex items-center justify-center gap-1 border-b border-gray-200 mb-4">
         {[
-          ...(embedded ? [] : [['dashboard', 'Dashboard']]),
+          ...(embedded ? [] : [['dashboard', 'Home']]),
           ['contracts', 'Created Contracts'],
-          ['templates', 'Templates'],
+          ['workflows', 'Document Workflows'],
           ['new', '+ New Document'],
         ].map(([key, label]) => (
           <button
@@ -126,7 +127,7 @@ export default function EDocuments({ clientId = null, embedded = false }) {
       {subTab === 'contracts' && (
         <ContractsTab clientId={clientId} userId={user?.id} embedded={embedded} />
       )}
-      {subTab === 'templates' && <TemplatesTab userId={user?.id} />}
+      {subTab === 'workflows' && <WorkflowsTab userId={user?.id} />}
       {subTab === 'new' && (
         <NewDocumentTab
           clientId={clientId}
@@ -176,7 +177,7 @@ export default function EDocuments({ clientId = null, embedded = false }) {
         {mainTab === 'photos' && <FileManager root="photos" accept="image/*" />}
         {mainTab === 'videos' && <FileManager root="videos" accept="video/*" />}
         {mainTab === 'gdrive' && <GoogleDriveBrowser />}
-        {mainTab === 'settings' && <PbsDrive settingsOnly />}
+        {mainTab === 'settings' && <DocsSettings userId={user?.id} />}
         {mainTab === 'edocuments' && eDocsContent}
       </div>
     </div>
@@ -407,6 +408,34 @@ function ContractsTab({ clientId, userId, embedded }) {
   )
 }
 
+// ── Documents Settings (admin) — PBS Drives + E-Doc Templates ─────────────────
+function DocsSettings({ userId }) {
+  const [tab, setTab] = useState('drives') // 'drives' | 'templates'
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-4">
+        {[
+          ['drives', '🗂️ PBS Drives'],
+          ['templates', '✍️ E-Doc Templates'],
+        ].map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${
+              tab === id
+                ? 'bg-green-700 text-white border-2 border-black'
+                : 'bg-white text-gray-700 border border-gray-300 hover:border-green-400'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {tab === 'drives' ? <PbsDrive settingsOnly /> : <TemplatesTab userId={userId} />}
+    </div>
+  )
+}
+
 // ── Templates ───────────────────────────────────────────────────────────────
 function TemplatesTab({ userId }) {
   const [templates, setTemplates] = useState([])
@@ -532,6 +561,12 @@ function TemplatesTab({ userId }) {
             </button>
           </div>
         </div>
+      )}
+
+      {tplTab === 'completed' && (
+        <p className="text-xs text-gray-500 bg-green-50 border border-green-100 rounded-lg px-3 py-2 mb-3">
+          Only <strong>completed</strong> templates (those with fields placed) are available to users when creating documents.
+        </p>
       )}
 
       {loading ? (
