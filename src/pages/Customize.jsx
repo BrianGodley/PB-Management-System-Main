@@ -119,12 +119,12 @@ function MenuPreview({ font, showIcons, barColor, bgUrl, bgSwatch, bgDark, group
   const Row = ({ item, indent }) => (
     <div className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 ${indent ? 'ml-3' : ''}`}>
       {showIcons && <span className="text-sm leading-none w-4 text-center">{item.icon}</span>}
-      <span style={{ color: textColor, ...sidebarFontStyle(font) }}>{item.label}</span>
+      <span className="whitespace-nowrap" style={{ color: textColor, ...sidebarFontStyle(font) }}>{item.label}</span>
     </div>
   )
   return (
     <div
-      className="rounded-md w-44 h-[360px] overflow-y-auto border border-gray-200"
+      className="rounded-md w-fit min-w-[11rem] border border-gray-200"
       style={{
         backgroundColor: baseColor,
         backgroundImage: clear && bgUrl ? `url(${bgUrl})` : undefined,
