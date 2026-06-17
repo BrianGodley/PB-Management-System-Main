@@ -458,52 +458,6 @@ export default function Customize() {
           </label>
         </div>
 
-        {/* ── Photo Backgrounds (your uploaded images) ── */}
-        <h2 className="text-lg font-bold text-gray-900 mb-1">Photo Backgrounds</h2>
-        <p className="text-sm text-gray-500 mb-3">
-          Your uploaded image backgrounds. Click one to preview it, then Apply.
-        </p>
-        <div className="bg-white border border-gray-200 rounded-xl p-4 mb-8">
-          {customBgs.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {customBgs.map(bg => {
-                const isSel = currentBg === bg.id
-                return (
-                  <div
-                    key={bg.id}
-                    className={`relative rounded-lg overflow-hidden border-2 transition-all ${
-                      isSel ? 'border-black ring-2 ring-black/20' : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <button onClick={() => setBgPreview(bg)} className="block w-full text-left">
-                      <img
-                        src={bg.url}
-                        alt={bg.label}
-                        loading="lazy"
-                        decoding="async"
-                        className="aspect-square w-full object-cover bg-gray-100"
-                      />
-                      <div className="flex items-center justify-between px-2 py-1 bg-white">
-                        <span className="text-[11px] font-medium text-gray-600 truncate">{bg.label}</span>
-                        {isSel && <span className="text-black text-xs">✓</span>}
-                      </div>
-                    </button>
-                    <button
-                      onClick={() => removeCustomBackground(bg.id)}
-                      title="Delete photo"
-                      className="absolute top-1 right-1 w-6 h-6 flex items-center justify-center rounded-full bg-white/90 text-gray-500 hover:text-red-600 shadow text-sm"
-                    >
-                      ×
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-400">No uploaded images yet — use “Upload a photo” above.</p>
-          )}
-        </div>
-
         {/* ── Module backgrounds ── */}
         <h2 className="text-lg font-bold text-gray-900 mb-1">Module Backgrounds</h2>
         <p className="text-sm text-gray-500 mb-3">
@@ -543,6 +497,7 @@ export default function Customize() {
             const leftover = BACKGROUNDS.filter(b => !claimed.has(b.id))
             const sections = [
               ...BG_SECTIONS.map(s => ({ title: s.title, items: s.ids.map(id => byId[id]).filter(Boolean) })),
+              ...(customBgs.length ? [{ title: 'Photos', items: customBgs }] : []),
               ...(leftover.length ? [{ title: 'Other', items: leftover }] : []),
             ]
             const Tile = bg => {
@@ -555,14 +510,17 @@ export default function Customize() {
                     isSel ? 'border-black ring-2 ring-black/20' : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <div
-                    className="h-14 w-full"
-                    style={
-                      bg.url
-                        ? { backgroundImage: `url('${bg.url}')`, backgroundSize: 'cover', backgroundPosition: 'center' }
-                        : { backgroundColor: bg.swatch }
-                    }
-                  />
+                  {bg.url ? (
+                    <img
+                      src={bg.url}
+                      alt={bg.label}
+                      loading="lazy"
+                      decoding="async"
+                      className="h-14 w-full object-cover bg-gray-100"
+                    />
+                  ) : (
+                    <div className="h-14 w-full" style={{ backgroundColor: bg.swatch }} />
+                  )}
                   <div className="flex items-center justify-between px-2 py-1 bg-white">
                     <span className="text-[11px] font-medium text-gray-600 truncate">{bg.label}</span>
                     {isSel && <span className="text-black text-xs">✓</span>}
