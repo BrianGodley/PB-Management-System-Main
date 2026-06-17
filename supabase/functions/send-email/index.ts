@@ -6,6 +6,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Default outbound sender + reply-to. Recipients see "Picture Build System"
+// from notifications@…, and replies route to the support inbox.
+const DEFAULT_FROM_EMAIL = 'notifications@picturebuild.com'
+const REPLY_TO = 'support@picturebuild.com'
+
 const respond = (payload: object) =>
   new Response(JSON.stringify(payload), {
     status: 200,
@@ -30,12 +35,12 @@ async function loadEmailConfig() {
 async function sendViaResend(creds: Record<string, string>, to: string | string[], subject: string, html: string, text: string) {
   const { api_key, from_email } = creds
   if (!api_key) throw new Error('Resend requires api_key')
-  const from = from_email ? `Picture Build System <${from_email}>` : 'Picture Build System <noreply@picturebuild.com>'
+  const from = `Picture Build System <${from_email || DEFAULT_FROM_EMAIL}>`
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${api_key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from, to: Array.isArray(to) ? to : [to], subject, html: html ?? text ?? '', text: text ?? '' }),
+    body: JSON.stringify({ from, reply_to: REPLY_TO, to: Array.isArray(to) ? to : [to], subject, html: html ?? text ?? '', text: text ?? '' }),
   })
   const data = await res.json()
   console.log('Resend response:', res.status, JSON.stringify(data))
@@ -54,6 +59,7 @@ async function sendViaSendGrid(creds: Record<string, string>, to: string | strin
     headers: { 'Authorization': `Bearer ${api_key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       from: { email: from_email, name: 'Picture Build System' },
+      reply_to: { email: REPLY_TO },
       personalizations: [{ to: toArr }],
       subject,
       content: [{ type: 'text/html', value: html ?? text ?? '' }],
@@ -75,6 +81,7 @@ async function sendViaMailgun(creds: Record<string, string>, to: string | string
   const toStr = Array.isArray(to) ? to.join(',') : to
   const body = new URLSearchParams({
     from: `Picture Build System <${from_email}>`,
+    'h:Reply-To': REPLY_TO,
     to: toStr,
     subject,
     html: html ?? text ?? '',
@@ -104,6 +111,7 @@ async function sendViaPostmark(creds: Record<string, string>, to: string | strin
     },
     body: JSON.stringify({
       From: `Picture Build System <${from_email}>`,
+      ReplyTo: REPLY_TO,
       To: toStr,
       Subject: subject,
       HtmlBody: html ?? text ?? '',
@@ -134,6 +142,7 @@ async function sendViaSMTP(creds: Record<string, string>, to: string | string[],
         api_key: password,
         to: toArr,
         sender: `Picture Build System <${from_email}>`,
+        custom_headers: [{ header: 'Reply-To', value: REPLY_TO }],
         subject,
         html_body: html,
       }),
@@ -173,7 +182,7 @@ serve(async (req) => {
     if (activeProvider === 'resend' && !creds.api_key) {
       creds = {
         api_key:    Deno.env.get('RESEND_API_KEY') || '',
-        from_email: Deno.env.get('RESEND_FROM_EMAIL') || 'noreply@picturebuild.com',
+        from_email: Deno.env.get('RESEND_FROM_EMAIL') || DEFAULT_FROM_EMAIL,
       }
     }
 
