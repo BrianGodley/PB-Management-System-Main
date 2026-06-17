@@ -196,10 +196,10 @@ export const SIDEBAR_FONTS = [
 
 // Sizes are kept modest (≤14px) so the menu never gets oversized.
 export const SIDEBAR_FONT_SIZES = [
-  { id: 'sm', label: 'S', value: '11px' },
-  { id: 'default', label: 'M', value: '' },
+  { id: 'sm', label: 'S', value: '10px' },
+  { id: 'default', label: 'M', value: '11.5px' },
   { id: 'md', label: 'L', value: '13px' },
-  { id: 'lg', label: 'XL', value: '14px' },
+  { id: 'lg', label: 'XL', value: '14.5px' },
 ]
 
 // Build an inline style object for the menu text from saved font settings.
