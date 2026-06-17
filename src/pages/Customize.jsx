@@ -438,8 +438,71 @@ export default function Customize() {
       <div className="flex-1 min-h-0 overflow-y-auto pb-8">
         {tab === 'backgrounds' && (
         <>
+        {/* ── My Image Backgrounds (uploaded photos) ── */}
+        <h2 className="text-lg font-bold text-gray-900 mb-1">My Image Backgrounds</h2>
+        <p className="text-sm text-gray-500 mb-3">
+          Upload your own photo (forest, beach, city, space — anything) to use as a background for the
+          selected module. Landscape images around 1600×1000 or larger look best.
+        </p>
+        <div className="bg-white border border-gray-200 rounded-xl p-4 mb-8">
+          <label className={`inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg border cursor-pointer transition-colors ${
+            uploadingBg ? 'opacity-60 pointer-events-none border-gray-300' : 'border-green-300 text-green-700 hover:bg-green-50'
+          }`}>
+            {uploadingBg ? 'Uploading…' : '⬆️ Upload a photo'}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) addCustomBackground(f) }}
+            />
+          </label>
+        </div>
+
+        {/* ── Photo Backgrounds (your uploaded images) ── */}
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Photo Backgrounds</h2>
+        <p className="text-sm text-gray-500 mb-3">
+          Your uploaded image backgrounds. Click one to preview it, then Apply.
+        </p>
+        <div className="bg-white border border-gray-200 rounded-xl p-4 mb-8">
+          {customBgs.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {customBgs.map(bg => {
+                const isSel = currentBg === bg.id
+                return (
+                  <div
+                    key={bg.id}
+                    className={`relative rounded-lg overflow-hidden border-2 transition-all ${
+                      isSel ? 'border-black ring-2 ring-black/20' : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <button onClick={() => setBgPreview(bg)} className="block w-full text-left">
+                      <div
+                        className="h-14 w-full"
+                        style={{ backgroundImage: `url('${bg.url}')`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+                      />
+                      <div className="flex items-center justify-between px-2 py-1 bg-white">
+                        <span className="text-[11px] font-medium text-gray-600 truncate">{bg.label}</span>
+                        {isSel && <span className="text-black text-xs">✓</span>}
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => removeCustomBackground(bg.id)}
+                      title="Delete photo"
+                      className="absolute top-1 right-1 w-6 h-6 flex items-center justify-center rounded-full bg-white/90 text-gray-500 hover:text-red-600 shadow text-sm"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400">No uploaded images yet — use “Upload a photo” above.</p>
+          )}
+        </div>
+
         {/* ── Module backgrounds ── */}
-        <h2 className="text-lg font-bold text-gray-900 mb-1">Page backgrounds</h2>
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Module Backgrounds</h2>
         <p className="text-sm text-gray-500 mb-3">
           Pick a module (or <strong>All</strong>), then choose its background below.
         </p>
@@ -517,59 +580,6 @@ export default function Customize() {
           })()}
         </div>
 
-        {/* ── My Photos (uploaded backgrounds) ── */}
-        <h2 className="text-lg font-bold text-gray-900 mt-6 mb-1">My Photos</h2>
-        <p className="text-sm text-gray-500 mb-3">
-          Upload your own photo (forest, beach, city, space — anything) to use as a background for the
-          selected module. Landscape images around 1600×1000 or larger look best.
-        </p>
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <label className={`inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg border cursor-pointer transition-colors ${
-            uploadingBg ? 'opacity-60 pointer-events-none border-gray-300' : 'border-green-300 text-green-700 hover:bg-green-50'
-          }`}>
-            {uploadingBg ? 'Uploading…' : '⬆️ Upload a photo'}
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) addCustomBackground(f) }}
-            />
-          </label>
-
-          {customBgs.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-4">
-              {customBgs.map(bg => {
-                const isSel = currentBg === bg.id
-                return (
-                  <div
-                    key={bg.id}
-                    className={`relative rounded-lg overflow-hidden border-2 transition-all ${
-                      isSel ? 'border-black ring-2 ring-black/20' : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <button onClick={() => setBgPreview(bg)} className="block w-full text-left">
-                      <div
-                        className="h-14 w-full"
-                        style={{ backgroundImage: `url('${bg.url}')`, backgroundSize: 'cover', backgroundPosition: 'center' }}
-                      />
-                      <div className="flex items-center justify-between px-2 py-1 bg-white">
-                        <span className="text-[11px] font-medium text-gray-600 truncate">{bg.label}</span>
-                        {isSel && <span className="text-black text-xs">✓</span>}
-                      </div>
-                    </button>
-                    <button
-                      onClick={() => removeCustomBackground(bg.id)}
-                      title="Delete photo"
-                      className="absolute top-1 right-1 w-6 h-6 flex items-center justify-center rounded-full bg-white/90 text-gray-500 hover:text-red-600 shadow text-sm"
-                    >
-                      ×
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
         </>
         )}
 
