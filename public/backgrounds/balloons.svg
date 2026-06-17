@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9ed8ff"/>
+      <stop offset="1" stop-color="#eaf7ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="1440" height="900" fill="url(#sky)"/>
+  <g fill="#ffffff" opacity="0.7">
+    <ellipse cx="360" cy="700" rx="220" ry="70"/>
+    <ellipse cx="1080" cy="760" rx="260" ry="80"/>
+  </g>
+  <!-- balloon helper shapes -->
+  <g>
+    <g transform="translate(300 250)">
+      <path d="M0 -70 C 60 -70 80 -20 60 30 C 50 55 20 78 0 95 C -20 78 -50 55 -60 30 C -80 -20 -60 -70 0 -70 Z" fill="#ff7a7a"/>
+      <rect x="-12" y="100" width="24" height="20" rx="3" fill="#8a5a2b"/>
+      <line x1="-30" y1="60" x2="-12" y2="100" stroke="#9aa3ad" stroke-width="2"/>
+      <line x1="30" y1="60" x2="12" y2="100" stroke="#9aa3ad" stroke-width="2"/>
+    </g>
+    <g transform="translate(760 180) scale(1.2)">
+      <path d="M0 -70 C 60 -70 80 -20 60 30 C 50 55 20 78 0 95 C -20 78 -50 55 -60 30 C -80 -20 -60 -70 0 -70 Z" fill="#5aa9f0"/>
+      <rect x="-12" y="100" width="24" height="20" rx="3" fill="#8a5a2b"/>
+      <line x1="-30" y1="60" x2="-12" y2="100" stroke="#9aa3ad" stroke-width="2"/>
+      <line x1="30" y1="60" x2="12" y2="100" stroke="#9aa3ad" stroke-width="2"/>
+    </g>
+    <g transform="translate(1120 320) scale(0.9)">
+      <path d="M0 -70 C 60 -70 80 -20 60 30 C 50 55 20 78 0 95 C -20 78 -50 55 -60 30 C -80 -20 -60 -70 0 -70 Z" fill="#ffc24d"/>
+      <rect x="-12" y="100" width="24" height="20" rx="3" fill="#8a5a2b"/>
+      <line x1="-30" y1="60" x2="-12" y2="100" stroke="#9aa3ad" stroke-width="2"/>
+      <line x1="30" y1="60" x2="12" y2="100" stroke="#9aa3ad" stroke-width="2"/>
+    </g>
+    <g transform="translate(520 380) scale(0.7)">
+      <path d="M0 -70 C 60 -70 80 -20 60 30 C 50 55 20 78 0 95 C -20 78 -50 55 -60 30 C -80 -20 -60 -70 0 -70 Z" fill="#8bd17c"/>
+      <rect x="-12" y="100" width="24" height="20" rx="3" fill="#8a5a2b"/>
+      <line x1="-30" y1="60" x2="-12" y2="100" stroke="#9aa3ad" stroke-width="2"/>
+      <line x1="30" y1="60" x2="12" y2="100" stroke="#9aa3ad" stroke-width="2"/>
+    </g>
+  </g>
+</svg>

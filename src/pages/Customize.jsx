@@ -712,6 +712,7 @@ export default function Customize() {
           {[
             { key: 'logo', label: 'Logo icon', desc: 'The company logo at the far left.' },
             { key: 'brand', label: 'System name', desc: 'The "Picture Build System" text.' },
+            { key: 'sam', label: 'Sam (AI assistant)', desc: 'The Sam assistant button.' },
             { key: 'help', label: 'Help menu', desc: 'The 🛟 Help dropdown.' },
           ].map(row => (
             <div key={row.key} className="flex items-center justify-between gap-4 py-2.5 first:pt-0">

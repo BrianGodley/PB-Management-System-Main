@@ -641,8 +641,8 @@ export default function Layout() {
           )}
 
           {/* Sam — AI assistant trigger (shown on all sizes; on mobile it sits
-              top-left in place of the logo/Dashboard link). */}
-          <SamChat />
+              top-left in place of the logo/Dashboard link). Optional via Customize. */}
+          {headerItems.sam && <SamChat />}
 
           {/* Mobile: screen name truly centered across the full bar (absolute so
               it doesn't shift with the left/right button widths). */}

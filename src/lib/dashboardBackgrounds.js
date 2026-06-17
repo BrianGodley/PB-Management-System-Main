@@ -33,6 +33,27 @@ export const BACKGROUNDS = [
   { id: 'carbon', label: 'Carbon', swatch: '#1d2128', url: '/backgrounds/carbon.svg', dark: true },
   { id: 'plum', label: 'Plum', swatch: '#3a1c46', url: '/backgrounds/plum.svg', dark: true },
   { id: 'emerald-night', label: 'Emerald Night', swatch: '#103f30', url: '/backgrounds/emerald-night.svg', dark: true },
+  // More light patterns
+  { id: 'chevron', label: 'Chevron', swatch: '#cfe2f3', url: '/backgrounds/chevron.svg' },
+  { id: 'triangles', label: 'Triangles', swatch: '#cfe0f2', url: '/backgrounds/triangles.svg' },
+  { id: 'diagonal-stripes', label: 'Diagonal Stripes', swatch: '#d8e6f3', url: '/backgrounds/diagonal-stripes.svg' },
+  { id: 'plus-grid', label: 'Plus Grid', swatch: '#dfe4ee', url: '/backgrounds/plus-grid.svg' },
+  { id: 'waves-soft', label: 'Soft Waves', swatch: '#cfe6f5', url: '/backgrounds/waves-soft.svg' },
+  // Multi-colored
+  { id: 'rainbow-pastel', label: 'Rainbow Pastel', swatch: '#ffe7b8', url: '/backgrounds/rainbow-pastel.svg' },
+  { id: 'holographic', label: 'Holographic', swatch: '#e0d3ff', url: '/backgrounds/holographic.svg' },
+  { id: 'cotton-candy', label: 'Cotton Candy', swatch: '#ffc2e2', url: '/backgrounds/cotton-candy.svg' },
+  { id: 'citrus', label: 'Citrus', swatch: '#cdeeb0', url: '/backgrounds/citrus.svg' },
+  { id: 'prism', label: 'Prism', swatch: '#d6f3c8', url: '/backgrounds/prism.svg' },
+  // Scenic
+  { id: 'mountains', label: 'Mountains', swatch: '#9fb4d6', url: '/backgrounds/mountains.svg' },
+  { id: 'beach', label: 'Beach', swatch: '#6fd3df', url: '/backgrounds/beach.svg' },
+  { id: 'desert', label: 'Desert', swatch: '#e2a567', url: '/backgrounds/desert.svg' },
+  { id: 'tropical-sea', label: 'Tropical Sea', swatch: '#28b6c9', url: '/backgrounds/tropical-sea.svg' },
+  { id: 'balloons', label: 'Hot Air Balloons', swatch: '#9ed8ff', url: '/backgrounds/balloons.svg' },
+  { id: 'cityscape', label: 'Cityscape', swatch: '#cdbbe0', url: '/backgrounds/cityscape.svg' },
+  { id: 'townscape', label: 'Townscape', swatch: '#bcd99b', url: '/backgrounds/townscape.svg' },
+  { id: 'meadow', label: 'Meadow', swatch: '#8fcf72', url: '/backgrounds/meadow.svg' },
 ]
 
 // The customizable modules (main app sections). `key` is the route prefix used
@@ -294,6 +315,7 @@ export const HEADER_ITEMS_KEY = '__headerItems'
 export const HEADER_ITEMS_DEFAULT = {
   logo: true,
   brand: true,
+  sam: true,
   help: true,
   adminIconOnly: false,
   profileIconOnly: false,

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#bfe3ff"/>
+      <stop offset="1" stop-color="#eaf6ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="1440" height="900" fill="url(#sky)"/>
+  <circle cx="1140" cy="200" r="90" fill="#fff3c4"/>
+  <!-- far range -->
+  <path d="M0 560 L260 380 L470 540 L700 360 L920 540 L1180 360 L1440 520 L1440 900 L0 900 Z" fill="#9fb4d6"/>
+  <!-- mid range -->
+  <path d="M0 660 L300 460 L560 640 L840 450 L1120 650 L1440 480 L1440 900 L0 900 Z" fill="#6f86ad"/>
+  <!-- snow caps on mid -->
+  <path d="M300 460 L350 520 L320 520 L300 500 L280 525 L250 520 Z" fill="#f4f8ff" opacity="0.85"/>
+  <path d="M840 450 L890 512 L860 512 L840 492 L818 516 L792 512 Z" fill="#f4f8ff" opacity="0.85"/>
+  <!-- front hills -->
+  <path d="M0 760 L320 640 L640 780 L980 650 L1440 770 L1440 900 L0 900 Z" fill="#4f7c57"/>
+  <path d="M0 820 L380 730 L760 840 L1140 740 L1440 830 L1440 900 L0 900 Z" fill="#3c6345"/>
+</svg>

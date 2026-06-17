@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#bfe6ff"/>
+      <stop offset="1" stop-color="#eef8ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="1440" height="900" fill="url(#sky)"/>
+  <circle cx="1180" cy="180" r="74" fill="#fff4cc"/>
+  <path d="M0 640 C 360 600 760 660 1120 620 C 1280 602 1380 628 1440 620 L1440 900 L0 900 Z" fill="#bcd99b"/>
+  <!-- little houses -->
+  <g>
+    <g transform="translate(220 560)">
+      <rect x="0" y="40" width="120" height="90" fill="#f3ead8"/>
+      <path d="M-12 40 L60 -6 L132 40 Z" fill="#c8694f"/>
+      <rect x="48" y="80" width="28" height="50" fill="#9a7b53"/>
+    </g>
+    <g transform="translate(560 590) scale(1.1)">
+      <rect x="0" y="40" width="120" height="90" fill="#e8eef3"/>
+      <path d="M-12 40 L60 -6 L132 40 Z" fill="#5b7fa6"/>
+      <rect x="48" y="82" width="28" height="48" fill="#7d6a4f"/>
+    </g>
+    <g transform="translate(940 575)">
+      <rect x="0" y="40" width="120" height="90" fill="#f6e7c9"/>
+      <path d="M-12 40 L60 -6 L132 40 Z" fill="#cf9a4d"/>
+      <rect x="48" y="80" width="28" height="50" fill="#9a7b53"/>
+    </g>
+  </g>
+  <path d="M0 740 C 380 700 760 760 1140 720 C 1300 704 1380 730 1440 722 L1440 900 L0 900 Z" fill="#8fb866"/>
+</svg>
