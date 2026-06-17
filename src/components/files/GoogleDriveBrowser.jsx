@@ -525,7 +525,7 @@ export default function GoogleDriveBrowser() {
             if (e.target === e.currentTarget) setViewFile(null)
           }}
         >
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-2xl w-[96vw] h-[96vh] flex flex-col overflow-hidden">
             <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100 flex-shrink-0">
               {viewFile.iconLink ? (
                 <img src={viewFile.iconLink} alt="" className="w-4 h-4" />
