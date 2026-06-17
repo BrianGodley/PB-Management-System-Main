@@ -195,18 +195,13 @@ function FlowCanvas({ steps, positions, setPositions }) {
       my: (p1.y + p2.y) / 2,
     })
   }
-  const hasExplicit = steps.some(s => (s.next || []).some(c => c.to))
-  if (hasExplicit) {
-    steps.forEach(a =>
-      (a.next || []).forEach(c => {
-        const b = byId[c.to]
-        if (b) pushEdge(a, b, c.label)
-      })
-    )
-  } else {
-    // Older workflows (no saved connections) show a simple top→bottom chain.
-    for (let i = 0; i < steps.length - 1; i++) pushEdge(steps[i], steps[i + 1], '')
-  }
+  // Only draw connections the user explicitly added (no auto chain).
+  steps.forEach(a =>
+    (a.next || []).forEach(c => {
+      const b = byId[c.to]
+      if (b) pushEdge(a, b, c.label)
+    })
+  )
 
   if (!steps.length) {
     return (
@@ -349,8 +344,8 @@ function WorkflowBuilder({ workflow, userId, onClose, onSaved }) {
         multi: false,
         entityType: 'employee',
         orgType: 'division',
-        // Decision nodes branch (Yes/No); others have a single onward link.
-        next: kind === 'decision' ? [{ to: '', label: 'Yes' }, { to: '', label: 'No' }] : [{ to: '', label: '' }],
+        // No connection by default — the user adds connections between items.
+        next: [],
       },
     ])
   const updateStep = (id, patch) => setSteps(prev => prev.map(s => (s.id === id ? { ...s, ...patch } : s)))
