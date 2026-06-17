@@ -61,6 +61,53 @@ export const MENU_POSITIONS = [
   { id: 'bottom', label: 'Bottom', icon: '⬇️' },
 ]
 
+// Reserved key: user-defined menu groups. An array of
+//   { id, name, items: [<path>, ...] }
+// Items not listed in any group render on their own (flat). Empty default =
+// no custom grouping (the menu uses its built-in layout per position).
+export const MENU_GROUPS_KEY = '__menuGroups'
+
+// Canonical menu items (path + label) for the grouping editor. The paths match
+// Layout's navItems so a group's saved paths resolve to the real nav entries.
+export const MENU_ITEMS = [
+  { path: '/', label: 'Dashboard' },
+  { path: '/org-chart', label: 'Org Chart' },
+  { path: '/hr', label: 'HR' },
+  { path: '/training', label: 'Training' },
+  { path: '/contacts', label: 'Contacts' },
+  { path: '/clients', label: 'Opportunities' },
+  { path: '/edocuments', label: 'Documents' },
+  { path: '/accounting', label: 'Accounting' },
+  { path: '/collections', label: 'Weekly FP' },
+  { path: '/design', label: 'Design' },
+  { path: '/bids', label: 'Bids' },
+  { path: '/jobs', label: 'Jobs' },
+  { path: '/equipment-tracking', label: 'Equipment' },
+  { path: '/portal/subs', label: 'Subs & Vendors' },
+  { path: '/statistics', label: 'Statistics' },
+]
+
+// Build a render structure from nav items + user groups. Returns an ordered
+// list of entries: ungrouped items first (each as { type:'single', item }),
+// then each non-empty group (as { type:'group', id, label, items:[...] }) in
+// the order the user created them. `items` are the caller's nav objects
+// (keyed by `.path`), so icons/labels come straight from the live nav.
+export function buildMenuStructure(items, groups) {
+  const byPath = Object.fromEntries((items || []).map(i => [i.path, i]))
+  const grouped = new Set()
+  const groupEntries = []
+  for (const g of groups || []) {
+    const resolved = (g.items || [])
+      .map(p => { grouped.add(p); return byPath[p] })
+      .filter(Boolean)
+    if (resolved.length) groupEntries.push({ type: 'group', id: g.id, label: g.name, items: resolved })
+  }
+  const singles = (items || [])
+    .filter(i => !grouped.has(i.path))
+    .map(i => ({ type: 'single', item: i }))
+  return [...singles, ...groupEntries]
+}
+
 // A broad set of the fonts that ship with Microsoft Office / Windows, in the
 // same spirit as Word's font menu. NOTE: a font only renders if it's actually
 // installed on the viewer's device (web apps can't bundle proprietary Office
@@ -194,12 +241,13 @@ export const SIDEBAR_FONTS = [
   { id: 'wide-latin', label: 'Wide Latin', value: '"Wide Latin", serif' },
 ]
 
-// Sizes are kept modest (≤14px) so the menu never gets oversized.
+// Five steps from extra-small to extra-large, evenly spaced by 2px.
 export const SIDEBAR_FONT_SIZES = [
-  { id: 'sm', label: 'S', value: '10px' },
-  { id: 'default', label: 'M', value: '11.5px' },
-  { id: 'md', label: 'L', value: '13px' },
-  { id: 'lg', label: 'XL', value: '14.5px' },
+  { id: 'xs', label: 'XS', value: '10.5px' },
+  { id: 'sm', label: 'S', value: '12.5px' },
+  { id: 'md', label: 'M', value: '14.5px' },
+  { id: 'lg', label: 'L', value: '16.5px' },
+  { id: 'xl', label: 'XL', value: '18.5px' },
 ]
 
 // Build an inline style object for the menu text from saved font settings.
@@ -302,8 +350,9 @@ export const DEFAULT_PREFS = (() => {
   m[SIDEBAR_KEY] = null // Clear left menu bar
   m[HEADER_KEY] = null // Clear header bar
   m[SIDEBAR_ICONS_KEY] = true // Show icons
-  m[SIDEBAR_FONT_KEY] = { family: '"Comic Sans MS", "Comic Sans", cursive', size: '13px', bold: false, italic: false }
+  m[SIDEBAR_FONT_KEY] = { family: '"Comic Sans MS", "Comic Sans", cursive', size: '16.5px', bold: false, italic: false }
   m[MENU_POS_KEY] = 'left' // Classic left sidebar
+  m[MENU_GROUPS_KEY] = [] // No custom menu groups by default
   return m
 })()
 

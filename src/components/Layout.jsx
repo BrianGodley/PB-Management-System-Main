@@ -12,6 +12,8 @@ import {
   SIDEBAR_ICONS_KEY,
   SIDEBAR_FONT_KEY,
   MENU_POS_KEY,
+  MENU_GROUPS_KEY,
+  buildMenuStructure,
   sidebarFontStyle,
   sidebarNavColor,
   HEADER_KEY,
@@ -240,6 +242,18 @@ export default function Layout() {
       return 'left'
     }
   })
+  // User-defined menu groups (empty = built-in layout per position).
+  const [menuGroups, setMenuGroups] = useState(() => {
+    try {
+      return readModuleBackgrounds()[MENU_GROUPS_KEY] || []
+    } catch {
+      return []
+    }
+  })
+  // Collapsed state of sidebar groups, keyed by group id (default expanded).
+  const [collapsedGroups, setCollapsedGroups] = useState({})
+  const isGroupOpen = id => !collapsedGroups[id]
+  const toggleGroup = id => setCollapsedGroups(s => ({ ...s, [id]: !s[id] }))
   // Which header nav group dropdown is open (Top menu mode).
   const [openNavGroup, setOpenNavGroup] = useState(null)
   // Background id of the current route's module (for nav contrast when the
@@ -307,6 +321,7 @@ export default function Layout() {
         setHeaderBg(map[HEADER_KEY] !== undefined ? map[HEADER_KEY] : HEADER_DEFAULT)
         setSidebarIcons(map[SIDEBAR_ICONS_KEY] !== false); setSidebarFont(map[SIDEBAR_FONT_KEY] || null)
         setMenuPos(map[MENU_POS_KEY] || 'left')
+        setMenuGroups(map[MENU_GROUPS_KEY] || [])
         setCurrentBgId(bgIdForPath(window.location.pathname, map))
       })
   }, [user?.id])
@@ -320,6 +335,7 @@ export default function Layout() {
     setHeaderBg(map[HEADER_KEY] !== undefined ? map[HEADER_KEY] : HEADER_DEFAULT)
     setSidebarIcons(map[SIDEBAR_ICONS_KEY] !== false); setSidebarFont(map[SIDEBAR_FONT_KEY] || null)
     setMenuPos(map[MENU_POS_KEY] || 'left')
+    setMenuGroups(map[MENU_GROUPS_KEY] || [])
     setCurrentBgId(bgIdForPath(location.pathname, map))
   }, [location.pathname])
   useEffect(() => {
@@ -330,6 +346,7 @@ export default function Layout() {
       setHeaderBg(map[HEADER_KEY] !== undefined ? map[HEADER_KEY] : HEADER_DEFAULT)
       setSidebarIcons(map[SIDEBAR_ICONS_KEY] !== false); setSidebarFont(map[SIDEBAR_FONT_KEY] || null)
       setMenuPos(map[MENU_POS_KEY] || 'left')
+      setMenuGroups(map[MENU_GROUPS_KEY] || [])
       setCurrentBgId(bgIdForPath(window.location.pathname, map))
     }
     window.addEventListener('module-backgrounds-updated', handler)
@@ -356,6 +373,13 @@ export default function Layout() {
   const menuOnBottom = menuPos === 'bottom'
   const showSidebar = menuPos === 'left' || menuOnRight // vertical sidebar modes
   const desktopTitle = screenTitle(location.pathname)
+
+  // User-defined menu groups. When present they drive every menu position;
+  // otherwise each position falls back to its built-in layout.
+  const useCustomGroups = Array.isArray(menuGroups) && menuGroups.length > 0
+  const menuStructure = buildMenuStructure(navItems, menuGroups)
+  // Top-position entries: custom groups when defined, else the built-in groups.
+  const topEntries = useCustomGroups ? menuStructure : NAV_GROUPS
 
   // Auto header text/tint: from the header color if set, else (Clear) from the
   // page background's darkness. Mirrors the sidebar's auto-contrast.
@@ -520,6 +544,29 @@ export default function Layout() {
     return location.pathname === to
   }
 
+  // A single sidebar nav link (shared by the flat list and grouped sections).
+  const renderNavLink = (item, indent = false) => (
+    <Link
+      key={item.path}
+      to={item.path}
+      onMouseEnter={e => {
+        if (!navCollapsed) return
+        const r = e.currentTarget.getBoundingClientRect()
+        setNavTip({ label: item.label, top: r.top + r.height / 2 })
+      }}
+      onMouseLeave={() => setNavTip(null)}
+      style={navItemStyle}
+      className={`flex items-center ${navCollapsed ? 'justify-center' : 'gap-2'} ${
+        indent && !navCollapsed ? 'pl-5' : ''
+      } px-2 py-2 rounded-lg text-xs font-semibold text-gray-800 transition-colors ${
+        isActive(item.path) ? navActivePill : navHoverPill
+      }`}
+    >
+      {(sidebarIcons || navCollapsed) && <span className="text-sm">{item.icon}</span>}
+      {!navCollapsed && item.label}
+    </Link>
+  )
+
   return (
     /* 100dvh (dynamic viewport height) matches the *visible* area on mobile, so
        the page itself never scrolls and drags the header — only <main> scrolls.
@@ -605,7 +652,7 @@ export default function Layout() {
               ref={navGroupRef}
               className="hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center gap-1"
             >
-              {NAV_GROUPS.map(g => {
+              {topEntries.map(g => {
                 if (g.type === 'single') {
                   const it = g.item
                   if (!it) return null
@@ -615,6 +662,7 @@ export default function Layout() {
                       to={it.path}
                       style={{
                         color: headerText,
+                        ...navFontStyle,
                         ...(isActive(it.path) ? { backgroundColor: headerActiveBg } : {}),
                       }}
                       className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-lg font-semibold whitespace-nowrap ${headerHoverPill}`}
@@ -625,10 +673,11 @@ export default function Layout() {
                 }
                 const groupActive = g.items.some(it => isActive(it.path))
                 return (
-                  <div key={g.label} className="relative group">
+                  <div key={g.id || g.label} className="relative group">
                     <button
                       style={{
                         color: headerText,
+                        ...navFontStyle,
                         ...(groupActive ? { backgroundColor: headerActiveBg } : {}),
                       }}
                       className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-lg font-semibold whitespace-nowrap ${headerHoverPill}`}
@@ -641,6 +690,7 @@ export default function Layout() {
                         <Link
                           key={it.path}
                           to={it.path}
+                          style={navFontStyle}
                           className={`flex items-center gap-2.5 px-4 py-2.5 text-base hover:bg-gray-50 ${
                             isActive(it.path)
                               ? 'text-green-700 font-semibold bg-green-50'
@@ -832,25 +882,29 @@ export default function Layout() {
           </button>
 
           <nav className="flex-1 px-1.5 py-1 space-y-0.5">
-            {navItems.map(item => (
-              <Link
-                key={item.path}
-                to={item.path}
-                onMouseEnter={e => {
-                  if (!navCollapsed) return
-                  const r = e.currentTarget.getBoundingClientRect()
-                  setNavTip({ label: item.label, top: r.top + r.height / 2 })
-                }}
-                onMouseLeave={() => setNavTip(null)}
-                style={navItemStyle}
-                className={`flex items-center ${navCollapsed ? 'justify-center' : 'gap-2'} px-2 py-2 rounded-lg text-xs font-semibold text-gray-800 transition-colors ${
-                  isActive(item.path) ? navActivePill : navHoverPill
-                }`}
-              >
-                {(sidebarIcons || navCollapsed) && <span className="text-sm">{item.icon}</span>}
-                {!navCollapsed && item.label}
-              </Link>
-            ))}
+            {useCustomGroups && !navCollapsed
+              ? menuStructure.map(e =>
+                  e.type === 'single' ? (
+                    renderNavLink(e.item)
+                  ) : (
+                    <div key={e.id}>
+                      <button
+                        onClick={() => toggleGroup(e.id)}
+                        style={navItemStyle}
+                        className={`w-full flex items-center justify-between px-2 py-2 rounded-lg text-xs font-semibold text-gray-800 transition-colors ${navHoverPill}`}
+                      >
+                        <span className="truncate">{e.label}</span>
+                        <span className="text-[10px] opacity-60 ml-1">{isGroupOpen(e.id) ? '▾' : '▸'}</span>
+                      </button>
+                      {isGroupOpen(e.id) && (
+                        <div className="space-y-0.5 mt-0.5">
+                          {e.items.map(it => renderNavLink(it, true))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                )
+              : navItems.map(item => renderNavLink(item))}
           </nav>
           <div className={`px-1.5 py-3 border-t ${navTheme.dark ? 'border-white/20' : 'border-black/10'}`}>
             <button
@@ -878,25 +932,71 @@ export default function Layout() {
           <Outlet />
         </main>
 
-        {/* DESKTOP BOTTOM NAV — horizontal menu bar for the Bottom position. */}
+        {/* DESKTOP BOTTOM NAV — horizontal menu bar for the Bottom position.
+            With custom groups, each group becomes an "up" dropdown that opens
+            above the bar; overflow stays visible so it isn't clipped. */}
         {menuOnBottom && (
           <nav
             style={sidebarBg ? { backgroundColor: sidebarBg } : undefined}
-            className="hidden lg:flex flex-shrink-0 items-center gap-1 overflow-x-auto border-t border-black/10 px-3 py-1.5"
+            className={`hidden lg:flex flex-shrink-0 items-center gap-1 border-t border-black/10 px-3 py-1.5 ${
+              useCustomGroups ? 'overflow-visible flex-wrap' : 'overflow-x-auto'
+            }`}
           >
-            {navItems.map(item => (
-              <Link
-                key={item.path}
-                to={item.path}
-                style={navItemStyle}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex-shrink-0 text-gray-800 transition-colors ${
-                  isActive(item.path) ? navActivePill : navHoverPill
-                }`}
-              >
-                {sidebarIcons && <span className="text-sm">{item.icon}</span>}
-                {item.label}
-              </Link>
-            ))}
+            {(useCustomGroups
+              ? menuStructure.map(e =>
+                  e.type === 'single' ? (
+                    <Link
+                      key={e.item.path}
+                      to={e.item.path}
+                      style={navItemStyle}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex-shrink-0 text-gray-800 transition-colors ${
+                        isActive(e.item.path) ? navActivePill : navHoverPill
+                      }`}
+                    >
+                      {sidebarIcons && <span className="text-sm">{e.item.icon}</span>}
+                      {e.item.label}
+                    </Link>
+                  ) : (
+                    <div key={e.id} className="relative group flex-shrink-0">
+                      <button
+                        style={navItemStyle}
+                        className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap text-gray-800 transition-colors ${
+                          e.items.some(it => isActive(it.path)) ? navActivePill : navHoverPill
+                        }`}
+                      >
+                        {e.label}
+                        <span className="text-[10px] opacity-60">▴</span>
+                      </button>
+                      <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-52 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
+                        {e.items.map(it => (
+                          <Link
+                            key={it.path}
+                            to={it.path}
+                            className={`flex items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-gray-50 ${
+                              isActive(it.path) ? 'text-green-700 font-semibold bg-green-50' : 'text-gray-700'
+                            }`}
+                          >
+                            {sidebarIcons && <span className="w-5 inline-flex justify-center">{it.icon}</span>}
+                            {it.label}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                )
+              : navItems.map(item => (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    style={navItemStyle}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex-shrink-0 text-gray-800 transition-colors ${
+                      isActive(item.path) ? navActivePill : navHoverPill
+                    }`}
+                  >
+                    {sidebarIcons && <span className="text-sm">{item.icon}</span>}
+                    {item.label}
+                  </Link>
+                )))}
             <button
               onClick={handleSignOut}
               style={navTextStyle}

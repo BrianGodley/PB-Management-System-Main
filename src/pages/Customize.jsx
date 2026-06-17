@@ -23,6 +23,10 @@ import {
   HEADER_DEFAULT,
   MENU_POS_KEY,
   MENU_POSITIONS,
+  MENU_GROUPS_KEY,
+  MENU_ITEMS,
+  buildMenuStructure,
+  sidebarNavColor,
   readModuleBackgrounds,
 } from '../lib/dashboardBackgrounds'
 import { COLOR_LIBRARY } from '../lib/colorLibrary'
@@ -91,6 +95,51 @@ function SpecialSwatch({ label, color, selected, onClick, clear }) {
   )
 }
 
+// Emoji icons for the menu preview (mirror Layout's nav icons closely enough
+// for a visual sample).
+const PREVIEW_ICONS = {
+  '/': '🏠', '/org-chart': '🏢', '/hr': '👥', '/training': '🎓',
+  '/contacts': '📇', '/clients': '💡', '/edocuments': '✍️', '/accounting': '🧮',
+  '/collections': '💰', '/design': '📐', '/bids': '📋', '/jobs': '🏡',
+  '/equipment-tracking': '🚜', '/portal/subs': '🧑‍🔧', '/statistics': '📈',
+}
+const PREVIEW_ITEMS = MENU_ITEMS.map(i => ({ ...i, icon: PREVIEW_ICONS[i.path] || '•' }))
+
+// A compact, live sample of the menu. Reflects the chosen font, icon
+// visibility, bar color, and (optionally) custom groups. Used by the Menu
+// icons, Menu Background, and Menu grouping previews.
+function MenuPreview({ font, showIcons, barColor, groups, max = 99 }) {
+  const bg = barColor || '#1f2d24'
+  const theme = sidebarNavColor(bg)
+  const textColor = theme.text || '#ffffff'
+  const structure = buildMenuStructure(PREVIEW_ITEMS, groups || []).slice(0, max)
+  const Row = ({ item, indent }) => (
+    <div className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 ${indent ? 'ml-3' : ''}`}>
+      {showIcons && <span className="text-sm leading-none w-4 text-center">{item.icon}</span>}
+      <span style={{ color: textColor, ...sidebarFontStyle(font) }}>{item.label}</span>
+    </div>
+  )
+  return (
+    <div className="rounded-md p-2 w-44" style={{ backgroundColor: bg }}>
+      {structure.map(e =>
+        e.type === 'single' ? (
+          <Row key={e.item.path} item={e.item} />
+        ) : (
+          <div key={e.id} className="mb-0.5">
+            <div className="flex items-center gap-1 px-2.5 py-1.5">
+              <span className="text-[10px] opacity-60" style={{ color: textColor }}>▾</span>
+              <span className="font-bold text-[11px] uppercase tracking-wide" style={{ color: textColor }}>
+                {e.label}
+              </span>
+            </div>
+            {e.items.map(it => <Row key={it.path} item={it} indent />)}
+          </div>
+        )
+      )}
+    </div>
+  )
+}
+
 export default function Customize() {
   const { user } = useAuth()
   const [map, setMap] = useState(() => readModuleBackgrounds())
@@ -119,6 +168,10 @@ export default function Customize() {
   const showIcons = map[SIDEBAR_ICONS_KEY] !== false
   const font = map[SIDEBAR_FONT_KEY] || {}
   const menuPos = map[MENU_POS_KEY] || 'left'
+  const menuGroups = map[MENU_GROUPS_KEY] || []
+  const byPath = Object.fromEntries(MENU_ITEMS.map(i => [i.path, i]))
+  const groupNameByPath = {}
+  menuGroups.forEach(g => (g.items || []).forEach(p => { groupNameByPath[p] = g.name }))
 
   function pickBackground(bgId) {
     setMap(m => {
@@ -157,6 +210,35 @@ export default function Customize() {
   function setFont(patch) {
     setMap(m => ({ ...m, [SIDEBAR_FONT_KEY]: { ...(m[SIDEBAR_FONT_KEY] || {}), ...patch } }))
     setSavedMsg('')
+  }
+
+  // ── Menu grouping helpers ──
+  function setGroups(updater) {
+    setMap(m => ({ ...m, [MENU_GROUPS_KEY]: updater(m[MENU_GROUPS_KEY] || []) }))
+    setSavedMsg('')
+  }
+  function addGroup() {
+    const id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'g' + Date.now()
+    setGroups(gs => [...gs, { id, name: 'New Group', items: [] }])
+  }
+  function renameGroup(id, name) {
+    setGroups(gs => gs.map(g => (g.id === id ? { ...g, name } : g)))
+  }
+  function deleteGroup(id) {
+    setGroups(gs => gs.filter(g => g.id !== id))
+  }
+  // Add a menu item to a group, removing it from any other group first
+  // (an item lives in at most one group).
+  function addItemToGroup(id, path) {
+    setGroups(gs =>
+      gs.map(g => {
+        const cleaned = { ...g, items: (g.items || []).filter(p => p !== path) }
+        return cleaned.id === id ? { ...cleaned, items: [...cleaned.items, path] } : cleaned
+      })
+    )
+  }
+  function removeItemFromGroup(id, path) {
+    setGroups(gs => gs.map(g => (g.id === id ? { ...g, items: (g.items || []).filter(p => p !== path) } : g)))
   }
 
   async function handleSave() {
@@ -330,26 +412,34 @@ export default function Customize() {
         <p className="text-sm text-gray-500 mb-3">
           Show or hide the icons next to each menu item. With icons off, the labels shift left.
         </p>
-        <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6 flex gap-2">
-          {[
-            { id: true, label: 'Show icons' },
-            { id: false, label: 'Hide icons' },
-          ].map(opt => {
-            const isSel = showIcons === opt.id
-            return (
-              <button
-                key={String(opt.id)}
-                onClick={() => setIcons(opt.id)}
-                className={`text-sm font-semibold px-4 py-2 rounded-lg border transition-colors ${
-                  isSel
-                    ? 'bg-green-700 text-white border-2 border-black'
-                    : 'bg-white text-gray-700 border border-gray-300 hover:border-green-400'
-                }`}
-              >
-                {isSel ? '✓ ' : ''}{opt.label}
-              </button>
-            )
-          })}
+        <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6">
+          <div className="grid md:grid-cols-2 gap-5">
+            <div className="flex gap-2 h-fit">
+              {[
+                { id: true, label: 'Show icons' },
+                { id: false, label: 'Hide icons' },
+              ].map(opt => {
+                const isSel = showIcons === opt.id
+                return (
+                  <button
+                    key={String(opt.id)}
+                    onClick={() => setIcons(opt.id)}
+                    className={`text-sm font-semibold px-4 py-2 rounded-lg border transition-colors ${
+                      isSel
+                        ? 'bg-green-700 text-white border-2 border-black'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:border-green-400'
+                    }`}
+                  >
+                    {isSel ? '✓ ' : ''}{opt.label}
+                  </button>
+                )
+              })}
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gray-500 mb-1.5">Preview</p>
+              <MenuPreview font={font} showIcons={showIcons} barColor={currentSidebar} groups={[]} max={6} />
+            </div>
+          </div>
         </div>
 
         {/* ── Menu font ── */}
@@ -458,7 +548,105 @@ export default function Customize() {
           through.
         </p>
         <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <BarPalette value={currentSidebar} onChange={pickSidebar} />
+          <div className="grid md:grid-cols-2 gap-5">
+            <BarPalette value={currentSidebar} onChange={pickSidebar} />
+            <div>
+              <p className="text-xs font-semibold text-gray-500 mb-1.5">Preview</p>
+              <MenuPreview font={font} showIcons={showIcons} barColor={currentSidebar} groups={[]} max={6} />
+            </div>
+          </div>
+        </div>
+
+        {/* ── Menu grouping ── */}
+        <h2 className="text-lg font-bold text-gray-900 mt-6 mb-1">Menu grouping</h2>
+        <p className="text-sm text-gray-500 mb-3">
+          Create your own groups, name them, and move menu items underneath. Items you don't put in a
+          group stay on their own. In the <strong>Top</strong> and <strong>Bottom</strong> menus, groups
+          become dropdowns; in the <strong>Left</strong>/<strong>Right</strong> sidebar they become
+          collapsible sections.
+        </p>
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="grid md:grid-cols-2 gap-5">
+            {/* editor */}
+            <div className="space-y-3">
+              {menuGroups.length === 0 && (
+                <p className="text-sm text-gray-400">No groups yet — add one to start grouping menu items.</p>
+              )}
+              {menuGroups.map(g => (
+                <div key={g.id} className="border border-gray-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <input
+                      value={g.name}
+                      onChange={e => renameGroup(g.id, e.target.value)}
+                      placeholder="Group name"
+                      className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600"
+                    />
+                    <button
+                      onClick={() => deleteGroup(g.id)}
+                      title="Delete group"
+                      className="w-7 h-7 flex items-center justify-center rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 text-lg leading-none"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {(g.items || []).length === 0 && (
+                      <span className="text-xs text-gray-400">No items yet</span>
+                    )}
+                    {(g.items || []).map(p => {
+                      const it = byPath[p]
+                      if (!it) return null
+                      return (
+                        <span
+                          key={p}
+                          className="inline-flex items-center gap-1 bg-green-50 text-green-800 border border-green-200 rounded-full pl-2.5 pr-1 py-0.5 text-xs"
+                        >
+                          {it.label}
+                          <button
+                            onClick={() => removeItemFromGroup(g.id, p)}
+                            className="w-4 h-4 flex items-center justify-center rounded-full hover:bg-green-200"
+                            title="Remove"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      )
+                    })}
+                  </div>
+                  <select
+                    value=""
+                    onChange={e => { if (e.target.value) addItemToGroup(g.id, e.target.value) }}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600"
+                  >
+                    <option value="">+ Add item…</option>
+                    {MENU_ITEMS.filter(i => !(g.items || []).includes(i.path)).map(i => {
+                      const inOther = groupNameByPath[i.path]
+                      return (
+                        <option key={i.path} value={i.path}>
+                          {i.label}{inOther ? ` (move from ${inOther})` : ''}
+                        </option>
+                      )
+                    })}
+                  </select>
+                </div>
+              ))}
+              <button
+                onClick={addGroup}
+                className="text-sm font-semibold text-green-700 border border-green-300 rounded-lg px-4 py-2 hover:bg-green-50"
+              >
+                + Add group
+              </button>
+            </div>
+            {/* preview */}
+            <div>
+              <p className="text-xs font-semibold text-gray-500 mb-1.5">Preview</p>
+              <MenuPreview font={font} showIcons={showIcons} barColor={currentSidebar} groups={menuGroups} />
+              <p className="text-[11px] text-gray-400 mt-1.5">
+                Ungrouped items appear on their own; groups show as collapsible sections here (dropdowns
+                in the Top/Bottom menus).
+              </p>
+            </div>
+          </div>
         </div>
         </>
         )}
