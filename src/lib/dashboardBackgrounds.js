@@ -118,6 +118,7 @@ export const MENU_ITEMS = [
   { path: '/contacts', label: 'Contacts' },
   { path: '/clients', label: 'Opportunities' },
   { path: '/edocuments', label: 'Documents' },
+  { path: '/workflows', label: 'Workflows' },
   { path: '/accounting', label: 'Accounting' },
   { path: '/collections', label: 'Weekly FP' },
   { path: '/design', label: 'Design' },

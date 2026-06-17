@@ -53,6 +53,7 @@ const Settings = lazy(() => import('./pages/Settings'))
 const Admin = lazy(() => import('./pages/Admin'))
 const EstimateDetail = lazy(() => import('./pages/EstimateDetail'))
 const EDocuments = lazy(() => import('./pages/EDocuments'))
+const Workflows = lazy(() => import('./pages/Workflows'))
 const Customize = lazy(() => import('./pages/Customize'))
 const SignDocument = lazy(() => import('./pages/SignDocument'))
 const MasterRates = lazy(() => import('./pages/MasterRates'))
@@ -171,6 +172,7 @@ function AppRoutes() {
           <Route path="estimates/:id" element={<EstimateDetail />} />
           <Route path="bids" element={<Bids />} />
           <Route path="edocuments" element={<EDocuments />} />
+          <Route path="workflows" element={<Workflows />} />
           <Route path="customize" element={<Customize />} />
           <Route path="tracker" element={<JobTracker />} />
           <Route path="collections" element={<Collections />} />

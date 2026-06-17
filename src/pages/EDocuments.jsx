@@ -18,7 +18,6 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import EDocFieldEditor from '../components/edoc/EDocFieldEditor'
 import EDocDocumentModal from '../components/edoc/EDocDocumentModal'
-import WorkflowsTab from '../components/edoc/WorkflowsTab'
 import FileManager from '../components/files/FileManager'
 import GoogleDriveBrowser from '../components/files/GoogleDriveBrowser'
 import PbsDrive from '../components/files/PbsDrive'
@@ -143,7 +142,6 @@ export default function EDocuments({ clientId = null, embedded = false }) {
   // Top-level Documents page: white tab bar with the file managers + E-Documents.
   const MAIN_TABS = [
     ['edocuments', '✍️ E-Documents'],
-    ['workflows', '🔀 Document Workflows'],
     ['files', '🗂️ PBS Drive'],
     ['gdrive', '🔵 Google Drive'],
     ['photos', '🖼️ Photos'],
@@ -177,7 +175,6 @@ export default function EDocuments({ clientId = null, embedded = false }) {
         {mainTab === 'videos' && <FileManager root="videos" accept="video/*" />}
         {mainTab === 'gdrive' && <GoogleDriveBrowser />}
         {mainTab === 'settings' && <DocsSettings userId={user?.id} />}
-        {mainTab === 'workflows' && <WorkflowsTab userId={user?.id} />}
         {mainTab === 'edocuments' && eDocsContent}
       </div>
     </div>

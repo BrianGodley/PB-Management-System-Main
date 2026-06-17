@@ -27,6 +27,10 @@ const STEP_KINDS = [
   { id: 'decision', label: 'Decision' },
 ]
 
+// Workflow category — required when creating a workflow; shown as the first
+// column in the workflows table.
+const WORKFLOW_TYPES = ['Document', 'Decision', 'Installation', 'Maintenance', 'Pilot', 'Sales', 'Finance', 'Other']
+
 // Who a Person node represents / what an Organization node represents.
 const ENTITY_TYPES = [
   ['employee', 'Employee'],
@@ -265,6 +269,7 @@ function FlowCanvas({ steps, positions, setPositions, readOnly = false }) {
 // ── Builder: typed wizard on top, visual diagram below ──
 function WorkflowBuilder({ workflow, userId, onClose, onSaved }) {
   const [name, setName] = useState(workflow?.name || '')
+  const [type, setType] = useState(workflow?.type || '')
   const [notes, setNotes] = useState(workflow?.notes || '')
   const [modules, setModules] = useState(
     Array.isArray(workflow?.module_integrations) ? workflow.module_integrations : []
@@ -411,9 +416,14 @@ function WorkflowBuilder({ workflow, userId, onClose, onSaved }) {
     )
 
   async function save() {
+    if (!type) {
+      alert('Please choose a workflow Type.')
+      return
+    }
     setSaving(true)
     const payload = {
       name: name.trim() || 'Untitled Workflow',
+      type,
       notes,
       module_integrations: modules,
       steps,
@@ -477,7 +487,16 @@ function WorkflowBuilder({ workflow, userId, onClose, onSaved }) {
       {/* Typed wizard — only in edit mode */}
       {editMode && (
       <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid md:grid-cols-3 gap-4">
+          <label className="block">
+            <span className="text-[11px] font-semibold text-gray-500 uppercase">
+              Type <span className="text-red-500">*</span>
+            </span>
+            <select value={type} onChange={e => setType(e.target.value)} className="input text-sm py-1.5 w-full mt-1">
+              <option value="">Select type…</option>
+              {WORKFLOW_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </label>
           <label className="block">
             <span className="text-[11px] font-semibold text-gray-500 uppercase">Workflow name</span>
             <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Policy review & acknowledgment" className="input text-sm py-1.5 w-full mt-1" />
@@ -734,7 +753,8 @@ export default function WorkflowsTab({ userId }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase tracking-wide text-xs">
-                <th className="px-4 py-2 text-left font-semibold">Name</th>
+                <th className="px-4 py-2 text-left font-semibold">Type</th>
+                <th className="px-3 py-2 text-left font-semibold">Name</th>
                 <th className="px-3 py-2 text-left font-semibold">Creation Date</th>
                 <th className="px-3 py-2 text-left font-semibold">Module Integrations</th>
                 <th className="px-3 py-2 text-left font-semibold">Notes</th>
@@ -744,7 +764,16 @@ export default function WorkflowsTab({ userId }) {
             <tbody className="divide-y divide-gray-100">
               {rows.map(w => (
                 <tr key={w.id} onClick={() => setEditing(w)} className="hover:bg-gray-50 cursor-pointer">
-                  <td className="px-4 py-2 font-medium text-gray-800">{w.name}</td>
+                  <td className="px-4 py-2">
+                    {w.type ? (
+                      <span className="inline-block text-[11px] font-semibold bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-0.5">
+                        {w.type}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 font-medium text-gray-800">{w.name}</td>
                   <td className="px-3 py-2 text-gray-500">{fmtDate(w.created_at)}</td>
                   <td className="px-3 py-2 text-gray-600">
                     {(Array.isArray(w.module_integrations) ? w.module_integrations : []).join(', ') || '—'}
