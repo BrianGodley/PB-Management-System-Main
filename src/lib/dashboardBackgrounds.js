@@ -13,6 +13,26 @@ export const BACKGROUNDS = [
   { id: 'sunset', label: 'Sunset', swatch: '#f3a07e', url: '/backgrounds/sunset.svg' },
   { id: 'aurora', label: 'Aurora', swatch: '#23406a', url: '/backgrounds/aurora.svg', dark: true },
   { id: 'mesh', label: 'Mesh', swatch: '#e7ebf2', url: '/backgrounds/mesh.svg' },
+  // Light gradients
+  { id: 'lavender', label: 'Lavender', swatch: '#d8c8f3', url: '/backgrounds/lavender.svg' },
+  { id: 'peach', label: 'Peach', swatch: '#f7c9a6', url: '/backgrounds/peach.svg' },
+  { id: 'sky', label: 'Sky', swatch: '#bfe0f5', url: '/backgrounds/sky.svg' },
+  { id: 'mint', label: 'Mint', swatch: '#bfe8d2', url: '/backgrounds/mint.svg' },
+  { id: 'sunrise', label: 'Sunrise', swatch: '#ffb98a', url: '/backgrounds/sunrise.svg' },
+  { id: 'rose-gold', label: 'Rose Gold', swatch: '#f0c5b9', url: '/backgrounds/rose-gold.svg' },
+  // Light patterns
+  { id: 'graphite-grid', label: 'Graphite Grid', swatch: '#e6ebf2', url: '/backgrounds/graphite-grid.svg' },
+  { id: 'dots', label: 'Dots', swatch: '#dde6f0', url: '/backgrounds/dots.svg' },
+  { id: 'crosshatch', label: 'Crosshatch', swatch: '#e7eaef', url: '/backgrounds/crosshatch.svg' },
+  { id: 'sand-topo', label: 'Sand Topo', swatch: '#ecdcbb', url: '/backgrounds/sand-topo.svg' },
+  { id: 'honeycomb', label: 'Honeycomb', swatch: '#d4e6f7', url: '/backgrounds/honeycomb.svg' },
+  // Dark gradients / scenes
+  { id: 'slate', label: 'Slate', swatch: '#2c3542', url: '/backgrounds/slate.svg', dark: true },
+  { id: 'ocean', label: 'Ocean', swatch: '#0b556f', url: '/backgrounds/ocean.svg', dark: true },
+  { id: 'midnight', label: 'Midnight', swatch: '#101a3c', url: '/backgrounds/midnight.svg', dark: true },
+  { id: 'carbon', label: 'Carbon', swatch: '#1d2128', url: '/backgrounds/carbon.svg', dark: true },
+  { id: 'plum', label: 'Plum', swatch: '#3a1c46', url: '/backgrounds/plum.svg', dark: true },
+  { id: 'emerald-night', label: 'Emerald Night', swatch: '#103f30', url: '/backgrounds/emerald-night.svg', dark: true },
 ]
 
 // The customizable modules (main app sections). `key` is the route prefix used
@@ -348,7 +368,7 @@ export const DEFAULT_PREFS = (() => {
   m[SIDEBAR_KEY] = null // Clear left menu bar
   m[HEADER_KEY] = null // Clear header bar
   m[SIDEBAR_ICONS_KEY] = true // Show icons
-  m[SIDEBAR_FONT_KEY] = { family: '"Comic Sans MS", "Comic Sans", cursive', size: '16px', bold: false, italic: false }
+  m[SIDEBAR_FONT_KEY] = { family: 'Arial, Helvetica, sans-serif', size: '16px', bold: false, italic: false }
   m[MENU_POS_KEY] = 'left' // Classic left sidebar
   m[MENU_GROUPS_KEY] = [] // No custom menu groups by default
   return m
