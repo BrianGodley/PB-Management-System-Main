@@ -781,7 +781,7 @@ export default function WorkflowsTab({ userId }) {
           onClick={() => setEditing('new')}
           className="text-xs px-3 py-1.5 rounded-lg bg-green-700 text-white font-semibold hover:bg-green-800 whitespace-nowrap"
         >
-          ＋ Create Document Workflow
+          ＋ New Workflow
         </button>
       </div>
 
