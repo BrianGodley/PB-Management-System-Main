@@ -381,10 +381,15 @@ export default function Layout() {
   // Top-position entries: custom groups when defined, else the built-in groups.
   const topEntries = useCustomGroups ? menuStructure : NAV_GROUPS
 
+  // In Top menu mode the nav lives in the header, so the Menu Background color
+  // colors the header bar itself (falling back to the Header bar color when no
+  // menu color is set). Other positions just use the Header bar color.
+  const headerColor = menuOnTop && sidebarBg ? sidebarBg : headerBg
+
   // Auto header text/tint: from the header color if set, else (Clear) from the
   // page background's darkness. Mirrors the sidebar's auto-contrast.
-  const headerTheme = headerBg
-    ? headerNavColor(headerBg)
+  const headerTheme = headerColor
+    ? headerNavColor(headerColor)
     : BACKGROUNDS.find(b => b.id === currentBgId)?.dark
       ? { text: '#f9fafb', dark: true }
       : { text: '#1f2937', dark: false }
@@ -596,8 +601,8 @@ export default function Layout() {
 
       {/* ── TOP BAR ── */}
       <header
-        style={{ backgroundColor: headerBg || 'transparent' }}
-        className={`w-full flex-shrink-0 sticky top-0 z-50 ${headerBg ? 'shadow-md' : ''}`}
+        style={{ backgroundColor: headerColor || 'transparent' }}
+        className={`w-full flex-shrink-0 sticky top-0 z-50 ${headerColor ? 'shadow-md' : ''}`}
       >
         <div className="relative flex items-center h-11 px-4 gap-4">
           {/* Logo + system name — desktop only (mobile shows Sam in this spot). */}
