@@ -29,6 +29,9 @@ import {
   MENU_ITEMS,
   buildMenuStructure,
   sidebarNavColor,
+  CUSTOM_BG_KEY,
+  readCustomBackgrounds,
+  resolveBackground,
   readModuleBackgrounds,
 } from '../lib/dashboardBackgrounds'
 import { COLOR_LIBRARY } from '../lib/colorLibrary'
@@ -180,6 +183,7 @@ export default function Customize() {
   const [map, setMap] = useState(() => readModuleBackgrounds())
   const [selected, setSelected] = useState('all') // 'all' | module route key
   const [saving, setSaving] = useState(false)
+  const [uploadingBg, setUploadingBg] = useState(false)
   const [savedMsg, setSavedMsg] = useState('')
   const [tab, setTab] = useState('backgrounds') // 'backgrounds' | 'menu'
 
@@ -209,9 +213,11 @@ export default function Customize() {
   const groupNameByPath = {}
   menuGroups.forEach(g => (g.items || []).forEach(p => { groupNameByPath[p] = g.name }))
 
+  // User-uploaded photo backgrounds (resolved like presets).
+  const customBgs = readCustomBackgrounds(map)
   // When the menu bar is Clear, previews show the user's current page
   // background so they see how Clear actually looks.
-  const previewBg = BACKGROUNDS.find(b => b.id === (currentBg || 'none')) || BACKGROUNDS[0]
+  const previewBg = resolveBackground(currentBg || 'none', map) || BACKGROUNDS[0]
   // Shared props so every preview is identical and reflects every change.
   const previewProps = {
     font,
@@ -233,6 +239,51 @@ export default function Customize() {
         return next
       }
       return { ...m, [selected]: bgId }
+    })
+    setSavedMsg('')
+  }
+
+  // Upload a photo to the public bucket, register it as a custom background,
+  // and select it for the current target. Persisted when the user clicks Save.
+  async function addCustomBackground(file) {
+    if (!file || !user?.id) return
+    setUploadingBg(true)
+    try {
+      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const path = `backgrounds/${user.id}/${Date.now()}-${safe}`
+      const { error } = await supabase.storage
+        .from('company-assets')
+        .upload(path, file, { upsert: true, contentType: file.type })
+      if (error) throw error
+      const { data } = supabase.storage.from('company-assets').getPublicUrl(path)
+      const url = data?.publicUrl
+      const id = 'custom-' + Date.now()
+      const label = (file.name.replace(/\.[^.]+$/, '') || 'Photo').slice(0, 40)
+      setMap(m => {
+        const list = Array.isArray(m[CUSTOM_BG_KEY]) ? m[CUSTOM_BG_KEY] : []
+        const next = { ...m, [CUSTOM_BG_KEY]: [...list, { id, label, url, storage_path: path }] }
+        if (selected === 'all') CUSTOMIZE_MODULES.forEach(mod => { next[mod.key] = id })
+        else next[selected] = id
+        return next
+      })
+      setSavedMsg('')
+    } catch (e) {
+      setSavedMsg('Upload failed: ' + (e?.message || 'unknown error'))
+    } finally {
+      setUploadingBg(false)
+    }
+  }
+
+  function removeCustomBackground(id) {
+    const item = customBgs.find(b => b.id === id)
+    if (item?.storage_path) {
+      supabase.storage.from('company-assets').remove([item.storage_path]).then(() => {}, () => {})
+    }
+    setMap(m => {
+      const list = (Array.isArray(m[CUSTOM_BG_KEY]) ? m[CUSTOM_BG_KEY] : []).filter(b => b.id !== id)
+      const next = { ...m, [CUSTOM_BG_KEY]: list }
+      CUSTOMIZE_MODULES.forEach(mod => { if (next[mod.key] === id) next[mod.key] = 'none' })
+      return next
     })
     setSavedMsg('')
   }
@@ -431,6 +482,60 @@ export default function Customize() {
               )
             })}
           </div>
+        </div>
+
+        {/* ── My Photos (uploaded backgrounds) ── */}
+        <h2 className="text-lg font-bold text-gray-900 mt-6 mb-1">My Photos</h2>
+        <p className="text-sm text-gray-500 mb-3">
+          Upload your own photo (forest, beach, city, space — anything) to use as a background for the
+          selected module. Landscape images around 1600×1000 or larger look best.
+        </p>
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <label className={`inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg border cursor-pointer transition-colors ${
+            uploadingBg ? 'opacity-60 pointer-events-none border-gray-300' : 'border-green-300 text-green-700 hover:bg-green-50'
+          }`}>
+            {uploadingBg ? 'Uploading…' : '⬆️ Upload a photo'}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) addCustomBackground(f) }}
+            />
+          </label>
+
+          {customBgs.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-4">
+              {customBgs.map(bg => {
+                const isSel = currentBg === bg.id
+                return (
+                  <div
+                    key={bg.id}
+                    className={`relative rounded-lg overflow-hidden border-2 transition-all ${
+                      isSel ? 'border-black ring-2 ring-black/20' : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <button onClick={() => pickBackground(bg.id)} className="block w-full text-left">
+                      <div
+                        className="h-14 w-full"
+                        style={{ backgroundImage: `url('${bg.url}')`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+                      />
+                      <div className="flex items-center justify-between px-2 py-1 bg-white">
+                        <span className="text-[11px] font-medium text-gray-600 truncate">{bg.label}</span>
+                        {isSel && <span className="text-black text-xs">✓</span>}
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => removeCustomBackground(bg.id)}
+                      title="Delete photo"
+                      className="absolute top-1 right-1 w-6 h-6 flex items-center justify-center rounded-full bg-white/90 text-gray-500 hover:text-red-600 shadow text-sm"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
         </>
         )}

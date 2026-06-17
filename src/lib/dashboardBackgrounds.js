@@ -410,6 +410,7 @@ export const DEFAULT_PREFS = (() => {
   m[MENU_POS_KEY] = 'left' // Classic left sidebar
   m[MENU_GROUPS_KEY] = [] // No custom menu groups by default
   m[HEADER_ITEMS_KEY] = { ...HEADER_ITEMS_DEFAULT } // All header items shown
+  m[CUSTOM_BG_KEY] = [] // No uploaded photo backgrounds by default
   return m
 })()
 
@@ -447,9 +448,25 @@ export function matchModuleKey(pathname) {
   return best
 }
 
+// Reserved key: user-uploaded photo backgrounds. Array of { id, label, url }.
+// These behave like presets but live in the user's saved preferences.
+export const CUSTOM_BG_KEY = '__customBackgrounds'
+export function readCustomBackgrounds(map) {
+  const v = map?.[CUSTOM_BG_KEY]
+  return Array.isArray(v) ? v : []
+}
+// Resolve a background id to its option — from presets or the user's uploads.
+export function resolveBackground(id, map) {
+  return (
+    BACKGROUNDS.find(b => b.id === id) ||
+    readCustomBackgrounds(map).find(b => b.id === id) ||
+    null
+  )
+}
+
 // Paint (or clear) the app-shell background for a given background id.
-export function applyAppBackground(id) {
-  const opt = BACKGROUNDS.find(b => b.id === id)
+export function applyAppBackground(id, map) {
+  const opt = resolveBackground(id, map)
   const el = document.getElementById('app-shell') || document.body
   if (!el) return
   const s = el.style
@@ -469,5 +486,5 @@ export function applyAppBackground(id) {
 // Convenience: apply whatever background the current route's module maps to.
 export function applyBackgroundForPath(pathname, map) {
   const key = matchModuleKey(pathname)
-  applyAppBackground((key && map?.[key]) || 'none')
+  applyAppBackground((key && map?.[key]) || 'none', map)
 }
