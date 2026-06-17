@@ -12,7 +12,8 @@
 // THIS PHASE = foundation/scaffold. The PDF field-placement builder and the
 // tokenized public signer page are the next phases; their entry points here
 // (Edit template, open document, send) are wired as clearly-labelled stubs.
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { Document, Page, pdfjs } from 'react-pdf'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import EDocFieldEditor from '../components/edoc/EDocFieldEditor'
@@ -22,6 +23,30 @@ import GoogleDriveBrowser from '../components/files/GoogleDriveBrowser'
 import PbsDrive from '../components/files/PbsDrive'
 
 const STORAGE_BUCKET = 'edocuments'
+
+// Match the field editor's worker so PDF thumbnails render here too.
+pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`
+
+// First-page thumbnail of a template/document PDF.
+function PdfThumb({ pdfPath, height = 160 }) {
+  const url = useMemo(
+    () => (pdfPath ? supabase.storage.from(STORAGE_BUCKET).getPublicUrl(pdfPath).data.publicUrl : null),
+    [pdfPath]
+  )
+  const placeholder = (
+    <div className="w-full flex items-center justify-center text-4xl text-gray-300" style={{ height }}>
+      📄
+    </div>
+  )
+  if (!url) return placeholder
+  return (
+    <div className="w-full overflow-hidden bg-gray-100 flex items-start justify-center" style={{ height }}>
+      <Document file={url} loading={placeholder} error={placeholder}>
+        <Page pageNumber={1} height={height} renderTextLayer={false} renderAnnotationLayer={false} />
+      </Document>
+    </div>
+  )
+}
 
 const STATUS_STYLES = {
   draft: { label: 'Draft', cls: 'bg-gray-100 text-gray-600 border-gray-200' },
@@ -435,6 +460,14 @@ function TemplatesTab({ userId }) {
     }
   }
 
+  // Inline rename (used in Pending Templates).
+  function renameLocal(id, name) {
+    setTemplates(prev => prev.map(t => (t.id === id ? { ...t, name } : t)))
+  }
+  async function saveName(t) {
+    await supabase.from('edoc_templates').update({ name: t.name }).eq('id', t.id)
+  }
+
   async function handleDelete(t) {
     if (!window.confirm(`Delete template "${t.name}"? This cannot be undone.`)) return
     if (t.pdf_path) {
@@ -514,8 +547,18 @@ function TemplatesTab({ userId }) {
           {list.map(t => (
             <div key={t.id} className="border border-gray-200 rounded-xl p-4 bg-white">
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="font-semibold text-gray-800 truncate">📄 {t.name}</p>
+                <div className="min-w-0 flex-1">
+                  {tplTab === 'pending' ? (
+                    <input
+                      value={t.name}
+                      onChange={e => renameLocal(t.id, e.target.value)}
+                      onBlur={() => saveName(t)}
+                      placeholder="Template name"
+                      className="input text-sm py-1 w-full font-semibold"
+                    />
+                  ) : (
+                    <p className="font-semibold text-gray-800 truncate">📄 {t.name}</p>
+                  )}
                   <p className="text-xs text-gray-400 mt-0.5">
                     {(t.fields?.length || 0)} field{(t.fields?.length || 0) !== 1 ? 's' : ''} ·{' '}
                     {fmtDate(t.created_at)}
@@ -660,11 +703,15 @@ function NewDocumentTab({ clientId, userId, userName, onCreated }) {
               key={t.id}
               disabled={creating}
               onClick={() => createDoc({ template: t })}
-              className="border border-gray-200 rounded-xl p-6 text-left hover:border-green-400 hover:bg-green-50 transition-colors disabled:opacity-50"
+              className="border border-gray-200 rounded-xl overflow-hidden text-left hover:border-green-400 transition-colors disabled:opacity-50 flex flex-col bg-white"
             >
-              <div className="text-2xl mb-1">📄</div>
-              <p className="font-semibold text-gray-700 truncate">{t.name}</p>
-              <p className="text-xs text-gray-400 mt-0.5">From template</p>
+              <div className="px-3 py-2 border-b border-gray-100">
+                <p className="font-semibold text-gray-800 truncate text-sm">{t.name}</p>
+              </div>
+              <PdfThumb pdfPath={t.pdf_path} height={180} />
+              <div className="px-3 py-2 border-t border-gray-100">
+                <p className="text-xs text-gray-400">From template</p>
+              </div>
             </button>
           ))}
         </div>
