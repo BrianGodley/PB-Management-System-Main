@@ -151,6 +151,60 @@ function PbsDriveSettings({ drives, onChange }) {
   const [creating, setCreating] = useState('')
   const [busy, setBusy] = useState(false)
   const [managing, setManaging] = useState(null) // drive being member-managed
+  // "Add a member to all drives" picker
+  const [allUsers, setAllUsers] = useState([])
+  const [bq, setBq] = useState('')
+  const [bopen, setBopen] = useState(false)
+  const [bsel, setBsel] = useState(null)
+  const [bperm, setBperm] = useState('editor')
+
+  useEffect(() => {
+    supabase
+      .from('profiles')
+      .select('id, full_name, email')
+      .order('full_name')
+      .then(({ data }) => setAllUsers(data || []))
+  }, [])
+
+  const bName = u => u.full_name || u.email || u.id
+  const bMatches = allUsers
+    .filter(u => {
+      const q = bq.trim().toLowerCase()
+      return !q || bName(u).toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q)
+    })
+    .slice(0, 50)
+
+  async function addToAllDrives() {
+    if (!bsel || drives.length === 0) return
+    setBusy(true)
+    try {
+      const rows = drives.map(d => ({ drive_id: d.id, user_id: bsel.id, permission: bperm }))
+      const { error } = await supabase
+        .from('pbs_drive_members')
+        .upsert(rows, { onConflict: 'drive_id,user_id' })
+      if (error) throw error
+      if (bsel.email) {
+        sendEmail({
+          to: bsel.email,
+          subject: `You've been given ${bperm} access to all PBS Drives`,
+          html: `<div style="font-family:sans-serif;font-size:15px;color:#374151;">
+            <p>Hi ${bsel.full_name || 'there'},</p>
+            <p>You now have <strong>${bperm}</strong> access to <strong>all ${drives.length} PBS Drives</strong> in Picture Build System.</p>
+            <p>Open <strong>Documents → PBS Drive</strong> to see them.</p>
+            <p style="margin-top:16px;"><a href="${window.location.origin}/edocuments" style="background:#3A5038;color:#fff;text-decoration:none;padding:10px 22px;border-radius:8px;font-weight:700;">Open PBS Drive</a></p>
+          </div>`,
+        })
+      }
+      alert(`Added ${bName(bsel)} to all ${drives.length} drives as ${bperm}.`)
+      setBsel(null)
+      setBq('')
+      onChange()
+    } catch (e) {
+      alert('Could not add to all drives: ' + e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   async function createDrive() {
     const name = creating.trim()
@@ -250,6 +304,66 @@ function PbsDriveSettings({ drives, onChange }) {
             Creates a matching PBS drive for each of your Google Shared Drives.
           </span>
         </div>
+      </div>
+
+      {/* Add a member to ALL drives at once */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <h3 className="text-sm font-bold text-gray-800 mb-2">Add a member to every drive</h3>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <input
+              value={bsel ? bName(bsel) : bq}
+              onChange={e => {
+                setBsel(null)
+                setBq(e.target.value)
+                setBopen(true)
+              }}
+              onFocus={() => setBopen(true)}
+              onBlur={() => setTimeout(() => setBopen(false), 150)}
+              placeholder="Search employees…"
+              className="input text-sm w-full"
+            />
+            {bopen && !bsel && (
+              <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                {bMatches.length === 0 ? (
+                  <p className="px-3 py-2 text-xs text-gray-400">No employees match.</p>
+                ) : (
+                  bMatches.map(u => (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onMouseDown={() => {
+                        setBsel(u)
+                        setBopen(false)
+                      }}
+                      className="block w-full text-left px-3 py-1.5 text-sm hover:bg-green-50"
+                    >
+                      {bName(u)}
+                      {u.email && <span className="text-gray-400"> · {u.email}</span>}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+          <select value={bperm} onChange={e => setBperm(e.target.value)} className="input text-sm w-40">
+            {PERMISSIONS.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.id[0].toUpperCase() + p.id.slice(1)}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={addToAllDrives}
+            disabled={busy || !bsel}
+            className="btn-primary text-sm px-4 py-2 rounded-lg disabled:opacity-50"
+          >
+            Add to all
+          </button>
+        </div>
+        <p className="text-xs text-gray-400 mt-2">
+          Grants the chosen access on all {drives.length} drives and emails the user.
+        </p>
       </div>
 
       {/* Drives list */}
@@ -380,7 +494,7 @@ function MembersModal({ drive, onClose }) {
       className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center p-4"
       onMouseDown={e => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[88vh] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
           <h2 className="text-base font-bold text-gray-900 truncate">Members · {drive.name}</h2>
           <button onClick={onClose} className="text-gray-300 hover:text-gray-500 text-xl leading-none">✕</button>
