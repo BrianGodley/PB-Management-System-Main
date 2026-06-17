@@ -291,6 +291,40 @@ export default function Customize() {
     return await new Promise(res => canvas.toBlob(b => res(b), 'image/jpeg', quality))
   }
 
+  // Estimate whether an image is "dark" so the menu/header can flip to light
+  // text for contrast. Samples a tiny 24px render and averages luminance.
+  async function imageIsDark(file) {
+    try {
+      const dataUrl = await new Promise((res, rej) => {
+        const fr = new FileReader()
+        fr.onload = () => res(fr.result)
+        fr.onerror = rej
+        fr.readAsDataURL(file)
+      })
+      const img = await new Promise((res, rej) => {
+        const i = new Image()
+        i.onload = () => res(i)
+        i.onerror = rej
+        i.src = dataUrl
+      })
+      const s = 24
+      const c = document.createElement('canvas')
+      c.width = s
+      c.height = s
+      const ctx = c.getContext('2d')
+      ctx.drawImage(img, 0, 0, s, s)
+      const d = ctx.getImageData(0, 0, s, s).data
+      let sum = 0
+      for (let i = 0; i < d.length; i += 4) {
+        sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]
+      }
+      const avg = sum / (d.length / 4) / 255
+      return avg < 0.55
+    } catch {
+      return false
+    }
+  }
+
   // Upload a photo (compressed) + a small thumbnail, register as a custom
   // background. Persisted when the user clicks Save.
   async function addCustomBackground(file) {
@@ -326,9 +360,10 @@ export default function Customize() {
 
       const id = 'custom-' + Date.now()
       const label = (file.name.replace(/\.[^.]+$/, '') || 'Photo').slice(0, 40)
+      const dark = await imageIsDark(file)
       setMap(m => {
         const list = Array.isArray(m[CUSTOM_BG_KEY]) ? m[CUSTOM_BG_KEY] : []
-        return { ...m, [CUSTOM_BG_KEY]: [...list, { id, label, url, thumbUrl, storage_path: mainPath, thumb_path: thumbPath }] }
+        return { ...m, [CUSTOM_BG_KEY]: [...list, { id, label, url, thumbUrl, dark, storage_path: mainPath, thumb_path: thumbPath }] }
       })
       setSavedMsg('')
       // Show the big preview so the user can Apply (or just close).

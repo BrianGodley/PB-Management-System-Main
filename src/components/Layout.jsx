@@ -16,13 +16,13 @@ import {
   buildMenuStructure,
   sidebarFontStyle,
   sidebarNavColor,
+  resolveBackground,
   HEADER_KEY,
   HEADER_DEFAULT,
   HEADER_ITEMS_KEY,
   readHeaderItems,
   headerNavColor,
   bgIdForPath,
-  BACKGROUNDS,
   withDefaults,
 } from '../lib/dashboardBackgrounds'
 import SamChat from './SamChat'
@@ -236,6 +236,9 @@ export default function Layout() {
   // Background id of the current route's module (for nav contrast when the
   // sidebar is Clear and showing the page background).
   const [currentBgId, setCurrentBgId] = useState('none')
+  // Whether the current route's background is dark (for nav/header contrast).
+  // Resolves presets AND uploaded photos (which carry a computed `dark` flag).
+  const [currentBgDark, setCurrentBgDark] = useState(false)
   const [companyLogoUrl, setCompanyLogoUrl] = useState(null)
   const userMenuRef = useRef(null)
   const helpMenuRef = useRef(null)
@@ -300,7 +303,9 @@ export default function Layout() {
         setMenuPos(map[MENU_POS_KEY] || 'left')
         setMenuGroups(map[MENU_GROUPS_KEY] || [])
         setHeaderItems(readHeaderItems(map))
-        setCurrentBgId(bgIdForPath(window.location.pathname, map))
+        const _id1 = bgIdForPath(window.location.pathname, map)
+        setCurrentBgId(_id1)
+        setCurrentBgDark(!!resolveBackground(_id1, map)?.dark)
       })
   }, [user?.id])
 
@@ -315,7 +320,9 @@ export default function Layout() {
     setMenuPos(map[MENU_POS_KEY] || 'left')
     setMenuGroups(map[MENU_GROUPS_KEY] || [])
     setHeaderItems(readHeaderItems(map))
-    setCurrentBgId(bgIdForPath(location.pathname, map))
+    const _id2 = bgIdForPath(location.pathname, map)
+    setCurrentBgId(_id2)
+    setCurrentBgDark(!!resolveBackground(_id2, map)?.dark)
   }, [location.pathname])
   useEffect(() => {
     const handler = () => {
@@ -327,7 +334,9 @@ export default function Layout() {
       setMenuPos(map[MENU_POS_KEY] || 'left')
       setMenuGroups(map[MENU_GROUPS_KEY] || [])
       setHeaderItems(readHeaderItems(map))
-      setCurrentBgId(bgIdForPath(window.location.pathname, map))
+      const _id3 = bgIdForPath(window.location.pathname, map)
+      setCurrentBgId(_id3)
+      setCurrentBgDark(!!resolveBackground(_id3, map)?.dark)
     }
     window.addEventListener('module-backgrounds-updated', handler)
     return () => window.removeEventListener('module-backgrounds-updated', handler)
@@ -337,7 +346,7 @@ export default function Layout() {
   // background's darkness when the sidebar is Clear.
   const navTheme = sidebarBg
     ? sidebarNavColor(sidebarBg)
-    : BACKGROUNDS.find(b => b.id === currentBgId)?.dark
+    : currentBgDark
       ? { text: '#f9fafb', dark: true }
       : { text: undefined, dark: false }
   const navActivePill = navTheme.dark ? 'bg-white/20' : 'bg-black/10'
@@ -371,7 +380,7 @@ export default function Layout() {
   // page background's darkness. Mirrors the sidebar's auto-contrast.
   const headerTheme = headerColor
     ? headerNavColor(headerColor)
-    : BACKGROUNDS.find(b => b.id === currentBgId)?.dark
+    : currentBgDark
       ? { text: '#f9fafb', dark: true }
       : { text: '#1f2937', dark: false }
   const headerText = headerTheme.text || '#ffffff'
