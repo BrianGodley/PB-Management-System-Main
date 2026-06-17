@@ -287,6 +287,22 @@ export function sidebarFontStyle(font) {
 export const HEADER_KEY = '__header'
 export const HEADER_DEFAULT = '#4E7B4C'
 
+// Reserved key: which header-bar items show, and which render icon-only.
+//   logo / brand / help  → show or hide
+//   adminIconOnly / profileIconOnly → drop the text label, keep the icon
+export const HEADER_ITEMS_KEY = '__headerItems'
+export const HEADER_ITEMS_DEFAULT = {
+  logo: true,
+  brand: true,
+  help: true,
+  adminIconOnly: false,
+  profileIconOnly: false,
+}
+// Merge a stored value over the defaults so missing sub-keys stay sensible.
+export function readHeaderItems(map) {
+  return { ...HEADER_ITEMS_DEFAULT, ...(map?.[HEADER_ITEMS_KEY] || {}) }
+}
+
 // Top header bar color options. The current default green is first; 'Clear'
 // makes the bar transparent (page background shows through). Header text
 // auto-contrasts to the chosen color (see headerNavColor).
@@ -371,6 +387,7 @@ export const DEFAULT_PREFS = (() => {
   m[SIDEBAR_FONT_KEY] = { family: 'Arial, Helvetica, sans-serif', size: '16px', bold: false, italic: false }
   m[MENU_POS_KEY] = 'left' // Classic left sidebar
   m[MENU_GROUPS_KEY] = [] // No custom menu groups by default
+  m[HEADER_ITEMS_KEY] = { ...HEADER_ITEMS_DEFAULT } // All header items shown
   return m
 })()
 

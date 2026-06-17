@@ -21,6 +21,8 @@ import {
   sidebarFontStyle,
   HEADER_KEY,
   HEADER_DEFAULT,
+  HEADER_ITEMS_KEY,
+  readHeaderItems,
   MENU_POS_KEY,
   MENU_POSITIONS,
   MENU_GROUPS_KEY,
@@ -198,6 +200,7 @@ export default function Customize() {
   const currentSidebar = map[SIDEBAR_KEY] ?? null
   // Undefined (never set) → default green; explicit null → Clear.
   const currentHeader = map[HEADER_KEY] !== undefined ? map[HEADER_KEY] : HEADER_DEFAULT
+  const headerItems = readHeaderItems(map)
   const showIcons = map[SIDEBAR_ICONS_KEY] !== false
   const font = map[SIDEBAR_FONT_KEY] || {}
   const menuPos = map[MENU_POS_KEY] || 'left'
@@ -241,6 +244,11 @@ export default function Customize() {
 
   function pickHeader(value) {
     setMap(m => ({ ...m, [HEADER_KEY]: value }))
+    setSavedMsg('')
+  }
+
+  function setHeaderItem(patch) {
+    setMap(m => ({ ...m, [HEADER_ITEMS_KEY]: { ...readHeaderItems(m), ...patch } }))
     setSavedMsg('')
   }
 
@@ -693,6 +701,67 @@ export default function Customize() {
         </p>
         <div className="bg-white border border-gray-200 rounded-xl p-4">
           <BarPalette value={currentHeader} onChange={pickHeader} includeDefault />
+        </div>
+
+        {/* ── Header Bar Items ── */}
+        <h2 className="text-lg font-bold text-gray-900 mt-6 mb-1">Header Bar Items</h2>
+        <p className="text-sm text-gray-500 mb-3">
+          Choose which items appear in the top bar, and which show as icon only.
+        </p>
+        <div className="bg-white border border-gray-200 rounded-xl p-4 divide-y divide-gray-100">
+          {[
+            { key: 'logo', label: 'Logo icon', desc: 'The company logo at the far left.' },
+            { key: 'brand', label: 'System name', desc: 'The "Picture Build System" text.' },
+            { key: 'help', label: 'Help menu', desc: 'The 🛟 Help dropdown.' },
+          ].map(row => (
+            <div key={row.key} className="flex items-center justify-between gap-4 py-2.5 first:pt-0">
+              <div>
+                <p className="text-sm font-semibold text-gray-800">{row.label}</p>
+                <p className="text-xs text-gray-500">{row.desc}</p>
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                {[{ v: true, t: 'Shown' }, { v: false, t: 'Hidden' }].map(opt => (
+                  <button
+                    key={String(opt.v)}
+                    onClick={() => setHeaderItem({ [row.key]: opt.v })}
+                    className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+                      headerItems[row.key] === opt.v
+                        ? 'bg-green-700 text-white border-2 border-black'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:border-green-400'
+                    }`}
+                  >
+                    {opt.t}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+          {[
+            { key: 'adminIconOnly', label: 'Admin button', desc: 'Show the 🛡️ Admin button with or without its label.' },
+            { key: 'profileIconOnly', label: 'Profile', desc: 'Show your avatar with or without your email.' },
+          ].map(row => (
+            <div key={row.key} className="flex items-center justify-between gap-4 py-2.5">
+              <div>
+                <p className="text-sm font-semibold text-gray-800">{row.label}</p>
+                <p className="text-xs text-gray-500">{row.desc}</p>
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                {[{ v: false, t: 'Icon + label' }, { v: true, t: 'Icon only' }].map(opt => (
+                  <button
+                    key={String(opt.v)}
+                    onClick={() => setHeaderItem({ [row.key]: opt.v })}
+                    className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+                      headerItems[row.key] === opt.v
+                        ? 'bg-green-700 text-white border-2 border-black'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:border-green-400'
+                    }`}
+                  >
+                    {opt.t}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
         </>
         )}

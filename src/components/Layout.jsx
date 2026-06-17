@@ -18,6 +18,8 @@ import {
   sidebarNavColor,
   HEADER_KEY,
   HEADER_DEFAULT,
+  HEADER_ITEMS_KEY,
+  readHeaderItems,
   headerNavColor,
   bgIdForPath,
   BACKGROUNDS,
@@ -200,6 +202,14 @@ export default function Layout() {
       return HEADER_DEFAULT
     }
   })
+  // Which header-bar items show / render icon-only.
+  const [headerItems, setHeaderItems] = useState(() => {
+    try {
+      return readHeaderItems(readModuleBackgrounds())
+    } catch {
+      return readHeaderItems(null)
+    }
+  })
   // Desktop menu position: 'left' | 'top' | 'right' | 'bottom'.
   const [menuPos, setMenuPos] = useState(() => {
     try {
@@ -289,6 +299,7 @@ export default function Layout() {
         setSidebarIcons(map[SIDEBAR_ICONS_KEY] !== false); setSidebarFont(map[SIDEBAR_FONT_KEY] || null)
         setMenuPos(map[MENU_POS_KEY] || 'left')
         setMenuGroups(map[MENU_GROUPS_KEY] || [])
+        setHeaderItems(readHeaderItems(map))
         setCurrentBgId(bgIdForPath(window.location.pathname, map))
       })
   }, [user?.id])
@@ -303,6 +314,7 @@ export default function Layout() {
     setSidebarIcons(map[SIDEBAR_ICONS_KEY] !== false); setSidebarFont(map[SIDEBAR_FONT_KEY] || null)
     setMenuPos(map[MENU_POS_KEY] || 'left')
     setMenuGroups(map[MENU_GROUPS_KEY] || [])
+    setHeaderItems(readHeaderItems(map))
     setCurrentBgId(bgIdForPath(location.pathname, map))
   }, [location.pathname])
   useEffect(() => {
@@ -314,6 +326,7 @@ export default function Layout() {
       setSidebarIcons(map[SIDEBAR_ICONS_KEY] !== false); setSidebarFont(map[SIDEBAR_FONT_KEY] || null)
       setMenuPos(map[MENU_POS_KEY] || 'left')
       setMenuGroups(map[MENU_GROUPS_KEY] || [])
+      setHeaderItems(readHeaderItems(map))
       setCurrentBgId(bgIdForPath(window.location.pathname, map))
     }
     window.addEventListener('module-backgrounds-updated', handler)
@@ -602,23 +615,30 @@ export default function Layout() {
         className={`w-full flex-shrink-0 sticky top-0 z-50 ${headerColor ? 'shadow-md' : ''}`}
       >
         <div className="relative flex items-center h-11 px-4 gap-4">
-          {/* Logo + system name — desktop only (mobile shows Sam in this spot). */}
-          <Link to="/" className="hidden lg:flex items-center gap-2.5 flex-shrink-0">
-            <img
-              src={companyLogoUrl || '/logo.png'}
-              alt="Logo"
-              className="h-6 w-6 object-contain rounded"
-              onError={e => {
-                e.target.style.display = 'none'
-              }}
-            />
-            <span
-              style={headerTextStyle}
-              className="font-semibold text-sm tracking-wide hidden sm:inline"
-            >
-              Picture Build System
-            </span>
-          </Link>
+          {/* Logo + system name — desktop only (mobile shows Sam in this spot).
+              Each item is individually toggleable via Customize → Header Bar Items. */}
+          {(headerItems.logo || headerItems.brand) && (
+            <Link to="/" className="hidden lg:flex items-center gap-2.5 flex-shrink-0">
+              {headerItems.logo && (
+                <img
+                  src={companyLogoUrl || '/logo.png'}
+                  alt="Logo"
+                  className="h-6 w-6 object-contain rounded"
+                  onError={e => {
+                    e.target.style.display = 'none'
+                  }}
+                />
+              )}
+              {headerItems.brand && (
+                <span
+                  style={headerTextStyle}
+                  className="font-semibold text-sm tracking-wide hidden sm:inline"
+                >
+                  Picture Build System
+                </span>
+              )}
+            </Link>
+          )}
 
           {/* Sam — AI assistant trigger (shown on all sizes; on mobile it sits
               top-left in place of the logo/Dashboard link). */}
@@ -734,11 +754,12 @@ export default function Layout() {
               style={{ color: headerText, ...(isActive('/admin') ? { backgroundColor: headerActiveBg } : {}) }}
               className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${headerHoverPill}`}
             >
-              🛡️ <span className="hidden sm:inline">Admin</span>
+              🛡️ {!headerItems.adminIconOnly && <span className="hidden sm:inline">Admin</span>}
             </Link>
 
             {/* Help dropdown — Documentation, Video Guides, Report Issue,
                 and (admins only) Help Desk for ticket administration. */}
+            {headerItems.help && (
             <div ref={helpMenuRef} className="relative hidden sm:block">
               <button
                 onClick={() => setShowHelpMenu(v => !v)}
@@ -788,6 +809,7 @@ export default function Layout() {
                 </div>
               )}
             </div>
+            )}
 
             {/* User avatar dropdown — desktop only */}
             <div
@@ -808,7 +830,9 @@ export default function Layout() {
                     user?.email?.[0]?.toUpperCase() || 'U'
                   )}
                 </div>
-                <span style={headerTextStyle} className="text-xs truncate max-w-[140px] opacity-80">{user?.email}</span>
+                {!headerItems.profileIconOnly && (
+                  <span style={headerTextStyle} className="text-xs truncate max-w-[140px] opacity-80">{user?.email}</span>
+                )}
                 <span style={headerTextStyle} className="text-xs opacity-50">▾</span>
               </button>
 
