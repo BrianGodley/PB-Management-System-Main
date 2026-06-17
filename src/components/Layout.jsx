@@ -99,6 +99,41 @@ function screenTitle(path) {
   return best
 }
 
+// Sample an image's average brightness and decide if it's "dark" (so nav/header
+// text should flip to white). Works for any photo URL at runtime — no stored
+// flag needed. Resolves false if the image can't be read (e.g. CORS).
+const _bgDarkCache = {}
+function detectImageDark(url) {
+  if (!url) return Promise.resolve(false)
+  if (url in _bgDarkCache) return Promise.resolve(_bgDarkCache[url])
+  return new Promise(resolve => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      try {
+        const s = 24
+        const c = document.createElement('canvas')
+        c.width = s
+        c.height = s
+        const ctx = c.getContext('2d')
+        ctx.drawImage(img, 0, 0, s, s)
+        const d = ctx.getImageData(0, 0, s, s).data
+        let sum = 0
+        for (let i = 0; i < d.length; i += 4) {
+          sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]
+        }
+        const dark = sum / (d.length / 4) / 255 < 0.55
+        _bgDarkCache[url] = dark
+        resolve(dark)
+      } catch {
+        resolve(false)
+      }
+    }
+    img.onerror = () => resolve(false)
+    img.src = url
+  })
+}
+
 function setFavicon(url) {
   let link = document.querySelector("link[rel~='icon']")
   if (!link) {
@@ -237,8 +272,18 @@ export default function Layout() {
   // sidebar is Clear and showing the page background).
   const [currentBgId, setCurrentBgId] = useState('none')
   // Whether the current route's background is dark (for nav/header contrast).
-  // Resolves presets AND uploaded photos (which carry a computed `dark` flag).
   const [currentBgDark, setCurrentBgDark] = useState(false)
+  // Decide contrast for a background id. Presets use their curated dark flag;
+  // uploaded photos use a stored flag if present, else are sampled at runtime
+  // (so even photos uploaded before this feature get correct contrast).
+  const updateBgContrast = (id, map) => {
+    const opt = resolveBackground(id, map)
+    const isCustom = String(id).startsWith('custom-')
+    if (!isCustom) { setCurrentBgDark(!!opt?.dark); return }
+    if (typeof opt?.dark === 'boolean') { setCurrentBgDark(opt.dark); return }
+    if (opt?.url) detectImageDark(opt.url).then(setCurrentBgDark)
+    else setCurrentBgDark(false)
+  }
   const [companyLogoUrl, setCompanyLogoUrl] = useState(null)
   const userMenuRef = useRef(null)
   const helpMenuRef = useRef(null)
@@ -305,7 +350,7 @@ export default function Layout() {
         setHeaderItems(readHeaderItems(map))
         const _id1 = bgIdForPath(window.location.pathname, map)
         setCurrentBgId(_id1)
-        setCurrentBgDark(!!resolveBackground(_id1, map)?.dark)
+        updateBgContrast(_id1, map)
       })
   }, [user?.id])
 
@@ -322,7 +367,7 @@ export default function Layout() {
     setHeaderItems(readHeaderItems(map))
     const _id2 = bgIdForPath(location.pathname, map)
     setCurrentBgId(_id2)
-    setCurrentBgDark(!!resolveBackground(_id2, map)?.dark)
+    updateBgContrast(_id2, map)
   }, [location.pathname])
   useEffect(() => {
     const handler = () => {
@@ -336,7 +381,7 @@ export default function Layout() {
       setHeaderItems(readHeaderItems(map))
       const _id3 = bgIdForPath(window.location.pathname, map)
       setCurrentBgId(_id3)
-      setCurrentBgDark(!!resolveBackground(_id3, map)?.dark)
+      updateBgContrast(_id3, map)
     }
     window.addEventListener('module-backgrounds-updated', handler)
     return () => window.removeEventListener('module-backgrounds-updated', handler)

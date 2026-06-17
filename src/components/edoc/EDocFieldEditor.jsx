@@ -212,6 +212,32 @@ export default function EDocFieldEditor({ template, onClose, onSaved }) {
                   className="input text-sm py-1 w-full"
                 />
               </label>
+
+              {/* Precise size + position (percent of page) so boxes fit exactly. */}
+              <div>
+                <span className="text-[11px] text-gray-500">Size &amp; position (% of page)</span>
+                <div className="grid grid-cols-2 gap-1.5 mt-1">
+                  {[
+                    ['wPct', 'Width', 3, 100 - selected.xPct],
+                    ['hPct', 'Height', 2, 100 - selected.yPct],
+                    ['xPct', 'X', 0, 100 - selected.wPct],
+                    ['yPct', 'Y', 0, 100 - selected.hPct],
+                  ].map(([key, lbl, lo, hi]) => (
+                    <label key={key} className="flex items-center gap-1">
+                      <span className="text-[10px] text-gray-400 w-10">{lbl}</span>
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={Math.round((selected[key] || 0) * 10) / 10}
+                        onChange={e =>
+                          updateField(selected.id, { [key]: clamp(parseFloat(e.target.value) || 0, lo, hi) })
+                        }
+                        className="input text-xs py-1 w-full"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
               <div className="flex gap-1.5">
                 {Object.entries(ROLES).map(([k]) => (
                   <button
@@ -267,6 +293,21 @@ export default function EDocFieldEditor({ template, onClose, onSaved }) {
 
       {/* PDF canvas */}
       <div className="flex-1 h-full overflow-auto bg-gray-100 p-6">
+        <div className="flex items-center justify-end gap-2 mb-3">
+          <span className="text-[11px] text-gray-500">Zoom</span>
+          <button
+            onClick={() => setPageWidth(w => clamp(w - 80, 480, 1100))}
+            className="w-7 h-7 rounded-md bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-bold leading-none"
+          >
+            −
+          </button>
+          <button
+            onClick={() => setPageWidth(w => clamp(w + 80, 480, 1100))}
+            className="w-7 h-7 rounded-md bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-bold leading-none"
+          >
+            +
+          </button>
+        </div>
         {loadError ? (
           <div className="text-center text-sm text-red-600 bg-white rounded-lg p-6 max-w-md mx-auto">
             Couldn't load the PDF. {loadError}

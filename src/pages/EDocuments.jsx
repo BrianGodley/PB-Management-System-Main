@@ -388,6 +388,7 @@ function TemplatesTab({ userId }) {
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [editing, setEditing] = useState(null) // template being field-edited
+  const [tplTab, setTplTab] = useState('completed') // 'completed' | 'pending'
   const fileRef = useRef(null)
 
   const load = useCallback(async () => {
@@ -447,39 +448,70 @@ function TemplatesTab({ userId }) {
     load()
   }
 
+  // A template is "Pending" until fillable fields are placed on it, then it's
+  // "Completed" and ready to send. Upload happens in the Pending tab.
+  const completed = templates.filter(t => (t.fields?.length || 0) > 0)
+  const pending = templates.filter(t => !(t.fields?.length))
+  const list = tplTab === 'completed' ? completed : pending
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-sm text-gray-500">
-          Upload a PDF, then place fillable fields on it (field editor — next phase).
-        </p>
-        <div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="application/pdf"
-            onChange={handleUpload}
-            className="hidden"
-          />
+      {/* sub-tabs */}
+      <div className="flex items-center gap-2 mb-4">
+        {[
+          ['completed', 'Completed Templates', completed.length],
+          ['pending', 'Pending Templates', pending.length],
+        ].map(([id, label, n]) => (
           <button
-            onClick={() => fileRef.current?.click()}
-            disabled={uploading}
-            className="text-xs px-3 py-1.5 rounded-lg bg-green-700 text-white font-semibold hover:bg-green-800 disabled:opacity-50"
+            key={id}
+            onClick={() => setTplTab(id)}
+            className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${
+              tplTab === id
+                ? 'bg-green-700 text-white border-2 border-black'
+                : 'bg-white text-gray-700 border border-gray-300 hover:border-green-400'
+            }`}
           >
-            {uploading ? 'Uploading…' : '⬆ Upload PDF Template'}
+            {label} ({n})
           </button>
-        </div>
+        ))}
       </div>
+
+      {/* Upload lives in the Pending tab. */}
+      {tplTab === 'pending' && (
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm text-gray-500">
+            Upload a PDF, then place fillable fields on it. Once it has fields it moves to Completed Templates.
+          </p>
+          <div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/pdf"
+              onChange={handleUpload}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="text-xs px-3 py-1.5 rounded-lg bg-green-700 text-white font-semibold hover:bg-green-800 disabled:opacity-50"
+            >
+              {uploading ? 'Uploading…' : '⬆ Upload PDF Template'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <p className="text-center text-sm text-gray-400 py-8">Loading…</p>
-      ) : templates.length === 0 ? (
+      ) : list.length === 0 ? (
         <p className="text-center text-sm text-gray-400 py-8">
-          No templates yet. Upload your Home Improvement Contract to get started.
+          {tplTab === 'completed'
+            ? 'No completed templates yet. Add fields to a pending template to finish it.'
+            : 'No pending templates. Upload a PDF to get started.'}
         </p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {templates.map(t => (
+          {list.map(t => (
             <div key={t.id} className="border border-gray-200 rounded-xl p-4 bg-white">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
