@@ -21,6 +21,7 @@ import EDocDocumentModal from '../components/edoc/EDocDocumentModal'
 import FileManager from '../components/files/FileManager'
 import GoogleDriveBrowser from '../components/files/GoogleDriveBrowser'
 import PbsDrive from '../components/files/PbsDrive'
+import DocCreator from '../components/DocCreator'
 
 const STORAGE_BUCKET = 'edocuments'
 
@@ -141,6 +142,7 @@ export default function EDocuments({ clientId = null, embedded = false }) {
 
   // Top-level Documents page: white tab bar with the file managers + E-Documents.
   const MAIN_TABS = [
+    ['doccreator', '📝 Doc Creator'],
     ['edocuments', '✍️ E-Documents'],
     ['files', '🗂️ PBS Drive'],
     ['gdrive', '🔵 Google Drive'],
@@ -175,6 +177,7 @@ export default function EDocuments({ clientId = null, embedded = false }) {
         {mainTab === 'videos' && <FileManager root="videos" accept="video/*" />}
         {mainTab === 'gdrive' && <GoogleDriveBrowser />}
         {mainTab === 'settings' && <DocsSettings userId={user?.id} />}
+        {mainTab === 'doccreator' && <DocCreator />}
         {mainTab === 'edocuments' && eDocsContent}
       </div>
     </div>
