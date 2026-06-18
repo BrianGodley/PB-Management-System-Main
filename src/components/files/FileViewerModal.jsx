@@ -11,6 +11,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { RichTextCreator, SheetCreator } from '../DocCreator'
+import PdfFieldEditor from './PdfFieldEditor'
 
 // xlsx + mammoth are loaded on demand (keeps the main bundle small and isolates
 // any browser-resolution quirks to when a file is actually opened).
@@ -44,6 +45,7 @@ export default function FileViewerModal({ bucket, prefix, name, onClose, onSaved
 
   const [state, setState] = useState({ loading: true, error: '', html: '', grid: null })
   const [savedMsg, setSavedMsg] = useState('')
+  const [fieldMode, setFieldMode] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -126,6 +128,47 @@ export default function FileViewerModal({ bucket, prefix, name, onClose, onSaved
     flashSaved(savePath.split('/').pop())
   }
 
+  // Embed placed fields as real AcroForm form fields and overwrite the PDF.
+  async function saveFillablePdf(fields) {
+    const { PDFDocument, rgb } = await import('pdf-lib')
+    const { data, error: dErr } = await supabase.storage.from(bucket).download(path)
+    if (dErr) throw dErr
+    const pdfDoc = await PDFDocument.load(await data.arrayBuffer())
+    const form = pdfDoc.getForm()
+    const pages = pdfDoc.getPages()
+    const used = {}
+    fields.forEach((f, i) => {
+      const page = pages[f.page - 1]
+      if (!page) return
+      const { width: pw, height: ph } = page.getSize()
+      const x = (f.xPct / 100) * pw
+      const w = (f.wPct / 100) * pw
+      const h = (f.hPct / 100) * ph
+      const y = ph - (f.yPct / 100) * ph - h
+      // Unique, PDF-safe field name.
+      let nm = (f.label || `${f.type}_${i + 1}`).replace(/[^\w]+/g, '_').replace(/^_+|_+$/g, '') || `field_${i + 1}`
+      used[nm] = (used[nm] || 0) + 1
+      if (used[nm] > 1) nm = `${nm}_${used[nm]}`
+      const opts = { x, y, width: w, height: h, borderWidth: 1, borderColor: rgb(0.5, 0.5, 0.5) }
+      try {
+        if (f.type === 'checkbox') {
+          form.createCheckBox(nm).addToPage(page, opts)
+        } else {
+          const tf = form.createTextField(nm)
+          tf.setText('')
+          if (f.type === 'signature') tf.setFontSize(14)
+          tf.addToPage(page, opts)
+        }
+      } catch {
+        /* skip a problematic field rather than fail the whole save */
+      }
+    })
+    const out = await pdfDoc.save()
+    await upload(path, new Blob([out], { type: 'application/pdf' }), 'application/pdf')
+    flashSaved(name)
+    setFieldMode(false)
+  }
+
   function flashSaved(fname) {
     setSavedMsg(`Saved ${fname}`)
     onSaved?.()
@@ -151,6 +194,9 @@ export default function FileViewerModal({ bucket, prefix, name, onClose, onSaved
         <span className="text-sm font-semibold text-gray-800 truncate">{name}</span>
         {savedMsg && <span className="text-xs text-green-700 font-medium whitespace-nowrap">✓ {savedMsg}</span>}
         <div className="ml-auto flex items-center gap-2">
+          {kind === 'pdf' && !state.error && (
+            <button onClick={() => setFieldMode(true)} className="btn-secondary text-xs px-3 py-1.5">✎ Add Fillable Fields</button>
+          )}
           {(kind === 'pdf' || kind === 'image' || kind === 'video' || kind === 'other' || state.error) && (
             <button onClick={downloadOriginal} className="btn-secondary text-xs px-3 py-1.5">Download</button>
           )}
@@ -192,6 +238,15 @@ export default function FileViewerModal({ bucket, prefix, name, onClose, onSaved
           </div>
         )}
       </div>
+
+      {fieldMode && (
+        <PdfFieldEditor
+          url={publicUrl}
+          title={name}
+          onClose={() => setFieldMode(false)}
+          onSave={saveFillablePdf}
+        />
+      )}
     </div>
   )
 }
