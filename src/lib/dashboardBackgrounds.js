@@ -66,6 +66,7 @@ export const CUSTOMIZE_MODULES = [
   { key: '/contacts', label: 'Contacts' },
   { key: '/clients', label: 'Opportunities' },
   { key: '/edocuments', label: 'Documents' },
+  { key: '/workflows', label: 'Workflows' },
   { key: '/accounting', label: 'Accounting' },
   { key: '/collections', label: 'Weekly FP' },
   { key: '/design', label: 'Design' },
