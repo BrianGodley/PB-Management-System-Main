@@ -8,6 +8,7 @@
 // `.keep` placeholder; we filter those out of the listing.
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
+import FileViewerModal from './FileViewerModal'
 
 const KEEP = '.keep'
 
@@ -53,6 +54,7 @@ export default function FileManager({ bucket = 'company-files', root = 'files', 
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [openFile, setOpenFile] = useState(null) // file name being viewed/edited
   const fileRef = useRef(null)
 
   const prefix = [root, ...path].join('/')
@@ -251,7 +253,7 @@ export default function FileManager({ bucket = 'company-files', root = 'files', 
                       onClick={() =>
                         entry.isFolder
                           ? setPath([...path, entry.name])
-                          : window.open(publicUrl(entry.name), '_blank')
+                          : setOpenFile(entry.name)
                       }
                       className="flex items-center gap-2 text-left font-medium text-gray-800 hover:text-green-700"
                     >
@@ -289,6 +291,16 @@ export default function FileManager({ bucket = 'company-files', root = 'files', 
           </tbody>
         </table>
       </div>
+
+      {openFile && (
+        <FileViewerModal
+          bucket={bucket}
+          prefix={prefix}
+          name={openFile}
+          onClose={() => setOpenFile(null)}
+          onSaved={load}
+        />
+      )}
     </div>
   )
 }

@@ -10,7 +10,7 @@
 // Word), PDF uses jsPDF + html2canvas (already installed), Excel uses SheetJS
 // loaded from CDN on demand (same source the Statistics export uses).
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { jsPDF } from 'jspdf'
 
 const MODES = [
@@ -68,12 +68,18 @@ export default function DocCreator() {
 const FONTS = ['Arial', 'Calibri', 'Times New Roman', 'Georgia', 'Courier New', 'Verdana', 'Trebuchet MS', 'Tahoma', 'Comic Sans MS']
 const FONT_SIZES = [10, 11, 12, 14, 16, 18, 24, 28, 36, 48, 72]
 
-function RichTextCreator({ mode }) {
-  const [title, setTitle] = useState('')
+export function RichTextCreator({ mode, initialTitle = '', initialHtml = '', onSave }) {
+  const [title, setTitle] = useState(initialTitle)
   const [busy, setBusy] = useState('')
   const editorRef = useRef(null)
   const pageRef = useRef(null)
   const savedRange = useRef(null)
+
+  // Seed the editor with the opened file's content (once on mount).
+  useEffect(() => {
+    if (editorRef.current && initialHtml) editorRef.current.innerHTML = initialHtml
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Save/restore the caret so toolbar dropdowns & color pickers (which steal
   // focus) still apply to the text you had selected.
@@ -271,13 +277,22 @@ function RichTextCreator({ mode }) {
 
         <div className="ml-auto flex items-center gap-2 pl-2">
           {busy && <span className="text-xs text-gray-500">{busy}</span>}
-          {mode === 'doc' ? (
-            <button onClick={downloadWord} className="btn-primary text-xs px-3 py-1.5">
-              Download Word
-            </button>
-          ) : (
-            <button onClick={downloadPdf} disabled={!!busy} className="btn-primary text-xs px-3 py-1.5">
-              Download PDF
+          <button onClick={downloadWord} className="btn-secondary text-xs px-3 py-1.5">Word</button>
+          <button onClick={downloadPdf} disabled={!!busy} className="btn-secondary text-xs px-3 py-1.5">PDF</button>
+          {onSave && (
+            <button
+              onClick={async () => {
+                setBusy('Saving…')
+                try {
+                  await onSave(editorRef.current?.innerHTML || '')
+                } finally {
+                  setBusy('')
+                }
+              }}
+              disabled={!!busy}
+              className="btn-primary text-xs px-3 py-1.5"
+            >
+              Save to Drive
             </button>
           )}
         </div>
@@ -331,13 +346,21 @@ function loadSheetJS() {
   })
 }
 
-function SheetCreator() {
+export function SheetCreator({ initialTitle = '', initialGrid = null, onSave }) {
   const START_ROWS = 12
   const START_COLS = 6
-  const [title, setTitle] = useState('')
-  const [grid, setGrid] = useState(() =>
-    Array.from({ length: START_ROWS }, () => Array.from({ length: START_COLS }, () => ''))
-  )
+  const [title, setTitle] = useState(initialTitle)
+  const [grid, setGrid] = useState(() => {
+    if (initialGrid && initialGrid.length) {
+      const cols = Math.max(1, ...initialGrid.map(r => r.length))
+      return initialGrid.map(r => {
+        const row = r.map(c => (c == null ? '' : String(c)))
+        while (row.length < cols) row.push('')
+        return row
+      })
+    }
+    return Array.from({ length: START_ROWS }, () => Array.from({ length: START_COLS }, () => ''))
+  })
   const [busy, setBusy] = useState('')
 
   const cols = grid[0]?.length || 0
@@ -400,7 +423,23 @@ function SheetCreator() {
         <button onClick={addCol} className="btn-secondary text-xs px-3 py-1.5">+ Column</button>
         {busy && <span className="text-xs text-gray-500">{busy}</span>}
         <button onClick={downloadCsv} className="btn-secondary text-xs px-3 py-1.5">CSV</button>
-        <button onClick={downloadXlsx} disabled={!!busy} className="btn-primary text-xs px-3 py-1.5">Download Excel</button>
+        <button onClick={downloadXlsx} disabled={!!busy} className={`text-xs px-3 py-1.5 ${onSave ? 'btn-secondary' : 'btn-primary'}`}>Excel</button>
+        {onSave && (
+          <button
+            onClick={async () => {
+              setBusy('Saving…')
+              try {
+                await onSave(trimmedGrid())
+              } finally {
+                setBusy('')
+              }
+            }}
+            disabled={!!busy}
+            className="btn-primary text-xs px-3 py-1.5"
+          >
+            Save to Drive
+          </button>
+        )}
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg overflow-auto">
