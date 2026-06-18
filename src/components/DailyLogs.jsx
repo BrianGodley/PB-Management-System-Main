@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { sendEmail, sendSMS } from '../lib/notify'
 import { fetchAllPaginated } from '../lib/fetchAll'
 import { generateDailyLogPdf } from '../lib/dailyLogPdf'
+import { generateDailyLogDocx } from '../lib/dailyLogDocx'
 
 // ── Constants ────────────────────────────────────────────────
 const PERMISSION_OPTIONS = [
@@ -424,7 +425,8 @@ export default function DailyLogs({
           ? `${opts.from ? fmtShortLocal(opts.from) : '…'} – ${opts.to ? fmtShortLocal(opts.to) : '…'}`
           : ''
 
-      await generateDailyLogPdf({
+      const gen = opts.format === 'docx' ? generateDailyLogDocx : generateDailyLogPdf
+      await gen({
         job,
         logs,
         company,
@@ -578,6 +580,7 @@ function ExportModal({ onClose, onExport, busy }) {
   const [to, setTo] = useState('')
   const [audience, setAudience] = useState('client')
   const [includePhotos, setIncludePhotos] = useState(true)
+  const [format, setFormat] = useState('pdf')
 
   return (
     <div className="fixed inset-0 z-[80] bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
@@ -625,10 +628,32 @@ function ExportModal({ onClose, onExport, busy }) {
           </button>
         </div>
 
-        <label className="flex items-center gap-2 mb-5 text-sm text-gray-700 cursor-pointer">
+        <label className="flex items-center gap-2 mb-4 text-sm text-gray-700 cursor-pointer">
           <input type="checkbox" checked={includePhotos} onChange={e => setIncludePhotos(e.target.checked)} disabled={busy} />
           Include photos
         </label>
+
+        <label className="label">Format</label>
+        <div className="grid grid-cols-2 gap-2 mb-5">
+          <button
+            disabled={busy}
+            onClick={() => setFormat('pdf')}
+            className={`px-3 py-2 rounded-lg text-sm border ${
+              format === 'pdf' ? 'bg-green-50 border-green-500 text-green-700 font-medium' : 'border-gray-300 text-gray-600'
+            }`}
+          >
+            PDF
+          </button>
+          <button
+            disabled={busy}
+            onClick={() => setFormat('docx')}
+            className={`px-3 py-2 rounded-lg text-sm border ${
+              format === 'docx' ? 'bg-green-50 border-green-500 text-green-700 font-medium' : 'border-gray-300 text-gray-600'
+            }`}
+          >
+            Word (.docx)
+          </button>
+        </div>
 
         {busy ? (
           <div className="flex items-center justify-center gap-2 py-2 text-sm text-gray-600">
