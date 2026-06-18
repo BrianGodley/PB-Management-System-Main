@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { sendEmail, sendSMS } from '../lib/notify'
+import { fetchAllPaginated } from '../lib/fetchAll'
+import { generateDailyLogPdf } from '../lib/dailyLogPdf'
 
 // ── Constants ────────────────────────────────────────────────
 const PERMISSION_OPTIONS = [
@@ -48,6 +50,15 @@ function getPublicUrl(path) {
   return data.publicUrl
 }
 
+function fmtShortLocal(d) {
+  if (!d) return ''
+  return new Date(d + 'T12:00:00').toLocaleDateString('en-US', {
+    month: 'numeric',
+    day: 'numeric',
+    year: '2-digit',
+  })
+}
+
 // ── Main Component ───────────────────────────────────────────
 
 export default function DailyLogs({
@@ -70,6 +81,9 @@ export default function DailyLogs({
   const [error, setError] = useState('')
   const [lightbox, setLightbox] = useState(null) // { photos, index }
   const [page, setPage] = useState(1)
+  // Client PDF export
+  const [exportOpen, setExportOpen] = useState(false)
+  const [exporting, setExporting] = useState('')
   // Alert: notify users by text/email when the log is saved.
   const [alertEmployees, setAlertEmployees] = useState([])
   const [alertUserIds, setAlertUserIds] = useState(() => new Set())
@@ -353,6 +367,78 @@ export default function DailyLogs({
     )
   }
 
+  // ── Client PDF export ──────────────────────────────────────
+  // Pulls ALL logs for the selected job (not just the current page), filters by
+  // date range + audience, and builds a polished PDF. Private logs are NEVER
+  // included in a client share.
+  async function runExport(opts) {
+    if (selectedJob === 'all') return
+    setExporting('Gathering logs…')
+    try {
+      const { data: allLogs } = await fetchAllPaginated(() =>
+        supabase
+          .from('daily_logs')
+          .select('*, daily_log_photos(*)')
+          .eq('job_id', selectedJob)
+          .order('date', { ascending: true })
+      )
+      let rows = allLogs || []
+      // Date range (inclusive)
+      if (opts.from) rows = rows.filter(l => l.date >= opts.from)
+      if (opts.to) rows = rows.filter(l => l.date <= opts.to)
+      // Audience: never leak private; client mode requires the client tag.
+      rows = rows.filter(l => {
+        const perms = l.permissions || []
+        if (perms.includes('private')) return false
+        if (opts.audience === 'client') return perms.includes('client')
+        return true
+      })
+
+      if (!rows.length) {
+        setExporting('')
+        alert('No logs match those options (check the date range / audience).')
+        return
+      }
+
+      const logs = rows.map(l => ({
+        date: l.date,
+        notes: l.notes,
+        weather_conditions: l.weather_conditions,
+        weather_notes: l.weather_notes,
+        authorName: profiles[l.created_by] || l.bt_author_name || '',
+        photoUrls: (l.daily_log_photos || []).map(p => ({ url: getPublicUrl(p.storage_path) })),
+      }))
+
+      // Company header info (best-effort).
+      let company = {}
+      try {
+        const { data: cs } = await supabase.from('company_settings').select('*').limit(1).maybeSingle()
+        if (cs) company = { name: cs.company_name || cs.name || '', logoUrl: cs.logo_url || '' }
+      } catch {
+        /* optional */
+      }
+
+      const job = jobs.find(j => j.id === selectedJob) || {}
+      const rangeLabel =
+        opts.from || opts.to
+          ? `${opts.from ? fmtShortLocal(opts.from) : '…'} – ${opts.to ? fmtShortLocal(opts.to) : '…'}`
+          : ''
+
+      await generateDailyLogPdf({
+        job,
+        logs,
+        company,
+        options: { includePhotos: opts.includePhotos !== false, rangeLabel },
+        onProgress: msg => setExporting(msg),
+      })
+      setExporting('')
+      setExportOpen(false)
+    } catch (e) {
+      setExporting('')
+      alert('Could not build the PDF: ' + (e?.message || 'unknown error'))
+    }
+  }
+
   // ── Render ─────────────────────────────────────────────────
   const totalPages = Math.max(1, Math.ceil(totalCount / LOGS_PER_PAGE))
   const safePage = Math.min(page, totalPages)
@@ -362,10 +448,21 @@ export default function DailyLogs({
     <div className="flex flex-col h-full">
       {/* Header — on mobile the title/count are hidden and the New Daily Log
           button stretches full width. */}
-      <div className="flex items-center justify-end mb-4 mt-3 flex-shrink-0">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 mb-4 mt-3 flex-shrink-0 lg:pr-6">
+        {selectedJob !== 'all' && (
+          <button
+            onClick={() => setExportOpen(true)}
+            className="bg-white border border-green-600 text-green-700 hover:bg-green-50 text-xs font-medium px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 w-full sm:w-auto"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Share with Client (PDF)
+          </button>
+        )}
         <button
           onClick={openNew}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 w-full lg:w-auto lg:mr-6"
+          className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 w-full sm:w-auto"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -466,6 +563,92 @@ export default function DailyLogs({
       {lightbox && (
         <Lightbox photos={lightbox.photos} index={lightbox.idx} onClose={() => setLightbox(null)} />
       )}
+
+      {/* Client PDF export */}
+      {exportOpen && (
+        <ExportModal onClose={() => !exporting && setExportOpen(false)} onExport={runExport} busy={exporting} />
+      )}
+    </div>
+  )
+}
+
+// ── Client PDF Export Modal ──────────────────────────────────
+function ExportModal({ onClose, onExport, busy }) {
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [audience, setAudience] = useState('client')
+  const [includePhotos, setIncludePhotos] = useState(true)
+
+  return (
+    <div className="fixed inset-0 z-[80] bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-xl shadow-2xl w-full max-w-md p-5"
+        onClick={e => e.stopPropagation()}
+        style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top))' }}
+      >
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-base font-bold text-gray-900">Share Daily Logs with Client</h3>
+          {!busy && (
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">
+              ×
+            </button>
+          )}
+        </div>
+        <p className="text-xs text-gray-500 mb-4">Builds a PDF report you can email or print. Private logs are never included.</p>
+
+        <label className="label">Date range (optional)</label>
+        <div className="flex items-center gap-2 mb-4">
+          <input type="date" value={from} onChange={e => setFrom(e.target.value)} className="input" disabled={busy} />
+          <span className="text-gray-400 text-sm">to</span>
+          <input type="date" value={to} onChange={e => setTo(e.target.value)} className="input" disabled={busy} />
+        </div>
+
+        <label className="label">Which logs</label>
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          <button
+            disabled={busy}
+            onClick={() => setAudience('client')}
+            className={`px-3 py-2 rounded-lg text-sm border ${
+              audience === 'client' ? 'bg-green-50 border-green-500 text-green-700 font-medium' : 'border-gray-300 text-gray-600'
+            }`}
+          >
+            Client-visible only
+          </button>
+          <button
+            disabled={busy}
+            onClick={() => setAudience('all')}
+            className={`px-3 py-2 rounded-lg text-sm border ${
+              audience === 'all' ? 'bg-green-50 border-green-500 text-green-700 font-medium' : 'border-gray-300 text-gray-600'
+            }`}
+          >
+            All (except private)
+          </button>
+        </div>
+
+        <label className="flex items-center gap-2 mb-5 text-sm text-gray-700 cursor-pointer">
+          <input type="checkbox" checked={includePhotos} onChange={e => setIncludePhotos(e.target.checked)} disabled={busy} />
+          Include photos
+        </label>
+
+        {busy ? (
+          <div className="flex items-center justify-center gap-2 py-2 text-sm text-gray-600">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-700" />
+            {busy}
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <button onClick={onClose} className="btn-secondary flex-1 text-sm">
+              Cancel
+            </button>
+            <button
+              onClick={() => onExport({ from, to, audience, includePhotos })}
+              className="btn-primary flex-1 text-sm"
+            >
+              Generate PDF
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
