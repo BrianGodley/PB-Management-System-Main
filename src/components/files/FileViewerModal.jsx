@@ -12,11 +12,10 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { RichTextCreator, SheetCreator } from '../DocCreator'
 import PdfFieldEditor from './PdfFieldEditor'
+import DocxFidelityEditor from './DocxFidelityEditor'
 
-// xlsx + mammoth are loaded on demand (keeps the main bundle small and isolates
-// any browser-resolution quirks to when a file is actually opened).
+// xlsx is loaded on demand (keeps the main bundle small).
 const loadXLSX = () => import('xlsx')
-const loadMammoth = () => import('mammoth').then(m => m.default || m)
 
 const DOC_EXT = ['doc', 'docx', 'txt', 'md', 'rtf', 'html', 'htm', 'odt']
 const SHEET_EXT = ['xlsx', 'xls', 'csv', 'tsv']
@@ -43,7 +42,7 @@ export default function FileViewerModal({ bucket, prefix, name, onClose, onSaved
   const path = `${prefix}/${name}`
   const publicUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl
 
-  const [state, setState] = useState({ loading: true, error: '', html: '', grid: null })
+  const [state, setState] = useState({ loading: true, error: '', html: '', grid: null, docxBlob: null })
   const [savedMsg, setSavedMsg] = useState('')
   const [fieldMode, setFieldMode] = useState(false)
 
@@ -60,14 +59,12 @@ export default function FileViewerModal({ bucket, prefix, name, onClose, onSaved
         const e = extOf(name)
         if (kind === 'doc') {
           if (e === 'docx') {
-            const mammoth = await loadMammoth()
-            const ab = await data.arrayBuffer()
-            const { value } = await mammoth.convertToHtml({ arrayBuffer: ab })
-            if (!cancelled) setState({ loading: false, error: '', html: value || '', grid: null })
+            // Full-fidelity render (headers, logos, tables) via docx-preview.
+            if (!cancelled) setState({ loading: false, error: '', html: '', grid: null, docxBlob: data })
           } else {
             const text = await data.text()
             const html = /<\w+[\s>]/.test(text) ? text : escapeHtml(text).replace(/\n/g, '<br>')
-            if (!cancelled) setState({ loading: false, error: '', html, grid: null })
+            if (!cancelled) setState({ loading: false, error: '', html, grid: null, docxBlob: null })
           }
         } else if (kind === 'sheet') {
           const XLSX = await loadXLSX()
@@ -75,7 +72,7 @@ export default function FileViewerModal({ bucket, prefix, name, onClose, onSaved
           const wb = XLSX.read(ab, { type: 'array' })
           const ws = wb.Sheets[wb.SheetNames[0]]
           const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '' })
-          if (!cancelled) setState({ loading: false, error: '', html: '', grid: aoa.length ? aoa : [['']] })
+          if (!cancelled) setState({ loading: false, error: '', html: '', grid: aoa.length ? aoa : [['']], docxBlob: null })
         }
       } catch (err) {
         if (!cancelled) setState({ loading: false, error: err?.message || 'Could not open this file.', html: '', grid: null })
@@ -217,6 +214,8 @@ export default function FileViewerModal({ bucket, prefix, name, onClose, onSaved
             <p className="text-xs text-gray-400">{state.error}</p>
             <button onClick={downloadOriginal} className="btn-primary text-sm px-4 py-2">Download instead</button>
           </div>
+        ) : kind === 'doc' && state.docxBlob ? (
+          <DocxFidelityEditor blob={state.docxBlob} name={name} onSave={saveDoc} />
         ) : kind === 'doc' ? (
           <RichTextCreator mode="doc" initialTitle={baseOf(name)} initialHtml={state.html} onSave={saveDoc} />
         ) : kind === 'sheet' ? (
