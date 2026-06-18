@@ -37,12 +37,17 @@ export default function DocxFidelityEditor({ blob, name, onSave }) {
           className: 'docx',
           inWrapper: true,
           ignoreLastRenderedPageBreak: true,
-          breakPages: true,
+          ignoreHeight: true, // flow by content so letterheads don't show a tall empty page
+          breakPages: false,
         })
         if (cancelled || !hostRef.current) return
-        // Make the rendered document editable (text + tables).
+        // Make every rendered page section editable (text, tables, header band).
         hostRef.current.setAttribute('contenteditable', 'true')
         hostRef.current.style.outline = 'none'
+        hostRef.current.querySelectorAll('section.docx, .docx').forEach(el => {
+          el.setAttribute('contenteditable', 'true')
+          el.style.outline = 'none'
+        })
       } catch (e) {
         if (!cancelled) setErr(e?.message || 'Could not render this document.')
       }
@@ -155,10 +160,18 @@ export default function DocxFidelityEditor({ blob, name, onSave }) {
           Couldn’t render this document. {err}
         </div>
       ) : (
-        <div className="bg-white shadow-sm border border-gray-200 rounded-lg p-2 overflow-auto">
+        <div className="overflow-auto">
           <div ref={hostRef} />
         </div>
       )}
+
+      {/* Override docx-preview's flex centering (which can clip/shove wide pages)
+          with reliable margin-auto centering, and drop its grey padding. */}
+      <style>{`
+        .docx-wrapper { background: transparent !important; padding: 0 !important; display: block !important; }
+        .docx-wrapper > section.docx { margin: 0 auto 16px auto !important; box-shadow: 0 1px 8px rgba(0,0,0,0.15); background:#fff; }
+        section.docx:focus, .docx-wrapper:focus { outline: none; }
+      `}</style>
     </div>
   )
 }
