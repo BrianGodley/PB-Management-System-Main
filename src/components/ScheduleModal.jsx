@@ -167,7 +167,7 @@ export default function ScheduleModal({ onClose }) {
   }, [items, todayStr])
 
   return (
-    <div className="fixed inset-0 z-[70] bg-white flex flex-col" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <div className="fixed inset-0 z-[70] bg-white flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       {/* Header — green bar with the screen name centered in white */}
       <div
         className="relative flex items-center justify-center px-4 h-11 flex-shrink-0 shadow-md"

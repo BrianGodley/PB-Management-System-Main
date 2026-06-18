@@ -159,7 +159,7 @@ export default function CONavModal({ onClose, onNavigate }) {
     return (
       <div
         className="fixed inset-0 z-[70] bg-white flex flex-col p-3"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))', paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <COEstimatePanel
           estimateId={estCO.estimateId}
@@ -393,7 +393,7 @@ function ExistingCOScreen({ job, starting, onClose, onManual, onEstimator }) {
   return (
     <div
       className="fixed inset-0 z-[70] bg-white flex flex-col"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       {/* Green header — job name for context + close X */}
       <div

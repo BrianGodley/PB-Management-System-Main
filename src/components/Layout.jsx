@@ -667,7 +667,7 @@ export default function Layout() {
 
       {/* ── TOP BAR ── */}
       <header
-        style={{ backgroundColor: headerColor || 'transparent' }}
+        style={{ backgroundColor: headerColor || 'transparent', paddingTop: 'env(safe-area-inset-top)' }}
         className={`w-full flex-shrink-0 sticky top-0 z-50 ${headerColor ? 'shadow-md' : ''}`}
       >
         <div className="relative flex items-center h-11 px-4 gap-4">
