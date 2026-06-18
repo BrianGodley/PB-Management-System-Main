@@ -65,15 +65,70 @@ export default function DocCreator() {
 }
 
 // ── Rich text (Document + PDF) ────────────────────────────────
+const FONTS = ['Arial', 'Calibri', 'Times New Roman', 'Georgia', 'Courier New', 'Verdana', 'Trebuchet MS', 'Tahoma', 'Comic Sans MS']
+const FONT_SIZES = [10, 11, 12, 14, 16, 18, 24, 28, 36, 48, 72]
+
 function RichTextCreator({ mode }) {
   const [title, setTitle] = useState('')
   const [busy, setBusy] = useState('')
   const editorRef = useRef(null)
   const pageRef = useRef(null)
+  const savedRange = useRef(null)
+
+  // Save/restore the caret so toolbar dropdowns & color pickers (which steal
+  // focus) still apply to the text you had selected.
+  const saveSel = () => {
+    const s = window.getSelection()
+    if (s && s.rangeCount && editorRef.current?.contains(s.anchorNode)) savedRange.current = s.getRangeAt(0)
+  }
+  const restoreSel = () => {
+    const r = savedRange.current
+    if (r) {
+      const s = window.getSelection()
+      s.removeAllRanges()
+      s.addRange(r)
+    }
+    editorRef.current?.focus()
+  }
 
   const cmd = (command, value = null) => {
+    document.execCommand('styleWithCSS', false, true)
     document.execCommand(command, false, value)
     editorRef.current?.focus()
+    saveSel()
+  }
+
+  const applyFont = f => {
+    if (!f) return
+    restoreSel()
+    document.execCommand('fontName', false, f)
+    saveSel()
+  }
+  // Reliable px font-size: execCommand only supports 1–7, so we tag with size 7
+  // then rewrite those nodes to the real px value.
+  const applyFontSize = px => {
+    if (!px) return
+    restoreSel()
+    document.execCommand('styleWithCSS', false, true)
+    document.execCommand('fontSize', false, '7')
+    editorRef.current?.querySelectorAll('font[size="7"]').forEach(el => {
+      el.removeAttribute('size')
+      el.style.fontSize = px + 'px'
+    })
+    saveSel()
+  }
+  const applyColor = (kind, val) => {
+    restoreSel()
+    document.execCommand('styleWithCSS', false, true)
+    if (kind === 'text') document.execCommand('foreColor', false, val)
+    else if (!document.execCommand('hiliteColor', false, val)) document.execCommand('backColor', false, val)
+    saveSel()
+  }
+  const addLink = () => {
+    restoreSel()
+    const url = window.prompt('Link URL (https://…):')
+    if (url) document.execCommand('createLink', false, url)
+    saveSel()
   }
 
   function downloadWord() {
@@ -139,22 +194,82 @@ function RichTextCreator({ mode }) {
     <div className="max-w-4xl mx-auto">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 py-1.5 mb-3 sticky top-0 z-10">
+        <ToolBtn onClick={() => cmd('undo')} title="Undo">↶</ToolBtn>
+        <ToolBtn onClick={() => cmd('redo')} title="Redo">↷</ToolBtn>
+        <span className="w-px h-5 bg-gray-200 mx-1" />
+
+        {/* Font + size */}
+        <select
+          title="Font"
+          defaultValue=""
+          onMouseDown={saveSel}
+          onChange={e => { applyFont(e.target.value); e.target.value = '' }}
+          className="text-xs border border-gray-200 rounded px-1 py-1 bg-white text-gray-700 max-w-[120px]"
+        >
+          <option value="" disabled>Font</option>
+          {FONTS.map(f => (
+            <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>
+          ))}
+        </select>
+        <select
+          title="Font size"
+          defaultValue=""
+          onMouseDown={saveSel}
+          onChange={e => { applyFontSize(e.target.value); e.target.value = '' }}
+          className="text-xs border border-gray-200 rounded px-1 py-1 bg-white text-gray-700 w-14"
+        >
+          <option value="" disabled>Size</option>
+          {FONT_SIZES.map(s => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+        <span className="w-px h-5 bg-gray-200 mx-1" />
+
+        {/* Inline styles */}
         <ToolBtn onClick={() => cmd('bold')} title="Bold"><b>B</b></ToolBtn>
         <ToolBtn onClick={() => cmd('italic')} title="Italic"><i>I</i></ToolBtn>
         <ToolBtn onClick={() => cmd('underline')} title="Underline"><u>U</u></ToolBtn>
+        <ToolBtn onClick={() => cmd('strikeThrough')} title="Strikethrough"><s>S</s></ToolBtn>
+
+        {/* Colors */}
+        <label title="Text color" onMouseDown={saveSel} className="relative px-1.5 py-1 rounded hover:bg-gray-100 cursor-pointer text-sm font-semibold leading-none flex items-center" style={{ textDecoration: 'underline', textDecorationColor: '#dc2626', textDecorationThickness: 2 }}>
+          A
+          <input type="color" defaultValue="#111111" onChange={e => applyColor('text', e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
+        </label>
+        <label title="Highlight" onMouseDown={saveSel} className="relative px-1.5 py-1 rounded hover:bg-gray-100 cursor-pointer text-sm leading-none flex items-center bg-yellow-200/70">
+          H
+          <input type="color" defaultValue="#ffeb3b" onChange={e => applyColor('highlight', e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
+        </label>
         <span className="w-px h-5 bg-gray-200 mx-1" />
+
+        {/* Blocks */}
         <ToolBtn onClick={() => cmd('formatBlock', 'H1')} title="Heading 1">H1</ToolBtn>
         <ToolBtn onClick={() => cmd('formatBlock', 'H2')} title="Heading 2">H2</ToolBtn>
+        <ToolBtn onClick={() => cmd('formatBlock', 'H3')} title="Heading 3">H3</ToolBtn>
         <ToolBtn onClick={() => cmd('formatBlock', 'P')} title="Normal text">¶</ToolBtn>
+        <ToolBtn onClick={() => cmd('formatBlock', 'BLOCKQUOTE')} title="Quote">❝</ToolBtn>
         <span className="w-px h-5 bg-gray-200 mx-1" />
+
+        {/* Lists + indent */}
         <ToolBtn onClick={() => cmd('insertUnorderedList')} title="Bullet list">• List</ToolBtn>
         <ToolBtn onClick={() => cmd('insertOrderedList')} title="Numbered list">1. List</ToolBtn>
+        <ToolBtn onClick={() => cmd('outdent')} title="Decrease indent">⇤</ToolBtn>
+        <ToolBtn onClick={() => cmd('indent')} title="Increase indent">⇥</ToolBtn>
         <span className="w-px h-5 bg-gray-200 mx-1" />
+
+        {/* Align */}
         <ToolBtn onClick={() => cmd('justifyLeft')} title="Align left">⯇</ToolBtn>
         <ToolBtn onClick={() => cmd('justifyCenter')} title="Center">≡</ToolBtn>
         <ToolBtn onClick={() => cmd('justifyRight')} title="Align right">⯈</ToolBtn>
+        <ToolBtn onClick={() => cmd('justifyFull')} title="Justify">▤</ToolBtn>
+        <span className="w-px h-5 bg-gray-200 mx-1" />
 
-        <div className="ml-auto flex items-center gap-2">
+        {/* Insert / clear */}
+        <ToolBtn onClick={addLink} title="Insert link">🔗</ToolBtn>
+        <ToolBtn onClick={() => cmd('insertHorizontalRule')} title="Divider line">―</ToolBtn>
+        <ToolBtn onClick={() => cmd('removeFormat')} title="Clear formatting">⌫</ToolBtn>
+
+        <div className="ml-auto flex items-center gap-2 pl-2">
           {busy && <span className="text-xs text-gray-500">{busy}</span>}
           {mode === 'doc' ? (
             <button onClick={downloadWord} className="btn-primary text-xs px-3 py-1.5">
@@ -180,6 +295,9 @@ function RichTextCreator({ mode }) {
           ref={editorRef}
           contentEditable
           suppressContentEditableWarning
+          onKeyUp={saveSel}
+          onMouseUp={saveSel}
+          onBlur={saveSel}
           className="prose-sm max-w-none outline-none text-gray-800 leading-relaxed min-h-[420px] doc-creator-body"
           style={{ fontSize: 15 }}
           data-placeholder="Start typing…"
