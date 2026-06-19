@@ -26,9 +26,9 @@ Sub-features that live *inside* Jobs (not separate nav modules), and therefore r
 | Module | Depends on | Type | Why (from code) |
 |---|---|---|---|
 | Estimating/Bids, Jobs, Design (Contractor) | **Contacts + Opportunities** (Tier 2) | **HARD** | Estimates & jobs attach to a `clients`/opportunity; `Bids`, `EstimateDetail`, `Design` all read `clients`. You can't create a job/estimate with no client. |
-| Accounting (T3) | Jobs (Contractor) | Soft | Reads `job_invoices`/`jobs` for AR; otherwise stands alone as bookkeeping (own `acct_*` ledger). |
-| Weekly FP (T3) | Jobs (Contractor) + Statistics (T1) | Soft | Reads job financials + `statistic_values`. |
-| Subs & Vendors (T3) | Jobs (Contractor) | Soft→strong | `SubVendorContracts/Quotes` read `jobs`, `work_orders`, `estimates`; subs are assigned to jobs. Limited use with no Jobs. |
+| Accounting (T3) | Jobs (Contractor) | Very soft | NO job-AR section. Only an *optional* `job_id` dropdown on invoices/bills/expense/journal lines (+1 `from('jobs')` to fill it). No Contractor = empty dropdown, harmless. At most hide the job-tag field. |
+| Weekly FP (T3) | — | **NONE** (verified) | Reads only `collection_weeks/rows/payables/financial`, `statistics`, `statistic_values`, `company_settings`. No `jobs`/`work_orders`/`estimates`/`job_invoices` refs anywhere. Fully standalone Tier-3 module. |
+| Subs & Vendors (T3) | Jobs (Contractor) | Soft→strong | Directory page (`SubsVendors.jsx`) is independent, but `SubVendorContracts/Quotes` read `jobs`, `work_orders`, `estimates` to link a contract/quote to a job/WO. No Contractor = empty pickers. **Only real banner case.** |
 | HR (T2) | Org Chart (T1) | Soft | Uses `positions` from the org structure. |
 | Training (T2) | HR (T2) | Soft | Course assignments key off `employees`/`positions`. |
 | Statistics (T1) | Org Chart (T1) + HR (T2) | Soft | Reads `positions` + `employees`; manual stats work without HR. |
@@ -55,9 +55,9 @@ hidden/disabled when the target module isn't entitled (use `isModuleEnabled(modu
 - **Contacts** → "Create Opportunity" → gate behind Opportunities (`/clients`).
 - **Dashboard** widgets summarizing jobs/finances → render only the job/finance widgets if Contractor;
   otherwise show the entitled widgets only.
-- **Accounting** → the job-AR / invoice-pull section → only if Contractor (`/jobs`).
-- **Weekly FP** → job financial rows → only if Contractor.
-- **Subs & Vendors** → job/work-order assignment UI → only if Contractor.
+- **Accounting** → optional per-transaction `job_id` dropdown only (no AR section). Empty + harmless without Contractor; optional: hide the job-tag field when `/jobs` not entitled.
+- **Weekly FP** → NO job hooks (verified independent). Nothing to gate.
+- **Subs & Vendors** → `SubVendorContracts/Quotes` job/work-order/estimate pickers → gate/empty-state behind Contractor (`/jobs`). Only genuine banner case.
 - **Statistics** → employee/position-linked stat types → full when HR present; manual stats always.
 - **Estimating/Bids** → client picker → requires Opportunities/Contacts (guaranteed by co-requisite #1).
 

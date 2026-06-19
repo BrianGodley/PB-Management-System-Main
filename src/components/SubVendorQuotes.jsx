@@ -18,6 +18,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import DocViewerModal from './DocViewerModal'
+import { useModule } from '../platform'
 
 const UNITS = ['Each', 'Sq Foot', 'Pallet', 'Yard', 'Scoop', 'Cubic Yard', 'Linear Feet']
 const money = v =>
@@ -141,6 +142,10 @@ function SendModal({ vendor, emailBody, smsBody, subject, onCancel, onConfirm })
 
 // ── Add / Edit quote modal ────────────────────────────────────────────────────
 function QuoteModal({ parties, jobs, estimates = [], onClose, onSaved, onVendorAdded }) {
+  // Job/estimate linking requires the Contractor package. Without it the
+  // optional Job + Estimate fields are hidden (quotes save fine standalone —
+  // job_id / estimate_id stay null).
+  const canJobs = useModule('/jobs')
   const [direction, setDirection] = useState('request') // 'request' | 'received'
   const [partyId, setPartyId] = useState('')
   const [jobId, setJobId] = useState('')
@@ -414,7 +419,9 @@ function QuoteModal({ parties, jobs, estimates = [], onClose, onSaved, onVendorA
             )}
           </div>
 
-          {/* Job */}
+          {/* Job + Estimate — only with the Contractor package */}
+          {canJobs && (
+          <>
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">
               Job{' '}
@@ -454,6 +461,8 @@ function QuoteModal({ parties, jobs, estimates = [], onClose, onSaved, onVendorA
               ))}
             </select>
           </div>
+          </>
+          )}
 
           {/* Line items */}
           <div>

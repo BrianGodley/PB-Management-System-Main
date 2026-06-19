@@ -15,6 +15,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import DocViewerModal from './DocViewerModal'
+import { useModule } from '../platform'
 
 const UNITS = ['Square Foot', 'Linear Feet', 'Each', 'Ton', 'Yard']
 
@@ -164,6 +165,10 @@ function SignaturePad({ value, onChange }) {
 const blankRow = () => ({ item: '', qty: '', unit: 'Each', unit_price: '' })
 
 function ContractModal({ parties, jobs, onClose, onSaved }) {
+  // Linking a contract to a job/work order requires the Contractor package.
+  // Without it, the optional assignment block is hidden (contracts save fine
+  // standalone — job_id stays null).
+  const canJobs = useModule('/jobs')
   const [mode, setMode] = useState('build') // 'build' | 'upload'
   const [partyId, setPartyId] = useState('')
   const [jobId, setJobId] = useState('')
@@ -347,7 +352,8 @@ function ContractModal({ parties, jobs, onClose, onSaved }) {
             </select>
           </div>
 
-          {/* Job + Work Order assignment */}
+          {/* Job + Work Order assignment — only with the Contractor package */}
+          {canJobs && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">Assign to Job</label>
@@ -391,6 +397,7 @@ function ContractModal({ parties, jobs, onClose, onSaved }) {
               </select>
             </div>
           </div>
+          )}
 
           {/* Mode toggle */}
           <div className="flex gap-2">
