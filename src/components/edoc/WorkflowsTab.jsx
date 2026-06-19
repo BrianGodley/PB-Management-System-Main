@@ -34,9 +34,46 @@ const STEP_KINDS = [
   { id: 'datastore', label: 'Data Storage' },
 ]
 
-// Workflow category — required when creating a workflow; shown as the first
-// column in the workflows table.
-const WORKFLOW_TYPES = ['Document', 'Decision', 'Installation', 'Maintenance', 'Pilot', 'Sales', 'Finance', 'Other']
+// Default workflow type names, seeded per tenant on first load (then fully
+// user-editable in Settings).
+const DEFAULT_TYPE_NAMES = ['Document', 'Decision', 'Installation', 'Maintenance', 'Pilot', 'Sales', 'Finance', 'Other']
+
+// The "large list of objects" users pick from when defining a type's template
+// or adding steps. Each maps to one of the base render shapes (`kind`) and
+// carries an icon + a short hint the user can override with their own purpose.
+const OBJECT_CATALOG = [
+  // People
+  { id: 'person', label: 'Person', kind: 'person', icon: '👤', hint: 'A specific person in the flow.' },
+  { id: 'employee', label: 'Employee', kind: 'person', icon: '👷', hint: 'An internal team member.' },
+  { id: 'client', label: 'Client', kind: 'person', icon: '🧑‍💼', hint: 'A customer / client.' },
+  { id: 'vendor', label: 'Vendor', kind: 'person', icon: '🏷️', hint: 'A supplier or vendor.' },
+  { id: 'subcontractor', label: 'Subcontractor', kind: 'person', icon: '🔧', hint: 'A subcontractor.' },
+  // Documents
+  { id: 'document', label: 'Document', kind: 'document', icon: '📄', hint: 'A single document.' },
+  { id: 'form', label: 'Form', kind: 'document', icon: '📝', hint: 'A form to fill out.' },
+  { id: 'contract', label: 'Contract', kind: 'document', icon: '📑', hint: 'A contract or agreement.' },
+  { id: 'report', label: 'Report', kind: 'document', icon: '📊', hint: 'A generated report.' },
+  // Organization
+  { id: 'organization', label: 'Organization', kind: 'organization', icon: '🏢', hint: 'A division, area, or company.' },
+  // Decisions / gates
+  { id: 'decision', label: 'Decision', kind: 'decision', icon: '❓', hint: 'A yes/no branch.' },
+  { id: 'approval', label: 'Approval', kind: 'decision', icon: '✅', hint: 'An approve / reject gate.' },
+  { id: 'signoff', label: 'Sign-off', kind: 'decision', icon: '✍️', hint: 'A required signature.' },
+  { id: 'review', label: 'Review', kind: 'decision', icon: '🔍', hint: 'A review checkpoint.' },
+  { id: 'condition', label: 'Condition', kind: 'decision', icon: '⚖️', hint: 'A conditional rule.' },
+  // Flow control
+  { id: 'merge', label: 'Merge', kind: 'merge', icon: '🔀', hint: 'Merge multiple paths into one.' },
+  { id: 'delay', label: 'Delay', kind: 'delay', icon: '⏳', hint: 'A wait / delay.' },
+  { id: 'timer', label: 'Timer', kind: 'delay', icon: '⏰', hint: 'A timed wait or deadline.' },
+  // Actions (generic)
+  { id: 'task', label: 'Task', kind: 'action', icon: '☑️', hint: 'A task someone must complete.' },
+  { id: 'notification', label: 'Notification', kind: 'action', icon: '🔔', hint: 'Send a notification.' },
+  { id: 'email', label: 'Email', kind: 'action', icon: '✉️', hint: 'Send an email.' },
+  { id: 'integration', label: 'Integration', kind: 'action', icon: '🔌', hint: 'Call another system or module.' },
+  // Data
+  { id: 'datastore', label: 'Data Storage', kind: 'datastore', icon: '🗄️', hint: 'Store or record data.' },
+]
+const CATALOG_BY_ID = Object.fromEntries(OBJECT_CATALOG.map(o => [o.id, o]))
 
 // Who a Person node represents / what an Organization node represents.
 const ENTITY_TYPES = [
@@ -92,7 +129,7 @@ function FlowNode({ step }) {
   if (step.kind === 'organization') {
     return (
       <div className="w-52 rounded-md border-2 border-green-600 bg-green-50 px-3 py-2 flex items-center gap-2">
-        <span className="text-lg">🏢</span>
+        <span className="text-lg">{step.icon || '🏢'}</span>
         <div className="min-w-0">
           <div className="text-sm font-semibold text-green-800 leading-tight truncate">{label}</div>
           {step.orgType && <div className="text-[9px] uppercase text-green-600 tracking-wide">{ORG_LABEL[step.orgType] || step.orgType}</div>}
@@ -135,10 +172,19 @@ function FlowNode({ step }) {
       </div>
     )
   }
+  if (step.kind === 'action') {
+    // Generic action: rounded rect with the object's own icon.
+    return (
+      <div className="w-52 rounded-lg border-2 border-indigo-500 bg-indigo-50 px-3 py-2 flex items-center gap-2">
+        <span className="text-lg">{step.icon || '⚙️'}</span>
+        <div className="text-sm font-semibold text-indigo-800 leading-tight truncate">{label}</div>
+      </div>
+    )
+  }
   // person
   return (
     <div className="w-52 rounded-xl border-2 border-blue-500 bg-blue-50 px-3 py-2 flex items-center gap-2">
-      <span className="text-lg">👤</span>
+      <span className="text-lg">{step.icon || '👤'}</span>
       <div className="min-w-0">
         <div className="text-sm font-semibold text-blue-800 leading-tight truncate">{label}</div>
         {step.entityType && <div className="text-[9px] uppercase text-blue-500 tracking-wide">{ENTITY_LABEL[step.entityType] || step.entityType}</div>}
@@ -156,6 +202,7 @@ const NODE_SIZE = {
   merge: { w: 128, h: 96 },
   delay: { w: 168, h: 56 },
   datastore: { w: 128, h: 88 },
+  action: { w: 208, h: 56 },
 }
 const sizeOf = s => NODE_SIZE[s.kind] || NODE_SIZE.person
 
@@ -312,7 +359,7 @@ function FlowCanvas({ steps, positions, setPositions, readOnly = false }) {
 }
 
 // ── Builder: typed wizard on top, visual diagram below ──
-function WorkflowBuilder({ workflow, userId, onClose, onSaved }) {
+function WorkflowBuilder({ workflow, userId, types = [], onClose, onSaved }) {
   const [name, setName] = useState(workflow?.name || '')
   const [type, setType] = useState(workflow?.type || '')
   const [notes, setNotes] = useState(workflow?.notes || '')
@@ -431,6 +478,30 @@ function WorkflowBuilder({ workflow, userId, onClose, onSaved }) {
   }, [steps])
 
   const toggleModule = m => setModules(prev => (prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]))
+
+  // Choosing a type for a brand-new, empty workflow pre-loads that type's
+  // template objects as starting steps.
+  const chooseType = nm => {
+    setType(nm)
+    if (!workflow && steps.length === 0) {
+      const t = types.find(x => x.name === nm)
+      const objs = Array.isArray(t?.objects) ? t.objects : []
+      if (objs.length) {
+        setSteps(
+          objs.map(o => ({
+            id: newId(),
+            kind: o.kind || 'person',
+            label: o.label || '',
+            icon: o.icon,
+            multi: false,
+            entityType: 'employee',
+            orgType: 'division',
+            next: [],
+          }))
+        )
+      }
+    }
+  }
   const addStep = kind =>
     setSteps(prev => {
       // Decisions get a sequential default name (Decision 1, 2, 3…) so they're
@@ -590,9 +661,9 @@ function WorkflowBuilder({ workflow, userId, onClose, onSaved }) {
             <span className="text-[11px] font-semibold text-gray-500 uppercase">
               Type <span className="text-red-500">*</span>
             </span>
-            <select value={type} onChange={e => setType(e.target.value)} className="input text-sm py-1.5 w-full mt-1">
+            <select value={type} onChange={e => chooseType(e.target.value)} className="input text-sm py-1.5 w-full mt-1">
               <option value="">Select type…</option>
-              {WORKFLOW_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              {types.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
             </select>
           </label>
           <label className="block">
@@ -787,10 +858,166 @@ function WorkflowBuilder({ workflow, userId, onClose, onSaved }) {
   )
 }
 
+// ── Settings: manage workflow Types (reusable templates) ──
+function WorkflowSettings({ types, onChange }) {
+  const [selId, setSelId] = useState(types[0]?.id || null)
+  const sel = types.find(t => t.id === selId) || null
+  const [name, setName] = useState('')
+  const [objects, setObjects] = useState([])
+  const [saving, setSaving] = useState(false)
+  const [showCatalog, setShowCatalog] = useState(false)
+
+  useEffect(() => {
+    setName(sel?.name || '')
+    setObjects(Array.isArray(sel?.objects) ? sel.objects : [])
+    setShowCatalog(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selId])
+
+  async function addType() {
+    const nm = window.prompt('New workflow type name:')
+    if (!nm || !nm.trim()) return
+    const max = Math.max(0, ...types.map(t => t.sort_order || 0))
+    const { data, error } = await supabase
+      .from('workflow_types')
+      .insert({ name: nm.trim(), sort_order: max + 1, objects: [] })
+      .select('id')
+      .single()
+    if (error) { alert('Could not add type: ' + error.message); return }
+    await onChange?.()
+    if (data?.id) setSelId(data.id)
+  }
+  async function deleteType() {
+    if (!sel) return
+    if (!window.confirm(`Delete the "${sel.name}" type? Existing workflows keep their data.`)) return
+    const { error } = await supabase.from('workflow_types').delete().eq('id', sel.id)
+    if (error) { alert('Delete failed: ' + error.message); return }
+    setSelId(null)
+    onChange?.()
+  }
+  async function saveType() {
+    if (!sel) return
+    if (!name.trim()) { alert('Type name is required.'); return }
+    setSaving(true)
+    const { error } = await supabase
+      .from('workflow_types')
+      .update({ name: name.trim(), objects, updated_at: new Date().toISOString() })
+      .eq('id', sel.id)
+    setSaving(false)
+    if (error) { alert('Save failed: ' + error.message); return }
+    onChange?.()
+  }
+
+  const addObject = cat =>
+    setObjects(prev => [...prev, { id: newId(), catId: cat.id, kind: cat.kind, label: cat.label, icon: cat.icon, purpose: cat.hint }])
+  const updateObject = (id, patch) => setObjects(prev => prev.map(o => (o.id === id ? { ...o, ...patch } : o)))
+  const removeObject = id => setObjects(prev => prev.filter(o => o.id !== id))
+  const moveObject = (id, dir) =>
+    setObjects(prev => {
+      const i = prev.findIndex(o => o.id === id)
+      const j = i + dir
+      if (i < 0 || j < 0 || j >= prev.length) return prev
+      const n = [...prev]
+      ;[n[i], n[j]] = [n[j], n[i]]
+      return n
+    })
+
+  return (
+    <div className="grid md:grid-cols-[220px_1fr] gap-4">
+      {/* Type list */}
+      <div className="border border-gray-200 rounded-xl p-2 bg-white self-start">
+        <div className="flex items-center justify-between px-1 pb-2">
+          <span className="text-[11px] font-semibold text-gray-500 uppercase">Workflow Types</span>
+          <button onClick={addType} className="text-xs text-green-700 font-semibold hover:underline">+ New</button>
+        </div>
+        {types.length === 0 ? (
+          <p className="text-xs text-gray-400 px-1 py-2">No types yet.</p>
+        ) : (
+          types.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setSelId(t.id)}
+              className={`w-full text-left text-sm px-2 py-1.5 rounded-lg ${selId === t.id ? 'bg-green-50 text-green-800 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}
+            >
+              {t.name}
+              <span className="text-[10px] text-gray-400 ml-1">{Array.isArray(t.objects) ? t.objects.length : 0} obj</span>
+            </button>
+          ))
+        )}
+      </div>
+
+      {/* Editor */}
+      {!sel ? (
+        <div className="border border-gray-200 rounded-xl p-6 text-center text-sm text-gray-400 bg-white">
+          Select a type to edit, or add a new one.
+        </div>
+      ) : (
+        <div className="border border-gray-200 rounded-xl p-4 bg-white">
+          <div className="flex items-center gap-2 mb-4">
+            <input value={name} onChange={e => setName(e.target.value)} className="input text-sm py-1.5 flex-1" placeholder="Type name" />
+            <button onClick={saveType} disabled={saving} className="text-sm bg-green-700 text-white font-semibold px-4 py-2 rounded-lg hover:bg-green-800 disabled:opacity-50">
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            <button onClick={deleteType} className="text-sm border border-red-100 text-red-500 px-3 py-2 rounded-lg hover:bg-red-50">Delete</button>
+          </div>
+
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-semibold text-gray-500 uppercase">Template objects</span>
+            <button onClick={() => setShowCatalog(v => !v)} className="text-xs px-2.5 py-1 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">＋ Add object</button>
+          </div>
+
+          {showCatalog && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mb-3 p-2 bg-gray-50 rounded-lg border border-gray-200">
+              {OBJECT_CATALOG.map(c => (
+                <button
+                  key={c.id}
+                  onClick={() => addObject(c)}
+                  title={c.hint}
+                  className="flex items-center gap-1.5 text-left text-xs px-2 py-1.5 rounded-lg bg-white border border-gray-200 hover:border-green-400"
+                >
+                  <span>{c.icon}</span>
+                  <span className="truncate">{c.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {objects.length === 0 ? (
+            <p className="text-xs text-gray-400 py-3">No objects yet. Add objects from the catalog to build this type's template.</p>
+          ) : (
+            <div className="space-y-2">
+              {objects.map(o => (
+                <div key={o.id} className="border border-gray-200 rounded-lg p-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{o.icon}</span>
+                    <input value={o.label} onChange={e => updateObject(o.id, { label: e.target.value })} className="input text-xs py-1 flex-1" placeholder="Object name" />
+                    <span className="text-[10px] uppercase text-gray-400">{o.kind}</span>
+                    <button onClick={() => moveObject(o.id, -1)} className="text-gray-400 hover:text-gray-700 px-1" title="Move up">↑</button>
+                    <button onClick={() => moveObject(o.id, 1)} className="text-gray-400 hover:text-gray-700 px-1" title="Move down">↓</button>
+                    <button onClick={() => removeObject(o.id)} className="text-gray-400 hover:text-red-600 px-1" title="Remove">×</button>
+                  </div>
+                  <input
+                    value={o.purpose || ''}
+                    onChange={e => updateObject(o.id, { purpose: e.target.value })}
+                    placeholder="What is this object for?"
+                    className="input text-[11px] py-1 w-full mt-1.5"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function WorkflowsTab({ userId }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(null) // workflow object | 'new' | null
+  const [tab, setTab] = useState('workflows') // 'workflows' | 'settings'
+  const [types, setTypes] = useState([])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -802,9 +1029,25 @@ export default function WorkflowsTab({ userId }) {
     setLoading(false)
   }, [])
 
+  // Load the tenant's workflow types; self-seed the defaults on first use so
+  // every tenant starts with the familiar set (then fully editable in Settings).
+  const loadTypes = useCallback(async () => {
+    const { data } = await supabase.from('workflow_types').select('*').order('sort_order')
+    let list = data || []
+    if (list.length === 0) {
+      await supabase
+        .from('workflow_types')
+        .insert(DEFAULT_TYPE_NAMES.map((name, i) => ({ name, sort_order: i + 1, objects: [] })))
+      const res = await supabase.from('workflow_types').select('*').order('sort_order')
+      list = res.data || []
+    }
+    setTypes(list)
+  }, [])
+
   useEffect(() => {
     load()
-  }, [load])
+    loadTypes()
+  }, [load, loadTypes])
 
   async function handleDelete(e, w) {
     e.stopPropagation()
@@ -822,6 +1065,7 @@ export default function WorkflowsTab({ userId }) {
       <WorkflowBuilder
         workflow={editing === 'new' ? null : editing}
         userId={userId}
+        types={types}
         onClose={() => setEditing(null)}
         onSaved={() => load()}
       />
@@ -830,6 +1074,22 @@ export default function WorkflowsTab({ userId }) {
 
   return (
     <div>
+      <div className="flex items-center gap-1 border-b border-gray-200 mb-4">
+        {[['workflows', '🔀 Workflows'], ['settings', '⚙️ Settings']].map(([k, l]) => (
+          <button
+            key={k}
+            onClick={() => setTab(k)}
+            className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${tab === k ? 'border-green-600 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+          >
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'settings' ? (
+        <WorkflowSettings types={types} onChange={loadTypes} />
+      ) : (
+      <>
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm text-gray-500">
           Multi-step approval &amp; routing flows for documents (e.g. secondary approval before sending, or policy → review → distribute → acknowledge).
@@ -890,6 +1150,8 @@ export default function WorkflowsTab({ userId }) {
             </tbody>
           </table>
         </div>
+      )}
+      </>
       )}
     </div>
   )
