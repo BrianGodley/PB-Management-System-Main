@@ -728,7 +728,7 @@ export default function Layout() {
           {menuOnTop && (
             <nav
               ref={navGroupRef}
-              className="hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center gap-1"
+              className="hidden lg:flex flex-1 justify-center items-center gap-1 min-w-0 overflow-x-auto px-2 thin-scroll"
             >
               {topEntries.map(g => {
                 if (g.type === 'single') {
@@ -786,8 +786,13 @@ export default function Layout() {
             </nav>
           )}
 
-          {/* Centre slot — pages portal content here (desktop). */}
-          <div className="flex-1 flex justify-center items-center min-w-0" id="app-header-center" />
+          {/* Centre slot — pages portal content here (desktop). Kept in the DOM
+              always (so portals don't break), but yields its flex space to the
+              top menu when the menu is on top. */}
+          <div
+            className={menuOnTop ? 'hidden' : 'flex-1 flex justify-center items-center min-w-0'}
+            id="app-header-center"
+          />
 
           {/* Right: mobile close (X) for screens with a green-bar title */}
           {screenTitle(location.pathname) && (
