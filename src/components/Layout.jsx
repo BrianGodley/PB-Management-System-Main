@@ -58,6 +58,24 @@ const navItems = [
   { path: '/statistics', label: 'Statistics', icon: '📈' },
 ]
 
+// Shown when a user navigates (e.g. by direct URL) to a module their plan
+// doesn't include. The menu already hides locked modules; this guards the route.
+function LockedModule({ label }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-center py-24 px-6">
+      <div className="text-5xl mb-4">🔒</div>
+      <h2 className="text-xl font-bold text-gray-900 mb-2">{label} isn’t in your plan</h2>
+      <p className="text-sm text-gray-500 max-w-md mb-6">
+        This module isn’t included in your current subscription. Upgrade your plan to unlock it, or
+        contact your administrator.
+      </p>
+      <Link to="/" className="btn-primary text-sm px-4 py-2">
+        Back to Dashboard
+      </Link>
+    </div>
+  )
+}
+
 // Dock and main menu labels are computed inside the component via t()
 // so they update when the user's language changes.
 
@@ -419,6 +437,14 @@ export default function Layout() {
   const { moduleKeys } = useEntitlements()
   const allowedNav = navItems.filter(i => isModuleEnabled(moduleKeys, i.path))
   const menuStructure = buildMenuStructure(allowedNav, menuGroups)
+  // Route guard: if the current path belongs to a module the plan doesn't
+  // include, block the page (show an upgrade notice) instead of rendering it.
+  const blockedModule = navItems.find(
+    i =>
+      i.path !== '/' &&
+      (location.pathname === i.path || location.pathname.startsWith(i.path + '/')) &&
+      !isModuleEnabled(moduleKeys, i.path)
+  )
   // Top-position entries: driven entirely by the user's Menu grouping. With no
   // groups defined every item shows flat (no hard-coded preset groups).
   const topEntries = menuStructure
@@ -1028,7 +1054,7 @@ export default function Layout() {
             layout — and the fixed bottom dock — wider than the screen.
             overscroll-none: the scroll box stops rubber-banding off the header. */}
         <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden overscroll-none p-2 pb-24 lg:px-6 lg:pb-6 lg:pt-9">
-          <Outlet />
+          {blockedModule ? <LockedModule label={blockedModule.label} /> : <Outlet />}
         </main>
 
         {/* DESKTOP BOTTOM NAV — horizontal menu bar for the Bottom position.
