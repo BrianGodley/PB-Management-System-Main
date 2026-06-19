@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import MasterRates from './MasterRates'
 import { DEFAULT_ESTIMATE_GPMD, DEFAULT_SALES_TAX_RATE } from '../lib/companyDefaults'
 import ConsultantPicker from '../components/ConsultantPicker'
-import ComingSoon from '../components/ComingSoon'
+import FunnelsBoard from '../components/FunnelsBoard'
 import Bids from './Bids'
 import { useModule } from '../platform'
 
@@ -1480,20 +1480,8 @@ export default function Clients() {
         </div>
       )}
 
-      {/* ── Funnels tab (pipeline view — built in a later phase) ── */}
-      {tab === 'funnels' && (
-        <ComingSoon
-          icon="🔻"
-          title="Sales Funnels"
-          blurb="See every opportunity as it moves through your pipeline, and act on what's stalling."
-          points={[
-            'Drag opportunities across pipeline stages',
-            'Value and count totals per stage',
-            'Spot deals going cold with time-in-stage',
-            'Filter by consultant, source, or kind',
-          ]}
-        />
-      )}
+      {/* ── Funnels tab — pipeline builder ── */}
+      {tab === 'funnels' && <FunnelsBoard />}
 
       {/* ── Estimates tab (Contractor) ── */}
       {tab === 'estimates' && canContractor && <EstimatesView onCountChange={setEstimatesTabCount} />}
