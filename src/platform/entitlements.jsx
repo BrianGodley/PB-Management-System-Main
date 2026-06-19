@@ -43,3 +43,21 @@ export function isModuleEnabled(moduleKeys, key) {
   if (!moduleKeys) return true
   return moduleKeys.includes(key)
 }
+
+// Convenience hook: is a module (or ANY of several) unlocked for this tenant?
+//   const canEstimate = useModule('/bids')
+//   const canJob = useModule(['/jobs', '/bids'])   // true if either is enabled
+export function useModule(key) {
+  const { moduleKeys } = useContext(EntitlementsContext)
+  const keys = Array.isArray(key) ? key : [key]
+  return keys.some(k => isModuleEnabled(moduleKeys, k))
+}
+
+// Declarative gate for cross-module hooks (buttons, tabs, widgets, links).
+//   <IfModule module="/bids"> <CreateEstimateButton/> </IfModule>
+//   <IfModule module={['/jobs','/bids']} fallback={<UpgradeNote/>}> ... </IfModule>
+export function IfModule({ module, fallback = null, children }) {
+  const { moduleKeys } = useContext(EntitlementsContext)
+  const keys = Array.isArray(module) ? module : [module]
+  return keys.some(k => isModuleEnabled(moduleKeys, k)) ? children : fallback
+}

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import NewEstimateModal from '../components/NewEstimateModal'
+import { IfModule } from '../platform'
 import BidDocViewerModal from '../components/BidDocViewerModal'
 import ConsultantPicker from '../components/ConsultantPicker'
 import EDocuments from './EDocuments'
@@ -915,12 +916,16 @@ export default function ClientDetail() {
                         {estimates.length}
                       </span>
                     </div>
-                    <button
-                      onClick={() => setShowEstimateModal(true)}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-green-700 text-white font-semibold hover:bg-green-800 transition-colors"
-                    >
-                      + New Estimate
-                    </button>
+                    {/* Estimating belongs to the Contractor package; hide the
+                        action for tenants without it (Opportunities stays as CRM). */}
+                    <IfModule module={['/bids', '/jobs']}>
+                      <button
+                        onClick={() => setShowEstimateModal(true)}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-green-700 text-white font-semibold hover:bg-green-800 transition-colors"
+                      >
+                        + New Estimate
+                      </button>
+                    </IfModule>
                   </div>
                   {estimates.length === 0 ? (
                     <p className="text-center text-sm text-gray-400 py-8">No estimates yet.</p>

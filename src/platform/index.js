@@ -16,5 +16,5 @@ export {
 } from './registry'
 
 export { Slot } from './Slot'
-export { EntitlementsProvider, useEntitlements, isModuleEnabled } from './entitlements'
+export { EntitlementsProvider, useEntitlements, isModuleEnabled, useModule, IfModule } from './entitlements'
 export * as hooks from './hooks'
