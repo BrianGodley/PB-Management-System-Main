@@ -835,6 +835,8 @@ export default function ClientDetail() {
                 </div>
 
                 {/* Stats card */}
+                {/* Summary (estimates/bids/jobs/COs/revenue) — Contractor package */}
+                <IfModule module={['/bids', '/jobs']}>
                 <div className="bg-white border border-slate-300 rounded-xl p-4 shadow-sm">
                   <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2.5">
                     Summary
@@ -889,6 +891,7 @@ export default function ClientDetail() {
                     ))}
                   </div>
                 </div>
+                </IfModule>
 
                 {/* Actions card — "+ New Estimate" was removed from here
                     because the Estimates section on the right already has
@@ -907,7 +910,8 @@ export default function ClientDetail() {
             {/* ══ RIGHT COLUMN ═════════════════════════════════════════════ */}
             <div className="bg-slate-200 lg:overflow-y-auto">
               <div className="p-3 space-y-3">
-                {/* ── Estimates ── */}
+                {/* ── Estimates ── (Contractor package) */}
+                <IfModule module={['/bids', '/jobs']}>
                 <div className="bg-white border border-slate-300 rounded-xl shadow-sm overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
                     <div className="flex items-center gap-2">
@@ -1030,6 +1034,7 @@ export default function ClientDetail() {
                     </div>
                   )}
                 </div>
+                </IfModule>
 
                 {/* ── E-Documents ── */}
                 <div className="bg-white border border-slate-300 rounded-xl shadow-sm overflow-hidden">
@@ -1041,7 +1046,8 @@ export default function ClientDetail() {
                   </div>
                 </div>
 
-                {/* ── Bids ── */}
+                {/* ── Bids ── (Contractor package) */}
+                <IfModule module={['/bids', '/jobs']}>
                 <div className="bg-white border border-slate-300 rounded-xl shadow-sm overflow-hidden">
                   <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-200">
                     <h3 className="text-sm font-bold text-gray-700">Bids</h3>
@@ -1131,8 +1137,10 @@ export default function ClientDetail() {
                     </div>
                   )}
                 </div>
+                </IfModule>
 
-                {/* ── Jobs / COs ── */}
+                {/* ── Jobs / COs ── (Contractor package) */}
+                <IfModule module={['/bids', '/jobs']}>
                 <div className="bg-white border border-slate-300 rounded-xl shadow-sm overflow-hidden">
                   <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-200">
                     <h3 className="text-sm font-bold text-gray-700">Jobs / Change Orders</h3>
@@ -1295,6 +1303,7 @@ export default function ClientDetail() {
                     </div>
                   )}
                 </div>
+                </IfModule>
               </div>
             </div>
             {/* ═══════════════════════════════════════════════════════════════ */}
