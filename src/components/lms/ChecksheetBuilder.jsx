@@ -39,16 +39,18 @@ function StepBadge({ type }) {
   )
 }
 
-export default function ChecksheetBuilder({ course: initialCourse, onClose, onSaved }) {
+export default function ChecksheetBuilder({ course: initialCourse, draft, onClose, onSaved }) {
   const { user } = useAuth()
 
-  const [title, setTitle] = useState(initialCourse?.title || '')
-  const [description, setDescription] = useState(initialCourse?.description || '')
-  const [category, setCategory] = useState(initialCourse?.category || 'General')
+  // `draft` (from "Generate from Documents") seeds a brand-new checksheet that
+  // hasn't been saved yet — title/category/steps are pre-filled for review.
+  const [title, setTitle] = useState(initialCourse?.title || draft?.title || '')
+  const [description, setDescription] = useState(initialCourse?.description || draft?.description || '')
+  const [category, setCategory] = useState(initialCourse?.category || draft?.category || 'General')
   const [imageUrl, setImageUrl] = useState(initialCourse?.image_url || '')
   const [imageFile, setImageFile] = useState(null)
   const imgRef = useRef()
-  const [steps, setSteps] = useState([])
+  const [steps, setSteps] = useState(draft?.steps || [])
 
   const [readItems, setReadItems] = useState([])
   const [drills, setDrills] = useState([])
@@ -525,9 +527,13 @@ export default function ChecksheetBuilder({ course: initialCourse, onClose, onSa
         </button>
         <div className="flex-1">
           <h2 className="font-bold text-gray-900 text-lg">
-            {initialCourse?.id ? 'Edit Checksheet' : 'New Checksheet'}
+            {initialCourse?.id ? 'Edit Checksheet' : draft ? '✨ Review AI Draft' : 'New Checksheet'}
           </h2>
-          <p className="text-xs text-gray-500">Build a step-by-step training course</p>
+          <p className="text-xs text-gray-500">
+            {draft
+              ? 'AI-generated draft — review each step, attach documents/quizzes, then Save.'
+              : 'Build a step-by-step training course'}
+          </p>
         </div>
         <button
           onClick={saveChecksheet}
@@ -649,7 +655,7 @@ export default function ChecksheetBuilder({ course: initialCourse, onClose, onSa
                   {step.step_type === 'watch' && step.youtube_url && (
                     <p className="text-xs text-gray-400 truncate mt-0.5">{step.youtube_url}</p>
                   )}
-                  {step.step_type === 'special_drill' && step.instructions && (
+                  {step.instructions && (
                     <p className="text-xs text-gray-400 truncate mt-0.5">{step.instructions}</p>
                   )}
                 </div>
@@ -711,6 +717,24 @@ export default function ChecksheetBuilder({ course: initialCourse, onClose, onSa
             </div>
 
             {renderStepFields()}
+
+            {/* General notes — shown for every type except special_drill, which
+                already has its own required Instructions field. Carries the
+                AI-generated step notes so they're reviewable/editable. */}
+            {stepForm.step_type !== 'special_drill' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Instructions / Notes <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <textarea
+                  value={stepForm.instructions}
+                  onChange={e => setSF('instructions', e.target.value)}
+                  rows={3}
+                  placeholder="What the trainee should do, key points to cover…"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-500 resize-none"
+                />
+              </div>
+            )}
 
             {stepError && (
               <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">

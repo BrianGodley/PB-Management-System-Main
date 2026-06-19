@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import ChecksheetBuilder from '../components/lms/ChecksheetBuilder'
+import GenerateChecksheetModal from '../components/lms/GenerateChecksheetModal'
 import CoursePlayer from '../components/lms/CoursePlayer'
 import LearningDrillsManager from '../components/lms/admin/LearningDrillsManager'
 import QuizzesManager from '../components/lms/admin/QuizzesManager'
@@ -180,6 +181,8 @@ export default function LMS() {
   // Modals
   const [showBuilder, setShowBuilder] = useState(false)
   const [editCourse, setEditCourse] = useState(null)
+  const [draftCourse, setDraftCourse] = useState(null) // AI-generated draft seed
+  const [showGenerate, setShowGenerate] = useState(false)
   const [showPlayer, setShowPlayer] = useState(null)
   const [showAssign, setShowAssign] = useState(null)
   const [assignEmployee, setAssignEmployee] = useState('')
@@ -362,15 +365,24 @@ export default function LMS() {
             Build step-by-step training courses for employees.
           </p>
         </div>
-        <button
-          onClick={() => {
-            setEditCourse(null)
-            setShowBuilder(true)
-          }}
-          className="px-4 py-2 bg-green-700 text-white rounded-xl font-medium hover:bg-green-800"
-        >
-          + New Checksheet
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowGenerate(true)}
+            className="px-4 py-2 bg-white border border-green-600 text-green-700 rounded-xl font-medium hover:bg-green-50"
+          >
+            ✨ Generate from Documents
+          </button>
+          <button
+            onClick={() => {
+              setEditCourse(null)
+              setDraftCourse(null)
+              setShowBuilder(true)
+            }}
+            className="px-4 py-2 bg-green-700 text-white rounded-xl font-medium hover:bg-green-800"
+          >
+            + New Checksheet
+          </button>
+        </div>
       </div>
 
       {coursesLoading ? (
@@ -695,13 +707,28 @@ export default function LMS() {
         </div>
       )}
 
+      {/* Generate-from-documents modal */}
+      {showGenerate && (
+        <GenerateChecksheetModal
+          onClose={() => setShowGenerate(false)}
+          onGenerated={draft => {
+            setShowGenerate(false)
+            setEditCourse(null)
+            setDraftCourse(draft)
+            setShowBuilder(true)
+          }}
+        />
+      )}
+
       {/* Checksheet builder */}
       {showBuilder && (
         <ChecksheetBuilder
           course={editCourse}
+          draft={draftCourse}
           onClose={() => {
             setShowBuilder(false)
             setEditCourse(null)
+            setDraftCourse(null)
           }}
           onSaved={loadCourses}
         />
