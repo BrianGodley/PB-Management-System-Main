@@ -4,6 +4,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LanguageContext'
 import { supabase } from '../lib/supabase'
+import { useEntitlements, isModuleEnabled } from '../platform'
 import {
   applyBackgroundForPath,
   readModuleBackgrounds,
@@ -413,7 +414,11 @@ export default function Layout() {
   // User-defined menu groups. When present they drive every menu position;
   // otherwise each position falls back to its built-in layout.
   const useCustomGroups = Array.isArray(menuGroups) && menuGroups.length > 0
-  const menuStructure = buildMenuStructure(navItems, menuGroups)
+  // Plan gating: only show modules the current tenant's plan unlocks. With no
+  // plan (moduleKeys === null) every module shows — today's behavior.
+  const { moduleKeys } = useEntitlements()
+  const allowedNav = navItems.filter(i => isModuleEnabled(moduleKeys, i.path))
+  const menuStructure = buildMenuStructure(allowedNav, menuGroups)
   // Top-position entries: driven entirely by the user's Menu grouping. With no
   // groups defined every item shows flat (no hard-coded preset groups).
   const topEntries = menuStructure
@@ -998,7 +1003,7 @@ export default function Layout() {
                     </button>
                   )
                 )
-              : navItems.map(item => renderNavLink(item))}
+              : allowedNav.map(item => renderNavLink(item))}
           </nav>
           <div className={`px-1.5 py-3 border-t ${navTheme.dark ? 'border-white/20' : 'border-black/10'}`}>
             <button
@@ -1078,7 +1083,7 @@ export default function Layout() {
                     </div>
                   )
                 )
-              : navItems.map(item => (
+              : allowedNav.map(item => (
                   <Link
                     key={item.path}
                     to={item.path}

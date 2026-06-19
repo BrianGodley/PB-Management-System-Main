@@ -5,6 +5,7 @@ import { LanguageProvider } from './contexts/LanguageContext'
 import { RateIconsProvider } from './contexts/RateIconsContext'
 import Layout from './components/Layout'
 import ErrorBoundary from './components/ErrorBoundary'
+import EntitlementsGate from './platform/EntitlementsGate'
 import Login from './pages/Login'
 
 // Wrap React.lazy so a failed/stale chunk import does a single auto-reload
@@ -152,7 +153,9 @@ function AppRoutes() {
           path="/"
           element={
             <ProtectedRoute>
-              <Layout />
+              <EntitlementsGate>
+                <Layout />
+              </EntitlementsGate>
             </ProtectedRoute>
           }
         >
