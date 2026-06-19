@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { ExportModal, ImportModal } from '../components/ContactImportExport'
 import { fetchAssignableEmployees } from '../lib/assignableEmployees'
+import ComingSoon from '../components/ComingSoon'
 
 // ── Stage config ──────────────────────────────────────────────────────────────
 const STAGES = [
@@ -1311,6 +1312,9 @@ export default function Contacts() {
         {[
           { id: 'individuals', label: `👤 Individuals (${contactsTotal.toLocaleString()})` },
           { id: 'companies', label: `🏢 Companies (${companiesTotal.toLocaleString()})` },
+          { id: 'workflows', label: '🔁 Contact Workflows' },
+          { id: 'website', label: '🌐 Website Builder' },
+          { id: 'social', label: '📣 Social Media' },
           { id: 'settings', label: '⚙️ Settings' },
         ].map(tab => (
           <button
@@ -1333,14 +1337,61 @@ export default function Contacts() {
         ))}
         </div>
         <div className="flex items-center gap-2 pr-2 flex-shrink-0">
-          <button
-            onClick={() => setShowAdd(true)}
-            className="hidden sm:flex btn-primary text-xs px-3 py-1.5"
-          >
-            + {isIndividuals ? 'Add Contact' : 'Add Company'}
-          </button>
+          {(activeTab === 'individuals' || activeTab === 'companies') && (
+            <button
+              onClick={() => setShowAdd(true)}
+              className="hidden sm:flex btn-primary text-xs px-3 py-1.5"
+            >
+              + {isIndividuals ? 'Add Contact' : 'Add Company'}
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Contact Workflows — placeholder (Tier 2; built in a later phase) */}
+      {activeTab === 'workflows' && (
+        <ComingSoon
+          icon="🔁"
+          title="Contact Workflows"
+          blurb="Automate follow-up so no lead goes cold — triggered by contact tags and pipeline activity."
+          points={[
+            'Email & SMS sequences that fire on stage changes',
+            'Automatic follow-up tasks assigned to your team',
+            'Drip nurture campaigns for cold and warm leads',
+            'Templates you can reuse across every contact',
+          ]}
+        />
+      )}
+
+      {/* Website Builder — placeholder (Tier 2; built in a later phase) */}
+      {activeTab === 'website' && (
+        <ComingSoon
+          icon="🌐"
+          title="Website Builder"
+          blurb="Stand up a lead-generating marketing site that feeds straight into your contacts."
+          points={[
+            'Drag-and-drop pages with your branding',
+            'Contact & quote-request forms that create contacts automatically',
+            'Hosted on your own domain',
+            'Mobile-friendly templates built for contractors',
+          ]}
+        />
+      )}
+
+      {/* Social Media — placeholder (Tier 2; built in a later phase) */}
+      {activeTab === 'social' && (
+        <ComingSoon
+          icon="📣"
+          title="Social Media Manager"
+          blurb="Plan, schedule, and post to your social channels without leaving Picture Build."
+          points={[
+            'Schedule posts across multiple platforms',
+            'A shared content calendar for your team',
+            'Reuse job photos and project highlights',
+            'Track engagement at a glance',
+          ]}
+        />
+      )}
 
       {/* Settings panel */}
       {activeTab === 'settings' && (
@@ -1388,7 +1439,7 @@ export default function Contacts() {
         </div>
       )}
 
-      {activeTab !== 'settings' && (
+      {(activeTab === 'individuals' || activeTab === 'companies') && (
         <>
           {/* Mobile: full-width Add button sits directly above the search field. */}
           <button

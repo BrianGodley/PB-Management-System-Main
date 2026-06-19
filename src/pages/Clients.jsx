@@ -6,6 +6,9 @@ import { useAuth } from '../contexts/AuthContext'
 import MasterRates from './MasterRates'
 import { DEFAULT_ESTIMATE_GPMD, DEFAULT_SALES_TAX_RATE } from '../lib/companyDefaults'
 import ConsultantPicker from '../components/ConsultantPicker'
+import ComingSoon from '../components/ComingSoon'
+import Bids from './Bids'
+import { useModule } from '../platform'
 
 // Opportunities list is fetched one page at a time (server-side paging).
 const CLIENTS_PER_PAGE = 200
@@ -1006,6 +1009,9 @@ function AddCompanyModal({ onSave, onClose, user }) {
 // ── Main Clients component ────────────────────────────────────────────────────
 export default function Clients() {
   const { user } = useAuth()
+  // Estimates + Bids are job-side (Contractor package). On Tier 2 without it,
+  // those two tabs are hidden; Funnels + the rest are Tier-2 native.
+  const canContractor = useModule('/bids')
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [clientModal, setClientModal] = useState(null) // null | 'individual' | 'company'
@@ -1394,7 +1400,9 @@ export default function Clients() {
           {[
             { key: 'individuals', label: '👤 Individuals', count: tabCounts.individuals },
             { key: 'companies',   label: '🏢 Companies',   count: tabCounts.companies },
-            { key: 'estimates',   label: '📋 Estimates',   count: tabCounts.estimates },
+            { key: 'funnels',     label: '🔻 Funnels',     count: null },
+            ...(canContractor ? [{ key: 'estimates', label: '📋 Estimates', count: tabCounts.estimates }] : []),
+            ...(canContractor ? [{ key: 'bids',      label: '📑 Bids',      count: null }] : []),
             { key: 'past',        label: '📦 Past',        count: tabCounts.past },
             { key: 'settings',    label: '⚙️ Settings',    count: null },
           ].map(t => (
@@ -1472,10 +1480,28 @@ export default function Clients() {
         </div>
       )}
 
-      {/* ── Estimates tab ── */}
-      {tab === 'estimates' && <EstimatesView onCountChange={setEstimatesTabCount} />}
+      {/* ── Funnels tab (pipeline view — built in a later phase) ── */}
+      {tab === 'funnels' && (
+        <ComingSoon
+          icon="🔻"
+          title="Sales Funnels"
+          blurb="See every opportunity as it moves through your pipeline, and act on what's stalling."
+          points={[
+            'Drag opportunities across pipeline stages',
+            'Value and count totals per stage',
+            'Spot deals going cold with time-in-stage',
+            'Filter by consultant, source, or kind',
+          ]}
+        />
+      )}
 
-      {tab !== 'settings' && tab !== 'estimates' && (
+      {/* ── Estimates tab (Contractor) ── */}
+      {tab === 'estimates' && canContractor && <EstimatesView onCountChange={setEstimatesTabCount} />}
+
+      {/* ── Bids tab (Contractor) ── */}
+      {tab === 'bids' && canContractor && <Bids />}
+
+      {tab !== 'settings' && tab !== 'estimates' && tab !== 'funnels' && tab !== 'bids' && (
         <>
           {/* ── Search + Column picker ── */}
           <div className="flex items-center justify-between mb-3 gap-3 mt-4 flex-shrink-0">
