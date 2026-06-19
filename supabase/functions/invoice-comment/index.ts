@@ -69,11 +69,15 @@ Deno.serve(async req => {
 
     const { data: job } = await admin
       .from('jobs')
-      .select('id, name, client_name, client_id')
+      .select('id, name, client_name, client_id, tenant_id')
       .eq('id', inv.job_id)
       .maybeSingle()
     if (!job || job.client_id !== portal.client_id)
       return json({ error: 'This invoice is not on your account.' }, 403)
+
+    // Service-role bypasses RLS, so every read/write below is scoped to the
+    // job's tenant explicitly (the caller is a portal client, not a staff user).
+    const tenantId = job.tenant_id
 
     const { data: client } = await admin
       .from('clients')
@@ -93,6 +97,7 @@ Deno.serve(async req => {
     // ── 1) Daily log ────────────────────────────────────────────────────────
     const { error: logErr } = await admin.from('daily_logs').insert({
       job_id: job.id,
+      tenant_id: tenantId,
       date: today,
       title: `Client comment · Invoice ${invNum}`,
       notes: `${clientName} commented on Invoice ${invNum}:\n\n${text}`,
@@ -106,6 +111,7 @@ Deno.serve(async req => {
     const { data: settings } = await admin
       .from('company_settings')
       .select('invoice_comm_position_id')
+      .eq('tenant_id', tenantId)
       .maybeSingle()
     let recipients: string[] = []
     if (settings?.invoice_comm_position_id) {
@@ -118,6 +124,7 @@ Deno.serve(async req => {
         const { data: emps } = await admin
           .from('employees')
           .select('email')
+          .eq('tenant_id', tenantId)
           .eq('status', 'active')
           .ilike('job_title', pos.title)
         recipients = (emps || []).map((e: { email?: string }) => e.email || '').filter(Boolean)

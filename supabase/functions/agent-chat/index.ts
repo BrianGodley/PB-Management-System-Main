@@ -96,6 +96,7 @@ async function buildSystemPrompt(
 async function getOrCreateConversation(
   admin: ReturnType<typeof adminClient>,
   userId: string,
+  tenantId: string,
   conversationId?: string,
 ) {
   if (conversationId) {
@@ -110,7 +111,7 @@ async function getOrCreateConversation(
   }
   const { data, error } = await admin
     .from('agent_conversations')
-    .insert({ user_id: userId })
+    .insert({ user_id: userId, tenant_id: tenantId })
     .select('id')
     .single()
   if (error) throw new Error(error.message)
@@ -142,6 +143,7 @@ async function loadHistory(
 async function saveMessage(
   admin: ReturnType<typeof adminClient>,
   conversationId: string,
+  tenantId: string,
   role: 'user' | 'assistant' | 'tool',
   content: string | null,
   raw: unknown,
@@ -151,6 +153,7 @@ async function saveMessage(
     .from('agent_messages')
     .insert({
       conversation_id: conversationId,
+      tenant_id: tenantId,
       role,
       content,
       raw,
@@ -195,6 +198,7 @@ async function persistMessageAttachments(
   conversationId: string,
   messageId: string,
   userId: string,
+  tenantId: string,
   attachments: AttachmentInput[],
 ) {
   if (!attachments.length) return
@@ -202,6 +206,7 @@ async function persistMessageAttachments(
     message_id:      messageId,
     conversation_id: conversationId,
     user_id:         userId,
+    tenant_id:       tenantId,
     storage_path:    a.storage_path,
     file_name:       a.file_name,
     mime_type:       a.mime_type,
@@ -284,6 +289,7 @@ async function buildUserMessageBlocks(
 async function logToolCall(
   admin: ReturnType<typeof adminClient>,
   conversationId: string,
+  tenantId: string,
   messageId: string | null,
   toolName: string,
   args: unknown,
@@ -293,6 +299,7 @@ async function logToolCall(
 ) {
   await admin.from('agent_tool_calls').insert({
     conversation_id: conversationId,
+    tenant_id:       tenantId,
     message_id:      messageId,
     tool_name:       toolName,
     arguments:       args,
@@ -309,6 +316,7 @@ const MAX_TOOL_ITERATIONS = 8
 async function runAgenticLoop(
   admin: ReturnType<typeof adminClient>,
   conversationId: string,
+  tenantId: string,
   history: LLMMessage[],
   toolCtx: ToolContext,
 ) {
@@ -336,6 +344,7 @@ async function runAgenticLoop(
     const assistantMsgId = await saveMessage(
       admin,
       conversationId,
+      tenantId,
       'assistant',
       renderedText,
       resp.content,
@@ -366,7 +375,7 @@ async function runAgenticLoop(
         errMsg = e instanceof Error ? e.message : String(e)
       }
       await logToolCall(
-        admin, conversationId, assistantMsgId,
+        admin, conversationId, tenantId, assistantMsgId,
         tu.name, tu.input, resultPayload, errMsg,
         Date.now() - started,
       )
@@ -380,7 +389,7 @@ async function runAgenticLoop(
 
     // Save the tool-result message and append both turns to history for the
     // next model call.
-    await saveMessage(admin, conversationId, 'tool', null, toolResultBlocks)
+    await saveMessage(admin, conversationId, tenantId, 'tool', null, toolResultBlocks)
 
     messages = [
       ...messages,
@@ -413,7 +422,13 @@ serve(async (req: Request) => {
     }
 
     const admin = adminClient()
-    const conversationId = await getOrCreateConversation(admin, userId, body?.conversation_id)
+    // Service-role bypasses RLS — resolve the caller's tenant so every agent_*
+    // insert is stamped with it (NOT NULL after Stage B).
+    const { data: prof } = await admin.from('profiles').select('tenant_id').eq('id', userId).maybeSingle()
+    const tenantId = prof?.tenant_id as string | undefined
+    if (!tenantId) return json(401, { error: 'No tenant for caller' })
+
+    const conversationId = await getOrCreateConversation(admin, userId, tenantId, body?.conversation_id)
     const history        = await loadHistory(admin, conversationId)
 
     // Build the rich content blocks (text + image/PDF) for this turn.

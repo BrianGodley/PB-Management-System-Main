@@ -180,11 +180,13 @@ serve(async (req) => {
     const limit   = Math.min(Number(reqBody.limit) || DEFAULT_BATCH, MAX_BATCH)
 
     const { data: conn, error: cErr } = await sb.from('ghl_connections')
-      .select('access_token, location_id, contacts_enabled')
+      .select('access_token, location_id, contacts_enabled, tenant_id')
       .eq('singleton', true)
       .maybeSingle()
     if (cErr)  throw new Error('Failed to load connection: ' + cErr.message)
     if (!conn) throw new Error('No GHL connection saved. Configure it in Admin → Integrations.')
+    // Single GHL connection → scope all contact reads/writes to its tenant.
+    const tenantId = conn.tenant_id
     if (!conn.contacts_enabled) {
       return json(200, { ok: true, skipped: true, reason: 'Contacts sync disabled.' })
     }
@@ -200,11 +202,13 @@ serve(async (req) => {
     const [{ data: noLink, error: nErr }, { data: linked, error: sErr }] = await Promise.all([
       sb.from('contacts')
         .select(CONTACT_SELECT_COLS)
+        .eq('tenant_id', tenantId)
         .is('ghl_contact_id', null)
         .order('id', { ascending: true })
         .limit(limit),
       sb.from('contacts')
         .select(CONTACT_SELECT_COLS)
+        .eq('tenant_id', tenantId)
         .not('ghl_contact_id', 'is', null)
         .order('updated_at', { ascending: false })
         .limit(2000),
@@ -292,6 +296,7 @@ serve(async (req) => {
     }).eq('object_type', 'contacts')
 
     await sb.from('ghl_sync_log').insert({
+      tenant_id:      tenantId,
       object_type:    'contacts',
       direction:      'outbound',
       status:         errorCount ? 'error' : 'ok',

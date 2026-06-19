@@ -428,10 +428,13 @@ serve(async (req) => {
     const startPage = Math.max(1, parseInt(reqBody.start_page) || 1)
 
     const { data: conn, error: cErr } = await sb.from('ghl_connections')
-      .select('access_token, location_id, contacts_enabled')
+      .select('access_token, location_id, contacts_enabled, tenant_id')
       .eq('singleton', true).maybeSingle()
     if (cErr) throw new Error('Failed to load connection: ' + cErr.message)
     if (!conn) throw new Error('No GHL connection saved. Configure it in Admin → Integrations.')
+    // GHL is a single connection (one tenant's). Service-role bypasses RLS, so
+    // scope every contacts read/write to this connection's tenant.
+    const tenantId = conn.tenant_id
     if (!conn.contacts_enabled) {
       return json(200, { ok: true, skipped: true, reason: 'Contacts sync disabled.' })
     }
@@ -500,6 +503,7 @@ serve(async (req) => {
       // Log each page for debugging.
       try {
         await sb.from('ghl_sync_log').insert({
+          tenant_id:      tenantId,
           object_type:    'contacts',
           direction:      'inbound',
           status:         'ok',
@@ -533,7 +537,7 @@ serve(async (req) => {
 
         // 1. ghl_contact_id
         const { data: byGhl } = await sb.from('contacts')
-          .select('id').eq('ghl_contact_id', row.ghl_contact_id).maybeSingle()
+          .select('id').eq('tenant_id', tenantId).eq('ghl_contact_id', row.ghl_contact_id).maybeSingle()
         // Strip created_at from all UPDATE payloads — it should only be set on INSERT.
         const { created_at: _ca, ...updateRow } = row as any
 
@@ -550,7 +554,7 @@ serve(async (req) => {
         // 2. email
         if (row.email) {
           const { data: byEmail } = await sb.from('contacts')
-            .select('id, first_name, last_name').eq('email', row.email).is('ghl_contact_id', null).maybeSingle()
+            .select('id, first_name, last_name').eq('tenant_id', tenantId).eq('email', row.email).is('ghl_contact_id', null).maybeSingle()
           if (byEmail?.id) {
             counts.would_update_by_email += 1
             collectSample('email', c, byEmail)
@@ -566,6 +570,7 @@ serve(async (req) => {
         if (phoneDigits.length >= 7) {
           const { data: phoneCands } = await sb.from('contacts')
             .select('id, first_name, last_name, phone, cell, ghl_contact_id')
+            .eq('tenant_id', tenantId)
             .or(`phone.ilike.%${phoneDigits.slice(-7)}%,cell.ilike.%${phoneDigits.slice(-7)}%`)
             .is('ghl_contact_id', null).limit(50)
           const phoneHit = (phoneCands || []).find(p => {
@@ -588,6 +593,7 @@ serve(async (req) => {
         if (hasNameZip) {
           const { data: nzCands } = await sb.from('contacts')
             .select('id, first_name, last_name, zip, ghl_contact_id')
+            .eq('tenant_id', tenantId)
             .ilike('last_name', row.last_name || '').ilike('first_name', row.first_name || '')
             .eq('zip', row.zip || '').is('ghl_contact_id', null).limit(5)
           const nzHit = (nzCands || [])[0]
@@ -606,7 +612,7 @@ serve(async (req) => {
         counts.would_insert += 1
         collectSample('insert', c, null)
         if (!dryRun) {
-          const { error: iErr } = await sb.from('contacts').insert(row)
+          const { error: iErr } = await sb.from('contacts').insert({ ...row, tenant_id: tenantId })
           if (iErr) throw new Error('Insert failed: ' + iErr.message)
         }
         recordsSynced += 1
@@ -661,6 +667,7 @@ serve(async (req) => {
     } catch { /* optional RPC */ }
 
     await sb.from('ghl_sync_log').insert({
+      tenant_id:      tenantId,
       object_type:    'contacts',
       direction:      'inbound',
       status:         'ok',

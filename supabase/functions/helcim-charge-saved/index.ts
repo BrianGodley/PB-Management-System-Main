@@ -54,7 +54,7 @@ Deno.serve(async req => {
 
     const { data: inv } = await supabase
       .from('job_invoices')
-      .select('id, invoice_number, amount, amount_paid, status, job_id')
+      .select('id, invoice_number, amount, amount_paid, status, job_id, tenant_id')
       .eq('id', invoice_id)
       .maybeSingle()
     if (!inv) return json({ error: 'Invoice not found' }, 404)
@@ -104,6 +104,7 @@ Deno.serve(async req => {
     // Record the payment + recompute the invoice balance.
     await supabase.from('job_invoice_payments').insert({
       job_id: inv.job_id,
+      tenant_id: inv.tenant_id,
       invoice_id: inv.id,
       amount,
       method: isBank ? 'Bank Transfer' : 'Credit Card',

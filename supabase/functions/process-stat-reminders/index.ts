@@ -151,7 +151,7 @@ serve(async (req) => {
       .select(`
         id, statistic_id, delay_days, notify_email, notify_sms,
         repeat_enabled, repeat_value, repeat_unit,
-        statistics ( id, name, tracking, owner_user_id, archived )
+        statistics ( id, name, tracking, owner_user_id, archived, tenant_id )
       `)
       .eq('enabled', true)
 
@@ -260,6 +260,7 @@ serve(async (req) => {
       const sentCount = (logRow?.sent_count ?? 0) + 1
       await admin.from('stat_reminder_log').upsert({
         statistic_id: rem.statistic_id,
+        tenant_id:    stat.tenant_id,
         period_date:  periodStr,
         sent_count:   sentCount,
         last_sent_at: today.toISOString(),

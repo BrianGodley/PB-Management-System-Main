@@ -20,6 +20,7 @@
 // Auto-provided by the platform: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { getTenantId } from '../_shared/tenant.ts'
 
 const BUCKET = 'company-files'
 const FOLDER_MIME = 'application/vnd.google-apps.folder'
@@ -167,11 +168,19 @@ Deno.serve(async req => {
     return json(500, { error: 'GDRIVE_SA_KEY is not set or not valid JSON.' })
   }
 
-  // Resolve / create the job.
+  // Resolve / create the job. Service-role bypasses RLS, so the tenant is
+  // resolved from the caller at job start and PERSISTED on the job row — the
+  // self-chained continue passes (service-role, no JWT) read it back.
   let jobId: number
+  let tenantId: string | null
   if (body.continue && body.jobId) {
     jobId = body.jobId
+    const { data: jrow } = await sb.from('drive_sync_jobs').select('tenant_id').eq('id', jobId).maybeSingle()
+    tenantId = jrow?.tenant_id ?? null
+    if (!tenantId) return json(400, { error: 'Sync job has no tenant.' })
   } else {
+    tenantId = await getTenantId(req, sb)
+    if (!tenantId) return json(401, { error: 'No tenant for caller' })
     // Don't start a second run on top of a live one.
     const { data: live } = await sb
       .from('drive_sync_jobs')
@@ -183,7 +192,7 @@ Deno.serve(async req => {
 
     const { data: jb, error: jErr } = await sb
       .from('drive_sync_jobs')
-      .insert({ status: 'running', message: 'Starting…', started_at: new Date().toISOString() })
+      .insert({ status: 'running', message: 'Starting…', started_at: new Date().toISOString(), tenant_id: tenantId })
       .select('id')
       .single()
     if (jErr) return json(500, { error: 'Could not create job: ' + jErr.message })
@@ -199,16 +208,16 @@ Deno.serve(async req => {
       }
       for (const d of drives) {
         // find or create matching PBS drive
-        const { data: ex } = await sb.from('pbs_drives').select('id').eq('name', d.name).limit(1)
+        const { data: ex } = await sb.from('pbs_drives').select('id').eq('name', d.name).eq('tenant_id', tenantId).limit(1)
         let pbsId = ex && ex[0] ? ex[0].id : null
         if (!pbsId) {
-          const { data: nd, error: e2 } = await sb.from('pbs_drives').insert({ name: d.name }).select('id').single()
+          const { data: nd, error: e2 } = await sb.from('pbs_drives').insert({ name: d.name, tenant_id: tenantId }).select('id').single()
           if (e2) throw e2
           pbsId = nd.id
         }
         await sb
           .from('drive_sync_queue')
-          .insert({ job_id: jobId, drive_id: d.id, parent_id: d.id, pbs_id: String(pbsId), rel_path: '' })
+          .insert({ job_id: jobId, drive_id: d.id, parent_id: d.id, pbs_id: String(pbsId), rel_path: '', tenant_id: tenantId })
           .then(() => {}, () => {}) // ignore unique conflicts
       }
     } catch (e) {
@@ -263,7 +272,7 @@ Deno.serve(async req => {
         const childPath = item.rel_path ? `${item.rel_path}/${c.name}` : c.name
         await sb
           .from('drive_sync_queue')
-          .insert({ job_id: jobId, drive_id: item.drive_id, parent_id: c.id, pbs_id: item.pbs_id, rel_path: childPath })
+          .insert({ job_id: jobId, drive_id: item.drive_id, parent_id: c.id, pbs_id: item.pbs_id, rel_path: childPath, tenant_id: tenantId })
           .then(() => {}, () => {}) // ignore unique conflict on resume
         continue
       }
@@ -272,7 +281,7 @@ Deno.serve(async req => {
       const fname = isNative ? `${c.name}.pdf` : c.name
       const pbsPath = `drives/${item.pbs_id}/${item.rel_path ? item.rel_path + '/' : ''}${fname}`
 
-      const { data: man } = await sb.from('drive_sync_files').select('modified_time').eq('file_id', c.id).maybeSingle()
+      const { data: man } = await sb.from('drive_sync_files').select('modified_time').eq('file_id', c.id).eq('tenant_id', tenantId).maybeSingle()
       if (
         man &&
         man.modified_time &&
@@ -301,6 +310,7 @@ Deno.serve(async req => {
         }
         await sb.from('drive_sync_files').upsert({
           file_id: c.id,
+          tenant_id: tenantId,
           modified_time: c.modifiedTime,
           name: fname,
           pbs_path: pbsPath,

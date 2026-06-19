@@ -148,6 +148,12 @@ serve(async (req) => {
     // need to worry about whether the column constraints / on-conflict
     // play nicely with the singleton index.
     const sb = adminClient()
+    // Stamp the connection with the admin's tenant — every GHL sync function
+    // reads this back as conn.tenant_id to scope its work.
+    const { data: prof } = await sb.from('profiles').select('tenant_id').eq('id', userId).maybeSingle()
+    const tenantId = prof?.tenant_id
+    if (!tenantId) return json(401, { ok: false, message: 'No tenant for caller' })
+
     const { error: delErr } = await sb.from('ghl_connections').delete().eq('singleton', true)
     if (delErr) {
       return json(500, { ok: false, message: 'Failed to clear old connection: ' + delErr.message })
@@ -160,6 +166,7 @@ serve(async (req) => {
         location_id:  location_id.trim(),
         company_id:   probe.companyId || null,
         created_by:   userId,
+        tenant_id:    tenantId,
       })
       .select('id, location_id, company_id, created_at')
       .single()

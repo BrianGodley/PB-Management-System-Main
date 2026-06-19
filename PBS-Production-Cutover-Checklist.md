@@ -62,6 +62,19 @@ Run each, verify, then move on. Stop immediately if any step errors.
   - [ ] Verify: `select id, plan_id from tenants;` → PB = `tier3`.
   - [ ] Verify: `select * from tenant_packages;` → PB has `contractor`.
   - [ ] Verify: `select public.get_my_modules();` (as an authed PB user) returns the full module list.
+- [ ] **5b. `supabase-provision-baseline.sql`** — run **AFTER** tiers-packages (it redefines
+      `provision_my_tenant` to the final version that ALSO seeds a `company_settings` row; running it
+      before step 5 would get overwritten). It also: **drops the `single_row` CHECK constraint** on
+      `company_settings` (the hard global-singleton guard — incompatible with one row per tenant) and
+      **backfills** a `company_settings` row for every existing tenant. On prod this is essentially a
+      no-op backfill (only PB exists, already has its row), but the constraint drop is required before
+      any second tenant can be created.
+  - [ ] Verify: `select cs.id, cs.tenant_id, t.name from company_settings cs join tenants t on t.id = cs.tenant_id order by cs.id;` → one row per tenant.
+- [ ] **5c. `supabase-funnels-tenancy.sql`** — the funnels/funnel_stages/funnel_cards tables were
+      created AFTER Stage A and missed tenant_id (would leak across tenants). Adds tenant_id +
+      auto-fill trigger + NOT NULL + FK + tenant-scoped RLS. Needs Stage B. On prod the funnels tables
+      are empty (feature not yet deployed there), so the backfill is a no-op; the policy swap is what
+      matters. (Verified on staging.)
 - [ ] **6. `supabase-payment-connections.sql`** — Layer 2 Helcim connected-accounts (inert until
       partner creds). Safe.
 - [ ] **7. `supabase-funnels.sql`** — ALREADY RUN on prod. Re-running is safe (idempotent); skip if you
