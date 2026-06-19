@@ -43,9 +43,12 @@ begin
   values (company, plan_id, 'trialing', now() + interval '14 days', uid)
   returning id into t;
 
+  -- First user of a tenant is the owner → 'super_admin' (full rights over their
+  -- own workspace; RLS still scopes them to their tenant). The app's admin
+  -- checks recognize 'admin'/'super_admin'; a literal 'owner' role has none.
   insert into public.profiles (id, email, full_name, role, tenant_id)
-  values (uid, (select email from auth.users where id = uid), company, 'owner', t)
-  on conflict (id) do update set tenant_id = excluded.tenant_id, role = 'owner';
+  values (uid, (select email from auth.users where id = uid), company, 'super_admin', t)
+  on conflict (id) do update set tenant_id = excluded.tenant_id, role = 'super_admin';
 
   -- attach requested packages that the chosen tier qualifies for
   if array_length(p_packages, 1) is not null then
@@ -70,6 +73,10 @@ begin
 end $$;
 
 grant execute on function public.provision_my_tenant(text, text, text[]) to authenticated;
+
+-- Backfill: tenant owners created with the old 'owner' role couldn't access
+-- admin screens — promote them to 'super_admin'.
+update public.profiles set role = 'super_admin' where role = 'owner';
 
 -- Backfill: any existing tenant that lacks a company_settings row. Assign ids
 -- explicitly above the current max (the id default sequence is unreliable).

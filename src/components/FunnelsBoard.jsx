@@ -150,7 +150,8 @@ export default function FunnelsBoard() {
   // ── Funnel CRUD ──
   async function createFunnel(name) {
     const max = Math.max(0, ...funnels.map(f => f.sort_order || 0))
-    const { data } = await supabase.from('funnels').insert({ name, sort_order: max + 1 }).select().single()
+    const { data, error } = await supabase.from('funnels').insert({ name, sort_order: max + 1 }).select().single()
+    if (error) { alert('Could not create funnel: ' + error.message); return }
     setTextModal(null)
     await loadFunnels()
     if (data) setFunnelId(data.id)
@@ -171,7 +172,8 @@ export default function FunnelsBoard() {
   // ── Stage CRUD ──
   async function createStage(name) {
     const max = Math.max(0, ...stages.map(s => s.sort_order || 0))
-    await supabase.from('funnel_stages').insert({ funnel_id: funnelId, name, sort_order: max + 1 })
+    const { error } = await supabase.from('funnel_stages').insert({ funnel_id: funnelId, name, sort_order: max + 1 })
+    if (error) { alert('Could not add stage: ' + error.message); return }
     setTextModal(null)
     loadBoard(funnelId)
   }

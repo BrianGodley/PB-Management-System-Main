@@ -14,10 +14,15 @@ export function useDriveLabel() {
     let alive = true
     supabase
       .from('company_settings')
-      .select('drive_label')
+      .select('drive_label, company_name')
       .maybeSingle()
       .then(({ data }) => {
-        if (alive && data?.drive_label && data.drive_label.trim()) setLabel(data.drive_label.trim())
+        if (!alive || !data) return
+        // Prefer the admin-set label; fall back to the tenant's company name; else "Drive".
+        const v =
+          (data.drive_label && data.drive_label.trim()) ||
+          (data.company_name && data.company_name.trim())
+        if (v) setLabel(v)
       })
     return () => {
       alive = false

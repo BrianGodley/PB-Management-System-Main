@@ -438,9 +438,9 @@ serve(async (req: Request) => {
     // We store text-only blocks in `raw` (no base64 in the DB); attachment
     // metadata lives in agent_message_attachments, keyed by message_id.
     const rawForStorage = [{ type: 'text', text: message }]
-    const userMessageId = await saveMessage(admin, conversationId, 'user', message, rawForStorage)
+    const userMessageId = await saveMessage(admin, conversationId, tenantId, 'user', message, rawForStorage)
     if (attachments.length > 0) {
-      await persistMessageAttachments(admin, conversationId, userMessageId, userId, attachments)
+      await persistMessageAttachments(admin, conversationId, userMessageId, userId, tenantId, attachments)
     }
     history.push({ role: 'user', content: userBlocks })
 
@@ -453,7 +453,7 @@ serve(async (req: Request) => {
       try { appOrigin = ref ? new URL(ref).origin : '' } catch { appOrigin = '' }
     }
 
-    const result = await runAgenticLoop(admin, conversationId, history, {
+    const result = await runAgenticLoop(admin, conversationId, tenantId, history, {
       userJwt: jwt,
       userId,
       conversationId,
