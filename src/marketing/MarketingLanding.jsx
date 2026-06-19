@@ -9,6 +9,7 @@
 
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 
 const FG = '#3A5038'
 const FG_DARK = '#2E4030'
@@ -127,6 +128,7 @@ function Check() {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function MarketingLanding() {
+  const { user } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
   const [openFaq, setOpenFaq] = useState(0)
 
@@ -153,14 +155,26 @@ export default function MarketingLanding() {
           </nav>
 
           <div className="hidden md:flex items-center gap-3">
-            <Link to="/login" className="text-sm font-semibold text-gray-700 hover:text-gray-900 px-3 py-2">Log in</Link>
-            <Link
-              to="/signup"
-              className="text-sm font-bold text-white rounded-xl px-4 py-2.5 shadow-sm hover:opacity-90 transition-opacity"
-              style={{ backgroundColor: FG }}
-            >
-              Start free trial
-            </Link>
+            {user ? (
+              <Link
+                to="/"
+                className="text-sm font-bold text-white rounded-xl px-4 py-2.5 shadow-sm hover:opacity-90 transition-opacity"
+                style={{ backgroundColor: FG }}
+              >
+                Go to app →
+              </Link>
+            ) : (
+              <>
+                <Link to="/login" className="text-sm font-semibold text-gray-700 hover:text-gray-900 px-3 py-2">Log in</Link>
+                <Link
+                  to="/signup"
+                  className="text-sm font-bold text-white rounded-xl px-4 py-2.5 shadow-sm hover:opacity-90 transition-opacity"
+                  style={{ backgroundColor: FG }}
+                >
+                  Start free trial
+                </Link>
+              </>
+            )}
           </div>
 
           <button className="md:hidden p-2 -mr-2 text-gray-700" onClick={() => setMenuOpen(v => !v)} aria-label="Menu">
@@ -178,8 +192,14 @@ export default function MarketingLanding() {
               <a key={href} href={href} onClick={() => setMenuOpen(false)} className="block py-2 text-sm font-medium text-gray-700">{label}</a>
             ))}
             <div className="flex gap-2 pt-2">
-              <Link to="/login" className="flex-1 text-center text-sm font-semibold text-gray-700 border border-gray-200 rounded-xl py-2.5">Log in</Link>
-              <Link to="/signup" className="flex-1 text-center text-sm font-bold text-white rounded-xl py-2.5" style={{ backgroundColor: FG }}>Start free trial</Link>
+              {user ? (
+                <Link to="/" className="flex-1 text-center text-sm font-bold text-white rounded-xl py-2.5" style={{ backgroundColor: FG }}>Go to app →</Link>
+              ) : (
+                <>
+                  <Link to="/login" className="flex-1 text-center text-sm font-semibold text-gray-700 border border-gray-200 rounded-xl py-2.5">Log in</Link>
+                  <Link to="/signup" className="flex-1 text-center text-sm font-bold text-white rounded-xl py-2.5" style={{ backgroundColor: FG }}>Start free trial</Link>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -379,7 +399,9 @@ export default function MarketingLanding() {
             <a href="#features" className="hover:text-gray-800">Features</a>
             <a href="#pricing" className="hover:text-gray-800">Pricing</a>
             <a href="#faq" className="hover:text-gray-800">FAQ</a>
-            <Link to="/login" className="hover:text-gray-800">Log in</Link>
+            {user
+              ? <Link to="/" className="hover:text-gray-800">Go to app →</Link>
+              : <Link to="/login" className="hover:text-gray-800">Log in</Link>}
           </nav>
           <p className="text-xs text-gray-400">© {new Date().getFullYear()} Picture Build System</p>
         </div>

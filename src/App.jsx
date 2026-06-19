@@ -170,6 +170,8 @@ function AppRoutes() {
         <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
         <Route path="/signup" element={user ? <Navigate to="/" replace /> : <Signup />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        {/* Marketing landing, reachable by anyone (logged-in users get a "Go to app" link) */}
+        <Route path="/welcome" element={<MarketingLanding />} />
         <Route path="/sign/:token" element={<SignDocument />} />
         <Route path="/client-portal/login" element={<PortalLogin />} />
         <Route path="/client-portal/activate" element={<PortalActivate />} />
