@@ -25,7 +25,7 @@ export default function EntitlementsGate({ children }) {
       // no tenant yet (covers the email-confirmation flow, where provisioning
       // couldn't run at signup time).
       try {
-        const pending = localStorage.getItem('pbs:pendingSignup')
+        const pending = localStorage.getItem('softcake:pendingSignup')
         if (pending) {
           const { data: tid } = await supabase.rpc('my_tenant_id')
           if (!tid) {
@@ -36,7 +36,7 @@ export default function EntitlementsGate({ children }) {
               p_packages: Array.isArray(packages) ? packages : [],
             })
           }
-          localStorage.removeItem('pbs:pendingSignup')
+          localStorage.removeItem('softcake:pendingSignup')
         }
       } catch {
         /* non-fatal */

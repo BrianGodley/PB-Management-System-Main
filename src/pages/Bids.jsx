@@ -196,22 +196,22 @@ export default function Bids() {
   // Sort preference persists across visits (restored on load, saved on change).
   const [sortCol, setSortCol] = useState(() => {
     try {
-      return localStorage.getItem('pbs:bids:sortCol') || 'last_name'
+      return localStorage.getItem('softcake:bids:sortCol') || 'last_name'
     } catch {
       return 'last_name'
     }
   })
   const [sortDir, setSortDir] = useState(() => {
     try {
-      return localStorage.getItem('pbs:bids:sortDir') || 'asc'
+      return localStorage.getItem('softcake:bids:sortDir') || 'asc'
     } catch {
       return 'asc'
     }
   })
   useEffect(() => {
     try {
-      localStorage.setItem('pbs:bids:sortCol', sortCol)
-      localStorage.setItem('pbs:bids:sortDir', sortDir)
+      localStorage.setItem('softcake:bids:sortCol', sortCol)
+      localStorage.setItem('softcake:bids:sortDir', sortDir)
     } catch {
       /* ignore */
     }

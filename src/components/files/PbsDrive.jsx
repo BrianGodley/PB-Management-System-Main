@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { sendEmail } from '../../lib/notify'
+import { useDriveLabel } from '../../lib/useDriveLabel'
 import FileManager from './FileManager'
 
 const PERMISSIONS = [
@@ -21,6 +22,7 @@ const PERMISSIONS = [
 
 export default function PbsDrive({ settingsOnly = false }) {
   const { user } = useAuth()
+  const driveLabel = useDriveLabel()
   const [isAdmin, setIsAdmin] = useState(false)
   const [drives, setDrives] = useState([])
   const [myPerms, setMyPerms] = useState({}) // driveId -> permission
@@ -66,7 +68,7 @@ export default function PbsDrive({ settingsOnly = false }) {
     if (!isAdmin) {
       return (
         <div className="rounded-xl border border-gray-200 bg-white px-5 py-6 text-sm text-gray-500">
-          PBS Drive settings are available to admins only.
+          {driveLabel} settings are available to admins only.
         </div>
       )
     }
@@ -186,12 +188,12 @@ function PbsDriveSettings({ drives, onChange }) {
       if (bsel.email) {
         sendEmail({
           to: bsel.email,
-          subject: `You've been given ${bperm} access to all PBS Drives`,
+          subject: `You've been given ${bperm} access to all ${driveLabel} drives`,
           html: `<div style="font-family:sans-serif;font-size:15px;color:#374151;">
             <p>Hi ${bsel.full_name || 'there'},</p>
-            <p>You now have <strong>${bperm}</strong> access to <strong>all ${drives.length} PBS Drives</strong> in Picture Build System.</p>
-            <p>Open <strong>Documents → PBS Drive</strong> to see them.</p>
-            <p style="margin-top:16px;"><a href="${window.location.origin}/edocuments" style="background:#3A5038;color:#fff;text-decoration:none;padding:10px 22px;border-radius:8px;font-weight:700;">Open PBS Drive</a></p>
+            <p>You now have <strong>${bperm}</strong> access to <strong>all ${drives.length} ${driveLabel} drives</strong>.</p>
+            <p>Open <strong>Documents → ${driveLabel}</strong> to see them.</p>
+            <p style="margin-top:16px;"><a href="${window.location.origin}/edocuments" style="background:#3A5038;color:#fff;text-decoration:none;padding:10px 22px;border-radius:8px;font-weight:700;">Open ${driveLabel}</a></p>
           </div>`,
         })
       }
@@ -301,7 +303,7 @@ function PbsDriveSettings({ drives, onChange }) {
             🔵 Import drive names from Google Drive
           </button>
           <span className="text-xs text-gray-400">
-            Creates a matching PBS drive for each of your Google Shared Drives.
+            Creates a matching drive for each of your Google Shared Drives.
           </span>
         </div>
       </div>
@@ -453,9 +455,9 @@ function MembersModal({ drive, onClose }) {
           subject: `You've been added to the "${drive.name}" drive`,
           html: `<div style="font-family:sans-serif;font-size:15px;color:#374151;">
             <p>Hi ${selected.full_name || 'there'},</p>
-            <p>You now have <strong>${perm}</strong> access to the <strong>${drive.name}</strong> drive in Picture Build System.</p>
-            <p>Open <strong>Documents → PBS Drive</strong> to see it.</p>
-            <p style="margin-top:16px;"><a href="${window.location.origin}/edocuments" style="background:#3A5038;color:#fff;text-decoration:none;padding:10px 22px;border-radius:8px;font-weight:700;">Open PBS Drive</a></p>
+            <p>You now have <strong>${perm}</strong> access to the <strong>${drive.name}</strong> drive.</p>
+            <p>Open <strong>Documents → ${driveLabel}</strong> to see it.</p>
+            <p style="margin-top:16px;"><a href="${window.location.origin}/edocuments" style="background:#3A5038;color:#fff;text-decoration:none;padding:10px 22px;border-radius:8px;font-weight:700;">Open ${driveLabel}</a></p>
           </div>`,
         })
       }

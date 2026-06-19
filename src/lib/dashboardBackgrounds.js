@@ -81,7 +81,7 @@ export const CUSTOMIZE_MODULES = [
 ]
 
 // The localStorage cache key for the route→background map.
-export const MODULE_BG_LS_KEY = 'pbs:moduleBackgrounds'
+export const MODULE_BG_LS_KEY = 'softcake:moduleBackgrounds'
 
 // Reserved (non-route) key in the same map that stores the left menu bar color.
 export const SIDEBAR_KEY = '__sidebar'

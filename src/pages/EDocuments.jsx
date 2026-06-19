@@ -22,6 +22,7 @@ import FileManager from '../components/files/FileManager'
 import GoogleDriveBrowser from '../components/files/GoogleDriveBrowser'
 import PbsDrive from '../components/files/PbsDrive'
 import DocCreator from '../components/DocCreator'
+import { useDriveLabel } from '../lib/useDriveLabel'
 
 const STORAGE_BUCKET = 'edocuments'
 
@@ -80,6 +81,7 @@ export default function EDocuments({ clientId = null, embedded = false }) {
   const [subTab, setSubTab] = useState(embedded ? 'contracts' : 'dashboard')
   const [mainTab, setMainTab] = useState('edocuments')
   const [isAdmin, setIsAdmin] = useState(false)
+  const driveLabel = useDriveLabel()
 
   useEffect(() => {
     if (!user?.id) return
@@ -144,7 +146,7 @@ export default function EDocuments({ clientId = null, embedded = false }) {
   const MAIN_TABS = [
     ['doccreator', '📝 Doc Creator'],
     ['edocuments', '✍️ E-Documents'],
-    ['files', '🗂️ PBS Drive'],
+    ['files', `🗂️ ${driveLabel}`],
     ['gdrive', '🔵 Google Drive'],
     ['photos', '🖼️ Photos'],
     ['videos', '🎞️ Videos'],
@@ -478,11 +480,12 @@ function ContractsTab({ clientId, userId, embedded }) {
 // ── Documents Settings (admin) — PBS Drives + E-Doc Templates ─────────────────
 function DocsSettings({ userId }) {
   const [tab, setTab] = useState('drives') // 'drives' | 'templates'
+  const driveLabel = useDriveLabel()
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
         {[
-          ['drives', '🗂️ PBS Drives'],
+          ['drives', `🗂️ ${driveLabel}`],
           ['templates', '✍️ E-Doc Templates'],
         ].map(([id, label]) => (
           <button

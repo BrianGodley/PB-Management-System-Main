@@ -289,7 +289,7 @@ export default function JobsList() {
   // localStorage keyed by the signed-in user so each user keeps their own
   // view across reloads. Set of stageId strings (or '__none__' for the
   // Unassigned bucket).
-  const collapsedKey = user?.id ? `pbs:jobsList:collapsedStages:${user.id}` : null
+  const collapsedKey = user?.id ? `softcake:jobsList:collapsedStages:${user.id}` : null
   const [collapsedStages, setCollapsedStages] = useState(() => {
     if (typeof window === 'undefined' || !collapsedKey) return new Set()
     try {
@@ -335,9 +335,9 @@ export default function JobsList() {
   //     headers collapse into a single flat list.
   //  2. hiddenStages — Set of stage IDs the user has chosen to hide. Works
   //     independently of #1 (you can hide stages with no role filter).
-  const filterRoleKey = user?.id ? `pbs:jobsList:filterRole:${user.id}` : null
-  const filterEmployeeKey = user?.id ? `pbs:jobsList:filterEmployee:${user.id}` : null
-  const hiddenStagesKey = user?.id ? `pbs:jobsList:hiddenStages:${user.id}` : null
+  const filterRoleKey = user?.id ? `softcake:jobsList:filterRole:${user.id}` : null
+  const filterEmployeeKey = user?.id ? `softcake:jobsList:filterEmployee:${user.id}` : null
+  const hiddenStagesKey = user?.id ? `softcake:jobsList:hiddenStages:${user.id}` : null
   const [filterRole, setFilterRole] = useState(() => {
     if (typeof window === 'undefined' || !filterRoleKey) return null
     try {

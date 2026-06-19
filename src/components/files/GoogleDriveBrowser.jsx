@@ -510,7 +510,7 @@ export default function GoogleDriveBrowser() {
     if (!token) return
     if (
       !window.confirm(
-        'Copy ALL Shared Drives (folders + files) into PBS Drives with the same names? Large drives can take a while. ' +
+        'Copy ALL Shared Drives (folders + files) into your drives with the same names? Large drives can take a while. ' +
           'You can re-run anytime — it skips files already copied.'
       )
     )
@@ -738,7 +738,7 @@ export default function GoogleDriveBrowser() {
             onClick={copyAllToPbs}
             disabled={!!busy || !!mirror || searching}
             className="text-xs px-3 py-1.5 rounded-lg border border-green-300 text-green-700 hover:bg-green-50 disabled:opacity-50"
-            title="Copy every Shared Drive (folders + files) into PBS Drives with the same names"
+            title="Copy every Shared Drive (folders + files) into your drives with the same names"
           >
             {mirror ? mirror : '⧉ Copy all → PBS'}
           </button>

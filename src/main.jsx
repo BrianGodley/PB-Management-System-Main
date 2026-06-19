@@ -2,6 +2,10 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
+import { migrateLegacyStorage } from './lib/storageMigration'
+
+// Rebrand: migrate any legacy pbs:/pb: localStorage keys to softcake: (once).
+migrateLegacyStorage()
 
 // ── Stale-chunk auto-recovery ────────────────────────────────────────────────
 // After a new deploy, the build's JS chunks get fresh content-hashed names. A
@@ -13,9 +17,9 @@ import './index.css'
 // stale chunk.
 window.addEventListener('vite:preloadError', event => {
   event.preventDefault()
-  const last = Number(sessionStorage.getItem('pbsPreloadReloadAt') || 0)
+  const last = Number(sessionStorage.getItem('softcake:preloadReloadAt') || 0)
   if (Date.now() - last > 10000) {
-    sessionStorage.setItem('pbsPreloadReloadAt', String(Date.now()))
+    sessionStorage.setItem('softcake:preloadReloadAt', String(Date.now()))
     window.location.reload()
   }
 })

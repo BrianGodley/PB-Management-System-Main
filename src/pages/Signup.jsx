@@ -104,7 +104,7 @@ export default function Signup() {
 
       const packages = wantsContractor ? ['contractor'] : []
       // Remember intent so provisioning can complete after confirm/login.
-      localStorage.setItem('pbs:pendingSignup', JSON.stringify({ company: company.trim(), plan, packages }))
+      localStorage.setItem('softcake:pendingSignup', JSON.stringify({ company: company.trim(), plan, packages }))
 
       if (data.session) {
         // Email confirmation is off — we have a session, provision now.
@@ -114,7 +114,7 @@ export default function Signup() {
           p_packages: packages,
         })
         if (pErr) throw pErr
-        localStorage.removeItem('pbs:pendingSignup')
+        localStorage.removeItem('softcake:pendingSignup')
         navigate('/')
         return
       }

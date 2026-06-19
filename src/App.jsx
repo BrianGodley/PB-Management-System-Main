@@ -17,7 +17,7 @@ import Login from './pages/Login'
 // the failure is a genuine error rather than a stale chunk.
 function lazy(factory) {
   return reactLazy(async () => {
-    const KEY = 'pb:chunkReloadAt'
+    const KEY = 'softcake:chunkReloadAt'
     try {
       const mod = await factory()
       if (!mod || !mod.default) throw new Error('stale-chunk: missing default export')
@@ -114,8 +114,8 @@ function ProtectedRoute({ children }) {
   // previous page never flashes on screen. Runs once per session
   // (sessionStorage survives in-session reloads, so manual reloads stay put,
   // but clears on a real cold start / app kill).
-  if (!sessionStorage.getItem('pbsLaunchHandled')) {
-    sessionStorage.setItem('pbsLaunchHandled', '1')
+  if (!sessionStorage.getItem('softcake:launchHandled')) {
+    sessionStorage.setItem('softcake:launchHandled', '1')
     const isMobile = window.matchMedia('(max-width: 1023px)').matches
     if (isMobile && window.location.pathname !== '/') {
       return <Navigate to="/" replace />

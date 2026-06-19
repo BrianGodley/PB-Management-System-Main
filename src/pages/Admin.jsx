@@ -1293,6 +1293,7 @@ function CompanySettings({ currentUserIsAdmin }) {
   // ── Company info ──────────────────────────────────────────────────────────
   const [companyForm, setCompanyForm] = useState({
     company_name: '',
+    drive_label: '',
     license_number: '',
     labor_rate_per_man_day: '400',
     main_phone: '',
@@ -1339,6 +1340,7 @@ function CompanySettings({ currentUserIsAdmin }) {
     if (data) {
       setCompanyForm({
         company_name: data.company_name || '',
+        drive_label: data.drive_label || '',
         license_number: data.license_number || '',
         labor_rate_per_man_day: String(data.labor_rate_per_man_day || '400'),
         main_phone: data.main_phone || '',
@@ -1469,6 +1471,7 @@ function CompanySettings({ currentUserIsAdmin }) {
       {
         id: existing?.id || 1,
         company_name: companyForm.company_name.trim(),
+        drive_label: companyForm.drive_label.trim() || null,
         license_number: companyForm.license_number.trim(),
         labor_rate_per_man_day: rate,
         main_phone: companyForm.main_phone.trim(),
@@ -1573,6 +1576,19 @@ function CompanySettings({ currentUserIsAdmin }) {
               placeholder="Your Company Name"
               disabled={!currentUserIsAdmin}
             />
+          </div>
+          <div>
+            <label className={labelCls}>Document Drive Tab Name</label>
+            <input
+              className={inputCls}
+              value={companyForm.drive_label}
+              onChange={e => setCompanyForm(p => ({ ...p, drive_label: e.target.value }))}
+              placeholder="e.g. Picture Build Drive"
+              disabled={!currentUserIsAdmin}
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              The name shown on the document drive tab under Documents (e.g. "Pete's Gardening Drive"). Leave blank to use "Drive".
+            </p>
           </div>
           <div>
             <label className={labelCls}>License Number</label>
