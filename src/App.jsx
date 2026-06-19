@@ -82,6 +82,7 @@ const VideoGuides = lazy(() => import('./pages/VideoGuides'))
 const PortalLogin = lazy(() => import('./portal/PortalLogin'))
 const PortalActivate = lazy(() => import('./portal/PortalActivate'))
 const PortalShell = lazy(() => import('./portal/PortalShell'))
+const MarketingLanding = lazy(() => import('./marketing/MarketingLanding'))
 
 function PortalPlaceholder({ label, icon }) {
   return (
@@ -124,6 +125,31 @@ function ProtectedRoute({ children }) {
   return children
 }
 
+// Root "/" gate: logged-out visitors see the public marketing site; logged-in
+// users get the protected app shell (with its mobile-launch redirect). The
+// marketing site is the public face of the apex domain (picturebuild.com); the
+// app lives at the same build under pbs.picturebuild.com.
+function RootGate() {
+  const { user, loading } = useAuth()
+  if (loading)
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-700 mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading…</p>
+        </div>
+      </div>
+    )
+  if (!user) return <MarketingLanding />
+  return (
+    <ProtectedRoute>
+      <EntitlementsGate>
+        <Layout />
+      </EntitlementsGate>
+    </ProtectedRoute>
+  )
+}
+
 function AppRoutes() {
   const { user } = useAuth()
   return (
@@ -151,16 +177,7 @@ function AppRoutes() {
         {/* Aliases so older invite emails (sent before the path change) still resolve */}
         <Route path="/portal/activate" element={<PortalActivate />} />
         <Route path="/portal/login" element={<PortalLogin />} />
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <EntitlementsGate>
-                <Layout />
-              </EntitlementsGate>
-            </ProtectedRoute>
-          }
-        >
+        <Route path="/" element={<RootGate />}>
           <Route index element={<Dashboard />} />
           <Route path="contacts" element={<Contacts />} />
           <Route path="contacts/:id" element={<ContactDetail />} />
