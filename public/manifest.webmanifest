@@ -1,7 +1,7 @@
 {
-  "name": "Picture Build System",
-  "short_name": "Picture Build",
-  "description": "Picture Build System",
+  "name": "SoftCake",
+  "short_name": "SoftCake",
+  "description": "SoftCake — run your whole company from one place",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

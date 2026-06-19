@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { sendSMS, sendEmail } from '../lib/notify'
+import { PLATFORM_BRAND } from '../lib/brand'
 
 const FG = '#3A5038'
 const FG_DARK = '#2E4030'
@@ -165,18 +166,18 @@ export default function Login() {
       if (method === 'sms') {
         const { error } = await sendSMS({
           to: resetPhone,
-          message: `Your Picture Build verification code is: ${code}. It expires in 10 minutes.`,
+          message: `Your ${PLATFORM_BRAND.name} verification code is: ${code}. It expires in 10 minutes.`,
         })
         if (error) throw new Error(error.message)
       } else {
         const { error } = await sendEmail({
           to: resetEmail,
-          subject: 'Picture Build — Password Reset Code',
+          subject: `${PLATFORM_BRAND.name} — Password Reset Code`,
           html: `
             <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#f9fafb;border-radius:16px;">
               <div style="text-align:center;margin-bottom:24px;">
                 <span style="font-size:2.5rem;">🌿</span>
-                <h2 style="margin:8px 0 0;color:#1f2937;font-size:20px;">Picture Build System</h2>
+                <h2 style="margin:8px 0 0;color:#1f2937;font-size:20px;">${PLATFORM_BRAND.name}</h2>
               </div>
               <div style="background:#fff;border-radius:12px;padding:28px;border:1px solid #e5e7eb;">
                 <h3 style="margin:0 0 8px;color:#111827;font-size:17px;">Password Reset Code</h3>
@@ -191,7 +192,7 @@ export default function Login() {
                 </p>
               </div>
             </div>`,
-          text: `Your Picture Build verification code is: ${code}. It expires in 10 minutes.`,
+          text: `Your ${PLATFORM_BRAND.name} verification code is: ${code}. It expires in 10 minutes.`,
         })
         if (error) throw new Error(error.message)
       }
@@ -348,8 +349,8 @@ export default function Login() {
             />
             <span style={{ display: 'none', fontSize: '2.5rem' }}>🌿</span>
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Picture Build</h1>
-          <p className="text-green-200 text-sm mt-1">Management System</p>
+          <h1 className="text-2xl font-bold text-white tracking-tight">{PLATFORM_BRAND.name}</h1>
+          <p className="text-green-200 text-sm mt-1">{PLATFORM_BRAND.tagline}</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
@@ -710,7 +711,7 @@ export default function Login() {
         </div>
 
         <p className="text-center text-green-300/60 text-xs mt-6">
-          © {new Date().getFullYear()} Picture Build System
+          © {new Date().getFullYear()} {PLATFORM_BRAND.name}
         </p>
       </div>
     </div>

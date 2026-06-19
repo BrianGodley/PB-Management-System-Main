@@ -1383,7 +1383,7 @@ export default function Contacts() {
         <ComingSoon
           icon="📣"
           title="Social Media Manager"
-          blurb="Plan, schedule, and post to your social channels without leaving Picture Build."
+          blurb="Plan, schedule, and post to your social channels without leaving SoftCake."
           points={[
             'Schedule posts across multiple platforms',
             'A shared content calendar for your team',

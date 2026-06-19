@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LanguageContext'
 import { supabase } from '../lib/supabase'
 import { useEntitlements, isModuleEnabled } from '../platform'
+import { PLATFORM_BRAND } from '../lib/brand'
 import {
   applyBackgroundForPath,
   readModuleBackgrounds,
@@ -304,6 +305,7 @@ export default function Layout() {
     else setCurrentBgDark(false)
   }
   const [companyLogoUrl, setCompanyLogoUrl] = useState(null)
+  const [companyName, setCompanyName] = useState(null)
   const userMenuRef = useRef(null)
   const helpMenuRef = useRef(null)
   const mainMenuRef = useRef(null)
@@ -329,13 +331,14 @@ export default function Layout() {
   const fetchCompanyLogo = () => {
     supabase
       .from('company_settings')
-      .select('logo_url')
+      .select('logo_url, company_name')
       .maybeSingle()
       .then(({ data }) => {
         if (data?.logo_url) {
           setCompanyLogoUrl(data.logo_url)
           setFavicon(data.logo_url)
         }
+        if (data?.company_name) setCompanyName(data.company_name)
       })
   }
 
@@ -719,7 +722,7 @@ export default function Layout() {
                   style={headerTextStyle}
                   className="font-semibold text-sm tracking-wide hidden sm:inline"
                 >
-                  Picture Build System
+                  {companyName || PLATFORM_BRAND.name}
                 </span>
               )}
             </Link>

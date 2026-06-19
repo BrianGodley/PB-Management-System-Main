@@ -10,6 +10,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { PLATFORM_BRAND } from '../lib/brand'
 
 const FG = '#3A5038'
 const FG_DARK = '#2E4030'
@@ -105,8 +106,8 @@ function Logo({ size = 36 }) {
       style={{ width: size, height: size, backgroundColor: FG_DARK }}
     >
       <img
-        src="/logo.png"
-        alt="Picture Build"
+        src={PLATFORM_BRAND.logo}
+        alt={PLATFORM_BRAND.name}
         className="w-full h-full object-contain p-1"
         onError={e => {
           e.target.style.display = 'none'
@@ -145,7 +146,7 @@ export default function MarketingLanding() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <a href="#top" className="flex items-center gap-2.5">
             <Logo />
-            <span className="font-bold text-lg tracking-tight">Picture Build</span>
+            <span className="font-bold text-lg tracking-tight">{PLATFORM_BRAND.name}</span>
           </a>
 
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600">
@@ -215,7 +216,7 @@ export default function MarketingLanding() {
             Run your whole company from one place
           </h1>
           <p className="mt-5 text-lg sm:text-xl text-green-50/90 max-w-2xl mx-auto">
-            Picture Build brings your people, jobs, estimates, documents and money into a single system — built for the way contractors actually work.
+            {PLATFORM_BRAND.name} brings your people, jobs, estimates, documents and money into a single system — built for the way contractors actually work.
           </p>
           <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
@@ -393,7 +394,7 @@ export default function MarketingLanding() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <Logo size={28} />
-            <span className="font-semibold text-gray-800">Picture Build</span>
+            <span className="font-semibold text-gray-800">{PLATFORM_BRAND.name}</span>
           </div>
           <nav className="flex items-center gap-6 text-sm text-gray-500">
             <a href="#features" className="hover:text-gray-800">Features</a>
@@ -403,7 +404,7 @@ export default function MarketingLanding() {
               ? <Link to="/" className="hover:text-gray-800">Go to app →</Link>
               : <Link to="/login" className="hover:text-gray-800">Log in</Link>}
           </nav>
-          <p className="text-xs text-gray-400">© {new Date().getFullYear()} Picture Build System</p>
+          <p className="text-xs text-gray-400">© {new Date().getFullYear()} {PLATFORM_BRAND.name}</p>
         </div>
       </footer>
     </div>
