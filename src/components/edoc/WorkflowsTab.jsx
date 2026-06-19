@@ -9,7 +9,11 @@
 // Auto connectors link the steps top→bottom. Manual drag editing + branching
 // is phase 2; positions will be saved to edoc_workflows.graph then.
 import { useState, useEffect, useCallback, useRef } from 'react'
+import html2canvas from 'html2canvas'
 import { supabase } from '../../lib/supabase'
+
+const escHtml = s =>
+  String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
 const fmtDate = d =>
   d ? new Date(d).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' }) : ''
@@ -326,6 +330,49 @@ function WorkflowBuilder({ workflow, userId, onClose, onSaved }) {
   // (diagram only) until the user clicks Edit.
   const [editMode, setEditMode] = useState(!workflow)
   const [savedId, setSavedId] = useState(workflow?.id || null)
+  const [printing, setPrinting] = useState(false)
+  const diagramRef = useRef(null)
+
+  // Print / Save-as-PDF: snapshot the flow diagram, drop it into a clean print
+  // window with the workflow header, and open the browser print dialog (which
+  // offers "Save as PDF" as a destination).
+  async function printWorkflow() {
+    setPrinting(true)
+    try {
+      let imgHtml = ''
+      const el = diagramRef.current
+      if (el) {
+        const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true })
+        imgHtml = `<img src="${canvas.toDataURL('image/png')}" style="max-width:100%;height:auto;border:1px solid #e5e7eb;border-radius:8px;" />`
+      }
+      const mods = (modules || []).join(', ')
+      const w = window.open('', '_blank', 'width=900,height=1000')
+      if (!w) { alert('Please allow pop-ups to print this workflow.'); return }
+      w.document.write(`<!doctype html><html><head><meta charset="utf-8"/>
+        <title>${escHtml(name) || 'Workflow'}</title>
+        <style>
+          *{box-sizing:border-box} body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#111827;margin:32px;}
+          h1{font-size:22px;margin:0 0 4px;} .meta{color:#6b7280;font-size:13px;margin:2px 0;}
+          .badge{display:inline-block;background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;border-radius:999px;padding:1px 10px;font-size:12px;font-weight:600;}
+          .notes{margin:8px 0 16px;font-size:14px;color:#374151;}
+          @media print{ body{margin:12mm;} }
+        </style></head><body>
+        ${type ? `<div class="meta"><span class="badge">${escHtml(type)}</span></div>` : ''}
+        <h1>${escHtml(name) || 'Untitled Workflow'}</h1>
+        ${notes ? `<div class="notes">${escHtml(notes)}</div>` : ''}
+        ${mods ? `<div class="meta"><strong>Modules:</strong> ${escHtml(mods)}</div>` : ''}
+        <div class="meta" style="margin-bottom:16px;">${steps.length} step${steps.length === 1 ? '' : 's'}</div>
+        ${imgHtml || '<p style="color:#9ca3af;">No diagram to print.</p>'}
+        </body></html>`)
+      w.document.close()
+      w.focus()
+      setTimeout(() => { try { w.print() } catch { /* ignore */ } }, 350)
+    } catch (e) {
+      alert('Could not prepare the printout: ' + (e?.message || e))
+    } finally {
+      setPrinting(false)
+    }
+  }
 
   // Existing documents a Document node can reference (they stay separate).
   useEffect(() => {
@@ -501,22 +548,32 @@ function WorkflowBuilder({ workflow, userId, onClose, onSaved }) {
       </datalist>
       <div className="flex items-center justify-between mb-3">
         <button onClick={onClose} className="text-sm text-gray-500 hover:text-gray-700">← Back to workflows</button>
-        {editMode ? (
+        <div className="flex items-center gap-2">
           <button
-            onClick={save}
-            disabled={saving}
-            className="text-sm bg-green-700 text-white font-semibold px-5 py-2 rounded-lg hover:bg-green-800 disabled:opacity-50"
+            onClick={printWorkflow}
+            disabled={printing}
+            title="Print or save this workflow as a PDF"
+            className="text-sm border border-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-lg hover:bg-gray-50 disabled:opacity-50"
           >
-            {saving ? 'Saving…' : '💾 Save Workflow'}
+            {printing ? 'Preparing…' : '🖨 Print / PDF'}
           </button>
-        ) : (
-          <button
-            onClick={() => setEditMode(true)}
-            className="text-sm bg-green-700 text-white font-semibold px-5 py-2 rounded-lg hover:bg-green-800"
-          >
-            ✎ Edit
-          </button>
-        )}
+          {editMode ? (
+            <button
+              onClick={save}
+              disabled={saving}
+              className="text-sm bg-green-700 text-white font-semibold px-5 py-2 rounded-lg hover:bg-green-800 disabled:opacity-50"
+            >
+              {saving ? 'Saving…' : '💾 Save Workflow'}
+            </button>
+          ) : (
+            <button
+              onClick={() => setEditMode(true)}
+              className="text-sm bg-green-700 text-white font-semibold px-5 py-2 rounded-lg hover:bg-green-800"
+            >
+              ✎ Edit
+            </button>
+          )}
+        </div>
       </div>
 
       {/* View mode: show the workflow name as a heading (wizard hidden). */}
@@ -710,7 +767,7 @@ function WorkflowBuilder({ workflow, userId, onClose, onSaved }) {
       )}
 
       {/* Visual diagram — always shown; draggable only while editing */}
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+      <div ref={diagramRef} className="bg-gray-50 border border-gray-200 rounded-xl p-3">
         <div className="flex items-center justify-between mb-1">
           <p className="text-[11px] font-semibold text-gray-500 uppercase">
             {editMode ? 'Flow diagram — drag nodes to arrange' : 'Flow diagram'}
