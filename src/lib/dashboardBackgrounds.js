@@ -401,18 +401,18 @@ export function bgIdForPath(pathname, map) {
 // These apply to every user *before* they make their own choices on the
 // Customize page. Anything a user explicitly saves overrides the matching
 // default (see withDefaults below); modules they never touch fall back here.
-//   • Forest background on all modules
+//   • Blue Waves background on all modules
 //   • Left menu bar: Clear        • Header bar: Clear
-//   • Menu font: Comic Sans MS, size L, no bold/italic, icons shown
+//   • Menu font: Arial, size 14px, no bold/italic, icons shown
 export const DEFAULT_PREFS = (() => {
   const m = {}
   CUSTOMIZE_MODULES.forEach(mod => {
-    m[mod.key] = 'green' // Forest
+    m[mod.key] = 'waves-blue' // Blue Waves
   })
   m[SIDEBAR_KEY] = null // Clear left menu bar
   m[HEADER_KEY] = null // Clear header bar
   m[SIDEBAR_ICONS_KEY] = true // Show icons
-  m[SIDEBAR_FONT_KEY] = { family: 'Arial, Helvetica, sans-serif', size: '16px', bold: false, italic: false }
+  m[SIDEBAR_FONT_KEY] = { family: 'Arial, Helvetica, sans-serif', size: '14px', bold: false, italic: false }
   m[MENU_POS_KEY] = 'left' // Classic left sidebar
   m[MENU_GROUPS_KEY] = [] // No custom menu groups by default
   m[HEADER_ITEMS_KEY] = { ...HEADER_ITEMS_DEFAULT } // All header items shown
