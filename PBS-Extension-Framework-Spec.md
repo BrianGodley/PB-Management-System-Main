@@ -314,3 +314,59 @@ Start with the **non-destructive** work that unblocks everything and touches no 
   backfill) for your review before it runs.
 
 The multi-tenant data migration (Step 2) only proceeds after you approve that migration plan.
+
+---
+
+## 12. Payments architecture — two layers (Helcim)
+
+There are **two separate payment flows**, using **two different Helcim accounts**. Keeping them
+distinct is essential.
+
+### Layer 1 — Platform billing (your SaaS → its customers)
+- *You* (the platform operator) collect **subscription fees** (Starter/Pro/Enterprise) from tenants.
+- One **main SaaS Helcim account**, owned by you. Token stored as platform secret
+  `HELCIM_PLATFORM_API_TOKEN`.
+- Flow (card-up-front, 14-day trial): signup → create tenant → **HelcimPay "verify"** vaults the
+  card → `create-subscription` edge fn creates a Helcim **Recurring** subscription with the trial →
+  store `helcim_subscription_id` on the tenant → **webhook** syncs `tenants.status`
+  (trialing/active/past_due/canceled) → in-app **Billing** page (plan change, update card, cancel).
+- Schema: `plans.price_monthly`, `plans.helcim_plan_id`; `tenants.helcim_customer_id`,
+  `helcim_subscription_id`, `billing_status`, `card_last4`, `current_period_end`
+  (`supabase-billing-schema.sql`).
+- **Status: pending** your creation of the main SaaS Helcim account + its API token.
+
+### Layer 2 — Tenant client-payments (each tenant → their own clients)
+Each tenant collects money from *their* clients (invoice payments, e-doc deposits). Those funds go to
+**that tenant's own Helcim account**, never the platform's. Implemented via Helcim's **Integration
+Partner Program / Connected Account Registrations** (chosen model: **partner sub-accounts**, so the
+platform earns revenue share).
+
+**How it works (built, inert until partner credentials set):**
+1. You enroll as a Helcim **Integration Partner** → receive a **partner-token** + a **registration URL**.
+2. Tenant onboarding: `ConnectPayments.jsx` → `start_payment_connection()` RPC mints a
+   `registration_ref` → redirect tenant to `REGISTRATION_URL?partner=<id>&ref=<ref>` to complete
+   Helcim merchant signup. *(Merchants still complete Helcim KYC/underwriting — unavoidable.)*
+3. On approval, Helcim posts to the **`helcim-connect-webhook`** edge fn, which stores the merchant's
+   **api-token** + account id against the tenant (matched by `ref`) and flips status to `connected`.
+4. Payment functions (`helcim-checkout`, `helcim-charge-saved`) call `getTenantHelcim()` +
+   `helcimHeaders()` (`_shared/helcim.ts`) → process on the **tenant's** account with the
+   **partner-token** attached → platform earns **revenue share**.
+
+**Storage / security:** `tenant_payment_connections` (`supabase-payment-connections.sql`) holds the
+sensitive merchant token; RLS denies all app roles — only edge functions (service role) and the
+SECURITY DEFINER status RPC touch it. The browser only ever sees connection *status*, never the token.
+
+**Config to flip it on (no rebuild):**
+- Vercel env: `VITE_HELCIM_REGISTRATION_URL`, `VITE_HELCIM_PARTNER_ID`.
+- Supabase secrets: `HELCIM_PARTNER_TOKEN`, optional `HELCIM_WEBHOOK_SECRET`; deploy
+  `helcim-connect-webhook` and point the Helcim partner webhook at it.
+- Confirm Helcim's exact webhook field names + partner-token header against the partner dashboard
+  (the code uses tolerant parsing + TODO markers).
+
+**Remaining work for Layer 2:** mount `ConnectPayments` in the Billing/Settings page; convert the two
+payment edge functions to per-tenant tokens (part of the edge-function tenant pass), done once tenants
+actually connect.
+
+### Build order
+Layer 1 (subscriptions) is built first once the main account exists; Layer 2 framework is already in
+place and activates when partner enrollment completes. The two never share an account or a token.

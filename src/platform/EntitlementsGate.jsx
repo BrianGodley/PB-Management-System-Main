@@ -29,8 +29,12 @@ export default function EntitlementsGate({ children }) {
         if (pending) {
           const { data: tid } = await supabase.rpc('my_tenant_id')
           if (!tid) {
-            const { company, plan } = JSON.parse(pending)
-            await supabase.rpc('provision_my_tenant', { p_company: company, p_plan: plan || 'starter' })
+            const { company, plan, packages } = JSON.parse(pending)
+            await supabase.rpc('provision_my_tenant', {
+              p_company: company,
+              p_plan: plan || 'tier1',
+              p_packages: Array.isArray(packages) ? packages : [],
+            })
           }
           localStorage.removeItem('pbs:pendingSignup')
         }

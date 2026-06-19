@@ -9,9 +9,9 @@ import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 const PLANS = [
-  { id: 'starter', name: 'Starter', blurb: 'Jobs, Contacts, Opportunities, Documents, Time Clock' },
-  { id: 'pro', name: 'Pro', blurb: 'Starter + Estimator/Bids, Workflows, Scheduling, e-Sign, Statistics' },
-  { id: 'enterprise', name: 'Enterprise', blurb: 'Pro + HR, Training, Accounting, Equipment, integrations' },
+  { id: 'tier1', name: 'Tier 1 — Base', price: 79, blurb: 'Dashboard, Org Chart, HR, Statistics, Documents' },
+  { id: 'tier2', name: 'Tier 2', price: 199, blurb: '+ Training, Contacts, Opportunities, Workflows' },
+  { id: 'tier3', name: 'Tier 3', price: 399, blurb: '+ Accounting, Weekly FP, Subs & Vendors, Equipment' },
 ]
 
 export default function Signup() {
@@ -20,10 +20,15 @@ export default function Signup() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [plan, setPlan] = useState('pro')
+  const [plan, setPlan] = useState('tier2')
+  const [addContractor, setAddContractor] = useState(true)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [info, setInfo] = useState('')
+
+  // Contractor package needs Tier 2+ (jobs/estimates attach to a client).
+  const contractorAllowed = plan !== 'tier1'
+  const wantsContractor = addContractor && contractorAllowed
 
   async function submit(e) {
     e.preventDefault()
@@ -40,14 +45,16 @@ export default function Signup() {
       })
       if (error) throw error
 
+      const packages = wantsContractor ? ['contractor'] : []
       // Remember intent so provisioning can complete after confirm/login.
-      localStorage.setItem('pbs:pendingSignup', JSON.stringify({ company: company.trim(), plan }))
+      localStorage.setItem('pbs:pendingSignup', JSON.stringify({ company: company.trim(), plan, packages }))
 
       if (data.session) {
         // Email confirmation is off — we have a session, provision now.
         const { error: pErr } = await supabase.rpc('provision_my_tenant', {
           p_company: company.trim(),
           p_plan: plan,
+          p_packages: packages,
         })
         if (pErr) throw pErr
         localStorage.removeItem('pbs:pendingSignup')
@@ -110,13 +117,48 @@ export default function Signup() {
                     }`}
                   >
                     <input type="radio" name="plan" checked={plan === p.id} onChange={() => setPlan(p.id)} className="mt-1 accent-green-700" />
-                    <span>
-                      <span className="block text-sm font-semibold text-gray-900">{p.name}</span>
+                    <span className="flex-1">
+                      <span className="flex items-baseline justify-between">
+                        <span className="text-sm font-semibold text-gray-900">{p.name}</span>
+                        <span className="text-sm font-bold text-gray-900">${p.price}<span className="text-xs font-normal text-gray-400">/mo</span></span>
+                      </span>
                       <span className="block text-xs text-gray-500">{p.blurb}</span>
                     </span>
                   </label>
                 ))}
               </div>
+            </div>
+
+            {/* Contractor add-on (requires Tier 2+) */}
+            <label
+              className={`flex items-start gap-2 border rounded-lg px-3 py-2 ${
+                contractorAllowed ? 'cursor-pointer ' : 'opacity-50 '
+              }${wantsContractor ? 'border-green-600 bg-green-50' : 'border-gray-200'}`}
+            >
+              <input
+                type="checkbox"
+                checked={wantsContractor}
+                disabled={!contractorAllowed}
+                onChange={e => setAddContractor(e.target.checked)}
+                className="mt-1 accent-green-700"
+              />
+              <span className="flex-1">
+                <span className="flex items-baseline justify-between">
+                  <span className="text-sm font-semibold text-gray-900">Contractor Package</span>
+                  <span className="text-sm font-bold text-gray-900">+$149<span className="text-xs font-normal text-gray-400">/mo</span></span>
+                </span>
+                <span className="block text-xs text-gray-500">
+                  Jobs, Estimating, Design{!contractorAllowed && ' — requires Tier 2 or higher'}
+                </span>
+              </span>
+            </label>
+
+            <div className="text-right text-sm text-gray-700">
+              <span className="text-gray-400 text-xs">Total </span>
+              <span className="font-bold">
+                ${(PLANS.find(p => p.id === plan)?.price || 0) + (wantsContractor ? 149 : 0)}
+                <span className="text-xs font-normal text-gray-400">/mo after trial</span>
+              </span>
             </div>
 
             <button type="submit" disabled={busy} className="btn-primary w-full text-sm py-2.5 disabled:opacity-50">
