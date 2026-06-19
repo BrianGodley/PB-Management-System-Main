@@ -750,9 +750,20 @@ export default function Layout() {
                   )
                 }
                 const groupActive = g.items.some(it => isActive(it.path))
+                const gid = g.id || g.label
                 return (
-                  <div key={g.id || g.label} className="relative group">
+                  <div key={gid} className="relative">
                     <button
+                      onClick={e => {
+                        if (groupPopup?.id === gid) {
+                          setGroupPopup(null)
+                          return
+                        }
+                        const r = e.currentTarget.getBoundingClientRect()
+                        // Open as a fixed-position portal popup so the scrollable
+                        // top bar can't clip it.
+                        setGroupPopup({ id: gid, items: g.items, top: r.bottom + 6, left: r.left })
+                      }}
                       style={{
                         color: headerText,
                         ...navFontStyle,
@@ -763,23 +774,6 @@ export default function Layout() {
                       {g.label}
                       <span className="text-sm opacity-50">▾</span>
                     </button>
-                    <div className="hidden group-hover:block absolute left-1/2 -translate-x-1/2 top-full w-56 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
-                      {g.items.map(it => (
-                        <Link
-                          key={it.path}
-                          to={it.path}
-                          style={navFontStyle}
-                          className={`flex items-center gap-2.5 px-4 py-2.5 text-base hover:bg-gray-50 ${
-                            isActive(it.path)
-                              ? 'text-green-700 font-semibold bg-green-50'
-                              : 'text-gray-700'
-                          }`}
-                        >
-                          <span className="w-5 inline-flex justify-center">{it.icon}</span>
-                          {it.label}
-                        </Link>
-                      ))}
-                    </div>
                   </div>
                 )
               })}
