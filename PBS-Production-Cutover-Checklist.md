@@ -50,6 +50,9 @@ Run each, verify, then move on. Stop immediately if any step errors.
   - [ ] **Verify EVERY existing profile has `tenant_id` = PB.** This is the single most important
         check — after RLS, a profile with a null tenant sees nothing.
         `select count(*) from profiles where tenant_id is null;` → must be **0**.
+- [ ] **1b. `supabase-tenant-whitelabel.sql`** — adds `brand_name` / `brand_logo_url` to `tenants`.
+      Must run **after** Stage A (it needs the `tenants` table — running it before fails with
+      `relation "public.tenants" does not exist`). Already applied on staging.
 - [ ] **2. `supabase-stageB-tenancy.sql`** — FK + NOT NULL on `tenant_id` + auto-fill trigger.
   - [ ] Verify: inserting a test row (then deleting it) auto-stamps `tenant_id`.
 - [ ] **3. `supabase-plans-entitlements.sql`** — `plans` table + base `get_my_modules()`.
@@ -63,6 +66,8 @@ Run each, verify, then move on. Stop immediately if any step errors.
       partner creds). Safe.
 - [ ] **7. `supabase-funnels.sql`** — ALREADY RUN on prod. Re-running is safe (idempotent); skip if you
       know it's there.
+  - [ ] Same for **`supabase-drive-label.sql`** — additive (`company_settings`), run on prod ahead of
+        cutover; safe to re-run. Not order-sensitive.
 - [ ] **8. `supabase-stageC-rls.sql`** — **LAST.** Enables RLS tenant isolation + `auth_tenant_id()`.
       This is the point of no return for data visibility. Only run after steps 1–5 verified.
   - [ ] **Immediately verify (you, logged in as a PB user): you still see all PB data.** Open the app
