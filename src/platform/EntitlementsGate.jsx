@@ -20,16 +20,27 @@ export default function EntitlementsGate({ children }) {
       setModuleKeys(null)
       return
     }
-    supabase
-      .rpc('get_my_modules')
-      .then(({ data, error }) => {
-        if (cancelled) return
-        // Fail open: any error (incl. RPC not deployed) => all modules enabled.
-        setModuleKeys(error ? null : Array.isArray(data) ? data : null)
-      })
-      .catch(() => {
-        if (!cancelled) setModuleKeys(null)
-      })
+    ;(async () => {
+      // Finish self-serve provisioning if a signup is pending and this user has
+      // no tenant yet (covers the email-confirmation flow, where provisioning
+      // couldn't run at signup time).
+      try {
+        const pending = localStorage.getItem('pbs:pendingSignup')
+        if (pending) {
+          const { data: tid } = await supabase.rpc('my_tenant_id')
+          if (!tid) {
+            const { company, plan } = JSON.parse(pending)
+            await supabase.rpc('provision_my_tenant', { p_company: company, p_plan: plan || 'starter' })
+          }
+          localStorage.removeItem('pbs:pendingSignup')
+        }
+      } catch {
+        /* non-fatal */
+      }
+      const { data, error } = await supabase.rpc('get_my_modules')
+      if (cancelled) return
+      setModuleKeys(error ? null : Array.isArray(data) ? data : null)
+    })()
     return () => {
       cancelled = true
     }

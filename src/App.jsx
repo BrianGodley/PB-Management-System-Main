@@ -57,6 +57,7 @@ const EDocuments = lazy(() => import('./pages/EDocuments'))
 const Workflows = lazy(() => import('./pages/Workflows'))
 const Customize = lazy(() => import('./pages/Customize'))
 const SignDocument = lazy(() => import('./pages/SignDocument'))
+const Signup = lazy(() => import('./pages/Signup'))
 const MasterRates = lazy(() => import('./pages/MasterRates'))
 const MasterCrews = lazy(() => import('./pages/MasterCrews'))
 const Statistics = lazy(() => import('./pages/Statistics'))
@@ -141,6 +142,7 @@ function AppRoutes() {
         {/* Public routes — no auth required */}
         <Route path="/apply" element={<ApplyForm />} />
         <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+        <Route path="/signup" element={user ? <Navigate to="/" replace /> : <Signup />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/sign/:token" element={<SignDocument />} />
         <Route path="/client-portal/login" element={<PortalLogin />} />

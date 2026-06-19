@@ -448,7 +448,10 @@ export default function Login() {
               </button>
 
               <p className="text-center text-xs text-gray-400">
-                Don't have an account? Contact your administrator.
+                Don't have an account?{' '}
+                <a href="/signup" className="font-medium hover:underline" style={{ color: FG }}>
+                  Start a free trial
+                </a>
               </p>
             </form>
           )}
