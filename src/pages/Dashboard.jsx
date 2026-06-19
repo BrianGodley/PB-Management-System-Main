@@ -20,6 +20,7 @@ import { resolveStatSeries } from '../lib/equationStat'
 import AddEmployeeModal from '../components/AddEmployeeModal'
 import CoursePlayer from '../components/lms/CoursePlayer'
 import QuickEstimateModal from '../components/QuickEstimateModal'
+import { useEntitlements, isModuleEnabled } from '../platform'
 import {
   LineChart,
   Line,
@@ -35,15 +36,16 @@ const FG = '#3A5038' // forest green
 // ── Quick-link buttons. Batch 1 wires each to its page; richer behaviour
 // (auto-opening modals, the multi-step Quick Estimate flow) follows in later
 // batches.
+// `module` (when set) gates the action to a plan/package; untagged = always shown.
 const QUICK_LINKS = [
-  { label: 'Quick Estimate', icon: '📝', key: 'quick-estimate' },
-  { label: 'Quick Bid', icon: '📋', to: '/bids' },
-  { label: 'Quick Job Schedule', icon: '📅', to: '/jobs?tab=schedule&addSchedule=1' },
-  { label: 'Quick Daily Log', icon: '🗒️', to: '/daily-logs?new=1' },
-  { label: 'Continue Training', icon: '🎓', key: 'continue-training' },
-  { label: 'Quick Add Employee', icon: '👤', key: 'add-employee' },
-  { label: 'Quick Add Vendor/Sub', icon: '🚜', key: 'add-vendor' },
-  { label: 'Quick Add Statistic', icon: '📈', to: '/statistics?new=1' },
+  { label: 'Quick Estimate', icon: '📝', key: 'quick-estimate', module: '/bids' },
+  { label: 'Quick Bid', icon: '📋', to: '/bids', module: '/bids' },
+  { label: 'Quick Job Schedule', icon: '📅', to: '/jobs?tab=schedule&addSchedule=1', module: '/jobs' },
+  { label: 'Quick Daily Log', icon: '🗒️', to: '/daily-logs?new=1', module: '/jobs' },
+  { label: 'Continue Training', icon: '🎓', key: 'continue-training', module: '/training' },
+  { label: 'Quick Add Employee', icon: '👤', key: 'add-employee', module: '/hr' },
+  { label: 'Quick Add Vendor/Sub', icon: '🚜', key: 'add-vendor', module: '/portal/subs' },
+  { label: 'Quick Add Statistic', icon: '📈', to: '/statistics?new=1', module: '/statistics' },
 ]
 
 // ── WMO weather codes → [emoji, label] ───────────────────────────────────────
@@ -549,6 +551,8 @@ async function fetchDashboardData(userId) {
 export default function Dashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const { moduleKeys } = useEntitlements()
+  const quickLinks = QUICK_LINKS.filter(q => !q.module || isModuleEnabled(moduleKeys, q.module))
   const [tab, setTab] = useState('dashboard')
   // Page backgrounds are applied app-wide by Layout (per module, via the
   // Customize page); the Dashboard no longer manages backgrounds.
@@ -636,7 +640,7 @@ export default function Dashboard() {
           <div className="card mt-4">
             <h3 className="text-sm font-bold text-gray-800 mb-3">Quick Links</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {QUICK_LINKS.map(q => (
+              {quickLinks.map(q => (
                 <button
                   key={q.label}
                   onClick={() => {
