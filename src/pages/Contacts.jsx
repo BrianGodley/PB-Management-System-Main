@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { ExportModal, ImportModal } from '../components/ContactImportExport'
 import { fetchAssignableEmployees } from '../lib/assignableEmployees'
 import ComingSoon from '../components/ComingSoon'
+import WebsiteBuilder from '../components/marketing/WebsiteBuilder'
 
 // ── Stage config ──────────────────────────────────────────────────────────────
 const STAGES = [
@@ -1363,20 +1364,8 @@ export default function Contacts() {
         />
       )}
 
-      {/* Website Builder — placeholder (Tier 2; built in a later phase) */}
-      {activeTab === 'website' && (
-        <ComingSoon
-          icon="🌐"
-          title="Website Builder"
-          blurb="Stand up a lead-generating marketing site that feeds straight into your contacts."
-          points={[
-            'Drag-and-drop pages with your branding',
-            'Contact & quote-request forms that create contacts automatically',
-            'Hosted on your own domain',
-            'Mobile-friendly templates built for contractors',
-          ]}
-        />
-      )}
+      {/* Website Builder */}
+      {activeTab === 'website' && <WebsiteBuilder />}
 
       {/* Social Media — placeholder (Tier 2; built in a later phase) */}
       {activeTab === 'social' && (
