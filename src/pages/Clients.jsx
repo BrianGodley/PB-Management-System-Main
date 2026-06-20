@@ -1433,7 +1433,7 @@ export default function Clients() {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2 pr-2 flex-shrink-0">
+        <div className="hidden sm:flex items-center gap-2 pr-2 flex-shrink-0">
           <button
             onClick={() => setClientModal('individual')}
             className="btn-primary text-xs px-3 py-1.5"
@@ -1496,6 +1496,17 @@ export default function Clients() {
 
       {tab !== 'settings' && tab !== 'estimates' && tab !== 'funnels' && tab !== 'bids' && tab !== 'calendar' && (
         <>
+          {/* Mobile: full-width Add button sits directly above the search field
+              (matches the Marketing hub's mobile layout). */}
+          {(tab === 'individuals' || tab === 'companies') && (
+            <button
+              onClick={() => setClientModal(tab === 'companies' ? 'company' : 'individual')}
+              className="sm:hidden w-full mb-3 mt-4 py-2.5 bg-green-700 text-white rounded-lg text-sm font-semibold flex items-center justify-center gap-2 flex-shrink-0"
+            >
+              + {tab === 'companies' ? 'Add Company' : 'Add Individual'}
+            </button>
+          )}
+
           {/* ── Search + Column picker ── */}
           <div className="flex items-center justify-between mb-3 gap-3 mt-4 flex-shrink-0">
             <input
