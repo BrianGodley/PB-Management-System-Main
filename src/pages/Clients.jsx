@@ -7,6 +7,7 @@ import MasterRates from './MasterRates'
 import { DEFAULT_ESTIMATE_GPMD, DEFAULT_SALES_TAX_RATE } from '../lib/companyDefaults'
 import ConsultantPicker from '../components/ConsultantPicker'
 import FunnelsBoard from '../components/FunnelsBoard'
+import SalesCalendar from '../components/SalesCalendar'
 import Bids from './Bids'
 import { useModule } from '../platform'
 
@@ -1401,6 +1402,7 @@ export default function Clients() {
             { key: 'individuals', label: '👤 Individuals', count: tabCounts.individuals },
             { key: 'companies',   label: '🏢 Companies',   count: tabCounts.companies },
             { key: 'funnels',     label: '🔻 Funnels',     count: null },
+            { key: 'calendar',    label: '📅 Calendar',    count: null },
             ...(canContractor ? [{ key: 'estimates', label: '📋 Estimates', count: tabCounts.estimates }] : []),
             ...(canContractor ? [{ key: 'bids',      label: '📑 Bids',      count: null }] : []),
             { key: 'past',        label: '📦 Past',        count: tabCounts.past },
@@ -1483,13 +1485,16 @@ export default function Clients() {
       {/* ── Funnels tab — pipeline builder ── */}
       {tab === 'funnels' && <FunnelsBoard />}
 
+      {/* ── Calendar tab — sales appointments ── */}
+      {tab === 'calendar' && <SalesCalendar />}
+
       {/* ── Estimates tab (Contractor) ── */}
       {tab === 'estimates' && canContractor && <EstimatesView onCountChange={setEstimatesTabCount} />}
 
       {/* ── Bids tab (Contractor) ── */}
       {tab === 'bids' && canContractor && <Bids />}
 
-      {tab !== 'settings' && tab !== 'estimates' && tab !== 'funnels' && tab !== 'bids' && (
+      {tab !== 'settings' && tab !== 'estimates' && tab !== 'funnels' && tab !== 'bids' && tab !== 'calendar' && (
         <>
           {/* ── Search + Column picker ── */}
           <div className="flex items-center justify-between mb-3 gap-3 mt-4 flex-shrink-0">
