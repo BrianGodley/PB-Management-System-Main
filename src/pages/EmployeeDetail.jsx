@@ -831,6 +831,10 @@ export default function EmployeeDetail() {
       .update({
         ...draft,
         pay_rate: draft.pay_rate ? parseFloat(draft.pay_rate) : null,
+        pto_days: draft.pto_days === '' || draft.pto_days == null ? 0 : parseFloat(draft.pto_days) || 0,
+        health_insurance_monthly: draft.health_insurance_monthly
+          ? parseFloat(draft.health_insurance_monthly)
+          : null,
         start_date: draft.start_date || null,
         updated_at: new Date().toISOString(),
       })
@@ -1319,6 +1323,48 @@ export default function EmployeeDetail() {
                           <option value="salary">yr</option>
                         </select>
                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Benefits ── */}
+                <div className="mt-3 mb-3 border-t border-gray-100 pt-3">
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                    Benefits
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-medium text-gray-600 mb-0.5">
+                        Paid Time Off (days/yr)
+                      </label>
+                      <input
+                        type="number" step="1" min="0"
+                        value={draft.pto_days ?? ''}
+                        onChange={e => set('pto_days', e.target.value)}
+                        placeholder="0"
+                        disabled={!editing}
+                        className={`w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500 ${
+                          !editing ? 'bg-gray-50 text-gray-700 cursor-default' : ''
+                        }`}
+                      />
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        Feeds the HR → Labor Rates PTO calculation.
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-gray-600 mb-0.5">
+                        Health Insurance ($/mo)
+                      </label>
+                      <input
+                        type="number" step="0.01" min="0"
+                        value={draft.health_insurance_monthly ?? ''}
+                        onChange={e => set('health_insurance_monthly', e.target.value)}
+                        placeholder="0.00"
+                        disabled={!editing}
+                        className={`w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500 ${
+                          !editing ? 'bg-gray-50 text-gray-700 cursor-default' : ''
+                        }`}
+                      />
                     </div>
                   </div>
                 </div>

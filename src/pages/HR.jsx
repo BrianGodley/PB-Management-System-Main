@@ -10,6 +10,7 @@ import { useCachedData } from '../lib/useCachedData'
 import AddEmployeeModal from '../components/AddEmployeeModal'
 import ReviewBuilder from '../components/hr/ReviewBuilder'
 import TimeClockPermissionsTab from '../components/hr/TimeClockPermissionsTab'
+import LaborRatesTab from '../components/hr/LaborRatesTab'
 import DocViewerModal from '../components/DocViewerModal'
 
 const APPLICANT_STATUSES = ['new', 'reviewing', 'interview', 'offered', 'hired', 'rejected']
@@ -1471,6 +1472,7 @@ export default function HR() {
             <div className="flex border border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0 rounded-xl mb-3">
               {[
                 { key: 'employee-groups', label: '👥 Employee Groups' },
+                { key: 'labor-rates', label: '💵 Labor Rates' },
                 { key: 'time-clock', label: '⏰ Time Clock' },
                 { key: 'new-employee', label: '🗂️ Employee Templates' },
               ].map(st => (
@@ -1703,6 +1705,9 @@ export default function HR() {
                   )}
                 </div>
               )}
+
+              {/* ── Labor Rates ── */}
+              {settingsTab === 'labor-rates' && <LaborRatesTab />}
 
               {/* ── Time Clock permissions ── */}
               {settingsTab === 'time-clock' && <TimeClockPermissionsTab employees={employees} />}
