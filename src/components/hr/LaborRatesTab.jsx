@@ -55,6 +55,7 @@ export default function LaborRatesTab() {
     burden_workcomp_rate: '0',
     burden_sdi_rate: '0',
     burden_gl_rate: '0',
+    avg_pto_days: '10',
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -64,7 +65,7 @@ export default function LaborRatesTab() {
         supabase
           .from('company_settings')
           .select(
-            'id, avg_hourly_crew_rate, burden_fica_rate, burden_medicare_rate, burden_futa_rate, burden_suta_rate, burden_workcomp_rate, burden_sdi_rate, burden_gl_rate'
+            'id, avg_hourly_crew_rate, burden_fica_rate, burden_medicare_rate, burden_futa_rate, burden_suta_rate, burden_workcomp_rate, burden_sdi_rate, burden_gl_rate, avg_pto_days'
           )
           .maybeSingle(),
         supabase
@@ -72,6 +73,9 @@ export default function LaborRatesTab() {
           .select('id, first_name, last_name, job_title, pay_rate, pay_type, pto_days, status')
           .eq('status', 'active'),
       ])
+      const crewEmps = (emps.data || []).filter(isCrew)
+      const ptoVals = crewEmps.map(e => num(e.pto_days)).filter(d => d > 0)
+      const empPtoAvg = ptoVals.length ? Math.round(ptoVals.reduce((a, b) => a + b, 0) / ptoVals.length) : null
       if (cs.data) {
         setSettingsId(cs.data.id)
         setForm(f => ({
@@ -84,9 +88,13 @@ export default function LaborRatesTab() {
           burden_workcomp_rate: String(cs.data.burden_workcomp_rate ?? '0'),
           burden_sdi_rate: String(cs.data.burden_sdi_rate ?? '0'),
           burden_gl_rate: String(cs.data.burden_gl_rate ?? '0'),
+          avg_pto_days:
+            cs.data.avg_pto_days != null ? String(cs.data.avg_pto_days) : empPtoAvg != null ? String(empPtoAvg) : '10',
         }))
+      } else if (empPtoAvg != null) {
+        setForm(f => ({ ...f, avg_pto_days: String(empPtoAvg) }))
       }
-      setCrew((emps.data || []).filter(isCrew))
+      setCrew(crewEmps)
       setLoading(false)
     })()
   }, [])
@@ -98,22 +106,17 @@ export default function LaborRatesTab() {
   }, [crew])
 
   const base = num(form.avg_hourly_crew_rate)
-  const burdenPct = BURDENS.reduce((s, [k]) => s + num(form[k]), 0)
+  const otherBurdenPct = BURDENS.reduce((s, [k]) => s + num(form[k]), 0)
+
+  // Paid Time Off as a labor-burden %: PTO hours ÷ annual working hours.
+  //   days × 8 (hr/day) = PTO hours;  ÷ 1920 working hr/yr = fraction of wages.
+  const ptoDays = num(form.avg_pto_days)
+  const ptoPct = ((ptoDays * 8) / WORK_HOURS_YEAR) * 100
+
+  // PTO now lives inside the burden total (it's just another burden line).
+  const burdenPct = otherBurdenPct + ptoPct
   const burdenPerHour = base * (burdenPct / 100)
-
-  const ptoPerHour = useMemo(() => {
-    const vals = crew
-      .map(e => {
-        const hr = hourlyOf(e)
-        const days = num(e.pto_days)
-        if (hr <= 0 || days <= 0) return null
-        return (days * 8 * hr) / WORK_HOURS_YEAR
-      })
-      .filter(v => v != null)
-    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0
-  }, [crew])
-
-  const total = base + burdenPerHour + ptoPerHour
+  const total = base + burdenPerHour
 
   const save = async () => {
     setMsg('')
@@ -130,7 +133,7 @@ export default function LaborRatesTab() {
     // Burden + PTO expressed as ONE fraction of the base wage, so the estimator
     // can keep a separate Labor line (wage) and Burden line (wage × fraction)
     // in the GPMD bar. wage + wage×fraction == the fully-loaded Total.
-    const burdenFraction = base > 0 ? burdenPct / 100 + ptoPerHour / base : burdenPct / 100
+    const burdenFraction = burdenPct / 100 // burdenPct already includes the PTO %
     const payload = {
       avg_hourly_crew_rate: base,
       burden_fica_rate: num(form.burden_fica_rate),
@@ -140,6 +143,7 @@ export default function LaborRatesTab() {
       burden_workcomp_rate: num(form.burden_workcomp_rate),
       burden_sdi_rate: num(form.burden_sdi_rate),
       burden_gl_rate: num(form.burden_gl_rate),
+      avg_pto_days: ptoDays,
       // Estimator pulls these two SEPARATELY (Labor vs Burden for the GPMD bar):
       labor_rate_per_hour: Math.round(base * 100) / 100, // base crew wage
       labor_burden_pct: Math.round(burdenFraction * 10000) / 10000, // all burden + PTO, as fraction
@@ -160,6 +164,8 @@ export default function LaborRatesTab() {
 
   const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
   const lbl = 'block text-xs font-semibold text-gray-600 mb-1'
+  const lblGreen = 'block text-xs font-semibold text-green-700 mb-1'
+  const inpGreen = `${inp} text-green-700 font-semibold`
 
   return (
     <div className="max-w-3xl space-y-5">
@@ -174,21 +180,25 @@ export default function LaborRatesTab() {
       {/* Base rate + computed actual */}
       <div className="bg-white border border-gray-200 rounded-xl p-5 grid sm:grid-cols-2 gap-4">
         <div>
-          <label className={lbl}>Average Hourly Crew Rate</label>
+          <label className={lblGreen}>
+            Average Hourly Crew Rate <span className="font-normal">(User Entered for System Calculation)</span>
+          </label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-green-600 text-sm">$</span>
             <input
               type="number" step="0.01"
               value={form.avg_hourly_crew_rate}
               onChange={e => set('avg_hourly_crew_rate', e.target.value)}
               placeholder="0.00"
-              className={`${inp} pl-7`}
+              className={`${inpGreen} pl-7`}
             />
           </div>
           <p className="text-[11px] text-gray-400 mt-1">The base crew wage used in the calculation.</p>
         </div>
         <div>
-          <label className={lbl}>Average Actual Hourly Rate</label>
+          <label className={lbl}>
+            Average Hourly Crew Rate <span className="font-normal text-gray-400">(Auto Pulled From Files for Comparison)</span>
+          </label>
           <div className="flex items-center gap-2">
             <div className="flex-1 border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-800">
               {computedAvg > 0 ? money(computedAvg) : '—'}
@@ -215,38 +225,53 @@ export default function LaborRatesTab() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {BURDENS.map(([k, label]) => (
             <div key={k}>
-              <label className={lbl}>{label}</label>
+              <label className={lblGreen}>{label}</label>
               <div className="relative">
                 <input
                   type="number" step="0.01"
                   value={form[k]}
                   onChange={e => set(k, e.target.value)}
-                  className={`${inp} pr-7`}
+                  className={`${inpGreen} pr-7`}
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-600 text-sm">%</span>
               </div>
             </div>
           ))}
+
+          {/* Paid Time Off — entered as days, shown as a burden % */}
+          <div>
+            <label className={lblGreen}>Average PTO Days</label>
+            <input
+              type="number" step="1" min="0"
+              value={form.avg_pto_days}
+              onChange={e => set('avg_pto_days', e.target.value)}
+              className={inpGreen}
+            />
+            <p className="text-[10px] text-gray-400 mt-0.5">Avg paid days off per year.</p>
+          </div>
+          <div>
+            <label className={lblGreen}>Paid Time Off Rate</label>
+            <div className="relative">
+              <div className="w-full border border-green-200 bg-green-50 rounded-lg px-3 py-2 text-sm font-semibold text-green-700">
+                {ptoPct.toFixed(2)}
+              </div>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-600 text-sm">%</span>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-0.5">PTO days × 8 ÷ {WORK_HOURS_YEAR} working hrs.</p>
+          </div>
         </div>
         <div className="mt-3 text-xs text-gray-500">
-          Total burden: <span className="font-semibold text-gray-700">{burdenPct.toFixed(2)}%</span> ={' '}
+          Total burden (incl. PTO): <span className="font-semibold text-gray-700">{burdenPct.toFixed(2)}%</span> ={' '}
           <span className="font-semibold text-gray-700">{money(burdenPerHour)}/hr</span> on the base rate.
         </div>
       </div>
 
-      {/* PTO + Total */}
-      <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
-        <div className="flex items-center justify-between text-sm">
-          <div>
-            <p className="font-semibold text-gray-700">Paid Time Off Rate</p>
-            <p className="text-[11px] text-gray-400">Avg of (PTO days × 8 × hourly) ÷ {WORK_HOURS_YEAR}, across crew employees. Set PTO days on each employee record.</p>
-          </div>
-          <p className="font-semibold text-gray-800">{money(ptoPerHour)}/hr</p>
-        </div>
-        <div className="border-t border-gray-100 pt-3 flex items-center justify-between">
+      {/* Total */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <div className="flex items-center justify-between">
           <div>
             <p className="font-bold text-gray-900">Total Average Crew Member Labor Cost</p>
-            <p className="text-[11px] text-gray-400">Base wage + burden + PTO. The estimator pulls the wage and burden % separately (keeps the GPMD Labor/Burden split); job tracking uses the loaded man-day rate.</p>
+            <p className="text-[11px] text-gray-400">Base wage + burden (incl. PTO). The estimator pulls the wage and burden % separately (keeps the GPMD Labor/Burden split); job tracking uses the loaded man-day rate.</p>
           </div>
           <div className="text-right">
             <p className="text-2xl font-bold text-green-700">{money(total)}<span className="text-sm font-medium text-gray-400">/hr</span></p>

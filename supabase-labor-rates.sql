@@ -28,7 +28,8 @@ alter table public.company_settings
   -- The estimator modules read this in place of their hard-coded 0.29 so the
   -- GPMD bar keeps a separate Labor line and Burden line. Default 0.29 keeps
   -- existing estimate math unchanged until the Labor Rates tab is saved.
-  add column if not exists labor_burden_pct         numeric not null default 0.29;
+  add column if not exists labor_burden_pct         numeric not null default 0.29,
+  add column if not exists avg_pto_days              numeric not null default 10; -- avg PTO days/yr → PTO burden %
 
 -- ── Per-employee benefits ───────────────────────────────────────────────────
 alter table public.employees

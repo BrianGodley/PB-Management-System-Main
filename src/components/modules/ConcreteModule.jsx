@@ -400,7 +400,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
       .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min')
       .single()
       .then(({ data }) => {
-        if (data) setLaborRatePerHour(parseFloat(data.value) || 35)
+        if (data?.labor_rate_per_hour != null) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || 35)
         if (data?.labor_burden_pct != null) setLaborBurdenPct(parseFloat(data.labor_burden_pct))
       })
   }, [])
