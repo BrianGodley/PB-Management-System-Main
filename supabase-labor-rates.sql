@@ -22,7 +22,13 @@ alter table public.company_settings
   add column if not exists burden_suta_rate        numeric not null default 0,
   add column if not exists burden_workcomp_rate    numeric not null default 0,
   add column if not exists burden_sdi_rate         numeric not null default 0,
-  add column if not exists burden_gl_rate          numeric not null default 0;
+  add column if not exists burden_gl_rate          numeric not null default 0,
+  -- Combined labor burden as a DECIMAL FRACTION of wages (e.g. 0.29 = 29%),
+  -- written by the Labor Rates tab = sum(all burden %)/100 + PTO/base wage.
+  -- The estimator modules read this in place of their hard-coded 0.29 so the
+  -- GPMD bar keeps a separate Labor line and Burden line. Default 0.29 keeps
+  -- existing estimate math unchanged until the Labor Rates tab is saved.
+  add column if not exists labor_burden_pct         numeric not null default 0.29;
 
 -- ── Per-employee benefits ───────────────────────────────────────────────────
 alter table public.employees

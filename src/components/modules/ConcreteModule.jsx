@@ -88,7 +88,8 @@ function calcConcrete(
   mr = {},
   sr = {},
   gpmd = R.gpmd,
-  walkAccess = null
+  walkAccess = null,
+  laborBurdenPct = R.laborBurdenPct
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const lrph = n(laborRatePerHour) || 35
@@ -253,7 +254,7 @@ function calcConcrete(
     sealerMat +
     manMat
   const laborCost = totalHrs * lrph
-  const burden = laborCost * R.laborBurdenPct
+  const burden = laborCost * (n(laborBurdenPct) || R.laborBurdenPct)
   const gp = manDays * gpmd
   const commission = gp * R.commissionRate
   const subCost = finishSubCost + manSub
@@ -375,6 +376,7 @@ const DEFAULT_MANUAL_ROWS = [
 
 export default function ConcreteModule({ onSave, onBack, saving, initialData }) {
   const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? 35)
+  const [laborBurdenPct, setLaborBurdenPct] = useState(initialData?.laborBurdenPct ?? R.laborBurdenPct)
 
   // Free-text notes for this module — Sam writes auto-generated
   // takeoffs here via create_estimate_from_takeoff, and the user can
@@ -395,10 +397,11 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     if (initialData?.laborRatePerHour) return
     supabase
       .from('company_settings')
-      .select('labor_rate_per_hour, walk_access_pace_lf_per_min')
+      .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min')
       .single()
       .then(({ data }) => {
         if (data) setLaborRatePerHour(parseFloat(data.value) || 35)
+        if (data?.labor_burden_pct != null) setLaborBurdenPct(parseFloat(data.labor_burden_pct))
       })
   }, [])
 

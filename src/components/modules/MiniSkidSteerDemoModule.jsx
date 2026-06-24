@@ -87,7 +87,8 @@ function calcDemo(
   subMarkupRate = 0.35,
   subRates = {},
   gpmd = 425,
-  walkAccess = null
+  walkAccess = null,
+  laborBurdenPct = 0.29
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const mp = materialPrices || {}
@@ -283,7 +284,7 @@ function calcDemo(
   // ── Financials ────────────────────────────────────────────────────────────
   const manDays = totalHrs / 8
   const laborCost = totalHrs * lrph
-  const burden = laborCost * 0.29
+  const burden = laborCost * (n(laborBurdenPct) || 0.29)
   // GP = labor component + Universal Sub Markup % on sub haul cost
   const gp = manDays * gpmd + subHaulCost * subMarkupRate
   const commission = gp * 0.12
@@ -474,6 +475,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices || {})
   const [laborRates, setLaborRates] = useState(initialData?.laborRates || {})
   const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? 35)
+  const [laborBurdenPct, setLaborBurdenPct] = useState(initialData?.laborBurdenPct ?? 0.29)
   const [walkAccess, setWalkAccess] = useState(
     initialData?.walkAccess ?? {
       paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
@@ -546,13 +548,15 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
         !initialData?.laborRatePerHour &&
           supabase
             .from('company_settings')
-            .select('labor_rate_per_hour, sub_markup_rate, walk_access_pace_lf_per_min')
+            .select('labor_rate_per_hour, labor_burden_pct, sub_markup_rate, walk_access_pace_lf_per_min')
             .maybeSingle()
             .single()
             .then(({ data }) => {
               if (!gone && data) {
                 if (data.labor_rate_per_hour != null)
                   setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || 35)
+                if (data.labor_burden_pct != null)
+                  setLaborBurdenPct(parseFloat(data.labor_burden_pct))
                 if (data.sub_markup_rate != null)
                   setSubMarkupRate(parseFloat(data.sub_markup_rate) || 0.35)
                 if (data.walk_access_pace_lf_per_min != null) {
@@ -596,7 +600,8 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
     subMarkupRate,
     subRates,
     gpmd,
-    walkAccess
+    walkAccess,
+    laborBurdenPct
   )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
@@ -638,6 +643,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       data: {
         ...state,
         laborRatePerHour,
+        laborBurdenPct,
         gpmd,
         materialPrices,
         laborRates,

@@ -70,7 +70,8 @@ function calcOutdoorKitchen(
   lrph = DEFAULTS.laborRatePerHour,
   mp = {},
   gpmd = DEFAULTS.gpmd,
-  walkAccess = null
+  walkAccess = null,
+  laborBurdenPct = DEFAULTS.laborBurdenPct
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const {
@@ -315,7 +316,7 @@ function calcOutdoorKitchen(
     manMat
 
   const laborCost = totalHrs * lrph
-  const burden = laborCost * DEFAULTS.laborBurdenPct
+  const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
   const gp = manDays * gpmd
   const commission = gp * DEFAULTS.commissionRate
   const subCost = manSub
@@ -396,6 +397,9 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
   const [laborRatePerHour, setLaborRatePerHour] = useState(
     initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour
   )
+  const [laborBurdenPct, setLaborBurdenPct] = useState(
+    initialData?.laborBurdenPct ?? DEFAULTS.laborBurdenPct
+  )
 
   // Free-text notes for this module — Sam writes auto-generated
   // takeoffs here via create_estimate_from_takeoff, and the user can
@@ -430,12 +434,14 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
     if (!initialData?.laborRatePerHour) {
       supabase
         .from('company_settings')
-        .select('labor_rate_per_hour, walk_access_pace_lf_per_min')
+        .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min')
         .single()
         .then(({ data }) => {
           if (!data) return
           if (data.labor_rate_per_hour != null)
             setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
+          if (data.labor_burden_pct != null)
+            setLaborBurdenPct(parseFloat(data.labor_burden_pct))
           if (data.walk_access_pace_lf_per_min != null) {
             const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
             setWalkAccess({
@@ -547,7 +553,14 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
     distanceLF,
     finishPrices,
   }
-  const calcRaw = calcOutdoorKitchen(state, laborRatePerHour, materialPrices, gpmd, walkAccess)
+  const calcRaw = calcOutdoorKitchen(
+    state,
+    laborRatePerHour,
+    materialPrices,
+    gpmd,
+    walkAccess,
+    laborBurdenPct
+  )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
@@ -574,7 +587,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
       notes,
       man_days: parseFloat(calc.manDays.toFixed(2)),
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
-      data: { ...state, walkAccess, laborRatePerHour, gpmd, materialPrices, calc },
+      data: { ...state, walkAccess, laborRatePerHour, laborBurdenPct, gpmd, materialPrices, calc },
     })
   }
 

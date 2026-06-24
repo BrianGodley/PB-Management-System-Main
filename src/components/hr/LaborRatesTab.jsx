@@ -127,6 +127,10 @@ export default function LaborRatesTab() {
     }
     setSaving(true)
     const totalRounded = Math.round(total * 100) / 100
+    // Burden + PTO expressed as ONE fraction of the base wage, so the estimator
+    // can keep a separate Labor line (wage) and Burden line (wage × fraction)
+    // in the GPMD bar. wage + wage×fraction == the fully-loaded Total.
+    const burdenFraction = base > 0 ? burdenPct / 100 + ptoPerHour / base : burdenPct / 100
     const payload = {
       avg_hourly_crew_rate: base,
       burden_fica_rate: num(form.burden_fica_rate),
@@ -136,14 +140,20 @@ export default function LaborRatesTab() {
       burden_workcomp_rate: num(form.burden_workcomp_rate),
       burden_sdi_rate: num(form.burden_sdi_rate),
       burden_gl_rate: num(form.burden_gl_rate),
-      // Drive the system-wide labor cost rates:
-      labor_rate_per_hour: totalRounded,
+      // Estimator pulls these two SEPARATELY (Labor vs Burden for the GPMD bar):
+      labor_rate_per_hour: Math.round(base * 100) / 100, // base crew wage
+      labor_burden_pct: Math.round(burdenFraction * 10000) / 10000, // all burden + PTO, as fraction
+      // Job / work-order tracking: one fully-loaded man-day rate.
       labor_rate_per_man_day: Math.round(totalRounded * 8 * 100) / 100,
       updated_at: new Date().toISOString(),
     }
     const { error } = await supabase.from('company_settings').update(payload).eq('id', settingsId)
     setSaving(false)
-    setMsg(error ? 'error:' + error.message : `ok:Saved. Estimator now costs labor at ${money(totalRounded)}/hr (${money(totalRounded * 8)}/man-day).`)
+    setMsg(
+      error
+        ? 'error:' + error.message
+        : `ok:Saved. Estimator uses ${money(base)}/hr wage + ${(burdenFraction * 100).toFixed(1)}% burden = ${money(totalRounded)}/hr loaded (${money(totalRounded * 8)}/man-day for job tracking).`
+    )
   }
 
   if (loading) return <p className="text-sm text-gray-400">Loading…</p>
@@ -236,7 +246,7 @@ export default function LaborRatesTab() {
         <div className="border-t border-gray-100 pt-3 flex items-center justify-between">
           <div>
             <p className="font-bold text-gray-900">Total Average Crew Member Labor Cost</p>
-            <p className="text-[11px] text-gray-400">Base + burden + PTO. This becomes the estimator & job-tracking labor rate.</p>
+            <p className="text-[11px] text-gray-400">Base wage + burden + PTO. The estimator pulls the wage and burden % separately (keeps the GPMD Labor/Burden split); job tracking uses the loaded man-day rate.</p>
           </div>
           <div className="text-right">
             <p className="text-2xl font-bold text-green-700">{money(total)}<span className="text-sm font-medium text-gray-400">/hr</span></p>

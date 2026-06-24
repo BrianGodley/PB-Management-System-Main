@@ -244,6 +244,7 @@ function makeInitial(data = {}) {
     steel: data.steel ?? { manualSubCost: '' },
     manualRows: data.manualRows ?? [newManualRow()],
     laborRatePerHour: data.laborRatePerHour ?? 35,
+    laborBurdenPct: data.laborBurdenPct ?? LABOR_BURDEN,
     gpmd: data.gpmd ?? 425,
     crewType: data.crewType ?? 'Specialty',
   }
@@ -269,6 +270,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     steel,
     manualRows,
     laborRatePerHour,
+    laborBurdenPct,
     gpmd,
   } = state
 
@@ -469,7 +471,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   const subCost =
     excavSub + shotcreteSub + interiorSub + equipmentSub + plumbSub + steelSub + manSub
   const laborCost = totalHrs * lrph
-  const burden = laborCost * LABOR_BURDEN
+  const burden = laborCost * (n(laborBurdenPct) || LABOR_BURDEN)
   const gp = manDays * gpmdVal
   const commission = gp * COMMISSION_RATE
   const price = totalMat + laborCost + burden + subCost + gp + commission

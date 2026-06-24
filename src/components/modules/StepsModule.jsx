@@ -31,7 +31,8 @@ function calcSteps(
   materialRates,
   paverPrices,
   gpmd = DEFAULTS.gpmd,
-  walkAccess = null
+  walkAccess = null,
+  laborBurdenPct = DEFAULTS.laborBurdenPct
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const lr = laborRates || {}
@@ -85,7 +86,7 @@ function calcSteps(
   const totalMat = paverCost + concMat + manMat
 
   const laborCost = totalHrs * (n(lrph) || DEFAULTS.laborRatePerHour)
-  const burden = laborCost * DEFAULTS.laborBurdenPct
+  const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
   const gp = manDays * gpmd
   const commission = gp * DEFAULTS.commissionRate
   const subCost = manSub
@@ -241,6 +242,9 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
   const [laborRatePerHour, setLaborRatePerHour] = useState(
     initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour
   )
+  const [laborBurdenPct, setLaborBurdenPct] = useState(
+    initialData?.laborBurdenPct ?? DEFAULTS.laborBurdenPct
+  )
 
   // Free-text notes for this module — Sam writes auto-generated
   // takeoffs here via create_estimate_from_takeoff, and the user can
@@ -286,11 +290,13 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
       !initialData?.laborRatePerHour &&
         supabase
           .from('company_settings')
-          .select('labor_rate_per_hour, walk_access_pace_lf_per_min')
+          .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min')
           .single()
           .then(({ data }) => {
             if (!gone && data?.labor_rate_per_hour != null)
               setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
+            if (!gone && data?.labor_burden_pct != null)
+              setLaborBurdenPct(parseFloat(data.labor_burden_pct))
           }),
       refreshAllRates(),
       supabase
@@ -370,7 +376,8 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
     materialRates,
     paverPrices,
     gpmd,
-    walkAccess
+    walkAccess,
+    laborBurdenPct
   )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
@@ -400,6 +407,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         ...state,
         walkAccess,
         laborRatePerHour,
+        laborBurdenPct,
         gpmd,
         laborRates,
         materialRates,

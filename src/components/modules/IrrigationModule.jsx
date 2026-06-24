@@ -116,7 +116,8 @@ function calcIrrigation(
   laborRates,
   salesTax,
   gpmd = 425,
-  walkAccess = null
+  walkAccess = null,
+  laborBurdenPct = 0.29
 ) {
   const mp = materialPrices || {}
   const lr = laborRates || {}
@@ -182,7 +183,7 @@ function calcIrrigation(
 
   const manDays = totalHrs / 8
   const laborCost = totalHrs * lrph
-  const burden = laborCost * 0.29 // 29% — Excel Module #1 O4
+  const burden = laborCost * (n(laborBurdenPct) || 0.29) // 29% — Excel Module #1 O4
   const gp = manDays * gpmd
   const commission = gp * 0.12 // 12% of GP — Excel Module #1 O3
   const price = laborCost + burden + totalMat + gp + commission + subCost
@@ -286,6 +287,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices || {})
   const [laborRates, setLaborRates] = useState(initialData?.laborRates || {})
   const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? 35)
+  const [laborBurdenPct, setLaborBurdenPct] = useState(initialData?.laborBurdenPct ?? 0.29)
   const [salesTax, setSalesTax] = useState(initialData?.salesTax ?? RATE_DEFAULTS.salesTax)
   const [walkAccess, setWalkAccess] = useState(
     initialData?.walkAccess ?? {
@@ -326,12 +328,14 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
         (!initialData?.laborRatePerHour || !initialData?.salesTax || !initialData?.walkAccess) &&
           supabase
             .from('company_settings')
-            .select('labor_rate_per_hour, sales_tax_rate, walk_access_pace_lf_per_min')
+            .select('labor_rate_per_hour, labor_burden_pct, sales_tax_rate, walk_access_pace_lf_per_min')
             .maybeSingle()
             .then(({ data }) => {
               if (!gone && data) {
                 if (!initialData?.laborRatePerHour && data.labor_rate_per_hour)
                   setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || 35)
+                if (!initialData?.laborBurdenPct && data.labor_burden_pct != null)
+                  setLaborBurdenPct(parseFloat(data.labor_burden_pct))
                 if (!initialData?.salesTax && data.sales_tax_rate != null)
                   setSalesTax(parseFloat(data.sales_tax_rate) || RATE_DEFAULTS.salesTax)
                 if (!initialData?.walkAccess) {
@@ -376,7 +380,8 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
     laborRates,
     salesTax,
     gpmd,
-    walkAccess
+    walkAccess,
+    laborBurdenPct
   )
 
   const fmt2 = v =>
@@ -399,6 +404,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
       data: {
         ...state,
         laborRatePerHour,
+        laborBurdenPct,
         gpmd,
         materialPrices,
         laborRates,

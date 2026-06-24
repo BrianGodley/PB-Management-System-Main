@@ -111,7 +111,8 @@ function calcDrainage(
   laborRatePerHour = DEFAULTS.laborRatePerHour,
   materialPrices = {},
   gpmd = DEFAULTS.gpmd,
-  walkAccess = null
+  walkAccess = null,
+  laborBurdenPct = DEFAULTS.laborBurdenPct
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const { difficulty, hoursAdj, trenchRows, pipeRows, fixtureRows, additionalItems, manualRows } =
@@ -186,7 +187,7 @@ function calcDrainage(
   const manDays = totalHrs / 8
   const totalMat = pipeMat + fixMat + drainFittingFee + addMat + manMat
   const laborCost = totalHrs * laborRatePerHour
-  const burden = laborCost * DEFAULTS.laborBurdenPct
+  const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
   const gp = manDays * gpmd
   const commission = gp * DEFAULTS.commissionRate
   const subCost = manSub
@@ -270,6 +271,9 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   const [laborRatePerHour, setLaborRatePerHour] = useState(
     initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour
   )
+  const [laborBurdenPct, setLaborBurdenPct] = useState(
+    initialData?.laborBurdenPct ?? DEFAULTS.laborBurdenPct
+  )
 
   // Free-text notes for this module — Sam writes auto-generated
   // takeoffs here via create_estimate_from_takeoff, and the user can
@@ -308,12 +312,14 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
     if (!initialData?.laborRatePerHour) {
       supabase
         .from('company_settings')
-        .select('labor_rate_per_hour, walk_access_pace_lf_per_min')
+        .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min')
         .single()
         .then(({ data }) => {
           if (!data) return
           if (data.labor_rate_per_hour != null)
             setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
+          if (data.labor_burden_pct != null)
+            setLaborBurdenPct(parseFloat(data.labor_burden_pct))
           if (data.walk_access_pace_lf_per_min != null) {
             const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
             setWalkAccess({
@@ -375,7 +381,8 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
     laborRatePerHour,
     materialPrices,
     gpmd,
-    walkAccess
+    walkAccess,
+    laborBurdenPct
   )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
@@ -418,6 +425,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         additionalItems,
         manualRows,
         laborRatePerHour,
+        laborBurdenPct,
         gpmd,
         materialPrices, // snapshot of prices used — so the summary always reflects save-time costs
         calc,

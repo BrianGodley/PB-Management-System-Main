@@ -115,7 +115,8 @@ function calcPlanting(
   gpmd,
   materialPrices,
   laborRates,
-  walkAccess = null
+  walkAccess = null,
+  laborBurdenPct = WORKER_DEFAULTS.laborBurdenPct
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const { tillSqft, difficulty, hoursAdj, smallPlantRows, largePlantRows, addons, manualRows } =
@@ -230,7 +231,7 @@ function calcPlanting(
   const manDays = totalHrs / 8
   const totalMat = smallMat + largeMat + addonMat + manMat + yardCheckMat
   const laborCost = totalHrs * laborRatePerHour
-  const burden = laborCost * WORKER_DEFAULTS.laborBurdenPct
+  const burden = laborCost * (n(laborBurdenPct) || WORKER_DEFAULTS.laborBurdenPct)
   const subCost = craneSub + manSub
   const gp = manDays * gpmd
   const commission = gp * WORKER_DEFAULTS.commissionRate
@@ -343,6 +344,9 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
   const [laborRatePerHour, setLaborRatePerHour] = useState(
     initialData?.laborRatePerHour ?? WORKER_DEFAULTS.laborRatePerHour
   )
+  const [laborBurdenPct, setLaborBurdenPct] = useState(
+    initialData?.laborBurdenPct ?? WORKER_DEFAULTS.laborBurdenPct
+  )
 
   // Free-text notes for this module — Sam writes auto-generated
   // takeoffs here via create_estimate_from_takeoff, and the user can
@@ -386,13 +390,16 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
     if (!initialData?.laborRatePerHour) {
       supabase
         .from('company_settings')
-        .select('labor_rate_per_hour, walk_access_pace_lf_per_min')
+        .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min')
         .single()
         .then(({ data }) => {
-          if (data)
+          if (data) {
             setLaborRatePerHour(
               parseFloat(data.labor_rate_per_hour) || WORKER_DEFAULTS.laborRatePerHour
             )
+            if (data.labor_burden_pct != null)
+              setLaborBurdenPct(parseFloat(data.labor_burden_pct))
+          }
         })
     }
 
@@ -453,7 +460,8 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
     gpmd,
     materialPrices,
     laborRates,
-    walkAccess
+    walkAccess,
+    laborBurdenPct
   )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
@@ -513,6 +521,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
         distanceLF,
         yardCheck,
         laborRatePerHour,
+        laborBurdenPct,
         gpmd,
         materialPrices, // snapshot so summary always reflects save-time prices
         laborRates, // snapshot so summary always reflects save-time rates
