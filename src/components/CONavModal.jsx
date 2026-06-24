@@ -198,7 +198,7 @@ export default function CONavModal({ onClose, onNavigate }) {
       <div
         className="w-full h-[100dvh] sm:h-auto sm:max-w-md bg-white sm:rounded-2xl shadow-2xl sm:max-h-[92dvh] flex flex-col"
         onClick={e => e.stopPropagation()}
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         {/* Header — green bar with the screen name centered in white */}
         <div
@@ -208,7 +208,7 @@ export default function CONavModal({ onClose, onNavigate }) {
           <h2 className="text-base font-semibold text-white">Change Orders</h2>
           <button
             onClick={onClose}
-            className="absolute right-3 w-8 h-8 rounded-full text-white/80 hover:bg-black/15 flex items-center justify-center text-lg"
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full text-white/80 hover:bg-black/15 flex items-center justify-center text-lg"
           >
             ✕
           </button>
