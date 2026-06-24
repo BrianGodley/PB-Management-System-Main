@@ -935,6 +935,7 @@ function CurrentLocationMap() {
   const mapEl = useRef(null) // map container div
   const mapObj = useRef(null) // Leaflet map instance
   const posRef = useRef(null) // { lat, lon }
+  const runRef = useRef(null) // fn to (re)request location after consent
 
   const recenter = () => {
     if (mapObj.current && posRef.current) {
@@ -948,6 +949,12 @@ function CurrentLocationMap() {
       return
     }
     let alive = true
+
+    // Wrapped so we can fire it silently when permission is already granted,
+    // or only after the user taps "Show my location" when it isn't — instead
+    // of triggering the browser's location prompt on every screen entry.
+    const run = () => {
+    setStatus('loading')
     navigator.geolocation.getCurrentPosition(
       async p => {
         if (!alive) return
@@ -955,6 +962,7 @@ function CurrentLocationMap() {
         const lon = p.coords.longitude
         posRef.current = { lat, lon }
         setStatus('ok')
+        try { localStorage.setItem('tc_geo_ok', '1') } catch { /* ignore */ }
 
         // Build the interactive map.
         try {
@@ -1009,6 +1017,31 @@ function CurrentLocationMap() {
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     )
+    }
+    runRef.current = run
+
+    // Only auto-locate when permission is already granted. When it's "prompt"
+    // (or unknown and never granted here before), show a one-time explanation
+    // and let the user trigger the request, so they aren't nagged every visit.
+    ;(async () => {
+      let state = null
+      try {
+        if (navigator.permissions?.query) {
+          state = (await navigator.permissions.query({ name: 'geolocation' })).state
+        }
+      } catch { /* Permissions API unsupported (older iOS Safari) */ }
+      if (!alive) return
+      if (state === 'granted') run()
+      else if (state === 'denied') setStatus('denied')
+      else if (state === 'prompt') setStatus('consent')
+      else {
+        let known = false
+        try { known = localStorage.getItem('tc_geo_ok') === '1' } catch { /* ignore */ }
+        if (known) run()
+        else setStatus('consent')
+      }
+    })()
+
     return () => {
       alive = false
       // Tear the Leaflet map down hard. On mobile Safari, just unmounting the
@@ -1032,6 +1065,26 @@ function CurrentLocationMap() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0 mt-2">
+      {status === 'consent' ? (
+        <div className="flex-1 min-h-0 flex flex-col items-center justify-center text-center px-6 border border-gray-200 rounded-lg bg-gray-50">
+          <div className="text-3xl mb-2">📍</div>
+          <p className="text-sm font-semibold text-gray-800">Show your location</p>
+          <p className="text-xs text-gray-500 mt-1 max-w-xs">
+            The time clock uses your location to confirm you’re on-site when you clock in. Your
+            browser will ask once.
+          </p>
+          <button
+            onClick={() => runRef.current && runRef.current()}
+            className="mt-3 px-4 py-2 bg-green-700 text-white rounded-xl text-sm font-semibold hover:bg-green-800"
+          >
+            Show my location
+          </button>
+          <p className="text-[11px] text-gray-400 mt-3 max-w-xs">
+            Tip: set Location to “Allow” for this site in your browser settings to stop being asked.
+          </p>
+        </div>
+      ) : (
+      <>
       {/* Tappable address row — recenters the map on the user's location. */}
       <button
         onClick={recenter}
@@ -1060,6 +1113,8 @@ function CurrentLocationMap() {
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   )
 }
