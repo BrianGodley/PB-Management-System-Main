@@ -820,13 +820,16 @@ export default function Layout() {
             id="app-header-center"
           />
 
-          {/* Right: mobile close (X) for screens with a green-bar title */}
+          {/* Right: mobile close (X) for screens with a green-bar title.
+              Absolutely anchored to the top-right corner so it can never drift
+              onto the absolutely-centered screen title (flex auto-margins let it
+              overlap on narrow screens). */}
           {screenTitle(location.pathname) && (
             <button
               onClick={() => navigate(-1)}
               aria-label="Close"
               style={headerTextStyle}
-              className="lg:hidden ml-auto w-8 h-8 rounded-full hover:bg-black/15 flex items-center justify-center text-lg flex-shrink-0"
+              className="lg:hidden absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full hover:bg-black/15 flex items-center justify-center text-lg"
             >
               ✕
             </button>
