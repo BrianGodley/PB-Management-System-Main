@@ -43,6 +43,7 @@ const FinishesModule = lazy(() => import('../components/modules/FinishesModule')
 import FinishesSummary from '../components/modules/FinishesSummary'
 const StepsModule = lazy(() => import('../components/modules/StepsModule'))
 import StepsSummary from '../components/modules/StepsSummary'
+const WeedAbatementModule = lazy(() => import('../components/modules/WeedAbatementModule'))
 import GpmdBar from '../components/modules/GpmdBar'
 import EstimateWhatIfModal from '../components/EstimateWhatIfModal'
 
@@ -67,6 +68,7 @@ const MODULE_GROUPS = [
     ],
   },
   { label: 'Softscapes', items: ['Irrigation', 'Planting'] },
+  { label: 'Maintenance', items: ['Weed Abatement'] },
 ]
 
 const TYPE_COLORS = {
@@ -2303,6 +2305,7 @@ export default function EstimateDetail() {
           selectedType === 'Fire Pit' ||
           selectedType === 'Walls' ||
           selectedType === 'Finishes' ||
+          selectedType === 'Weed Abatement' ||
           selectedType === 'Steps' ? (
             <div
               className={`relative bg-white rounded-2xl shadow-xl w-full mx-4 flex flex-col ${selectedType === 'Pavers' || selectedType === 'Pool' ? 'max-w-6xl' : 'max-w-5xl'}`}
@@ -2563,6 +2566,15 @@ export default function EstimateDetail() {
                   )}
                   {selectedType === 'Steps' && (
                     <StepsModule
+                      projectName={selectedProject?.project_name}
+                      onSave={editingModule ? updateModule : saveModule}
+                      onBack={editingModule ? closeModuleFlow : () => setSelectedType(null)}
+                      saving={savingModule}
+                      initialData={moduleInitialData}
+                    />
+                  )}
+                  {selectedType === 'Weed Abatement' && (
+                    <WeedAbatementModule
                       projectName={selectedProject?.project_name}
                       onSave={editingModule ? updateModule : saveModule}
                       onBack={editingModule ? closeModuleFlow : () => setSelectedType(null)}
