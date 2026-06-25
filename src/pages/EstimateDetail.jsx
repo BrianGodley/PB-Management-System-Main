@@ -328,10 +328,12 @@ export default function EstimateDetail() {
         // No override → straight copy.
         return { ...modShell, project_id: newProj.id }
       })
-      if (newRows.length > 0) {
-        const { error: modErr } = await supabase.from('estimate_modules').insert(newRows)
+      // Insert one at a time so a bad row is named instead of failing silently.
+      for (const row of newRows) {
+        const { error: modErr } = await supabase.from('estimate_modules').insert(row)
         if (modErr) {
-          alert('Module copy failed: ' + modErr.message)
+          const label = row.module_name || row.module_type || 'a module'
+          alert(`Couldn't copy the "${label}" module to the new version: ${modErr.message}`)
           return false
         }
       }
@@ -352,7 +354,9 @@ export default function EstimateDetail() {
   async function applyOverwrite() {
     if (!estimate) return false
 
-    // 1) Remove the existing rows for this estimate.
+    // Capture the existing project ids FIRST, but don't delete anything yet —
+    // we insert the new rows and only remove the old ones once everything is
+    // safely in. That way a failed insert can never wipe the saved estimate.
     const { data: exProjs, error: exErr } = await supabase
       .from('estimate_projects')
       .select('id')
@@ -362,26 +366,20 @@ export default function EstimateDetail() {
       return false
     }
     const exIds = (exProjs || []).map(p => p.id)
-    if (exIds.length) {
-      const { error: delModErr } = await supabase
-        .from('estimate_modules')
-        .delete()
-        .in('project_id', exIds)
-      if (delModErr) {
-        alert('Save failed: ' + delModErr.message)
-        return false
-      }
-      const { error: delProjErr } = await supabase
-        .from('estimate_projects')
-        .delete()
-        .in('id', exIds)
-      if (delProjErr) {
-        alert('Save failed: ' + delProjErr.message)
-        return false
+
+    // Undo any rows we inserted this attempt (deleting a project cascades to
+    // its modules) so a mid-way failure leaves the database exactly as it was.
+    const insertedProjIds = []
+    const rollback = async () => {
+      if (insertedProjIds.length) {
+        await supabase.from('estimate_modules').delete().in('project_id', insertedProjIds)
+        await supabase.from('estimate_projects').delete().in('id', insertedProjIds)
       }
     }
 
-    // 2) Re-insert each project + its modules from local state.
+    // 1) Insert each project, then its modules ONE AT A TIME so a single bad
+    //    row is isolated and reported by name instead of silently failing the
+    //    whole batch (which previously dropped every module in the project).
     for (const proj of projects) {
       const {
         id: _projId,
@@ -396,19 +394,48 @@ export default function EstimateDetail() {
         .select()
         .single()
       if (projErr || !newProj) {
-        alert('Project save failed: ' + (projErr?.message || 'unknown'))
+        await rollback()
+        alert(
+          `Project save failed: ${projErr?.message || 'unknown'}\n\nYour saved estimate was NOT changed.`
+        )
         return false
       }
-      const newRows = (proj.estimate_modules || []).map(m => {
+      insertedProjIds.push(newProj.id)
+
+      for (const m of proj.estimate_modules || []) {
         const { id: _modId, project_id: _pid, created_at: _mca, ...modShell } = m
-        return { ...modShell, project_id: newProj.id }
-      })
-      if (newRows.length > 0) {
-        const { error: modErr } = await supabase.from('estimate_modules').insert(newRows)
+        const { error: modErr } = await supabase
+          .from('estimate_modules')
+          .insert({ ...modShell, project_id: newProj.id })
         if (modErr) {
-          alert('Module save failed: ' + modErr.message)
+          await rollback()
+          const label = m.module_name || m.module_type || 'a module'
+          alert(
+            `Couldn't save the "${label}" module: ${modErr.message}\n\nYour saved estimate was NOT changed — fix or remove that module and try again.`
+          )
           return false
         }
+      }
+    }
+
+    // 2) Everything new is in — now it's safe to remove the previous version's
+    //    projects (cascade removes their modules).
+    if (exIds.length) {
+      const { error: delModErr } = await supabase
+        .from('estimate_modules')
+        .delete()
+        .in('project_id', exIds)
+      if (delModErr) {
+        alert('Saved, but clearing the previous version failed: ' + delModErr.message)
+        return true
+      }
+      const { error: delProjErr } = await supabase
+        .from('estimate_projects')
+        .delete()
+        .in('id', exIds)
+      if (delProjErr) {
+        alert('Saved, but clearing the previous version failed: ' + delProjErr.message)
+        return true
       }
     }
 
