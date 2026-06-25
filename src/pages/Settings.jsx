@@ -1,9 +1,18 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import SubscriptionTab from '../components/settings/SubscriptionTab'
+import BillingTab from '../components/settings/BillingTab'
+
+const TABS = [
+  { id: 'general', label: 'General' },
+  { id: 'subscription', label: 'Subscription' },
+  { id: 'billing', label: 'Billing' },
+]
 
 export default function Settings() {
   const { user, signOut } = useAuth()
+  const [tab, setTab] = useState('general')
   const [form, setForm] = useState({
     company_name: '',
     license_number: '',
@@ -64,8 +73,30 @@ export default function Settings() {
 
   return (
     <div className="max-w-xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
+      <h1 className="text-2xl font-bold text-gray-900 mb-4">Settings</h1>
 
+      {/* Tab bar */}
+      <div className="flex justify-center mb-6">
+        <div className="inline-flex bg-gray-100 rounded-full p-1">
+          {TABS.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-4 py-1.5 text-sm font-medium rounded-full transition-colors ${
+                tab === t.id ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {tab === 'subscription' && <SubscriptionTab />}
+      {tab === 'billing' && <BillingTab />}
+
+      {tab === 'general' && (
+      <>
       {/* Company settings */}
       <div className="card mb-6">
         <h2 className="font-semibold text-gray-900 mb-4">Company Settings</h2>
@@ -167,6 +198,8 @@ export default function Settings() {
           </p>
         </div>
       </div>
+      </>
+      )}
     </div>
   )
 }
