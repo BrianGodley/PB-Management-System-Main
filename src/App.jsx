@@ -50,7 +50,6 @@ const DesignDetail = lazy(() => import('./pages/DesignDetail'))
 const Bids = lazy(() => import('./pages/Bids'))
 const JobTracker = lazy(() => import('./pages/JobTracker'))
 const Collections = lazy(() => import('./pages/Collections'))
-const Settings = lazy(() => import('./pages/Settings'))
 const Admin = lazy(() => import('./pages/Admin'))
 const EstimateDetail = lazy(() => import('./pages/EstimateDetail'))
 const EDocuments = lazy(() => import('./pages/EDocuments'))
@@ -204,7 +203,6 @@ function AppRoutes() {
           <Route path="customize" element={<Customize />} />
           <Route path="tracker" element={<JobTracker />} />
           <Route path="collections" element={<Collections />} />
-          <Route path="settings" element={<Settings />} />
           <Route path="admin" element={<Admin />} />
           <Route path="master-rates" element={<MasterRates />} />
           <Route path="master-crews" element={<MasterCrews />} />

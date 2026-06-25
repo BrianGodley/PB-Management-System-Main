@@ -1297,7 +1297,6 @@ function CompanySettings({ currentUserIsAdmin }) {
     company_name: '',
     drive_label: '',
     license_number: '',
-    labor_rate_per_man_day: '400',
     main_phone: '',
     pbs_system_phone: '',
     main_office_address: '',
@@ -1344,7 +1343,6 @@ function CompanySettings({ currentUserIsAdmin }) {
         company_name: data.company_name || '',
         drive_label: data.drive_label || '',
         license_number: data.license_number || '',
-        labor_rate_per_man_day: String(data.labor_rate_per_man_day || '400'),
         main_phone: data.main_phone || '',
         pbs_system_phone: data.pbs_system_phone || '',
         main_office_address: data.main_office_address || '',
@@ -1429,11 +1427,6 @@ function CompanySettings({ currentUserIsAdmin }) {
 
   async function saveCompany(e) {
     e.preventDefault()
-    const rate = parseFloat(companyForm.labor_rate_per_man_day)
-    if (isNaN(rate) || rate <= 0) {
-      setCompanyMsg('error:Labor rate must be a positive number.')
-      return
-    }
     setSavingCompany(true)
     setCompanyMsg('')
 
@@ -1475,7 +1468,6 @@ function CompanySettings({ currentUserIsAdmin }) {
         company_name: companyForm.company_name.trim(),
         drive_label: companyForm.drive_label.trim() || null,
         license_number: companyForm.license_number.trim(),
-        labor_rate_per_man_day: rate,
         main_phone: companyForm.main_phone.trim(),
         pbs_system_phone: companyForm.pbs_system_phone.trim(),
         main_office_address: mainAddr,
@@ -1548,7 +1540,6 @@ function CompanySettings({ currentUserIsAdmin }) {
   const inputCls =
     'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
   const labelCls = 'block text-xs font-semibold text-gray-600 mb-1'
-  const rate = parseFloat(companyForm.labor_rate_per_man_day || 0)
 
   if (loadingCompany)
     return (
@@ -1626,30 +1617,6 @@ function CompanySettings({ currentUserIsAdmin }) {
               />
             </div>
           </div>
-          <div>
-            <label className={labelCls}>Labor Rate — Per Man Day (1 MD = 8 hrs)</label>
-            <div className="relative">
-              <span className="absolute left-3 top-2 text-gray-400 text-sm">$</span>
-              <input
-                className={inputCls + ' pl-7'}
-                type="number"
-                min="1"
-                step="0.01"
-                value={companyForm.labor_rate_per_man_day}
-                onChange={e =>
-                  setCompanyForm(p => ({ ...p, labor_rate_per_man_day: e.target.value }))
-                }
-                placeholder="400.00"
-                disabled={!currentUserIsAdmin}
-              />
-            </div>
-            {rate > 0 && (
-              <p className="text-xs text-gray-400 mt-1">
-                At ${rate.toFixed(2)}/MD that's ${(rate / 8).toFixed(2)}/hr.
-              </p>
-            )}
-          </div>
-
           <div>
             <label className={labelCls}>Main Office Address</label>
             <input
