@@ -1641,18 +1641,6 @@ function CompanySettings({ currentUserIsAdmin }) {
             />
           </div>
 
-          {companyMsg && <Msg m={companyMsg} />}
-
-          {currentUserIsAdmin && (
-            <button
-              type="submit"
-              disabled={savingCompany}
-              className="w-full py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50"
-              style={{ backgroundColor: FG }}
-            >
-              {savingCompany ? 'Saving…' : 'Save Company Settings'}
-            </button>
-          )}
         </form>
 
         {/* Company logo — combined into Company Info */}
@@ -1699,6 +1687,26 @@ function CompanySettings({ currentUserIsAdmin }) {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Save Company Info — below logo config */}
+        <div className="mt-6 pt-5 border-t border-gray-100">
+          {companyMsg && (
+            <div className="mb-3">
+              <Msg m={companyMsg} />
+            </div>
+          )}
+          {currentUserIsAdmin && (
+            <button
+              type="button"
+              onClick={saveCompany}
+              disabled={savingCompany}
+              className="w-full py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50"
+              style={{ backgroundColor: FG }}
+            >
+              {savingCompany ? 'Saving…' : 'Save Company Info'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -1757,10 +1765,10 @@ function CompanySettings({ currentUserIsAdmin }) {
               pendingCompanyWeekDay === null ||
               pendingCompanyWeekDay === companyWeekDay
             }
-            className="px-5 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-40"
+            className="w-full py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-40"
             style={{ backgroundColor: FG }}
           >
-            {savingCompanyWeekDay ? 'Saving…' : 'Save Setting'}
+            {savingCompanyWeekDay ? 'Saving…' : 'Save Company Week Settings'}
           </button>
         )}
         {currentUserIsAdmin &&
