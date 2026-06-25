@@ -190,8 +190,13 @@ function calcDemo(
 
   // ── Vegetation — Bobcat access ────────────────────────────────────────────
   const shrubHrs = n(state.shrubQty) * accessBobcat * shrubRate
-  const shrubSfHrs = n(state.shrubSqFt) * 0.03
-  const shrubSfMat = n(state.shrubSqFt) * 0.8
+  // Shrubs by SqFt: density (1–5) × rate per 100 SF. Density 1 = 2 hrs &
+  // $100 per 100 SF; both base rates editable in the Edit Rates popovers.
+  const shrubSfRate = lr['Demo - Shrub SqFt (Mini Skid)'] ?? 1
+  const shrubSfMatRate = mp['Demo - Shrub SqFt'] ?? 100
+  const shrubSfDensity = n(state.shrubDensity) || 1
+  const shrubSfHrs = (n(state.shrubSqFt) / 100) * shrubSfDensity * shrubSfRate
+  const shrubSfMat = (n(state.shrubSqFt) / 100) * shrubSfDensity * shrubSfMatRate
   const stumpFstHrs = n(state.stumpFirstQty) * accessBobcat * stumpFstRate
   const stumpAddHrs = n(state.stumpAddQty) * accessBobcat * stumpAddRate
 
@@ -321,6 +326,8 @@ function calcDemo(
     shrubHrs,
     shrubSfHrs,
     shrubSfMat,
+    shrubSfRate,
+    shrubSfMatRate,
     stumpFstHrs,
     stumpAddHrs,
     shrubRate,
@@ -395,6 +402,7 @@ const DEFAULT_STATE = {
   ssCmpDepth: 3,
   shrubQty: '',
   shrubSqFt: '',
+  shrubDensity: '1',
   stumpFirstQty: '',
   stumpAddQty: '',
   treeRows: [
@@ -1431,14 +1439,47 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             </p>
           </div>
         ))}
-        {/* Shrubs by square footage — labor + $0.80/SF material */}
+        {/* Shrubs by square footage — density (1–5) × rate per 100 SF */}
         <div>
-          <p className="text-xs text-gray-500 mb-0.5">Shrubs (Sq Ft)</p>
-          <Inp value={state.shrubSqFt} onChange={e => set('shrubSqFt', e.target.value)} />
+          <p className="text-xs text-gray-500 mb-0.5 inline-flex items-center gap-1">
+            Shrubs (Density × Sq Ft)
+            <RateEditPopover
+              table="labor_rates"
+              name="Demo - Shrub SqFt (Mini Skid)"
+              category="Demo"
+              mode="coefficient"
+              unitLabel="hrs/100sf"
+              currentValue={calc.shrubSfRate}
+              onSaved={refreshAllRates}
+            />
+            <RateEditPopover
+              table="material_rates"
+              name="Demo - Shrub SqFt"
+              category="Demo"
+              unitLabel="$/100sf"
+              currentValue={calc.shrubSfMatRate}
+              onSaved={refreshAllRates}
+            />
+          </p>
+          <div className="flex gap-2">
+            <select
+              value={state.shrubDensity}
+              onChange={e => set('shrubDensity', e.target.value)}
+              title="Density"
+              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+            >
+              {[1, 2, 3, 4, 5].map(d => (
+                <option key={d} value={d}>
+                  Density {d}
+                </option>
+              ))}
+            </select>
+            <Inp value={state.shrubSqFt} onChange={e => set('shrubSqFt', e.target.value)} />
+          </div>
           <p className="text-xs text-gray-400 mt-0.5">
             {calc.shrubSfHrs > 0
               ? `${calc.shrubSfHrs.toFixed(2)} hrs · $${calc.shrubSfMat.toFixed(2)} mat`
-              : 'Labor + $0.80/SF material'}
+              : `Density × ${calc.shrubSfRate} hrs & $${calc.shrubSfMatRate} per 100 SF`}
           </p>
         </div>
       </div>
