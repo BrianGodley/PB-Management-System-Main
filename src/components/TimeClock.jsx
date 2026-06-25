@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LanguageContext'
+import { deductionMinsForDay, netMinsWithDeduction } from '../lib/autoDeduct'
 
 // ── Time helpers ─────────────────────────────────────────────
 function fmt12h(t) {
@@ -575,6 +576,7 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
   const [employeeId, setEmployeeId] = useState(null)
   const [nowTime, setNowTime] = useState(new Date())
   const [payrollWeekStart, setPayrollWeekStart] = useState(0) // 0=Sunday
+  const [autoDeduct, setAutoDeduct] = useState({ enabled: false, minutes: 30, perHours: 6 })
   const [myWeekEntries, setMyWeekEntries] = useState([])
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
@@ -642,10 +644,16 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
   useEffect(() => {
     supabase
       .from('company_settings')
-      .select('payroll_week_start')
+      .select('payroll_week_start, auto_deduct_enabled, auto_deduct_minutes, auto_deduct_per_hours')
       .maybeSingle()
       .then(({ data }) => {
-        if (data?.payroll_week_start != null) setPayrollWeekStart(data.payroll_week_start)
+        if (!data) return
+        if (data.payroll_week_start != null) setPayrollWeekStart(data.payroll_week_start)
+        setAutoDeduct({
+          enabled: !!data.auto_deduct_enabled,
+          minutes: data.auto_deduct_minutes ?? 30,
+          perHours: data.auto_deduct_per_hours ?? 6,
+        })
       })
   }, [])
 
@@ -693,21 +701,21 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
   const { weekStart, weekEnd } = getWeekRange(payrollWeekStart)
   const weekRangeLabel = fmtWeekRange(weekStart, weekEnd)
 
-  const myTodayMins = myWeekEntries
-    .filter(e => e.date === todayDate() && e.time_out)
-    .reduce(
-      (sum, e) =>
-        sum + Math.max(0, (diffMins(e.time_in, e.time_out) || 0) - (myWeekBreakMins[e.id] || 0)),
-      0
-    )
+  const workedMinsOf = e =>
+    Math.max(0, (diffMins(e.time_in, e.time_out) || 0) - (myWeekBreakMins[e.id] || 0))
 
-  const myWeekMins = myWeekEntries
-    .filter(e => e.time_out)
-    .reduce(
-      (sum, e) =>
-        sum + Math.max(0, (diffMins(e.time_in, e.time_out) || 0) - (myWeekBreakMins[e.id] || 0)),
-      0
-    )
+  // Today is a single day → deduct once against the combined daily total.
+  const myTodayGrossMins = myWeekEntries
+    .filter(e => e.date === todayDate() && e.time_out)
+    .reduce((sum, e) => sum + workedMinsOf(e), 0)
+  const myTodayMins = Math.max(0, myTodayGrossMins - deductionMinsForDay(myTodayGrossMins, autoDeduct))
+
+  // Week → group entries by day, deduct per day, then sum.
+  const myWeekMins = netMinsWithDeduction(
+    myWeekEntries.filter(e => e.time_out),
+    workedMinsOf,
+    autoDeduct
+  )
 
   async function fetchEntries() {
     const myReq = ++reqId.current

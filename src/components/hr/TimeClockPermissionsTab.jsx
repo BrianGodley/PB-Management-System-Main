@@ -16,6 +16,8 @@ export default function TimeClockPermissionsTab({ employees = [] }) {
   const [query, setQuery] = useState('')
   const [weekStart, setWeekStart] = useState(0) // 0=Sunday
   const [settingsId, setSettingsId] = useState(null)
+  const [tab, setTab] = useState('weekly') // weekly | multiple | auto-deduct
+  const [autoDeduct, setAutoDeduct] = useState({ enabled: false, minutes: 30, perHours: 6 })
 
   useEffect(() => {
     let alive = true
@@ -23,7 +25,10 @@ export default function TimeClockPermissionsTab({ employees = [] }) {
       const [{ data: permRows }, { data: crews }, { data: cs }] = await Promise.all([
         supabase.from('time_clock_permissions').select('*'),
         supabase.from('crews').select('crew_chief_id'),
-        supabase.from('company_settings').select('id, payroll_week_start').maybeSingle(),
+        supabase
+          .from('company_settings')
+          .select('id, payroll_week_start, auto_deduct_enabled, auto_deduct_minutes, auto_deduct_per_hours')
+          .maybeSingle(),
       ])
       if (!alive) return
       const p = {}
@@ -38,6 +43,11 @@ export default function TimeClockPermissionsTab({ employees = [] }) {
       if (cs) {
         setSettingsId(cs.id || null)
         if (cs.payroll_week_start != null) setWeekStart(cs.payroll_week_start)
+        setAutoDeduct({
+          enabled: !!cs.auto_deduct_enabled,
+          minutes: cs.auto_deduct_minutes ?? 30,
+          perHours: cs.auto_deduct_per_hours ?? 6,
+        })
       }
       setLoading(false)
     })()
@@ -60,6 +70,21 @@ export default function TimeClockPermissionsTab({ employees = [] }) {
         .insert({ payroll_week_start: day })
         .select('id')
         .single()
+      if (data) setSettingsId(data.id)
+    }
+  }
+
+  async function saveAutoDeduct(next) {
+    setAutoDeduct(next)
+    const payload = {
+      auto_deduct_enabled: next.enabled,
+      auto_deduct_minutes: parseFloat(next.minutes) || 0,
+      auto_deduct_per_hours: parseFloat(next.perHours) || 0,
+    }
+    if (settingsId) {
+      await supabase.from('company_settings').update(payload).eq('id', settingsId)
+    } else {
+      const { data } = await supabase.from('company_settings').insert(payload).select('id').single()
       if (data) setSettingsId(data.id)
     }
   }
@@ -116,6 +141,97 @@ export default function TimeClockPermissionsTab({ employees = [] }) {
 
   return (
     <div className="max-w-3xl">
+      {/* Sub-tab bar */}
+      <div className="flex gap-1 border-b border-gray-200 mb-4 overflow-x-auto">
+        {[
+          ['weekly', '📅 Weekly Period'],
+          ['multiple', '👥 Multiple Clock In'],
+          ['auto-deduct', '➖ Auto Deduction'],
+        ].map(([k, l]) => (
+          <button
+            key={k}
+            onClick={() => setTab(k)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors ${
+              tab === k ? 'border-green-700 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Weekly Period ── */}
+      {tab === 'weekly' && (
+        <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3 flex-wrap">
+          <div>
+            <p className="text-sm font-semibold text-gray-800">Weekly time-clock period</p>
+            <p className="text-xs text-gray-400">The week the “Weekly Total” is measured against.</p>
+          </div>
+          <label className="ml-auto text-sm text-gray-600 flex items-center gap-2">
+            Week starts on
+            <select
+              value={weekStart}
+              onChange={e => saveWeekStart(Number(e.target.value))}
+              className="input text-sm py-1.5"
+            >
+              {WEEKDAYS.map((d, i) => (
+                <option key={d} value={i}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+
+      {/* ── Auto Deduction ── */}
+      {tab === 'auto-deduct' && (
+        <div className="max-w-xl">
+          <p className="text-sm text-gray-600 mb-1">
+            Automatically deduct unpaid break time from each employee’s total clock-in hours.
+          </p>
+          <p className="text-xs text-gray-400 mb-4">Applied every day to the day’s total.</p>
+          <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoDeduct.enabled}
+                onChange={e => saveAutoDeduct({ ...autoDeduct, enabled: e.target.checked })}
+                className="w-4 h-4 accent-green-700"
+              />
+              <span className="text-sm font-semibold text-gray-800">Enable daily auto-deduction</span>
+            </label>
+            <div
+              className={`flex items-center flex-wrap gap-2 text-sm ${autoDeduct.enabled ? '' : 'opacity-50 pointer-events-none'}`}
+            >
+              <span className="text-gray-600">Deduct</span>
+              <input
+                type="number" step="1" min="0"
+                value={autoDeduct.minutes}
+                onChange={e => setAutoDeduct(a => ({ ...a, minutes: e.target.value }))}
+                onBlur={() => saveAutoDeduct(autoDeduct)}
+                className="input w-20 text-sm py-1.5"
+              />
+              <span className="text-gray-600">minutes for every</span>
+              <input
+                type="number" step="0.5" min="0"
+                value={autoDeduct.perHours}
+                onChange={e => setAutoDeduct(a => ({ ...a, perHours: e.target.value }))}
+                onBlur={() => saveAutoDeduct(autoDeduct)}
+                className="input w-20 text-sm py-1.5"
+              />
+              <span className="text-gray-600">hours worked.</span>
+            </div>
+            <p className="text-xs text-gray-400">
+              Example: 30 minutes for every 6 hours → an 8-hour day nets 7.5 hours; a 12-hour day nets 11 hours.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Multiple Clock In ── */}
+      {tab === 'multiple' && (
+      <div>
       <p className="text-sm text-gray-600 mb-1">
         Control who can clock in multiple employees at once.
       </p>
@@ -123,28 +239,6 @@ export default function TimeClockPermissionsTab({ employees = [] }) {
         Crew chiefs (assigned on a master crew) are enabled automatically — you can override
         either setting below.
       </p>
-
-      {/* Payroll week start — defines the weekly time-clock period (Sun–Sat by default). */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4 mb-5 flex items-center gap-3 flex-wrap">
-        <div>
-          <p className="text-sm font-semibold text-gray-800">Weekly time-clock period</p>
-          <p className="text-xs text-gray-400">The week the “Weekly Total” is measured against.</p>
-        </div>
-        <label className="ml-auto text-sm text-gray-600 flex items-center gap-2">
-          Week starts on
-          <select
-            value={weekStart}
-            onChange={e => saveWeekStart(Number(e.target.value))}
-            className="input text-sm py-1.5"
-          >
-            {WEEKDAYS.map((d, i) => (
-              <option key={d} value={i}>
-                {d}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
 
       <input
         type="text"
@@ -210,6 +304,8 @@ export default function TimeClockPermissionsTab({ employees = [] }) {
           </tbody>
         </table>
       </div>
+      </div>
+      )}
     </div>
   )
 }
