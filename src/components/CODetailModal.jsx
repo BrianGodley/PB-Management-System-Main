@@ -1133,19 +1133,30 @@ export default function CODetailModal({
 // ── Input helpers ──────────────────────────────────────────────────────────
 // Currency mask: show "$1,234" as the user types whole dollars; blank when
 // empty (no leading zero). Stored value is a plain number (or '').
+// A leading "-" is preserved so credit change orders can use negative amounts.
 function moneyMask(v) {
-  const d = String(v ?? '').replace(/[^0-9]/g, '')
-  return d ? '$' + Number(d).toLocaleString('en-US') : ''
+  const raw = String(v ?? '')
+  const neg = raw.trimStart().startsWith('-')
+  const d = raw.replace(/[^0-9]/g, '')
+  if (!d) return neg ? '-' : ''
+  return (neg ? '-$' : '$') + Number(d).toLocaleString('en-US')
 }
 function moneyDigits(v) {
-  const d = String(v ?? '').replace(/[^0-9]/g, '')
-  return d ? Number(d) : ''
+  const raw = String(v ?? '')
+  const neg = raw.trimStart().startsWith('-')
+  const d = raw.replace(/[^0-9]/g, '')
+  if (!d) return neg ? '-' : ''
+  return neg ? -Number(d) : Number(d)
 }
-// Plain number mask (no $): digits + one decimal point, blank when empty.
+// Plain number mask (no $): optional leading "-", digits + one decimal point.
 function numMask(v) {
-  const s = String(v ?? '').replace(/[^0-9.]/g, '')
+  const raw = String(v ?? '')
+  const neg = raw.trimStart().startsWith('-')
+  let s = raw.replace(/[^0-9.]/g, '')
   const i = s.indexOf('.')
-  return i === -1 ? s : s.slice(0, i + 1) + s.slice(i + 1).replace(/\./g, '')
+  s = i === -1 ? s : s.slice(0, i + 1) + s.slice(i + 1).replace(/\./g, '')
+  if (!s) return neg ? '-' : ''
+  return (neg ? '-' : '') + s
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────

@@ -1427,7 +1427,6 @@ export default function COEstimatePanel({
                   <input
                     type="number"
                     step="0.5"
-                    min="0"
                     className="input"
                     placeholder="0.0"
                     value={moduleForm.man_days}
@@ -1447,7 +1446,6 @@ export default function COEstimatePanel({
                     <input
                       type="number"
                       step="0.01"
-                      min="0"
                       className="input pl-7"
                       placeholder="0.00"
                       value={moduleForm.material_cost}

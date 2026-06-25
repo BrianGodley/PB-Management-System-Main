@@ -559,7 +559,6 @@ function PaverPicker({
             type="number"
             inputMode="decimal"
             step="0.01"
-            min="0"
             value={customPrice}
             onChange={e => onCustomPriceChange && onCustomPriceChange(e.target.value)}
             placeholder="0.00"
