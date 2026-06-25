@@ -260,9 +260,9 @@ export default function LaborRatesTab() {
             <p className="text-[10px] text-gray-400 mt-0.5">PTO days × 8 ÷ {WORK_HOURS_YEAR} working hrs.</p>
           </div>
         </div>
-        <div className="mt-3 text-xs text-gray-500">
-          Total burden (incl. PTO): <span className="font-semibold text-gray-700">{burdenPct.toFixed(2)}%</span> ={' '}
-          <span className="font-semibold text-gray-700">{money(burdenPerHour)}/hr</span> on the base rate.
+        <div className="mt-4 pt-3 border-t border-gray-200 flex items-center justify-between">
+          <span className="text-sm font-bold text-gray-900">Total Labor Burden Rate</span>
+          <span className="text-lg font-bold text-green-700">{burdenPct.toFixed(2)}%</span>
         </div>
       </div>
 

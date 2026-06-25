@@ -617,6 +617,33 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
     }
   }, [])
 
+  // Pull the company labor rate + burden % (HR → Labor Rates) into the pool's
+  // state, mirroring the other modules. Skip when re-editing a saved module so
+  // it keeps the rate it was built with.
+  useEffect(() => {
+    if (initialData?.laborRatePerHour) return
+    let alive = true
+    supabase
+      .from('company_settings')
+      .select('labor_rate_per_hour, labor_burden_pct')
+      .single()
+      .then(({ data }) => {
+        if (!alive || !data) return
+        setState(s => ({
+          ...s,
+          ...(data.labor_rate_per_hour != null
+            ? { laborRatePerHour: parseFloat(data.labor_rate_per_hour) || 35 }
+            : {}),
+          ...(data.labor_burden_pct != null
+            ? { laborBurdenPct: parseFloat(data.labor_burden_pct) }
+            : {}),
+        }))
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
   // Re-fetch all three Pool rate tables. Called on mount and after edits.
   const refreshAllRates = useCallback(async () => {
     const [matRes, labRes, subRes] = await Promise.all([

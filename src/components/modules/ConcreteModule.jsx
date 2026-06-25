@@ -522,7 +522,8 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     materialRates,
     subRates,
     gpmd,
-    walkAccess
+    walkAccess,
+    laborBurdenPct
   )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
