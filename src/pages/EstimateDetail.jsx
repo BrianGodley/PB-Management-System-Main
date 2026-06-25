@@ -1769,6 +1769,9 @@ export default function EstimateDetail() {
             totalHrs={pt.manDays * 8}
             manDays={pt.manDays}
             laborCost={pt.laborCost}
+            laborRatePerHour={
+              pt.manDays > 0 && pt.laborCost > 0 ? pt.laborCost / (pt.manDays * 8) : 35
+            }
             burden={pt.burden}
             subCost={pt.subCost}
             gpmd={projectGpmds[selectedProject.id] ?? projGpmd}
