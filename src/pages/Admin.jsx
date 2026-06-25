@@ -1735,33 +1735,6 @@ function CompanySettings({ currentUserIsAdmin }) {
         </div>
       </div>
 
-      {/* ── GP explanation ────────────────────────────────────────────────── */}
-      <div className="card bg-green-50 border-green-200">
-        <h3 className="font-semibold text-green-900 mb-2">📊 How GP is Calculated</h3>
-        <div className="text-sm text-green-800 space-y-1.5">
-          <p>
-            <b>Revenue</b> = Contract Price + Change Order Prices
-          </p>
-          <p>
-            <b>Labor Cost</b> = Total Man Days × Rate per Man Day
-          </p>
-          <p>
-            <b>Total Cost</b> = Labor Cost + Material Cost
-          </p>
-          <p>
-            <b>Gross Profit</b> = Revenue − Total Cost
-          </p>
-          <p>
-            <b>GP %</b> = Gross Profit ÷ Revenue × 100
-          </p>
-          <hr className="border-green-200 my-2" />
-          <p className="text-xs text-green-700">
-            1 Man Day = 8 hours. A module with 3 man days at ${rate > 0 ? rate.toFixed(0) : 400}/MD
-            = ${(3 * (rate > 0 ? rate : 400)).toLocaleString()} labor cost.
-          </p>
-        </div>
-      </div>
-
       {/* ── Company week ending day ──────────────────────────────────────── */}
       <div className="card">
         <div className="flex items-start justify-between mb-1">
@@ -1827,32 +1800,6 @@ function CompanySettings({ currentUserIsAdmin }) {
           pendingCompanyWeekDay !== null &&
           pendingCompanyWeekDay === companyWeekDay &&
           !companyWeekMsg && <p className="text-xs text-gray-400 mt-2">No changes to save.</p>}
-      </div>
-
-      {/* ── Period reference ──────────────────────────────────────────────── */}
-      <div className="card bg-gray-50 border-gray-200">
-        <h3 className="font-semibold text-gray-700 mb-3 text-sm">
-          📋 Period Reference (read-only)
-        </h3>
-        <div className="space-y-2 text-sm text-gray-600">
-          {[
-            ['Daily', 'Every calendar day'],
-            [
-              'Weekly',
-              weekEndingDay !== null
-                ? `Week ending ${WEEK_DAYS[weekEndingDay]?.label}`
-                : 'Not configured — set above',
-            ],
-            ['Monthly', 'Last day of each calendar month'],
-            ['Quarterly', 'Mar 31 · Jun 30 · Sep 30 · Dec 31'],
-            ['Yearly', 'Dec 31 of each year'],
-          ].map(([label, val]) => (
-            <div key={label} className="flex justify-between">
-              <span className="font-medium">{label}</span>
-              <span className="text-gray-500">{val}</span>
-            </div>
-          ))}
-        </div>
       </div>
 
     </div>
