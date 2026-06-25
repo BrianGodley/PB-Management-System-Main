@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { sendWelcomeEmail, sendSMS, sendFeedbackStatusEmail } from '../lib/notify'
+import SubscriptionTab from '../components/settings/SubscriptionTab'
+import BillingTab from '../components/settings/BillingTab'
 
 const FG = '#3A5038'
 
@@ -4021,6 +4023,8 @@ export default function Admin() {
 
   const tabs = [
     { key: 'settings', label: 'Company Settings' },
+    { key: 'subscription', label: '💳 Subscription' },
+    { key: 'billing', label: '🧾 Billing' },
     { key: 'sms', label: '📱 SMS Settings' },
     { key: 'email', label: '✉️ Email Settings' },
     { key: 'integrations', label: '🔗 Integrations' },
@@ -4080,6 +4084,10 @@ export default function Admin() {
 
       {/* ── SETTINGS TAB ──────────────────────────────────────────────────── */}
       {tab === 'settings' && <CompanySettings currentUserIsAdmin={currentUserIsAdmin} />}
+
+      {tab === 'subscription' && <SubscriptionTab />}
+
+      {tab === 'billing' && <BillingTab />}
 
       {tab === 'sms' && <SmsSettings />}
 
