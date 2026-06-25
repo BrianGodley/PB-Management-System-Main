@@ -4,6 +4,11 @@ name: Deploy Supabase Edge Functions
   push:
     branches:
       - master
+    # Only run when edge functions (or this workflow) change, so frontend-only
+    # pushes don't trigger — or fail — the Supabase deploy.
+    paths:
+      - "supabase/functions/**"
+      - ".github/workflows/deploy.yml"
 
 jobs:
   deploy:
@@ -13,7 +18,10 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pin a specific CLI version. Using "latest" makes the action query
+          # GitHub's API for the newest release, which gets rate-limited and
+          # fails the job. Bump this when you want a newer CLI.
+          version: 2.84.2
 
       - run: supabase functions deploy --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
         env:
