@@ -160,9 +160,9 @@ const FAQS = [
 // "one system" showcase grid.
 // Body copy kept to ~two lines each so all three cards stay uniform.
 const SHOWCASE = [
-  ['/marketing/marketing.jpg', 'Sales & Marketing', 'CRM and workflows. Auto campaigns, Booking Calendar and more.'],
-  ['/marketing/team.jpg', 'Establishment', 'Org Charts, Time Clocks, Strategic Planning and Policy Management.'],
-  ['/marketing/hr.jpg', 'Human Resources', 'Recruiting, Employee Management, and training so new hires and seasoned employees grow.'],
+  ['/marketing/marketing.jpg', 'Sales & Marketing', 'CRM, Website Builder, Auto Campaigns, Booking Calendars, Sales Funnels and more to fully control your customer interaction.'],
+  ['/marketing/team.jpg', 'Establishment', 'Org Charts, Workflows, Strategic Planning and Policy Management to create all your company guidelines.'],
+  ['/marketing/hr.jpg', 'Human Resources', 'Recruiting, Position Management, Employee Records, Permissions and Training so new hires and seasoned employees grow.'],
 ]
 
 // Sam — the built-in AI assistant. `true` marks an ability that's on the roadmap.
