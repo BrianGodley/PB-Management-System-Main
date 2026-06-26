@@ -36,9 +36,9 @@ const Hero = {
     align: { type: 'select', options: [{ label: 'Center', value: 'center' }, { label: 'Left', value: 'left' }] },
   },
   defaultProps: {
-    title: 'Beautiful landscapes, built to last',
-    subtitle: 'Design, installation, and maintenance for homeowners who want the best.',
-    buttonText: 'Get a free quote',
+    title: 'Your headline here',
+    subtitle: 'Add a short subtitle that tells visitors what your business does.',
+    buttonText: 'Get started',
     buttonLink: '#contact',
     bgImage: '',
     align: 'center',
@@ -70,15 +70,15 @@ const Services = {
       type: 'array',
       getItemSummary: i => i.title || 'Service',
       arrayFields: { icon: { type: 'text' }, title: { type: 'text' }, description: { type: 'textarea' } },
-      defaultItemProps: { icon: '🌿', title: 'Service', description: 'Describe it briefly.' },
+      defaultItemProps: { icon: '⭐', title: 'New service', description: 'Describe this service briefly.' },
     },
   },
   defaultProps: {
-    heading: 'What we do',
+    heading: 'What we offer',
     items: [
-      { icon: '🌳', title: 'Landscape Design', description: 'Custom plans tailored to your property.' },
-      { icon: '🧱', title: 'Hardscaping', description: 'Patios, walls, walkways, and outdoor living.' },
-      { icon: '💧', title: 'Irrigation', description: 'Efficient systems that keep everything thriving.' },
+      { icon: '⭐', title: 'Service one', description: 'Describe this service in a sentence or two.' },
+      { icon: '⭐', title: 'Service two', description: 'Describe this service in a sentence or two.' },
+      { icon: '⭐', title: 'Service three', description: 'Describe this service in a sentence or two.' },
     ],
   },
   render: ({ heading, items = [] }) => (
@@ -174,7 +174,7 @@ const Testimonials = {
   },
   defaultProps: {
     heading: 'What clients say',
-    items: [{ quote: 'Best decision we made for our yard.', name: 'Jamie R.', role: 'Homeowner' }],
+    items: [{ quote: 'Add a great customer quote here.', name: 'Customer name', role: '' }],
   },
   render: ({ heading, items = [] }) => (
     <Section className="bg-gray-50">
@@ -200,7 +200,7 @@ const CTA = {
     buttonText: { type: 'text' },
     buttonLink: { type: 'text' },
   },
-  defaultProps: { heading: 'Ready to get started?', text: 'Request your free, no-obligation quote today.', buttonText: 'Contact us', buttonLink: '#contact' },
+  defaultProps: { heading: 'Ready to get started?', text: 'Add a closing line and a call to action here.', buttonText: 'Contact us', buttonLink: '#contact' },
   render: ({ heading, text, buttonText, buttonLink }) => (
     <section className="w-full px-6 py-16" style={{ backgroundColor: PRIMARY }}>
       <div className="max-w-3xl mx-auto text-center">
