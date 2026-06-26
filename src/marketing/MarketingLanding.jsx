@@ -4,17 +4,17 @@
 // there's no authenticated user (see App.jsx). CTAs route into the app's
 // /signup and /login. Single-page scroll with anchor nav.
 //
-// Branding mirrors Login.jsx: Picture Build, deep-green palette, /logo.png with
-// a 🌿 fallback.
+// Branding: SoftCake, blue palette (matches the cloud logo), /logo.png with a
+// ☁️ fallback.
 
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { PLATFORM_BRAND } from '../lib/brand'
 
-const FG = '#3A5038'
-const FG_DARK = '#2E4030'
-const FG_LIGHT = '#5a7a58'
+const FG = '#2E8BC9'       // SoftCake blue (primary)
+const FG_DARK = '#1B5E8C'  // deep blue (gradients)
+const FG_LIGHT = '#5BB3E4' // light sky blue
 
 // ── Content ──────────────────────────────────────────────────────────────────
 const FEATURE_GROUPS = [
@@ -34,7 +34,7 @@ const FEATURE_GROUPS = [
     title: 'Win & manage work',
     blurb: 'From first call to signed contract.',
     items: [
-      ['Contacts & Opportunities', 'A CRM built around how contractors actually sell.'],
+      ['Sales & Marketing', 'A CRM built around how contractors actually sell — funnels, calendar and campaigns.'],
       ['Training (LMS)', 'Assign courses, track completion, build a competent team.'],
       ['Workflows', 'Repeatable document and approval flows that run themselves.'],
       ['Documents & E-Docs', 'Files, photos, videos, a doc creator, and e-signature.'],
@@ -75,15 +75,15 @@ const TIERS = [
   {
     id: 'tier2',
     name: 'Tier 2',
-    price: 199,
+    price: 229,
     featured: true,
     tagline: 'Win and manage work, end to end.',
-    includes: ['Everything in Tier 1', 'Training (LMS)', 'Contacts', 'Opportunities (CRM)', 'Workflows'],
+    includes: ['Everything in Tier 1', 'Training (LMS)', 'Sales', 'Marketing', 'Workflows'],
   },
   {
     id: 'tier3',
     name: 'Tier 3',
-    price: 399,
+    price: 389,
     tagline: 'Full financial and operational control.',
     includes: ['Everything in Tier 2', 'Accounting', 'Weekly Financial Planning', 'Subs & Vendors', 'Equipment Tracking'],
   },
@@ -96,6 +96,15 @@ const FAQS = [
   ['Can I change plans later?', 'Anytime. Move up or down a tier, or add the Contractor Package, and your modules update immediately. You only ever see the features your plan includes.'],
   ['Is my data secure and private?', 'Each company is fully isolated — your records are only ever visible to your team. We use row-level security so one company can never see another’s data.'],
   ['Do you charge setup or cancellation fees?', 'No setup fees and no cancellation fees. It’s month-to-month.'],
+]
+
+// Front-page photos. Drop the files in public/marketing/ (any missing image is
+// hidden automatically). Swap the filenames/paths if you name them differently.
+const PHOTOS = [
+  ['/marketing/contractor.jpg', 'Contractors reviewing plans on the job site'],
+  ['/marketing/marketing.jpg', 'Marketing & brand planning'],
+  ['/marketing/team.jpg', 'Office team at work'],
+  ['/marketing/hr.jpg', 'Hiring, training & HR'],
 ]
 
 // ── Small pieces ───────────────────────────────────────────────────────────
@@ -209,13 +218,13 @@ export default function MarketingLanding() {
       {/* ── Hero ───────────────────────────────────────────────────────────── */}
       <section id="top" className="relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${FG_DARK} 0%, ${FG} 55%, ${FG_LIGHT} 100%)` }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-20 sm:py-28 text-center">
-          <span className="inline-block text-xs font-semibold tracking-wide uppercase text-green-100/90 bg-white/10 rounded-full px-3 py-1 mb-5">
+          <span className="inline-block text-xs font-semibold tracking-wide uppercase text-blue-100/90 bg-white/10 rounded-full px-3 py-1 mb-5">
             For landscape & construction companies
           </span>
           <h1 className="text-4xl sm:text-6xl font-extrabold text-white tracking-tight leading-[1.05] max-w-3xl mx-auto">
             Run your whole company from one place
           </h1>
-          <p className="mt-5 text-lg sm:text-xl text-green-50/90 max-w-2xl mx-auto">
+          <p className="mt-5 text-lg sm:text-xl text-blue-50/90 max-w-2xl mx-auto">
             {PLATFORM_BRAND.name} brings your people, jobs, estimates, documents and money into a single system — built for the way contractors actually work.
           </p>
           <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -230,9 +239,33 @@ export default function MarketingLanding() {
               See what’s inside
             </a>
           </div>
-          <p className="mt-5 text-sm text-green-100/80">
+          <p className="mt-5 text-sm text-blue-100/80">
             Unlimited users · No setup fees · Cancel anytime
           </p>
+        </div>
+      </section>
+
+      {/* ── Photo band ─────────────────────────────────────────────────────── */}
+      <section className="border-b border-gray-100 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
+          <p className="text-center text-sm font-semibold tracking-wide uppercase text-gray-400 mb-6">
+            Built for the office and the field
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+            {PHOTOS.map(([src, alt]) => (
+              <div key={src} className="aspect-[4/3] rounded-2xl overflow-hidden bg-blue-50 ring-1 ring-blue-100">
+                <img
+                  src={src}
+                  alt={alt}
+                  loading="lazy"
+                  className="w-full h-full object-cover"
+                  onError={e => {
+                    if (e.currentTarget.parentElement) e.currentTarget.parentElement.style.display = 'none'
+                  }}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -335,7 +368,7 @@ export default function MarketingLanding() {
           </div>
 
           {/* Contractor add-on */}
-          <div className="mt-8 rounded-2xl border-2 border-dashed p-6 sm:p-7 flex flex-col sm:flex-row sm:items-center gap-5" style={{ borderColor: FG_LIGHT, backgroundColor: '#f3f7f2' }}>
+          <div className="mt-8 rounded-2xl border-2 border-dashed p-6 sm:p-7 flex flex-col sm:flex-row sm:items-center gap-5" style={{ borderColor: FG_LIGHT, backgroundColor: '#eef6fc' }}>
             <div className="text-3xl">🚜</div>
             <div className="flex-1">
               <div className="flex items-baseline gap-2 flex-wrap">
@@ -382,7 +415,8 @@ export default function MarketingLanding() {
       <section className="px-4 sm:px-6 pb-20">
         <div className="max-w-5xl mx-auto rounded-3xl px-6 py-14 sm:py-16 text-center" style={{ background: `linear-gradient(135deg, ${FG_DARK} 0%, ${FG} 60%, ${FG_LIGHT} 100%)` }}>
           <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">Ready to get organized?</h2>
-          <p className="mt-3 text-green-50/90 max-w-xl mx-auto">Set up your company in under a minute. 14 days free, unlimited users, cancel anytime.</p>
+          <p className="mt-3 text-blue-50/90 max-w-xl mx-auto">Set up your company in under a minute. 14 days free, unlimited users, cancel anytime.</p>
+          {/* (blue theme) */}
           <Link to="/signup" className="inline-block mt-7 text-base font-bold rounded-xl px-8 py-3.5 shadow-lg hover:opacity-90 transition-opacity" style={{ backgroundColor: 'white', color: FG_DARK }}>
             Start your free trial
           </Link>

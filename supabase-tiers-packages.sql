@@ -3,7 +3,7 @@
 -- ----------------------------------------------------------------------------
 -- Final model: three stacking tiers (flat, unlimited users) + add-on packages.
 -- Supersedes the starter/pro/enterprise rows from supabase-plans-entitlements.sql.
--- Prices: Tier 1 $79, Tier 2 $199, Tier 3 $399, Contractor +$149.
+-- Prices: Tier 1 $79, Tier 2 $229, Tier 3 $389, Contractor +$149.
 -- ============================================================================
 
 -- 0) Ensure pricing columns exist on plans (also in supabase-billing-schema.sql)
@@ -15,11 +15,11 @@ insert into public.plans (id, name, rank, price_monthly, module_keys) values
   ('tier1', 'Tier 1 — Base', 1, 79, array[
      '/', '/org-chart', '/statistics', '/edocuments', '/hr'
    ]),
-  ('tier2', 'Tier 2', 2, 199, array[
+  ('tier2', 'Tier 2', 2, 229, array[
      '/', '/org-chart', '/statistics', '/edocuments', '/hr',
      '/training', '/contacts', '/clients', '/workflows'
    ]),
-  ('tier3', 'Tier 3', 3, 399, array[
+  ('tier3', 'Tier 3', 3, 389, array[
      '/', '/org-chart', '/statistics', '/edocuments', '/hr',
      '/training', '/contacts', '/clients', '/workflows',
      '/accounting', '/collections', '/portal/subs', '/equipment-tracking'

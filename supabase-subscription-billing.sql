@@ -9,7 +9,15 @@
 --   • Picture Build → tier3, contractor package, active, Visa test card 4242
 -- ============================================================================
 
--- 1) Card display columns (card_last4 already added in supabase-billing-schema.sql)
+-- 0) Base billing columns (also in supabase-billing-schema.sql — included here so
+--    this file is self-contained and order-independent).
+alter table public.tenants add column if not exists helcim_customer_id     text;
+alter table public.tenants add column if not exists helcim_subscription_id text;
+alter table public.tenants add column if not exists billing_status         text;  -- trialing|active|past_due|canceled
+alter table public.tenants add column if not exists card_last4             text;
+alter table public.tenants add column if not exists current_period_end     timestamptz;
+
+-- 1) Card display columns
 alter table public.tenants add column if not exists card_brand text;   -- Visa | Mastercard | ...
 alter table public.tenants add column if not exists card_exp   text;   -- 'MM/YYYY'
 

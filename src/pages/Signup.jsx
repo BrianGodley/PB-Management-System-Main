@@ -20,8 +20,8 @@ const BETA_PAYMENTS = true
 
 const PLANS = [
   { id: 'tier1', name: 'Tier 1 — Base', price: 79, blurb: 'Dashboard, Org Chart, HR, Statistics, Documents' },
-  { id: 'tier2', name: 'Tier 2', price: 199, blurb: '+ Training, Contacts, Opportunities, Workflows' },
-  { id: 'tier3', name: 'Tier 3', price: 399, blurb: '+ Accounting, Weekly FP, Subs & Vendors, Equipment' },
+  { id: 'tier2', name: 'Tier 2', price: 229, blurb: '+ Training, Sales, Marketing, Workflows' },
+  { id: 'tier3', name: 'Tier 3', price: 389, blurb: '+ Accounting, Weekly FP, Subs & Vendors, Equipment' },
 ]
 
 // Card input formatters
