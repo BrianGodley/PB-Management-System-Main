@@ -98,13 +98,13 @@ const FAQS = [
   ['Do you charge setup or cancellation fees?', 'No setup fees and no cancellation fees. It’s month-to-month.'],
 ]
 
-// Front-page photos. Drop the files in public/marketing/ (any missing image is
-// hidden automatically). Swap the filenames/paths if you name them differently.
-const PHOTOS = [
-  ['/marketing/contractor.jpg', 'Contractors reviewing plans on the job site'],
-  ['/marketing/marketing.jpg', 'Marketing & brand planning'],
-  ['/marketing/team.jpg', 'Office team at work'],
-  ['/marketing/hr.jpg', 'Hiring, training & HR'],
+// Front-page photos live in public/marketing/. A missing image degrades
+// gracefully. The contractor shot anchors its own band; these three fill the
+// "one system" showcase grid.
+const SHOWCASE = [
+  ['/marketing/marketing.jpg', 'Sales & Marketing', 'Funnels, a booking calendar, contact workflows and campaigns — built around how contractors actually sell.'],
+  ['/marketing/team.jpg', 'People & operations', 'Org chart, employees, time clock and onboarding — keep the office and the field aligned.'],
+  ['/marketing/hr.jpg', 'Hire & train', 'Recruiting, skill training and a full LMS so every new hire ramps up the same way.'],
 ]
 
 // ── Small pieces ───────────────────────────────────────────────────────────
@@ -245,26 +245,26 @@ export default function MarketingLanding() {
         </div>
       </section>
 
-      {/* ── Photo band ─────────────────────────────────────────────────────── */}
-      <section className="border-b border-gray-100 bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
-          <p className="text-center text-sm font-semibold tracking-wide uppercase text-gray-400 mb-6">
-            Built for the office and the field
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-            {PHOTOS.map(([src, alt]) => (
-              <div key={src} className="aspect-[4/3] rounded-2xl overflow-hidden bg-blue-50 ring-1 ring-blue-100">
-                <img
-                  src={src}
-                  alt={alt}
-                  loading="lazy"
-                  className="w-full h-full object-cover"
-                  onError={e => {
-                    if (e.currentTarget.parentElement) e.currentTarget.parentElement.style.display = 'none'
-                  }}
-                />
-              </div>
-            ))}
+      {/* ── Contractor band ────────────────────────────────────────────────── */}
+      <section className="relative bg-gray-900">
+        <img
+          src="/marketing/contractor.jpg"
+          alt="Contractors reviewing plans on the job site"
+          loading="lazy"
+          className="w-full h-[260px] sm:h-[380px] object-cover opacity-95"
+          onError={e => { e.currentTarget.style.display = 'none' }}
+        />
+        <div
+          className="absolute inset-0 flex items-end"
+          style={{ background: `linear-gradient(to top, ${FG_DARK}E6, ${FG_DARK}33 55%, transparent)` }}
+        >
+          <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 pb-8">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              From the first call to the final invoice
+            </h2>
+            <p className="text-blue-50/90 mt-1.5 max-w-xl">
+              One system for the office and the field — estimates, jobs, change orders, time and money.
+            </p>
           </div>
         </div>
       </section>
@@ -316,6 +316,35 @@ export default function MarketingLanding() {
               </ul>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ── One-system showcase (photos) ───────────────────────────────────── */}
+      <section className="bg-gray-50 border-y border-gray-100">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16">
+          <div className="text-center max-w-2xl mx-auto mb-10">
+            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">One system for every part of your business</h2>
+            <p className="mt-4 text-gray-600">Sell it, staff it, build it — all connected, all in one place.</p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6">
+            {SHOWCASE.map(([src, title, body]) => (
+              <div key={src} className="rounded-2xl overflow-hidden bg-white border border-gray-200 shadow-sm flex flex-col">
+                <div className="aspect-[16/10] bg-blue-50">
+                  <img
+                    src={src}
+                    alt={title}
+                    loading="lazy"
+                    className="w-full h-full object-cover"
+                    onError={e => { e.currentTarget.style.display = 'none' }}
+                  />
+                </div>
+                <div className="p-5">
+                  <h3 className="font-bold text-gray-900">{title}</h3>
+                  <p className="text-sm text-gray-600 mt-1.5">{body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
