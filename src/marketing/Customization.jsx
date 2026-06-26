@@ -85,6 +85,20 @@ export default function Customization() {
         </div>
       </section>
 
+      {/* Extremely affordable */}
+      <section className="border-b border-gray-100">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 text-center">
+          <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight" style={{ color: FG }}>
+            Extremely affordable
+          </h2>
+          <p className="mt-4 text-lg text-gray-600">
+            You may be surprised how affordable our custom extensions can be. With our AI-assisted
+            development, we deliver products faster, cheaper and better than traditional custom-coded
+            projects.
+          </p>
+        </div>
+      </section>
+
       {/* Two kinds of extensions */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
         <div className="text-center max-w-2xl mx-auto mb-12">
