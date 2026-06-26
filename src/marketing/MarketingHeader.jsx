@@ -16,7 +16,7 @@ const FG = '#2E8BC9'
 const FG_DARK = '#1B5E8C'
 
 const NAV = [
-  ['Features', '/#features'],
+  ['Features', '/features'],
   ['Pricing', '/pricing'],
   ['Customization', '/customization'],
   ['Contractor', '/contractor-extensions'],

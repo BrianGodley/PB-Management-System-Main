@@ -85,6 +85,7 @@ const MarketingLanding = lazy(() => import('./marketing/MarketingLanding'))
 const ContractorExtensions = lazy(() => import('./marketing/ContractorExtensions'))
 const Customization = lazy(() => import('./marketing/Customization'))
 const Pricing = lazy(() => import('./marketing/Pricing'))
+const Features = lazy(() => import('./marketing/Features'))
 const PublicSite = lazy(() => import('./pages/PublicSite'))
 
 function PortalPlaceholder({ label, icon }) {
@@ -178,6 +179,7 @@ function AppRoutes() {
         <Route path="/contractor-extensions" element={<ContractorExtensions />} />
         <Route path="/customization" element={<Customization />} />
         <Route path="/pricing" element={<Pricing />} />
+        <Route path="/features" element={<Features />} />
         <Route path="/sign/:token" element={<SignDocument />} />
         {/* Public tenant marketing sites built in the Website Builder */}
         <Route path="/s/:slug" element={<PublicSite />} />

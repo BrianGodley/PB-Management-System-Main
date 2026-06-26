@@ -19,7 +19,8 @@ const FG_DARK = '#1B5E8C'  // deep blue (gradients)
 const FG_LIGHT = '#5BB3E4' // light sky blue
 
 // ── Content ──────────────────────────────────────────────────────────────────
-const FEATURE_GROUPS = [
+// Exported so the dedicated /features page can render the same groups.
+export const FEATURE_GROUPS = [
   {
     icon: '🏢',
     title: 'Organize the Business',
@@ -230,9 +231,9 @@ export default function MarketingLanding() {
             >
               Start your 14-day free trial
             </Link>
-            <a href="#features" className="w-full sm:w-auto text-base font-semibold text-white border border-white/30 rounded-xl px-7 py-3.5 hover:bg-white/10 transition-colors">
+            <Link to="/features" className="w-full sm:w-auto text-base font-semibold text-white border border-white/30 rounded-xl px-7 py-3.5 hover:bg-white/10 transition-colors">
               See what’s inside
-            </a>
+            </Link>
           </div>
           <p className="mt-5 text-sm text-blue-100/80">
             Unlimited users · No setup fees · Cancel anytime
@@ -252,39 +253,6 @@ export default function MarketingLanding() {
             <div key={small}>
               <div className="text-2xl sm:text-3xl font-extrabold" style={{ color: FG }}>{big}</div>
               <div className="text-xs sm:text-sm text-gray-500 mt-1">{small}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Features ───────────────────────────────────────────────────────── */}
-      <section id="features" className="max-w-6xl mx-auto px-4 sm:px-6 py-20">
-        <div className="text-center max-w-2xl mx-auto mb-14">
-          <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Integrated Organization</h2>
-          <p className="mt-4 text-gray-600">
-            Each module works on its own and connects to the rest. Start with the essentials and turn on more as you grow — you only ever see what your plan includes.
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-6">
-          {FEATURE_GROUPS.map(group => (
-            <div key={group.title} className="border border-gray-150 rounded-2xl p-6 bg-gray-50/60">
-              <div className="flex items-center gap-3 mb-1">
-                <span className="text-2xl">{group.icon}</span>
-                <h3 className="text-lg font-bold">{group.title}</h3>
-              </div>
-              <p className="text-sm text-gray-500 mb-5">{group.blurb}</p>
-              <ul className="space-y-3.5">
-                {group.items.map(([name, desc]) => (
-                  <li key={name} className="flex gap-3">
-                    <span style={{ color: FG }}><Check /></span>
-                    <span>
-                      <span className="font-semibold text-sm text-gray-900">{name}</span>
-                      <span className="block text-sm text-gray-500">{desc}</span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
             </div>
           ))}
         </div>
@@ -413,7 +381,7 @@ export default function MarketingLanding() {
             <span className="font-semibold text-gray-800">{PLATFORM_BRAND.name}</span>
           </div>
           <nav className="flex items-center gap-6 text-sm text-gray-500">
-            <a href="#features" className="hover:text-gray-800">Features</a>
+            <Link to="/features" className="hover:text-gray-800">Features</Link>
             <Link to="/pricing" className="hover:text-gray-800">Pricing</Link>
             <a href="#faq" className="hover:text-gray-800">FAQ</a>
             {user
