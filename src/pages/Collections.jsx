@@ -529,7 +529,7 @@ export default function Collections() {
     // Check if that week already exists in DB (e.g. was created but has no data yet)
     const alreadyExists = weeks.find(w => w.week_ending === nextDate) || null
     setCreatingWeek(false)
-    setNewWeekModal({ lastDataWeek, nextDate, alreadyExists })
+    setNewWeekModal({ lastDataWeek, nextDate, alreadyExists, starting: weeks.length === 0 })
   }
 
   // Step 2: create (or reuse) the week and copy rows from lastDataWeek
@@ -757,6 +757,38 @@ export default function Collections() {
             .insert(allNewFinancial)
           if (finErr) console.error('collection_financial insert error:', finErr)
         }
+      }
+    } else {
+      // ── Starting week (no prior data to draw from) ────────────────────────
+      // Create a clean week. Collections & Payables start completely blank — the
+      // user adds clients and bills directly in each tab. Only the standard
+      // Financial Planning scaffold (Cash On Hand + Payroll Allocations at $0) is
+      // seeded so those tables render and are ready to fill in. Nothing is copied.
+      const { data: existingFin } = await supabase
+        .from('collection_financial')
+        .select('id')
+        .eq('week_id', targetWeek.id)
+        .limit(1)
+      if (!existingFin?.length) {
+        const base = {
+          week_id: targetWeek.id,
+          subsection: null,
+          amount: 0,
+          is_formula: false,
+          formula_type: null,
+          formula_pct: null,
+          source_payable_id: null,
+          is_paid: false,
+        }
+        const scaffold = [
+          { ...base, section: 'cash_on_hand', label: 'Operating Expense', sort_order: 0 },
+          { ...base, section: 'cash_on_hand', label: 'Income', sort_order: 1 },
+          { ...base, section: 'cash_on_hand', label: 'Payroll', sort_order: 2 },
+          { ...base, section: 'payroll', label: 'Payroll', sort_order: 0 },
+          { ...base, section: 'payroll', label: 'Payroll Taxes', sort_order: 1 },
+        ]
+        const { error: finErr } = await supabase.from('collection_financial').insert(scaffold)
+        if (finErr) console.error('collection_financial starting-week seed error:', finErr)
       }
     }
 
@@ -1047,11 +1079,14 @@ export default function Collections() {
       {newWeekModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
-            <div className="bg-green-700 px-6 py-4">
-              <h2 className="text-white font-bold text-lg">Create New Weekly Period</h2>
+            <div className={`px-6 py-4 ${newWeekModal.starting ? 'bg-blue-700' : 'bg-green-700'}`}>
+              <h2 className="text-white font-bold text-lg">
+                {newWeekModal.starting ? 'Create Your Starting Week' : 'Create New Weekly Period'}
+              </h2>
             </div>
             <div className="px-6 py-5 space-y-4">
-              {/* Last data week */}
+              {/* Last data week (hidden for the first-ever starting week) */}
+              {!newWeekModal.starting && (
               <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
                   Last Week With Data
@@ -1065,15 +1100,30 @@ export default function Collections() {
                   <p className="text-sm text-gray-400 italic">No data found in any week</p>
                 )}
               </div>
+              )}
               {/* New week */}
               <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
                 <p className="text-xs font-semibold text-green-600 uppercase tracking-wide mb-1">
-                  New Week To Be Created
+                  {newWeekModal.starting ? 'Your First Week' : 'New Week To Be Created'}
                 </p>
                 <p className="text-sm font-semibold text-green-900">
                   {prevWeekStart(newWeekModal.nextDate)} – {fmtWeekEnd(newWeekModal.nextDate)}
                 </p>
               </div>
+              {/* Starting-week explainer */}
+              {newWeekModal.starting && (
+                <div className="text-xs text-gray-600 space-y-1.5 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+                  <p className="font-semibold text-blue-800 mb-1">
+                    This is your first weekly period — we'll start you clean.
+                  </p>
+                  <p>✅ Nothing is copied from a previous week.</p>
+                  <p>✅ Collections &amp; Payables start blank — add your clients and bills directly.</p>
+                  <p>
+                    ✅ Financial Planning is pre-set with the standard rows (Operating Expense,
+                    Income, Payroll) at $0, ready to fill in.
+                  </p>
+                </div>
+              )}
               {/* What will happen */}
               {newWeekModal.lastDataWeek && (
                 <div className="text-xs text-gray-600 space-y-1.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
@@ -1110,9 +1160,17 @@ export default function Collections() {
               <button
                 onClick={confirmCreateWeek}
                 disabled={creatingWeek}
-                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-green-700 hover:bg-green-800 disabled:opacity-50"
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 ${
+                  newWeekModal.starting
+                    ? 'bg-blue-700 hover:bg-blue-800'
+                    : 'bg-green-700 hover:bg-green-800'
+                }`}
               >
-                {creatingWeek ? 'Creating…' : 'Create New Week'}
+                {creatingWeek
+                  ? 'Creating…'
+                  : newWeekModal.starting
+                    ? 'Create Starting Week'
+                    : 'Create New Week'}
               </button>
             </div>
           </div>
@@ -1165,9 +1223,9 @@ export default function Collections() {
             <button
               onClick={handleNewWeekClick}
               disabled={creatingWeek}
-              className="text-sm px-5 py-2.5 rounded-lg bg-green-700 text-white font-semibold hover:bg-green-800 disabled:opacity-50"
+              className="text-sm px-5 py-2.5 rounded-lg bg-blue-700 text-white font-semibold hover:bg-blue-800 disabled:opacity-50"
             >
-              {creatingWeek ? 'Loading…' : '+ New Week'}
+              {creatingWeek ? 'Loading…' : 'Create Starting Week'}
             </button>
           </div>
         </div>
