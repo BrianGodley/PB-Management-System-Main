@@ -9,7 +9,20 @@ import ConsultantPicker from '../components/ConsultantPicker'
 import FunnelsBoard from '../components/FunnelsBoard'
 import SalesCalendar from '../components/SalesCalendar'
 import Bids from './Bids'
+import EDocuments from './EDocuments'
 import { useModule } from '../platform'
+
+// Stacked-stage funnel icon for the Funnels tab. Uses currentColor so it picks
+// up the tab's active (green) / inactive (gray) text color automatically.
+function FunnelIcon({ className = 'w-4 h-4' }) {
+  return (
+    <svg className={className} viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+      <path d="M2 3 H14 L11.4 5.8 H4.6 Z" />
+      <path d="M5 6.9 H11 L9.6 9.7 H6.4 Z" />
+      <path d="M6.8 10.8 H9.2 L8.4 13.5 H7.6 Z" />
+    </svg>
+  )
+}
 
 // Opportunities list is fetched one page at a time (server-side paging).
 const CLIENTS_PER_PAGE = 200
@@ -1401,10 +1414,11 @@ export default function Clients() {
           {[
             { key: 'individuals', label: '👤 Individuals', count: tabCounts.individuals },
             { key: 'companies',   label: '🏢 Companies',   count: tabCounts.companies },
-            { key: 'funnels',     label: '🔻 Funnels',     count: null },
+            { key: 'funnels',     label: <span className="inline-flex items-center gap-1.5"><FunnelIcon /> Funnels</span>, count: null },
             { key: 'calendar',    label: '📅 Calendar',    count: null },
             ...(canContractor ? [{ key: 'estimates', label: '📋 Estimates', count: tabCounts.estimates }] : []),
             ...(canContractor ? [{ key: 'bids',      label: '📑 Bids',      count: null }] : []),
+            { key: 'edocs',       label: '✍️ E-Docs',      count: null },
             { key: 'past',        label: '📦 Past',        count: tabCounts.past },
             { key: 'settings',    label: '⚙️ Settings',    count: null },
           ].map(t => (
@@ -1494,7 +1508,10 @@ export default function Clients() {
       {/* ── Bids tab (Contractor) ── */}
       {tab === 'bids' && canContractor && <Bids />}
 
-      {tab !== 'settings' && tab !== 'estimates' && tab !== 'funnels' && tab !== 'bids' && tab !== 'calendar' && (
+      {/* ── E-Docs tab — e-signature documents (moved here from Documents) ── */}
+      {tab === 'edocs' && <EDocuments embedded />}
+
+      {tab !== 'settings' && tab !== 'estimates' && tab !== 'funnels' && tab !== 'bids' && tab !== 'calendar' && tab !== 'edocs' && (
         <>
           {/* Mobile: full-width Add button sits directly above the search field
               (matches the Marketing hub's mobile layout). */}
