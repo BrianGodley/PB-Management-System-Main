@@ -12,6 +12,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { PLATFORM_BRAND } from '../lib/brand'
 import SamWidget from './SamWidget'
+import MarketingHeader from './MarketingHeader'
 
 const FG = '#2E8BC9'       // SoftCake blue (primary)
 const FG_DARK = '#1B5E8C'  // deep blue (gradients)
@@ -119,7 +120,7 @@ export const CONTRACTOR_MODULES = [
   },
 ]
 
-const TIERS = [
+export const TIERS = [
   {
     id: 'tier1',
     name: 'Tier 1 — Base',
@@ -203,90 +204,11 @@ function Check() {
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function MarketingLanding() {
   const { user } = useAuth()
-  const [menuOpen, setMenuOpen] = useState(false)
   const [openFaq, setOpenFaq] = useState(0)
-
-  const navLinks = [
-    ['Features', '#features'],
-    ['Pricing', '#pricing'],
-    ['Customization', '/customization'],
-    ['FAQ', '#faq'],
-  ]
 
   return (
     <div className="min-h-screen bg-white text-gray-900">
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-gray-100">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <a href="#top" className="flex items-center gap-2.5">
-            <Logo />
-            <span className="font-bold text-lg tracking-tight">{PLATFORM_BRAND.name}</span>
-          </a>
-
-          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600">
-            {navLinks.map(([label, href]) =>
-              href.startsWith('/') ? (
-                <Link key={href} to={href} className="hover:text-gray-900 transition-colors">{label}</Link>
-              ) : (
-                <a key={href} href={href} className="hover:text-gray-900 transition-colors">{label}</a>
-              )
-            )}
-          </nav>
-
-          <div className="hidden md:flex items-center gap-3">
-            {user ? (
-              <Link
-                to="/"
-                className="text-sm font-bold text-white rounded-xl px-4 py-2.5 shadow-sm hover:opacity-90 transition-opacity"
-                style={{ backgroundColor: FG }}
-              >
-                Go to app →
-              </Link>
-            ) : (
-              <>
-                <Link to="/login" className="text-sm font-semibold text-gray-700 hover:text-gray-900 px-3 py-2">Log in</Link>
-                <Link
-                  to="/signup"
-                  className="text-sm font-bold text-white rounded-xl px-4 py-2.5 shadow-sm hover:opacity-90 transition-opacity"
-                  style={{ backgroundColor: FG }}
-                >
-                  Start free trial
-                </Link>
-              </>
-            )}
-          </div>
-
-          <button className="md:hidden p-2 -mr-2 text-gray-700" onClick={() => setMenuOpen(v => !v)} aria-label="Menu">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              {menuOpen
-                ? <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                : <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M4 12h16M4 17h16" />}
-            </svg>
-          </button>
-        </div>
-
-        {menuOpen && (
-          <div className="md:hidden border-t border-gray-100 bg-white px-4 py-3 space-y-1">
-            {navLinks.map(([label, href]) =>
-              href.startsWith('/') ? (
-                <Link key={href} to={href} onClick={() => setMenuOpen(false)} className="block py-2 text-sm font-medium text-gray-700">{label}</Link>
-              ) : (
-                <a key={href} href={href} onClick={() => setMenuOpen(false)} className="block py-2 text-sm font-medium text-gray-700">{label}</a>
-              )
-            )}
-            <div className="flex gap-2 pt-2">
-              {user ? (
-                <Link to="/" className="flex-1 text-center text-sm font-bold text-white rounded-xl py-2.5" style={{ backgroundColor: FG }}>Go to app →</Link>
-              ) : (
-                <>
-                  <Link to="/login" className="flex-1 text-center text-sm font-semibold text-gray-700 border border-gray-200 rounded-xl py-2.5">Log in</Link>
-                  <Link to="/signup" className="flex-1 text-center text-sm font-bold text-white rounded-xl py-2.5" style={{ backgroundColor: FG }}>Start free trial</Link>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-      </header>
+      <MarketingHeader />
 
       {/* ── Hero ───────────────────────────────────────────────────────────── */}
       <section id="top" className="relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${FG_DARK} 0%, ${FG} 55%, ${FG_LIGHT} 100%)` }}>
@@ -447,96 +369,6 @@ export default function MarketingLanding() {
         </div>
       </section>
 
-      {/* ── Pricing ────────────────────────────────────────────────────────── */}
-      <section id="pricing" className="bg-gray-50 border-y border-gray-100">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-20">
-          <div className="text-center max-w-2xl mx-auto mb-14">
-            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Simple, flat pricing</h2>
-            <p className="mt-4 text-gray-600">
-              Plans stack — each tier includes the one below it. Every plan has <span className="font-semibold text-gray-800">unlimited users</span> and a 14-day free trial.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6 items-start">
-            {TIERS.map(tier => (
-              <div
-                key={tier.id}
-                className={`rounded-2xl bg-white p-7 flex flex-col ${tier.featured ? 'ring-2 shadow-xl md:-mt-3' : 'border border-gray-200 shadow-sm'}`}
-                style={tier.featured ? { boxShadow: '0 20px 40px -16px rgba(58,80,56,0.35)', ['--tw-ring-color']: FG } : undefined}
-              >
-                {tier.featured && (
-                  <span className="self-start text-xs font-bold uppercase tracking-wide text-white rounded-full px-3 py-1 mb-3" style={{ backgroundColor: FG }}>
-                    Most popular
-                  </span>
-                )}
-                <h3 className="text-lg font-bold">{tier.name}</h3>
-                <p className="text-sm text-gray-500 mt-1 min-h-[2.5rem]">{tier.tagline}</p>
-                <div className="mt-4 mb-1">
-                  <span className="text-4xl font-extrabold">${tier.price}</span>
-                  <span className="text-gray-400 text-sm font-medium">/mo</span>
-                </div>
-                <p className="text-xs text-gray-400 mb-5">Unlimited users</p>
-                <Link
-                  to="/signup"
-                  className={`block text-center text-sm font-bold rounded-xl py-3 mb-6 transition-opacity hover:opacity-90 ${tier.featured ? 'text-white' : 'text-white'}`}
-                  style={{ backgroundColor: tier.featured ? FG : FG_LIGHT }}
-                >
-                  Start free trial
-                </Link>
-                <ul className="space-y-3">
-                  {tier.includes.map(item => (
-                    <li key={item} className="flex gap-2.5 text-sm">
-                      <span style={{ color: FG }}><Check /></span>
-                      <span className="text-gray-700">{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-
-          {/* Contractor Extension Package */}
-          <div id="contractor" className="mt-10 rounded-3xl overflow-hidden bg-white border border-gray-200 shadow-sm grid md:grid-cols-2">
-            <div className="bg-blue-50 min-h-[240px] md:min-h-full">
-              <img
-                src="/marketing/contractor.jpg"
-                alt="Contractors reviewing plans on the job site"
-                loading="lazy"
-                className="w-full h-full object-cover"
-                onError={e => { e.currentTarget.style.display = 'none' }}
-              />
-            </div>
-            <div className="p-7 sm:p-9">
-              <span className="text-xs font-bold uppercase tracking-wide" style={{ color: FG }}>Optional add-on</span>
-              <h3 className="text-2xl font-extrabold tracking-tight mt-1">Contractor Extension Package</h3>
-              <div className="flex items-baseline gap-2 mt-1.5">
-                <span className="text-xl font-bold" style={{ color: FG }}>+$199/mo</span>
-                <span className="text-xs text-gray-500">add to Tier 2 or Tier 3</span>
-              </div>
-              <p className="text-sm text-gray-600 mt-3">
-                Running projects, job sites or field crews? Turn on the full contractor toolkit on top of any plan.
-              </p>
-              <ul className="mt-4 grid sm:grid-cols-2 gap-x-4 gap-y-2">
-                {CONTRACTOR_MODULES.map(m => (
-                  <li key={m.name} className="flex gap-2 text-sm text-gray-700">
-                    <span style={{ color: FG }}><Check /></span>
-                    <span>{m.name}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Link to="/signup" className="text-sm font-bold text-white rounded-xl px-5 py-3 hover:opacity-90 transition-opacity" style={{ backgroundColor: FG }}>
-                  Add it at signup
-                </Link>
-                <Link to="/contractor-extensions" className="text-sm font-bold rounded-xl px-5 py-3 border-2 hover:bg-blue-50 transition-colors" style={{ borderColor: FG, color: FG }}>
-                  See all contractor features →
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* ── FAQ ────────────────────────────────────────────────────────────── */}
       <section id="faq" className="max-w-3xl mx-auto px-4 sm:px-6 py-20">
         <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-center mb-12">Questions, answered</h2>
@@ -582,7 +414,7 @@ export default function MarketingLanding() {
           </div>
           <nav className="flex items-center gap-6 text-sm text-gray-500">
             <a href="#features" className="hover:text-gray-800">Features</a>
-            <a href="#pricing" className="hover:text-gray-800">Pricing</a>
+            <Link to="/pricing" className="hover:text-gray-800">Pricing</Link>
             <a href="#faq" className="hover:text-gray-800">FAQ</a>
             {user
               ? <Link to="/" className="hover:text-gray-800">Go to app →</Link>

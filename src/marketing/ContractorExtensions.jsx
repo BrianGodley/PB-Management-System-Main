@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom'
 import { PLATFORM_BRAND } from '../lib/brand'
 import { CONTRACTOR_MODULES } from './MarketingLanding'
 import SamWidget from './SamWidget'
+import MarketingHeader from './MarketingHeader'
 
 const FG = '#2E8BC9'
 const FG_DARK = '#1B5E8C'
@@ -23,23 +24,7 @@ function Check() {
 export default function ContractorExtensions() {
   return (
     <div className="min-h-screen bg-white text-gray-900">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-gray-100">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5">
-            <span className="inline-flex items-center justify-center rounded-xl overflow-hidden shadow w-9 h-9" style={{ backgroundColor: FG_DARK }}>
-              <img src={PLATFORM_BRAND.logo} alt={PLATFORM_BRAND.name} className="w-full h-full object-contain p-1" />
-            </span>
-            <span className="font-bold text-lg tracking-tight">{PLATFORM_BRAND.name}</span>
-          </Link>
-          <div className="flex items-center gap-3">
-            <Link to="/" className="text-sm font-semibold text-gray-600 hover:text-gray-900 px-3 py-2">← Back to home</Link>
-            <Link to="/signup" className="text-sm font-bold text-white rounded-xl px-4 py-2.5 shadow-sm hover:opacity-90 transition-opacity" style={{ backgroundColor: FG }}>
-              Start free trial
-            </Link>
-          </div>
-        </div>
-      </header>
+      <MarketingHeader />
 
       {/* Hero */}
       <section className="relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${FG_DARK} 0%, ${FG} 55%, ${FG_LIGHT} 100%)` }}>
@@ -130,7 +115,7 @@ export default function ContractorExtensions() {
           <span className="font-semibold text-gray-800">{PLATFORM_BRAND.name}</span>
           <nav className="flex items-center gap-6 text-sm text-gray-500">
             <Link to="/" className="hover:text-gray-800">Home</Link>
-            <Link to="/#pricing" className="hover:text-gray-800">Pricing</Link>
+            <Link to="/pricing" className="hover:text-gray-800">Pricing</Link>
             <Link to="/login" className="hover:text-gray-800">Log in</Link>
           </nav>
           <p className="text-xs text-gray-400">© {new Date().getFullYear()} {PLATFORM_BRAND.name}</p>
