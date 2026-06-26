@@ -17,11 +17,31 @@ import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 const BETA_PAYMENTS = true
+const FG = '#2E8BC9' // SoftCake blue
 
 const PLANS = [
-  { id: 'tier1', name: 'Tier 1 — Base', price: 79, blurb: 'Dashboard, Org Chart, HR, Statistics, Documents' },
-  { id: 'tier2', name: 'Tier 2', price: 229, blurb: '+ Training, Sales, Marketing, Workflows' },
-  { id: 'tier3', name: 'Tier 3', price: 389, blurb: '+ Accounting, Weekly FP, Subs & Vendors, Equipment' },
+  {
+    id: 'tier1',
+    name: 'Tier 1 — Base',
+    price: 79,
+    tagline: 'The essentials to organize your company.',
+    includes: ['Dashboard', 'Org Chart', 'HR', 'Statistics', 'Documents & E-Docs'],
+  },
+  {
+    id: 'tier2',
+    name: 'Tier 2',
+    price: 229,
+    featured: true,
+    tagline: 'Win and manage work, end to end.',
+    includes: ['Everything in Tier 1', 'Training (LMS)', 'Sales', 'Marketing', 'Workflows'],
+  },
+  {
+    id: 'tier3',
+    name: 'Tier 3',
+    price: 389,
+    tagline: 'Full financial and operational control.',
+    includes: ['Everything in Tier 2', 'Accounting', 'Weekly FP', 'Subs & Vendors', 'Equipment'],
+  },
 ]
 
 // Card input formatters
@@ -152,19 +172,24 @@ export default function Signup() {
     }
   }
 
+  const wide = step === 'details' && !info
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-800 to-green-950 p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-7">
-        <div className="text-center mb-5">
-          <h1 className="text-2xl font-bold text-gray-900">Start your free trial</h1>
-          <p className="text-sm text-gray-500 mt-1">14 days free. Set up your company in under a minute.</p>
+    <div
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{ background: `linear-gradient(135deg, #1B5E8C 0%, #2E8BC9 60%, #5BB3E4 100%)` }}
+    >
+      <div className={`w-full ${wide ? 'max-w-4xl' : 'max-w-md'} bg-white rounded-2xl shadow-2xl p-7 sm:p-9 transition-all`}>
+        <div className="text-center mb-6">
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">Start your free trial</h1>
+          <p className="text-sm sm:text-base text-gray-500 mt-2">14 days free, unlimited users. Set up your company in under a minute.</p>
         </div>
 
         {/* Step indicator */}
-        <div className="flex items-center justify-center gap-2 mb-5 text-xs font-medium">
-          <span className={step === 'details' ? 'text-green-700' : 'text-gray-400'}>1. Your details</span>
+        <div className="flex items-center justify-center gap-2 mb-6 text-xs font-medium">
+          <span style={step === 'details' ? { color: FG } : undefined} className={step === 'details' ? '' : 'text-gray-400'}>1. Your details</span>
           <span className="text-gray-300">—</span>
-          <span className={step === 'payment' ? 'text-green-700' : 'text-gray-400'}>2. Payment</span>
+          <span style={step === 'payment' ? { color: FG } : undefined} className={step === 'payment' ? '' : 'text-gray-400'}>2. Payment</span>
         </div>
 
         {err && <div className="mb-4 text-sm bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">{err}</div>}
@@ -173,64 +198,91 @@ export default function Signup() {
           <div className="text-sm bg-green-50 border border-green-200 text-green-800 rounded-lg px-4 py-3">
             {info}
             <div className="mt-3">
-              <Link to="/login" className="btn-primary text-sm px-4 py-2 inline-block">Go to login</Link>
+              <Link to="/login" className="text-sm px-4 py-2 inline-block rounded-xl font-bold text-white" style={{ backgroundColor: FG }}>Go to login</Link>
             </div>
           </div>
         ) : step === 'details' ? (
           /* ── Step 1: details + plan ─────────────────────────────────────── */
-          <form onSubmit={continueToPayment} className="space-y-3">
-            <div>
-              <label className="label">Company name</label>
-              <input value={company} onChange={e => setCompany(e.target.value)} className="input" placeholder="Acme Landscaping" />
-            </div>
-            <div>
-              <label className="label">Your name</label>
-              <input value={fullName} onChange={e => setFullName(e.target.value)} className="input" placeholder="Jane Smith" />
-            </div>
-            <div>
-              <label className="label">Work email</label>
-              <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="input" placeholder="you@company.com" />
-            </div>
-            <div>
-              <label className="label">Password</label>
-              <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="input" placeholder="At least 6 characters" />
+          <form onSubmit={continueToPayment} className="space-y-5">
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <label className="label">Company name</label>
+                <input value={company} onChange={e => setCompany(e.target.value)} className="input" placeholder="Acme Landscaping" />
+              </div>
+              <div>
+                <label className="label">Your name</label>
+                <input value={fullName} onChange={e => setFullName(e.target.value)} className="input" placeholder="Jane Smith" />
+              </div>
+              <div>
+                <label className="label">Work email</label>
+                <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="input" placeholder="you@company.com" />
+              </div>
+              <div>
+                <label className="label">Password</label>
+                <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="input" placeholder="At least 6 characters" />
+              </div>
             </div>
 
+            {/* Plans across — same detail as the pricing page */}
             <div>
-              <label className="label">Plan</label>
-              <div className="space-y-2">
-                {PLANS.map(p => (
-                  <label
-                    key={p.id}
-                    className={`flex items-start gap-2 border rounded-lg px-3 py-2 cursor-pointer ${
-                      plan === p.id ? 'border-green-600 bg-green-50' : 'border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    <input type="radio" name="plan" checked={plan === p.id} onChange={() => setPlan(p.id)} className="mt-1 accent-green-700" />
-                    <span className="flex-1">
-                      <span className="flex items-baseline justify-between">
-                        <span className="text-sm font-semibold text-gray-900">{p.name}</span>
-                        <span className="text-sm font-bold text-gray-900">${p.price}<span className="text-xs font-normal text-gray-400">/mo</span></span>
+              <label className="label">Choose your plan</label>
+              <div className="grid sm:grid-cols-3 gap-3 mt-1">
+                {PLANS.map(p => {
+                  const sel = plan === p.id
+                  return (
+                    <button
+                      type="button"
+                      key={p.id}
+                      onClick={() => setPlan(p.id)}
+                      className={`text-left rounded-xl border-2 p-4 flex flex-col transition-all ${sel ? 'bg-blue-50 shadow-sm' : 'border-gray-200 hover:border-blue-300'}`}
+                      style={sel ? { borderColor: FG } : undefined}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-gray-900">{p.name}</span>
+                        {p.featured && (
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-white rounded-full px-2 py-0.5" style={{ backgroundColor: FG }}>
+                            Popular
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1">
+                        <span className="text-2xl font-extrabold text-gray-900">${p.price}</span>
+                        <span className="text-xs text-gray-400">/mo</span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1 min-h-[2.5rem]">{p.tagline}</p>
+                      <ul className="mt-2 space-y-1.5 flex-1">
+                        {p.includes.map(i => (
+                          <li key={i} className="flex gap-1.5 text-xs text-gray-600">
+                            <span className="font-bold" style={{ color: FG }}>✓</span>
+                            <span>{i}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      <span
+                        className={`mt-4 text-center text-xs font-bold rounded-lg py-2 ${sel ? 'text-white' : 'text-gray-600 border border-gray-200'}`}
+                        style={sel ? { backgroundColor: FG } : undefined}
+                      >
+                        {sel ? '✓ Selected' : 'Choose'}
                       </span>
-                      <span className="block text-xs text-gray-500">{p.blurb}</span>
-                    </span>
-                  </label>
-                ))}
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
             {/* Contractor add-on (requires Tier 2+) */}
             <label
-              className={`flex items-start gap-2 border rounded-lg px-3 py-2 ${
+              className={`flex items-start gap-3 border-2 rounded-xl px-4 py-3 ${
                 contractorAllowed ? 'cursor-pointer ' : 'opacity-50 '
-              }${wantsContractor ? 'border-green-600 bg-green-50' : 'border-gray-200'}`}
+              }${wantsContractor ? 'bg-blue-50' : 'border-gray-200'}`}
+              style={wantsContractor ? { borderColor: FG } : undefined}
             >
               <input
                 type="checkbox"
                 checked={wantsContractor}
                 disabled={!contractorAllowed}
                 onChange={e => setAddContractor(e.target.checked)}
-                className="mt-1 accent-green-700"
+                className="mt-1 accent-blue-600"
               />
               <span className="flex-1">
                 <span className="flex items-baseline justify-between">
@@ -238,20 +290,26 @@ export default function Signup() {
                   <span className="text-sm font-bold text-gray-900">+$149<span className="text-xs font-normal text-gray-400">/mo</span></span>
                 </span>
                 <span className="block text-xs text-gray-500">
-                  Jobs, Estimating, Design{!contractorAllowed && ' — requires Tier 2 or higher'}
+                  Jobs, Estimating &amp; Bids, Design{!contractorAllowed && ' — requires Tier 2 or higher'}
                 </span>
               </span>
             </label>
 
-            <div className="text-right text-sm text-gray-700">
-              <span className="text-gray-400 text-xs">Total </span>
-              <span className="font-bold">${total}<span className="text-xs font-normal text-gray-400">/mo after trial</span></span>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
+              <p className="text-sm text-gray-500">
+                <span className="font-extrabold text-gray-900 text-xl">${total}</span>/mo after your 14-day trial
+              </p>
+              <button
+                type="submit"
+                className="w-full sm:w-auto text-base font-bold rounded-xl px-8 py-3.5 text-white shadow-sm hover:opacity-90 transition-opacity"
+                style={{ backgroundColor: FG }}
+              >
+                Continue to payment
+              </button>
             </div>
-
-            <button type="submit" className="btn-primary w-full text-sm py-2.5">Continue to payment</button>
-            <p className="text-center text-xs text-gray-500 pt-1">
+            <p className="text-center text-xs text-gray-500">
               Already have an account?{' '}
-              <Link to="/login" className="text-green-700 font-medium hover:underline">Log in</Link>
+              <Link to="/login" className="font-medium hover:underline" style={{ color: FG }}>Log in</Link>
             </p>
           </form>
         ) : (
@@ -273,7 +331,7 @@ export default function Signup() {
                 <span className="font-semibold text-gray-900">Due after 14-day trial</span>
                 <span className="font-bold text-gray-900">${total}/mo</span>
               </div>
-              <p className="text-xs text-green-700 mt-1.5">$0 due today — your trial starts free.</p>
+              <p className="text-xs text-blue-700 mt-1.5">$0 due today — your trial starts free.</p>
             </div>
 
             {BETA_PAYMENTS && (
@@ -311,7 +369,12 @@ export default function Signup() {
               </div>
             </div>
 
-            <button type="submit" disabled={busy} className="btn-primary w-full text-sm py-2.5 disabled:opacity-50">
+            <button
+              type="submit"
+              disabled={busy}
+              className="w-full text-base font-bold rounded-xl py-3.5 text-white shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+              style={{ backgroundColor: FG }}
+            >
               {busy ? 'Creating your workspace…' : 'Start free trial'}
             </button>
             <button type="button" onClick={() => { setErr(''); setStep('details') }} disabled={busy} className="w-full text-center text-xs text-gray-500 hover:text-gray-700 pt-1 disabled:opacity-50">

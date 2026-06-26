@@ -41,27 +41,27 @@ const FEATURE_GROUPS = [
     ],
   },
   {
-    icon: '🚜',
-    title: 'Build & deliver',
-    blurb: 'The contractor toolkit — add it to any plan.',
-    items: [
-      ['Jobs', 'Scheduling, daily logs, change orders, work orders and time tracking.'],
-      ['Estimating & Bids', 'Module-based estimates and polished, branded bid documents.'],
-      ['Design', 'Tie design work to the opportunity and the job it belongs to.'],
-      ['Subs & Vendors', 'A directory plus contracts and quotes, linked to your jobs.'],
-    ],
-  },
-  {
     icon: '💵',
     title: 'Control the money',
-    blurb: 'Job-level finance, not just bookkeeping.',
+    blurb: 'Real finance, not just bookkeeping.',
     items: [
-      ['Accounting', 'Invoices, bills and journals — optionally tagged to a job.'],
+      ['Accounting', 'Invoices, bills and journals — tagged to the work they belong to.'],
       ['Weekly Financial Planning', 'Plan the week around real cash and statistics.'],
-      ['Equipment Tracking', 'Know where your assets are and what they cost you.'],
-      ['Client Portal', 'Give clients a clean window into their project and approvals.'],
+      ['Equipment & Assets', 'Know where your assets are and what they cost you.'],
+      ['Client Portal', 'Give clients a clean window into their work and approvals.'],
     ],
   },
+]
+
+// The optional Contractor Extension Package — surfaced on the landing page and
+// the dedicated /contractor-extensions page.
+export const CONTRACTOR_FEATURES = [
+  ['Jobs', 'Scheduling, daily logs, tasks, work orders and on-site time tracking.'],
+  ['Estimating & Bids', 'Module-based estimates with gross-profit analysis and polished, branded bid documents.'],
+  ['Change Orders', 'Create, release, approve and e-sign change orders that flow straight into the job.'],
+  ['Design', 'Tie design work to the opportunity and the job it belongs to.'],
+  ['Subs & Vendors', 'A directory plus contracts and quotes, linked to your jobs.'],
+  ['Client Portal for jobs', 'Give clients a window into their project, approvals and payments.'],
 ]
 
 const TIERS = [
@@ -92,7 +92,7 @@ const TIERS = [
 const FAQS = [
   ['Is it really unlimited users?', 'Yes. Every plan includes unlimited users at no extra cost — add your whole team, office and field, without per-seat fees.'],
   ['How does the free trial work?', 'You get 14 days free. Pick a plan, set up your company in under a minute, and explore everything. You can change or cancel before the trial ends.'],
-  ['What is the Contractor Package?', 'It adds the job-site toolkit — Jobs, Estimating & Bids, and Design — on top of any Tier 2 or Tier 3 plan for an extra $149/mo. It needs Tier 2+ because jobs and estimates attach to your contacts and opportunities.'],
+  ['What is the Contractor Extension Package?', 'An optional add-on for companies that run projects, job sites or field crews. It turns on Jobs, Estimating & Bids, Design, change orders and more on top of any Tier 2 or Tier 3 plan for an extra $149/mo. Most businesses never need it — see the contractor extensions page for the full list.'],
   ['Can I change plans later?', 'Anytime. Move up or down a tier, or add the Contractor Package, and your modules update immediately. You only ever see the features your plan includes.'],
   ['Is my data secure and private?', 'Each company is fully isolated — your records are only ever visible to your team. We use row-level security so one company can never see another’s data.'],
   ['Do you charge setup or cancellation fees?', 'No setup fees and no cancellation fees. It’s month-to-month.'],
@@ -219,13 +219,13 @@ export default function MarketingLanding() {
       <section id="top" className="relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${FG_DARK} 0%, ${FG} 55%, ${FG_LIGHT} 100%)` }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-20 sm:py-28 text-center">
           <span className="inline-block text-xs font-semibold tracking-wide uppercase text-blue-100/90 bg-white/10 rounded-full px-3 py-1 mb-5">
-            For landscape & construction companies
+            All-in-one platform to run your business
           </span>
           <h1 className="text-4xl sm:text-6xl font-extrabold text-white tracking-tight leading-[1.05] max-w-3xl mx-auto">
             Run your whole company from one place
           </h1>
           <p className="mt-5 text-lg sm:text-xl text-blue-50/90 max-w-2xl mx-auto">
-            {PLATFORM_BRAND.name} brings your people, jobs, estimates, documents and money into a single system — built for the way contractors actually work.
+            {PLATFORM_BRAND.name} brings your people, sales, documents and money into one connected system — the modern way to run a company, whatever you do.
           </p>
           <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
@@ -245,37 +245,13 @@ export default function MarketingLanding() {
         </div>
       </section>
 
-      {/* ── Contractor band ────────────────────────────────────────────────── */}
-      <section className="relative bg-gray-900">
-        <img
-          src="/marketing/contractor.jpg"
-          alt="Contractors reviewing plans on the job site"
-          loading="lazy"
-          className="w-full h-[260px] sm:h-[380px] object-cover opacity-95"
-          onError={e => { e.currentTarget.style.display = 'none' }}
-        />
-        <div
-          className="absolute inset-0 flex items-end"
-          style={{ background: `linear-gradient(to top, ${FG_DARK}E6, ${FG_DARK}33 55%, transparent)` }}
-        >
-          <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 pb-8">
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              From the first call to the final invoice
-            </h2>
-            <p className="text-blue-50/90 mt-1.5 max-w-xl">
-              One system for the office and the field — estimates, jobs, change orders, time and money.
-            </p>
-          </div>
-        </div>
-      </section>
-
       {/* ── Stat band ──────────────────────────────────────────────────────── */}
       <section className="border-b border-gray-100">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
           {[
             ['Unlimited', 'users on every plan'],
             ['15+', 'connected modules'],
-            ['1 system', 'office to field'],
+            ['1 system', 'across every team'],
             ['14 days', 'free to try'],
           ].map(([big, small]) => (
             <div key={small}>
@@ -396,22 +372,44 @@ export default function MarketingLanding() {
             ))}
           </div>
 
-          {/* Contractor add-on */}
-          <div className="mt-8 rounded-2xl border-2 border-dashed p-6 sm:p-7 flex flex-col sm:flex-row sm:items-center gap-5" style={{ borderColor: FG_LIGHT, backgroundColor: '#eef6fc' }}>
-            <div className="text-3xl">🚜</div>
-            <div className="flex-1">
-              <div className="flex items-baseline gap-2 flex-wrap">
-                <h3 className="text-lg font-bold">Contractor Package</h3>
-                <span className="font-bold" style={{ color: FG }}>+$149/mo</span>
+          {/* Contractor Extension Package */}
+          <div id="contractor" className="mt-10 rounded-3xl overflow-hidden bg-white border border-gray-200 shadow-sm grid md:grid-cols-2">
+            <div className="bg-blue-50 min-h-[240px] md:min-h-full">
+              <img
+                src="/marketing/contractor.jpg"
+                alt="Contractors reviewing plans on the job site"
+                loading="lazy"
+                className="w-full h-full object-cover"
+                onError={e => { e.currentTarget.style.display = 'none' }}
+              />
+            </div>
+            <div className="p-7 sm:p-9">
+              <span className="text-xs font-bold uppercase tracking-wide" style={{ color: FG }}>Optional add-on</span>
+              <h3 className="text-2xl font-extrabold tracking-tight mt-1">Contractor Extension Package</h3>
+              <div className="flex items-baseline gap-2 mt-1.5">
+                <span className="text-xl font-bold" style={{ color: FG }}>+$149/mo</span>
                 <span className="text-xs text-gray-500">add to Tier 2 or Tier 3</span>
               </div>
-              <p className="text-sm text-gray-600 mt-1">
-                Adds the job-site toolkit — <span className="font-medium text-gray-800">Jobs, Estimating &amp; Bids, and Design</span> — including scheduling, daily logs, change orders, work orders and time tracking.
+              <p className="text-sm text-gray-600 mt-3">
+                Running projects, job sites or field crews? Turn on the full contractor toolkit on top of any plan.
               </p>
+              <ul className="mt-4 grid sm:grid-cols-2 gap-x-4 gap-y-2">
+                {CONTRACTOR_FEATURES.map(([name]) => (
+                  <li key={name} className="flex gap-2 text-sm text-gray-700">
+                    <span style={{ color: FG }}><Check /></span>
+                    <span>{name}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Link to="/signup" className="text-sm font-bold text-white rounded-xl px-5 py-3 hover:opacity-90 transition-opacity" style={{ backgroundColor: FG }}>
+                  Add it at signup
+                </Link>
+                <Link to="/contractor-extensions" className="text-sm font-bold rounded-xl px-5 py-3 border-2 hover:bg-blue-50 transition-colors" style={{ borderColor: FG, color: FG }}>
+                  See all contractor features →
+                </Link>
+              </div>
             </div>
-            <Link to="/signup" className="text-sm font-bold text-white rounded-xl px-5 py-3 whitespace-nowrap hover:opacity-90 transition-opacity self-start sm:self-center" style={{ backgroundColor: FG }}>
-              Add it at signup
-            </Link>
           </div>
         </div>
       </section>

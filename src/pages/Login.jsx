@@ -4,8 +4,8 @@ import { useAuth } from '../contexts/AuthContext'
 import { sendSMS, sendEmail } from '../lib/notify'
 import { PLATFORM_BRAND } from '../lib/brand'
 
-const FG = '#3A5038'
-const FG_DARK = '#2E4030'
+const FG = '#2E8BC9'
+const FG_DARK = '#1B5E8C'
 
 // Mask phone: show only last 4 digits
 function maskPhone(phone) {
@@ -265,7 +265,7 @@ export default function Login() {
   // ── Shared UI helpers ──────────────────────────────────────────────────────
   const inputCls = `
     w-full border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-900
-    placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-700
+    placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500
     focus:border-transparent transition-all bg-white
   `
 
@@ -329,7 +329,7 @@ export default function Login() {
   return (
     <div
       className="min-h-screen flex items-center justify-center px-4 py-12"
-      style={{ background: `linear-gradient(135deg, ${FG_DARK} 0%, ${FG} 60%, #5a7a58 100%)` }}
+      style={{ background: `linear-gradient(135deg, ${FG_DARK} 0%, ${FG} 60%, #5BB3E4 100%)` }}
     >
       <div className="w-full max-w-sm">
         {/* Branding */}
@@ -350,7 +350,7 @@ export default function Login() {
             <span style={{ display: 'none', fontSize: '2.5rem' }}>🌿</span>
           </div>
           <h1 className="text-2xl font-bold text-white tracking-tight">{PLATFORM_BRAND.name}</h1>
-          <p className="text-green-200 text-sm mt-1">{PLATFORM_BRAND.tagline}</p>
+          <p className="text-blue-100 text-sm mt-1">{PLATFORM_BRAND.tagline}</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
@@ -408,7 +408,7 @@ export default function Login() {
                     type="checkbox"
                     checked={rememberMe}
                     onChange={e => setRememberMe(e.target.checked)}
-                    className="w-4 h-4 rounded accent-green-700"
+                    className="w-4 h-4 rounded accent-blue-600"
                   />
                   <span className="text-sm text-gray-600">Remember me</span>
                 </label>
@@ -525,11 +525,11 @@ export default function Login() {
                     type="button"
                     disabled={resetLoading}
                     onClick={() => handleSendCode('sms')}
-                    className="w-full flex items-center gap-4 border-2 border-gray-200 hover:border-green-600 rounded-xl px-4 py-3.5 text-left transition-all disabled:opacity-60 group"
+                    className="w-full flex items-center gap-4 border-2 border-gray-200 hover:border-blue-500 rounded-xl px-4 py-3.5 text-left transition-all disabled:opacity-60 group"
                   >
                     <span className="text-2xl">📱</span>
                     <div>
-                      <p className="text-sm font-semibold text-gray-800 group-hover:text-green-700">
+                      <p className="text-sm font-semibold text-gray-800 group-hover:text-blue-700">
                         Text message to {resetPhoneMasked}
                       </p>
                       <p className="text-xs text-gray-500 mt-0.5">
@@ -544,11 +544,11 @@ export default function Login() {
                   type="button"
                   disabled={resetLoading}
                   onClick={() => handleSendCode('email')}
-                  className="w-full flex items-center gap-4 border-2 border-gray-200 hover:border-green-600 rounded-xl px-4 py-3.5 text-left transition-all disabled:opacity-60 group"
+                  className="w-full flex items-center gap-4 border-2 border-gray-200 hover:border-blue-500 rounded-xl px-4 py-3.5 text-left transition-all disabled:opacity-60 group"
                 >
                   <span className="text-2xl">✉️</span>
                   <div>
-                    <p className="text-sm font-semibold text-gray-800 group-hover:text-green-700">
+                    <p className="text-sm font-semibold text-gray-800 group-hover:text-blue-700">
                       Email to {resetEmailMasked}
                     </p>
                     <p className="text-xs text-gray-500 mt-0.5">Email a 6-digit code for entry</p>
@@ -558,7 +558,7 @@ export default function Login() {
 
               {resetLoading && (
                 <div className="flex items-center justify-center gap-2 text-sm text-gray-500 py-1">
-                  <span className="animate-spin inline-block w-4 h-4 border-2 border-gray-300 border-t-green-700 rounded-full" />
+                  <span className="animate-spin inline-block w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full" />
                   Sending code…
                 </div>
               )}
@@ -710,7 +710,7 @@ export default function Login() {
           )}
         </div>
 
-        <p className="text-center text-green-300/60 text-xs mt-6">
+        <p className="text-center text-blue-200/70 text-xs mt-6">
           © {new Date().getFullYear()} {PLATFORM_BRAND.name}
         </p>
       </div>
