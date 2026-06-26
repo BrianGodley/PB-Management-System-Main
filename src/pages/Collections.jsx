@@ -547,7 +547,11 @@ export default function Collections() {
         .single()
       if (error || !data) {
         setCreatingWeek(false)
-        setNewWeekModal(null)
+        alert(
+          'Could not create the week: ' +
+            (error?.message || 'unknown error') +
+            (error?.code ? ` (${error.code})` : '')
+        )
         return
       }
       targetWeek = data
