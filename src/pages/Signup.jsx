@@ -334,12 +334,6 @@ export default function Signup() {
               <p className="text-xs text-blue-700 mt-1.5">$0 due today — your trial starts free.</p>
             </div>
 
-            {BETA_PAYMENTS && (
-              <div className="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2">
-                Test mode — no card is charged. You can enter any test card details (e.g. 4242 4242 4242 4242).
-              </div>
-            )}
-
             <div>
               <label className="label">Name on card</label>
               <input value={cardName} onChange={e => setCardName(e.target.value)} className="input" placeholder="Jane Smith" />
@@ -351,7 +345,7 @@ export default function Signup() {
                 value={cardNumber}
                 onChange={e => setCardNumber(fmtCard(e.target.value))}
                 className="input tracking-widest"
-                placeholder="4242 4242 4242 4242"
+                placeholder="1234 5678 9012 3456"
               />
             </div>
             <div className="grid grid-cols-3 gap-2">
