@@ -16,6 +16,8 @@ export default function SamWidget() {
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const scrollRef = useRef(null)
+  const hpRef = useRef(null)        // honeypot input (bots fill it, humans don't)
+  const lastSentRef = useRef(0)     // client-side throttle
 
   useEffect(() => {
     if (open && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
@@ -25,6 +27,10 @@ export default function SamWidget() {
     e?.preventDefault()
     const text = input.trim()
     if (!text || busy) return
+    // Client-side throttle: at most one send per 1.5s (mirrors server burst cap).
+    const now = Date.now()
+    if (now - lastSentRef.current < 1500) return
+    lastSentRef.current = now
     setInput('')
     const next = [...messages, { role: 'user', content: text }]
     setMessages(next)
@@ -33,7 +39,7 @@ export default function SamWidget() {
       // Only send prior conversational turns (skip the canned greeting).
       const history = next.filter(m => m.content !== GREETING).slice(-6)
       const { data, error } = await supabase.functions.invoke('sam-public', {
-        body: { message: text, history },
+        body: { message: text, history, hp: hpRef.current?.value || '' },
       })
       const reply = data?.reply || data?.error || error?.message || "Sorry, I couldn't reach Sam just now."
       setMessages(m => [...m, { role: 'assistant', content: reply }])
@@ -103,6 +109,17 @@ export default function SamWidget() {
 
           {/* Input */}
           <form onSubmit={send} className="border-t border-gray-100 p-2.5 flex items-center gap-2">
+            {/* Honeypot: visually hidden, off-screen, not tabbable. Real users
+                never fill this; bots that auto-fill inputs trip it. */}
+            <input
+              ref={hpRef}
+              type="text"
+              name="company_website"
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden="true"
+              className="hidden"
+            />
             <input
               value={input}
               onChange={e => setInput(e.target.value)}

@@ -48,12 +48,7 @@ export default function MarketingHeader() {
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-gray-100">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2.5">
-          <span
-            className="inline-flex items-center justify-center rounded-xl overflow-hidden shadow w-9 h-9"
-            style={{ backgroundColor: FG_DARK }}
-          >
-            <img src={PLATFORM_BRAND.logo} alt={PLATFORM_BRAND.name} className="w-full h-full object-contain p-1" />
-          </span>
+          <img src={PLATFORM_BRAND.logo} alt={PLATFORM_BRAND.name} className="h-10 w-auto object-contain" />
           <span className="font-bold text-lg tracking-tight">{PLATFORM_BRAND.name}</span>
         </Link>
 

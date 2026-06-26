@@ -25,6 +25,8 @@ const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'content-type': 'application/json' } })
 
 const DAILY_CAP = 30            // messages per IP per day
+const BURST_CAP = 6             // messages per IP per minute (anti-hammer)
+const GLOBAL_DAILY_CAP = 5000   // all IPs per day (cost circuit-breaker)
 const MAX_MESSAGE_CHARS = 1000  // per user message
 const MAX_HISTORY = 6           // turns of context we accept from the client
 const MODEL = 'claude-haiku-4-5-20251001'
@@ -54,6 +56,19 @@ function getIp(req: Request): string {
   return (xf.split(',')[0] || 'unknown').trim() || 'unknown'
 }
 
+// Optional origin allowlist. Set SAM_ALLOWED_ORIGINS to a comma-separated list
+// (e.g. "https://softcake.com,https://www.softcake.com,https://pbs.picturebuild.com")
+// to reject direct/scripted POSTs from anywhere else. When unset, all origins
+// pass (so it never accidentally blocks a legit page during setup).
+function originAllowed(req: Request): boolean {
+  const raw = Deno.env.get('SAM_ALLOWED_ORIGINS')
+  if (!raw) return true
+  const allow = raw.split(',').map(s => s.trim()).filter(Boolean)
+  if (!allow.length) return true
+  const origin = req.headers.get('origin') || ''
+  return allow.includes(origin)
+}
+
 async function verifyTurnstile(token: string | undefined, ip: string): Promise<boolean> {
   const secret = Deno.env.get('TURNSTILE_SECRET')
   if (!secret) return true // not configured → skip (stubbed)
@@ -74,10 +89,21 @@ Deno.serve(async req => {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
   if (!apiKey) return json(500, { error: 'Sam is not configured yet.' })
 
+  // Reject scripted POSTs from non-allowlisted origins (no-op until configured).
+  if (!originAllowed(req)) return json(403, { error: 'Not allowed.' })
+
   const body = (await req.json().catch(() => ({}))) as {
     message?: string
     history?: Array<{ role: string; content: string }>
     turnstileToken?: string
+    hp?: string // honeypot — must stay empty
+  }
+
+  // Honeypot: a hidden field no human ever fills. If it's populated, it's a bot.
+  // Return a benign canned reply (no model call, no spend) so the bot can't tell
+  // it was caught.
+  if (String(body.hp || '').trim()) {
+    return json(200, { reply: 'Thanks! Start a free 14-day trial to explore SoftCake.' })
   }
 
   const message = String(body.message || '').trim()
@@ -91,24 +117,30 @@ Deno.serve(async req => {
   const okHuman = await verifyTurnstile(body.turnstileToken, ip)
   if (!okHuman) return json(403, { error: 'Please complete the verification and try again.' })
 
-  // Per-IP daily rate limit (service role; isolated table, no tenant data).
+  // Atomic rate gate (service role; isolated counter table, no tenant data):
+  // per-IP/minute burst, global daily ceiling, and per-IP daily cap — all in one
+  // round trip with no check-then-write race.
   const admin = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     { auth: { persistSession: false } }
   )
-  const today = new Date().toISOString().slice(0, 10)
-  const { data: row } = await admin
-    .from('sam_public_usage').select('count').eq('ip', ip).eq('day', today).maybeSingle()
-  const used = row?.count || 0
-  if (used >= DAILY_CAP) {
+  const { data: gate } = await admin.rpc('sam_public_gate', {
+    p_ip: ip,
+    p_daily_cap: DAILY_CAP,
+    p_burst_cap: BURST_CAP,
+    p_global_cap: GLOBAL_DAILY_CAP,
+  })
+  const g = Array.isArray(gate) ? gate[0] : gate
+  if (g && g.allowed === false) {
+    if (g.reason === 'burst')
+      return json(429, { error: "You're sending messages quickly — give it a moment and try again." })
+    if (g.reason === 'global')
+      return json(429, { error: 'Sam is very busy right now. Please try again later, or start a free trial!' })
     return json(429, {
       error: "You've reached today's chat limit. Start a free 14-day trial to keep exploring SoftCake!",
     })
   }
-  await admin
-    .from('sam_public_usage')
-    .upsert({ ip, day: today, count: used + 1, updated_at: new Date().toISOString() }, { onConflict: 'ip,day' })
 
   // Build a short, safe message list (text only).
   const history = Array.isArray(body.history) ? body.history.slice(-MAX_HISTORY) : []

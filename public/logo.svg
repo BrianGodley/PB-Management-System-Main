@@ -1,0 +1,16 @@
+<svg viewBox="0 0 240 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="SoftCake">
+  <title>SoftCake</title>
+  <defs>
+    <clipPath id="sc-cloud">
+      <circle cx="84" cy="86" r="34"/>
+      <circle cx="124" cy="64" r="44"/>
+      <circle cx="166" cy="88" r="32"/>
+      <rect x="60" y="86" width="120" height="34" rx="17"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#sc-cloud)">
+    <rect x="0" y="0" width="124" height="150" fill="#3FA9E0"/>
+    <rect x="116" y="0" width="124" height="150" fill="#8A9099"/>
+    <path d="M150 6 C110 48 150 88 108 150" fill="none" stroke="#ffffff" stroke-width="12" stroke-linecap="round"/>
+  </g>
+</svg>

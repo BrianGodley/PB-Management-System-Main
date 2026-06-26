@@ -10,6 +10,20 @@
 -- ============================================================================
 
 -- 1) Columns -----------------------------------------------------------------
+-- Base tenant columns this script depends on (added by earlier migrations, but
+-- declared here with IF NOT EXISTS so this file is self-contained on any DB).
+alter table public.tenants add column if not exists status                 text default 'trialing';
+alter table public.tenants add column if not exists owner_user_id          uuid;
+alter table public.tenants add column if not exists trial_ends_at          timestamptz;
+alter table public.tenants add column if not exists billing_status         text;
+alter table public.tenants add column if not exists helcim_customer_id     text;
+alter table public.tenants add column if not exists helcim_subscription_id text;
+alter table public.tenants add column if not exists card_brand             text;
+alter table public.tenants add column if not exists card_last4             text;
+alter table public.tenants add column if not exists card_exp               text;
+alter table public.tenants add column if not exists current_period_end     timestamptz;
+
+-- New trial-clock columns.
 alter table public.tenants add column if not exists trial_started_at     timestamptz default now();
 alter table public.tenants add column if not exists trial_extended_count int not null default 0;
 alter table public.tenants add column if not exists data_retention_until timestamptz;
