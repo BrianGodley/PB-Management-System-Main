@@ -217,7 +217,7 @@ export default function MarketingLanding() {
             All-in-one platform to run your business
           </span>
           <h1 className="text-4xl sm:text-6xl font-extrabold text-white tracking-tight leading-[1.05] max-w-3xl mx-auto">
-            Run your whole company from one place
+            Organize your whole company from one place
           </h1>
           <p className="mt-5 text-lg sm:text-xl text-blue-50/90 max-w-2xl mx-auto">
             {PLATFORM_BRAND.name} brings your people, sales, documents and money into one connected system — the modern way to run a company, whatever you do.
@@ -260,7 +260,7 @@ export default function MarketingLanding() {
       {/* ── Features ───────────────────────────────────────────────────────── */}
       <section id="features" className="max-w-6xl mx-auto px-4 sm:px-6 py-20">
         <div className="text-center max-w-2xl mx-auto mb-14">
-          <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Everything your company runs on</h2>
+          <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Integrated Organization</h2>
           <p className="mt-4 text-gray-600">
             Each module works on its own and connects to the rest. Start with the essentials and turn on more as you grow — you only ever see what your plan includes.
           </p>
