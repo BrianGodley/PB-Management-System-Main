@@ -56,10 +56,17 @@ export default function FileManager({ bucket = 'company-files', root = 'files', 
   const [busy, setBusy] = useState(false)
   const [openFile, setOpenFile] = useState(null) // file name being viewed/edited
   const fileRef = useRef(null)
+  // Every tenant gets its OWN namespace inside the shared bucket so one
+  // company never sees another's files/folders.
+  const [tenantId, setTenantId] = useState(undefined) // undefined = loading, null = none
+  useEffect(() => {
+    supabase.rpc('my_tenant_id').then(({ data }) => setTenantId(data || null))
+  }, [])
 
-  const prefix = [root, ...path].join('/')
+  const prefix = tenantId ? [tenantId, root, ...path].join('/') : null
 
   const load = useCallback(async () => {
+    if (!prefix) { setEntries([]); setLoading(tenantId === undefined); return }
     setLoading(true)
     const { data, error } = await supabase.storage.from(bucket).list(prefix, {
       limit: 1000,
@@ -85,7 +92,7 @@ export default function FileManager({ bucket = 'company-files', root = 'files', 
     })
     setEntries(list)
     setLoading(false)
-  }, [bucket, prefix])
+  }, [bucket, prefix, tenantId])
 
   useEffect(() => {
     load()
@@ -97,7 +104,7 @@ export default function FileManager({ bucket = 'company-files', root = 'files', 
 
   async function handleUpload(e) {
     const files = Array.from(e.target.files || [])
-    if (!files.length) return
+    if (!files.length || !prefix) return
     setBusy(true)
     try {
       for (const f of files) {
@@ -117,6 +124,7 @@ export default function FileManager({ bucket = 'company-files', root = 'files', 
   }
 
   async function newFolder() {
+    if (!prefix) return
     const name = window.prompt('New folder name:')
     if (!name) return
     const clean = name.trim().replace(/[/\\]+/g, '-')
