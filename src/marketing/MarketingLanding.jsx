@@ -158,10 +158,11 @@ const FAQS = [
 // Front-page photos live in public/marketing/. A missing image degrades
 // gracefully. The contractor shot anchors its own band; these three fill the
 // "one system" showcase grid.
+// Body copy kept to ~two lines each so all three cards stay uniform.
 const SHOWCASE = [
-  ['/marketing/marketing.jpg', 'Sales & Marketing', 'Funnels, a booking calendar, contact workflows and campaigns — built around how contractors actually sell.'],
-  ['/marketing/team.jpg', 'People & operations', 'Org chart, employees, time clock and onboarding — keep the office and the field aligned.'],
-  ['/marketing/hr.jpg', 'Hire & train', 'Recruiting, skill training and a full LMS so every new hire ramps up the same way.'],
+  ['/marketing/marketing.jpg', 'Sales & Marketing', 'CRM and workflows. Auto campaigns, Booking Calendar and more.'],
+  ['/marketing/team.jpg', 'Establishment', 'Org Charts, Time Clocks, Strategic Planning and Policy Management.'],
+  ['/marketing/hr.jpg', 'Human Resources', 'Recruiting, Employee Management, and training so new hires and seasoned employees grow.'],
 ]
 
 // Sam — the built-in AI assistant. `true` marks an ability that's on the roadmap.
@@ -267,7 +268,7 @@ export default function MarketingLanding() {
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {SHOWCASE.map(([src, title, body]) => (
-              <div key={src} className="rounded-2xl overflow-hidden bg-white border border-gray-200 shadow-sm flex flex-col">
+              <div key={src} className="h-full rounded-2xl overflow-hidden bg-white border border-gray-200 shadow-sm flex flex-col">
                 <div className="aspect-[16/10] bg-blue-50">
                   <img
                     src={src}
@@ -277,9 +278,10 @@ export default function MarketingLanding() {
                     onError={e => { e.currentTarget.style.display = 'none' }}
                   />
                 </div>
-                <div className="p-5">
+                <div className="p-5 flex-1">
                   <h3 className="font-bold text-gray-900">{title}</h3>
-                  <p className="text-sm text-gray-600 mt-1.5">{body}</p>
+                  {/* min-height reserves two lines so all three cards stay uniform */}
+                  <p className="text-sm text-gray-600 mt-1.5 min-h-[2.75rem]">{body}</p>
                 </div>
               </div>
             ))}
