@@ -184,6 +184,18 @@ Deno.serve(async req => {
     const { error: upErr } = await admin.from('tenants').update(update).eq('id', tenantId)
     if (upErr) return json({ error: upErr.message }, 500)
 
+    // Log the first charge in the billing history (best-effort).
+    await admin.from('billing_payments').insert({
+      tenant_id: tenantId,
+      description: pkgTotal > 0 ? `${plan?.name || 'Subscription'} + add-ons` : (plan?.name || 'Subscription'),
+      amount: recurringAmount,
+      method: 'card',
+      card_brand: card.brand || null,
+      card_last4: card.last4 ? String(card.last4).slice(-4) : null,
+      status: 'paid',
+      helcim_transaction_id: subscriptionId ? String(subscriptionId) : null,
+    }).then(() => {}, () => {})
+
     return json({ ok: true, subscription_id: subscriptionId, recurringAmount })
   }
 
