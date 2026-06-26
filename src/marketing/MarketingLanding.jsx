@@ -199,6 +199,7 @@ export default function MarketingLanding() {
   const navLinks = [
     ['Features', '#features'],
     ['Pricing', '#pricing'],
+    ['Customization', '/customization'],
     ['FAQ', '#faq'],
   ]
 
@@ -213,9 +214,13 @@ export default function MarketingLanding() {
           </a>
 
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600">
-            {navLinks.map(([label, href]) => (
-              <a key={href} href={href} className="hover:text-gray-900 transition-colors">{label}</a>
-            ))}
+            {navLinks.map(([label, href]) =>
+              href.startsWith('/') ? (
+                <Link key={href} to={href} className="hover:text-gray-900 transition-colors">{label}</Link>
+              ) : (
+                <a key={href} href={href} className="hover:text-gray-900 transition-colors">{label}</a>
+              )
+            )}
           </nav>
 
           <div className="hidden md:flex items-center gap-3">
@@ -252,9 +257,13 @@ export default function MarketingLanding() {
 
         {menuOpen && (
           <div className="md:hidden border-t border-gray-100 bg-white px-4 py-3 space-y-1">
-            {navLinks.map(([label, href]) => (
-              <a key={href} href={href} onClick={() => setMenuOpen(false)} className="block py-2 text-sm font-medium text-gray-700">{label}</a>
-            ))}
+            {navLinks.map(([label, href]) =>
+              href.startsWith('/') ? (
+                <Link key={href} to={href} onClick={() => setMenuOpen(false)} className="block py-2 text-sm font-medium text-gray-700">{label}</Link>
+              ) : (
+                <a key={href} href={href} onClick={() => setMenuOpen(false)} className="block py-2 text-sm font-medium text-gray-700">{label}</a>
+              )
+            )}
             <div className="flex gap-2 pt-2">
               {user ? (
                 <Link to="/" className="flex-1 text-center text-sm font-bold text-white rounded-xl py-2.5" style={{ backgroundColor: FG }}>Go to app →</Link>
