@@ -3987,8 +3987,8 @@ export default function Admin() {
         <p className="text-sm text-gray-500">System overview and management</p>
       </div>
 
-      {/* Tab bar */}
-      <div className="flex justify-center gap-1 bg-white border border-gray-200 rounded-xl mb-6">
+      {/* Tab bar (frozen — content scrolls beneath) */}
+      <div className="sticky top-0 z-20 flex justify-center gap-1 bg-white border border-gray-200 rounded-xl mb-6 shadow-sm">
         {tabs.map(t => (
           <button
             key={t.key}
