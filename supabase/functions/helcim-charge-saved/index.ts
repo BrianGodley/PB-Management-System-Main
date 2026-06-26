@@ -44,10 +44,29 @@ Deno.serve(async req => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // ── Authenticate the portal caller and resolve THEIR client ─────────────
+    // Service role bypasses RLS, so we must prove ownership in code: the caller
+    // must have an active portal, and BOTH the invoice and the saved payment
+    // method must belong to that portal's client. Without this, anyone could
+    // POST another client's (or another tenant's) ids and trigger a charge.
+    const jwt = (req.headers.get('Authorization') || '').replace('Bearer ', '')
+    const { data: userData } = await supabase.auth.getUser(jwt)
+    const user = userData?.user
+    if (!user) return json({ error: 'Not signed in.' }, 401)
+
+    const { data: portal } = await supabase
+      .from('client_portals')
+      .select('client_id, status')
+      .eq('auth_user_id', user.id)
+      .maybeSingle()
+    if (!portal || portal.status !== 'active')
+      return json({ error: 'No active client portal for this account.' }, 403)
+
     const { data: pm } = await supabase
       .from('client_payment_methods')
       .select('*')
       .eq('id', payment_method_id)
+      .eq('client_id', portal.client_id)
       .maybeSingle()
     if (!pm || !pm.helcim_card_token)
       return json({ error: 'Saved payment method not found.' }, 404)
@@ -58,6 +77,15 @@ Deno.serve(async req => {
       .eq('id', invoice_id)
       .maybeSingle()
     if (!inv) return json({ error: 'Invoice not found' }, 404)
+
+    // Confirm the invoice's job belongs to the caller's client (and tenant).
+    const { data: ownerJob } = await supabase
+      .from('jobs')
+      .select('id, client_id, tenant_id')
+      .eq('id', inv.job_id)
+      .maybeSingle()
+    if (!ownerJob || ownerJob.client_id !== portal.client_id)
+      return json({ error: 'This invoice is not on your account.' }, 403)
     if (inv.status === 'paid') return json({ error: 'This invoice is already paid.' }, 400)
     const balance = Number(inv.amount || 0) - Number(inv.amount_paid || 0)
     if (!(balance > 0)) return json({ error: 'This invoice has no balance due.' }, 400)

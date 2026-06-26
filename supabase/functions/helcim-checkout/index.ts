@@ -79,12 +79,41 @@ Deno.serve(async req => {
     }
 
     if (!invoice_id) return json({ error: 'invoice_id is required' }, 400)
+
+    // ── Authenticate the portal caller and scope to THEIR client ────────────
+    // Service role bypasses RLS; the invoice path is portal-authenticated (the
+    // tokenized edoc path above is intentionally login-less). Verify the caller
+    // has an active portal and the invoice's job belongs to that client, so no
+    // one can read another client's/tenant's invoice number + balance or open a
+    // payment session against it.
+    const jwt = (req.headers.get('Authorization') || '').replace('Bearer ', '')
+    const { data: userData } = await supabase.auth.getUser(jwt)
+    const user = userData?.user
+    if (!user) return json({ error: 'Not signed in.' }, 401)
+    const { data: portal } = await supabase
+      .from('client_portals')
+      .select('client_id, status')
+      .eq('auth_user_id', user.id)
+      .maybeSingle()
+    if (!portal || portal.status !== 'active')
+      return json({ error: 'No active client portal for this account.' }, 403)
+
     const { data: inv, error } = await supabase
       .from('job_invoices')
       .select('id, invoice_number, amount, amount_paid, status, job_id')
       .eq('id', invoice_id)
       .maybeSingle()
     if (error || !inv) return json({ error: 'Invoice not found' }, 404)
+
+    // Confirm the invoice's job belongs to the caller's client.
+    const { data: ownerJob } = await supabase
+      .from('jobs')
+      .select('id, client_id')
+      .eq('id', inv.job_id)
+      .maybeSingle()
+    if (!ownerJob || ownerJob.client_id !== portal.client_id)
+      return json({ error: 'This invoice is not on your account.' }, 403)
+
     if (inv.status === 'paid') return json({ error: 'This invoice is already paid.' }, 400)
 
     const balance = Number(inv.amount || 0) - Number(inv.amount_paid || 0)

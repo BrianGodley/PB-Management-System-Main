@@ -81,9 +81,14 @@ Deno.serve(async req => {
 
     const { data: client } = await admin
       .from('clients')
-      .select('name, first_name, last_name')
+      .select('name, first_name, last_name, tenant_id')
       .eq('id', portal.client_id)
       .maybeSingle()
+    // Defense-in-depth: the portal's client and the invoice's job must be in the
+    // same tenant. (client_id uniqueness already guarantees this; this makes the
+    // tenant boundary explicit and fails closed if that ever changes.)
+    if (!client || (client.tenant_id && client.tenant_id !== tenantId))
+      return json({ error: 'This invoice is not on your account.' }, 403)
     const clientName =
       client?.name ||
       [client?.first_name, client?.last_name].filter(Boolean).join(' ') ||

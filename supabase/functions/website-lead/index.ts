@@ -49,6 +49,36 @@ Deno.serve(async req => {
     if (!site || !site.published) return json({ error: 'Site not found.' }, 404)
     const tenantId = site.tenant_id
 
+    // ── Anti-spam throttle (public endpoint) ────────────────────────────────
+    // Not a tenant-isolation issue (we write to the slug's own tenant), but an
+    // open form invites flooding. Cap submissions per site per IP per hour and
+    // drop exact-duplicate (same email → same site) repeats within 5 minutes.
+    const ip =
+      (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() ||
+      req.headers.get('cf-connecting-ip') ||
+      'unknown'
+    const emailNorm = String(email || '').trim().toLowerCase()
+    const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+    const { count: ipCount } = await admin
+      .from('website_leads')
+      .select('id', { count: 'exact', head: true })
+      .eq('website_id', site.id)
+      .gte('created_at', hourAgo)
+      .contains('raw', { ip })
+    if ((ipCount || 0) >= 10)
+      return json({ error: 'Too many submissions. Please try again later.' }, 429)
+    if (emailNorm) {
+      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+      const { count: dupCount } = await admin
+        .from('website_leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('website_id', site.id)
+        .eq('email', emailNorm)
+        .gte('created_at', fiveMinAgo)
+      if ((dupCount || 0) >= 1)
+        return json({ ok: true, deduped: true })
+    }
+
     // ── 1) Create the contact ───────────────────────────────────────────────
     const full = String(name).trim()
     const sp = full.indexOf(' ')
@@ -98,10 +128,10 @@ Deno.serve(async req => {
       website_id: site.id,
       page_slug: page_slug || null,
       name: full,
-      email: String(email || '').trim() || null,
+      email: emailNorm || null,
       phone: String(phone || '').trim() || null,
       message: String(message || '').trim() || null,
-      raw: { name, email, phone, message, page_slug },
+      raw: { name, email, phone, message, page_slug, ip },
       client_id: clientId,
     })
 
