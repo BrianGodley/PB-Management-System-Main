@@ -5,6 +5,7 @@
 
 import { Link } from 'react-router-dom'
 import { PLATFORM_BRAND } from '../lib/brand'
+import SamWidget from './SamWidget'
 
 const FG = '#2E8BC9'
 const FG_DARK = '#1B5E8C'
@@ -183,6 +184,8 @@ export default function Customization() {
           <p className="text-xs text-gray-400">© {new Date().getFullYear()} {PLATFORM_BRAND.name}</p>
         </div>
       </footer>
+
+      <SamWidget />
     </div>
   )
 }
