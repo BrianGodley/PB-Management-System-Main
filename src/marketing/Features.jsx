@@ -34,7 +34,7 @@ export default function Features() {
             Integrated Organization
           </span>
           <h1 className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight leading-[1.05] max-w-3xl mx-auto">
-            Everything you need to run your company
+            Robust tools for managing multiple parts of your company
           </h1>
           <p className="mt-5 text-lg text-blue-50/90 max-w-2xl mx-auto">
             Each module works on its own and connects to the rest. Start with the essentials and turn on more as you grow — you only ever see what your plan includes.
