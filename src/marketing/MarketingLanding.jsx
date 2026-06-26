@@ -269,7 +269,10 @@ export default function MarketingLanding() {
           <div className="grid md:grid-cols-3 gap-6">
             {SHOWCASE.map(([src, title, body]) => (
               <div key={src} className="h-full rounded-2xl overflow-hidden bg-white border border-gray-200 shadow-sm flex flex-col">
-                <div className="aspect-[16/10] bg-blue-50">
+                {/* Fixed-height image (standard class, not an arbitrary aspect
+                    utility) so all three photos render at exactly the same
+                    height and never stagger. */}
+                <div className="h-44 sm:h-48 flex-shrink-0 bg-blue-50">
                   <img
                     src={src}
                     alt={title}
@@ -278,10 +281,11 @@ export default function MarketingLanding() {
                     onError={e => { e.currentTarget.style.display = 'none' }}
                   />
                 </div>
+                {/* flex-1 makes every card's text area fill the same remaining
+                    height, so titles align at the top and the cards stay even. */}
                 <div className="p-5 flex-1">
                   <h3 className="font-bold text-gray-900">{title}</h3>
-                  {/* min-height reserves two lines so all three cards stay uniform */}
-                  <p className="text-sm text-gray-600 mt-1.5 min-h-[2.75rem]">{body}</p>
+                  <p className="text-sm text-gray-600 mt-1.5">{body}</p>
                 </div>
               </div>
             ))}
