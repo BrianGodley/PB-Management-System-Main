@@ -19,12 +19,20 @@
      off the screen edges (showing margin) and snap back. Normal vertical
      scrolling within the page still works; inner scroll areas (e.g. the
      org-chart canvas) keep their own scrolling since this only governs the
-     page root's overscroll. */
+     page root's overscroll.
+
+     IMPORTANT: use `overflow-x: clip`, NOT `hidden`. `hidden` turns each of
+     these into a scroll container (it forces overflow-y to compute to `auto`)
+     and, when set on html+body+#root together, confuses which element is the
+     document scroller — the visible scrollbar drags one element while the mouse
+     wheel targets another, so wheel scrolling silently stops working. `clip`
+     prevents horizontal scroll/overscroll the same way without creating a
+     scroll container, so the window keeps scrolling normally with the wheel. */
   html,
   body,
   #root {
     max-width: 100%;
-    overflow-x: hidden;
+    overflow-x: clip;
     overscroll-behavior: none;
   }
   body {
