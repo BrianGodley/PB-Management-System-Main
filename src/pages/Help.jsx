@@ -105,6 +105,17 @@ function serializeNotes(notes) {
 export default function Help() {
   const [tab, setTab] = useState('tickets')
   const [stats, setStats] = useState({ handled: 0, avgDays: null })
+  // The Help Desk (triage) is only available in the support tenant (Picture
+  // Build). null = still checking, false = not allowed, true = allowed.
+  const [isSupport, setIsSupport] = useState(null)
+
+  useEffect(() => {
+    supabase
+      .from('tenants')
+      .select('is_support_tenant')
+      .maybeSingle()
+      .then(({ data }) => setIsSupport(!!data?.is_support_tenant))
+  }, [])
 
   // Top-of-page stat boxes — tickets handled (closed status) and avg
   // completion time. Computed across ALL tickets, not just the current
@@ -140,6 +151,18 @@ export default function Help() {
     })()
     return () => { cancelled = true }
   }, [])
+
+  if (isSupport === false)
+    return (
+      <div className="w-full max-w-lg mx-auto mt-16 text-center">
+        <p className="text-5xl mb-4">🛟</p>
+        <h1 className="text-xl font-bold text-gray-800">Help Desk isn't available here</h1>
+        <p className="text-sm text-gray-500 mt-2">
+          Need a hand? Use <b>Help → Report Issue</b> from the top bar to send a ticket to our support team —
+          we'll take it from there.
+        </p>
+      </div>
+    )
 
   return (
     <div className="w-full">

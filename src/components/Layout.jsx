@@ -210,6 +210,7 @@ export default function Layout() {
   ]
 
   const [userRole, setUserRole] = useState(null)
+  const [isSupportTenant, setIsSupportTenant] = useState(false)
   const isAdmin = userRole === 'admin' || userRole === 'super_admin'
   const MAIN_MENU_ITEMS = [
     { path: '/', label: 'Dashboard', icon: <DashboardIcon /> },
@@ -345,6 +346,13 @@ export default function Layout() {
   useEffect(() => {
     fetchProfile()
     fetchCompanyLogo()
+    // Help Desk (ticket triage) is only available in the support tenant
+    // (Picture Build). Other tenants' tickets flow through to it.
+    supabase
+      .from('tenants')
+      .select('is_support_tenant')
+      .maybeSingle()
+      .then(({ data }) => setIsSupportTenant(!!data?.is_support_tenant))
   }, [user?.id])
 
   // Per-module page backgrounds: load the user's saved route→background map
@@ -884,7 +892,7 @@ export default function Layout() {
                   >
                     🎫 Report Issue
                   </button>
-                  {isAdmin && (
+                  {isAdmin && isSupportTenant && (
                     <>
                       <div className="border-t border-gray-100 my-1" />
                       <Link

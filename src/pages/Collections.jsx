@@ -1159,9 +1159,16 @@ export default function Collections() {
         <div className="flex-1 flex items-center justify-center text-gray-400">
           <div className="text-center">
             <p className="text-4xl mb-3">📋</p>
-            <p className="text-sm font-medium text-gray-500">
-              No weeks yet — click <strong>+ New Week</strong> to start
+            <p className="text-sm font-medium text-gray-500 mb-4">
+              No weeks yet — start your first weekly period.
             </p>
+            <button
+              onClick={handleNewWeekClick}
+              disabled={creatingWeek}
+              className="text-sm px-5 py-2.5 rounded-lg bg-green-700 text-white font-semibold hover:bg-green-800 disabled:opacity-50"
+            >
+              {creatingWeek ? 'Loading…' : '+ New Week'}
+            </button>
           </div>
         </div>
       ) : (
