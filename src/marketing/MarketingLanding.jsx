@@ -161,6 +161,15 @@ const SHOWCASE = [
   ['/marketing/hr.jpg', 'Hire & train', 'Recruiting, skill training and a full LMS so every new hire ramps up the same way.'],
 ]
 
+// Sam — the built-in AI assistant. `true` marks an ability that's on the roadmap.
+const SAM_FEATURES = [
+  ['Ask anything about your business in plain English', false],
+  ['Draft documents, checksheets and templates', false],
+  ['Summaries and synopses across every module', false],
+  ['AI schedule assistant for jobs', true],
+  ['Vendor price-negotiation assistant', true],
+]
+
 // ── Small pieces ───────────────────────────────────────────────────────────
 function Logo({ size = 36 }) {
   return (
@@ -383,6 +392,56 @@ export default function MarketingLanding() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Meet Sam (AI) ──────────────────────────────────────────────────── */}
+      <section id="sam" className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
+        <div className="rounded-3xl overflow-hidden grid md:grid-cols-2" style={{ background: `linear-gradient(135deg, ${FG_DARK} 0%, ${FG} 100%)` }}>
+          <div className="p-8 sm:p-12 text-white">
+            <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide bg-white/15 rounded-full px-3 py-1">
+              ✨ AI built in
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight mt-4">Meet Sam, your AI assistant</h2>
+            <p className="mt-4 text-blue-50/90">
+              Sam works across {PLATFORM_BRAND.name} — ask questions in plain English, draft documents,
+              and let AI handle the busywork. We’re adding new abilities all the time.
+            </p>
+            <ul className="mt-6 space-y-3 text-sm text-blue-50/95">
+              {SAM_FEATURES.map(([f, soon]) => (
+                <li key={f} className="flex items-start gap-2.5">
+                  <span className="text-white/90"><Check /></span>
+                  <span>
+                    {f}
+                    {soon && (
+                      <span className="ml-2 text-[10px] uppercase font-bold bg-white/20 rounded px-1.5 py-0.5 align-middle">
+                        Coming soon
+                      </span>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="relative flex items-center justify-center p-8 sm:p-10 bg-white/5">
+            <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl p-5">
+              <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-lg" style={{ backgroundColor: FG }}>✨</div>
+                <div>
+                  <p className="font-bold text-gray-900 leading-tight">Sam</p>
+                  <p className="text-xs text-gray-400">AI assistant</p>
+                </div>
+              </div>
+              <div className="space-y-3 pt-4 text-sm">
+                <p className="bg-gray-100 text-gray-700 rounded-2xl rounded-tl-sm px-3 py-2 max-w-[80%]">
+                  Which jobs are over budget this week?
+                </p>
+                <p className="text-white rounded-2xl rounded-tr-sm px-3 py-2 max-w-[88%] ml-auto" style={{ backgroundColor: FG }}>
+                  Three are tracking over on labor. Want me to flag them and draft a note to each PM?
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
