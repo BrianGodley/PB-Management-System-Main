@@ -93,7 +93,7 @@ export default function Signup() {
   // Contractor package needs Tier 2+ (jobs/estimates attach to a client).
   const contractorAllowed = plan !== 'tier1'
   const wantsContractor = addContractor && contractorAllowed
-  const total = (PLANS.find(p => p.id === plan)?.price || 0) + (wantsContractor ? 149 : 0)
+  const total = (PLANS.find(p => p.id === plan)?.price || 0) + (wantsContractor ? 199 : 0)
 
   // Step 1 → 2: validate details, then show the payment step.
   function continueToPayment(e) {
@@ -287,7 +287,7 @@ export default function Signup() {
               <span className="flex-1">
                 <span className="flex items-baseline justify-between">
                   <span className="text-sm font-semibold text-gray-900">Contractor Package</span>
-                  <span className="text-sm font-bold text-gray-900">+$149<span className="text-xs font-normal text-gray-400">/mo</span></span>
+                  <span className="text-sm font-bold text-gray-900">+$199<span className="text-xs font-normal text-gray-400">/mo</span></span>
                 </span>
                 <span className="block text-xs text-gray-500">
                   Jobs, Estimating &amp; Bids, Design{!contractorAllowed && ' — requires Tier 2 or higher'}
@@ -324,7 +324,7 @@ export default function Signup() {
               {wantsContractor && (
                 <div className="flex justify-between mt-1">
                   <span className="text-gray-600">Contractor Package</span>
-                  <span className="font-medium text-gray-800">+$149/mo</span>
+                  <span className="font-medium text-gray-800">+$199/mo</span>
                 </div>
               )}
               <div className="flex justify-between mt-2 pt-2 border-t border-gray-200">

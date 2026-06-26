@@ -20,12 +20,13 @@ const FG_LIGHT = '#5BB3E4' // light sky blue
 const FEATURE_GROUPS = [
   {
     icon: '🏢',
-    title: 'Run the business',
-    blurb: 'The back office your crew leaders never had.',
+    title: 'Organize the Business',
+    blurb: 'The back office every growing company needs.',
     items: [
-      ['Dashboard', 'A live pulse on jobs, people and money the moment you log in.'],
+      ['Dashboard', 'A live pulse on your people, work and money the moment you log in.'],
       ['Org Chart', 'Map every position, area and reporting line — then drill into each.'],
       ['HR', 'Employees, applicants, time clock, document files and onboarding templates.'],
+      ['Workflows', 'Repeatable document and approval flows that run themselves.'],
       ['Statistics', 'Track the numbers that matter by position and by person.'],
     ],
   },
@@ -34,9 +35,8 @@ const FEATURE_GROUPS = [
     title: 'Win & manage work',
     blurb: 'From first call to signed contract.',
     items: [
-      ['Sales & Marketing', 'A CRM built around how contractors actually sell — funnels, calendar and campaigns.'],
+      ['Sales & Marketing', 'A CRM with funnels, a booking calendar and campaigns.'],
       ['Training (LMS)', 'Assign courses, track completion, build a competent team.'],
-      ['Workflows', 'Repeatable document and approval flows that run themselves.'],
       ['Documents & E-Docs', 'Files, photos, videos, a doc creator, and e-signature.'],
     ],
   },
@@ -48,20 +48,74 @@ const FEATURE_GROUPS = [
       ['Accounting', 'Invoices, bills and journals — tagged to the work they belong to.'],
       ['Weekly Financial Planning', 'Plan the week around real cash and statistics.'],
       ['Equipment & Assets', 'Know where your assets are and what they cost you.'],
-      ['Client Portal', 'Give clients a clean window into their work and approvals.'],
     ],
   },
 ]
 
 // The optional Contractor Extension Package — surfaced on the landing page and
-// the dedicated /contractor-extensions page.
-export const CONTRACTOR_FEATURES = [
-  ['Jobs', 'Scheduling, daily logs, tasks, work orders and on-site time tracking.'],
-  ['Estimating & Bids', 'Module-based estimates with gross-profit analysis and polished, branded bid documents.'],
-  ['Change Orders', 'Create, release, approve and e-sign change orders that flow straight into the job.'],
-  ['Design', 'Tie design work to the opportunity and the job it belongs to.'],
-  ['Subs & Vendors', 'A directory plus contracts and quotes, linked to your jobs.'],
-  ['Client Portal for jobs', 'Give clients a window into their project, approvals and payments.'],
+// detailed module-by-module on the /contractor-extensions page.
+export const CONTRACTOR_MODULES = [
+  {
+    name: 'Jobs',
+    blurb: 'Run every project from schedule to invoice.',
+    items: [
+      ['Scheduling', 'Master crew schedule, schedule by work order, and an AI schedule assistant.'],
+      ['Daily Logs', 'Track notes and job photos, and send important notifications from the field.'],
+      ['Tasks', 'Track tasks by job, see per-job or total tasks, and set reminders.'],
+      ['Work Orders', 'Organize work by crew type, with hours and assignments.'],
+      ['On-site Time Tracking', 'Time Clock integrated by job for job-specific time tracking.'],
+      ['Tracking', 'Estimated material and hours vs. actual — with auto payroll calculations and per-job material tracking.'],
+      ['Invoicing', 'Invoice clients and receive payments.'],
+      ['Job Documents', 'Track job documentation on every project.'],
+    ],
+  },
+  {
+    name: 'Design',
+    blurb: 'Design and spec the work.',
+    items: [
+      ['CAD-assisted drawing', 'Draw plans with CAD-assisted tools.'],
+      ['Take-off calculations', 'Calculate quantities directly from the drawing.'],
+      ['Material Choices Library', 'A shared library of material choices for clients and internal staff.'],
+    ],
+  },
+  {
+    name: 'Estimating & Bids',
+    blurb: 'Price the work and win it.',
+    items: [
+      ['GP & Man-Day estimating', 'Gross-profit and man-day based estimating.'],
+      ['Branded bids', 'Turn estimates into bids on company letterhead with full descriptions and disclaimers.'],
+      ['Bid tracking', 'Create bids from estimates and track the bid process.'],
+      ['Contracts & e-signature', 'Create company-specific, customized contracts and send them for electronic signature.'],
+    ],
+  },
+  {
+    name: 'Subs & Vendors',
+    blurb: 'Manage everyone you work with.',
+    items: [
+      ['Directory', 'Track subs and vendors in one place.'],
+      ['Sub contracts', 'Create contracts for subs in the office or on the jobsite.'],
+      ['Vendor pricing + AI', 'Update vendor pricing and use an AI assistant for vendor price negotiations.'],
+    ],
+  },
+  {
+    name: 'Client Portal',
+    blurb: 'Give clients a window into their project.',
+    items: [
+      ['Web login', 'Clients access their data through a secure web login.'],
+      ['Change-order approvals', 'Clients view and approve change orders.'],
+      ['Schedule & logs', 'Optionally give clients access to the schedule and daily logs.'],
+      ['Job documentation', 'Client-viewable job documentation.'],
+    ],
+  },
+  {
+    name: 'Change Orders',
+    blurb: 'Capture scope changes anywhere.',
+    items: [
+      ['Profit & man-day estimators', 'Use the profit and man-day estimators for change orders in the office or onsite.'],
+      ['Sign onsite', 'Clients can sign and approve onsite.'],
+      ['Auto flow', 'Change orders flow automatically into accounting and job-tracking measurables.'],
+    ],
+  },
 ]
 
 const TIERS = [
@@ -92,7 +146,7 @@ const TIERS = [
 const FAQS = [
   ['Is it really unlimited users?', 'Yes. Every plan includes unlimited users at no extra cost — add your whole team, office and field, without per-seat fees.'],
   ['How does the free trial work?', 'You get 14 days free. Pick a plan, set up your company in under a minute, and explore everything. You can change or cancel before the trial ends.'],
-  ['What is the Contractor Extension Package?', 'An optional add-on for companies that run projects, job sites or field crews. It turns on Jobs, Estimating & Bids, Design, change orders and more on top of any Tier 2 or Tier 3 plan for an extra $149/mo. Most businesses never need it — see the contractor extensions page for the full list.'],
+  ['What is the Contractor Extension Package?', 'An optional add-on for companies that run projects, job sites or field crews. It turns on Jobs, Estimating & Bids, Design, change orders and more on top of any Tier 2 or Tier 3 plan for an extra $199/mo. Most businesses never need it — see the contractor extensions page for the full list.'],
   ['Can I change plans later?', 'Anytime. Move up or down a tier, or add the Contractor Package, and your modules update immediately. You only ever see the features your plan includes.'],
   ['Is my data secure and private?', 'Each company is fully isolated — your records are only ever visible to your team. We use row-level security so one company can never see another’s data.'],
   ['Do you charge setup or cancellation fees?', 'No setup fees and no cancellation fees. It’s month-to-month.'],
@@ -387,17 +441,17 @@ export default function MarketingLanding() {
               <span className="text-xs font-bold uppercase tracking-wide" style={{ color: FG }}>Optional add-on</span>
               <h3 className="text-2xl font-extrabold tracking-tight mt-1">Contractor Extension Package</h3>
               <div className="flex items-baseline gap-2 mt-1.5">
-                <span className="text-xl font-bold" style={{ color: FG }}>+$149/mo</span>
+                <span className="text-xl font-bold" style={{ color: FG }}>+$199/mo</span>
                 <span className="text-xs text-gray-500">add to Tier 2 or Tier 3</span>
               </div>
               <p className="text-sm text-gray-600 mt-3">
                 Running projects, job sites or field crews? Turn on the full contractor toolkit on top of any plan.
               </p>
               <ul className="mt-4 grid sm:grid-cols-2 gap-x-4 gap-y-2">
-                {CONTRACTOR_FEATURES.map(([name]) => (
-                  <li key={name} className="flex gap-2 text-sm text-gray-700">
+                {CONTRACTOR_MODULES.map(m => (
+                  <li key={m.name} className="flex gap-2 text-sm text-gray-700">
                     <span style={{ color: FG }}><Check /></span>
-                    <span>{name}</span>
+                    <span>{m.name}</span>
                   </li>
                 ))}
               </ul>

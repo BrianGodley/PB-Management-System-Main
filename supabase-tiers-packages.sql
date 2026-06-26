@@ -3,7 +3,7 @@
 -- ----------------------------------------------------------------------------
 -- Final model: three stacking tiers (flat, unlimited users) + add-on packages.
 -- Supersedes the starter/pro/enterprise rows from supabase-plans-entitlements.sql.
--- Prices: Tier 1 $79, Tier 2 $229, Tier 3 $389, Contractor +$149.
+-- Prices: Tier 1 $79, Tier 2 $229, Tier 3 $389, Contractor +$199.
 -- ============================================================================
 
 -- 0) Ensure pricing columns exist on plans (also in supabase-billing-schema.sql)
@@ -37,7 +37,7 @@ create table if not exists public.packages (
   module_keys        text[] not null default '{}'
 );
 insert into public.packages (id, name, price_monthly, requires_tier_rank, module_keys) values
-  ('contractor', 'Contractor Package', 149, 2, array['/jobs', '/bids', '/design'])
+  ('contractor', 'Contractor Extension Package', 199, 2, array['/jobs', '/bids', '/design'])
 on conflict (id) do update
   set name = excluded.name, price_monthly = excluded.price_monthly,
       requires_tier_rank = excluded.requires_tier_rank, module_keys = excluded.module_keys;

@@ -9,5 +9,8 @@
 update public.plans set price_monthly = 229 where id = 'tier2';
 update public.plans set price_monthly = 389 where id = 'tier3';
 
+-- Contractor Extension Package → $199/mo (+ rename)
+update public.packages set price_monthly = 199, name = 'Contractor Extension Package' where id = 'contractor';
+
 -- verify
 -- select id, name, price_monthly from public.plans order by rank;
