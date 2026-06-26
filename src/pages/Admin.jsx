@@ -4009,7 +4009,7 @@ export default function Admin() {
 
       {tab === 'subscription' && <SubscriptionTab />}
 
-      {tab === 'billing' && <BillingTab />}
+      {tab === 'billing' && <BillingTab currentUserIsAdmin={currentUserIsAdmin} />}
 
       {tab === 'sms' && <SmsSettings />}
 

@@ -31,6 +31,15 @@ const fmtExp = v => {
   return d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d
 }
 
+// Best-effort card brand from the leading digit(s) (display only — beta).
+function cardBrandOf(digits) {
+  if (/^4/.test(digits)) return 'Visa'
+  if (/^(5[1-5]|2[2-7])/.test(digits)) return 'Mastercard'
+  if (/^3[47]/.test(digits)) return 'Amex'
+  if (/^(6011|65|64[4-9])/.test(digits)) return 'Discover'
+  return 'Card'
+}
+
 // Stand-in for the real processor. In beta this always "succeeds" without
 // charging. Swap for a HelcimPay tokenize + create-subscription call to go live.
 async function mockChargeCard() {
@@ -103,8 +112,19 @@ export default function Signup() {
       if (error) throw error
 
       const packages = wantsContractor ? ['contractor'] : []
+      // The (beta/test) card to show in Settings → Billing. Last4 + brand + exp
+      // only — never the full PAN.
+      const expDigits = cardExp.replace(/\D/g, '')
+      const card = {
+        brand: cardBrandOf(digits),
+        last4: digits.slice(-4),
+        exp: expDigits.length === 4 ? `${expDigits.slice(0, 2)}/20${expDigits.slice(2)}` : '',
+      }
       // Remember intent so provisioning can complete after confirm/login.
-      localStorage.setItem('softcake:pendingSignup', JSON.stringify({ company: company.trim(), plan, packages }))
+      localStorage.setItem(
+        'softcake:pendingSignup',
+        JSON.stringify({ company: company.trim(), plan, packages, card })
+      )
 
       if (data.session) {
         // Email confirmation is off — we have a session, provision now.
@@ -114,6 +134,10 @@ export default function Signup() {
           p_packages: packages,
         })
         if (pErr) throw pErr
+        // Store the beta card so Billing reflects it (non-fatal).
+        await supabase
+          .rpc('set_beta_card', { p_brand: card.brand, p_last4: card.last4, p_exp: card.exp })
+          .catch(() => {})
         localStorage.removeItem('softcake:pendingSignup')
         navigate('/')
         return
