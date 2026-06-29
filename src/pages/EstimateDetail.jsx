@@ -2038,6 +2038,11 @@ export default function EstimateDetail() {
                       {parseFloat(mod.man_days || 0).toFixed(1)} MD · $
                       {parseFloat(mod.material_cost || 0).toLocaleString()} mat.
                     </p>
+                    {mod.notes && (
+                      <p className="text-xs text-gray-900 mt-1 whitespace-pre-wrap">
+                        {mod.notes}
+                      </p>
+                    )}
                   </div>
                 )
               })
