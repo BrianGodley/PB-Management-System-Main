@@ -2073,7 +2073,13 @@ export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open'
         const subCost = parseFloat(mod.sub_cost || calc.subCost || 0)
         const totalPrice = parseFloat(mod.total_price || calc.price || 0)
 
-        if (laborCost > 0 || manDays > 0 || matCost > 0) {
+        // Everything generates as a single in-house work order for now.
+        // Any sub cost (incl. incidental equipment/finish costs like concrete
+        // pump/stamp/sand or a crane) is folded into this one work order's
+        // sub_cost so the dollar value is preserved, but it is NOT split out
+        // into a separate "subcontractor" work order. A future per-module
+        // In-House / Sub tab system will drive true sub designation.
+        if (laborCost > 0 || manDays > 0 || matCost > 0 || subCost > 0) {
           rows.push({
             job_id: jobId,
             estimate_module_id: mod.id,
@@ -2083,27 +2089,10 @@ export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open'
             man_days: manDays,
             labor_hours: laborHours,
             material_cost: matCost,
-            sub_cost: 0,
+            sub_cost: subCost,
             labor_cost: laborCost,
             labor_burden: laborBurden,
-            total_price: totalPrice - subCost,
-            status: 'pending',
-          })
-        }
-        if (subCost > 0) {
-          rows.push({
-            job_id: jobId,
-            estimate_module_id: mod.id,
-            project_name: proj.project_name,
-            module_type: mod.module_type,
-            is_subcontractor: true,
-            man_days: 0,
-            labor_hours: 0,
-            material_cost: 0,
-            sub_cost: subCost,
-            labor_cost: 0,
-            labor_burden: 0,
-            total_price: subCost,
+            total_price: totalPrice,
             status: 'pending',
           })
         }
