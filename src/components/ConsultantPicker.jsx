@@ -15,6 +15,17 @@ const POSITION_TITLES = {
   install: 'Installation Consultant',
 }
 
+// Classify a free-text position/job title into 'design' | 'install' | null.
+// Keyword-based (case-insensitive) so naming variants still match —
+// e.g. "Install Consultant" vs "Installation Consultant", or extra spacing.
+function classifyConsultant(title) {
+  const t = (title || '').toLowerCase()
+  if (!t.includes('consult')) return null
+  if (t.includes('design')) return 'design'
+  if (t.includes('install')) return 'install'
+  return null
+}
+
 export default function ConsultantPicker({ value = null, onChange, compact = false }) {
   const [loading, setLoading] = useState(true)
   // [{ id, first_name, last_name, position_title }]
@@ -40,29 +51,30 @@ export default function ConsultantPicker({ value = null, onChange, compact = fal
           .from('employees')
           .select('id, first_name, last_name, status, job_title')
           .eq('status', 'active')
-          .in('job_title', [POSITION_TITLES.design, POSITION_TITLES.install]),
+          .ilike('job_title', '%consult%'),
       ])
       if (cancelled) return
 
       const fromJoin = (joinRes.data || [])
         .filter(r => r.employees?.status === 'active')
-        .filter(r =>
-          r.positions?.title === POSITION_TITLES.design ||
-          r.positions?.title === POSITION_TITLES.install,
-        )
         .map(r => ({
-          id: r.employees.id,
-          first_name: r.employees.first_name || '',
-          last_name: r.employees.last_name || '',
-          position_title: r.positions.title,
+          id: r.employees?.id,
+          first_name: r.employees?.first_name || '',
+          last_name: r.employees?.last_name || '',
+          position_title: r.positions?.title || '',
+          kind: classifyConsultant(r.positions?.title),
         }))
+        .filter(r => r.id && r.kind)
 
-      const fromTitle = (byTitleRes.data || []).map(e => ({
-        id: e.id,
-        first_name: e.first_name || '',
-        last_name: e.last_name || '',
-        position_title: e.job_title,
-      }))
+      const fromTitle = (byTitleRes.data || [])
+        .map(e => ({
+          id: e.id,
+          first_name: e.first_name || '',
+          last_name: e.last_name || '',
+          position_title: e.job_title || '',
+          kind: classifyConsultant(e.job_title),
+        }))
+        .filter(e => e.kind)
 
       const rows = [...fromJoin, ...fromTitle]
       // De-dupe (employee could hold both positions, and the two queries
@@ -71,7 +83,7 @@ export default function ConsultantPicker({ value = null, onChange, compact = fal
       const seen = new Set()
       const deduped = []
       for (const r of rows) {
-        const k = `${r.id}::${r.position_title}`
+        const k = `${r.id}::${r.kind}`
         if (seen.has(k)) continue
         seen.add(k)
         deduped.push(r)
@@ -84,9 +96,7 @@ export default function ConsultantPicker({ value = null, onChange, compact = fal
       if (value) {
         const match = deduped.find(r => r.id === value)
         if (match) {
-          setConsultantType(
-            match.position_title === POSITION_TITLES.install ? 'install' : 'design',
-          )
+          setConsultantType(match.kind === 'install' ? 'install' : 'design')
         }
       }
       setLoading(false)
@@ -101,8 +111,7 @@ export default function ConsultantPicker({ value = null, onChange, compact = fal
   }, [])
 
   const filtered = useMemo(() => {
-    const wanted = consultantType === 'install' ? POSITION_TITLES.install : POSITION_TITLES.design
-    return consultants.filter(r => r.position_title === wanted)
+    return consultants.filter(r => r.kind === consultantType)
   }, [consultants, consultantType])
 
   return (
