@@ -1412,8 +1412,8 @@ export default function Clients() {
       <div className="bg-white border-b border-gray-200 flex justify-between gap-0 flex-shrink-0 rounded-xl">
         <div className="flex items-center justify-center flex-1 min-w-0 overflow-x-auto">
           {[
-            { key: 'individuals', label: '👤 Individuals', count: tabCounts.individuals },
-            { key: 'companies',   label: '🏢 Companies',   count: tabCounts.companies },
+            { key: 'individuals', label: '👤 Individual Opportunities', count: tabCounts.individuals },
+            { key: 'companies',   label: '🏢 Company Opportunities',   count: tabCounts.companies },
             { key: 'funnels',     label: <span className="inline-flex items-center gap-1.5"><FunnelIcon /> Funnels</span>, count: null },
             { key: 'calendar',    label: '📅 Calendar',    count: null },
             ...(canContractor ? [{ key: 'estimates', label: '📋 Estimates', count: tabCounts.estimates }] : []),

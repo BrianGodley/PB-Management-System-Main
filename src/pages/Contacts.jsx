@@ -1311,8 +1311,8 @@ export default function Contacts() {
       <div className="bg-white border-b border-gray-200 flex justify-between gap-0 flex-shrink-0 rounded-xl">
         <div className="flex items-center justify-center flex-1 min-w-0 overflow-x-auto">
         {[
-          { id: 'individuals', label: `👤 Individuals (${contactsTotal.toLocaleString()})` },
-          { id: 'companies', label: `🏢 Companies (${companiesTotal.toLocaleString()})` },
+          { id: 'individuals', label: `👤 Individual Contacts (${contactsTotal.toLocaleString()})` },
+          { id: 'companies', label: `🏢 Company Contacts (${companiesTotal.toLocaleString()})` },
           { id: 'workflows', label: '🔁 Contact Workflows' },
           { id: 'website', label: '🌐 Website Builder' },
           { id: 'social', label: '📣 Social Media' },
@@ -1339,12 +1339,20 @@ export default function Contacts() {
         </div>
         <div className="flex items-center gap-2 pr-2 flex-shrink-0">
           {(activeTab === 'individuals' || activeTab === 'companies') && (
-            <button
-              onClick={() => setShowAdd(true)}
-              className="hidden sm:flex btn-primary text-xs px-3 py-1.5"
-            >
-              + {isIndividuals ? 'Add Contact' : 'Add Company'}
-            </button>
+            <>
+              <button
+                onClick={() => setShowAdd('individual')}
+                className="hidden sm:flex btn-primary text-xs px-3 py-1.5"
+              >
+                + Add Individual
+              </button>
+              <button
+                onClick={() => setShowAdd('company')}
+                className="hidden sm:flex btn-primary text-xs px-3 py-1.5"
+              >
+                + Add Company
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -1430,13 +1438,21 @@ export default function Contacts() {
 
       {(activeTab === 'individuals' || activeTab === 'companies') && (
         <>
-          {/* Mobile: full-width Add button sits directly above the search field. */}
-          <button
-            onClick={() => setShowAdd(true)}
-            className="sm:hidden w-full mb-3 mt-4 py-2.5 bg-green-700 text-white rounded-lg text-sm font-semibold flex items-center justify-center gap-2 flex-shrink-0"
-          >
-            + {isIndividuals ? 'Add Contact' : 'Add Company'}
-          </button>
+          {/* Mobile: full-width Add buttons sit directly above the search field. */}
+          <div className="sm:hidden flex gap-2 mb-3 mt-4 flex-shrink-0">
+            <button
+              onClick={() => setShowAdd('individual')}
+              className="flex-1 py-2.5 bg-green-700 text-white rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
+            >
+              + Add Individual
+            </button>
+            <button
+              onClick={() => setShowAdd('company')}
+              className="flex-1 py-2.5 bg-green-700 text-white rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
+            >
+              + Add Company
+            </button>
+          </div>
 
           {/* Search + column picker */}
           <div className="mb-4 mt-4 flex-shrink-0 flex items-center justify-between gap-3">
@@ -1626,7 +1642,7 @@ export default function Contacts() {
           </div>
           {/* end scrollable */}
 
-          {showAdd && isIndividuals && (
+          {showAdd === 'individual' && (
             <AddContactModal
               assignees={assignees}
               onSave={c => {
@@ -1637,7 +1653,7 @@ export default function Contacts() {
             />
           )}
 
-          {showAdd && !isIndividuals && (
+          {showAdd === 'company' && (
             <AddCompanyModal
               assignees={assignees}
               onSave={c => {
