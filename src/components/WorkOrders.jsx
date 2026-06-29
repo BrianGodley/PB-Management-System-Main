@@ -1485,6 +1485,25 @@ function ModuleRow({ wo, jobsMap, crewMap, subMap, onStatusChange, onRowClick })
           <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOT[wo.status]}`} />
           {STATUS_LABELS[wo.status]}
         </button>
+        {/* Per-row edit pencil — always visible so every work order is
+            editable (incl. crew reassignment), regardless of group size. */}
+        <button
+          onClick={e => {
+            e.stopPropagation()
+            onRowClick()
+          }}
+          title="View / edit work order"
+          className="flex items-center justify-center text-gray-400 hover:text-green-700 transition-colors flex-shrink-0"
+        >
+          <svg width="16" height="16" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M18 7.5a1.768 1.768 0 0 1 2.5 2.5L9.5 21 6 22l1-3.5L18 7.5z"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
       </div>
     </div>
   )
