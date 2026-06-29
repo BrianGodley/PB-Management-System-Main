@@ -1380,19 +1380,45 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
 
           <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-2 text-[11px] text-gray-500">
             <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">
-              PIP Rate (click to edit)
+              PIP Rates (click to edit)
             </p>
-            <span className="inline-flex items-center gap-1">
-              Concrete truck ${r('concreteTruck')}/CY
-              <RateEditPopover
-                table="material_rates"
-                name={WALL_RATES.concreteTruck.db}
-                category="Walls"
-                unitLabel="CY"
-                currentValue={r('concreteTruck')}
-                onSaved={refreshAllRates}
-              />
-            </span>
+            <div className="flex flex-wrap gap-x-3 gap-y-1">
+              <span className="inline-flex items-center gap-1">
+                Concrete truck ${r('concreteTruck')}/CY
+                <RateEditPopover
+                  table="material_rates"
+                  name={WALL_RATES.concreteTruck.db}
+                  category="Walls"
+                  unitLabel="CY"
+                  currentValue={r('concreteTruck')}
+                  onSaved={refreshAllRates}
+                />
+              </span>
+              <span className="inline-flex items-center gap-1">
+                Dig {r('digLab')} CF/hr
+                <RateEditPopover
+                  table="labor_rates"
+                  name={WALL_RATES.digLab.db}
+                  category="Walls"
+                  mode="coefficient"
+                  unitLabel="CF/hr"
+                  currentValue={r('digLab')}
+                  onSaved={refreshAllRates}
+                />
+              </span>
+              <span className="inline-flex items-center gap-1">
+                Rebar {r('rebarLab')} LF/hr
+                <RateEditPopover
+                  table="labor_rates"
+                  name={WALL_RATES.rebarLab.db}
+                  category="Walls"
+                  mode="coefficient"
+                  unitLabel="LF/hr"
+                  currentValue={r('rebarLab')}
+                  onSaved={refreshAllRates}
+                />
+              </span>
+            </div>
           </div>
 
           {pipWalls.map((wall, idx) => (
