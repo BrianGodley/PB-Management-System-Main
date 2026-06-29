@@ -223,7 +223,7 @@ function NewWorkOrderModal({ jobId, crewTypes, onSave, onClose }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Work Order Detail / Edit Modal
 // ─────────────────────────────────────────────────────────────────────────────
-function WorkOrderDetailModal({ wo, crewTypes, onClose, onSaved, onDeleted }) {
+function WorkOrderDetailModal({ wo, crewTypes, crews = [], onClose, onSaved, onDeleted }) {
   const [editMode, setEditMode] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -232,6 +232,7 @@ function WorkOrderDetailModal({ wo, crewTypes, onClose, onSaved, onDeleted }) {
     module_type: wo.module_type || '',
     project_name: wo.project_name || '',
     crew_type: wo.crew_type || '',
+    scheduled_crew_id: wo.scheduled_crew_id || '',
     is_subcontractor: wo.is_subcontractor || false,
     man_days: wo.man_days ?? '',
     labor_hours: wo.labor_hours ?? '',
@@ -250,6 +251,7 @@ function WorkOrderDetailModal({ wo, crewTypes, onClose, onSaved, onDeleted }) {
       form.module_type !== (wo.module_type || '') ||
       form.project_name !== (wo.project_name || '') ||
       form.crew_type !== (wo.crew_type || '') ||
+      form.scheduled_crew_id !== (wo.scheduled_crew_id || '') ||
       form.is_subcontractor !== (wo.is_subcontractor || false) ||
       n(form.man_days) !== n(wo.man_days) ||
       n(form.labor_hours) !== n(wo.labor_hours) ||
@@ -267,6 +269,7 @@ function WorkOrderDetailModal({ wo, crewTypes, onClose, onSaved, onDeleted }) {
       module_type: form.module_type.trim(),
       project_name: form.project_name.trim() || null,
       crew_type: form.crew_type || null,
+      scheduled_crew_id: form.scheduled_crew_id || null,
       is_subcontractor: form.is_subcontractor,
       man_days: parseFloat(form.man_days) || 0,
       labor_hours: parseFloat(form.labor_hours) || 0,
@@ -380,6 +383,33 @@ function WorkOrderDetailModal({ wo, crewTypes, onClose, onSaved, onDeleted }) {
                 </select>
               ) : (
                 <input readOnly className={roInput} value={form.crew_type || '—'} />
+              )}
+            </div>
+            <div>
+              <label className="label text-xs">Assigned Crew</label>
+              {editMode ? (
+                <select
+                  className="input text-sm"
+                  value={form.scheduled_crew_id}
+                  onChange={e => set('scheduled_crew_id', e.target.value)}
+                >
+                  <option value="">— Unassigned —</option>
+                  {crews.map(c => (
+                    <option key={c.id} value={c.id}>
+                      Crew {c.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  readOnly
+                  className={roInput}
+                  value={
+                    crews.find(c => c.id === form.scheduled_crew_id)
+                      ? `Crew ${crews.find(c => c.id === form.scheduled_crew_id).label}`
+                      : '—'
+                  }
+                />
               )}
             </div>
           </div>
@@ -2240,6 +2270,7 @@ export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open'
         <WorkOrderDetailModal
           wo={detailWO}
           crewTypes={crewTypes}
+          crews={Object.values(crewMap)}
           onClose={() => setDetailWO(null)}
           onSaved={updatedWO => {
             handleWOSaved(updatedWO)
