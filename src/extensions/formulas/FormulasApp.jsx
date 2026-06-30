@@ -140,10 +140,10 @@ function NewFormula({ userId, onSaved }) {
   useEffect(() => {
     ;(async () => {
       const [{ data: s }, { data: c }] = await Promise.all([
-        supabase.from('statistics').select('id, name, upside_down, tracking, week_ending_day').eq('archived', false).order('name'),
+        supabase.from('statistics').select('id, name, upside_down, tracking, week_ending_day, archived, stat_category').order('name'),
         supabase.from('ext_formulas_conditions').select('id, name, slug, tenant_id').order('sort_order'),
       ])
-      setStats(s || [])
+      setStats((s || []).filter(x => !x.archived && !['overlay', 'target'].includes(x.stat_category)))
       setConditions(c || [])
     })()
   }, [])
