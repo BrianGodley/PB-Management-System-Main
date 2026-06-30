@@ -1,13 +1,18 @@
 // src/extensions/formulas/lib/condition.js
 //
-// Condition/trend engine — ported from legacy Softcake FormulasViewUtil.
-// Pure, dependency-free. Classifies a statistic's recent trend into a condition.
+// Condition/trend engine — ported from legacy Softcake FormulasViewUtil, "clean"
+// variant (no legacy zero-padding of short series). Pure, dependency-free.
 //
-// Conditions (slugs). Note: the classifier never *outputs* 'power' (legacy only
-// references it in the invert map); it's selectable manually but not auto-derived.
+// Three trend views, mirroring the legacy one/six/twelve-week conditions:
+//   one-week    : newest period vs the prior period
+//   six-week    : most recent 7 periods, older half vs newer half (4/4)
+//   twelve-week : most recent 13 periods, older half vs newer half (7/7)
+// All use the same classifier thresholds.
+//
+// The classifier never *outputs* 'power' (legacy only references it in the
+// invert map); it's selectable manually but not auto-derived.
 export const CONDITIONS = ['non_existence', 'danger', 'emergency', 'normal', 'affluence']
 
-// Legacy invertCondition() map (for "upside_down" stats where lower is better).
 const INVERT = {
   danger: 'affluence',
   emergency: 'normal',
@@ -17,9 +22,8 @@ const INVERT = {
   non_existence: 'affluence',
 }
 
-// Exact legacy thresholds. Inputs: window max/low and the two half-averages.
-// Returns a condition slug, or null where legacy leaves it undefined (rare gaps,
-// e.g. a > 100% jump). Callers should render null as "—".
+// Exact legacy thresholds. Returns a condition slug, or null where legacy leaves
+// it undefined (rare gaps, e.g. a > 100% jump). Render null as "—".
 export function classify(maxValue, lowValue, current, baseline) {
   if (maxValue === 0 && lowValue === 0) return 'non_existence'
   const graphRange = maxValue - lowValue
@@ -37,44 +41,73 @@ export function classify(maxValue, lowValue, current, baseline) {
   return null
 }
 
-// Flip a condition for "upside_down" stats (lower is better). Legacy invert map.
 export function invert(slug) {
   return INVERT[slug] ?? slug
 }
 
-// Build window half-averages from a chronological (oldest->newest) numeric series.
-// mode: 'static' (most recent 7 periods) | 'dynamic' (all points). The two halves
-// share the middle point when the window length is odd — this matches the legacy
-// engine exactly for the common n>=7 static case (4-and-4 with a shared midpoint).
-export function computeWindow(series, mode = 'static') {
-  const data = (series || []).filter(v => typeof v === 'number' && !Number.isNaN(v))
+const isNum = v => typeof v === 'number' && !Number.isNaN(v)
+const avg = a => a.reduce((s, x) => s + x, 0) / a.length
+
+// Half-averages over the most recent `size` periods (or all when size is falsy).
+// The two halves share the middle point when the window length is odd.
+export function windowStats(series, size) {
+  const data = (series || []).filter(isNum)
   const n = data.length
   if (n < 2) return null
-  const window = mode === 'dynamic' ? data : data.slice(Math.max(0, n - 7))
-  const w = window.length
-  const half = Math.ceil(w / 2)
-  const firstHalf = window.slice(0, half)
-  const secondHalf = window.slice(w - half)
-  const avg = a => a.reduce((s, x) => s + x, 0) / a.length
+  const w = size ? data.slice(Math.max(0, n - size)) : data
+  const L = w.length
+  const half = Math.ceil(L / 2)
   return {
-    baseline: avg(firstHalf),
-    current: avg(secondHalf),
-    maxValue: Math.max(...window),
-    lowValue: Math.min(...window),
-    window,
+    baseline: avg(w.slice(0, half)),
+    current: avg(w.slice(L - half)),
+    maxValue: Math.max(...w),
+    lowValue: Math.min(...w),
+    window: w,
   }
 }
 
-// Top-level helper: a chronological series + options -> condition result.
-// Returns { slug, baseline, current, pct, window } or null if < 2 data points.
-export function computeCondition(series, { mode = 'static', upsideDown = false } = {}) {
-  const win = computeWindow(series, mode)
-  if (!win) return null
-  let slug = classify(win.maxValue, win.lowValue, win.current, win.baseline)
+// Generic sized-window condition. size = 7 (six-week), 13 (twelve-week), or
+// null/undefined (all periods, "dynamic").
+export function computeConditionSized(series, size, { upsideDown = false } = {}) {
+  const ws = windowStats(series, size)
+  if (!ws) return null
+  let slug = classify(ws.maxValue, ws.lowValue, ws.current, ws.baseline)
   if (slug && upsideDown) slug = invert(slug)
-  const range = win.maxValue - win.lowValue
-  const pct = range !== 0 ? ((win.current - win.baseline) / range) * 100 : null
-  return { slug, baseline: win.baseline, current: win.current, pct, window: win.window }
+  const range = ws.maxValue - ws.lowValue
+  const pct = range !== 0 ? ((ws.current - ws.baseline) / range) * 100 : null
+  return { slug, baseline: ws.baseline, current: ws.current, pct, window: ws.window }
+}
+
+// One-week trend: newest period vs the prior period; range over recent context.
+export function computeOneWeek(series, { upsideDown = false } = {}) {
+  const data = (series || []).filter(isNum)
+  const n = data.length
+  if (n < 2) return null
+  const ctx = data.slice(Math.max(0, n - 13))
+  const current = data[n - 1]
+  const baseline = data[n - 2]
+  let slug = classify(Math.max(...ctx), Math.min(...ctx), current, baseline)
+  if (slug && upsideDown) slug = invert(slug)
+  const range = Math.max(...ctx) - Math.min(...ctx)
+  const pct = range !== 0 ? ((current - baseline) / range) * 100 : null
+  return { slug, baseline, current, pct, window: ctx }
+}
+
+// Backward-compatible: 'static' = six-week (7), 'dynamic' = all periods.
+export function computeWindow(series, mode = 'static') {
+  return windowStats(series, mode === 'dynamic' ? null : 7)
+}
+export function computeCondition(series, { mode = 'static', upsideDown = false } = {}) {
+  return computeConditionSized(series, mode === 'dynamic' ? null : 7, { upsideDown })
+}
+
+// All three trend views at once.
+export function computeTrends(series, { upsideDown = false } = {}) {
+  return {
+    one_week: computeOneWeek(series, { upsideDown }),
+    six_week: computeConditionSized(series, 7, { upsideDown }),
+    twelve_week: computeConditionSized(series, 13, { upsideDown }),
+  }
 }
 
 // Display metadata for the standard conditions (badge color + label).
@@ -85,4 +118,10 @@ export const CONDITION_META = {
   normal: { label: 'Normal', color: '#16a34a', bg: '#f0fdf4' },
   affluence: { label: 'Affluence', color: '#15803d', bg: '#f0fdf4' },
   power: { label: 'Power', color: '#15803d', bg: '#f0fdf4' },
+}
+
+export const TREND_LABELS = {
+  one_week: '1-week',
+  six_week: '6-week',
+  twelve_week: '12-week',
 }

@@ -1,6 +1,13 @@
 // Standalone tests for the condition engine. Run: node src/extensions/formulas/lib/condition.test.mjs
-// (No test runner is installed; this uses plain assertions. Add vitest later if desired.)
-import { classify, invert, computeWindow, computeCondition } from './condition.js'
+import {
+  classify,
+  invert,
+  computeWindow,
+  computeCondition,
+  computeOneWeek,
+  computeConditionSized,
+  computeTrends,
+} from './condition.js'
 
 let pass = 0,
   fail = 0
@@ -38,7 +45,7 @@ eq('invert affluence', invert('affluence'), 'danger')
 eq('invert normal', invert('normal'), 'emergency')
 eq('invert non_existence', invert('non_existence'), 'affluence')
 
-// windowing (legacy parity for n>=7 static: 4-and-4, shared midpoint)
+// windowing (legacy parity for n>=7 six-week: 4-and-4, shared midpoint)
 {
   const w = computeWindow([1, 2, 3, 4, 5, 6, 7], 'static')
   near('static baseline 2.5', w.baseline, 2.5)
@@ -52,7 +59,7 @@ eq('invert non_existence', invert('non_existence'), 'affluence')
   near('recent7 current 5.5', w.current, 5.5)
 }
 
-// end-to-end
+// end-to-end six-week
 {
   const r = computeCondition([1, 2, 3, 4, 5, 6, 7])
   eq('rising -> affluence', r.slug, 'affluence')
@@ -62,6 +69,31 @@ eq('rising upside_down -> danger', computeCondition([1, 2, 3, 4, 5, 6, 7], { ups
 eq('flat -> emergency', computeCondition([5, 5, 5, 5, 5, 5, 5]).slug, 'emergency')
 eq('falling pct-50 -> danger', computeCondition([7, 6, 5, 4, 3, 2, 1]).slug, 'danger')
 eq('steep fall -> non_existence', computeCondition([100, 100, 100, 100, 10, 5, 0]).slug, 'non_existence')
+
+// one-week trend: newest vs prior period
+eq('1wk rising -> affluence', computeOneWeek([10, 10, 10, 10, 10, 10, 20]).slug, 'affluence')
+eq('1wk flat -> emergency', computeOneWeek([10, 10, 10, 10, 10, 10, 10]).slug, 'emergency')
+eq('1wk drop -> non_existence', computeOneWeek([20, 20, 20, 20, 20, 20, 0]).slug, 'non_existence')
+
+// sized windows: six (7) vs twelve (13)
+{
+  const s = Array.from({ length: 13 }, (_, i) => i + 1) // 1..13 rising
+  eq('6wk(7) rising -> affluence', computeConditionSized(s, 7).slug, 'affluence')
+  eq('12wk(13) rising -> affluence', computeConditionSized(s, 13).slug, 'affluence')
+}
+
+// computeTrends bundles all three
+{
+  const t = computeTrends([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])
+  eq('trends has one_week', !!t.one_week, true)
+  eq('trends six_week affluence', t.six_week.slug, 'affluence')
+  eq('trends twelve_week affluence', t.twelve_week.slug, 'affluence')
+}
+eq(
+  '12wk upside rising -> danger',
+  computeConditionSized([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], 13, { upsideDown: true }).slug,
+  'danger'
+)
 
 console.log(`\nRESULT: ${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)
