@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { computeTrends, CONDITION_META, TREND_LABELS } from './lib/condition.js'
+import ConditionManager from './ConditionManager.jsx'
 
 function ConditionBadge({ slug, size = 'sm' }) {
   const meta = CONDITION_META[slug]
@@ -83,9 +84,14 @@ export default function FormulasApp() {
           </p>
         </div>
         {view === 'list' ? (
-          <button onClick={() => setView('new')} className="bg-green-700 text-white font-semibold px-4 py-2 rounded-lg hover:bg-green-800 text-sm">
-            + New Formula
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => setView('conditions')} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2 hover:bg-gray-50">
+              Manage Conditions
+            </button>
+            <button onClick={() => setView('new')} className="bg-green-700 text-white font-semibold px-4 py-2 rounded-lg hover:bg-green-800 text-sm">
+              + New Formula
+            </button>
+          </div>
         ) : (
           <button onClick={() => setView('list')} className="text-sm text-gray-600 border border-gray-200 rounded-lg px-4 py-2 hover:bg-gray-50">
             ← Back
@@ -93,7 +99,9 @@ export default function FormulasApp() {
         )}
       </div>
 
-      {view === 'new' ? (
+      {view === 'conditions' ? (
+        <ConditionManager />
+      ) : view === 'new' ? (
         <NewFormula userId={user?.id} onSaved={() => { setView('list'); loadFormulas() }} />
       ) : loading ? (
         <p className="text-sm text-gray-400">Loading…</p>
@@ -133,7 +141,7 @@ function NewFormula({ userId, onSaved }) {
     ;(async () => {
       const [{ data: s }, { data: c }] = await Promise.all([
         supabase.from('statistics').select('id, name, upside_down, tracking, week_ending_day').eq('archived', false).order('name'),
-        supabase.from('ext_formulas_conditions').select('id, name, slug').order('sort_order'),
+        supabase.from('ext_formulas_conditions').select('id, name, slug, tenant_id').order('sort_order'),
       ])
       setStats(s || [])
       setConditions(c || [])
@@ -160,10 +168,11 @@ function NewFormula({ userId, onSaved }) {
   )
   // The six-week condition is the primary one that drives handling steps.
   const result = trends?.six_week
-  const matchedCondition = useMemo(
-    () => (result?.slug ? conditions.find(c => c.slug === result.slug) : null),
-    [result, conditions]
-  )
+  const matchedCondition = useMemo(() => {
+    if (!result?.slug) return null
+    const matches = conditions.filter(c => c.slug === result.slug)
+    return matches.find(c => c.tenant_id) || matches[0] || null // prefer tenant-customized
+  }, [result, conditions])
 
   useEffect(() => {
     if (!matchedCondition) { setSteps([]); return }
