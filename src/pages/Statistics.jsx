@@ -8972,29 +8972,53 @@ export default function Statistics() {
   async function fetchOverlayValues(stat) {
     const parts = stat.overlay_parts || []
     // stat_id may be stored as a string in JSONB — normalise to number
-    const statIds = parts.map(p => Number(p.stat_id)).filter(Boolean)
-    if (!statIds.length) {
+    const partInfo = parts
+      .filter(p => p.stat_id)
+      .map(p => {
+        const numId = Number(p.stat_id)
+        return { part: p, numId, stat: stats.find(s => s.id === numId) || null }
+      })
+    if (!partInfo.length) {
       setOverlayValues([])
       setValuesStatId(stat.id)
       return
     }
 
-    const { data: rawVals } = await supabase
-      .from('statistic_values')
-      .select('statistic_id, period_date, value')
-      .in('statistic_id', statIds)
-      .order('period_date')
+    // Regular (DB-backed) parts are fetched directly. EQUATION parts store no
+    // rows of their own — resolve them to a computed series (same as the
+    // equation stat's own chart) so they render on the overlay.
+    const regularIds = partInfo
+      .filter(pi => pi.stat?.stat_category !== 'equation')
+      .map(pi => pi.numId)
+    let rawVals = []
+    if (regularIds.length) {
+      const { data } = await supabase
+        .from('statistic_values')
+        .select('statistic_id, period_date, value')
+        .in('statistic_id', regularIds)
+        .order('period_date')
+      rawVals = data || []
+    }
+    const equationValuesById = {}
+    for (const pi of partInfo) {
+      if (pi.stat?.stat_category === 'equation') {
+        const map = await resolveEquationToMap(pi.stat, stats)
+        equationValuesById[pi.numId] = [...map].map(([period_date, value]) => ({
+          statistic_id: pi.numId,
+          period_date,
+          value,
+        }))
+      }
+    }
 
-    const grouped = parts
-      .filter(p => p.stat_id)
-      .map(p => {
-        const numId = Number(p.stat_id)
-        return {
-          stat: stats.find(s => s.id === numId) || null,
-          part: p,
-          values: (rawVals || []).filter(v => v.statistic_id === numId),
-        }
-      })
+    const grouped = partInfo.map(pi => ({
+      stat: pi.stat,
+      part: pi.part,
+      values:
+        pi.stat?.stat_category === 'equation'
+          ? equationValuesById[pi.numId] || []
+          : rawVals.filter(v => v.statistic_id === pi.numId),
+    }))
 
     setOverlayValues(grouped)
     setValuesStatId(stat.id)
