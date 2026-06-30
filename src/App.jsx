@@ -6,6 +6,7 @@ import { RateIconsProvider } from './contexts/RateIconsContext'
 import Layout from './components/Layout'
 import ErrorBoundary from './components/ErrorBoundary'
 import EntitlementsGate from './platform/EntitlementsGate'
+import ExtensionHost from './platform/ExtensionHost'
 import Login from './pages/Login'
 
 // Wrap React.lazy so a failed/stale chunk import does a single auto-reload
@@ -235,6 +236,9 @@ function AppRoutes() {
           <Route path="help" element={<Help />} />
           <Route path="documentation" element={<Documentation />} />
           <Route path="video-guides" element={<VideoGuides />} />
+          {/* Platform extensions: one generic host mounts any enabled extension's
+              module by id (e.g. /x/formulas). Gating happens inside ExtensionHost. */}
+          <Route path="x/:extId/*" element={<ExtensionHost />} />
         </Route>
       </Routes>
       </Suspense>

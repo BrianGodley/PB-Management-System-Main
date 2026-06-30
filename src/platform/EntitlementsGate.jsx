@@ -13,11 +13,13 @@ import { EntitlementsProvider } from './entitlements'
 export default function EntitlementsGate({ children }) {
   const { user } = useAuth()
   const [moduleKeys, setModuleKeys] = useState(null) // null = all modules enabled
+  const [enabledExtensionIds, setEnabledExtensionIds] = useState([])
 
   useEffect(() => {
     let cancelled = false
     if (!user) {
       setModuleKeys(null)
+      setEnabledExtensionIds([])
       return
     }
     ;(async () => {
@@ -50,11 +52,18 @@ export default function EntitlementsGate({ children }) {
       const { data, error } = await supabase.rpc('get_my_modules')
       if (cancelled) return
       setModuleKeys(error ? null : Array.isArray(data) ? data : null)
+
+      // Which paid extensions does this tenant have? (fail-open to none.)
+      const { data: exts } = await supabase.rpc('get_my_extensions')
+      if (cancelled) return
+      setEnabledExtensionIds(Array.isArray(exts) ? exts : [])
     })()
     return () => {
       cancelled = true
     }
   }, [user?.id])
 
-  return <EntitlementsProvider value={{ moduleKeys }}>{children}</EntitlementsProvider>
+  return (
+    <EntitlementsProvider value={{ moduleKeys, enabledExtensionIds }}>{children}</EntitlementsProvider>
+  )
 }

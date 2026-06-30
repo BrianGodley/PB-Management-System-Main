@@ -4,7 +4,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LanguageContext'
 import { supabase } from '../lib/supabase'
-import { useEntitlements, isModuleEnabled } from '../platform'
+import { useEntitlements, isModuleEnabled, getExtensionModules } from '../platform'
 import { PLATFORM_BRAND } from '../lib/brand'
 import {
   applyBackgroundForPath,
@@ -443,8 +443,12 @@ export default function Layout() {
   const useCustomGroups = Array.isArray(menuGroups) && menuGroups.length > 0
   // Plan gating: only show modules the current tenant's plan unlocks. With no
   // plan (moduleKeys === null) every module shows — today's behavior.
-  const { moduleKeys } = useEntitlements()
-  const allowedNav = navItems.filter(i => isModuleEnabled(moduleKeys, i.path))
+  const { moduleKeys, activeExtensions } = useEntitlements()
+  const allowedNav = [
+    ...navItems.filter(i => isModuleEnabled(moduleKeys, i.path)),
+    // Paid extensions enabled for this tenant contribute their own nav entries.
+    ...getExtensionModules(activeExtensions).map(m => ({ path: m.path, label: m.label, icon: m.icon })),
+  ]
   const menuStructure = buildMenuStructure(allowedNav, menuGroups)
   // Route guard: if the current path belongs to a module the plan doesn't
   // include, block the page (show an upgrade notice) instead of rendering it.

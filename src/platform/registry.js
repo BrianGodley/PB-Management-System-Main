@@ -7,12 +7,13 @@
 // [] and every helper returns nothing — so the app behaves exactly as today.
 
 import pictureBuild from '../extensions/picture-build/manifest'
+import formulas from '../extensions/formulas/manifest'
 
 // Bump when the slot/hook/manifest contract changes in a breaking way.
 export const PLATFORM_API_VERSION = 1
 
 // Every known extension manifest (whether or not any tenant has it enabled).
-const ALL_EXTENSIONS = [pictureBuild]
+const ALL_EXTENSIONS = [pictureBuild, formulas]
 
 export function allExtensions() {
   return ALL_EXTENSIONS
