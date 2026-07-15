@@ -74,6 +74,7 @@ export const CUSTOMIZE_MODULES = [
   { key: '/jobs', label: 'Jobs' },
   { key: '/equipment-tracking', label: 'Equipment' },
   { key: '/statistics', label: 'Statistics' },
+  { key: '/x/formulas', label: 'Formulas' },
   { key: '/portal/subs', label: 'Subs & Vendors' },
   { key: '/customize', label: 'Customize' },
   { key: '/admin', label: 'Admin' },
@@ -126,6 +127,7 @@ export const MENU_ITEMS = [
   { path: '/bids', label: 'Bids' },
   { path: '/jobs', label: 'Jobs' },
   { path: '/equipment-tracking', label: 'Equipment' },
+  { path: '/x/formulas', label: 'Formulas' },
   { path: '/portal/subs', label: 'Subs & Vendors' },
   { path: '/statistics', label: 'Statistics' },
 ]
