@@ -8,8 +8,9 @@
 //     chosen condition + handling steps (no stat/trend).
 //   * Settings                    — manage conditions & their handling steps.
 //
-// Listing tables mirror the Bids table styling (full-width). The page renders
-// inside Layout's <Outlet/>, so it inherits the user's customized background.
+// Sub-tabs use the shared white tab-bar look; listing tables mirror the Bids
+// table (full-width). The page renders inside Layout's <Outlet/>, so it
+// inherits the user's customized background.
 //
 // Reads core: public.statistics, public.statistic_values.
 // Reads/writes ext_formulas_* (gated by RLS + the 'formulas' entitlement).
@@ -97,20 +98,14 @@ export default function FormulasApp() {
 
   return (
     <div className="w-full">
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">🧮 Formulas</h1>
-        <p className="text-sm text-gray-600">
-          Classify a statistic’s trend into a condition — or apply a condition directly — and record the handling steps.
-        </p>
-      </div>
-
-      <div className="flex items-center gap-1 border-b border-gray-200 mb-5">
+      {/* Sub-tabs — shared white tab-bar look */}
+      <div className="bg-white border-b border-gray-200 flex justify-center gap-0 flex-shrink-0 rounded-xl mb-5">
         {TABS.map(t => (
           <button
             key={t.key}
             onClick={() => switchTab(t.key)}
-            className={`px-4 py-2 text-sm font-semibold -mb-px border-b-2 transition-colors ${
-              tab === t.key ? 'border-green-700 text-green-800' : 'border-transparent text-gray-500 hover:text-gray-700'
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              tab === t.key ? 'border-green-700 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
             {t.label}
