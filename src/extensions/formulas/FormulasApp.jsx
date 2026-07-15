@@ -8,8 +8,8 @@
 //     chosen condition + handling steps (no stat/trend).
 //   * Settings                    — manage conditions & their handling steps.
 //
-// Listing tables mirror the Bids table styling. The page renders inside Layout's
-// <Outlet/>, so it inherits the user's customized module background.
+// Listing tables mirror the Bids table styling (full-width). The page renders
+// inside Layout's <Outlet/>, so it inherits the user's customized background.
 //
 // Reads core: public.statistics, public.statistic_values.
 // Reads/writes ext_formulas_* (gated by RLS + the 'formulas' entitlement).
@@ -96,7 +96,7 @@ export default function FormulasApp() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="w-full">
       <div className="mb-4">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">🧮 Formulas</h1>
         <p className="text-sm text-gray-600">
@@ -155,7 +155,7 @@ export default function FormulasApp() {
   )
 }
 
-// ---- Bids-style listing table --------------------------------------------
+// ---- Bids-style listing table (full width) --------------------------------
 function FormulaTable({ rows, kind, loading, onOpen, onDelete }) {
   if (loading) return <p className="text-sm text-gray-400">Loading…</p>
   if (!rows.length) {
@@ -168,7 +168,7 @@ function FormulaTable({ rows, kind, loading, onOpen, onDelete }) {
   }
   const isStats = kind === 'stats'
   return (
-    <div className="thin-scroll overflow-auto rounded-xl border border-gray-200 bg-white">
+    <div className="thin-scroll w-full overflow-auto rounded-xl border border-gray-200 bg-white">
       <table className="w-full text-sm border-collapse">
         <thead className="sticky top-0 z-10">
           <tr className="bg-gray-50 border-b border-gray-200 text-left">
@@ -322,8 +322,8 @@ function NewStatFormula({ userId, formulas, onCreate, onEdit }) {
             <p className="text-[11px] text-gray-400 text-center">This statistic is marked “down is better” — conditions are inverted accordingly.</p>
           )}
 
-          {/* Large graph */}
-          <StatGraph stat={stat} series={dated} height={440} />
+          {/* Large graph — most recent 12-week window, full width */}
+          <StatGraph stat={stat} series={dated} height={440} maxPoints={13} />
         </div>
       )}
     </div>

@@ -3,9 +3,10 @@
 // Large statistic graph for the Formulas module — mirrors the Statistics module's
 // look (recharts LineChart with black/red colored trend segments) as a self-
 // contained component. Props:
-//   stat   : { name, stat_type, tracking, upside_down, show_values }
-//   series : [{ value, period_date }]  (ascending by period_date)
-//   height : number (px, default 420)
+//   stat      : { name, stat_type, tracking, upside_down, show_values }
+//   series    : [{ value, period_date }]  (ascending by period_date)
+//   height    : number (px, default 420)
+//   maxPoints : only plot the most recent N points (default 13 ≈ 12 weeks)
 import { useMemo } from 'react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Customized,
@@ -71,13 +72,14 @@ function ColoredLineSegments({ formattedGraphicalItems, stat }) {
   )
 }
 
-export default function StatGraph({ stat, series = [], height = 420 }) {
+export default function StatGraph({ stat, series = [], height = 420, maxPoints = 13 }) {
   const chartData = useMemo(
     () =>
       (series || [])
         .filter(r => r && r.value != null && !Number.isNaN(Number(r.value)))
+        .slice(-maxPoints) // only the most recent window (default ~12 weeks)
         .map(r => ({ label: periodLabel(r.period_date, stat?.tracking), value: Number(r.value), date: r.period_date })),
-    [series, stat]
+    [series, stat, maxPoints]
   )
 
   const { yDomain, yTicks } = useMemo(() => {
@@ -109,7 +111,7 @@ export default function StatGraph({ stat, series = [], height = 420 }) {
   return (
     <div style={{ width: '100%', height }}>
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={chartData} margin={{ top: 28, right: 24, left: 16, bottom: 20 }}>
+        <LineChart data={chartData} margin={{ top: 28, right: 8, left: 0, bottom: 20 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis
             dataKey="label"
@@ -130,7 +132,7 @@ export default function StatGraph({ stat, series = [], height = 420 }) {
               if (stat?.stat_type === 'percentage') return v + '%'
               return Number(v).toLocaleString()
             }}
-            width={80}
+            width={56}
           />
           <Tooltip content={() => null} cursor={{ stroke: '#9ca3af', strokeDasharray: '3 3' }} />
           <Line type="linear" dataKey="value" stroke="transparent" dot={false} activeDot={{ r: 6, fill: FG, stroke: 'white', strokeWidth: 2 }} isAnimationActive={false} />
