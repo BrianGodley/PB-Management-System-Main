@@ -6,11 +6,10 @@
 //     handling steps (each period can be a different condition).
 //   * Formulas for Non Statistics — "optional" formulas: a title + a manually
 //     chosen condition + handling steps (no stat/trend).
-//   * Settings                    — manage conditions & their handling steps.
+//   * Settings                    — manage conditions, handling steps & access.
 //
-// Sub-tabs use the shared white tab-bar look with the New Formula button pinned
-// to the upper-right; listing tables mirror the Bids table (full-width). The
-// page renders inside Layout's <Outlet/>, so it inherits the customized bg.
+// Restricted conditions (the lower conditions) are hidden from the Non-Statistics
+// picker/list unless the current user is granted access (or is an admin).
 //
 // Reads core: public.statistics, public.statistic_values.
 // Reads/writes ext_formulas_* (gated by RLS + the 'formulas' entitlement).
@@ -73,6 +72,7 @@ export default function FormulasApp() {
   const [formulas, setFormulas] = useState([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)   // ConditionModal spec or null
+  const [blocked, setBlocked] = useState(new Set()) // restricted condition ids the user can't view
 
   async function loadFormulas() {
     setLoading(true)
@@ -85,8 +85,27 @@ export default function FormulasApp() {
   }
   useEffect(() => { loadFormulas() }, [])
 
+  // Compute which restricted conditions the current user cannot view.
+  useEffect(() => {
+    if (!user?.id) return
+    ;(async () => {
+      try {
+        const [{ data: conds, error: ce }, { data: grants }, roleRes] = await Promise.all([
+          supabase.from('ext_formulas_conditions').select('id, restricted'),
+          supabase.from('ext_formulas_condition_access').select('condition_id').eq('user_id', user.id),
+          supabase.from('profiles').select('role').eq('id', user.id).maybeSingle(),
+        ])
+        if (ce) { setBlocked(new Set()); return }
+        const admin = ['admin', 'owner'].includes(roleRes?.data?.role)
+        const granted = new Set((grants || []).map(g => g.condition_id))
+        const b = admin ? new Set() : new Set((conds || []).filter(c => c.restricted && !granted.has(c.id)).map(c => c.id))
+        setBlocked(b)
+      } catch { setBlocked(new Set()) }
+    })()
+  }, [user?.id])
+
   const statFormulas = formulas.filter(f => (f.type || 'stat') === 'stat')
-  const optionalFormulas = formulas.filter(f => f.type === 'optional')
+  const optionalFormulas = formulas.filter(f => f.type === 'optional' && !blocked.has(f.ext_formulas_conditions?.id))
 
   function switchTab(t) { setTab(t); setMode('list') }
   const onModalSaved = () => { setModal(null); loadFormulas() }
@@ -101,7 +120,7 @@ export default function FormulasApp() {
   const newButton =
     tab === 'settings' ? null
       : tab === 'optional'
-        ? <button onClick={() => setModal({ mode: 'create', kind: 'optional', userId: user?.id })} className={newBtnCls}>+ New Formula</button>
+        ? <button onClick={() => setModal({ mode: 'create', kind: 'optional', userId: user?.id, blocked })} className={newBtnCls}>+ New Formula</button>
         : mode === 'list'
           ? <button onClick={() => setMode('new')} className={newBtnCls}>+ New Formula</button>
           : null
@@ -188,7 +207,7 @@ function FormulaTable({ rows, kind, loading, onOpen, onDelete }) {
                 <td className="px-4 py-3 font-bold text-gray-900">{cond?.name || '—'}</td>
                 <td className="px-4 py-3">
                   <button onClick={() => onOpen(f)} className="text-green-700 hover:text-green-900 font-semibold underline decoration-green-200 underline-offset-2">
-                    View condition
+                    View Formula
                   </button>
                 </td>
                 <td className="px-4 py-3 text-gray-700">{isStats ? (f.statistics?.name || '—') : (f.title || '—')}</td>

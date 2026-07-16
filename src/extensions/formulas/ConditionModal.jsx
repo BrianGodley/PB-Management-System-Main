@@ -1,9 +1,12 @@
 // src/extensions/formulas/ConditionModal.jsx
 //
-// Modal for a single formula's condition + handling steps. Three uses:
-//   create-stat     : condition is fixed by a trend period (1/6/12-week)
+// Modal for a single formula's condition + handling steps. Uses:
+//   create-stat     : condition fixed by a trend period (1/6/12-week)
 //   create-optional : user gives a title and picks a condition manually
-//   edit            : load a saved formula, edit its steps, mark completed
+//   edit            : load a saved formula, edit its actions, mark completed
+//
+// Each handling step can hold MULTIPLE actions (action_text + due date + assign).
+// Restricted conditions are filtered out of the optional picker unless allowed.
 //
 // Reads/writes ext_formulas_* (gated by RLS + the 'formulas' entitlement).
 import { useEffect, useMemo, useState } from 'react'
@@ -14,6 +17,7 @@ const inputCls =
   'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600'
 
 const PERIOD_LABEL = { one_week: '1-week', six_week: '6-week', twelve_week: '12-week' }
+const emptyAction = () => ({ action_text: '', due_date: '', assign: false })
 
 function Badge({ slug, size = 'sm' }) {
   const m = CONDITION_META[slug]
@@ -29,32 +33,36 @@ function Badge({ slug, size = 'sm' }) {
 export default function ConditionModal({ spec, onClose, onSaved }) {
   const isEdit = spec?.mode === 'edit'
   const isOptional = spec?.kind === 'optional'
+  const blocked = useMemo(
+    () => (spec?.blocked instanceof Set ? spec.blocked : new Set(spec?.blocked || [])),
+    [spec]
+  )
 
   const [title, setTitle] = useState(spec?.title || '')
   const [condId, setCondId] = useState(spec?.condition?.id || '')
   const [condition, setCondition] = useState(spec?.condition || null)
-  const [options, setOptions] = useState([])        // optional-mode condition picker
-  const [steps, setSteps] = useState([])
+  const [options, setOptions] = useState([])       // optional-mode condition picker
+  const [steps, setSteps] = useState([])           // [{ condition_step_id, seq, text, actions:[{...}] }]
   const [status, setStatus] = useState('active')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState(null)
 
-  // Load condition options (optional-create only).
+  // Optional-create: load selectable conditions (skip restricted-and-blocked).
   useEffect(() => {
     if (isEdit || !isOptional) return
     ;(async () => {
       const { data } = await supabase
         .from('ext_formulas_conditions')
-        .select('id, name, slug, tenant_id, sort_order')
+        .select('id, name, slug, tenant_id, restricted, sort_order')
         .order('sort_order')
       const bySlug = {}
       for (const c of data || []) if (!bySlug[c.slug] || c.tenant_id) bySlug[c.slug] = c
-      setOptions(Object.values(bySlug))
+      setOptions(Object.values(bySlug).filter(c => !blocked.has(c.id)))
     })()
-  }, [isEdit, isOptional])
+  }, [isEdit, isOptional, blocked])
 
-  // Load the steps to display/edit.
+  // Load steps (with actions) to display/edit.
   useEffect(() => {
     let cancel = false
     ;(async () => {
@@ -67,27 +75,27 @@ export default function ConditionModal({ spec, onClose, onSaved }) {
           .single()
         const { data: rows } = await supabase
           .from('ext_formulas_steps')
-          .select('id, seq, action_text, due_date, assign, condition_step_id, ext_formulas_condition_steps(text)')
+          .select('id, seq, action_seq, action_text, due_date, assign, condition_step_id, ext_formulas_condition_steps(text)')
           .eq('formula_id', spec.formulaId)
           .order('seq')
+          .order('action_seq')
         if (cancel) return
         setCondition(f?.ext_formulas_conditions || null)
         setTitle(f?.title || '')
         setStatus(f?.status || 'active')
-        setSteps(
-          (rows || []).map(r => ({
-            condition_step_id: r.condition_step_id,
-            seq: r.seq,
-            text: r.ext_formulas_condition_steps?.text || '',
-            action_text: r.action_text || '',
-            due_date: r.due_date || '',
-            assign: !!r.assign,
-          }))
-        )
+        // Group rows into steps by condition_step_id (keep step order by seq).
+        const byStep = new Map()
+        for (const r of rows || []) {
+          const key = r.condition_step_id || `s${r.seq}`
+          if (!byStep.has(key)) byStep.set(key, { condition_step_id: r.condition_step_id, seq: r.seq, text: r.ext_formulas_condition_steps?.text || '', actions: [] })
+          byStep.get(key).actions.push({ action_text: r.action_text || '', due_date: r.due_date || '', assign: !!r.assign })
+        }
+        const list = [...byStep.values()].sort((a, b) => a.seq - b.seq)
+        for (const st of list) if (!st.actions.length) st.actions.push(emptyAction())
+        setSteps(list)
         setLoading(false)
         return
       }
-      // create modes: load the chosen condition's canned steps
       const cid = condId
       if (!cid) { setSteps([]); setLoading(false); return }
       const { data } = await supabase
@@ -96,34 +104,48 @@ export default function ConditionModal({ spec, onClose, onSaved }) {
         .eq('condition_id', cid)
         .order('seq')
       if (cancel) return
-      setSteps((data || []).map(st => ({ condition_step_id: st.id, seq: st.seq, text: st.text, action_text: '', due_date: '', assign: false })))
+      setSteps((data || []).map(st => ({ condition_step_id: st.id, seq: st.seq, text: st.text, actions: [emptyAction()] })))
       setLoading(false)
     })()
     return () => { cancel = true }
   }, [isEdit, spec, condId])
 
-  const setStep = (i, k, v) => setSteps(p => p.map((s, j) => (j === i ? { ...s, [k]: v } : s)))
+  const setAction = (si, ai, k, v) =>
+    setSteps(p => p.map((s, j) => j === si ? { ...s, actions: s.actions.map((a, k2) => k2 === ai ? { ...a, [k]: v } : a) } : s))
+  const addAction = si => setSteps(p => p.map((s, j) => j === si ? { ...s, actions: [...s.actions, emptyAction()] } : s))
+  const removeAction = (si, ai) => setSteps(p => p.map((s, j) => j === si ? { ...s, actions: s.actions.length > 1 ? s.actions.filter((_, k) => k !== ai) : s.actions } : s))
 
   const headerCondition = condition || spec?.condition || null
-  const stepsRows = (formulaId) =>
-    steps.map(s => ({
-      formula_id: formulaId, condition_step_id: s.condition_step_id, seq: s.seq,
-      action_text: (s.action_text || '').trim() || null, due_date: s.due_date || null, assign: !!s.assign,
-    }))
+
+  function buildRows(formulaId) {
+    const out = []
+    for (const s of steps) {
+      s.actions.forEach((a, ai) => {
+        out.push({
+          formula_id: formulaId,
+          condition_step_id: s.condition_step_id,
+          seq: s.seq,
+          action_seq: ai + 1,
+          action_text: (a.action_text || '').trim() || null,
+          due_date: a.due_date || null,
+          assign: !!a.assign,
+        })
+      })
+    }
+    return out
+  }
 
   async function save() {
     setSaving(true)
     setErr(null)
     try {
       if (isEdit) {
-        const { error: ue } = await supabase
-          .from('ext_formulas_formulas')
-          .update({ status })
-          .eq('id', spec.formulaId)
+        const { error: ue } = await supabase.from('ext_formulas_formulas').update({ status }).eq('id', spec.formulaId)
         if (ue) throw ue
         await supabase.from('ext_formulas_steps').delete().eq('formula_id', spec.formulaId)
-        if (steps.length) {
-          const { error: se } = await supabase.from('ext_formulas_steps').insert(stepsRows(spec.formulaId))
+        const rows = buildRows(spec.formulaId)
+        if (rows.length) {
+          const { error: se } = await supabase.from('ext_formulas_steps').insert(rows)
           if (se) throw se
         }
       } else {
@@ -138,8 +160,9 @@ export default function ConditionModal({ spec, onClose, onSaved }) {
             }
         const { data: f, error } = await supabase.from('ext_formulas_formulas').insert(insert).select().single()
         if (error) throw error
-        if (steps.length) {
-          const { error: se } = await supabase.from('ext_formulas_steps').insert(stepsRows(f.id))
+        const rows = buildRows(f.id)
+        if (rows.length) {
+          const { error: se } = await supabase.from('ext_formulas_steps').insert(rows)
           if (se) throw se
         }
       }
@@ -181,7 +204,7 @@ export default function ConditionModal({ spec, onClose, onSaved }) {
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Condition</label>
                 <select className={inputCls} value={condId} onChange={e => { setCondId(e.target.value); setCondition(options.find(o => String(o.id) === String(e.target.value)) || null) }}>
                   <option value="">— Choose a condition —</option>
-                  {options.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {options.map(c => <option key={c.id} value={c.id}>{c.name}{c.restricted ? ' 🔒' : ''}</option>)}
                 </select>
               </div>
             </div>
@@ -205,19 +228,25 @@ export default function ConditionModal({ spec, onClose, onSaved }) {
             </p>
           ) : (
             <div>
-              <p className="text-xs font-semibold text-gray-500 mb-2">Handling steps — fill in actions and assign as needed.</p>
+              <p className="text-xs font-semibold text-gray-500 mb-2">Handling steps — add one or more actions per step.</p>
               <div className="space-y-3">
-                {steps.map((s, i) => (
-                  <div key={s.condition_step_id || i} className="border border-gray-100 rounded-lg p-3">
+                {steps.map((s, si) => (
+                  <div key={s.condition_step_id || si} className="border border-gray-100 rounded-lg p-3">
                     <p className="text-sm text-gray-800 mb-2"><span className="font-semibold text-gray-500 mr-1">{s.seq}.</span>{s.text}</p>
-                    <div className="grid sm:grid-cols-[1fr_140px_auto] gap-2 items-center">
-                      <input className={inputCls} placeholder="Action to take…" value={s.action_text} onChange={e => setStep(i, 'action_text', e.target.value)} />
-                      <input type="date" className={inputCls} value={s.due_date} onChange={e => setStep(i, 'due_date', e.target.value)} />
-                      <label className="inline-flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer whitespace-nowrap">
-                        <input type="checkbox" checked={s.assign} onChange={e => setStep(i, 'assign', e.target.checked)} className="w-4 h-4 rounded accent-green-600" />
-                        Assign
-                      </label>
+                    <div className="space-y-2">
+                      {s.actions.map((a, ai) => (
+                        <div key={ai} className="grid sm:grid-cols-[1fr_140px_auto_auto] gap-2 items-center">
+                          <input className={inputCls} placeholder={`Action${s.actions.length > 1 ? ` ${ai + 1}` : ''}…`} value={a.action_text} onChange={e => setAction(si, ai, 'action_text', e.target.value)} />
+                          <input type="date" className={inputCls} value={a.due_date} onChange={e => setAction(si, ai, 'due_date', e.target.value)} />
+                          <label className="inline-flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer whitespace-nowrap">
+                            <input type="checkbox" checked={a.assign} onChange={e => setAction(si, ai, 'assign', e.target.checked)} className="w-4 h-4 rounded accent-green-600" />
+                            Assign
+                          </label>
+                          <button onClick={() => removeAction(si, ai)} disabled={s.actions.length <= 1} title="Remove action" className="text-red-300 hover:text-red-500 disabled:opacity-30 text-sm px-1">✕</button>
+                        </div>
+                      ))}
                     </div>
+                    <button onClick={() => addAction(si)} className="mt-2 text-xs text-green-700 font-medium hover:text-green-900">+ Add action</button>
                   </div>
                 ))}
               </div>

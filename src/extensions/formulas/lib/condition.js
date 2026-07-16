@@ -118,6 +118,12 @@ export const CONDITION_META = {
   normal: { label: 'Normal', color: '#16a34a', bg: '#f0fdf4' },
   affluence: { label: 'Affluence', color: '#15803d', bg: '#f0fdf4' },
   power: { label: 'Power', color: '#15803d', bg: '#f0fdf4' },
+  // Lower conditions (below Non-Existence) — manually selectable only.
+  liability: { label: 'Liability', color: '#b91c1c', bg: '#fef2f2' },
+  doubt: { label: 'Doubt', color: '#b45309', bg: '#fffbeb' },
+  enemy: { label: 'Enemy', color: '#991b1b', bg: '#fef2f2' },
+  treason: { label: 'Treason', color: '#7f1d1d', bg: '#fef2f2' },
+  confusion: { label: 'Confusion', color: '#6b7280', bg: '#f3f4f6' },
 }
 
 export const TREND_LABELS = {
