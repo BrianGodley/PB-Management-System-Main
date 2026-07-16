@@ -159,7 +159,11 @@ export default function ConditionModal({ spec, onClose, onSaved }) {
               period_start: spec.periodStart || null, period_end: spec.periodEnd || null,
               created_by: spec.userId || null,
             }
-        const { data: f, error } = await supabase.from('ext_formulas_formulas').insert(insert).select().single()
+        let { data: f, error } = await supabase.from('ext_formulas_formulas').insert(insert).select().single()
+        if (error && /period_unit/i.test(error.message || '')) {
+          const { period_unit, ...rest } = insert
+          ;({ data: f, error } = await supabase.from('ext_formulas_formulas').insert(rest).select().single())
+        }
         if (error) throw error
         const rows = buildRows(f.id)
         if (rows.length) {

@@ -89,10 +89,14 @@ export default function FormulasApp() {
 
   async function loadFormulas() {
     setLoading(true)
-    const { data } = await supabase
-      .from('ext_formulas_formulas')
-      .select('id, evaluated_on, created_at, type, title, statistic_id, status, period, period_unit, period_start, period_end, statistics(name), ext_formulas_conditions(id, name, slug)')
-      .order('created_at', { ascending: false })
+    const full = 'id, evaluated_on, created_at, type, title, statistic_id, status, period, period_unit, period_start, period_end, statistics(name), ext_formulas_conditions(id, name, slug)'
+    let { data, error } = await supabase.from('ext_formulas_formulas').select(full).order('created_at', { ascending: false })
+    if (error) {
+      // period_unit column not applied yet — fall back so the list still loads.
+      const safe = 'id, evaluated_on, created_at, type, title, statistic_id, status, period, period_start, period_end, statistics(name), ext_formulas_conditions(id, name, slug)'
+      const r = await supabase.from('ext_formulas_formulas').select(safe).order('created_at', { ascending: false })
+      data = r.data
+    }
     setFormulas(data || [])
     setLoading(false)
   }
@@ -273,10 +277,18 @@ function NewStatFormula({ userId, formulas, onCreate, onEdit }) {
         .order('period_date', { ascending: true })
       const rows = (data || []).filter(r => r.value != null && !Number.isNaN(Number(r.value))).map(r => ({ value: Number(r.value), period_date: r.period_date }))
       setDated(rows)
-      setFromDate(rows.length ? rows[0].period_date : '')
-      setToDate(rows.length ? rows[rows.length - 1].period_date : '')
     })()
   }, [statId, stats])
+
+  // Default the visible range to the most recent 12 periods of the chosen view period.
+  useEffect(() => {
+    if (!dated.length || !stat) return
+    const full = aggregateSeries(dated, stat.tracking, viewPeriod, { isPercentage: stat.stat_type === 'percentage' })
+    if (!full.length) return
+    const cutoff = full.length > 12 ? full[full.length - 12].period_date : full[0].period_date
+    setFromDate(cutoff)
+    setToDate(dated[dated.length - 1].period_date)
+  }, [dated, viewPeriod, stat])
 
   const isPct = stat?.stat_type === 'percentage'
   const filtered = useMemo(
