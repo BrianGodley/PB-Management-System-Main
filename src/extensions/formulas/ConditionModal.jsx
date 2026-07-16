@@ -155,7 +155,8 @@ export default function ConditionModal({ spec, onClose, onSaved }) {
           ? { type: 'optional', statistic_id: null, title: title.trim() || null, condition_id: cid, window_mode: 'static', created_by: spec.userId || null }
           : {
               type: 'stat', statistic_id: spec.statisticId, condition_id: cid, window_mode: 'static',
-              period: spec.period, period_start: spec.periodStart || null, period_end: spec.periodEnd || null,
+              period: spec.period, period_unit: spec.periodUnit || null,
+              period_start: spec.periodStart || null, period_end: spec.periodEnd || null,
               created_by: spec.userId || null,
             }
         const { data: f, error } = await supabase.from('ext_formulas_formulas').insert(insert).select().single()

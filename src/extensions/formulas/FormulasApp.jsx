@@ -1,15 +1,16 @@
 // src/extensions/formulas/FormulasApp.jsx
 //
 // Formulas extension UI. Three tabs:
-//   * Formulas for Statistics     — pick a stat, see a large graph with the
-//     1/6/12-week conditions across the top; click a period to record its
-//     handling steps (each period can be a different condition).
+//   * Formulas for Statistics     — pick a stat, adjust the date range and view
+//     period; the large graph and the 1/6/12-period conditions recompute. Click
+//     a period to record its handling steps (each period can be a different
+//     condition). The condition labels reflect the period (week/month/quarter…).
 //   * Formulas for Non Statistics — "optional" formulas: a title + a manually
 //     chosen condition + handling steps (no stat/trend).
 //   * Settings                    — manage conditions, handling steps & access.
 //
-// Restricted conditions (the lower conditions) are hidden from the Non-Statistics
-// picker/list unless the current user is granted access (or is an admin).
+// Restricted conditions are hidden from the Non-Statistics picker/list unless the
+// current user is granted access (or is an admin).
 //
 // Reads core: public.statistics, public.statistic_values.
 // Reads/writes ext_formulas_* (gated by RLS + the 'formulas' entitlement).
@@ -17,20 +18,32 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { computeTrends, CONDITION_META } from './lib/condition.js'
+import { aggregateSeries, viewOptionsFor, UNIT_TITLE, UNIT_SINGULAR } from './lib/periods.js'
 import StatGraph from './StatGraph.jsx'
 import ConditionModal from './ConditionModal.jsx'
 import ConditionManager from './ConditionManager.jsx'
 
 const inputCls =
   'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600'
+const ctrlCls =
+  'border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600'
 const newBtnCls = 'bg-green-700 text-white font-semibold px-4 py-1.5 rounded-lg hover:bg-green-800 text-sm whitespace-nowrap'
 
+// Trend windows: label count + how many periods each window spans.
 const PERIODS = [
-  { key: 'one_week', label: '1-Week', size: 2 },
-  { key: 'six_week', label: '6-Week', size: 7 },
-  { key: 'twelve_week', label: '12-Week', size: 13 },
+  { key: 'one_week', count: 1, size: 2 },
+  { key: 'six_week', count: 6, size: 7 },
+  { key: 'twelve_week', count: 12, size: 13 },
 ]
-const PERIOD_SHORT = { one_week: '1 week', six_week: '6 week', twelve_week: '12 week' }
+const PERIOD_COUNT = { one_week: 1, six_week: 6, twelve_week: 12 }
+const cap = s => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
+
+function periodText(f) {
+  if (!f.period) return '—'
+  const n = PERIOD_COUNT[f.period] || ''
+  const unit = f.period_unit || 'week'
+  return `${n} ${unit}${n > 1 ? 's' : ''}`
+}
 
 function fmtDate(d) {
   if (!d) return '—'
@@ -68,24 +81,23 @@ const TABS = [
 export default function FormulasApp() {
   const { user } = useAuth()
   const [tab, setTab] = useState('stats')
-  const [mode, setMode] = useState('list')   // stats tab: 'list' | 'new'
+  const [mode, setMode] = useState('list')
   const [formulas, setFormulas] = useState([])
   const [loading, setLoading] = useState(true)
-  const [modal, setModal] = useState(null)   // ConditionModal spec or null
-  const [blocked, setBlocked] = useState(new Set()) // restricted condition ids the user can't view
+  const [modal, setModal] = useState(null)
+  const [blocked, setBlocked] = useState(new Set())
 
   async function loadFormulas() {
     setLoading(true)
     const { data } = await supabase
       .from('ext_formulas_formulas')
-      .select('id, evaluated_on, created_at, type, title, statistic_id, status, period, period_start, period_end, statistics(name), ext_formulas_conditions(id, name, slug)')
+      .select('id, evaluated_on, created_at, type, title, statistic_id, status, period, period_unit, period_start, period_end, statistics(name), ext_formulas_conditions(id, name, slug)')
       .order('created_at', { ascending: false })
     setFormulas(data || [])
     setLoading(false)
   }
   useEffect(() => { loadFormulas() }, [])
 
-  // Compute which restricted conditions the current user cannot view.
   useEffect(() => {
     if (!user?.id) return
     ;(async () => {
@@ -116,7 +128,6 @@ export default function FormulasApp() {
     loadFormulas()
   }
 
-  // The New Formula button, pinned to the tab bar's upper-right when relevant.
   const newButton =
     tab === 'settings' ? null
       : tab === 'optional'
@@ -127,7 +138,6 @@ export default function FormulasApp() {
 
   return (
     <div className="w-full">
-      {/* Sub-tabs — shared white tab-bar look, New Formula pinned upper-right */}
       <div className="relative bg-white border-b border-gray-200 flex justify-center gap-0 flex-shrink-0 rounded-xl mb-5">
         {TABS.map(t => (
           <button
@@ -151,12 +161,7 @@ export default function FormulasApp() {
         mode === 'new' ? (
           <div className="space-y-4">
             <button onClick={() => setMode('list')} className="text-sm text-gray-600 border border-gray-200 rounded-lg px-4 py-2 hover:bg-gray-50 bg-white">← Back to list</button>
-            <NewStatFormula
-              userId={user?.id}
-              formulas={statFormulas}
-              onCreate={setModal}
-              onEdit={setModal}
-            />
+            <NewStatFormula userId={user?.id} formulas={statFormulas} onCreate={setModal} onEdit={setModal} />
           </div>
         ) : (
           <FormulaTable rows={statFormulas} kind="stats" loading={loading} onOpen={f => setModal({ mode: 'edit', formulaId: f.id })} onDelete={removeFormula} />
@@ -211,7 +216,7 @@ function FormulaTable({ rows, kind, loading, onOpen, onDelete }) {
                   </button>
                 </td>
                 <td className="px-4 py-3 text-gray-700">{isStats ? (f.statistics?.name || '—') : (f.title || '—')}</td>
-                {isStats && <td className="px-4 py-3 whitespace-nowrap text-gray-600">{PERIOD_SHORT[f.period] || '—'}</td>}
+                {isStats && <td className="px-4 py-3 whitespace-nowrap text-gray-600">{periodText(f)}</td>}
                 <td className="px-4 py-3 whitespace-nowrap text-gray-500">{range}</td>
                 <td className="px-4 py-3 text-center"><StatusPill status={f.status} /></td>
                 <td className="px-4 py-3">
@@ -233,13 +238,16 @@ function FormulaTable({ rows, kind, loading, onOpen, onDelete }) {
   )
 }
 
-// ---- New statistic formula: big graph + 1/6/12-week period cards ----------
+// ---- New statistic formula: controls + big graph + period cards ------------
 function NewStatFormula({ userId, formulas, onCreate, onEdit }) {
   const [stats, setStats] = useState([])
   const [conditions, setConditions] = useState([])
   const [statId, setStatId] = useState('')
-  const [dated, setDated] = useState([])   // [{ value, period_date }]
+  const [dated, setDated] = useState([])       // native [{ value, period_date }]
   const [stat, setStat] = useState(null)
+  const [viewPeriod, setViewPeriod] = useState('weekly')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
 
   useEffect(() => {
     ;(async () => {
@@ -254,19 +262,37 @@ function NewStatFormula({ userId, formulas, onCreate, onEdit }) {
 
   useEffect(() => {
     if (!statId) { setDated([]); setStat(null); return }
-    setStat(stats.find(s => String(s.id) === String(statId)) || null)
+    const chosen = stats.find(s => String(s.id) === String(statId)) || null
+    setStat(chosen)
+    setViewPeriod(chosen?.tracking || 'weekly')
     ;(async () => {
       const { data } = await supabase
         .from('statistic_values')
         .select('value, period_date')
         .eq('statistic_id', statId)
         .order('period_date', { ascending: true })
-      setDated((data || []).filter(r => r.value != null && !Number.isNaN(Number(r.value))).map(r => ({ value: Number(r.value), period_date: r.period_date })))
+      const rows = (data || []).filter(r => r.value != null && !Number.isNaN(Number(r.value))).map(r => ({ value: Number(r.value), period_date: r.period_date }))
+      setDated(rows)
+      setFromDate(rows.length ? rows[0].period_date : '')
+      setToDate(rows.length ? rows[rows.length - 1].period_date : '')
     })()
   }, [statId, stats])
 
-  const series = useMemo(() => dated.map(d => d.value), [dated])
+  const isPct = stat?.stat_type === 'percentage'
+  const filtered = useMemo(
+    () => dated.filter(d => (!fromDate || d.period_date >= fromDate) && (!toDate || d.period_date <= toDate)),
+    [dated, fromDate, toDate]
+  )
+  const view = useMemo(
+    () => aggregateSeries(filtered, stat?.tracking, viewPeriod, { isPercentage: isPct }),
+    [filtered, stat, viewPeriod, isPct]
+  )
+  const series = useMemo(() => view.map(d => d.value), [view])
   const trends = useMemo(() => computeTrends(series, { upsideDown: !!stat?.upside_down }), [series, stat])
+
+  const unit = UNIT_SINGULAR[viewPeriod] || 'week'
+  const unitTitle = UNIT_TITLE[viewPeriod] || 'Week'
+  const options = stat ? viewOptionsFor(stat.tracking) : []
 
   const matchCondition = slug => {
     if (!slug) return null
@@ -274,22 +300,22 @@ function NewStatFormula({ userId, formulas, onCreate, onEdit }) {
     return m.find(c => c.tenant_id) || m[0] || null
   }
   const rangeFor = size => {
-    const w = dated.slice(Math.max(0, dated.length - size))
+    const w = view.slice(Math.max(0, view.length - size))
     return { start: w[0]?.period_date || null, end: w[w.length - 1]?.period_date || null }
   }
-  const existingFor = key => formulas.find(f => String(f.statistic_id) === String(statId) && f.period === key)
+  const existingFor = key =>
+    formulas.find(f => String(f.statistic_id) === String(statId) && f.period === key && (f.period_unit || 'week') === unit)
 
   function openPeriod(p) {
     const existing = existingFor(p.key)
     if (existing) { onEdit({ mode: 'edit', formulaId: existing.id }); return }
-    const trend = trends?.[p.key]
-    const condition = matchCondition(trend?.slug)
+    const condition = matchCondition(trends?.[p.key]?.slug)
     if (!condition) return
     const r = rangeFor(p.size)
     onCreate({
       mode: 'create', kind: 'stat', userId,
       statisticId: Number(statId), statName: stat?.name,
-      period: p.key, condition, periodStart: r.start, periodEnd: r.end,
+      period: p.key, periodUnit: unit, condition, periodStart: r.start, periodEnd: r.end,
     })
   }
 
@@ -311,34 +337,59 @@ function NewStatFormula({ userId, formulas, onCreate, onEdit }) {
 
       {statId && dated.length >= 2 && (
         <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-5">
-          {/* 1 / 6 / 12-week condition cards across the top */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {PERIODS.map(p => {
-              const trend = trends?.[p.key]
-              const existing = existingFor(p.key)
-              return (
-                <div key={p.key} className="border border-gray-200 rounded-xl p-4 flex flex-col items-center text-center gap-2">
-                  <div className="text-xs uppercase tracking-wide text-gray-400 font-semibold">{p.label}</div>
-                  <ConditionBadge slug={trend?.slug} size="xl" />
-                  {trend?.pct != null && <div className="text-[11px] text-gray-400">{trend.pct.toFixed(1)}% of range</div>}
-                  <button
-                    onClick={() => openPeriod(p)}
-                    disabled={!trend?.slug}
-                    className={`mt-1 text-sm font-semibold px-4 py-2 rounded-lg w-full disabled:opacity-40 ${existing ? 'border border-green-300 text-green-700 hover:bg-green-50' : 'bg-green-700 text-white hover:bg-green-800'}`}
-                  >
-                    {existing ? '✓ View / edit formula' : 'Create formula'}
-                  </button>
-                </div>
-              )
-            })}
+          {/* Controls: view period + date range */}
+          <div className="flex flex-wrap items-end gap-4">
+            <div>
+              <label className="block text-[11px] font-semibold text-gray-500 mb-1">View period</label>
+              <select className={ctrlCls} value={viewPeriod} onChange={e => setViewPeriod(e.target.value)}>
+                {options.map(p => <option key={p} value={p}>{cap(p)}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-gray-500 mb-1">From</label>
+              <input type="date" className={ctrlCls} value={fromDate} onChange={e => setFromDate(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-gray-500 mb-1">To</label>
+              <input type="date" className={ctrlCls} value={toDate} onChange={e => setToDate(e.target.value)} />
+            </div>
+            <p className="text-[11px] text-gray-400 pb-2">{view.length} {unit}{view.length === 1 ? '' : 's'} in range</p>
           </div>
 
-          {stat?.upside_down && (
-            <p className="text-[11px] text-gray-400 text-center">This statistic is marked “down is better” — conditions are inverted accordingly.</p>
-          )}
+          {view.length < 2 ? (
+            <p className="text-sm text-gray-500">Not enough {unit}s in this range to compute a condition — widen the date range.</p>
+          ) : (
+            <>
+              {/* 1 / 6 / 12-period condition cards across the top */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {PERIODS.map(p => {
+                  const trend = trends?.[p.key]
+                  const existing = existingFor(p.key)
+                  return (
+                    <div key={p.key} className="border border-gray-200 rounded-xl p-4 flex flex-col items-center text-center gap-2">
+                      <div className="text-xs uppercase tracking-wide text-gray-400 font-semibold">{p.count}-{unitTitle}</div>
+                      <ConditionBadge slug={trend?.slug} size="xl" />
+                      {trend?.pct != null && <div className="text-[11px] text-gray-400">{trend.pct.toFixed(1)}% of range</div>}
+                      <button
+                        onClick={() => openPeriod(p)}
+                        disabled={!trend?.slug}
+                        className={`mt-1 text-sm font-semibold px-4 py-2 rounded-lg w-full disabled:opacity-40 ${existing ? 'border border-green-300 text-green-700 hover:bg-green-50' : 'bg-green-700 text-white hover:bg-green-800'}`}
+                      >
+                        {existing ? '✓ View / edit formula' : 'Create formula'}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
 
-          {/* Large graph — most recent 12-week window, full width */}
-          <StatGraph stat={stat} series={dated} height={440} maxPoints={13} />
+              {stat?.upside_down && (
+                <p className="text-[11px] text-gray-400 text-center">This statistic is marked “down is better” — conditions are inverted accordingly.</p>
+              )}
+
+              {/* Large graph — the selected range/period, full width */}
+              <StatGraph stat={stat} series={view} height={440} maxPoints={view.length} periodType={viewPeriod} />
+            </>
+          )}
         </div>
       )}
     </div>

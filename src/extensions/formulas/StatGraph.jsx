@@ -72,14 +72,14 @@ function ColoredLineSegments({ formattedGraphicalItems, stat }) {
   )
 }
 
-export default function StatGraph({ stat, series = [], height = 420, maxPoints = 13 }) {
+export default function StatGraph({ stat, series = [], height = 420, maxPoints = 13, periodType }) {
   const chartData = useMemo(
     () =>
       (series || [])
         .filter(r => r && r.value != null && !Number.isNaN(Number(r.value)))
         .slice(-maxPoints) // only the most recent window (default ~12 weeks)
-        .map(r => ({ label: periodLabel(r.period_date, stat?.tracking), value: Number(r.value), date: r.period_date })),
-    [series, stat, maxPoints]
+        .map(r => ({ label: periodLabel(r.period_date, periodType || stat?.tracking), value: Number(r.value), date: r.period_date })),
+    [series, stat, maxPoints, periodType]
   )
 
   const { yDomain, yTicks } = useMemo(() => {
