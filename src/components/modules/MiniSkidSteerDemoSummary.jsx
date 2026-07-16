@@ -32,6 +32,13 @@ const R = {
 const n = v => parseFloat(v) || 0
 const sfToTons = (sf, depthIn) => (n(sf) / 200) * n(depthIn)
 
+// Removed debris disposal is container-based: SF -> CF -> CY (/27) -> x1.2 swell,
+// $770 per 10-CY low-boy container (per material, rounded up).
+const CONTAINER_COST = 770
+const CONTAINER_CY = 10
+const SWELL = 1.2
+const removalContainers = (sf, depthIn) => Math.ceil((((n(sf) * (n(depthIn) / 12)) / 27) * SWELL) / CONTAINER_CY)
+
 function SectionLabel({ title }) {
   return (
     <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mt-4 mb-1 border-t border-gray-100 pt-3">
@@ -151,6 +158,10 @@ export default function MiniSkidSteerDemoSummary({ module }) {
   const dirt = flat(dirtSF, dirtDepth || 6, rateConc, dumpDirt)
   const base = flat(baseSF, baseDepth || 4, rateBase, dumpBase)
   const grass = flat(grassSF, grassDepth || 2, rateGrass, dumpGreen)
+  // Concrete + soils + grass removal use container disposal, not per-ton dump.
+  conc.dumpFee = isSelf ? removalContainers(concSF, concDepth || 4) * CONTAINER_COST : 0
+  dirt.dumpFee = isSelf ? removalContainers(dirtSF, dirtDepth || 6) * CONTAINER_COST : 0
+  grass.dumpFee = isSelf ? removalContainers(grassSF, grassDepth || 2) * CONTAINER_COST : 0
 
   const miscFlatCalc = miscFlatRows.map(r => flat(r.sf, r.depth || 4, rateConc, dumpConc))
   const miscVertCalc = miscVertRows.map(r =>
@@ -159,6 +170,7 @@ export default function MiniSkidSteerDemoSummary({ module }) {
   const footingCalc = footingRows.map(r => flat(r.sf, r.depth || 12, rateConc, dumpConc))
 
   const gradeCut = flat(gradeCutSF, gradeCutDepth || 3, rateConc, dumpDirt)
+  gradeCut.dumpFee = isSelf ? removalContainers(gradeCutSF, gradeCutDepth || 3) * CONTAINER_COST : 0
   const gradeFill = flat(gradeFillSF, gradeFillDepth || 3, rateBase, 0)
 
   const jjTons = sfToTons(jjSF, jjDepth || 3)

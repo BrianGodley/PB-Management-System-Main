@@ -79,6 +79,14 @@ const DUMP_FEE_DEFAULTS = {
 const n = v => parseFloat(v) || 0
 const sfToTons = (sf, depthIn) => (n(sf) / 200) * n(depthIn)
 
+// Container-based removal: SF -> CF (x depth/12) -> CY (/27) -> x swell,
+// billed at a flat rate per low-boy container (per material, rounded up).
+const CONTAINER_COST = 770
+const CONTAINER_CY = 10
+const SWELL = 1.2
+const removalYards = (sf, depthIn) => ((n(sf) * (n(depthIn) / 12)) / 27) * SWELL
+const removalContainers = (sf, depthIn) => Math.ceil(removalYards(sf, depthIn) / CONTAINER_CY)
+
 function calcDemo(
   state,
   laborRatePerHour,
@@ -152,11 +160,15 @@ function calcDemo(
     }
   }
 
+  // Container disposal cost for one removed material (0 when a sub handles the dump).
+  const containerCost = (sf, depthIn) =>
+    isSub || isDumpSub ? 0 : removalContainers(sf, depthIn) * CONTAINER_COST
+
   // ── Demo rows — NonBob access (OK=0.667) ──────────────────────────────────
-  const conc = flat(state.concSF, state.concDepth || 4, rateConc, dumpConc, accessNonBob)
-  const dirt = flat(state.dirtSF, state.dirtDepth || 6, rateConc, dumpDirt, accessNonBob)
+  const conc = flat(state.concSF, state.concDepth || 4, rateConc, 0, accessNonBob)
+  const dirt = flat(state.dirtSF, state.dirtDepth || 6, rateConc, 0, accessNonBob)
   const base = flat(state.baseSF, state.baseDepth || 4, rateBase, dumpBase, accessNonBob) // Mini: has dump fee
-  const grass = flat(state.grassSF, state.grassDepth || 2, rateGrass, dumpGreen, accessBobcat)
+  const grass = flat(state.grassSF, state.grassDepth || 2, rateGrass, 0, accessBobcat)
 
   // Mini SS: misc flat/vert carry $36.21 concrete dump fee — NonBob access
   const miscFlatCalc = (state.miscFlatRows || []).map(r =>
@@ -175,7 +187,7 @@ function calcDemo(
     state.gradeCutSF,
     state.gradeCutDepth || 3,
     rateConc,
-    dumpDirt,
+    0,
     accessBobcat
   )
   const gradeFill = flat(state.gradeFillSF, state.gradeFillDepth || 3, rateBase, 0, accessBobcat)
@@ -284,7 +296,13 @@ function calcDemo(
       footingCalc.reduce((s, r) => s + r.dumpFee, 0) +
       gradeCut.dumpFee +
       treeCalc.reduce((s, r) => s + r.dumpFee, 0)
-  const totalMat = dumpMatCost + manualMat + shrubSfMat
+  // Removed debris (concrete, soils, grade cut, grass) — container disposal, per material.
+  const containerMat =
+    containerCost(state.concSF, state.concDepth || 4) +
+    containerCost(state.dirtSF, state.dirtDepth || 6) +
+    containerCost(state.gradeCutSF, state.gradeCutDepth || 3) +
+    containerCost(state.grassSF, state.grassDepth || 2)
+  const totalMat = dumpMatCost + manualMat + shrubSfMat + containerMat
 
   // ── Financials ────────────────────────────────────────────────────────────
   const manDays = totalHrs / 8
