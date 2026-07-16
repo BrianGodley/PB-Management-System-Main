@@ -36,10 +36,18 @@ export default function ConditionManager() {
 
   async function load() {
     setLoading(true)
-    const { data: conds } = await supabase
+    let { data: conds, error: cerr } = await supabase
       .from('ext_formulas_conditions')
       .select('id, name, slug, tenant_id, read_only, restricted, sort_order')
       .order('sort_order')
+    if (cerr) {
+      // `restricted` column not present yet (migration not applied) — fall back.
+      const r = await supabase
+        .from('ext_formulas_conditions')
+        .select('id, name, slug, tenant_id, read_only, sort_order')
+        .order('sort_order')
+      conds = r.data
+    }
     const list = conds || []
     const { data: steps } = await supabase
       .from('ext_formulas_condition_steps')
@@ -159,8 +167,7 @@ export default function ConditionManager() {
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-between items-center">
-        <p className="text-sm text-gray-500">Standard conditions are read-only. Add your own, and restrict who can use a condition.</p>
+      <div className="flex justify-end items-center">
         <button onClick={startNew} className="text-sm bg-green-700 text-white font-semibold px-4 py-2 rounded-lg hover:bg-green-800">+ New Condition</button>
       </div>
       {loading ? (
