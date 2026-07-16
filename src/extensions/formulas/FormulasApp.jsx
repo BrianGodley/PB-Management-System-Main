@@ -8,9 +8,9 @@
 //     chosen condition + handling steps (no stat/trend).
 //   * Settings                    — manage conditions & their handling steps.
 //
-// Sub-tabs use the shared white tab-bar look; listing tables mirror the Bids
-// table (full-width). The page renders inside Layout's <Outlet/>, so it
-// inherits the user's customized background.
+// Sub-tabs use the shared white tab-bar look with the New Formula button pinned
+// to the upper-right; listing tables mirror the Bids table (full-width). The
+// page renders inside Layout's <Outlet/>, so it inherits the customized bg.
 //
 // Reads core: public.statistics, public.statistic_values.
 // Reads/writes ext_formulas_* (gated by RLS + the 'formulas' entitlement).
@@ -24,6 +24,7 @@ import ConditionManager from './ConditionManager.jsx'
 
 const inputCls =
   'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600'
+const newBtnCls = 'bg-green-700 text-white font-semibold px-4 py-1.5 rounded-lg hover:bg-green-800 text-sm whitespace-nowrap'
 
 const PERIODS = [
   { key: 'one_week', label: '1-Week', size: 2 },
@@ -96,10 +97,19 @@ export default function FormulasApp() {
     loadFormulas()
   }
 
+  // The New Formula button, pinned to the tab bar's upper-right when relevant.
+  const newButton =
+    tab === 'settings' ? null
+      : tab === 'optional'
+        ? <button onClick={() => setModal({ mode: 'create', kind: 'optional', userId: user?.id })} className={newBtnCls}>+ New Formula</button>
+        : mode === 'list'
+          ? <button onClick={() => setMode('new')} className={newBtnCls}>+ New Formula</button>
+          : null
+
   return (
     <div className="w-full">
-      {/* Sub-tabs — shared white tab-bar look */}
-      <div className="bg-white border-b border-gray-200 flex justify-center gap-0 flex-shrink-0 rounded-xl mb-5">
+      {/* Sub-tabs — shared white tab-bar look, New Formula pinned upper-right */}
+      <div className="relative bg-white border-b border-gray-200 flex justify-center gap-0 flex-shrink-0 rounded-xl mb-5">
         {TABS.map(t => (
           <button
             key={t.key}
@@ -111,6 +121,7 @@ export default function FormulasApp() {
             {t.label}
           </button>
         ))}
+        {newButton && <div className="absolute right-2 top-1/2 -translate-y-1/2">{newButton}</div>}
       </div>
 
       {tab === 'settings' ? (
@@ -129,20 +140,10 @@ export default function FormulasApp() {
             />
           </div>
         ) : (
-          <div className="space-y-4">
-            <div className="flex justify-end">
-              <button onClick={() => setMode('new')} className="bg-green-700 text-white font-semibold px-4 py-2 rounded-lg hover:bg-green-800 text-sm">+ New Formula</button>
-            </div>
-            <FormulaTable rows={statFormulas} kind="stats" loading={loading} onOpen={f => setModal({ mode: 'edit', formulaId: f.id })} onDelete={removeFormula} />
-          </div>
+          <FormulaTable rows={statFormulas} kind="stats" loading={loading} onOpen={f => setModal({ mode: 'edit', formulaId: f.id })} onDelete={removeFormula} />
         )
       ) : (
-        <div className="space-y-4">
-          <div className="flex justify-end">
-            <button onClick={() => setModal({ mode: 'create', kind: 'optional', userId: user?.id })} className="bg-green-700 text-white font-semibold px-4 py-2 rounded-lg hover:bg-green-800 text-sm">+ New Formula</button>
-          </div>
-          <FormulaTable rows={optionalFormulas} kind="optional" loading={loading} onOpen={f => setModal({ mode: 'edit', formulaId: f.id })} onDelete={removeFormula} />
-        </div>
+        <FormulaTable rows={optionalFormulas} kind="optional" loading={loading} onOpen={f => setModal({ mode: 'edit', formulaId: f.id })} onDelete={removeFormula} />
       )}
 
       {modal && <ConditionModal spec={modal} onClose={() => setModal(null)} onSaved={onModalSaved} />}

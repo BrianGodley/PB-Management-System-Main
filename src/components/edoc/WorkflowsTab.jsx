@@ -1074,34 +1074,30 @@ export default function WorkflowsTab({ userId }) {
 
   return (
     <div>
-      <div className="flex items-center gap-1 border-b border-gray-200 mb-4">
+      <div className="relative bg-white border-b border-gray-200 flex justify-center gap-0 flex-shrink-0 rounded-xl mb-4">
         {[['workflows', '🔀 Workflows'], ['settings', '⚙️ Settings']].map(([k, l]) => (
           <button
             key={k}
             onClick={() => setTab(k)}
-            className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${tab === k ? 'border-green-600 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === k ? 'border-green-700 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
           >
             {l}
           </button>
         ))}
+        {tab === 'workflows' && (
+          <button
+            onClick={() => setEditing('new')}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs px-3 py-1.5 rounded-lg bg-green-700 text-white font-semibold hover:bg-green-800 whitespace-nowrap"
+          >
+            ＋ New Workflow
+          </button>
+        )}
       </div>
 
       {tab === 'settings' ? (
         <WorkflowSettings types={types} onChange={loadTypes} />
       ) : (
       <>
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-sm text-gray-500">
-          Multi-step approval &amp; routing flows for documents (e.g. secondary approval before sending, or policy → review → distribute → acknowledge).
-        </p>
-        <button
-          onClick={() => setEditing('new')}
-          className="text-xs px-3 py-1.5 rounded-lg bg-green-700 text-white font-semibold hover:bg-green-800 whitespace-nowrap"
-        >
-          ＋ New Workflow
-        </button>
-      </div>
-
       {loading ? (
         <p className="text-center text-sm text-gray-400 py-8">Loading…</p>
       ) : rows.length === 0 ? (
