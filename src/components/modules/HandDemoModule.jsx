@@ -684,15 +684,14 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       </div>
 
       {/* In House / Subcontractor chooser — drives the Sub calculations (isSub) */}
-      <div className="flex items-center gap-3 mb-2">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Work Type</label>
+      <div className="flex justify-center mb-2">
         <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden">
           {['In-House', 'Subcontractor'].map(opt => (
             <button
               key={opt}
               type="button"
               onClick={() => set('dumpType', opt)}
-              className={`px-4 py-1.5 text-sm font-semibold transition-colors ${
+              className={`px-12 py-2 text-sm font-semibold transition-colors ${
                 state.dumpType === opt
                   ? 'bg-green-700 text-white'
                   : 'bg-white text-gray-600 hover:bg-gray-50'
