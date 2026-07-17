@@ -262,8 +262,9 @@ function calcDemo(
       : 0
 
   // ── Hour aggregation — labor is the same in both modes ────────────────────
-  const crewDemoHrs =
-    conc.hours +
+  const crewDemoHrs = isSub
+    ? 0
+    : conc.hours +
     dirt.hours +
     base.hours +
     grass.hours +
@@ -328,9 +329,22 @@ function calcDemo(
       n(state.haulSoilLoads) * haulSoilRate +
       n(state.haulBaseLoads) * haulBaseRate
     : 0
-  const gp = manDays * gpmd + (subHaulCost + haulCost) * subMarkupRate
+  // Subcontractor combined demo line: SF × tiered $/sf by depth (concrete/dirt/rock/paver).
+  const miniRateDeep = sr['Sub Demo - Mini 5-7in'] ?? 2.0
+  const miniRateMid = sr['Sub Demo - Mini 2-4in'] ?? 1.75
+  const miniRateShallow = sr['Sub Demo - Mini 1-2in'] ?? 1.5
+  const miniSubRate = d => {
+    const x = n(d)
+    return x >= 5 ? miniRateDeep : x >= 2 ? miniRateMid : miniRateShallow
+  }
+  const subDemoCost = isSub ? n(state.subDemoSF) * miniSubRate(state.subDemoDepth || 7) : 0
+  const miscFlatSubCost = isSub
+    ? (state.miscFlatRows || []).reduce((sum, r) => sum + n(r.sf) * miniSubRate(r.depth || 7), 0)
+    : 0
+  const miniSubDemo = subDemoCost + miscFlatSubCost
+  const gp = manDays * gpmd + (subHaulCost + haulCost + miniSubDemo) * subMarkupRate
   const commission = gp * 0.12
-  const subCost = subHaulCost + manualSub + haulCost
+  const subCost = subHaulCost + manualSub + haulCost + miniSubDemo
   const price = laborCost + burden + totalMat + gp + commission + subCost
 
   return {
@@ -347,6 +361,10 @@ function calcDemo(
     haulConcreteRate,
     haulSoilRate,
     haulBaseRate,
+    miniRateDeep,
+    miniRateMid,
+    miniRateShallow,
+    subDemoCost,
     gp,
     commission,
     price,
@@ -457,6 +475,8 @@ const DEFAULT_STATE = {
   haulConcreteLoads: '',
   haulSoilLoads: '',
   haulBaseLoads: '',
+  subDemoSF: '',
+  subDemoDepth: 7,
   treeRows: [
     { qty: '', height: 10, size: 'Small' },
     { qty: '', height: 10, size: 'Small' },
@@ -990,22 +1010,40 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
               />
             </>
           ) : (
-            <span className="font-normal normal-case">· Subcontractor (see sub cost)</span>
+            <>
+              <span className="font-normal normal-case">· Concrete / Dirt / Rock / Paver</span>
+              <span className="font-normal normal-case text-gray-500">${calc.miniRateDeep} (5-7")</span>
+              <RateEditPopover table="subcontractor_rates" name="Sub Demo - Mini 5-7in" unitLabel="/sf" currentValue={calc.miniRateDeep} onSaved={refreshAllRates} />
+              <span className="font-normal normal-case text-gray-500">/ ${calc.miniRateMid} (2-4")</span>
+              <RateEditPopover table="subcontractor_rates" name="Sub Demo - Mini 2-4in" unitLabel="/sf" currentValue={calc.miniRateMid} onSaved={refreshAllRates} />
+              <span className="font-normal normal-case text-gray-500">/ ${calc.miniRateShallow} (1-2")</span>
+              <RateEditPopover table="subcontractor_rates" name="Sub Demo - Mini 1-2in" unitLabel="/sf" currentValue={calc.miniRateShallow} onSaved={refreshAllRates} />
+              <span className="font-normal normal-case text-gray-500">/sf</span>
+            </>
           )}
         </div>
         <table className="w-full text-xs">
           <TH
-            cols={[
-              { label: 'Material', w: 'w-32' },
-              { label: 'SF', w: 'w-24' },
-              { label: 'Depth (in)', w: 'w-20' },
-              { label: 'Tons', w: 'w-16' },
-              ...(isSelf ? [{ label: 'Dump Fee', w: 'w-24' }] : []),
-              { label: 'Labor Hrs', w: 'w-20' },
-            ]}
+            cols={
+              isSelf
+                ? [
+                    { label: 'Material', w: 'w-32' },
+                    { label: 'SF', w: 'w-24' },
+                    { label: 'Depth (in)', w: 'w-20' },
+                    { label: 'Tons', w: 'w-16' },
+                    { label: 'Dump Fee', w: 'w-24' },
+                    { label: 'Labor Hrs', w: 'w-20' },
+                  ]
+                : [
+                    { label: 'Material', w: 'w-40' },
+                    { label: 'SF', w: 'w-24' },
+                    { label: 'Depth (in)', w: 'w-20' },
+                    { label: 'Cost', w: 'w-24' },
+                  ]
+            }
           />
           <tbody className="divide-y divide-gray-50">
-            {[
+            {isSelf ? [
               {
                 label: 'Concrete',
                 sfK: 'concSF',
@@ -1102,7 +1140,18 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 {isSelf && <td className={num}>{row.dumpFee > 0 ? fmt2(row.dumpFee) : '—'}</td>}
                 <td className={num}>{fh(row.hours)}</td>
               </tr>
-            ))}
+            )) : (
+              <tr>
+                <td className={`${td} font-medium text-gray-700`}>Concrete / Dirt / Rock / Paver</td>
+                <td className={td}>
+                  <Inp value={state.subDemoSF} onChange={e => set('subDemoSF', e.target.value)} />
+                </td>
+                <td className={td}>
+                  <Inp value={state.subDemoDepth} onChange={e => set('subDemoDepth', e.target.value)} placeholder="7" />
+                </td>
+                <td className={num}>{calc.subDemoCost > 0 ? fmt2(calc.subDemoCost) : '—'}</td>
+              </tr>
+            )}
           </tbody>
         </table>
 
@@ -1137,16 +1186,18 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       {/* Misc Flat */}
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Misc Flat Demo — {calc.rateConc} t/hr</span>
-          <RateEditPopover
-            table="labor_rates"
-            name="Demo - Mini Skid Steer Concrete/Dirt"
-            category="Demo"
-            mode="coefficient"
-            unitLabel="t/hr"
-            currentValue={calc.rateConc}
-            onSaved={refreshAllRates}
-          />
+          <span>Misc Flat Demo{isSelf ? ` — ${calc.rateConc} t/hr` : ''}</span>
+          {isSelf && (
+            <RateEditPopover
+              table="labor_rates"
+              name="Demo - Mini Skid Steer Concrete/Dirt"
+              category="Demo"
+              mode="coefficient"
+              unitLabel="t/hr"
+              currentValue={calc.rateConc}
+              onSaved={refreshAllRates}
+            />
+          )}
           {isSelf && (
             <>
               <span className="font-normal normal-case">· ${dumpConc}/ton dump fee</span>
@@ -1160,17 +1211,29 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
               />
             </>
           )}
+          {isSub && (
+            <span className="font-normal normal-case text-gray-500">${calc.miniRateDeep} (5-7") / ${calc.miniRateMid} (2-4") / ${calc.miniRateShallow} (1-2") /sf</span>
+          )}
         </div>
         <table className="w-full text-xs">
           <TH
-            cols={[
-              { label: 'Description' },
-              { label: 'SF', w: 'w-24' },
-              { label: 'Depth (in)', w: 'w-20' },
-              { label: 'Tons', w: 'w-16' },
-              ...(isSelf ? [{ label: 'Dump Fee', w: 'w-24' }] : []),
-              { label: 'Labor Hrs', w: 'w-20' },
-            ]}
+            cols={
+              isSelf
+                ? [
+                    { label: 'Description' },
+                    { label: 'SF', w: 'w-24' },
+                    { label: 'Depth (in)', w: 'w-20' },
+                    { label: 'Tons', w: 'w-16' },
+                    { label: 'Dump Fee', w: 'w-24' },
+                    { label: 'Labor Hrs', w: 'w-20' },
+                  ]
+                : [
+                    { label: 'Description' },
+                    { label: 'SF', w: 'w-24' },
+                    { label: 'Depth (in)', w: 'w-20' },
+                    { label: 'Cost', w: 'w-24' },
+                  ]
+            }
           />
           <tbody className="divide-y divide-gray-50">
             {state.miscFlatRows.map((r, i) => {
@@ -1195,12 +1258,29 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                     <Inp
                       value={r.depth}
                       onChange={e => setRow('miscFlatRows', i, 'depth', e.target.value)}
-                      placeholder="4"
+                      placeholder={isSub ? '7' : '4'}
                     />
                   </td>
-                  <td className={num}>{cr.tons > 0 ? cr.tons.toFixed(1) : '—'}</td>
-                  {isSelf && <td className={num}>{cr.dumpFee > 0 ? fmt2(cr.dumpFee) : '—'}</td>}
-                  <td className={num}>{fh(cr.hours)}</td>
+                  {isSelf ? (
+                    <>
+                      <td className={num}>{cr.tons > 0 ? cr.tons.toFixed(1) : '—'}</td>
+                      <td className={num}>{cr.dumpFee > 0 ? fmt2(cr.dumpFee) : '—'}</td>
+                      <td className={num}>{fh(cr.hours)}</td>
+                    </>
+                  ) : (
+                    <td className={num}>
+                      {n(r.sf) > 0
+                        ? fmt2(
+                            n(r.sf) *
+                              (n(r.depth || 7) >= 5
+                                ? calc.miniRateDeep
+                                : n(r.depth || 7) >= 2
+                                  ? calc.miniRateMid
+                                  : calc.miniRateShallow)
+                          )
+                        : '—'}
+                    </td>
+                  )}
                 </tr>
               )
             })}
