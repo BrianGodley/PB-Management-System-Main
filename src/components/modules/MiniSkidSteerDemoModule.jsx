@@ -317,9 +317,20 @@ function calcDemo(
   const laborCost = totalHrs * lrph
   const burden = laborCost * (n(laborBurdenPct) || 0.29)
   // GP = labor component + Universal Sub Markup % on sub haul cost
-  const gp = manDays * gpmd + subHaulCost * subMarkupRate
+  // Hauling (Subcontractor) — 12-yard loads × per-load rate (sub cost, pre-GP markup).
+  const haulTrashRate = sr['Sub Haul - Trash 12yd'] ?? 850
+  const haulConcreteRate = sr['Sub Haul - Concrete 12yd'] ?? 800
+  const haulSoilRate = sr['Sub Haul - Soil 12yd'] ?? 650
+  const haulBaseRate = sr['Sub Haul - Import Base 12yd'] ?? 350
+  const haulCost = isSub
+    ? n(state.haulTrashLoads) * haulTrashRate +
+      n(state.haulConcreteLoads) * haulConcreteRate +
+      n(state.haulSoilLoads) * haulSoilRate +
+      n(state.haulBaseLoads) * haulBaseRate
+    : 0
+  const gp = manDays * gpmd + (subHaulCost + haulCost) * subMarkupRate
   const commission = gp * 0.12
-  const subCost = subHaulCost + manualSub
+  const subCost = subHaulCost + manualSub + haulCost
   const price = laborCost + burden + totalMat + gp + commission + subCost
 
   return {
@@ -331,6 +342,11 @@ function calcDemo(
     burden,
     totalMat,
     subCost,
+    haulCost,
+    haulTrashRate,
+    haulConcreteRate,
+    haulSoilRate,
+    haulBaseRate,
     gp,
     commission,
     price,
@@ -437,6 +453,10 @@ const DEFAULT_STATE = {
   shrubDensity: '1',
   stumpFirstQty: '',
   stumpAddQty: '',
+  haulTrashLoads: '',
+  haulConcreteLoads: '',
+  haulSoilLoads: '',
+  haulBaseLoads: '',
   treeRows: [
     { qty: '', height: 10, size: 'Small' },
     { qty: '', height: 10, size: 'Small' },
@@ -1343,6 +1363,47 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           </tbody>
         </table>
       </div>
+
+      {isSub && (
+        <>
+          <SecHdr title="Hauling" />
+          <div>
+            <table className="w-full text-xs">
+              <TH
+                cols={[{ label: 'Load Type' }, { label: 'Loads', w: 'w-24' }, { label: 'Cost', w: 'w-24' }]}
+              />
+              <tbody className="divide-y divide-gray-50">
+                {[
+                  { label: 'Trash Per 12 Yard Load', key: 'haulTrashLoads', rate: calc.haulTrashRate, rateName: 'Sub Haul - Trash 12yd' },
+                  { label: 'Concrete Per 12 Yard Load', key: 'haulConcreteLoads', rate: calc.haulConcreteRate, rateName: 'Sub Haul - Concrete 12yd' },
+                  { label: 'Soil Per 12 Yard Load', key: 'haulSoilLoads', rate: calc.haulSoilRate, rateName: 'Sub Haul - Soil 12yd' },
+                  { label: 'Import Base Per 12 Yard Load', key: 'haulBaseLoads', rate: calc.haulBaseRate, rateName: 'Sub Haul - Import Base 12yd' },
+                ].map(({ label, key, rate, rateName }) => (
+                  <tr key={key}>
+                    <td className={`${td} font-medium text-gray-700`}>
+                      <span className="inline-flex items-center gap-1">
+                        {label}
+                        <span className="text-gray-400 font-normal">(${rate}/load)</span>
+                        <RateEditPopover
+                          table="subcontractor_rates"
+                          name={rateName}
+                          unitLabel="/load"
+                          currentValue={rate}
+                          onSaved={refreshAllRates}
+                        />
+                      </span>
+                    </td>
+                    <td className={td}>
+                      <Inp value={state[key]} onChange={e => set(key, e.target.value)} />
+                    </td>
+                    <td className={num}>{n(state[key]) > 0 ? fmt2(n(state[key]) * rate) : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       {/* Grading */}
       <div>
