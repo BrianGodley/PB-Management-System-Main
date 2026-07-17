@@ -683,6 +683,27 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
         <ModuleNotesField value={notes} onChange={setNotes} />
       </div>
 
+      {/* In House / Subcontractor chooser — drives the Sub calculations (isSub) */}
+      <div className="flex items-center gap-3 mb-2">
+        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Work Type</label>
+        <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden">
+          {['In-House', 'Subcontractor'].map(opt => (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => set('dumpType', opt)}
+              className={`px-4 py-1.5 text-sm font-semibold transition-colors ${
+                state.dumpType === opt
+                  ? 'bg-green-700 text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {opt === 'In-House' ? 'In House' : 'Subcontractor'}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Crew Type + Change Demo Module switcher */}
       <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
         <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
@@ -844,11 +865,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Demo Type</p>
-          <Sel
-            value={state.dumpType}
-            onChange={e => set('dumpType', e.target.value)}
-            options={DUMP_TYPES}
-          />
+          <p className="text-sm font-medium text-gray-700 py-1">{isSelf ? 'In House' : 'Subcontractor'}</p>
           {!isSelf && (
             <p className="text-xs text-amber-600 mt-0.5 inline-flex items-center flex-wrap gap-x-1 gap-y-0.5">
               Sub haul:
