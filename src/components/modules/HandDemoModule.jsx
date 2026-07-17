@@ -209,7 +209,7 @@ function calcDemo(
   const rebarHrs = rebarSfPerHr > 0 ? n(state.rebarSF) / rebarSfPerHr : 0
 
   // ── Vegetation ───────────────────────────────────────────────────────────
-  // Shrub demo: per-area rows — qty × shrub rate × stub-height modifier.
+  // Shrub demo: per-area rows — qty × shrub rate × shrub-height modifier.
   const shrubRowsCalc = (state.shrubRows || []).map(r => ({
     hrs: n(r.qty) * shrubRate * (STUB_HEIGHT_MODS[r.height] ?? 0.75),
   }))
@@ -1473,7 +1473,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             cols={[
               { label: 'Area Description' },
               { label: 'Qty', w: 'w-20' },
-              { label: 'Stub Height', w: 'w-32' },
+              { label: 'Shrub Height', w: 'w-32' },
               { label: 'Labor Hrs', w: 'w-20' },
             ]}
           />
@@ -1513,7 +1513,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           </tbody>
         </table>
         <p className="text-xs text-gray-400 mt-1 inline-flex items-center gap-1">
-          {calc.shrubRate} hrs/ea × stub-height modifier
+          {calc.shrubRate} hrs/ea × shrub-height modifier
           <RateEditPopover
             table="labor_rates"
             name="Demo - Shrub"
