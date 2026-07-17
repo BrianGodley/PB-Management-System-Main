@@ -209,16 +209,13 @@ function calcDemo(
   const rebarHrs = rebarSfPerHr > 0 ? n(state.rebarSF) / rebarSfPerHr : 0
 
   // ── Vegetation ───────────────────────────────────────────────────────────
-  const shrubHrs = n(state.shrubQty) * access * shrubRate
-  // Shrubs by SqFt: density (1–5) × rate per 100 SF. Density 1 = 2 hrs &
-  // $100 per 100 SF; both base rates editable in the Edit Rates popovers.
-  const shrubSfRate = lr['Demo - Shrub SqFt (Hand)'] ?? 2
-  const shrubSfMatRate = mp['Demo - Shrub SqFt'] ?? 100
-  const stubHeightMod = STUB_HEIGHT_MODS[state.shrubHeight] ?? 0.75
-  const shrubSfHrs = (n(state.shrubSqFt) / 100) * stubHeightMod * shrubSfRate
-  const shrubSfMat = (n(state.shrubSqFt) / 100) * stubHeightMod * shrubSfMatRate
-  const stumpFstHrs = n(state.stumpFirstQty) * access * stumpFstRate
-  const stumpAddHrs = n(state.stumpAddQty) * access * stumpAddRate
+  // Shrub demo: per-area rows — qty × shrub rate × stub-height modifier.
+  const shrubRowsCalc = (state.shrubRows || []).map(r => ({
+    hrs: n(r.qty) * shrubRate * (STUB_HEIGHT_MODS[r.height] ?? 0.75),
+  }))
+  const shrubRowsHrs = shrubRowsCalc.reduce((s, r) => s + r.hrs, 0)
+  const stumpFstHrs = n(state.stumpFirstQty) * stumpFstRate
+  const stumpAddHrs = n(state.stumpAddQty) * stumpAddRate
 
   const treeCalc = (state.treeRows || []).map(r => {
     const qty = n(r.qty),
@@ -270,7 +267,7 @@ function calcDemo(
     bucketCalc.reduce((s, r) => s + r.hours, 0) +
     gradeCut.hours
   const gradingHrs = gradeFill.hours + jjHrs
-  const vegHrs = shrubHrs + shrubSfHrs + stumpFstHrs + stumpAddHrs + treeCalc.reduce((s, r) => s + r.hrs, 0)
+  const vegHrs = shrubRowsHrs + stumpFstHrs + stumpAddHrs + treeCalc.reduce((s, r) => s + r.hrs, 0)
 
   const rawHrs = crewDemoHrs + gradingHrs + vegHrs + rebarHrs + manualHrs
   const _preWalkHrs = rawHrs * diff + hrsAdj
@@ -296,7 +293,7 @@ function calcDemo(
       bucketCalc.reduce((s, r) => s + r.dumpFee, 0) +
       gradeCut.dumpFee +
       treeCalc.reduce((s, r) => s + r.dumpFee, 0)
-  const totalMat = dumpMatCost + manualMat + shrubSfMat + baseMat
+  const totalMat = dumpMatCost + manualMat + baseMat
 
   // ── Financials ────────────────────────────────────────────────────────────
   const manDays = totalHrs / 8
@@ -324,7 +321,6 @@ function calcDemo(
     swellFactor,
     sfLaborRate,
     rebarSfPerHr,
-    stubHeightMod,
     baseMat,
     difficultyRatio,
     haulSecPerFt,
@@ -342,11 +338,7 @@ function calcDemo(
     gradeFill,
     jjHrs,
     rebarHrs,
-    shrubHrs,
-    shrubSfHrs,
-    shrubSfMat,
-    shrubSfRate,
-    shrubSfMatRate,
+    shrubRowsCalc,
     stumpFstHrs,
     stumpAddHrs,
     treeCalc,
@@ -420,9 +412,9 @@ const DEFAULT_STATE = {
   jjSF: '',
   jjDepth: 3,
   // Vegetation
-  shrubQty: '',
-  shrubSqFt: '',
-  shrubHeight: '0-1',
+  shrubRows: Array(4)
+    .fill(null)
+    .map(() => ({ area: '', qty: '', height: '0-1' })),
   stumpFirstQty: '',
   stumpAddQty: '',
   treeRows: [
@@ -1473,18 +1465,71 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
         </table>
       </div>
 
-      {/* Shrub & Stump */}
-      <SecHdr title="Shrub & Stump Demo" />
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {/* Shrub Demo */}
+      <SecHdr title="Shrub Demo" />
+      <div>
+        <table className="w-full text-xs">
+          <TH
+            cols={[
+              { label: 'Area Description' },
+              { label: 'Qty', w: 'w-20' },
+              { label: 'Stub Height', w: 'w-32' },
+              { label: 'Labor Hrs', w: 'w-20' },
+            ]}
+          />
+          <tbody className="divide-y divide-gray-50">
+            {state.shrubRows.map((r, i) => {
+              const cr = calc.shrubRowsCalc[i] || { hrs: 0 }
+              return (
+                <tr key={i}>
+                  <td className={td}>
+                    <Inp
+                      type="text"
+                      value={r.area}
+                      onChange={e => setRow('shrubRows', i, 'area', e.target.value)}
+                      placeholder={`Area ${i + 1}`}
+                    />
+                  </td>
+                  <td className={td}>
+                    <Inp value={r.qty} onChange={e => setRow('shrubRows', i, 'qty', e.target.value)} />
+                  </td>
+                  <td className={td}>
+                    <select
+                      value={r.height || '0-1'}
+                      onChange={e => setRow('shrubRows', i, 'height', e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                    >
+                      {[['0-1', '0–1 ft'], ['1-2', '1–2 ft'], ['2-3', '2–3 ft'], ['3-4', '3–4 ft'], ['4-5', '4–5 ft']].map(([v, l]) => (
+                        <option key={v} value={v}>
+                          {l}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className={num}>{fh(cr.hrs)}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        <p className="text-xs text-gray-400 mt-1 inline-flex items-center gap-1">
+          {calc.shrubRate} hrs/ea × stub-height modifier
+          <RateEditPopover
+            table="labor_rates"
+            name="Demo - Shrub"
+            category="Demo"
+            mode="coefficient"
+            unitLabel="hrs/ea"
+            currentValue={calc.shrubRate}
+            onSaved={refreshAllRates}
+          />
+        </p>
+      </div>
+
+      {/* Stump Demo */}
+      <SecHdr title="Stump Demo" />
+      <div className="grid grid-cols-2 gap-3">
         {[
-          {
-            label: 'Shrubs (qty)',
-            key: 'shrubQty',
-            hrs: calc.shrubHrs,
-            sub: `${calc.shrubRate} hrs/ea`,
-            rate: calc.shrubRate,
-            rateName: 'Demo - Shrub',
-          },
           {
             label: 'Stump Grind 1st',
             key: 'stumpFirstQty',
@@ -1521,49 +1566,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             </p>
           </div>
         ))}
-        {/* Shrubs by square footage — density (1–5) × rate per 100 SF */}
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5 inline-flex items-center gap-1">
-            Shrubs (Stub Height × Sq Ft)
-            <RateEditPopover
-              table="labor_rates"
-              name="Demo - Shrub SqFt (Hand)"
-              category="Demo"
-              mode="coefficient"
-              unitLabel="hrs/100sf"
-              currentValue={calc.shrubSfRate}
-              onSaved={refreshAllRates}
-            />
-            <RateEditPopover
-              table="material_rates"
-              name="Demo - Shrub SqFt"
-              category="Demo"
-              unitLabel="$/100sf"
-              currentValue={calc.shrubSfMatRate}
-              onSaved={refreshAllRates}
-            />
-          </p>
-          <div className="flex gap-2">
-            <select
-              value={state.shrubHeight || '0-1'}
-              onChange={e => set('shrubHeight', e.target.value)}
-              title="Stub Height"
-              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
-            >
-              {[['0-1', '0–1 ft'], ['1-2', '1–2 ft'], ['2-3', '2–3 ft'], ['3-4', '3–4 ft'], ['4-5', '4–5 ft']].map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
-                </option>
-              ))}
-            </select>
-            <Inp value={state.shrubSqFt} onChange={e => set('shrubSqFt', e.target.value)} />
-          </div>
-          <p className="text-xs text-gray-400 mt-0.5">
-            {calc.shrubSfHrs > 0
-              ? `${calc.shrubSfHrs.toFixed(2)} hrs · $${calc.shrubSfMat.toFixed(2)} mat`
-              : `Height × ${calc.shrubSfRate} hrs & $${calc.shrubSfMatRate} per 100 SF`}
-          </p>
-        </div>
       </div>
 
       {/* Trees */}
