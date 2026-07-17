@@ -22,6 +22,7 @@ import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../
 // ── Fallback constants ────────────────────────────────────────────────────────
 
 const ACCESS_LEVELS = { Poor: 0.5, OK: 0.667, Full: 1.0 }
+const STUB_HEIGHT_MODS = { '0-1': 0.75, '1-2': 1, '2-3': 1.5, '3-4': 2, '4-5': 2.5 }
 const DUMP_TYPES = ['In-House', 'Subcontractor']
 
 const RATE_DEFAULTS = {
@@ -146,11 +147,21 @@ function calcDemo(
   // Editable hauling coefficients: wheelbarrow load 1/5 cy; 4 sec/ft (covers round trip).
   const haulSecPerFt = lr['Demo - Hand Haul Sec/Ft'] ?? 4
   const haulLoadCy = lr['Demo - Hand Load (CY)'] ?? 0.2
+  // Concrete-method labor generalized to raw cubic feet (= (sf/100)*depth for flat).
+  const flatCf = (sf, depthIn) => n(sf) * (n(depthIn) / 12)
+  const cfLaborHrs = cf => (n(cf) * 12 / 100) * sfLaborRate
+  const containerCostCf = cf =>
+    isSub || isDumpSub ? 0 : Math.ceil(((n(cf) / 27) * swellFactor) / containerCy) * containerPrice
+  const baseMatPer10Cy = mp['Demo - Import Base $/10cy'] ?? 150
+  const rebarSfPerHr = lr['Demo - Hand Rebar SF/hr'] ?? 250
 
   // ── Demo rows ────────────────────────────────────────────────────────────
   const conc = flat(state.concSF, state.concDepth || 4, rateConc, 0)
   const dirt = flat(state.dirtSF, state.dirtDepth || 6, rateConc, 0)
   const base = flat(state.baseSF, state.baseDepth || 4, rateBase, 0)
+  base.hours = 0.5 * sfLaborHrs(state.baseSF, state.baseDepth || 4)
+  const baseRawCy = flatCf(state.baseSF, state.baseDepth || 4) / 27
+  const baseMat = isSub ? 0 : Math.ceil(baseRawCy / 10) * baseMatPer10Cy
   const grass = flat(state.grassSF, state.grassDepth || 2, rateGrass, 0)
   // Removed debris — container disposal per material (shown as the row's Dump Fee).
   conc.dumpFee = containerCost(state.concSF, state.concDepth || 4)
@@ -159,12 +170,26 @@ function calcDemo(
   // Hand-demo: concrete + soils removal labor is square-foot based (not tons).
   conc.hours = sfLaborHrs(state.concSF, state.concDepth || 4)
   dirt.hours = sfLaborHrs(state.dirtSF, state.dirtDepth || 6)
+  grass.hours = sfLaborHrs(state.grassSF, state.grassDepth || 2)
 
-  const miscFlatCalc = (state.miscFlatRows || []).map(r => flat(r.sf, r.depth || 4, rateConc, 0))
-  const miscVertCalc = (state.miscVertRows || []).map(r =>
-    vert(r.lf, r.heightIn || 0, r.widthIn || 8, rateConc, 0)
-  )
-  const footingCalc = (state.footingRows || []).map(r => flat(r.sf, r.depth || 12, rateConc, 0))
+  const miscFlatCalc = (state.miscFlatRows || []).map(r => {
+    const row = flat(r.sf, r.depth || 4, rateConc, 0)
+    row.hours = sfLaborHrs(r.sf, r.depth || 4)
+    row.dumpFee = containerCost(r.sf, r.depth || 4)
+    return row
+  })
+  const miscVertCalc = (state.miscVertRows || []).map(r => {
+    const row = vert(r.lf, r.heightIn || 0, r.widthIn || 8, rateConc, 0)
+    row.hours = cfLaborHrs(row.cf)
+    row.dumpFee = containerCostCf(row.cf)
+    return row
+  })
+  const footingCalc = (state.footingRows || []).map(r => {
+    const row = flat(r.sf, r.depth || 12, rateConc, 0)
+    row.hours = sfLaborHrs(r.sf, r.depth || 12)
+    row.dumpFee = containerCost(r.sf, r.depth || 12)
+    return row
+  })
 
   // ── Hand Bucket Areas (confined-access manual work) ───────────────────────
   const bucketCalc = (state.bucketRows || []).map(r =>
@@ -174,13 +199,14 @@ function calcDemo(
   // ── Grading ──────────────────────────────────────────────────────────────
   const gradeCut = flat(state.gradeCutSF, state.gradeCutDepth || 3, rateConc, 0)
   gradeCut.dumpFee = containerCost(state.gradeCutSF, state.gradeCutDepth || 3)
+  gradeCut.hours = sfLaborHrs(state.gradeCutSF, state.gradeCutDepth || 3)
   const gradeFill = flat(state.gradeFillSF, state.gradeFillDepth || 3, rateBase, 0)
+  gradeFill.hours = sfLaborHrs(state.gradeFillSF, state.gradeFillDepth || 3)
 
-  const jjTons = sfToTons(state.jjSF, state.jjDepth || 3)
-  const jjHrs = jjTons > 0 ? jjTons / rateJJ : 0 // no access mod on JJ
+  const jjHrs = sfLaborHrs(state.jjSF, state.jjDepth || 3)
 
   // ── Rebar add-on ─────────────────────────────────────────────────────────
-  const rebarHrs = n(state.rebarSF) * (rebarMinPerSF / 60)
+  const rebarHrs = rebarSfPerHr > 0 ? n(state.rebarSF) / rebarSfPerHr : 0
 
   // ── Vegetation ───────────────────────────────────────────────────────────
   const shrubHrs = n(state.shrubQty) * access * shrubRate
@@ -188,9 +214,9 @@ function calcDemo(
   // $100 per 100 SF; both base rates editable in the Edit Rates popovers.
   const shrubSfRate = lr['Demo - Shrub SqFt (Hand)'] ?? 2
   const shrubSfMatRate = mp['Demo - Shrub SqFt'] ?? 100
-  const shrubSfDensity = n(state.shrubDensity) || 1
-  const shrubSfHrs = (n(state.shrubSqFt) / 100) * shrubSfDensity * shrubSfRate
-  const shrubSfMat = (n(state.shrubSqFt) / 100) * shrubSfDensity * shrubSfMatRate
+  const stubHeightMod = STUB_HEIGHT_MODS[state.shrubHeight] ?? 0.75
+  const shrubSfHrs = (n(state.shrubSqFt) / 100) * stubHeightMod * shrubSfRate
+  const shrubSfMat = (n(state.shrubSqFt) / 100) * stubHeightMod * shrubSfMatRate
   const stumpFstHrs = n(state.stumpFirstQty) * access * stumpFstRate
   const stumpAddHrs = n(state.stumpAddQty) * access * stumpAddRate
 
@@ -270,7 +296,7 @@ function calcDemo(
       bucketCalc.reduce((s, r) => s + r.dumpFee, 0) +
       gradeCut.dumpFee +
       treeCalc.reduce((s, r) => s + r.dumpFee, 0)
-  const totalMat = dumpMatCost + manualMat + shrubSfMat
+  const totalMat = dumpMatCost + manualMat + shrubSfMat + baseMat
 
   // ── Financials ────────────────────────────────────────────────────────────
   const manDays = totalHrs / 8
@@ -297,6 +323,9 @@ function calcDemo(
     containerCy,
     swellFactor,
     sfLaborRate,
+    rebarSfPerHr,
+    stubHeightMod,
+    baseMat,
     difficultyRatio,
     haulSecPerFt,
     haulLoadCy,
@@ -311,7 +340,6 @@ function calcDemo(
     bucketCalc,
     gradeCut,
     gradeFill,
-    jjTons,
     jjHrs,
     rebarHrs,
     shrubHrs,
@@ -394,7 +422,7 @@ const DEFAULT_STATE = {
   // Vegetation
   shrubQty: '',
   shrubSqFt: '',
-  shrubDensity: '1',
+  shrubHeight: '0-1',
   stumpFirstQty: '',
   stumpAddQty: '',
   treeRows: [
@@ -1032,15 +1060,15 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             <p className="text-xs text-gray-500 mb-0.5 inline-flex items-center gap-1">
               Rebar SF
               <span className="text-gray-400 font-normal">
-                ({calc.rebarMinPerSF} min/SF = {(calc.rebarMinPerSF / 60).toFixed(5)} hrs/SF)
+                (1 hr per {calc.rebarSfPerHr} SF)
               </span>
               <RateEditPopover
                 table="labor_rates"
-                name="Demo - Hand Rebar"
+                name="Demo - Hand Rebar SF/hr"
                 category="Demo"
                 mode="coefficient"
-                unitLabel="min/SF"
-                currentValue={calc.rebarMinPerSF}
+                unitLabel="SF/hr"
+                currentValue={calc.rebarSfPerHr}
                 onSaved={refreshAllRates}
               />
             </p>
@@ -1348,7 +1376,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 sfK: 'jjSF',
                 dK: 'jjDepth',
                 dep: 3,
-                tons: calc.jjTons,
+                tons: 0,
                 hrs: calc.jjHrs,
                 note: `${calc.rateJJ} t/hr`,
                 rate: calc.rateJJ,
@@ -1440,7 +1468,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
         {/* Shrubs by square footage — density (1–5) × rate per 100 SF */}
         <div>
           <p className="text-xs text-gray-500 mb-0.5 inline-flex items-center gap-1">
-            Shrubs (Density × Sq Ft)
+            Shrubs (Stub Height × Sq Ft)
             <RateEditPopover
               table="labor_rates"
               name="Demo - Shrub SqFt (Hand)"
@@ -1461,14 +1489,14 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           </p>
           <div className="flex gap-2">
             <select
-              value={state.shrubDensity}
-              onChange={e => set('shrubDensity', e.target.value)}
-              title="Density"
+              value={state.shrubHeight || '0-1'}
+              onChange={e => set('shrubHeight', e.target.value)}
+              title="Stub Height"
               className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
             >
-              {[1, 2, 3, 4, 5].map(d => (
-                <option key={d} value={d}>
-                  Density {d}
+              {[['0-1', '0–1 ft'], ['1-2', '1–2 ft'], ['2-3', '2–3 ft'], ['3-4', '3–4 ft'], ['4-5', '4–5 ft']].map(([v, l]) => (
+                <option key={v} value={v}>
+                  {l}
                 </option>
               ))}
             </select>
@@ -1477,7 +1505,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           <p className="text-xs text-gray-400 mt-0.5">
             {calc.shrubSfHrs > 0
               ? `${calc.shrubSfHrs.toFixed(2)} hrs · $${calc.shrubSfMat.toFixed(2)} mat`
-              : `Density × ${calc.shrubSfRate} hrs & $${calc.shrubSfMatRate} per 100 SF`}
+              : `Height × ${calc.shrubSfRate} hrs & $${calc.shrubSfMatRate} per 100 SF`}
           </p>
         </div>
       </div>
