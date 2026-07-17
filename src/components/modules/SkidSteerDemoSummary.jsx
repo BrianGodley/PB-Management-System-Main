@@ -4,9 +4,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DUMP_FEE_DEFAULTS = {
-  'Dump Fee - Concrete': 36.21,
-  'Dump Fee - Dirt': 36.21,
-  'Dump Fee - Green Waste': 72.19,
+  'Demo - Skid Dump - Concrete': 36.21,
+  'Demo - Skid Dump - Dirt': 36.21,
+  'Demo - Skid Dump - Green Waste': 72.19,
 }
 
 const ACCESS_LEVELS = { Poor: 0.5, OK: 0.75, Full: 1.0 }
@@ -110,19 +110,19 @@ export default function SkidSteerDemoSummary({ module }) {
   const rateConc = lr['Demo - Skid Steer Concrete/Dirt'] ?? R.concrete
   const rateGrass = lr['Demo - Skid Steer Grass'] ?? R.grass
   const rateBase = lr['Demo - Skid Steer Import Base'] ?? R.importBase
-  const rateJJ = lr['Demo - JJ Compaction'] ?? R.jj
-  const rateSSCmp = lr['Demo - SS Compaction'] ?? R.ssCompact
-  const rebarMinPerSF = lr['Demo - Rebar'] ?? R.rebarMin
-  const shrubRate = lr['Demo - Shrub'] ?? R.shrub
-  const stumpFstRate = lr['Demo - Stump 1st'] ?? R.stumpFst
-  const stumpAddRate = lr['Demo - Stump Additional'] ?? R.stumpAdd
-  const treeSmall = lr['Demo - Tree Small'] ?? R.treeSmall
-  const treeMed = lr['Demo - Tree Medium'] ?? R.treeMed
-  const treeLarge = lr['Demo - Tree Large'] ?? R.treeLarge
+  const rateJJ = lr['Demo - Skid JJ Compaction'] ?? R.jj
+  const rateSSCmp = lr['Demo - Skid SS Compaction'] ?? R.ssCompact
+  const rebarMinPerSF = lr['Demo - Skid Rebar'] ?? R.rebarMin
+  const shrubRate = lr['Demo - Skid Shrub'] ?? R.shrub
+  const stumpFstRate = lr['Demo - Skid Stump 1st'] ?? R.stumpFst
+  const stumpAddRate = lr['Demo - Skid Stump Additional'] ?? R.stumpAdd
+  const treeSmall = lr['Demo - Skid Tree Small'] ?? R.treeSmall
+  const treeMed = lr['Demo - Skid Tree Medium'] ?? R.treeMed
+  const treeLarge = lr['Demo - Skid Tree Large'] ?? R.treeLarge
 
-  const dumpConc = mp['Dump Fee - Concrete'] ?? DUMP_FEE_DEFAULTS['Dump Fee - Concrete']
-  const dumpDirt = mp['Dump Fee - Dirt'] ?? DUMP_FEE_DEFAULTS['Dump Fee - Dirt']
-  const dumpGreen = mp['Dump Fee - Green Waste'] ?? DUMP_FEE_DEFAULTS['Dump Fee - Green Waste']
+  const dumpConc = mp['Demo - Skid Dump - Concrete'] ?? DUMP_FEE_DEFAULTS['Demo - Skid Dump - Concrete']
+  const dumpDirt = mp['Demo - Skid Dump - Dirt'] ?? DUMP_FEE_DEFAULTS['Demo - Skid Dump - Dirt']
+  const dumpGreen = mp['Demo - Skid Dump - Green Waste'] ?? DUMP_FEE_DEFAULTS['Demo - Skid Dump - Green Waste']
 
   const accessMult = ACCESS_LEVELS[access] || 0.75
   const isSelf = dumpType === 'Self Haul'

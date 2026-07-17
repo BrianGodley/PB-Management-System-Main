@@ -9,13 +9,13 @@ import WorkTypeChooser from './WorkTypeChooser'
 //   'Demo - Mini Skid Steer Import Base'     5.0 t/hr
 //   'Demo - Mini SS Compaction'          1.23 t/hr
 // Shared with full SS:
-//   'Demo - JJ Compaction', 'Demo - Shrub', 'Demo - Stump 1st/Additional',
-//   'Demo - Tree Small/Medium/Large', 'Demo - Rebar'
+//   'Demo - Mini JJ Compaction', 'Demo - Mini Shrub', 'Demo - Stump 1st/Additional',
+//   'Demo - Tree Small/Medium/Large', 'Demo - Mini Rebar'
 //
 // Mini-specific dump fee differences vs full SS:
 //   • Import Base carries $7.50/ton dump fee
 //   • Misc Flat/Vert/Footing carry $36.21/ton concrete dump fee
-//   • Trees use $125.33/ton 'Dump Fee - Tree/Stump'
+//   • Trees use $125.33/ton 'Demo - Mini Dump - Tree/Stump'
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -48,15 +48,15 @@ const RATE_DEFAULTS = {
   importBase: 5.0, // 'Demo - Mini Skid Steer Import Base' (NonBob)
   bobcatConc: 2.0, // Full Bobcat haul rate — used for Grade Cut & Footing
   bobcatBase: 10.0, // Full Bobcat base spread — used for Grade Fill
-  jj: 1.75, // 'Demo - JJ Compaction'
+  jj: 1.75, // 'Demo - Mini JJ Compaction'
   ssCompact: 1.23, // 'Demo - Mini SS Compaction'
-  rebarMin: 0.05, // 'Demo - Rebar'
-  shrub: 0.75, // 'Demo - Shrub'
-  stumpFst: 2.5, // 'Demo - Stump 1st'
-  stumpAdd: 0.75, // 'Demo - Stump Additional'
-  treeSmall: 0.1, // 'Demo - Tree Small'
-  treeMed: 0.15, // 'Demo - Tree Medium'
-  treeLarge: 0.2, // 'Demo - Tree Large'
+  rebarMin: 0.05, // 'Demo - Mini Rebar'
+  shrub: 0.75, // 'Demo - Mini Shrub'
+  stumpFst: 2.5, // 'Demo - Mini Stump 1st'
+  stumpAdd: 0.75, // 'Demo - Mini Stump Additional'
+  treeSmall: 0.1, // 'Demo - Mini Tree Small'
+  treeMed: 0.15, // 'Demo - Mini Tree Medium'
+  treeLarge: 0.2, // 'Demo - Mini Tree Large'
 }
 
 // Sub Haul rates — billed per 1.5 tons removed (sub cost, not materials)
@@ -68,11 +68,11 @@ const SUB_HAUL_DEFAULTS = {
 }
 
 const DUMP_FEE_DEFAULTS = {
-  'Dump Fee - Concrete': 36.21,
-  'Dump Fee - Dirt': 36.21,
-  'Dump Fee - Green Waste': 72.19,
-  'Dump Fee - Tree/Stump': 125.33,
-  'Dump Fee - Import Base': 7.5,
+  'Demo - Mini Dump - Concrete': 36.21,
+  'Demo - Mini Dump - Dirt': 36.21,
+  'Demo - Mini Dump - Green Waste': 72.19,
+  'Demo - Mini Dump - Tree/Stump': 125.33,
+  'Demo - Mini Dump - Import Base': 7.5,
 }
 
 // ── Calculation engine ────────────────────────────────────────────────────────
@@ -109,30 +109,36 @@ function calcDemo(
   const isSub = state.dumpType === 'Subcontractor'
   const isDumpSub = false // disposal follows the In House/Sub toggle
   const lrph = n(laborRatePerHour) || 35
-  const difficultyRatio = lr['Demo - Difficulty Ratio'] ?? 1
+  const difficultyRatio = lr['Demo - Mini Difficulty Ratio'] ?? 1
   const diff = 1 + (n(state.difficulty) / 100) * difficultyRatio
   const hrsAdj = n(state.hoursAdj)
 
   // ── Pull rates from DB (lr) with fallbacks ────────────────────────────────
   // Mini Skid Steer rates — used for all operations
-  const rateConc = lr['Demo - Mini Skid Steer Concrete/Dirt'] ?? RATE_DEFAULTS.concrete
+  const laborConc = lr['Demo - Mini - Concrete t/hr'] ?? RATE_DEFAULTS.concrete
+  const laborDirt = lr['Demo - Mini - Dirt t/hr'] ?? RATE_DEFAULTS.concrete
+  const laborMiscFlat = lr['Demo - Mini - Misc Flat t/hr'] ?? RATE_DEFAULTS.concrete
+  const laborMiscVert = lr['Demo - Mini - Misc Vert t/hr'] ?? RATE_DEFAULTS.concrete
+  const laborFooting = lr['Demo - Mini - Footing t/hr'] ?? RATE_DEFAULTS.concrete
+  const laborGradeCut = lr['Demo - Mini - Grade Cut t/hr'] ?? RATE_DEFAULTS.concrete
   const rateGrass = lr['Demo - Mini Skid Steer Grass'] ?? RATE_DEFAULTS.grass
-  const rateBase = lr['Demo - Mini Skid Steer Import Base'] ?? RATE_DEFAULTS.importBase
-  const rateJJ = lr['Demo - JJ Compaction'] ?? RATE_DEFAULTS.jj
+  const laborBase = lr['Demo - Mini - Import Base t/hr'] ?? RATE_DEFAULTS.importBase
+  const laborGradeFill = lr['Demo - Mini - Grade Fill t/hr'] ?? RATE_DEFAULTS.importBase
+  const rateJJ = lr['Demo - Mini JJ Compaction'] ?? RATE_DEFAULTS.jj
   const rateSSCmp = lr['Demo - Mini SS Compaction'] ?? RATE_DEFAULTS.ssCompact
-  const rebarMinPerSF = lr['Demo - Rebar'] ?? RATE_DEFAULTS.rebarMin
-  const shrubRate = lr['Demo - Shrub'] ?? RATE_DEFAULTS.shrub
-  const stumpFstRate = lr['Demo - Stump 1st'] ?? RATE_DEFAULTS.stumpFst
-  const stumpAddRate = lr['Demo - Stump Additional'] ?? RATE_DEFAULTS.stumpAdd
-  const treeSmall = lr['Demo - Tree Small'] ?? RATE_DEFAULTS.treeSmall
-  const treeMed = lr['Demo - Tree Medium'] ?? RATE_DEFAULTS.treeMed
-  const treeLarge = lr['Demo - Tree Large'] ?? RATE_DEFAULTS.treeLarge
+  const rebarMinPerSF = lr['Demo - Mini Rebar'] ?? RATE_DEFAULTS.rebarMin
+  const shrubRate = lr['Demo - Mini Shrub'] ?? RATE_DEFAULTS.shrub
+  const stumpFstRate = lr['Demo - Mini Stump 1st'] ?? RATE_DEFAULTS.stumpFst
+  const stumpAddRate = lr['Demo - Mini Stump Additional'] ?? RATE_DEFAULTS.stumpAdd
+  const treeSmall = lr['Demo - Mini Tree Small'] ?? RATE_DEFAULTS.treeSmall
+  const treeMed = lr['Demo - Mini Tree Medium'] ?? RATE_DEFAULTS.treeMed
+  const treeLarge = lr['Demo - Mini Tree Large'] ?? RATE_DEFAULTS.treeLarge
 
-  const dumpConc = mp['Dump Fee - Concrete'] ?? DUMP_FEE_DEFAULTS['Dump Fee - Concrete']
-  const dumpDirt = mp['Dump Fee - Dirt'] ?? DUMP_FEE_DEFAULTS['Dump Fee - Dirt']
-  const dumpGreen = mp['Dump Fee - Green Waste'] ?? DUMP_FEE_DEFAULTS['Dump Fee - Green Waste']
-  const dumpTreeStump = mp['Dump Fee - Tree/Stump'] ?? DUMP_FEE_DEFAULTS['Dump Fee - Tree/Stump']
-  const dumpBase = mp['Dump Fee - Import Base'] ?? DUMP_FEE_DEFAULTS['Dump Fee - Import Base']
+  const dumpConc = mp['Demo - Mini Dump - Concrete'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Concrete']
+  const dumpDirt = mp['Demo - Mini Dump - Dirt'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Dirt']
+  const dumpGreen = mp['Demo - Mini Dump - Green Waste'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Green Waste']
+  const dumpTreeStump = mp['Demo - Mini Dump - Tree/Stump'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Tree/Stump']
+  const dumpBase = mp['Demo - Mini Dump - Import Base'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Import Base']
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   // accessLevel param lets each call site use the correct NonBob or Bobcat multiplier
@@ -161,9 +167,9 @@ function calcDemo(
   }
 
   // Editable container disposal rates (Master Rates -> Materials, category Demo).
-  const containerPrice = mp['Demo - Container (Low-Boy)'] ?? CONTAINER_COST
-  const containerCy = mp['Demo - Container Capacity (CY)'] ?? CONTAINER_CY
-  const swellFactor = mp['Demo - Removal Swell'] ?? SWELL
+  const containerPrice = mp['Demo - Mini Container (Low-Boy)'] ?? CONTAINER_COST
+  const containerCy = mp['Demo - Mini Container Capacity (CY)'] ?? CONTAINER_CY
+  const swellFactor = mp['Demo - Mini Removal Swell'] ?? SWELL
   const removalYards = (sf, depthIn) => ((n(sf) * (n(depthIn) / 12)) / 27) * swellFactor
   const removalContainers = (sf, depthIn) => Math.ceil(removalYards(sf, depthIn) / containerCy)
   const containerCost = (sf, depthIn) =>
@@ -173,39 +179,39 @@ function calcDemo(
   const haulLoadCy = lr['Demo - Mini Load (CY)'] ?? 0.2
 
   // ── Demo rows — NonBob access (OK=0.667) ──────────────────────────────────
-  const conc = flat(state.concSF, state.concDepth || 4, rateConc, 0, accessNonBob)
-  const dirt = flat(state.dirtSF, state.dirtDepth || 6, rateConc, 0, accessNonBob)
-  const base = flat(state.baseSF, state.baseDepth || 4, rateBase, dumpBase, accessNonBob) // Mini: has dump fee
-  const grass = flat(state.grassSF, state.grassDepth || 2, rateGrass, 0, accessBobcat)
+  const conc = flat(state.concSF, state.concDepth || 4, laborConc, 0, accessNonBob)
+  const dirt = flat(state.dirtSF, state.dirtDepth || 4, laborDirt, 0, accessNonBob)
+  const base = flat(state.baseSF, state.baseDepth || 4, laborBase, dumpBase, accessNonBob) // Mini: has dump fee
+  const grass = flat(state.grassSF, state.grassDepth || 4, rateGrass, 0, accessBobcat)
   conc.dumpFee = containerCost(state.concSF, state.concDepth || 4)
-  dirt.dumpFee = containerCost(state.dirtSF, state.dirtDepth || 6)
-  grass.dumpFee = containerCost(state.grassSF, state.grassDepth || 2)
+  dirt.dumpFee = containerCost(state.dirtSF, state.dirtDepth || 4)
+  grass.dumpFee = containerCost(state.grassSF, state.grassDepth || 4)
 
   // Mini SS: misc flat/vert carry $36.21 concrete dump fee — NonBob access
   const miscFlatCalc = (state.miscFlatRows || []).map(r =>
-    flat(r.sf, r.depth || 4, rateConc, dumpConc, accessNonBob)
+    flat(r.sf, r.depth || 4, laborMiscFlat, dumpConc, accessNonBob)
   )
   const miscVertCalc = (state.miscVertRows || []).map(r =>
-    vert(r.lf, r.heightIn || 0, r.widthIn || 8, rateConc, dumpConc, accessNonBob)
+    vert(r.lf, r.heightIn || 0, r.widthIn || 8, laborMiscVert, dumpConc, accessNonBob)
   )
   // Footing — Mini Skid Steer rate + Bobcat access
   const footingCalc = (state.footingRows || []).map(r =>
-    flat(r.sf, r.depth || 12, rateConc, dumpConc, accessBobcat)
+    flat(r.sf, r.depth || 12, laborFooting, dumpConc, accessBobcat)
   )
 
   // ── Grading — Mini Skid Steer rates + Bobcat access ──────────────────────
   const gradeCut = flat(
     state.gradeCutSF,
-    state.gradeCutDepth || 3,
-    rateConc,
+    state.gradeCutDepth || 4,
+    laborGradeCut,
     0,
     accessBobcat
   )
-  gradeCut.dumpFee = containerCost(state.gradeCutSF, state.gradeCutDepth || 3)
-  const gradeFill = flat(state.gradeFillSF, state.gradeFillDepth || 3, rateBase, 0, accessBobcat)
+  gradeCut.dumpFee = containerCost(state.gradeCutSF, state.gradeCutDepth || 4)
+  const gradeFill = flat(state.gradeFillSF, state.gradeFillDepth || 4, laborGradeFill, 0, accessBobcat)
 
-  const jjTons = sfToTons(state.jjSF, state.jjDepth || 3)
-  const ssCmpTons = sfToTons(state.ssCmpSF, state.ssCmpDepth || 3)
+  const jjTons = sfToTons(state.jjSF, state.jjDepth || 4)
+  const ssCmpTons = sfToTons(state.ssCmpSF, state.ssCmpDepth || 4)
   const jjHrs = jjTons > 0 ? jjTons / rateJJ : 0
   const ssCmpHrs = ssCmpTons > 0 ? ssCmpTons / rateSSCmp : 0
 
@@ -217,7 +223,7 @@ function calcDemo(
   // Shrubs by SqFt: density (1–5) × rate per 100 SF. Density 1 = 2 hrs &
   // $100 per 100 SF; both base rates editable in the Edit Rates popovers.
   const shrubSfRate = lr['Demo - Shrub SqFt (Mini Skid)'] ?? 1
-  const shrubSfMatRate = mp['Demo - Shrub SqFt'] ?? 100
+  const shrubSfMatRate = mp['Demo - Mini Shrub SqFt Mat'] ?? 100
   const shrubSfDensity = n(state.shrubDensity) || 1
   const shrubSfHrs = (n(state.shrubSqFt) / 100) * shrubSfDensity * shrubSfRate
   const shrubSfMat = (n(state.shrubSqFt) / 100) * shrubSfDensity * shrubSfMatRate
@@ -244,9 +250,9 @@ function calcDemo(
 
   // ── Sub Haul cost — per 1.5 tons, goes into subCost (not materials) ──────────
   // DB values (subcontractor_rates category='Sub Haul') take precedence over defaults
-  const shConc = sr['Sub Haul - Concrete'] ?? SUB_HAUL_DEFAULTS.concrete
-  const shDirt = sr['Sub Haul - Dirt'] ?? SUB_HAUL_DEFAULTS.dirt
-  const shGrass = sr['Sub Haul - Grass'] ?? SUB_HAUL_DEFAULTS.grass
+  const shConc = sr['Demo - Mini Sub Haul - Concrete'] ?? SUB_HAUL_DEFAULTS.concrete
+  const shDirt = sr['Demo - Mini Sub Haul - Dirt'] ?? SUB_HAUL_DEFAULTS.dirt
+  const shGrass = sr['Demo - Mini Sub Haul - Grass'] ?? SUB_HAUL_DEFAULTS.grass
 
   const tonsPerCharge = 1.5 // billing increment
 
@@ -290,9 +296,9 @@ function calcDemo(
     treeCalc.reduce((s, r) => s + r.tons, 0)
   const haulYards =
     removalYards(state.concSF, state.concDepth || 4) +
-    removalYards(state.dirtSF, state.dirtDepth || 6) +
-    removalYards(state.gradeCutSF, state.gradeCutDepth || 3) +
-    removalYards(state.grassSF, state.grassDepth || 2)
+    removalYards(state.dirtSF, state.dirtDepth || 4) +
+    removalYards(state.gradeCutSF, state.gradeCutDepth || 4) +
+    removalYards(state.grassSF, state.grassDepth || 4)
   const haulTrips = haulLoadCy > 0 ? haulYards / haulLoadCy : 0
   const walkHrs = (haulTrips * n(state.distanceLF) * haulSecPerFt) / 3600
 
@@ -319,10 +325,10 @@ function calcDemo(
   const burden = laborCost * (n(laborBurdenPct) || 0.29)
   // GP = labor component + Universal Sub Markup % on sub haul cost
   // Hauling (Subcontractor) — 12-yard loads × per-load rate (sub cost, pre-GP markup).
-  const haulTrashRate = sr['Sub Haul - Trash 12yd'] ?? 850
-  const haulConcreteRate = sr['Sub Haul - Concrete 12yd'] ?? 800
-  const haulSoilRate = sr['Sub Haul - Soil 12yd'] ?? 650
-  const haulBaseRate = sr['Sub Haul - Import Base 12yd'] ?? 350
+  const haulTrashRate = sr['Demo - Mini Sub Haul - Trash 12yd'] ?? 850
+  const haulConcreteRate = sr['Demo - Mini Sub Haul - Concrete 12yd'] ?? 800
+  const haulSoilRate = sr['Demo - Mini Sub Haul - Soil 12yd'] ?? 650
+  const haulBaseRate = sr['Demo - Mini Sub Haul - Import Base 12yd'] ?? 350
   const haulCost = isSub
     ? n(state.haulTrashLoads) * haulTrashRate +
       n(state.haulConcreteLoads) * haulConcreteRate +
@@ -412,9 +418,15 @@ function calcDemo(
     dumpGreen,
     dumpTreeStump,
     dumpBase,
-    rateConc,
+    laborConc,
+    laborDirt,
+    laborBase,
+    laborMiscFlat,
+    laborMiscVert,
+    laborFooting,
+    laborGradeCut,
+    laborGradeFill,
     rateGrass,
-    rateBase,
     rateJJ,
     rateSSCmp,
     rebarMinPerSF,
@@ -873,7 +885,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             {calc.difficultyRatio}% labor per 1%
             <RateEditPopover
               table="labor_rates"
-              name="Demo - Difficulty Ratio"
+              name="Demo - Mini Difficulty Ratio"
               category="Demo"
               mode="coefficient"
               unitLabel="% per 1%"
@@ -932,7 +944,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 ${calc.shConc}/1.5T conc
                 <RateEditPopover
                   table="subcontractor_rates"
-                  name="Sub Haul - Concrete"
+                  name="Demo - Mini Sub Haul - Concrete"
                   unitLabel="/1.5T"
                   currentValue={calc.shConc}
                   onSaved={refreshAllRates}
@@ -943,7 +955,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 ${calc.shDirt}/1.5T dirt
                 <RateEditPopover
                   table="subcontractor_rates"
-                  name="Sub Haul - Dirt"
+                  name="Demo - Mini Sub Haul - Dirt"
                   unitLabel="/1.5T"
                   currentValue={calc.shDirt}
                   onSaved={refreshAllRates}
@@ -954,7 +966,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 ${calc.shGrass}/1.5T grass
                 <RateEditPopover
                   table="subcontractor_rates"
-                  name="Sub Haul - Grass"
+                  name="Demo - Mini Sub Haul - Grass"
                   unitLabel="/1.5T"
                   currentValue={calc.shGrass}
                   onSaved={refreshAllRates}
@@ -967,22 +979,13 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       {/* Demolition */}
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Demolition — {calc.rateConc} t/hr</span>
-          <RateEditPopover
-            table="labor_rates"
-            name="Demo - Mini Skid Steer Concrete/Dirt"
-            category="Demo"
-            mode="coefficient"
-            unitLabel="t/hr"
-            currentValue={calc.rateConc}
-            onSaved={refreshAllRates}
-          />
+          <span>Demolition</span>
           {isSelf ? (
             <>
               <span className="font-normal normal-case">· Container ${calc.containerPrice}</span>
               <RateEditPopover
                 table="material_rates"
-                name="Demo - Container (Low-Boy)"
+                name="Demo - Mini Container (Low-Boy)"
                 category="Demo"
                 unitLabel="container"
                 currentValue={calc.containerPrice}
@@ -991,7 +994,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
               <span className="font-normal normal-case">/ {calc.containerCy} cy</span>
               <RateEditPopover
                 table="material_rates"
-                name="Demo - Container Capacity (CY)"
+                name="Demo - Mini Container Capacity (CY)"
                 category="Demo"
                 mode="coefficient"
                 unitLabel="cy"
@@ -1001,7 +1004,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
               <span className="font-normal normal-case">· ×{calc.swellFactor} swell</span>
               <RateEditPopover
                 table="material_rates"
-                name="Demo - Removal Swell"
+                name="Demo - Mini Removal Swell"
                 category="Demo"
                 mode="coefficient"
                 unitLabel="×"
@@ -1051,20 +1054,20 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 dep: 4,
                 row: calc.conc,
                 fee: dumpConc,
-                rate: calc.rateConc,
-                rateName: 'Demo - Mini Skid Steer Concrete/Dirt',
-                rateNote: `${calc.rateConc} t/hr`,
+                rate: calc.laborConc,
+                rateName: 'Demo - Mini - Concrete t/hr',
+                rateNote: `${calc.laborConc} t/hr`,
               },
               {
                 label: 'Dirt/Rock',
                 sfK: 'dirtSF',
                 dK: 'dirtDepth',
-                dep: 6,
+                dep: 4,
                 row: calc.dirt,
                 fee: dumpDirt,
-                rate: calc.rateConc,
-                rateName: 'Demo - Mini Skid Steer Concrete/Dirt',
-                rateNote: `${calc.rateConc} t/hr`,
+                rate: calc.laborDirt,
+                rateName: 'Demo - Mini - Dirt t/hr',
+                rateNote: `${calc.laborDirt} t/hr`,
               },
               {
                 label: 'Import Base',
@@ -1073,13 +1076,13 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 dep: 4,
                 row: calc.base,
                 fee: dumpBase,
-                rate: calc.rateBase,
-                rateName: 'Demo - Mini Skid Steer Import Base',
-                rateNote: `${calc.rateBase} t/hr · $${dumpBase}/ton base`,
+                rate: calc.laborBase,
+                rateName: 'Demo - Mini - Import Base t/hr',
+                rateNote: `${calc.laborBase} t/hr · $${dumpBase}/ton base`,
                 extraIcon: (
                   <RateEditPopover
                     table="material_rates"
-                    name="Dump Fee - Import Base"
+                    name="Demo - Mini Dump - Import Base"
                     category="Demo"
                     unitLabel="ton"
                     currentValue={dumpBase}
@@ -1091,7 +1094,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 label: 'Grass/Sod',
                 sfK: 'grassSF',
                 dK: 'grassDepth',
-                dep: 2,
+                dep: 4,
                 row: calc.grass,
                 fee: dumpGreen,
                 rate: calc.rateGrass,
@@ -1100,7 +1103,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 extraIcon: (
                   <RateEditPopover
                     table="material_rates"
-                    name="Dump Fee - Green Waste"
+                    name="Demo - Mini Dump - Green Waste"
                     category="Demo"
                     unitLabel="ton"
                     currentValue={dumpGreen}
@@ -1163,7 +1166,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
               <span className="text-gray-400 font-normal">({calc.rebarMinPerSF} min/SF)</span>
               <RateEditPopover
                 table="labor_rates"
-                name="Demo - Rebar"
+                name="Demo - Mini Rebar"
                 category="Demo"
                 mode="coefficient"
                 unitLabel="min/SF"
@@ -1186,15 +1189,15 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       {/* Misc Flat */}
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Misc Flat Demo{isSelf ? ` — ${calc.rateConc} t/hr` : ''}</span>
+          <span>Misc Flat Demo{isSelf ? ` — ${calc.laborMiscFlat} t/hr` : ''}</span>
           {isSelf && (
             <RateEditPopover
               table="labor_rates"
-              name="Demo - Mini Skid Steer Concrete/Dirt"
+              name="Demo - Mini - Misc Flat t/hr"
               category="Demo"
               mode="coefficient"
               unitLabel="t/hr"
-              currentValue={calc.rateConc}
+              currentValue={calc.laborMiscFlat}
               onSaved={refreshAllRates}
             />
           )}
@@ -1203,7 +1206,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
               <span className="font-normal normal-case">· ${dumpConc}/ton dump fee</span>
               <RateEditPopover
                 table="material_rates"
-                name="Dump Fee - Concrete"
+                name="Demo - Mini Dump - Concrete"
                 category="Demo"
                 unitLabel="ton"
                 currentValue={dumpConc}
@@ -1291,14 +1294,14 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       {/* Misc Vertical */}
       <div className={isSub ? 'hidden' : undefined}>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Misc Vertical / Structural Demo — LF × Height × Width · {calc.rateConc} t/hr</span>
+          <span>Misc Vertical / Structural Demo — LF × Height × Width · {calc.laborMiscVert} t/hr</span>
           <RateEditPopover
             table="labor_rates"
-            name="Demo - Mini Skid Steer Concrete/Dirt"
+            name="Demo - Mini - Misc Vert t/hr"
             category="Demo"
             mode="coefficient"
             unitLabel="t/hr"
-            currentValue={calc.rateConc}
+            currentValue={calc.laborMiscVert}
             onSaved={refreshAllRates}
           />
           {isSelf && (
@@ -1306,7 +1309,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
               <span className="font-normal normal-case">· ${dumpConc}/ton dump fee</span>
               <RateEditPopover
                 table="material_rates"
-                name="Dump Fee - Concrete"
+                name="Demo - Mini Dump - Concrete"
                 category="Demo"
                 unitLabel="ton"
                 currentValue={dumpConc}
@@ -1373,14 +1376,14 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       {/* Footing */}
       <div className={isSub ? 'hidden' : undefined}>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Footing Demo — SF × Depth · {calc.rateConc} t/hr</span>
+          <span>Footing Demo — SF × Depth · {calc.laborFooting} t/hr</span>
           <RateEditPopover
             table="labor_rates"
-            name="Demo - Mini Skid Steer Concrete/Dirt"
+            name="Demo - Mini - Footing t/hr"
             category="Demo"
             mode="coefficient"
             unitLabel="t/hr"
-            currentValue={calc.rateConc}
+            currentValue={calc.laborFooting}
             onSaved={refreshAllRates}
           />
           {isSelf && (
@@ -1388,7 +1391,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
               <span className="font-normal normal-case">· ${dumpConc}/ton dump fee</span>
               <RateEditPopover
                 table="material_rates"
-                name="Dump Fee - Concrete"
+                name="Demo - Mini Dump - Concrete"
                 category="Demo"
                 unitLabel="ton"
                 currentValue={dumpConc}
@@ -1454,10 +1457,10 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
               />
               <tbody className="divide-y divide-gray-50">
                 {[
-                  { label: 'Trash Per 12 Yard Load', key: 'haulTrashLoads', rate: calc.haulTrashRate, rateName: 'Sub Haul - Trash 12yd' },
-                  { label: 'Concrete Per 12 Yard Load', key: 'haulConcreteLoads', rate: calc.haulConcreteRate, rateName: 'Sub Haul - Concrete 12yd' },
-                  { label: 'Soil Per 12 Yard Load', key: 'haulSoilLoads', rate: calc.haulSoilRate, rateName: 'Sub Haul - Soil 12yd' },
-                  { label: 'Import Base Per 12 Yard Load', key: 'haulBaseLoads', rate: calc.haulBaseRate, rateName: 'Sub Haul - Import Base 12yd' },
+                  { label: 'Trash Per 12 Yard Load', key: 'haulTrashLoads', rate: calc.haulTrashRate, rateName: 'Demo - Mini Sub Haul - Trash 12yd' },
+                  { label: 'Concrete Per 12 Yard Load', key: 'haulConcreteLoads', rate: calc.haulConcreteRate, rateName: 'Demo - Mini Sub Haul - Concrete 12yd' },
+                  { label: 'Soil Per 12 Yard Load', key: 'haulSoilLoads', rate: calc.haulSoilRate, rateName: 'Demo - Mini Sub Haul - Soil 12yd' },
+                  { label: 'Import Base Per 12 Yard Load', key: 'haulBaseLoads', rate: calc.haulBaseRate, rateName: 'Demo - Mini Sub Haul - Import Base 12yd' },
                 ].map(({ label, key, rate, rateName }) => (
                   <tr key={key}>
                     <td className={`${td} font-medium text-gray-700`}>
@@ -1506,40 +1509,40 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 label: 'Grade Cut',
                 sfK: 'gradeCutSF',
                 dK: 'gradeCutDepth',
-                dep: 3,
+                dep: 4,
                 tons: calc.gradeCut.tons,
                 hrs: calc.gradeCut.hours,
-                note: `${calc.rateConc} t/hr`,
-                rate: calc.rateConc,
-                rateName: 'Demo - Mini Skid Steer Concrete/Dirt',
+                note: `${calc.laborGradeCut} t/hr`,
+                rate: calc.laborGradeCut,
+                rateName: 'Demo - Mini - Grade Cut t/hr',
               },
               {
                 label: 'Grade Fill',
                 sfK: 'gradeFillSF',
                 dK: 'gradeFillDepth',
-                dep: 3,
+                dep: 4,
                 tons: calc.gradeFill.tons,
                 hrs: calc.gradeFill.hours,
-                note: `${calc.rateBase} t/hr`,
-                rate: calc.rateBase,
-                rateName: 'Demo - Mini Skid Steer Import Base',
+                note: `${calc.laborGradeFill} t/hr`,
+                rate: calc.laborGradeFill,
+                rateName: 'Demo - Mini - Grade Fill t/hr',
               },
               {
                 label: 'Jumping Jack',
                 sfK: 'jjSF',
                 dK: 'jjDepth',
-                dep: 3,
+                dep: 4,
                 tons: calc.jjTons,
                 hrs: calc.jjHrs,
                 note: `${calc.rateJJ} t/hr`,
                 rate: calc.rateJJ,
-                rateName: 'Demo - JJ Compaction',
+                rateName: 'Demo - Mini JJ Compaction',
               },
               {
                 label: 'Mini SS Compact (4" Max)',
                 sfK: 'ssCmpSF',
                 dK: 'ssCmpDepth',
-                dep: 3,
+                dep: 4,
                 tons: calc.ssCmpTons,
                 hrs: calc.ssCmpHrs,
                 note: `${calc.rateSSCmp} t/hr`,
@@ -1591,7 +1594,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             hrs: calc.shrubHrs,
             sub: `${calc.shrubRate} hrs/ea`,
             rate: calc.shrubRate,
-            rateName: 'Demo - Shrub',
+            rateName: 'Demo - Mini Shrub',
           },
           {
             label: 'Stump Grind 1st',
@@ -1599,7 +1602,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             hrs: calc.stumpFstHrs,
             sub: `${calc.stumpFstRate} hrs`,
             rate: calc.stumpFstRate,
-            rateName: 'Demo - Stump 1st',
+            rateName: 'Demo - Mini Stump 1st',
           },
           {
             label: "Stump Grind Add'l",
@@ -1607,7 +1610,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             hrs: calc.stumpAddHrs,
             sub: `${calc.stumpAddRate} hrs`,
             rate: calc.stumpAddRate,
-            rateName: 'Demo - Stump Additional',
+            rateName: 'Demo - Mini Stump Additional',
           },
         ].map(({ label, key, hrs, sub, rate, rateName }) => (
           <div key={key}>
@@ -1644,7 +1647,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             />
             <RateEditPopover
               table="material_rates"
-              name="Demo - Shrub SqFt"
+              name="Demo - Mini Shrub SqFt Mat"
               category="Demo"
               unitLabel="$/100sf"
               currentValue={calc.shrubSfMatRate}
@@ -1682,7 +1685,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             (S:{calc.treeSmall}
             <RateEditPopover
               table="labor_rates"
-              name="Demo - Tree Small"
+              name="Demo - Mini Tree Small"
               category="Demo"
               mode="coefficient"
               unitLabel="hrs/ft"
@@ -1692,7 +1695,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             · M:{calc.treeMed}
             <RateEditPopover
               table="labor_rates"
-              name="Demo - Tree Medium"
+              name="Demo - Mini Tree Medium"
               category="Demo"
               mode="coefficient"
               unitLabel="hrs/ft"
@@ -1702,7 +1705,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             · L:{calc.treeLarge}
             <RateEditPopover
               table="labor_rates"
-              name="Demo - Tree Large"
+              name="Demo - Mini Tree Large"
               category="Demo"
               mode="coefficient"
               unitLabel="hrs/ft"
@@ -1716,7 +1719,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
               · ${dumpTreeStump}/ton tree/stump dump
               <RateEditPopover
                 table="material_rates"
-                name="Dump Fee - Tree/Stump"
+                name="Demo - Mini Dump - Tree/Stump"
                 category="Demo"
                 unitLabel="ton"
                 currentValue={dumpTreeStump}

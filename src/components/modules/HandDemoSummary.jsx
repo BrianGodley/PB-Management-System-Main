@@ -4,10 +4,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DUMP_FEE_DEFAULTS = {
-  'Dump Fee - Concrete': 36.21,
-  'Dump Fee - Dirt': 36.21,
-  'Dump Fee - Green Waste': 72.19,
-  'Dump Fee - Tree/Stump': 125.33,
+  'Demo - Hand Dump - Concrete': 36.21,
+  'Demo - Hand Dump - Dirt': 36.21,
+  'Demo - Hand Dump - Green Waste': 72.19,
+  'Demo - Hand Dump - Tree/Stump': 125.33,
 }
 
 const ACCESS_LEVELS = { Poor: 0.5, OK: 0.667, Full: 1.0 }
@@ -110,19 +110,19 @@ export default function HandDemoSummary({ module }) {
   const rateGrass = lr['Demo - Hand Grass'] ?? R.grass
   const rateBase = lr['Demo - Hand Import Base'] ?? R.importBase
   const rateBucket = lr['Demo - Hand Bucket'] ?? R.bucket
-  const rateJJ = lr['Demo - JJ Compaction'] ?? R.jj
+  const rateJJ = lr['Demo - Hand JJ Compaction'] ?? R.jj
   const rebarMinPerSF = lr['Demo - Hand Rebar'] ?? R.rebarMin
-  const shrubRate = lr['Demo - Shrub'] ?? R.shrub
-  const stumpFstRate = lr['Demo - Stump 1st'] ?? R.stumpFst
-  const stumpAddRate = lr['Demo - Stump Additional'] ?? R.stumpAdd
-  const treeSmall = lr['Demo - Tree Small'] ?? R.treeSmall
-  const treeMed = lr['Demo - Tree Medium'] ?? R.treeMed
-  const treeLarge = lr['Demo - Tree Large'] ?? R.treeLarge
+  const shrubRate = lr['Demo - Hand Shrub'] ?? R.shrub
+  const stumpFstRate = lr['Demo - Hand Stump 1st'] ?? R.stumpFst
+  const stumpAddRate = lr['Demo - Hand Stump Additional'] ?? R.stumpAdd
+  const treeSmall = lr['Demo - Hand Tree Small'] ?? R.treeSmall
+  const treeMed = lr['Demo - Hand Tree Medium'] ?? R.treeMed
+  const treeLarge = lr['Demo - Hand Tree Large'] ?? R.treeLarge
 
-  const dumpConc = mp['Dump Fee - Concrete'] ?? DUMP_FEE_DEFAULTS['Dump Fee - Concrete']
-  const dumpDirt = mp['Dump Fee - Dirt'] ?? DUMP_FEE_DEFAULTS['Dump Fee - Dirt']
-  const dumpGreen = mp['Dump Fee - Green Waste'] ?? DUMP_FEE_DEFAULTS['Dump Fee - Green Waste']
-  const dumpTree = mp['Dump Fee - Tree/Stump'] ?? DUMP_FEE_DEFAULTS['Dump Fee - Tree/Stump']
+  const dumpConc = mp['Demo - Hand Dump - Concrete'] ?? DUMP_FEE_DEFAULTS['Demo - Hand Dump - Concrete']
+  const dumpDirt = mp['Demo - Hand Dump - Dirt'] ?? DUMP_FEE_DEFAULTS['Demo - Hand Dump - Dirt']
+  const dumpGreen = mp['Demo - Hand Dump - Green Waste'] ?? DUMP_FEE_DEFAULTS['Demo - Hand Dump - Green Waste']
+  const dumpTree = mp['Demo - Hand Dump - Tree/Stump'] ?? DUMP_FEE_DEFAULTS['Demo - Hand Dump - Tree/Stump']
 
   const accessMult = ACCESS_LEVELS[access] || 0.667
   const isSelf = dumpType === 'Self Haul'

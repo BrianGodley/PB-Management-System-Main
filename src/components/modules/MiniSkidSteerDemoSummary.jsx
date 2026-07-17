@@ -4,11 +4,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DUMP_FEE_DEFAULTS = {
-  'Dump Fee - Concrete': 36.21,
-  'Dump Fee - Dirt': 36.21,
-  'Dump Fee - Green Waste': 72.19,
-  'Dump Fee - Tree/Stump': 125.33,
-  'Dump Fee - Import Base': 7.5,
+  'Demo - Mini Dump - Concrete': 36.21,
+  'Demo - Mini Dump - Dirt': 36.21,
+  'Demo - Mini Dump - Green Waste': 72.19,
+  'Demo - Mini Dump - Tree/Stump': 125.33,
+  'Demo - Mini Dump - Import Base': 7.5,
 }
 
 const ACCESS_LEVELS = { Poor: 0.5, OK: 0.75, Full: 1.0 }
@@ -112,21 +112,21 @@ export default function MiniSkidSteerDemoSummary({ module }) {
   const rateConc = lr['Demo - Mini Skid Steer Concrete/Dirt'] ?? R.concrete
   const rateGrass = lr['Demo - Mini Skid Steer Grass'] ?? R.grass
   const rateBase = lr['Demo - Mini Skid Steer Import Base'] ?? R.importBase
-  const rateJJ = lr['Demo - JJ Compaction'] ?? R.jj
+  const rateJJ = lr['Demo - Mini JJ Compaction'] ?? R.jj
   const rateSSCmp = lr['Demo - Mini SS Compaction'] ?? R.ssCompact
-  const rebarMinPerSF = lr['Demo - Rebar'] ?? R.rebarMin
-  const shrubRate = lr['Demo - Shrub'] ?? R.shrub
-  const stumpFstRate = lr['Demo - Stump 1st'] ?? R.stumpFst
-  const stumpAddRate = lr['Demo - Stump Additional'] ?? R.stumpAdd
-  const treeSmall = lr['Demo - Tree Small'] ?? R.treeSmall
-  const treeMed = lr['Demo - Tree Medium'] ?? R.treeMed
-  const treeLarge = lr['Demo - Tree Large'] ?? R.treeLarge
+  const rebarMinPerSF = lr['Demo - Mini Rebar'] ?? R.rebarMin
+  const shrubRate = lr['Demo - Mini Shrub'] ?? R.shrub
+  const stumpFstRate = lr['Demo - Mini Stump 1st'] ?? R.stumpFst
+  const stumpAddRate = lr['Demo - Mini Stump Additional'] ?? R.stumpAdd
+  const treeSmall = lr['Demo - Mini Tree Small'] ?? R.treeSmall
+  const treeMed = lr['Demo - Mini Tree Medium'] ?? R.treeMed
+  const treeLarge = lr['Demo - Mini Tree Large'] ?? R.treeLarge
 
-  const dumpConc = mp['Dump Fee - Concrete'] ?? DUMP_FEE_DEFAULTS['Dump Fee - Concrete']
-  const dumpDirt = mp['Dump Fee - Dirt'] ?? DUMP_FEE_DEFAULTS['Dump Fee - Dirt']
-  const dumpGreen = mp['Dump Fee - Green Waste'] ?? DUMP_FEE_DEFAULTS['Dump Fee - Green Waste']
-  const dumpTreeStump = mp['Dump Fee - Tree/Stump'] ?? DUMP_FEE_DEFAULTS['Dump Fee - Tree/Stump']
-  const dumpBase = mp['Dump Fee - Import Base'] ?? DUMP_FEE_DEFAULTS['Dump Fee - Import Base']
+  const dumpConc = mp['Demo - Mini Dump - Concrete'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Concrete']
+  const dumpDirt = mp['Demo - Mini Dump - Dirt'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Dirt']
+  const dumpGreen = mp['Demo - Mini Dump - Green Waste'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Green Waste']
+  const dumpTreeStump = mp['Demo - Mini Dump - Tree/Stump'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Tree/Stump']
+  const dumpBase = mp['Demo - Mini Dump - Import Base'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Import Base']
 
   const accessMult = ACCESS_LEVELS[access] || 0.75
   const isSelf = dumpType === 'Self Haul'
