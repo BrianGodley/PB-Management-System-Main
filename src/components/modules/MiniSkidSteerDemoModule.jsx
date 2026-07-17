@@ -104,8 +104,8 @@ function calcDemo(
   // Excel uses two separate access-level tables:
   //   NonBobLevels — hand/mini demo items (concrete, dirt, base, misc flat/vert)
   //   BobcatLevels — bobcat-assisted ops (grass, grading, footing, vegetation)
-  const accessNonBob = NON_BOB_LEVELS[state.access] ?? 0.667
-  const accessBobcat = BOB_LEVELS[state.access] ?? 0.75
+  const accessNonBob = 1 // access modifier removed
+  const accessBobcat = 1 // access modifier removed
   const isSub = state.dumpType === 'Subcontractor'
   const isDumpSub = !isSub && state.dispType === 'Subcontractor'
   const lrph = n(laborRatePerHour) || 35
@@ -883,17 +883,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           <Inp value={state.hoursAdj} onChange={e => set('hoursAdj', e.target.value)} step="0.5" />
         </div>
         <div>
-          <p className="text-xs text-gray-500 mb-0.5">Access Level</p>
-          <Sel
-            value={state.access}
-            onChange={e => set('access', e.target.value)}
-            options={Object.keys(NON_BOB_LEVELS)}
-          />
-          <p className="text-xs text-gray-400 mt-0.5">
-            Demo: {calc.accessNonBob}× · Bobcat: {calc.accessBobcat}×
-          </p>
-        </div>
-        <div>
           <p className="text-xs text-gray-500 mb-0.5">Demo Type</p>
           <p className="text-sm font-medium text-gray-700 py-1">{state.dumpType === 'In-House' ? 'In House' : 'Subcontractor'}</p>
           {!isSelf && (
@@ -1470,7 +1459,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             label: 'Shrubs (qty)',
             key: 'shrubQty',
             hrs: calc.shrubHrs,
-            sub: `${calc.accessBobcat}× × ${calc.shrubRate} hrs/ea`,
+            sub: `${calc.shrubRate} hrs/ea`,
             rate: calc.shrubRate,
             rateName: 'Demo - Shrub',
           },
@@ -1478,7 +1467,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             label: 'Stump Grind 1st',
             key: 'stumpFirstQty',
             hrs: calc.stumpFstHrs,
-            sub: `${calc.accessBobcat}× × ${calc.stumpFstRate} hrs`,
+            sub: `${calc.stumpFstRate} hrs`,
             rate: calc.stumpFstRate,
             rateName: 'Demo - Stump 1st',
           },
@@ -1486,7 +1475,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             label: "Stump Grind Add'l",
             key: 'stumpAddQty',
             hrs: calc.stumpAddHrs,
-            sub: `${calc.accessBobcat}× × ${calc.stumpAddRate} hrs`,
+            sub: `${calc.stumpAddRate} hrs`,
             rate: calc.stumpAddRate,
             rateName: 'Demo - Stump Additional',
           },
@@ -1558,7 +1547,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       {/* Trees */}
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Tree Demo — qty × height × {calc.accessBobcat}× access × size multiplier</span>
+          <span>Tree Demo — qty × height × size multiplier</span>
           <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
             (S:{calc.treeSmall}
             <RateEditPopover
