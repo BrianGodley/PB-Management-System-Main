@@ -234,7 +234,12 @@ function calcDemo(
   const treeCalc = (state.treeRows || []).map(r => {
     const qty = n(r.qty),
       ht = n(r.height) || 10
-    const mult = r.size === 'Large' ? treeLarge : r.size === 'Medium' ? treeMed : treeSmall
+    const mult =
+      r.size === '18" - 24"' || r.size === 'Large'
+        ? treeLarge
+        : r.size === '12" - 18"' || r.size === 'Medium'
+          ? treeMed
+          : treeSmall
     const hrs = qty * ht * access * mult
     const tons = qty * (ht / 10) * 0.25
     const dumpFee = isSub ? 0 : tons * dumpTree
@@ -479,11 +484,11 @@ const DEFAULT_STATE = {
   subDemoSF: '',
   subDemoDepth: 7,
   treeRows: [
-    { qty: '', height: 10, size: 'Small' },
-    { qty: '', height: 10, size: 'Small' },
-    { qty: '', height: 10, size: 'Small' },
-    { qty: '', height: 15, size: 'Medium' },
-    { qty: '', height: 20, size: 'Large' },
+    { qty: '', height: 10, size: '6" - 12"' },
+    { qty: '', height: 10, size: '6" - 12"' },
+    { qty: '', height: 10, size: '6" - 12"' },
+    { qty: '', height: 15, size: '12" - 18"' },
+    { qty: '', height: 20, size: '18" - 24"' },
   ],
   // Manual
   manualRows: [
@@ -1674,7 +1679,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             cols={[
               { label: 'Qty', w: 'w-16' },
               { label: 'Height (ft)', w: 'w-24' },
-              { label: 'Size', w: 'w-28' },
+              { label: 'Trunk Size', w: 'w-32' },
               { label: 'Labor Hrs', w: 'w-20' },
               ...(isSelf ? [{ label: 'Tree Dump', w: 'w-24' }] : []),
             ]}
@@ -1701,7 +1706,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                     <Sel
                       value={r.size}
                       onChange={e => setRow('treeRows', i, 'size', e.target.value)}
-                      options={['Small', 'Medium', 'Large']}
+                      options={['6" - 12"', '12" - 18"', '18" - 24"']}
                     />
                   </td>
                   <td className={num}>{fh(cr.hrs)}</td>
@@ -1711,6 +1716,9 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             })}
           </tbody>
         </table>
+        <p className="text-xs text-gray-500 mt-1 italic">
+          Note: trunks over 24" must be subcontracted.
+        </p>
       </div>
 
       {/* Manual */}

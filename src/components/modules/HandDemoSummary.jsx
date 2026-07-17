@@ -187,7 +187,7 @@ export default function HandDemoSummary({ module }) {
   const treeCalc = treeRows.map(r => {
     const qty = n(r.qty),
       height = n(r.height) || 10
-    const mult = r.size === 'Large' ? treeLarge : r.size === 'Medium' ? treeMed : treeSmall
+    const mult = r.size === '18" - 24"' || r.size === 'Large' ? treeLarge : r.size === '12" - 18"' || r.size === 'Medium' ? treeMed : treeSmall
     const hrs = qty * height * accessMult * mult
     const tons = qty * (height / 10) * 0.25
     const dumpFee = isSelf ? tons * dumpTree : 0
@@ -456,7 +456,7 @@ export default function HandDemoSummary({ module }) {
                 const cr = treeCalc[i]
                 if (!cr || !cr.hrs) return null
                 const mult =
-                  r.size === 'Large' ? treeLarge : r.size === 'Medium' ? treeMed : treeSmall
+                  r.size === '18" - 24"' || r.size === 'Large' ? treeLarge : r.size === '12" - 18"' || r.size === 'Medium' ? treeMed : treeSmall
                 return (
                   <LineRow
                     key={i}
