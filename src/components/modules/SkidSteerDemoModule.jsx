@@ -1,3 +1,4 @@
+import WorkTypeChooser from './WorkTypeChooser'
 // ─────────────────────────────────────────────────────────────────────────────
 // SkidSteerDemoModule — Full Skid Steer Demo estimator
 //
@@ -755,6 +756,8 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
         <ModuleNotesField value={notes} onChange={setNotes} />
       </div>
 
+      <WorkTypeChooser value={state.dumpType} onChange={v => set('dumpType', v)} />
+
       {/* Crew Type + Change Demo Module switcher */}
       <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
         <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
@@ -916,11 +919,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Demo Type</p>
-          <Sel
-            value={state.dumpType}
-            onChange={e => set('dumpType', e.target.value)}
-            options={DEMO_TYPES}
-          />
+          <p className="text-sm font-medium text-gray-700 py-1">{state.dumpType === 'In-House' ? 'In House' : 'Subcontractor'}</p>
           {isDemoSub && <p className="text-xs text-amber-600 mt-0.5">Sub handles removal</p>}
         </div>
         <div>

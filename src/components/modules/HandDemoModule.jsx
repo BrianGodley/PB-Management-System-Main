@@ -1,3 +1,4 @@
+import WorkTypeChooser from './WorkTypeChooser'
 // ─────────────────────────────────────────────────────────────────────────────
 // HandDemoModule — Hand (Non-Skid-Steer) Demo estimator
 //
@@ -684,24 +685,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       </div>
 
       {/* In House / Subcontractor chooser — drives the Sub calculations (isSub) */}
-      <div className="flex justify-center mb-2">
-        <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden">
-          {['In-House', 'Subcontractor'].map(opt => (
-            <button
-              key={opt}
-              type="button"
-              onClick={() => set('dumpType', opt)}
-              className={`px-12 py-2 text-sm font-semibold transition-colors ${
-                state.dumpType === opt
-                  ? 'bg-green-700 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {opt === 'In-House' ? 'In House' : 'Subcontractor'}
-            </button>
-          ))}
-        </div>
-      </div>
+      <WorkTypeChooser value={state.dumpType} onChange={v => set('dumpType', v)} />
 
       {/* Crew Type + Change Demo Module switcher */}
       <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">

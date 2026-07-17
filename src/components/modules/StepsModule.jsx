@@ -1,3 +1,4 @@
+import WorkTypeChooser from './WorkTypeChooser'
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
@@ -321,6 +322,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
   // ── State ──────────────────────────────────────────────────────────────────
   const [difficulty, setDifficulty] = useState(initialData?.difficulty ?? '')
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Masonry')
+  const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
   const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
 
   // Paver Steps
@@ -355,6 +357,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
 
   const state = {
     crewType,
+    subType,
     difficulty,
     hoursAdj,
     straightLF,
@@ -445,6 +448,8 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
       <div className="sticky top-[56px] z-10 -mx-6 px-6 pt-2 pb-2 mt-2 bg-transparent">
         <ModuleNotesField value={notes} onChange={setNotes} />
       </div>
+
+      <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} />
 
       {/* Crew Type */}
       <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">

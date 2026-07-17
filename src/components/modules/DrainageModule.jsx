@@ -1,3 +1,4 @@
+import WorkTypeChooser from './WorkTypeChooser'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
@@ -344,6 +345,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   const [difficulty, setDifficulty] = useState(initialData?.difficulty ?? '')
   const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Demo')
+  const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
   const [trenchRows, setTrenchRows] = useState(initialData?.trenchRows ?? DEFAULT_TRENCH_ROWS)
   const [pipeRows, setPipeRows] = useState(initialData?.pipeRows ?? DEFAULT_PIPE_ROWS)
   const [fixtureRows, setFixtureRows] = useState(initialData?.fixtureRows ?? DEFAULT_FIXTURE_ROWS)
@@ -460,6 +462,8 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
       <div className="sticky top-[56px] z-10 -mx-6 px-6 pt-2 pb-2 mt-2 bg-transparent">
         <ModuleNotesField value={notes} onChange={setNotes} />
       </div>
+
+      <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} />
 
       {/* Crew Type */}
       <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
