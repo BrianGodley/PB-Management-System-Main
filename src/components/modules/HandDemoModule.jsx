@@ -434,11 +434,11 @@ const DEFAULT_STATE = {
   concSF: '',
   concDepth: 4,
   dirtSF: '',
-  dirtDepth: 6,
+  dirtDepth: 4,
   baseSF: '',
   baseDepth: 4,
   grassSF: '',
-  grassDepth: 2,
+  grassDepth: 4,
   // Rebar add-on
   rebarSF: '',
   // Misc flat (SF + Depth)
@@ -459,11 +459,11 @@ const DEFAULT_STATE = {
     .map(() => ({ label: '', sf: '', depth: 4 })),
   // Grading
   gradeCutSF: '',
-  gradeCutDepth: 3,
+  gradeCutDepth: 4,
   gradeFillSF: '',
-  gradeFillDepth: 3,
+  gradeFillDepth: 4,
   jjSF: '',
-  jjDepth: 3,
+  jjDepth: 4,
   // Vegetation
   shrubRows: Array(4)
     .fill(null)
