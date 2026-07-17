@@ -108,7 +108,8 @@ function calcDemo(
   const isSub = state.dumpType === 'Subcontractor'
   const isDumpSub = !isSub && state.dispType === 'Subcontractor'
   const lrph = n(laborRatePerHour) || 35
-  const diff = 1 + n(state.difficulty) / 100
+  const difficultyBase = lr['Demo - Difficulty Base'] ?? 1
+  const diff = difficultyBase + n(state.difficulty) / 100
   const hrsAdj = n(state.hoursAdj)
 
   // ── Pull rates from DB (lr) with fallbacks ────────────────────────────────
@@ -162,10 +163,13 @@ function calcDemo(
   const containerPrice = mp['Demo - Container (Low-Boy)'] ?? CONTAINER_COST
   const containerCy = mp['Demo - Container Capacity (CY)'] ?? CONTAINER_CY
   const swellFactor = mp['Demo - Removal Swell'] ?? SWELL
-  const removalContainers = (sf, depthIn) =>
-    Math.ceil((((n(sf) * (n(depthIn) / 12)) / 27) * swellFactor) / containerCy)
+  const removalYards = (sf, depthIn) => ((n(sf) * (n(depthIn) / 12)) / 27) * swellFactor
+  const removalContainers = (sf, depthIn) => Math.ceil(removalYards(sf, depthIn) / containerCy)
   const containerCost = (sf, depthIn) =>
     isSub || isDumpSub ? 0 : removalContainers(sf, depthIn) * containerPrice
+  // Editable hauling coefficients (Master Rates -> Labor, category Demo).
+  const haulSecPerFt = lr['Demo - Mini Haul Sec/Ft'] ?? 0.5
+  const haulLoadCy = lr['Demo - Mini Load (CY)'] ?? 0.2
 
   // ── Demo rows — NonBob access (OK=0.667) ──────────────────────────────────
   const conc = flat(state.concSF, state.concDepth || 4, rateConc, 0, accessNonBob)
@@ -282,11 +286,13 @@ function calcDemo(
     footingCalc.reduce((s, r) => s + r.tons, 0) +
     gradeCut.tons +
     treeCalc.reduce((s, r) => s + r.tons, 0)
-  const miniTrips = totalDemoTons > 0 ? (totalDemoTons * 2000) / BOBCAT_BUCKET_LBS : 0
-  const walkHrs = calcWalkAccessTrips(miniTrips, state.distanceLF, {
-    paceLfPerMin: _pace,
-    baselineLF: DEFAULT_BOBCAT_BASELINE_LF,
-  })
+  const haulYards =
+    removalYards(state.concSF, state.concDepth || 4) +
+    removalYards(state.dirtSF, state.dirtDepth || 6) +
+    removalYards(state.gradeCutSF, state.gradeCutDepth || 3) +
+    removalYards(state.grassSF, state.grassDepth || 2)
+  const haulTrips = haulLoadCy > 0 ? haulYards / haulLoadCy : 0
+  const walkHrs = (haulTrips * n(state.distanceLF) * haulSecPerFt) / 3600
 
   const rawHrs = crewDemoHrs + gradingHrs + vegHrs + rebarHrs + manualHrs
   const totalHrs = rawHrs * diff + hrsAdj + walkHrs
@@ -331,6 +337,10 @@ function calcDemo(
     containerPrice,
     containerCy,
     swellFactor,
+    difficultyBase,
+    haulSecPerFt,
+    haulLoadCy,
+    haulTrips,
     conc,
     dirt,
     base,
@@ -817,6 +827,18 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             onChange={e => set('difficulty', e.target.value)}
             step="5"
           />
+          <p className="text-[10px] text-gray-500 mt-0.5 inline-flex items-center gap-1">
+            base ×{calc.difficultyBase}
+            <RateEditPopover
+              table="labor_rates"
+              name="Demo - Difficulty Base"
+              category="Demo"
+              mode="coefficient"
+              unitLabel="×"
+              currentValue={calc.difficultyBase}
+              onSaved={refreshAllRates}
+            />
+          </p>
         </div>
         <div>
           <p
@@ -830,11 +852,29 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             onChange={e => set('distanceLF', e.target.value)}
             step="5"
           />
-          {calc.walkHrs > 0 && (
-            <p className="text-[10px] text-gray-500 mt-0.5">
-              +{calc.walkHrs.toFixed(2)} hrs walk-access
-            </p>
-          )}
+          <p className="text-[10px] text-gray-500 mt-0.5 inline-flex items-center gap-1 flex-wrap">
+            {calc.haulSecPerFt} sec/ft
+            <RateEditPopover
+              table="labor_rates"
+              name="Demo - Mini Haul Sec/Ft"
+              category="Demo"
+              mode="coefficient"
+              unitLabel="sec/ft"
+              currentValue={calc.haulSecPerFt}
+              onSaved={refreshAllRates}
+            />
+            · {calc.haulLoadCy} cy/load
+            <RateEditPopover
+              table="labor_rates"
+              name="Demo - Mini Load (CY)"
+              category="Demo"
+              mode="coefficient"
+              unitLabel="cy"
+              currentValue={calc.haulLoadCy}
+              onSaved={refreshAllRates}
+            />
+            {calc.walkHrs > 0 && <span>· +{calc.walkHrs.toFixed(2)} hrs haul</span>}
+          </p>
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
