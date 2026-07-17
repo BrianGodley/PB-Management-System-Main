@@ -107,7 +107,7 @@ function calcDemo(
   const accessNonBob = 1 // access modifier removed
   const accessBobcat = 1 // access modifier removed
   const isSub = state.dumpType === 'Subcontractor'
-  const isDumpSub = !isSub && state.dispType === 'Subcontractor'
+  const isDumpSub = false // disposal follows the In House/Sub toggle
   const lrph = n(laborRatePerHour) || 35
   const difficultyRatio = lr['Demo - Difficulty Ratio'] ?? 1
   const diff = 1 + (n(state.difficulty) / 100) * difficultyRatio
@@ -663,7 +663,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
   const fh = v => (v > 0 ? v.toFixed(2) : '—')
   const isSelf = state.dumpType === 'In-House'
   const isSub = state.dumpType === 'Subcontractor'
-  const isDumpSub = !isSub && state.dispType === 'Subcontractor'
+  const isDumpSub = false // disposal follows the In House/Sub toggle
 
   const { dumpConc, dumpDirt, dumpGreen, dumpTreeStump, dumpBase } = calc
 
@@ -922,17 +922,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
               </span>
             </p>
           )}
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Dump Type</p>
-          <Sel
-            value={state.dispType ?? 'In-House'}
-            onChange={e => set('dispType', e.target.value)}
-            options={['In-House', 'Subcontractor']}
-            disabled={isSub}
-          />
-          {isDumpSub && <p className="text-xs text-amber-600 mt-0.5">Sub haul charges apply</p>}
-          {isSub && <p className="text-xs text-gray-400 mt-0.5">N/A — sub demos</p>}
         </div>
       </div>
       {/* Demolition */}

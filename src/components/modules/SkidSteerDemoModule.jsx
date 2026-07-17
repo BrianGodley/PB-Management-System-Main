@@ -102,7 +102,7 @@ function calcDemo(
   const sr = subRates || {}
   const access = 1 // access modifier removed
   const isSub = state.dumpType === 'Subcontractor' // Demo Type = Sub
-  const isDumpSub = !isSub && state.dispType === 'Subcontractor' // Dump Type = Sub (Demo must be In-House)
+  const isDumpSub = false // disposal follows the In House/Sub toggle
   const lrph = n(laborRatePerHour) || 35
   const difficultyRatio = lr['Demo - Difficulty Ratio'] ?? 1
   const diff = 1 + (n(state.difficulty) / 100) * difficultyRatio
@@ -685,7 +685,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
   const fh = v => (v > 0 ? v.toFixed(2) : '—')
   // isSelf = fully in-house (no sub involvement in demo or dump)
   const isDemoSub = state.dumpType === 'Subcontractor'
-  const isDumpSub = !isDemoSub && state.dispType === 'Subcontractor'
+  const isDumpSub = false
   const isSelf = !isDemoSub && !isDumpSub
 
   const dumpConc = materialPrices['Dump Fee - Concrete'] ?? DUMP_FEE_DEFAULTS['Dump Fee - Concrete']
@@ -912,17 +912,6 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           <p className="text-xs text-gray-500 mb-0.5">Demo Type</p>
           <p className="text-sm font-medium text-gray-700 py-1">{state.dumpType === 'In-House' ? 'In House' : 'Subcontractor'}</p>
           {isDemoSub && <p className="text-xs text-amber-600 mt-0.5">Sub handles removal</p>}
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Dump Type</p>
-          <Sel
-            value={state.dispType ?? 'In-House'}
-            onChange={e => set('dispType', e.target.value)}
-            options={['In-House', 'Subcontractor']}
-            disabled={isDemoSub}
-          />
-          {isDumpSub && <p className="text-xs text-amber-600 mt-0.5">Sub haul charges apply</p>}
-          {isDemoSub && <p className="text-xs text-gray-400 mt-0.5">N/A — sub demos</p>}
         </div>
       </div>
       {/* Demolition */}
