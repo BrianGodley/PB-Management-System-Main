@@ -484,10 +484,8 @@ const DEFAULT_STATE = {
   subDemoSF: '',
   subDemoDepth: 7,
   treeRows: [
-    { qty: '', height: 10, size: '6" - 12"' },
-    { qty: '', height: 10, size: '6" - 12"' },
-    { qty: '', height: 10, size: '6" - 12"' },
-    { qty: '', height: 15, size: '12" - 18"' },
+    { qty: '', height: 20, size: '6" - 12"' },
+    { qty: '', height: 20, size: '12" - 18"' },
     { qty: '', height: 20, size: '18" - 24"' },
   ],
   // Manual
