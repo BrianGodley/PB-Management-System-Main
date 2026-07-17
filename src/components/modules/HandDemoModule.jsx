@@ -1090,7 +1090,8 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           <span>Misc Flat Demo</span>
-          <span className="font-normal normal-case text-gray-500">· SF × Depth · hand labor {calc.sfLaborRate} hr/100sf·in</span>
+          <span className="text-gray-400 font-normal">·</span>
+          <span className="font-normal normal-case">Hand labor {calc.sfLaborRate} hr/100sf·in</span>
           <RateEditPopover
             table="labor_rates"
             name="Demo - Hand Removal (SF)"
@@ -1100,7 +1101,42 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             currentValue={calc.sfLaborRate}
             onSaved={refreshAllRates}
           />
-          {isSelf && <span className="font-normal normal-case text-gray-500">· container disposal</span>}
+          {isSelf ? (
+            <>
+              <span className="text-gray-400 font-normal">·</span>
+              <span className="font-normal normal-case">Container ${calc.containerPrice}</span>
+              <RateEditPopover
+                table="material_rates"
+                name="Demo - Container (Low-Boy)"
+                category="Demo"
+                unitLabel="container"
+                currentValue={calc.containerPrice}
+                onSaved={refreshAllRates}
+              />
+              <span className="font-normal normal-case">/ {calc.containerCy} cy</span>
+              <RateEditPopover
+                table="material_rates"
+                name="Demo - Container Capacity (CY)"
+                category="Demo"
+                mode="coefficient"
+                unitLabel="cy"
+                currentValue={calc.containerCy}
+                onSaved={refreshAllRates}
+              />
+              <span className="font-normal normal-case">· ×{calc.swellFactor} swell</span>
+              <RateEditPopover
+                table="material_rates"
+                name="Demo - Removal Swell"
+                category="Demo"
+                mode="coefficient"
+                unitLabel="×"
+                currentValue={calc.swellFactor}
+                onSaved={refreshAllRates}
+              />
+            </>
+          ) : (
+            <span className="font-normal normal-case">· Sub Handles Removal</span>
+          )}
         </div>
         <table className="w-full text-xs">
           <TH
@@ -1109,12 +1145,13 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
               { label: 'SF', w: 'w-24' },
               { label: 'Depth (in)', w: 'w-20' },
               { label: 'Tons', w: 'w-16' },
+              ...(isSelf ? [{ label: 'Disposal', w: 'w-24' }] : []),
               { label: 'Labor Hrs', w: 'w-20' },
             ]}
           />
           <tbody className="divide-y divide-gray-50">
             {state.miscFlatRows.map((r, i) => {
-              const cr = calc.miscFlatCalc[i] || { tons: 0, hours: 0 }
+              const cr = calc.miscFlatCalc[i] || { tons: 0, hours: 0, dumpFee: 0 }
               return (
                 <tr key={i}>
                   <td className={td}>
@@ -1139,6 +1176,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                     />
                   </td>
                   <td className={num}>{cr.tons > 0 ? cr.tons.toFixed(1) : '—'}</td>
+                  {isSelf && <td className={num}>{cr.dumpFee > 0 ? fmt2(cr.dumpFee) : '—'}</td>}
                   <td className={num}>{fh(cr.hours)}</td>
                 </tr>
               )
