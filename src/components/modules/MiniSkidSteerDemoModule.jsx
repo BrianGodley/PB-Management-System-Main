@@ -128,8 +128,10 @@ function calcDemo(
   const rateSSCmp = lr['Demo - Mini SS Compaction'] ?? RATE_DEFAULTS.ssCompact
   const rebarMinPerSF = lr['Demo - Mini Rebar'] ?? RATE_DEFAULTS.rebarMin
   const shrubRate = lr['Demo - Mini Shrub'] ?? RATE_DEFAULTS.shrub
-  const stumpFstRate = lr['Demo - Mini Stump 1st'] ?? RATE_DEFAULTS.stumpFst
-  const stumpAddRate = lr['Demo - Mini Stump Additional'] ?? RATE_DEFAULTS.stumpAdd
+  const stumpSmallRate = lr['Demo - Mini Stump Small'] ?? 1.25
+  const stumpMedRate = lr['Demo - Mini Stump Medium'] ?? 2.5
+  const stumpLargeRate = lr['Demo - Mini Stump Large'] ?? 3.75
+  const stumpXLRate = lr['Demo - Mini Stump XL'] ?? 5
   const treeSmall = lr['Demo - Mini Tree Small'] ?? RATE_DEFAULTS.treeSmall
   const treeMed = lr['Demo - Mini Tree Medium'] ?? RATE_DEFAULTS.treeMed
   const treeLarge = lr['Demo - Mini Tree Large'] ?? RATE_DEFAULTS.treeLarge
@@ -227,8 +229,11 @@ function calcDemo(
   const shrubSfDensity = n(state.shrubDensity) || 1
   const shrubSfHrs = (n(state.shrubSqFt) / 100) * shrubSfDensity * shrubSfRate
   const shrubSfMat = (n(state.shrubSqFt) / 100) * shrubSfDensity * shrubSfMatRate
-  const stumpFstHrs = n(state.stumpFirstQty) * accessBobcat * stumpFstRate
-  const stumpAddHrs = n(state.stumpAddQty) * accessBobcat * stumpAddRate
+  const stumpSmallHrs = n(state.stumpSmallQty) * accessBobcat * stumpSmallRate
+  const stumpMedHrs = n(state.stumpMedQty) * accessBobcat * stumpMedRate
+  const stumpLargeHrs = n(state.stumpLargeQty) * accessBobcat * stumpLargeRate
+  const stumpXLHrs = n(state.stumpXLQty) * accessBobcat * stumpXLRate
+  const stumpHrs = stumpSmallHrs + stumpMedHrs + stumpLargeHrs + stumpXLHrs
 
   const treeCalc = (state.treeRows || []).map(r => {
     const qty = n(r.qty),
@@ -279,7 +284,7 @@ function calcDemo(
     footingCalc.reduce((s, r) => s + r.hours, 0) +
     gradeCut.hours
   const gradingHrs = gradeFill.hours + jjHrs + ssCmpHrs
-  const vegHrs = shrubHrs + shrubSfHrs + stumpFstHrs + stumpAddHrs + treeCalc.reduce((s, r) => s + r.hrs, 0)
+  const vegHrs = shrubHrs + shrubSfHrs + stumpHrs + treeCalc.reduce((s, r) => s + r.hrs, 0)
 
   // ── Walk-access (Truck → Work Area) — trip-based for mini-skid demo ───
   // Excel: S4 = (F6 - BobcatTravel) × N4 × 2 × (1/60/60)
@@ -400,11 +405,15 @@ function calcDemo(
     shrubSfMat,
     shrubSfRate,
     shrubSfMatRate,
-    stumpFstHrs,
-    stumpAddHrs,
+    stumpSmallHrs,
+    stumpMedHrs,
+    stumpLargeHrs,
+    stumpXLHrs,
     shrubRate,
-    stumpFstRate,
-    stumpAddRate,
+    stumpSmallRate,
+    stumpMedRate,
+    stumpLargeRate,
+    stumpXLRate,
     treeCalc,
     crewDemoHrs,
     gradingHrs,
@@ -481,8 +490,10 @@ const DEFAULT_STATE = {
   shrubQty: '',
   shrubSqFt: '',
   shrubDensity: '1',
-  stumpFirstQty: '',
-  stumpAddQty: '',
+  stumpSmallQty: '',
+  stumpMedQty: '',
+  stumpLargeQty: '',
+  stumpXLQty: '',
   haulTrashLoads: '',
   haulConcreteLoads: '',
   haulSoilLoads: '',
@@ -1597,20 +1608,36 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             rateName: 'Demo - Mini Shrub',
           },
           {
-            label: 'Stump Grind 1st',
-            key: 'stumpFirstQty',
-            hrs: calc.stumpFstHrs,
-            sub: `${calc.stumpFstRate} hrs`,
-            rate: calc.stumpFstRate,
-            rateName: 'Demo - Mini Stump 1st',
+            label: 'Small (up to 12")',
+            key: 'stumpSmallQty',
+            hrs: calc.stumpSmallHrs,
+            sub: `${calc.stumpSmallRate} hrs/ea`,
+            rate: calc.stumpSmallRate,
+            rateName: 'Demo - Mini Stump Small',
           },
           {
-            label: "Stump Grind Add'l",
-            key: 'stumpAddQty',
-            hrs: calc.stumpAddHrs,
-            sub: `${calc.stumpAddRate} hrs`,
-            rate: calc.stumpAddRate,
-            rateName: 'Demo - Mini Stump Additional',
+            label: 'Medium (12"–24")',
+            key: 'stumpMedQty',
+            hrs: calc.stumpMedHrs,
+            sub: `${calc.stumpMedRate} hrs/ea`,
+            rate: calc.stumpMedRate,
+            rateName: 'Demo - Mini Stump Medium',
+          },
+          {
+            label: 'Large (24"–36")',
+            key: 'stumpLargeQty',
+            hrs: calc.stumpLargeHrs,
+            sub: `${calc.stumpLargeRate} hrs/ea`,
+            rate: calc.stumpLargeRate,
+            rateName: 'Demo - Mini Stump Large',
+          },
+          {
+            label: 'Extra Large (36"–48")',
+            key: 'stumpXLQty',
+            hrs: calc.stumpXLHrs,
+            sub: `${calc.stumpXLRate} hrs/ea`,
+            rate: calc.stumpXLRate,
+            rateName: 'Demo - Mini Stump XL',
           },
         ].map(({ label, key, hrs, sub, rate, rateName }) => (
           <div key={key}>

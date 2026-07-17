@@ -98,8 +98,10 @@ function calcDemo(
   const rateJJ = lr['Demo - Hand JJ Compaction'] ?? RATE_DEFAULTS.jj
   const rebarMinPerSF = lr['Demo - Hand Rebar'] ?? RATE_DEFAULTS.rebarMin
   const shrubRate = lr['Demo - Hand Shrub'] ?? RATE_DEFAULTS.shrub
-  const stumpFstRate = lr['Demo - Hand Stump 1st'] ?? RATE_DEFAULTS.stumpFst
-  const stumpAddRate = lr['Demo - Hand Stump Additional'] ?? RATE_DEFAULTS.stumpAdd
+  const stumpSmallRate = lr['Demo - Hand Stump Small'] ?? 1.25
+  const stumpMedRate = lr['Demo - Hand Stump Medium'] ?? 2.5
+  const stumpLargeRate = lr['Demo - Hand Stump Large'] ?? 3.75
+  const stumpXLRate = lr['Demo - Hand Stump XL'] ?? 5
   const treeSmall = lr['Demo - Hand Tree Small'] ?? RATE_DEFAULTS.treeSmall
   const treeMed = lr['Demo - Hand Tree Medium'] ?? RATE_DEFAULTS.treeMed
   const treeLarge = lr['Demo - Hand Tree Large'] ?? RATE_DEFAULTS.treeLarge
@@ -223,8 +225,11 @@ function calcDemo(
     hrs: n(r.qty) * shrubRate * (STUB_HEIGHT_MODS[r.height] ?? 0.75),
   }))
   const shrubRowsHrs = shrubRowsCalc.reduce((s, r) => s + r.hrs, 0)
-  const stumpFstHrs = n(state.stumpFirstQty) * stumpFstRate
-  const stumpAddHrs = n(state.stumpAddQty) * stumpAddRate
+  const stumpSmallHrs = n(state.stumpSmallQty) * stumpSmallRate
+  const stumpMedHrs = n(state.stumpMedQty) * stumpMedRate
+  const stumpLargeHrs = n(state.stumpLargeQty) * stumpLargeRate
+  const stumpXLHrs = n(state.stumpXLQty) * stumpXLRate
+  const stumpHrs = stumpSmallHrs + stumpMedHrs + stumpLargeHrs + stumpXLHrs
 
   const treeCalc = (state.treeRows || []).map(r => {
     const qty = n(r.qty),
@@ -277,7 +282,7 @@ function calcDemo(
     bucketCalc.reduce((s, r) => s + r.hours, 0) +
     gradeCut.hours
   const gradingHrs = gradeFill.hours + jjHrs
-  const vegHrs = shrubRowsHrs + stumpFstHrs + stumpAddHrs + treeCalc.reduce((s, r) => s + r.hrs, 0)
+  const vegHrs = shrubRowsHrs + stumpHrs + treeCalc.reduce((s, r) => s + r.hrs, 0)
 
   const rawHrs = crewDemoHrs + gradingHrs + vegHrs + rebarHrs + manualHrs
   const _preWalkHrs = rawHrs * diff + hrsAdj
@@ -383,8 +388,10 @@ function calcDemo(
     jjHrs,
     rebarHrs,
     shrubRowsCalc,
-    stumpFstHrs,
-    stumpAddHrs,
+    stumpSmallHrs,
+    stumpMedHrs,
+    stumpLargeHrs,
+    stumpXLHrs,
     treeCalc,
     crewDemoHrs,
     gradingHrs,
@@ -404,8 +411,10 @@ function calcDemo(
     rateJJ,
     rebarMinPerSF,
     shrubRate,
-    stumpFstRate,
-    stumpAddRate,
+    stumpSmallRate,
+    stumpMedRate,
+    stumpLargeRate,
+    stumpXLRate,
     treeSmall,
     treeMed,
     treeLarge,
@@ -459,8 +468,10 @@ const DEFAULT_STATE = {
   shrubRows: Array(4)
     .fill(null)
     .map(() => ({ area: '', qty: '', height: '0-1' })),
-  stumpFirstQty: '',
-  stumpAddQty: '',
+  stumpSmallQty: '',
+  stumpMedQty: '',
+  stumpLargeQty: '',
+  stumpXLQty: '',
   haulTrashLoads: '',
   haulConcreteLoads: '',
   haulSoilLoads: '',
@@ -1546,20 +1557,36 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       <div className="grid grid-cols-2 gap-3">
         {[
           {
-            label: 'Stump Grind 1st',
-            key: 'stumpFirstQty',
-            hrs: calc.stumpFstHrs,
-            sub: `${calc.stumpFstRate} hrs`,
-            rate: calc.stumpFstRate,
-            rateName: 'Demo - Hand Stump 1st',
+            label: 'Small (up to 12")',
+            key: 'stumpSmallQty',
+            hrs: calc.stumpSmallHrs,
+            sub: `${calc.stumpSmallRate} hrs/ea`,
+            rate: calc.stumpSmallRate,
+            rateName: 'Demo - Hand Stump Small',
           },
           {
-            label: "Stump Grind Add'l",
-            key: 'stumpAddQty',
-            hrs: calc.stumpAddHrs,
-            sub: `${calc.stumpAddRate} hrs`,
-            rate: calc.stumpAddRate,
-            rateName: 'Demo - Hand Stump Additional',
+            label: 'Medium (12"–24")',
+            key: 'stumpMedQty',
+            hrs: calc.stumpMedHrs,
+            sub: `${calc.stumpMedRate} hrs/ea`,
+            rate: calc.stumpMedRate,
+            rateName: 'Demo - Hand Stump Medium',
+          },
+          {
+            label: 'Large (24"–36")',
+            key: 'stumpLargeQty',
+            hrs: calc.stumpLargeHrs,
+            sub: `${calc.stumpLargeRate} hrs/ea`,
+            rate: calc.stumpLargeRate,
+            rateName: 'Demo - Hand Stump Large',
+          },
+          {
+            label: 'Extra Large (36"–48")',
+            key: 'stumpXLQty',
+            hrs: calc.stumpXLHrs,
+            sub: `${calc.stumpXLRate} hrs/ea`,
+            rate: calc.stumpXLRate,
+            rateName: 'Demo - Hand Stump XL',
           },
         ].map(({ label, key, hrs, sub, rate, rateName }) => (
           <div key={key}>

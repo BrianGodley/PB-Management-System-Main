@@ -95,8 +95,10 @@ export default function MiniSkidSteerDemoSummary({ module }) {
     ssCmpSF = 0,
     ssCmpDepth = 3,
     shrubQty = 0,
-    stumpFirstQty = 0,
-    stumpAddQty = 0,
+    stumpSmallQty = 0,
+    stumpMedQty = 0,
+    stumpLargeQty = 0,
+    stumpXLQty = 0,
     treeRows = [],
     manualRows = [],
     laborRatePerHour = 35,
@@ -116,8 +118,10 @@ export default function MiniSkidSteerDemoSummary({ module }) {
   const rateSSCmp = lr['Demo - Mini SS Compaction'] ?? R.ssCompact
   const rebarMinPerSF = lr['Demo - Mini Rebar'] ?? R.rebarMin
   const shrubRate = lr['Demo - Mini Shrub'] ?? R.shrub
-  const stumpFstRate = lr['Demo - Mini Stump 1st'] ?? R.stumpFst
-  const stumpAddRate = lr['Demo - Mini Stump Additional'] ?? R.stumpAdd
+  const stumpSmallRate = lr['Demo - Mini Stump Small'] ?? 1.25
+  const stumpMedRate = lr['Demo - Mini Stump Medium'] ?? 2.5
+  const stumpLargeRate = lr['Demo - Mini Stump Large'] ?? 3.75
+  const stumpXLRate = lr['Demo - Mini Stump XL'] ?? 5
   const treeSmall = lr['Demo - Mini Tree Small'] ?? R.treeSmall
   const treeMed = lr['Demo - Mini Tree Medium'] ?? R.treeMed
   const treeLarge = lr['Demo - Mini Tree Large'] ?? R.treeLarge
@@ -180,8 +184,10 @@ export default function MiniSkidSteerDemoSummary({ module }) {
 
   const rebarHrs = n(rebarSF) * (rebarMinPerSF / 60)
   const shrubHrs = n(shrubQty) * accessMult * shrubRate
-  const stumpFstHrs = n(stumpFirstQty) * accessMult * stumpFstRate
-  const stumpAddHrs = n(stumpAddQty) * accessMult * stumpAddRate
+  const stumpSmallHrs = n(stumpSmallQty) * accessMult * stumpSmallRate
+  const stumpMedHrs = n(stumpMedQty) * accessMult * stumpMedRate
+  const stumpLargeHrs = n(stumpLargeQty) * accessMult * stumpLargeRate
+  const stumpXLHrs = n(stumpXLQty) * accessMult * stumpXLRate
 
   const treeCalc = treeRows.map(r => {
     const qty = n(r.qty),
@@ -401,7 +407,7 @@ export default function MiniSkidSteerDemoSummary({ module }) {
           )}
 
           {/* Vegetation */}
-          {(n(shrubQty) || n(stumpFirstQty) || n(stumpAddQty) || treeCalc.some(r => r.hrs > 0)) >
+          {(n(shrubQty) || n(stumpSmallQty) || n(stumpMedQty) || n(stumpLargeQty) || n(stumpXLQty) || treeCalc.some(r => r.hrs > 0)) >
             0 && (
             <>
               <SectionLabel title="Shrub / Stump / Tree" />
@@ -412,18 +418,32 @@ export default function MiniSkidSteerDemoSummary({ module }) {
                   sub={`${accessMult}× × ${shrubRate} hrs/ea`}
                 />
               )}
-              {n(stumpFirstQty) > 0 && (
+              {n(stumpSmallQty) > 0 && (
                 <LineRow
-                  label={`Stump Grind 1st × ${stumpFirstQty}`}
-                  value={fh(stumpFstHrs) || '—'}
-                  sub={`${accessMult}× × ${stumpFstRate} hrs`}
+                  label={`Stump Small × ${stumpSmallQty}`}
+                  value={fh(stumpSmallHrs) || '—'}
+                  sub={`${accessMult}× × ${stumpSmallRate} hrs/ea`}
                 />
               )}
-              {n(stumpAddQty) > 0 && (
+              {n(stumpMedQty) > 0 && (
                 <LineRow
-                  label={`Stump Add'l × ${stumpAddQty}`}
-                  value={fh(stumpAddHrs) || '—'}
-                  sub={`${accessMult}× × ${stumpAddRate} hrs`}
+                  label={`Stump Medium × ${stumpMedQty}`}
+                  value={fh(stumpMedHrs) || '—'}
+                  sub={`${accessMult}× × ${stumpMedRate} hrs/ea`}
+                />
+              )}
+              {n(stumpLargeQty) > 0 && (
+                <LineRow
+                  label={`Stump Large × ${stumpLargeQty}`}
+                  value={fh(stumpLargeHrs) || '—'}
+                  sub={`${accessMult}× × ${stumpLargeRate} hrs/ea`}
+                />
+              )}
+              {n(stumpXLQty) > 0 && (
+                <LineRow
+                  label={`Stump XL × ${stumpXLQty}`}
+                  value={fh(stumpXLHrs) || '—'}
+                  sub={`${accessMult}× × ${stumpXLRate} hrs/ea`}
                 />
               )}
               {treeRows.map((r, i) => {
