@@ -66,8 +66,7 @@ join (values
   ('doubt', 6, 'Join, remain in or befriend the side that best serves the greatest good, and announce the decision publicly to both sides.'),
   ('enemy', 1, 'Find out who you really are.'),
   ('treason', 1, 'Find out that you are.'),
-  ('confusion', 1, 'Find out where you are.'),
-  ('confusion', 2, 'Having located yourself, handle by then applying the Non-Existence formula.')
+  ('confusion', 1, 'Find out where you are.')
 ) as s(slug, seq, text) on s.slug = c.slug
 where c.tenant_id is null
   and not exists (select 1 from public.ext_formulas_condition_steps st where st.condition_id = c.id);
