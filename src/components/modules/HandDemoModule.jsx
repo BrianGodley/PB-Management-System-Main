@@ -1409,9 +1409,10 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 3,
                 tons: calc.gradeCut.tons,
                 hrs: calc.gradeCut.hours,
-                note: `${calc.rateConc} t/hr`,
-                rate: calc.rateConc,
-                rateName: 'Demo - Hand Concrete/Dirt',
+                note: `${calc.sfLaborRate} hr/100sf·in`,
+                rate: calc.sfLaborRate,
+                rateName: 'Demo - Hand Removal (SF)',
+                rateUnit: 'hr/100sf·in',
               },
               {
                 label: 'Grade Fill',
@@ -1420,9 +1421,10 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 3,
                 tons: calc.gradeFill.tons,
                 hrs: calc.gradeFill.hours,
-                note: `${calc.rateBase} t/hr`,
-                rate: calc.rateBase,
-                rateName: 'Demo - Hand Import Base',
+                note: `${calc.sfLaborRate} hr/100sf·in`,
+                rate: calc.sfLaborRate,
+                rateName: 'Demo - Hand Removal (SF)',
+                rateUnit: 'hr/100sf·in',
               },
               {
                 label: 'Jumping Jack',
@@ -1431,11 +1433,12 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 3,
                 tons: 0,
                 hrs: calc.jjHrs,
-                note: `${calc.rateJJ} t/hr`,
-                rate: calc.rateJJ,
-                rateName: 'Demo - JJ Compaction',
+                note: `${calc.sfLaborRate} hr/100sf·in`,
+                rate: calc.sfLaborRate,
+                rateName: 'Demo - Hand Removal (SF)',
+                rateUnit: 'hr/100sf·in',
               },
-            ].map(({ label, sfK, dK, dep, tons, hrs, note, rate, rateName }) => (
+            ].map(({ label, sfK, dK, dep, tons, hrs, note, rate, rateName, rateUnit }) => (
               <tr key={label}>
                 <td className={`${td} font-medium text-gray-700`}>
                   <span className="inline-flex items-center gap-1">
@@ -1446,7 +1449,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                       name={rateName}
                       category="Demo"
                       mode="coefficient"
-                      unitLabel="t/hr"
+                      unitLabel={rateUnit || 't/hr'}
                       currentValue={rate}
                       onSaved={refreshAllRates}
                     />
