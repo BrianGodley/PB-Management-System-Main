@@ -334,7 +334,6 @@ function calcDemo(
 
   return {
     walkHrs,
-    bobcatTrips,
     totalDemoTons,
     totalHrs,
     manDays,

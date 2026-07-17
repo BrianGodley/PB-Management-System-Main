@@ -323,7 +323,6 @@ function calcDemo(
 
   return {
     walkHrs,
-    miniTrips,
     totalDemoTons,
     totalHrs,
     manDays,
