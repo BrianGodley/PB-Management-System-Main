@@ -777,7 +777,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       {/* Settings */}
       <SecHdr title="Job Site Conditions" />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
+        <div className={isSub ? 'hidden' : undefined}>
           <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
           <Inp
             value={state.difficulty}
@@ -797,7 +797,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             />
           </p>
         </div>
-        <div>
+        <div className={isSub ? 'hidden' : undefined}>
           <p
             className="text-xs text-gray-500 mb-0.5"
             title="Average Distance from Truck to Work Area"

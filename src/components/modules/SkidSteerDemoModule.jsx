@@ -848,7 +848,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
       {/* Settings */}
       <SecHdr title="Job Site Conditions" />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
+        <div className={isDemoSub ? 'hidden' : undefined}>
           <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
           <Inp
             value={state.difficulty}
@@ -868,7 +868,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
             />
           </p>
         </div>
-        <div>
+        <div className={isDemoSub ? 'hidden' : undefined}>
           <p
             className="text-xs text-gray-500 mb-0.5"
             title="Average Distance from Truck to Work Area"
