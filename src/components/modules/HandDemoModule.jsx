@@ -64,8 +64,6 @@ const sfToTons = (sf, depthIn) => (n(sf) / 200) * n(depthIn)
 const CONTAINER_COST = 770 // $ per low-boy container
 const CONTAINER_CY = 10 // cubic yards a container holds
 const SWELL = 1.2 // broken-material swell factor
-const removalYards = (sf, depthIn) => ((n(sf) * (n(depthIn) / 12)) / 27) * SWELL
-const removalContainers = (sf, depthIn) => Math.ceil(removalYards(sf, depthIn) / CONTAINER_CY)
 
 function calcDemo(
   state,
@@ -132,17 +130,27 @@ function calcDemo(
     }
   }
 
-  // Container disposal cost for one removed material (0 when a sub handles the dump).
+  // Editable container disposal rates (Master Rates -> Materials, category Demo).
+  const containerPrice = mp['Demo - Container (Low-Boy)'] ?? CONTAINER_COST
+  const containerCy = mp['Demo - Container Capacity (CY)'] ?? CONTAINER_CY
+  const swellFactor = mp['Demo - Removal Swell'] ?? SWELL
+  const removalContainers = (sf, depthIn) =>
+    Math.ceil((((n(sf) * (n(depthIn) / 12)) / 27) * swellFactor) / containerCy)
   const containerCost = (sf, depthIn) =>
-    isSub || isDumpSub ? 0 : removalContainers(sf, depthIn) * CONTAINER_COST
-  // Hand-demo removal labor: 100 SF @ 1" = 1 hr, scaled by thickness.
-  const sfLaborHrs = (sf, depthIn) => (n(sf) / 100) * n(depthIn)
+    isSub || isDumpSub ? 0 : removalContainers(sf, depthIn) * containerPrice
+  // Editable hand-demo removal labor: hours per 100 SF at 1", scaled by thickness.
+  const sfLaborRate = lr['Demo - Hand Removal (SF)'] ?? 1
+  const sfLaborHrs = (sf, depthIn) => (n(sf) / 100) * n(depthIn) * sfLaborRate
 
   // ── Demo rows ────────────────────────────────────────────────────────────
   const conc = flat(state.concSF, state.concDepth || 4, rateConc, 0)
   const dirt = flat(state.dirtSF, state.dirtDepth || 6, rateConc, 0)
   const base = flat(state.baseSF, state.baseDepth || 4, rateBase, 0)
   const grass = flat(state.grassSF, state.grassDepth || 2, rateGrass, 0)
+  // Removed debris — container disposal per material (shown as the row's Dump Fee).
+  conc.dumpFee = containerCost(state.concSF, state.concDepth || 4)
+  dirt.dumpFee = containerCost(state.dirtSF, state.dirtDepth || 6)
+  grass.dumpFee = containerCost(state.grassSF, state.grassDepth || 2)
   // Hand-demo: concrete + soils removal labor is square-foot based (not tons).
   conc.hours = sfLaborHrs(state.concSF, state.concDepth || 4)
   dirt.hours = sfLaborHrs(state.dirtSF, state.dirtDepth || 6)
@@ -160,6 +168,7 @@ function calcDemo(
 
   // ── Grading ──────────────────────────────────────────────────────────────
   const gradeCut = flat(state.gradeCutSF, state.gradeCutDepth || 3, rateConc, 0)
+  gradeCut.dumpFee = containerCost(state.gradeCutSF, state.gradeCutDepth || 3)
   const gradeFill = flat(state.gradeFillSF, state.gradeFillDepth || 3, rateBase, 0)
 
   const jjTons = sfToTons(state.jjSF, state.jjDepth || 3)
@@ -249,13 +258,7 @@ function calcDemo(
       bucketCalc.reduce((s, r) => s + r.dumpFee, 0) +
       gradeCut.dumpFee +
       treeCalc.reduce((s, r) => s + r.dumpFee, 0)
-  // Removed debris (concrete, soils, grade cut, grass) — container disposal, per material.
-  const containerMat =
-    containerCost(state.concSF, state.concDepth || 4) +
-    containerCost(state.dirtSF, state.dirtDepth || 6) +
-    containerCost(state.gradeCutSF, state.gradeCutDepth || 3) +
-    containerCost(state.grassSF, state.grassDepth || 2)
-  const totalMat = dumpMatCost + manualMat + shrubSfMat + containerMat
+  const totalMat = dumpMatCost + manualMat + shrubSfMat
 
   // ── Financials ────────────────────────────────────────────────────────────
   const manDays = totalHrs / 8
@@ -278,6 +281,10 @@ function calcDemo(
     gp,
     commission,
     price,
+    containerPrice,
+    containerCy,
+    swellFactor,
+    sfLaborRate,
     conc,
     dirt,
     base,
@@ -850,36 +857,48 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       {/* Demolition */}
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Demolition — {calc.rateConc} t/hr hand</span>
+          <span>Demolition</span>
+          <span className="text-gray-400 font-normal">·</span>
+          <span className="font-normal normal-case">Hand labor {calc.sfLaborRate} hr/100sf·in</span>
           <RateEditPopover
             table="labor_rates"
-            name="Demo - Hand Concrete/Dirt"
+            name="Demo - Hand Removal (SF)"
             category="Demo"
             mode="coefficient"
-            unitLabel="t/hr"
-            currentValue={calc.rateConc}
+            unitLabel="hr/100sf·in"
+            currentValue={calc.sfLaborRate}
             onSaved={refreshAllRates}
           />
           {isSelf ? (
             <>
               <span className="text-gray-400 font-normal">·</span>
-              <span className="font-normal normal-case">Conc ${dumpConc}/ton</span>
+              <span className="font-normal normal-case">Container ${calc.containerPrice}</span>
               <RateEditPopover
                 table="material_rates"
-                name="Dump Fee - Concrete"
+                name="Demo - Container (Low-Boy)"
                 category="Demo"
-                unitLabel="ton"
-                currentValue={dumpConc}
+                unitLabel="container"
+                currentValue={calc.containerPrice}
                 onSaved={refreshAllRates}
               />
-              <span className="text-gray-400 font-normal">·</span>
-              <span className="font-normal normal-case">Dirt ${dumpDirt}/ton</span>
+              <span className="font-normal normal-case">/ {calc.containerCy} cy</span>
               <RateEditPopover
                 table="material_rates"
-                name="Dump Fee - Dirt"
+                name="Demo - Container Capacity (CY)"
                 category="Demo"
-                unitLabel="ton"
-                currentValue={dumpDirt}
+                mode="coefficient"
+                unitLabel="cy"
+                currentValue={calc.containerCy}
+                onSaved={refreshAllRates}
+              />
+              <span className="font-normal normal-case">· ×{calc.swellFactor} swell</span>
+              <RateEditPopover
+                table="material_rates"
+                name="Demo - Removal Swell"
+                category="Demo"
+                mode="coefficient"
+                unitLabel="×"
+                currentValue={calc.swellFactor}
                 onSaved={refreshAllRates}
               />
             </>
@@ -907,9 +926,10 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 4,
                 row: calc.conc,
                 fee: dumpConc,
-                rate: calc.rateConc,
-                rateName: 'Demo - Hand Concrete/Dirt',
-                rateNote: `${calc.rateConc} t/hr`,
+                rate: calc.sfLaborRate,
+                rateName: 'Demo - Hand Removal (SF)',
+                rateNote: `${calc.sfLaborRate} hr/100sf·in`,
+                rateUnit: 'hr/100sf·in',
               },
               {
                 label: 'Dirt/Rock',
@@ -918,9 +938,10 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 6,
                 row: calc.dirt,
                 fee: dumpDirt,
-                rate: calc.rateConc,
-                rateName: 'Demo - Hand Concrete/Dirt',
-                rateNote: `${calc.rateConc} t/hr`,
+                rate: calc.sfLaborRate,
+                rateName: 'Demo - Hand Removal (SF)',
+                rateNote: `${calc.sfLaborRate} hr/100sf·in`,
+                rateUnit: 'hr/100sf·in',
               },
               {
                 label: 'Import Base',
@@ -942,19 +963,9 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 fee: dumpGreen,
                 rate: calc.rateGrass,
                 rateName: 'Demo - Hand Grass',
-                rateNote: `${calc.rateGrass} t/hr · $${dumpGreen}/ton green waste`,
-                extraIcon: (
-                  <RateEditPopover
-                    table="material_rates"
-                    name="Dump Fee - Green Waste"
-                    category="Demo"
-                    unitLabel="ton"
-                    currentValue={dumpGreen}
-                    onSaved={refreshAllRates}
-                  />
-                ),
+                rateNote: `${calc.rateGrass} t/hr`,
               },
-            ].map(({ label, sfK, dK, dep, row, rate, rateName, rateNote, extraIcon }) => (
+            ].map(({ label, sfK, dK, dep, row, rate, rateName, rateNote, rateUnit, extraIcon }) => (
               <tr key={label}>
                 <td className={`${td} font-medium text-gray-700`}>
                   <span className="inline-flex items-center gap-1">
@@ -965,7 +976,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                       name={rateName}
                       category="Demo"
                       mode="coefficient"
-                      unitLabel="t/hr"
+                      unitLabel={rateUnit || 't/hr'}
                       currentValue={rate}
                       onSaved={refreshAllRates}
                     />
