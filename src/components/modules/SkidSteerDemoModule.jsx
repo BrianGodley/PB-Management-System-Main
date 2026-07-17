@@ -339,9 +339,22 @@ function calcDemo(
       n(state.haulSoilLoads) * haulSoilRate +
       n(state.haulBaseLoads) * haulBaseRate
     : 0
-  const gp = manDays * gpmd + (subDumpCost + subHaulCost + haulCost) * subMarkupRate
+  // Subcontractor combined demo line: SF × tiered $/sf by depth (concrete/dirt/rock/paver).
+  const skidRateDeep = sr['Sub Demo - Skid 5-7in'] ?? 2.0
+  const skidRateMid = sr['Sub Demo - Skid 2-4in'] ?? 1.75
+  const skidRateShallow = sr['Sub Demo - Skid 1-2in'] ?? 1.5
+  const skidSubRate = d => {
+    const x = n(d)
+    return x >= 5 ? skidRateDeep : x >= 2 ? skidRateMid : skidRateShallow
+  }
+  const subDemoCost = isSub ? n(state.subDemoSF) * skidSubRate(state.subDemoDepth || 7) : 0
+  const miscFlatSubCost = isSub
+    ? (state.miscFlatRows || []).reduce((sum, r) => sum + n(r.sf) * skidSubRate(r.depth || 7), 0)
+    : 0
+  const skidSubDemo = subDemoCost + miscFlatSubCost
+  const gp = manDays * gpmd + (skidSubDemo + subHaulCost + haulCost) * subMarkupRate
   const commission = gp * 0.12
-  const subCost = subDumpCost + subHaulCost + manualSub + haulCost
+  const subCost = skidSubDemo + subHaulCost + manualSub + haulCost
   const price = laborCost + burden + totalMat + gp + commission + subCost
 
   return {
@@ -399,6 +412,10 @@ function calcDemo(
     isSub,
     isDumpSub,
     subDumpCost,
+    skidRateDeep,
+    skidRateMid,
+    skidRateShallow,
+    subDemoCost,
     subHaulCost,
     // expose resolved rates for UI display
     rateConc,
@@ -474,6 +491,8 @@ const DEFAULT_STATE = {
   haulConcreteLoads: '',
   haulSoilLoads: '',
   haulBaseLoads: '',
+  subDemoSF: '',
+  subDemoDepth: 7,
   treeRows: [
     { qty: '', height: 10, size: 'Small' },
     { qty: '', height: 10, size: 'Small' },
@@ -1018,20 +1037,42 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
               />
             </>
           )}
+          {isDemoSub && (
+            <>
+              <span className="text-gray-400 font-normal">·</span>
+              <span className="font-normal normal-case">Concrete / Dirt / Rock / Paver</span>
+              <span className="font-normal normal-case text-gray-500">${calc.skidRateDeep} (5-7")</span>
+              <RateEditPopover table="subcontractor_rates" name="Sub Demo - Skid 5-7in" unitLabel="/sf" currentValue={calc.skidRateDeep} onSaved={refreshAllRates} />
+              <span className="font-normal normal-case text-gray-500">/ ${calc.skidRateMid} (2-4")</span>
+              <RateEditPopover table="subcontractor_rates" name="Sub Demo - Skid 2-4in" unitLabel="/sf" currentValue={calc.skidRateMid} onSaved={refreshAllRates} />
+              <span className="font-normal normal-case text-gray-500">/ ${calc.skidRateShallow} (1-2")</span>
+              <RateEditPopover table="subcontractor_rates" name="Sub Demo - Skid 1-2in" unitLabel="/sf" currentValue={calc.skidRateShallow} onSaved={refreshAllRates} />
+              <span className="font-normal normal-case text-gray-500">/sf</span>
+            </>
+          )}
         </div>
         <table className="w-full text-xs">
           <TH
-            cols={[
-              { label: 'Material', w: 'w-32' },
-              { label: 'SF', w: 'w-24' },
-              { label: 'Depth (in)', w: 'w-20' },
-              { label: 'Tons', w: 'w-16' },
-              ...(isSelf ? [{ label: 'Dump Fee', w: 'w-24' }] : []),
-              { label: 'Labor Hrs', w: 'w-20' },
-            ]}
+            cols={
+              isSelf
+                ? [
+                    { label: 'Material', w: 'w-32' },
+                    { label: 'SF', w: 'w-24' },
+                    { label: 'Depth (in)', w: 'w-20' },
+                    { label: 'Tons', w: 'w-16' },
+                    { label: 'Dump Fee', w: 'w-24' },
+                    { label: 'Labor Hrs', w: 'w-20' },
+                  ]
+                : [
+                    { label: 'Material', w: 'w-40' },
+                    { label: 'SF', w: 'w-24' },
+                    { label: 'Depth (in)', w: 'w-20' },
+                    { label: 'Cost', w: 'w-24' },
+                  ]
+            }
           />
           <tbody className="divide-y divide-gray-50">
-            {[
+            {isSelf ? [
               {
                 label: 'Concrete',
                 sfK: 'concSF',
@@ -1118,7 +1159,18 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 {isSelf && <td className={num}>{row.dumpFee > 0 ? fmt2(row.dumpFee) : '—'}</td>}
                 <td className={num}>{fh(row.hours)}</td>
               </tr>
-            ))}
+            )) : (
+              <tr>
+                <td className={`${td} font-medium text-gray-700`}>Concrete / Dirt / Rock / Paver</td>
+                <td className={td}>
+                  <Inp value={state.subDemoSF} onChange={e => set('subDemoSF', e.target.value)} />
+                </td>
+                <td className={td}>
+                  <Inp value={state.subDemoDepth} onChange={e => set('subDemoDepth', e.target.value)} placeholder="7" />
+                </td>
+                <td className={num}>{calc.subDemoCost > 0 ? fmt2(calc.subDemoCost) : '—'}</td>
+              </tr>
+            )}
           </tbody>
         </table>
 
@@ -1155,26 +1207,42 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
       {/* Misc Flat */}
       <div>
         <div className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2 flex items-center gap-2">
-          <span>Misc Flat Demo — {calc.rateConc} t/hr</span>
-          <RateEditPopover
-            table="labor_rates"
-            name="Demo - Skid Steer Concrete/Dirt"
-            category="Demo"
-            mode="coefficient"
-            unitLabel="t/hr"
-            currentValue={calc.rateConc}
-            onSaved={refreshAllRates}
-          />
+          <span>Misc Flat Demo{isSelf ? ` — ${calc.rateConc} t/hr` : ''}</span>
+          {isSelf && (
+            <RateEditPopover
+              table="labor_rates"
+              name="Demo - Skid Steer Concrete/Dirt"
+              category="Demo"
+              mode="coefficient"
+              unitLabel="t/hr"
+              currentValue={calc.rateConc}
+              onSaved={refreshAllRates}
+            />
+          )}
+          {isDemoSub && (
+            <>
+              <span className="font-normal normal-case text-gray-500">${calc.skidRateDeep} (5-7") / ${calc.skidRateMid} (2-4") / ${calc.skidRateShallow} (1-2") /sf</span>
+            </>
+          )}
         </div>
         <table className="w-full text-xs">
           <TH
-            cols={[
-              { label: 'Description' },
-              { label: 'SF', w: 'w-24' },
-              { label: 'Depth (in)', w: 'w-20' },
-              { label: 'Tons', w: 'w-16' },
-              { label: 'Labor Hrs', w: 'w-20' },
-            ]}
+            cols={
+              isSelf
+                ? [
+                    { label: 'Description' },
+                    { label: 'SF', w: 'w-24' },
+                    { label: 'Depth (in)', w: 'w-20' },
+                    { label: 'Tons', w: 'w-16' },
+                    { label: 'Labor Hrs', w: 'w-20' },
+                  ]
+                : [
+                    { label: 'Description' },
+                    { label: 'SF', w: 'w-24' },
+                    { label: 'Depth (in)', w: 'w-20' },
+                    { label: 'Cost', w: 'w-24' },
+                  ]
+            }
           />
           <tbody className="divide-y divide-gray-50">
             {state.miscFlatRows.map((r, i) => {
@@ -1199,11 +1267,28 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                     <Inp
                       value={r.depth}
                       onChange={e => setRow('miscFlatRows', i, 'depth', e.target.value)}
-                      placeholder="4"
+                      placeholder={isDemoSub ? '7' : '4'}
                     />
                   </td>
-                  <td className={num}>{cr.tons > 0 ? cr.tons.toFixed(1) : '—'}</td>
-                  <td className={num}>{fh(cr.hours)}</td>
+                  {isSelf ? (
+                    <>
+                      <td className={num}>{cr.tons > 0 ? cr.tons.toFixed(1) : '—'}</td>
+                      <td className={num}>{fh(cr.hours)}</td>
+                    </>
+                  ) : (
+                    <td className={num}>
+                      {n(r.sf) > 0
+                        ? fmt2(
+                            n(r.sf) *
+                              (n(r.depth || 7) >= 5
+                                ? calc.skidRateDeep
+                                : n(r.depth || 7) >= 2
+                                  ? calc.skidRateMid
+                                  : calc.skidRateShallow)
+                          )
+                        : '—'}
+                    </td>
+                  )}
                 </tr>
               )
             })}

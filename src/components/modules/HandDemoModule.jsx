@@ -256,8 +256,9 @@ function calcDemo(
       : 0
 
   // ── Hour aggregation — labor same in both modes ───────────────────────────
-  const crewDemoHrs =
-    conc.hours +
+  const crewDemoHrs = isSub
+    ? 0
+    : conc.hours +
     dirt.hours +
     base.hours +
     grass.hours +
@@ -310,10 +311,17 @@ function calcDemo(
       n(state.haulSoilLoads) * haulSoilRate +
       n(state.haulBaseLoads) * haulBaseRate
     : 0
-  // GP = labor component + Universal Sub Markup % on sub-haul + hauling
-  const gp = manDays * gpmd + (subHaulCost + haulCost) * subMarkupRate
+  // Subcontractor demo line: SF × per-sf rate (concrete/dirt/rock/paver combined).
+  const handSubRate = sr['Sub Demo - Hand SF'] ?? 2.8
+  const subDemoCost = isSub ? n(state.subDemoSF) * handSubRate : 0
+  const miscFlatSubCost = isSub
+    ? (state.miscFlatRows || []).reduce((sum, r) => sum + n(r.sf) * handSubRate, 0)
+    : 0
+  const handSubDemo = subDemoCost + miscFlatSubCost
+  // GP = labor component + Universal Sub Markup % on sub-haul + hauling + sub demo
+  const gp = manDays * gpmd + (subHaulCost + haulCost + handSubDemo) * subMarkupRate
   const commission = gp * 0.12
-  const subCost = subHaulCost + manualSub + haulCost
+  const subCost = subHaulCost + manualSub + haulCost + handSubDemo
   const price = laborCost + burden + totalMat + gp + commission + subCost
 
   return {
@@ -329,6 +337,8 @@ function calcDemo(
     haulConcreteRate,
     haulSoilRate,
     haulBaseRate,
+    handSubRate,
+    subDemoCost,
     gp,
     commission,
     price,
@@ -437,6 +447,8 @@ const DEFAULT_STATE = {
   haulConcreteLoads: '',
   haulSoilLoads: '',
   haulBaseLoads: '',
+  subDemoSF: '',
+  subDemoDepth: 7,
   treeRows: [
     { qty: '', height: 10, size: 'Small' },
     { qty: '', height: 10, size: 'Small' },
@@ -900,20 +912,36 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
               <RateEditPopover table="material_rates" name="Demo - Removal Swell" category="Demo" mode="coefficient" unitLabel="×" currentValue={calc.swellFactor} onSaved={refreshAllRates} />
             </>
           )}
+          {isSub && (
+            <>
+              <span className="text-gray-400 font-normal">·</span>
+              <span className="font-normal normal-case">Concrete / Dirt / Rock / Paver — ${calc.handSubRate}/sf</span>
+              <RateEditPopover table="subcontractor_rates" name="Sub Demo - Hand SF" unitLabel="/sf" currentValue={calc.handSubRate} onSaved={refreshAllRates} />
+            </>
+          )}
         </div>
         <table className="w-full text-xs">
           <TH
-            cols={[
-              { label: 'Material', w: 'w-32' },
-              { label: 'SF', w: 'w-24' },
-              { label: 'Depth (in)', w: 'w-20' },
-              { label: 'Tons', w: 'w-16' },
-              ...(isSelf ? [{ label: 'Dump Fee', w: 'w-24' }] : []),
-              { label: 'Labor Hrs', w: 'w-20' },
-            ]}
+            cols={
+              isSelf
+                ? [
+                    { label: 'Material', w: 'w-32' },
+                    { label: 'SF', w: 'w-24' },
+                    { label: 'Depth (in)', w: 'w-20' },
+                    { label: 'Tons', w: 'w-16' },
+                    { label: 'Dump Fee', w: 'w-24' },
+                    { label: 'Labor Hrs', w: 'w-20' },
+                  ]
+                : [
+                    { label: 'Material', w: 'w-40' },
+                    { label: 'SF', w: 'w-24' },
+                    { label: 'Depth (in)', w: 'w-20' },
+                    { label: 'Cost', w: 'w-24' },
+                  ]
+            }
           />
           <tbody className="divide-y divide-gray-50">
-            {[
+            {isSelf ? [
               {
                 label: 'Concrete',
                 sfK: 'concSF',
@@ -990,7 +1018,18 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 {isSelf && <td className={num}>{row.dumpFee > 0 ? fmt2(row.dumpFee) : '—'}</td>}
                 <td className={num}>{fh(row.hours)}</td>
               </tr>
-            ))}
+            )) : (
+              <tr>
+                <td className={`${td} font-medium text-gray-700`}>Concrete / Dirt / Rock / Paver</td>
+                <td className={td}>
+                  <Inp value={state.subDemoSF} onChange={e => set('subDemoSF', e.target.value)} />
+                </td>
+                <td className={td}>
+                  <Inp value={state.subDemoDepth} onChange={e => set('subDemoDepth', e.target.value)} placeholder="7" />
+                </td>
+                <td className={num}>{calc.subDemoCost > 0 ? fmt2(calc.subDemoCost) : '—'}</td>
+              </tr>
+            )}
           </tbody>
         </table>
 
@@ -1042,17 +1081,33 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
               <RateEditPopover table="material_rates" name="Demo - Removal Swell" category="Demo" mode="coefficient" unitLabel="×" currentValue={calc.swellFactor} onSaved={refreshAllRates} />
             </>
           )}
+          {isSub && (
+            <>
+              <span className="text-gray-400 font-normal">·</span>
+              <span className="font-normal normal-case">${calc.handSubRate}/sf</span>
+              <RateEditPopover table="subcontractor_rates" name="Sub Demo - Hand SF" unitLabel="/sf" currentValue={calc.handSubRate} onSaved={refreshAllRates} />
+            </>
+          )}
         </div>
         <table className="w-full text-xs">
           <TH
-            cols={[
-              { label: 'Description' },
-              { label: 'SF', w: 'w-24' },
-              { label: 'Depth (in)', w: 'w-20' },
-              { label: 'Tons', w: 'w-16' },
-              ...(isSelf ? [{ label: 'Disposal', w: 'w-24' }] : []),
-              { label: 'Labor Hrs', w: 'w-20' },
-            ]}
+            cols={
+              isSelf
+                ? [
+                    { label: 'Description' },
+                    { label: 'SF', w: 'w-24' },
+                    { label: 'Depth (in)', w: 'w-20' },
+                    { label: 'Tons', w: 'w-16' },
+                    { label: 'Disposal', w: 'w-24' },
+                    { label: 'Labor Hrs', w: 'w-20' },
+                  ]
+                : [
+                    { label: 'Description' },
+                    { label: 'SF', w: 'w-24' },
+                    { label: 'Depth (in)', w: 'w-20' },
+                    { label: 'Cost', w: 'w-24' },
+                  ]
+            }
           />
           <tbody className="divide-y divide-gray-50">
             {state.miscFlatRows.map((r, i) => {
@@ -1077,12 +1132,18 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                     <Inp
                       value={r.depth}
                       onChange={e => setRow('miscFlatRows', i, 'depth', e.target.value)}
-                      placeholder="4"
+                      placeholder={isSub ? '7' : '4'}
                     />
                   </td>
-                  <td className={num}>{cr.tons > 0 ? cr.tons.toFixed(1) : '—'}</td>
-                  {isSelf && <td className={num}>{cr.dumpFee > 0 ? fmt2(cr.dumpFee) : '—'}</td>}
-                  <td className={num}>{fh(cr.hours)}</td>
+                  {isSelf ? (
+                    <>
+                      <td className={num}>{cr.tons > 0 ? cr.tons.toFixed(1) : '—'}</td>
+                      <td className={num}>{cr.dumpFee > 0 ? fmt2(cr.dumpFee) : '—'}</td>
+                      <td className={num}>{fh(cr.hours)}</td>
+                    </>
+                  ) : (
+                    <td className={num}>{n(r.sf) > 0 ? fmt2(n(r.sf) * calc.handSubRate) : '—'}</td>
+                  )}
                 </tr>
               )
             })}
