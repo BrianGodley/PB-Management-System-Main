@@ -103,8 +103,8 @@ function calcDemo(
   const isSub = state.dumpType === 'Subcontractor' // Demo Type = Sub
   const isDumpSub = !isSub && state.dispType === 'Subcontractor' // Dump Type = Sub (Demo must be In-House)
   const lrph = n(laborRatePerHour) || 35
-  const difficultyBase = lr['Demo - Difficulty Base'] ?? 1
-  const diff = difficultyBase + n(state.difficulty) / 100
+  const difficultyRatio = lr['Demo - Difficulty Ratio'] ?? 1
+  const diff = 1 + (n(state.difficulty) / 100) * difficultyRatio
   const hrsAdj = n(state.hoursAdj)
 
   // ── Pull rates from DB (lr) with fallbacks ────────────────────────────────
@@ -347,7 +347,7 @@ function calcDemo(
     containerPrice,
     containerCy,
     swellFactor,
-    difficultyBase,
+    difficultyRatio,
     haulSecPerFt,
     haulLoadCy,
     haulTrips,
@@ -853,14 +853,14 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
             step="5"
           />
           <p className="text-[10px] text-gray-500 mt-0.5 inline-flex items-center gap-1">
-            base ×{calc.difficultyBase}
+            {calc.difficultyRatio}% labor per 1%
             <RateEditPopover
               table="labor_rates"
-              name="Demo - Difficulty Base"
+              name="Demo - Difficulty Ratio"
               category="Demo"
               mode="coefficient"
-              unitLabel="×"
-              currentValue={calc.difficultyBase}
+              unitLabel="% per 1%"
+              currentValue={calc.difficultyRatio}
               onSaved={refreshAllRates}
             />
           </p>
