@@ -1003,9 +1003,10 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 4,
                 row: calc.base,
                 fee: 0,
-                rate: calc.rateBase,
-                rateName: 'Demo - Hand Import Base',
-                rateNote: `${calc.rateBase} t/hr`,
+                rate: calc.sfLaborRate,
+                rateName: 'Demo - Hand Removal (SF)',
+                rateNote: `½ × ${calc.sfLaborRate} hr/100sf·in`,
+                rateUnit: 'hr/100sf·in',
               },
               {
                 label: 'Grass/Sod',
@@ -1014,9 +1015,10 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 2,
                 row: calc.grass,
                 fee: dumpGreen,
-                rate: calc.rateGrass,
-                rateName: 'Demo - Hand Grass',
-                rateNote: `${calc.rateGrass} t/hr`,
+                rate: calc.sfLaborRate,
+                rateName: 'Demo - Hand Removal (SF)',
+                rateNote: `${calc.sfLaborRate} hr/100sf·in`,
+                rateUnit: 'hr/100sf·in',
               },
             ].map(({ label, sfK, dK, dep, row, rate, rateName, rateNote, rateUnit, extraIcon }) => (
               <tr key={label}>
