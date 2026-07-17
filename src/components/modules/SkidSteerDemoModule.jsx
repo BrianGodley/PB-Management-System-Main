@@ -846,7 +846,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
       )}
 
       {/* Settings */}
-      <SecHdr title="Settings" />
+      <SecHdr title="Job Site Conditions" />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>

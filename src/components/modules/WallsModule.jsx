@@ -1024,7 +1024,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
       )}
 
       {/* Settings */}
-      <SectionHeader title="Settings" />
+      <SectionHeader title="Job Site Conditions" />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
