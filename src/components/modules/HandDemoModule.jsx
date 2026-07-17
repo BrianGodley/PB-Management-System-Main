@@ -185,9 +185,9 @@ function calcDemo(
     return row
   })
   const footingCalc = (state.footingRows || []).map(r => {
-    const row = flat(r.sf, r.depth || 12, rateConc, 0)
-    row.hours = sfLaborHrs(r.sf, r.depth || 12)
-    row.dumpFee = containerCost(r.sf, r.depth || 12)
+    const row = vert(r.lf, r.heightIn || 0, r.widthIn || 8, rateConc, 0)
+    row.hours = cfLaborHrs(row.cf)
+    row.dumpFee = containerCostCf(row.cf)
     return row
   })
 
@@ -404,10 +404,10 @@ const DEFAULT_STATE = {
   miscVertRows: Array(4)
     .fill(null)
     .map(() => ({ label: '', lf: '', heightIn: '', widthIn: 8 })),
-  // Footing (SF + Depth)
+  // Footing (LF × Height × Width)
   footingRows: Array(4)
     .fill(null)
-    .map(() => ({ label: '', sf: '', depth: 12 })),
+    .map(() => ({ label: '', lf: '', heightIn: '', widthIn: 8 })),
   // Hand Bucket Areas
   bucketRows: Array(4)
     .fill(null)
@@ -1220,7 +1220,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           <span>Footing Demo</span>
-          <span className="font-normal normal-case text-gray-500">· SF × Depth · hand labor {calc.sfLaborRate} hr/100sf·in</span>
+          <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.sfLaborRate} hr/100sf·in equiv</span>
           <RateEditPopover
             table="labor_rates"
             name="Demo - Hand Removal (SF)"
@@ -1236,15 +1236,16 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           <TH
             cols={[
               { label: 'Description' },
-              { label: 'SF', w: 'w-24' },
-              { label: 'Depth (in)', w: 'w-20' },
+              { label: 'LF', w: 'w-20' },
+              { label: 'H (in)', w: 'w-18' },
+              { label: 'W (in)', w: 'w-18' },
               { label: 'Tons', w: 'w-16' },
               { label: 'Labor Hrs', w: 'w-20' },
             ]}
           />
           <tbody className="divide-y divide-gray-50">
             {state.footingRows.map((r, i) => {
-              const cr = calc.footingCalc[i] || { tons: 0, hours: 0 }
+              const cr = calc.footingCalc[i] || { tons: 0, hours: 0, cf: 0 }
               return (
                 <tr key={i}>
                   <td className={td}>
@@ -1257,15 +1258,22 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                   </td>
                   <td className={td}>
                     <Inp
-                      value={r.sf}
-                      onChange={e => setRow('footingRows', i, 'sf', e.target.value)}
+                      value={r.lf}
+                      onChange={e => setRow('footingRows', i, 'lf', e.target.value)}
                     />
                   </td>
                   <td className={td}>
                     <Inp
-                      value={r.depth}
-                      onChange={e => setRow('footingRows', i, 'depth', e.target.value)}
-                      placeholder="12"
+                      value={r.heightIn}
+                      onChange={e => setRow('footingRows', i, 'heightIn', e.target.value)}
+                      placeholder="0"
+                    />
+                  </td>
+                  <td className={td}>
+                    <Inp
+                      value={r.widthIn}
+                      onChange={e => setRow('footingRows', i, 'widthIn', e.target.value)}
+                      placeholder="8"
                     />
                   </td>
                   <td className={num}>{cr.tons > 0 ? cr.tons.toFixed(2) : '—'}</td>
