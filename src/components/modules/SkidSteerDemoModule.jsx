@@ -1192,7 +1192,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
       </div>
 
       {/* Misc Vertical */}
-      <div>
+      <div className={isDemoSub ? 'hidden' : undefined}>
         <div className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2 flex items-center gap-2">
           <span>Misc Vertical / Structural Demo — LF × Height × Width · {calc.rateConc} t/hr</span>
           <RateEditPopover
@@ -1259,7 +1259,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
       </div>
 
       {/* Footing */}
-      <div>
+      <div className={isDemoSub ? 'hidden' : undefined}>
         <div className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2 flex items-center gap-2">
           <span>Footing Demo — SF × Depth · {calc.rateConc} t/hr</span>
           <RateEditPopover

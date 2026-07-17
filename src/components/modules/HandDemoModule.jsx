@@ -860,43 +860,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Demo Type</p>
           <p className="text-sm font-medium text-gray-700 py-1">{isSelf ? 'In House' : 'Subcontractor'}</p>
-          {!isSelf && (
-            <p className="text-xs text-amber-600 mt-0.5 inline-flex items-center flex-wrap gap-x-1 gap-y-0.5">
-              Sub haul:
-              <span className="inline-flex items-center gap-0.5">
-                ${calc.shConc}/1.5T conc
-                <RateEditPopover
-                  table="subcontractor_rates"
-                  name="Sub Haul - Concrete"
-                  unitLabel="/1.5T"
-                  currentValue={calc.shConc}
-                  onSaved={refreshAllRates}
-                />
-              </span>
-              ·
-              <span className="inline-flex items-center gap-0.5">
-                ${calc.shDirt}/1.5T dirt
-                <RateEditPopover
-                  table="subcontractor_rates"
-                  name="Sub Haul - Dirt"
-                  unitLabel="/1.5T"
-                  currentValue={calc.shDirt}
-                  onSaved={refreshAllRates}
-                />
-              </span>
-              ·
-              <span className="inline-flex items-center gap-0.5">
-                ${calc.shGrass}/1.5T grass
-                <RateEditPopover
-                  table="subcontractor_rates"
-                  name="Sub Haul - Grass"
-                  unitLabel="/1.5T"
-                  currentValue={calc.shGrass}
-                  onSaved={refreshAllRates}
-                />
-              </span>
-            </p>
-          )}
         </div>
       </div>
       {/* Demolition */}
@@ -1108,7 +1071,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       </div>
 
       {/* Misc Vertical */}
-      <div>
+      <div className={isSub ? 'hidden' : undefined}>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           <span>Misc Vertical / Structural Demo</span>
           {isSelf && (
@@ -1173,7 +1136,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       </div>
 
       {/* Footing */}
-      <div>
+      <div className={isSub ? 'hidden' : undefined}>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           <span>Footing Demo</span>
           {isSelf && (
@@ -1238,7 +1201,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       </div>
 
       {/* Hand Bucket Areas */}
-      <div>
+      <div className={isSub ? 'hidden' : undefined}>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           <span>Hand Bucket Areas</span>
           {isSelf && (

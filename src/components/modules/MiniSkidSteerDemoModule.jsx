@@ -1189,7 +1189,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       </div>
 
       {/* Misc Vertical */}
-      <div>
+      <div className={isSub ? 'hidden' : undefined}>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           <span>Misc Vertical / Structural Demo — LF × Height × Width · {calc.rateConc} t/hr</span>
           <RateEditPopover
@@ -1271,7 +1271,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       </div>
 
       {/* Footing */}
-      <div>
+      <div className={isSub ? 'hidden' : undefined}>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           <span>Footing Demo — SF × Depth · {calc.rateConc} t/hr</span>
           <RateEditPopover
