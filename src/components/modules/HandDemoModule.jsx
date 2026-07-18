@@ -217,7 +217,7 @@ function calcDemo(
   const jjHrs = sfLaborHrs(state.jjSF, state.jjDepth || 4, laborJJ)
 
   // ── Rebar add-on ─────────────────────────────────────────────────────────
-  const rebarHrs = rebarSfPerHr > 0 ? n(state.rebarSF) / rebarSfPerHr : 0
+  const rebarHrs = isSub ? 0 : rebarSfPerHr > 0 ? n(state.rebarSF) / rebarSfPerHr : 0
 
   // ── Vegetation ───────────────────────────────────────────────────────────
   // Shrub demo: per-area rows — qty × shrub rate × shrub-height modifier.
@@ -334,7 +334,7 @@ function calcDemo(
   const handSubRate = sr['Sub Demo - Hand SF'] ?? 2.8
   const subDemoCost = isSub ? n(state.subDemoSF) * handSubRate : 0
   const miscFlatSubCost = isSub
-    ? (state.miscFlatRows || []).reduce((sum, r) => sum + n(r.sf) * handSubRate, 0)
+    ? (state.miscFlatRows || []).slice(0, 2).reduce((sum, r) => sum + n(r.sf) * handSubRate, 0)
     : 0
   const handSubDemo = subDemoCost + miscFlatSubCost
   // GP = labor component + Universal Sub Markup % on sub-haul + hauling + sub demo
@@ -1061,7 +1061,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           </tbody>
         </table>
 
-        {/* Rebar add-on */}
+        {isSelf && (
         <div className="mt-3 flex items-center gap-3">
           <div className="flex-1 max-w-xs">
             <p className="text-xs text-gray-500 mb-0.5 inline-flex items-center gap-1">
@@ -1089,6 +1089,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             <p className="text-xs text-gray-500 mt-4">+{calc.rebarHrs.toFixed(2)} hrs rebar</p>
           )}
         </div>
+        )}
       </div>
 
       {/* Misc Flat */}
@@ -1132,13 +1133,12 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 : [
                     { label: 'Description' },
                     { label: 'SF', w: 'w-24' },
-                    { label: 'Depth (in)', w: 'w-20' },
                     { label: 'Cost', w: 'w-24' },
                   ]
             }
           />
           <tbody className="divide-y divide-gray-50">
-            {state.miscFlatRows.map((r, i) => {
+            {(isSub ? state.miscFlatRows.slice(0, 2) : state.miscFlatRows).map((r, i) => {
               const cr = calc.miscFlatCalc[i] || { tons: 0, hours: 0, dumpFee: 0 }
               return (
                 <tr key={i}>
@@ -1156,13 +1156,15 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                       onChange={e => setRow('miscFlatRows', i, 'sf', e.target.value)}
                     />
                   </td>
-                  <td className={td}>
-                    <Inp
-                      value={r.depth}
-                      onChange={e => setRow('miscFlatRows', i, 'depth', e.target.value)}
-                      placeholder={isSub ? '7' : '4'}
-                    />
-                  </td>
+                  {isSelf && (
+                    <td className={td}>
+                      <Inp
+                        value={r.depth}
+                        onChange={e => setRow('miscFlatRows', i, 'depth', e.target.value)}
+                        placeholder="4"
+                      />
+                    </td>
+                  )}
                   {isSelf ? (
                     <>
                       <td className={num}>{cr.tons > 0 ? cr.tons.toFixed(1) : '—'}</td>

@@ -218,7 +218,7 @@ function calcDemo(
   const ssCmpHrs = ssCmpTons > 0 ? ssCmpTons / rateSSCmp : 0
 
   // ── Rebar add-on ─────────────────────────────────────────────────────────
-  const rebarHrs = n(state.rebarSF) * (rebarMinPerSF / 60)
+  const rebarHrs = isSub ? 0 : n(state.rebarSF) * (rebarMinPerSF / 60)
 
   // ── Vegetation — Bobcat access ────────────────────────────────────────────
   const shrubHrs = n(state.shrubQty) * accessBobcat * shrubRate
@@ -349,8 +349,9 @@ function calcDemo(
     return x >= 5 ? miniRateDeep : x >= 2 ? miniRateMid : miniRateShallow
   }
   const subDemoCost = isSub ? n(state.subDemoSF) * miniSubRate(state.subDemoDepth || 7) : 0
+  const miniMiscFlatSubRate = sr['Sub Demo - Mini Misc Flat'] ?? 2.0
   const miscFlatSubCost = isSub
-    ? (state.miscFlatRows || []).reduce((sum, r) => sum + n(r.sf) * miniSubRate(r.depth || 7), 0)
+    ? (state.miscFlatRows || []).slice(0, 2).reduce((sum, r) => sum + n(r.sf) * miniMiscFlatSubRate, 0)
     : 0
   const miniSubDemo = subDemoCost + miscFlatSubCost
   const gp = manDays * gpmd + (subHaulCost + haulCost + miniSubDemo) * subMarkupRate
@@ -376,6 +377,7 @@ function calcDemo(
     miniRateMid,
     miniRateShallow,
     subDemoCost,
+    miniMiscFlatSubRate,
     gp,
     commission,
     price,
@@ -1167,7 +1169,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           </tbody>
         </table>
 
-        {/* Rebar add-on */}
+        {isSelf && (
         <div className="mt-3 flex items-center gap-3">
           <div className="flex-1 max-w-xs">
             <p className="text-xs text-gray-500 mb-0.5 inline-flex items-center gap-1">
@@ -1193,6 +1195,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             <p className="text-xs text-gray-500 mt-4">+{calc.rebarHrs.toFixed(2)} hrs rebar</p>
           )}
         </div>
+        )}
       </div>
 
       {/* Misc Flat */}
@@ -1224,7 +1227,10 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             </>
           )}
           {isSub && (
-            <span className="font-normal normal-case text-gray-500">${calc.miniRateDeep} (5-7") / ${calc.miniRateMid} (2-4") / ${calc.miniRateShallow} (1-2") /sf</span>
+            <>
+              <span className="font-normal normal-case text-gray-500">${calc.miniMiscFlatSubRate}/sf</span>
+              <RateEditPopover table="subcontractor_rates" name="Sub Demo - Mini Misc Flat" unitLabel="/sf" currentValue={calc.miniMiscFlatSubRate} onSaved={refreshAllRates} />
+            </>
           )}
         </div>
         <table className="w-full text-xs">
@@ -1242,13 +1248,12 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 : [
                     { label: 'Description' },
                     { label: 'SF', w: 'w-24' },
-                    { label: 'Depth (in)', w: 'w-20' },
                     { label: 'Cost', w: 'w-24' },
                   ]
             }
           />
           <tbody className="divide-y divide-gray-50">
-            {state.miscFlatRows.map((r, i) => {
+            {(isSub ? state.miscFlatRows.slice(0, 2) : state.miscFlatRows).map((r, i) => {
               const cr = calc.miscFlatCalc[i] || { tons: 0, hours: 0, dumpFee: 0 }
               return (
                 <tr key={i}>
@@ -1266,13 +1271,15 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                       onChange={e => setRow('miscFlatRows', i, 'sf', e.target.value)}
                     />
                   </td>
-                  <td className={td}>
-                    <Inp
-                      value={r.depth}
-                      onChange={e => setRow('miscFlatRows', i, 'depth', e.target.value)}
-                      placeholder={isSub ? '7' : '4'}
-                    />
-                  </td>
+                  {isSelf && (
+                    <td className={td}>
+                      <Inp
+                        value={r.depth}
+                        onChange={e => setRow('miscFlatRows', i, 'depth', e.target.value)}
+                        placeholder="4"
+                      />
+                    </td>
+                  )}
                   {isSelf ? (
                     <>
                       <td className={num}>{cr.tons > 0 ? cr.tons.toFixed(1) : '—'}</td>
@@ -1280,18 +1287,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                       <td className={num}>{fh(cr.hours)}</td>
                     </>
                   ) : (
-                    <td className={num}>
-                      {n(r.sf) > 0
-                        ? fmt2(
-                            n(r.sf) *
-                              (n(r.depth || 7) >= 5
-                                ? calc.miniRateDeep
-                                : n(r.depth || 7) >= 2
-                                  ? calc.miniRateMid
-                                  : calc.miniRateShallow)
-                          )
-                        : '—'}
-                    </td>
+                    <td className={num}>{n(r.sf) > 0 ? fmt2(n(r.sf) * calc.miniMiscFlatSubRate) : '—'}</td>
                   )}
                 </tr>
               )

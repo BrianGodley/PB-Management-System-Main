@@ -298,17 +298,6 @@ export default function SkidSteerDemoSummary({ module }) {
             </>
           )}
 
-          {/* Rebar */}
-          {rebarHrs > 0 && (
-            <>
-              <SectionLabel title="Rebar Add-On" />
-              <LineRow
-                label={`Rebar — ${n(rebarSF).toLocaleString()} SF`}
-                value={fh(rebarHrs) || '—'}
-                sub={`${rebarMinPerSF} min/SF`}
-              />
-            </>
-          )}
 
           {/* Misc flat */}
           {miscFlatCalc.some(r => r.tons > 0) && (
@@ -399,6 +388,18 @@ export default function SkidSteerDemoSummary({ module }) {
                   sub={`${ssCmpTons.toFixed(1)} tons  ·  ${rateSSCmp} t/hr`}
                 />
               )}
+            </>
+          )}
+
+          {/* Rebar */}
+          {rebarHrs > 0 && (
+            <>
+              <SectionLabel title="Rebar Add-On" />
+              <LineRow
+                label={`Rebar — ${n(rebarSF).toLocaleString()} SF`}
+                value={fh(rebarHrs) || '—'}
+                sub={`${rebarMinPerSF} min/SF`}
+              />
             </>
           )}
 

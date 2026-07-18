@@ -193,7 +193,7 @@ function calcDemo(
   const ssCmpHrs = ssCmpTons > 0 ? ssCmpTons / rateSSCmp : 0 // no access mod
 
   // ── Rebar add-on ─────────────────────────────────────────────────────────
-  const rebarHrs = n(state.rebarSF) * (rebarMinPerSF / 60)
+  const rebarHrs = isSub ? 0 : n(state.rebarSF) * (rebarMinPerSF / 60)
 
   // ── Vegetation ───────────────────────────────────────────────────────────
   const shrubHrs = n(state.shrubQty) * access * shrubRate
@@ -359,8 +359,9 @@ function calcDemo(
     return x >= 5 ? skidRateDeep : x >= 2 ? skidRateMid : skidRateShallow
   }
   const subDemoCost = isSub ? n(state.subDemoSF) * skidSubRate(state.subDemoDepth || 7) : 0
+  const skidMiscFlatSubRate = sr['Sub Demo - Skid Misc Flat'] ?? 2.0
   const miscFlatSubCost = isSub
-    ? (state.miscFlatRows || []).reduce((sum, r) => sum + n(r.sf) * skidSubRate(r.depth || 7), 0)
+    ? (state.miscFlatRows || []).slice(0, 2).reduce((sum, r) => sum + n(r.sf) * skidMiscFlatSubRate, 0)
     : 0
   const skidSubDemo = subDemoCost + miscFlatSubCost
   const gp = manDays * gpmd + (skidSubDemo + subHaulCost + haulCost) * subMarkupRate
@@ -431,6 +432,7 @@ function calcDemo(
     skidRateMid,
     skidRateShallow,
     subDemoCost,
+    skidMiscFlatSubRate,
     subHaulCost,
     // expose resolved rates for UI display
     laborConc,
@@ -1186,7 +1188,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           </tbody>
         </table>
 
-        {/* Rebar add-on */}
+        {isSelf && (
         <div className="mt-3 flex items-center gap-3">
           <div className="flex-1 max-w-xs">
             <p className="text-xs text-gray-500 mb-0.5 inline-flex items-center gap-1">
@@ -1214,6 +1216,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
             <p className="text-xs text-gray-500 mt-4">+{calc.rebarHrs.toFixed(2)} hrs rebar</p>
           )}
         </div>
+        )}
       </div>
 
       {/* Misc Flat */}
@@ -1233,7 +1236,8 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           )}
           {isDemoSub && (
             <>
-              <span className="font-normal normal-case text-gray-500">${calc.skidRateDeep} (5-7") / ${calc.skidRateMid} (2-4") / ${calc.skidRateShallow} (1-2") /sf</span>
+              <span className="font-normal normal-case text-gray-500">${calc.skidMiscFlatSubRate}/sf</span>
+              <RateEditPopover table="subcontractor_rates" name="Sub Demo - Skid Misc Flat" unitLabel="/sf" currentValue={calc.skidMiscFlatSubRate} onSaved={refreshAllRates} />
             </>
           )}
         </div>
@@ -1251,13 +1255,12 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 : [
                     { label: 'Description' },
                     { label: 'SF', w: 'w-24' },
-                    { label: 'Depth (in)', w: 'w-20' },
                     { label: 'Cost', w: 'w-24' },
                   ]
             }
           />
           <tbody className="divide-y divide-gray-50">
-            {state.miscFlatRows.map((r, i) => {
+            {(isDemoSub ? state.miscFlatRows.slice(0, 2) : state.miscFlatRows).map((r, i) => {
               const cr = calc.miscFlatCalc[i] || { tons: 0, hours: 0 }
               return (
                 <tr key={i}>
@@ -1275,31 +1278,22 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                       onChange={e => setRow('miscFlatRows', i, 'sf', e.target.value)}
                     />
                   </td>
-                  <td className={td}>
-                    <Inp
-                      value={r.depth}
-                      onChange={e => setRow('miscFlatRows', i, 'depth', e.target.value)}
-                      placeholder={isDemoSub ? '7' : '4'}
-                    />
-                  </td>
+                  {isSelf && (
+                    <td className={td}>
+                      <Inp
+                        value={r.depth}
+                        onChange={e => setRow('miscFlatRows', i, 'depth', e.target.value)}
+                        placeholder="4"
+                      />
+                    </td>
+                  )}
                   {isSelf ? (
                     <>
                       <td className={num}>{cr.tons > 0 ? cr.tons.toFixed(1) : '—'}</td>
                       <td className={num}>{fh(cr.hours)}</td>
                     </>
                   ) : (
-                    <td className={num}>
-                      {n(r.sf) > 0
-                        ? fmt2(
-                            n(r.sf) *
-                              (n(r.depth || 7) >= 5
-                                ? calc.skidRateDeep
-                                : n(r.depth || 7) >= 2
-                                  ? calc.skidRateMid
-                                  : calc.skidRateShallow)
-                          )
-                        : '—'}
-                    </td>
+                    <td className={num}>{n(r.sf) > 0 ? fmt2(n(r.sf) * calc.skidMiscFlatSubRate) : '—'}</td>
                   )}
                 </tr>
               )

@@ -297,17 +297,6 @@ export default function HandDemoSummary({ module }) {
             </>
           )}
 
-          {/* Rebar */}
-          {rebarHrs > 0 && (
-            <>
-              <SectionLabel title="Rebar Add-On" />
-              <LineRow
-                label={`Rebar — ${n(rebarSF).toLocaleString()} SF`}
-                value={fh(rebarHrs) || '—'}
-                sub={`${rebarMinPerSF} min/SF (hand)`}
-              />
-            </>
-          )}
 
           {/* Misc flat */}
           {miscFlatCalc.some(r => r.tons > 0) && (
@@ -410,6 +399,18 @@ export default function HandDemoSummary({ module }) {
                   sub={`${jjTons.toFixed(1)} tons  ·  ${rateJJ} t/hr`}
                 />
               )}
+            </>
+          )}
+
+          {/* Rebar */}
+          {rebarHrs > 0 && (
+            <>
+              <SectionLabel title="Rebar Add-On" />
+              <LineRow
+                label={`Rebar — ${n(rebarSF).toLocaleString()} SF`}
+                value={fh(rebarHrs) || '—'}
+                sub={`${rebarMinPerSF} min/SF (hand)`}
+              />
             </>
           )}
 
