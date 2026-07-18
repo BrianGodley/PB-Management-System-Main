@@ -389,3 +389,87 @@ export function ContainerNode({
     </g>
   )
 }
+
+// Flatten a node's notes array into display lines with bullet/number prefixes.
+// Each item: { text, format: 'plain' | 'bullet' | 'number' }. A field's text may
+// span multiple lines; each non-empty line becomes its own display line.
+function buildNoteLines(notes) {
+  const out = []
+  let num = 0
+  ;(Array.isArray(notes) ? notes : []).forEach(item => {
+    const fmt = (item && item.format) || 'plain'
+    String((item && item.text) || '')
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean)
+      .forEach(line => {
+        if (fmt === 'bullet') out.push('•  ' + line)
+        else if (fmt === 'number') {
+          num += 1
+          out.push(num + '.  ' + line)
+        } else out.push(line)
+      })
+  })
+  return out
+}
+
+// Note / Data node — a box like an Area, but with a bold Description at the top
+// and a left-aligned list of note/data lines below. Reuses the Area box styling.
+export function NoteNode({ node, box, selected, onClick }) {
+  const noColor = node.bg_color === 'none'
+  const color = node.bg_color || '#1E293B'
+  const bs = node.box_style || {}
+  const solid = !noColor && bs.fill === 'solid'
+  const fill = noColor ? 'none' : solid ? color : '#FFFFFF'
+  const borderColor = noColor ? '#111111' : solid ? 'rgba(0,0,0,0.12)' : color
+  const borderW = solid ? 1 : noColor ? 1.5 : Number.isFinite(bs.borderWidth) ? bs.borderWidth : 2
+  const cornerR = bs.corners === 'square' ? 0 : 10
+  const textColor = solid ? pickTextColor(color) : '#1E293B'
+  const cx = box.x + box.width / 2
+  const descSize = 11
+  const noteSize = 9
+  const fitChars = sz => Math.max(6, Math.floor((box.width - 14) / (sz * 0.55)))
+
+  const desc = (node.label || '').trim()
+  const descLines = desc ? wrapLabel(desc, fitChars(descSize)) : []
+  const noteLines = buildNoteLines(node.notes).flatMap(l => wrapLabel(l, fitChars(noteSize)))
+
+  const descTop = box.y + 16
+  const notesTop = descTop + descLines.length * (descSize + 3) + (descLines.length ? 8 : 0)
+
+  return (
+    <g onClick={onClick} style={{ cursor: 'pointer' }}>
+      <SelectOutline x={box.x} y={box.y} w={box.width} h={box.height} selected={selected} />
+      <rect
+        x={box.x}
+        y={box.y}
+        width={box.width}
+        height={box.height}
+        rx={cornerR}
+        ry={cornerR}
+        fill={fill}
+        pointerEvents="all"
+        stroke={borderColor}
+        strokeWidth={borderW}
+      />
+      {descLines.length > 0 && (
+        <text textAnchor="middle" fill={textColor}>
+          {descLines.map((ln, i) => (
+            <tspan key={`d-${i}`} x={cx} y={descTop + i * (descSize + 3)} fontSize={descSize} fontWeight="700">
+              {ln}
+            </tspan>
+          ))}
+        </text>
+      )}
+      {noteLines.length > 0 && (
+        <text textAnchor="start" fill={textColor}>
+          {noteLines.map((ln, i) => (
+            <tspan key={`n-${i}`} x={box.x + 8} y={notesTop + i * (noteSize + 3)} fontSize={noteSize}>
+              {ln}
+            </tspan>
+          ))}
+        </text>
+      )}
+    </g>
+  )
+}

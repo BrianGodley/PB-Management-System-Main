@@ -1289,6 +1289,7 @@ export default function OrgChartV2() {
         height: payload.height || 40,
         font_sizes: payload.font_sizes || {},
         text_styles: payload.text_styles || {},
+        notes: payload.notes || [],
         x_offset,
         x: 0,
         y: 0,
@@ -1385,6 +1386,7 @@ export default function OrgChartV2() {
         height: payload.height || 40,
         font_sizes: payload.font_sizes || {},
         text_styles: payload.text_styles || {},
+        notes: payload.notes || [],
       }
       // Position placement: independent (top-level) vs contained in an area.
       // Contained positions live inside the area box; their tier follows the
@@ -2455,6 +2457,10 @@ export default function OrgChartV2() {
               setDialog({ mode: 'child', parentId: selectedNode.id, fixedKind: 'container' })
               setContextMenu(null)
             }}
+            onAddJuniorNote={() => {
+              setDialog({ mode: 'child', parentId: selectedNode.id, fixedKind: 'note' })
+              setContextMenu(null)
+            }}
             onAddAssistant={() => {
               setDialog({ mode: 'new', fixedKind: 'assistant', anchorId: selectedNode.id })
               setContextMenu(null)
@@ -2786,6 +2792,7 @@ function ItemContextMenu({
   onConnect,
   onAddJuniorPosition,
   onAddJuniorArea,
+  onAddJuniorNote,
   onAddAssistant,
   onChangeSenior,
   onChangeChild,
@@ -2850,6 +2857,7 @@ function ItemContextMenu({
       <MenuItem label="Change Connection" onClick={onChangeConnection} />
       <MenuItem label="Add Junior Position" onClick={onAddJuniorPosition} />
       <MenuItem label="Add Junior Area" onClick={onAddJuniorArea} />
+      <MenuItem label="Add Junior Note/Data" onClick={onAddJuniorNote} />
       {kind !== 'container' && <MenuItem label="Add Assistant" onClick={onAddAssistant} />}
       <div className="border-t border-slate-100 my-1" />
       <MenuItem label="Change Senior" onClick={onChangeSenior} />

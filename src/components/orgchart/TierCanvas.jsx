@@ -14,7 +14,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { layoutTiers, CANVAS_PAD_X, NODE_GAP } from './layout.js'
 import EdgeLayer from './EdgeLayer.jsx'
-import { CustomNode, PositionNode, ContainerNode } from './NodeRenderers.jsx'
+import { CustomNode, PositionNode, ContainerNode, NoteNode } from './NodeRenderers.jsx'
 
 const DRAG_THRESHOLD = 4
 
@@ -302,6 +302,14 @@ export default function TierCanvas({
                   displayName={ph?.displayName}
                   containedPositions={contained}
                 />
+                {renderEditIcon(box, n.id)}
+              </g>
+            )
+          }
+          if (n.kind === 'note') {
+            return (
+              <g key={n.id} data-node-id={n.id} style={wrapStyle} onMouseDown={onMouseDown} onDoubleClick={() => editable && onNodeDoubleClick && onNodeDoubleClick(n.id)}>
+                <NoteNode node={n} box={box} selected={selected} onClick={onClick} />
                 {renderEditIcon(box, n.id)}
               </g>
             )

@@ -12,7 +12,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { ContainerNode, PositionNode, CustomNode } from './NodeRenderers.jsx'
+import { ContainerNode, PositionNode, CustomNode, NoteNode } from './NodeRenderers.jsx'
 
 const FG = '#16491b'
 
@@ -199,6 +199,7 @@ function ChartNode({ node, box, resolveNodeHolder, onClick, containedPositions =
       />
     )
   }
+  if (n.kind === 'note') return <NoteNode node={n} box={box} selected={false} onClick={onClick} />
   return <CustomNode node={n} box={box} selected={false} onClick={onClick} />
 }
 

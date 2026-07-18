@@ -24,6 +24,7 @@ const KIND_LABEL = {
   container: 'Org Chart Area',
   custom: 'Custom Item',
   assistant: 'Assistant',
+  note: 'Note / Data',
 }
 
 // Shorter labels used in modal titles ("Add Position", "Edit Area", …).
@@ -32,6 +33,7 @@ const TITLE_LABEL = {
   container: 'Area',
   custom: 'Item',
   assistant: 'Assistant',
+  note: 'Note/Data',
 }
 
 export default function AddNodeDialog({
@@ -132,6 +134,13 @@ export default function AddNodeDialog({
   const [seniorStandardId, setSeniorStandardId] = useState('')
 
   const [heading, setHeading] = useState(isEdit ? existing.heading || '' : '')
+  // Repeatable Note/Data items — used by 'note' nodes AND Junior Areas.
+  // Each: { text, format: 'plain' | 'bullet' | 'number' }.
+  const [notes, setNotes] = useState(
+    isEdit && Array.isArray(existing.notes) && existing.notes.length
+      ? existing.notes
+      : [{ text: '', format: 'plain' }],
+  )
   // A new junior area inherits its parent (senior) area's color by default.
   const parentArea =
     !isEdit && mode === 'child' && parentId
@@ -269,9 +278,11 @@ export default function AddNodeDialog({
   const defaultSize =
     sizeKind === 'container'
       ? { w: 210, h: 90 }
-      : sizeKind === 'assistant'
-        ? { w: 130, h: 44 }
-        : { w: 110, h: 40 }
+      : sizeKind === 'note'
+        ? { w: 220, h: 140 }
+        : sizeKind === 'assistant'
+          ? { w: 130, h: 44 }
+          : { w: 110, h: 40 }
   const [width, setWidth] = useState(isEdit ? existing.width || defaultSize.w : defaultSize.w)
   const [height, setHeight] = useState(isEdit ? existing.height || defaultSize.h : defaultSize.h)
   // Assistant kind state
@@ -345,6 +356,57 @@ export default function AddNodeDialog({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rowTemplate?.id])
+
+  // Repeatable Note/Data editor — reused by the 'note' form and Junior Areas.
+  const notesEditor = () => (
+    <div>
+      <label className="block text-xs font-medium text-gray-500 mb-1">
+        Note / Data fields
+      </label>
+      {notes.map((item, i) => (
+        <div key={i} className="flex items-start gap-2 mb-2">
+          <select
+            value={item.format || 'plain'}
+            onChange={e =>
+              setNotes(prev => prev.map((x, j) => (j === i ? { ...x, format: e.target.value } : x)))
+            }
+            title="Formatting"
+            className="border border-gray-300 rounded-md px-1 py-1.5 text-xs"
+          >
+            <option value="plain">None</option>
+            <option value="bullet">Bullet</option>
+            <option value="number">Number</option>
+          </select>
+          <textarea
+            value={item.text}
+            onChange={e =>
+              setNotes(prev => prev.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))
+            }
+            placeholder="Type a note or data. Put each bullet/number on its own line."
+            rows={2}
+            className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+          />
+          {notes.length > 1 && (
+            <button
+              type="button"
+              onClick={() => setNotes(prev => prev.filter((_, j) => j !== i))}
+              className="text-gray-400 hover:text-red-600 text-lg leading-none px-1"
+              title="Remove"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={() => setNotes(prev => [...prev, { text: '', format: 'plain' }])}
+        className="mt-1 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+      >
+        + Add note / data field
+      </button>
+    </div>
+  )
 
   function handleSubmit() {
     const base = {
@@ -431,6 +493,18 @@ export default function AddNodeDialog({
         container_mode: containerMode,
         position_id: positionId ? Number(positionId) : null,
         employee_id: employeeId || null,
+        notes: notes.filter(x => (x.text || '').trim()),
+        width,
+        height,
+        attachDirect: mode === 'child' && attachMode === 'direct',
+      })
+    } else if (kind === 'note') {
+      onSubmit({
+        ...base,
+        label: label.trim() || 'Note / Data',
+        notes: notes.filter(x => (x.text || '').trim()),
+        bg_color: bgColor,
+        box_style: boxStyle,
         width,
         height,
         attachDirect: mode === 'child' && attachMode === 'direct',
@@ -1174,6 +1248,7 @@ export default function AddNodeDialog({
                 })}
               </div>
             </div>
+            {notesEditor()}
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Box Width</label>
@@ -1198,6 +1273,23 @@ export default function AddNodeDialog({
                 />
               </div>
             </div>
+          </div>
+        )}
+
+        {kind === 'note' && (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">
+                Note / Data Description
+              </label>
+              <input
+                value={label}
+                onChange={e => setLabel(e.target.value)}
+                placeholder="e.g. Key Metrics, Reminders, Reference"
+                className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+              />
+            </div>
+            {notesEditor()}
           </div>
         )}
 

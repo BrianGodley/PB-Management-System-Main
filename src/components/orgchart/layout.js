@@ -45,7 +45,7 @@ export function layoutTiers(nodes, rowSpacing = {}, colSpacing = {}) {
     // Only junior AREAS render as columns below their parent. A position whose
     // parent_container_id is set is "contained in" the area and is drawn INSIDE
     // the area box (see ContainerNode), so it gets no column box here.
-    if (n.kind !== 'container') continue
+    if (n.kind !== 'container' && n.kind !== 'note') continue
     if (!childrenByContainer.has(n.parent_container_id)) {
       childrenByContainer.set(n.parent_container_id, [])
     }
