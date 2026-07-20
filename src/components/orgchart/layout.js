@@ -10,6 +10,11 @@
 //      container. The container auto-grows to fit them.
 
 export const TIER_GAP = 80
+// Vertical space reserved for a Level that exists in numbering but holds no
+// items, so putting an item on a much higher Level actually places it lower
+// (e.g. a summary box on Level 10 of a 4-row chart) instead of butting it
+// against the last occupied row.
+export const EMPTY_ROW_H = 40
 export const NODE_GAP = 32
 export const CANVAS_PAD_X = 80
 export const CANVAS_PAD_Y = 60
@@ -135,7 +140,8 @@ export function layoutTiers(nodes, rowSpacing = {}, colSpacing = {}) {
     if (gapByTier.has(ct)) gapByTier.set(ct, gapByTier.get(ct) + h + CHILD_COL_GAP)
   }
 
-  for (const t of tierKeys) {
+  for (let ti = 0; ti < tierKeys.length; ti++) {
+    const t = tierKeys[ti]
     const tierNodes = byTier.get(t)
     const tierH = tierNodes.reduce((max, n) => Math.max(max, n.height || 64), 0)
     // Column spacing config per row: { gap, auto } (a bare number = auto).
@@ -164,6 +170,14 @@ export function layoutTiers(nodes, rowSpacing = {}, colSpacing = {}) {
     maxWidth = Math.max(maxWidth, tierWidth)
     tiers.push({ tier: t, y: cursorY, h: tierH, nodes: tierNodes })
     cursorY += tierH + (gapByTier.get(t) ?? TIER_GAP)
+    // Reserve space for any empty Levels between this row and the next
+    // occupied one, so Level numbers translate into real vertical position.
+    const nextT = tierKeys[ti + 1]
+    if (Number.isInteger(nextT) && nextT - t > 1) {
+      const skipped = nextT - t - 1
+      const perSkip = Number.isFinite(rowSpacing?.[t]) ? rowSpacing[t] : TIER_GAP
+      cursorY += skipped * (EMPTY_ROW_H + perSkip)
+    }
   }
 
   // ── 4. Lay out junior areas as columns BELOW their container ─────────
