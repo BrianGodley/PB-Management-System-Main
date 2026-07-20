@@ -90,6 +90,11 @@ export function layoutTiers(nodes, rowSpacing = {}, colSpacing = {}) {
     })
   }
 
+  // Levels claimed by ANY node — including assistants (which lay out in their
+  // own band beside their anchor) and contained sub-items. Used so those levels
+  // are NOT treated as "empty" and given extra reserved space on top of the
+  // space their own band already takes.
+  const occupiedTiers = new Set(nodes.map(n => (Number.isInteger(n.tier) ? n.tier : 0)))
   const tierKeys = [...byTier.keys()].sort((a, b) => a - b)
   const laidOut = new Map()
   const tiers = []
@@ -172,11 +177,14 @@ export function layoutTiers(nodes, rowSpacing = {}, colSpacing = {}) {
     cursorY += tierH + (gapByTier.get(t) ?? TIER_GAP)
     // Reserve space for any empty Levels between this row and the next
     // occupied one, so Level numbers translate into real vertical position.
+    // An explicit Row Spacing value for this gap WINS: whatever the user types
+    // is the exact gap, so a skipped level can always be tightened back up.
     const nextT = tierKeys[ti + 1]
-    if (Number.isInteger(nextT) && nextT - t > 1) {
-      const skipped = nextT - t - 1
-      const perSkip = Number.isFinite(rowSpacing?.[t]) ? rowSpacing[t] : TIER_GAP
-      cursorY += skipped * (EMPTY_ROW_H + perSkip)
+    const hasOverride = Number.isFinite(rowSpacing?.[t])
+    if (!hasOverride && Number.isInteger(nextT) && nextT - t > 1) {
+      let skipped = 0
+      for (let k = t + 1; k < nextT; k++) if (!occupiedTiers.has(k)) skipped++
+      if (skipped) cursorY += skipped * (EMPTY_ROW_H + TIER_GAP)
     }
   }
 
