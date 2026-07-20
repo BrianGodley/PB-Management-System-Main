@@ -490,7 +490,9 @@ export default function AddNodeDialog({
     } else if (kind === 'container') {
       onSubmit({
         ...base,
-        label: label.trim() || 'Untitled',
+        // Both titles may be left blank — the box then shows only what's there
+        // (notes, position in charge) with no placeholder text.
+        label: label.trim(),
         heading: heading.trim() || null,
         bg_color: bgColor,
         box_style: boxStyle,
@@ -505,7 +507,7 @@ export default function AddNodeDialog({
     } else if (kind === 'note') {
       onSubmit({
         ...base,
-        label: label.trim() || 'Note / Data',
+        label: label.trim(),
         notes: notes.filter(x => (x.text || '').trim()),
         bg_color: bgColor,
         box_style: boxStyle,

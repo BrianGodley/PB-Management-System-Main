@@ -247,8 +247,12 @@ export function ContainerNode({
   const nT2Lines = (node.heading || '').trim()
     ? wrapLabel((node.heading || '').trim(), fitAt(szH)).length
     : 0
+  // Only reserve vertical space for titles that actually have text; with both
+  // blank the notes start at the top of the box.
   const titlesBottom =
-    box.y + 12 + nT1Lines * (szL + 2) + (nT2Lines ? titleSpacing + nT2Lines * (szH + 2) : 0)
+    nT1Lines || nT2Lines
+      ? box.y + 12 + nT1Lines * (szL + 2) + (nT2Lines ? titleSpacing + nT2Lines * (szH + 2) : 0)
+      : box.y + 4
   return (
     <g onClick={onClick} style={{ cursor: 'pointer' }}>
       <SelectOutline x={box.x} y={box.y} w={box.width} h={box.height} selected={selected} />
