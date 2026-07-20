@@ -286,8 +286,10 @@ function calcDemo(
     footingCalc.reduce((s, r) => s + r.hours, 0) +
     bucketCalc.reduce((s, r) => s + r.hours, 0) +
     gradeCut.hours
-  const gradingHrs = gradeFill.hours + jjHrs
-  const vegHrs = shrubRowsHrs + stumpHrs + treeCalc.reduce((s, r) => s + r.hrs, 0)
+  const gradingHrs = isSub ? 0 : gradeFill.hours + jjHrs
+  const vegHrs = isSub
+    ? shrubRowsHrs
+    : shrubRowsHrs + stumpHrs + treeCalc.reduce((s, r) => s + r.hrs, 0)
 
   const rawHrs = crewDemoHrs + gradingHrs + vegHrs + rebarHrs + manualHrs
   const _preWalkHrs = rawHrs * diff + hrsAdj
@@ -337,10 +339,51 @@ function calcDemo(
     ? (state.miscFlatRows || []).slice(0, 2).reduce((sum, r) => sum + n(r.sf) * handSubRate, 0)
     : 0
   const handSubDemo = subDemoCost + miscFlatSubCost
+
+  // ── Subcontractor fixed unit pricing: Grading ($/sf), Stump & Tree ($/ea) ──
+  const sgCut = sr['Sub Grade - Hand Cut SF'] ?? 0
+  const sgFill = sr['Sub Grade - Hand Fill SF'] ?? 0
+  const sgJJ = sr['Sub Grade - Hand JJ SF'] ?? 0
+  const sgSheep = sr['Sub Grade - Hand Sheepsfoot SF'] ?? 0
+  const sgRoll = sr['Sub Grade - Hand Roll SF'] ?? 0
+  const subGradingCost = isSub
+    ? n(state.gradeCutSF) * sgCut +
+      n(state.gradeFillSF) * sgFill +
+      n(state.jjSF) * sgJJ +
+      n(state.sheepsfootSF) * sgSheep +
+      n(state.rollCompSF) * sgRoll
+    : 0
+
+  const ssSmall = sr['Sub Stump - Hand Small'] ?? 0
+  const ssMed = sr['Sub Stump - Hand Medium'] ?? 0
+  const ssLarge = sr['Sub Stump - Hand Large'] ?? 0
+  const ssXL = sr['Sub Stump - Hand XL'] ?? 0
+  const subStumpCost = isSub
+    ? n(state.stumpSmallQty) * ssSmall +
+      n(state.stumpMedQty) * ssMed +
+      n(state.stumpLargeQty) * ssLarge +
+      n(state.stumpXLQty) * ssXL
+    : 0
+
+  const stSmall = sr['Sub Tree - Hand 6-12'] ?? 0
+  const stMed = sr['Sub Tree - Hand 12-18'] ?? 0
+  const stLarge = sr['Sub Tree - Hand 18-24'] ?? 0
+  const subTreeRateFor = size =>
+    size === '18" - 24"' || size === 'Large'
+      ? stLarge
+      : size === '12" - 18"' || size === 'Medium'
+        ? stMed
+        : stSmall
+  const subTreeCost = isSub
+    ? (state.treeRows || []).reduce((sum, r) => sum + n(r.qty) * subTreeRateFor(r.size), 0)
+    : 0
+
+  const subFixedCost = subGradingCost + subStumpCost + subTreeCost
   // GP = labor component + Universal Sub Markup % on sub-haul + hauling + sub demo
-  const gp = manDays * gpmd + (subHaulCost + haulCost + handSubDemo) * subMarkupRate
+  const gp =
+    manDays * gpmd + (subHaulCost + haulCost + handSubDemo + subFixedCost) * subMarkupRate
   const commission = gp * 0.12
-  const subCost = subHaulCost + manualSub + haulCost + handSubDemo
+  const subCost = subHaulCost + manualSub + haulCost + handSubDemo + subFixedCost
   const price = laborCost + burden + totalMat + gp + commission + subCost
 
   return {
@@ -358,6 +401,22 @@ function calcDemo(
     haulBaseRate,
     handSubRate,
     subDemoCost,
+    sgCut,
+    sgFill,
+    sgJJ,
+    sgSheep,
+    sgRoll,
+    subGradingCost,
+    ssSmall,
+    ssMed,
+    ssLarge,
+    ssXL,
+    subStumpCost,
+    stSmall,
+    stMed,
+    stLarge,
+    subTreeRateFor,
+    subTreeCost,
     gp,
     commission,
     price,
@@ -481,6 +540,8 @@ const DEFAULT_STATE = {
   haulConcreteLoads: '',
   haulSoilLoads: '',
   haulBaseLoads: '',
+  sheepsfootSF: '',
+  rollCompSF: '',
   subDemoSF: '',
   subDemoDepth: 7,
   treeRows: [
@@ -1415,6 +1476,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
         <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           Grading
         </div>
+        {isSelf && (
         <table className="w-full text-xs">
           <TH
             cols={[
@@ -1492,6 +1554,47 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             ))}
           </tbody>
         </table>
+        )}
+        {isSub && (
+          <table className="w-full text-xs">
+            <TH
+              cols={[
+                { label: 'Operation', w: 'w-48' },
+                { label: 'SF', w: 'w-24' },
+                { label: 'Cost', w: 'w-24' },
+              ]}
+            />
+            <tbody className="divide-y divide-gray-50">
+              {[
+                { label: 'Grade Cut', key: 'gradeCutSF', rate: calc.sgCut, rateName: 'Sub Grade - Hand Cut SF' },
+                { label: 'Grade Fill', key: 'gradeFillSF', rate: calc.sgFill, rateName: 'Sub Grade - Hand Fill SF' },
+                { label: 'Jumping Jack', key: 'jjSF', rate: calc.sgJJ, rateName: 'Sub Grade - Hand JJ SF' },
+                { label: 'Sheepsfoot Compactor', key: 'sheepsfootSF', rate: calc.sgSheep, rateName: 'Sub Grade - Hand Sheepsfoot SF' },
+                { label: 'Roll Compactor', key: 'rollCompSF', rate: calc.sgRoll, rateName: 'Sub Grade - Hand Roll SF' },
+              ].map(({ label, key, rate, rateName }) => (
+                <tr key={key}>
+                  <td className={`${td} font-medium text-gray-700`}>
+                    <span className="inline-flex items-center gap-1">
+                      {label}
+                      <span className="text-gray-400 font-normal">(${rate}/sf)</span>
+                      <RateEditPopover
+                        table="subcontractor_rates"
+                        name={rateName}
+                        unitLabel="/sf"
+                        currentValue={rate}
+                        onSaved={refreshAllRates}
+                      />
+                    </span>
+                  </td>
+                  <td className={td}>
+                    <Inp value={state[key]} onChange={e => set(key, e.target.value)} />
+                  </td>
+                  <td className={num}>{n(state[key]) > 0 ? fmt2(n(state[key]) * rate) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Shrub Demo */}
@@ -1568,6 +1671,8 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             sub: `${calc.stumpSmallRate} hrs/ea`,
             rate: calc.stumpSmallRate,
             rateName: 'Demo - Hand Stump Small',
+            subRate: calc.ssSmall,
+            subRateName: 'Sub Stump - Hand Small',
           },
           {
             label: 'Medium (12"–24")',
@@ -1576,6 +1681,8 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             sub: `${calc.stumpMedRate} hrs/ea`,
             rate: calc.stumpMedRate,
             rateName: 'Demo - Hand Stump Medium',
+            subRate: calc.ssMed,
+            subRateName: 'Sub Stump - Hand Medium',
           },
           {
             label: 'Large (24"–36")',
@@ -1584,6 +1691,8 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             sub: `${calc.stumpLargeRate} hrs/ea`,
             rate: calc.stumpLargeRate,
             rateName: 'Demo - Hand Stump Large',
+            subRate: calc.ssLarge,
+            subRateName: 'Sub Stump - Hand Large',
           },
           {
             label: 'Extra Large (36"–48")',
@@ -1592,24 +1701,42 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             sub: `${calc.stumpXLRate} hrs/ea`,
             rate: calc.stumpXLRate,
             rateName: 'Demo - Hand Stump XL',
+            subRate: calc.ssXL,
+            subRateName: 'Sub Stump - Hand XL',
           },
-        ].map(({ label, key, hrs, sub, rate, rateName }) => (
+        ].map(({ label, key, hrs, sub, rate, rateName, subRate, subRateName }) => (
           <div key={key}>
             <p className="text-xs text-gray-500 mb-0.5 inline-flex items-center gap-1">
               {label}
-              <RateEditPopover
-                table="labor_rates"
-                name={rateName}
-                category="Demo"
-                mode="coefficient"
-                unitLabel="hrs/ea"
-                currentValue={rate}
-                onSaved={refreshAllRates}
-              />
+              {isSub ? (
+                <RateEditPopover
+                  table="subcontractor_rates"
+                  name={subRateName}
+                  unitLabel="/ea"
+                  currentValue={subRate}
+                  onSaved={refreshAllRates}
+                />
+              ) : (
+                <RateEditPopover
+                  table="labor_rates"
+                  name={rateName}
+                  category="Demo"
+                  mode="coefficient"
+                  unitLabel="hrs/ea"
+                  currentValue={rate}
+                  onSaved={refreshAllRates}
+                />
+              )}
             </p>
             <Inp value={state[key]} onChange={e => set(key, e.target.value)} />
             <p className="text-xs text-gray-400 mt-0.5">
-              {hrs > 0 ? `${hrs.toFixed(2)} hrs — ${sub}` : sub}
+              {isSub
+                ? n(state[key]) > 0
+                  ? `${fmt2(n(state[key]) * subRate)} — $${subRate}/ea`
+                  : `$${subRate}/ea`
+                : hrs > 0
+                  ? `${hrs.toFixed(2)} hrs — ${sub}`
+                  : sub}
             </p>
           </div>
         ))}
@@ -1657,6 +1784,16 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           </span>
             </>
           )}
+          {isSub && (
+            <span className="font-normal normal-case text-gray-500 inline-flex items-center gap-1">
+              · per tree: 6-12" ${calc.stSmall}
+              <RateEditPopover table="subcontractor_rates" name="Sub Tree - Hand 6-12" unitLabel="/ea" currentValue={calc.stSmall} onSaved={refreshAllRates} />
+              · 12-18" ${calc.stMed}
+              <RateEditPopover table="subcontractor_rates" name="Sub Tree - Hand 12-18" unitLabel="/ea" currentValue={calc.stMed} onSaved={refreshAllRates} />
+              · 18-24" ${calc.stLarge}
+              <RateEditPopover table="subcontractor_rates" name="Sub Tree - Hand 18-24" unitLabel="/ea" currentValue={calc.stLarge} onSaved={refreshAllRates} />
+            </span>
+          )}
           {isSelf && (
             <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
               · Tree dump
@@ -1676,13 +1813,21 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
         </div>
         <table className="w-full text-xs">
           <TH
-            cols={[
-              { label: 'Qty', w: 'w-16' },
-              { label: 'Height (ft)', w: 'w-24' },
-              { label: 'Trunk Size', w: 'w-32' },
-              { label: 'Labor Hrs', w: 'w-20' },
-              ...(isSelf ? [{ label: 'Tree Dump', w: 'w-24' }] : []),
-            ]}
+            cols={
+              isSelf
+                ? [
+                    { label: 'Qty', w: 'w-16' },
+                    { label: 'Height (ft)', w: 'w-24' },
+                    { label: 'Trunk Size', w: 'w-32' },
+                    { label: 'Labor Hrs', w: 'w-20' },
+                    { label: 'Tree Dump', w: 'w-24' },
+                  ]
+                : [
+                    { label: 'Qty', w: 'w-16' },
+                    { label: 'Trunk Size', w: 'w-32' },
+                    { label: 'Cost', w: 'w-24' },
+                  ]
+            }
           />
           <tbody className="divide-y divide-gray-50">
             {state.treeRows.map((r, i) => {
@@ -1695,13 +1840,15 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                       onChange={e => setRow('treeRows', i, 'qty', e.target.value)}
                     />
                   </td>
-                  <td className={td}>
-                    <Inp
-                      value={r.height}
-                      onChange={e => setRow('treeRows', i, 'height', e.target.value)}
-                      placeholder="10"
-                    />
-                  </td>
+                  {isSelf && (
+                    <td className={td}>
+                      <Inp
+                        value={r.height}
+                        onChange={e => setRow('treeRows', i, 'height', e.target.value)}
+                        placeholder="10"
+                      />
+                    </td>
+                  )}
                   <td className={td}>
                     <Sel
                       value={r.size}
@@ -1709,8 +1856,16 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                       options={['6" - 12"', '12" - 18"', '18" - 24"']}
                     />
                   </td>
-                  <td className={num}>{fh(cr.hrs)}</td>
-                  {isSelf && <td className={num}>{cr.dumpFee > 0 ? fmt2(cr.dumpFee) : '—'}</td>}
+                  {isSelf ? (
+                    <>
+                      <td className={num}>{fh(cr.hrs)}</td>
+                      <td className={num}>{cr.dumpFee > 0 ? fmt2(cr.dumpFee) : '—'}</td>
+                    </>
+                  ) : (
+                    <td className={num}>
+                      {n(r.qty) > 0 ? fmt2(n(r.qty) * calc.subTreeRateFor(r.size)) : '—'}
+                    </td>
+                  )}
                 </tr>
               )
             })}
