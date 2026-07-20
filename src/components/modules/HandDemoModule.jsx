@@ -203,9 +203,15 @@ function calcDemo(
   })
 
   // ── Hand Bucket Areas (confined-access manual work) ───────────────────────
-  const bucketCalc = (state.bucketRows || []).map(r =>
-    flat(r.sf, r.depth || 4, rateBucket, dumpDirt)
-  )
+  // Hand Bucket Areas: identical square-foot calc to Concrete demo but at
+  // DOUBLE the rate (tight/confined access), and the same container disposal.
+  const laborBucket = laborConc * 2
+  const bucketCalc = (state.bucketRows || []).map(r => {
+    const row = flat(r.sf, r.depth || 4, rateConc, 0)
+    row.hours = sfLaborHrs(r.sf, r.depth || 4, laborBucket)
+    row.dumpFee = containerCost(r.sf, r.depth || 4)
+    return row
+  })
 
   // ── Grading ──────────────────────────────────────────────────────────────
   const gradeCut = flat(state.gradeCutSF, state.gradeCutDepth || 4, rateConc, 0)
@@ -472,6 +478,7 @@ function calcDemo(
     rateGrass,
     rateBase,
     rateBucket,
+    laborBucket,
     rateJJ,
     rebarMinPerSF,
     shrubRate,
@@ -1378,8 +1385,9 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           <span>Hand Bucket Areas</span>
           {isSelf && (
             <>
-              <span className="font-normal normal-case text-gray-500">· tight/confined access · {calc.rateBucket} t/hr</span>
-              <RateEditPopover table="labor_rates" name="Demo - Hand Bucket" category="Demo" mode="coefficient" unitLabel="t/hr" currentValue={calc.rateBucket} onSaved={refreshAllRates} />
+              <span className="font-normal normal-case text-gray-500">· tight/confined access · 2 × concrete rate = {calc.laborBucket} hr/100sf·in</span>
+              <RateEditPopover table="labor_rates" name="Demo - Hand - Concrete SF" category="Demo" mode="coefficient" unitLabel="hr/100sf·in" currentValue={calc.laborConc} onSaved={refreshAllRates} />
+              <span className="font-normal normal-case text-gray-500">· container disposal</span>
             </>
           )}
         </div>
