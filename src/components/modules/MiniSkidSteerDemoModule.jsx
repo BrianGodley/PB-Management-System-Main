@@ -42,6 +42,8 @@ const NON_BOB_LEVELS = { Poor: 0.5, OK: 0.667, Full: 1.0 }
 const BOB_LEVELS = { Poor: 0.5, OK: 0.75, Full: 1.0 }
 const DUMP_TYPES = ['In-House', 'Subcontractor']
 
+const STUB_HEIGHT_MODS = { '0-1': 0.75, '1-2': 1, '2-3': 1.5, '3-4': 2, '4-5': 2.5 }
+
 const RATE_DEFAULTS = {
   concrete: 0.75, // 'Demo - Mini Skid Steer Concrete/Dirt' (NonBob)
   grass: 0.75, // 'Demo - Mini Skid Steer Grass' (Bobcat)
@@ -221,14 +223,11 @@ function calcDemo(
   const rebarHrs = isSub ? 0 : n(state.rebarSF) * (rebarMinPerSF / 60)
 
   // ── Vegetation — Bobcat access ────────────────────────────────────────────
-  const shrubHrs = n(state.shrubQty) * accessBobcat * shrubRate
-  // Shrubs by SqFt: density (1–5) × rate per 100 SF. Density 1 = 2 hrs &
-  // $100 per 100 SF; both base rates editable in the Edit Rates popovers.
-  const shrubSfRate = lr['Demo - Shrub SqFt (Mini Skid)'] ?? 1
-  const shrubSfMatRate = mp['Demo - Mini Shrub SqFt Mat'] ?? 100
-  const shrubSfDensity = n(state.shrubDensity) || 1
-  const shrubSfHrs = (n(state.shrubSqFt) / 100) * shrubSfDensity * shrubSfRate
-  const shrubSfMat = (n(state.shrubSqFt) / 100) * shrubSfDensity * shrubSfMatRate
+  // Shrub Demo — per-area rows: qty × shrub rate × height modifier (Hand format).
+  const shrubRowsCalc = (state.shrubRows || []).map(r => ({
+    hrs: n(r.qty) * accessBobcat * shrubRate * (STUB_HEIGHT_MODS[r.height] ?? 0.75),
+  }))
+  const shrubRowsHrs = shrubRowsCalc.reduce((sum, r) => sum + r.hrs, 0)
   const stumpSmallHrs = n(state.stumpSmallQty) * accessBobcat * stumpSmallRate
   const stumpMedHrs = n(state.stumpMedQty) * accessBobcat * stumpMedRate
   const stumpLargeHrs = n(state.stumpLargeQty) * accessBobcat * stumpLargeRate
@@ -285,8 +284,8 @@ function calcDemo(
     gradeCut.hours
   const gradingHrs = isSub ? 0 : gradeFill.hours + jjHrs + ssCmpHrs
   const vegHrs = isSub
-    ? shrubHrs + shrubSfHrs
-    : shrubHrs + shrubSfHrs + stumpHrs + treeCalc.reduce((s, r) => s + r.hrs, 0)
+    ? shrubRowsHrs
+    : shrubRowsHrs + stumpHrs + treeCalc.reduce((s, r) => s + r.hrs, 0)
 
   // ── Walk-access (Truck → Work Area) — trip-based for mini-skid demo ───
   // Excel: S4 = (F6 - BobcatTravel) × N4 × 2 × (1/60/60)
@@ -324,7 +323,7 @@ function calcDemo(
       footingCalc.reduce((s, r) => s + r.dumpFee, 0) +
       gradeCut.dumpFee +
       treeCalc.reduce((s, r) => s + r.dumpFee, 0)
-  const totalMat = dumpMatCost + manualMat + shrubSfMat
+  const totalMat = dumpMatCost + manualMat
 
   // ── Financials ────────────────────────────────────────────────────────────
   const manDays = totalHrs / 8
@@ -463,11 +462,7 @@ function calcDemo(
     jjHrs,
     ssCmpHrs,
     rebarHrs,
-    shrubHrs,
-    shrubSfHrs,
-    shrubSfMat,
-    shrubSfRate,
-    shrubSfMatRate,
+    shrubRowsCalc,
     stumpSmallHrs,
     stumpMedHrs,
     stumpLargeHrs,
@@ -553,6 +548,9 @@ const DEFAULT_STATE = {
   shrubQty: '',
   shrubSqFt: '',
   shrubDensity: '1',
+  shrubRows: Array(4)
+    .fill(null)
+    .map(() => ({ area: '', qty: '', height: '0-1' })),
   stumpSmallQty: '',
   stumpMedQty: '',
   stumpLargeQty: '',
@@ -1695,18 +1693,59 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
         )}
       </div>
 
-      {/* Shrub & Stump */}
-      <SecHdr title="Shrub & Stump Demo" />
+      {/* Shrub Demo */}
+      <SecHdr title="Shrub Demo" />
+      <div>
+        <table className="w-full text-xs">
+          <TH
+            cols={[
+              { label: 'Area Description' },
+              { label: 'Qty', w: 'w-20' },
+              { label: 'Shrub Height', w: 'w-32' },
+              { label: 'Labor Hrs', w: 'w-20' },
+            ]}
+          />
+          <tbody className="divide-y divide-gray-50">
+            {state.shrubRows.map((r, i) => {
+              const cr = calc.shrubRowsCalc[i] || { hrs: 0 }
+              return (
+                <tr key={i}>
+                  <td className={td}>
+                    <Inp
+                      type="text"
+                      value={r.area}
+                      onChange={e => setRow('shrubRows', i, 'area', e.target.value)}
+                      placeholder={`Area ${i + 1}`}
+                    />
+                  </td>
+                  <td className={td}>
+                    <Inp value={r.qty} onChange={e => setRow('shrubRows', i, 'qty', e.target.value)} />
+                  </td>
+                  <td className={td}>
+                    <select
+                      value={r.height || '0-1'}
+                      onChange={e => setRow('shrubRows', i, 'height', e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                    >
+                      {[['0-1', '0–1 ft'], ['1-2', '1–2 ft'], ['2-3', '2–3 ft'], ['3-4', '3–4 ft'], ['4-5', '4–5 ft']].map(([v, l]) => (
+                        <option key={v} value={v}>
+                          {l}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className={num}>{fh(cr.hrs)}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Stump Demo */}
+      <SecHdr title="Stump Demo" />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {[
-          {
-            label: 'Shrubs (qty)',
-            key: 'shrubQty',
-            hrs: calc.shrubHrs,
-            sub: `${calc.shrubRate} hrs/ea`,
-            rate: calc.shrubRate,
-            rateName: 'Demo - Mini Shrub',
-          },
           {
             label: 'Small (up to 12")',
             key: 'stumpSmallQty',
@@ -1783,49 +1822,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             </p>
           </div>
         ))}
-        {/* Shrubs by square footage — density (1–5) × rate per 100 SF */}
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5 inline-flex items-center gap-1">
-            Shrubs (Density × Sq Ft)
-            <RateEditPopover
-              table="labor_rates"
-              name="Demo - Shrub SqFt (Mini Skid)"
-              category="Demo"
-              mode="coefficient"
-              unitLabel="hrs/100sf"
-              currentValue={calc.shrubSfRate}
-              onSaved={refreshAllRates}
-            />
-            <RateEditPopover
-              table="material_rates"
-              name="Demo - Mini Shrub SqFt Mat"
-              category="Demo"
-              unitLabel="$/100sf"
-              currentValue={calc.shrubSfMatRate}
-              onSaved={refreshAllRates}
-            />
-          </p>
-          <div className="flex gap-2">
-            <select
-              value={state.shrubDensity}
-              onChange={e => set('shrubDensity', e.target.value)}
-              title="Density"
-              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
-            >
-              {[1, 2, 3, 4, 5].map(d => (
-                <option key={d} value={d}>
-                  Density {d}
-                </option>
-              ))}
-            </select>
-            <Inp value={state.shrubSqFt} onChange={e => set('shrubSqFt', e.target.value)} />
-          </div>
-          <p className="text-xs text-gray-400 mt-0.5">
-            {calc.shrubSfHrs > 0
-              ? `${calc.shrubSfHrs.toFixed(2)} hrs · $${calc.shrubSfMat.toFixed(2)} mat`
-              : `Density × ${calc.shrubSfRate} hrs & $${calc.shrubSfMatRate} per 100 SF`}
-          </p>
-        </div>
       </div>
 
       {/* Trees */}
