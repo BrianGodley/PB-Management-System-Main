@@ -397,6 +397,39 @@ export function ContainerNode({
           </g>
         )
       })()}
+      {/* Note / Data lines added to this Area. Rendered below the titles (and
+          the in-charge block when shown), clipped to the box. */}
+      {(() => {
+        const lines = buildNoteLines(node.notes)
+        if (!lines.length) return null
+        const nSize = Math.max(7, Math.min(11, (fs.title || 10) - 1))
+        const lineH = nSize + 3
+        const fitChars = Math.max(6, Math.floor((box.width - 12) / (nSize * 0.55)))
+        const wrapped = lines.flatMap(l => wrapLabel(l, fitChars))
+        let startY = box.y + titleStackH + 6 + nSize
+        if (hasPosition) startY = Math.max(startY, headNameY + nSize + 6)
+        if (containedPositions.length) startY = Math.max(startY, box.y + box.height / 2 + nSize)
+        const limit = box.y + box.height - 4
+        const vis = wrapped.filter((_, i) => startY + i * lineH <= limit)
+        if (!vis.length) return null
+        return (
+          <g>
+            {vis.map((ln, i) => (
+              <text
+                key={`note-${i}`}
+                x={box.x + 6}
+                y={startY + i * lineH}
+                textAnchor="start"
+                fill={textColor}
+                opacity={0.9}
+                fontSize={nSize}
+              >
+                {ln}
+              </text>
+            ))}
+          </g>
+        )
+      })()}
     </g>
   )
 }
