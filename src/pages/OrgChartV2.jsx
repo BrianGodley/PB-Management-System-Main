@@ -149,6 +149,84 @@ export default function OrgChartV2() {
     }
   }
 
+  // ── Delete an entire level (row) ──────────────────────────────────────────
+  // Removes every item on that row plus anything nested inside them (contained
+  // items, assistants, junior positions), then closes the gap by shifting all
+  // lower rows up one level. Row/column spacing keys are remapped to match.
+  async function deleteRow(t) {
+    const tierOf = n => (Number.isInteger(n.tier) ? n.tier : 0)
+    const onRow = nodes.filter(
+      n => !n.parent_container_id && n.kind !== 'assistant' && tierOf(n) === t,
+    )
+    const ids = new Set()
+    const addTree = id => {
+      if (ids.has(id)) return
+      ids.add(id)
+      nodes
+        .filter(
+          x =>
+            x.parent_container_id === id ||
+            x.attached_to_node_id === id ||
+            x.senior_node_id === id,
+        )
+        .forEach(x => addTree(x.id))
+    }
+    onRow.forEach(n => addTree(n.id))
+    const delIds = [...ids]
+    const msg = delIds.length
+      ? `Delete Row ${t + 1}? This removes ${delIds.length} item${delIds.length === 1 ? '' : 's'} on that row (including anything inside them). Rows below move up.`
+      : `Delete Row ${t + 1}? Rows below will move up.`
+    if (!confirm(msg)) return
+    pushHistory(`Delete Row ${t + 1}`)
+    setBusy(true)
+    try {
+      if (delIds.length) {
+        await supabase.from('org_edges').delete().in('source_id', delIds)
+        await supabase.from('org_edges').delete().in('target_id', delIds)
+        await supabase.from('org_nodes').delete().in('id', delIds)
+      }
+      const remaining = nodes.filter(n => !ids.has(n.id))
+      const shifted = remaining.filter(n => tierOf(n) > t)
+      await Promise.all(
+        shifted.map(n =>
+          supabase.from('org_nodes').update({ tier: tierOf(n) - 1 }).eq('id', n.id),
+        ),
+      )
+      // Remap spacing keys: drop the deleted row's, shift lower ones up.
+      // Keys look like '3', '3_a', '3_b' (assistant bands) or 'top'.
+      const shiftKeys = obj => {
+        const out = {}
+        Object.entries(obj || {}).forEach(([k, v]) => {
+          const m = /^(\d+)(_a|_b)?$/.exec(k)
+          if (!m) {
+            out[k] = v
+            return
+          }
+          const num = Number(m[1])
+          if (num === t) return
+          out[`${num > t ? num - 1 : num}${m[2] || ''}`] = v
+        })
+        return out
+      }
+      const nextRow = shiftKeys(rowSpacing)
+      const nextCol = shiftKeys(colSpacing)
+      await supabase
+        .from('org_charts')
+        .update({ row_spacing: nextRow, col_spacing: nextCol })
+        .eq('id', chartId)
+      setRowSpacing(nextRow)
+      setColSpacing(nextCol)
+      setNodes(remaining.map(n => (tierOf(n) > t ? { ...n, tier: tierOf(n) - 1 } : n)))
+      setEdges(prev => prev.filter(e => !ids.has(e.source_id) && !ids.has(e.target_id)))
+      setSelectedNodeId(null)
+      setContextMenu(null)
+    } catch (e) {
+      alert('Could not delete row: ' + (e.message || String(e)))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   // Column-spacing config per tier, stored as { gap, auto } (a bare number
   // counts as auto for backward compatibility).
   function readColCfg(t) {
@@ -2020,7 +2098,7 @@ export default function OrgChartV2() {
                   Row Spacing ▾
                 </button>
                 {rowSpacingOpen && (
-                  <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 shadow-lg rounded-md z-50 w-56 py-2 px-3">
+                  <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 shadow-lg rounded-md z-50 w-64 py-2 px-3 max-h-[70vh] overflow-y-auto">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs font-semibold text-slate-500">Row spacing (px)</span>
                       <button
@@ -2060,6 +2138,44 @@ export default function OrgChartV2() {
                       Adjusts each vertical gap — connection lines and the rows
                       move closer or farther apart.
                     </p>
+                    <div className="mt-2 pt-2 border-t border-slate-100">
+                      <span className="text-xs font-semibold text-slate-500">Delete a row</span>
+                      {presentTiers.length === 0 ? (
+                        <p className="text-xs text-slate-400 py-1">No rows yet.</p>
+                      ) : (
+                        presentTiers.map(t => {
+                          const count = nodes.filter(
+                            n =>
+                              !n.parent_container_id &&
+                              n.kind !== 'assistant' &&
+                              (Number.isInteger(n.tier) ? n.tier : 0) === t,
+                          ).length
+                          return (
+                            <div key={`delrow-${t}`} className="flex items-center justify-between gap-2 py-1">
+                              <span className="text-xs text-slate-600">
+                                Row {t + 1}
+                                <span className="text-slate-400">
+                                  {' '}
+                                  ({count} item{count === 1 ? '' : 's'})
+                                </span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => deleteRow(t)}
+                                disabled={busy}
+                                className="text-xs px-2 py-0.5 rounded bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          )
+                        })
+                      )}
+                      <p className="mt-1 text-[10px] text-slate-400 leading-snug">
+                        Deletes the row and everything on it; rows below move up.
+                        Use Undo if you change your mind.
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
