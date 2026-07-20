@@ -130,9 +130,12 @@ export function layoutTiers(nodes, rowSpacing = {}, colSpacing = {}) {
     }
   }
 
-  // Attached junior areas form one shared row beneath their tier: every
-  // junior across all parents in a tier uses the same (tallest) height, and
-  // the tier's gap reserves that band once.
+  // Attached junior areas form a shared row beneath their parent — and those
+  // juniors can themselves have juniors, stacking further down. Reserve the
+  // FULL nested depth below a row, otherwise the next row is placed on top of
+  // the deeper columns (a junior-of-a-junior would render behind it).
+  // Per-tier shared junior row height (tallest junior across all parents on a
+  // tier) — the column layout below uses this so juniors line up evenly.
   const juniorRowHeightByTier = new Map()
   for (const [containerId, kids] of childrenByContainer.entries()) {
     const container = nodes.find(x => x.id === containerId)
@@ -141,8 +144,30 @@ export function layoutTiers(nodes, rowSpacing = {}, colSpacing = {}) {
     const h = kids.reduce((m, c) => Math.max(m, c.height || 40), 40)
     juniorRowHeightByTier.set(ct, Math.max(juniorRowHeightByTier.get(ct) || 0, h))
   }
-  for (const [ct, h] of juniorRowHeightByTier.entries()) {
-    if (gapByTier.has(ct)) gapByTier.set(ct, gapByTier.get(ct) + h + CHILD_COL_GAP)
+
+  const juniorDepthCache = new Map()
+  const juniorDepth = id => {
+    if (juniorDepthCache.has(id)) return juniorDepthCache.get(id)
+    juniorDepthCache.set(id, 0) // cycle guard
+    const kids = childrenByContainer.get(id) || []
+    let d = 0
+    if (kids.length) {
+      const rowH = kids.reduce((m, c) => Math.max(m, c.height || 40), 40)
+      const deeper = kids.reduce((m, c) => Math.max(m, juniorDepth(c.id)), 0)
+      d = CHILD_COL_GAP + rowH + deeper
+    }
+    juniorDepthCache.set(id, d)
+    return d
+  }
+  const juniorBandByTier = new Map()
+  for (const n of topLevel) {
+    const d = juniorDepth(n.id)
+    if (!d) continue
+    const ct = Number.isInteger(n.tier) ? n.tier : 0
+    juniorBandByTier.set(ct, Math.max(juniorBandByTier.get(ct) || 0, d))
+  }
+  for (const [ct, d] of juniorBandByTier.entries()) {
+    if (gapByTier.has(ct)) gapByTier.set(ct, gapByTier.get(ct) + d)
   }
 
   for (let ti = 0; ti < tierKeys.length; ti++) {
