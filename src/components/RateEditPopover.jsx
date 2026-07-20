@@ -25,6 +25,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
+import { useSubRateOverrides } from './SubRateOverrideContext.jsx'
 import { useRateIcons } from '../contexts/RateIconsContext'
 
 const DEFAULT_VALUE_FIELD = {
@@ -62,6 +63,11 @@ export default function RateEditPopover({
   const field = valueField || DEFAULT_VALUE_FIELD[table] || 'unit_cost'
   const nameCol = NAME_COLUMN[table] || 'name'
   const { showRateIcons } = useRateIcons()
+  // One-off, this-estimate-only adjustment (subcontractor pricing only).
+  const ovCtx = useSubRateOverrides()
+  const canOverride = !!(ovCtx && ovCtx.setOverride && table === 'subcontractor_rates')
+  const overrideVal = canOverride ? ovCtx.overrides[name] : undefined
+  const hasOverride = overrideVal !== undefined && overrideVal !== null && overrideVal !== ''
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
   const [loaded, setLoaded] = useState(false)
@@ -403,6 +409,48 @@ export default function RateEditPopover({
                       {saving ? 'Saving…' : 'Save'}
                     </button>
                   </div>
+                  {canOverride && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const v = Number(draft)
+                          if (!Number.isFinite(v)) {
+                            setError('Enter a number first.')
+                            return
+                          }
+                          ovCtx.setOverride(name, v)
+                          setOpen(false)
+                        }}
+                        disabled={!loaded}
+                        className="w-full py-2 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 text-sm font-semibold hover:bg-amber-100 disabled:opacity-50"
+                      >
+                        Use for this estimate only
+                      </button>
+                      {hasOverride && (
+                        <div className="mt-2 flex items-center justify-between gap-2 text-[11px]">
+                          <span className="text-amber-700">
+                            This estimate is using {mode === 'currency' ? '$' : ''}
+                            {overrideVal}
+                            {mode === 'currency' ? '' : ` ${unitLabel || ''}`}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              ovCtx.setOverride(name, undefined)
+                              setOpen(false)
+                            }}
+                            className="text-gray-500 underline hover:text-gray-800"
+                          >
+                            Back to master rate
+                          </button>
+                        </div>
+                      )}
+                      <p className="text-[11px] text-gray-400 mt-2 italic text-center">
+                        Applies to this estimate only — the master rate is unchanged.
+                      </p>
+                    </div>
+                  )}
                 </>
               )}
 

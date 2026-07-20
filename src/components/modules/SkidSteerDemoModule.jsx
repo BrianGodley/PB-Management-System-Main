@@ -17,6 +17,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
+import { SubRateOverrideProvider } from '../SubRateOverrideContext.jsx'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import {
   calcWalkAccessTrips,
@@ -101,7 +102,12 @@ function calcDemo(
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const mp = materialPrices || {}
   const lr = laborRates || {}
-  const sr = subRates || {}
+  // Subcontractor rates: a one-off adjustment saved on THIS estimate
+  // (state.rateOverrides) takes precedence over the master rate.
+  const sr = { ...(subRates || {}) }
+  Object.entries(state.rateOverrides || {}).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '' && Number.isFinite(Number(v))) sr[k] = Number(v)
+  })
   const access = 1 // access modifier removed
   const isSub = state.dumpType === 'Subcontractor' // Demo Type = Sub
   const isDumpSub = false // disposal follows the In House/Sub toggle
@@ -579,6 +585,7 @@ const DEFAULT_STATE = {
   haulBaseLoads: '',
   sheepsfootSF: '',
   rollCompSF: '',
+  rateOverrides: {},
   subDemoSF: '',
   subDemoDepth: 7,
   treeRows: [
@@ -767,6 +774,15 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
   }, [refreshAllRates])
 
   const set = useCallback((f, v) => setState(p => ({ ...p, [f]: v })), [])
+  // One-off subcontractor rate for this estimate only (undefined clears it).
+  const setOverride = useCallback((name, value) => {
+    setState(p => {
+      const next = { ...(p.rateOverrides || {}) }
+      if (value === undefined || value === null || value === '') delete next[name]
+      else next[name] = Number(value)
+      return { ...p, rateOverrides: next }
+    })
+  }, [])
   const setRow = useCallback(
     (sec, i, f, v) =>
       setState(p => {
@@ -854,6 +870,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
   }
 
   return (
+    <SubRateOverrideProvider overrides={state.rateOverrides} setOverride={setOverride}>
     <div className="space-y-4">
       {/* ── Sticky GPMD bar ── */}
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
@@ -1995,5 +2012,6 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
         </button>
       </div>
     </div>
+    </SubRateOverrideProvider>
   )
 }
