@@ -309,6 +309,10 @@ export default function AddNodeDialog({
     }
     return 0
   })
+  // Raw text for the Level input so it can be CLEARED while typing. A plain
+  // controlled number field snapped back to "1" on every keystroke (you could
+  // only append digits); this keeps the typed text and commits valid numbers.
+  const [tierText, setTierText] = useState(String((isEdit ? existing.tier ?? 0 : 0) + 1))
 
   // When adding a NEW item to a row that already has items of the same kind,
   // the modal defaults to that row's existing parameters — font sizes /
@@ -667,8 +671,19 @@ export default function AddNodeDialog({
             <input
               type="number"
               min={1}
-              value={tier + 1}
-              onChange={e => setTier(Math.max(0, (Number(e.target.value) || 1) - 1))}
+              value={tierText}
+              onChange={e => {
+                const v = e.target.value
+                setTierText(v)
+                const num = Number(v)
+                if (v !== '' && Number.isFinite(num) && num >= 1) setTier(Math.max(0, Math.round(num) - 1))
+              }}
+              onBlur={() => {
+                const num = Number(tierText)
+                if (tierText === '' || !Number.isFinite(num) || num < 1) setTierText(String(tier + 1))
+                else setTierText(String(Math.max(1, Math.round(num))))
+              }}
+              onFocus={e => e.target.select()}
               className="no-spin w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
             />
             <p className="mt-1 text-[11px] leading-snug text-gray-400">
