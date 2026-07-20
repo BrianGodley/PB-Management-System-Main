@@ -235,6 +235,20 @@ export function ContainerNode({
     ? box.y + titleStackH + 8
     : box.y + box.height / 2 + 6 + posShift
   const headNameY = topAnchored ? headTitleY + (fs.title || 10) + 4 : box.y + box.height / 2 + 18 + posShift
+  // Note/Data lines shown inside the Area. When notes are present the titles
+  // anchor to the TOP (as they do when there's a position in charge) so the
+  // notes can flow beneath them instead of overlapping.
+  const areaNoteLines = buildNoteLines(node.notes)
+  const hasNotes = areaNoteLines.length > 0
+  const fitAt = sz => Math.max(4, Math.floor((box.width - 12) / (sz * 0.57)))
+  const nT1Lines = (node.label || '').toString().trim()
+    ? wrapLabel((node.label || '').toString(), fitAt(szL)).length
+    : 0
+  const nT2Lines = (node.heading || '').trim()
+    ? wrapLabel((node.heading || '').trim(), fitAt(szH)).length
+    : 0
+  const titlesBottom =
+    box.y + 12 + nT1Lines * (szL + 2) + (nT2Lines ? titleSpacing + nT2Lines * (szH + 2) : 0)
   return (
     <g onClick={onClick} style={{ cursor: 'pointer' }}>
       <SelectOutline x={box.x} y={box.y} w={box.width} h={box.height} selected={selected} />
@@ -278,7 +292,7 @@ export function ContainerNode({
             wrapped.reduce((s, h) => s + h.lines.length * (h.size + 2), 0) +
             titleSpacing * Math.max(0, wrapped.length - 1)
           let y =
-            vTitles.length > 0 || hTitles.length > 1
+            vTitles.length > 0 || hTitles.length > 1 || hasNotes
               ? box.y + 12 + wrapped[0].size
               : labelY - blockH / 2 + wrapped[0].size
           const rows = []
@@ -400,13 +414,12 @@ export function ContainerNode({
       {/* Note / Data lines added to this Area. Rendered below the titles (and
           the in-charge block when shown), clipped to the box. */}
       {(() => {
-        const lines = buildNoteLines(node.notes)
-        if (!lines.length) return null
+        if (!hasNotes) return null
         const nSize = Math.max(7, Math.min(11, (fs.title || 10) - 1))
         const lineH = nSize + 3
         const fitChars = Math.max(6, Math.floor((box.width - 12) / (nSize * 0.55)))
-        const wrapped = lines.flatMap(l => wrapLabel(l, fitChars))
-        let startY = box.y + titleStackH + 6 + nSize
+        const wrapped = areaNoteLines.flatMap(l => wrapLabel(l, fitChars))
+        let startY = titlesBottom + 4 + nSize
         if (hasPosition) startY = Math.max(startY, headNameY + nSize + 6)
         if (containedPositions.length) startY = Math.max(startY, box.y + box.height / 2 + nSize)
         const limit = box.y + box.height - 4
