@@ -283,8 +283,10 @@ function calcDemo(
     miscVertCalc.reduce((s, r) => s + r.hours, 0) +
     footingCalc.reduce((s, r) => s + r.hours, 0) +
     gradeCut.hours
-  const gradingHrs = gradeFill.hours + jjHrs + ssCmpHrs
-  const vegHrs = shrubHrs + shrubSfHrs + stumpHrs + treeCalc.reduce((s, r) => s + r.hrs, 0)
+  const gradingHrs = isSub ? 0 : gradeFill.hours + jjHrs + ssCmpHrs
+  const vegHrs = isSub
+    ? shrubHrs + shrubSfHrs
+    : shrubHrs + shrubSfHrs + stumpHrs + treeCalc.reduce((s, r) => s + r.hrs, 0)
 
   // ── Walk-access (Truck → Work Area) — trip-based for mini-skid demo ───
   // Excel: S4 = (F6 - BobcatTravel) × N4 × 2 × (1/60/60)
@@ -354,9 +356,51 @@ function calcDemo(
     ? (state.miscFlatRows || []).slice(0, 2).reduce((sum, r) => sum + n(r.sf) * miniMiscFlatSubRate, 0)
     : 0
   const miniSubDemo = subDemoCost + miscFlatSubCost
-  const gp = manDays * gpmd + (subHaulCost + haulCost + miniSubDemo) * subMarkupRate
+
+  // ── Subcontractor fixed unit pricing: Grading ($/sf), Stump & Tree ($/ea) ──
+  const sgCut = sr['Sub Grade - Mini Cut SF'] ?? 0
+  const sgFill = sr['Sub Grade - Mini Fill SF'] ?? 0
+  const sgJJ = sr['Sub Grade - Mini JJ SF'] ?? 0
+  const sgSheep = sr['Sub Grade - Mini Sheepsfoot SF'] ?? 0
+  const sgRoll = sr['Sub Grade - Mini Roll SF'] ?? 0
+  const sgSS = sr['Sub Grade - Mini SS Compact SF'] ?? 0
+  const subGradingCost = isSub
+    ? n(state.gradeCutSF) * sgCut +
+      n(state.gradeFillSF) * sgFill +
+      n(state.jjSF) * sgJJ +
+      n(state.sheepsfootSF) * sgSheep +
+      n(state.rollCompSF) * sgRoll +
+      n(state.ssCmpSF) * sgSS
+    : 0
+
+  const ssSmall = sr['Sub Stump - Mini Small'] ?? 0
+  const ssMed = sr['Sub Stump - Mini Medium'] ?? 0
+  const ssLarge = sr['Sub Stump - Mini Large'] ?? 0
+  const ssXL = sr['Sub Stump - Mini XL'] ?? 0
+  const subStumpCost = isSub
+    ? n(state.stumpSmallQty) * ssSmall +
+      n(state.stumpMedQty) * ssMed +
+      n(state.stumpLargeQty) * ssLarge +
+      n(state.stumpXLQty) * ssXL
+    : 0
+
+  const stSmall = sr['Sub Tree - Mini Small'] ?? 0
+  const stMed = sr['Sub Tree - Mini Medium'] ?? 0
+  const stLarge = sr['Sub Tree - Mini Large'] ?? 0
+  const subTreeRateFor = size =>
+    size === 'Large' || size === '18" - 24"'
+      ? stLarge
+      : size === 'Medium' || size === '12" - 18"'
+        ? stMed
+        : stSmall
+  const subTreeCost = isSub
+    ? (state.treeRows || []).reduce((sum, r) => sum + n(r.qty) * subTreeRateFor(r.size), 0)
+    : 0
+
+  const subFixedCost = subGradingCost + subStumpCost + subTreeCost
+  const gp = manDays * gpmd + (subHaulCost + haulCost + miniSubDemo + subFixedCost) * subMarkupRate
   const commission = gp * 0.12
-  const subCost = subHaulCost + manualSub + haulCost + miniSubDemo
+  const subCost = subHaulCost + manualSub + haulCost + miniSubDemo + subFixedCost
   const price = laborCost + burden + totalMat + gp + commission + subCost
 
   return {
@@ -377,6 +421,23 @@ function calcDemo(
     miniRateMid,
     miniRateShallow,
     subDemoCost,
+    sgCut,
+    sgFill,
+    sgJJ,
+    sgSheep,
+    sgRoll,
+    sgSS,
+    subGradingCost,
+    ssSmall,
+    ssMed,
+    ssLarge,
+    ssXL,
+    subStumpCost,
+    stSmall,
+    stMed,
+    stLarge,
+    subTreeRateFor,
+    subTreeCost,
     miniMiscFlatSubRate,
     gp,
     commission,
@@ -500,6 +561,8 @@ const DEFAULT_STATE = {
   haulConcreteLoads: '',
   haulSoilLoads: '',
   haulBaseLoads: '',
+  sheepsfootSF: '',
+  rollCompSF: '',
   subDemoSF: '',
   subDemoDepth: 7,
   treeRows: [
@@ -1498,6 +1561,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
         <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           Grading
         </div>
+        {isSelf && (
         <table className="w-full text-xs">
           <TH
             cols={[
@@ -1587,6 +1651,48 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             ))}
           </tbody>
         </table>
+        )}
+        {isSub && (
+          <table className="w-full text-xs">
+            <TH
+              cols={[
+                { label: 'Operation', w: 'w-48' },
+                { label: 'SF', w: 'w-24' },
+                { label: 'Cost', w: 'w-24' },
+              ]}
+            />
+            <tbody className="divide-y divide-gray-50">
+              {[
+                { label: 'Grade Cut', key: 'gradeCutSF', rate: calc.sgCut, rateName: 'Sub Grade - Mini Cut SF' },
+                { label: 'Grade Fill', key: 'gradeFillSF', rate: calc.sgFill, rateName: 'Sub Grade - Mini Fill SF' },
+                { label: 'Jumping Jack', key: 'jjSF', rate: calc.sgJJ, rateName: 'Sub Grade - Mini JJ SF' },
+                { label: 'Sheepsfoot Compactor', key: 'sheepsfootSF', rate: calc.sgSheep, rateName: 'Sub Grade - Mini Sheepsfoot SF' },
+                { label: 'Roll Compactor', key: 'rollCompSF', rate: calc.sgRoll, rateName: 'Sub Grade - Mini Roll SF' },
+                { label: 'SS Compact', key: 'ssCmpSF', rate: calc.sgSS, rateName: 'Sub Grade - Mini SS Compact SF' },
+              ].map(({ label, key, rate, rateName }) => (
+                <tr key={key}>
+                  <td className={`${td} font-medium text-gray-700`}>
+                    <span className="inline-flex items-center gap-1">
+                      {label}
+                      <span className="text-gray-400 font-normal">(${rate}/sf)</span>
+                      <RateEditPopover
+                        table="subcontractor_rates"
+                        name={rateName}
+                        unitLabel="/sf"
+                        currentValue={rate}
+                        onSaved={refreshAllRates}
+                      />
+                    </span>
+                  </td>
+                  <td className={td}>
+                    <Inp value={state[key]} onChange={e => set(key, e.target.value)} />
+                  </td>
+                  <td className={num}>{n(state[key]) > 0 ? fmt2(n(state[key]) * rate) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Shrub & Stump */}
@@ -1608,6 +1714,8 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             sub: `${calc.stumpSmallRate} hrs/ea`,
             rate: calc.stumpSmallRate,
             rateName: 'Demo - Mini Stump Small',
+            subRate: calc.ssSmall,
+            subRateName: 'Sub Stump - Mini Small',
           },
           {
             label: 'Medium (12"–24")',
@@ -1616,6 +1724,8 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             sub: `${calc.stumpMedRate} hrs/ea`,
             rate: calc.stumpMedRate,
             rateName: 'Demo - Mini Stump Medium',
+            subRate: calc.ssMed,
+            subRateName: 'Sub Stump - Mini Medium',
           },
           {
             label: 'Large (24"–36")',
@@ -1624,6 +1734,8 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             sub: `${calc.stumpLargeRate} hrs/ea`,
             rate: calc.stumpLargeRate,
             rateName: 'Demo - Mini Stump Large',
+            subRate: calc.ssLarge,
+            subRateName: 'Sub Stump - Mini Large',
           },
           {
             label: 'Extra Large (36"–48")',
@@ -1632,24 +1744,42 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             sub: `${calc.stumpXLRate} hrs/ea`,
             rate: calc.stumpXLRate,
             rateName: 'Demo - Mini Stump XL',
+            subRate: calc.ssXL,
+            subRateName: 'Sub Stump - Mini XL',
           },
-        ].map(({ label, key, hrs, sub, rate, rateName }) => (
+        ].map(({ label, key, hrs, sub, rate, rateName, subRate, subRateName }) => (
           <div key={key}>
             <p className="text-xs text-gray-500 mb-0.5 inline-flex items-center gap-1">
               {label}
-              <RateEditPopover
-                table="labor_rates"
-                name={rateName}
-                category="Demo"
-                mode="coefficient"
-                unitLabel="hrs/ea"
-                currentValue={rate}
-                onSaved={refreshAllRates}
-              />
+              {isSub ? (
+                <RateEditPopover
+                  table="subcontractor_rates"
+                  name={subRateName}
+                  unitLabel="/ea"
+                  currentValue={subRate}
+                  onSaved={refreshAllRates}
+                />
+              ) : (
+                <RateEditPopover
+                  table="labor_rates"
+                  name={rateName}
+                  category="Demo"
+                  mode="coefficient"
+                  unitLabel="hrs/ea"
+                  currentValue={rate}
+                  onSaved={refreshAllRates}
+                />
+              )}
             </p>
             <Inp value={state[key]} onChange={e => set(key, e.target.value)} />
             <p className="text-xs text-gray-400 mt-0.5">
-              {hrs > 0 ? `${hrs.toFixed(2)} hrs — ${sub}` : sub}
+              {isSub
+                ? n(state[key]) > 0
+                  ? `${fmt2(n(state[key]) * subRate)} — $${subRate}/ea`
+                  : `$${subRate}/ea`
+                : hrs > 0
+                  ? `${hrs.toFixed(2)} hrs — ${sub}`
+                  : sub}
             </p>
           </div>
         ))}
@@ -1749,15 +1879,33 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             </span>
           )}
         </div>
+          {isSub && (
+            <span className="font-normal normal-case text-gray-500 inline-flex items-center gap-1">
+              · per tree: S ${calc.stSmall}
+              <RateEditPopover table="subcontractor_rates" name="Sub Tree - Mini Small" unitLabel="/ea" currentValue={calc.stSmall} onSaved={refreshAllRates} />
+              · M ${calc.stMed}
+              <RateEditPopover table="subcontractor_rates" name="Sub Tree - Mini Medium" unitLabel="/ea" currentValue={calc.stMed} onSaved={refreshAllRates} />
+              · L ${calc.stLarge}
+              <RateEditPopover table="subcontractor_rates" name="Sub Tree - Mini Large" unitLabel="/ea" currentValue={calc.stLarge} onSaved={refreshAllRates} />
+            </span>
+          )}
         <table className="w-full text-xs">
           <TH
-            cols={[
-              { label: 'Qty', w: 'w-16' },
-              { label: 'Height (ft)', w: 'w-24' },
-              { label: 'Size', w: 'w-28' },
-              { label: 'Labor Hrs', w: 'w-20' },
-              ...(isSelf ? [{ label: 'Dump Fee', w: 'w-24' }] : []),
-            ]}
+            cols={
+              isSelf
+                ? [
+                    { label: 'Qty', w: 'w-16' },
+                    { label: 'Height (ft)', w: 'w-24' },
+                    { label: 'Size', w: 'w-28' },
+                    { label: 'Labor Hrs', w: 'w-20' },
+                    { label: 'Dump Fee', w: 'w-24' },
+                  ]
+                : [
+                    { label: 'Qty', w: 'w-16' },
+                    { label: 'Size', w: 'w-28' },
+                    { label: 'Cost', w: 'w-24' },
+                  ]
+            }
           />
           <tbody className="divide-y divide-gray-50">
             {state.treeRows.map((r, i) => {
@@ -1770,13 +1918,15 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                       onChange={e => setRow('treeRows', i, 'qty', e.target.value)}
                     />
                   </td>
-                  <td className={td}>
-                    <Inp
-                      value={r.height}
-                      onChange={e => setRow('treeRows', i, 'height', e.target.value)}
-                      placeholder="10"
-                    />
-                  </td>
+                  {isSelf && (
+                    <td className={td}>
+                      <Inp
+                        value={r.height}
+                        onChange={e => setRow('treeRows', i, 'height', e.target.value)}
+                        placeholder="10"
+                      />
+                    </td>
+                  )}
                   <td className={td}>
                     <Sel
                       value={r.size}
@@ -1784,8 +1934,16 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                       options={['Small', 'Medium', 'Large']}
                     />
                   </td>
-                  <td className={num}>{fh(cr.hrs)}</td>
-                  {isSelf && <td className={num}>{cr.dumpFee > 0 ? fmt2(cr.dumpFee) : '—'}</td>}
+                  {isSelf ? (
+                    <>
+                      <td className={num}>{fh(cr.hrs)}</td>
+                      <td className={num}>{cr.dumpFee > 0 ? fmt2(cr.dumpFee) : '—'}</td>
+                    </>
+                  ) : (
+                    <td className={num}>
+                      {n(r.qty) > 0 ? fmt2(n(r.qty) * calc.subTreeRateFor(r.size)) : '—'}
+                    </td>
+                  )}
                 </tr>
               )
             })}
