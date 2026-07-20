@@ -361,12 +361,44 @@ export default function AddNodeDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rowTemplate?.id])
 
+  // Left / Center / Right alignment for a text block inside the box.
+  const alignToggle = (field, def = 'left') => {
+    const cur = (textStyles[field] && textStyles[field].align) || def
+    const setAlign = v =>
+      setTextStyles(prev => ({ ...prev, [field]: { ...(prev[field] || {}), align: v } }))
+    const cls = on =>
+      `px-1.5 py-0.5 rounded border text-[11px] ${
+        on ? 'border-blue-600 bg-blue-50 text-blue-700 font-semibold' : 'border-gray-300 text-gray-500'
+      }`
+    return (
+      <div className="flex items-center gap-1 shrink-0">
+        {[
+          { v: 'left', label: 'L', title: 'Align left' },
+          { v: 'center', label: 'C', title: 'Center' },
+          { v: 'right', label: 'R', title: 'Align right' },
+        ].map(o => (
+          <button
+            key={o.v}
+            type="button"
+            onClick={() => setAlign(o.v)}
+            title={o.title}
+            className={cls(cur === o.v)}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    )
+  }
+
   // Repeatable Note/Data editor — reused by the 'note' form and Junior Areas.
   const notesEditor = () => (
     <div>
-      <label className="block text-xs font-medium text-gray-500 mb-1">
-        Note / Data fields
-      </label>
+      <div className="flex items-center flex-wrap gap-2 mb-1">
+        <label className="block text-xs font-medium text-gray-500">Note / Data fields</label>
+        {fieldStyle('notes', 9, 'sans')}
+        {alignToggle('notes')}
+      </div>
       {notes.map((item, i) => (
         <div key={i} className="flex items-start gap-2 mb-2">
           <select
@@ -1300,12 +1332,16 @@ export default function AddNodeDialog({
               <label className="block text-xs font-medium text-gray-500 mb-1">
                 Note / Data Description
               </label>
-              <input
-                value={label}
-                onChange={e => setLabel(e.target.value)}
-                placeholder="e.g. Key Metrics, Reminders, Reference"
-                className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
-              />
+              <div className="flex items-center gap-2">
+                <input
+                  value={label}
+                  onChange={e => setLabel(e.target.value)}
+                  placeholder="e.g. Key Metrics, Reminders, Reference"
+                  className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+                />
+                {fieldStyle('label', 11, 'sans', true)}
+                {alignToggle('label', 'center')}
+              </div>
             </div>
             {notesEditor()}
           </div>

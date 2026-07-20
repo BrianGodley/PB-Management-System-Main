@@ -419,8 +419,12 @@ export function ContainerNode({
           the in-charge block when shown), clipped to the box. */}
       {(() => {
         if (!hasNotes) return null
-        const nSize = Math.max(7, Math.min(11, (fs.title || 10) - 1))
+        const defNote = Math.max(7, Math.min(11, (fs.title || 10) - 1))
+        const nSize = Number.isFinite(fs.notes) ? fs.notes : defNote
         const lineH = nSize + 3
+        const align = ((node.text_styles || {}).notes || {}).align || 'left'
+        const anchor = align === 'center' ? 'middle' : align === 'right' ? 'end' : 'start'
+        const tx = align === 'center' ? cx : align === 'right' ? box.x + box.width - 6 : box.x + 6
         const fitChars = Math.max(6, Math.floor((box.width - 12) / (nSize * 0.55)))
         const wrapped = areaNoteLines.flatMap(l => wrapLabel(l, fitChars))
         let startY = titlesBottom + 4 + nSize
@@ -434,12 +438,13 @@ export function ContainerNode({
             {vis.map((ln, i) => (
               <text
                 key={`note-${i}`}
-                x={box.x + 6}
+                x={tx}
                 y={startY + i * lineH}
-                textAnchor="start"
+                textAnchor={anchor}
                 fill={textColor}
                 opacity={0.9}
                 fontSize={nSize}
+                {...styleFor(node, 'notes', { family: 'sans' })}
               >
                 {ln}
               </text>
@@ -498,8 +503,14 @@ export function NoteNode({ node, box, selected, onClick }) {
   const cornerR = bs.corners === 'square' ? 0 : 10
   const textColor = solid ? pickTextColor(color) : '#1E293B'
   const cx = box.x + box.width / 2
-  const descSize = 11
-  const noteSize = 9
+  const fsz = node.font_sizes || {}
+  const ts = node.text_styles || {}
+  const descSize = Number.isFinite(fsz.label) ? fsz.label : 11
+  const noteSize = Number.isFinite(fsz.notes) ? fsz.notes : 9
+  const descAlign = (ts.label || {}).align || 'center'
+  const noteAlign = (ts.notes || {}).align || 'left'
+  const anchorOf = a => (a === 'center' ? 'middle' : a === 'right' ? 'end' : 'start')
+  const xOf = a => (a === 'center' ? cx : a === 'right' ? box.x + box.width - 8 : box.x + 8)
   const fitChars = sz => Math.max(6, Math.floor((box.width - 14) / (sz * 0.55)))
 
   const desc = (node.label || '').trim()
@@ -525,18 +536,18 @@ export function NoteNode({ node, box, selected, onClick }) {
         strokeWidth={borderW}
       />
       {descLines.length > 0 && (
-        <text textAnchor="middle" fill={textColor}>
+        <text textAnchor={anchorOf(descAlign)} fill={textColor} {...styleFor(node, 'label', { family: 'sans', weight: 700 })}>
           {descLines.map((ln, i) => (
-            <tspan key={`d-${i}`} x={cx} y={descTop + i * (descSize + 3)} fontSize={descSize} fontWeight="700">
+            <tspan key={`d-${i}`} x={xOf(descAlign)} y={descTop + i * (descSize + 3)} fontSize={descSize}>
               {ln}
             </tspan>
           ))}
         </text>
       )}
       {noteLines.length > 0 && (
-        <text textAnchor="start" fill={textColor}>
+        <text textAnchor={anchorOf(noteAlign)} fill={textColor} {...styleFor(node, 'notes', { family: 'sans' })}>
           {noteLines.map((ln, i) => (
-            <tspan key={`n-${i}`} x={box.x + 8} y={notesTop + i * (noteSize + 3)} fontSize={noteSize}>
+            <tspan key={`n-${i}`} x={xOf(noteAlign)} y={notesTop + i * (noteSize + 3)} fontSize={noteSize}>
               {ln}
             </tspan>
           ))}
