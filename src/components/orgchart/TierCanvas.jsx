@@ -12,7 +12,7 @@
 //     so the parent can position a contextual menu next to it
 
 import { useEffect, useRef, useState } from 'react'
-import { layoutTiers, CANVAS_PAD_X, NODE_GAP } from './layout.js'
+import { layoutTiers, CANVAS_PAD_X, CANVAS_PAD_Y, NODE_GAP, TIER_GAP } from './layout.js'
 import EdgeLayer from './EdgeLayer.jsx'
 import { CustomNode, PositionNode, ContainerNode, NoteNode } from './NodeRenderers.jsx'
 
@@ -31,6 +31,7 @@ export default function TierCanvas({
   onEdgeClick,
   onBackgroundClick,
   onNodeDropped,
+  onRowGapChange,
   onEdgeBusChange,
   rowSpacing = {},
   colSpacing = {},
@@ -183,6 +184,45 @@ export default function TierCanvas({
     return x
   }
 
+  // Tiers that anchor an assistant — their gap below is split into
+  // `${t}_a` (row→assistant) and `${t}_b` (assistant→next row).
+  const assistantAnchorTiers = new Set(
+    nodes
+      .filter(n => n.kind === 'assistant' && n.attached_to_node_id)
+      .map(n => nodes.find(x => x.id === n.attached_to_node_id))
+      .filter(Boolean)
+      .map(a => (Number.isInteger(a.tier) ? a.tier : 0)),
+  )
+
+  // The adjustable gap ABOVE a row: the rowSpacing key that controls it and
+  // its current effective value. Mirrors the gap math in layout.js.
+  function rowGapAbove(tier) {
+    const idx = tiers.findIndex(t => t.tier === tier)
+    if (idx < 0) return null
+    if (idx === 0) {
+      return {
+        key: 'top',
+        current: Number.isFinite(rowSpacing?.top) ? rowSpacing.top : CANVAS_PAD_Y,
+      }
+    }
+    const prev = tiers[idx - 1].tier
+    if (assistantAnchorTiers.has(prev)) {
+      const k = `${prev}_b`
+      return {
+        key: k,
+        current: Number.isFinite(rowSpacing?.[k]) ? rowSpacing[k] : TIER_GAP / 2,
+      }
+    }
+    return {
+      key: prev,
+      current: Number.isFinite(rowSpacing?.[prev]) ? rowSpacing[prev] : TIER_GAP,
+    }
+  }
+
+  // Vertical drag only counts past this, so a normal left/right drag doesn't
+  // nudge row spacing by accident.
+  const V_DRAG_MIN = 6
+
   function handleSvgMouseUp() {
     if (!editable || !drag) return
     if (!drag.dragging) {
@@ -212,6 +252,11 @@ export default function TierCanvas({
         const natural = naturalXForSlot(newTier, newTierOrder, drag.nodeId)
         const newXOffset = Math.round(dropLeftX - natural)
         onNodeDropped(drag.nodeId, newTier, newTierOrder, newXOffset)
+        // Dragging up/down moves the whole ROW: grow or shrink the gap above it.
+        if (onRowGapChange && isRowMate(node) && Math.abs(drag.dy) > V_DRAG_MIN) {
+          const gap = rowGapAbove(newTier)
+          if (gap) onRowGapChange(gap.key, Math.max(0, Math.round(gap.current + drag.dy)))
+        }
       }
     }
     setDrag(null)
@@ -220,16 +265,20 @@ export default function TierCanvas({
   const laidOutForRender =
     drag && drag.dragging
       ? (() => {
-          const cloned = new Map(laidOut)
           const original = laidOut.get(drag.nodeId)
-          if (original) {
-            cloned.set(drag.nodeId, {
-              ...original,
-              x: original.x + drag.dx,
-              // Y is locked — items move left/right only, never up/down.
-              y: original.y,
-            })
-          }
+          if (!original) return laidOut
+          const dragNode = nodes.find(n => n.id === drag.nodeId)
+          // Vertical drag previews the row (and everything below it) moving,
+          // since it changes the gap above this row.
+          const moveRow =
+            !!dragNode && isRowMate(dragNode) && Math.abs(drag.dy) > V_DRAG_MIN
+          const cloned = new Map()
+          laidOut.forEach((b, id) => {
+            let nb = b
+            if (moveRow && b.y >= original.y) nb = { ...nb, y: nb.y + drag.dy }
+            if (id === drag.nodeId) nb = { ...nb, x: nb.x + drag.dx }
+            cloned.set(id, nb)
+          })
           return cloned
         })()
       : laidOut

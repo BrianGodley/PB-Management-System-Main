@@ -149,6 +149,14 @@ export default function OrgChartV2() {
     }
   }
 
+  // Dragging a row up/down rewrites the adjustable gap above it (same value
+  // the Row Spacing panel edits), so rows can be placed as close or as far
+  // apart as wanted.
+  async function handleRowGapChange(key, value) {
+    pushHistory('Row spacing')
+    await updateRowSpacing(key, value)
+  }
+
   // ── Delete an entire level (row) ──────────────────────────────────────────
   // Removes every item on that row plus anything nested inside them (contained
   // items, assistants, junior positions), then closes the gap by shifting all
@@ -2517,6 +2525,7 @@ export default function OrgChartV2() {
               setDialog({ mode: 'edit', existing: n })
             }}
             onNodeDropped={handleNodeDropped}
+            onRowGapChange={handleRowGapChange}
             onEdgeBusChange={updateEdgeBus}
             rowSpacing={rowSpacing}
             colSpacing={colSpacing}
