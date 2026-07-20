@@ -187,10 +187,21 @@ export function ContainerNode({
   const noColor = node.bg_color === 'none'
   const color = node.bg_color || '#1E293B'
   const bs = node.box_style || {}
-  const solid = !noColor && bs.fill === 'solid'
-  const fill = noColor ? 'none' : solid ? color : '#FFFFFF'
-  const borderColor = noColor ? '#111111' : solid ? 'rgba(0,0,0,0.12)' : color
-  const borderW = solid ? 1 : noColor ? 1.5 : Number.isFinite(bs.borderWidth) ? bs.borderWidth : 2
+  // 'none' = text only: no fill and no border (the box still captures clicks
+  // via pointerEvents, so it can be selected and dragged).
+  const textOnly = bs.fill === 'none'
+  const solid = !noColor && !textOnly && bs.fill === 'solid'
+  const fill = textOnly || noColor ? 'none' : solid ? color : '#FFFFFF'
+  const borderColor = textOnly ? 'none' : noColor ? '#111111' : solid ? 'rgba(0,0,0,0.12)' : color
+  const borderW = textOnly
+    ? 0
+    : solid
+      ? 1
+      : noColor
+        ? 1.5
+        : Number.isFinite(bs.borderWidth)
+          ? bs.borderWidth
+          : 2
   // Corner radius: 'square' = sharp corners, default = rounded.
   const cornerR = bs.corners === 'square' ? 0 : 10
   const textColor = solid ? pickTextColor(color) : '#1E293B'
@@ -419,10 +430,21 @@ export function NoteNode({ node, box, selected, onClick }) {
   const noColor = node.bg_color === 'none'
   const color = node.bg_color || '#1E293B'
   const bs = node.box_style || {}
-  const solid = !noColor && bs.fill === 'solid'
-  const fill = noColor ? 'none' : solid ? color : '#FFFFFF'
-  const borderColor = noColor ? '#111111' : solid ? 'rgba(0,0,0,0.12)' : color
-  const borderW = solid ? 1 : noColor ? 1.5 : Number.isFinite(bs.borderWidth) ? bs.borderWidth : 2
+  // 'none' = text only: no fill and no border (the box still captures clicks
+  // via pointerEvents, so it can be selected and dragged).
+  const textOnly = bs.fill === 'none'
+  const solid = !noColor && !textOnly && bs.fill === 'solid'
+  const fill = textOnly || noColor ? 'none' : solid ? color : '#FFFFFF'
+  const borderColor = textOnly ? 'none' : noColor ? '#111111' : solid ? 'rgba(0,0,0,0.12)' : color
+  const borderW = textOnly
+    ? 0
+    : solid
+      ? 1
+      : noColor
+        ? 1.5
+        : Number.isFinite(bs.borderWidth)
+          ? bs.borderWidth
+          : 2
   const cornerR = bs.corners === 'square' ? 0 : 10
   const textColor = solid ? pickTextColor(color) : '#1E293B'
   const cx = box.x + box.width / 2

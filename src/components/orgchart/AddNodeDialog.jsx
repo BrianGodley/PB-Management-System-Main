@@ -1203,6 +1203,7 @@ export default function AddNodeDialog({
                   {[
                     { v: 'solid', label: 'Solid' },
                     { v: 'border', label: 'Border' },
+                    { v: 'none', label: 'Text only' },
                   ].map(o => (
                     <button
                       key={o.v}
