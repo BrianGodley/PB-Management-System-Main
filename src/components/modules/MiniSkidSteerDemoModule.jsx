@@ -289,8 +289,9 @@ function calcDemo(
     footingCalc.reduce((s, r) => s + r.hours, 0) +
     gradeCut.hours
   const gradingHrs = isSub ? 0 : gradeFill.hours + jjHrs + ssCmpHrs
+  // Shrub & Stump Demo are In-House only — no labour or sub cost on Sub.
   const vegHrs = isSub
-    ? shrubRowsHrs
+    ? 0
     : shrubRowsHrs + stumpHrs + treeCalc.reduce((s, r) => s + r.hrs, 0)
 
   // ── Walk-access (Truck → Work Area) — trip-based for mini-skid demo ───
@@ -402,7 +403,7 @@ function calcDemo(
     ? (state.treeRows || []).reduce((sum, r) => sum + n(r.qty) * subTreeRateFor(r.size), 0)
     : 0
 
-  const subFixedCost = subGradingCost + subStumpCost + subTreeCost
+  const subFixedCost = subGradingCost + subTreeCost
   const gp = manDays * gpmd + (subHaulCost + haulCost + miniSubDemo + subFixedCost) * subMarkupRate
   const commission = gp * 0.12
   const subCost = subHaulCost + manualSub + haulCost + miniSubDemo + subFixedCost
@@ -1710,6 +1711,8 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
         )}
       </div>
 
+      {isSelf && (
+        <>
       {/* Shrub Demo */}
       <SecHdr title="Shrub Demo" />
       <div>
@@ -1840,6 +1843,9 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           </div>
         ))}
       </div>
+
+        </>
+      )}
 
       {/* Trees */}
       <div>
@@ -2014,6 +2020,13 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             ))}
           </tbody>
         </table>
+        <button
+          type="button"
+          onClick={() => set('manualRows', [...state.manualRows, { label: '', hours: '', materials: '', subCost: '' }])}
+          className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+        >
+          + Add manual entry
+        </button>
       </div>
 
       {/* Actions */}

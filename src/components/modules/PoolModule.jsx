@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
+import { SubRateOverrideProvider } from '../SubRateOverrideContext.jsx'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 
@@ -253,6 +254,13 @@ function makeInitial(data = {}) {
 
 // ── Main Calculation ──────────────────────────────────────────────────────────
 function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess = null) {
+  // Subcontractor rates: a one-off adjustment saved on THIS estimate
+  // (state.rateOverrides) takes precedence over the master rate.
+  subRates = { ...(subRates || {}) }
+  Object.entries(state.rateOverrides || {}).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '' && Number.isFinite(Number(v))) subRates[k] = Number(v)
+  })
+
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const {
     pool,
@@ -674,6 +682,14 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
   }, [refreshAllRates])
 
   const upd = (key, val) => setState(p => ({ ...p, [key]: val }))
+  // One-off subcontractor rate for this estimate only (undefined clears it).
+  const setOverride = (name, value) =>
+    setState(p => {
+      const next = { ...(p.rateOverrides || {}) }
+      if (value === undefined || value === null || value === '') delete next[name]
+      else next[name] = Number(value)
+      return { ...p, rateOverrides: next }
+    })
   const updStruct = (key, val) => setState(p => ({ ...p, [key]: val }))
 
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
@@ -813,6 +829,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
     )
 
   return (
+    <SubRateOverrideProvider overrides={state.rateOverrides} setOverride={setOverride}>
     <div className="space-y-6 pb-6">
       {/* ── Sticky GPMD bar ── */}
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
@@ -1867,5 +1884,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         </button>
       </div>
     </div>
+    </SubRateOverrideProvider>
   )
 }

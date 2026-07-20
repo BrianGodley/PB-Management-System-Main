@@ -14,6 +14,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
+import { SubRateOverrideProvider } from '../SubRateOverrideContext.jsx'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 
@@ -92,6 +93,12 @@ function calcConcrete(
   walkAccess = null,
   laborBurdenPct = R.laborBurdenPct
 ) {
+  // Subcontractor rates: a one-off adjustment saved on THIS estimate
+  // (state.rateOverrides) takes precedence over the master rate.
+  sr = { ...(sr || {}) }
+  Object.entries(state.rateOverrides || {}).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '' && Number.isFinite(Number(v))) sr[k] = Number(v)
+  })
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const lrph = n(laborRatePerHour) || 35
 
@@ -392,6 +399,15 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const [laborRates, setLaborRates] = useState(initialData?.laborRates ?? {})
   const [materialRates, setMaterialRates] = useState(initialData?.materialRates ?? {})
   const [subRates, setSubRates] = useState(initialData?.subRates ?? {})
+  // One-off subcontractor rates for this estimate only (undefined clears one).
+  const [rateOverrides, setRateOverrides] = useState(initialData?.rateOverrides ?? {})
+  const setOverride = (name, value) =>
+    setRateOverrides(p => {
+      const next = { ...(p || {}) }
+      if (value === undefined || value === null || value === '') delete next[name]
+      else next[name] = Number(value)
+      return next
+    })
 
   // Fetch company labor rate per hour
   useEffect(() => {
@@ -493,6 +509,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   }, [])
 
   const state = {
+    rateOverrides,
     crewType,
     subType,
     difficulty,
@@ -572,6 +589,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   return (
+    <SubRateOverrideProvider overrides={rateOverrides} setOverride={setOverride}>
     <div className="space-y-5">
       {/* ── Sticky GPMD bar ── */}
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
@@ -1141,6 +1159,13 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               ))}
             </tbody>
           </table>
+          <button
+            type="button"
+            onClick={() => setManualRows(rows => [...rows, { label: '', hours: '', materials: '', subCost: '' }])}
+            className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+          >
+            + Add manual entry
+          </button>
         </div>
       </div>
 
@@ -1154,5 +1179,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
         </button>
       </div>
     </div>
+    </SubRateOverrideProvider>
   )
 }

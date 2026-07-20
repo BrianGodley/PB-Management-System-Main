@@ -1652,6 +1652,13 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             ))}
           </tbody>
         </table>
+        <button
+          type="button"
+          onClick={() => set('manualRows', [...state.manualRows, { label: '', hours: '', materials: '', subCost: '' }])}
+          className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+        >
+          + Add manual entry
+        </button>
       </div>
 
       {/* ── GPMD Summary Bar ─────────────────────────────────────────────────── */}
