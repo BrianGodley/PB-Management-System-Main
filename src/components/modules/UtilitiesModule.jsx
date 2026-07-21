@@ -177,13 +177,6 @@ const ADD_ITEM_RATES = {
     laborHrs: 2,
     laborDbName: 'Hydrocut Under Hardscape - Labor Rate',
   },
-  gfciOutlet: {
-    matCost: 19.5,
-    dbName: 'GFCI Outlet Receptacle',
-    label: 'GFCI Outlet Receptacle',
-    laborHrs: 1,
-    laborDbName: 'GFCI Outlet Receptacle - Labor Rate',
-  },
 }
 
 const DEFAULTS = {
@@ -358,7 +351,6 @@ const DEFAULT_ELEC_FIXTURE_ROWS = [
 const DEFAULT_ADDITIONAL = {
   curbCoreQty: '',
   hydrocutQty: '',
-  gfciOutletQty: '',
   permitRequired: false,
 }
 const DEFAULT_MANUAL_ROWS = [
