@@ -125,9 +125,11 @@ function calcDemo(
   // Mini Skid Steer rates — used for all operations
   const laborConc = lr['Demo - Mini - Concrete t/hr'] ?? RATE_DEFAULTS.concrete
   const laborDirt = lr['Demo - Mini - Dirt t/hr'] ?? RATE_DEFAULTS.concrete
-  const laborMiscFlat = lr['Demo - Mini - Misc Flat t/hr'] ?? RATE_DEFAULTS.concrete
-  const laborMiscVert = lr['Demo - Mini - Misc Vert t/hr'] ?? RATE_DEFAULTS.concrete
-  const laborFooting = lr['Demo - Mini - Footing t/hr'] ?? RATE_DEFAULTS.concrete
+  // Misc Flat matches Hand Demo: square-foot labour (hr per 100sf·in)
+  // plus container disposal, rather than the tons ÷ t/hr model.
+  const laborMiscFlat = lr['Demo - Mini - Misc Flat SF'] ?? 1
+  const laborMiscVert = lr['Demo - Mini - Misc Vert SF'] ?? 1
+  const laborFooting = lr['Demo - Mini - Footing SF'] ?? 1
   const laborGradeCut = lr['Demo - Mini - Grade Cut t/hr'] ?? RATE_DEFAULTS.concrete
   const rateGrass = lr['Demo - Mini Skid Steer Grass'] ?? RATE_DEFAULTS.grass
   const laborBase = lr['Demo - Mini - Import Base t/hr'] ?? RATE_DEFAULTS.importBase
@@ -184,6 +186,10 @@ function calcDemo(
   const removalContainers = (sf, depthIn) => Math.ceil(removalYards(sf, depthIn) / containerCy)
   const containerCost = (sf, depthIn) =>
     isSub || isDumpSub ? 0 : removalContainers(sf, depthIn) * containerPrice
+  const sfLaborHrs = (sf, depthIn, rate) => (n(sf) / 100) * n(depthIn) * rate
+  const cfLaborHrs = (cf, rate) => (n(cf) * 12 / 100) * rate
+  const containerCostCf = cf =>
+    isSub ? 0 : Math.ceil(((n(cf) / 27) * swellFactor) / containerCy) * containerPrice
   // Editable hauling coefficients (Master Rates -> Labor, category Demo).
   const haulSecPerFt = lr['Demo - Mini Haul Sec/Ft'] ?? 0.5
   const haulLoadCy = lr['Demo - Mini Load (CY)'] ?? 0.2
@@ -198,16 +204,24 @@ function calcDemo(
   grass.dumpFee = containerCost(state.grassSF, state.grassDepth || 4)
 
   // Mini SS: misc flat/vert carry $36.21 concrete dump fee — NonBob access
-  const miscFlatCalc = (state.miscFlatRows || []).map(r =>
-    flat(r.sf, r.depth || 4, laborMiscFlat, dumpConc, accessNonBob)
-  )
-  const miscVertCalc = (state.miscVertRows || []).map(r =>
-    vert(r.lf, r.heightIn || 0, r.widthIn || 8, laborMiscVert, dumpConc, accessNonBob)
-  )
-  // Footing — Mini Skid Steer rate + Bobcat access
-  const footingCalc = (state.footingRows || []).map(r =>
-    flat(r.sf, r.depth || 12, laborFooting, dumpConc, accessBobcat)
-  )
+  const miscFlatCalc = (state.miscFlatRows || []).map(r => {
+    const row = flat(r.sf, r.depth || 4, laborConc, 0, accessNonBob)
+    row.hours = sfLaborHrs(r.sf, r.depth || 4, laborMiscFlat)
+    row.dumpFee = containerCost(r.sf, r.depth || 4)
+    return row
+  })
+  const miscVertCalc = (state.miscVertRows || []).map(r => {
+    const row = vert(r.lf, r.heightIn || 0, r.widthIn || 8, laborConc, 0, accessNonBob)
+    row.hours = cfLaborHrs(row.cf, laborMiscVert)
+    row.dumpFee = containerCostCf(row.cf)
+    return row
+  })
+  const footingCalc = (state.footingRows || []).map(r => {
+    const row = vert(r.lf, r.heightIn || 0, r.widthIn || 8, laborConc, 0, accessBobcat)
+    row.hours = cfLaborHrs(row.cf, laborFooting)
+    row.dumpFee = containerCostCf(row.cf)
+    return row
+  })
 
   // ── Grading — Mini Skid Steer rates + Bobcat access ──────────────────────
   const gradeCut = flat(
@@ -543,7 +557,7 @@ const DEFAULT_STATE = {
     .map(() => ({ label: '', lf: '', heightIn: '', widthIn: 8 })),
   footingRows: Array(4)
     .fill(null)
-    .map(() => ({ label: '', sf: '', depth: 12 })),
+    .map(() => ({ label: '', lf: '', heightIn: '', widthIn: 8 })),
   gradeCutSF: '',
   gradeCutDepth: 4,
   gradeFillSF: '',
@@ -1280,17 +1294,20 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       {/* Misc Flat */}
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Misc Flat Demo{isSelf ? ` — ${calc.laborMiscFlat} t/hr` : ''}</span>
+          <span>Misc Flat Demo{isSelf ? ` — ${calc.laborMiscFlat} hr/100sf·in` : ''}</span>
           {isSelf && (
-            <RateEditPopover
-              table="labor_rates"
-              name="Demo - Mini - Misc Flat t/hr"
-              category="Demo"
-              mode="coefficient"
-              unitLabel="t/hr"
-              currentValue={calc.laborMiscFlat}
-              onSaved={refreshAllRates}
-            />
+            <>
+              <RateEditPopover
+                table="labor_rates"
+                name="Demo - Mini - Misc Flat SF"
+                category="Demo"
+                mode="coefficient"
+                unitLabel="hr/100sf·in"
+                currentValue={calc.laborMiscFlat}
+                onSaved={refreshAllRates}
+              />
+              <span className="font-normal normal-case text-gray-500">· container disposal</span>
+            </>
           )}
           {isSelf && (
             <>
@@ -1321,7 +1338,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                     { label: 'SF', w: 'w-24' },
                     { label: 'Depth (in)', w: 'w-20' },
                     { label: 'Tons', w: 'w-16' },
-                    { label: 'Dump Fee', w: 'w-24' },
+                    { label: 'Disposal', w: 'w-24' },
                     { label: 'Labor Hrs', w: 'w-20' },
                   ]
                 : [
@@ -1378,16 +1395,14 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       {/* Misc Vertical */}
       <div className={isSub ? 'hidden' : undefined}>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Misc Vertical / Structural Demo — LF × Height × Width · {calc.laborMiscVert} t/hr</span>
-          <RateEditPopover
-            table="labor_rates"
-            name="Demo - Mini - Misc Vert t/hr"
-            category="Demo"
-            mode="coefficient"
-            unitLabel="t/hr"
-            currentValue={calc.laborMiscVert}
-            onSaved={refreshAllRates}
-          />
+          <span>Misc Vertical / Structural Demo</span>
+          {isSelf && (
+            <>
+              <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborMiscVert} hr/100sf·in equiv</span>
+              <RateEditPopover table="labor_rates" name="Demo - Mini - Misc Vert SF" category="Demo" mode="coefficient" unitLabel="hr/100sf·in" currentValue={calc.laborMiscVert} onSaved={refreshAllRates} />
+              <span className="font-normal normal-case text-gray-500">· container disposal</span>
+            </>
+          )}
           {isSelf && (
             <>
               <span className="font-normal normal-case">· ${dumpConc}/ton dump fee</span>
@@ -1460,16 +1475,14 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       {/* Footing */}
       <div className={isSub ? 'hidden' : undefined}>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Footing Demo — SF × Depth · {calc.laborFooting} t/hr</span>
-          <RateEditPopover
-            table="labor_rates"
-            name="Demo - Mini - Footing t/hr"
-            category="Demo"
-            mode="coefficient"
-            unitLabel="t/hr"
-            currentValue={calc.laborFooting}
-            onSaved={refreshAllRates}
-          />
+          <span>Footing Demo</span>
+          {isSelf && (
+            <>
+              <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborFooting} hr/100sf·in equiv</span>
+              <RateEditPopover table="labor_rates" name="Demo - Mini - Footing SF" category="Demo" mode="coefficient" unitLabel="hr/100sf·in" currentValue={calc.laborFooting} onSaved={refreshAllRates} />
+              <span className="font-normal normal-case text-gray-500">· container disposal</span>
+            </>
+          )}
           {isSelf && (
             <>
               <span className="font-normal normal-case">· ${dumpConc}/ton dump fee</span>
@@ -1488,10 +1501,11 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           <TH
             cols={[
               { label: 'Description' },
-              { label: 'SF', w: 'w-24' },
-              { label: 'Depth (in)', w: 'w-20' },
+              { label: 'LF', w: 'w-20' },
+              { label: 'H (in)', w: 'w-18' },
+              { label: 'W (in)', w: 'w-18' },
               { label: 'Tons', w: 'w-16' },
-              ...(isSelf ? [{ label: 'Dump Fee', w: 'w-24' }] : []),
+              ...(isSelf ? [{ label: 'Disposal', w: 'w-24' }] : []),
               { label: 'Labor Hrs', w: 'w-20' },
             ]}
           />
@@ -1510,15 +1524,21 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                   </td>
                   <td className={td}>
                     <Inp
-                      value={r.sf}
-                      onChange={e => setRow('footingRows', i, 'sf', e.target.value)}
+                      value={r.lf}
+                      onChange={e => setRow('footingRows', i, 'lf', e.target.value)}
                     />
                   </td>
                   <td className={td}>
                     <Inp
-                      value={r.depth}
-                      onChange={e => setRow('footingRows', i, 'depth', e.target.value)}
-                      placeholder="12"
+                      value={r.heightIn}
+                      onChange={e => setRow('footingRows', i, 'heightIn', e.target.value)}
+                    />
+                  </td>
+                  <td className={td}>
+                    <Inp
+                      value={r.widthIn}
+                      onChange={e => setRow('footingRows', i, 'widthIn', e.target.value)}
+                      placeholder="8"
                     />
                   </td>
                   <td className={num}>{cr.tons > 0 ? cr.tons.toFixed(2) : '—'}</td>
