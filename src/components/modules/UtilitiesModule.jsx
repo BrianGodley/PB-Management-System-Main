@@ -104,6 +104,18 @@ const GAS_FIXTURE_TYPES = {
 
 // Electrical fixtures — same table/rate shape as gas, in their own section.
 const ELECTRICAL_FIXTURE_TYPES = {
+  'Electric Sub-panel': {
+    cost: 300,
+    dbName: 'Electric Sub-panel',
+    laborHrs: 4.5,
+    laborDbName: 'Electric Sub-panel - Labor Rate',
+  },
+  'Electric Disconnect': {
+    cost: 150,
+    dbName: 'Electric Disconnect',
+    laborHrs: 2.5,
+    laborDbName: 'Electric Disconnect - Labor Rate',
+  },
   'GFCI Protected Receptacles': {
     cost: 86.25,
     dbName: 'GFCI Protected Receptacles',
@@ -151,20 +163,6 @@ const TRENCH_LABOR_RATE_NAME = {
 
 const ADD_ITEM_RATES = {
   // In-house electrical: quantity × install hours + material (NOT a sub cost).
-  electricSubpanel: {
-    matCost: 300,
-    dbName: 'Electric Sub-panel',
-    label: 'Electric Sub-panel',
-    laborHrs: 4.5,
-    laborDbName: 'Electric Sub-panel - Labor Rate',
-  },
-  electricDisconnect: {
-    matCost: 150,
-    dbName: 'Electric Disconnect',
-    label: 'Electric Disconnect',
-    laborHrs: 2.5,
-    laborDbName: 'Electric Disconnect - Labor Rate',
-  },
   curbCore: {
     matCost: 250,
     dbName: 'Curb Core',
@@ -358,8 +356,6 @@ const DEFAULT_ELEC_FIXTURE_ROWS = [
   { type: 'GFCI Protected Receptacles', qty: '' },
 ]
 const DEFAULT_ADDITIONAL = {
-  electricSubpanelQty: '',
-  electricDisconnectQty: '',
   curbCoreQty: '',
   hydrocutQty: '',
   gfciOutletQty: '',
@@ -708,6 +704,65 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
         </div>
       </div>
 
+      {/* ── Additional Subgrade Work ── */}
+      <div>
+        <SectionHeader title="Additional Subgrade Work" />
+        <div className="space-y-2">
+          {/* Curb Core & Hydrocut — qty based */}
+          {Object.entries(ADD_ITEM_RATES).map(([key, rate]) => {
+            const qty = n(additionalItems[`${key}Qty`])
+            const matCost = materialPrices[rate.dbName] ?? rate.matCost
+            const laborHrs = materialPrices[rate.laborDbName] ?? rate.laborHrs
+            return (
+              <div key={key} className="flex items-center gap-3 py-1.5 border-b border-gray-100">
+                <span className="text-xs text-gray-700 flex-1 inline-flex items-center gap-1">
+                  {rate.label}
+                  <RateEditPopover
+                    table="labor_rates"
+                    name={rate.laborDbName}
+                    category="Utilities"
+                    mode="coefficient"
+                    unitLabel="hr/ea"
+                    currentValue={laborHrs}
+                    onSaved={refreshAllRates}
+                  />
+                  <RateEditPopover
+                    table="material_rates"
+                    name={rate.dbName}
+                    category="Utilities"
+                    unitLabel="ea"
+                    currentValue={matCost}
+                    onSaved={refreshAllRates}
+                  />
+                </span>
+                <input
+                  type="number"
+                  step="1"
+                  className="input text-sm py-1 w-20"
+                  placeholder="Qty"
+                  value={additionalItems[`${key}Qty`]}
+                  onChange={e => setAdditionalItems(p => ({ ...p, [`${key}Qty`]: e.target.value }))}
+                />
+                <span className="text-xs text-gray-400 w-20 text-right">
+                  {qty > 0 ? `$${(qty * matCost).toLocaleString()} mat` : '—'}
+                </span>
+              </div>
+            )
+          })}
+
+          {/* Permit Required */}
+          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer py-1">
+            <input
+              type="checkbox"
+              checked={additionalItems.permitRequired}
+              onChange={e => setAdditionalItems(p => ({ ...p, permitRequired: e.target.checked }))}
+              className="rounded"
+            />
+            * Permit Required
+          </label>
+        </div>
+      </div>
+
       {/* ── Utility Lines ── */}
       <div>
         <SectionHeader title="Utility Lines" />
@@ -952,65 +1007,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
           >
             + Add row
           </button>
-        </div>
-      </div>
-
-      {/* ── Additional Items ── */}
-      <div>
-        <SectionHeader title="Additional Items" />
-        <div className="space-y-2">
-          {/* Curb Core & Hydrocut — qty based */}
-          {Object.entries(ADD_ITEM_RATES).map(([key, rate]) => {
-            const qty = n(additionalItems[`${key}Qty`])
-            const matCost = materialPrices[rate.dbName] ?? rate.matCost
-            const laborHrs = materialPrices[rate.laborDbName] ?? rate.laborHrs
-            return (
-              <div key={key} className="flex items-center gap-3 py-1.5 border-b border-gray-100">
-                <span className="text-xs text-gray-700 flex-1 inline-flex items-center gap-1">
-                  {rate.label}
-                  <RateEditPopover
-                    table="labor_rates"
-                    name={rate.laborDbName}
-                    category="Utilities"
-                    mode="coefficient"
-                    unitLabel="hr/ea"
-                    currentValue={laborHrs}
-                    onSaved={refreshAllRates}
-                  />
-                  <RateEditPopover
-                    table="material_rates"
-                    name={rate.dbName}
-                    category="Utilities"
-                    unitLabel="ea"
-                    currentValue={matCost}
-                    onSaved={refreshAllRates}
-                  />
-                </span>
-                <input
-                  type="number"
-                  step="1"
-                  className="input text-sm py-1 w-20"
-                  placeholder="Qty"
-                  value={additionalItems[`${key}Qty`]}
-                  onChange={e => setAdditionalItems(p => ({ ...p, [`${key}Qty`]: e.target.value }))}
-                />
-                <span className="text-xs text-gray-400 w-20 text-right">
-                  {qty > 0 ? `$${(qty * matCost).toLocaleString()} mat` : '—'}
-                </span>
-              </div>
-            )
-          })}
-
-          {/* Permit Required */}
-          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer py-1">
-            <input
-              type="checkbox"
-              checked={additionalItems.permitRequired}
-              onChange={e => setAdditionalItems(p => ({ ...p, permitRequired: e.target.checked }))}
-              className="rounded"
-            />
-            * Permit Required
-          </label>
         </div>
       </div>
 
