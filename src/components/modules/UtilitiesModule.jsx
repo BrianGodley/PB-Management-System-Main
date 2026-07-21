@@ -51,7 +51,7 @@ const UTILITY_LINE_TYPES = {
   },
 }
 
-const FIXTURE_TYPES = {
+const GAS_FIXTURE_TYPES = {
   '12" Single Gas Ring': {
     cost: 61.75,
     dbName: '12" Single Gas Ring',
@@ -100,6 +100,10 @@ const FIXTURE_TYPES = {
     laborHrs: 2,
     laborDbName: 'Gas Shut-Off Valve - Labor Rate',
   },
+}
+
+// Electrical fixtures — same table/rate shape as gas, in their own section.
+const ELECTRICAL_FIXTURE_TYPES = {
   'GFCI Protected Receptacles': {
     cost: 86.25,
     dbName: 'GFCI Protected Receptacles',
@@ -131,6 +135,9 @@ const FIXTURE_TYPES = {
     laborDbName: 'Infratech Single Duplex Switch in Surface Mount Gang Box - Labor Rate',
   },
 }
+
+// Combined lookup so a row of either kind resolves its rate.
+const FIXTURE_TYPES = { ...GAS_FIXTURE_TYPES, ...ELECTRICAL_FIXTURE_TYPES }
 
 // Minutes per cubic foot by equipment type (same as Drainage)
 const TRENCH_MINS_PER_CF = { Trench: 10, Hand: 12.5 }
@@ -205,6 +212,7 @@ function calcUtilities(
     trenchRows,
     lineRows,
     fixtureRows,
+    elecFixtureRows,
     additionalItems,
     electricSubpanelSubCost,
     manualRows,
@@ -245,7 +253,7 @@ function calcUtilities(
     }
   })
 
-  fixtureRows.forEach(r => {
+  ;[...fixtureRows, ...(elecFixtureRows || [])].forEach(r => {
     const qty = n(r.qty)
     const rate = FIXTURE_TYPES[r.type]
     if (qty > 0 && rate) {
@@ -345,6 +353,10 @@ const DEFAULT_FIXTURE_ROWS = [
   { type: '12" Single Gas Ring', qty: '' },
   { type: '12" Single Gas Ring', qty: '' },
 ]
+const DEFAULT_ELEC_FIXTURE_ROWS = [
+  { type: 'GFCI Protected Receptacles', qty: '' },
+  { type: 'GFCI Protected Receptacles', qty: '' },
+]
 const DEFAULT_ADDITIONAL = {
   electricSubpanelQty: '',
   electricDisconnectQty: '',
@@ -436,6 +448,9 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   const [trenchRows, setTrenchRows] = useState(initialData?.trenchRows ?? DEFAULT_TRENCH_ROWS)
   const [lineRows, setLineRows] = useState(initialData?.lineRows ?? DEFAULT_LINE_ROWS)
   const [fixtureRows, setFixtureRows] = useState(initialData?.fixtureRows ?? DEFAULT_FIXTURE_ROWS)
+  const [elecFixtureRows, setElecFixtureRows] = useState(
+    initialData?.elecFixtureRows ?? DEFAULT_ELEC_FIXTURE_ROWS
+  )
   const [additionalItems, setAdditionalItems] = useState(
     initialData?.additionalItems ?? DEFAULT_ADDITIONAL
   )
@@ -466,6 +481,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
       trenchRows,
       lineRows,
       fixtureRows,
+      elecFixtureRows,
       additionalItems,
       electricSubpanelSubCost,
       manualRows,
@@ -501,6 +517,9 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   function updateFixture(i, field, val) {
     setFixtureRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
+  function updateElecFixture(i, field, val) {
+    setElecFixtureRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  }
   function updateManual(i, field, val) {
     setManualRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
@@ -516,6 +535,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
         trenchRows,
         lineRows,
         fixtureRows,
+        elecFixtureRows,
         additionalItems,
         electricSubpanelSubCost,
         manualRows,
@@ -799,7 +819,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                           value={row.type}
                           onChange={e => updateFixture(i, 'type', e.target.value)}
                         >
-                          {Object.keys(FIXTURE_TYPES).map(t => (
+                          {Object.keys(GAS_FIXTURE_TYPES).map(t => (
                             <option key={t}>{t}</option>
                           ))}
                         </select>
@@ -846,6 +866,89 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
             type="button"
             className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
             onClick={() => setFixtureRows(r => [...r, { type: '12" Single Gas Ring', qty: '' }])}
+          >
+            + Add row
+          </button>
+        </div>
+      </div>
+
+      {/* ── Electrical Fixtures ── */}
+      <div>
+        <SectionHeader title="Electrical Fixtures" />
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-2 font-medium">Fixture</th>
+                <th className="text-left pb-1 pr-2 font-medium">Qty</th>
+                <th className="text-right pb-1 pr-2 font-medium text-gray-400">$/Ea</th>
+                <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
+              </tr>
+            </thead>
+            <tbody>
+              {elecFixtureRows.map((row, i) => {
+                const rate = FIXTURE_TYPES[row.type]
+                const cost = materialPrices[rate?.dbName] ?? rate?.cost ?? 0
+                const laborHrs = materialPrices[rate?.laborDbName] ?? rate?.laborHrs ?? 0
+                const mat = n(row.qty) * cost
+                return (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-2">
+                      <div className="flex items-center gap-1">
+                        <select
+                          className="input text-sm py-1 flex-1 min-w-0"
+                          value={row.type}
+                          onChange={e => updateElecFixture(i, 'type', e.target.value)}
+                        >
+                          {Object.keys(ELECTRICAL_FIXTURE_TYPES).map(t => (
+                            <option key={t}>{t}</option>
+                          ))}
+                        </select>
+                        {rate && (
+                          <RateEditPopover
+                            table="labor_rates"
+                            name={rate.laborDbName}
+                            category="Utilities"
+                            mode="coefficient"
+                            unitLabel="hrs/ea"
+                            currentValue={laborHrs}
+                            onSaved={refreshAllRates}
+                          />
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-1 pr-2">
+                      <NumInput value={row.qty} onChange={v => updateElecFixture(i, 'qty', v)} />
+                    </td>
+                    <td className="py-1 text-right text-gray-400 text-xs pr-2">
+                      <span className="inline-flex items-center justify-end gap-1">
+                        ${cost.toFixed(2)}
+                        {rate && (
+                          <RateEditPopover
+                            table="material_rates"
+                            name={rate.dbName}
+                            category="Utilities"
+                            unitLabel="ea"
+                            currentValue={cost}
+                            onSaved={refreshAllRates}
+                          />
+                        )}
+                      </span>
+                    </td>
+                    <td className="py-1 text-right text-gray-600 text-xs">
+                      {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <button
+            type="button"
+            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+            onClick={() =>
+              setElecFixtureRows(r => [...r, { type: 'GFCI Protected Receptacles', qty: '' }])
+            }
           >
             + Add row
           </button>
