@@ -284,12 +284,12 @@ function calcTurf(
   const manualSub = manualFiltered.reduce((s, r) => s + n(r.subCost), 0)
 
   // ── Totals ────────────────────────────────────────────────────────────────
-  const rawHrs = demoHrs + baseHrs + turfHrs + stripsHrs + cutHrs + manualHrs
+  const rawHrs = baseHrs + turfHrs + stripsHrs + cutHrs + manualHrs
   const diffHrs = (rawHrs * n(state.difficulty)) / 100
   const _preWalkHrs = rawHrs + diffHrs + hrsAdj
   const walkHrs = calcWalkAccessLabor(_preWalkHrs, distanceLF, { paceLfPerMin: _pace })
   const totalHrs = _preWalkHrs + walkHrs
-  const totalMat = demoMat + baseMat + turfMat + stripsMat + cutMat + infillMat + manualMat
+  const totalMat = baseMat + turfMat + stripsMat + cutMat + infillMat + manualMat
   const subCost = manualSub
 
   const manDays = totalHrs / 8
@@ -712,91 +712,11 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         </div>
       </div>
 
-      {/* Turf Prep — Demo */}
-      <div>
-        <SecHdr title="Turf Preparation (Demo)" />
-        <table className="w-full text-xs">
-          <TH
-            cols={[
-              { label: 'Demo Type' },
-              { label: 'Method', w: 'w-36' },
-              { label: 'Sq Ft', w: 'w-20' },
-              { label: 'Inches', w: 'w-16' },
-              { label: 'Tons', w: 'w-16' },
-              { label: 'Hrs', w: 'w-16' },
-              { label: 'Dump $', w: 'w-20' },
-            ]}
-          />
-          <tbody className="divide-y divide-gray-50">
-            {DEMO_ROWS.map((row, i) => {
-              const cr = calc.demoCalc[i]
-              const methodMeta = DEMO_METHODS.find(x => x.key === state.demo[row.key].method)
-              return (
-                <tr key={row.key}>
-                  <td className={`${td} font-medium text-gray-700`}>
-                    <span className="inline-flex items-center gap-1">
-                      {row.label}
-                      <RateEditPopover
-                        table="material_rates"
-                        name={row.dumpKey}
-                        category="Demo"
-                        unitLabel="ton"
-                        currentValue={cr.dumpRate}
-                        onSaved={refreshAllRates}
-                      />
-                    </span>
-                  </td>
-                  <td className={td}>
-                    <div className="flex items-center gap-1">
-                      <div className="flex-1 min-w-0">
-                        <Sel
-                          value={state.demo[row.key].method}
-                          onChange={e => setDemo(row.key, 'method', e.target.value)}
-                          options={demoMethodKeys}
-                          optionLabels={demoMethodLabels}
-                        />
-                      </div>
-                      {methodMeta && (
-                        <RateEditPopover
-                          table="labor_rates"
-                          name={methodMeta.matKey}
-                          category="Artificial Turf"
-                          mode="coefficient"
-                          unitLabel="t/hr"
-                          currentValue={cr.rate}
-                          onSaved={refreshAllRates}
-                        />
-                      )}
-                    </div>
-                  </td>
-                  <td className={td}>
-                    <Inp
-                      value={state.demo[row.key].sf}
-                      onChange={e => setDemo(row.key, 'sf', e.target.value)}
-                    />
-                  </td>
-                  <td className={td}>
-                    <Inp
-                      value={state.demo[row.key].inches}
-                      onChange={e => setDemo(row.key, 'inches', e.target.value)}
-                      step="1"
-                    />
-                  </td>
-                  <td className={num}>{cr.tons > 0 ? cr.tons.toFixed(2) : '—'}</td>
-                  <td className={num}>{fh(cr.hrs)}</td>
-                  <td className={num}>{cr.mat > 0 ? fmt2(cr.mat) : '—'}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-
       {/* Base Installation */}
       <div>
         <SecHdr title="Base Installation" />
         <div className="text-xs text-gray-500 mb-2 italic">
-          SF defaults to the largest demo area entered. Override below if different.
+          Enter the turf area square footage.
         </div>
         <table className="w-full text-xs">
           <TH
