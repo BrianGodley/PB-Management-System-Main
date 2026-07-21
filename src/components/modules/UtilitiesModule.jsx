@@ -143,6 +143,21 @@ const TRENCH_LABOR_RATE_NAME = {
 }
 
 const ADD_ITEM_RATES = {
+  // In-house electrical: quantity × install hours + material (NOT a sub cost).
+  electricSubpanel: {
+    matCost: 300,
+    dbName: 'Electric Sub-panel',
+    label: 'Electric Sub-panel',
+    laborHrs: 4.5,
+    laborDbName: 'Electric Sub-panel - Labor Rate',
+  },
+  electricDisconnect: {
+    matCost: 150,
+    dbName: 'Electric Disconnect',
+    label: 'Electric Disconnect',
+    laborHrs: 2.5,
+    laborDbName: 'Electric Disconnect - Labor Rate',
+  },
   curbCore: {
     matCost: 250,
     dbName: 'Curb Core',
@@ -257,8 +272,6 @@ function calcUtilities(
     manSub += n(r.subCost)
   })
 
-  const subpanelSub = n(electricSubpanelSubCost)
-
   const baseHrs = trenchHrs + lineHrs + fixHrs + addHrs + manHrs
   const diffMod = 1 + n(difficulty) / 100
   const adjHrs = n(hoursAdj)
@@ -271,7 +284,7 @@ function calcUtilities(
   const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
   const gp = manDays * gpmd
   const commission = gp * DEFAULTS.commissionRate
-  const subCost = manSub + subpanelSub
+  const subCost = manSub
   const price = totalMat + laborCost + burden + gp + commission + subCost
 
   return {
@@ -333,6 +346,8 @@ const DEFAULT_FIXTURE_ROWS = [
   { type: '12" Single Gas Ring', qty: '' },
 ]
 const DEFAULT_ADDITIONAL = {
+  electricSubpanelQty: '',
+  electricDisconnectQty: '',
   curbCoreQty: '',
   hydrocutQty: '',
   gfciOutletQty: '',
@@ -841,25 +856,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
       <div>
         <SectionHeader title="Additional Items" />
         <div className="space-y-2">
-          {/* Electric Sub-panel — sub cost entry */}
-          <div className="flex items-center gap-3 py-1.5 border-b border-gray-100">
-            <span className="text-xs text-gray-700 flex-1">Electric Sub-panel</span>
-            <div className="relative w-36">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-                $
-              </span>
-              <input
-                type="number"
-                step="any"
-                className="input text-sm py-1 pl-6"
-                placeholder="Sub cost"
-                value={electricSubpanelSubCost}
-                onChange={e => setElectricSubpanelSubCost(e.target.value)}
-              />
-            </div>
-            <span className="text-xs text-gray-400 w-20 text-right">sub cost</span>
-          </div>
-
           {/* Curb Core & Hydrocut — qty based */}
           {Object.entries(ADD_ITEM_RATES).map(([key, rate]) => {
             const qty = n(additionalItems[`${key}Qty`])
