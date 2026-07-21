@@ -125,12 +125,12 @@ function calcDemo(
   const laborMiscFlat = lr['Demo - Skid - Misc Flat SF'] ?? 1
   const laborMiscVert = lr['Demo - Skid - Misc Vert SF'] ?? 1
   const laborFooting = lr['Demo - Skid - Footing SF'] ?? 1
-  const laborGradeCut = lr['Demo - Skid - Grade Cut t/hr'] ?? RATE_DEFAULTS.concrete
+  const laborGradeCut = lr['Demo - Skid - Grade Cut SF'] ?? 1
   const rateGrass = lr['Demo - Skid Steer Grass'] ?? RATE_DEFAULTS.grass
   const laborBase = lr['Demo - Skid - Import Base SF'] ?? 1
-  const laborGradeFill = lr['Demo - Skid - Grade Fill t/hr'] ?? RATE_DEFAULTS.importBase
-  const rateJJ = lr['Demo - Skid JJ Compaction'] ?? RATE_DEFAULTS.jj
-  const rateSSCmp = lr['Demo - Skid SS Compaction'] ?? RATE_DEFAULTS.ssCompact
+  const laborGradeFill = lr['Demo - Skid - Grade Fill SF'] ?? 1
+  const laborJJ = lr['Demo - Skid - JJ SF'] ?? 1
+  const laborSS = lr['Demo - Skid - SS Compact SF'] ?? 1
   const rebarMinPerSF = lr['Demo - Skid Rebar'] ?? RATE_DEFAULTS.rebarMin
   const shrubRate = lr['Demo - Skid Shrub'] ?? RATE_DEFAULTS.shrub
   const stumpSmallRate = lr['Demo - Skid Stump Small'] ?? 1.25
@@ -224,11 +224,14 @@ function calcDemo(
   const gradeCut = flat(state.gradeCutSF, state.gradeCutDepth || 4, laborGradeCut, 0)
   gradeCut.dumpFee = containerCost(state.gradeCutSF, state.gradeCutDepth || 4)
   const gradeFill = flat(state.gradeFillSF, state.gradeFillDepth || 4, laborGradeFill, 0)
+  // Square-foot based grading labour (matches Hand Demo).
+  gradeCut.hours = sfLaborHrs(state.gradeCutSF, state.gradeCutDepth || 4, laborGradeCut)
+  gradeFill.hours = sfLaborHrs(state.gradeFillSF, state.gradeFillDepth || 4, laborGradeFill)
 
   const jjTons = sfToTons(state.jjSF, state.jjDepth || 4)
   const ssCmpTons = sfToTons(state.ssCmpSF, state.ssCmpDepth || 4)
-  const jjHrs = jjTons > 0 ? jjTons / rateJJ : 0 // no access mod
-  const ssCmpHrs = ssCmpTons > 0 ? ssCmpTons / rateSSCmp : 0 // no access mod
+  const jjHrs = sfLaborHrs(state.jjSF, state.jjDepth || 4, laborJJ) // no access mod
+  const ssCmpHrs = sfLaborHrs(state.ssCmpSF, state.ssCmpDepth || 4, laborSS) // no access mod
 
   // ── Rebar add-on ─────────────────────────────────────────────────────────
   const rebarHrs = isSub ? 0 : n(state.rebarSF) * (rebarMinPerSF / 60)
@@ -541,8 +544,8 @@ function calcDemo(
     laborGradeCut,
     laborGradeFill,
     rateGrass,
-    rateJJ,
-    rateSSCmp,
+    laborJJ,
+    laborSS,
     rebarMinPerSF,
     treeSmall,
     treeMed,
@@ -1619,9 +1622,10 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 dep: 4,
                 tons: calc.gradeCut.tons,
                 hrs: calc.gradeCut.hours,
-                note: `${calc.laborGradeCut} t/hr`,
+                note: `${calc.laborGradeCut} hr/100sf·in`,
                 rate: calc.laborGradeCut,
-                rateName: 'Demo - Skid - Grade Cut t/hr',
+                rateName: 'Demo - Skid - Grade Cut SF',
+                rateUnit: 'hr/100sf·in',
               },
               {
                 label: 'Grade Fill',
@@ -1630,9 +1634,10 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 dep: 4,
                 tons: calc.gradeFill.tons,
                 hrs: calc.gradeFill.hours,
-                note: `${calc.laborGradeFill} t/hr`,
+                note: `${calc.laborGradeFill} hr/100sf·in`,
                 rate: calc.laborGradeFill,
-                rateName: 'Demo - Skid - Grade Fill t/hr',
+                rateName: 'Demo - Skid - Grade Fill SF',
+                rateUnit: 'hr/100sf·in',
               },
               {
                 label: 'Jumping Jack',
@@ -1641,9 +1646,10 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 dep: 4,
                 tons: calc.jjTons,
                 hrs: calc.jjHrs,
-                note: `${calc.rateJJ} t/hr`,
-                rate: calc.rateJJ,
-                rateName: 'Demo - Skid JJ Compaction',
+                note: `${calc.laborJJ} hr/100sf·in`,
+                rate: calc.laborJJ,
+                rateName: 'Demo - Skid - JJ SF',
+                rateUnit: 'hr/100sf·in',
               },
               {
                 label: 'SS Compact',
@@ -1652,11 +1658,12 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 dep: 4,
                 tons: calc.ssCmpTons,
                 hrs: calc.ssCmpHrs,
-                note: `${calc.rateSSCmp} t/hr`,
-                rate: calc.rateSSCmp,
-                rateName: 'Demo - Skid SS Compaction',
+                note: `${calc.laborSS} hr/100sf·in`,
+                rate: calc.laborSS,
+                rateName: 'Demo - Skid - SS Compact SF',
+                rateUnit: 'hr/100sf·in',
               },
-            ].map(({ label, sfK, dK, dep, tons, hrs, note, rate, rateName }) => (
+            ].map(({ label, sfK, dK, dep, tons, hrs, note, rate, rateName, rateUnit }) => (
               <tr key={label}>
                 <td className={`${td} font-medium text-gray-700`}>
                   <span className="inline-flex items-center gap-1">
@@ -1667,7 +1674,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                       name={rateName}
                       category="Demo"
                       mode="coefficient"
-                      unitLabel="t/hr"
+                      unitLabel={rateUnit || 't/hr'}
                       currentValue={rate}
                       onSaved={refreshAllRates}
                     />
@@ -1782,6 +1789,20 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
             })}
           </tbody>
         </table>
+        {isSelf && (
+          <p className="text-xs text-gray-400 mt-1 inline-flex items-center gap-1">
+            {calc.shrubRate} hrs/ea × shrub-height modifier
+            <RateEditPopover
+              table="labor_rates"
+              name="Demo - Skid Shrub"
+              category="Demo"
+              mode="coefficient"
+              unitLabel="hrs/ea"
+              currentValue={calc.shrubRate}
+              onSaved={refreshAllRates}
+            />
+          </p>
+        )}
       </div>
 
       {/* Stump Demo */}

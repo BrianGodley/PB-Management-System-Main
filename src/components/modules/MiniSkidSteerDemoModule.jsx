@@ -131,12 +131,12 @@ function calcDemo(
   const laborMiscFlat = lr['Demo - Mini - Misc Flat SF'] ?? 1
   const laborMiscVert = lr['Demo - Mini - Misc Vert SF'] ?? 1
   const laborFooting = lr['Demo - Mini - Footing SF'] ?? 1
-  const laborGradeCut = lr['Demo - Mini - Grade Cut t/hr'] ?? RATE_DEFAULTS.concrete
+  const laborGradeCut = lr['Demo - Mini - Grade Cut SF'] ?? 1
   const rateGrass = lr['Demo - Mini Skid Steer Grass'] ?? RATE_DEFAULTS.grass
   const laborBase = lr['Demo - Mini - Import Base SF'] ?? 1
-  const laborGradeFill = lr['Demo - Mini - Grade Fill t/hr'] ?? RATE_DEFAULTS.importBase
-  const rateJJ = lr['Demo - Mini JJ Compaction'] ?? RATE_DEFAULTS.jj
-  const rateSSCmp = lr['Demo - Mini SS Compaction'] ?? RATE_DEFAULTS.ssCompact
+  const laborGradeFill = lr['Demo - Mini - Grade Fill SF'] ?? 1
+  const laborJJ = lr['Demo - Mini - JJ SF'] ?? 1
+  const laborSS = lr['Demo - Mini - SS Compact SF'] ?? 1
   const rebarMinPerSF = lr['Demo - Mini Rebar'] ?? RATE_DEFAULTS.rebarMin
   const shrubRate = lr['Demo - Mini Shrub'] ?? RATE_DEFAULTS.shrub
   const stumpSmallRate = lr['Demo - Mini Stump Small'] ?? 1.25
@@ -244,11 +244,14 @@ function calcDemo(
   )
   gradeCut.dumpFee = containerCost(state.gradeCutSF, state.gradeCutDepth || 4)
   const gradeFill = flat(state.gradeFillSF, state.gradeFillDepth || 4, laborGradeFill, 0, accessBobcat)
+  // Square-foot based grading labour (matches Hand Demo).
+  gradeCut.hours = sfLaborHrs(state.gradeCutSF, state.gradeCutDepth || 4, laborGradeCut)
+  gradeFill.hours = sfLaborHrs(state.gradeFillSF, state.gradeFillDepth || 4, laborGradeFill)
 
   const jjTons = sfToTons(state.jjSF, state.jjDepth || 4)
   const ssCmpTons = sfToTons(state.ssCmpSF, state.ssCmpDepth || 4)
-  const jjHrs = jjTons > 0 ? jjTons / rateJJ : 0
-  const ssCmpHrs = ssCmpTons > 0 ? ssCmpTons / rateSSCmp : 0
+  const jjHrs = sfLaborHrs(state.jjSF, state.jjDepth || 4, laborJJ)
+  const ssCmpHrs = sfLaborHrs(state.ssCmpSF, state.ssCmpDepth || 4, laborSS)
 
   // ── Rebar add-on ─────────────────────────────────────────────────────────
   const rebarHrs = isSub ? 0 : n(state.rebarSF) * (rebarMinPerSF / 60)
@@ -528,8 +531,8 @@ function calcDemo(
     laborGradeCut,
     laborGradeFill,
     rateGrass,
-    rateJJ,
-    rateSSCmp,
+    laborJJ,
+    laborSS,
     rebarMinPerSF,
     treeSmall,
     treeMed,
@@ -1634,9 +1637,10 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 dep: 4,
                 tons: calc.gradeCut.tons,
                 hrs: calc.gradeCut.hours,
-                note: `${calc.laborGradeCut} t/hr`,
+                note: `${calc.laborGradeCut} hr/100sf·in`,
                 rate: calc.laborGradeCut,
-                rateName: 'Demo - Mini - Grade Cut t/hr',
+                rateName: 'Demo - Mini - Grade Cut SF',
+                rateUnit: 'hr/100sf·in',
               },
               {
                 label: 'Grade Fill',
@@ -1645,9 +1649,10 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 dep: 4,
                 tons: calc.gradeFill.tons,
                 hrs: calc.gradeFill.hours,
-                note: `${calc.laborGradeFill} t/hr`,
+                note: `${calc.laborGradeFill} hr/100sf·in`,
                 rate: calc.laborGradeFill,
-                rateName: 'Demo - Mini - Grade Fill t/hr',
+                rateName: 'Demo - Mini - Grade Fill SF',
+                rateUnit: 'hr/100sf·in',
               },
               {
                 label: 'Jumping Jack',
@@ -1656,9 +1661,10 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 dep: 4,
                 tons: calc.jjTons,
                 hrs: calc.jjHrs,
-                note: `${calc.rateJJ} t/hr`,
-                rate: calc.rateJJ,
-                rateName: 'Demo - Mini JJ Compaction',
+                note: `${calc.laborJJ} hr/100sf·in`,
+                rate: calc.laborJJ,
+                rateName: 'Demo - Mini - JJ SF',
+                rateUnit: 'hr/100sf·in',
               },
               {
                 label: 'Mini SS Compact (4" Max)',
@@ -1667,11 +1673,12 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 dep: 4,
                 tons: calc.ssCmpTons,
                 hrs: calc.ssCmpHrs,
-                note: `${calc.rateSSCmp} t/hr`,
-                rate: calc.rateSSCmp,
-                rateName: 'Demo - Mini SS Compaction',
+                note: `${calc.laborSS} hr/100sf·in`,
+                rate: calc.laborSS,
+                rateName: 'Demo - Mini - SS Compact SF',
+                rateUnit: 'hr/100sf·in',
               },
-            ].map(({ label, sfK, dK, dep, tons, hrs, note, rate, rateName }) => (
+            ].map(({ label, sfK, dK, dep, tons, hrs, note, rate, rateName, rateUnit }) => (
               <tr key={label}>
                 <td className={`${td} font-medium text-gray-700`}>
                   <span className="inline-flex items-center gap-1">
@@ -1682,7 +1689,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                       name={rateName}
                       category="Demo"
                       mode="coefficient"
-                      unitLabel="t/hr"
+                      unitLabel={rateUnit || 't/hr'}
                       currentValue={rate}
                       onSaved={refreshAllRates}
                     />
@@ -1797,6 +1804,20 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             })}
           </tbody>
         </table>
+        {isSelf && (
+          <p className="text-xs text-gray-400 mt-1 inline-flex items-center gap-1">
+            {calc.shrubRate} hrs/ea × shrub-height modifier
+            <RateEditPopover
+              table="labor_rates"
+              name="Demo - Mini Shrub"
+              category="Demo"
+              mode="coefficient"
+              unitLabel="hrs/ea"
+              currentValue={calc.shrubRate}
+              onSaved={refreshAllRates}
+            />
+          </p>
+        )}
       </div>
 
       {/* Stump Demo */}
