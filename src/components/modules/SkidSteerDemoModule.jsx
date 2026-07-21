@@ -117,8 +117,9 @@ function calcDemo(
   const hrsAdj = n(state.hoursAdj)
 
   // ── Pull rates from DB (lr) with fallbacks ────────────────────────────────
-  const laborConc = lr['Demo - Skid - Concrete t/hr'] ?? RATE_DEFAULTS.concrete
-  const laborDirt = lr['Demo - Skid - Dirt t/hr'] ?? RATE_DEFAULTS.concrete
+  const laborConc = lr['Demo - Skid - Concrete SF'] ?? 1
+  const laborDirt = lr['Demo - Skid - Dirt SF'] ?? 1
+  const laborGrass = lr['Demo - Skid - Grass SF'] ?? 1
   // Misc Flat matches Hand Demo: square-foot labour (hr per 100sf·in)
   // plus container disposal, rather than the tons ÷ t/hr model.
   const laborMiscFlat = lr['Demo - Skid - Misc Flat SF'] ?? 1
@@ -126,7 +127,7 @@ function calcDemo(
   const laborFooting = lr['Demo - Skid - Footing SF'] ?? 1
   const laborGradeCut = lr['Demo - Skid - Grade Cut t/hr'] ?? RATE_DEFAULTS.concrete
   const rateGrass = lr['Demo - Skid Steer Grass'] ?? RATE_DEFAULTS.grass
-  const laborBase = lr['Demo - Skid - Import Base t/hr'] ?? RATE_DEFAULTS.importBase
+  const laborBase = lr['Demo - Skid - Import Base SF'] ?? 1
   const laborGradeFill = lr['Demo - Skid - Grade Fill t/hr'] ?? RATE_DEFAULTS.importBase
   const rateJJ = lr['Demo - Skid JJ Compaction'] ?? RATE_DEFAULTS.jj
   const rateSSCmp = lr['Demo - Skid SS Compaction'] ?? RATE_DEFAULTS.ssCompact
@@ -174,6 +175,8 @@ function calcDemo(
     isSub || isDumpSub ? 0 : removalContainers(sf, depthIn) * containerPrice
   const sfLaborHrs = (sf, depthIn, rate) => (n(sf) / 100) * n(depthIn) * rate
   const cfLaborHrs = (cf, rate) => (n(cf) * 12 / 100) * rate
+  const flatCf = (sf, depthIn) => n(sf) * (n(depthIn) / 12)
+  const baseMatPer10Cy = mp['Demo - Skid Import Base $/10cy'] ?? 150
   const containerCostCf = cf =>
     isSub ? 0 : Math.ceil(((n(cf) / 27) * swellFactor) / containerCy) * containerPrice
   // Editable hauling coefficients (Master Rates -> Labor, category Demo).
@@ -184,7 +187,15 @@ function calcDemo(
   const conc = flat(state.concSF, state.concDepth || 4, laborConc, 0)
   const dirt = flat(state.dirtSF, state.dirtDepth || 4, laborDirt, 0)
   const base = flat(state.baseSF, state.baseDepth || 4, laborBase, 0)
+  // Import Base: half the square-foot labour rate, priced as material per 10 raw cy.
+  base.hours = 0.5 * sfLaborHrs(state.baseSF, state.baseDepth || 4, laborBase)
+  const baseRawCy = flatCf(state.baseSF, state.baseDepth || 4) / 27
+  const baseMat = isSub ? 0 : Math.ceil(baseRawCy / 10) * baseMatPer10Cy
   const grass = flat(state.grassSF, state.grassDepth || 4, rateGrass, 0)
+  // Square-foot based removal labour (not tons), matching Hand Demo.
+  conc.hours = sfLaborHrs(state.concSF, state.concDepth || 4, laborConc)
+  dirt.hours = sfLaborHrs(state.dirtSF, state.dirtDepth || 4, laborDirt)
+  grass.hours = sfLaborHrs(state.grassSF, state.grassDepth || 4, laborGrass)
   conc.dumpFee = containerCost(state.concSF, state.concDepth || 4)
   dirt.dumpFee = containerCost(state.dirtSF, state.dirtDepth || 4)
   grass.dumpFee = containerCost(state.grassSF, state.grassDepth || 4)
@@ -359,7 +370,7 @@ function calcDemo(
       footingCalc.reduce((s, r) => s + r.dumpFee, 0) +
       gradeCut.dumpFee +
       treeCalc.reduce((s, r) => s + r.dumpFee, 0)
-  const totalMat = dumpMatCost + manualMat
+  const totalMat = dumpMatCost + baseMat + manualMat
 
   // ── Financials ────────────────────────────────────────────────────────────
   const manDays = totalHrs / 8
@@ -492,6 +503,8 @@ function calcDemo(
     vegHrs,
     manualHrs,
     dumpMatCost,
+    baseMat,
+    laborGrass,
     isSub,
     isDumpSub,
     subDumpCost,
@@ -1195,8 +1208,9 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 row: calc.conc,
                 fee: dumpConc,
                 rate: calc.laborConc,
-                rateName: 'Demo - Skid - Concrete t/hr',
-                rateNote: `${calc.laborConc} t/hr`,
+                rateName: 'Demo - Skid - Concrete SF',
+                rateNote: `${calc.laborConc} hr/100sf·in`,
+                rateUnit: 'hr/100sf·in',
               },
               {
                 label: 'Dirt/Rock',
@@ -1206,8 +1220,9 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 row: calc.dirt,
                 fee: dumpDirt,
                 rate: calc.laborDirt,
-                rateName: 'Demo - Skid - Dirt t/hr',
-                rateNote: `${calc.laborDirt} t/hr`,
+                rateName: 'Demo - Skid - Dirt SF',
+                rateNote: `${calc.laborDirt} hr/100sf·in`,
+                rateUnit: 'hr/100sf·in',
               },
               {
                 label: 'Import Base',
@@ -1217,8 +1232,9 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 row: calc.base,
                 fee: 0,
                 rate: calc.laborBase,
-                rateName: 'Demo - Skid - Import Base t/hr',
-                rateNote: `${calc.laborBase} t/hr`,
+                rateName: 'Demo - Skid - Import Base SF',
+                rateNote: `½ × ${calc.laborBase} hr/100sf·in`,
+                rateUnit: 'hr/100sf·in',
               },
               {
                 label: 'Grass/Sod',
@@ -1227,9 +1243,10 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 dep: 4,
                 row: calc.grass,
                 fee: dumpGreen,
-                rate: calc.rateGrass,
-                rateName: 'Demo - Skid Steer Grass',
-                rateNote: `${calc.rateGrass} t/hr · $${dumpGreen}/ton green waste`,
+                rate: calc.laborGrass,
+                rateName: 'Demo - Skid - Grass SF',
+                rateNote: `${calc.laborGrass} hr/100sf·in`,
+                rateUnit: 'hr/100sf·in',
                 extraIcon: (
                   <RateEditPopover
                     table="material_rates"
@@ -1241,7 +1258,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                   />
                 ),
               },
-            ].map(({ label, sfK, dK, dep, row, rate, rateName, rateNote, extraIcon }) => (
+            ].map(({ label, sfK, dK, dep, row, rate, rateName, rateNote, rateUnit, extraIcon }) => (
               <tr key={label}>
                 <td className={`${td} font-medium text-gray-700`}>
                   <span className="inline-flex items-center gap-1">
@@ -1252,7 +1269,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                       name={rateName}
                       category="Demo"
                       mode="coefficient"
-                      unitLabel="t/hr"
+                      unitLabel={rateUnit || 't/hr'}
                       currentValue={rate}
                       onSaved={refreshAllRates}
                     />

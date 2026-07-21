@@ -123,8 +123,9 @@ function calcDemo(
 
   // ── Pull rates from DB (lr) with fallbacks ────────────────────────────────
   // Mini Skid Steer rates — used for all operations
-  const laborConc = lr['Demo - Mini - Concrete t/hr'] ?? RATE_DEFAULTS.concrete
-  const laborDirt = lr['Demo - Mini - Dirt t/hr'] ?? RATE_DEFAULTS.concrete
+  const laborConc = lr['Demo - Mini - Concrete SF'] ?? 1
+  const laborDirt = lr['Demo - Mini - Dirt SF'] ?? 1
+  const laborGrass = lr['Demo - Mini - Grass SF'] ?? 1
   // Misc Flat matches Hand Demo: square-foot labour (hr per 100sf·in)
   // plus container disposal, rather than the tons ÷ t/hr model.
   const laborMiscFlat = lr['Demo - Mini - Misc Flat SF'] ?? 1
@@ -132,7 +133,7 @@ function calcDemo(
   const laborFooting = lr['Demo - Mini - Footing SF'] ?? 1
   const laborGradeCut = lr['Demo - Mini - Grade Cut t/hr'] ?? RATE_DEFAULTS.concrete
   const rateGrass = lr['Demo - Mini Skid Steer Grass'] ?? RATE_DEFAULTS.grass
-  const laborBase = lr['Demo - Mini - Import Base t/hr'] ?? RATE_DEFAULTS.importBase
+  const laborBase = lr['Demo - Mini - Import Base SF'] ?? 1
   const laborGradeFill = lr['Demo - Mini - Grade Fill t/hr'] ?? RATE_DEFAULTS.importBase
   const rateJJ = lr['Demo - Mini JJ Compaction'] ?? RATE_DEFAULTS.jj
   const rateSSCmp = lr['Demo - Mini SS Compaction'] ?? RATE_DEFAULTS.ssCompact
@@ -188,6 +189,8 @@ function calcDemo(
     isSub || isDumpSub ? 0 : removalContainers(sf, depthIn) * containerPrice
   const sfLaborHrs = (sf, depthIn, rate) => (n(sf) / 100) * n(depthIn) * rate
   const cfLaborHrs = (cf, rate) => (n(cf) * 12 / 100) * rate
+  const flatCf = (sf, depthIn) => n(sf) * (n(depthIn) / 12)
+  const baseMatPer10Cy = mp['Demo - Mini Import Base $/10cy'] ?? 150
   const containerCostCf = cf =>
     isSub ? 0 : Math.ceil(((n(cf) / 27) * swellFactor) / containerCy) * containerPrice
   // Editable hauling coefficients (Master Rates -> Labor, category Demo).
@@ -197,8 +200,16 @@ function calcDemo(
   // ── Demo rows — NonBob access (OK=0.667) ──────────────────────────────────
   const conc = flat(state.concSF, state.concDepth || 4, laborConc, 0, accessNonBob)
   const dirt = flat(state.dirtSF, state.dirtDepth || 4, laborDirt, 0, accessNonBob)
-  const base = flat(state.baseSF, state.baseDepth || 4, laborBase, dumpBase, accessNonBob) // Mini: has dump fee
+  const base = flat(state.baseSF, state.baseDepth || 4, laborBase, 0, accessNonBob)
+  // Import Base: half the square-foot labour rate, priced as material per 10 raw cy.
+  base.hours = 0.5 * sfLaborHrs(state.baseSF, state.baseDepth || 4, laborBase)
+  const baseRawCy = flatCf(state.baseSF, state.baseDepth || 4) / 27
+  const baseMat = isSub ? 0 : Math.ceil(baseRawCy / 10) * baseMatPer10Cy
   const grass = flat(state.grassSF, state.grassDepth || 4, rateGrass, 0, accessBobcat)
+  // Square-foot based removal labour (not tons), matching Hand Demo.
+  conc.hours = sfLaborHrs(state.concSF, state.concDepth || 4, laborConc)
+  dirt.hours = sfLaborHrs(state.dirtSF, state.dirtDepth || 4, laborDirt)
+  grass.hours = sfLaborHrs(state.grassSF, state.grassDepth || 4, laborGrass)
   conc.dumpFee = containerCost(state.concSF, state.concDepth || 4)
   dirt.dumpFee = containerCost(state.dirtSF, state.dirtDepth || 4)
   grass.dumpFee = containerCost(state.grassSF, state.grassDepth || 4)
@@ -344,7 +355,7 @@ function calcDemo(
       footingCalc.reduce((s, r) => s + r.dumpFee, 0) +
       gradeCut.dumpFee +
       treeCalc.reduce((s, r) => s + r.dumpFee, 0)
-  const totalMat = dumpMatCost + manualMat
+  const totalMat = dumpMatCost + baseMat + manualMat
 
   // ── Financials ────────────────────────────────────────────────────────────
   const manDays = totalHrs / 8
@@ -499,6 +510,8 @@ function calcDemo(
     vegHrs,
     manualHrs,
     dumpMatCost,
+    baseMat,
+    laborGrass,
     isSub,
     subHaulCost,
     dumpConc,
@@ -1159,8 +1172,9 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 row: calc.conc,
                 fee: dumpConc,
                 rate: calc.laborConc,
-                rateName: 'Demo - Mini - Concrete t/hr',
-                rateNote: `${calc.laborConc} t/hr`,
+                rateName: 'Demo - Mini - Concrete SF',
+                rateNote: `${calc.laborConc} hr/100sf·in`,
+                rateUnit: 'hr/100sf·in',
               },
               {
                 label: 'Dirt/Rock',
@@ -1170,8 +1184,9 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 row: calc.dirt,
                 fee: dumpDirt,
                 rate: calc.laborDirt,
-                rateName: 'Demo - Mini - Dirt t/hr',
-                rateNote: `${calc.laborDirt} t/hr`,
+                rateName: 'Demo - Mini - Dirt SF',
+                rateNote: `${calc.laborDirt} hr/100sf·in`,
+                rateUnit: 'hr/100sf·in',
               },
               {
                 label: 'Import Base',
@@ -1181,8 +1196,9 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 row: calc.base,
                 fee: dumpBase,
                 rate: calc.laborBase,
-                rateName: 'Demo - Mini - Import Base t/hr',
-                rateNote: `${calc.laborBase} t/hr · $${dumpBase}/ton base`,
+                rateName: 'Demo - Mini - Import Base SF',
+                rateNote: `½ × ${calc.laborBase} hr/100sf·in`,
+                rateUnit: 'hr/100sf·in',
                 extraIcon: (
                   <RateEditPopover
                     table="material_rates"
@@ -1201,9 +1217,10 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 dep: 4,
                 row: calc.grass,
                 fee: dumpGreen,
-                rate: calc.rateGrass,
-                rateName: 'Demo - Mini Skid Steer Grass',
-                rateNote: `${calc.rateGrass} t/hr · $${dumpGreen}/ton green waste`,
+                rate: calc.laborGrass,
+                rateName: 'Demo - Mini - Grass SF',
+                rateNote: `${calc.laborGrass} hr/100sf·in`,
+                rateUnit: 'hr/100sf·in',
                 extraIcon: (
                   <RateEditPopover
                     table="material_rates"
@@ -1215,7 +1232,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                   />
                 ),
               },
-            ].map(({ label, sfK, dK, dep, row, rate, rateName, rateNote, extraIcon }) => (
+            ].map(({ label, sfK, dK, dep, row, rate, rateName, rateNote, rateUnit, extraIcon }) => (
               <tr key={label}>
                 <td className={`${td} font-medium text-gray-700`}>
                   <span className="inline-flex items-center gap-1">
@@ -1226,7 +1243,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                       name={rateName}
                       category="Demo"
                       mode="coefficient"
-                      unitLabel="t/hr"
+                      unitLabel={rateUnit || 't/hr'}
                       currentValue={rate}
                       onSaved={refreshAllRates}
                     />
