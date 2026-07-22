@@ -977,6 +977,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
       {/* ── Sticky GPMD bar ── */}
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
         <GpmdBar
+          variant={subType === 'Subcontractor' ? 'sub' : 'inhouse'}
           sticky
           totalMat={calc.totalMat}
           totalHrs={calc.totalHrs}

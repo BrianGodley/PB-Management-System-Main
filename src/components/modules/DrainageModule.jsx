@@ -114,7 +114,8 @@ function calcDrainage(
   gpmd = DEFAULTS.gpmd,
   walkAccess = null,
   laborBurdenPct = DEFAULTS.laborBurdenPct,
-  subRates = {}
+  subRates = {},
+  subMarkupRate = 0.2
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const { difficulty, hoursAdj, trenchRows, pipeRows, fixtureRows, additionalItems, manualRows } =
@@ -202,9 +203,12 @@ function calcDrainage(
   const totalMat = pipeMat + fixMat + drainFittingFee + addMat + manMat
   const laborCost = totalHrs * laborRatePerHour
   const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
-  const gp = manDays * gpmd
-  const commission = gp * DEFAULTS.commissionRate
   const subCost = manSub + subDrainCost
+  // Sub work earns a markup (gross profit on subcontracted cost), matching the
+  // GPMD bar, so the saved total includes it.
+  const subGp = subCost * (subMarkupRate || 0)
+  const gp = manDays * gpmd + subGp
+  const commission = gp * DEFAULTS.commissionRate
   const price = totalMat + laborCost + burden + gp + commission + subCost
 
   return {
@@ -217,6 +221,7 @@ function calcDrainage(
     laborCost,
     burden,
     gp,
+    subGp,
     commission,
     subCost,
     price,
@@ -396,12 +401,15 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
       additionalItems,
       manualRows,
       distanceLF,
+      subType,
     },
     laborRatePerHour,
     materialPrices,
     gpmd,
     walkAccess,
-    laborBurdenPct
+    laborBurdenPct,
+    subRates,
+    subGpMarkupRate
   )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
@@ -472,6 +480,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           gpmd={gpmd}
           price={calc.price}
           subMarkupRate={subGpMarkupRate}
+          variant={isSub ? 'sub' : 'inhouse'}
         />
             </div>
 

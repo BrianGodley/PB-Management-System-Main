@@ -413,6 +413,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
         {/* GPMD summary bar */}
         <GpmdBar
+          variant={subType === 'Subcontractor' ? 'sub' : 'inhouse'}
           sticky
           totalMat={calc.totalMat}
           totalHrs={calc.totalHrs}
