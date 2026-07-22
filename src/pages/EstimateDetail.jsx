@@ -472,6 +472,13 @@ export default function EstimateDetail() {
   function switchDemoType(newType, payload) {
     if (!newType) return
     setSwitchDemoData(payload || null)
+    // Keep the header identifier in sync: if the module name is still the
+    // default (matches the current type) or blank, update it to the new type.
+    // A custom name the user typed is preserved.
+    setModuleNameInput(prev => {
+      const cur = (prev || '').trim()
+      return !cur || cur === selectedType ? newType : prev
+    })
     setSelectedType(newType)
     setPickerStep(3)
   }
