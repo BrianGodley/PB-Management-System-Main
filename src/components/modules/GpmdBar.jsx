@@ -38,11 +38,14 @@ export default function GpmdBar({
   subMarkupRate = 0.2, // Sub GP = subCost × subMarkupRate
   onSubMarkupSave = null, // if provided → Sub % cell is editable
   sticky = false, // when true: renders with sticky positioning (handled by parent wrapper)
-  // 'inhouse' (default) hides Sub Cost + Sub GP.
-  // 'sub' hides Labor Hours, Man Days, GPMD, Crew Labor and Labor Burden.
-  variant = 'inhouse',
+  // 'full' (default) shows every column — used by the project + estimate
+  //   aggregate bars, which combine In-House and Subcontractor totals.
+  // 'inhouse' hides Sub Cost + Sub GP (module In-House tab).
+  // 'sub' hides Labor Hours, Man Days, GPMD, Crew Labor, Labor Burden (module Sub tab).
+  variant = 'full',
 }) {
   const isSubView = variant === 'sub'
+  const isInhouseView = variant === 'inhouse'
   const [editingGpmd, setEditingGpmd] = useState(false)
   const [draftGpmd, setDraftGpmd] = useState('')
   const [editingSubPct, setEditingSubPct] = useState(false)
@@ -200,11 +203,12 @@ export default function GpmdBar({
         {/* Data columns — filtered by variant. In-house drops Sub Cost;
             Sub view drops the labour/man-day/GPMD columns. */}
         {cols
-          .filter(col =>
-            isSubView
-              ? !['Labor Hours', 'Man Days', 'Crew Labor', 'Labor Burden'].includes(col.label)
-              : col.label !== 'Sub Cost',
-          )
+          .filter(col => {
+            if (isSubView)
+              return !['Labor Hours', 'Man Days', 'Crew Labor', 'Labor Burden'].includes(col.label)
+            if (isInhouseView) return col.label !== 'Sub Cost'
+            return true // full: show everything
+          })
           .map(col => {
           const isAfterSubCost = col.label === 'Gross Profit'
           // Always visible (even collapsed on mobile): Gross Profit + Total Price.
@@ -214,7 +218,7 @@ export default function GpmdBar({
           // on this iterator (shorthand <> can't accept a key prop).
           return (
             <React.Fragment key={col.label}>
-              {isAfterSubCost && isSubView && <SubGpCol />}
+              {isAfterSubCost && !isInhouseView && <SubGpCol />}
               <div className={`px-1.5 flex-1 min-w-0 text-center ${hideCls}`}>
                 <p className="text-[10px] text-gray-400 truncate mb-0.5">{col.label}</p>
                 <p
