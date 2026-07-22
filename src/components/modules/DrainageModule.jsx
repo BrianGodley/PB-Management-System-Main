@@ -113,11 +113,13 @@ function calcDrainage(
   materialPrices = {},
   gpmd = DEFAULTS.gpmd,
   walkAccess = null,
-  laborBurdenPct = DEFAULTS.laborBurdenPct
+  laborBurdenPct = DEFAULTS.laborBurdenPct,
+  subRates = {}
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const { difficulty, hoursAdj, trenchRows, pipeRows, fixtureRows, additionalItems, manualRows } =
     state
+  const isSub = state.subType === 'Subcontractor'
 
   let trenchHrs = 0,
     pipeHrs = 0,
@@ -180,6 +182,17 @@ function calcDrainage(
     manSub += n(r.subCost)
   })
 
+  // Subcontractor: trenching + drain pipe collapse into ONE fixed price per
+  // linear foot of trench run (default $16/LF). Their in-house labour/material
+  // is replaced by that sub cost.
+  const subRatePerLF = subRates['Drainage Sub - Per LF'] ?? 16
+  const subLf = trenchRows.reduce((sum, r) => sum + n(r.lf), 0)
+  const subDrainCost = isSub ? subLf * subRatePerLF : 0
+  if (isSub) {
+    trenchHrs = 0
+    pipeHrs = 0
+    pipeMat = 0
+  }
   const baseHrs = trenchHrs + pipeHrs + fixHrs + addHrs + manHrs
   const diffMod = 1 + n(difficulty) / 100
   const _preWalkHrs = baseHrs * diffMod + (parseFloat(hoursAdj) || 0)
@@ -191,12 +204,15 @@ function calcDrainage(
   const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
   const gp = manDays * gpmd
   const commission = gp * DEFAULTS.commissionRate
-  const subCost = manSub
+  const subCost = manSub + subDrainCost
   const price = totalMat + laborCost + burden + gp + commission + subCost
 
   return {
     totalHrs,
     manDays,
+    subRatePerLF,
+    subLf,
+    subDrainCost,
     totalMat,
     laborCost,
     burden,
@@ -346,6 +362,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Demo')
   const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
+  const isSub = subType === 'Subcontractor'
   const [trenchRows, setTrenchRows] = useState(initialData?.trenchRows ?? DEFAULT_TRENCH_ROWS)
   const [pipeRows, setPipeRows] = useState(initialData?.pipeRows ?? DEFAULT_PIPE_ROWS)
   const [fixtureRows, setFixtureRows] = useState(initialData?.fixtureRows ?? DEFAULT_FIXTURE_ROWS)
@@ -430,6 +447,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         laborBurdenPct,
         gpmd,
         materialPrices, // snapshot of prices used — so the summary always reflects save-time costs
+        subRates,
         calc,
       },
     })
@@ -515,6 +533,60 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         </div>
       </div>
 
+      {/* ── Drainage (Subcontractor) ── */}
+      {isSub ? (
+        <div>
+          <SectionHeader title="Drainage — Subcontractor" />
+          <p className="text-xs text-gray-500 mb-2">
+            Trenching and drain pipe as one fixed price per linear foot of trench run.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-gray-500 border-b border-gray-200">
+                  <th className="text-left pb-1 pr-2 font-medium">Run</th>
+                  <th className="text-left pb-1 pr-2 font-medium">Linear Feet</th>
+                  <th className="text-right pb-1 font-medium">Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                {trenchRows.map((row, i) => (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-2 text-gray-600 text-xs">Run {i + 1}</td>
+                    <td className="py-1 pr-2">
+                      <NumInput value={row.lf} onChange={v => updateTrench(i, 'lf', v)} />
+                    </td>
+                    <td className="py-1 text-right text-gray-600 text-xs">
+                      {n(row.lf) > 0 ? `$${(n(row.lf) * calc.subRatePerLF).toFixed(2)}` : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <button
+              type="button"
+              className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+              onClick={() =>
+                setTrenchRows(r => [...r, { equipment: 'Trench', lf: '', width: '', depth: '' }])
+              }
+            >
+              + Add run
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mt-2 inline-flex items-center gap-1">
+            ${calc.subRatePerLF}/LF × {calc.subLf} LF = ${calc.subDrainCost.toFixed(2)}
+            <RateEditPopover
+              table="subcontractor_rates"
+              name="Drainage Sub - Per LF"
+              category="Drainage"
+              unitLabel="/LF"
+              currentValue={calc.subRatePerLF}
+              onSaved={refreshMaterialPrices}
+            />
+          </p>
+        </div>
+      ) : (
+        <>
       {/* ── Trenching ── */}
       <div>
         <SectionHeader title="Trenching" />
@@ -651,6 +723,9 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           </table>
         </div>
       </div>
+
+        </>
+      )}
 
       {/* ── Fixtures ── */}
       <div>
