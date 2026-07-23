@@ -105,8 +105,8 @@ export default function GpmdBar({
   function GpmdCell() {
     if (onGpmdSave && editingGpmd) {
       return (
-        <div className="rounded-lg bg-amber-500/20 border border-amber-400/50 px-3 py-1 text-center min-w-[68px]">
-          <p className="text-xs mb-0.5 whitespace-nowrap text-amber-300">GPMD</p>
+        <div className="rounded-lg bg-blue-500/20 border border-blue-400/50 px-3 py-1 text-center min-w-[68px]">
+          <p className="text-xs mb-0.5 whitespace-nowrap text-blue-300">GPMD</p>
           <input
             autoFocus
             value={draftGpmd}
@@ -116,21 +116,21 @@ export default function GpmdBar({
               if (e.key === 'Enter') commitGpmdEdit()
               if (e.key === 'Escape') setEditingGpmd(false)
             }}
-            className="w-16 bg-gray-800 border border-amber-400 rounded text-amber-200 text-sm font-bold text-center tabular-nums outline-none px-1"
+            className="w-16 bg-gray-800 border border-blue-400 rounded text-blue-200 text-sm font-bold text-center tabular-nums outline-none px-1"
           />
         </div>
       )
     }
     return (
       <div
-        className={`rounded-lg bg-amber-500/20 border border-amber-400/30 px-3 py-1 text-center min-w-[68px] ${onGpmdSave ? 'cursor-pointer hover:bg-amber-500/30 transition-colors' : ''}`}
+        className={`rounded-lg bg-blue-500/20 border border-blue-400/30 px-3 py-1 text-center min-w-[68px] ${onGpmdSave ? 'cursor-pointer hover:bg-blue-500/30 transition-colors' : ''}`}
         onClick={startGpmdEdit}
         title={onGpmdSave ? 'Click to edit GPMD' : undefined}
       >
-        <p className="text-xs mb-0.5 whitespace-nowrap text-amber-300">
-          GPMD{onGpmdSave && <span className="text-amber-500 text-[10px] ml-1">✎</span>}
+        <p className="text-xs mb-0.5 whitespace-nowrap text-blue-300">
+          GPMD{onGpmdSave && <span className="text-blue-500 text-[10px] ml-1">✎</span>}
         </p>
-        <p className="font-bold tabular-nums text-sm text-amber-200">
+        <p className="font-bold tabular-nums text-sm text-blue-200">
           ${displayGpmd.toLocaleString()}
         </p>
       </div>
@@ -270,31 +270,40 @@ export default function GpmdBar({
                 dim={`@ $${parseFloat(laborRatePerHour).toFixed(0)}/hr`}
               />
               <Cell label="Labor Burden" value={fmt(burden)} dim="29%" />
-              <Cell label="Gross Profit" value={fmt(effectiveGp)} color="text-green-400" />
+              <Cell label="Gross Profit" value={fmt(effectiveGp)} />
               <div className="px-1 shrink-0 self-center">
                 <GpmdCell />
               </div>
             </div>
           </div>
 
-          {/* Subcontractor group */}
+          {/* Subcontractor group — sub figures only */}
           <div className="min-w-0 lg:flex-1">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-300 mb-1 px-1 lg:text-right">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-300 mb-1 px-1">
               Subcontractor
             </p>
             <div className="flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-orange-400/60 bg-orange-500/5 py-1.5 px-1">
               <Cell label="Sub Cost" value={subCost > 0 ? fmt(subCost) : '—'} />
-              <Cell label="Gross Profit" value={fmt(subGp)} color="text-green-400" />
+              <Cell label="Gross Profit" value={fmt(subGp)} />
               <div className="px-1 shrink-0 self-center">
                 <MarkupBox />
               </div>
               <Cell label="Commission" value={fmt(effectiveComm)} dim="12%" />
+            </div>
+          </div>
+
+          {/* Totals group — combined GP + price */}
+          <div className="min-w-0 lg:flex-none">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-green-300 mb-1 px-1 lg:text-right">
+              Totals
+            </p>
+            <div className="flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-green-400/60 bg-green-500/5 py-1.5 px-1">
               <Cell
                 label="Total Gross Profit"
                 value={fmt(effectiveGp + subGp)}
                 color="text-green-400"
               />
-              <Cell label="Total Price" value={fmt(effectivePrice)} color="text-blue-400" big />
+              <Cell label="Total Price" value={fmt(effectivePrice)} color="text-green-400" big />
             </div>
           </div>
         </div>
