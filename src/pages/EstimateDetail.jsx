@@ -1757,6 +1757,11 @@ export default function EstimateDetail() {
             burden={pt.burden}
             subCost={pt.subCost}
             gpmd={projectGpmds[selectedProject.id] ?? projGpmd}
+            directGp={
+              projectGpmds[selectedProject.id] != null
+                ? pt.manDays * projectGpmds[selectedProject.id]
+                : pt.gp
+            }
             price={pt.price}
             onGpmdSave={val => saveProjectGpmd(selectedProject.id, val)}
             subMarkupRate={selectedProject.sub_gp_markup_rate ?? 0.2}
