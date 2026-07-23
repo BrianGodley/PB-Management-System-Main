@@ -205,11 +205,13 @@ export default function GpmdBar({
   function Cell({ label, value, dim, color = 'text-white', big = false, cls = 'flex-1' }) {
     return (
       <div className={`px-2 min-w-0 text-center self-center ${cls}`}>
-        <p className="text-[10px] text-gray-400 truncate mb-0.5">{label}</p>
+        <p className="text-[10px] text-gray-400 truncate mb-0.5">
+          {label}
+          {dim && <span className="ml-1 text-gray-500">{dim}</span>}
+        </p>
         <p className={`font-bold tabular-nums truncate ${big ? 'text-base' : 'text-sm'} ${color}`}>
           {value}
         </p>
-        {dim && <p className="text-[10px] text-gray-500 truncate">{dim}</p>}
       </div>
     )
   }
@@ -265,8 +267,8 @@ export default function GpmdBar({
               {inHouseLabel}
             </p>
             <div className="flex-1 flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-blue-400/70 bg-gray-900 py-1.5 px-1">
-              <Cell label="Labor Hours" value={fnum(totalHrs)} dim="hrs" />
-              <Cell label="Man Days" value={fnum(manDays)} dim="MD" />
+              <Cell label="Labor Hours" value={fnum(totalHrs)} />
+              <Cell label="Man Days" value={fnum(manDays)} />
               <Cell label="Materials" value={fmt2(totalMat)} />
               <Cell
                 label="Crew Labor"
@@ -274,24 +276,24 @@ export default function GpmdBar({
                 dim={`@ $${parseFloat(laborRatePerHour).toFixed(0)}/hr`}
               />
               <Cell label="Labor Burden" value={fmt(burden)} dim="29%" />
-              <Cell label="Gross Profit" value={fmt(effectiveGp)} />
               <div className="px-1 shrink-0 self-center">
                 <GpmdCell />
               </div>
+              <Cell label="Gross Profit" value={fmt(effectiveGp)} />
             </div>
           </div>
 
-          {/* Subcontractor group — sub figures only, skinny cells */}
+          {/* Subcontractor group — sub figures only; wider so labels fit */}
           <div className="min-w-0 lg:flex-none flex flex-col">
             <p className="text-[10px] font-bold uppercase tracking-wider text-orange-600 mb-1 px-1 text-center">
               {subLabel}
             </p>
             <div className="flex-1 flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-orange-400/70 bg-gray-900 py-1.5 px-1">
-              <Cell label="Sub Cost" value={subCost > 0 ? fmt(subCost) : '—'} cls="flex-none w-16" />
-              <Cell label="Gross Profit" value={fmt(subGp)} cls="flex-none w-16" />
+              <Cell label="Sub Cost" value={subCost > 0 ? fmt(subCost) : '—'} cls="flex-none w-24" />
               <div className="px-1 shrink-0 self-center">
                 <MarkupBox />
               </div>
+              <Cell label="Gross Profit" value={fmt(subGp)} cls="flex-none w-24" />
             </div>
           </div>
 
@@ -301,7 +303,7 @@ export default function GpmdBar({
               {totalsLabel}
             </p>
             <div className="flex-1 flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-green-400/70 bg-gray-900 py-1.5 px-1">
-              <Cell label="Commission" value={fmt(effectiveComm)} dim="12%" cls="flex-none w-20" />
+              <Cell label="Commission" value={fmt(effectiveComm)} dim="12%" cls="flex-none w-24" />
               <Cell
                 label="Total Gross Profit"
                 value={fmt(effectiveGp + subGp)}

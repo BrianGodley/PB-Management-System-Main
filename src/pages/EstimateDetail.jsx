@@ -1736,8 +1736,8 @@ export default function EstimateDetail() {
             directGp={adjustedEstimateGP}
             price={et.price}
             subMarkupRate={derivedEstSubRate}
-            inHouseLabel="In House Estimate Totals"
-            subLabel="Subcontractor Estimate Totals"
+            inHouseLabel="In House Estimate"
+            subLabel="Subcontractor Estimate"
             totalsLabel="Estimate Totals"
           />
         )}
@@ -1761,8 +1761,8 @@ export default function EstimateDetail() {
             onGpmdSave={val => saveProjectGpmd(selectedProject.id, val)}
             subMarkupRate={selectedProject.sub_gp_markup_rate ?? 0.2}
             onSubMarkupSave={val => saveProjectSubRate(selectedProject.id, val)}
-            inHouseLabel={`${selectedProject.project_name} - In House Total`}
-            subLabel={`${selectedProject.project_name} Subcontractor Total`}
+            inHouseLabel={`In House (${selectedProject.project_name})`}
+            subLabel={`Subcontractor (${selectedProject.project_name})`}
             totalsLabel={`${selectedProject.project_name} Totals`}
           />
         </div>
