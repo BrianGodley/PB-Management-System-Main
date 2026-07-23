@@ -307,11 +307,7 @@ export default function GpmdBar({
             </p>
             <div className="flex-1 flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-green-400/70 bg-gray-900 py-1.5 px-1">
               <Cell label="Commission" value={fmt(effectiveComm)} dim="12%" />
-              <Cell
-                label="Total Gross Profit"
-                value={fmt(effectiveGp + subGp)}
-                color="text-green-400"
-              />
+              <Cell label="Total Gross Profit" value={fmt(effectiveGp + subGp)} />
               <Cell label="Total Price" value={fmt(effectivePrice)} color="text-green-400" big />
             </div>
           </div>
