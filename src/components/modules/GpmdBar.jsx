@@ -66,9 +66,16 @@ export default function GpmdBar({
   const displayGpmd = directGp != null ? (manDays > 0 ? Math.round(directGp / manDays) : 0) : gpmd
   const subGp = (subCost || 0) * (subMarkupRate || 0)
   const displaySubPct = Math.round((subMarkupRate || 0) * 100)
-  const effectiveComm = (effectiveGp + subGp) * 0.12
-  const effectivePrice =
-    laborCost + burden + totalMat + (subCost || 0) + effectiveGp + subGp + effectiveComm
+  // Commission + Total Price are variant-specific so each module tab shows only
+  // ITS side's total: In-House = labour+burden+materials+GP; Sub = subCost+SubGP.
+  // 'full' (project/estimate) combines everything.
+  const commBase = isSubView ? subGp : isInhouseView ? effectiveGp : effectiveGp + subGp
+  const effectiveComm = commBase * 0.12
+  const effectivePrice = isSubView
+    ? (subCost || 0) + subGp + effectiveComm
+    : isInhouseView
+      ? laborCost + burden + totalMat + effectiveGp + effectiveComm
+      : laborCost + burden + totalMat + (subCost || 0) + effectiveGp + subGp + effectiveComm
 
   // ── GPMD edit handlers ─────────────────────────────────────────────────────
   function startGpmdEdit() {
@@ -205,7 +212,14 @@ export default function GpmdBar({
         {cols
           .filter(col => {
             if (isSubView)
-              return !['Labor Hours', 'Man Days', 'Crew Labor', 'Labor Burden'].includes(col.label)
+              return ![
+                'Labor Hours',
+                'Man Days',
+                'Crew Labor',
+                'Labor Burden',
+                'Materials',
+                'Gross Profit',
+              ].includes(col.label)
             if (isInhouseView) return col.label !== 'Sub Cost'
             return true // full: show everything
           })
