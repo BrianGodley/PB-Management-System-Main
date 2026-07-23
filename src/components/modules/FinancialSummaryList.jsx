@@ -33,6 +33,7 @@ export default function FinancialSummaryList({
   burden = 0,
   subCost = 0,
   gp = 0,
+  subGp = 0,
   commission = 0,
   price = 0,
 }) {
@@ -50,6 +51,7 @@ export default function FinancialSummaryList({
       <Row label="Crew Labor" value={fmt(laborCost)} dim={`@ $${n(lrph).toFixed(0)}/hr`} />
       <Row label="Labor Burden" value={fmt(burden)} dim="29%" />
       <Row label="Sub Cost" value={subCost > 0 ? fmt(subCost) : '—'} />
+      {subGp > 0 && <Row label="Sub GP" value={fmt(subGp)} green />}
       <Row label="Gross Profit" value={fmt(gp)} green />
       <Row label="Commission" value={fmt(commission)} dim="12%" />
 

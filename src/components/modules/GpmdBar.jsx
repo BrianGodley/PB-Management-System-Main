@@ -224,7 +224,10 @@ export default function GpmdBar({
             return true // full: show everything
           })
           .map(col => {
-          const isAfterSubCost = col.label === 'Gross Profit'
+          // Sub GP sits right after Gross Profit — but the Sub view hides
+          // Gross Profit, so there we anchor it just before Commission instead
+          // (order: Sub Cost, Sub GP, Commission, Total Price).
+          const isAfterSubCost = col.label === (isSubView ? 'Commission' : 'Gross Profit')
           // Always visible (even collapsed on mobile): Gross Profit + Total Price.
           const essential = col.label === 'Gross Profit' || col.label === 'Total Price'
           const hideCls = essential || expanded ? '' : 'hidden lg:block'

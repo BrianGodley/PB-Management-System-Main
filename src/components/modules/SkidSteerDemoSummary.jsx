@@ -207,7 +207,8 @@ export default function SkidSteerDemoSummary({ module }) {
   const laborCost = n(savedCalc.laborCost) || totalHrs * n(laborRatePerHour)
   const burden = n(savedCalc.burden)
   const gp = n(savedCalc.gp)
-  const commission = n(savedCalc.commission) || gp * 0.12
+  const subGp = n(savedCalc.subGp)
+  const commission = n(savedCalc.commission) || (gp + subGp) * 0.12
   const subCost = n(savedCalc.subCost)
   const priceTotal = n(savedCalc.price)
 
@@ -507,6 +508,7 @@ export default function SkidSteerDemoSummary({ module }) {
         burden={burden}
         subCost={subCost}
         gp={gp}
+        subGp={subGp}
         commission={commission}
         price={priceTotal}
       />
