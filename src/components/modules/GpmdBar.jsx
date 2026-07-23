@@ -132,7 +132,8 @@ export default function GpmdBar({
         title={onGpmdSave ? 'Click to edit GPMD' : undefined}
       >
         <p className="text-xs mb-0.5 whitespace-nowrap text-blue-300">
-          GPMD{onGpmdSave && <span className="text-blue-500 text-[10px] ml-1">✎</span>}
+          GPMD
+          <span className={`text-blue-500 text-[10px] ml-1 ${onGpmdSave ? '' : 'invisible'}`}>✎</span>
         </p>
         <p className="font-bold tabular-nums text-sm text-blue-200">
           ${displayGpmd.toLocaleString()}
@@ -205,7 +206,7 @@ export default function GpmdBar({
   function Cell({ label, value, dim, color = 'text-white', big = false, cls = 'flex-1' }) {
     return (
       <div className={`px-2 min-w-0 text-center self-center ${cls}`}>
-        <p className="text-[10px] text-gray-400 truncate mb-0.5">
+        <p className="text-[10px] text-gray-400 leading-tight mb-0.5">
           {label}
           {dim && <span className="ml-1 text-gray-500">{dim}</span>}
         </p>
@@ -246,7 +247,8 @@ export default function GpmdBar({
         title={onSubMarkupSave ? 'Click to edit Sub GP markup %' : undefined}
       >
         <p className="text-xs mb-0.5 whitespace-nowrap text-orange-300">
-          Markup{onSubMarkupSave && <span className="text-orange-500 text-[10px] ml-1">✎</span>}
+          Markup
+          <span className={`text-orange-500 text-[10px] ml-1 ${onSubMarkupSave ? '' : 'invisible'}`}>✎</span>
         </p>
         <p className="font-bold tabular-nums text-sm text-orange-200">{displaySubPct}%</p>
       </div>
@@ -263,7 +265,7 @@ export default function GpmdBar({
         <div className="flex flex-col lg:flex-row gap-3 items-stretch">
           {/* In House group (grows to fill) */}
           <div className="min-w-0 lg:flex-1 flex flex-col">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 mb-1 px-1 text-center">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 mb-1 px-1 text-center truncate">
               {inHouseLabel}
             </p>
             <div className="flex-1 flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-blue-400/70 bg-gray-900 py-1.5 px-1">
@@ -283,40 +285,34 @@ export default function GpmdBar({
             </div>
           </div>
 
-          {/* Subcontractor group — sub figures only; wider so labels fit */}
-          <div className="min-w-0 lg:flex-none flex flex-col">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-600 mb-1 px-1 text-center">
+          {/* Subcontractor group — fixed width (same in every bar) so the
+              In House group fills identical remaining space; cells flex-equal. */}
+          <div className="min-w-0 lg:w-64 lg:shrink-0 flex flex-col">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-600 mb-1 px-1 text-center truncate">
               {subLabel}
             </p>
             <div className="flex-1 flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-orange-400/70 bg-gray-900 py-1.5 px-1">
-              <Cell label="Sub Cost" value={subCost > 0 ? fmt(subCost) : '—'} cls="flex-none w-24" />
+              <Cell label="Sub Cost" value={subCost > 0 ? fmt(subCost) : '—'} />
               <div className="px-1 shrink-0 self-center">
                 <MarkupBox />
               </div>
-              <Cell label="Gross Profit" value={fmt(subGp)} cls="flex-none w-24" />
+              <Cell label="Gross Profit" value={fmt(subGp)} />
             </div>
           </div>
 
-          {/* Totals group — commission + combined GP + price, wide cells */}
-          <div className="min-w-0 lg:flex-none flex flex-col">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-green-700 mb-1 px-1 text-center">
+          {/* Totals group — fixed width, cells flex-equal */}
+          <div className="min-w-0 lg:w-72 lg:shrink-0 flex flex-col">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-green-700 mb-1 px-1 text-center truncate">
               {totalsLabel}
             </p>
             <div className="flex-1 flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-green-400/70 bg-gray-900 py-1.5 px-1">
-              <Cell label="Commission" value={fmt(effectiveComm)} dim="12%" cls="flex-none w-24" />
+              <Cell label="Commission" value={fmt(effectiveComm)} dim="12%" />
               <Cell
                 label="Total Gross Profit"
                 value={fmt(effectiveGp + subGp)}
                 color="text-green-400"
-                cls="flex-none w-32"
               />
-              <Cell
-                label="Total Price"
-                value={fmt(effectivePrice)}
-                color="text-green-400"
-                big
-                cls="flex-none w-32"
-              />
+              <Cell label="Total Price" value={fmt(effectivePrice)} color="text-green-400" big />
             </div>
           </div>
         </div>
