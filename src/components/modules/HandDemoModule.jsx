@@ -124,7 +124,7 @@ function calcDemo(
     return {
       tons,
       hours: tons / (baseRate * access), // labor always calculated
-      dumpFee: isSub || isDumpSub ? 0 : tons * dumpFeePerTon,
+      dumpFee: tons * dumpFeePerTon,
     }
   }
 
@@ -137,7 +137,7 @@ function calcDemo(
       tons,
       cf,
       hours: tons / (baseRate * access), // labor always calculated
-      dumpFee: isSub || isDumpSub ? 0 : tons * dumpFeePerTon,
+      dumpFee: tons * dumpFeePerTon,
     }
   }
 
@@ -148,7 +148,7 @@ function calcDemo(
   const removalYards = (sf, depthIn) => ((n(sf) * (n(depthIn) / 12)) / 27) * swellFactor
   const removalContainers = (sf, depthIn) => Math.ceil(removalYards(sf, depthIn) / containerCy)
   const containerCost = (sf, depthIn) =>
-    isSub || isDumpSub ? 0 : removalContainers(sf, depthIn) * containerPrice
+    removalContainers(sf, depthIn) * containerPrice
   // Editable hand-demo removal labor: hours per 100 SF at 1", scaled by thickness.
   const laborConc = lr['Demo - Hand - Concrete SF'] ?? 1
   const laborDirt = lr['Demo - Hand - Dirt SF'] ?? 1
@@ -168,7 +168,7 @@ function calcDemo(
   const flatCf = (sf, depthIn) => n(sf) * (n(depthIn) / 12)
   const cfLaborHrs = (cf, rate) => (n(cf) * 12 / 100) * rate
   const containerCostCf = cf =>
-    isSub || isDumpSub ? 0 : Math.ceil(((n(cf) / 27) * swellFactor) / containerCy) * containerPrice
+    Math.ceil(((n(cf) / 27) * swellFactor) / containerCy) * containerPrice
   const baseMatPer10Cy = mp['Demo - Hand Import Base $/10cy'] ?? 150
   const rebarSfPerHr = lr['Demo - Hand Rebar SF/hr'] ?? 250
 
@@ -178,7 +178,7 @@ function calcDemo(
   const base = flat(state.baseSF, state.baseDepth || 4, rateBase, 0)
   base.hours = 0.5 * sfLaborHrs(state.baseSF, state.baseDepth || 4, laborBase)
   const baseRawCy = flatCf(state.baseSF, state.baseDepth || 4) / 27
-  const baseMat = isSub ? 0 : Math.ceil(baseRawCy / 10) * baseMatPer10Cy
+  const baseMat = Math.ceil(baseRawCy / 10) * baseMatPer10Cy
   const grass = flat(state.grassSF, state.grassDepth || 4, rateGrass, 0)
   // Removed debris — container disposal per material (shown as the row's Dump Fee).
   conc.dumpFee = containerCost(state.concSF, state.concDepth || 4)
@@ -229,7 +229,7 @@ function calcDemo(
   const jjHrs = sfLaborHrs(state.jjSF, state.jjDepth || 4, laborJJ)
 
   // ── Rebar add-on ─────────────────────────────────────────────────────────
-  const rebarHrs = isSub ? 0 : rebarSfPerHr > 0 ? n(state.rebarSF) / rebarSfPerHr : 0
+  const rebarHrs = rebarSfPerHr > 0 ? n(state.rebarSF) / rebarSfPerHr : 0
 
   // ── Vegetation ───────────────────────────────────────────────────────────
   // Shrub demo: per-area rows — qty × shrub rate × shrub-height modifier.
@@ -254,7 +254,7 @@ function calcDemo(
           : treeSmall
     const hrs = qty * ht * access * mult
     const tons = qty * (ht / 10) * 0.25
-    const dumpFee = isSub ? 0 : tons * dumpTree
+    const dumpFee = tons * dumpTree
     return { hrs, tons, dumpFee }
   })
 
@@ -287,9 +287,8 @@ function calcDemo(
       : 0
 
   // ── Hour aggregation — labor same in both modes ───────────────────────────
-  const crewDemoHrs = isSub
-    ? 0
-    : conc.hours +
+  const crewDemoHrs =
+    conc.hours +
     dirt.hours +
     base.hours +
     grass.hours +
@@ -298,11 +297,9 @@ function calcDemo(
     footingCalc.reduce((s, r) => s + r.hours, 0) +
     bucketCalc.reduce((s, r) => s + r.hours, 0) +
     gradeCut.hours
-  const gradingHrs = isSub ? 0 : gradeFill.hours + jjHrs
+  const gradingHrs = gradeFill.hours + jjHrs
   // Shrub & Stump Demo are In-House only — no labour or sub cost on Sub.
-  const vegHrs = isSub
-    ? 0
-    : shrubRowsHrs + stumpHrs + treeCalc.reduce((s, r) => s + r.hrs, 0)
+  const vegHrs = shrubRowsHrs + stumpHrs + treeCalc.reduce((s, r) => s + r.hrs, 0)
 
   const rawHrs = crewDemoHrs + gradingHrs + vegHrs + rebarHrs + manualHrs
   const _preWalkHrs = rawHrs * diff + hrsAdj
@@ -317,9 +314,8 @@ function calcDemo(
   const totalHrs = _preWalkHrs + walkHrs
 
   // ── Materials ─────────────────────────────────────────────────────────────
-  const dumpMatCost = isSub
-    ? 0
-    : conc.dumpFee +
+  const dumpMatCost =
+    conc.dumpFee +
       dirt.dumpFee +
       grass.dumpFee +
       miscFlatCalc.reduce((s, r) => s + r.dumpFee, 0) +
@@ -339,18 +335,17 @@ function calcDemo(
   const haulConcreteRate = sr['Demo - Hand Sub Haul - Concrete 12yd'] ?? 800
   const haulSoilRate = sr['Demo - Hand Sub Haul - Soil 12yd'] ?? 650
   const haulBaseRate = sr['Demo - Hand Sub Haul - Import Base 12yd'] ?? 350
-  const haulCost = isSub
-    ? n(state.haulTrashLoads) * haulTrashRate +
-      n(state.haulConcreteLoads) * haulConcreteRate +
-      n(state.haulSoilLoads) * haulSoilRate +
-      n(state.haulBaseLoads) * haulBaseRate
-    : 0
+  const haulCost =
+    n(state.haulTrashLoads) * haulTrashRate +
+    n(state.haulConcreteLoads) * haulConcreteRate +
+    n(state.haulSoilLoads) * haulSoilRate +
+    n(state.haulBaseLoads) * haulBaseRate
   // Subcontractor demo line: SF × per-sf rate (concrete/dirt/rock/paver combined).
   const handSubRate = sr['Sub Demo - Hand SF'] ?? 2.8
-  const subDemoCost = isSub ? n(state.subDemoSF) * handSubRate : 0
-  const miscFlatSubCost = isSub
-    ? (state.miscFlatRows || []).slice(0, 2).reduce((sum, r) => sum + n(r.sf) * handSubRate, 0)
-    : 0
+  const subDemoCost = n(state.subDemoSF) * handSubRate
+  const miscFlatSubCost = (state.miscFlatRows || [])
+    .slice(0, 2)
+    .reduce((sum, r) => sum + n(r.sf) * handSubRate, 0)
   const handSubDemo = subDemoCost + miscFlatSubCost
 
   // ── Subcontractor fixed unit pricing: Grading ($/sf), Stump & Tree ($/ea) ──
@@ -359,24 +354,22 @@ function calcDemo(
   const sgJJ = sr['Sub Grade - Hand JJ SF'] ?? 0
   const sgSheep = sr['Sub Grade - Hand Sheepsfoot SF'] ?? 0
   const sgRoll = sr['Sub Grade - Hand Roll SF'] ?? 0
-  const subGradingCost = isSub
-    ? n(state.gradeCutSF) * sgCut +
-      n(state.gradeFillSF) * sgFill +
-      n(state.jjSF) * sgJJ +
-      n(state.sheepsfootSF) * sgSheep +
-      n(state.rollCompSF) * sgRoll
-    : 0
+  const subGradingCost =
+    n(state.gradeCutSF) * sgCut +
+    n(state.gradeFillSF) * sgFill +
+    n(state.jjSF) * sgJJ +
+    n(state.sheepsfootSF) * sgSheep +
+    n(state.rollCompSF) * sgRoll
 
   const ssSmall = sr['Sub Stump - Hand Small'] ?? 0
   const ssMed = sr['Sub Stump - Hand Medium'] ?? 0
   const ssLarge = sr['Sub Stump - Hand Large'] ?? 0
   const ssXL = sr['Sub Stump - Hand XL'] ?? 0
-  const subStumpCost = isSub
-    ? n(state.stumpSmallQty) * ssSmall +
-      n(state.stumpMedQty) * ssMed +
-      n(state.stumpLargeQty) * ssLarge +
-      n(state.stumpXLQty) * ssXL
-    : 0
+  const subStumpCost =
+    n(state.stumpSmallQty) * ssSmall +
+    n(state.stumpMedQty) * ssMed +
+    n(state.stumpLargeQty) * ssLarge +
+    n(state.stumpXLQty) * ssXL
 
   const stSmall = sr['Sub Tree - Hand 6-12'] ?? 0
   const stMed = sr['Sub Tree - Hand 12-18'] ?? 0
@@ -387,16 +380,17 @@ function calcDemo(
       : size === '12" - 18"' || size === 'Medium'
         ? stMed
         : stSmall
-  const subTreeCost = isSub
-    ? (state.treeRows || []).reduce((sum, r) => sum + n(r.qty) * subTreeRateFor(r.size), 0)
-    : 0
+  const subTreeCost = (state.treeRows || []).reduce(
+    (sum, r) => sum + n(r.qty) * subTreeRateFor(r.size),
+    0,
+  )
 
-  const subFixedCost = subGradingCost + subTreeCost
+  const subFixedCost = subGradingCost + subStumpCost + subTreeCost
   // GP = labor component + Universal Sub Markup % on sub-haul + hauling + sub demo
   const gp =
-    manDays * gpmd + (subHaulCost + haulCost + handSubDemo + subFixedCost) * subMarkupRate
+    manDays * gpmd + (haulCost + handSubDemo + subFixedCost) * subMarkupRate
   const commission = gp * 0.12
-  const subCost = subHaulCost + manualSub + haulCost + handSubDemo + subFixedCost
+  const subCost = manualSub + haulCost + handSubDemo + subFixedCost
   const price = laborCost + burden + totalMat + gp + commission + subCost
 
   return {
