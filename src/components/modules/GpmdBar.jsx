@@ -149,46 +149,46 @@ export default function GpmdBar({
     },
     { label: 'Labor Burden', value: fmt(burden), dim: '29%' },
     { label: 'Sub Cost', value: subCost > 0 ? fmt(subCost) : '—', dim: null },
-    { label: 'Gross Profit', value: fmt(effectiveGp), dim: null, green: true },
     { label: 'Commission', value: fmt(effectiveComm), dim: '12%' },
-    { label: 'Total Price', value: fmt(effectivePrice), dim: null, green: true, big: true },
+    { label: 'Gross Profit', value: fmt(effectiveGp), dim: null, green: true },
+    { label: 'Total Price', value: fmt(effectivePrice), dim: null, blue: true, big: true },
   ]
 
-  // ── Sub GP column — rendered separately so the rate is inline-editable ─────
+  // ── Sub GP box — styled like the GPMD box (amber), rate inline-editable ────
   function SubGpCol() {
     return (
-      <div
-        className={`px-3 flex-1 min-w-0 text-center ${expanded ? '' : 'hidden lg:block'}`}
-      >
-        <p className="text-xs text-gray-400 whitespace-nowrap mb-0.5">Sub GP</p>
-        <p className="font-bold whitespace-nowrap tabular-nums text-sm text-blue-400">
-          {subGp > 0 ? fmt(subGp) : '—'}
-        </p>
-        {/* Editable rate shown below the value */}
-        {editingSubPct ? (
-          <div className="flex items-center justify-center gap-0.5 mt-0.5">
-            <input
-              autoFocus
-              value={draftSubPct}
-              onChange={e => setDraftSubPct(e.target.value)}
-              onBlur={commitSubEdit}
-              onKeyDown={e => {
-                if (e.key === 'Enter') commitSubEdit()
-                if (e.key === 'Escape') setEditingSubPct(false)
-              }}
-              className="w-8 bg-gray-800 border border-blue-400 rounded text-blue-200 text-xs font-bold text-center tabular-nums outline-none px-0.5"
-            />
-            <span className="text-blue-300 text-xs font-bold">%</span>
-          </div>
-        ) : (
-          <p
-            className={`text-xs text-gray-500 whitespace-nowrap mt-0.5 ${onSubMarkupSave ? 'cursor-pointer hover:text-blue-400 transition-colors' : ''}`}
-            onClick={onSubMarkupSave ? startSubEdit : undefined}
-            title={onSubMarkupSave ? 'Click to edit Sub GP markup rate' : undefined}
-          >
-            {displaySubPct}%{onSubMarkupSave && <span className="ml-1 text-gray-600">✎</span>}
+      <div className={`px-1 shrink-0 self-center ${expanded ? '' : 'hidden lg:block'}`}>
+        <div className="rounded-lg bg-amber-500/20 border border-amber-400/30 px-3 py-1 text-center min-w-[68px]">
+          <p className="text-xs mb-0.5 whitespace-nowrap text-amber-300">Sub GP</p>
+          <p className="font-bold tabular-nums text-sm text-amber-200">
+            {subGp > 0 ? fmt(subGp) : '—'}
           </p>
-        )}
+          {/* Editable rate shown below the value */}
+          {editingSubPct ? (
+            <div className="flex items-center justify-center gap-0.5 mt-0.5">
+              <input
+                autoFocus
+                value={draftSubPct}
+                onChange={e => setDraftSubPct(e.target.value)}
+                onBlur={commitSubEdit}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') commitSubEdit()
+                  if (e.key === 'Escape') setEditingSubPct(false)
+                }}
+                className="w-8 bg-gray-800 border border-amber-400 rounded text-amber-200 text-xs font-bold text-center tabular-nums outline-none px-0.5"
+              />
+              <span className="text-amber-300 text-xs font-bold">%</span>
+            </div>
+          ) : (
+            <p
+              className={`text-xs text-amber-400/70 whitespace-nowrap mt-0.5 ${onSubMarkupSave ? 'cursor-pointer hover:text-amber-300 transition-colors' : ''}`}
+              onClick={onSubMarkupSave ? startSubEdit : undefined}
+              title={onSubMarkupSave ? 'Click to edit Sub GP markup rate' : undefined}
+            >
+              {displaySubPct}%{onSubMarkupSave && <span className="ml-1 text-amber-500">✎</span>}
+            </p>
+          )}
+        </div>
       </div>
     )
   }
@@ -200,15 +200,10 @@ export default function GpmdBar({
   return (
     <div className={containerCls}>
       <div className="flex gap-0 divide-x divide-white/10 flex-wrap">
-        {/* Left: GPMD editable cell — hidden on the Subcontractor view */}
-        {!isSubView && (
-          <div className="pr-2 shrink-0">
-            <GpmdCell />
-          </div>
-        )}
-
         {/* Data columns — filtered by variant. In-house drops Sub Cost;
-            Sub view drops the labour/man-day/GPMD columns. */}
+            Sub view drops the labour/man-day/GPMD columns.
+            The Sub GP + GPMD boxes are inserted just before Commission so the
+            order reads: … Sub GP, GPMD, Commission, Gross Profit, Total Price. */}
         {cols
           .filter(col => {
             if (isSubView)
@@ -224,10 +219,9 @@ export default function GpmdBar({
             return true // full: show everything
           })
           .map(col => {
-          // Sub GP sits right after Gross Profit — but the Sub view hides
-          // Gross Profit, so there we anchor it just before Commission instead
-          // (order: Sub Cost, Sub GP, Commission, Total Price).
-          const isAfterSubCost = col.label === (isSubView ? 'Commission' : 'Gross Profit')
+          // Sub GP + GPMD boxes are inserted immediately before the Commission
+          // column, so both sit to the left of Gross Profit.
+          const insertBoxes = col.label === 'Commission'
           // Always visible (even collapsed on mobile): Gross Profit + Total Price.
           const essential = col.label === 'Gross Profit' || col.label === 'Total Price'
           const hideCls = essential || expanded ? '' : 'hidden lg:block'
@@ -235,13 +229,18 @@ export default function GpmdBar({
           // on this iterator (shorthand <> can't accept a key prop).
           return (
             <React.Fragment key={col.label}>
-              {isAfterSubCost && !isInhouseView && <SubGpCol />}
+              {insertBoxes && !isInhouseView && <SubGpCol />}
+              {insertBoxes && !isSubView && (
+                <div className="px-1 shrink-0 self-center">
+                  <GpmdCell />
+                </div>
+              )}
               <div className={`px-1.5 flex-1 min-w-0 text-center ${hideCls}`}>
                 <p className="text-[10px] text-gray-400 truncate mb-0.5">{col.label}</p>
                 <p
                   className={`font-bold tabular-nums truncate ${
                     col.big
-                      ? 'text-base text-green-400'
+                      ? 'text-base text-blue-400'
                       : col.green
                         ? 'text-sm text-green-400'
                         : 'text-sm text-white'
