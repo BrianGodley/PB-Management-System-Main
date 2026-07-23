@@ -198,9 +198,9 @@ export default function GpmdBar({
     : 'bg-gray-900 text-white rounded-xl p-3 mt-2'
 
   // ── Plain value cell used by the grouped (full) layout ─────────────────────
-  function Cell({ label, value, dim, color = 'text-white', big = false }) {
+  function Cell({ label, value, dim, color = 'text-white', big = false, cls = 'flex-1' }) {
     return (
-      <div className="px-2 flex-1 min-w-0 text-center">
+      <div className={`px-2 min-w-0 text-center self-center ${cls}`}>
         <p className="text-[10px] text-gray-400 truncate mb-0.5">{label}</p>
         <p className={`font-bold tabular-nums truncate ${big ? 'text-base' : 'text-sm'} ${color}`}>
           {value}
@@ -253,14 +253,14 @@ export default function GpmdBar({
   // combined commission, total GP and total price.
   if (variant === 'full') {
     return (
-      <div className={containerCls}>
+      <div className="mt-2">
         <div className="flex flex-col lg:flex-row gap-3 items-stretch">
-          {/* In House group */}
-          <div className="min-w-0 lg:flex-1">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-300 mb-1 px-1">
+          {/* In House group (grows to fill) */}
+          <div className="min-w-0 lg:flex-1 flex flex-col">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 mb-1 px-1">
               In House
             </p>
-            <div className="flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-blue-400/60 bg-blue-500/5 py-1.5 px-1">
+            <div className="flex-1 flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-blue-400/70 bg-gray-900 py-1.5 px-1">
               <Cell label="Labor Hours" value={fnum(totalHrs)} dim="hrs" />
               <Cell label="Man Days" value={fnum(manDays)} dim="MD" />
               <Cell label="Materials" value={fmt2(totalMat)} />
@@ -277,33 +277,40 @@ export default function GpmdBar({
             </div>
           </div>
 
-          {/* Subcontractor group — sub figures only */}
-          <div className="min-w-0 lg:flex-1">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-300 mb-1 px-1">
+          {/* Subcontractor group — sub figures only, skinny cells */}
+          <div className="min-w-0 lg:flex-none flex flex-col">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-600 mb-1 px-1">
               Subcontractor
             </p>
-            <div className="flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-orange-400/60 bg-orange-500/5 py-1.5 px-1">
-              <Cell label="Sub Cost" value={subCost > 0 ? fmt(subCost) : '—'} />
-              <Cell label="Gross Profit" value={fmt(subGp)} />
+            <div className="flex-1 flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-orange-400/70 bg-gray-900 py-1.5 px-1">
+              <Cell label="Sub Cost" value={subCost > 0 ? fmt(subCost) : '—'} cls="flex-none w-16" />
+              <Cell label="Gross Profit" value={fmt(subGp)} cls="flex-none w-16" />
               <div className="px-1 shrink-0 self-center">
                 <MarkupBox />
               </div>
-              <Cell label="Commission" value={fmt(effectiveComm)} dim="12%" />
             </div>
           </div>
 
-          {/* Totals group — combined GP + price */}
-          <div className="min-w-0 lg:flex-none">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-green-300 mb-1 px-1 lg:text-right">
+          {/* Totals group — commission + combined GP + price, wide cells */}
+          <div className="min-w-0 lg:flex-none flex flex-col">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-green-700 mb-1 px-1 lg:text-right">
               Totals
             </p>
-            <div className="flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-green-400/60 bg-green-500/5 py-1.5 px-1">
+            <div className="flex-1 flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-green-400/70 bg-gray-900 py-1.5 px-1">
+              <Cell label="Commission" value={fmt(effectiveComm)} dim="12%" cls="flex-none w-20" />
               <Cell
                 label="Total Gross Profit"
                 value={fmt(effectiveGp + subGp)}
                 color="text-green-400"
+                cls="flex-none w-32"
               />
-              <Cell label="Total Price" value={fmt(effectivePrice)} color="text-green-400" big />
+              <Cell
+                label="Total Price"
+                value={fmt(effectivePrice)}
+                color="text-green-400"
+                big
+                cls="flex-none w-32"
+              />
             </div>
           </div>
         </div>
