@@ -197,6 +197,111 @@ export default function GpmdBar({
     ? 'bg-gray-900 text-white py-1 px-2'
     : 'bg-gray-900 text-white rounded-xl p-3 mt-2'
 
+  // ── Plain value cell used by the grouped (full) layout ─────────────────────
+  function Cell({ label, value, dim, color = 'text-white', big = false }) {
+    return (
+      <div className="px-2 flex-1 min-w-0 text-center">
+        <p className="text-[10px] text-gray-400 truncate mb-0.5">{label}</p>
+        <p className={`font-bold tabular-nums truncate ${big ? 'text-base' : 'text-sm'} ${color}`}>
+          {value}
+        </p>
+        {dim && <p className="text-[10px] text-gray-500 truncate">{dim}</p>}
+      </div>
+    )
+  }
+
+  // ── Markup box — editable Sub GP % (orange, styled like the GPMD box) ──────
+  function MarkupBox() {
+    if (onSubMarkupSave && editingSubPct) {
+      return (
+        <div className="rounded-lg bg-orange-500/20 border border-orange-400/50 px-3 py-1 text-center min-w-[64px]">
+          <p className="text-xs mb-0.5 whitespace-nowrap text-orange-300">Markup</p>
+          <div className="flex items-center justify-center gap-0.5">
+            <input
+              autoFocus
+              value={draftSubPct}
+              onChange={e => setDraftSubPct(e.target.value)}
+              onBlur={commitSubEdit}
+              onKeyDown={e => {
+                if (e.key === 'Enter') commitSubEdit()
+                if (e.key === 'Escape') setEditingSubPct(false)
+              }}
+              className="w-10 bg-gray-800 border border-orange-400 rounded text-orange-200 text-sm font-bold text-center tabular-nums outline-none px-1"
+            />
+            <span className="text-orange-300 text-sm font-bold">%</span>
+          </div>
+        </div>
+      )
+    }
+    return (
+      <div
+        className={`rounded-lg bg-orange-500/20 border border-orange-400/30 px-3 py-1 text-center min-w-[64px] ${onSubMarkupSave ? 'cursor-pointer hover:bg-orange-500/30 transition-colors' : ''}`}
+        onClick={onSubMarkupSave ? startSubEdit : undefined}
+        title={onSubMarkupSave ? 'Click to edit Sub GP markup %' : undefined}
+      >
+        <p className="text-xs mb-0.5 whitespace-nowrap text-orange-300">
+          Markup{onSubMarkupSave && <span className="text-orange-500 text-[10px] ml-1">✎</span>}
+        </p>
+        <p className="font-bold tabular-nums text-sm text-orange-200">{displaySubPct}%</p>
+      </div>
+    )
+  }
+
+  // ── Grouped layout — Project & Estimate (full) bars ────────────────────────
+  // Left "In House" group (blue) holds labour/materials/in-house GP + GPMD;
+  // right "Subcontractor" group (orange) holds sub cost/GP/markup, then the
+  // combined commission, total GP and total price.
+  if (variant === 'full') {
+    return (
+      <div className={containerCls}>
+        <div className="flex flex-col lg:flex-row gap-3 items-stretch">
+          {/* In House group */}
+          <div className="min-w-0 lg:flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-300 mb-1 px-1">
+              In House
+            </p>
+            <div className="flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-blue-400/60 bg-blue-500/5 py-1.5 px-1">
+              <Cell label="Labor Hours" value={fnum(totalHrs)} dim="hrs" />
+              <Cell label="Man Days" value={fnum(manDays)} dim="MD" />
+              <Cell label="Materials" value={fmt2(totalMat)} />
+              <Cell
+                label="Crew Labor"
+                value={fmt(laborCost)}
+                dim={`@ $${parseFloat(laborRatePerHour).toFixed(0)}/hr`}
+              />
+              <Cell label="Labor Burden" value={fmt(burden)} dim="29%" />
+              <Cell label="Gross Profit" value={fmt(effectiveGp)} color="text-green-400" />
+              <div className="px-1 shrink-0 self-center">
+                <GpmdCell />
+              </div>
+            </div>
+          </div>
+
+          {/* Subcontractor group */}
+          <div className="min-w-0 lg:flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-300 mb-1 px-1 lg:text-right">
+              Subcontractor
+            </p>
+            <div className="flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-orange-400/60 bg-orange-500/5 py-1.5 px-1">
+              <Cell label="Sub Cost" value={subCost > 0 ? fmt(subCost) : '—'} />
+              <Cell label="Gross Profit" value={fmt(subGp)} color="text-green-400" />
+              <div className="px-1 shrink-0 self-center">
+                <MarkupBox />
+              </div>
+              <Cell label="Commission" value={fmt(effectiveComm)} dim="12%" />
+              <Cell
+                label="Total Gross Profit"
+                value={fmt(effectiveGp + subGp)}
+                color="text-green-400"
+              />
+              <Cell label="Total Price" value={fmt(effectivePrice)} color="text-blue-400" big />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={containerCls}>
       <div className="flex gap-0 divide-x divide-white/10 flex-wrap">
