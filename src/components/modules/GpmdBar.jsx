@@ -43,6 +43,10 @@ export default function GpmdBar({
   // 'inhouse' hides Sub Cost + Sub GP (module In-House tab).
   // 'sub' hides Labor Hours, Man Days, GPMD, Crew Labor, Labor Burden (module Sub tab).
   variant = 'full',
+  // Group headings for the full (Project/Estimate) layout.
+  inHouseLabel = 'In House',
+  subLabel = 'Subcontractor',
+  totalsLabel = 'Totals',
 }) {
   const isSubView = variant === 'sub'
   const isInhouseView = variant === 'inhouse'
@@ -257,8 +261,8 @@ export default function GpmdBar({
         <div className="flex flex-col lg:flex-row gap-3 items-stretch">
           {/* In House group (grows to fill) */}
           <div className="min-w-0 lg:flex-1 flex flex-col">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 mb-1 px-1">
-              In House
+            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 mb-1 px-1 text-center">
+              {inHouseLabel}
             </p>
             <div className="flex-1 flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-blue-400/70 bg-gray-900 py-1.5 px-1">
               <Cell label="Labor Hours" value={fnum(totalHrs)} dim="hrs" />
@@ -279,8 +283,8 @@ export default function GpmdBar({
 
           {/* Subcontractor group — sub figures only, skinny cells */}
           <div className="min-w-0 lg:flex-none flex flex-col">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-600 mb-1 px-1">
-              Subcontractor
+            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-600 mb-1 px-1 text-center">
+              {subLabel}
             </p>
             <div className="flex-1 flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-orange-400/70 bg-gray-900 py-1.5 px-1">
               <Cell label="Sub Cost" value={subCost > 0 ? fmt(subCost) : '—'} cls="flex-none w-16" />
@@ -293,8 +297,8 @@ export default function GpmdBar({
 
           {/* Totals group — commission + combined GP + price, wide cells */}
           <div className="min-w-0 lg:flex-none flex flex-col">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-green-700 mb-1 px-1 lg:text-right">
-              Totals
+            <p className="text-[10px] font-bold uppercase tracking-wider text-green-700 mb-1 px-1 text-center">
+              {totalsLabel}
             </p>
             <div className="flex-1 flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-green-400/70 bg-gray-900 py-1.5 px-1">
               <Cell label="Commission" value={fmt(effectiveComm)} dim="12%" cls="flex-none w-20" />

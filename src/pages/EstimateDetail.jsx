@@ -1716,18 +1716,6 @@ export default function EstimateDetail() {
 
       {/* ── Estimate-wide summary bar ── */}
       <div className="mb-4">
-        <div className="flex items-center justify-between mb-2 px-1">
-          <div className="flex items-center gap-3">
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-500">
-              Estimate Totals
-            </p>
-          </div>
-          <p className="text-xs text-gray-400">
-            {allModules.length} module{allModules.length !== 1 ? 's' : ''}
-            {' across '}
-            {projects.length} project{projects.length !== 1 ? 's' : ''}
-          </p>
-        </div>
         {allModules.length === 0 ? (
           <div className="bg-gray-900 text-white rounded-xl px-5 py-4">
             <p className="text-xs text-gray-500 text-center py-1">
@@ -1748,6 +1736,9 @@ export default function EstimateDetail() {
             directGp={adjustedEstimateGP}
             price={et.price}
             subMarkupRate={derivedEstSubRate}
+            inHouseLabel="In House Estimate Totals"
+            subLabel="Subcontractor Estimate Totals"
+            totalsLabel="Estimate Totals"
           />
         )}
       </div>
@@ -1755,22 +1746,6 @@ export default function EstimateDetail() {
       {/* ── Per-project summary bar (shown when a project is selected) ── */}
       {selectedProject && pt.price > 0 && (
         <div className="mb-4">
-          <div className="flex items-center justify-between mb-2 px-1">
-            <div className="flex items-center gap-3">
-              <p className="text-xs font-bold uppercase tracking-wider text-gray-500">
-                {selectedProject.project_name} — Project Totals
-              </p>
-              {projectGpmds[selectedProject.id] != null &&
-                projectGpmds[selectedProject.id] !== projGpmd && (
-                  <span className="text-[10px] bg-amber-100 text-amber-700 border border-amber-300 rounded-full px-2 py-0.5 font-medium">
-                    ⚠ GPMD overridden from module average of ${projGpmd.toLocaleString()}
-                  </span>
-                )}
-            </div>
-            <p className="text-xs text-gray-400">
-              {projModules.length} module{projModules.length !== 1 ? 's' : ''}
-            </p>
-          </div>
           <GpmdBar
             totalMat={pt.materialCost}
             totalHrs={pt.manDays * 8}
@@ -1786,6 +1761,9 @@ export default function EstimateDetail() {
             onGpmdSave={val => saveProjectGpmd(selectedProject.id, val)}
             subMarkupRate={selectedProject.sub_gp_markup_rate ?? 0.2}
             onSubMarkupSave={val => saveProjectSubRate(selectedProject.id, val)}
+            inHouseLabel={`${selectedProject.project_name} - In House Total`}
+            subLabel={`${selectedProject.project_name} Subcontractor Total`}
+            totalsLabel={`${selectedProject.project_name} Totals`}
           />
         </div>
       )}
