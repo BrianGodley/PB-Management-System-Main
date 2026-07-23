@@ -207,9 +207,9 @@ function calcDrainage(
   // Sub work earns a markup (gross profit on subcontracted cost), matching the
   // GPMD bar, so the saved total includes it.
   const subGp = subCost * (subMarkupRate || 0)
-  const gp = manDays * gpmd + subGp
-  const commission = gp * DEFAULTS.commissionRate
-  const price = totalMat + laborCost + burden + gp + commission + subCost
+  const gp = manDays * gpmd // in-house GP only; bar adds Sub GP once
+  const commission = (gp + subGp) * DEFAULTS.commissionRate
+  const price = totalMat + laborCost + burden + gp + subGp + commission + subCost
 
   return {
     totalHrs,

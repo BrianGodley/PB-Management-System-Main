@@ -387,11 +387,13 @@ function calcDemo(
 
   const subFixedCost = subGradingCost + subStumpCost + subTreeCost
   // GP = labor component + Universal Sub Markup % on sub-haul + hauling + sub demo
-  const gp =
-    manDays * gpmd + (haulCost + handSubDemo + subFixedCost) * subMarkupRate
-  const commission = gp * 0.12
   const subCost = manualSub + haulCost + handSubDemo + subFixedCost
-  const price = laborCost + burden + totalMat + gp + commission + subCost
+  // gross_profit saved = IN-HOUSE GP only; the GPMD bar adds Sub GP once so
+  // project/estimate GPMD stays the base rate (no double-count of Sub GP).
+  const subGp = subCost * subMarkupRate
+  const gp = manDays * gpmd
+  const commission = (gp + subGp) * 0.12
+  const price = laborCost + burden + totalMat + gp + subGp + commission + subCost
 
   return {
     walkHrs,

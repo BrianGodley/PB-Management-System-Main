@@ -417,10 +417,11 @@ function calcDemo(
   )
 
   const subFixedCost = subGradingCost + subStumpCost + subTreeCost
-  const gp = manDays * gpmd + (subHaulCost + haulCost + miniSubDemo + subFixedCost) * subMarkupRate
-  const commission = gp * 0.12
   const subCost = subHaulCost + manualSub + haulCost + miniSubDemo + subFixedCost
-  const price = laborCost + burden + totalMat + gp + commission + subCost
+  const subGp = subCost * subMarkupRate
+  const gp = manDays * gpmd
+  const commission = (gp + subGp) * 0.12
+  const price = laborCost + burden + totalMat + gp + subGp + commission + subCost
 
   return {
     walkHrs,
