@@ -372,7 +372,7 @@ function calcDemo(
   }
   const subDemoCost = n(state.subDemoSF) * miniSubRate(state.subDemoDepth || 7)
   const miniMiscFlatSubRate = sr['Sub Demo - Mini Misc Flat'] ?? 2.0
-  const miscFlatSubCost = (state.miscFlatRows || [])
+  const miscFlatSubCost = (state.subMiscFlatRows || [])
     .slice(0, 2)
     .reduce((sum, r) => sum + n(r.sf) * miniMiscFlatSubRate, 0)
   const miniSubDemo = subDemoCost + miscFlatSubCost
@@ -385,12 +385,12 @@ function calcDemo(
   const sgRoll = sr['Sub Grade - Mini Roll SF'] ?? 0
   const sgSS = sr['Sub Grade - Mini SS Compact SF'] ?? 0
   const subGradingCost =
-    n(state.gradeCutSF) * sgCut +
-    n(state.gradeFillSF) * sgFill +
-    n(state.jjSF) * sgJJ +
+    n(state.subGradeCutSF) * sgCut +
+    n(state.subGradeFillSF) * sgFill +
+    n(state.subJjSF) * sgJJ +
     n(state.sheepsfootSF) * sgSheep +
     n(state.rollCompSF) * sgRoll +
-    n(state.ssCmpSF) * sgSS
+    n(state.subSsCmpSF) * sgSS
 
   const ssSmall = sr['Sub Stump - Mini Small'] ?? 0
   const ssMed = sr['Sub Stump - Mini Medium'] ?? 0
@@ -411,12 +411,12 @@ function calcDemo(
       : size === 'Medium' || size === '12" - 18"'
         ? stMed
         : stSmall
-  const subTreeCost = (state.treeRows || []).reduce(
+  const subTreeCost = (state.subTreeRows || []).reduce(
     (sum, r) => sum + n(r.qty) * subTreeRateFor(r.size),
     0,
   )
 
-  const subFixedCost = subGradingCost + subStumpCost + subTreeCost
+  const subFixedCost = subGradingCost + subTreeCost // stump hidden on Sub tab
   const subCost = subHaulCost + manualSub + haulCost + miniSubDemo + subFixedCost
   const subGp = subCost * subMarkupRate
   const gp = manDays * gpmd
@@ -554,6 +554,10 @@ const DEFAULT_STATE = {
   miscFlatRows: Array(4)
     .fill(null)
     .map(() => ({ label: '', sf: '', depth: 4 })),
+  // Sub tab: its OWN misc-flat rows (2), independent of In-House.
+  subMiscFlatRows: Array(2)
+    .fill(null)
+    .map(() => ({ label: '', sf: '', depth: 4 })),
   miscVertRows: Array(4)
     .fill(null)
     .map(() => ({ label: '', lf: '', heightIn: '', widthIn: 8 })),
@@ -586,8 +590,19 @@ const DEFAULT_STATE = {
   rollCompSF: '',
   rateOverrides: {},
   subDemoSF: '',
+  // Sub tab has its OWN grading fields — independent of In-House.
+  subGradeCutSF: '',
+  subGradeFillSF: '',
+  subJjSF: '',
+  subSsCmpSF: '',
   subDemoDepth: 7,
   treeRows: [
+    { qty: '', height: 20, size: 'Small' },
+    { qty: '', height: 20, size: 'Medium' },
+    { qty: '', height: 20, size: 'Large' },
+  ],
+  // Sub tab: its OWN tree rows, independent of In-House.
+  subTreeRows: [
     { qty: '', height: 20, size: 'Small' },
     { qty: '', height: 20, size: 'Medium' },
     { qty: '', height: 20, size: 'Large' },
@@ -1356,7 +1371,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             }
           />
           <tbody className="divide-y divide-gray-50">
-            {(isSub ? state.miscFlatRows.slice(0, 2) : state.miscFlatRows).map((r, i) => {
+            {(isSub ? state.subMiscFlatRows.slice(0, 2) : state.miscFlatRows).map((r, i) => {
               const cr = calc.miscFlatCalc[i] || { tons: 0, hours: 0, dumpFee: 0 }
               return (
                 <tr key={i}>
@@ -1364,14 +1379,14 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                     <Inp
                       type="text"
                       value={r.label}
-                      onChange={e => setRow('miscFlatRows', i, 'label', e.target.value)}
+                      onChange={e => setRow(isSub ? 'subMiscFlatRows' : 'miscFlatRows', i, 'label', e.target.value)}
                       placeholder={`Item ${i + 1}`}
                     />
                   </td>
                   <td className={td}>
                     <Inp
                       value={r.sf}
-                      onChange={e => setRow('miscFlatRows', i, 'sf', e.target.value)}
+                      onChange={e => setRow(isSub ? 'subMiscFlatRows' : 'miscFlatRows', i, 'sf', e.target.value)}
                     />
                   </td>
                   {isSelf && (
@@ -1710,12 +1725,12 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             />
             <tbody className="divide-y divide-gray-50">
               {[
-                { label: 'Grade Cut', key: 'gradeCutSF', rate: calc.sgCut, rateName: 'Sub Grade - Mini Cut SF' },
-                { label: 'Grade Fill', key: 'gradeFillSF', rate: calc.sgFill, rateName: 'Sub Grade - Mini Fill SF' },
-                { label: 'Jumping Jack', key: 'jjSF', rate: calc.sgJJ, rateName: 'Sub Grade - Mini JJ SF' },
+                { label: 'Grade Cut', key: 'subGradeCutSF', rate: calc.sgCut, rateName: 'Sub Grade - Mini Cut SF' },
+                { label: 'Grade Fill', key: 'subGradeFillSF', rate: calc.sgFill, rateName: 'Sub Grade - Mini Fill SF' },
+                { label: 'Jumping Jack', key: 'subJjSF', rate: calc.sgJJ, rateName: 'Sub Grade - Mini JJ SF' },
                 { label: 'Sheepsfoot Compactor', key: 'sheepsfootSF', rate: calc.sgSheep, rateName: 'Sub Grade - Mini Sheepsfoot SF' },
                 { label: 'Roll Compactor', key: 'rollCompSF', rate: calc.sgRoll, rateName: 'Sub Grade - Mini Roll SF' },
-                { label: 'SS Compact', key: 'ssCmpSF', rate: calc.sgSS, rateName: 'Sub Grade - Mini SS Compact SF' },
+                { label: 'SS Compact', key: 'subSsCmpSF', rate: calc.sgSS, rateName: 'Sub Grade - Mini SS Compact SF' },
               ].map(({ label, key, rate, rateName }) => (
                 <tr key={key}>
                   <td className={`${td} font-medium text-gray-700`}>
@@ -1972,14 +1987,14 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             }
           />
           <tbody className="divide-y divide-gray-50">
-            {state.treeRows.map((r, i) => {
+            {(isSub ? state.subTreeRows : state.treeRows).map((r, i) => {
               const cr = calc.treeCalc[i] || { hrs: 0, dumpFee: 0 }
               return (
                 <tr key={i}>
                   <td className={td}>
                     <Inp
                       value={r.qty}
-                      onChange={e => setRow('treeRows', i, 'qty', e.target.value)}
+                      onChange={e => setRow(isSub ? 'subTreeRows' : 'treeRows', i, 'qty', e.target.value)}
                     />
                   </td>
                   {isSelf && (
@@ -1994,7 +2009,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                   <td className={td}>
                     <Sel
                       value={r.size}
-                      onChange={e => setRow('treeRows', i, 'size', e.target.value)}
+                      onChange={e => setRow(isSub ? 'subTreeRows' : 'treeRows', i, 'size', e.target.value)}
                       options={['Small', 'Medium', 'Large']}
                     />
                   </td>
