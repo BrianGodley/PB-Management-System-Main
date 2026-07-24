@@ -1965,8 +1965,8 @@ export default function EstimateDetail() {
                       )}
                     </div>
                     <p className="text-xs text-gray-400 mt-0.5 leading-tight">
-                      GP {moneyFmt(projFin.gp)} · In House {moneyFmt(projFin.inHouse)} · Sub{' '}
-                      {moneyFmt(projFin.sub)} · Total {moneyFmt(projFin.combined)}
+                      In House {moneyFmt(projFin.inHouse)} · Sub {moneyFmt(projFin.sub)} · Total{' '}
+                      {moneyFmt(projFin.combined)}
                     </p>
                   </div>
                 )
@@ -2045,8 +2045,8 @@ export default function EstimateDetail() {
                       const f = moduleFinance(mod)
                       return (
                         <p className="text-xs text-gray-400 mt-0.5 leading-tight">
-                          GP {moneyFmt(f.gp)} · In House {moneyFmt(f.inHouse)} · Sub{' '}
-                          {moneyFmt(f.sub)} · Total {moneyFmt(f.combined)}
+                          In House {moneyFmt(f.inHouse)} · Sub {moneyFmt(f.sub)} · Total{' '}
+                          {moneyFmt(f.combined)}
                         </p>
                       )
                     })()}
