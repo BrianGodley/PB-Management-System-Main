@@ -2134,7 +2134,7 @@ export default function EstimateDetail() {
                 {/* In House / Subcontractor label — demo modules group both
                     sides internally, so only the single-side (non-demo)
                     modules get a top label based on their work-type toggle. */}
-                {!['Hand Demo', 'Skid Steer Demo', 'Mini Skid Steer Demo'].includes(
+                {!['Hand Demo', 'Skid Steer Demo', 'Mini Skid Steer Demo', 'Utilities'].includes(
                   selectedModule.module_type
                 ) && (
                   <p
