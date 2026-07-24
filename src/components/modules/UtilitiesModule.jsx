@@ -447,6 +447,27 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   )
   const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
 
+  // ── Independent Subcontractor-tab state ──────────────────────────────────
+  // The Sub tab is its own calculator (mirrors the demo Hand/Skid/Mini tabs).
+  // Each field defaults to the same blank rows as its in-house counterpart,
+  // except sub trench which is LF-only (no equipment/width/depth).
+  const [subTrenchRows, setSubTrenchRows] = useState(
+    initialData?.subTrenchRows ?? [{ lf: '' }, { lf: '' }]
+  )
+  const [subLineRows, setSubLineRows] = useState(initialData?.subLineRows ?? DEFAULT_LINE_ROWS)
+  const [subFixtureRows, setSubFixtureRows] = useState(
+    initialData?.subFixtureRows ?? DEFAULT_FIXTURE_ROWS
+  )
+  const [subElecFixtureRows, setSubElecFixtureRows] = useState(
+    initialData?.subElecFixtureRows ?? DEFAULT_ELEC_FIXTURE_ROWS
+  )
+  const [subAdditionalItems, setSubAdditionalItems] = useState(
+    initialData?.subAdditionalItems ?? DEFAULT_ADDITIONAL
+  )
+  const [subManualRows, setSubManualRows] = useState(
+    initialData?.subManualRows ?? DEFAULT_MANUAL_ROWS
+  )
+
   // ── Sales tax — applied to totalMat across every module so the bid
   //    reflects supplier-invoiced material cost. Sourced from
   //    company_settings.sales_tax_rate via fetchSalesTaxRate(). Default
@@ -462,7 +483,23 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
     }
   }, [])
 
-  const calcRaw = calcUtilities(
+  // Active-tab wiring: the shared sections (Lines / Fixtures / Electrical
+  // Fixtures / Additional / Manual) edit whichever set matches the current
+  // tab, so In-House and Subcontractor are fully independent calculators.
+  const isSub = subType === 'Subcontractor'
+  const activeLineRows = isSub ? subLineRows : lineRows
+  const activeFixtureRows = isSub ? subFixtureRows : fixtureRows
+  const activeElecFixtureRows = isSub ? subElecFixtureRows : elecFixtureRows
+  const activeAdditionalItems = isSub ? subAdditionalItems : additionalItems
+  const activeManualRows = isSub ? subManualRows : manualRows
+  const setActiveLineRows = isSub ? setSubLineRows : setLineRows
+  const setActiveFixtureRows = isSub ? setSubFixtureRows : setFixtureRows
+  const setActiveElecFixtureRows = isSub ? setSubElecFixtureRows : setElecFixtureRows
+  const setActiveAdditionalItems = isSub ? setSubAdditionalItems : setAdditionalItems
+  const setActiveManualRows = isSub ? setSubManualRows : setManualRows
+
+  // In-house calc is unchanged — it reads only the in-house state fields.
+  const inHouse = calcUtilities(
     {
       difficulty,
       hoursAdj,
@@ -481,6 +518,63 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
     walkAccess,
     laborBurdenPct
   )
+
+  // ── Sub-side cost — a single fully-loaded subcontractor cost figure.
+  // Reuses the exact same per-unit rate lookups as the in-house calc, but
+  // books (material$ + labor-hours × labor rate) as a sub COST. It does NOT
+  // add to the module's in-house manDays / totalHrs / totalMat / laborCost.
+  const subTrenchRate = materialPrices['Utilities Sub Trench - Per LF'] ?? 12
+  let subSideCost = 0
+  subTrenchRows.forEach(r => {
+    subSideCost += n(r.lf) * subTrenchRate
+  })
+  subLineRows.forEach(r => {
+    const lf = n(r.lf)
+    const rate = UTILITY_LINE_TYPES[r.type]
+    if (lf > 0 && rate) {
+      const costPerLF = materialPrices[rate.dbName] ?? rate.costPerLF
+      const laborPerLF = materialPrices[rate.laborDbName] ?? rate.laborPerLF
+      subSideCost += lf * costPerLF + lf * laborPerLF * laborRatePerHour
+    }
+  })
+  ;[...subFixtureRows, ...(subElecFixtureRows || [])].forEach(r => {
+    const qty = n(r.qty)
+    const rate = FIXTURE_TYPES[r.type]
+    if (qty > 0 && rate) {
+      const cost = materialPrices[rate.dbName] ?? rate.cost
+      const laborHrs = materialPrices[rate.laborDbName] ?? rate.laborHrs
+      subSideCost += qty * cost + qty * laborHrs * laborRatePerHour
+    }
+  })
+  Object.entries(ADD_ITEM_RATES).forEach(([key, rate]) => {
+    const qty = n(subAdditionalItems[`${key}Qty`])
+    if (qty > 0) {
+      const matCost = materialPrices[rate.dbName] ?? rate.matCost
+      const laborHrs = materialPrices[rate.laborDbName] ?? rate.laborHrs
+      subSideCost += qty * matCost + qty * laborHrs * laborRatePerHour
+    }
+  })
+  subManualRows.forEach(r => {
+    subSideCost += n(r.subCost)
+  })
+
+  // ── Combine: in-house calc + sub-side cost. GP stays in-house; sub cost
+  // earns its own markup (subGp); commission applies to both GP pools.
+  const _subCost = inHouse.subCost + subSideCost
+  const _subGp = _subCost * subGpMarkupRate
+  const _gp = inHouse.gp
+  const _commission = (_gp + _subGp) * 0.12
+  const _price =
+    inHouse.totalMat + inHouse.laborCost + inHouse.burden + _gp + _subCost + _subGp + _commission
+  const calcRaw = {
+    ...inHouse,
+    subCost: _subCost,
+    subGp: _subGp,
+    gp: _gp,
+    commission: _commission,
+    price: _price,
+  }
+
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
@@ -499,17 +593,20 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   function updateTrench(i, field, val) {
     setTrenchRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
+  function updateSubTrench(i, field, val) {
+    setSubTrenchRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  }
   function updateLine(i, field, val) {
-    setLineRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+    setActiveLineRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
   function updateFixture(i, field, val) {
-    setFixtureRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+    setActiveFixtureRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
   function updateElecFixture(i, field, val) {
-    setElecFixtureRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+    setActiveElecFixtureRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
   function updateManual(i, field, val) {
-    setManualRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+    setActiveManualRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
 
   function handleSave() {
@@ -527,6 +624,13 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
         additionalItems,
         electricSubpanelSubCost,
         manualRows,
+        subTrenchRows,
+        subLineRows,
+        subFixtureRows,
+        subElecFixtureRows,
+        subAdditionalItems,
+        subManualRows,
+        subType,
         laborRatePerHour,
         laborBurdenPct,
         gpmd,
@@ -542,7 +646,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
         {/* GPMD summary bar */}
         <GpmdBar
-          variant={subType === 'Subcontractor' ? 'sub' : 'inhouse'}
+          variant={isSub ? 'sub' : 'inhouse'}
           sticky
           totalMat={calc.totalMat}
           totalHrs={calc.totalHrs}
@@ -589,36 +693,41 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
         </div>
       )}
 
-      {/* Settings */}
-      <SectionHeader title="Job Site Conditions" />
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
-          <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
-        </div>
-        <div>
-          <p
-            className="text-xs text-gray-500 mb-0.5"
-            title="Average Distance from Truck to Work Area"
-          >
-            Truck → Work Area (Avg LF)
-          </p>
-          <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
-          {calc.walkHrs > 0 && (
-            <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">
-              +{calc.walkHrs.toFixed(2)} hrs walk-access
-            </p>
-          )}
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
-          <NumInput value={hoursAdj} onChange={setHoursAdj} placeholder="0" />
-        </div>
-      </div>
+      {/* Settings — In-House tab only (sub tab is a flat cost calculator) */}
+      {!isSub && (
+        <>
+          <SectionHeader title="Job Site Conditions" />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
+              <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
+            </div>
+            <div>
+              <p
+                className="text-xs text-gray-500 mb-0.5"
+                title="Average Distance from Truck to Work Area"
+              >
+                Truck → Work Area (Avg LF)
+              </p>
+              <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
+              {calc.walkHrs > 0 && (
+                <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">
+                  +{calc.walkHrs.toFixed(2)} hrs walk-access
+                </p>
+              )}
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
+              <NumInput value={hoursAdj} onChange={setHoursAdj} placeholder="0" />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ── Trenching ── */}
       <div>
         <SectionHeader title="Trenching" />
+        {!isSub ? (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -695,6 +804,53 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
             + Add row
           </button>
         </div>
+        ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-2 font-medium">Linear Feet</th>
+                <th className="text-right pb-1 font-medium text-gray-400">Sub $</th>
+              </tr>
+            </thead>
+            <tbody>
+              {subTrenchRows.map((row, i) => {
+                const cost = n(row.lf) * subTrenchRate
+                return (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-2">
+                      <NumInput value={row.lf} onChange={v => updateSubTrench(i, 'lf', v)} />
+                    </td>
+                    <td className="py-1 text-right text-gray-600 text-xs">
+                      {cost > 0 ? `$${cost.toFixed(2)}` : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <div className="flex items-center gap-3 mt-1">
+            <button
+              type="button"
+              className="text-xs text-green-700 hover:text-green-900 font-medium"
+              onClick={() => setSubTrenchRows(r => [...r, { lf: '' }])}
+            >
+              + Add row
+            </button>
+            <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+              ${subTrenchRate.toFixed(2)}/LF
+              <RateEditPopover
+                table="material_rates"
+                name="Utilities Sub Trench - Per LF"
+                category="Utilities"
+                unitLabel="LF"
+                currentValue={subTrenchRate}
+                onSaved={refreshAllRates}
+              />
+            </span>
+          </div>
+        </div>
+        )}
       </div>
 
       {/* ── Additional Subgrade Work ── */}
@@ -703,7 +859,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
         <div className="space-y-2">
           {/* Curb Core & Hydrocut — qty based */}
           {Object.entries(ADD_ITEM_RATES).map(([key, rate]) => {
-            const qty = n(additionalItems[`${key}Qty`])
+            const qty = n(activeAdditionalItems[`${key}Qty`])
             const matCost = materialPrices[rate.dbName] ?? rate.matCost
             const laborHrs = materialPrices[rate.laborDbName] ?? rate.laborHrs
             return (
@@ -733,8 +889,10 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                   step="1"
                   className="input text-sm py-1 w-20"
                   placeholder="Qty"
-                  value={additionalItems[`${key}Qty`]}
-                  onChange={e => setAdditionalItems(p => ({ ...p, [`${key}Qty`]: e.target.value }))}
+                  value={activeAdditionalItems[`${key}Qty`]}
+                  onChange={e =>
+                    setActiveAdditionalItems(p => ({ ...p, [`${key}Qty`]: e.target.value }))
+                  }
                 />
                 <span className="text-xs text-gray-400 w-20 text-right">
                   {qty > 0 ? `$${(qty * matCost).toLocaleString()} mat` : '—'}
@@ -747,8 +905,10 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
           <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer py-1">
             <input
               type="checkbox"
-              checked={additionalItems.permitRequired}
-              onChange={e => setAdditionalItems(p => ({ ...p, permitRequired: e.target.checked }))}
+              checked={activeAdditionalItems.permitRequired}
+              onChange={e =>
+                setActiveAdditionalItems(p => ({ ...p, permitRequired: e.target.checked }))
+              }
               className="rounded"
             />
             * Permit Required
@@ -770,7 +930,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
               </tr>
             </thead>
             <tbody>
-              {lineRows.map((row, i) => {
+              {activeLineRows.map((row, i) => {
                 const rate = UTILITY_LINE_TYPES[row.type]
                 const costPerLF = materialPrices[rate?.dbName] ?? rate?.costPerLF ?? 0
                 const laborPerLF = materialPrices[rate?.laborDbName] ?? rate?.laborPerLF ?? 0
@@ -831,7 +991,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
             type="button"
             className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
             onClick={() =>
-              setLineRows(r => [...r, { type: 'PVC Conduit with Electrical', lf: '' }])
+              setActiveLineRows(r => [...r, { type: 'PVC Conduit with Electrical', lf: '' }])
             }
           >
             + Add row
@@ -853,7 +1013,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
               </tr>
             </thead>
             <tbody>
-              {fixtureRows.map((row, i) => {
+              {activeFixtureRows.map((row, i) => {
                 const rate = FIXTURE_TYPES[row.type]
                 const cost = materialPrices[rate?.dbName] ?? rate?.cost ?? 0
                 const laborHrs = materialPrices[rate?.laborDbName] ?? rate?.laborHrs ?? 0
@@ -913,7 +1073,9 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
           <button
             type="button"
             className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
-            onClick={() => setFixtureRows(r => [...r, { type: '12" Single Gas Ring', qty: '' }])}
+            onClick={() =>
+              setActiveFixtureRows(r => [...r, { type: '12" Single Gas Ring', qty: '' }])
+            }
           >
             + Add row
           </button>
@@ -934,7 +1096,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
               </tr>
             </thead>
             <tbody>
-              {elecFixtureRows.map((row, i) => {
+              {activeElecFixtureRows.map((row, i) => {
                 const rate = FIXTURE_TYPES[row.type]
                 const cost = materialPrices[rate?.dbName] ?? rate?.cost ?? 0
                 const laborHrs = materialPrices[rate?.laborDbName] ?? rate?.laborHrs ?? 0
@@ -995,7 +1157,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
             type="button"
             className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
             onClick={() =>
-              setElecFixtureRows(r => [...r, { type: 'GFCI Protected Receptacles', qty: '' }])
+              setActiveElecFixtureRows(r => [...r, { type: 'GFCI Protected Receptacles', qty: '' }])
             }
           >
             + Add row
@@ -1017,7 +1179,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
               </tr>
             </thead>
             <tbody>
-              {manualRows.map((row, i) => (
+              {activeManualRows.map((row, i) => (
                 <tr key={i} className="border-b border-gray-100">
                   <td className="py-1 pr-2">
                     <input
@@ -1045,7 +1207,12 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
           </table>
           <button
             type="button"
-            onClick={() => setManualRows(rows => [...rows, { label: '', hours: '', materials: '', subCost: '' }])}
+            onClick={() =>
+              setActiveManualRows(rows => [
+                ...rows,
+                { label: '', hours: '', materials: '', subCost: '' },
+              ])
+            }
             className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
           >
             + Add manual entry
