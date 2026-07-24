@@ -203,7 +203,7 @@ export default function GpmdBar({
     : 'bg-gray-900 text-white rounded-xl p-3 mt-2'
 
   // ── Plain value cell used by the grouped (full) layout ─────────────────────
-  function Cell({ label, value, dim, color = 'text-white', big = false, cls = 'flex-1' }) {
+  function Cell({ label, value, dim, color = 'text-white', big = false, cls = 'w-24 shrink-0' }) {
     return (
       <div className={`px-2 min-w-0 text-center self-center ${cls}`}>
         <p className="text-[10px] text-gray-400 leading-tight mb-0.5">
@@ -261,10 +261,10 @@ export default function GpmdBar({
   // combined commission, total GP and total price.
   if (variant === 'full') {
     return (
-      <div className="mt-2">
+      <div className="mt-2 overflow-x-auto">
         <div className="flex flex-col lg:flex-row gap-3 items-stretch">
-          {/* In House group (grows to fill) */}
-          <div className="min-w-0 lg:flex-1 flex flex-col">
+          {/* In House group */}
+          <div className="min-w-0 flex flex-col">
             <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 mb-1 px-1 text-center truncate">
               {inHouseLabel}
             </p>
@@ -278,7 +278,7 @@ export default function GpmdBar({
                 dim={`@ $${parseFloat(laborRatePerHour).toFixed(0)}/hr`}
               />
               <Cell label="Labor Burden" value={fmt(burden)} dim="29%" />
-              <div className="px-1 shrink-0 self-center">
+              <div className="w-24 shrink-0 self-center flex justify-center">
                 <GpmdCell />
               </div>
               <Cell label="Gross Profit" value={fmt(effectiveGp)} />
@@ -287,13 +287,13 @@ export default function GpmdBar({
 
           {/* Subcontractor group — fixed width (same in every bar) so the
               In House group fills identical remaining space; cells flex-equal. */}
-          <div className="min-w-0 lg:w-64 lg:shrink-0 flex flex-col">
+          <div className="min-w-0 flex flex-col">
             <p className="text-[10px] font-bold uppercase tracking-wider text-orange-600 mb-1 px-1 text-center truncate">
               {subLabel}
             </p>
             <div className="flex-1 flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-orange-400/70 bg-gray-900 py-1.5 px-1">
               <Cell label="Sub Cost" value={subCost > 0 ? fmt(subCost) : '—'} />
-              <div className="px-1 shrink-0 self-center">
+              <div className="w-24 shrink-0 self-center flex justify-center">
                 <MarkupBox />
               </div>
               <Cell label="Gross Profit" value={fmt(subGp)} />
@@ -301,7 +301,7 @@ export default function GpmdBar({
           </div>
 
           {/* Totals group — fixed width, cells flex-equal */}
-          <div className="min-w-0 lg:w-72 lg:shrink-0 flex flex-col">
+          <div className="min-w-0 flex flex-col">
             <p className="text-[10px] font-bold uppercase tracking-wider text-green-700 mb-1 px-1 text-center truncate">
               {totalsLabel}
             </p>
@@ -350,7 +350,7 @@ export default function GpmdBar({
             <React.Fragment key={col.label}>
               {insertBoxes && !isInhouseView && <SubGpCol />}
               {insertBoxes && !isSubView && (
-                <div className="px-1 shrink-0 self-center">
+                <div className="w-24 shrink-0 self-center flex justify-center">
                   <GpmdCell />
                 </div>
               )}
