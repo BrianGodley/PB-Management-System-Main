@@ -873,6 +873,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
         materialPrices,
         laborRates,
         walkAccess,
+        subRates,
         calc: {
           totalHrs: calc.totalHrs,
           manDays: calc.manDays,

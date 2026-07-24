@@ -174,34 +174,6 @@ export default function IrrigationSummary({ module }) {
 
   return (
     <div className="space-y-1 text-sm">
-      {/* Stat bar */}
-      <div className="grid grid-cols-2 gap-2 mb-2">
-        <div className="bg-gray-50 rounded-lg p-3 text-center">
-          <p className="text-xs text-gray-500 mb-0.5">Man Days</p>
-          <p className="text-xl font-bold text-gray-900">{manDays.toFixed(2)}</p>
-          <p className="text-xs text-gray-400">{totalHrs.toFixed(1)} hrs</p>
-        </div>
-        <div className="bg-gray-50 rounded-lg p-3 text-center">
-          <p className="text-xs text-gray-500 mb-0.5">Materials</p>
-          <p className="text-xl font-bold text-gray-900">{fmt2(totalMat)}</p>
-        </div>
-      </div>
-
-      {/* Settings badges */}
-      <div className="flex gap-2 flex-wrap mb-1">
-        {n(difficulty) > 0 && (
-          <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded">
-            +{difficulty}% difficulty
-          </span>
-        )}
-        {n(hoursAdj) !== 0 && (
-          <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded">
-            {n(hoursAdj) > 0 ? '+' : ''}
-            {hoursAdj} hrs adj
-          </span>
-        )}
-      </div>
-
       {!hasLines ? (
         <p className="text-xs text-gray-400 text-center py-4">No line items entered.</p>
       ) : (

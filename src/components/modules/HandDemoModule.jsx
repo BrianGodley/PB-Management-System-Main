@@ -834,6 +834,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
         gpmd,
         materialPrices,
         laborRates,
+        subRates,
         calc: {
           totalHrs: calc.totalHrs,
           manDays: calc.manDays,

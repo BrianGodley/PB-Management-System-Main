@@ -910,6 +910,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
         materialPrices,
         laborRates,
         walkAccess,
+        subRates,
         calc: {
           totalHrs: calc.totalHrs,
           manDays: calc.manDays,

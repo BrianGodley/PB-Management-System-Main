@@ -174,45 +174,6 @@ export default function ConcreteSummary({ module }) {
 
   return (
     <div className="space-y-1 text-sm">
-      {/* Stat bar */}
-      <div className="grid grid-cols-2 gap-2 mb-2">
-        <div className="bg-gray-50 rounded-lg p-3 text-center">
-          <p className="text-xs text-gray-500 mb-0.5">Man Days</p>
-          <p className="text-xl font-bold text-gray-900">{manDays.toFixed(2)}</p>
-          <p className="text-xs text-gray-400">{totalHrs.toFixed(1)} hrs</p>
-        </div>
-        <div className="bg-gray-50 rounded-lg p-3 text-center">
-          <p className="text-xs text-gray-500 mb-0.5">Materials</p>
-          <p className="text-xl font-bold text-gray-900">{fmt2(totalMat)}</p>
-        </div>
-      </div>
-
-      {/* Badges */}
-      <div className="flex gap-2 flex-wrap mb-1">
-        {concreteCY > 0 && (
-          <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded">
-            {concreteCY.toFixed(2)} CY @ {depthIn}"
-          </span>
-        )}
-        <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{finishType}</span>
-        <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
-          {finishingType === 'IH' ? 'In-House' : 'Sub'} finish
-        </span>
-        {colorYes && (
-          <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded">
-            Color Hardener
-          </span>
-        )}
-        {pumpYes && (
-          <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded">Pump</span>
-        )}
-        {n(difficulty) > 0 && (
-          <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded">
-            +{difficulty}% difficulty
-          </span>
-        )}
-      </div>
-
       {/* Base */}
       {hasBaseRows && (
         <>
