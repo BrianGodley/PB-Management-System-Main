@@ -1221,12 +1221,14 @@ export default function EstimateDetail() {
     (acc, mod) => {
       const calc = mod.data?.calc || {}
       const gp = parseFloat(mod.gross_profit || calc.gp || 0)
+      acc.totalHrs += parseFloat(calc.totalHrs || parseFloat(mod.man_days || 0) * 8 || 0)
       acc.manDays += parseFloat(mod.man_days || 0)
       acc.materialCost += parseFloat(mod.material_cost || 0)
       acc.laborCost += parseFloat(mod.labor_cost || calc.laborCost || 0)
       acc.burden += parseFloat(mod.labor_burden || calc.burden || 0)
       acc.subCost += parseFloat(mod.sub_cost || calc.subCost || 0)
       acc.gp += gp
+      acc.subGp += parseFloat(calc.subGp || 0)
       acc.commission += parseFloat(calc.commission || gp * 0.12 || 0)
       acc.price += parseFloat(mod.total_price || calc.price || 0)
       return acc
@@ -1238,8 +1240,10 @@ export default function EstimateDetail() {
       burden: 0,
       subCost: 0,
       gp: 0,
+      subGp: 0,
       commission: 0,
       price: 0,
+      totalHrs: 0,
     }
   )
   const et = estimateTotals
@@ -1304,16 +1308,19 @@ export default function EstimateDetail() {
   const projectTotals = projModules.reduce(
     (acc, mod) => {
       const calc = mod.data?.calc || {}
+      acc.totalHrs += parseFloat(calc.totalHrs || parseFloat(mod.man_days || 0) * 8 || 0)
       acc.manDays += parseFloat(mod.man_days || 0)
       acc.materialCost += parseFloat(mod.material_cost || 0)
       acc.laborCost += parseFloat(mod.labor_cost || calc.laborCost || 0)
       acc.burden += parseFloat(mod.labor_burden || calc.burden || 0)
       acc.subCost += parseFloat(mod.sub_cost || calc.subCost || 0)
       acc.gp += parseFloat(mod.gross_profit || calc.gp || 0)
+      acc.subGp += parseFloat(calc.subGp || 0)
+      acc.commission += parseFloat(calc.commission || 0)
       acc.price += parseFloat(mod.total_price || calc.price || 0)
       return acc
     },
-    { manDays: 0, materialCost: 0, laborCost: 0, burden: 0, subCost: 0, gp: 0, price: 0 }
+    { totalHrs: 0, manDays: 0, materialCost: 0, laborCost: 0, burden: 0, subCost: 0, gp: 0, subGp: 0, commission: 0, price: 0 }
   )
   const pt = projectTotals
   const projGpmd = pt.manDays > 0 ? Math.round(pt.gp / pt.manDays) : 425
@@ -1751,15 +1758,18 @@ export default function EstimateDetail() {
         ) : (
           <GpmdBar
             totalMat={et.materialCost}
-            totalHrs={et.manDays * 8}
+            totalHrs={et.totalHrs}
             manDays={et.manDays}
             laborCost={et.laborCost}
             laborRatePerHour={
-              et.manDays > 0 && et.laborCost > 0 ? et.laborCost / (et.manDays * 8) : 35
+              et.totalHrs > 0 && et.laborCost > 0 ? et.laborCost / et.totalHrs : 35
             }
             burden={et.burden}
             subCost={et.subCost}
             directGp={adjustedEstimateGP}
+            directSubGp={et.subGp}
+            directCommission={et.commission}
+            directPrice={et.price}
             price={et.price}
             subMarkupRate={derivedEstSubRate}
             inHouseLabel="In House Estimate"
@@ -1774,11 +1784,11 @@ export default function EstimateDetail() {
         <div className="mb-4">
           <GpmdBar
             totalMat={pt.materialCost}
-            totalHrs={pt.manDays * 8}
+            totalHrs={pt.totalHrs}
             manDays={pt.manDays}
             laborCost={pt.laborCost}
             laborRatePerHour={
-              pt.manDays > 0 && pt.laborCost > 0 ? pt.laborCost / (pt.manDays * 8) : 35
+              pt.totalHrs > 0 && pt.laborCost > 0 ? pt.laborCost / pt.totalHrs : 35
             }
             burden={pt.burden}
             subCost={pt.subCost}
@@ -1788,6 +1798,9 @@ export default function EstimateDetail() {
                 ? pt.manDays * projectGpmds[selectedProject.id]
                 : pt.gp
             }
+            directSubGp={pt.subGp}
+            directCommission={projectGpmds[selectedProject.id] != null ? null : pt.commission}
+            directPrice={projectGpmds[selectedProject.id] != null ? null : pt.price}
             price={pt.price}
             onGpmdSave={val => saveProjectGpmd(selectedProject.id, val)}
             subMarkupRate={selectedProject.sub_gp_markup_rate ?? 0.2}
