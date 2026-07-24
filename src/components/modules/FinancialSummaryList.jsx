@@ -51,9 +51,14 @@ export default function FinancialSummaryList({
   const hasSub = subCost > 0 || subGp > 0
 
   return (
-    <div className="bg-gray-50 rounded-lg p-3 mt-3">
-      {/* In House */}
-      <GroupLabel color="text-blue-700">In House</GroupLabel>
+    <>
+      {/* Section header — matches the In House / Subcontractor headers above */}
+      <p className="text-xs font-bold uppercase tracking-wider mt-3 mb-1 border-t border-gray-100 pt-2 text-green-700">
+        Summary
+      </p>
+      <div className="bg-gray-50 rounded-lg p-3">
+        {/* In House */}
+        <GroupLabel color="text-blue-700">In House</GroupLabel>
       <Row label="Labor Hours" value={fnum(totalHrs)} dim="hrs" />
       <Row label="Man Days" value={fnum(manDays)} dim="MD" />
       <Row label="Materials" value={fmt(totalMat)} />
@@ -80,6 +85,7 @@ export default function FinancialSummaryList({
       <div className="border-t border-gray-200 my-1.5" />
 
       <Row label="Total Price" value={fmt(price)} green bold />
-    </div>
+      </div>
+    </>
   )
 }
