@@ -537,6 +537,33 @@ export default function EstimateDetail() {
         .order('created_at')
       if (projs) {
         setProjects(projs)
+        // After an overwrite-save the projects/modules are re-inserted with NEW
+        // ids, so re-point the current selection (match by name/order) to the
+        // fresh objects — otherwise later edits target a deleted project id and
+        // silently no-op (markup won't stick, Save stays greyed).
+        setSelectedProject(prev =>
+          !prev
+            ? prev
+            : projs.find(p => p.id === prev.id) ||
+              projs.find(
+                p => p.project_name === prev.project_name && p.sort_order === prev.sort_order
+              ) ||
+              projs.find(p => p.project_name === prev.project_name) ||
+              null
+        )
+        setSelectedModule(prevMod => {
+          if (!prevMod) return prevMod
+          const allMods = projs.flatMap(p => p.estimate_modules || [])
+          return (
+            allMods.find(m => m.id === prevMod.id) ||
+            allMods.find(
+              m =>
+                m.module_type === prevMod.module_type &&
+                (m.module_name || '') === (prevMod.module_name || '')
+            ) ||
+            null
+          )
+        })
         // An estimate with saved projects opens in view mode (Edit button);
         // an empty/new one opens editable so the first save can happen.
         const savedHasContent = projs.length > 0
@@ -1817,9 +1844,9 @@ export default function EstimateDetail() {
             onGpmdSave={val => saveProjectGpmd(selectedProject.id, val)}
             subMarkupRate={selectedProject.sub_gp_markup_rate ?? 0.2}
             onSubMarkupSave={val => saveProjectSubRate(selectedProject.id, val)}
-            inHouseLabel={`In House (${selectedProject.project_name})`}
-            subLabel={`Subcontractor (${selectedProject.project_name})`}
-            totalsLabel={`${selectedProject.project_name} Totals`}
+            inHouseLabel={`In House ${selectedProject.project_name} Project`}
+            subLabel={`Subcontractor ${selectedProject.project_name} Project`}
+            totalsLabel={`${selectedProject.project_name} Project Totals`}
           />
         </div>
       )}
