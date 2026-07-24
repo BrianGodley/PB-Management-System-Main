@@ -635,24 +635,12 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const subConcreteCY =
     n(subInstallSF) > 0 ? ((_subDepth / 12) * n(subInstallSF)) / 27 : 0
   let subSideCost = 0
-  // Base install rows
-  ;(subBaseRows || []).forEach(r => {
-    const sf = n(r.sf),
-      depth = n(r.depth) || 2
-    if (!sf) return
-    const tons = (sf / 200) * depth
-    const rate = laborRates[BASE_METHOD_LABOR_NAME[r.method]] ?? BASE_RATES[r.method] ?? 10.0
-    subSideCost += tons * costBase + (tons / rate) * lrph
-  })
-  // Concrete install — flat $/SF (finish folded in, so subFinishType ignored)
+  // Concrete install — flat $/SF (finish folded in, so subFinishType ignored).
+  // No Base Install or Form Edging on the sub side (removed by request).
   subSideCost += n(subInstallSF) * subSlabRate
   // Rebar
   if (n(subRebarSF) > 0) {
     subSideCost += n(subRebarSF) * rebarSFPrice + (n(subRebarSF) / rebarSFPerHr) * lrph
-  }
-  // Form edging
-  if (n(subFormLF) > 0) {
-    subSideCost += n(subFormLF) * formMaterialPerLF + (n(subFormLF) / formLFPerHr) * lrph
   }
   // Sleeves
   if (n(subSleeveLF) > 0) {
@@ -878,7 +866,8 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
       </div>
       )}
 
-      {/* ── Base Install ── */}
+      {/* ── Base Install — In-House only ── */}
+      {!isSub && (
       <div>
         <SectionHeader title="Base Install" />
         <p className="text-xs text-gray-400 mb-1 inline-flex items-center gap-1">
@@ -966,6 +955,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           </table>
         </div>
       </div>
+      )}
 
       {/* ── Concrete Install ── */}
       <div>
@@ -1049,6 +1039,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             </label>
             <NumInput value={activeRebarSF} onChange={setActiveRebarSF} />
           </div>
+          {!isSub && (
           <div>
             <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1">
               Form Edging (Lin Ft)
@@ -1075,6 +1066,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             </label>
             <NumInput value={activeFormLF} onChange={setActiveFormLF} />
           </div>
+          )}
           <div>
             <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1">
               3" Sleeves (Lin Ft)
