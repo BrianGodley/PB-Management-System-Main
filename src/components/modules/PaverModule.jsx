@@ -397,6 +397,35 @@ const DEFAULT_STATE = {
     { label: '', hours: '', materials: '', subCost: '' },
     { label: '', hours: '', materials: '', subCost: '' },
   ],
+
+  // ── Subcontractor tab — independent copies of every mirrored field so the
+  //    Sub tab is its own calculator that SUMS with In-House. Only the
+  //    modifiers (difficulty / distanceLF / hoursAdj) are In-House-only and
+  //    are NOT mirrored. Sub cost itself uses an install-only whole-job rate
+  //    (see calc below); the other mirrored fields are captured for scope.
+  subAreaRows: [
+    { label: 'Area 1', method: 'Skid OK', sf: '', depth: 6, paverBrand: '', paverName: '', customPricePerSF: '' },
+    { label: 'Area 2', method: 'Skid OK', sf: '', depth: 6, paverBrand: '', paverName: '', customPricePerSF: '' },
+    { label: 'Area 3', method: 'Skid OK', sf: '', depth: 6, paverBrand: '', paverName: '', customPricePerSF: '' },
+  ],
+  subStraightCutLF: '',
+  subCurvedCutLF: '',
+  subRestraintsLF: '',
+  subNumStones: '',
+  subNumColors: '',
+  subSleevesLF: '',
+  subVertSoldierLF: '',
+  subVertPaverBrand: '',
+  subVertPaverName: '',
+  subVertCustomPricePerLF: '',
+  subSealerSF: '',
+  subIs80mm: false,
+  subPolySand: false,
+  subPolySandExistingSF: '',
+  subManualRows: [
+    { label: '', hours: '', materials: '', subCost: '' },
+    { label: '', hours: '', materials: '', subCost: '' },
+  ],
 }
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
@@ -729,7 +758,34 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
 
   const gpmd = initialData?.gpmd ?? 425
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
-  const calcRaw = calcPaver(
+
+  // ── In-House vs Subcontractor tab ───────────────────────────────────────────
+  // The two tabs are independent calculators that SUM together. Each mirrored
+  // input binds to the ACTIVE key so it edits its own tab's data; the In-House
+  // engine (calcPaver) always reads the raw In-House fields, so switching tabs
+  // never mutates In-House numbers. Active-key strings resolve to the original
+  // field names on the In-House tab (behaviour unchanged) and to the sub*
+  // counterparts on the Subcontractor tab.
+  const isSub = state.subType === 'Subcontractor'
+  const kArea = isSub ? 'subAreaRows' : 'areaRows'
+  const kIs80mm = isSub ? 'subIs80mm' : 'is80mm'
+  const kStraight = isSub ? 'subStraightCutLF' : 'straightCutLF'
+  const kCurved = isSub ? 'subCurvedCutLF' : 'curvedCutLF'
+  const kRestraints = isSub ? 'subRestraintsLF' : 'restraintsLF'
+  const kSleeves = isSub ? 'subSleevesLF' : 'sleevesLF'
+  const kVertSoldier = isSub ? 'subVertSoldierLF' : 'vertSoldierLF'
+  const kVertBrand = isSub ? 'subVertPaverBrand' : 'vertPaverBrand'
+  const kVertName = isSub ? 'subVertPaverName' : 'vertPaverName'
+  const kVertCustom = isSub ? 'subVertCustomPricePerLF' : 'vertCustomPricePerLF'
+  const kSealer = isSub ? 'subSealerSF' : 'sealerSF'
+  const kPolySand = isSub ? 'subPolySand' : 'polySand'
+  const kPolyExisting = isSub ? 'subPolySandExistingSF' : 'polySandExistingSF'
+  const kStones = isSub ? 'subNumStones' : 'numStones'
+  const kColors = isSub ? 'subNumColors' : 'numColors'
+  const kManual = isSub ? 'subManualRows' : 'manualRows'
+
+  // In-House engine — always reads the raw In-House fields (state.areaRows …).
+  const inHouse = calcPaver(
     state,
     laborRatePerHour,
     laborRates,
@@ -739,6 +795,43 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
     walkAccess,
     laborBurdenPct
   )
+
+  // ── Sub side — install-only whole-job rate ──────────────────────────────────
+  // Sub pricing is a single $/SF applied to the sub paver areas plus any sub
+  // manual-row sub costs. The other mirrored sub fields (cuts, restraints,
+  // sleeves, soldier, sealer, poly sand, stones, colors, 80mm) are captured on
+  // the Sub tab for SCOPE only and do NOT add to the sub cost.
+  const subRatePerSF = materialRates['Paver Sub - Per SF'] ?? 20
+  const subInstallSF = (state.subAreaRows || []).reduce((s, r) => s + n(r.sf), 0)
+  const subSideCost =
+    subInstallSF * subRatePerSF +
+    (state.subManualRows || []).reduce((s, r) => s + n(r.subCost), 0)
+
+  // ── Combine In-House + Sub, apply the Sub GP markup ─────────────────────────
+  const _subCost = inHouse.subCost + subSideCost
+  const _subGp = _subCost * subGpMarkupRate
+  const _gp = inHouse.gp
+  const _commission = (_gp + _subGp) * 0.12
+  const _price =
+    inHouse.laborCost +
+    inHouse.burden +
+    inHouse.totalMat +
+    _gp +
+    _subCost +
+    _subGp +
+    _commission
+  const calcRaw = {
+    ...inHouse,
+    subCost: _subCost,
+    subGp: _subGp,
+    gp: _gp,
+    commission: _commission,
+    price: _price,
+    subInstallSF,
+    subSideCost,
+    subRatePerSF,
+  }
+
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
@@ -789,6 +882,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           totalMat: calc.totalMat,
           subCost: calc.subCost,
           gp: calc.gp,
+          subGp: calc.subGp,
           commission: calc.commission,
           price: calc.price,
         },
@@ -801,7 +895,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       {/* ── Sticky GPMD bar ── */}
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
         <GpmdBar
-          variant={subType === 'Subcontractor' ? 'sub' : 'inhouse'}
+          variant={isSub ? 'sub' : 'inhouse'}
           sticky
           totalMat={calc.totalMat}
           totalHrs={calc.totalHrs}
@@ -850,46 +944,54 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       {/* ── Settings ─────────────────────────────────────────────────────────── */}
       <SecHdr title="Job Site Conditions" />
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
-          <Inp
-            value={state.difficulty}
-            onChange={e => set('difficulty', e.target.value)}
-            step="5"
-          />
-          <p className="text-xs text-gray-400 mt-0.5">Adds % to install hrs</p>
-        </div>
-        <div>
-          <p
-            className="text-xs text-gray-500 mb-0.5"
-            title="Average Distance from Truck to Work Area"
-          >
-            Truck → Work Area (Avg LF)
-          </p>
-          <Inp
-            value={state.distanceLF}
-            onChange={e => set('distanceLF', e.target.value)}
-            step="5"
-          />
-          {calc.walkHrs > 0 && (
-            <p className="text-[10px] text-gray-500 mt-0.5">
-              +{calc.walkHrs.toFixed(2)} hrs walk-access
+        {/* Difficulty / walk-access / hours-adj are In-House modifiers only —
+            hidden on the Subcontractor tab (sub pricing is a whole-job rate). */}
+        {!isSub && (
+          <div>
+            <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
+            <Inp
+              value={state.difficulty}
+              onChange={e => set('difficulty', e.target.value)}
+              step="5"
+            />
+            <p className="text-xs text-gray-400 mt-0.5">Adds % to install hrs</p>
+          </div>
+        )}
+        {!isSub && (
+          <div>
+            <p
+              className="text-xs text-gray-500 mb-0.5"
+              title="Average Distance from Truck to Work Area"
+            >
+              Truck → Work Area (Avg LF)
             </p>
-          )}
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
-          <Inp value={state.hoursAdj} onChange={e => set('hoursAdj', e.target.value)} step="0.5" />
-        </div>
+            <Inp
+              value={state.distanceLF}
+              onChange={e => set('distanceLF', e.target.value)}
+              step="5"
+            />
+            {calc.walkHrs > 0 && (
+              <p className="text-[10px] text-gray-500 mt-0.5">
+                +{calc.walkHrs.toFixed(2)} hrs walk-access
+              </p>
+            )}
+          </div>
+        )}
+        {!isSub && (
+          <div>
+            <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
+            <Inp value={state.hoursAdj} onChange={e => set('hoursAdj', e.target.value)} step="0.5" />
+          </div>
+        )}
         <div className="flex flex-col gap-2 justify-center pt-4">
           <Toggle
-            checked={state.is80mm}
-            onChange={v => set('is80mm', v)}
+            checked={state[kIs80mm]}
+            onChange={v => set(kIs80mm, v)}
             label="80mm Pavers (+15%)"
           />
           <Toggle
-            checked={state.polySand}
-            onChange={v => set('polySand', v)}
+            checked={state[kPolySand]}
+            onChange={v => set(kPolySand, v)}
             label="Poly Sand — New Pavers"
           />
         </div>
@@ -900,8 +1002,8 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             Poly Sand — Existing Pavers (SF)
           </p>
           <Inp
-            value={state.polySandExistingSF}
-            onChange={e => set('polySandExistingSF', e.target.value)}
+            value={state[kPolyExisting]}
+            onChange={e => set(kPolyExisting, e.target.value)}
             placeholder="0"
           />
           {calc.polySandExistingSF > 0 && (
@@ -917,9 +1019,31 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           <span>Paver Choices</span>
-          {calc.totalInstallSF > 0 && (
-            <span className="font-normal normal-case text-gray-400">
-              {calc.totalInstallSF.toLocaleString()} SF total
+          {isSub ? (
+            calc.subInstallSF > 0 && (
+              <span className="font-normal normal-case text-gray-400">
+                {calc.subInstallSF.toLocaleString()} SF total
+              </span>
+            )
+          ) : (
+            calc.totalInstallSF > 0 && (
+              <span className="font-normal normal-case text-gray-400">
+                {calc.totalInstallSF.toLocaleString()} SF total
+              </span>
+            )
+          )}
+          {isSub && (
+            <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
+              · Sub ${calc.subRatePerSF}/SF install
+              <RateEditPopover
+                table="material_rates"
+                name="Paver Sub - Per SF"
+                category="Paver"
+                unitLabel="SF"
+                currentValue={calc.subRatePerSF}
+                onSaved={refreshAllRates}
+              />
+              {calc.subSideCost > 0 && <>· {fmt2(calc.subSideCost)} sub cost</>}
             </span>
           )}
           <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
@@ -955,7 +1079,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             ]}
           />
           <tbody className="divide-y divide-gray-50">
-            {state.areaRows.map((row, i) => {
+            {state[kArea].map((row, i) => {
               const a = calc.areas[i] || {}
               return (
                 <tr key={i}>
@@ -963,14 +1087,14 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                     <Inp
                       type="text"
                       value={row.label}
-                      onChange={e => setRow('areaRows', i, 'label', e.target.value)}
+                      onChange={e => setRow(kArea, i, 'label', e.target.value)}
                       placeholder={`Area ${i + 1}`}
                     />
                   </td>
                   <td className={td}>
                     <Inp
                       value={row.sf}
-                      onChange={e => setRow('areaRows', i, 'sf', e.target.value)}
+                      onChange={e => setRow(kArea, i, 'sf', e.target.value)}
                       placeholder="Paver SF"
                     />
                   </td>
@@ -979,13 +1103,13 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                       brand={row.paverBrand}
                       name={row.paverName}
                       onSelect={(b, nm) => {
-                        setRow('areaRows', i, 'paverBrand', b)
-                        setRow('areaRows', i, 'paverName', nm)
+                        setRow(kArea, i, 'paverBrand', b)
+                        setRow(kArea, i, 'paverName', nm)
                       }}
                       paverPrices={paverPrices}
                       customPrice={row.customPricePerSF || ''}
                       onCustomPriceChange={v =>
-                        setRow('areaRows', i, 'customPricePerSF', v)
+                        setRow(kArea, i, 'customPricePerSF', v)
                       }
                     />
                   </td>
@@ -1041,7 +1165,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             ]}
           />
           <tbody className="divide-y divide-gray-50">
-            {state.areaRows.map((row, i) => {
+            {state[kArea].map((row, i) => {
               const a = calc.areas[i] || {}
               const baseRate =
                 row.method === 'Skid Good'
@@ -1057,7 +1181,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                   <td className={td}>
                     <Inp
                       value={row.baseSf ?? ''}
-                      onChange={e => setRow('areaRows', i, 'baseSf', e.target.value)}
+                      onChange={e => setRow(kArea, i, 'baseSf', e.target.value)}
                       placeholder={row.sf ? `Base SF (def ${row.sf})` : 'Base SF'}
                     />
                   </td>
@@ -1066,7 +1190,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                       <div className="flex-1 min-w-0">
                         <Sel
                           value={row.method}
-                          onChange={e => setRow('areaRows', i, 'method', e.target.value)}
+                          onChange={e => setRow(kArea, i, 'method', e.target.value)}
                           options={BASE_METHODS}
                         />
                       </div>
@@ -1084,7 +1208,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                   <td className={td}>
                     <Inp
                       value={row.depth}
-                      onChange={e => setRow('areaRows', i, 'depth', e.target.value)}
+                      onChange={e => setRow(kArea, i, 'depth', e.target.value)}
                       placeholder="6"
                     />
                   </td>
@@ -1138,7 +1262,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
               <td className={num}>{fh(calc.installHrs)}</td>
               <td className="py-1 text-xs text-gray-400">auto from areas</td>
             </tr>
-            {state.is80mm && (
+            {state[kIs80mm] && (
               <tr>
                 <td className={`${td} font-medium text-gray-700`}>
                   <span className="inline-flex items-center gap-1">
@@ -1165,7 +1289,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
               {
                 label: 'Straight Cut',
                 rate: calc.straightCutRate,
-                key: 'straightCutLF',
+                key: kStraight,
                 hrs: calc.straightCutHrs,
                 unit: 'LF',
                 rateName: 'Paver - Straight Cut',
@@ -1173,7 +1297,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
               {
                 label: 'Curved Cut',
                 rate: calc.curvedCutRate,
-                key: 'curvedCutLF',
+                key: kCurved,
                 hrs: calc.curvedCutHrs,
                 unit: 'LF',
                 rateName: 'Paver - Curved Cut',
@@ -1181,7 +1305,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
               {
                 label: 'Restraints',
                 rate: calc.restraintRate,
-                key: 'restraintsLF',
+                key: kRestraints,
                 hrs: calc.restraintsHrs,
                 unit: 'LF',
                 rateName: 'Paver - Restraints',
@@ -1192,7 +1316,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
               {
                 label: 'Sleeves',
                 rate: calc.sleevesRate,
-                key: 'sleevesLF',
+                key: kSleeves,
                 hrs: calc.sleevesHrs,
                 unit: 'LF',
                 rateName: 'Paver - Sleeves',
@@ -1265,8 +1389,8 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
               </td>
               <td className={td}>
                 <Inp
-                  value={state.numStones}
-                  onChange={e => set('numStones', e.target.value)}
+                  value={state[kStones]}
+                  onChange={e => set(kStones, e.target.value)}
                   placeholder="0"
                 />
               </td>
@@ -1293,15 +1417,15 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
               </td>
               <td className={td}>
                 <Inp
-                  value={state.numColors}
-                  onChange={e => set('numColors', e.target.value)}
+                  value={state[kColors]}
+                  onChange={e => set(kColors, e.target.value)}
                   placeholder="0"
                 />
               </td>
               <td className={num}>{fh(calc.addColorHrs)}</td>
               <td />
             </tr>
-            {state.polySand && (
+            {state[kPolySand] && (
               <tr>
                 <td className={`${td} font-medium text-gray-700`}>
                   <span className="inline-flex items-center gap-1 flex-wrap">
@@ -1397,8 +1521,8 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
               </td>
               <td className={td}>
                 <Inp
-                  value={state.sealerSF}
-                  onChange={e => set('sealerSF', e.target.value)}
+                  value={state[kSealer]}
+                  onChange={e => set(kSealer, e.target.value)}
                   placeholder="0 SF"
                 />
               </td>
@@ -1429,7 +1553,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Vertical Soldier LF</p>
-          <Inp value={state.vertSoldierLF} onChange={e => set('vertSoldierLF', e.target.value)} />
+          <Inp value={state[kVertSoldier]} onChange={e => set(kVertSoldier, e.target.value)} />
           {calc.vertSoldierHrs > 0 && (
             <p className="text-xs text-gray-400 mt-0.5">{calc.vertSoldierHrs.toFixed(2)} hrs</p>
           )}
@@ -1437,20 +1561,20 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         <div className="sm:col-span-2">
           <p className="text-xs text-gray-500 mb-0.5">Paver (priced per LF)</p>
           <PaverPicker
-            brand={state.vertPaverBrand}
-            name={state.vertPaverName}
+            brand={state[kVertBrand]}
+            name={state[kVertName]}
             onSelect={(b, nm) => {
-              set('vertPaverBrand', b)
-              set('vertPaverName', nm)
+              set(kVertBrand, b)
+              set(kVertName, nm)
             }}
             paverPrices={paverPrices.filter(p => p.price_per_lf_vert > 0)}
             showLF
-            customPrice={state.vertCustomPricePerLF || ''}
-            onCustomPriceChange={v => set('vertCustomPricePerLF', v)}
+            customPrice={state[kVertCustom] || ''}
+            onCustomPriceChange={v => set(kVertCustom, v)}
           />
           {calc.vertPaverCost > 0 && (
             <p className="text-xs text-gray-400 mt-0.5">
-              {n(state.vertSoldierLF).toLocaleString()} LF × {fmt2(calc.vertPricePerLF)}/LF ={' '}
+              {n(state[kVertSoldier]).toLocaleString()} LF × {fmt2(calc.vertPricePerLF)}/LF ={' '}
               {fmt2(calc.vertPaverCost)}
             </p>
           )}
@@ -1618,34 +1742,34 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             ]}
           />
           <tbody className="divide-y divide-gray-50">
-            {state.manualRows.map((r, i) => (
+            {state[kManual].map((r, i) => (
               <tr key={i}>
                 <td className={td}>
                   <Inp
                     type="text"
                     value={r.label}
-                    onChange={e => setRow('manualRows', i, 'label', e.target.value)}
+                    onChange={e => setRow(kManual, i, 'label', e.target.value)}
                     placeholder="Description"
                   />
                 </td>
                 <td className={td}>
                   <Inp
                     value={r.hours}
-                    onChange={e => setRow('manualRows', i, 'hours', e.target.value)}
+                    onChange={e => setRow(kManual, i, 'hours', e.target.value)}
                     step="0.5"
                   />
                 </td>
                 <td className={td}>
                   <Inp
                     value={r.materials}
-                    onChange={e => setRow('manualRows', i, 'materials', e.target.value)}
+                    onChange={e => setRow(kManual, i, 'materials', e.target.value)}
                     step="1"
                   />
                 </td>
                 <td className={td}>
                   <Inp
                     value={r.subCost}
-                    onChange={e => setRow('manualRows', i, 'subCost', e.target.value)}
+                    onChange={e => setRow(kManual, i, 'subCost', e.target.value)}
                     step="1"
                   />
                 </td>
@@ -1655,7 +1779,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         </table>
         <button
           type="button"
-          onClick={() => set('manualRows', [...state.manualRows, { label: '', hours: '', materials: '', subCost: '' }])}
+          onClick={() => set(kManual, [...state[kManual], { label: '', hours: '', materials: '', subCost: '' }])}
           className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
         >
           + Add manual entry
