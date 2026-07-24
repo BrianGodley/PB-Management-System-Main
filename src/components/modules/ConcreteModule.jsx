@@ -493,6 +493,27 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const [baseRows, setBaseRows] = useState(initialData?.baseRows ?? DEFAULT_BASE_ROWS)
   const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
 
+  // ── Independent Subcontractor-tab state ──────────────────────────────────
+  // The Sub tab is its own calculator (mirrors the demo / Utilities modules).
+  // Each field defaults to the same blank value as its in-house counterpart.
+  // The site-conditions modifiers (difficulty/layout/distance/backyard/
+  // forming complexity/hours adj) are In-House only and are NOT mirrored.
+  const [subInstallSF, setSubInstallSF] = useState(initialData?.subInstallSF ?? '')
+  const [subDepthIn, setSubDepthIn] = useState(initialData?.subDepthIn ?? '4')
+  const [subRebarSF, setSubRebarSF] = useState(initialData?.subRebarSF ?? '')
+  const [subFormLF, setSubFormLF] = useState(initialData?.subFormLF ?? '')
+  const [subSleeveLF, setSubSleeveLF] = useState(initialData?.subSleeveLF ?? '')
+  const [subFinishType, setSubFinishType] = useState(initialData?.subFinishType ?? 'Broom Finish')
+  const [subColorYes, setSubColorYes] = useState(initialData?.subColorYes ?? false)
+  const [subPumpYes, setSubPumpYes] = useState(initialData?.subPumpYes ?? false)
+  const [subVaporBarrierSF, setSubVaporBarrierSF] = useState(initialData?.subVaporBarrierSF ?? '')
+  const [subSealerSF, setSubSealerSF] = useState(initialData?.subSealerSF ?? '')
+  const [subSealerType, setSubSealerType] = useState(initialData?.subSealerType ?? 'Natural')
+  const [subBaseRows, setSubBaseRows] = useState(initialData?.subBaseRows ?? DEFAULT_BASE_ROWS)
+  const [subManualRows, setSubManualRows] = useState(
+    initialData?.subManualRows ?? DEFAULT_MANUAL_ROWS
+  )
+
   // ── Sales tax — applied to totalMat across every module so the bid
   //    reflects supplier-invoiced material cost. Sourced from
   //    company_settings.sales_tax_rate via fetchSalesTaxRate(). Default
@@ -535,7 +556,45 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   }
   const gpmd = initialData?.gpmd ?? R.gpmd
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
-  const calcRaw = calcConcrete(
+
+  // Active-tab wiring: the mirrored field sections edit whichever set matches
+  // the current tab, so In-House and Subcontractor are fully independent
+  // calculators. Modifiers (difficulty/layout/etc.) are In-House only.
+  const isSub = subType === 'Subcontractor'
+  const activeInstallSF = isSub ? subInstallSF : installSF
+  const setActiveInstallSF = isSub ? setSubInstallSF : setInstallSF
+  const activeDepthIn = isSub ? subDepthIn : depthIn
+  const setActiveDepthIn = isSub ? setSubDepthIn : setDepthIn
+  const activeRebarSF = isSub ? subRebarSF : rebarSF
+  const setActiveRebarSF = isSub ? setSubRebarSF : setRebarSF
+  const activeFormLF = isSub ? subFormLF : formLF
+  const setActiveFormLF = isSub ? setSubFormLF : setFormLF
+  const activeSleeveLF = isSub ? subSleeveLF : sleeveLF
+  const setActiveSleeveLF = isSub ? setSubSleeveLF : setSleeveLF
+  const activeFinishType = isSub ? subFinishType : finishType
+  const setActiveFinishType = isSub ? setSubFinishType : setFinishType
+  const activeColorYes = isSub ? subColorYes : colorYes
+  const setActiveColorYes = isSub ? setSubColorYes : setColorYes
+  const activePumpYes = isSub ? subPumpYes : pumpYes
+  const setActivePumpYes = isSub ? setSubPumpYes : setPumpYes
+  const activeVaporBarrierSF = isSub ? subVaporBarrierSF : vaporBarrierSF
+  const setActiveVaporBarrierSF = isSub ? setSubVaporBarrierSF : setVaporBarrierSF
+  const activeSealerSF = isSub ? subSealerSF : sealerSF
+  const setActiveSealerSF = isSub ? setSubSealerSF : setSealerSF
+  const activeSealerType = isSub ? subSealerType : sealerType
+  const setActiveSealerType = isSub ? setSubSealerType : setSealerType
+  const activeBaseRows = isSub ? subBaseRows : baseRows
+  const setActiveBaseRows = isSub ? setSubBaseRows : setBaseRows
+  const activeManualRows = isSub ? subManualRows : manualRows
+  const setActiveManualRows = isSub ? setSubManualRows : setManualRows
+
+  // Concrete volume for the ACTIVE tab (drives color/pump display + sub calc).
+  const _activeDepth = n(activeDepthIn) || 4
+  const activeConcreteCY =
+    n(activeInstallSF) > 0 ? ((_activeDepth / 12) * n(activeInstallSF)) / 27 : 0
+
+  // In-house calc is unchanged — it reads only the in-house state fields.
+  const inHouse = calcConcrete(
     state,
     laborRatePerHour,
     laborRates,
@@ -545,6 +604,103 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     walkAccess,
     laborBurdenPct
   )
+
+  // ── Sub-side cost — a single fully-loaded subcontractor cost figure.
+  // Concrete install is a flat $/SF (covers finish); the add-ons reuse the
+  // exact same per-unit rate lookups as the in-house calc but book
+  // (material$ + labor-hours × labor rate) as a sub COST. Nothing here adds
+  // to the module's in-house manDays / totalHrs / totalMat / laborCost.
+  const subSlabRate = subRates['Concrete Sub - Per SF'] ?? 12
+  const lrph = n(laborRatePerHour) || 35
+  // Resolved add-on rates (identical on both tabs — sourced from rate maps).
+  const {
+    rebarSFPerHr,
+    rebarSFPrice,
+    formLFPerHr,
+    formMaterialPerLF,
+    sleeveLFPerHr,
+    sleevePer10LF,
+    colorCostPerCY,
+    pumpFeeFlat,
+    pumpFeePerCY,
+    vaporBarrierSFPerHr,
+    vaporBarrierPerSF,
+    sealerNaturalSFPerHr,
+    sealerWetSFPerHr,
+    sealerNatural5g,
+    sealerWet5g,
+    costBase,
+  } = inHouse
+  const _subDepth = n(subDepthIn) || 4
+  const subConcreteCY =
+    n(subInstallSF) > 0 ? ((_subDepth / 12) * n(subInstallSF)) / 27 : 0
+  let subSideCost = 0
+  // Base install rows
+  ;(subBaseRows || []).forEach(r => {
+    const sf = n(r.sf),
+      depth = n(r.depth) || 2
+    if (!sf) return
+    const tons = (sf / 200) * depth
+    const rate = laborRates[BASE_METHOD_LABOR_NAME[r.method]] ?? BASE_RATES[r.method] ?? 10.0
+    subSideCost += tons * costBase + (tons / rate) * lrph
+  })
+  // Concrete install — flat $/SF (finish folded in, so subFinishType ignored)
+  subSideCost += n(subInstallSF) * subSlabRate
+  // Rebar
+  if (n(subRebarSF) > 0) {
+    subSideCost += n(subRebarSF) * rebarSFPrice + (n(subRebarSF) / rebarSFPerHr) * lrph
+  }
+  // Form edging
+  if (n(subFormLF) > 0) {
+    subSideCost += n(subFormLF) * formMaterialPerLF + (n(subFormLF) / formLFPerHr) * lrph
+  }
+  // Sleeves
+  if (n(subSleeveLF) > 0) {
+    const units = Math.ceil(n(subSleeveLF) / 10)
+    subSideCost += units * sleevePer10LF + (n(subSleeveLF) / sleeveLFPerHr) * lrph
+  }
+  // Color hardener
+  if (subColorYes && subConcreteCY > 0) {
+    subSideCost += Math.ceil(subConcreteCY) * colorCostPerCY
+  }
+  // Pump
+  if (subPumpYes && subConcreteCY > 0) {
+    subSideCost += pumpFeeFlat + pumpFeePerCY * Math.ceil(subConcreteCY)
+  }
+  // Vapor barrier
+  if (n(subVaporBarrierSF) > 0) {
+    subSideCost +=
+      n(subVaporBarrierSF) * vaporBarrierPerSF + (n(subVaporBarrierSF) / vaporBarrierSFPerHr) * lrph
+  }
+  // Sealer
+  if (n(subSealerSF) > 0) {
+    const gals = Math.ceil(n(subSealerSF) / R.sealerSFPerGal)
+    const price5g = subSealerType === 'Natural' ? sealerNatural5g : sealerWet5g
+    const sealSFPerHr = subSealerType === 'Natural' ? sealerNaturalSFPerHr : sealerWetSFPerHr
+    subSideCost += gals * (price5g / 5) + (n(subSealerSF) / sealSFPerHr) * lrph
+  }
+  // Sub manual rows
+  ;(subManualRows || []).forEach(r => {
+    subSideCost += n(r.subCost)
+  })
+
+  // ── Combine: in-house calc + sub-side cost. GP stays in-house; sub cost
+  // earns its own markup (subGp); commission applies to both GP pools.
+  const _subCost = inHouse.subCost + subSideCost
+  const _subGp = _subCost * subGpMarkupRate
+  const _gp = inHouse.gp
+  const _commission = (_gp + _subGp) * R.commissionRate
+  const _price =
+    inHouse.totalMat + inHouse.laborCost + inHouse.burden + _gp + _subCost + _subGp + _commission
+  const calcRaw = {
+    ...inHouse,
+    subCost: _subCost,
+    subGp: _subGp,
+    gp: _gp,
+    commission: _commission,
+    price: _price,
+  }
+
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
@@ -561,10 +717,10 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
       : calcRaw
 
   function updateBaseRow(i, field, val) {
-    setBaseRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+    setActiveBaseRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
   function updateManual(i, field, val) {
-    setManualRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+    setActiveManualRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
 
   function handleSave() {
@@ -574,6 +730,21 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
       data: {
         ...state,
+        // Independent Subcontractor-tab fields
+        subType,
+        subInstallSF,
+        subDepthIn,
+        subRebarSF,
+        subFormLF,
+        subSleeveLF,
+        subFinishType,
+        subColorYes,
+        subPumpYes,
+        subVaporBarrierSF,
+        subSealerSF,
+        subSealerType,
+        subBaseRows,
+        subManualRows,
         walkAccess,
         laborRatePerHour,
         gpmd,
@@ -595,7 +766,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
         {/* GPMD summary bar */}
         <GpmdBar
-          variant={subType === 'Subcontractor' ? 'sub' : 'inhouse'}
+          variant={isSub ? 'sub' : 'inhouse'}
           sticky
           totalMat={calc.totalMat}
           totalHrs={calc.totalHrs}
@@ -636,7 +807,8 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
         </select>
       </div>
 
-      {/* ── Global Settings ── */}
+      {/* ── Global Settings — In-House tab only (Sub tab has no modifiers) ── */}
+      {!isSub && (
       <div>
         <SectionHeader title="Job Site Conditions" />
         <div className="grid grid-cols-2 gap-3">
@@ -703,22 +875,8 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             />
           </div>
         </div>
-        <div className="mt-2 flex items-center gap-4">
-          <span className="text-xs text-gray-500">Concrete Finishing</span>
-          {['IH', 'Sub'].map(opt => (
-            <label key={opt} className="flex items-center gap-1.5 text-sm cursor-pointer">
-              <input
-                type="radio"
-                value={opt}
-                checked={finishingType === opt}
-                onChange={() => setFinishingType(opt)}
-                className="accent-green-600"
-              />
-              {opt === 'IH' ? 'In-House' : 'Sub'}
-            </label>
-          ))}
-        </div>
       </div>
+      )}
 
       {/* ── Base Install ── */}
       <div>
@@ -746,9 +904,16 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               </tr>
             </thead>
             <tbody>
-              {baseRows.map((row, i) => {
-                const c = calc.baseCalc[i] || {}
-                const methodRate = c.rate ?? BASE_RATES[row.method]
+              {activeBaseRows.map((row, i) => {
+                const _sf = n(row.sf),
+                  _depth = n(row.depth) || 2
+                const _tons = _sf > 0 ? (_sf / 200) * _depth : 0
+                const methodRate =
+                  laborRates[BASE_METHOD_LABOR_NAME[row.method]] ?? BASE_RATES[row.method] ?? 10.0
+                const c = {
+                  hrs: _tons > 0 ? _tons / methodRate : 0,
+                  mat: _tons * (calc.costBase ?? R.costBase),
+                }
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
@@ -807,40 +972,56 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
         <SectionHeader title="Concrete Install" />
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1">
+            <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap">
               Installation (Sq Ft)
-              <span className="text-gray-400">
-                — {calc.concreteSFPerHr} SF/hr · ${calc.concretePerCY}/CY
-              </span>
-              <RateEditPopover
-                table="labor_rates"
-                name="Concrete - Pour & Finish"
-                category="Concrete"
-                mode="coefficient"
-                unitLabel="SF/hr"
-                currentValue={calc.concreteSFPerHr}
-                onSaved={refreshAllRates}
-              />
-              <RateEditPopover
-                table="material_rates"
-                name="Concrete - Per CY"
-                category="Concrete"
-                unitLabel="CY"
-                currentValue={calc.concretePerCY}
-                onSaved={refreshAllRates}
-              />
+              {isSub ? (
+                <span className="text-gray-400 inline-flex items-center gap-1">
+                  — ${subSlabRate}/SF all-in
+                  <RateEditPopover
+                    table="subcontractor_rates"
+                    name="Concrete Sub - Per SF"
+                    category="Concrete"
+                    unitLabel="/SF"
+                    currentValue={subSlabRate}
+                    onSaved={refreshAllRates}
+                  />
+                </span>
+              ) : (
+                <>
+                  <span className="text-gray-400">
+                    — {calc.concreteSFPerHr} SF/hr · ${calc.concretePerCY}/CY
+                  </span>
+                  <RateEditPopover
+                    table="labor_rates"
+                    name="Concrete - Pour & Finish"
+                    category="Concrete"
+                    mode="coefficient"
+                    unitLabel="SF/hr"
+                    currentValue={calc.concreteSFPerHr}
+                    onSaved={refreshAllRates}
+                  />
+                  <RateEditPopover
+                    table="material_rates"
+                    name="Concrete - Per CY"
+                    category="Concrete"
+                    unitLabel="CY"
+                    currentValue={calc.concretePerCY}
+                    onSaved={refreshAllRates}
+                  />
+                </>
+              )}
             </label>
             <NumInput
-              value={installSF}
+              value={activeInstallSF}
               onChange={v => {
-                setInstallSF(v)
-                if (!rebarSF) setRebarSF(v)
+                setActiveInstallSF(v)
+                if (!activeRebarSF) setActiveRebarSF(v)
               }}
             />
           </div>
           <div>
             <label className="text-xs text-gray-500 block mb-1">Depth (inches)</label>
-            <NumInput value={depthIn} onChange={setDepthIn} placeholder="4" />
+            <NumInput value={activeDepthIn} onChange={setActiveDepthIn} placeholder="4" />
           </div>
           <div>
             <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1">
@@ -866,7 +1047,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 onSaved={refreshAllRates}
               />
             </label>
-            <NumInput value={rebarSF} onChange={setRebarSF} />
+            <NumInput value={activeRebarSF} onChange={setActiveRebarSF} />
           </div>
           <div>
             <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1">
@@ -892,7 +1073,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 onSaved={refreshAllRates}
               />
             </label>
-            <NumInput value={formLF} onChange={setFormLF} />
+            <NumInput value={activeFormLF} onChange={setActiveFormLF} />
           </div>
           <div>
             <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1">
@@ -918,13 +1099,15 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 onSaved={refreshAllRates}
               />
             </label>
-            <NumInput value={sleeveLF} onChange={setSleeveLF} />
+            <NumInput value={activeSleeveLF} onChange={setActiveSleeveLF} />
           </div>
-          {calc.concreteCY > 0 && (
+          {activeConcreteCY > 0 && (
             <div className="flex items-end pb-1.5">
               <p className="text-xs text-gray-400">
                 ≈{' '}
-                <span className="font-semibold text-gray-600">{calc.concreteCY.toFixed(2)} CY</span>{' '}
+                <span className="font-semibold text-gray-600">
+                  {activeConcreteCY.toFixed(2)} CY
+                </span>{' '}
                 concrete
               </p>
             </div>
@@ -939,7 +1122,10 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           <div>
             <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap">
               Finish Type
-              {finishType === 'Sand Finish' && (
+              {isSub && (
+                <span className="text-gray-400">— folded into $/SF</span>
+              )}
+              {!isSub && activeFinishType === 'Sand Finish' && (
                 <span className="text-gray-400 inline-flex items-center gap-1">
                   — sand sub ${calc.sandFinishPer400SF}/400SF
                   <RateEditPopover
@@ -952,7 +1138,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                   />
                 </span>
               )}
-              {finishType === 'Stamped' && (
+              {!isSub && activeFinishType === 'Stamped' && (
                 <span className="text-gray-400 inline-flex items-center gap-1 flex-wrap">
                   — stamp sub ${calc.stampSubFlat} flat
                   <RateEditPopover
@@ -977,8 +1163,8 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             </label>
             <select
               className="input text-sm py-1.5"
-              value={finishType}
-              onChange={e => setFinishType(e.target.value)}
+              value={activeFinishType}
+              onChange={e => setActiveFinishType(e.target.value)}
             >
               {FINISH_TYPES.map(t => (
                 <option key={t}>{t}</option>
@@ -989,8 +1175,8 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             <label className="flex items-center gap-1.5 text-sm cursor-pointer">
               <input
                 type="checkbox"
-                checked={colorYes}
-                onChange={e => setColorYes(e.target.checked)}
+                checked={activeColorYes}
+                onChange={e => setActiveColorYes(e.target.checked)}
                 className="accent-green-600"
               />
               <span className="text-gray-700">Color Hardener (${calc.colorCostPerCY}/CY)</span>
@@ -1006,8 +1192,8 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             <label className="flex items-center gap-1.5 text-sm cursor-pointer">
               <input
                 type="checkbox"
-                checked={pumpYes}
-                onChange={e => setPumpYes(e.target.checked)}
+                checked={activePumpYes}
+                onChange={e => setActivePumpYes(e.target.checked)}
                 className="accent-green-600"
               />
               <span className="text-gray-700">
@@ -1055,12 +1241,12 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 onSaved={refreshAllRates}
               />
             </label>
-            <NumInput value={vaporBarrierSF} onChange={setVaporBarrierSF} />
+            <NumInput value={activeVaporBarrierSF} onChange={setActiveVaporBarrierSF} />
           </div>
           <div>
             <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap">
               Sealer (Sq Ft)
-              {sealerType === 'Natural' ? (
+              {activeSealerType === 'Natural' ? (
                 <span className="text-gray-400 inline-flex items-center gap-1">
                   — {calc.sealerNaturalSFPerHr} SF/hr · ${calc.sealerNatural5g}/5gal
                   <RateEditPopover
@@ -1105,11 +1291,11 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               )}
             </label>
             <div className="flex gap-2">
-              <NumInput value={sealerSF} onChange={setSealerSF} className="flex-1" />
+              <NumInput value={activeSealerSF} onChange={setActiveSealerSF} className="flex-1" />
               <select
                 className="input text-sm py-1.5 w-28"
-                value={sealerType}
-                onChange={e => setSealerType(e.target.value)}
+                value={activeSealerType}
+                onChange={e => setActiveSealerType(e.target.value)}
               >
                 {SEALER_TYPES.map(t => (
                   <option key={t}>{t}</option>
@@ -1134,7 +1320,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               </tr>
             </thead>
             <tbody>
-              {manualRows.map((row, i) => (
+              {activeManualRows.map((row, i) => (
                 <tr key={i} className="border-b border-gray-100">
                   <td className="py-1 pr-2">
                     <input
@@ -1162,7 +1348,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           </table>
           <button
             type="button"
-            onClick={() => setManualRows(rows => [...rows, { label: '', hours: '', materials: '', subCost: '' }])}
+            onClick={() => setActiveManualRows(rows => [...rows, { label: '', hours: '', materials: '', subCost: '' }])}
             className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
           >
             + Add manual entry
