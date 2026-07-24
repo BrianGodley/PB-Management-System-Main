@@ -2079,6 +2079,22 @@ export default function EstimateDetail() {
               </div>
             ) : (
               <div className="space-y-3">
+                {/* In House / Subcontractor label — demo modules group both
+                    sides internally, so only the single-side (non-demo)
+                    modules get a top label based on their work-type toggle. */}
+                {!['Hand Demo', 'Skid Steer Demo', 'Mini Skid Steer Demo'].includes(
+                  selectedModule.module_type
+                ) && (
+                  <p
+                    className={`text-xs font-bold uppercase tracking-wider ${
+                      selectedModule.data?.subType === 'Subcontractor'
+                        ? 'text-orange-600'
+                        : 'text-blue-700'
+                    }`}
+                  >
+                    {selectedModule.data?.subType === 'Subcontractor' ? 'Subcontractor' : 'In House'}
+                  </p>
+                )}
                 {/* Module-specific detail view */}
                 {selectedModule.module_type === 'Drainage' ? (
                   <DrainageSummary module={selectedModule} />
