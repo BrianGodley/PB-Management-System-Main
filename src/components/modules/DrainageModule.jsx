@@ -536,7 +536,10 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         </div>
       )}
 
-      {/* Settings */}
+      {/* Settings — In-House only. The sub side is a fixed $/LF cost, so job
+          site conditions and the difficulty/hours modifiers don't apply. */}
+      {!isSub && (
+        <>
       <SectionHeader title="Job Site Conditions" />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
@@ -562,6 +565,8 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           <NumInput value={hoursAdj} onChange={setHoursAdj} placeholder="0" />
         </div>
       </div>
+        </>
+      )}
 
       {/* ── Drainage (Subcontractor) ── */}
       {isSub ? (

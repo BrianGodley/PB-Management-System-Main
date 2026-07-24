@@ -1806,7 +1806,7 @@ export default function EstimateDetail() {
             burden={et.burden}
             subCost={et.subCost}
             directGp={adjustedEstimateGP}
-            directSubGp={estimateTotalSubGp}
+            directSubGp={et.subGp}
             directCommission={et.commission}
             directPrice={et.price}
             price={et.price}
