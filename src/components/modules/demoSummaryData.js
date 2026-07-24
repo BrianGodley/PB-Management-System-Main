@@ -141,70 +141,39 @@ export function buildDemoSummary(module, cfg) {
     { title: 'Manual Entry', rows: manualIH },
   ]
 
-  // ── Subcontractor — per-line $ ─────────────────────────────────────────────
-  let subDemoRate
-  if (cfg.subDemoModel === 'tiered') {
-    const deep = sr[`Sub Demo - ${P} 5-7in`] ?? 2.0
-    const mid = sr[`Sub Demo - ${P} 2-4in`] ?? 1.75
-    const shallow = sr[`Sub Demo - ${P} 1-2in`] ?? 1.5
-    const x = n(d.subDemoDepth || 7)
-    subDemoRate = x >= 5 ? deep : x >= 2 ? mid : shallow
-  } else {
-    subDemoRate = sr[cfg.subDemoFlatKey] ?? 2.8
-  }
-  const miscFlatSubRate = cfg.miscFlatKey ? sr[cfg.miscFlatKey] ?? 2.0 : subDemoRate
-
+  // ── Subcontractor — quantities only (pricing lives in the Summary box) ─────
   const subDemoRows =
     n(d.subDemoSF) > 0
-      ? [
-          {
-            label: `Demolition — ${n(d.subDemoSF).toLocaleString()} SF @ ${d.subDemoDepth || 7}"`,
-            value: fmt(n(d.subDemoSF) * subDemoRate),
-            sub: `${fmt2(subDemoRate)}/sf`,
-          },
-        ]
+      ? [{ label: 'Demolition', value: `${n(d.subDemoSF).toLocaleString()} SF`, sub: `${d.subDemoDepth || 7}"` }]
       : []
 
   const subMiscFlatRows = (d.subMiscFlatRows || [])
     .slice(0, 2)
     .filter(r => n(r.sf) > 0)
-    .map((r, i) => ({
-      label: r.label || `Item ${i + 1}`,
-      value: fmt(n(r.sf) * miscFlatSubRate),
-      sub: `${n(r.sf)} SF · ${fmt2(miscFlatSubRate)}/sf`,
-    }))
+    .map((r, i) => ({ label: r.label || `Item ${i + 1}`, value: `${n(r.sf)} SF` }))
 
-  const sg = (label, sf, key) =>
-    n(sf) > 0
-      ? { label, value: fmt(n(sf) * (sr[key] ?? 0)), sub: `${n(sf)} SF · ${fmt2(sr[key] ?? 0)}/sf` }
-      : null
+  const sg = (label, sf) => (n(sf) > 0 ? { label, value: `${n(sf).toLocaleString()} SF` } : null)
   const subGradeRows = [
-    sg('Grade Cut', d.subGradeCutSF, `Sub Grade - ${P} Cut SF`),
-    sg('Grade Fill', d.subGradeFillSF, `Sub Grade - ${P} Fill SF`),
-    sg('Jumping Jack', d.subJjSF, `Sub Grade - ${P} JJ SF`),
-    sg('Sheepsfoot', d.sheepsfootSF, `Sub Grade - ${P} Sheepsfoot SF`),
-    sg('Roll Compactor', d.rollCompSF, `Sub Grade - ${P} Roll SF`),
-    cfg.hasSS ? sg('SS Compact', d.subSsCmpSF, `Sub Grade - ${P} SS Compact SF`) : null,
+    sg('Grade Cut', d.subGradeCutSF),
+    sg('Grade Fill', d.subGradeFillSF),
+    sg('Jumping Jack', d.subJjSF),
+    sg('Sheepsfoot', d.sheepsfootSF),
+    sg('Roll Compactor', d.rollCompSF),
+    cfg.hasSS ? sg('SS Compact', d.subSsCmpSF) : null,
   ].filter(Boolean)
 
   const subTreeRows = (d.subTreeRows || [])
     .filter(r => n(r.qty) > 0)
-    .map(r => {
-      const rate = sr[cfg.treeKey(r.size)] ?? 0
-      return { label: `${r.size} Trees × ${r.qty}`, value: fmt(n(r.qty) * rate), sub: `${fmt2(rate)}/ea` }
-    })
+    .map(r => ({ label: `${r.size} Trees`, value: `× ${r.qty}` }))
 
   const haulRows = [
-    ['Trash haul', d.haulTrashLoads, `Demo - ${P} Sub Haul - Trash 12yd`, 850],
-    ['Concrete haul', d.haulConcreteLoads, `Demo - ${P} Sub Haul - Concrete 12yd`, 800],
-    ['Soil haul', d.haulSoilLoads, `Demo - ${P} Sub Haul - Soil 12yd`, 650],
-    ['Import base haul', d.haulBaseLoads, `Demo - ${P} Sub Haul - Import Base 12yd`, 350],
+    ['Trash haul', d.haulTrashLoads],
+    ['Concrete haul', d.haulConcreteLoads],
+    ['Soil haul', d.haulSoilLoads],
+    ['Import base haul', d.haulBaseLoads],
   ]
     .filter(([, loads]) => n(loads) > 0)
-    .map(([label, loads, key, def]) => {
-      const rate = sr[key] ?? def
-      return { label: `${label} × ${loads}`, value: fmt(n(loads) * rate), sub: `${fmt(rate)}/load` }
-    })
+    .map(([label, loads]) => ({ label, value: `× ${loads} load${n(loads) !== 1 ? 's' : ''}` }))
 
   const subManual = (d.subManualRows || [])
     .filter(r => n(r.subCost) > 0)
