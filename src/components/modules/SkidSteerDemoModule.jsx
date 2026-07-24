@@ -2052,34 +2052,34 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
             ]}
           />
           <tbody className="divide-y divide-gray-50">
-            {(isSub ? state.subManualRows : state.manualRows).map((r, i) => (
+            {(isDemoSub ? state.subManualRows : state.manualRows).map((r, i) => (
               <tr key={i}>
                 <td className={td}>
                   <Inp
                     type="text"
                     value={r.label}
-                    onChange={e => setRow(isSub ? 'subManualRows' : 'manualRows', i, 'label', e.target.value)}
+                    onChange={e => setRow(isDemoSub ? 'subManualRows' : 'manualRows', i, 'label', e.target.value)}
                     placeholder="Description"
                   />
                 </td>
                 <td className={td}>
                   <Inp
                     value={r.hours}
-                    onChange={e => setRow(isSub ? 'subManualRows' : 'manualRows', i, 'hours', e.target.value)}
+                    onChange={e => setRow(isDemoSub ? 'subManualRows' : 'manualRows', i, 'hours', e.target.value)}
                     step="0.5"
                   />
                 </td>
                 <td className={td}>
                   <Inp
                     value={r.materials}
-                    onChange={e => setRow(isSub ? 'subManualRows' : 'manualRows', i, 'materials', e.target.value)}
+                    onChange={e => setRow(isDemoSub ? 'subManualRows' : 'manualRows', i, 'materials', e.target.value)}
                     step="1"
                   />
                 </td>
                 <td className={td}>
                   <Inp
                     value={r.subCost}
-                    onChange={e => setRow(isSub ? 'subManualRows' : 'manualRows', i, 'subCost', e.target.value)}
+                    onChange={e => setRow(isDemoSub ? 'subManualRows' : 'manualRows', i, 'subCost', e.target.value)}
                     step="1"
                   />
                 </td>
@@ -2089,7 +2089,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
         </table>
         <button
           type="button"
-          onClick={() => set(isSub ? 'subManualRows' : 'manualRows', [...(isSub ? state.subManualRows : state.manualRows), { label: '', hours: '', materials: '', subCost: '' }])}
+          onClick={() => set(isDemoSub ? 'subManualRows' : 'manualRows', [...(isDemoSub ? state.subManualRows : state.manualRows), { label: '', hours: '', materials: '', subCost: '' }])}
           className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
         >
           + Add manual entry
