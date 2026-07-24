@@ -640,31 +640,36 @@ export default function EstimateDetail() {
   }
 
   // ── Per-project GPMD override (draft) ─────────────────────
-  function saveProjectGpmd(projectId, newVal) {
-    setProjectGpmds(prev => ({ ...prev, [projectId]: newVal }))
+  // Recompute a module's financials for a given GPMD + sub-GP markup, using the
+  // current pricing model: In-House GP = manDays × gpmd, Sub GP = subCost ×
+  // markup, commission = 12% of (In-House GP + Sub GP), total = costs + GP +
+  // Sub GP + commission. gross_profit stays In-House-only. Updates the saved
+  // snapshot (data.calc) so module detail + list subtext reflect the change.
+  function recalcModuleFinancials(mod, gpmd, subMarkup) {
+    const manDays = parseFloat(mod.man_days || 0)
+    const laborCost = parseFloat(mod.labor_cost || mod.data?.calc?.laborCost || 0)
+    const burden = parseFloat(mod.labor_burden || mod.data?.calc?.burden || 0)
+    const mat = parseFloat(mod.material_cost || 0)
+    const subCost = parseFloat(mod.sub_cost || mod.data?.calc?.subCost || 0)
+    const inHouseGp = manDays * gpmd
+    const subGp = subCost * subMarkup
+    const commission = (inHouseGp + subGp) * 0.12
+    const price = laborCost + burden + mat + subCost + inHouseGp + subGp + commission
+    const data = {
+      ...(mod.data || {}),
+      gpmd,
+      subGpMarkupRate: subMarkup,
+      calc: { ...(mod.data?.calc || {}), gp: inHouseGp, subGp, commission, price },
+    }
+    return { ...mod, gross_profit: inHouseGp, total_price: price, data }
+  }
+
+  // Apply recomputed modules to a project and sync selection state.
+  function applyProjectModuleRecalc(projectId, projPatch, mapMod) {
     const proj = projects.find(p => p.id === projectId)
     if (!proj) return
-    const mods = proj.estimate_modules || []
-    const updatedMods = mods.map(mod => {
-      const manDays = parseFloat(mod.man_days || 0)
-      const laborCost = parseFloat(mod.labor_cost || mod.data?.calc?.laborCost || 0)
-      const burden = parseFloat(mod.labor_burden || mod.data?.calc?.burden || 0)
-      const mat = parseFloat(mod.material_cost || 0)
-      const subCost = parseFloat(mod.sub_cost || mod.data?.calc?.subCost || 0)
-      const oldGpmd = parseFloat(mod.data?.gpmd ?? 425)
-      const oldTotalGP = parseFloat(mod.gross_profit || mod.data?.calc?.gp || 0)
-      const subContrib = oldTotalGP - manDays * oldGpmd
-      const newGP = manDays * newVal + subContrib
-      const newCommission = newGP * 0.12
-      const newPrice = laborCost + burden + mat + subCost + newGP + newCommission
-      const updatedData = {
-        ...(mod.data || {}),
-        gpmd: newVal,
-        calc: { ...(mod.data?.calc || {}), gp: newGP, commission: newCommission, price: newPrice },
-      }
-      return { ...mod, gross_profit: newGP, total_price: newPrice, data: updatedData }
-    })
-    const updatedProj = { ...proj, gpmd_override: newVal, estimate_modules: updatedMods }
+    const updatedMods = (proj.estimate_modules || []).map(mapMod)
+    const updatedProj = { ...proj, ...projPatch, estimate_modules: updatedMods }
     setProjects(prev => prev.map(p => (p.id === projectId ? updatedProj : p)))
     if (selectedProject?.id === projectId) setSelectedProject(updatedProj)
     if (selectedModule) {
@@ -674,14 +679,21 @@ export default function EstimateDetail() {
     markDirty()
   }
 
-  // ── Per-project sub GP markup rate (draft) ────────────────────────────
-  function saveProjectSubRate(projectId, newVal) {
-    setProjects(prev =>
-      prev.map(p => (p.id === projectId ? { ...p, sub_gp_markup_rate: newVal } : p))
+  function saveProjectGpmd(projectId, newVal) {
+    setProjectGpmds(prev => ({ ...prev, [projectId]: newVal }))
+    const proj = projects.find(p => p.id === projectId)
+    const projMarkup = proj?.sub_gp_markup_rate ?? 0.2
+    applyProjectModuleRecalc(projectId, { gpmd_override: newVal }, mod =>
+      recalcModuleFinancials(mod, newVal, parseFloat(mod.data?.subGpMarkupRate ?? projMarkup))
     )
-    if (selectedProject?.id === projectId)
-      setSelectedProject(p => ({ ...p, sub_gp_markup_rate: newVal }))
-    markDirty()
+  }
+
+  // ── Per-project sub GP markup rate — cascades to every module ──────────
+  function saveProjectSubRate(projectId, newVal) {
+    applyProjectModuleRecalc(projectId, { sub_gp_markup_rate: newVal }, mod => {
+      const gpmd = projectGpmds[projectId] ?? parseFloat(mod.data?.gpmd ?? 425)
+      return recalcModuleFinancials(mod, gpmd, newVal)
+    })
   }
 
   // ── Modules ──────────────────────────────────────
