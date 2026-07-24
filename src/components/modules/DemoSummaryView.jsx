@@ -21,12 +21,12 @@ function SectionLabel({ title }) {
 }
 function LineRow({ label, value, sub }) {
   return (
-    <div className="flex items-start justify-between py-1 border-b border-gray-50">
-      <span className="text-xs flex-1 pr-2 text-gray-600">{label}</span>
-      <div className="text-right shrink-0">
-        <span className="text-xs text-gray-800">{value}</span>
-        {sub && <p className="text-[11px] text-gray-400">{sub}</p>}
-      </div>
+    <div className="flex items-baseline justify-between gap-2 py-1 border-b border-gray-50">
+      <span className="text-xs text-gray-600 whitespace-nowrap">{label}</span>
+      {sub && (
+        <span className="text-[11px] text-gray-400 flex-1 min-w-0 truncate text-right">{sub}</span>
+      )}
+      <span className="text-xs text-gray-800 tabular-nums whitespace-nowrap shrink-0">{value}</span>
     </div>
   )
 }
