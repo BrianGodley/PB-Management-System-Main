@@ -1,151 +1,138 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// PaverSummary — read-only detail view for a saved Paver module
+// PaverSummary — read-only detail view. In House / Subcontractor sections show
+// entered quantities; the green Summary box carries the money (shared
+// DemoSummaryView layout, same as the demo modules).
 // ─────────────────────────────────────────────────────────────────────────────
+import DemoSummaryView from './DemoSummaryView'
 
-const fmt = v => `$${Math.round(v || 0).toLocaleString()}`
-const fnum = v =>
-  (v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const n = v => parseFloat(v) || 0
+const fmt2 = v =>
+  `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-export default function PaverSummary({ module: mod }) {
-  const data = mod?.data || {}
-  const calc = data.calc || {}
+// Build quantity sections for one field set (In-House or Sub).
+function paverSections(f, isSub) {
+  const areas = (f.areaRows || [])
+    .filter(r => n(r.sf) > 0)
+    .map(r => {
+      const label =
+        r.paverBrand === 'Custom'
+          ? 'Custom paver'
+          : [r.paverBrand, r.paverName].filter(Boolean).join(' ') || 'Pavers'
+      const sub = [r.depth ? `${r.depth}"` : null, r.method].filter(Boolean).join(' · ')
+      return { label, value: `${n(r.sf).toLocaleString()} SF`, sub: sub || undefined }
+    })
 
-  const totalHrs = n(calc.totalHrs)
-  const manDays = n(calc.manDays)
-  const laborCost = n(calc.laborCost)
-  const burden = n(calc.burden)
-  const totalMat = n(calc.totalMat)
-  const subCost = n(calc.subCost)
-  const gp = n(calc.gp)
-  const commission = n(calc.commission)
-  const price = n(calc.price)
-  const lrph = n(data.laborRatePerHour) || 35
-  const gpmd = manDays > 0 && gp > 0 ? Math.round(gp / manDays) : 425
+  const details = []
+  if (f.is80mm) details.push({ label: '80mm pavers', value: 'Yes' })
+  if (n(f.straightCutLF) > 0)
+    details.push({ label: 'Straight cut', value: `${n(f.straightCutLF).toLocaleString()} LF` })
+  if (n(f.curvedCutLF) > 0)
+    details.push({ label: 'Curved cut', value: `${n(f.curvedCutLF).toLocaleString()} LF` })
+  if (n(f.restraintsLF) > 0)
+    details.push({ label: 'Restraints', value: `${n(f.restraintsLF).toLocaleString()} LF` })
+  if (n(f.sleevesLF) > 0)
+    details.push({ label: 'Sleeves', value: `${n(f.sleevesLF).toLocaleString()} LF` })
+  if (n(f.vertSoldierLF) > 0)
+    details.push({
+      label: `Vertical soldier${f.vertPaverName ? ` (${f.vertPaverName})` : ''}`,
+      value: `${n(f.vertSoldierLF).toLocaleString()} LF`,
+    })
+  if (n(f.sealerSF) > 0)
+    details.push({ label: 'Sealer', value: `${n(f.sealerSF).toLocaleString()} SF` })
+  if (f.polySand) details.push({ label: 'Poly sand', value: 'Yes' })
+  if (n(f.polySandExistingSF) > 0)
+    details.push({
+      label: 'Poly sand (existing)',
+      value: `${n(f.polySandExistingSF).toLocaleString()} SF`,
+    })
+  if (n(f.numStones) > 0) details.push({ label: 'Stones', value: `× ${n(f.numStones)}` })
+  if (n(f.numColors) > 0) details.push({ label: 'Colors', value: `× ${n(f.numColors)}` })
 
-  const areaRows = data.areaRows || []
-  const hasAreas = areaRows.some(r => n(r.sf) > 0)
+  const manual = isSub
+    ? (f.manualRows || [])
+        .filter(r => n(r.subCost) > 0)
+        .map((r, i) => ({ label: r.label || `Item ${i + 1}`, value: fmt2(r.subCost) }))
+    : (f.manualRows || [])
+        .filter(r => n(r.hours) > 0 || n(r.materials) > 0)
+        .map((r, i) => ({
+          label: r.label || `Item ${i + 1}`,
+          value: n(r.hours) > 0 ? `${n(r.hours).toFixed(1)} hrs` : fmt2(r.materials),
+          sub: n(r.hours) > 0 && n(r.materials) > 0 ? `${fmt2(r.materials)} mat.` : undefined,
+        }))
 
-  const installItems = []
-  if (n(data.straightCutLF) > 0)
-    installItems.push(`${n(data.straightCutLF).toLocaleString()} LF straight cut`)
-  if (n(data.curvedCutLF) > 0)
-    installItems.push(`${n(data.curvedCutLF).toLocaleString()} LF curved cut`)
-  if (n(data.restraintsLF) > 0)
-    installItems.push(`${n(data.restraintsLF).toLocaleString()} LF restraints`)
-  if (n(data.sleevesLF) > 0) installItems.push(`${n(data.sleevesLF).toLocaleString()} LF sleeves`)
-  if (n(data.vertSoldierLF) > 0)
-    installItems.push(`${n(data.vertSoldierLF).toLocaleString()} LF vert soldier`)
-  if (n(data.sealerSF) > 0) installItems.push(`${n(data.sealerSF).toLocaleString()} SF sealer`)
-  if (n(data.numStones) > 0) installItems.push(`${n(data.numStones)} stones`)
-  if (n(data.numColors) > 0) installItems.push(`${n(data.numColors)} colors`)
-  if (data.is80mm) installItems.push('80mm pavers')
-  if (data.polySand) installItems.push('poly sand')
+  return [
+    { title: 'Paver Areas', rows: areas },
+    { title: 'Install Details', rows: details },
+    { title: 'Manual Entry', rows: manual },
+  ]
+}
 
-  const hasSteps = n(data.stepStraightLF) > 0 || n(data.stepCurvedLF) > 0
+export default function PaverSummary({ module }) {
+  const d = module?.data || {}
 
-  const Row = ({ label, value, dim, green, bold }) => (
-    <div className="flex items-baseline justify-between text-xs py-0.5">
-      <span className="text-gray-500">
-        {label}
-        {dim && <span className="ml-1 text-gray-400 text-[10px]">{dim}</span>}
-      </span>
-      <span
-        className={`tabular-nums font-${bold ? 'semibold' : 'normal'} ${green ? 'text-green-700' : 'text-gray-800'}`}
-      >
-        {value}
-      </span>
-    </div>
+  const inHouseSections = paverSections(
+    {
+      areaRows: d.areaRows,
+      is80mm: d.is80mm,
+      straightCutLF: d.straightCutLF,
+      curvedCutLF: d.curvedCutLF,
+      restraintsLF: d.restraintsLF,
+      sleevesLF: d.sleevesLF,
+      vertSoldierLF: d.vertSoldierLF,
+      vertPaverName: d.vertPaverName,
+      sealerSF: d.sealerSF,
+      polySand: d.polySand,
+      polySandExistingSF: d.polySandExistingSF,
+      numStones: d.numStones,
+      numColors: d.numColors,
+      manualRows: d.manualRows,
+    },
+    false
   )
 
+  const subSections = paverSections(
+    {
+      areaRows: d.subAreaRows,
+      is80mm: d.subIs80mm,
+      straightCutLF: d.subStraightCutLF,
+      curvedCutLF: d.subCurvedCutLF,
+      restraintsLF: d.subRestraintsLF,
+      sleevesLF: d.subSleevesLF,
+      vertSoldierLF: d.subVertSoldierLF,
+      vertPaverName: d.subVertPaverName,
+      sealerSF: d.subSealerSF,
+      polySand: d.subPolySand,
+      polySandExistingSF: d.subPolySandExistingSF,
+      numStones: d.subNumStones,
+      numColors: d.subNumColors,
+      manualRows: d.subManualRows,
+    },
+    true
+  )
+
+  // ── Totals from saved calc snapshot ────────────────────────────────────────
+  const c = d.calc || {}
+  const gp = n(c.gp) || n(module.gross_profit)
+  const subGp = n(c.subGp)
+  const financials = {
+    totalHrs: n(c.totalHrs),
+    manDays: n(c.manDays) || n(module.man_days),
+    totalMat: n(c.totalMat) || n(module.material_cost),
+    laborCost: n(c.laborCost),
+    lrph: n(d.laborRatePerHour) || 35,
+    burden: n(c.burden),
+    subCost: n(c.subCost) || n(module.sub_cost),
+    gp,
+    subGp,
+    commission: n(c.commission) || (gp + subGp) * 0.12,
+    price: n(c.price) || n(module.total_price),
+  }
+
   return (
-    <div className="space-y-3 text-sm">
-      {/* Paver areas */}
-      {hasAreas && (
-        <div className="bg-gray-50 rounded-lg p-3">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            Paver Areas
-          </p>
-          <div className="space-y-1">
-            {areaRows
-              .filter(r => n(r.sf) > 0)
-              .map((row, i) => (
-                <div key={i} className="flex items-center justify-between text-xs">
-                  <span className="text-gray-700 font-medium">{row.label || `Area ${i + 1}`}</span>
-                  <span className="text-gray-500">
-                    {n(row.sf).toLocaleString()} SF · {row.depth}" base · {row.method}
-                    {row.paverName && (
-                      <span className="ml-1 text-gray-400"> · {row.paverName}</span>
-                    )}
-                  </span>
-                </div>
-              ))}
-          </div>
-        </div>
-      )}
-
-      {/* Install details */}
-      {installItems.length > 0 && (
-        <div className="bg-gray-50 rounded-lg p-3">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Install Details
-          </p>
-          <p className="text-xs text-gray-600">{installItems.join(' · ')}</p>
-        </div>
-      )}
-
-      {/* Steps */}
-      {hasSteps && (
-        <div className="bg-gray-50 rounded-lg p-3">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Steps</p>
-          <p className="text-xs text-gray-600">
-            {n(data.stepStraightLF) > 0 && `${n(data.stepStraightLF).toLocaleString()} LF straight`}
-            {n(data.stepStraightLF) > 0 && n(data.stepCurvedLF) > 0 && ' · '}
-            {n(data.stepCurvedLF) > 0 && `${n(data.stepCurvedLF).toLocaleString()} LF curved`}
-            {data.stepPaverName && ` · ${data.stepPaverName}`}
-            {n(data.stepPaverSF) > 0 && ` · ${n(data.stepPaverSF).toLocaleString()} SF`}
-          </p>
-        </div>
-      )}
-
-      {/* Options used */}
-      {(data.includeDelivery ||
-        data.is80mm ||
-        data.polySand ||
-        n(data.salesTax) > 0 ||
-        n(data.shippingCharge) > 0) && (
-        <div className="text-xs text-gray-500 bg-blue-50 rounded-lg px-3 py-2">
-          {[
-            data.includeDelivery && 'Delivery included',
-            data.is80mm && '80mm pavers',
-            data.polySand && 'Polymeric sand',
-            n(data.salesTax) > 0 && `${n(data.salesTax)}% sales tax`,
-            n(data.shippingCharge) > 0 && `$${n(data.shippingCharge).toLocaleString()} shipping`,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
-        </div>
-      )}
-
-      {/* Main financials list */}
-      <div className="bg-gray-50 rounded-lg p-3">
-        <Row label="GPMD" value={`$${gpmd.toLocaleString()}`} dim="rate/MD" />
-        <Row label="Labor Hours" value={fnum(totalHrs)} dim="hrs" />
-        <Row label="Man Days" value={fnum(manDays)} dim="MD" />
-
-        <div className="border-t border-gray-200 my-1.5" />
-
-        <Row label="Materials" value={fmt(totalMat)} />
-        <Row label="Crew Labor" value={fmt(laborCost)} dim={`@ $${lrph.toFixed(0)}/hr`} />
-        <Row label="Labor Burden" value={fmt(burden)} dim="29%" />
-        <Row label="Sub Cost" value={subCost > 0 ? fmt(subCost) : '—'} />
-        <Row label="Gross Profit" value={fmt(gp)} green />
-        <Row label="Commission" value={fmt(commission)} dim="12%" />
-
-        <div className="border-t border-gray-200 my-1.5" />
-
-        <Row label="Total Price" value={fmt(price)} green bold />
-      </div>
-    </div>
+    <DemoSummaryView
+      inHouseSections={inHouseSections}
+      subSections={subSections}
+      financials={financials}
+    />
   )
 }

@@ -2140,6 +2140,8 @@ export default function EstimateDetail() {
                   'Mini Skid Steer Demo',
                   'Utilities',
                   'Drainage',
+                  'Concrete',
+                  'Pavers',
                 ].includes(selectedModule.module_type) && (
                   <p
                     className={`text-xs font-bold uppercase tracking-wider ${
