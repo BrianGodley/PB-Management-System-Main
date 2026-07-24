@@ -118,8 +118,16 @@ function calcDrainage(
   subMarkupRate = 0.2
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
-  const { difficulty, hoursAdj, trenchRows, pipeRows, fixtureRows, additionalItems, manualRows } =
-    state
+  const {
+    difficulty,
+    hoursAdj,
+    trenchRows,
+    pipeRows,
+    fixtureRows,
+    additionalItems,
+    manualRows,
+    subTrenchRows,
+  } = state
   const isSub = state.subType === 'Subcontractor'
 
   let trenchHrs = 0,
@@ -186,14 +194,11 @@ function calcDrainage(
   // Subcontractor: trenching + drain pipe collapse into ONE fixed price per
   // linear foot of trench run (default $16/LF). Their in-house labour/material
   // is replaced by that sub cost.
+  // Sub side is independent of In-House now: its own trench-run LF list, priced
+  // at the fixed $/LF. In-House always computes its own labour/material.
   const subRatePerLF = subRates['Drainage Sub - Per LF'] ?? 16
-  const subLf = trenchRows.reduce((sum, r) => sum + n(r.lf), 0)
-  const subDrainCost = isSub ? subLf * subRatePerLF : 0
-  if (isSub) {
-    trenchHrs = 0
-    pipeHrs = 0
-    pipeMat = 0
-  }
+  const subLf = (subTrenchRows || []).reduce((sum, r) => sum + n(r.lf), 0)
+  const subDrainCost = subLf * subRatePerLF
   const baseHrs = trenchHrs + pipeHrs + fixHrs + addHrs + manHrs
   const diffMod = 1 + n(difficulty) / 100
   const _preWalkHrs = baseHrs * diffMod + (parseFloat(hoursAdj) || 0)
@@ -378,6 +383,10 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
   const isSub = subType === 'Subcontractor'
   const [trenchRows, setTrenchRows] = useState(initialData?.trenchRows ?? DEFAULT_TRENCH_ROWS)
+  // Subcontractor tab has its OWN trench-run LF list, independent of In-House.
+  const [subTrenchRows, setSubTrenchRows] = useState(
+    initialData?.subTrenchRows ?? [{ lf: '' }, { lf: '' }]
+  )
   const [pipeRows, setPipeRows] = useState(initialData?.pipeRows ?? DEFAULT_PIPE_ROWS)
   const [fixtureRows, setFixtureRows] = useState(initialData?.fixtureRows ?? DEFAULT_FIXTURE_ROWS)
   const [additionalItems, setAdditionalItems] = useState(
@@ -409,6 +418,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
       fixtureRows,
       additionalItems,
       manualRows,
+      subTrenchRows,
       distanceLF,
       subType,
     },
@@ -456,10 +466,12 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
       data: {
         difficulty,
         trenchRows,
+        subTrenchRows,
         pipeRows,
         fixtureRows,
         additionalItems,
         manualRows,
+        subType,
         laborRatePerHour,
         laborBurdenPct,
         gpmd,
@@ -568,11 +580,18 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                 </tr>
               </thead>
               <tbody>
-                {trenchRows.map((row, i) => (
+                {subTrenchRows.map((row, i) => (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2 text-gray-600 text-xs">Run {i + 1}</td>
                     <td className="py-1 pr-2">
-                      <NumInput value={row.lf} onChange={v => updateTrench(i, 'lf', v)} />
+                      <NumInput
+                        value={row.lf}
+                        onChange={v =>
+                          setSubTrenchRows(rows =>
+                            rows.map((r, idx) => (idx === i ? { ...r, lf: v } : r))
+                          )
+                        }
+                      />
                     </td>
                     <td className="py-1 text-right text-gray-600 text-xs">
                       {n(row.lf) > 0 ? `$${(n(row.lf) * calc.subRatePerLF).toFixed(2)}` : '—'}
@@ -584,9 +603,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
             <button
               type="button"
               className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
-              onClick={() =>
-                setTrenchRows(r => [...r, { equipment: 'Trench', lf: '', width: '', depth: '' }])
-              }
+              onClick={() => setSubTrenchRows(r => [...r, { lf: '' }])}
             >
               + Add run
             </button>
