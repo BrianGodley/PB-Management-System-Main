@@ -310,21 +310,30 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   // Live material prices from material_rates table (category='Drainage')
   // When editing, use the snapshot saved at the time the module was created
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
+  const [subRates, setSubRates] = useState(initialData?.subRates ?? {})
   const [pricesLoading, setPricesLoading] = useState(!initialData?.materialPrices)
 
   // Pulled out so RateEditPopover can call it after the user saves a new
-  // master-rate value — picks up the change without a page refresh.
+  // master-rate value — picks up the change without a page refresh. Fetches
+  // both the Drainage material rates and the Drainage subcontractor rates.
   async function refreshMaterialPrices() {
-    const { data } = await supabase
-      .from('material_rates')
-      .select('name, unit_cost')
-      .eq('category', 'Drainage')
-    if (data) {
+    const [matRes, subRes] = await Promise.all([
+      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Drainage'),
+      supabase.from('subcontractor_rates').select('company_name, rate').eq('category', 'Drainage'),
+    ])
+    if (matRes.data) {
       const prices = {}
-      data.forEach(r => {
+      matRes.data.forEach(r => {
         prices[r.name] = parseFloat(r.unit_cost) || 0
       })
       setMaterialPrices(prices)
+    }
+    if (subRes.data) {
+      const sr = {}
+      subRes.data.forEach(r => {
+        sr[r.company_name] = parseFloat(r.rate) || 0
+      })
+      setSubRates(sr)
     }
     setPricesLoading(false)
   }
