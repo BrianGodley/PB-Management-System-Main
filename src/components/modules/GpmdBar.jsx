@@ -33,6 +33,9 @@ export default function GpmdBar({
   burden = 0,
   gpmd = 425, // PROJECT mode: GP = manDays × gpmd
   directGp = null, // ESTIMATE mode: actual GP total; GPMD is derived
+  directSubGp = null, // full aggregate bars: summed module Sub GP
+  directCommission = null, // full aggregate bars: summed module commission
+  directPrice = null, // full aggregate bars: summed module total_price (authoritative)
   subCost = 0,
   onGpmdSave = null, // if provided → PROJECT mode (editable GPMD)
   subMarkupRate = 0.2, // Sub GP = subCost × subMarkupRate
@@ -68,14 +71,26 @@ export default function GpmdBar({
   // ── Core calculations ──────────────────────────────────────────────────────
   const effectiveGp = directGp != null ? directGp : manDays * gpmd
   const displayGpmd = directGp != null ? (manDays > 0 ? Math.round(directGp / manDays) : 0) : gpmd
-  const subGp = (subCost || 0) * (subMarkupRate || 0)
-  const displaySubPct = Math.round((subMarkupRate || 0) * 100)
+  // Aggregate bars pass directSubGp / directCommission / directPrice = the summed
+  // module values, so the project/estimate totals equal the sum of the modules
+  // exactly (module GP/markup conventions vary and can't be re-derived here).
+  const subGp = directSubGp != null ? directSubGp : (subCost || 0) * (subMarkupRate || 0)
+  // When the Markup box is editable, show the markup SETTING being edited so the
+  // value "sticks" after a change. Read-only aggregate bars show the effective
+  // blended rate derived from the summed Sub GP.
+  const displaySubPct = onSubMarkupSave
+    ? Math.round((subMarkupRate || 0) * 100)
+    : directSubGp != null && (subCost || 0) > 0
+      ? Math.round((directSubGp / subCost) * 100)
+      : Math.round((subMarkupRate || 0) * 100)
   // Commission + Total Price are variant-specific so each module tab shows only
   // ITS side's total: In-House = labour+burden+materials+GP; Sub = subCost+SubGP.
   // 'full' (project/estimate) combines everything.
   const commBase = isSubView ? subGp : isInhouseView ? effectiveGp : effectiveGp + subGp
-  const effectiveComm = commBase * 0.12
-  const effectivePrice = isSubView
+  const effectiveComm = directCommission != null ? directCommission : commBase * 0.12
+  const effectivePrice = directPrice != null
+    ? directPrice
+    : isSubView
     ? (subCost || 0) + subGp + effectiveComm
     : isInhouseView
       ? laborCost + burden + totalMat + effectiveGp + effectiveComm
