@@ -331,6 +331,37 @@ export default function GpmdBar({
     )
   }
 
+  // ── Subcontractor tab (module) — fixed order:
+  //    Sub Cost · Markup % · Gross Profit · Commission · Total Price ──────────
+  if (isSubView) {
+    const subCells = [
+      { label: 'Sub Cost', value: subCost > 0 ? fmt(subCost) : '—' },
+      { label: 'Markup', value: `${displaySubPct}%` },
+      { label: 'Gross Profit', value: subGp > 0 ? fmt(subGp) : '—' },
+      { label: 'Commission', value: fmt(effectiveComm), dim: '12%' },
+      { label: 'Total Price', value: fmt(effectivePrice), color: 'text-blue-400', big: true },
+    ]
+    return (
+      <div className={containerCls}>
+        <div className="flex gap-0 divide-x divide-white/10">
+          {subCells.map(c => (
+            <div key={c.label} className="px-1.5 flex-1 min-w-0 text-center">
+              <p className="text-[10px] text-gray-400 truncate mb-0.5">
+                {c.label}
+                {c.dim && <span className="ml-1 text-gray-500">{c.dim}</span>}
+              </p>
+              <p
+                className={`font-bold tabular-nums truncate ${c.big ? 'text-base' : 'text-sm'} ${c.color || 'text-white'}`}
+              >
+                {c.value}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={containerCls}>
       <div className="flex gap-0 divide-x divide-white/10 flex-wrap">
