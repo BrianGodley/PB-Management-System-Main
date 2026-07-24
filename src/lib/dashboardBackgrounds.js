@@ -441,6 +441,10 @@ export function readModuleBackgrounds() {
 
 // Which module key owns a given pathname (longest matching prefix; '/' exact).
 export function matchModuleKey(pathname) {
+  // Estimate detail pages (/estimates/:id) are reached from the Bids workflow
+  // but aren't their own customizable module — inherit the Bids background so
+  // they show the user's customized scheme instead of the plain default.
+  if (pathname.startsWith('/estimates')) return '/bids'
   let best = null
   for (const m of CUSTOMIZE_MODULES) {
     if (m.key === '/') {
