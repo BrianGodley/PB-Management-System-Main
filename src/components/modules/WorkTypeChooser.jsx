@@ -9,16 +9,26 @@ export default function WorkTypeChooser({ value, onChange }) {
     <div className="flex justify-center mb-2">
       <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden">
         {['In-House', 'Subcontractor'].map(opt => (
-          <button
+          // Rendered as a div (not a button) so the tab stays clickable even
+          // inside a disabled <fieldset> — lets you switch In House/Sub while
+          // viewing a saved estimate read-only.
+          <div
             key={opt}
-            type="button"
+            role="button"
+            tabIndex={0}
             onClick={() => onChange(opt)}
-            className={`px-12 py-2 text-sm font-semibold transition-colors ${
+            onKeyDown={e => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onChange(opt)
+              }
+            }}
+            className={`cursor-pointer select-none px-12 py-2 text-sm font-semibold transition-colors ${
               current === opt ? 'bg-green-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
             }`}
           >
             {opt === 'In-House' ? 'In House' : 'Subcontractor'}
-          </button>
+          </div>
         ))}
       </div>
     </div>

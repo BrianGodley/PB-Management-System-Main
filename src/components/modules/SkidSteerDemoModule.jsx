@@ -264,7 +264,10 @@ function calcDemo(
   )
   const manualHrs = manualRows.reduce((s, r) => s + n(r.hours), 0)
   const manualMat = manualRows.reduce((s, r) => s + n(r.materials), 0)
-  const manualSub = manualRows.reduce((s, r) => s + n(r.subCost), 0)
+  const subManualEntries = (state.subManualRows || []).filter(
+    r => n(r.hours) > 0 || n(r.materials) > 0 || n(r.subCost) > 0
+  )
+  const manualSub = subManualEntries.reduce((s, r) => s + n(r.subCost), 0)
 
   // ── Sub rates — DB values take precedence over hardcoded fallbacks ───────────
   // Concrete/dirt/misc/footing/gradeCut → $/CY  |  grass/base → $/SF
@@ -643,6 +646,15 @@ const DEFAULT_STATE = {
   manualRows: [
     { label: '', hours: '', materials: '', subCost: '' },
     { label: '', hours: '', materials: '', subCost: '' },
+    { label: '', hours: '', materials: '', subCost: '' },
+    { label: '', hours: '', materials: '', subCost: '' },
+  ],
+  // Sub tab has its OWN manual rows — independent of In-House.
+  subManualRows: [
+    { label: '', hours: '', materials: '', subCost: '' },
+    { label: '', hours: '', materials: '', subCost: '' },
+    { label: '', hours: '', materials: '', subCost: '' },
+    { label: '', hours: '', materials: '', subCost: '' },
   ],
 }
 
@@ -752,10 +764,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
     const [matRes, lrRes, srRes] = await Promise.all([
       supabase.from('material_rates').select('name,unit_cost').eq('category', 'Demo'),
       supabase.from('labor_rates').select('name,rate,rate_per_day'),
-      supabase
-        .from('subcontractor_rates')
-        .select('company_name,rate')
-        .in('category', ['Demo', 'Sub Haul']),
+      supabase.from('subcontractor_rates').select('company_name,rate'),
     ])
     if (matRes.data) {
       const m = {}
@@ -2043,34 +2052,34 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
             ]}
           />
           <tbody className="divide-y divide-gray-50">
-            {state.manualRows.map((r, i) => (
+            {(isSub ? state.subManualRows : state.manualRows).map((r, i) => (
               <tr key={i}>
                 <td className={td}>
                   <Inp
                     type="text"
                     value={r.label}
-                    onChange={e => setRow('manualRows', i, 'label', e.target.value)}
+                    onChange={e => setRow(isSub ? 'subManualRows' : 'manualRows', i, 'label', e.target.value)}
                     placeholder="Description"
                   />
                 </td>
                 <td className={td}>
                   <Inp
                     value={r.hours}
-                    onChange={e => setRow('manualRows', i, 'hours', e.target.value)}
+                    onChange={e => setRow(isSub ? 'subManualRows' : 'manualRows', i, 'hours', e.target.value)}
                     step="0.5"
                   />
                 </td>
                 <td className={td}>
                   <Inp
                     value={r.materials}
-                    onChange={e => setRow('manualRows', i, 'materials', e.target.value)}
+                    onChange={e => setRow(isSub ? 'subManualRows' : 'manualRows', i, 'materials', e.target.value)}
                     step="1"
                   />
                 </td>
                 <td className={td}>
                   <Inp
                     value={r.subCost}
-                    onChange={e => setRow('manualRows', i, 'subCost', e.target.value)}
+                    onChange={e => setRow(isSub ? 'subManualRows' : 'manualRows', i, 'subCost', e.target.value)}
                     step="1"
                   />
                 </td>
@@ -2080,7 +2089,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
         </table>
         <button
           type="button"
-          onClick={() => set('manualRows', [...state.manualRows, { label: '', hours: '', materials: '', subCost: '' }])}
+          onClick={() => set(isSub ? 'subManualRows' : 'manualRows', [...(isSub ? state.subManualRows : state.manualRows), { label: '', hours: '', materials: '', subCost: '' }])}
           className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
         >
           + Add manual entry
