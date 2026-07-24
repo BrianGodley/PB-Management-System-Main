@@ -17,11 +17,7 @@ function GroupLabel({ children, color }) {
   )
 }
 function SectionLabel({ title }) {
-  return (
-    <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mt-2 mb-0.5">
-      {title}
-    </p>
-  )
+  return <p className="text-xs font-bold text-gray-700 mt-2 mb-0.5">{title}</p>
 }
 function LineRow({ label, value, sub }) {
   return (
