@@ -38,7 +38,9 @@ export const CFG = {
 
 export function buildDemoSummary(module, cfg) {
   const d = module?.data || {}
-  const sr = d.subRates || {}
+  // Resolve sub rates exactly like the module calc: estimate-level one-off
+  // overrides (rateOverrides) win over the master subRates snapshot.
+  const sr = { ...(d.subRates || {}), ...(d.rateOverrides || {}) }
   const P = cfg.prefix
 
   // ── In House — entered quantities ──────────────────────────────────────────
