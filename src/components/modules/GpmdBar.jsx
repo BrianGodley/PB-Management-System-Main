@@ -77,12 +77,13 @@ export default function GpmdBar({
   const subGp = directSubGp != null ? directSubGp : (subCost || 0) * (subMarkupRate || 0)
   // When the Markup box is editable, show the markup SETTING being edited so the
   // value "sticks" after a change. Read-only aggregate bars show the effective
-  // blended rate derived from the summed Sub GP.
+  // blended rate derived from the summed Sub GP. Shown to one decimal place.
+  const pct1 = x => Math.round((x || 0) * 1000) / 10
   const displaySubPct = onSubMarkupSave
-    ? Math.round((subMarkupRate || 0) * 100)
+    ? pct1(subMarkupRate)
     : directSubGp != null && (subCost || 0) > 0
-      ? Math.round((directSubGp / subCost) * 100)
-      : Math.round((subMarkupRate || 0) * 100)
+      ? pct1(directSubGp / subCost)
+      : pct1(subMarkupRate)
   // Commission + Total Price are variant-specific so each module tab shows only
   // ITS side's total: In-House = labour+burden+materials+GP; Sub = subCost+SubGP.
   // 'full' (project/estimate) combines everything.
