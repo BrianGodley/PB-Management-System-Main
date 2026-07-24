@@ -1244,6 +1244,32 @@ export default function EstimateDetail() {
   )
   const et = estimateTotals
 
+  // Finance summary for the Projects / Modules list panels: combined Gross
+  // Profit (in-house GP + sub GP), the In-House-side total, the Sub-side total,
+  // and the combined total (In-House + Sub = module total_price).
+  const moneyFmt = v => `$${Math.round(v || 0).toLocaleString()}`
+  const moduleFinance = mod => {
+    const c = mod.data?.calc || {}
+    const inHouseGP = parseFloat(mod.gross_profit ?? c.gp ?? 0) || 0
+    const subGp = parseFloat(c.subGp ?? 0) || 0
+    const subCost = parseFloat(mod.sub_cost ?? c.subCost ?? 0) || 0
+    const combined = parseFloat(mod.total_price ?? c.price ?? 0) || 0
+    const sub = subCost + subGp * 1.12 // sub cost + sub GP + sub commission
+    return { gp: inHouseGP + subGp, inHouse: combined - sub, sub, combined }
+  }
+  const sumFinance = mods =>
+    (mods || []).reduce(
+      (a, m) => {
+        const f = moduleFinance(m)
+        a.gp += f.gp
+        a.inHouse += f.inHouse
+        a.sub += f.sub
+        a.combined += f.combined
+        return a
+      },
+      { gp: 0, inHouse: 0, sub: 0, combined: 0 }
+    )
+
   // Adjusted estimate GP — sum of each project bar's effective GP
   // If a project has a GPMD override: GP = projManDays × override
   // Otherwise: GP = natural sum of module gross profits
@@ -1863,14 +1889,7 @@ export default function EstimateDetail() {
               </div>
             ) : (
               projects.map(proj => {
-                const projMD = (proj.estimate_modules || []).reduce(
-                  (s, m) => s + parseFloat(m.man_days || 0),
-                  0
-                )
-                const projMat = (proj.estimate_modules || []).reduce(
-                  (s, m) => s + parseFloat(m.material_cost || 0),
-                  0
-                )
+                const projFin = sumFinance(proj.estimate_modules)
                 const isSelected = selectedProject?.id === proj.id
                 return (
                   <div
@@ -1945,11 +1964,9 @@ export default function EstimateDetail() {
                         </div>
                       )}
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {(proj.estimate_modules || []).length} module
-                      {(proj.estimate_modules || []).length !== 1 ? 's' : ''}
-                      {projMD > 0 && ` · ${projMD.toFixed(1)} MD`}
-                      {projMat > 0 && ` · $${projMat.toLocaleString()}`}
+                    <p className="text-xs text-gray-400 mt-0.5 leading-tight">
+                      GP {moneyFmt(projFin.gp)} · In House {moneyFmt(projFin.inHouse)} · Sub{' '}
+                      {moneyFmt(projFin.sub)} · Total {moneyFmt(projFin.combined)}
                     </p>
                   </div>
                 )
@@ -2024,10 +2041,15 @@ export default function EstimateDetail() {
                         </button>
                       )}
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {parseFloat(mod.man_days || 0).toFixed(1)} MD · $
-                      {parseFloat(mod.material_cost || 0).toLocaleString()} mat.
-                    </p>
+                    {(() => {
+                      const f = moduleFinance(mod)
+                      return (
+                        <p className="text-xs text-gray-400 mt-0.5 leading-tight">
+                          GP {moneyFmt(f.gp)} · In House {moneyFmt(f.inHouse)} · Sub{' '}
+                          {moneyFmt(f.sub)} · Total {moneyFmt(f.combined)}
+                        </p>
+                      )
+                    })()}
                     {mod.notes && (
                       <p className="text-xs text-gray-900 mt-1 whitespace-pre-wrap">
                         {mod.notes}
