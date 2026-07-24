@@ -40,7 +40,12 @@ export function buildDemoSummary(module, cfg) {
   const d = module?.data || {}
   // Resolve sub rates exactly like the module calc: estimate-level one-off
   // overrides (rateOverrides) win over the master subRates snapshot.
-  const sr = { ...(d.subRates || {}), ...(d.rateOverrides || {}) }
+  // Prefer the exact resolved rate map the module used at save time; fall back
+  // to merging the master rates with any estimate-level overrides.
+  const sr =
+    d.calc && d.calc.subRatesUsed
+      ? d.calc.subRatesUsed
+      : { ...(d.subRates || {}), ...(d.rateOverrides || {}) }
   const P = cfg.prefix
 
   // ── In House — entered quantities ──────────────────────────────────────────
