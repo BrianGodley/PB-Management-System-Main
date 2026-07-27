@@ -145,7 +145,8 @@ function calcTurf(
   laborRates,
   gpmd = 425,
   walkAccess = null,
-  laborBurdenPct = 0.29
+  laborBurdenPct = 0.29,
+  subRates = {}
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const mp = materialPrices || {}
@@ -153,6 +154,14 @@ function calcTurf(
   const lrph = n(laborRatePerHour) || 35
   const hrsAdj = n(state.hoursAdj)
   const distanceLF = n(state.distanceLF) // avg distance truck to work area
+
+  // ── Subcontractor tab ──────────────────────────────────────────────────────
+  // On the Sub tab, turf install + strips become flat sub costs (SF/LF based,
+  // no labor hours). Rates come from subcontractor_rates (category 'Artificial
+  // Turf'), keyed by company_name.
+  const isSub = state.subType === 'Subcontractor'
+  const subInstallPerSF = subRates['Turf Sub - Install Per SF'] ?? 3
+  const subStripPerLF = subRates['Turf Sub - Strip Per LF'] ?? 10
 
   // Look up demo method rate (tons/hr) for each demo row
   function demoRate(method) {
@@ -218,25 +227,39 @@ function calcTurf(
     baseMat += weedMat
   }
 
+  // On the Sub tab there is no Base Installation section — the subcontractor's
+  // flat SF/LF pricing is all-in — so base labor + material never apply.
+  if (isSub) {
+    baseHrs = 0
+    baseMat = 0
+  }
+
   // ── Turf installation (up to 3 rolls of 15' wide) ─────────────────────────
   // hrs = SF/TurfSFHr * TurfPH = SF/20 * 0.5
   const turfSFHr = n(lr['Turf - Turf Install SF/hr']) || RATE_DEFAULTS.turfSFHr
   const turfPH = RATE_DEFAULTS.turfPH
   let turfHrs = 0,
     turfMat = 0,
-    totalEdgeLF = 0
+    totalEdgeLF = 0,
+    subTurfCost = 0
 
   const rollCalc = state.rolls.map(roll => {
     const edgeLF = n(roll.edgeLF)
-    const sf = edgeLF * 15
+    const installSF = n(roll.installSF)
     const brand = TURF_BRANDS.find(b => b.key === roll.brand) || TURF_BRANDS[0]
     const pricePerSF = n(mp[brand.matKey]) || brand.fallback
-    const hrs = sf > 0 ? (sf / turfSFHr) * turfPH : 0
-    const mat = sf * pricePerSF
+    // In-house derives SF from the 15' roll edge; the Sub tab uses the
+    // installed SF the estimator enters directly.
+    const sf = isSub ? installSF : edgeLF * 15
+    const hrs = !isSub && sf > 0 ? (sf / turfSFHr) * turfPH : 0
+    const mat = isSub ? 0 : sf * pricePerSF
+    // All-in sub cost for this roll: (sub install $/SF + material $/SF) × SF.
+    const rowSubCost = installSF * (subInstallPerSF + pricePerSF)
     turfHrs += hrs
     turfMat += mat
     totalEdgeLF += edgeLF
-    return { edgeLF, sf, brand: roll.brand, pricePerSF, hrs, mat }
+    subTurfCost += rowSubCost
+    return { edgeLF, installSF, sf, brand: roll.brand, pricePerSF, hrs, mat, rowSubCost }
   })
 
   // ── Turf Strips (row 20-21) ───────────────────────────────────────────────
@@ -244,22 +267,29 @@ function calcTurf(
   // Labor: hrs = (LF / 100) * 8  — Excel R20=(E21/100)*8
   // Material: brand $/SF × (LF × width ft)  — Excel S20=O20*Q20 (manual inputs)
   const stripsLF = n(state.strips?.lf)
-  const stripsWidth = n(state.strips?.widthFt) || 1
+  const stripsWidthIn = n(state.strips?.widthIn) || 12
   const stripsBrand = TURF_BRANDS.find(b => b.key === state.strips?.brand) || TURF_BRANDS[0]
   const stripsPrice = n(mp[stripsBrand.matKey]) || stripsBrand.fallback
-  const stripsSF = stripsLF * stripsWidth
+  const stripsSF = stripsLF * (stripsWidthIn / 12)
   // Labor rate is DB-editable (LF/hr). Legacy (LF/100)*8 == LF/12.5.
   const stripLFHr = n(lr['Turf - Strip Install LF/hr']) || RATE_DEFAULTS.stripLFHr
-  const stripsHrs = stripsLF > 0 && stripLFHr > 0 ? stripsLF / stripLFHr : 0
-  const stripsMat = stripsPrice * stripsSF
+  const stripsHrs = !isSub && stripsLF > 0 && stripLFHr > 0 ? stripsLF / stripLFHr : 0
+  const stripsMat = isSub ? 0 : stripsPrice * stripsSF
+  // Sub strips: flat $/LF sub install + brand material $/SF.
+  const subStripsCost = stripsLF * subStripPerLF + stripsPrice * stripsSF
 
   // ── Cut, Staple & Seam ────────────────────────────────────────────────────
   // hrs = (totalLF / TurfCutSfHr) * TurfCutRate = (totalLF/100)*1.0
   // mat = installMaterials ($/LF) × totalLF  — matches Excel S18=O18*Q18
   const installMatPerLF = n(mp['Turf - Install Materials']) || RATE_DEFAULTS.installMaterials
   const cutHrs =
-    totalEdgeLF > 0 ? (totalEdgeLF / RATE_DEFAULTS.turfCutSFHr) * RATE_DEFAULTS.turfCutRate : 0
-  const cutMat = installMatPerLF * totalEdgeLF
+    !isSub && totalEdgeLF > 0
+      ? (totalEdgeLF / RATE_DEFAULTS.turfCutSFHr) * RATE_DEFAULTS.turfCutRate
+      : 0
+  // On the Sub tab cut/seam material rolls into the sub cost bucket instead of
+  // in-house material.
+  const subCutMat = installMatPerLF * totalEdgeLF
+  const cutMat = isSub ? 0 : installMatPerLF * totalEdgeLF
 
   // ── Infill ────────────────────────────────────────────────────────────────
   // Excel uses K8 (base gravel SF) directly for infill quantity — NOT the demo SF.
@@ -270,7 +300,7 @@ function calcTurf(
   const infillAreaSF =
     turfAreaSF || n(state.base.gravelSF) || n(state.base.dgSF) || n(state.base.weedSF)
   let infillMat = 0
-  if (infillAreaSF > 0) {
+  if (!isSub && infillAreaSF > 0) {
     if (state.useZeoFill) {
       const bags = Math.ceil(infillAreaSF / 30)
       infillMat = bags * (n(mp['Turf - Infill ZeoFill']) || RATE_DEFAULTS.infillZeoFill)
@@ -294,7 +324,7 @@ function calcTurf(
   const walkHrs = calcWalkAccessLabor(_preWalkHrs, distanceLF, { paceLfPerMin: _pace })
   const totalHrs = _preWalkHrs + walkHrs
   const totalMat = baseMat + turfMat + stripsMat + cutMat + infillMat + manualMat
-  const subCost = manualSub
+  const subCost = manualSub + (isSub ? subTurfCost + subStripsCost + subCutMat : 0)
 
   const manDays = totalHrs / 8
   const laborCost = totalHrs * lrph
@@ -333,7 +363,7 @@ function calcTurf(
     turfSFHr,
     turfMat,
     stripsLF,
-    stripsWidth,
+    stripsWidthIn,
     stripsSF,
     stripsHrs,
     stripLFHr,
@@ -341,11 +371,17 @@ function calcTurf(
     stripsPrice,
     cutHrs,
     cutMat,
+    subCutMat,
     infillMat,
     demoHrs,
     baseHrs,
     rawHrs,
     diffHrs,
+    isSub,
+    subTurfCost,
+    subStripsCost,
+    subInstallPerSF,
+    subStripPerLF,
   }
 }
 
@@ -374,7 +410,7 @@ const DEFAULT_STATE = {
     { brand: 'Socal Blen Supreme 80', edgeLF: '' },
     { brand: 'Socal Blen Supreme 80', edgeLF: '' },
   ],
-  strips: { lf: '', widthFt: '1', brand: 'Socal Blen Supreme 80' },
+  strips: { lf: '', widthIn: '12', brand: 'Socal Blen Supreme 80' },
   manualRows: [
     { label: '', hours: '', materials: '', subCost: '' },
     { label: '', hours: '', materials: '', subCost: '' },
@@ -455,6 +491,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
   const [notes, setNotes] = useState(initialData?.notes ?? '')
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices || {})
   const [laborRates, setLaborRates] = useState(initialData?.laborRates || {})
+  const [subRates, setSubRates] = useState(initialData?.subRates || {})
   const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? 35)
   const [laborBurdenPct, setLaborBurdenPct] = useState(initialData?.laborBurdenPct ?? 0.29)
   const [walkAccess] = useState(
@@ -482,12 +519,16 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
 
   // Re-fetch Turf rate maps. Used on mount and after any RateEditPopover save.
   const refreshAllRates = useCallback(async () => {
-    const [matRes, labRes] = await Promise.all([
+    const [matRes, labRes, subRes] = await Promise.all([
       supabase
         .from('material_rates')
         .select('name, unit_cost')
         .in('category', ['Artificial Turf', 'Demo']),
       supabase.from('labor_rates').select('name, rate').eq('category', 'Artificial Turf'),
+      supabase
+        .from('subcontractor_rates')
+        .select('company_name, rate')
+        .eq('category', 'Artificial Turf'),
     ])
     if (matRes.data) {
       const m = {}
@@ -502,6 +543,13 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         m[r.name] = parseFloat(r.rate)
       })
       setLaborRates(m)
+    }
+    if (subRes.data) {
+      const m = {}
+      subRes.data.forEach(r => {
+        m[r.company_name] = parseFloat(r.rate) || 0
+      })
+      setSubRates(m)
     }
   }, [])
 
@@ -572,7 +620,8 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
     laborRates,
     gpmd,
     walkAccess,
-    laborBurdenPct
+    laborBurdenPct,
+    subRates
   )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
@@ -617,6 +666,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         gpmd,
         materialPrices,
         laborRates,
+        subRates,
         calc: {
           totalHrs: calc.totalHrs,
           manDays: calc.manDays,
@@ -723,7 +773,8 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         </>
       )}
 
-      {/* Base Installation */}
+      {/* Base Installation — In-House only (hidden on Sub tab) */}
+      {state.subType !== 'Subcontractor' && (
       <div>
         <SecHdr title="Base Installation" />
         <div className="text-xs text-gray-500 mb-2 italic">
@@ -925,24 +976,43 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           </span>
         </div>
       </div>
+      )}
 
       {/* Turf Installation */}
       <div>
         <SecHdr title="Turf Installation (15' Wide Rolls)" />
         <div className="text-xs text-gray-400 mb-2">
-          Each row edits both rates: <span className="text-gray-500">material</span> ($/SF, per
-          brand) and <span className="text-gray-500">install labor</span> ({calc.turfSFHr} SF/hr,
-          shared).
+          {calc.isSub ? (
+            <>
+              Flat subcontractor install: <span className="text-gray-500">${calc.subInstallPerSF}/SF</span>{' '}
+              + brand material ($/SF). Enter the installed square footage per brand.
+            </>
+          ) : (
+            <>
+              Each row edits both rates: <span className="text-gray-500">material</span> ($/SF, per
+              brand) and <span className="text-gray-500">install labor</span> ({calc.turfSFHr} SF/hr,
+              shared).
+            </>
+          )}
         </div>
         <table className="w-full text-xs">
           <TH
-            cols={[
-              { label: 'Turf Brand' },
-              { label: 'Edge LF', w: 'w-20' },
-              { label: 'Sq Ft', w: 'w-20' },
-              { label: 'Hrs', w: 'w-16' },
-              { label: 'Material', w: 'w-24' },
-            ]}
+            cols={
+              calc.isSub
+                ? [
+                    { label: 'Turf Brand' },
+                    { label: 'Install SF', w: 'w-24' },
+                    { label: 'Edge LF', w: 'w-20' },
+                    { label: 'Material', w: 'w-24' },
+                  ]
+                : [
+                    { label: 'Turf Brand' },
+                    { label: 'Edge LF', w: 'w-20' },
+                    { label: 'Sq Ft', w: 'w-20' },
+                    { label: 'Hrs', w: 'w-16' },
+                    { label: 'Material', w: 'w-24' },
+                  ]
+            }
           />
           <tbody className="divide-y divide-gray-50">
             {state.rolls.map((roll, i) => {
@@ -968,23 +1038,57 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                         currentValue={cr.pricePerSF}
                         onSaved={refreshAllRates}
                       />
-                      <RateEditPopover
-                        table="labor_rates"
-                        name="Turf - Turf Install SF/hr"
-                        category="Artificial Turf"
-                        mode="coefficient"
-                        unitLabel="SF/hr"
-                        currentValue={calc.turfSFHr}
-                        onSaved={refreshAllRates}
-                      />
+                      {calc.isSub ? (
+                        <RateEditPopover
+                          table="subcontractor_rates"
+                          name="Turf Sub - Install Per SF"
+                          category="Artificial Turf"
+                          unitLabel="/SF"
+                          currentValue={calc.subInstallPerSF}
+                          onSaved={refreshAllRates}
+                        />
+                      ) : (
+                        <RateEditPopover
+                          table="labor_rates"
+                          name="Turf - Turf Install SF/hr"
+                          category="Artificial Turf"
+                          mode="coefficient"
+                          unitLabel="SF/hr"
+                          currentValue={calc.turfSFHr}
+                          onSaved={refreshAllRates}
+                        />
+                      )}
                     </div>
                   </td>
-                  <td className={td}>
-                    <Inp value={roll.edgeLF} onChange={e => setRoll(i, 'edgeLF', e.target.value)} />
-                  </td>
-                  <td className={num}>{cr.sf > 0 ? cr.sf.toLocaleString() : '—'}</td>
-                  <td className={num}>{fh(cr.hrs)}</td>
-                  <td className={num}>{cr.mat > 0 ? fmt2(cr.mat) : '—'}</td>
+                  {calc.isSub ? (
+                    <>
+                      <td className={td}>
+                        <Inp
+                          value={roll.installSF || ''}
+                          onChange={e => setRoll(i, 'installSF', e.target.value)}
+                        />
+                      </td>
+                      <td className={td}>
+                        <Inp
+                          value={roll.edgeLF}
+                          onChange={e => setRoll(i, 'edgeLF', e.target.value)}
+                        />
+                      </td>
+                      <td className={num}>{cr.rowSubCost > 0 ? fmt2(cr.rowSubCost) : '—'}</td>
+                    </>
+                  ) : (
+                    <>
+                      <td className={td}>
+                        <Inp
+                          value={roll.edgeLF}
+                          onChange={e => setRoll(i, 'edgeLF', e.target.value)}
+                        />
+                      </td>
+                      <td className={num}>{cr.sf > 0 ? cr.sf.toLocaleString() : '—'}</td>
+                      <td className={num}>{fh(cr.hrs)}</td>
+                      <td className={num}>{cr.mat > 0 ? fmt2(cr.mat) : '—'}</td>
+                    </>
+                  )}
                 </tr>
               )
             })}
@@ -1009,8 +1113,10 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
               />
             </span>
             <div className="flex gap-4">
-              <span className="text-gray-700">{fh(calc.cutHrs)} hrs</span>
-              <span className="text-gray-700">{fmt2(calc.cutMat)} mat</span>
+              {!calc.isSub && <span className="text-gray-700">{fh(calc.cutHrs)} hrs</span>}
+              <span className="text-gray-700">
+                {fmt2(calc.isSub ? calc.subCutMat : calc.cutMat)} {calc.isSub ? 'sub' : 'mat'}
+              </span>
             </div>
           </div>
         )}
@@ -1033,20 +1139,38 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       <div>
         <SecHdr title="Turf Strips (Narrow / Custom Cuts)" />
         <div className="text-xs text-gray-500 mb-2 italic">
-          For narrow strips that don't come off a standard 15' roll. Row edits both rates:{' '}
-          <span className="text-gray-600">material</span> ($/SF, per brand) and{' '}
-          <span className="text-gray-600">install labor</span> ({calc.stripLFHr} LF/hr).
+          {calc.isSub ? (
+            <>
+              For narrow strips that don't come off a standard 15' roll. Flat subcontractor rate:{' '}
+              <span className="text-gray-600">${calc.subStripPerLF}/LF</span> + brand material ($/SF).
+            </>
+          ) : (
+            <>
+              For narrow strips that don't come off a standard 15' roll. Row edits both rates:{' '}
+              <span className="text-gray-600">material</span> ($/SF, per brand) and{' '}
+              <span className="text-gray-600">install labor</span> ({calc.stripLFHr} LF/hr).
+            </>
+          )}
         </div>
         <table className="w-full text-xs">
           <TH
-            cols={[
-              { label: 'Turf Brand' },
-              { label: 'Length (LF)', w: 'w-24' },
-              { label: 'Width (ft)', w: 'w-20' },
-              { label: 'Sq Ft', w: 'w-16' },
-              { label: 'Hrs', w: 'w-16' },
-              { label: 'Material', w: 'w-24' },
-            ]}
+            cols={
+              calc.isSub
+                ? [
+                    { label: 'Turf Brand' },
+                    { label: 'Length (LF)', w: 'w-24' },
+                    { label: 'Width (in)', w: 'w-20' },
+                    { label: 'Material', w: 'w-24' },
+                  ]
+                : [
+                    { label: 'Turf Brand' },
+                    { label: 'Length (LF)', w: 'w-24' },
+                    { label: 'Width (in)', w: 'w-20' },
+                    { label: 'Sq Ft', w: 'w-16' },
+                    { label: 'Hrs', w: 'w-16' },
+                    { label: 'Material', w: 'w-24' },
+                  ]
+            }
           />
           <tbody>
             <tr>
@@ -1073,15 +1197,26 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                           currentValue={calc.stripsPrice}
                           onSaved={refreshAllRates}
                         />
-                        <RateEditPopover
-                          table="labor_rates"
-                          name="Turf - Strip Install LF/hr"
-                          category="Artificial Turf"
-                          mode="coefficient"
-                          unitLabel="LF/hr"
-                          currentValue={calc.stripLFHr}
-                          onSaved={refreshAllRates}
-                        />
+                        {calc.isSub ? (
+                          <RateEditPopover
+                            table="subcontractor_rates"
+                            name="Turf Sub - Strip Per LF"
+                            category="Artificial Turf"
+                            unitLabel="/LF"
+                            currentValue={calc.subStripPerLF}
+                            onSaved={refreshAllRates}
+                          />
+                        ) : (
+                          <RateEditPopover
+                            table="labor_rates"
+                            name="Turf - Strip Install LF/hr"
+                            category="Artificial Turf"
+                            mode="coefficient"
+                            unitLabel="LF/hr"
+                            currentValue={calc.stripLFHr}
+                            onSaved={refreshAllRates}
+                          />
+                        )}
                       </>
                     )
                   })()}
@@ -1095,14 +1230,23 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
               </td>
               <td className={td}>
                 <Inp
-                  value={state.strips?.widthFt || '1'}
-                  onChange={e => setStrips('widthFt', e.target.value)}
-                  step="0.5"
+                  value={state.strips?.widthIn || '12'}
+                  onChange={e => setStrips('widthIn', e.target.value)}
+                  placeholder="12"
+                  step="1"
                 />
               </td>
-              <td className={num}>{calc.stripsSF > 0 ? calc.stripsSF.toLocaleString() : '—'}</td>
-              <td className={num}>{fh(calc.stripsHrs)}</td>
-              <td className={num}>{calc.stripsMat > 0 ? fmt2(calc.stripsMat) : '—'}</td>
+              {calc.isSub ? (
+                <td className={num}>{calc.subStripsCost > 0 ? fmt2(calc.subStripsCost) : '—'}</td>
+              ) : (
+                <>
+                  <td className={num}>
+                    {calc.stripsSF > 0 ? calc.stripsSF.toLocaleString() : '—'}
+                  </td>
+                  <td className={num}>{fh(calc.stripsHrs)}</td>
+                  <td className={num}>{calc.stripsMat > 0 ? fmt2(calc.stripsMat) : '—'}</td>
+                </>
+              )}
             </tr>
           </tbody>
         </table>

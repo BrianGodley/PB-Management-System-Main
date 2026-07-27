@@ -54,6 +54,7 @@ import FinancialSummaryList from './FinancialSummaryList'
 export default function ArtificialTurfSummary({ module }) {
   const data = module?.data || {}
   const {
+    subType = 'In-House',
     difficulty = 0,
     hoursAdj = 0,
     distanceLF = 0,
@@ -66,6 +67,7 @@ export default function ArtificialTurfSummary({ module }) {
     laborRatePerHour = 35,
     calc = null,
   } = data
+  const isSub = subType === 'Subcontractor'
 
   const savedCalc = calc || {}
   const totalHrs = n(savedCalc.totalHrs)
@@ -89,14 +91,19 @@ export default function ArtificialTurfSummary({ module }) {
     return { label: row.label, sf, inches: n(d.inches) || 4, method: d.method || 'Skid Steer Good' }
   }).filter(d => d.sf > 0)
 
-  // Base items included
+  // Base items included — omitted entirely on the Sub tab (no base section).
   const baseLines = []
-  if (base.useGravel) baseLines.push(`2" Gravel Base (${n(base.gravelSF) || turfAreaSF} SF)`)
-  if (base.useDG) baseLines.push(`1" DG Base (${n(base.dgSF) || turfAreaSF} SF)`)
-  if (base.useWeedFabric) baseLines.push(`Weed Barrier Fabric (${n(base.weedSF) || turfAreaSF} SF)`)
+  if (!isSub) {
+    if (base.useGravel) baseLines.push(`2" Gravel Base (${n(base.gravelSF) || turfAreaSF} SF)`)
+    if (base.useDG) baseLines.push(`1" DG Base (${n(base.dgSF) || turfAreaSF} SF)`)
+    if (base.useWeedFabric)
+      baseLines.push(`Weed Barrier Fabric (${n(base.weedSF) || turfAreaSF} SF)`)
+  }
 
-  // Active rolls
-  const rollLines = (rolls || []).filter(r => n(r.edgeLF) > 0)
+  // Active rolls — Sub uses entered install SF, In-House uses edge LF.
+  const rollLines = (rolls || []).filter(r =>
+    isSub ? n(r.installSF) > 0 : n(r.edgeLF) > 0
+  )
 
   const manualFiltered = (manualRows || []).filter(
     r => n(r.hours) > 0 || n(r.materials) > 0 || n(r.subCost) > 0
@@ -149,6 +156,16 @@ export default function ArtificialTurfSummary({ module }) {
             <>
               <SectionLabel title="Turf Installation" />
               {rollLines.map((r, i) => {
+                if (isSub) {
+                  return (
+                    <LineRow
+                      key={i}
+                      label={TURF_BRANDS[r.brand] || r.brand}
+                      value={`${n(r.installSF).toLocaleString()} SF`}
+                      sub={n(r.edgeLF) > 0 ? `${n(r.edgeLF)} LF edge` : undefined}
+                    />
+                  )
+                }
                 const sf = n(r.edgeLF) * 15
                 return (
                   <LineRow
@@ -167,9 +184,9 @@ export default function ArtificialTurfSummary({ module }) {
             <>
               <SectionLabel title="Turf Strips" />
               <LineRow
-                label={`${TURF_BRANDS[strips?.brand] || strips?.brand || 'Turf'} · ${n(strips?.widthFt) || 1} ft wide`}
+                label={`${TURF_BRANDS[strips?.brand] || strips?.brand || 'Turf'} · ${n(strips?.widthIn) || 12} in wide`}
                 value={`${stripsLF} LF`}
-                sub={`${(stripsLF * (n(strips?.widthFt) || 1)).toLocaleString()} SF`}
+                sub={`${(stripsLF * ((n(strips?.widthIn) || 12) / 12)).toLocaleString()} SF`}
               />
             </>
           )}
