@@ -59,6 +59,13 @@ const GRAVEL_TYPES = [
   { label: 'Black River Rock 2" to 3"', dbName: 'Gravel - Black River Rock 2in-3in', fallback: 130 },
 ]
 
+// D.G. product types (material_rates, per TON). Mirror of the module. Legacy
+// modules without dgType fall through to the first entry (Decomposed Granite).
+const DG_TYPES = [
+  { label: 'Decomposed Granite', dbName: 'Decomposed Granite', fallback: 50 },
+  { label: 'Rock Dust - Grey', dbName: 'DG - Rock Dust Grey', fallback: 86 },
+]
+
 const n = v => parseFloat(v) || 0
 const fmt2 = v =>
   `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -97,9 +104,12 @@ export default function GroundTreatmentsSummary({ module }) {
     mulchSF = 0,
     mulchDepth = 2,
     mulchType = 'Premium Mulch',
+    mulchWeedFabric = 'No',
+    mulchRows,
     plasticEdgingLF = 0,
     metalEdgingLF = 0,
     soilPrepSF = 0,
+    sodSoilPrepSF = 0,
     sodSF = 0,
     sodType = 'Marathon I/II',
     flagstoneSF = 0,
@@ -110,10 +120,13 @@ export default function GroundTreatmentsSummary({ module }) {
     flagstoneConcreteSF = 0,
     precastSoilSF = 0,
     precastConcreteSF = 0,
+    dgType = 'Decomposed Granite',
     dgSF = 0,
     dgDepth = 3.5,
+    dgWeedFabric = 'No',
     dgMethod = 'Machine',
     dgCement = 'Yes',
+    dgRows,
     gravelRows = [],
     manualRows = [],
     laborRatePerHour = 35,
@@ -130,7 +143,19 @@ export default function GroundTreatmentsSummary({ module }) {
     const mat = n(soilPrepSF) * mp(GT_RATES.soilPrepMat.dbName, GT_RATES.soilPrepMat.fallback)
     const hrs = n(soilPrepSF) * mp(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
     soilPrepLine = {
-      label: `Soil Prep — ${n(soilPrepSF).toLocaleString()} SF`,
+      label: `Till and Amend — ${n(soilPrepSF).toLocaleString()} SF`,
+      value: fmt2(mat),
+      sub: `${hrs.toFixed(2)} hrs`,
+    }
+  }
+
+  // ── Sod bed soil prep (same rates, entered in the Sod section) ─────────────────
+  let sodSoilPrepLine = null
+  if (n(sodSoilPrepSF) > 0) {
+    const mat = n(sodSoilPrepSF) * mp(GT_RATES.soilPrepMat.dbName, GT_RATES.soilPrepMat.fallback)
+    const hrs = n(sodSoilPrepSF) * mp(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
+    sodSoilPrepLine = {
+      label: `Soil Prep — ${n(sodSoilPrepSF).toLocaleString()} SF`,
       value: fmt2(mat),
       sub: `${hrs.toFixed(2)} hrs`,
     }
@@ -152,45 +177,91 @@ export default function GroundTreatmentsSummary({ module }) {
     }
   }
 
-  // ── Mulch ─────────────────────────────────────────────────────────────────────
-  let mulchLine = null
-  if (n(mulchSF) > 0) {
-    const CY = (n(mulchSF) * (n(mulchDepth) / 12)) / 27
-    const mt = MULCH_TYPES.find(t => t.label === mulchType) || MULCH_TYPES[0]
-    const mat =
-      CY * mp(mt.dbName, mt.fallback) +
-      mp(GT_RATES.mulchDelivery.dbName, GT_RATES.mulchDelivery.fallback)
-    const mulchCYPerDay = mp(GT_RATES.mulchLab.dbName, GT_RATES.mulchLab.fallback)
-    const hrs = (CY / mulchCYPerDay) * 8 + (n(mulchSF) / 3200) * 8
-    mulchLine = {
-      label: `${mulchType || 'Mulch'} — ${n(mulchSF).toLocaleString()} SF × ${n(mulchDepth)}"`,
-      value: fmt2(mat),
-      sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} CY`,
-    }
-  }
+  // ── Mulch (multi-row) ─────────────────────────────────────────────────────────
+  // New modules store d.mulchRows; legacy modules store single mulchSF/…, which
+  // we synthesize into a one-row array. Delivery fee is applied ONCE (to the first
+  // non-empty row) to mirror the module's delivery-once semantics.
+  const _mulchRows =
+    Array.isArray(mulchRows) && mulchRows.length
+      ? mulchRows
+      : n(mulchSF) > 0
+        ? [{ type: mulchType, sf: mulchSF, depth: mulchDepth, weedFabric: mulchWeedFabric }]
+        : []
+  const mulchCYPerDay = mp(GT_RATES.mulchLab.dbName, GT_RATES.mulchLab.fallback)
+  let _mulchDeliveryDone = false
+  const mulchLines = _mulchRows
+    .map((r, i) => {
+      if (!(n(r.sf) > 0)) return null
+      const CY = (n(r.sf) * (n(r.depth) / 12)) / 27
+      const mt = MULCH_TYPES.find(t => t.label === r.type) || MULCH_TYPES[0]
+      const fabric = r.weedFabric === 'Yes'
+      let mat = CY * mp(mt.dbName, mt.fallback)
+      if (!_mulchDeliveryDone) {
+        mat += mp(GT_RATES.mulchDelivery.dbName, GT_RATES.mulchDelivery.fallback)
+        _mulchDeliveryDone = true
+      }
+      let hrs = (CY / mulchCYPerDay) * 8 + (n(r.sf) / 3200) * 8
+      if (fabric) {
+        mat += n(r.sf) * mp(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)
+        hrs += n(r.sf) * mp(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
+      }
+      return {
+        key: i,
+        label: `${r.type || 'Mulch'} — ${n(r.sf).toLocaleString()} SF × ${n(r.depth)}"${fabric ? ' · weed fabric' : ''}`,
+        value: fmt2(mat),
+        sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} CY`,
+      }
+    })
+    .filter(Boolean)
 
-  // ── DG ────────────────────────────────────────────────────────────────────────
-  let dgLine = null
-  if (n(dgSF) > 0) {
-    const tons = (n(dgSF) * n(dgDepth)) / 200
-    const cement = dgCement === 'Yes'
-    const matBase =
-      tons * mp(GT_RATES.dgPerTon.dbName, GT_RATES.dgPerTon.fallback) +
-      (cement ? tons * mp(GT_RATES.dgCementPerTon.dbName, GT_RATES.dgCementPerTon.fallback) : 0)
-    const mat = matBase * 1.1
-    const dgHandRate = mp(GT_RATES.dgHandLab.dbName, GT_RATES.dgHandLab.fallback)
-    const dgMachineRate = mp(GT_RATES.dgMachineLab.dbName, GT_RATES.dgMachineLab.fallback)
-    const baseHrs =
-      dgMethod === 'Hand'
-        ? (tons * 1.62) / dgHandRate + (n(dgSF) / 1000) * 8 + tons
-        : ((tons * 1.62) / dgMachineRate) * 8 + (n(dgSF) / 1000) * 8 + tons
-    const hrs = baseHrs + (cement ? tons * 1.25 : 0)
-    dgLine = {
-      label: `D.G. — ${n(dgSF).toLocaleString()} SF × ${n(dgDepth)}" (${dgMethod}${cement ? ', cement' : ''})`,
-      value: fmt2(mat),
-      sub: `${hrs.toFixed(2)} hrs · ${tons.toFixed(2)} tons`,
-    }
-  }
+  // ── DG (multi-row) ──────────────────────────────────────────────────────────
+  // New modules store d.dgRows; legacy modules store single dgSF/… fields, which
+  // we synthesize into a one-row array.
+  const _dgRows =
+    Array.isArray(dgRows) && dgRows.length
+      ? dgRows
+      : n(dgSF) > 0
+        ? [
+            {
+              type: dgType,
+              sf: dgSF,
+              depth: dgDepth,
+              weedFabric: dgWeedFabric,
+              method: dgMethod,
+              cement: dgCement,
+            },
+          ]
+        : []
+  const dgHandRate = mp(GT_RATES.dgHandLab.dbName, GT_RATES.dgHandLab.fallback)
+  const dgMachineRate = mp(GT_RATES.dgMachineLab.dbName, GT_RATES.dgMachineLab.fallback)
+  const dgLines = _dgRows
+    .map((r, i) => {
+      if (!(n(r.sf) > 0)) return null
+      const tons = (n(r.sf) * n(r.depth)) / 200
+      const cement = r.cement === 'Yes'
+      const fabric = r.weedFabric === 'Yes'
+      const dgt = DG_TYPES.find(t => t.label === r.type) || DG_TYPES[0]
+      const matBase =
+        tons * mp(dgt.dbName, dgt.fallback) +
+        (cement ? tons * mp(GT_RATES.dgCementPerTon.dbName, GT_RATES.dgCementPerTon.fallback) : 0)
+      let mat = matBase * 1.1
+      const baseHrs =
+        r.method === 'Hand'
+          ? (tons * 1.62) / dgHandRate + (n(r.sf) / 1000) * 8 + tons
+          : ((tons * 1.62) / dgMachineRate) * 8 + (n(r.sf) / 1000) * 8 + tons
+      let hrs = baseHrs + (cement ? tons * 1.25 : 0)
+      if (fabric) {
+        mat += n(r.sf) * mp(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)
+        hrs += n(r.sf) * mp(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
+      }
+      return {
+        key: i,
+        label: `${r.type || 'D.G.'} — ${n(r.sf).toLocaleString()} SF @ ${n(r.depth)}" (${r.method}${cement ? ', cement' : ''}${fabric ? ', fabric' : ''})`,
+        value: fmt2(mat),
+        sub: `${hrs.toFixed(2)} hrs · ${tons.toFixed(2)} tons`,
+      }
+    })
+    .filter(Boolean)
 
   // ── Gravel ────────────────────────────────────────────────────────────────────
   const gravelLines = gravelRows
@@ -302,9 +373,10 @@ export default function GroundTreatmentsSummary({ module }) {
 
   const hasAnyLines =
     soilPrepLine ||
+    sodSoilPrepLine ||
     sodLine ||
-    mulchLine ||
-    dgLine ||
+    mulchLines.length ||
+    dgLines.length ||
     gravelLines.length ||
     edgingLines.length ||
     stepperLines.length ||
@@ -359,7 +431,7 @@ export default function GroundTreatmentsSummary({ module }) {
         <>
           {soilPrepLine && (
             <>
-              <SectionLabel title="Soil Prep" />
+              <SectionLabel title="Planting Bed Prep" />
               <LineRow
                 label={soilPrepLine.label}
                 value={soilPrepLine.value}
@@ -368,24 +440,37 @@ export default function GroundTreatmentsSummary({ module }) {
             </>
           )}
 
-          {sodLine && (
+          {(sodSoilPrepLine || sodLine) && (
             <>
               <SectionLabel title="Sod" />
-              <LineRow label={sodLine.label} value={sodLine.value} sub={sodLine.sub} />
+              {sodSoilPrepLine && (
+                <LineRow
+                  label={sodSoilPrepLine.label}
+                  value={sodSoilPrepLine.value}
+                  sub={sodSoilPrepLine.sub}
+                />
+              )}
+              {sodLine && (
+                <LineRow label={sodLine.label} value={sodLine.value} sub={sodLine.sub} />
+              )}
             </>
           )}
 
-          {mulchLine && (
+          {mulchLines.length > 0 && (
             <>
               <SectionLabel title="Mulch" />
-              <LineRow label={mulchLine.label} value={mulchLine.value} sub={mulchLine.sub} />
+              {mulchLines.map(l => (
+                <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />
+              ))}
             </>
           )}
 
-          {dgLine && (
+          {dgLines.length > 0 && (
             <>
               <SectionLabel title="Decomposed Granite" />
-              <LineRow label={dgLine.label} value={dgLine.value} sub={dgLine.sub} />
+              {dgLines.map(l => (
+                <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />
+              ))}
             </>
           )}
 

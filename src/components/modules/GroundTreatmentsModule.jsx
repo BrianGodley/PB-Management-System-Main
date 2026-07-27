@@ -88,6 +88,13 @@ const MULCH_TYPES = [
   { label: 'Medium Bark Nugget', dbName: 'Mulch - Medium Bark Nugget', fallback: 85 },
 ]
 
+// D.G. product types (material_rates, per TON — matches the existing per-ton DG
+// material calc). Default 'Decomposed Granite' keeps existing estimates unchanged.
+const DG_TYPES = [
+  { label: 'Decomposed Granite', dbName: 'Decomposed Granite', fallback: 50 }, // existing rate
+  { label: 'Rock Dust - Grey', dbName: 'DG - Rock Dust Grey', fallback: 86 }, // placeholder ~$120/CY
+]
+
 const DEFAULTS = {
   laborRatePerHour: 35,
   laborBurdenPct: 0.29,
@@ -113,22 +120,18 @@ function calcGroundTreatments(
   const {
     difficulty,
     hoursAdj,
-    mulchSF,
-    mulchDepth,
-    mulchType,
+    mulchRows,
     plasticEdgingLF,
     metalEdgingLF,
     soilPrepSF,
+    sodSoilPrepSF,
     sodSF,
     sodType,
     flagstoneSoilSF,
     flagstoneConcreteSF,
     precastSoilSF,
     precastConcreteSF,
-    dgSF,
-    dgDepth,
-    dgMethod,
-    dgCement,
+    dgRows,
     gravelRows,
     manualRows,
   } = state
@@ -137,17 +140,28 @@ function calcGroundTreatments(
 
   let totalMat = 0
 
-  // ── Mulch ──────────────────────────────────────────────────────────────────
+  // ── Mulch (multi-row) ────────────────────────────────────────────────────────
   let mulchLab = 0,
     mulchMat = 0
-  if (n(mulchSF) > 0) {
-    const CY = (n(mulchSF) * (n(mulchDepth) / 12)) / 27
+  {
     const mulchCYPerDay = p(GT_RATES.mulchLab.dbName, GT_RATES.mulchLab.fallback)
-    mulchLab = (CY / mulchCYPerDay) * 8 + (n(mulchSF) / 3200) * 8
-    const mt = MULCH_TYPES.find(t => t.label === mulchType) || MULCH_TYPES[0]
-    mulchMat =
-      CY * p(mt.dbName, mt.fallback) +
-      p(GT_RATES.mulchDelivery.dbName, GT_RATES.mulchDelivery.fallback)
+    let anyMulch = false
+    ;(mulchRows || []).forEach(r => {
+      if (!(n(r.sf) > 0)) return
+      anyMulch = true
+      const CY = (n(r.sf) * (n(r.depth) / 12)) / 27
+      const mt = MULCH_TYPES.find(t => t.label === r.type) || MULCH_TYPES[0]
+      mulchMat += CY * p(mt.dbName, mt.fallback)
+      mulchLab += (CY / mulchCYPerDay) * 8 + (n(r.sf) / 3200) * 8
+      if (r.weedFabric === 'Yes') {
+        mulchMat += n(r.sf) * p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)
+        mulchLab += n(r.sf) * p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
+      }
+    })
+    // Flat delivery fee applied ONCE if any mulch row has area.
+    if (anyMulch) {
+      mulchMat += p(GT_RATES.mulchDelivery.dbName, GT_RATES.mulchDelivery.fallback)
+    }
   }
 
   // ── Edging ─────────────────────────────────────────────────────────────────
@@ -163,6 +177,11 @@ function calcGroundTreatments(
   // ── Soil Prep ──────────────────────────────────────────────────────────────
   const soilLab = n(soilPrepSF) * p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
   const soilMat = n(soilPrepSF) * p(GT_RATES.soilPrepMat.dbName, GT_RATES.soilPrepMat.fallback)
+  // Sod bed prep — same rates as Planting Bed Prep, entered in the Sod section.
+  const sodSoilLab =
+    n(sodSoilPrepSF) * p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
+  const sodSoilMat =
+    n(sodSoilPrepSF) * p(GT_RATES.soilPrepMat.dbName, GT_RATES.soilPrepMat.fallback)
 
   // ── Sod ────────────────────────────────────────────────────────────────────
   const sodLab = n(sodSF) * p(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback)
@@ -212,23 +231,33 @@ function calcGroundTreatments(
     }
   }
 
-  // ── Decomposed Granite ─────────────────────────────────────────────────────
+  // ── Decomposed Granite (multi-row) ──────────────────────────────────────────
   let dgLab = 0,
     dgMat = 0
-  if (n(dgSF) > 0) {
-    const tons = (n(dgSF) * n(dgDepth)) / 200
-    const cement = dgCement === 'Yes'
+  {
     const dgHandRate = p(GT_RATES.dgHandLab.dbName, GT_RATES.dgHandLab.fallback)
     const dgMachineRate = p(GT_RATES.dgMachineLab.dbName, GT_RATES.dgMachineLab.fallback)
-    const baseHrs =
-      dgMethod === 'Hand'
-        ? (tons * 1.62) / dgHandRate + (n(dgSF) / 1000) * 8 + tons
-        : ((tons * 1.62) / dgMachineRate) * 8 + (n(dgSF) / 1000) * 8 + tons
-    dgLab = baseHrs + (cement ? tons * 1.25 : 0)
-    dgMat =
-      (tons * p(GT_RATES.dgPerTon.dbName, GT_RATES.dgPerTon.fallback) +
-        (cement ? tons * p(GT_RATES.dgCementPerTon.dbName, GT_RATES.dgCementPerTon.fallback) : 0)) *
-      1.1
+    ;(dgRows || []).forEach(r => {
+      if (!(n(r.sf) > 0)) return
+      const tons = (n(r.sf) * n(r.depth)) / 200
+      const cement = r.cement === 'Yes'
+      const dgt = DG_TYPES.find(t => t.label === r.type) || DG_TYPES[0]
+      const baseHrs =
+        r.method === 'Hand'
+          ? (tons * 1.62) / dgHandRate + (n(r.sf) / 1000) * 8 + tons
+          : ((tons * 1.62) / dgMachineRate) * 8 + (n(r.sf) / 1000) * 8 + tons
+      dgLab += baseHrs + (cement ? tons * 1.25 : 0)
+      dgMat +=
+        (tons * p(dgt.dbName, dgt.fallback) +
+          (cement
+            ? tons * p(GT_RATES.dgCementPerTon.dbName, GT_RATES.dgCementPerTon.fallback)
+            : 0)) *
+        1.1
+      if (r.weedFabric === 'Yes') {
+        dgMat += n(r.sf) * p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)
+        dgLab += n(r.sf) * p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
+      }
+    })
   }
 
   // ── Gravel rows ────────────────────────────────────────────────────────────
@@ -267,6 +296,7 @@ function calcGroundTreatments(
     plasticLab +
     metalLab +
     soilLab +
+    sodSoilLab +
     sodLab +
     flagLab +
     precastLab +
@@ -283,6 +313,7 @@ function calcGroundTreatments(
     plasticMat +
     metalMat +
     soilMat +
+    sodSoilMat +
     sodMat +
     flagMat +
     precastMat +
@@ -364,8 +395,14 @@ function LabeledRow({ label, children, note }) {
 const DEFAULT_GRAVEL_ROWS = [
   { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3' },
   { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3' },
-  { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3' },
-  { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3' },
+]
+const DEFAULT_MULCH_ROWS = [
+  { type: 'Premium Mulch', sf: '', depth: '2', weedFabric: 'No' },
+  { type: 'Premium Mulch', sf: '', depth: '2', weedFabric: 'No' },
+]
+const DEFAULT_DG_ROWS = [
+  { type: 'Decomposed Granite', sf: '', depth: '3.5', weedFabric: 'No', method: 'Machine', cement: 'No' },
+  { type: 'Decomposed Granite', sf: '', depth: '3.5', weedFabric: 'No', method: 'Machine', cement: 'No' },
 ]
 const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 1', hours: '', materials: '', subCost: '' },
@@ -448,12 +485,26 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Landscape')
   const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
   const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
-  const [mulchSF, setMulchSF] = useState(initialData?.mulchSF ?? '')
-  const [mulchDepth, setMulchDepth] = useState(initialData?.mulchDepth ?? '2')
-  const [mulchType, setMulchType] = useState(initialData?.mulchType ?? MULCH_TYPES[0].label)
+  // Mulch is now a multi-row table. Backward-compat: migrate a legacy single
+  // mulch entry (mulchSF/mulchType/…) into the first row + one blank row.
+  const [mulchRows, setMulchRows] = useState(
+    initialData?.mulchRows ??
+      (initialData?.mulchSF != null && initialData?.mulchSF !== ''
+        ? [
+            {
+              type: initialData.mulchType || 'Premium Mulch',
+              sf: initialData.mulchSF,
+              depth: initialData.mulchDepth || '2',
+              weedFabric: initialData.mulchWeedFabric || 'No',
+            },
+            { type: 'Premium Mulch', sf: '', depth: '2', weedFabric: 'No' },
+          ]
+        : DEFAULT_MULCH_ROWS)
+  )
   const [plasticEdgingLF, setPlasticEdgingLF] = useState(initialData?.plasticEdgingLF ?? '')
   const [metalEdgingLF, setMetalEdgingLF] = useState(initialData?.metalEdgingLF ?? '')
   const [soilPrepSF, setSoilPrepSF] = useState(initialData?.soilPrepSF ?? '')
+  const [sodSoilPrepSF, setSodSoilPrepSF] = useState(initialData?.sodSoilPrepSF ?? '')
   const [sodSF, setSodSF] = useState(initialData?.sodSF ?? '')
   const [sodType, setSodType] = useState(initialData?.sodType ?? 'Marathon I/II')
   const [flagstoneSoilSF, setFlagstoneSoilSF] = useState(initialData?.flagstoneSoilSF ?? '')
@@ -462,10 +513,31 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   )
   const [precastSoilSF, setPrecastSoilSF] = useState(initialData?.precastSoilSF ?? '')
   const [precastConcreteSF, setPrecastConcreteSF] = useState(initialData?.precastConcreteSF ?? '')
-  const [dgSF, setDgSF] = useState(initialData?.dgSF ?? '')
-  const [dgDepth, setDgDepth] = useState(initialData?.dgDepth ?? '3.5')
-  const [dgMethod, setDgMethod] = useState(initialData?.dgMethod ?? 'Machine')
-  const [dgCement, setDgCement] = useState(initialData?.dgCement ?? 'Yes')
+  // D.G. is now a multi-row table. Backward-compat: migrate a legacy single DG
+  // entry (dgSF/dgType/…) into the first row + one blank row.
+  const [dgRows, setDgRows] = useState(
+    initialData?.dgRows ??
+      (initialData?.dgSF != null && initialData?.dgSF !== ''
+        ? [
+            {
+              type: initialData.dgType || 'Decomposed Granite',
+              sf: initialData.dgSF,
+              depth: initialData.dgDepth || '3.5',
+              weedFabric: initialData.dgWeedFabric || 'No',
+              method: initialData.dgMethod || 'Machine',
+              cement: initialData.dgCement || 'No',
+            },
+            {
+              type: 'Decomposed Granite',
+              sf: '',
+              depth: '3.5',
+              weedFabric: 'No',
+              method: 'Machine',
+              cement: 'No',
+            },
+          ]
+        : DEFAULT_DG_ROWS)
+  )
   const [gravelRows, setGravelRows] = useState(initialData?.gravelRows ?? DEFAULT_GRAVEL_ROWS)
   const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
 
@@ -489,22 +561,18 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     subType,
     difficulty,
     hoursAdj,
-    mulchSF,
-    mulchDepth,
-    mulchType,
+    mulchRows,
     plasticEdgingLF,
     metalEdgingLF,
     soilPrepSF,
+    sodSoilPrepSF,
     sodSF,
     sodType,
     flagstoneSoilSF,
     flagstoneConcreteSF,
     precastSoilSF,
     precastConcreteSF,
-    dgSF,
-    dgDepth,
-    dgMethod,
-    dgCement,
+    dgRows,
     gravelRows,
     manualRows,
     distanceLF,
@@ -536,6 +604,12 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
 
   function updateGravel(i, field, val) {
     setGravelRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  }
+  function updateMulch(i, field, val) {
+    setMulchRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  }
+  function updateDg(i, field, val) {
+    setDgRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
   function updateManual(i, field, val) {
     setManualRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
@@ -634,12 +708,12 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
         </>
       )}
 
-      {/* ── Soil Prep ── */}
+      {/* ── Planting Bed Prep ── */}
       <div>
-        <SectionHeader title="Soil Prep" />
+        <SectionHeader title="Planting Bed Prep" />
         <div className="space-y-0">
           <LabeledRow
-            label="Soil Prep"
+            label="Till and Amend"
             note={
               n(soilPrepSF) > 0
                 ? `$${(n(soilPrepSF) * p(GT_RATES.soilPrepMat.dbName, 0.1558)).toFixed(2)} mat`
@@ -680,6 +754,41 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       <div>
         <SectionHeader title="Sod" />
         <div className="space-y-0">
+          <LabeledRow
+            label="Soil Prep"
+            note={
+              n(sodSoilPrepSF) > 0
+                ? `$${(n(sodSoilPrepSF) * p(GT_RATES.soilPrepMat.dbName, 0.1558)).toFixed(2)} mat`
+                : null
+            }
+          >
+            <NumInput
+              value={sodSoilPrepSF}
+              onChange={setSodSoilPrepSF}
+              placeholder="SF"
+              className="w-28"
+            />
+            <span className="text-xs text-gray-400 inline-flex items-center gap-1">
+              ${p(GT_RATES.soilPrepMat.dbName, 0.1558).toFixed(2)}/SF
+              <RateEditPopover
+                table="material_rates"
+                name={GT_RATES.soilPrepMat.dbName}
+                category="Ground Treatments"
+                unitLabel="SF"
+                currentValue={p(GT_RATES.soilPrepMat.dbName, GT_RATES.soilPrepMat.fallback)}
+                onSaved={refreshAllRates}
+              />
+              <RateEditPopover
+                table="labor_rates"
+                name={GT_RATES.soilPrepLab.dbName}
+                category="Ground Treatments"
+                mode="coefficient"
+                unitLabel="hrs/SF"
+                currentValue={p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)}
+                onSaved={refreshAllRates}
+              />
+            </span>
+          </LabeledRow>
           <LabeledRow label="Sod">
             <NumInput value={sodSF} onChange={setSodSF} placeholder="SF" className="w-28" />
             <select
@@ -751,25 +860,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
         <SectionHeader title="Mulch" />
         <p className="text-xs text-gray-400 mb-2 inline-flex items-center flex-wrap gap-x-2">
           <span className="inline-flex items-center gap-1">
-            {(() => {
-              const mt = MULCH_TYPES.find(t => t.label === mulchType) || MULCH_TYPES[0]
-              return (
-                <>
-                  ${p(mt.dbName, mt.fallback).toFixed(2)}/CY
-                  <RateEditPopover
-                    table="material_rates"
-                    name={mt.dbName}
-                    category="Ground Treatments"
-                    unitLabel="CY"
-                    currentValue={p(mt.dbName, mt.fallback)}
-                    onSaved={refreshAllRates}
-                  />
-                </>
-              )
-            })()}
-          </span>
-          ·
-          <span className="inline-flex items-center gap-1">
             ${p(GT_RATES.mulchDelivery.dbName, 75).toFixed(2)} delivery
             <RateEditPopover
               table="material_rates"
@@ -793,38 +883,139 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               onSaved={refreshAllRates}
             />
           </span>
+          ·
+          <span className="inline-flex items-center gap-1">
+            Weed fabric ${p(GT_RATES.gravelFabricMat.dbName, 0.1).toFixed(2)}/SF
+            <RateEditPopover
+              table="material_rates"
+              name={GT_RATES.gravelFabricMat.dbName}
+              category="Ground Treatments"
+              unitLabel="SF"
+              currentValue={p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)}
+              onSaved={refreshAllRates}
+            />
+            · {p(GT_RATES.gravelFabricLab.dbName, 0.024)} hrs/SF
+            <RateEditPopover
+              table="labor_rates"
+              name={GT_RATES.gravelFabricLab.dbName}
+              category="Ground Treatments"
+              mode="coefficient"
+              unitLabel="hrs/SF"
+              currentValue={p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)}
+              onSaved={refreshAllRates}
+            />
+          </span>
         </p>
-        <div className="space-y-0">
-          <LabeledRow label="Mulch">
-            <select
-              className="input text-sm py-1.5"
-              value={mulchType}
-              onChange={e => setMulchType(e.target.value)}
-            >
-              {MULCH_TYPES.map(t => (
-                <option key={t.label} value={t.label}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-            <NumInput value={mulchSF} onChange={setMulchSF} placeholder="SF" className="w-28" />
-            <select
-              className="input text-sm py-1.5 w-24"
-              value={mulchDepth}
-              onChange={e => setMulchDepth(e.target.value)}
-            >
-              {['1', '2', '3', '4'].map(d => (
-                <option key={d} value={d}>
-                  {d}" deep
-                </option>
-              ))}
-            </select>
-            {n(mulchSF) > 0 && (
-              <span className="text-xs text-gray-400">
-                {((n(mulchSF) * (n(mulchDepth) / 12)) / 27).toFixed(2)} CY
-              </span>
-            )}
-          </LabeledRow>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-1 font-medium">Type</th>
+                <th className="text-left pb-1 pr-1 font-medium">Area (SF)</th>
+                <th className="text-left pb-1 pr-1 font-medium">Depth (in)</th>
+                <th className="text-left pb-1 font-medium">Weed Fabric</th>
+              </tr>
+            </thead>
+            <tbody>
+              {mulchRows.map((row, i) => {
+                const mt = MULCH_TYPES.find(t => t.label === row.type) || MULCH_TYPES[0]
+                const typeCost = p(mt.dbName, mt.fallback)
+                return (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-1">
+                      <div className="flex flex-col gap-1">
+                        <select
+                          className="input text-sm py-1.5"
+                          value={row.type || MULCH_TYPES[0].label}
+                          onChange={e => updateMulch(i, 'type', e.target.value)}
+                        >
+                          {MULCH_TYPES.map(t => (
+                            <option key={t.label} value={t.label}>
+                              {t.label}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-xs text-gray-400 inline-flex items-center gap-1 whitespace-nowrap">
+                          ${typeCost.toFixed(2)}/CY
+                          <RateEditPopover
+                            table="material_rates"
+                            name={mt.dbName}
+                            category="Ground Treatments"
+                            unitLabel="CY"
+                            currentValue={typeCost}
+                            onSaved={refreshAllRates}
+                          />
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-1 pr-1">
+                      <NumInput value={row.sf} onChange={v => updateMulch(i, 'sf', v)} />
+                    </td>
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.depth}
+                        onChange={e => updateMulch(i, 'depth', e.target.value)}
+                      >
+                        {['1', '2', '3', '4'].map(d => (
+                          <option key={d} value={d}>
+                            {d}" deep
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1">
+                      <div className="flex items-center gap-1">
+                        <select
+                          className="input text-sm py-1.5"
+                          value={row.weedFabric}
+                          onChange={e => updateMulch(i, 'weedFabric', e.target.value)}
+                        >
+                          <option value="No">No</option>
+                          <option value="Yes">Yes</option>
+                        </select>
+                        {mulchRows.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setMulchRows(rows => rows.filter((_, idx) => idx !== i))}
+                            className="text-gray-300 hover:text-red-500 text-sm px-1"
+                            title="Remove line"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <button
+            type="button"
+            onClick={() =>
+              setMulchRows(r => [
+                ...r,
+                { type: 'Premium Mulch', sf: '', depth: '2', weedFabric: 'No' },
+              ])
+            }
+            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+          >
+            + Add line
+          </button>
+          {mulchRows.some(r => n(r.sf) > 0) && (
+            <div className="mt-1 flex gap-4 flex-wrap">
+              {mulchRows.map((row, i) => {
+                if (!n(row.sf)) return null
+                const CY = (n(row.sf) * (n(row.depth) / 12)) / 27
+                return (
+                  <span key={i} className="text-xs text-gray-400">
+                    #{i + 1}: {CY.toFixed(2)} CY
+                  </span>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
 
@@ -832,18 +1023,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       <div>
         <SectionHeader title="Decomposed Granite (D.G.)" />
         <p className="text-xs text-gray-400 mb-2 inline-flex items-center flex-wrap gap-x-2">
-          <span className="inline-flex items-center gap-1">
-            DG ${p(GT_RATES.dgPerTon.dbName, 50).toFixed(2)}/ton
-            <RateEditPopover
-              table="material_rates"
-              name={GT_RATES.dgPerTon.dbName}
-              category="Ground Treatments"
-              unitLabel="ton"
-              currentValue={p(GT_RATES.dgPerTon.dbName, GT_RATES.dgPerTon.fallback)}
-              onSaved={refreshAllRates}
-            />
-          </span>
-          ·
           <span className="inline-flex items-center gap-1">
             Cement add ${p(GT_RATES.dgCementPerTon.dbName, 20).toFixed(2)}/ton
             <RateEditPopover
@@ -881,53 +1060,175 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               onSaved={refreshAllRates}
             />
           </span>
+          ·
+          <span className="inline-flex items-center gap-1">
+            Weed fabric ${p(GT_RATES.gravelFabricMat.dbName, 0.1).toFixed(2)}/SF
+            <RateEditPopover
+              table="material_rates"
+              name={GT_RATES.gravelFabricMat.dbName}
+              category="Ground Treatments"
+              unitLabel="SF"
+              currentValue={p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)}
+              onSaved={refreshAllRates}
+            />
+            · {p(GT_RATES.gravelFabricLab.dbName, 0.024)} hrs/SF
+            <RateEditPopover
+              table="labor_rates"
+              name={GT_RATES.gravelFabricLab.dbName}
+              category="Ground Treatments"
+              mode="coefficient"
+              unitLabel="hrs/SF"
+              currentValue={p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)}
+              onSaved={refreshAllRates}
+            />
+          </span>
         </p>
-        <div className="grid grid-cols-2 gap-3 mb-2">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Area (SF)</label>
-            <NumInput value={dgSF} onChange={setDgSF} />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Depth (Inches)</label>
-            <NumInput value={dgDepth} onChange={setDgDepth} placeholder="3.5" />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Method</label>
-            <select
-              className="input text-sm py-1.5"
-              value={dgMethod}
-              onChange={e => setDgMethod(e.target.value)}
-            >
-              {DG_METHODS.map(m => (
-                <option key={m}>{m}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Add Cement Mixture?</label>
-            <select
-              className="input text-sm py-1.5"
-              value={dgCement}
-              onChange={e => setDgCement(e.target.value)}
-            >
-              <option value="Yes">Yes</option>
-              <option value="No">No</option>
-            </select>
-          </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-1 font-medium">Type</th>
+                <th className="text-left pb-1 pr-1 font-medium">Area (SF)</th>
+                <th className="text-left pb-1 pr-1 font-medium">Depth (in)</th>
+                <th className="text-left pb-1 pr-1 font-medium">Weed Fabric</th>
+                <th className="text-left pb-1 pr-1 font-medium">Method</th>
+                <th className="text-left pb-1 font-medium">Cement</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dgRows.map((row, i) => {
+                const dgt = DG_TYPES.find(t => t.label === row.type) || DG_TYPES[0]
+                const typeCost = p(dgt.dbName, dgt.fallback)
+                return (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-1">
+                      <div className="flex flex-col gap-1">
+                        <select
+                          className="input text-sm py-1.5"
+                          value={row.type || DG_TYPES[0].label}
+                          onChange={e => updateDg(i, 'type', e.target.value)}
+                        >
+                          {DG_TYPES.map(t => (
+                            <option key={t.label} value={t.label}>
+                              {t.label}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-xs text-gray-400 inline-flex items-center gap-1 whitespace-nowrap">
+                          ${typeCost.toFixed(2)}/ton
+                          <RateEditPopover
+                            table="material_rates"
+                            name={dgt.dbName}
+                            category="Ground Treatments"
+                            unitLabel="ton"
+                            currentValue={typeCost}
+                            onSaved={refreshAllRates}
+                          />
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-1 pr-1">
+                      <NumInput value={row.sf} onChange={v => updateDg(i, 'sf', v)} />
+                    </td>
+                    <td className="py-1 pr-1">
+                      <NumInput
+                        value={row.depth}
+                        onChange={v => updateDg(i, 'depth', v)}
+                        placeholder="3.5"
+                      />
+                    </td>
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.weedFabric}
+                        onChange={e => updateDg(i, 'weedFabric', e.target.value)}
+                      >
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                      </select>
+                    </td>
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.method}
+                        onChange={e => updateDg(i, 'method', e.target.value)}
+                      >
+                        {DG_METHODS.map(m => (
+                          <option key={m}>{m}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1">
+                      <div className="flex items-center gap-1">
+                        <select
+                          className="input text-sm py-1.5"
+                          value={row.cement}
+                          onChange={e => updateDg(i, 'cement', e.target.value)}
+                          title="Add Cement Mixture"
+                        >
+                          <option value="No">No</option>
+                          <option value="Yes">Yes</option>
+                        </select>
+                        {dgRows.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setDgRows(rows => rows.filter((_, idx) => idx !== i))}
+                            className="text-gray-300 hover:text-red-500 text-sm px-1"
+                            title="Remove line"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <button
+            type="button"
+            onClick={() =>
+              setDgRows(r => [
+                ...r,
+                {
+                  type: 'Decomposed Granite',
+                  sf: '',
+                  depth: '3.5',
+                  weedFabric: 'No',
+                  method: 'Machine',
+                  cement: 'No',
+                },
+              ])
+            }
+            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+          >
+            + Add line
+          </button>
+          {dgRows.some(r => n(r.sf) > 0) && (
+            <div className="mt-1 flex gap-4 flex-wrap">
+              {dgRows.map((row, i) => {
+                if (!n(row.sf)) return null
+                const tons = (n(row.sf) * n(row.depth)) / 200
+                return (
+                  <span key={i} className="text-xs text-gray-400">
+                    #{i + 1}: {tons.toFixed(2)} tons
+                  </span>
+                )
+              })}
+            </div>
+          )}
+          {(n(calc.dgMat) > 0 || n(calc.dgLab) > 0) && (
+            <div className="mt-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-gray-600 flex gap-6">
+              <span>
+                Material: <strong>${calc.dgMat.toFixed(2)}</strong>
+              </span>
+              <span>
+                Labor: <strong>{calc.dgLab.toFixed(2)} hrs</strong>
+              </span>
+            </div>
+          )}
         </div>
-        {n(dgSF) > 0 && (
-          <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-gray-600 flex gap-6">
-            <span>
-              Tons: <strong>{((n(dgSF) * n(dgDepth)) / 200).toFixed(2)}</strong>
-            </span>
-            <span>
-              Material: <strong>${calc.dgMat.toFixed(2)}</strong>
-            </span>
-            <span>
-              Labor: <strong>{calc.dgLab.toFixed(2)} hrs</strong>
-            </span>
-          </div>
-        )}
       </div>
 
       {/* ── Gravel ── */}
