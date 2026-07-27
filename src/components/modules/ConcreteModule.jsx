@@ -43,6 +43,16 @@ const METHODS = Object.keys(BASE_RATES)
 const FINISH_TYPES = ['Broom Finish', 'Sand Finish', 'Salt Finish', 'Stamped']
 const SEALER_TYPES = ['Natural', 'Wet-Look']
 
+// In-House pour+finish is priced by job-size tier — each tier has its own
+// SF/hr labour rate (editable via labor_rates, category 'Concrete').
+const INSTALL_TIERS = [
+  { key: 's100_300', label: '100–300 SF', rateName: 'Concrete - Install 100-300', def: 6.5 },
+  { key: 's300_600', label: '300–600 SF', rateName: 'Concrete - Install 300-600', def: 12 },
+  { key: 's600_1000', label: '600–1000 SF', rateName: 'Concrete - Install 600-1000', def: 20 },
+  { key: 's1000_2000', label: '1000–2000 SF', rateName: 'Concrete - Install 1000-2000', def: 24 },
+  { key: 's2000plus', label: '2000+ SF', rateName: 'Concrete - Install 2000+', def: 28 },
+]
+
 // ── Hardcoded fallbacks (mirror seed values in each table) ───────────────────
 const R = {
   // Labor production rates (labor_rates)
@@ -163,14 +173,22 @@ function calcConcrete(
   })
 
   // ── Concrete install ─────────────────────────────────────────────────────
-  const installSF = n(state.installSF)
+  // In-House install SF is entered per job-size tier; each tier has its own
+  // SF/hr rate. Total SF drives the material (CY) + finish add-ons.
+  const installTiers = state.installTiers || {}
+  const installSF = INSTALL_TIERS.reduce((s, t) => s + n(installTiers[t.key]), 0)
   const depthIn = n(state.depthIn) || 4
   const rebarSF = n(state.rebarSF)
   const formLF = n(state.formLF)
   const sleeveLF = n(state.sleeveLF)
 
   const concreteCY = installSF > 0 ? ((depthIn / 12) * installSF) / 27 : 0
-  const installHrs = installSF / concreteSFPerHr
+  const installHrs = INSTALL_TIERS.reduce((s, t) => {
+    const sf = n(installTiers[t.key])
+    if (!sf) return s
+    const rate = lr[t.rateName] ?? t.def
+    return s + (rate > 0 ? sf / rate : 0)
+  }, 0)
   const concreteMat = concreteCY * concretePerCY
 
   const rebarHrs = rebarSF > 0 ? rebarSF / rebarSFPerHr : 0
@@ -475,7 +493,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
 
   // Install
-  const [installSF, setInstallSF] = useState(initialData?.installSF ?? '')
+  const [installTiers, setInstallTiers] = useState(initialData?.installTiers ?? {})
   const [depthIn, setDepthIn] = useState(initialData?.depthIn ?? '4')
   const [rebarSF, setRebarSF] = useState(initialData?.rebarSF ?? '')
   const [formLF, setFormLF] = useState(initialData?.formLF ?? '')
@@ -540,7 +558,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     formingComplexity,
     finishingType,
     hoursAdj,
-    installSF,
+    installTiers,
     depthIn,
     rebarSF,
     formLF,
@@ -561,8 +579,11 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   // the current tab, so In-House and Subcontractor are fully independent
   // calculators. Modifiers (difficulty/layout/etc.) are In-House only.
   const isSub = subType === 'Subcontractor'
-  const activeInstallSF = isSub ? subInstallSF : installSF
-  const setActiveInstallSF = isSub ? setSubInstallSF : setInstallSF
+  const installTiersTotal = INSTALL_TIERS.reduce((s, t) => s + n(installTiers[t.key]), 0)
+  // In-House install is entered per tier (below); activeInstallSF is the total
+  // used for the CY/material readout. Sub uses its single whole-slab SF field.
+  const activeInstallSF = isSub ? subInstallSF : installTiersTotal
+  const setActiveInstallSF = isSub ? setSubInstallSF : () => {}
   const activeDepthIn = isSub ? subDepthIn : depthIn
   const setActiveDepthIn = isSub ? setSubDepthIn : setDepthIn
   const activeRebarSF = isSub ? subRebarSF : rebarSF
@@ -961,7 +982,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
       <div>
         <SectionHeader title="Concrete Install" />
         <div className="grid grid-cols-2 gap-3">
-          <div>
+          <div className={!isSub ? 'col-span-2' : undefined}>
             <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap">
               Installation (Sq Ft)
               {isSub ? (
@@ -977,19 +998,8 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                   />
                 </span>
               ) : (
-                <>
-                  <span className="text-gray-400">
-                    — {calc.concreteSFPerHr} SF/hr · ${calc.concretePerCY}/CY
-                  </span>
-                  <RateEditPopover
-                    table="labor_rates"
-                    name="Concrete - Pour & Finish"
-                    category="Concrete"
-                    mode="coefficient"
-                    unitLabel="SF/hr"
-                    currentValue={calc.concreteSFPerHr}
-                    onSaved={refreshAllRates}
-                  />
+                <span className="text-gray-400 inline-flex items-center gap-1">
+                  — ${calc.concretePerCY}/CY
                   <RateEditPopover
                     table="material_rates"
                     name="Concrete - Per CY"
@@ -998,16 +1008,48 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                     currentValue={calc.concretePerCY}
                     onSaved={refreshAllRates}
                   />
-                </>
+                </span>
               )}
             </label>
-            <NumInput
-              value={activeInstallSF}
-              onChange={v => {
-                setActiveInstallSF(v)
-                if (!activeRebarSF) setActiveRebarSF(v)
-              }}
-            />
+            {isSub ? (
+              <NumInput
+                value={activeInstallSF}
+                onChange={v => {
+                  setActiveInstallSF(v)
+                  if (!activeRebarSF) setActiveRebarSF(v)
+                }}
+              />
+            ) : (
+              <div className="space-y-1">
+                {INSTALL_TIERS.map(t => {
+                  const rate = laborRates[t.rateName] ?? t.def
+                  return (
+                    <div key={t.key} className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 w-24 shrink-0">{t.label}</span>
+                      <div className="flex-1">
+                        <NumInput
+                          value={installTiers[t.key] ?? ''}
+                          onChange={v => setInstallTiers({ ...installTiers, [t.key]: v })}
+                          placeholder="0 SF"
+                        />
+                      </div>
+                      <span className="text-[11px] text-gray-400 inline-flex items-center gap-1 shrink-0 whitespace-nowrap">
+                        {rate} SF/hr
+                        <RateEditPopover
+                          table="labor_rates"
+                          name={t.rateName}
+                          category="Concrete"
+                          mode="coefficient"
+                          unitLabel="SF/hr"
+                          currentValue={rate}
+                          onSaved={refreshAllRates}
+                        />
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
           <div>
             <label className="text-xs text-gray-500 block mb-1">Depth (inches)</label>

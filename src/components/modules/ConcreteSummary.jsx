@@ -20,7 +20,24 @@ function buildSections(f, isSub) {
     }))
 
   const install = []
-  if (n(f.installSF) > 0)
+  if (f.installTiers) {
+    // In-House install is entered per job-size tier.
+    const TIER_LABELS = {
+      s100_300: '100–300 SF',
+      s300_600: '300–600 SF',
+      s600_1000: '600–1000 SF',
+      s1000_2000: '1000–2000 SF',
+      s2000plus: '2000+ SF',
+    }
+    Object.entries(TIER_LABELS).forEach(([k, label]) => {
+      if (n(f.installTiers[k]) > 0)
+        install.push({
+          label: `Install (${label})`,
+          value: `${n(f.installTiers[k]).toLocaleString()} SF`,
+          sub: `${f.depthIn || 4}"`,
+        })
+    })
+  } else if (n(f.installSF) > 0)
     install.push({ label: 'Pour + Finish', value: `${n(f.installSF).toLocaleString()} SF`, sub: `${f.depthIn || 4}"` })
   if (n(f.rebarSF) > 0)
     install.push({ label: 'Rebar 24" OC', value: `${n(f.rebarSF).toLocaleString()} SF` })
@@ -68,7 +85,7 @@ export default function ConcreteSummary({ module }) {
 
   const inHouseSections = buildSections(
     {
-      installSF: d.installSF,
+      installTiers: d.installTiers,
       depthIn: d.depthIn,
       rebarSF: d.rebarSF,
       formLF: d.formLF,
