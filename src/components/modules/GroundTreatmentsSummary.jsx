@@ -4,6 +4,21 @@ import FinancialSummaryList from './FinancialSummaryList'
 // GroundTreatmentsSummary — read-only detail view for a saved Ground Treatments module
 // ─────────────────────────────────────────────────────────────────────────────
 
+const MULCH_TYPES = [
+  { label: 'Premium Mulch', dbName: 'Mulch - Premium', fallback: 20 },
+  { label: 'Brown Shredded', dbName: 'Mulch - Brown Shredded', fallback: 20 },
+  { label: 'Flower Bed Mulch', dbName: 'Mulch - Flower Bed', fallback: 28 },
+  { label: 'Shredded Cedar / Gorilla Hair', dbName: 'Mulch - Shredded Cedar', fallback: 80 },
+  { label: 'Forest Moss', dbName: 'Mulch - Forest Moss', fallback: 80 },
+  { label: 'Black Dyed Chips', dbName: 'Mulch - Black Dyed Chips', fallback: 32 },
+  { label: 'Brown Dyed Chips', dbName: 'Mulch - Brown Dyed Chips', fallback: 32 },
+  { label: 'Red Dyed Chips', dbName: 'Mulch - Red Dyed Chips', fallback: 32 },
+  { label: 'Playground Chips', dbName: 'Mulch - Playground Chips', fallback: 60 },
+  { label: 'Walk On Bark', dbName: 'Mulch - Walk On Bark', fallback: 85 },
+  { label: 'Small Bark Nugget', dbName: 'Mulch - Small Bark Nugget', fallback: 85 },
+  { label: 'Medium Bark Nugget', dbName: 'Mulch - Medium Bark Nugget', fallback: 85 },
+]
+
 const GT_RATES = {
   mulchPerCY: { dbName: 'Mulch', fallback: 25.0 },
   mulchDelivery: { dbName: 'Mulch Delivery Fee', fallback: 75.0 },
@@ -81,6 +96,7 @@ export default function GroundTreatmentsSummary({ module }) {
     hoursAdj = 0,
     mulchSF = 0,
     mulchDepth = 2,
+    mulchType = 'Premium Mulch',
     plasticEdgingLF = 0,
     metalEdgingLF = 0,
     soilPrepSF = 0,
@@ -140,13 +156,14 @@ export default function GroundTreatmentsSummary({ module }) {
   let mulchLine = null
   if (n(mulchSF) > 0) {
     const CY = (n(mulchSF) * (n(mulchDepth) / 12)) / 27
+    const mt = MULCH_TYPES.find(t => t.label === mulchType) || MULCH_TYPES[0]
     const mat =
-      CY * mp(GT_RATES.mulchPerCY.dbName, GT_RATES.mulchPerCY.fallback) +
+      CY * mp(mt.dbName, mt.fallback) +
       mp(GT_RATES.mulchDelivery.dbName, GT_RATES.mulchDelivery.fallback)
     const mulchCYPerDay = mp(GT_RATES.mulchLab.dbName, GT_RATES.mulchLab.fallback)
     const hrs = (CY / mulchCYPerDay) * 8 + (n(mulchSF) / 3200) * 8
     mulchLine = {
-      label: `Mulch — ${n(mulchSF).toLocaleString()} SF × ${n(mulchDepth)}"`,
+      label: `${mulchType || 'Mulch'} — ${n(mulchSF).toLocaleString()} SF × ${n(mulchDepth)}"`,
       value: fmt2(mat),
       sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} CY`,
     }

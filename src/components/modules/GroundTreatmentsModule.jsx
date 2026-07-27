@@ -72,6 +72,22 @@ const GRAVEL_TYPES = [
   { label: 'Black River Rock 2" to 3"', dbName: 'Gravel - Black River Rock 2in-3in', fallback: 130 },
 ]
 
+// Mulch product types (material_rates, $/CY). Type drives material cost only.
+const MULCH_TYPES = [
+  { label: 'Premium Mulch', dbName: 'Mulch - Premium', fallback: 20 },
+  { label: 'Brown Shredded', dbName: 'Mulch - Brown Shredded', fallback: 20 },
+  { label: 'Flower Bed Mulch', dbName: 'Mulch - Flower Bed', fallback: 28 },
+  { label: 'Shredded Cedar / Gorilla Hair', dbName: 'Mulch - Shredded Cedar', fallback: 80 },
+  { label: 'Forest Moss', dbName: 'Mulch - Forest Moss', fallback: 80 },
+  { label: 'Black Dyed Chips', dbName: 'Mulch - Black Dyed Chips', fallback: 32 },
+  { label: 'Brown Dyed Chips', dbName: 'Mulch - Brown Dyed Chips', fallback: 32 },
+  { label: 'Red Dyed Chips', dbName: 'Mulch - Red Dyed Chips', fallback: 32 },
+  { label: 'Playground Chips', dbName: 'Mulch - Playground Chips', fallback: 60 },
+  { label: 'Walk On Bark', dbName: 'Mulch - Walk On Bark', fallback: 85 },
+  { label: 'Small Bark Nugget', dbName: 'Mulch - Small Bark Nugget', fallback: 85 },
+  { label: 'Medium Bark Nugget', dbName: 'Mulch - Medium Bark Nugget', fallback: 85 },
+]
+
 const DEFAULTS = {
   laborRatePerHour: 35,
   laborBurdenPct: 0.29,
@@ -99,6 +115,7 @@ function calcGroundTreatments(
     hoursAdj,
     mulchSF,
     mulchDepth,
+    mulchType,
     plasticEdgingLF,
     metalEdgingLF,
     soilPrepSF,
@@ -127,8 +144,9 @@ function calcGroundTreatments(
     const CY = (n(mulchSF) * (n(mulchDepth) / 12)) / 27
     const mulchCYPerDay = p(GT_RATES.mulchLab.dbName, GT_RATES.mulchLab.fallback)
     mulchLab = (CY / mulchCYPerDay) * 8 + (n(mulchSF) / 3200) * 8
+    const mt = MULCH_TYPES.find(t => t.label === mulchType) || MULCH_TYPES[0]
     mulchMat =
-      CY * p(GT_RATES.mulchPerCY.dbName, GT_RATES.mulchPerCY.fallback) +
+      CY * p(mt.dbName, mt.fallback) +
       p(GT_RATES.mulchDelivery.dbName, GT_RATES.mulchDelivery.fallback)
   }
 
@@ -432,6 +450,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
   const [mulchSF, setMulchSF] = useState(initialData?.mulchSF ?? '')
   const [mulchDepth, setMulchDepth] = useState(initialData?.mulchDepth ?? '2')
+  const [mulchType, setMulchType] = useState(initialData?.mulchType ?? MULCH_TYPES[0].label)
   const [plasticEdgingLF, setPlasticEdgingLF] = useState(initialData?.plasticEdgingLF ?? '')
   const [metalEdgingLF, setMetalEdgingLF] = useState(initialData?.metalEdgingLF ?? '')
   const [soilPrepSF, setSoilPrepSF] = useState(initialData?.soilPrepSF ?? '')
@@ -472,6 +491,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     hoursAdj,
     mulchSF,
     mulchDepth,
+    mulchType,
     plasticEdgingLF,
     metalEdgingLF,
     soilPrepSF,
@@ -731,6 +751,17 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
         <SectionHeader title="Mulch" />
         <div className="space-y-0">
           <LabeledRow label="Mulch">
+            <select
+              className="input text-sm py-1.5"
+              value={mulchType}
+              onChange={e => setMulchType(e.target.value)}
+            >
+              {MULCH_TYPES.map(t => (
+                <option key={t.label} value={t.label}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
             <NumInput value={mulchSF} onChange={setMulchSF} placeholder="SF" className="w-28" />
             <select
               className="input text-sm py-1.5 w-24"
@@ -744,15 +775,22 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               ))}
             </select>
             <span className="text-xs text-gray-400 inline-flex items-center gap-1">
-              ${p(GT_RATES.mulchPerCY.dbName, 25).toFixed(2)}/CY
-              <RateEditPopover
-                table="material_rates"
-                name={GT_RATES.mulchPerCY.dbName}
-                category="Ground Treatments"
-                unitLabel="CY"
-                currentValue={p(GT_RATES.mulchPerCY.dbName, GT_RATES.mulchPerCY.fallback)}
-                onSaved={refreshAllRates}
-              />
+              {(() => {
+                const mt = MULCH_TYPES.find(t => t.label === mulchType) || MULCH_TYPES[0]
+                return (
+                  <>
+                    ${p(mt.dbName, mt.fallback).toFixed(2)}/CY
+                    <RateEditPopover
+                      table="material_rates"
+                      name={mt.dbName}
+                      category="Ground Treatments"
+                      unitLabel="CY"
+                      currentValue={p(mt.dbName, mt.fallback)}
+                      onSaved={refreshAllRates}
+                    />
+                  </>
+                )
+              })()}
               · ${p(GT_RATES.mulchDelivery.dbName, 75).toFixed(2)} delivery
               <RateEditPopover
                 table="material_rates"

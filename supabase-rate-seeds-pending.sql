@@ -142,12 +142,36 @@ ON CONFLICT DO NOTHING;
 INSERT INTO public.material_rates (name, unit_cost, category, notes, tenant_id)
 SELECT v.name, v.unit_cost, 'Ground Treatments', v.notes, t.tenant_id
 FROM (VALUES
-  ('Gravel - Crushed Pea Gravel',        130, 'Gravel type $/CY - placeholder, update pricing'),
-  ('Gravel - 3/4" Crushed Gravel',       130, 'Gravel type $/CY - placeholder, update pricing'),
-  ('Gravel - Del Rio',                   130, 'Gravel type $/CY - placeholder, update pricing'),
-  ('Gravel - Black River Rock 1in minus', 130, 'Gravel type $/CY - placeholder, update pricing'),
-  ('Gravel - Black River Rock 1in-2in',  130, 'Gravel type $/CY - placeholder, update pricing'),
-  ('Gravel - Black River Rock 2in-3in',  130, 'Gravel type $/CY - placeholder, update pricing')
+  ('Gravel - Crushed Pea Gravel',        95,  'C&M 1/4" Crushed Pea Gravel $/CY (2026-05-22)'),
+  ('Gravel - 3/4" Crushed Gravel',       79,  'C&M 3/4" Crushed Gravel $/CY (2026-05-22)'),
+  ('Gravel - Del Rio',                   200, 'C&M Del Rio Pebble $/CY (2026-05-22)'),
+  ('Gravel - Black River Rock 1in minus', 130, 'Gravel type $/CY - placeholder, no C&M match'),
+  ('Gravel - Black River Rock 1in-2in',  130, 'Gravel type $/CY - placeholder, no C&M match'),
+  ('Gravel - Black River Rock 2in-3in',  130, 'Gravel type $/CY - placeholder, no C&M match')
+) AS v(name, unit_cost, notes)
+CROSS JOIN (SELECT DISTINCT tenant_id FROM public.material_rates) AS t
+ON CONFLICT DO NOTHING;
+
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- GROUND TREATMENTS — material_rates : Mulch product types ($/CY, C&M 2026-05-22)
+-- (2026-07-27)
+-- ═════════════════════════════════════════════════════════════════════════════
+INSERT INTO public.material_rates (name, unit_cost, category, notes, tenant_id)
+SELECT v.name, v.unit_cost, 'Ground Treatments', v.notes, t.tenant_id
+FROM (VALUES
+  ('Mulch - Premium',          20, 'C&M Premium Mulch $/CY'),
+  ('Mulch - Brown Shredded',   20, 'C&M Brown Shredded $/CY'),
+  ('Mulch - Flower Bed',       28, 'C&M Flower Bed Mulch $/CY'),
+  ('Mulch - Shredded Cedar',   80, 'C&M Shredded Cedar / Gorilla Hair $/CY'),
+  ('Mulch - Forest Moss',      80, 'C&M Forest Moss (triple grind cedar) $/CY'),
+  ('Mulch - Black Dyed Chips', 32, 'C&M Black Dyed Wood Chips $/CY'),
+  ('Mulch - Brown Dyed Chips', 32, 'C&M Brown Dyed Wood Chips $/CY'),
+  ('Mulch - Red Dyed Chips',   32, 'C&M Red Dyed Wood Chips $/CY'),
+  ('Mulch - Playground Chips', 60, 'C&M Certified Playground Chips $/CY'),
+  ('Mulch - Walk On Bark',     85, 'C&M Walk On Bark 2"-3" $/CY'),
+  ('Mulch - Small Bark Nugget', 85, 'C&M Small Bark Nugget 1/2"-3/4" $/CY'),
+  ('Mulch - Medium Bark Nugget', 85, 'C&M Medium Bark Nugget 1"-1 3/4" $/CY')
 ) AS v(name, unit_cost, notes)
 CROSS JOIN (SELECT DISTINCT tenant_id FROM public.material_rates) AS t
 ON CONFLICT DO NOTHING;
