@@ -42,12 +42,29 @@ const BASE_METHOD_LABOR_NAME = {
 const METHODS = Object.keys(BASE_RATES)
 const FINISH_TYPES = [
   'Broom Finish',
+  'Smooth Trowel',
   'Sand Finish',
   'Salt Finish',
   'Stamped',
   'Exposed Aggregate',
   'Seeded Aggregate',
 ]
+
+// Sub-tab finish modifier — flat $/SF (labor) + optional $/SF material, on top
+// of the base install $/SF. Broom + Smooth Trowel have no added cost.
+const SUB_FINISH_RATES = {
+  'Sand Finish': { labor: { name: 'Concrete Sub - Sand Finish Per SF', def: 2 } },
+  'Salt Finish': { labor: { name: 'Concrete Sub - Salt Finish Per SF', def: 3 } },
+  Stamped: { labor: { name: 'Concrete Sub - Stamped Per SF', def: 3 } },
+  'Exposed Aggregate': {
+    labor: { name: 'Concrete Sub - Exposed Aggregate Per SF', def: 5 },
+    mat: { name: 'Concrete Sub - Exposed Aggregate Mat Per SF', def: 2.75 },
+  },
+  'Seeded Aggregate': {
+    labor: { name: 'Concrete Sub - Seeded Aggregate Per SF', def: 4.5 },
+    mat: { name: 'Concrete Sub - Seeded Aggregate Mat Per SF', def: 1.75 },
+  },
+}
 const SEALER_TYPES = ['Natural', 'Wet-Look']
 
 // In-House pour+finish is priced by job-size tier — each tier has its own
@@ -664,6 +681,14 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   // Sub-side vapor barrier + sealer are flat $/SF (no SF/hr labor component).
   const subVaporBarrierRate = subRates['Concrete Sub - Vapor Barrier Per SF'] ?? 1
   const subSealerRate = subRates['Concrete Sub - Sealer Per SF'] ?? 3
+  // Sub-side finish modifier ($/SF labor + optional $/SF material).
+  const subFinishCfg = SUB_FINISH_RATES[subFinishType] || null
+  const subFinishLaborPerSF = subFinishCfg
+    ? subRates[subFinishCfg.labor.name] ?? subFinishCfg.labor.def
+    : 0
+  const subFinishMatPerSF = subFinishCfg?.mat
+    ? subRates[subFinishCfg.mat.name] ?? subFinishCfg.mat.def
+    : 0
   const lrph = n(laborRatePerHour) || 35
   // Resolved add-on rates (identical on both tabs — sourced from rate maps).
   const {
@@ -688,9 +713,10 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const subConcreteCY =
     n(subInstallSF) > 0 ? ((_subDepth / 12) * n(subInstallSF)) / 27 : 0
   let subSideCost = 0
-  // Concrete install — flat $/SF (finish folded in, so subFinishType ignored).
+  // Concrete install — flat $/SF, plus a per-finish $/SF modifier (labor + mat).
   // No Base Install or Form Edging on the sub side (removed by request).
   subSideCost += n(subInstallSF) * subSlabRate
+  subSideCost += n(subInstallSF) * (subFinishLaborPerSF + subFinishMatPerSF)
   // Rebar
   if (n(subRebarSF) > 0) {
     subSideCost += n(subRebarSF) * rebarSFPrice + (n(subRebarSF) / rebarSFPerHr) * lrph
@@ -1211,9 +1237,35 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           <div>
             <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap">
               Finish Type
-              {isSub && (
-                <span className="text-gray-400">— folded into $/SF</span>
-              )}
+              {isSub &&
+                (subFinishCfg ? (
+                  <span className="text-gray-400 inline-flex items-center gap-1 flex-wrap">
+                    — ${subFinishLaborPerSF}/SF
+                    <RateEditPopover
+                      table="subcontractor_rates"
+                      name={subFinishCfg.labor.name}
+                      category="Concrete"
+                      unitLabel="/SF"
+                      currentValue={subFinishLaborPerSF}
+                      onSaved={refreshAllRates}
+                    />
+                    {subFinishCfg.mat && (
+                      <>
+                        · ${subFinishMatPerSF}/SF mat
+                        <RateEditPopover
+                          table="subcontractor_rates"
+                          name={subFinishCfg.mat.name}
+                          category="Concrete"
+                          unitLabel="/SF"
+                          currentValue={subFinishMatPerSF}
+                          onSaved={refreshAllRates}
+                        />
+                      </>
+                    )}
+                  </span>
+                ) : (
+                  <span className="text-gray-400">— no added cost</span>
+                ))}
               {!isSub && activeFinishType === 'Sand Finish' && (
                 <span className="text-gray-400 inline-flex items-center gap-1 flex-wrap">
                   — {calc.sandFinishSFPerHr} SF/hr
