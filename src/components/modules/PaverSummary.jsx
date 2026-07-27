@@ -90,25 +90,31 @@ export default function PaverSummary({ module }) {
     false
   )
 
-  const subSections = paverSections(
-    {
-      areaRows: d.subAreaRows,
-      is80mm: d.subIs80mm,
-      straightCutLF: d.subStraightCutLF,
-      curvedCutLF: d.subCurvedCutLF,
-      restraintsLF: d.subRestraintsLF,
-      sleevesLF: d.subSleevesLF,
-      vertSoldierLF: d.subVertSoldierLF,
-      vertPaverName: d.subVertPaverName,
-      sealerSF: d.subSealerSF,
-      polySand: d.subPolySand,
-      polySandExistingSF: d.subPolySandExistingSF,
-      numStones: d.subNumStones,
-      numColors: d.subNumColors,
-      manualRows: d.subManualRows,
-    },
-    true
-  )
+  // Sub tab is a fixed set of install line items (SF each) + sleeves (LF).
+  const SUB_LINES = [
+    ['handDemo', 'Paver with Hand Demo'],
+    ['bobcatDemo', 'Paver with Bobcat Demo'],
+    ['noDemo', 'Paver No Demo'],
+    ['noDemoBase', 'Paver No Demo/Base'],
+    ['tileConcrete', 'Tile Paver in Concrete'],
+    ['permeable', 'Permeable Paver'],
+    ['largeFormat', 'Large Format Paver'],
+    ['under500', 'Less than 500 SF'],
+  ]
+  const si = d.subInstall || {}
+  const installRows = SUB_LINES.filter(([k]) => n(si[k]) > 0).map(([k, label]) => ({
+    label,
+    value: `${n(si[k]).toLocaleString()} SF`,
+  }))
+  if (n(d.subSleevesLF) > 0)
+    installRows.push({ label: 'Sleeves', value: `${n(d.subSleevesLF).toLocaleString()} LF` })
+  const subManual = (d.subManualRows || [])
+    .filter(r => n(r.subCost) > 0)
+    .map((r, i) => ({ label: r.label || `Item ${i + 1}`, value: fmt2(r.subCost) }))
+  const subSections = [
+    { title: 'Paver & Demo Installation', rows: installRows },
+    { title: 'Manual Entry', rows: subManual },
+  ]
 
   // ── Totals from saved calc snapshot ────────────────────────────────────────
   const c = d.calc || {}
