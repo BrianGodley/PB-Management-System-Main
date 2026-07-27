@@ -50,7 +50,16 @@ function buildSections(f, isSub) {
   const options = []
   if (n(f.installSF) > 0 && f.finishType) options.push({ label: 'Finish', value: f.finishType })
   if (f.colorYes) options.push({ label: 'Color Hardener', value: 'Yes' })
-  if (f.pumpYes) options.push({ label: 'Concrete Pump', value: 'Yes' })
+  // In-House pump is auto-included for 300+ tiers; Sub keeps its explicit flag.
+  const pumpOn = f.installTiers
+    ? n(f.installTiers.s300_600) +
+        n(f.installTiers.s600_1000) +
+        n(f.installTiers.s1000_2000) +
+        n(f.installTiers.s2000plus) >
+      0
+    : f.pumpYes
+  if (pumpOn)
+    options.push({ label: 'Concrete Pump', value: f.installTiers ? 'Yes (auto 300+)' : 'Yes' })
   if (n(f.vaporBarrierSF) > 0)
     options.push({ label: 'Vapor Barrier', value: `${n(f.vaporBarrierSF).toLocaleString()} SF` })
   if (n(f.sealerSF) > 0)

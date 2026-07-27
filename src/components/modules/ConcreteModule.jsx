@@ -40,7 +40,14 @@ const BASE_METHOD_LABOR_NAME = {
 }
 
 const METHODS = Object.keys(BASE_RATES)
-const FINISH_TYPES = ['Broom Finish', 'Sand Finish', 'Salt Finish', 'Stamped']
+const FINISH_TYPES = [
+  'Broom Finish',
+  'Sand Finish',
+  'Salt Finish',
+  'Stamped',
+  'Exposed Aggregate',
+  'Seeded Aggregate',
+]
 const SEALER_TYPES = ['Natural', 'Wet-Look']
 
 // In-House pour+finish is priced by job-size tier — each tier has its own
@@ -122,6 +129,11 @@ function calcConcrete(
   const vaporBarrierSFPerHr = lr['Concrete - Vapor Barrier'] ?? R.vaporBarrierSFPerHr
   const complexityPctPerUnit =
     lr['Concrete - Forming Complexity % Per Unit'] ?? R.complexityPctPerUnit
+  // Finish add-on labor coefficients (SF/hr) — editable via labor_rates.
+  const sandFinishSFPerHr = lr['Concrete - Sand Finish SF/hr'] ?? 100
+  const saltFinishSFPerHr = lr['Concrete - Salt Finish SF/hr'] ?? 25
+  const exposedAggSFPerHr = lr['Concrete - Exposed Aggregate SF/hr'] ?? 50
+  const seededAggSFPerHr = lr['Concrete - Seeded Aggregate SF/hr'] ?? 40
 
   // ── Material unit costs (material_rates) ─────────────────────────────────
   const concretePerCY = mr['Concrete - Per CY'] ?? R.concretePerCY
@@ -215,10 +227,14 @@ function calcConcrete(
     finishSubCost = 0,
     colorMat = 0
   if (finishType === 'Sand Finish') {
-    finishHrs = installSF / 100
+    finishHrs = sandFinishSFPerHr > 0 ? installSF / sandFinishSFPerHr : 0
     if (isIH) finishSubCost = Math.ceil(installSF / 400) * sandFinishPer400SF
   } else if (finishType === 'Salt Finish') {
-    finishHrs = installSF / 25
+    finishHrs = saltFinishSFPerHr > 0 ? installSF / saltFinishSFPerHr : 0
+  } else if (finishType === 'Exposed Aggregate') {
+    finishHrs = exposedAggSFPerHr > 0 ? installSF / exposedAggSFPerHr : 0
+  } else if (finishType === 'Seeded Aggregate') {
+    finishHrs = seededAggSFPerHr > 0 ? installSF / seededAggSFPerHr : 0
   } else if (finishType === 'Stamped') {
     finishSubCost = isIH ? stampSubFlat : concreteCY * stampSubPerCY
   }
@@ -227,7 +243,15 @@ function calcConcrete(
   }
 
   // ── Pump ────────────────────────────────────────────────────────────────
-  const pumpMat = pumpYes && concreteCY > 0 ? pumpFeeFlat + pumpFeePerCY * Math.ceil(concreteCY) : 0
+  // Auto-included whenever any 300+ SF install tier has SF (In-House). The
+  // pumpYes toggle was removed from the UI; pump is now driven by job size.
+  const pumpAuto =
+    n(installTiers.s300_600) +
+      n(installTiers.s600_1000) +
+      n(installTiers.s1000_2000) +
+      n(installTiers.s2000plus) >
+    0
+  const pumpMat = pumpAuto && concreteCY > 0 ? pumpFeeFlat + pumpFeePerCY * Math.ceil(concreteCY) : 0
 
   // ── Vapor barrier ────────────────────────────────────────────────────────
   const vaporHrs = vaporSF > 0 ? vaporSF / vaporBarrierSFPerHr : 0
@@ -343,6 +367,11 @@ function calcConcrete(
     sandFinishPer400SF,
     stampSubFlat,
     stampSubPerCY,
+    sandFinishSFPerHr,
+    saltFinishSFPerHr,
+    exposedAggSFPerHr,
+    seededAggSFPerHr,
+    pumpAuto,
   }
 }
 
@@ -981,7 +1010,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
       {/* ── Concrete Install ── */}
       <div>
         <SectionHeader title="Concrete Install" />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 items-end">
           <div className={!isSub ? 'col-span-2' : undefined}>
             <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap">
               Installation (Sq Ft)
@@ -1023,17 +1052,24 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               <div className="space-y-1">
                 {INSTALL_TIERS.map(t => {
                   const rate = laborRates[t.rateName] ?? t.def
+                  const is300plus = t.key !== 's100_300'
+                  const hasSF = n(installTiers[t.key]) > 0
                   return (
                     <div key={t.key} className="flex items-center gap-2">
                       <span className="text-[11px] text-gray-500 w-24 shrink-0">{t.label}</span>
-                      <div className="flex-1">
+                      <div className="w-20 shrink-0">
                         <NumInput
                           value={installTiers[t.key] ?? ''}
                           onChange={v => setInstallTiers({ ...installTiers, [t.key]: v })}
                           placeholder="0 SF"
                         />
                       </div>
-                      <span className="text-[11px] text-gray-400 inline-flex items-center gap-1 shrink-0 whitespace-nowrap">
+                      {is300plus && hasSF && (
+                        <span className="text-[10px] text-green-600 shrink-0 whitespace-nowrap">
+                          pump incl.
+                        </span>
+                      )}
+                      <span className="text-[11px] text-gray-400 inline-flex items-center gap-1 shrink-0 whitespace-nowrap ml-auto">
                         {rate} SF/hr
                         <RateEditPopover
                           table="labor_rates"
@@ -1048,6 +1084,26 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                     </div>
                   )
                 })}
+                <div className="pt-1 text-[11px] text-gray-400 inline-flex items-center gap-1 flex-wrap">
+                  Pump (auto 300+): ${calc.pumpFeeFlat} flat
+                  <RateEditPopover
+                    table="subcontractor_rates"
+                    name="Concrete - Pump Flat Fee"
+                    category="Concrete"
+                    unitLabel="flat"
+                    currentValue={calc.pumpFeeFlat}
+                    onSaved={refreshAllRates}
+                  />
+                  + ${calc.pumpFeePerCY}/CY
+                  <RateEditPopover
+                    table="subcontractor_rates"
+                    name="Concrete - Pump Per CY"
+                    category="Concrete"
+                    unitLabel="CY"
+                    currentValue={calc.pumpFeePerCY}
+                    onSaved={refreshAllRates}
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -1160,14 +1216,66 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 <span className="text-gray-400">— folded into $/SF</span>
               )}
               {!isSub && activeFinishType === 'Sand Finish' && (
-                <span className="text-gray-400 inline-flex items-center gap-1">
-                  — sand sub ${calc.sandFinishPer400SF}/400SF
+                <span className="text-gray-400 inline-flex items-center gap-1 flex-wrap">
+                  — {calc.sandFinishSFPerHr} SF/hr
+                  <RateEditPopover
+                    table="labor_rates"
+                    name="Concrete - Sand Finish SF/hr"
+                    category="Concrete"
+                    mode="coefficient"
+                    unitLabel="SF/hr"
+                    currentValue={calc.sandFinishSFPerHr}
+                    onSaved={refreshAllRates}
+                  />
+                  · sand sub ${calc.sandFinishPer400SF}/400SF
                   <RateEditPopover
                     table="subcontractor_rates"
                     name="Concrete - Sand Finish 400SF"
                     category="Concrete"
                     unitLabel="400SF"
                     currentValue={calc.sandFinishPer400SF}
+                    onSaved={refreshAllRates}
+                  />
+                </span>
+              )}
+              {!isSub && activeFinishType === 'Salt Finish' && (
+                <span className="text-gray-400 inline-flex items-center gap-1">
+                  — {calc.saltFinishSFPerHr} SF/hr
+                  <RateEditPopover
+                    table="labor_rates"
+                    name="Concrete - Salt Finish SF/hr"
+                    category="Concrete"
+                    mode="coefficient"
+                    unitLabel="SF/hr"
+                    currentValue={calc.saltFinishSFPerHr}
+                    onSaved={refreshAllRates}
+                  />
+                </span>
+              )}
+              {!isSub && activeFinishType === 'Exposed Aggregate' && (
+                <span className="text-gray-400 inline-flex items-center gap-1">
+                  — {calc.exposedAggSFPerHr} SF/hr
+                  <RateEditPopover
+                    table="labor_rates"
+                    name="Concrete - Exposed Aggregate SF/hr"
+                    category="Concrete"
+                    mode="coefficient"
+                    unitLabel="SF/hr"
+                    currentValue={calc.exposedAggSFPerHr}
+                    onSaved={refreshAllRates}
+                  />
+                </span>
+              )}
+              {!isSub && activeFinishType === 'Seeded Aggregate' && (
+                <span className="text-gray-400 inline-flex items-center gap-1">
+                  — {calc.seededAggSFPerHr} SF/hr
+                  <RateEditPopover
+                    table="labor_rates"
+                    name="Concrete - Seeded Aggregate SF/hr"
+                    category="Concrete"
+                    mode="coefficient"
+                    unitLabel="SF/hr"
+                    currentValue={calc.seededAggSFPerHr}
                     onSaved={refreshAllRates}
                   />
                 </span>
@@ -1220,33 +1328,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 category="Concrete"
                 unitLabel="CY"
                 currentValue={calc.colorCostPerCY}
-                onSaved={refreshAllRates}
-              />
-            </label>
-            <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-              <input
-                type="checkbox"
-                checked={activePumpYes}
-                onChange={e => setActivePumpYes(e.target.checked)}
-                className="accent-green-600"
-              />
-              <span className="text-gray-700">
-                Pump (${calc.pumpFeeFlat} + ${calc.pumpFeePerCY}/CY)
-              </span>
-              <RateEditPopover
-                table="subcontractor_rates"
-                name="Concrete - Pump Flat Fee"
-                category="Concrete"
-                unitLabel="flat"
-                currentValue={calc.pumpFeeFlat}
-                onSaved={refreshAllRates}
-              />
-              <RateEditPopover
-                table="subcontractor_rates"
-                name="Concrete - Pump Per CY"
-                category="Concrete"
-                unitLabel="CY"
-                currentValue={calc.pumpFeePerCY}
                 onSaved={refreshAllRates}
               />
             </label>
