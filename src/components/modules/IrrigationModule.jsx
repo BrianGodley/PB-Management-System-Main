@@ -478,7 +478,9 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
         </div>
       )}
 
-      {/* Settings */}
+      {/* Settings — Job Site Conditions is In-House only (hidden on Sub tab) */}
+      {subType !== 'Subcontractor' && (
+        <>
       <SecHdr title="Job Site Conditions" />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
@@ -512,6 +514,8 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
           <Inp value={state.hoursAdj} onChange={e => set('hoursAdj', e.target.value)} step="0.5" />
         </div>
       </div>
+        </>
+      )}
 
       {/* Zones */}
       <div>

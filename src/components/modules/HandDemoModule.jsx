@@ -973,7 +973,9 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
         </div>
       )}
 
-      {/* Settings */}
+      {/* Settings — In-House only (subs don't bill by these modifiers) */}
+      {!isSub && (
+      <>
       <SecHdr title="Job Site Conditions" />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className={isSub ? 'hidden' : undefined}>
@@ -1041,6 +1043,8 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           <p className="text-sm font-medium text-gray-700 py-1">{isSelf ? 'In House' : 'Subcontractor'}</p>
         </div>
       </div>
+      </>
+      )}
       {/* Demolition */}
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">

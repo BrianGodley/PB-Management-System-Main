@@ -500,7 +500,9 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
         </select>
       </div>
 
-      {/* Settings */}
+      {/* Settings — Job Site Conditions is In-House only (hidden on Sub tab) */}
+      {subType !== 'Subcontractor' && (
+        <>
       <SectionHeader title="Job Site Conditions" />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
@@ -547,6 +549,8 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
           />
         </div>
       </div>
+        </>
+      )}
 
       {/* ── Light Fixtures ── */}
       <div>

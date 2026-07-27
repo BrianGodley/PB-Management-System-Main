@@ -671,7 +671,9 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
         </div>
       )}
 
-      {/* Settings */}
+      {/* Settings — Job Site Conditions is In-House only (hidden on Sub tab) */}
+      {subType !== 'Subcontractor' && (
+        <>
       <SectionHeader title="Job Site Conditions" />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
@@ -697,6 +699,8 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
           <NumInput value={hoursAdj} onChange={setHoursAdj} placeholder="0" />
         </div>
       </div>
+        </>
+      )}
 
       {/* ── Fire Pit Structure ── */}
       <div>

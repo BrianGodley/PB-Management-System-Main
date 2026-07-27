@@ -120,6 +120,8 @@ const RATE_DEFAULTS = {
   turfPH: 0.5, // person-hours multiplier (TurfPH)
   turfCutSFHr: 100, // LF/hr for cut/staple/seam (TurfCutSfHr)
   turfCutRate: 1.0, // PH for cut/staple/seam (TurfCutRate)
+  stripLFHr: 12.5, // LF/hr for narrow/custom strips — equals legacy (LF/100)*8
+
   weedFabricHrPer1kSF: 8, // hrs per 1000 SF for weed fabric — (SF/1000)*8
   // Material rates
   gravelBase: 6.9, // $/ton (Gravel Base — $6.90/ton)
@@ -246,7 +248,9 @@ function calcTurf(
   const stripsBrand = TURF_BRANDS.find(b => b.key === state.strips?.brand) || TURF_BRANDS[0]
   const stripsPrice = n(mp[stripsBrand.matKey]) || stripsBrand.fallback
   const stripsSF = stripsLF * stripsWidth
-  const stripsHrs = stripsLF > 0 ? (stripsLF / 100) * 8 : 0
+  // Labor rate is DB-editable (LF/hr). Legacy (LF/100)*8 == LF/12.5.
+  const stripLFHr = n(lr['Turf - Strip Install LF/hr']) || RATE_DEFAULTS.stripLFHr
+  const stripsHrs = stripsLF > 0 && stripLFHr > 0 ? stripsLF / stripLFHr : 0
   const stripsMat = stripsPrice * stripsSF
 
   // ── Cut, Staple & Seam ────────────────────────────────────────────────────
@@ -332,6 +336,7 @@ function calcTurf(
     stripsWidth,
     stripsSF,
     stripsHrs,
+    stripLFHr,
     stripsMat,
     stripsPrice,
     cutHrs,
@@ -679,7 +684,9 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         </div>
       )}
 
-      {/* Settings */}
+      {/* Settings — Job Site Conditions is In-House only (hidden on Sub tab) */}
+      {state.subType !== 'Subcontractor' && (
+        <>
       <SecHdr title="Job Site Conditions" />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
@@ -713,6 +720,8 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           <Inp value={state.hoursAdj} onChange={e => set('hoursAdj', e.target.value)} step="0.5" />
         </div>
       </div>
+        </>
+      )}
 
       {/* Base Installation */}
       <div>
@@ -1024,8 +1033,9 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       <div>
         <SecHdr title="Turf Strips (Narrow / Custom Cuts)" />
         <div className="text-xs text-gray-500 mb-2 italic">
-          For narrow strips that don't come off a standard 15' roll. Labor: (LF/100)×8 hrs.
-          Material: brand $/SF × (LF × width).
+          For narrow strips that don't come off a standard 15' roll. Row edits both rates:{' '}
+          <span className="text-gray-600">material</span> ($/SF, per brand) and{' '}
+          <span className="text-gray-600">install labor</span> ({calc.stripLFHr} LF/hr).
         </div>
         <table className="w-full text-xs">
           <TH
@@ -1054,14 +1064,25 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                     const stripBrand =
                       TURF_BRANDS.find(b => b.key === state.strips?.brand) || TURF_BRANDS[0]
                     return (
-                      <RateEditPopover
-                        table="material_rates"
-                        name={stripBrand.matKey}
-                        category="Artificial Turf"
-                        unitLabel="SF"
-                        currentValue={calc.stripsPrice}
-                        onSaved={refreshAllRates}
-                      />
+                      <>
+                        <RateEditPopover
+                          table="material_rates"
+                          name={stripBrand.matKey}
+                          category="Artificial Turf"
+                          unitLabel="SF"
+                          currentValue={calc.stripsPrice}
+                          onSaved={refreshAllRates}
+                        />
+                        <RateEditPopover
+                          table="labor_rates"
+                          name="Turf - Strip Install LF/hr"
+                          category="Artificial Turf"
+                          mode="coefficient"
+                          unitLabel="LF/hr"
+                          currentValue={calc.stripLFHr}
+                          onSaved={refreshAllRates}
+                        />
+                      </>
                     )
                   })()}
                 </div>

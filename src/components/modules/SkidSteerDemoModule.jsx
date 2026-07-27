@@ -1048,7 +1048,9 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
         </div>
       )}
 
-      {/* Settings */}
+      {/* Settings — In-House only (subs don't bill by these modifiers) */}
+      {!isDemoSub && (
+      <>
       <SecHdr title="Job Site Conditions" />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className={isDemoSub ? 'hidden' : undefined}>
@@ -1117,6 +1119,8 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           {isDemoSub && <p className="text-xs text-amber-600 mt-0.5">Sub handles removal</p>}
         </div>
       </div>
+      </>
+      )}
       {/* Demolition */}
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">

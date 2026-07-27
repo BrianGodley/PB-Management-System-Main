@@ -875,7 +875,9 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         </select>
       </div>
 
-      {/* Settings */}
+      {/* Settings — In-House tab only */}
+      {subType !== 'Subcontractor' && (
+        <>
       <SectionHeader title="Job Site Conditions" />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
@@ -922,6 +924,8 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           />
         </div>
       </div>
+        </>
+      )}
 
       {/* ─── 1. Structure Dimensions ─── */}
       <div>

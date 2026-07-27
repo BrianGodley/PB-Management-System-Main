@@ -546,7 +546,9 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
         </div>
       )}
 
-      {/* Settings */}
+      {/* Settings — Job Site Conditions is In-House only (hidden on Sub tab) */}
+      {subType !== 'Subcontractor' && (
+        <>
       <SectionHeader title="Job Site Conditions" />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
@@ -572,6 +574,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           <NumInput value={hoursAdj} onChange={setHoursAdj} placeholder="0" />
         </div>
       </div>
+        </>
+      )}
 
       {/* ── Soil Prep ── */}
       <div>

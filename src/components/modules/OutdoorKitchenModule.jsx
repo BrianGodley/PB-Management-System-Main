@@ -647,7 +647,9 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
         </div>
       )}
 
-      {/* Settings */}
+      {/* Settings — In-House tab only */}
+      {subType !== 'Subcontractor' && (
+        <>
       <SectionHeader title="Job Site Conditions" />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
@@ -673,6 +675,8 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
           <NumInput value={hoursAdj} onChange={setHoursAdj} placeholder="0" />
         </div>
       </div>
+        </>
+      )}
 
       {/* ── BBQ Structure ── */}
       <div>

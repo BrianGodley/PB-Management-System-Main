@@ -474,7 +474,9 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         </div>
       )}
 
-      {/* Settings */}
+      {/* Settings — In-House tab only */}
+      {subType !== 'Subcontractor' && (
+        <>
       <SectionHeader title="Job Site Conditions" />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
@@ -500,6 +502,8 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           <NumInput value={hoursAdj} onChange={setHoursAdj} placeholder="0" />
         </div>
       </div>
+        </>
+      )}
 
       {/* ── Paver Steps ── */}
       <div>
