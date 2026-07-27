@@ -175,3 +175,19 @@ FROM (VALUES
 ) AS v(name, unit_cost, notes)
 CROSS JOIN (SELECT DISTINCT tenant_id FROM public.material_rates) AS t
 ON CONFLICT DO NOTHING;
+
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- GROUND TREATMENTS — material_rates : DG product types (C&M 2026-05-22)
+-- Stored in the DG per-ton field, matching the existing 'Decomposed Granite'=$50
+-- convention (C&M lists these per CY). 'Decomposed Granite' already seeded.
+-- ═════════════════════════════════════════════════════════════════════════════
+INSERT INTO public.material_rates (name, unit_cost, category, notes, tenant_id)
+SELECT v.name, v.unit_cost, 'Ground Treatments', v.notes, t.tenant_id
+FROM (VALUES
+  ('DG - Stabilized',                75,  'C&M Stabilized DG (DG + binding agent)'),
+  ('DG - Rock Dust Grey',            120, 'C&M Rock Dust - Grey / Pewter'),
+  ('DG - Grey Stabilized Rock Dust', 145, 'C&M Grey Stabilized Rock Dust')
+) AS v(name, unit_cost, notes)
+CROSS JOIN (SELECT DISTINCT tenant_id FROM public.material_rates) AS t
+ON CONFLICT DO NOTHING;

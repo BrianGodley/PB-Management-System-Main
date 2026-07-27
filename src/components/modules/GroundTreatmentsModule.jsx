@@ -91,8 +91,10 @@ const MULCH_TYPES = [
 // D.G. product types (material_rates, per TON — matches the existing per-ton DG
 // material calc). Default 'Decomposed Granite' keeps existing estimates unchanged.
 const DG_TYPES = [
-  { label: 'Decomposed Granite', dbName: 'Decomposed Granite', fallback: 50 }, // existing rate
-  { label: 'Rock Dust - Grey', dbName: 'DG - Rock Dust Grey', fallback: 86 }, // placeholder ~$120/CY
+  { label: 'Decomposed Granite', dbName: 'Decomposed Granite', fallback: 50 }, // C&M $50/CY
+  { label: 'Stabilized DG', dbName: 'DG - Stabilized', fallback: 75 }, // C&M $75/CY
+  { label: 'Rock Dust - Grey', dbName: 'DG - Rock Dust Grey', fallback: 120 }, // C&M $120/CY
+  { label: 'Grey Stabilized Rock Dust', dbName: 'DG - Grey Stabilized Rock Dust', fallback: 145 }, // C&M $145/CY
 ]
 
 const DEFAULTS = {
@@ -860,6 +862,25 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
         <SectionHeader title="Mulch" />
         <p className="text-xs text-gray-400 mb-2 inline-flex items-center flex-wrap gap-x-2">
           <span className="inline-flex items-center gap-1">
+            {(() => {
+              const mt = MULCH_TYPES.find(t => t.label === mulchRows[0]?.type) || MULCH_TYPES[0]
+              return (
+                <>
+                  ${p(mt.dbName, mt.fallback).toFixed(2)}/CY
+                  <RateEditPopover
+                    table="material_rates"
+                    name={mt.dbName}
+                    category="Ground Treatments"
+                    unitLabel="CY"
+                    currentValue={p(mt.dbName, mt.fallback)}
+                    onSaved={refreshAllRates}
+                  />
+                </>
+              )
+            })()}
+          </span>
+          ·
+          <span className="inline-flex items-center gap-1">
             ${p(GT_RATES.mulchDelivery.dbName, 75).toFixed(2)} delivery
             <RateEditPopover
               table="material_rates"
@@ -1023,6 +1044,25 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       <div>
         <SectionHeader title="Decomposed Granite (D.G.)" />
         <p className="text-xs text-gray-400 mb-2 inline-flex items-center flex-wrap gap-x-2">
+          <span className="inline-flex items-center gap-1">
+            {(() => {
+              const dt = DG_TYPES.find(t => t.label === dgRows[0]?.type) || DG_TYPES[0]
+              return (
+                <>
+                  ${p(dt.dbName, dt.fallback).toFixed(2)}/ton
+                  <RateEditPopover
+                    table="material_rates"
+                    name={dt.dbName}
+                    category="Ground Treatments"
+                    unitLabel="ton"
+                    currentValue={p(dt.dbName, dt.fallback)}
+                    onSaved={refreshAllRates}
+                  />
+                </>
+              )
+            })()}
+          </span>
+          ·
           <span className="inline-flex items-center gap-1">
             Cement add ${p(GT_RATES.dgCementPerTon.dbName, 20).toFixed(2)}/ton
             <RateEditPopover
@@ -1352,6 +1392,18 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               })}
             </tbody>
           </table>
+          <button
+            type="button"
+            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+            onClick={() =>
+              setGravelRows(r => [
+                ...r,
+                { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3' },
+              ])
+            }
+          >
+            + Add line
+          </button>
           {/* Show CY / material preview below table */}
           {gravelRows.some(r => n(r.sf) > 0) && (
             <div className="mt-1 flex gap-4 flex-wrap">

@@ -63,7 +63,9 @@ const GRAVEL_TYPES = [
 // modules without dgType fall through to the first entry (Decomposed Granite).
 const DG_TYPES = [
   { label: 'Decomposed Granite', dbName: 'Decomposed Granite', fallback: 50 },
-  { label: 'Rock Dust - Grey', dbName: 'DG - Rock Dust Grey', fallback: 86 },
+  { label: 'Stabilized DG', dbName: 'DG - Stabilized', fallback: 75 },
+  { label: 'Rock Dust - Grey', dbName: 'DG - Rock Dust Grey', fallback: 120 },
+  { label: 'Grey Stabilized Rock Dust', dbName: 'DG - Grey Stabilized Rock Dust', fallback: 145 },
 ]
 
 const n = v => parseFloat(v) || 0
