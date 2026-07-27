@@ -191,3 +191,69 @@ FROM (VALUES
 ) AS v(name, unit_cost, notes)
 CROSS JOIN (SELECT DISTINCT tenant_id FROM public.material_rates) AS t
 ON CONFLICT DO NOTHING;
+
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- GROUND TREATMENTS — material_rates : Gravel type expansion (C&M Crushed Gravel, $/CY)
+-- ═════════════════════════════════════════════════════════════════════════════
+INSERT INTO public.material_rates (name, unit_cost, category, notes, tenant_id)
+SELECT v.name, v.unit_cost, 'Ground Treatments', v.notes, t.tenant_id
+FROM (VALUES
+  ('Gravel - 3/8in Crushed Pea Gravel', 89,  'C&M 3/8" Crushed Pea Gravel'),
+  ('Gravel - 1.5in Crushed Gravel',     85,  'C&M 1 1/2" Crushed Gravel'),
+  ('Gravel - Misc Aggregate',           40,  'C&M Misc Aggregate not washed 3/4"'),
+  ('Gravel - Black Lava',               165, 'C&M Black Lava 3/8"/3/4"'),
+  ('Gravel - Burgundy Lava 3/8in',      180, 'C&M Burgundy Lava 3/8" (20 CY min)'),
+  ('Gravel - Burgundy Lava 3/4in',      165, 'C&M Burgundy Lava 3/4"'),
+  ('Gravel - California Gold 3/8in',    250, 'C&M California Gold 3/8"'),
+  ('Gravel - California Gold 3/4in',    300, 'C&M California Gold 3/4"'),
+  ('Gravel - Eagle Mountain',           165, 'C&M Eagle Mountain 3/8"/3/4"'),
+  ('Gravel - Honey Quartz',             200, 'C&M Honey Quartz 3/4"'),
+  ('Gravel - Las Vegas Rainbow',        220, 'C&M Las Vegas Rainbow 3/4"'),
+  ('Gravel - Pearl White',              300, 'C&M Pearl White 3/4"/1"-2"'),
+  ('Gravel - Tuscan Rose',              220, 'C&M Tuscan Rose 3/4"')
+) AS v(name, unit_cost, notes)
+CROSS JOIN (SELECT DISTINCT tenant_id FROM public.material_rates) AS t
+ON CONFLICT DO NOTHING;
+
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- GROUND TREATMENTS — material_rates : Pebble types ($/CY; beach pebbles per-3,000lb ≈ CY)
+-- ═════════════════════════════════════════════════════════════════════════════
+INSERT INTO public.material_rates (name, unit_cost, category, notes, tenant_id)
+SELECT v.name, v.unit_cost, 'Ground Treatments', v.notes, t.tenant_id
+FROM (VALUES
+  ('Pebble - Arizona River Rock', 300, 'C&M Arizona River Rock $/CY'),
+  ('Pebble - Cinnamon',           320, 'C&M Cinnamon 1 1/2" $/CY'),
+  ('Pebble - Del Rio',            200, 'C&M Del Rio Pebble $/CY'),
+  ('Pebble - Leopard Granite',    150, 'C&M Leopard Granite $/CY'),
+  ('Pebble - White River',        150, 'C&M White River Pebble $/CY'),
+  ('Pebble - Yosemite',           295, 'C&M Yosemite $/CY'),
+  ('Pebble - Yuba',               450, 'C&M Yuba Salt & Pepper $/CY'),
+  ('Pebble - Baja',               660, 'C&M Baja beach pebble (per 3,000 lb ~= CY)'),
+  ('Pebble - Black',              660, 'C&M Black beach pebble (per 3,000 lb ~= CY)'),
+  ('Pebble - Buff',               690, 'C&M Buff beach pebble (per 3,000 lb ~= CY)'),
+  ('Pebble - Mixed',              660, 'C&M Mixed beach pebble (per 3,000 lb ~= CY)'),
+  ('Pebble - Red',                690, 'C&M Red beach pebble (per 3,000 lb ~= CY)'),
+  ('Pebble - Sonora',             660, 'C&M Sonora beach pebble (per 3,000 lb ~= CY)')
+) AS v(name, unit_cost, notes)
+CROSS JOIN (SELECT DISTINCT tenant_id FROM public.material_rates) AS t
+ON CONFLICT DO NOTHING;
+
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- GROUND TREATMENTS — material_rates : Cobbles & Boulders ($/CY, converted from C&M $/lb @ ~2,800 lb/CY)
+-- ═════════════════════════════════════════════════════════════════════════════
+INSERT INTO public.material_rates (name, unit_cost, category, notes, tenant_id)
+SELECT v.name, v.unit_cost, 'Ground Treatments', v.notes, t.tenant_id
+FROM (VALUES
+  ('Cobble - Granite River Rock', 308, 'C&M Granite River Rock ($0.11/lb x 2800)'),
+  ('Cobble - Arizona',            420, 'C&M Arizona ($0.15/lb x 2800)'),
+  ('Cobble - Auburn Brown',       644, 'C&M Auburn Brown ($0.23/lb x 2800)'),
+  ('Cobble - Cresta',             700, 'C&M Cresta ($0.25/lb x 2800)'),
+  ('Cobble - Las Vegas Rainbow',  588, 'C&M Las Vegas Rainbow ($0.21/lb x 2800)'),
+  ('Cobble - Miners Gold',        252, 'C&M Miners Gold ($0.09/lb x 2800)'),
+  ('Cobble - Miners Pink',        252, 'C&M Miners Pink ($0.09/lb x 2800)')
+) AS v(name, unit_cost, notes)
+CROSS JOIN (SELECT DISTINCT tenant_id FROM public.material_rates) AS t
+ON CONFLICT DO NOTHING;

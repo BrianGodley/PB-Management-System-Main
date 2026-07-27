@@ -57,6 +57,47 @@ const GRAVEL_TYPES = [
   { label: 'Black River Rock 1" minus', dbName: 'Gravel - Black River Rock 1in minus', fallback: 130 },
   { label: 'Black River Rock 1"-2"', dbName: 'Gravel - Black River Rock 1in-2in', fallback: 130 },
   { label: 'Black River Rock 2" to 3"', dbName: 'Gravel - Black River Rock 2in-3in', fallback: 130 },
+  { label: '3/8" Crushed Pea Gravel', dbName: 'Gravel - 3/8in Crushed Pea Gravel', fallback: 89 },
+  { label: '1 1/2" Crushed Gravel',   dbName: 'Gravel - 1.5in Crushed Gravel',     fallback: 85 },
+  { label: 'Misc Aggregate (3/4")',   dbName: 'Gravel - Misc Aggregate',           fallback: 40 },
+  { label: 'Black Lava',              dbName: 'Gravel - Black Lava',                fallback: 165 },
+  { label: 'Burgundy Lava 3/8"',      dbName: 'Gravel - Burgundy Lava 3/8in',      fallback: 180 },
+  { label: 'Burgundy Lava 3/4"',      dbName: 'Gravel - Burgundy Lava 3/4in',      fallback: 165 },
+  { label: 'California Gold 3/8"',    dbName: 'Gravel - California Gold 3/8in',     fallback: 250 },
+  { label: 'California Gold 3/4"',    dbName: 'Gravel - California Gold 3/4in',     fallback: 300 },
+  { label: 'Eagle Mountain',          dbName: 'Gravel - Eagle Mountain',           fallback: 165 },
+  { label: 'Honey Quartz',            dbName: 'Gravel - Honey Quartz',             fallback: 200 },
+  { label: 'Las Vegas Rainbow',       dbName: 'Gravel - Las Vegas Rainbow',        fallback: 220 },
+  { label: 'Pearl White',             dbName: 'Gravel - Pearl White',              fallback: 300 },
+  { label: 'Tuscan Rose',             dbName: 'Gravel - Tuscan Rose',              fallback: 220 },
+]
+
+// Pebble material types — mirror of the module.
+const PEBBLE_TYPES = [
+  { label: 'Arizona River Rock', dbName: 'Pebble - Arizona River Rock', fallback: 300 },
+  { label: 'Cinnamon',           dbName: 'Pebble - Cinnamon',           fallback: 320 },
+  { label: 'Del Rio Pebble',     dbName: 'Pebble - Del Rio',            fallback: 200 },
+  { label: 'Leopard Granite',    dbName: 'Pebble - Leopard Granite',    fallback: 150 },
+  { label: 'White River Pebble', dbName: 'Pebble - White River',        fallback: 150 },
+  { label: 'Yosemite',           dbName: 'Pebble - Yosemite',           fallback: 295 },
+  { label: 'Yuba (Salt & Pepper)', dbName: 'Pebble - Yuba',             fallback: 450 },
+  { label: 'Baja (Beach)',       dbName: 'Pebble - Baja',               fallback: 660 },
+  { label: 'Black (Beach)',      dbName: 'Pebble - Black',              fallback: 660 },
+  { label: 'Buff (Beach)',       dbName: 'Pebble - Buff',               fallback: 690 },
+  { label: 'Mixed (Beach)',      dbName: 'Pebble - Mixed',              fallback: 660 },
+  { label: 'Red (Beach)',        dbName: 'Pebble - Red',               fallback: 690 },
+  { label: 'Sonora (Beach)',     dbName: 'Pebble - Sonora',             fallback: 660 },
+]
+
+// Cobbles & Boulders material types — mirror of the module.
+const COBBLE_TYPES = [
+  { label: 'Granite River Rock', dbName: 'Cobble - Granite River Rock', fallback: 308 },
+  { label: 'Arizona',            dbName: 'Cobble - Arizona',            fallback: 420 },
+  { label: 'Auburn Brown',       dbName: 'Cobble - Auburn Brown',       fallback: 644 },
+  { label: 'Cresta',             dbName: 'Cobble - Cresta',             fallback: 700 },
+  { label: 'Las Vegas Rainbow',  dbName: 'Cobble - Las Vegas Rainbow',  fallback: 588 },
+  { label: 'Miners Gold',        dbName: 'Cobble - Miners Gold',        fallback: 252 },
+  { label: 'Miners Pink',        dbName: 'Cobble - Miners Pink',        fallback: 252 },
 ]
 
 // D.G. product types (material_rates, per TON). Mirror of the module. Legacy
@@ -130,6 +171,8 @@ export default function GroundTreatmentsSummary({ module }) {
     dgCement = 'Yes',
     dgRows,
     gravelRows = [],
+    pebbleRows = [],
+    cobbleRows = [],
     manualRows = [],
     laborRatePerHour = 35,
     materialPrices = {},
@@ -293,6 +336,58 @@ export default function GroundTreatmentsSummary({ module }) {
     })
     .filter(Boolean)
 
+  // ── Pebble (same calc/labor as Gravel; PEBBLE_TYPES material) ──────────────────
+  const pebbleLines = pebbleRows
+    .map((r, i) => {
+      if (!n(r.sf)) return null
+      const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
+      const ptype = r.type ? PEBBLE_TYPES.find(t => t.label === r.type) : null
+      const costPerCY = ptype ? mp(ptype.dbName, ptype.fallback) : n(r.costPerCY) || PEBBLE_TYPES[0].fallback
+      const mat =
+        CY * costPerCY +
+        n(r.sf) * mp(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)
+      const machineRate = mp(GT_RATES.gravelMachineLab.dbName, GT_RATES.gravelMachineLab.fallback)
+      const handRate = mp(GT_RATES.gravelHandLab.dbName, GT_RATES.gravelHandLab.fallback)
+      const excavLab =
+        r.method === 'Machine' ? ((CY * 1.62) / machineRate) * 8 : ((CY * 1.62) / handRate) * 8
+      const fabricLab =
+        n(r.sf) * mp(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
+      const hrs = excavLab + fabricLab
+      return {
+        key: i,
+        label: `Pebble #${i + 1}${r.type ? ` (${r.type})` : ''} — ${n(r.sf).toLocaleString()} SF × ${n(r.depthIn)}" (${r.method})`,
+        value: fmt2(mat),
+        sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} CY · $${costPerCY.toFixed ? costPerCY.toFixed(2) : costPerCY}/CY`,
+      }
+    })
+    .filter(Boolean)
+
+  // ── Cobbles & Boulders (same calc/labor as Gravel; COBBLE_TYPES material) ──────
+  const cobbleLines = cobbleRows
+    .map((r, i) => {
+      if (!n(r.sf)) return null
+      const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
+      const ctype = r.type ? COBBLE_TYPES.find(t => t.label === r.type) : null
+      const costPerCY = ctype ? mp(ctype.dbName, ctype.fallback) : n(r.costPerCY) || COBBLE_TYPES[0].fallback
+      const mat =
+        CY * costPerCY +
+        n(r.sf) * mp(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)
+      const machineRate = mp(GT_RATES.gravelMachineLab.dbName, GT_RATES.gravelMachineLab.fallback)
+      const handRate = mp(GT_RATES.gravelHandLab.dbName, GT_RATES.gravelHandLab.fallback)
+      const excavLab =
+        r.method === 'Machine' ? ((CY * 1.62) / machineRate) * 8 : ((CY * 1.62) / handRate) * 8
+      const fabricLab =
+        n(r.sf) * mp(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
+      const hrs = excavLab + fabricLab
+      return {
+        key: i,
+        label: `Cobble #${i + 1}${r.type ? ` (${r.type})` : ''} — ${n(r.sf).toLocaleString()} SF × ${n(r.depthIn)}" (${r.method})`,
+        value: fmt2(mat),
+        sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} CY · $${costPerCY.toFixed ? costPerCY.toFixed(2) : costPerCY}/CY`,
+      }
+    })
+    .filter(Boolean)
+
   // ── Edging ────────────────────────────────────────────────────────────────────
   const edgingLines = []
 
@@ -380,6 +475,8 @@ export default function GroundTreatmentsSummary({ module }) {
     mulchLines.length ||
     dgLines.length ||
     gravelLines.length ||
+    pebbleLines.length ||
+    cobbleLines.length ||
     edgingLines.length ||
     stepperLines.length ||
     manualLines.length
@@ -480,6 +577,24 @@ export default function GroundTreatmentsSummary({ module }) {
             <>
               <SectionLabel title="Gravel" />
               {gravelLines.map(l => (
+                <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />
+              ))}
+            </>
+          )}
+
+          {pebbleLines.length > 0 && (
+            <>
+              <SectionLabel title="Pebble" />
+              {pebbleLines.map(l => (
+                <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />
+              ))}
+            </>
+          )}
+
+          {cobbleLines.length > 0 && (
+            <>
+              <SectionLabel title="Cobbles & Boulders" />
+              {cobbleLines.map(l => (
                 <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />
               ))}
             </>

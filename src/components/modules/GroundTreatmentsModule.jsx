@@ -70,6 +70,48 @@ const GRAVEL_TYPES = [
   { label: 'Black River Rock 1" minus', dbName: 'Gravel - Black River Rock 1in minus', fallback: 130 },
   { label: 'Black River Rock 1"-2"', dbName: 'Gravel - Black River Rock 1in-2in', fallback: 130 },
   { label: 'Black River Rock 2" to 3"', dbName: 'Gravel - Black River Rock 2in-3in', fallback: 130 },
+  { label: '3/8" Crushed Pea Gravel', dbName: 'Gravel - 3/8in Crushed Pea Gravel', fallback: 89 },
+  { label: '1 1/2" Crushed Gravel',   dbName: 'Gravel - 1.5in Crushed Gravel',     fallback: 85 },
+  { label: 'Misc Aggregate (3/4")',   dbName: 'Gravel - Misc Aggregate',           fallback: 40 },
+  { label: 'Black Lava',              dbName: 'Gravel - Black Lava',                fallback: 165 },
+  { label: 'Burgundy Lava 3/8"',      dbName: 'Gravel - Burgundy Lava 3/8in',      fallback: 180 },
+  { label: 'Burgundy Lava 3/4"',      dbName: 'Gravel - Burgundy Lava 3/4in',      fallback: 165 },
+  { label: 'California Gold 3/8"',    dbName: 'Gravel - California Gold 3/8in',     fallback: 250 },
+  { label: 'California Gold 3/4"',    dbName: 'Gravel - California Gold 3/4in',     fallback: 300 },
+  { label: 'Eagle Mountain',          dbName: 'Gravel - Eagle Mountain',           fallback: 165 },
+  { label: 'Honey Quartz',            dbName: 'Gravel - Honey Quartz',             fallback: 200 },
+  { label: 'Las Vegas Rainbow',       dbName: 'Gravel - Las Vegas Rainbow',        fallback: 220 },
+  { label: 'Pearl White',             dbName: 'Gravel - Pearl White',              fallback: 300 },
+  { label: 'Tuscan Rose',             dbName: 'Gravel - Tuscan Rose',              fallback: 220 },
+]
+
+// Pebble material types — each drives its own $/CY (material_rates). Reuses the
+// same labor + fabric rates as Gravel; only the material Type list differs.
+const PEBBLE_TYPES = [
+  { label: 'Arizona River Rock', dbName: 'Pebble - Arizona River Rock', fallback: 300 },
+  { label: 'Cinnamon',           dbName: 'Pebble - Cinnamon',           fallback: 320 },
+  { label: 'Del Rio Pebble',     dbName: 'Pebble - Del Rio',            fallback: 200 },
+  { label: 'Leopard Granite',    dbName: 'Pebble - Leopard Granite',    fallback: 150 },
+  { label: 'White River Pebble', dbName: 'Pebble - White River',        fallback: 150 },
+  { label: 'Yosemite',           dbName: 'Pebble - Yosemite',           fallback: 295 },
+  { label: 'Yuba (Salt & Pepper)', dbName: 'Pebble - Yuba',             fallback: 450 },
+  { label: 'Baja (Beach)',       dbName: 'Pebble - Baja',               fallback: 660 },
+  { label: 'Black (Beach)',      dbName: 'Pebble - Black',              fallback: 660 },
+  { label: 'Buff (Beach)',       dbName: 'Pebble - Buff',               fallback: 690 },
+  { label: 'Mixed (Beach)',      dbName: 'Pebble - Mixed',              fallback: 660 },
+  { label: 'Red (Beach)',        dbName: 'Pebble - Red',               fallback: 690 },
+  { label: 'Sonora (Beach)',     dbName: 'Pebble - Sonora',             fallback: 660 },
+]
+
+// Cobbles & Boulders material types — same calc/labor as Gravel; type list only.
+const COBBLE_TYPES = [
+  { label: 'Granite River Rock', dbName: 'Cobble - Granite River Rock', fallback: 308 },
+  { label: 'Arizona',            dbName: 'Cobble - Arizona',            fallback: 420 },
+  { label: 'Auburn Brown',       dbName: 'Cobble - Auburn Brown',       fallback: 644 },
+  { label: 'Cresta',             dbName: 'Cobble - Cresta',             fallback: 700 },
+  { label: 'Las Vegas Rainbow',  dbName: 'Cobble - Las Vegas Rainbow',  fallback: 588 },
+  { label: 'Miners Gold',        dbName: 'Cobble - Miners Gold',        fallback: 252 },
+  { label: 'Miners Pink',        dbName: 'Cobble - Miners Pink',        fallback: 252 },
 ]
 
 // Mulch product types (material_rates, $/CY). Type drives material cost only.
@@ -135,6 +177,8 @@ function calcGroundTreatments(
     precastConcreteSF,
     dgRows,
     gravelRows,
+    pebbleRows,
+    cobbleRows,
     manualRows,
   } = state
 
@@ -282,6 +326,46 @@ function calcGroundTreatments(
       n(r.sf) * p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)
   })
 
+  // ── Pebble rows (same calc/labor as Gravel; PEBBLE_TYPES material) ──────────
+  let pebbleLab = 0,
+    pebbleMat = 0
+  ;(pebbleRows || []).forEach(r => {
+    if (!n(r.sf)) return
+    const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
+    const machineRate = p(GT_RATES.gravelMachineLab.dbName, GT_RATES.gravelMachineLab.fallback)
+    const handRate = p(GT_RATES.gravelHandLab.dbName, GT_RATES.gravelHandLab.fallback)
+    const excavLab =
+      r.method === 'Machine' ? ((CY * 1.62) / machineRate) * 8 : ((CY * 1.62) / handRate) * 8
+    const fabricLab =
+      n(r.sf) * p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
+    pebbleLab += excavLab + fabricLab
+    const ptype = PEBBLE_TYPES.find(t => t.label === r.type) || PEBBLE_TYPES[0]
+    const costPerCY = p(ptype.dbName, ptype.fallback)
+    pebbleMat +=
+      CY * costPerCY +
+      n(r.sf) * p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)
+  })
+
+  // ── Cobbles & Boulders rows (same calc/labor as Gravel; COBBLE_TYPES) ───────
+  let cobbleLab = 0,
+    cobbleMat = 0
+  ;(cobbleRows || []).forEach(r => {
+    if (!n(r.sf)) return
+    const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
+    const machineRate = p(GT_RATES.gravelMachineLab.dbName, GT_RATES.gravelMachineLab.fallback)
+    const handRate = p(GT_RATES.gravelHandLab.dbName, GT_RATES.gravelHandLab.fallback)
+    const excavLab =
+      r.method === 'Machine' ? ((CY * 1.62) / machineRate) * 8 : ((CY * 1.62) / handRate) * 8
+    const fabricLab =
+      n(r.sf) * p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
+    cobbleLab += excavLab + fabricLab
+    const ctype = COBBLE_TYPES.find(t => t.label === r.type) || COBBLE_TYPES[0]
+    const costPerCY = p(ctype.dbName, ctype.fallback)
+    cobbleMat +=
+      CY * costPerCY +
+      n(r.sf) * p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)
+  })
+
   // ── Manual ─────────────────────────────────────────────────────────────────
   let manHrs = 0,
     manMat = 0,
@@ -304,6 +388,8 @@ function calcGroundTreatments(
     precastLab +
     dgLab +
     gravelLab +
+    pebbleLab +
+    cobbleLab +
     manHrs
   const diffMod = 1 + n(difficulty) / 100
   const _preWalkHrs = baseHrs * diffMod + n(hoursAdj)
@@ -321,6 +407,8 @@ function calcGroundTreatments(
     precastMat +
     dgMat +
     gravelMat +
+    pebbleMat +
+    cobbleMat +
     manMat
   const laborCost = totalHrs * lrph
   const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
@@ -359,6 +447,10 @@ function calcGroundTreatments(
     dgMat,
     gravelLab,
     gravelMat,
+    pebbleLab,
+    pebbleMat,
+    cobbleLab,
+    cobbleMat,
   }
 }
 
@@ -397,6 +489,14 @@ function LabeledRow({ label, children, note }) {
 const DEFAULT_GRAVEL_ROWS = [
   { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3' },
   { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3' },
+]
+const DEFAULT_PEBBLE_ROWS = [
+  { sf: '', method: 'Hand', type: 'Arizona River Rock', depthIn: '3' },
+  { sf: '', method: 'Hand', type: 'Arizona River Rock', depthIn: '3' },
+]
+const DEFAULT_COBBLE_ROWS = [
+  { sf: '', method: 'Hand', type: 'Granite River Rock', depthIn: '3' },
+  { sf: '', method: 'Hand', type: 'Granite River Rock', depthIn: '3' },
 ]
 const DEFAULT_MULCH_ROWS = [
   { type: 'Premium Mulch', sf: '', depth: '2', weedFabric: 'No' },
@@ -541,6 +641,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
         : DEFAULT_DG_ROWS)
   )
   const [gravelRows, setGravelRows] = useState(initialData?.gravelRows ?? DEFAULT_GRAVEL_ROWS)
+  const [pebbleRows, setPebbleRows] = useState(initialData?.pebbleRows ?? DEFAULT_PEBBLE_ROWS)
+  const [cobbleRows, setCobbleRows] = useState(initialData?.cobbleRows ?? DEFAULT_COBBLE_ROWS)
   const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
 
   // ── Sales tax — applied to totalMat across every module so the bid
@@ -576,6 +678,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     precastConcreteSF,
     dgRows,
     gravelRows,
+    pebbleRows,
+    cobbleRows,
     manualRows,
     distanceLF,
   }
@@ -606,6 +710,12 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
 
   function updateGravel(i, field, val) {
     setGravelRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  }
+  function updatePebble(i, field, val) {
+    setPebbleRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  }
+  function updateCobble(i, field, val) {
+    setCobbleRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
   function updateMulch(i, field, val) {
     setMulchRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
@@ -1024,19 +1134,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           >
             + Add line
           </button>
-          {mulchRows.some(r => n(r.sf) > 0) && (
-            <div className="mt-1 flex gap-4 flex-wrap">
-              {mulchRows.map((row, i) => {
-                if (!n(row.sf)) return null
-                const CY = (n(row.sf) * (n(row.depth) / 12)) / 27
-                return (
-                  <span key={i} className="text-xs text-gray-400">
-                    #{i + 1}: {CY.toFixed(2)} CY
-                  </span>
-                )
-              })}
-            </div>
-          )}
         </div>
       </div>
 
@@ -1245,19 +1342,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           >
             + Add line
           </button>
-          {dgRows.some(r => n(r.sf) > 0) && (
-            <div className="mt-1 flex gap-4 flex-wrap">
-              {dgRows.map((row, i) => {
-                if (!n(row.sf)) return null
-                const tons = (n(row.sf) * n(row.depth)) / 200
-                return (
-                  <span key={i} className="text-xs text-gray-400">
-                    #{i + 1}: {tons.toFixed(2)} tons
-                  </span>
-                )
-              })}
-            </div>
-          )}
           {(n(calc.dgMat) > 0 || n(calc.dgLab) > 0) && (
             <div className="mt-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-gray-600 flex gap-6">
               <span>
@@ -1414,6 +1498,316 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                   GRAVEL_TYPES.find(t => t.label === row.type) || GRAVEL_TYPES[0]
                 const mat =
                   CY * p(gtype.dbName, gtype.fallback) +
+                  n(row.sf) * p(GT_RATES.gravelFabricMat.dbName, 0.1)
+                return (
+                  <span key={i} className="text-xs text-gray-400">
+                    #{i + 1}: {CY.toFixed(2)} CY · ${mat.toFixed(2)} mat
+                  </span>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Pebble ── */}
+      <div>
+        <SectionHeader title="Pebble" />
+        <p className="text-xs text-gray-400 mb-2 inline-flex items-center flex-wrap gap-x-2">
+          <span className="inline-flex items-center gap-1">
+            Fabric ${p(GT_RATES.gravelFabricMat.dbName, 0.1).toFixed(2)}/SF mat
+            <RateEditPopover
+              table="material_rates"
+              name={GT_RATES.gravelFabricMat.dbName}
+              category="Ground Treatments"
+              unitLabel="SF"
+              currentValue={p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)}
+              onSaved={refreshAllRates}
+            />
+            · {p(GT_RATES.gravelFabricLab.dbName, 0.024)} hrs/SF labor
+            <RateEditPopover
+              table="labor_rates"
+              name={GT_RATES.gravelFabricLab.dbName}
+              category="Ground Treatments"
+              mode="coefficient"
+              unitLabel="hrs/SF"
+              currentValue={p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)}
+              onSaved={refreshAllRates}
+            />
+          </span>
+          ·
+          <span className="inline-flex items-center gap-1">
+            Machine excav {p(GT_RATES.gravelMachineLab.dbName, 12)} CY/day
+            <RateEditPopover
+              table="labor_rates"
+              name={GT_RATES.gravelMachineLab.dbName}
+              category="Ground Treatments"
+              mode="coefficient"
+              unitLabel="CY/day"
+              currentValue={p(GT_RATES.gravelMachineLab.dbName, GT_RATES.gravelMachineLab.fallback)}
+              onSaved={refreshAllRates}
+            />
+          </span>
+          ·
+          <span className="inline-flex items-center gap-1">
+            Hand excav {p(GT_RATES.gravelHandLab.dbName, 4)} CY/day
+            <RateEditPopover
+              table="labor_rates"
+              name={GT_RATES.gravelHandLab.dbName}
+              category="Ground Treatments"
+              mode="coefficient"
+              unitLabel="CY/day"
+              currentValue={p(GT_RATES.gravelHandLab.dbName, GT_RATES.gravelHandLab.fallback)}
+              onSaved={refreshAllRates}
+            />
+          </span>
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-1 font-medium">Type</th>
+                <th className="text-left pb-1 pr-1 font-medium">SF</th>
+                <th className="text-left pb-1 pr-1 font-medium">Method</th>
+                <th className="text-left pb-1 pr-1 font-medium">$/CY</th>
+                <th className="text-left pb-1 font-medium">Depth (in)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pebbleRows.map((row, i) => {
+                const ptype =
+                  PEBBLE_TYPES.find(t => t.label === row.type) || PEBBLE_TYPES[0]
+                const typeCost = p(ptype.dbName, ptype.fallback)
+                return (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.type || PEBBLE_TYPES[0].label}
+                        onChange={e => updatePebble(i, 'type', e.target.value)}
+                      >
+                        {PEBBLE_TYPES.map(t => (
+                          <option key={t.label} value={t.label}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1 pr-1">
+                      <NumInput value={row.sf} onChange={v => updatePebble(i, 'sf', v)} />
+                    </td>
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.method}
+                        onChange={e => updatePebble(i, 'method', e.target.value)}
+                      >
+                        <option>Hand</option>
+                        <option>Machine</option>
+                      </select>
+                    </td>
+                    <td className="py-1 pr-1">
+                      <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
+                        ${typeCost.toFixed(2)}/CY
+                        <RateEditPopover
+                          table="material_rates"
+                          name={ptype.dbName}
+                          category="Ground Treatments"
+                          unitLabel="CY"
+                          currentValue={typeCost}
+                          onSaved={refreshAllRates}
+                        />
+                      </span>
+                    </td>
+                    <td className="py-1">
+                      <NumInput
+                        value={row.depthIn}
+                        onChange={v => updatePebble(i, 'depthIn', v)}
+                        placeholder="3"
+                      />
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <button
+            type="button"
+            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+            onClick={() =>
+              setPebbleRows(r => [
+                ...r,
+                { sf: '', method: 'Hand', type: 'Arizona River Rock', depthIn: '3' },
+              ])
+            }
+          >
+            + Add line
+          </button>
+          {/* Show CY / material preview below table */}
+          {pebbleRows.some(r => n(r.sf) > 0) && (
+            <div className="mt-1 flex gap-4 flex-wrap">
+              {pebbleRows.map((row, i) => {
+                if (!n(row.sf)) return null
+                const CY = (n(row.sf) * (n(row.depthIn) / 12)) / 27
+                const ptype =
+                  PEBBLE_TYPES.find(t => t.label === row.type) || PEBBLE_TYPES[0]
+                const mat =
+                  CY * p(ptype.dbName, ptype.fallback) +
+                  n(row.sf) * p(GT_RATES.gravelFabricMat.dbName, 0.1)
+                return (
+                  <span key={i} className="text-xs text-gray-400">
+                    #{i + 1}: {CY.toFixed(2)} CY · ${mat.toFixed(2)} mat
+                  </span>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Cobbles & Boulders ── */}
+      <div>
+        <SectionHeader title="Cobbles & Boulders" />
+        <p className="text-xs text-gray-400 mb-2 inline-flex items-center flex-wrap gap-x-2">
+          <span className="inline-flex items-center gap-1">
+            Fabric ${p(GT_RATES.gravelFabricMat.dbName, 0.1).toFixed(2)}/SF mat
+            <RateEditPopover
+              table="material_rates"
+              name={GT_RATES.gravelFabricMat.dbName}
+              category="Ground Treatments"
+              unitLabel="SF"
+              currentValue={p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)}
+              onSaved={refreshAllRates}
+            />
+            · {p(GT_RATES.gravelFabricLab.dbName, 0.024)} hrs/SF labor
+            <RateEditPopover
+              table="labor_rates"
+              name={GT_RATES.gravelFabricLab.dbName}
+              category="Ground Treatments"
+              mode="coefficient"
+              unitLabel="hrs/SF"
+              currentValue={p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)}
+              onSaved={refreshAllRates}
+            />
+          </span>
+          ·
+          <span className="inline-flex items-center gap-1">
+            Machine excav {p(GT_RATES.gravelMachineLab.dbName, 12)} CY/day
+            <RateEditPopover
+              table="labor_rates"
+              name={GT_RATES.gravelMachineLab.dbName}
+              category="Ground Treatments"
+              mode="coefficient"
+              unitLabel="CY/day"
+              currentValue={p(GT_RATES.gravelMachineLab.dbName, GT_RATES.gravelMachineLab.fallback)}
+              onSaved={refreshAllRates}
+            />
+          </span>
+          ·
+          <span className="inline-flex items-center gap-1">
+            Hand excav {p(GT_RATES.gravelHandLab.dbName, 4)} CY/day
+            <RateEditPopover
+              table="labor_rates"
+              name={GT_RATES.gravelHandLab.dbName}
+              category="Ground Treatments"
+              mode="coefficient"
+              unitLabel="CY/day"
+              currentValue={p(GT_RATES.gravelHandLab.dbName, GT_RATES.gravelHandLab.fallback)}
+              onSaved={refreshAllRates}
+            />
+          </span>
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-1 font-medium">Type</th>
+                <th className="text-left pb-1 pr-1 font-medium">SF</th>
+                <th className="text-left pb-1 pr-1 font-medium">Method</th>
+                <th className="text-left pb-1 pr-1 font-medium">$/CY</th>
+                <th className="text-left pb-1 font-medium">Depth (in)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cobbleRows.map((row, i) => {
+                const ctype =
+                  COBBLE_TYPES.find(t => t.label === row.type) || COBBLE_TYPES[0]
+                const typeCost = p(ctype.dbName, ctype.fallback)
+                return (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.type || COBBLE_TYPES[0].label}
+                        onChange={e => updateCobble(i, 'type', e.target.value)}
+                      >
+                        {COBBLE_TYPES.map(t => (
+                          <option key={t.label} value={t.label}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1 pr-1">
+                      <NumInput value={row.sf} onChange={v => updateCobble(i, 'sf', v)} />
+                    </td>
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.method}
+                        onChange={e => updateCobble(i, 'method', e.target.value)}
+                      >
+                        <option>Hand</option>
+                        <option>Machine</option>
+                      </select>
+                    </td>
+                    <td className="py-1 pr-1">
+                      <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
+                        ${typeCost.toFixed(2)}/CY
+                        <RateEditPopover
+                          table="material_rates"
+                          name={ctype.dbName}
+                          category="Ground Treatments"
+                          unitLabel="CY"
+                          currentValue={typeCost}
+                          onSaved={refreshAllRates}
+                        />
+                      </span>
+                    </td>
+                    <td className="py-1">
+                      <NumInput
+                        value={row.depthIn}
+                        onChange={v => updateCobble(i, 'depthIn', v)}
+                        placeholder="3"
+                      />
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <button
+            type="button"
+            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+            onClick={() =>
+              setCobbleRows(r => [
+                ...r,
+                { sf: '', method: 'Hand', type: 'Granite River Rock', depthIn: '3' },
+              ])
+            }
+          >
+            + Add line
+          </button>
+          {/* Show CY / material preview below table */}
+          {cobbleRows.some(r => n(r.sf) > 0) && (
+            <div className="mt-1 flex gap-4 flex-wrap">
+              {cobbleRows.map((row, i) => {
+                if (!n(row.sf)) return null
+                const CY = (n(row.sf) * (n(row.depthIn) / 12)) / 27
+                const ctype =
+                  COBBLE_TYPES.find(t => t.label === row.type) || COBBLE_TYPES[0]
+                const mat =
+                  CY * p(ctype.dbName, ctype.fallback) +
                   n(row.sf) * p(GT_RATES.gravelFabricMat.dbName, 0.1)
                 return (
                   <span key={i} className="text-xs text-gray-400">
