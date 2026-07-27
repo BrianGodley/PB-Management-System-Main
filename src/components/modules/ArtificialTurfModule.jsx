@@ -920,18 +920,10 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       {/* Turf Installation */}
       <div>
         <SecHdr title="Turf Installation (15' Wide Rolls)" />
-        <div className="text-xs text-gray-400 mb-2 inline-flex items-center gap-1">
-          Install labor: {calc.turfSFHr} SF/hr
-          <RateEditPopover
-            table="labor_rates"
-            name="Turf - Turf Install SF/hr"
-            category="Artificial Turf"
-            mode="coefficient"
-            unitLabel="SF/hr"
-            currentValue={calc.turfSFHr}
-            onSaved={refreshAllRates}
-          />
-          <span className="ml-1">· material rate is per-brand (edit on each row →)</span>
+        <div className="text-xs text-gray-400 mb-2">
+          Each row edits both rates: <span className="text-gray-500">material</span> ($/SF, per
+          brand) and <span className="text-gray-500">install labor</span> ({calc.turfSFHr} SF/hr,
+          shared).
         </div>
         <table className="w-full text-xs">
           <TH
@@ -965,6 +957,15 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                         category="Artificial Turf"
                         unitLabel="SF"
                         currentValue={cr.pricePerSF}
+                        onSaved={refreshAllRates}
+                      />
+                      <RateEditPopover
+                        table="labor_rates"
+                        name="Turf - Turf Install SF/hr"
+                        category="Artificial Turf"
+                        mode="coefficient"
+                        unitLabel="SF/hr"
+                        currentValue={calc.turfSFHr}
                         onSaved={refreshAllRates}
                       />
                     </div>
