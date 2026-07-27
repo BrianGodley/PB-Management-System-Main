@@ -749,6 +749,51 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       {/* ── Mulch ── */}
       <div>
         <SectionHeader title="Mulch" />
+        <p className="text-xs text-gray-400 mb-2 inline-flex items-center flex-wrap gap-x-2">
+          <span className="inline-flex items-center gap-1">
+            {(() => {
+              const mt = MULCH_TYPES.find(t => t.label === mulchType) || MULCH_TYPES[0]
+              return (
+                <>
+                  ${p(mt.dbName, mt.fallback).toFixed(2)}/CY
+                  <RateEditPopover
+                    table="material_rates"
+                    name={mt.dbName}
+                    category="Ground Treatments"
+                    unitLabel="CY"
+                    currentValue={p(mt.dbName, mt.fallback)}
+                    onSaved={refreshAllRates}
+                  />
+                </>
+              )
+            })()}
+          </span>
+          ·
+          <span className="inline-flex items-center gap-1">
+            ${p(GT_RATES.mulchDelivery.dbName, 75).toFixed(2)} delivery
+            <RateEditPopover
+              table="material_rates"
+              name={GT_RATES.mulchDelivery.dbName}
+              category="Ground Treatments"
+              unitLabel="flat"
+              currentValue={p(GT_RATES.mulchDelivery.dbName, GT_RATES.mulchDelivery.fallback)}
+              onSaved={refreshAllRates}
+            />
+          </span>
+          ·
+          <span className="inline-flex items-center gap-1">
+            {p(GT_RATES.mulchLab.dbName, 15)} CY/day labor
+            <RateEditPopover
+              table="labor_rates"
+              name={GT_RATES.mulchLab.dbName}
+              category="Ground Treatments"
+              mode="coefficient"
+              unitLabel="CY/day"
+              currentValue={p(GT_RATES.mulchLab.dbName, GT_RATES.mulchLab.fallback)}
+              onSaved={refreshAllRates}
+            />
+          </span>
+        </p>
         <div className="space-y-0">
           <LabeledRow label="Mulch">
             <select
@@ -774,43 +819,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 </option>
               ))}
             </select>
-            <span className="text-xs text-gray-400 inline-flex items-center gap-1">
-              {(() => {
-                const mt = MULCH_TYPES.find(t => t.label === mulchType) || MULCH_TYPES[0]
-                return (
-                  <>
-                    ${p(mt.dbName, mt.fallback).toFixed(2)}/CY
-                    <RateEditPopover
-                      table="material_rates"
-                      name={mt.dbName}
-                      category="Ground Treatments"
-                      unitLabel="CY"
-                      currentValue={p(mt.dbName, mt.fallback)}
-                      onSaved={refreshAllRates}
-                    />
-                  </>
-                )
-              })()}
-              · ${p(GT_RATES.mulchDelivery.dbName, 75).toFixed(2)} delivery
-              <RateEditPopover
-                table="material_rates"
-                name={GT_RATES.mulchDelivery.dbName}
-                category="Ground Treatments"
-                unitLabel="flat"
-                currentValue={p(GT_RATES.mulchDelivery.dbName, GT_RATES.mulchDelivery.fallback)}
-                onSaved={refreshAllRates}
-              />
-              · {p(GT_RATES.mulchLab.dbName, 15)} CY/day labor
-              <RateEditPopover
-                table="labor_rates"
-                name={GT_RATES.mulchLab.dbName}
-                category="Ground Treatments"
-                mode="coefficient"
-                unitLabel="CY/day"
-                currentValue={p(GT_RATES.mulchLab.dbName, GT_RATES.mulchLab.fallback)}
-                onSaved={refreshAllRates}
-              />
-            </span>
             {n(mulchSF) > 0 && (
               <span className="text-xs text-gray-400">
                 {((n(mulchSF) * (n(mulchDepth) / 12)) / 27).toFixed(2)} CY
