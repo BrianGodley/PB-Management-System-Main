@@ -218,7 +218,7 @@ function calcTurf(
 
   // ── Turf installation (up to 3 rolls of 15' wide) ─────────────────────────
   // hrs = SF/TurfSFHr * TurfPH = SF/20 * 0.5
-  const turfSFHr = RATE_DEFAULTS.turfSFHr
+  const turfSFHr = n(lr['Turf - Turf Install SF/hr']) || RATE_DEFAULTS.turfSFHr
   const turfPH = RATE_DEFAULTS.turfPH
   let turfHrs = 0,
     turfMat = 0,
@@ -326,6 +326,7 @@ function calcTurf(
     rollCalc,
     totalEdgeLF,
     turfHrs,
+    turfSFHr,
     turfMat,
     stripsLF,
     stripsWidth,
@@ -919,6 +920,19 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       {/* Turf Installation */}
       <div>
         <SecHdr title="Turf Installation (15' Wide Rolls)" />
+        <div className="text-xs text-gray-400 mb-2 inline-flex items-center gap-1">
+          Install labor: {calc.turfSFHr} SF/hr
+          <RateEditPopover
+            table="labor_rates"
+            name="Turf - Turf Install SF/hr"
+            category="Artificial Turf"
+            mode="coefficient"
+            unitLabel="SF/hr"
+            currentValue={calc.turfSFHr}
+            onSaved={refreshAllRates}
+          />
+          <span className="ml-1">· material rate is per-brand (edit on each row →)</span>
+        </div>
         <table className="w-full text-xs">
           <TH
             cols={[
