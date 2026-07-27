@@ -661,6 +661,9 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   // (material$ + labor-hours × labor rate) as a sub COST. Nothing here adds
   // to the module's in-house manDays / totalHrs / totalMat / laborCost.
   const subSlabRate = subRates['Concrete Sub - Per SF'] ?? 12
+  // Sub-side vapor barrier + sealer are flat $/SF (no SF/hr labor component).
+  const subVaporBarrierRate = subRates['Concrete Sub - Vapor Barrier Per SF'] ?? 1
+  const subSealerRate = subRates['Concrete Sub - Sealer Per SF'] ?? 3
   const lrph = n(laborRatePerHour) || 35
   // Resolved add-on rates (identical on both tabs — sourced from rate maps).
   const {
@@ -705,17 +708,13 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   if (subPumpYes && subConcreteCY > 0) {
     subSideCost += pumpFeeFlat + pumpFeePerCY * Math.ceil(subConcreteCY)
   }
-  // Vapor barrier
+  // Vapor barrier — flat $/SF (no SF/hr labor).
   if (n(subVaporBarrierSF) > 0) {
-    subSideCost +=
-      n(subVaporBarrierSF) * vaporBarrierPerSF + (n(subVaporBarrierSF) / vaporBarrierSFPerHr) * lrph
+    subSideCost += n(subVaporBarrierSF) * subVaporBarrierRate
   }
-  // Sealer
+  // Sealer — flat $/SF (no SF/hr labor, type-independent).
   if (n(subSealerSF) > 0) {
-    const gals = Math.ceil(n(subSealerSF) / R.sealerSFPerGal)
-    const price5g = subSealerType === 'Natural' ? sealerNatural5g : sealerWet5g
-    const sealSFPerHr = subSealerType === 'Natural' ? sealerNaturalSFPerHr : sealerWetSFPerHr
-    subSideCost += gals * (price5g / 5) + (n(subSealerSF) / sealSFPerHr) * lrph
+    subSideCost += n(subSealerSF) * subSealerRate
   }
   // Sub manual rows
   ;(subManualRows || []).forEach(r => {
@@ -1057,7 +1056,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                   return (
                     <div key={t.key} className="flex items-center gap-2">
                       <span className="text-[11px] text-gray-500 w-24 shrink-0">{t.label}</span>
-                      <div className="w-20 shrink-0">
+                      <div className="flex-1 min-w-0">
                         <NumInput
                           value={installTiers[t.key] ?? ''}
                           onChange={v => setInstallTiers({ ...installTiers, [t.key]: v })}
@@ -1069,7 +1068,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                           pump incl.
                         </span>
                       )}
-                      <span className="text-[11px] text-gray-400 inline-flex items-center gap-1 shrink-0 whitespace-nowrap ml-auto">
+                      <span className="text-[11px] text-gray-400 inline-flex items-center gap-1 shrink-0 whitespace-nowrap">
                         {rate} SF/hr
                         <RateEditPopover
                           table="labor_rates"
@@ -1335,33 +1334,61 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           <div>
             <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1">
               Vapor Barrier (Sq Ft)
-              <span className="text-gray-400">
-                — {calc.vaporBarrierSFPerHr} SF/hr · ${calc.vaporBarrierPerSF}/SF
-              </span>
-              <RateEditPopover
-                table="labor_rates"
-                name="Concrete - Vapor Barrier"
-                category="Concrete"
-                mode="coefficient"
-                unitLabel="SF/hr"
-                currentValue={calc.vaporBarrierSFPerHr}
-                onSaved={refreshAllRates}
-              />
-              <RateEditPopover
-                table="material_rates"
-                name="Concrete - Vapor Barrier SF"
-                category="Concrete"
-                unitLabel="SF"
-                currentValue={calc.vaporBarrierPerSF}
-                onSaved={refreshAllRates}
-              />
+              {isSub ? (
+                <span className="text-gray-400 inline-flex items-center gap-1">
+                  — ${subVaporBarrierRate}/SF
+                  <RateEditPopover
+                    table="subcontractor_rates"
+                    name="Concrete Sub - Vapor Barrier Per SF"
+                    category="Concrete"
+                    unitLabel="/SF"
+                    currentValue={subVaporBarrierRate}
+                    onSaved={refreshAllRates}
+                  />
+                </span>
+              ) : (
+                <>
+                  <span className="text-gray-400">
+                    — {calc.vaporBarrierSFPerHr} SF/hr · ${calc.vaporBarrierPerSF}/SF
+                  </span>
+                  <RateEditPopover
+                    table="labor_rates"
+                    name="Concrete - Vapor Barrier"
+                    category="Concrete"
+                    mode="coefficient"
+                    unitLabel="SF/hr"
+                    currentValue={calc.vaporBarrierSFPerHr}
+                    onSaved={refreshAllRates}
+                  />
+                  <RateEditPopover
+                    table="material_rates"
+                    name="Concrete - Vapor Barrier SF"
+                    category="Concrete"
+                    unitLabel="SF"
+                    currentValue={calc.vaporBarrierPerSF}
+                    onSaved={refreshAllRates}
+                  />
+                </>
+              )}
             </label>
             <NumInput value={activeVaporBarrierSF} onChange={setActiveVaporBarrierSF} />
           </div>
           <div>
             <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap">
               Sealer (Sq Ft)
-              {activeSealerType === 'Natural' ? (
+              {isSub ? (
+                <span className="text-gray-400 inline-flex items-center gap-1">
+                  — ${subSealerRate}/SF
+                  <RateEditPopover
+                    table="subcontractor_rates"
+                    name="Concrete Sub - Sealer Per SF"
+                    category="Concrete"
+                    unitLabel="/SF"
+                    currentValue={subSealerRate}
+                    onSaved={refreshAllRates}
+                  />
+                </span>
+              ) : activeSealerType === 'Natural' ? (
                 <span className="text-gray-400 inline-flex items-center gap-1">
                   — {calc.sealerNaturalSFPerHr} SF/hr · ${calc.sealerNatural5g}/5gal
                   <RateEditPopover
