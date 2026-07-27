@@ -66,13 +66,36 @@ export default function DrainageSummary({ module }) {
     { title: 'Manual Entry', rows: manualHrsRows },
   ]
 
-  // ── Subcontractor — quantities (LF of trench run) ──────────────────────────
+  // ── Subcontractor — quantities (LF of trench run + flat fixtures/items) ─────
+  const subFixtureFlat = n(d.subRates?.['Drainage Sub - Fixture Flat']) || 20
   const subSections = [
     {
       title: 'Trenching',
       rows: (d.subTrenchRows || [])
         .filter(r => n(r.lf) > 0)
         .map(r => ({ label: 'Trenching', value: `${n(r.lf)} LF` })),
+    },
+    {
+      title: 'Drain Fixtures',
+      rows: (d.subFixtureRows || [])
+        .filter(r => n(r.qty) > 0)
+        .map(r => ({ label: r.type, value: `${n(r.qty)} × ${fmt2(subFixtureFlat)}` })),
+    },
+    {
+      title: 'Additional Items',
+      rows: [
+        { key: 'pumpVaultQty', label: 'Pump Vault', unit: '' },
+        { key: 'sumpPumpQty', label: 'Sump Pump', unit: '' },
+        { key: 'curbCoreQty', label: 'Curb Core', unit: '' },
+        { key: 'hydrocutLF', label: 'Hydro Cut', unit: ' LF' },
+      ]
+        .filter(it => n(d.subAdditionalItems?.[it.key]) > 0)
+        .map(it => ({
+          label: it.label,
+          value: it.unit
+            ? `${n(d.subAdditionalItems[it.key])}${it.unit}`
+            : `× ${n(d.subAdditionalItems[it.key])}`,
+        })),
     },
   ]
 

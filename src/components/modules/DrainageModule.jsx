@@ -127,6 +127,8 @@ function calcDrainage(
     additionalItems,
     manualRows,
     subTrenchRows,
+    subFixtureRows,
+    subAdditionalItems,
   } = state
   const isSub = state.subType === 'Subcontractor'
 
@@ -199,16 +201,33 @@ function calcDrainage(
   const subRatePerLF = subRates['Drainage Sub - Per LF'] ?? 16
   const subLf = (subTrenchRows || []).reduce((sum, r) => sum + n(r.lf), 0)
   const subDrainCost = subLf * subRatePerLF
-  const baseHrs = trenchHrs + pipeHrs + fixHrs + addHrs + manHrs
+
+  // Sub tab's own flat-priced Drain Fixtures + Additional Items — independent
+  // of the In-House hourly sections. Each rate is a fixed sub cost.
+  const subFixtureFlat = subRates['Drainage Sub - Fixture Flat'] ?? 20
+  const subPumpVaultRate = subRates['Drainage Sub - Pump Vault'] ?? 250
+  const subSumpPumpRate = subRates['Drainage Sub - Sump Pump'] ?? 300
+  const subCurbCoreRate = subRates['Drainage Sub - Curb Core'] ?? 250
+  const subHydrocutRate = subRates['Drainage Sub - Hydrocut Per LF'] ?? 10
+  const subFixQty = (subFixtureRows || []).reduce((s, r) => s + n(r.qty), 0)
+  const subFixtureCost = subFixQty * subFixtureFlat
+  const sa = subAdditionalItems || {}
+  const subAdditionalCost =
+    n(sa.pumpVaultQty) * subPumpVaultRate +
+    n(sa.sumpPumpQty) * subSumpPumpRate +
+    n(sa.curbCoreQty) * subCurbCoreRate +
+    n(sa.hydrocutLF) * subHydrocutRate
+
+  const baseHrs = (isSub ? 0 : trenchHrs + pipeHrs + fixHrs + addHrs) + manHrs
   const diffMod = 1 + n(difficulty) / 100
   const _preWalkHrs = baseHrs * diffMod + (parseFloat(hoursAdj) || 0)
   const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
   const totalHrs = _preWalkHrs + walkHrs
   const manDays = totalHrs / 8
-  const totalMat = pipeMat + fixMat + drainFittingFee + addMat + manMat
+  const totalMat = (isSub ? 0 : pipeMat + fixMat + drainFittingFee + addMat) + manMat
   const laborCost = totalHrs * laborRatePerHour
   const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
-  const subCost = manSub + subDrainCost
+  const subCost = manSub + subDrainCost + (isSub ? subFixtureCost + subAdditionalCost : 0)
   // Sub work earns a markup (gross profit on subcontracted cost), matching the
   // GPMD bar, so the saved total includes it.
   const subGp = subCost * (subMarkupRate || 0)
@@ -222,6 +241,14 @@ function calcDrainage(
     subRatePerLF,
     subLf,
     subDrainCost,
+    subFixtureFlat,
+    subFixtureCost,
+    subFixQty,
+    subPumpVaultRate,
+    subSumpPumpRate,
+    subCurbCoreRate,
+    subHydrocutRate,
+    subAdditionalCost,
     totalMat,
     laborCost,
     burden,
@@ -392,6 +419,19 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   const [additionalItems, setAdditionalItems] = useState(
     initialData?.additionalItems ?? DEFAULT_ADDITIONAL
   )
+  // Subcontractor tab has its OWN Drain Fixtures + Additional Items, priced as
+  // flat sub costs — independent of the In-House hourly sections above.
+  const [subFixtureRows, setSubFixtureRows] = useState(
+    initialData?.subFixtureRows ?? DEFAULT_FIXTURE_ROWS.map(r => ({ ...r }))
+  )
+  const [subAdditionalItems, setSubAdditionalItems] = useState(
+    initialData?.subAdditionalItems ?? {
+      pumpVaultQty: '',
+      sumpPumpQty: '',
+      curbCoreQty: '',
+      hydrocutLF: '',
+    }
+  )
   const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
 
   // ── Sales tax — applied to totalMat across every module so the bid
@@ -419,6 +459,8 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
       additionalItems,
       manualRows,
       subTrenchRows,
+      subFixtureRows,
+      subAdditionalItems,
       distanceLF,
       subType,
     },
@@ -454,6 +496,9 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   function updateFixture(i, field, val) {
     setFixtureRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
+  function updateSubFixture(i, field, val) {
+    setSubFixtureRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  }
   function updateManual(i, field, val) {
     setManualRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
@@ -470,6 +515,8 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         pipeRows,
         fixtureRows,
         additionalItems,
+        subFixtureRows,
+        subAdditionalItems,
         manualRows,
         subType,
         laborRatePerHour,
@@ -570,6 +617,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
 
       {/* ── Drainage (Subcontractor) ── */}
       {isSub ? (
+        <>
         <div>
           <SectionHeader title="Drainage — Subcontractor" />
           <p className="text-xs text-gray-500 mb-2">
@@ -625,6 +673,155 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
             />
           </p>
         </div>
+
+        {/* ── Drain Fixtures (Subcontractor — flat) ── */}
+        <div>
+          <SectionHeader title="Drain Fixtures" />
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-gray-500 border-b border-gray-200">
+                  <th className="text-left pb-1 pr-2 font-medium">Fixture Type</th>
+                  <th className="text-left pb-1 pr-2 font-medium">Qty</th>
+                  <th className="text-right pb-1 font-medium text-gray-400">Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                {subFixtureRows.map((row, i) => (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-2">
+                      <select
+                        className="input text-sm py-1 w-full min-w-0"
+                        value={row.type}
+                        onChange={e => updateSubFixture(i, 'type', e.target.value)}
+                      >
+                        <option value="">-- Select --</option>
+                        {Object.keys(FIXTURE_TYPES).map(t => (
+                          <option key={t}>{t}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1 pr-2">
+                      <NumInput value={row.qty} onChange={v => updateSubFixture(i, 'qty', v)} />
+                    </td>
+                    <td className="py-1 text-right text-gray-600 text-xs">
+                      {n(row.qty) > 0
+                        ? `$${(n(row.qty) * calc.subFixtureFlat).toFixed(2)}`
+                        : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <button
+              type="button"
+              className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+              onClick={() => setSubFixtureRows(r => [...r, { type: '3" Area Drain', qty: '' }])}
+            >
+              + Add fixture
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mt-2 inline-flex items-center gap-1">
+            ${calc.subFixtureFlat}/fixture × {calc.subFixQty} = ${calc.subFixtureCost.toFixed(2)}
+            <RateEditPopover
+              table="subcontractor_rates"
+              name="Drainage Sub - Fixture Flat"
+              category="Drainage"
+              unitLabel="/fixture"
+              currentValue={calc.subFixtureFlat}
+              onSaved={refreshMaterialPrices}
+            />
+          </p>
+        </div>
+
+        {/* ── Additional Items (Subcontractor — flat) ── */}
+        <div>
+          <SectionHeader title="Additional Items" />
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-gray-500 border-b border-gray-200">
+                  <th className="text-left pb-1 pr-2 font-medium">Item</th>
+                  <th className="text-left pb-1 pr-2 font-medium w-32">Qty</th>
+                  <th className="text-right pb-1 font-medium text-gray-400">Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  {
+                    key: 'pumpVaultQty',
+                    label: 'Pump Vault',
+                    rate: calc.subPumpVaultRate,
+                    rateName: 'Drainage Sub - Pump Vault',
+                    unit: 'ea',
+                  },
+                  {
+                    key: 'sumpPumpQty',
+                    label: 'Sump Pump',
+                    rate: calc.subSumpPumpRate,
+                    rateName: 'Drainage Sub - Sump Pump',
+                    unit: 'ea',
+                  },
+                  {
+                    key: 'curbCoreQty',
+                    label: 'Curb Core',
+                    rate: calc.subCurbCoreRate,
+                    rateName: 'Drainage Sub - Curb Core',
+                    unit: 'ea',
+                  },
+                  {
+                    key: 'hydrocutLF',
+                    label: 'Hydro Cut',
+                    rate: calc.subHydrocutRate,
+                    rateName: 'Drainage Sub - Hydrocut Per LF',
+                    unit: 'LF',
+                    qtyLabel: 'Linear Feet',
+                  },
+                ].map(item => {
+                  const qty = n(subAdditionalItems[item.key])
+                  return (
+                    <tr key={item.key} className="border-b border-gray-100">
+                      <td className="py-1.5 pr-2 text-xs text-gray-700">{item.label}</td>
+                      <td className="py-1.5 pr-2">
+                        {item.qtyLabel && (
+                          <span className="text-[10px] text-gray-400 block leading-none mb-0.5">
+                            {item.qtyLabel}
+                          </span>
+                        )}
+                        <input
+                          type="number"
+                          step="any"
+                          className="input text-sm py-1 w-24"
+                          placeholder="0"
+                          value={subAdditionalItems[item.key]}
+                          onChange={e =>
+                            setSubAdditionalItems(p => ({ ...p, [item.key]: e.target.value }))
+                          }
+                        />
+                      </td>
+                      <td className="py-1.5 text-right text-gray-600 text-xs">
+                        <span className="inline-flex items-center justify-end">
+                          {qty > 0
+                            ? `$${(qty * item.rate).toFixed(2)}`
+                            : `$${item.rate} / ${item.unit}`}
+                          <RateEditPopover
+                            table="subcontractor_rates"
+                            name={item.rateName}
+                            category="Drainage"
+                            unitLabel={`/${item.unit}`}
+                            currentValue={item.rate}
+                            onSaved={refreshMaterialPrices}
+                          />
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        </>
       ) : (
         <>
       {/* ── Trenching ── */}
@@ -767,7 +964,8 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         </>
       )}
 
-      {/* ── Fixtures ── */}
+      {/* ── Fixtures (In-House) ── */}
+      {!isSub && (
       <div>
         <SectionHeader title="Drains & Fixtures" />
         <div className="overflow-x-auto">
@@ -838,7 +1036,10 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         </div>
       </div>
 
-      {/* ── Additional Items ── */}
+      )}
+
+      {/* ── Additional Items (In-House) ── */}
+      {!isSub && (
       <div>
         <SectionHeader title="Additional Items" />
         <div className="overflow-x-auto">
@@ -917,6 +1118,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           </label>
         </div>
       </div>
+      )}
 
       {/* ── Manual Entry ── */}
       <div>
