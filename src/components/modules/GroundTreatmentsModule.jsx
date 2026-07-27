@@ -19,6 +19,7 @@ const GT_RATES = {
   // ── Mulch ──────────────────────────────────────────────────────────────────
   mulchPerCY: { dbName: 'Mulch', fallback: 25.0 }, // $/CY
   mulchDelivery: { dbName: 'Mulch Delivery Fee', fallback: 75.0 }, // $ flat per delivery
+  mulchLab: { dbName: 'Mulch - Labor Rate', fallback: 15 }, // CY/day spread rate (labor_rates)
 
   // ── Edging ─────────────────────────────────────────────────────────────────
   plasticEdgingMat: { dbName: 'Plastic Edging', fallback: 1.2 }, // $/LF
@@ -36,19 +37,40 @@ const GT_RATES = {
   sodLab: { dbName: 'Sod - Labor Rate', fallback: 0.01143 }, // hrs/SF (≈8/700)
 
   // ── Steppers ───────────────────────────────────────────────────────────────
+  // Each stone (Flagstone / Precast) has ONE per-ton material key shared across
+  // its Soil Set + Concrete Set lines, and a SEPARATE labor rate (SF/day) per
+  // set. "Concrete Set" differs from "Soil Set" only by a (slower) labor rate —
+  // no automatic concrete/mortar material is added (values TBD).
   flagstonePerTon: { dbName: 'Flagstone Steppers', fallback: 500.0 }, // $/ton default
-  flagstoneLab: { dbName: 'Flagstone Steppers - Labor Rate', fallback: 35 }, // SF/day
+  flagstoneSoilLab: { dbName: 'Flagstone Steppers - Soil Labor', fallback: 35 }, // SF/day
+  flagstoneConcreteLab: { dbName: 'Flagstone Steppers - Concrete Labor', fallback: 25 }, // SF/day
   precastPerTon: { dbName: 'Precast Steppers', fallback: 200.0 }, // $/ton default
-  precastLab: { dbName: 'Precast Steppers - Labor Rate', fallback: 50 }, // SF/day
+  precastSoilLab: { dbName: 'Precast Steppers - Soil Labor', fallback: 50 }, // SF/day
+  precastConcreteLab: { dbName: 'Precast Steppers - Concrete Labor', fallback: 35 }, // SF/day
 
   // ── Decomposed Granite ─────────────────────────────────────────────────────
   dgPerTon: { dbName: 'Decomposed Granite', fallback: 50.0 }, // $/ton
   dgCementPerTon: { dbName: 'DG Cement Mix', fallback: 20.0 }, // $/ton add-on
+  dgHandLab: { dbName: 'DG - Hand Labor Rate', fallback: 0.5 }, // CY/hr (labor_rates)
+  dgMachineLab: { dbName: 'DG - Machine Labor Rate', fallback: 12 }, // CY/day (labor_rates)
 
   // ── Gravel ─────────────────────────────────────────────────────────────────
   gravelFabricMat: { dbName: 'Gravel Fabric', fallback: 0.1 }, // $/SF
   gravelFabricLab: { dbName: 'Gravel Fabric - Labor Rate', fallback: 0.024 }, // hrs/SF
+  gravelMachineLab: { dbName: 'Gravel - Machine Labor Rate', fallback: 12 }, // CY/day (labor_rates)
+  gravelHandLab: { dbName: 'Gravel - Hand Labor Rate', fallback: 4 }, // CY/day (labor_rates)
 }
+
+// Gravel material types — each drives its own $/CY (material_rates). Pricing TBD
+// (all default 130) until real per-type prices are entered via RateEditPopover.
+const GRAVEL_TYPES = [
+  { label: 'Crushed Pea Gravel', dbName: 'Gravel - Crushed Pea Gravel', fallback: 130 },
+  { label: '3/4" Crushed Gravel', dbName: 'Gravel - 3/4" Crushed Gravel', fallback: 130 },
+  { label: 'Del Rio', dbName: 'Gravel - Del Rio', fallback: 130 },
+  { label: 'Black River Rock 1" minus', dbName: 'Gravel - Black River Rock 1in minus', fallback: 130 },
+  { label: 'Black River Rock 1"-2"', dbName: 'Gravel - Black River Rock 1in-2in', fallback: 130 },
+  { label: 'Black River Rock 2" to 3"', dbName: 'Gravel - Black River Rock 2in-3in', fallback: 130 },
+]
 
 const DEFAULTS = {
   laborRatePerHour: 35,
@@ -82,10 +104,10 @@ function calcGroundTreatments(
     soilPrepSF,
     sodSF,
     sodType,
-    flagstoneSF,
-    flagstoneRate,
-    precastSF,
-    precastRate,
+    flagstoneSoilSF,
+    flagstoneConcreteSF,
+    precastSoilSF,
+    precastConcreteSF,
     dgSF,
     dgDepth,
     dgMethod,
@@ -103,7 +125,8 @@ function calcGroundTreatments(
     mulchMat = 0
   if (n(mulchSF) > 0) {
     const CY = (n(mulchSF) * (n(mulchDepth) / 12)) / 27
-    mulchLab = (CY / 15) * 8 + (n(mulchSF) / 3200) * 8
+    const mulchCYPerDay = p(GT_RATES.mulchLab.dbName, GT_RATES.mulchLab.fallback)
+    mulchLab = (CY / mulchCYPerDay) * 8 + (n(mulchSF) / 3200) * 8
     mulchMat =
       CY * p(GT_RATES.mulchPerCY.dbName, GT_RATES.mulchPerCY.fallback) +
       p(GT_RATES.mulchDelivery.dbName, GT_RATES.mulchDelivery.fallback)
@@ -131,27 +154,44 @@ function calcGroundTreatments(
       ? p(GT_RATES.sodStAugMat.dbName, GT_RATES.sodStAugMat.fallback)
       : p(GT_RATES.sodMarathonMat.dbName, GT_RATES.sodMarathonMat.fallback))
 
-  // ── Flagstone Steppers ─────────────────────────────────────────────────────
+  // ── Flagstone Steppers (Soil Set + Concrete Set) ────────────────────────────
+  // Each set has its own labor rate (SF/day); material is tons*perTon for both,
+  // where tons = SF/80. Concrete Set adds NO extra concrete/mortar material —
+  // it only differs by a (slower) labor rate (values TBD, easy to extend later).
   let flagLab = 0,
     flagMat = 0
-  if (n(flagstoneSF) > 0) {
-    const tons = n(flagstoneSF) / 80
-    const sfPerDay = p(GT_RATES.flagstoneLab.dbName, GT_RATES.flagstoneLab.fallback)
-    flagLab = (n(flagstoneSF) / sfPerDay) * 8
-    flagMat =
-      tons *
-      (n(flagstoneRate) || p(GT_RATES.flagstonePerTon.dbName, GT_RATES.flagstonePerTon.fallback))
+  {
+    const perTon = p(GT_RATES.flagstonePerTon.dbName, GT_RATES.flagstonePerTon.fallback)
+    const soilSfPerDay = p(GT_RATES.flagstoneSoilLab.dbName, GT_RATES.flagstoneSoilLab.fallback)
+    const concSfPerDay = p(
+      GT_RATES.flagstoneConcreteLab.dbName,
+      GT_RATES.flagstoneConcreteLab.fallback
+    )
+    if (n(flagstoneSoilSF) > 0) {
+      flagLab += (n(flagstoneSoilSF) / soilSfPerDay) * 8
+      flagMat += (n(flagstoneSoilSF) / 80) * perTon
+    }
+    if (n(flagstoneConcreteSF) > 0) {
+      flagLab += (n(flagstoneConcreteSF) / concSfPerDay) * 8
+      flagMat += (n(flagstoneConcreteSF) / 80) * perTon
+    }
   }
 
-  // ── Precast Steppers ───────────────────────────────────────────────────────
+  // ── Precast Steppers (Soil Set + Concrete Set) ──────────────────────────────
   let precastLab = 0,
     precastMat = 0
-  if (n(precastSF) > 0) {
-    const tons = n(precastSF) / 80
-    const sfPerDay = p(GT_RATES.precastLab.dbName, GT_RATES.precastLab.fallback)
-    precastLab = (n(precastSF) / sfPerDay) * 8
-    precastMat =
-      tons * (n(precastRate) || p(GT_RATES.precastPerTon.dbName, GT_RATES.precastPerTon.fallback))
+  {
+    const perTon = p(GT_RATES.precastPerTon.dbName, GT_RATES.precastPerTon.fallback)
+    const soilSfPerDay = p(GT_RATES.precastSoilLab.dbName, GT_RATES.precastSoilLab.fallback)
+    const concSfPerDay = p(GT_RATES.precastConcreteLab.dbName, GT_RATES.precastConcreteLab.fallback)
+    if (n(precastSoilSF) > 0) {
+      precastLab += (n(precastSoilSF) / soilSfPerDay) * 8
+      precastMat += (n(precastSoilSF) / 80) * perTon
+    }
+    if (n(precastConcreteSF) > 0) {
+      precastLab += (n(precastConcreteSF) / concSfPerDay) * 8
+      precastMat += (n(precastConcreteSF) / 80) * perTon
+    }
   }
 
   // ── Decomposed Granite ─────────────────────────────────────────────────────
@@ -160,10 +200,12 @@ function calcGroundTreatments(
   if (n(dgSF) > 0) {
     const tons = (n(dgSF) * n(dgDepth)) / 200
     const cement = dgCement === 'Yes'
+    const dgHandRate = p(GT_RATES.dgHandLab.dbName, GT_RATES.dgHandLab.fallback)
+    const dgMachineRate = p(GT_RATES.dgMachineLab.dbName, GT_RATES.dgMachineLab.fallback)
     const baseHrs =
       dgMethod === 'Hand'
-        ? (tons * 1.62) / 0.5 + (n(dgSF) / 1000) * 8 + tons
-        : ((tons * 1.62) / 12) * 8 + (n(dgSF) / 1000) * 8 + tons
+        ? (tons * 1.62) / dgHandRate + (n(dgSF) / 1000) * 8 + tons
+        : ((tons * 1.62) / dgMachineRate) * 8 + (n(dgSF) / 1000) * 8 + tons
     dgLab = baseHrs + (cement ? tons * 1.25 : 0)
     dgMat =
       (tons * p(GT_RATES.dgPerTon.dbName, GT_RATES.dgPerTon.fallback) +
@@ -177,11 +219,15 @@ function calcGroundTreatments(
   gravelRows.forEach(r => {
     if (!n(r.sf)) return
     const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
-    const excavLab = r.method === 'Machine' ? ((CY * 1.62) / 12) * 8 : ((CY * 1.62) / 4) * 8
+    const machineRate = p(GT_RATES.gravelMachineLab.dbName, GT_RATES.gravelMachineLab.fallback)
+    const handRate = p(GT_RATES.gravelHandLab.dbName, GT_RATES.gravelHandLab.fallback)
+    const excavLab =
+      r.method === 'Machine' ? ((CY * 1.62) / machineRate) * 8 : ((CY * 1.62) / handRate) * 8
     const fabricLab =
       n(r.sf) * p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
     gravelLab += excavLab + fabricLab
-    const costPerCY = n(r.costPerCY) || 130
+    const gtype = GRAVEL_TYPES.find(t => t.label === r.type) || GRAVEL_TYPES[0]
+    const costPerCY = p(gtype.dbName, gtype.fallback)
     gravelMat +=
       CY * costPerCY +
       n(r.sf) * p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)
@@ -298,10 +344,10 @@ function LabeledRow({ label, children, note }) {
 }
 
 const DEFAULT_GRAVEL_ROWS = [
-  { sf: '', method: 'Hand', costPerCY: '130', depthIn: '3' },
-  { sf: '', method: 'Hand', costPerCY: '130', depthIn: '3' },
-  { sf: '', method: 'Hand', costPerCY: '130', depthIn: '3' },
-  { sf: '', method: 'Hand', costPerCY: '130', depthIn: '3' },
+  { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3' },
+  { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3' },
+  { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3' },
+  { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3' },
 ]
 const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 1', hours: '', materials: '', subCost: '' },
@@ -391,10 +437,12 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   const [soilPrepSF, setSoilPrepSF] = useState(initialData?.soilPrepSF ?? '')
   const [sodSF, setSodSF] = useState(initialData?.sodSF ?? '')
   const [sodType, setSodType] = useState(initialData?.sodType ?? 'Marathon I/II')
-  const [flagstoneSF, setFlagstoneSF] = useState(initialData?.flagstoneSF ?? '')
-  const [flagstoneRate, setFlagstoneRate] = useState(initialData?.flagstoneRate ?? '')
-  const [precastSF, setPrecastSF] = useState(initialData?.precastSF ?? '')
-  const [precastRate, setPrecastRate] = useState(initialData?.precastRate ?? '')
+  const [flagstoneSoilSF, setFlagstoneSoilSF] = useState(initialData?.flagstoneSoilSF ?? '')
+  const [flagstoneConcreteSF, setFlagstoneConcreteSF] = useState(
+    initialData?.flagstoneConcreteSF ?? ''
+  )
+  const [precastSoilSF, setPrecastSoilSF] = useState(initialData?.precastSoilSF ?? '')
+  const [precastConcreteSF, setPrecastConcreteSF] = useState(initialData?.precastConcreteSF ?? '')
   const [dgSF, setDgSF] = useState(initialData?.dgSF ?? '')
   const [dgDepth, setDgDepth] = useState(initialData?.dgDepth ?? '3.5')
   const [dgMethod, setDgMethod] = useState(initialData?.dgMethod ?? 'Machine')
@@ -417,17 +465,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     }
   }, [])
 
-  // Default stepper rates once prices load
-  useEffect(() => {
-    if (Object.keys(materialPrices).length === 0) return
-    if (!initialData?.flagstoneRate && materialPrices[GT_RATES.flagstonePerTon.dbName]) {
-      setFlagstoneRate(materialPrices[GT_RATES.flagstonePerTon.dbName].toString())
-    }
-    if (!initialData?.precastRate && materialPrices[GT_RATES.precastPerTon.dbName]) {
-      setPrecastRate(materialPrices[GT_RATES.precastPerTon.dbName].toString())
-    }
-  }, [materialPrices])
-
   const state = {
     crewType,
     subType,
@@ -440,10 +477,10 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     soilPrepSF,
     sodSF,
     sodType,
-    flagstoneSF,
-    flagstoneRate,
-    precastSF,
-    precastRate,
+    flagstoneSoilSF,
+    flagstoneConcreteSF,
+    precastSoilSF,
+    precastConcreteSF,
     dgSF,
     dgDepth,
     dgMethod,
@@ -725,6 +762,16 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 currentValue={p(GT_RATES.mulchDelivery.dbName, GT_RATES.mulchDelivery.fallback)}
                 onSaved={refreshAllRates}
               />
+              · {p(GT_RATES.mulchLab.dbName, 15)} CY/day labor
+              <RateEditPopover
+                table="labor_rates"
+                name={GT_RATES.mulchLab.dbName}
+                category="Ground Treatments"
+                mode="coefficient"
+                unitLabel="CY/day"
+                currentValue={p(GT_RATES.mulchLab.dbName, GT_RATES.mulchLab.fallback)}
+                onSaved={refreshAllRates}
+              />
             </span>
             {n(mulchSF) > 0 && (
               <span className="text-xs text-gray-400">
@@ -759,6 +806,32 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               category="Ground Treatments"
               unitLabel="ton"
               currentValue={p(GT_RATES.dgCementPerTon.dbName, GT_RATES.dgCementPerTon.fallback)}
+              onSaved={refreshAllRates}
+            />
+          </span>
+          ·
+          <span className="inline-flex items-center gap-1">
+            Hand {p(GT_RATES.dgHandLab.dbName, 0.5)} CY/hr labor
+            <RateEditPopover
+              table="labor_rates"
+              name={GT_RATES.dgHandLab.dbName}
+              category="Ground Treatments"
+              mode="coefficient"
+              unitLabel="CY/hr"
+              currentValue={p(GT_RATES.dgHandLab.dbName, GT_RATES.dgHandLab.fallback)}
+              onSaved={refreshAllRates}
+            />
+          </span>
+          ·
+          <span className="inline-flex items-center gap-1">
+            Machine {p(GT_RATES.dgMachineLab.dbName, 12)} CY/day labor
+            <RateEditPopover
+              table="labor_rates"
+              name={GT_RATES.dgMachineLab.dbName}
+              category="Ground Treatments"
+              mode="coefficient"
+              unitLabel="CY/day"
+              currentValue={p(GT_RATES.dgMachineLab.dbName, GT_RATES.dgMachineLab.fallback)}
               onSaved={refreshAllRates}
             />
           </span>
@@ -836,12 +909,38 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               onSaved={refreshAllRates}
             />
           </span>
+          ·
+          <span className="inline-flex items-center gap-1">
+            Machine excav {p(GT_RATES.gravelMachineLab.dbName, 12)} CY/day
+            <RateEditPopover
+              table="labor_rates"
+              name={GT_RATES.gravelMachineLab.dbName}
+              category="Ground Treatments"
+              mode="coefficient"
+              unitLabel="CY/day"
+              currentValue={p(GT_RATES.gravelMachineLab.dbName, GT_RATES.gravelMachineLab.fallback)}
+              onSaved={refreshAllRates}
+            />
+          </span>
+          ·
+          <span className="inline-flex items-center gap-1">
+            Hand excav {p(GT_RATES.gravelHandLab.dbName, 4)} CY/day
+            <RateEditPopover
+              table="labor_rates"
+              name={GT_RATES.gravelHandLab.dbName}
+              category="Ground Treatments"
+              mode="coefficient"
+              unitLabel="CY/day"
+              currentValue={p(GT_RATES.gravelHandLab.dbName, GT_RATES.gravelHandLab.fallback)}
+              onSaved={refreshAllRates}
+            />
+          </span>
         </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-left pb-1 pr-1 font-medium w-16">#</th>
+                <th className="text-left pb-1 pr-1 font-medium">Type</th>
                 <th className="text-left pb-1 pr-1 font-medium">SF</th>
                 <th className="text-left pb-1 pr-1 font-medium">Method</th>
                 <th className="text-left pb-1 pr-1 font-medium">$/CY</th>
@@ -850,9 +949,24 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             </thead>
             <tbody>
               {gravelRows.map((row, i) => {
+                const gtype =
+                  GRAVEL_TYPES.find(t => t.label === row.type) || GRAVEL_TYPES[0]
+                const typeCost = p(gtype.dbName, gtype.fallback)
                 return (
                   <tr key={i} className="border-b border-gray-100">
-                    <td className="py-1 pr-1 text-xs text-gray-500">#{i + 1}</td>
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.type || GRAVEL_TYPES[0].label}
+                        onChange={e => updateGravel(i, 'type', e.target.value)}
+                      >
+                        {GRAVEL_TYPES.map(t => (
+                          <option key={t.label} value={t.label}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
                     <td className="py-1 pr-1">
                       <NumInput value={row.sf} onChange={v => updateGravel(i, 'sf', v)} />
                     </td>
@@ -867,11 +981,17 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <NumInput
-                        value={row.costPerCY}
-                        onChange={v => updateGravel(i, 'costPerCY', v)}
-                        placeholder="130"
-                      />
+                      <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
+                        ${typeCost.toFixed(2)}/CY
+                        <RateEditPopover
+                          table="material_rates"
+                          name={gtype.dbName}
+                          category="Ground Treatments"
+                          unitLabel="CY"
+                          currentValue={typeCost}
+                          onSaved={refreshAllRates}
+                        />
+                      </span>
                     </td>
                     <td className="py-1">
                       <NumInput
@@ -891,8 +1011,10 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               {gravelRows.map((row, i) => {
                 if (!n(row.sf)) return null
                 const CY = (n(row.sf) * (n(row.depthIn) / 12)) / 27
+                const gtype =
+                  GRAVEL_TYPES.find(t => t.label === row.type) || GRAVEL_TYPES[0]
                 const mat =
-                  CY * (n(row.costPerCY) || 130) +
+                  CY * p(gtype.dbName, gtype.fallback) +
                   n(row.sf) * p(GT_RATES.gravelFabricMat.dbName, 0.1)
                 return (
                   <span key={i} className="text-xs text-gray-400">
@@ -994,127 +1116,102 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       {/* ── Steppers ── */}
       <div>
         <SectionHeader title="Steppers" />
-        <p className="text-xs text-gray-400 mb-2 inline-flex items-center flex-wrap gap-x-2">
-          <span className="inline-flex items-center gap-1">
-            Flagstone {p(GT_RATES.flagstoneLab.dbName, 35)} SF/day labor
-            <RateEditPopover
-              table="labor_rates"
-              name={GT_RATES.flagstoneLab.dbName}
-              category="Ground Treatments"
-              mode="coefficient"
-              unitLabel="SF/day"
-              currentValue={p(GT_RATES.flagstoneLab.dbName, GT_RATES.flagstoneLab.fallback)}
-              onSaved={refreshAllRates}
-            />
-          </span>
-          ·
-          <span className="inline-flex items-center gap-1">
-            Precast {p(GT_RATES.precastLab.dbName, 50)} SF/day labor
-            <RateEditPopover
-              table="labor_rates"
-              name={GT_RATES.precastLab.dbName}
-              category="Ground Treatments"
-              mode="coefficient"
-              unitLabel="SF/day"
-              currentValue={p(GT_RATES.precastLab.dbName, GT_RATES.precastLab.fallback)}
-              onSaved={refreshAllRates}
-            />
-          </span>
+        <p className="text-xs text-gray-400 mb-2">
+          Each stone splits into a Soil Set and a Concrete Set line. "Concrete Set" differs only by a
+          (slower) editable labor rate — no automatic concrete/mortar material is added (TBD).
+          tons = SF / 80; material = tons × per-ton rate (shared per stone).
         </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-left pb-1 pr-2 font-medium">Type</th>
+                <th className="text-left pb-1 pr-2 font-medium">Line</th>
                 <th className="text-left pb-1 pr-2 font-medium">Area (SF)</th>
+                <th className="text-left pb-1 pr-2 font-medium">Labor</th>
                 <th className="text-left pb-1 pr-2 font-medium">$/Ton</th>
                 <th className="text-right pb-1 pr-2 font-medium text-gray-400">Tons</th>
                 <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
               </tr>
             </thead>
             <tbody>
-              {/* Flagstone */}
-              <tr className="border-b border-gray-100">
-                <td className="py-1 pr-2 text-xs text-gray-700">Flagstone Steppers</td>
-                <td className="py-1 pr-2">
-                  <NumInput value={flagstoneSF} onChange={setFlagstoneSF} />
-                </td>
-                <td className="py-1 pr-2">
-                  <div className="flex items-center gap-1">
-                    <div className="relative">
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                        $
+              {[
+                {
+                  label: 'Flagstone — Soil Set',
+                  sf: flagstoneSoilSF,
+                  set: setFlagstoneSoilSF,
+                  labRate: GT_RATES.flagstoneSoilLab,
+                  matRate: GT_RATES.flagstonePerTon,
+                },
+                {
+                  label: 'Flagstone — Concrete Set',
+                  sf: flagstoneConcreteSF,
+                  set: setFlagstoneConcreteSF,
+                  labRate: GT_RATES.flagstoneConcreteLab,
+                  matRate: GT_RATES.flagstonePerTon,
+                },
+                {
+                  label: 'Precast — Soil Set',
+                  sf: precastSoilSF,
+                  set: setPrecastSoilSF,
+                  labRate: GT_RATES.precastSoilLab,
+                  matRate: GT_RATES.precastPerTon,
+                },
+                {
+                  label: 'Precast — Concrete Set',
+                  sf: precastConcreteSF,
+                  set: setPrecastConcreteSF,
+                  labRate: GT_RATES.precastConcreteLab,
+                  matRate: GT_RATES.precastPerTon,
+                },
+              ].map((row, i) => {
+                const sfPerDay = p(row.labRate.dbName, row.labRate.fallback)
+                const perTon = p(row.matRate.dbName, row.matRate.fallback)
+                const sfN = n(row.sf)
+                const tons = sfN / 80
+                const mat = tons * perTon
+                const hrs = sfPerDay > 0 ? (sfN / sfPerDay) * 8 : 0
+                return (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-2 text-xs text-gray-700 whitespace-nowrap">{row.label}</td>
+                    <td className="py-1 pr-2">
+                      <NumInput value={row.sf} onChange={row.set} />
+                    </td>
+                    <td className="py-1 pr-2">
+                      <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
+                        {sfPerDay} SF/day
+                        <RateEditPopover
+                          table="labor_rates"
+                          name={row.labRate.dbName}
+                          category="Ground Treatments"
+                          mode="coefficient"
+                          unitLabel="SF/day"
+                          currentValue={sfPerDay}
+                          onSaved={refreshAllRates}
+                        />
                       </span>
-                      <input
-                        type="number"
-                        step="any"
-                        className="input text-sm py-1.5 pl-5 w-24"
-                        placeholder={p(GT_RATES.flagstonePerTon.dbName, 500).toString()}
-                        value={flagstoneRate}
-                        onChange={e => setFlagstoneRate(e.target.value)}
-                      />
-                    </div>
-                    <RateEditPopover
-                      table="material_rates"
-                      name={GT_RATES.flagstonePerTon.dbName}
-                      category="Ground Treatments"
-                      unitLabel="ton"
-                      currentValue={p(
-                        GT_RATES.flagstonePerTon.dbName,
-                        GT_RATES.flagstonePerTon.fallback
-                      )}
-                      onSaved={refreshAllRates}
-                    />
-                  </div>
-                </td>
-                <td className="py-1 text-right text-xs text-gray-400 pr-2">
-                  {n(flagstoneSF) > 0 ? (n(flagstoneSF) / 80).toFixed(2) : '—'}
-                </td>
-                <td className="py-1 text-right text-xs text-gray-600">
-                  {n(flagstoneSF) > 0 ? `$${calc.flagMat.toFixed(2)}` : '—'}
-                </td>
-              </tr>
-              {/* Precast */}
-              <tr className="border-b border-gray-100">
-                <td className="py-1 pr-2 text-xs text-gray-700">Precast Steppers</td>
-                <td className="py-1 pr-2">
-                  <NumInput value={precastSF} onChange={setPrecastSF} />
-                </td>
-                <td className="py-1 pr-2">
-                  <div className="flex items-center gap-1">
-                    <div className="relative">
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                        $
+                    </td>
+                    <td className="py-1 pr-2">
+                      <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
+                        ${perTon.toFixed(2)}/ton
+                        <RateEditPopover
+                          table="material_rates"
+                          name={row.matRate.dbName}
+                          category="Ground Treatments"
+                          unitLabel="ton"
+                          currentValue={perTon}
+                          onSaved={refreshAllRates}
+                        />
                       </span>
-                      <input
-                        type="number"
-                        step="any"
-                        className="input text-sm py-1.5 pl-5 w-24"
-                        placeholder={p(GT_RATES.precastPerTon.dbName, 200).toString()}
-                        value={precastRate}
-                        onChange={e => setPrecastRate(e.target.value)}
-                      />
-                    </div>
-                    <RateEditPopover
-                      table="material_rates"
-                      name={GT_RATES.precastPerTon.dbName}
-                      category="Ground Treatments"
-                      unitLabel="ton"
-                      currentValue={p(
-                        GT_RATES.precastPerTon.dbName,
-                        GT_RATES.precastPerTon.fallback
-                      )}
-                      onSaved={refreshAllRates}
-                    />
-                  </div>
-                </td>
-                <td className="py-1 text-right text-xs text-gray-400 pr-2">
-                  {n(precastSF) > 0 ? (n(precastSF) / 80).toFixed(2) : '—'}
-                </td>
-                <td className="py-1 text-right text-xs text-gray-600">
-                  {n(precastSF) > 0 ? `$${calc.precastMat.toFixed(2)}` : '—'}
-                </td>
-              </tr>
+                    </td>
+                    <td className="py-1 text-right text-xs text-gray-400 pr-2">
+                      {sfN > 0 ? tons.toFixed(2) : '—'}
+                    </td>
+                    <td className="py-1 text-right text-xs text-gray-600 whitespace-nowrap">
+                      {sfN > 0 ? `$${mat.toFixed(2)} · ${hrs.toFixed(2)} hrs` : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

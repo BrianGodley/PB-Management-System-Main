@@ -7,6 +7,7 @@ import FinancialSummaryList from './FinancialSummaryList'
 const GT_RATES = {
   mulchPerCY: { dbName: 'Mulch', fallback: 25.0 },
   mulchDelivery: { dbName: 'Mulch Delivery Fee', fallback: 75.0 },
+  mulchLab: { dbName: 'Mulch - Labor Rate', fallback: 15 }, // CY/day
   plasticEdgingMat: { dbName: 'Plastic Edging', fallback: 1.2 },
   plasticEdgingLab: { dbName: 'Plastic Edging - Labor Rate', fallback: 0.09 },
   metalEdgingMat: { dbName: 'Metal Edging', fallback: 4.0 },
@@ -17,14 +18,31 @@ const GT_RATES = {
   sodStAugMat: { dbName: 'Sod - St. Augustine', fallback: 1.97 },
   sodLab: { dbName: 'Sod - Labor Rate', fallback: 0.01143 },
   flagstonePerTon: { dbName: 'Flagstone Steppers', fallback: 500.0 },
-  flagstoneLab: { dbName: 'Flagstone Steppers - Labor Rate', fallback: 35 },
+  flagstoneSoilLab: { dbName: 'Flagstone Steppers - Soil Labor', fallback: 35 },
+  flagstoneConcreteLab: { dbName: 'Flagstone Steppers - Concrete Labor', fallback: 25 },
   precastPerTon: { dbName: 'Precast Steppers', fallback: 200.0 },
-  precastLab: { dbName: 'Precast Steppers - Labor Rate', fallback: 50 },
+  precastSoilLab: { dbName: 'Precast Steppers - Soil Labor', fallback: 50 },
+  precastConcreteLab: { dbName: 'Precast Steppers - Concrete Labor', fallback: 35 },
   dgPerTon: { dbName: 'Decomposed Granite', fallback: 50.0 },
   dgCementPerTon: { dbName: 'DG Cement Mix', fallback: 20.0 },
+  dgHandLab: { dbName: 'DG - Hand Labor Rate', fallback: 0.5 },
+  dgMachineLab: { dbName: 'DG - Machine Labor Rate', fallback: 12 },
   gravelFabricMat: { dbName: 'Gravel Fabric', fallback: 0.1 },
   gravelFabricLab: { dbName: 'Gravel Fabric - Labor Rate', fallback: 0.024 },
+  gravelMachineLab: { dbName: 'Gravel - Machine Labor Rate', fallback: 12 },
+  gravelHandLab: { dbName: 'Gravel - Hand Labor Rate', fallback: 4 },
 }
+
+// Gravel material types — mirror of the module. Legacy modules may instead have a
+// row.costPerCY; the summary falls back to that when no type is present.
+const GRAVEL_TYPES = [
+  { label: 'Crushed Pea Gravel', dbName: 'Gravel - Crushed Pea Gravel', fallback: 130 },
+  { label: '3/4" Crushed Gravel', dbName: 'Gravel - 3/4" Crushed Gravel', fallback: 130 },
+  { label: 'Del Rio', dbName: 'Gravel - Del Rio', fallback: 130 },
+  { label: 'Black River Rock 1" minus', dbName: 'Gravel - Black River Rock 1in minus', fallback: 130 },
+  { label: 'Black River Rock 1"-2"', dbName: 'Gravel - Black River Rock 1in-2in', fallback: 130 },
+  { label: 'Black River Rock 2" to 3"', dbName: 'Gravel - Black River Rock 2in-3in', fallback: 130 },
+]
 
 const n = v => parseFloat(v) || 0
 const fmt2 = v =>
@@ -72,6 +90,10 @@ export default function GroundTreatmentsSummary({ module }) {
     flagstoneRate,
     precastSF = 0,
     precastRate,
+    flagstoneSoilSF = 0,
+    flagstoneConcreteSF = 0,
+    precastSoilSF = 0,
+    precastConcreteSF = 0,
     dgSF = 0,
     dgDepth = 3.5,
     dgMethod = 'Machine',
@@ -121,7 +143,8 @@ export default function GroundTreatmentsSummary({ module }) {
     const mat =
       CY * mp(GT_RATES.mulchPerCY.dbName, GT_RATES.mulchPerCY.fallback) +
       mp(GT_RATES.mulchDelivery.dbName, GT_RATES.mulchDelivery.fallback)
-    const hrs = (CY / 15) * 8 + (n(mulchSF) / 3200) * 8
+    const mulchCYPerDay = mp(GT_RATES.mulchLab.dbName, GT_RATES.mulchLab.fallback)
+    const hrs = (CY / mulchCYPerDay) * 8 + (n(mulchSF) / 3200) * 8
     mulchLine = {
       label: `Mulch — ${n(mulchSF).toLocaleString()} SF × ${n(mulchDepth)}"`,
       value: fmt2(mat),
@@ -138,10 +161,12 @@ export default function GroundTreatmentsSummary({ module }) {
       tons * mp(GT_RATES.dgPerTon.dbName, GT_RATES.dgPerTon.fallback) +
       (cement ? tons * mp(GT_RATES.dgCementPerTon.dbName, GT_RATES.dgCementPerTon.fallback) : 0)
     const mat = matBase * 1.1
+    const dgHandRate = mp(GT_RATES.dgHandLab.dbName, GT_RATES.dgHandLab.fallback)
+    const dgMachineRate = mp(GT_RATES.dgMachineLab.dbName, GT_RATES.dgMachineLab.fallback)
     const baseHrs =
       dgMethod === 'Hand'
-        ? (tons * 1.62) / 0.5 + (n(dgSF) / 1000) * 8 + tons
-        : ((tons * 1.62) / 12) * 8 + (n(dgSF) / 1000) * 8 + tons
+        ? (tons * 1.62) / dgHandRate + (n(dgSF) / 1000) * 8 + tons
+        : ((tons * 1.62) / dgMachineRate) * 8 + (n(dgSF) / 1000) * 8 + tons
     const hrs = baseHrs + (cement ? tons * 1.25 : 0)
     dgLine = {
       label: `D.G. — ${n(dgSF).toLocaleString()} SF × ${n(dgDepth)}" (${dgMethod}${cement ? ', cement' : ''})`,
@@ -155,18 +180,25 @@ export default function GroundTreatmentsSummary({ module }) {
     .map((r, i) => {
       if (!n(r.sf)) return null
       const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
+      // New modules store row.type (drives $/CY via material_rates); legacy
+      // modules store a manual row.costPerCY — fall back to that.
+      const gtype = r.type ? GRAVEL_TYPES.find(t => t.label === r.type) : null
+      const costPerCY = gtype ? mp(gtype.dbName, gtype.fallback) : n(r.costPerCY) || 130
       const mat =
-        CY * (n(r.costPerCY) || 130) +
+        CY * costPerCY +
         n(r.sf) * mp(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)
-      const excavLab = r.method === 'Machine' ? ((CY * 1.62) / 12) * 8 : ((CY * 1.62) / 4) * 8
+      const machineRate = mp(GT_RATES.gravelMachineLab.dbName, GT_RATES.gravelMachineLab.fallback)
+      const handRate = mp(GT_RATES.gravelHandLab.dbName, GT_RATES.gravelHandLab.fallback)
+      const excavLab =
+        r.method === 'Machine' ? ((CY * 1.62) / machineRate) * 8 : ((CY * 1.62) / handRate) * 8
       const fabricLab =
         n(r.sf) * mp(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
       const hrs = excavLab + fabricLab
       return {
         key: i,
-        label: `Gravel #${i + 1} — ${n(r.sf).toLocaleString()} SF × ${n(r.depthIn)}" (${r.method})`,
+        label: `Gravel #${i + 1}${r.type ? ` (${r.type})` : ''} — ${n(r.sf).toLocaleString()} SF × ${n(r.depthIn)}" (${r.method})`,
         value: fmt2(mat),
-        sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} CY · $${n(r.costPerCY) || 130}/CY`,
+        sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} CY · $${costPerCY.toFixed ? costPerCY.toFixed(2) : costPerCY}/CY`,
       }
     })
     .filter(Boolean)
@@ -199,35 +231,52 @@ export default function GroundTreatmentsSummary({ module }) {
   }
 
   // ── Steppers ─────────────────────────────────────────────────────────────────
+  // Each stone (Flagstone / Precast) splits into a Soil Set and a Concrete Set
+  // line — same per-ton material rate, different (slower) concrete labor rate.
+  // Legacy modules stored a single flagstoneSF/precastSF (+ optional
+  // flagstoneRate/precastRate); those fall through to the soil-set line.
   const stepperLines = []
-
-  if (n(flagstoneSF) > 0) {
-    const tons = n(flagstoneSF) / 80
-    const rate =
-      n(flagstoneRate) || mp(GT_RATES.flagstonePerTon.dbName, GT_RATES.flagstonePerTon.fallback)
-    const sfPerDay = mp(GT_RATES.flagstoneLab.dbName, GT_RATES.flagstoneLab.fallback)
+  const stepperDefs = [
+    {
+      label: 'Flagstone Steppers (Soil Set)',
+      sf: n(flagstoneSoilSF) || n(flagstoneSF),
+      matRate: GT_RATES.flagstonePerTon,
+      matOverride: flagstoneRate,
+      labRate: GT_RATES.flagstoneSoilLab,
+    },
+    {
+      label: 'Flagstone Steppers (Concrete Set)',
+      sf: n(flagstoneConcreteSF),
+      matRate: GT_RATES.flagstonePerTon,
+      labRate: GT_RATES.flagstoneConcreteLab,
+    },
+    {
+      label: 'Precast Steppers (Soil Set)',
+      sf: n(precastSoilSF) || n(precastSF),
+      matRate: GT_RATES.precastPerTon,
+      matOverride: precastRate,
+      labRate: GT_RATES.precastSoilLab,
+    },
+    {
+      label: 'Precast Steppers (Concrete Set)',
+      sf: n(precastConcreteSF),
+      matRate: GT_RATES.precastPerTon,
+      labRate: GT_RATES.precastConcreteLab,
+    },
+  ]
+  stepperDefs.forEach(def => {
+    if (def.sf <= 0) return
+    const tons = def.sf / 80
+    const rate = n(def.matOverride) || mp(def.matRate.dbName, def.matRate.fallback)
+    const sfPerDay = mp(def.labRate.dbName, def.labRate.fallback)
     const mat = tons * rate
-    const hrs = (n(flagstoneSF) / sfPerDay) * 8
+    const hrs = sfPerDay > 0 ? (def.sf / sfPerDay) * 8 : 0
     stepperLines.push({
-      label: `Flagstone Steppers — ${n(flagstoneSF).toLocaleString()} SF`,
+      label: `${def.label} — ${def.sf.toLocaleString()} SF`,
       value: fmt2(mat),
       sub: `${hrs.toFixed(2)} hrs · ${tons.toFixed(2)} tons · ${fmt2(rate)}/ton`,
     })
-  }
-
-  if (n(precastSF) > 0) {
-    const tons = n(precastSF) / 80
-    const rate =
-      n(precastRate) || mp(GT_RATES.precastPerTon.dbName, GT_RATES.precastPerTon.fallback)
-    const sfPerDay = mp(GT_RATES.precastLab.dbName, GT_RATES.precastLab.fallback)
-    const mat = tons * rate
-    const hrs = (n(precastSF) / sfPerDay) * 8
-    stepperLines.push({
-      label: `Precast Steppers — ${n(precastSF).toLocaleString()} SF`,
-      value: fmt2(mat),
-      sub: `${hrs.toFixed(2)} hrs · ${tons.toFixed(2)} tons · ${fmt2(rate)}/ton`,
-    })
-  }
+  })
 
   // ── Manual rows ────────────────────────────────────────────────────────────────
   const manualLines = (manualRows || []).filter(

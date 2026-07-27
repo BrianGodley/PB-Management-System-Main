@@ -112,3 +112,42 @@ FROM (VALUES
 ) AS v(company_name, rate, notes)
 CROSS JOIN (SELECT DISTINCT tenant_id FROM public.subcontractor_rates) AS t
 ON CONFLICT DO NOTHING;
+
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- GROUND TREATMENTS — labor_rates : Mulch / DG / Gravel / Stepper labor rates
+-- (2026-07-27)
+-- ═════════════════════════════════════════════════════════════════════════════
+INSERT INTO public.labor_rates (name, rate, unit, category, notes, tenant_id)
+SELECT v.name, v.rate, v.unit, 'Ground Treatments', v.notes, t.tenant_id
+FROM (VALUES
+  ('Mulch - Labor Rate',                    15,  'CY/day', 'Mulch spread labor rate'),
+  ('DG - Hand Labor Rate',                  0.5, 'CY/hr',  'Decomposed granite hand install rate'),
+  ('DG - Machine Labor Rate',               12,  'CY/day', 'Decomposed granite machine install rate'),
+  ('Gravel - Machine Labor Rate',           12,  'CY/day', 'Gravel machine excavation rate'),
+  ('Gravel - Hand Labor Rate',              4,   'CY/day', 'Gravel hand excavation rate'),
+  ('Flagstone Steppers - Soil Labor',       35,  'SF/day', 'Flagstone stepper labor - soil set'),
+  ('Flagstone Steppers - Concrete Labor',   25,  'SF/day', 'Flagstone stepper labor - concrete set'),
+  ('Precast Steppers - Soil Labor',         50,  'SF/day', 'Precast stepper labor - soil set'),
+  ('Precast Steppers - Concrete Labor',     35,  'SF/day', 'Precast stepper labor - concrete set')
+) AS v(name, rate, unit, notes)
+CROSS JOIN (SELECT DISTINCT tenant_id FROM public.labor_rates) AS t
+ON CONFLICT DO NOTHING;
+
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- GROUND TREATMENTS — material_rates : Gravel type $/CY (placeholder 130, update later)
+-- (2026-07-27)
+-- ═════════════════════════════════════════════════════════════════════════════
+INSERT INTO public.material_rates (name, unit_cost, category, notes, tenant_id)
+SELECT v.name, v.unit_cost, 'Ground Treatments', v.notes, t.tenant_id
+FROM (VALUES
+  ('Gravel - Crushed Pea Gravel',        130, 'Gravel type $/CY - placeholder, update pricing'),
+  ('Gravel - 3/4" Crushed Gravel',       130, 'Gravel type $/CY - placeholder, update pricing'),
+  ('Gravel - Del Rio',                   130, 'Gravel type $/CY - placeholder, update pricing'),
+  ('Gravel - Black River Rock 1in minus', 130, 'Gravel type $/CY - placeholder, update pricing'),
+  ('Gravel - Black River Rock 1in-2in',  130, 'Gravel type $/CY - placeholder, update pricing'),
+  ('Gravel - Black River Rock 2in-3in',  130, 'Gravel type $/CY - placeholder, update pricing')
+) AS v(name, unit_cost, notes)
+CROSS JOIN (SELECT DISTINCT tenant_id FROM public.material_rates) AS t
+ON CONFLICT DO NOTHING;
