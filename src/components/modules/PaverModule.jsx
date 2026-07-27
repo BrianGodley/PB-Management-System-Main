@@ -100,10 +100,14 @@ function calcPaver(
   walkAccess = null,
   laborBurdenPct = 0.29
 ) {
-  const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const lr = laborRates || {}
   const mr = materialRates || {}
   const pp = paverPrices || []
+  // Walk-access pace is now a Paver-specific editable labor rate (LF/min).
+  const walkPace =
+    lr['Paver - Walk Access Pace'] ??
+    parseFloat(walkAccess?.paceLfPerMin) ??
+    DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
 
   // Labor rates
   const installRate = lr['Paver - Install'] ?? LABOR_DEFAULTS.install
@@ -236,7 +240,7 @@ function calcPaver(
     addColorHrs
   const adjustedInstallHrs = rawInstallHrs * diff + hrsAdj
   const _preWalkHrs = adjustedInstallHrs + totalBaseHrs + manualHrs
-  const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
+  const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: walkPace })
   const totalHrs = _preWalkHrs + walkHrs
 
   // ── Materials ─────────────────────────────────────────────────────────────────
@@ -289,6 +293,7 @@ function calcPaver(
 
   return {
     walkHrs,
+    walkPace,
     totalHrs,
     adjustedInstallHrs,
     totalBaseHrs,
@@ -404,9 +409,9 @@ const DEFAULT_STATE = {
   //    are NOT mirrored. Sub cost itself uses an install-only whole-job rate
   //    (see calc below); the other mirrored fields are captured for scope.
   subAreaRows: [
-    { label: 'Area 1', method: 'Skid OK', sf: '', depth: 6, paverBrand: '', paverName: '', customPricePerSF: '' },
-    { label: 'Area 2', method: 'Skid OK', sf: '', depth: 6, paverBrand: '', paverName: '', customPricePerSF: '' },
-    { label: 'Area 3', method: 'Skid OK', sf: '', depth: 6, paverBrand: '', paverName: '', customPricePerSF: '' },
+    { label: 'Area 1', method: 'Skid OK', sf: '', depth: 6, paverBrand: '', paverName: '', customPricePerSF: '', installType: 'Hand Demo', largeFormat: false, under500: false },
+    { label: 'Area 2', method: 'Skid OK', sf: '', depth: 6, paverBrand: '', paverName: '', customPricePerSF: '', installType: 'Hand Demo', largeFormat: false, under500: false },
+    { label: 'Area 3', method: 'Skid OK', sf: '', depth: 6, paverBrand: '', paverName: '', customPricePerSF: '', installType: 'Hand Demo', largeFormat: false, under500: false },
   ],
   subStraightCutLF: '',
   subCurvedCutLF: '',
@@ -784,6 +789,37 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   const kColors = isSub ? 'subNumColors' : 'numColors'
   const kManual = isSub ? 'subManualRows' : 'manualRows'
 
+  // ── Sub tab unit-price rates (per-SF install types + per-LF sleeves) ─────────
+  // Simple $/SF install pricing keyed by install type, plus per-SF surcharges
+  // and a per-LF sleeves rate. All read from labor_rates (category 'Paver').
+  const SUB_INSTALL_TYPES = [
+    'Hand Demo',
+    'Bobcat Demo',
+    'No Demo',
+    'No Demo/Base',
+    'Tile in Concrete',
+    'Permeable',
+  ]
+  const SUB_INSTALL_RATE_NAMES = {
+    'Hand Demo': 'Paver Sub - Hand Demo',
+    'Bobcat Demo': 'Paver Sub - Bobcat Demo',
+    'No Demo': 'Paver Sub - No Demo',
+    'No Demo/Base': 'Paver Sub - No Demo/Base',
+    'Tile in Concrete': 'Paver Sub - Tile in Concrete',
+    Permeable: 'Paver Sub - Permeable',
+  }
+  const SUB_INSTALL_RATES = {
+    'Hand Demo': laborRates['Paver Sub - Hand Demo'] ?? 8,
+    'Bobcat Demo': laborRates['Paver Sub - Bobcat Demo'] ?? 7,
+    'No Demo': laborRates['Paver Sub - No Demo'] ?? 6.25,
+    'No Demo/Base': laborRates['Paver Sub - No Demo/Base'] ?? 5.5,
+    'Tile in Concrete': laborRates['Paver Sub - Tile in Concrete'] ?? 12,
+    Permeable: laborRates['Paver Sub - Permeable'] ?? 11,
+  }
+  const subLargeAdd = laborRates['Paver Sub - Large Format Add'] ?? 1.5
+  const subUnderAdd = laborRates['Paver Sub - Under 500 Add'] ?? 1.0
+  const sleevesSubRate = laborRates['Paver Sub - Sleeves LF'] ?? 12
+
   // In-House engine — always reads the raw In-House fields (state.areaRows …).
   const inHouse = calcPaver(
     state,
@@ -796,15 +832,20 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
     laborBurdenPct
   )
 
-  // ── Sub side — install-only whole-job rate ──────────────────────────────────
-  // Sub pricing is a single $/SF applied to the sub paver areas plus any sub
-  // manual-row sub costs. The other mirrored sub fields (cuts, restraints,
-  // sleeves, soldier, sealer, poly sand, stones, colors, 80mm) are captured on
-  // the Sub tab for SCOPE only and do NOT add to the sub cost.
-  const subRatePerSF = materialRates['Paver Sub - Per SF'] ?? 20
+  // ── Sub side — per-SF / per-LF unit pricing ─────────────────────────────────
+  // Each sub paver area is priced by its install type ($/SF) plus optional
+  // Large-Format and Under-500-SF per-SF surcharges. Sleeves are priced per LF
+  // and sub manual-row sub costs pass through.
   const subInstallSF = (state.subAreaRows || []).reduce((s, r) => s + n(r.sf), 0)
+  const subAreaCost = (state.subAreaRows || []).reduce((s, r) => {
+    const typeRate = SUB_INSTALL_RATES[r.installType] ?? SUB_INSTALL_RATES['Hand Demo']
+    const per =
+      typeRate + (r.largeFormat ? subLargeAdd : 0) + (r.under500 ? subUnderAdd : 0)
+    return s + n(r.sf) * per
+  }, 0)
   const subSideCost =
-    subInstallSF * subRatePerSF +
+    subAreaCost +
+    n(state.subSleevesLF) * sleevesSubRate +
     (state.subManualRows || []).reduce((s, r) => s + n(r.subCost), 0)
 
   // ── Combine In-House + Sub, apply the Sub GP markup ─────────────────────────
@@ -828,8 +869,8 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
     commission: _commission,
     price: _price,
     subInstallSF,
+    subAreaCost,
     subSideCost,
-    subRatePerSF,
   }
 
   // Apply company sales tax to the module's total material cost so the
@@ -942,6 +983,11 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       )}
 
       {/* ── Settings ─────────────────────────────────────────────────────────── */}
+      {/* Job Site Conditions — In-House only. The Sub tab is a simple
+          unit-priced section and does not use difficulty / walk-access /
+          80mm / poly-sand modifiers. */}
+      {!isSub && (
+        <>
       <SecHdr title="Job Site Conditions" />
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
         {/* Difficulty / walk-access / hours-adj are In-House modifiers only —
@@ -959,12 +1005,23 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         )}
         {!isSub && (
           <div>
-            <p
-              className="text-xs text-gray-500 mb-0.5"
-              title="Average Distance from Truck to Work Area"
-            >
-              Truck → Work Area (Avg LF)
-            </p>
+            <div className="flex items-center gap-1 mb-0.5">
+              <p
+                className="text-xs text-gray-500"
+                title="Average Distance from Truck to Work Area"
+              >
+                Truck → Work Area (Avg LF)
+              </p>
+              <RateEditPopover
+                table="labor_rates"
+                name="Paver - Walk Access Pace"
+                category="Paver"
+                mode="coefficient"
+                unitLabel="LF/min"
+                currentValue={calc.walkPace}
+                onSaved={refreshAllRates}
+              />
+            </div>
             <Inp
               value={state.distanceLF}
               onChange={e => set('distanceLF', e.target.value)}
@@ -1014,36 +1071,17 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           )}
         </div>
       </div>
+        </>
+      )}
 
-      {/* ── Paver Choices ───────────────────────────────────────────────────────── */}
+      {/* ── Paver Choices — In-House only ───────────────────────────────────────── */}
+      {!isSub && (
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           <span>Paver Choices</span>
-          {isSub ? (
-            calc.subInstallSF > 0 && (
-              <span className="font-normal normal-case text-gray-400">
-                {calc.subInstallSF.toLocaleString()} SF total
-              </span>
-            )
-          ) : (
-            calc.totalInstallSF > 0 && (
-              <span className="font-normal normal-case text-gray-400">
-                {calc.totalInstallSF.toLocaleString()} SF total
-              </span>
-            )
-          )}
-          {isSub && (
-            <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
-              · Sub ${calc.subRatePerSF}/SF install
-              <RateEditPopover
-                table="material_rates"
-                name="Paver Sub - Per SF"
-                category="Paver"
-                unitLabel="SF"
-                currentValue={calc.subRatePerSF}
-                onSaved={refreshAllRates}
-              />
-              {calc.subSideCost > 0 && <>· {fmt2(calc.subSideCost)} sub cost</>}
+          {calc.totalInstallSF > 0 && (
+            <span className="font-normal normal-case text-gray-400">
+              {calc.totalInstallSF.toLocaleString()} SF total
             </span>
           )}
           <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
@@ -1122,8 +1160,10 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           </tbody>
         </table>
       </div>
+      )}
 
-      {/* ── Base Material ───────────────────────────────────────────────────────── */}
+      {/* ── Base Material — In-House only ───────────────────────────────────────── */}
+      {!isSub && (
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           <span>Base Material</span>
@@ -1220,16 +1260,20 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           </tbody>
         </table>
       </div>
+      )}
 
-      {/* ── Paver Labor ─────────────────────────────────────────────────────── */}
+      {/* ── Paver Labor (In-House) / Paver and Demo Installation (Sub) ─────────── */}
       <div>
         <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          Paver Labor
-          <span className="ml-2 font-normal normal-case text-gray-400">
-            {calc.installRate} SF/hr install · {calc.straightCutRate}/{calc.curvedCutRate} LF/hr
-            cuts
-          </span>
+          {isSub ? 'Paver and Demo Installation' : 'Paver Labor'}
+          {!isSub && (
+            <span className="ml-2 font-normal normal-case text-gray-400">
+              {calc.installRate} SF/hr install · {calc.straightCutRate}/{calc.curvedCutRate} LF/hr
+              cuts
+            </span>
+          )}
         </div>
+        {!isSub && (
         <table className="w-full text-xs">
           <TH
             cols={[
@@ -1531,9 +1575,184 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             </tr>
           </tbody>
         </table>
+        )}
+
+        {/* Sub tab — simple per-SF / per-LF unit-priced installation. */}
+        {isSub && (
+          <>
+            <table className="w-full text-xs">
+              <TH
+                cols={[
+                  { label: 'Area', w: 'w-20' },
+                  { label: 'SF', w: 'w-24' },
+                  { label: 'Install Type' },
+                  { label: 'Large Fmt', w: 'w-16' },
+                  { label: '< 500 SF', w: 'w-16' },
+                  { label: 'Cost', w: 'w-20' },
+                ]}
+              />
+              <tbody className="divide-y divide-gray-50">
+                {(state.subAreaRows || []).map((row, i) => {
+                  const typeRate =
+                    SUB_INSTALL_RATES[row.installType] ?? SUB_INSTALL_RATES['Hand Demo']
+                  const per =
+                    typeRate +
+                    (row.largeFormat ? subLargeAdd : 0) +
+                    (row.under500 ? subUnderAdd : 0)
+                  const rowCost = n(row.sf) * per
+                  return (
+                    <tr key={i}>
+                      <td className={td}>
+                        <Inp
+                          type="text"
+                          value={row.label}
+                          onChange={e => setRow('subAreaRows', i, 'label', e.target.value)}
+                          placeholder={`Area ${i + 1}`}
+                        />
+                      </td>
+                      <td className={td}>
+                        <Inp
+                          value={row.sf}
+                          onChange={e => setRow('subAreaRows', i, 'sf', e.target.value)}
+                          placeholder="SF"
+                        />
+                      </td>
+                      <td className={td}>
+                        <Sel
+                          value={row.installType || 'Hand Demo'}
+                          onChange={e => setRow('subAreaRows', i, 'installType', e.target.value)}
+                          options={SUB_INSTALL_TYPES}
+                        />
+                      </td>
+                      <td className={`${td} text-center`}>
+                        <input
+                          type="checkbox"
+                          checked={!!row.largeFormat}
+                          onChange={e =>
+                            setRow('subAreaRows', i, 'largeFormat', e.target.checked)
+                          }
+                          className="w-4 h-4 rounded accent-blue-600"
+                        />
+                      </td>
+                      <td className={`${td} text-center`}>
+                        <input
+                          type="checkbox"
+                          checked={!!row.under500}
+                          onChange={e =>
+                            setRow('subAreaRows', i, 'under500', e.target.checked)
+                          }
+                          className="w-4 h-4 rounded accent-blue-600"
+                        />
+                      </td>
+                      <td className={num}>{rowCost > 0 ? fmt(rowCost) : '—'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            <button
+              type="button"
+              onClick={() =>
+                set('subAreaRows', [
+                  ...(state.subAreaRows || []),
+                  {
+                    label: `Area ${(state.subAreaRows || []).length + 1}`,
+                    sf: '',
+                    installType: 'Hand Demo',
+                    largeFormat: false,
+                    under500: false,
+                  },
+                ])
+              }
+              className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+            >
+              + Add area
+            </button>
+
+            {/* Sleeves — per linear foot */}
+            <div className="mt-3 flex items-center flex-wrap gap-2">
+              <p className="text-xs text-gray-500 w-24">Sleeves (LF)</p>
+              <div className="w-32">
+                <Inp
+                  value={state[kSleeves]}
+                  onChange={e => set(kSleeves, e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+              <span className="text-xs text-gray-400 inline-flex items-center gap-1">
+                × ${sleevesSubRate}/LF
+                <RateEditPopover
+                  table="labor_rates"
+                  name="Paver Sub - Sleeves LF"
+                  category="Paver"
+                  unitLabel="LF"
+                  currentValue={sleevesSubRate}
+                  onSaved={refreshAllRates}
+                />
+                {n(state[kSleeves]) > 0 && <> = {fmt2(n(state[kSleeves]) * sleevesSubRate)}</>}
+              </span>
+            </div>
+
+            {/* Editable rate legend */}
+            <div className="mt-3 bg-gray-50 rounded-lg p-3 text-xs">
+              <p className="font-semibold text-gray-600 uppercase tracking-wide text-xs mb-2">
+                Install Rates ($/SF)
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-gray-600">
+                {SUB_INSTALL_TYPES.map(t => (
+                  <span key={t} className="inline-flex items-center gap-1">
+                    {t}: <strong>${SUB_INSTALL_RATES[t]}</strong>/SF
+                    <RateEditPopover
+                      table="labor_rates"
+                      name={SUB_INSTALL_RATE_NAMES[t]}
+                      category="Paver"
+                      unitLabel="SF"
+                      currentValue={SUB_INSTALL_RATES[t]}
+                      onSaved={refreshAllRates}
+                    />
+                  </span>
+                ))}
+                <span className="inline-flex items-center gap-1">
+                  Large Format Add: <strong>${subLargeAdd}</strong>/SF
+                  <RateEditPopover
+                    table="labor_rates"
+                    name="Paver Sub - Large Format Add"
+                    category="Paver"
+                    unitLabel="SF"
+                    currentValue={subLargeAdd}
+                    onSaved={refreshAllRates}
+                  />
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  Under 500 SF Add: <strong>${subUnderAdd}</strong>/SF
+                  <RateEditPopover
+                    table="labor_rates"
+                    name="Paver Sub - Under 500 Add"
+                    category="Paver"
+                    unitLabel="SF"
+                    currentValue={subUnderAdd}
+                    onSaved={refreshAllRates}
+                  />
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  Sleeves: <strong>${sleevesSubRate}</strong>/LF
+                  <RateEditPopover
+                    table="labor_rates"
+                    name="Paver Sub - Sleeves LF"
+                    category="Paver"
+                    unitLabel="LF"
+                    currentValue={sleevesSubRate}
+                    onSaved={refreshAllRates}
+                  />
+                </span>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* ── Vertical Soldier Course ───────────────────────────────────────────── */}
+      {/* ── Vertical Soldier Course — In-House only ───────────────────────────── */}
+      {!isSub && (
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="col-span-full flex items-center flex-wrap gap-x-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-1">
           <span>Vertical Soldier Course</span>
@@ -1580,6 +1799,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           )}
         </div>
       </div>
+      )}
 
       {/* ── Added Costs ────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
