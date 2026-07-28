@@ -1435,11 +1435,23 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </span>
                     </td>
                     <td className="py-1">
-                      <NumInput
-                        value={row.depthIn}
-                        onChange={v => updateGravel(i, 'depthIn', v)}
-                        placeholder="3"
-                      />
+                      <div className="flex items-center gap-1">
+                        <NumInput
+                          value={row.depthIn}
+                          onChange={v => updateGravel(i, 'depthIn', v)}
+                          placeholder="3"
+                        />
+                        {gravelRows.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setGravelRows(rows => rows.filter((_, idx) => idx !== i))}
+                            className="text-gray-300 hover:text-red-500 text-sm px-1"
+                            title="Remove line"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )
