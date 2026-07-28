@@ -246,28 +246,32 @@ function calcConcrete(
   // In-House install SF is entered per job-size tier; each tier has its own
   // SF/hr rate. Total SF drives the material (CY) + finish add-ons.
   const installTiers = state.installTiers || {}
+  const installTierVendor = state.installTierVendor || {}
+  const installTierType = state.installTierType || {}
+  const installTierDepth = state.installTierDepth || {}
   const installSF = INSTALL_TIERS.reduce((s, t) => s + n(installTiers[t.key]), 0)
-  const depthIn = n(state.depthIn) || 4
+  const depthIn = n(state.depthIn) || 4 // legacy single depth — fallback for old saves + Sub
   const rebarSF = n(state.rebarSF)
   const formLF = n(state.formLF)
   const sleeveLF = n(state.sleeveLF)
 
-  const concreteCY = installSF > 0 ? ((depthIn / 12) * installSF) / 27 : 0
   const installHrs = INSTALL_TIERS.reduce((s, t) => {
     const sf = n(installTiers[t.key])
     if (!sf) return s
     const rate = lr[t.rateName] ?? t.def
     return s + (rate > 0 ? sf / rate : 0)
   }, 0)
-  // Concrete mix material — per size-tier: each tier's SF drives its own CY,
-  // priced at that tier's picked mix Vendor/Type. House defaults to
-  // 'Concrete - Per CY', so an all-House job matches the old flat calc.
-  const installTierVendor = state.installTierVendor || {}
-  const installTierType = state.installTierType || {}
+  // Concrete mix material + volume — per size-tier: each tier's SF × its own
+  // depth drives its own CY, priced at that tier's picked mix Vendor/Type.
+  // Depth falls back to the legacy single depth for pre-per-tier estimates, so
+  // an all-House job at one depth matches the old flat calc.
+  let concreteCY = 0
   const concreteMat = INSTALL_TIERS.reduce((s, t) => {
     const sf = n(installTiers[t.key])
     if (!sf) return s
-    const tierCY = ((depthIn / 12) * sf) / 27
+    const d = n(installTierDepth[t.key]) || depthIn
+    const tierCY = ((d / 12) * sf) / 27
+    concreteCY += tierCY
     const mt = rowOpt(
       'Concrete Mix',
       { vendor: installTierVendor[t.key], type: installTierType[t.key] },
@@ -649,6 +653,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   // Per size-tier concrete-mix Vendor + Type (objects keyed by INSTALL_TIERS key)
   const [installTierVendor, setInstallTierVendor] = useState(initialData?.installTierVendor ?? {})
   const [installTierType, setInstallTierType] = useState(initialData?.installTierType ?? {})
+  const [installTierDepth, setInstallTierDepth] = useState(initialData?.installTierDepth ?? {})
   const [depthIn, setDepthIn] = useState(initialData?.depthIn ?? '4')
   const [rebarSF, setRebarSF] = useState(initialData?.rebarSF ?? '')
   const [formLF, setFormLF] = useState(initialData?.formLF ?? '')
@@ -716,6 +721,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     installTiers,
     installTierVendor,
     installTierType,
+    installTierDepth,
     depthIn,
     rebarSF,
     formLF,
@@ -825,9 +831,18 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const setActiveManualRows = isSub ? setSubManualRows : setManualRows
 
   // Concrete volume for the ACTIVE tab (drives color/pump display + sub calc).
+  // In-House sums each tier's SF × its own depth; Sub uses its single slab depth.
   const _activeDepth = n(activeDepthIn) || 4
-  const activeConcreteCY =
-    n(activeInstallSF) > 0 ? ((_activeDepth / 12) * n(activeInstallSF)) / 27 : 0
+  const activeConcreteCY = isSub
+    ? n(activeInstallSF) > 0
+      ? ((_activeDepth / 12) * n(activeInstallSF)) / 27
+      : 0
+    : INSTALL_TIERS.reduce((s, t) => {
+        const sf = n(installTiers[t.key])
+        if (!sf) return s
+        const d = n(installTierDepth[t.key]) || n(depthIn) || 4
+        return s + ((d / 12) * sf) / 27
+      }, 0)
 
   // In-house calc is unchanged — it reads only the in-house state fields.
   const inHouse = calcConcrete(
@@ -1132,7 +1147,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-left pb-1 pr-2 font-medium">Area</th>
                 <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-left pb-1 pr-2 font-medium">Type</th>
                 <th className="text-left pb-1 pr-2 font-medium">Method</th>
@@ -1157,13 +1171,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 }
                 return (
                   <tr key={i} className="border-b border-gray-100">
-                    <td className="py-1 pr-2">
-                      <input
-                        className="input text-sm py-1"
-                        value={row.label}
-                        onChange={e => updateBaseRow(i, 'label', e.target.value)}
-                      />
-                    </td>
                     <td className="py-1 pr-2">
                       <select
                         className="input text-sm py-1 min-w-0"
@@ -1290,6 +1297,14 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               />
             ) : (
               <div className="space-y-1">
+                {/* Column labels */}
+                <div className="flex items-center gap-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                  <span className="w-24 shrink-0" />
+                  <span className="w-28 shrink-0">Vendor</span>
+                  <span className="flex-1 min-w-0">Type</span>
+                  <span className="w-16 shrink-0">Sq Ft</span>
+                  <span className="w-14 shrink-0">Depth</span>
+                </div>
                 {INSTALL_TIERS.map(t => {
                   const rate = laborRates[t.rateName] ?? t.def
                   const is300plus = t.key !== 's100_300'
@@ -1300,13 +1315,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                   return (
                     <div key={t.key} className="flex items-center gap-2 flex-wrap">
                       <span className="text-[11px] text-gray-500 w-24 shrink-0">{t.label}</span>
-                      <div className="w-20 shrink-0">
-                        <NumInput
-                          value={installTiers[t.key] ?? ''}
-                          onChange={v => setInstallTiers({ ...installTiers, [t.key]: v })}
-                          placeholder="0 SF"
-                        />
-                      </div>
                       <select
                         className="input text-xs py-1 w-28 shrink-0"
                         value={effVendor('Concrete Mix', installTierVendor[t.key])}
@@ -1336,6 +1344,20 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                           </option>
                         ))}
                       </select>
+                      <div className="w-16 shrink-0">
+                        <NumInput
+                          value={installTiers[t.key] ?? ''}
+                          onChange={v => setInstallTiers({ ...installTiers, [t.key]: v })}
+                          placeholder="0"
+                        />
+                      </div>
+                      <div className="w-14 shrink-0">
+                        <NumInput
+                          value={installTierDepth[t.key] ?? ''}
+                          onChange={v => setInstallTierDepth({ ...installTierDepth, [t.key]: v })}
+                          placeholder="4"
+                        />
+                      </div>
                       <span className="text-[11px] text-gray-400 inline-flex items-center gap-1 shrink-0 whitespace-nowrap">
                         ${Number(mixRate).toFixed(0)}/CY
                         <RateEditPopover
@@ -1390,10 +1412,12 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               </div>
             )}
           </div>
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Depth (inches)</label>
-            <NumInput value={activeDepthIn} onChange={setActiveDepthIn} placeholder="4" />
-          </div>
+          {isSub && (
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Depth (inches)</label>
+              <NumInput value={activeDepthIn} onChange={setActiveDepthIn} placeholder="4" />
+            </div>
+          )}
           <div>
             <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1">
               Rebar 24" OC (Sq Ft)
