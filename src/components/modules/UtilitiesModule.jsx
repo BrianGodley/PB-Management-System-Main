@@ -220,34 +220,33 @@ const UTIL_CAT = {
   elec: 'Electrical Fixtures',
 }
 
-// Vendor-aware option list for a section: House (or a vendor with no catalog
-// rows) → the built-in array; a real vendor → its catalog items for the category.
-function utilSectionOptions(cat, vendorSel, houseArr, materialRows, catDefaults) {
-  const vsel = vendorSel && vendorSel !== 'auto' ? vendorSel : catDefaults[cat] || 'House'
-  if (!vsel || vsel === 'House') return houseArr
-  const rows = (materialRows || []).filter(r => r.subcategory === cat && r.vendor_id === vsel)
-  if (!rows.length) return houseArr
-  const prefix = `${cat} - `
-  return rows.map(r => ({
-    label: r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name,
-    dbName: r.name,
-    fallback: n(r.unit_cost),
-  }))
-}
-
-// Resolve a row's material option + per-unit material cost + per-unit labor.
-// Material follows the picked Vendor/Type; labor comes from the matching built-in
-// item, else the row's kept `laborType`, else the first built-in item.
+// Resolve a row's material cost + per-unit labor.
+// The Type is ALWAYS a built-in item — it defines the labor and the House
+// material price. A vendor NEVER affects labor; it only overrides the MATERIAL
+// price for the selected item, matched by the item's name in the vendor's
+// catalog (material_rates for the category + vendor). No match → House price.
 function resolveUtilRow(cat, row, houseArr, materialRows, catDefaults, mp) {
-  const opts = utilSectionOptions(cat, row.vendor, houseArr, materialRows, catDefaults)
-  const matOpt = opts.find(o => o.label === row.type) || opts[0] || houseArr[0]
-  const matCost = mp[matOpt?.dbName] ?? matOpt?.fallback ?? 0
-  const laborBuiltIn =
-    houseArr.find(o => o.label === row.type) ||
-    houseArr.find(o => o.label === row.laborType) ||
-    houseArr[0]
-  const laborVal = mp[laborBuiltIn?.laborDbName] ?? laborBuiltIn?.laborFallback ?? 0
-  return { opts, matOpt, matCost, laborVal, laborBuiltIn }
+  const builtIn = houseArr.find(o => o.label === row.type) || houseArr[0]
+  const laborVal = mp[builtIn?.laborDbName] ?? builtIn?.laborFallback ?? 0
+  let matDbName = builtIn?.dbName
+  let matFallback = builtIn?.fallback ?? 0
+  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : catDefaults[cat] || 'House'
+  if (vsel && vsel !== 'House') {
+    const prefix = `${cat} - `
+    const vrow = (materialRows || []).find(r => {
+      if (r.subcategory !== cat || r.vendor_id !== vsel) return false
+      const label = r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name
+      return label === builtIn?.label
+    })
+    if (vrow) {
+      matDbName = vrow.name
+      matFallback = n(vrow.unit_cost)
+    }
+  }
+  const matCost = mp[matDbName] ?? matFallback
+  // matOpt drives the Type dropdown value + the material rate popover target.
+  const matOpt = { label: builtIn?.label, dbName: matDbName, fallback: matFallback }
+  return { opts: houseArr, matOpt, matCost, laborVal, laborBuiltIn: builtIn }
 }
 
 function calcUtilities(
@@ -781,33 +780,18 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   function updateManual(i, field, val) {
     setActiveManualRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
-  // Vendor/Type changes keep `laborType` = the last built-in item, so labor for a
-  // vendor-only item stays sensible. Section = 'line' | 'gas' | 'elec'.
-  const _sectionCfg = {
-    line: { setter: setActiveLineRows, cat: UTIL_CAT.line, arr: LINE_TYPE_ARR },
-    gas: { setter: setActiveFixtureRows, cat: UTIL_CAT.gas, arr: GAS_TYPE_ARR },
-    elec: { setter: setActiveElecFixtureRows, cat: UTIL_CAT.elec, arr: ELEC_TYPE_ARR },
+  // Type = built-in item (sets labor); Vendor = material price only. Both are
+  // simple per-row field sets. Section = 'line' | 'gas' | 'elec'.
+  const _sectionSetter = {
+    line: setActiveLineRows,
+    gas: setActiveFixtureRows,
+    elec: setActiveElecFixtureRows,
   }
   function changeRowType(section, i, val) {
-    const { setter, arr } = _sectionCfg[section]
-    const isBuiltIn = arr.some(o => o.label === val)
-    setter(rows =>
-      rows.map((r, idx) =>
-        idx === i ? { ...r, type: val, ...(isBuiltIn ? { laborType: val } : {}) } : r
-      )
-    )
+    _sectionSetter[section](rows => rows.map((r, idx) => (idx === i ? { ...r, type: val } : r)))
   }
   function changeRowVendor(section, i, val) {
-    const { setter, cat, arr } = _sectionCfg[section]
-    setter(rows =>
-      rows.map((r, idx) => {
-        if (idx !== i) return r
-        const opts = utilSectionOptions(cat, val, arr, materialRows, catDefaults)
-        const newType = opts.some(o => o.label === r.type) ? r.type : opts[0]?.label ?? r.type
-        const isBuiltIn = arr.some(o => o.label === newType)
-        return { ...r, vendor: val, type: newType, ...(isBuiltIn ? { laborType: newType } : {}) }
-      })
-    )
+    _sectionSetter[section](rows => rows.map((r, idx) => (idx === i ? { ...r, vendor: val } : r)))
   }
 
   function handleSave() {
@@ -1122,7 +1106,14 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
       <div>
         <SectionHeader title="Utility Lines" />
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              <col className="w-[128px]" />
+              <col />
+              <col className="w-[84px]" />
+              <col className="w-[96px]" />
+              <col className="w-[96px]" />
+            </colgroup>
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
@@ -1147,7 +1138,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
                       <select
-                        className="input text-sm py-1 w-28"
+                        className="input text-sm py-1 w-full"
                         value={effVendor(UTIL_CAT.line, row.vendor)}
                         onChange={e => changeRowVendor('line', i, e.target.value)}
                         title="Vendor"
@@ -1187,7 +1178,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                       </div>
                     </td>
                     <td className="py-1 pr-2">
-                      <NumInput value={row.lf} onChange={v => updateLine(i, 'lf', v)} />
+                      <NumInput value={row.lf} onChange={v => updateLine(i, 'lf', v)} className="w-full" />
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
                       <span className="inline-flex items-center justify-end gap-1">
@@ -1236,7 +1227,14 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
       <div>
         <SectionHeader title="Gas Fixtures" />
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              <col className="w-[128px]" />
+              <col />
+              <col className="w-[84px]" />
+              <col className="w-[96px]" />
+              <col className="w-[96px]" />
+            </colgroup>
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
@@ -1261,7 +1259,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
                       <select
-                        className="input text-sm py-1 w-28"
+                        className="input text-sm py-1 w-full"
                         value={effVendor(UTIL_CAT.gas, row.vendor)}
                         onChange={e => changeRowVendor('gas', i, e.target.value)}
                         title="Vendor"
@@ -1301,7 +1299,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                       </div>
                     </td>
                     <td className="py-1 pr-2">
-                      <NumInput value={row.qty} onChange={v => updateFixture(i, 'qty', v)} />
+                      <NumInput value={row.qty} onChange={v => updateFixture(i, 'qty', v)} className="w-full" />
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
                       <span className="inline-flex items-center justify-end gap-1">
@@ -1350,7 +1348,14 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
       <div>
         <SectionHeader title="Electrical Fixtures" />
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              <col className="w-[128px]" />
+              <col />
+              <col className="w-[84px]" />
+              <col className="w-[96px]" />
+              <col className="w-[96px]" />
+            </colgroup>
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
@@ -1375,7 +1380,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
                       <select
-                        className="input text-sm py-1 w-28"
+                        className="input text-sm py-1 w-full"
                         value={effVendor(UTIL_CAT.elec, row.vendor)}
                         onChange={e => changeRowVendor('elec', i, e.target.value)}
                         title="Vendor"
@@ -1415,7 +1420,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                       </div>
                     </td>
                     <td className="py-1 pr-2">
-                      <NumInput value={row.qty} onChange={v => updateElecFixture(i, 'qty', v)} />
+                      <NumInput value={row.qty} onChange={v => updateElecFixture(i, 'qty', v)} className="w-full" />
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
                       <span className="inline-flex items-center justify-end gap-1">
