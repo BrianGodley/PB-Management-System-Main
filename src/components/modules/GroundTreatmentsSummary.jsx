@@ -127,6 +127,24 @@ const FERTILIZER_TYPES = [
   { label: 'Sod & Seed Starter (15-15-15)', dbName: 'Fertilizer - Sod Seed Starter', fallback: 20.87 },
 ]
 
+// Soil products — mirror of the module ($/CY).
+const SOIL_TYPES = [
+  { label: 'Topsoil (Sandy Loam)', dbName: 'Soil - Topsoil', fallback: 20 },
+  { label: 'Compost', dbName: 'Soil - Compost', fallback: 20 },
+  { label: 'Seed Cover', dbName: 'Soil - Seed Cover', fallback: 20 },
+  { label: 'Veggie/Flower Mix', dbName: 'Soil - Veggie Flower Mix', fallback: 20 },
+  { label: '50/50 Planter Mix', dbName: 'Soil - 50-50 Planter Mix', fallback: 20 },
+  { label: '70/30 Topsoil Mix', dbName: 'Soil - 70-30 Topsoil Mix', fallback: 20 },
+  { label: '30/70 Compost Mix', dbName: 'Soil - 30-70 Compost Mix', fallback: 40 },
+  { label: 'Nursery Mix', dbName: 'Soil - Nursery Mix', fallback: 20 },
+  { label: 'Nursery Mix w/ Pumice', dbName: 'Soil - Nursery Mix Pumice', fallback: 40 },
+  { label: 'Cactus Mix', dbName: 'Soil - Cactus Mix', fallback: 40 },
+  { label: 'Can Mix', dbName: 'Soil - Can Mix', fallback: 40 },
+  { label: 'Color Mix', dbName: 'Soil - Color Mix', fallback: 40 },
+  { label: 'Bioswale Mix', dbName: 'Soil - Bioswale Mix', fallback: 40 },
+  { label: 'Pump Mix', dbName: 'Soil - Pump Mix', fallback: 40 },
+]
+
 const n = v => parseFloat(v) || 0
 const fmt2 = v =>
   `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -190,6 +208,7 @@ export default function GroundTreatmentsSummary({ module }) {
     dgCement = 'Yes',
     dgRows,
     gravelRows = [],
+    soilsRows = [],
     pebbleRows = [],
     cobbleRows = [],
     manualRows = [],
@@ -370,6 +389,22 @@ export default function GroundTreatmentsSummary({ module }) {
     })
     .filter(Boolean)
 
+  // ── Soils (material only) ──────────────────────────────────────────────────────
+  const soilsLines = soilsRows
+    .map((r, i) => {
+      if (!n(r.sf)) return null
+      const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
+      const st = SOIL_TYPES.find(t => t.label === r.type) || SOIL_TYPES[0]
+      const rate = mp(st.dbName, st.fallback)
+      return {
+        key: i,
+        label: `${r.type || 'Soil'} — ${n(r.sf).toLocaleString()} SF × ${n(r.depthIn)}"`,
+        value: fmt2(CY * rate),
+        sub: `${CY.toFixed(2)} CY · ${fmt2(rate)}/CY`,
+      }
+    })
+    .filter(Boolean)
+
   // ── Pebble (same calc/labor as Gravel; PEBBLE_TYPES material) ──────────────────
   const pebbleLines = pebbleRows
     .map((r, i) => {
@@ -510,6 +545,7 @@ export default function GroundTreatmentsSummary({ module }) {
     mulchLines.length ||
     dgLines.length ||
     gravelLines.length ||
+    soilsLines.length ||
     pebbleLines.length ||
     cobbleLines.length ||
     edgingLines.length ||
@@ -590,6 +626,15 @@ export default function GroundTreatmentsSummary({ module }) {
               {fertLine && (
                 <LineRow label={fertLine.label} value={fertLine.value} sub={fertLine.sub} />
               )}
+            </>
+          )}
+
+          {soilsLines.length > 0 && (
+            <>
+              <SectionLabel title="Soils" />
+              {soilsLines.map(l => (
+                <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />
+              ))}
             </>
           )}
 

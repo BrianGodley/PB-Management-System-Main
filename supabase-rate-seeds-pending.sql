@@ -300,3 +300,28 @@ FROM (VALUES
 ) AS v(name, rate, unit, notes)
 CROSS JOIN (SELECT DISTINCT tenant_id FROM public.labor_rates) AS t
 ON CONFLICT DO NOTHING;
+
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- GROUND TREATMENTS — Soils section ($/CY, C&M Topsoil "SOILS")  (2026-07-28)
+-- ═════════════════════════════════════════════════════════════════════════════
+INSERT INTO public.material_rates (name, unit_cost, category, notes, tenant_id)
+SELECT v.name, v.unit_cost, 'Ground Treatments', v.notes, t.tenant_id
+FROM (VALUES
+  ('Soil - Topsoil',            20, 'C&M Topsoil - Class A Sandy Loam'),
+  ('Soil - Compost',            20, 'C&M Compost SB 1383'),
+  ('Soil - Seed Cover',         20, 'C&M Seed Cover'),
+  ('Soil - Veggie Flower Mix',  20, 'C&M Veggie/Flower Mix'),
+  ('Soil - 50-50 Planter Mix',  20, 'C&M 50/50 Planter Mix'),
+  ('Soil - 70-30 Topsoil Mix',  20, 'C&M 70/30 Topsoil Mix'),
+  ('Soil - 30-70 Compost Mix',  40, 'C&M 30/70 Compost Mix (light weight)'),
+  ('Soil - Nursery Mix',        20, 'C&M Nursery Mix'),
+  ('Soil - Nursery Mix Pumice', 40, 'C&M Nursery Mix w/ Pumice'),
+  ('Soil - Cactus Mix',         40, 'C&M Cactus Mix'),
+  ('Soil - Can Mix',            40, 'C&M Can Mix'),
+  ('Soil - Color Mix',          40, 'C&M Color Mix'),
+  ('Soil - Bioswale Mix',       40, 'C&M Bioswale Mix'),
+  ('Soil - Pump Mix',           40, 'C&M Pump Mix')
+) AS v(name, unit_cost, notes)
+CROSS JOIN (SELECT DISTINCT tenant_id FROM public.material_rates) AS t
+ON CONFLICT DO NOTHING;

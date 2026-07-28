@@ -166,6 +166,24 @@ const FERTILIZER_TYPES = [
   { label: 'Marathon All Season (24-2-4)', dbName: 'Fertilizer - Marathon All Season', fallback: 20.84 },
   { label: 'Sod & Seed Starter (15-15-15)', dbName: 'Fertilizer - Sod Seed Starter', fallback: 20.87 },
 ]
+
+// Soil products — C&M Topsoil "SOILS" section, $/CY (material_rates). Optional lines.
+const SOIL_TYPES = [
+  { label: 'Topsoil (Sandy Loam)', dbName: 'Soil - Topsoil', fallback: 20 },
+  { label: 'Compost', dbName: 'Soil - Compost', fallback: 20 },
+  { label: 'Seed Cover', dbName: 'Soil - Seed Cover', fallback: 20 },
+  { label: 'Veggie/Flower Mix', dbName: 'Soil - Veggie Flower Mix', fallback: 20 },
+  { label: '50/50 Planter Mix', dbName: 'Soil - 50-50 Planter Mix', fallback: 20 },
+  { label: '70/30 Topsoil Mix', dbName: 'Soil - 70-30 Topsoil Mix', fallback: 20 },
+  { label: '30/70 Compost Mix', dbName: 'Soil - 30-70 Compost Mix', fallback: 40 },
+  { label: 'Nursery Mix', dbName: 'Soil - Nursery Mix', fallback: 20 },
+  { label: 'Nursery Mix w/ Pumice', dbName: 'Soil - Nursery Mix Pumice', fallback: 40 },
+  { label: 'Cactus Mix', dbName: 'Soil - Cactus Mix', fallback: 40 },
+  { label: 'Can Mix', dbName: 'Soil - Can Mix', fallback: 40 },
+  { label: 'Color Mix', dbName: 'Soil - Color Mix', fallback: 40 },
+  { label: 'Bioswale Mix', dbName: 'Soil - Bioswale Mix', fallback: 40 },
+  { label: 'Pump Mix', dbName: 'Soil - Pump Mix', fallback: 40 },
+]
 const DG_METHODS = ['Machine', 'Hand']
 
 const n = v => parseFloat(v) || 0
@@ -197,6 +215,7 @@ function calcGroundTreatments(
     precastConcreteSF,
     dgRows,
     gravelRows,
+    soilsRows,
     pebbleRows,
     cobbleRows,
     manualRows,
@@ -262,6 +281,15 @@ function calcGroundTreatments(
     const bags = sfPerBag > 0 ? Math.ceil(n(sodSF) / sfPerBag) : 0
     fertMat = bags * p(fertT.dbName, fertT.fallback)
   }
+
+  // ── Soils (optional amendment lines) ────────────────────────────────────────
+  let soilsMat = 0
+  ;(soilsRows || []).forEach(r => {
+    if (!n(r.sf)) return
+    const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
+    const st = SOIL_TYPES.find(t => t.label === r.type) || SOIL_TYPES[0]
+    soilsMat += CY * p(st.dbName, st.fallback)
+  })
 
   // ── Flagstone Steppers (Soil Set + Concrete Set) ────────────────────────────
   // Each set has its own labor rate (SF/day); material is tons*perTon for both,
@@ -436,6 +464,7 @@ function calcGroundTreatments(
     gravelMat +
     pebbleMat +
     cobbleMat +
+    soilsMat +
     manMat
   const laborCost = totalHrs * lrph
   const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
@@ -516,6 +545,10 @@ function LabeledRow({ label, children, note }) {
 const DEFAULT_GRAVEL_ROWS = [
   { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3' },
   { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3' },
+]
+const DEFAULT_SOILS_ROWS = [
+  { type: 'Topsoil (Sandy Loam)', sf: '', depthIn: '2' },
+  { type: 'Topsoil (Sandy Loam)', sf: '', depthIn: '2' },
 ]
 const DEFAULT_PEBBLE_ROWS = [
   { sf: '', method: 'Hand', type: 'Arizona River Rock', depthIn: '3' },
@@ -668,6 +701,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
         : DEFAULT_DG_ROWS)
   )
   const [gravelRows, setGravelRows] = useState(initialData?.gravelRows ?? DEFAULT_GRAVEL_ROWS)
+  const [soilsRows, setSoilsRows] = useState(initialData?.soilsRows ?? DEFAULT_SOILS_ROWS)
   const [pebbleRows, setPebbleRows] = useState(initialData?.pebbleRows ?? DEFAULT_PEBBLE_ROWS)
   const [cobbleRows, setCobbleRows] = useState(initialData?.cobbleRows ?? DEFAULT_COBBLE_ROWS)
   const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
@@ -706,6 +740,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     precastConcreteSF,
     dgRows,
     gravelRows,
+    soilsRows,
     pebbleRows,
     cobbleRows,
     manualRows,
@@ -736,6 +771,9 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
 
   const p = (dbName, fallback) => materialPrices[dbName] ?? fallback
 
+  function updateSoils(i, field, val) {
+    setSoilsRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  }
   function updateGravel(i, field, val) {
     setGravelRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
@@ -887,6 +925,97 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               />
             </span>
           </LabeledRow>
+        </div>
+      </div>
+
+      {/* ── Soils ── */}
+      <div>
+        <SectionHeader title="Soils" />
+        <p className="text-xs text-gray-400 mb-2">Optional soil / amendment lines (material only).</p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-1 font-medium">Type</th>
+                <th className="text-left pb-1 pr-1 font-medium">Area (SF)</th>
+                <th className="text-left pb-1 pr-1 font-medium">Depth (in)</th>
+                <th className="text-left pb-1 pr-1 font-medium">$/CY</th>
+                <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
+              </tr>
+            </thead>
+            <tbody>
+              {soilsRows.map((row, i) => {
+                const st = SOIL_TYPES.find(t => t.label === row.type) || SOIL_TYPES[0]
+                const typeCost = p(st.dbName, st.fallback)
+                const CY = (n(row.sf) * (n(row.depthIn) / 12)) / 27
+                const mat = CY * typeCost
+                return (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.type || SOIL_TYPES[0].label}
+                        onChange={e => updateSoils(i, 'type', e.target.value)}
+                      >
+                        {SOIL_TYPES.map(t => (
+                          <option key={t.label} value={t.label}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1 pr-1">
+                      <NumInput value={row.sf} onChange={v => updateSoils(i, 'sf', v)} />
+                    </td>
+                    <td className="py-1 pr-1">
+                      <NumInput
+                        value={row.depthIn}
+                        onChange={v => updateSoils(i, 'depthIn', v)}
+                        placeholder="2"
+                      />
+                    </td>
+                    <td className="py-1 pr-1">
+                      <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
+                        ${typeCost.toFixed(2)}/CY
+                        <RateEditPopover
+                          table="material_rates"
+                          name={st.dbName}
+                          category="Ground Treatments"
+                          unitLabel="CY"
+                          currentValue={typeCost}
+                          onSaved={refreshAllRates}
+                        />
+                      </span>
+                    </td>
+                    <td className="py-1 text-right text-xs text-gray-600">
+                      <div className="flex items-center justify-end gap-1">
+                        <span>{n(row.sf) > 0 ? `$${mat.toFixed(2)}` : '—'}</span>
+                        {soilsRows.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setSoilsRows(rows => rows.filter((_, idx) => idx !== i))}
+                            className="text-gray-300 hover:text-red-500 text-sm px-1"
+                            title="Remove line"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <button
+            type="button"
+            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+            onClick={() =>
+              setSoilsRows(r => [...r, { type: 'Topsoil (Sandy Loam)', sf: '', depthIn: '2' }])
+            }
+          >
+            + Add line
+          </button>
         </div>
       </div>
 
