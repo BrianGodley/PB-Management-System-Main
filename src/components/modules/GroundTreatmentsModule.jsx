@@ -224,7 +224,8 @@ function calcGroundTreatments(
   walkAccess = null,
   laborBurdenPct = DEFAULTS.laborBurdenPct,
   opts = {},
-  materialRows = []
+  materialRows = [],
+  catDefaults = {}
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   // Sod stays single-choice, so its option list is still supplied via opts.
@@ -236,9 +237,12 @@ function calcGroundTreatments(
   // an old estimate) → hardcoded House array. A vendor id → that vendor's
   // products for the row's material category, priced at the vendor's unit_cost.
   const rowOpt = (cat, row, houseArray) => {
-    if (!row.vendor || row.vendor === 'House') return resolveType(row.type, houseArray, houseArray)
+    // Resolve the effective vendor: a stored 'auto' (new default) → the category
+    // default (first real vendor, else House); an explicit 'House'/id stays as-is.
+    const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : (catDefaults[cat] || 'House')
+    if (!vsel || vsel === 'House') return resolveType(row.type, houseArray, houseArray)
     const rows = (materialRows || []).filter(
-      r => r.subcategory === cat && r.vendor_id === row.vendor
+      r => r.subcategory === cat && r.vendor_id === vsel
     )
     const opts = rows.map(r => ({
       label: r.name.replace(new RegExp('^' + cat + ' - '), '').replace(/^.*? - /, ''),
@@ -342,9 +346,13 @@ function calcGroundTreatments(
 
   // Fertilizer — auto-figured bags from sod SF × coverage (SF/bag). Material only.
   let fertMat = 0
+  const _fertV =
+    sodFertilizerVendor && sodFertilizerVendor !== 'auto'
+      ? sodFertilizerVendor
+      : (catDefaults.Fertilizer || 'House')
   const fertT =
-    sodFertilizerVendor && sodFertilizerVendor !== 'House'
-      ? rowOpt('Fertilizer', { vendor: sodFertilizerVendor, type: sodFertilizer }, FERTILIZER_TYPES)
+    _fertV && _fertV !== 'House'
+      ? rowOpt('Fertilizer', { vendor: _fertV, type: sodFertilizer }, FERTILIZER_TYPES)
       : FERTILIZER_TYPES.find(t => t.label === sodFertilizer)
   if (fertT && fertT.dbName && n(sodSF) > 0) {
     const sfPerBag = p(GT_RATES.fertilizerSFPerBag.dbName, GT_RATES.fertilizerSFPerBag.fallback)
@@ -634,28 +642,28 @@ function VendorPicker({ vendors = [], value = 'House', onChange, label = 'Vendor
 }
 
 const DEFAULT_GRAVEL_ROWS = [
-  { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3', vendor: 'House' },
-  { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3', vendor: 'House' },
+  { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3', vendor: 'auto' },
+  { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3', vendor: 'auto' },
 ]
 const DEFAULT_SOILS_ROWS = [
-  { type: 'Topsoil (Sandy Loam)', sf: '', depthIn: '2', vendor: 'House' },
-  { type: 'Topsoil (Sandy Loam)', sf: '', depthIn: '2', vendor: 'House' },
+  { type: 'Topsoil (Sandy Loam)', sf: '', depthIn: '2', vendor: 'auto' },
+  { type: 'Topsoil (Sandy Loam)', sf: '', depthIn: '2', vendor: 'auto' },
 ]
 const DEFAULT_PEBBLE_ROWS = [
-  { sf: '', method: 'Hand', type: 'Arizona River Rock', depthIn: '3', vendor: 'House' },
-  { sf: '', method: 'Hand', type: 'Arizona River Rock', depthIn: '3', vendor: 'House' },
+  { sf: '', method: 'Hand', type: 'Arizona River Rock', depthIn: '3', vendor: 'auto' },
+  { sf: '', method: 'Hand', type: 'Arizona River Rock', depthIn: '3', vendor: 'auto' },
 ]
 const DEFAULT_COBBLE_ROWS = [
-  { sf: '', method: 'Hand', type: 'Granite River Rock', depthIn: '3', vendor: 'House' },
-  { sf: '', method: 'Hand', type: 'Granite River Rock', depthIn: '3', vendor: 'House' },
+  { sf: '', method: 'Hand', type: 'Granite River Rock', depthIn: '3', vendor: 'auto' },
+  { sf: '', method: 'Hand', type: 'Granite River Rock', depthIn: '3', vendor: 'auto' },
 ]
 const DEFAULT_MULCH_ROWS = [
-  { type: 'Premium Mulch', sf: '', depth: '2', weedFabric: 'No', vendor: 'House' },
-  { type: 'Premium Mulch', sf: '', depth: '2', weedFabric: 'No', vendor: 'House' },
+  { type: 'Premium Mulch', sf: '', depth: '2', weedFabric: 'No', vendor: 'auto' },
+  { type: 'Premium Mulch', sf: '', depth: '2', weedFabric: 'No', vendor: 'auto' },
 ]
 const DEFAULT_DG_ROWS = [
-  { type: 'Decomposed Granite', sf: '', depth: '3.5', weedFabric: 'No', method: 'Machine', cement: 'No', vendor: 'House' },
-  { type: 'Decomposed Granite', sf: '', depth: '3.5', weedFabric: 'No', method: 'Machine', cement: 'No', vendor: 'House' },
+  { type: 'Decomposed Granite', sf: '', depth: '3.5', weedFabric: 'No', method: 'Machine', cement: 'No', vendor: 'auto' },
+  { type: 'Decomposed Granite', sf: '', depth: '3.5', weedFabric: 'No', method: 'Machine', cement: 'No', vendor: 'auto' },
 ]
 const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 1', hours: '', materials: '', subCost: '' },
@@ -933,6 +941,45 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   // Vendors that supply a given material category — drives the per-row vendor
   // dropdowns so each row only offers vendors that carry that category.
   const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
+  // First real vendor supplying a category (else 'House').
+  const defaultVendorFor = cat => vendorsForCategory(cat)[0]?.id || 'House'
+
+  // On a NEW module, once vendor catalogs load, default each section's vendor to
+  // the first real vendor that supplies its category (House then falls to the
+  // bottom of the picker). Runs once; never overrides a saved estimate or an
+  // explicit user pick.
+  const [vendorDefaultsApplied, setVendorDefaultsApplied] = useState(false)
+  useEffect(() => {
+    if (vendorDefaultsApplied || initialData || !vendors.length) return
+    setVendorDefaultsApplied(true)
+    const mig = (cat, rows) =>
+      (rows || []).map(r => (r.vendor === 'House' || !r.vendor ? { ...r, vendor: defaultVendorFor(cat) } : r))
+    setGravelRows(rows => mig('Gravel', rows))
+    setPebbleRows(rows => mig('Pebble', rows))
+    setCobbleRows(rows => mig('Cobbles', rows))
+    setSoilsRows(rows => mig('Soils', rows))
+    setMulchRows(rows => mig('Mulch', rows))
+    setDgRows(rows => mig('DG', rows))
+    setSodVendor(v => (v === 'House' ? defaultVendorFor('Sod') : v))
+    setSodFertilizerVendor(v => (v === 'House' ? defaultVendorFor('Fertilizer') : v))
+    setStepperVendor(sv => {
+      const d = defaultVendorFor('Steppers')
+      const nv = { ...sv }
+      Object.keys(nv).forEach(k => {
+        if (nv[k] === 'House') nv[k] = d
+      })
+      return nv
+    })
+    setEdgingVendor(ev => {
+      const d = defaultVendorFor('Edging')
+      const nv = { ...ev }
+      Object.keys(nv).forEach(k => {
+        if (nv[k] === 'House') nv[k] = d
+      })
+      return nv
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendors, initialData, vendorDefaultsApplied])
 
   const sodOpts = sectionOptions('Sod', sodVendor, SOD_TYPES)
 
