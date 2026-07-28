@@ -188,13 +188,77 @@ const DEFAULTS = {
 
 const n = v => parseFloat(v) || 0
 
+// ── Vendor catalog: built-in Type lists as {label, dbName, fallback, labor…} ──
+// The section's built-in items become the "House" option list; vendors tagged to
+// the matching material category supply additional priced items (material only —
+// labor is kept from the matching/last built-in item).
+const LINE_TYPE_ARR = Object.entries(UTILITY_LINE_TYPES).map(([label, t]) => ({
+  label,
+  dbName: t.dbName,
+  fallback: t.costPerLF,
+  laborDbName: t.laborDbName,
+  laborFallback: t.laborPerLF,
+}))
+const GAS_TYPE_ARR = Object.entries(GAS_FIXTURE_TYPES).map(([label, t]) => ({
+  label,
+  dbName: t.dbName,
+  fallback: t.cost,
+  laborDbName: t.laborDbName,
+  laborFallback: t.laborHrs,
+}))
+const ELEC_TYPE_ARR = Object.entries(ELECTRICAL_FIXTURE_TYPES).map(([label, t]) => ({
+  label,
+  dbName: t.dbName,
+  fallback: t.cost,
+  laborDbName: t.laborDbName,
+  laborFallback: t.laborHrs,
+}))
+// Section → material category name (used for vendor tagging + catalog lookup).
+const UTIL_CAT = {
+  line: 'Utility Lines',
+  gas: 'Gas Fixtures',
+  elec: 'Electrical Fixtures',
+}
+
+// Vendor-aware option list for a section: House (or a vendor with no catalog
+// rows) → the built-in array; a real vendor → its catalog items for the category.
+function utilSectionOptions(cat, vendorSel, houseArr, materialRows, catDefaults) {
+  const vsel = vendorSel && vendorSel !== 'auto' ? vendorSel : catDefaults[cat] || 'House'
+  if (!vsel || vsel === 'House') return houseArr
+  const rows = (materialRows || []).filter(r => r.subcategory === cat && r.vendor_id === vsel)
+  if (!rows.length) return houseArr
+  const prefix = `${cat} - `
+  return rows.map(r => ({
+    label: r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name,
+    dbName: r.name,
+    fallback: n(r.unit_cost),
+  }))
+}
+
+// Resolve a row's material option + per-unit material cost + per-unit labor.
+// Material follows the picked Vendor/Type; labor comes from the matching built-in
+// item, else the row's kept `laborType`, else the first built-in item.
+function resolveUtilRow(cat, row, houseArr, materialRows, catDefaults, mp) {
+  const opts = utilSectionOptions(cat, row.vendor, houseArr, materialRows, catDefaults)
+  const matOpt = opts.find(o => o.label === row.type) || opts[0] || houseArr[0]
+  const matCost = mp[matOpt?.dbName] ?? matOpt?.fallback ?? 0
+  const laborBuiltIn =
+    houseArr.find(o => o.label === row.type) ||
+    houseArr.find(o => o.label === row.laborType) ||
+    houseArr[0]
+  const laborVal = mp[laborBuiltIn?.laborDbName] ?? laborBuiltIn?.laborFallback ?? 0
+  return { opts, matOpt, matCost, laborVal, laborBuiltIn }
+}
+
 function calcUtilities(
   state,
   laborRatePerHour = DEFAULTS.laborRatePerHour,
   materialPrices = {},
   gpmd = DEFAULTS.gpmd,
   walkAccess = null,
-  laborBurdenPct = DEFAULTS.laborBurdenPct
+  laborBurdenPct = DEFAULTS.laborBurdenPct,
+  materialRows = [],
+  catDefaults = {}
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const {
@@ -235,25 +299,37 @@ function calcUtilities(
 
   lineRows.forEach(r => {
     const lf = n(r.lf)
-    const rate = UTILITY_LINE_TYPES[r.type]
-    if (lf > 0 && rate) {
-      const costPerLF = materialPrices[rate.dbName] ?? rate.costPerLF
-      const laborPerLF = materialPrices[rate.laborDbName] ?? rate.laborPerLF
-      lineMat += lf * costPerLF
-      lineHrs += lf * laborPerLF
-    }
+    if (lf <= 0) return
+    const { matCost, laborVal } = resolveUtilRow(
+      UTIL_CAT.line,
+      r,
+      LINE_TYPE_ARR,
+      materialRows,
+      catDefaults,
+      materialPrices
+    )
+    lineMat += lf * matCost
+    lineHrs += lf * laborVal
   })
 
-  ;[...fixtureRows, ...(elecFixtureRows || [])].forEach(r => {
-    const qty = n(r.qty)
-    const rate = FIXTURE_TYPES[r.type]
-    if (qty > 0 && rate) {
-      const cost = materialPrices[rate.dbName] ?? rate.cost
-      const laborHrs = materialPrices[rate.laborDbName] ?? rate.laborHrs
-      fixMat += qty * cost
-      fixHrs += qty * laborHrs
-    }
-  })
+  const _fixtureLoop = (rows, cat, houseArr) => {
+    ;(rows || []).forEach(r => {
+      const qty = n(r.qty)
+      if (qty <= 0) return
+      const { matCost, laborVal } = resolveUtilRow(
+        cat,
+        r,
+        houseArr,
+        materialRows,
+        catDefaults,
+        materialPrices
+      )
+      fixMat += qty * matCost
+      fixHrs += qty * laborVal
+    })
+  }
+  _fixtureLoop(fixtureRows, UTIL_CAT.gas, GAS_TYPE_ARR)
+  _fixtureLoop(elecFixtureRows, UTIL_CAT.elec, ELEC_TYPE_ARR)
 
   Object.entries(ADD_ITEM_RATES).forEach(([key, rate]) => {
     const qty = n(additionalItems[`${key}Qty`])
@@ -336,17 +412,17 @@ const DEFAULT_TRENCH_ROWS = [
   { equipment: 'Hand', lf: '', width: '', depth: '' },
 ]
 const DEFAULT_LINE_ROWS = [
-  { type: 'PVC Conduit with Electrical', lf: '' },
-  { type: '1" Black Iron Gas Pipe', lf: '' },
-  { type: '1-1/2" Black Iron Gas Pipe', lf: '' },
+  { type: 'PVC Conduit with Electrical', laborType: 'PVC Conduit with Electrical', lf: '', vendor: 'auto' },
+  { type: '1" Black Iron Gas Pipe', laborType: '1" Black Iron Gas Pipe', lf: '', vendor: 'auto' },
+  { type: '1-1/2" Black Iron Gas Pipe', laborType: '1-1/2" Black Iron Gas Pipe', lf: '', vendor: 'auto' },
 ]
 const DEFAULT_FIXTURE_ROWS = [
-  { type: '12" Single Gas Ring', qty: '' },
-  { type: '12" Single Gas Ring', qty: '' },
+  { type: '12" Single Gas Ring', laborType: '12" Single Gas Ring', qty: '', vendor: 'auto' },
+  { type: '12" Single Gas Ring', laborType: '12" Single Gas Ring', qty: '', vendor: 'auto' },
 ]
 const DEFAULT_ELEC_FIXTURE_ROWS = [
-  { type: 'GFCI Protected Receptacles', qty: '' },
-  { type: 'GFCI Protected Receptacles', qty: '' },
+  { type: 'GFCI Protected Receptacles', laborType: 'GFCI Protected Receptacles', qty: '', vendor: 'auto' },
+  { type: 'GFCI Protected Receptacles', laborType: 'GFCI Protected Receptacles', qty: '', vendor: 'auto' },
 ]
 const DEFAULT_ADDITIONAL = {
   curbCoreQty: '',
@@ -380,13 +456,25 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   )
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
   const [pricesLoading, setPricesLoading] = useState(!initialData?.materialPrices)
+  // Vendor catalog (material_rates rows with subcategory + vendor_id) + vendor list.
+  const [materialRows, setMaterialRows] = useState(initialData?.materialRows ?? [])
+  const [vendors, setVendors] = useState([])
 
   // Re-fetch Utilities labor+material rate map (merged into one for lookup).
   // Called once on mount and again after any RateEditPopover save.
   const refreshAllRates = useCallback(async () => {
-    const [matRes, labRes] = await Promise.all([
+    const [matRes, labRes, matRowsRes, venRes] = await Promise.all([
       supabase.from('material_rates').select('name, unit_cost').eq('category', 'Utilities'),
       supabase.from('labor_rates').select('name, rate').eq('category', 'Utilities'),
+      supabase
+        .from('material_rates')
+        .select('name, unit_cost, subcategory, vendor_id')
+        .eq('category', 'Utilities'),
+      supabase
+        .from('subs_vendors')
+        .select('id, company_name, supplied_categories')
+        .eq('type', 'vendor')
+        .order('company_name'),
     ])
     const prices = {}
     ;(matRes.data || []).forEach(r => {
@@ -396,6 +484,44 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
       prices[r.name] = parseFloat(r.rate) || 0
     })
     setMaterialPrices(prices)
+    setMaterialRows(matRowsRes.data || [])
+    setVendors(
+      (venRes.data || []).map(v => ({
+        id: v.id,
+        name: v.company_name,
+        categories: v.supplied_categories || [],
+      }))
+    )
+  }, [])
+
+  // Always load the vendor list + material rows (even when re-editing a saved
+  // estimate) so the per-row Vendor/Type pickers work.
+  useEffect(() => {
+    let alive = true
+    Promise.all([
+      supabase
+        .from('material_rates')
+        .select('name, unit_cost, subcategory, vendor_id')
+        .eq('category', 'Utilities'),
+      supabase
+        .from('subs_vendors')
+        .select('id, company_name, supplied_categories')
+        .eq('type', 'vendor')
+        .order('company_name'),
+    ]).then(([matRowsRes, venRes]) => {
+      if (!alive) return
+      setMaterialRows(matRowsRes.data || [])
+      setVendors(
+        (venRes.data || []).map(v => ({
+          id: v.id,
+          name: v.company_name,
+          categories: v.supplied_categories || [],
+        }))
+      )
+    })
+    return () => {
+      alive = false
+    }
   }, [])
 
   useEffect(() => {
@@ -497,7 +623,41 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   const setActiveAdditionalItems = isSub ? setSubAdditionalItems : setAdditionalItems
   const setActiveManualRows = isSub ? setSubManualRows : setManualRows
 
-  // In-house calc is unchanged — it reads only the in-house state fields.
+  // ── Vendor catalog helpers (per-row Vendor/Type pickers) ─────────────────
+  const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
+  const defaultVendorFor = cat => vendorsForCategory(cat)[0]?.id || 'House'
+  const effVendor = (cat, v) => (v && v !== 'auto' && v !== 'House' ? v : defaultVendorFor(cat))
+  const catDefaults = {
+    [UTIL_CAT.line]: defaultVendorFor(UTIL_CAT.line),
+    [UTIL_CAT.gas]: defaultVendorFor(UTIL_CAT.gas),
+    [UTIL_CAT.elec]: defaultVendorFor(UTIL_CAT.elec),
+  }
+
+  // On a NEW estimate, once vendor catalogs load, default each Line/Fixture row's
+  // vendor to the first real vendor for its category. Never overrides a saved
+  // estimate (has a materialPrices snapshot) or an explicit pick.
+  const [vendorDefaultsApplied, setVendorDefaultsApplied] = useState(false)
+  useEffect(() => {
+    const isSaved = initialData?.materialPrices && Object.keys(initialData.materialPrices).length > 0
+    if (vendorDefaultsApplied || isSaved || !vendors.length) return
+    setVendorDefaultsApplied(true)
+    const needsDefault = v => !v || v === 'House' || v === 'auto'
+    const migLine = rows =>
+      (rows || []).map(r => (needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor(UTIL_CAT.line) } : r))
+    const migGas = rows =>
+      (rows || []).map(r => (needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor(UTIL_CAT.gas) } : r))
+    const migElec = rows =>
+      (rows || []).map(r => (needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor(UTIL_CAT.elec) } : r))
+    setLineRows(migLine)
+    setSubLineRows(migLine)
+    setFixtureRows(migGas)
+    setSubFixtureRows(migGas)
+    setElecFixtureRows(migElec)
+    setSubElecFixtureRows(migElec)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendors, vendorDefaultsApplied])
+
+  // In-house calc — now vendor-aware via materialRows + catDefaults.
   const inHouse = calcUtilities(
     {
       difficulty,
@@ -515,7 +675,9 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
     materialPrices,
     gpmd,
     walkAccess,
-    laborBurdenPct
+    laborBurdenPct,
+    materialRows,
+    catDefaults
   )
 
   // ── Sub-side cost — a single fully-loaded subcontractor cost figure.
@@ -529,22 +691,34 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   })
   subLineRows.forEach(r => {
     const lf = n(r.lf)
-    const rate = UTILITY_LINE_TYPES[r.type]
-    if (lf > 0 && rate) {
-      const costPerLF = materialPrices[rate.dbName] ?? rate.costPerLF
-      const laborPerLF = materialPrices[rate.laborDbName] ?? rate.laborPerLF
-      subSideCost += lf * costPerLF + lf * laborPerLF * laborRatePerHour
-    }
+    if (lf <= 0) return
+    const { matCost, laborVal } = resolveUtilRow(
+      UTIL_CAT.line,
+      r,
+      LINE_TYPE_ARR,
+      materialRows,
+      catDefaults,
+      materialPrices
+    )
+    subSideCost += lf * matCost + lf * laborVal * laborRatePerHour
   })
-  ;[...subFixtureRows, ...(subElecFixtureRows || [])].forEach(r => {
-    const qty = n(r.qty)
-    const rate = FIXTURE_TYPES[r.type]
-    if (qty > 0 && rate) {
-      const cost = materialPrices[rate.dbName] ?? rate.cost
-      const laborHrs = materialPrices[rate.laborDbName] ?? rate.laborHrs
-      subSideCost += qty * cost + qty * laborHrs * laborRatePerHour
-    }
-  })
+  const _subFixtureLoop = (rows, cat, houseArr) => {
+    ;(rows || []).forEach(r => {
+      const qty = n(r.qty)
+      if (qty <= 0) return
+      const { matCost, laborVal } = resolveUtilRow(
+        cat,
+        r,
+        houseArr,
+        materialRows,
+        catDefaults,
+        materialPrices
+      )
+      subSideCost += qty * matCost + qty * laborVal * laborRatePerHour
+    })
+  }
+  _subFixtureLoop(subFixtureRows, UTIL_CAT.gas, GAS_TYPE_ARR)
+  _subFixtureLoop(subElecFixtureRows, UTIL_CAT.elec, ELEC_TYPE_ARR)
   Object.entries(ADD_ITEM_RATES).forEach(([key, rate]) => {
     const qty = n(subAdditionalItems[`${key}Qty`])
     if (qty > 0) {
@@ -607,6 +781,34 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   function updateManual(i, field, val) {
     setActiveManualRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
+  // Vendor/Type changes keep `laborType` = the last built-in item, so labor for a
+  // vendor-only item stays sensible. Section = 'line' | 'gas' | 'elec'.
+  const _sectionCfg = {
+    line: { setter: setActiveLineRows, cat: UTIL_CAT.line, arr: LINE_TYPE_ARR },
+    gas: { setter: setActiveFixtureRows, cat: UTIL_CAT.gas, arr: GAS_TYPE_ARR },
+    elec: { setter: setActiveElecFixtureRows, cat: UTIL_CAT.elec, arr: ELEC_TYPE_ARR },
+  }
+  function changeRowType(section, i, val) {
+    const { setter, arr } = _sectionCfg[section]
+    const isBuiltIn = arr.some(o => o.label === val)
+    setter(rows =>
+      rows.map((r, idx) =>
+        idx === i ? { ...r, type: val, ...(isBuiltIn ? { laborType: val } : {}) } : r
+      )
+    )
+  }
+  function changeRowVendor(section, i, val) {
+    const { setter, cat, arr } = _sectionCfg[section]
+    setter(rows =>
+      rows.map((r, idx) => {
+        if (idx !== i) return r
+        const opts = utilSectionOptions(cat, val, arr, materialRows, catDefaults)
+        const newType = opts.some(o => o.label === r.type) ? r.type : opts[0]?.label ?? r.type
+        const isBuiltIn = arr.some(o => o.label === newType)
+        return { ...r, vendor: val, type: newType, ...(isBuiltIn ? { laborType: newType } : {}) }
+      })
+    )
+  }
 
   function handleSave() {
     onSave({
@@ -634,6 +836,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
         laborBurdenPct,
         gpmd,
         materialPrices,
+        materialRows, // ← vendor catalog snapshot (for re-edit pricing)
         calc,
       },
     })
@@ -731,7 +934,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-left pb-1 pr-2 font-medium">Equipment</th>
+                <th className="text-left pb-1 pr-2 font-medium">Method</th>
                 <th className="text-left pb-1 pr-2 font-medium">Linear Feet</th>
                 <th className="text-left pb-1 pr-2 font-medium">Width (In)</th>
                 <th className="text-left pb-1 font-medium">Depth (In)</th>
@@ -922,6 +1125,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-left pb-1 pr-2 font-medium">Line Type</th>
                 <th className="text-left pb-1 pr-2 font-medium">Linear Feet</th>
                 <th className="text-right pb-1 pr-2 font-medium text-gray-400">$/LF</th>
@@ -930,31 +1134,53 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
             </thead>
             <tbody>
               {activeLineRows.map((row, i) => {
-                const rate = UTILITY_LINE_TYPES[row.type]
-                const costPerLF = materialPrices[rate?.dbName] ?? rate?.costPerLF ?? 0
-                const laborPerLF = materialPrices[rate?.laborDbName] ?? rate?.laborPerLF ?? 0
-                const mat = n(row.lf) * costPerLF
+                const { opts, matOpt, matCost, laborVal, laborBuiltIn } = resolveUtilRow(
+                  UTIL_CAT.line,
+                  row,
+                  LINE_TYPE_ARR,
+                  materialRows,
+                  catDefaults,
+                  materialPrices
+                )
+                const mat = n(row.lf) * matCost
                 return (
                   <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-2">
+                      <select
+                        className="input text-sm py-1 w-28"
+                        value={effVendor(UTIL_CAT.line, row.vendor)}
+                        onChange={e => changeRowVendor('line', i, e.target.value)}
+                        title="Vendor"
+                      >
+                        {vendorsForCategory(UTIL_CAT.line).map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                        <option value="House">House</option>
+                      </select>
+                    </td>
                     <td className="py-1 pr-2">
                       <div className="flex items-center gap-1">
                         <select
                           className="input text-sm py-1 flex-1 min-w-0"
-                          value={row.type}
-                          onChange={e => updateLine(i, 'type', e.target.value)}
+                          value={matOpt?.label}
+                          onChange={e => changeRowType('line', i, e.target.value)}
                         >
-                          {Object.keys(UTILITY_LINE_TYPES).map(t => (
-                            <option key={t}>{t}</option>
+                          {opts.map(o => (
+                            <option key={o.label} value={o.label}>
+                              {o.label}
+                            </option>
                           ))}
                         </select>
-                        {rate && (
+                        {laborBuiltIn && (
                           <RateEditPopover
                             table="labor_rates"
-                            name={rate.laborDbName}
+                            name={laborBuiltIn.laborDbName}
                             category="Utilities"
                             mode="coefficient"
                             unitLabel="hrs/LF"
-                            currentValue={laborPerLF}
+                            currentValue={laborVal}
                             onSaved={refreshAllRates}
                           />
                         )}
@@ -965,14 +1191,14 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
                       <span className="inline-flex items-center justify-end gap-1">
-                        ${costPerLF.toFixed(2)}
-                        {rate && (
+                        ${matCost.toFixed(2)}
+                        {matOpt?.dbName && (
                           <RateEditPopover
                             table="material_rates"
-                            name={rate.dbName}
+                            name={matOpt.dbName}
                             category="Utilities"
                             unitLabel="LF"
-                            currentValue={costPerLF}
+                            currentValue={matCost}
                             onSaved={refreshAllRates}
                           />
                         )}
@@ -990,7 +1216,15 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
             type="button"
             className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
             onClick={() =>
-              setActiveLineRows(r => [...r, { type: 'PVC Conduit with Electrical', lf: '' }])
+              setActiveLineRows(r => [
+                ...r,
+                {
+                  type: 'PVC Conduit with Electrical',
+                  laborType: 'PVC Conduit with Electrical',
+                  lf: '',
+                  vendor: defaultVendorFor(UTIL_CAT.line),
+                },
+              ])
             }
           >
             + Add row
@@ -1005,6 +1239,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-left pb-1 pr-2 font-medium">Fixture</th>
                 <th className="text-left pb-1 pr-2 font-medium">Qty</th>
                 <th className="text-right pb-1 pr-2 font-medium text-gray-400">$/Ea</th>
@@ -1013,31 +1248,53 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
             </thead>
             <tbody>
               {activeFixtureRows.map((row, i) => {
-                const rate = FIXTURE_TYPES[row.type]
-                const cost = materialPrices[rate?.dbName] ?? rate?.cost ?? 0
-                const laborHrs = materialPrices[rate?.laborDbName] ?? rate?.laborHrs ?? 0
-                const mat = n(row.qty) * cost
+                const { opts, matOpt, matCost, laborVal, laborBuiltIn } = resolveUtilRow(
+                  UTIL_CAT.gas,
+                  row,
+                  GAS_TYPE_ARR,
+                  materialRows,
+                  catDefaults,
+                  materialPrices
+                )
+                const mat = n(row.qty) * matCost
                 return (
                   <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-2">
+                      <select
+                        className="input text-sm py-1 w-28"
+                        value={effVendor(UTIL_CAT.gas, row.vendor)}
+                        onChange={e => changeRowVendor('gas', i, e.target.value)}
+                        title="Vendor"
+                      >
+                        {vendorsForCategory(UTIL_CAT.gas).map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                        <option value="House">House</option>
+                      </select>
+                    </td>
                     <td className="py-1 pr-2">
                       <div className="flex items-center gap-1">
                         <select
                           className="input text-sm py-1 flex-1 min-w-0"
-                          value={row.type}
-                          onChange={e => updateFixture(i, 'type', e.target.value)}
+                          value={matOpt?.label}
+                          onChange={e => changeRowType('gas', i, e.target.value)}
                         >
-                          {Object.keys(GAS_FIXTURE_TYPES).map(t => (
-                            <option key={t}>{t}</option>
+                          {opts.map(o => (
+                            <option key={o.label} value={o.label}>
+                              {o.label}
+                            </option>
                           ))}
                         </select>
-                        {rate && (
+                        {laborBuiltIn && (
                           <RateEditPopover
                             table="labor_rates"
-                            name={rate.laborDbName}
+                            name={laborBuiltIn.laborDbName}
                             category="Utilities"
                             mode="coefficient"
                             unitLabel="hrs/ea"
-                            currentValue={laborHrs}
+                            currentValue={laborVal}
                             onSaved={refreshAllRates}
                           />
                         )}
@@ -1048,14 +1305,14 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
                       <span className="inline-flex items-center justify-end gap-1">
-                        ${cost.toFixed(2)}
-                        {rate && (
+                        ${matCost.toFixed(2)}
+                        {matOpt?.dbName && (
                           <RateEditPopover
                             table="material_rates"
-                            name={rate.dbName}
+                            name={matOpt.dbName}
                             category="Utilities"
                             unitLabel="ea"
-                            currentValue={cost}
+                            currentValue={matCost}
                             onSaved={refreshAllRates}
                           />
                         )}
@@ -1073,7 +1330,15 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
             type="button"
             className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
             onClick={() =>
-              setActiveFixtureRows(r => [...r, { type: '12" Single Gas Ring', qty: '' }])
+              setActiveFixtureRows(r => [
+                ...r,
+                {
+                  type: '12" Single Gas Ring',
+                  laborType: '12" Single Gas Ring',
+                  qty: '',
+                  vendor: defaultVendorFor(UTIL_CAT.gas),
+                },
+              ])
             }
           >
             + Add row
@@ -1088,6 +1353,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-left pb-1 pr-2 font-medium">Fixture</th>
                 <th className="text-left pb-1 pr-2 font-medium">Qty</th>
                 <th className="text-right pb-1 pr-2 font-medium text-gray-400">$/Ea</th>
@@ -1096,31 +1362,53 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
             </thead>
             <tbody>
               {activeElecFixtureRows.map((row, i) => {
-                const rate = FIXTURE_TYPES[row.type]
-                const cost = materialPrices[rate?.dbName] ?? rate?.cost ?? 0
-                const laborHrs = materialPrices[rate?.laborDbName] ?? rate?.laborHrs ?? 0
-                const mat = n(row.qty) * cost
+                const { opts, matOpt, matCost, laborVal, laborBuiltIn } = resolveUtilRow(
+                  UTIL_CAT.elec,
+                  row,
+                  ELEC_TYPE_ARR,
+                  materialRows,
+                  catDefaults,
+                  materialPrices
+                )
+                const mat = n(row.qty) * matCost
                 return (
                   <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-2">
+                      <select
+                        className="input text-sm py-1 w-28"
+                        value={effVendor(UTIL_CAT.elec, row.vendor)}
+                        onChange={e => changeRowVendor('elec', i, e.target.value)}
+                        title="Vendor"
+                      >
+                        {vendorsForCategory(UTIL_CAT.elec).map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                        <option value="House">House</option>
+                      </select>
+                    </td>
                     <td className="py-1 pr-2">
                       <div className="flex items-center gap-1">
                         <select
                           className="input text-sm py-1 flex-1 min-w-0"
-                          value={row.type}
-                          onChange={e => updateElecFixture(i, 'type', e.target.value)}
+                          value={matOpt?.label}
+                          onChange={e => changeRowType('elec', i, e.target.value)}
                         >
-                          {Object.keys(ELECTRICAL_FIXTURE_TYPES).map(t => (
-                            <option key={t}>{t}</option>
+                          {opts.map(o => (
+                            <option key={o.label} value={o.label}>
+                              {o.label}
+                            </option>
                           ))}
                         </select>
-                        {rate && (
+                        {laborBuiltIn && (
                           <RateEditPopover
                             table="labor_rates"
-                            name={rate.laborDbName}
+                            name={laborBuiltIn.laborDbName}
                             category="Utilities"
                             mode="coefficient"
                             unitLabel="hrs/ea"
-                            currentValue={laborHrs}
+                            currentValue={laborVal}
                             onSaved={refreshAllRates}
                           />
                         )}
@@ -1131,14 +1419,14 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
                       <span className="inline-flex items-center justify-end gap-1">
-                        ${cost.toFixed(2)}
-                        {rate && (
+                        ${matCost.toFixed(2)}
+                        {matOpt?.dbName && (
                           <RateEditPopover
                             table="material_rates"
-                            name={rate.dbName}
+                            name={matOpt.dbName}
                             category="Utilities"
                             unitLabel="ea"
-                            currentValue={cost}
+                            currentValue={matCost}
                             onSaved={refreshAllRates}
                           />
                         )}
@@ -1156,7 +1444,15 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
             type="button"
             className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
             onClick={() =>
-              setActiveElecFixtureRows(r => [...r, { type: 'GFCI Protected Receptacles', qty: '' }])
+              setActiveElecFixtureRows(r => [
+                ...r,
+                {
+                  type: 'GFCI Protected Receptacles',
+                  laborType: 'GFCI Protected Receptacles',
+                  qty: '',
+                  vendor: defaultVendorFor(UTIL_CAT.elec),
+                },
+              ])
             }
           >
             + Add row
