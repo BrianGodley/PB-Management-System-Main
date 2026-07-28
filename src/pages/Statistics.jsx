@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -4742,6 +4742,121 @@ const AUTO_SOURCE_MAP = Object.fromEntries(
   AUTO_SOURCES.flatMap(cat => cat.sources.map(s => [s.key, s]))
 )
 
+// ── Allowlist catalog — the SECURITY boundary for custom sources ──────────────
+// The custom-source builder only lets users pick tables/columns listed here, and
+// syncAutoValues validates every source against it before querying. Only add a
+// table/column that is safe to aggregate and readable under the tenant's RLS.
+const STAT_SOURCE_CATALOG = {
+  jobs: {
+    label: 'Jobs',
+    icon: '🏗️',
+    dateColumns: [
+      { col: 'sold_date', label: 'Sold date' },
+      { col: 'created_at', label: 'Created date' },
+    ],
+    valueFields: [
+      { col: 'total_price', label: 'Total Price', stat_type: 'currency' },
+      { col: 'gross_profit', label: 'Gross Profit', stat_type: 'currency' },
+      { col: 'gpmd', label: 'GPMD %', stat_type: 'percentage' },
+    ],
+    filterFields: [],
+  },
+  bids: {
+    label: 'Bids',
+    icon: '📋',
+    dateColumns: [
+      { col: 'created_at', label: 'Created date' },
+      { col: 'sold_date', label: 'Sold date' },
+    ],
+    valueFields: [
+      { col: 'total_price', label: 'Total Price', stat_type: 'currency' },
+      { col: 'gross_profit', label: 'Gross Profit', stat_type: 'currency' },
+    ],
+    filterFields: [],
+  },
+  schedule_items: {
+    label: 'Schedule Items',
+    icon: '📅',
+    dateColumns: [{ col: 'work_date', label: 'Work date' }],
+    valueFields: [],
+    filterFields: [
+      { col: 'scheduling_type', label: 'Scheduling type', options: ['job', 'yard_check'] },
+    ],
+  },
+  collections: {
+    label: 'Collections',
+    icon: '💰',
+    dateColumns: [
+      { col: 'invoice_date', label: 'Invoice date' },
+      { col: 'paid_date', label: 'Paid date' },
+    ],
+    valueFields: [
+      { col: 'amount', label: 'Invoiced Amount', stat_type: 'currency' },
+      { col: 'amount_paid', label: 'Paid Amount', stat_type: 'currency' },
+    ],
+    filterFields: [],
+  },
+  work_orders: {
+    label: 'Work Orders',
+    icon: '🛠️',
+    dateColumns: [{ col: 'created_at', label: 'Created date' }],
+    valueFields: [],
+    filterFields: [],
+  },
+  clients: {
+    label: 'Opportunities',
+    icon: '🤝',
+    dateColumns: [{ col: 'created_at', label: 'Created date' }],
+    valueFields: [],
+    filterFields: [],
+  },
+}
+
+// Validate a source's table/date/field/metric against the allowlist. Used by the
+// builder (to constrain choices) and by syncAutoValues (defense in depth).
+function isSourceAllowed(ds) {
+  if (!ds || ds.source_type === 'push') return true // push sources aren't table-queried
+  const t = STAT_SOURCE_CATALOG[ds.table]
+  if (!t) return false
+  if (!t.dateColumns.some(d => d.col === ds.date_column)) return false
+  if (ds.metric && !['count', 'sum', 'avg'].includes(ds.metric)) return false
+  if (ds.metric !== 'count' && !t.valueFields.some(v => v.col === ds.field)) return false
+  if (ds.filter) {
+    for (const col of Object.keys(ds.filter)) {
+      if (!t.filterFields.some(f => f.col === col)) return false
+    }
+  }
+  return true
+}
+
+// Turn custom stat_sources rows into the AUTO_SOURCES shape and merge them into
+// the built-in categories (matching category names extend; new ones are added).
+function mergeCustomSources(customRows) {
+  const merged = AUTO_SOURCES.map(c => ({ ...c, sources: [...c.sources] }))
+  ;(customRows || []).forEach(r => {
+    const src = {
+      key: r.key,
+      label: r.label,
+      desc: r.description || '',
+      table: r.table_name,
+      date_column: r.date_column,
+      metric: r.metric,
+      field: r.field || undefined,
+      filter:
+        r.filters && Object.keys(r.filters).length ? r.filters : undefined,
+      source_type: r.source_type || 'pull',
+      stat_type: r.stat_type,
+      tracking: r.tracking,
+      custom: true,
+      id: r.id,
+    }
+    const cat = merged.find(c => c.category === (r.category || 'Custom'))
+    if (cat) cat.sources.push(src)
+    else merged.push({ category: r.category || 'Custom', icon: '🧩', sources: [src] })
+  })
+  return merged
+}
+
 // ── AutoStatForm ──────────────────────────────────────────────────────────────
 function AutoStatForm({ initialData, profiles, positions, onSave, onClose, onDelete, onOpenShares }) {
   const { user } = useAuth()
@@ -4760,6 +4875,26 @@ function AutoStatForm({ initialData, profiles, positions, onSave, onClose, onDel
     existingDs.category || AUTO_SOURCES[0].category
   )
   const [selectedKey, setSelectedKey] = useState(existingDs.key || '')
+
+  // Custom sources (stat_sources) merged with the built-in AUTO_SOURCES so the
+  // picker shows both. `showCustomBuilder` toggles the allowlisted builder.
+  const [customSources, setCustomSources] = useState([])
+  const [showCustomBuilder, setShowCustomBuilder] = useState(false)
+  const loadCustomSources = useCallback(async () => {
+    const { data } = await supabase
+      .from('stat_sources')
+      .select('*')
+      .eq('archived', false)
+      .order('created_at', { ascending: true })
+    setCustomSources(data || [])
+  }, [])
+  useEffect(() => {
+    loadCustomSources()
+  }, [loadCustomSources])
+  const sources = mergeCustomSources(customSources)
+  const sourceMap = Object.fromEntries(
+    sources.flatMap(cat => cat.sources.map(s => [s.key, s]))
+  )
   const [form, setForm] = useState({
     name: initialData?.name || '',
     tracking: initialData?.tracking || 'monthly',
@@ -4778,8 +4913,8 @@ function AutoStatForm({ initialData, profiles, positions, onSave, onClose, onDel
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  const categoryObj = AUTO_SOURCES.find(c => c.category === selectedCategory) || AUTO_SOURCES[0]
-  const sourceDef = AUTO_SOURCE_MAP[selectedKey] || null
+  const categoryObj = sources.find(c => c.category === selectedCategory) || sources[0]
+  const sourceDef = sourceMap[selectedKey] || null
 
   // When source changes, inherit stat_type / tracking and suggest name
   useEffect(() => {
@@ -4883,7 +5018,7 @@ function AutoStatForm({ initialData, profiles, positions, onSave, onClose, onDel
               Data Category
             </label>
             <div className="flex flex-wrap gap-2">
-              {AUTO_SOURCES.map(cat => (
+              {sources.map(cat => (
                 <button
                   key={cat.category}
                   type="button"
@@ -4905,7 +5040,16 @@ function AutoStatForm({ initialData, profiles, positions, onSave, onClose, onDel
 
           {/* Source picker */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Data Source</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-sm font-semibold text-gray-700">Data Source</label>
+              <button
+                type="button"
+                onClick={() => setShowCustomBuilder(true)}
+                className="text-xs font-semibold text-blue-700 hover:text-blue-900"
+              >
+                ＋ New custom source
+              </button>
+            </div>
             <div className="space-y-1.5">
               {categoryObj.sources.map(src => (
                 <button
@@ -5138,6 +5282,271 @@ function AutoStatForm({ initialData, profiles, positions, onSave, onClose, onDel
           <button
             onClick={onClose}
             className="px-4 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+      {showCustomBuilder && (
+        <CustomSourceModal
+          onClose={() => setShowCustomBuilder(false)}
+          onCreated={created => {
+            setShowCustomBuilder(false)
+            loadCustomSources().then(() => {
+              if (created?.category) setSelectedCategory(created.category)
+              if (created?.key) setSelectedKey(created.key)
+            })
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── CustomSourceModal — allowlisted builder that writes a stat_sources row ─────
+function CustomSourceModal({ onClose, onCreated }) {
+  const tableKeys = Object.keys(STAT_SOURCE_CATALOG)
+  const [tableName, setTableName] = useState(tableKeys[0])
+  const [dateColumn, setDateColumn] = useState(
+    STAT_SOURCE_CATALOG[tableKeys[0]].dateColumns[0]?.col || ''
+  )
+  const [metric, setMetric] = useState('count')
+  const [field, setField] = useState('')
+  const [filters, setFilters] = useState({}) // { col: value }
+  const [label, setLabel] = useState('')
+  const [category, setCategory] = useState('Custom')
+  const [tracking, setTracking] = useState('monthly')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  const cat = STAT_SOURCE_CATALOG[tableName]
+  // Reset dependent choices when the table changes.
+  const changeTable = t => {
+    setTableName(t)
+    const c = STAT_SOURCE_CATALOG[t]
+    setDateColumn(c.dateColumns[0]?.col || '')
+    setMetric('count')
+    setField('')
+    setFilters({})
+  }
+  const valueField = cat.valueFields.find(v => v.col === field)
+  const statType = metric === 'count' ? 'numeric' : valueField?.stat_type || 'numeric'
+
+  async function handleCreate() {
+    if (metric !== 'count' && !field) {
+      setErr('Pick a value field for sum/average.')
+      return
+    }
+    if (!label.trim()) {
+      setErr('Enter a name for this source.')
+      return
+    }
+    const cleanFilters = Object.fromEntries(
+      Object.entries(filters).filter(([, v]) => v !== '' && v != null)
+    )
+    const key =
+      'custom_' +
+      label
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '') +
+      '_' +
+      Math.random().toString(36).slice(2, 6)
+    const row = {
+      category: category.trim() || 'Custom',
+      key,
+      label: label.trim(),
+      description: `${cat.label}: ${metric}${
+        field ? ` of ${valueField?.label || field}` : ''
+      } by ${cat.dateColumns.find(d => d.col === dateColumn)?.label || dateColumn}.`,
+      source_type: 'pull',
+      table_name: tableName,
+      date_column: dateColumn,
+      metric,
+      field: metric === 'count' ? null : field,
+      filters: cleanFilters,
+      stat_type: statType,
+      tracking,
+    }
+    // Defense in depth: never write a row the sync engine would reject.
+    if (!isSourceAllowed({ ...row, table: tableName, filter: cleanFilters })) {
+      setErr('That combination is not allowed.')
+      return
+    }
+    setErr('')
+    setSaving(true)
+    const { data, error } = await supabase.from('stat_sources').insert(row).select().single()
+    setSaving(false)
+    if (error) {
+      setErr(error.message)
+      return
+    }
+    onCreated?.(data)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-3">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="text-base font-bold text-gray-900">New Custom Source</h2>
+          <button onClick={onClose} className="text-gray-300 hover:text-gray-500 text-xl leading-none">
+            ✕
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Source table</label>
+            <select
+              value={tableName}
+              onChange={e => changeTable(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            >
+              {tableKeys.map(t => (
+                <option key={t} value={t}>
+                  {STAT_SOURCE_CATALOG[t].icon} {STAT_SOURCE_CATALOG[t].label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Date column</label>
+            <select
+              value={dateColumn}
+              onChange={e => setDateColumn(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            >
+              {cat.dateColumns.map(d => (
+                <option key={d.col} value={d.col}>
+                  {d.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Metric</label>
+            <div className="flex gap-1.5">
+              {['count', 'sum', 'avg'].map(m => {
+                const disabled = m !== 'count' && cat.valueFields.length === 0
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => setMetric(m)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border capitalize transition-colors ${
+                      metric === m
+                        ? 'bg-blue-700 text-white border-blue-700'
+                        : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400 disabled:opacity-40'
+                    }`}
+                  >
+                    {m === 'avg' ? 'Average' : m}
+                  </button>
+                )
+              })}
+            </div>
+            {cat.valueFields.length === 0 && (
+              <p className="text-[11px] text-gray-400 mt-1">
+                This table only supports counting rows.
+              </p>
+            )}
+          </div>
+          {metric !== 'count' && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Value field</label>
+              <select
+                value={field}
+                onChange={e => setField(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="">— Select field —</option>
+                {cat.valueFields.map(v => (
+                  <option key={v.col} value={v.col}>
+                    {v.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {cat.filterFields.length > 0 && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">
+                Filters (optional)
+              </label>
+              <div className="space-y-2">
+                {cat.filterFields.map(f => (
+                  <div key={f.col} className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500 w-32 shrink-0">{f.label}</span>
+                    <select
+                      value={filters[f.col] ?? ''}
+                      onChange={e => setFilters(prev => ({ ...prev, [f.col]: e.target.value }))}
+                      className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+                    >
+                      <option value="">— Any —</option>
+                      {(f.options || []).map(o => (
+                        <option key={o} value={o}>
+                          {o}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Name</label>
+              <input
+                value={label}
+                onChange={e => setLabel(e.target.value)}
+                placeholder="e.g. Jobs Avg Price (West)"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Category</label>
+              <input
+                value={category}
+                onChange={e => setCategory(e.target.value)}
+                placeholder="Custom"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Tracking</label>
+            <div className="flex flex-wrap gap-1.5">
+              {['daily', 'weekly', 'monthly', 'quarterly', 'yearly'].map(t => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTracking(t)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border capitalize transition-colors ${
+                    tracking === t
+                      ? 'bg-blue-700 text-white border-blue-700'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+          {err && <p className="text-sm text-red-600 font-medium">{err}</p>}
+        </div>
+        <div className="px-6 py-4 border-t border-gray-100 flex gap-2">
+          <button
+            onClick={handleCreate}
+            disabled={saving}
+            className="flex-1 py-2.5 text-sm font-semibold text-white rounded-xl disabled:opacity-50"
+            style={{ backgroundColor: '#1e40af' }}
+          >
+            {saving ? 'Creating…' : 'Create Source'}
+          </button>
+          <button
+            onClick={onClose}
+            className="px-4 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50"
           >
             Cancel
           </button>
@@ -8800,6 +9209,9 @@ export default function Statistics() {
       return null
     }
     if (!ds?.table || !ds?.date_column) return null
+    // Defense in depth: only query tables/columns on the allowlist, even if a
+    // stored source somehow references something outside the builder's options.
+    if (!isSourceAllowed(ds)) return null
 
     // Fetch all rows from the source table
     let query = supabase
