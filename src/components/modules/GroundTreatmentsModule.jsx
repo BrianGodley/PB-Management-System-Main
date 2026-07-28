@@ -976,7 +976,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               const mt = MULCH_TYPES.find(t => t.label === mulchRows[0]?.type) || MULCH_TYPES[0]
               return (
                 <>
-                  ${p(mt.dbName, mt.fallback).toFixed(2)}/CY
+                  Type ${p(mt.dbName, mt.fallback).toFixed(2)}/CY
                   <RateEditPopover
                     table="material_rates"
                     name={mt.dbName}
@@ -1049,35 +1049,20 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             </thead>
             <tbody>
               {mulchRows.map((row, i) => {
-                const mt = MULCH_TYPES.find(t => t.label === row.type) || MULCH_TYPES[0]
-                const typeCost = p(mt.dbName, mt.fallback)
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-1">
-                      <div className="flex flex-col gap-1">
-                        <select
-                          className="input text-sm py-1.5"
-                          value={row.type || MULCH_TYPES[0].label}
-                          onChange={e => updateMulch(i, 'type', e.target.value)}
-                        >
-                          {MULCH_TYPES.map(t => (
-                            <option key={t.label} value={t.label}>
-                              {t.label}
-                            </option>
-                          ))}
-                        </select>
-                        <span className="text-xs text-gray-400 inline-flex items-center gap-1 whitespace-nowrap">
-                          ${typeCost.toFixed(2)}/CY
-                          <RateEditPopover
-                            table="material_rates"
-                            name={mt.dbName}
-                            category="Ground Treatments"
-                            unitLabel="CY"
-                            currentValue={typeCost}
-                            onSaved={refreshAllRates}
-                          />
-                        </span>
-                      </div>
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.type || MULCH_TYPES[0].label}
+                        onChange={e => updateMulch(i, 'type', e.target.value)}
+                      >
+                        {MULCH_TYPES.map(t => (
+                          <option key={t.label} value={t.label}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                     <td className="py-1 pr-1">
                       <NumInput value={row.sf} onChange={v => updateMulch(i, 'sf', v)} />
@@ -1146,7 +1131,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               const dt = DG_TYPES.find(t => t.label === dgRows[0]?.type) || DG_TYPES[0]
               return (
                 <>
-                  ${p(dt.dbName, dt.fallback).toFixed(2)}/ton
+                  Type ${p(dt.dbName, dt.fallback).toFixed(2)}/ton
                   <RateEditPopover
                     table="material_rates"
                     name={dt.dbName}
@@ -1234,35 +1219,20 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             </thead>
             <tbody>
               {dgRows.map((row, i) => {
-                const dgt = DG_TYPES.find(t => t.label === row.type) || DG_TYPES[0]
-                const typeCost = p(dgt.dbName, dgt.fallback)
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-1">
-                      <div className="flex flex-col gap-1">
-                        <select
-                          className="input text-sm py-1.5"
-                          value={row.type || DG_TYPES[0].label}
-                          onChange={e => updateDg(i, 'type', e.target.value)}
-                        >
-                          {DG_TYPES.map(t => (
-                            <option key={t.label} value={t.label}>
-                              {t.label}
-                            </option>
-                          ))}
-                        </select>
-                        <span className="text-xs text-gray-400 inline-flex items-center gap-1 whitespace-nowrap">
-                          ${typeCost.toFixed(2)}/ton
-                          <RateEditPopover
-                            table="material_rates"
-                            name={dgt.dbName}
-                            category="Ground Treatments"
-                            unitLabel="ton"
-                            currentValue={typeCost}
-                            onSaved={refreshAllRates}
-                          />
-                        </span>
-                      </div>
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.type || DG_TYPES[0].label}
+                        onChange={e => updateDg(i, 'type', e.target.value)}
+                      >
+                        {DG_TYPES.map(t => (
+                          <option key={t.label} value={t.label}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                     <td className="py-1 pr-1">
                       <NumInput value={row.sf} onChange={v => updateDg(i, 'sf', v)} />
