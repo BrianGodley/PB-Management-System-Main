@@ -106,6 +106,31 @@ const DEFAULTS = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const n = v => parseFloat(v) || 0
 
+// ── Vendor catalog: material-only overrides for Drain Pipe / Drain Fixtures ──
+// The Type still sets the item's labor (per-type coefficient, unchanged) AND its
+// House material price. A vendor only overrides the MATERIAL price for the same
+// item (matched by name in the vendor's catalog); it never affects labor.
+const DRAIN_CAT = { pipe: 'Drain Pipe', fixture: 'Drain Fixtures' }
+function drainMatCost(cat, row, TYPES, materialRows, catDefaults, mp) {
+  const t = TYPES[row.type]
+  let dbName = t?.dbName
+  let fallback = t?.costPerLF ?? t?.cost ?? 0
+  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : catDefaults[cat] || 'House'
+  if (vsel && vsel !== 'House') {
+    const prefix = `${cat} - `
+    const vrow = (materialRows || []).find(r => {
+      if (r.subcategory !== cat || r.vendor_id !== vsel) return false
+      const label = r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name
+      return label === row.type
+    })
+    if (vrow) {
+      dbName = vrow.name
+      fallback = n(vrow.unit_cost)
+    }
+  }
+  return { dbName, cost: mp[dbName] ?? fallback }
+}
+
 // materialPrices — { 'dbName': unit_cost, ... } fetched from material_rates
 function calcDrainage(
   state,
@@ -115,7 +140,9 @@ function calcDrainage(
   walkAccess = null,
   laborBurdenPct = DEFAULTS.laborBurdenPct,
   subRates = {},
-  subMarkupRate = 0.2
+  subMarkupRate = 0.2,
+  materialRows = [],
+  catDefaults = {}
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const {
@@ -155,8 +182,8 @@ function calcDrainage(
     const lf = n(r.lf)
     const rate = PIPE_TYPES[r.type]
     if (lf > 0 && rate) {
-      const costPerLF = materialPrices[rate.dbName] ?? rate.costPerLF
-      pipeMat += lf * costPerLF
+      const { cost } = drainMatCost(DRAIN_CAT.pipe, r, PIPE_TYPES, materialRows, catDefaults, materialPrices)
+      pipeMat += lf * cost
       pipeHrs += lf * rate.laborPerLF
     }
   })
@@ -166,7 +193,7 @@ function calcDrainage(
     const qty = n(r.qty)
     const rate = FIXTURE_TYPES[r.type]
     if (qty > 0 && rate) {
-      const cost = materialPrices[rate.dbName] ?? rate.cost
+      const { cost } = drainMatCost(DRAIN_CAT.fixture, r, FIXTURE_TYPES, materialRows, catDefaults, materialPrices)
       fixMat += qty * cost
       fixHrs += qty * rate.laborHrs
       totalFixQty += qty
@@ -294,14 +321,14 @@ const DEFAULT_TRENCH_ROWS = [
   { equipment: 'Hand', lf: '', width: '', depth: '' },
 ]
 const DEFAULT_PIPE_ROWS = [
-  { type: '3" SDR 35', lf: '' },
-  { type: '3" SDR 35', lf: '' },
-  { type: '3" SDR 35', lf: '' },
+  { type: '3" SDR 35', lf: '', vendor: 'auto' },
+  { type: '3" SDR 35', lf: '', vendor: 'auto' },
+  { type: '3" SDR 35', lf: '', vendor: 'auto' },
 ]
 const DEFAULT_FIXTURE_ROWS = [
-  { type: '3" Area Drain', qty: '' },
-  { type: '3" Area Drain', qty: '' },
-  { type: '3" Area Drain', qty: '' },
+  { type: '3" Area Drain', qty: '', vendor: 'auto' },
+  { type: '3" Area Drain', qty: '', vendor: 'auto' },
+  { type: '3" Area Drain', qty: '', vendor: 'auto' },
 ]
 const DEFAULT_ADDITIONAL = {
   pumpVaultQty: '',
@@ -340,6 +367,36 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
   const [subRates, setSubRates] = useState(initialData?.subRates ?? {})
   const [pricesLoading, setPricesLoading] = useState(!initialData?.materialPrices)
+  // Vendor catalog (material_rates rows with subcategory + vendor_id) + vendor list.
+  const [materialRows, setMaterialRows] = useState(initialData?.materialRows ?? [])
+  const [vendors, setVendors] = useState([])
+  useEffect(() => {
+    let alive = true
+    Promise.all([
+      supabase
+        .from('material_rates')
+        .select('name, unit_cost, subcategory, vendor_id')
+        .eq('category', 'Drainage'),
+      supabase
+        .from('subs_vendors')
+        .select('id, company_name, supplied_categories')
+        .eq('type', 'vendor')
+        .order('company_name'),
+    ]).then(([matRowsRes, venRes]) => {
+      if (!alive) return
+      setMaterialRows(matRowsRes.data || [])
+      setVendors(
+        (venRes.data || []).map(v => ({
+          id: v.id,
+          name: v.company_name,
+          categories: v.supplied_categories || [],
+        }))
+      )
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
 
   // Pulled out so RateEditPopover can call it after the user saves a new
   // master-rate value — picks up the change without a page refresh. Fetches
@@ -445,6 +502,33 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
     }
   }, [])
 
+  // ── Vendor catalog helpers (material-only, per-row Vendor picker) ────────
+  const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
+  const defaultVendorFor = cat => vendorsForCategory(cat)[0]?.id || 'House'
+  const effVendor = (cat, v) => (v && v !== 'auto' && v !== 'House' ? v : defaultVendorFor(cat))
+  const catDefaults = {
+    [DRAIN_CAT.pipe]: defaultVendorFor(DRAIN_CAT.pipe),
+    [DRAIN_CAT.fixture]: defaultVendorFor(DRAIN_CAT.fixture),
+  }
+  // On a NEW estimate, default each pipe/fixture row's vendor to the first real
+  // vendor for its category once catalogs load. Never overrides a saved estimate.
+  const [vendorDefaultsApplied, setVendorDefaultsApplied] = useState(false)
+  useEffect(() => {
+    const isSaved = initialData?.materialPrices && Object.keys(initialData.materialPrices).length > 0
+    if (vendorDefaultsApplied || isSaved || !vendors.length) return
+    setVendorDefaultsApplied(true)
+    const needs = v => !v || v === 'House' || v === 'auto'
+    setPipeRows(rows =>
+      (rows || []).map(r => (needs(r.vendor) ? { ...r, vendor: defaultVendorFor(DRAIN_CAT.pipe) } : r))
+    )
+    setFixtureRows(rows =>
+      (rows || []).map(r =>
+        needs(r.vendor) ? { ...r, vendor: defaultVendorFor(DRAIN_CAT.fixture) } : r
+      )
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendors, vendorDefaultsApplied])
+
   const calcRaw = calcDrainage(
     {
       difficulty,
@@ -466,7 +550,9 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
     walkAccess,
     laborBurdenPct,
     subRates,
-    subGpMarkupRate
+    subGpMarkupRate,
+    materialRows,
+    catDefaults
   )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
@@ -519,6 +605,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         laborBurdenPct,
         gpmd,
         materialPrices, // snapshot of prices used — so the summary always reflects save-time costs
+        materialRows, // vendor catalog snapshot (for re-edit pricing)
         subRates,
         calc,
       },
@@ -891,9 +978,17 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
       <div>
         <SectionHeader title="Drain Pipe" />
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              <col className="w-[128px]" />
+              <col />
+              <col className="w-[84px]" />
+              <col className="w-[96px]" />
+              <col className="w-[96px]" />
+            </colgroup>
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-left pb-1 pr-2 font-medium">Pipe Type</th>
                 <th className="text-left pb-1 pr-2 font-medium">Linear Feet</th>
                 <th className="text-right pb-1 pr-2 font-medium text-gray-400">$/LF</th>
@@ -903,10 +998,32 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
             <tbody>
               {pipeRows.map((row, i) => {
                 const rate = PIPE_TYPES[row.type]
-                const costPerLF = materialPrices[rate?.dbName] ?? rate?.costPerLF ?? 0
-                const mat = n(row.lf) * costPerLF
+                const { dbName, cost } = drainMatCost(
+                  DRAIN_CAT.pipe,
+                  row,
+                  PIPE_TYPES,
+                  materialRows,
+                  catDefaults,
+                  materialPrices
+                )
+                const mat = n(row.lf) * cost
                 return (
                   <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-2">
+                      <select
+                        className="input text-sm py-1 w-full"
+                        value={effVendor(DRAIN_CAT.pipe, row.vendor)}
+                        onChange={e => updatePipe(i, 'vendor', e.target.value)}
+                        title="Vendor"
+                      >
+                        {vendorsForCategory(DRAIN_CAT.pipe).map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                        <option value="House">House</option>
+                      </select>
+                    </td>
                     <td className="py-1 pr-2">
                       <div className="flex items-center gap-1">
                         <select
@@ -931,17 +1048,17 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                       </div>
                     </td>
                     <td className="py-1 pr-2">
-                      <NumInput value={row.lf} onChange={v => updatePipe(i, 'lf', v)} />
+                      <NumInput value={row.lf} onChange={v => updatePipe(i, 'lf', v)} className="w-full" />
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
                       <span className="inline-flex items-center justify-end">
-                        ${costPerLF.toFixed(2)}
+                        ${cost.toFixed(2)}
                         <RateEditPopover
                           table="material_rates"
-                          name={rate?.dbName || row.type}
+                          name={dbName || row.type}
                           category="Drainage"
                           unitLabel="LF"
-                          currentValue={costPerLF}
+                          currentValue={cost}
                           onSaved={refreshMaterialPrices}
                         />
                       </span>
@@ -965,9 +1082,17 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
       <div>
         <SectionHeader title="Drains & Fixtures" />
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              <col className="w-[128px]" />
+              <col />
+              <col className="w-[84px]" />
+              <col className="w-[96px]" />
+              <col className="w-[96px]" />
+            </colgroup>
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-left pb-1 pr-2 font-medium">Fixture Type</th>
                 <th className="text-left pb-1 pr-2 font-medium">Qty</th>
                 <th className="text-right pb-1 pr-2 font-medium text-gray-400">$/Ea</th>
@@ -977,10 +1102,32 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
             <tbody>
               {fixtureRows.map((row, i) => {
                 const rate = FIXTURE_TYPES[row.type]
-                const cost = materialPrices[rate?.dbName] ?? rate?.cost ?? 0
+                const { dbName, cost } = drainMatCost(
+                  DRAIN_CAT.fixture,
+                  row,
+                  FIXTURE_TYPES,
+                  materialRows,
+                  catDefaults,
+                  materialPrices
+                )
                 const mat = n(row.qty) * cost
                 return (
                   <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-2">
+                      <select
+                        className="input text-sm py-1 w-full"
+                        value={effVendor(DRAIN_CAT.fixture, row.vendor)}
+                        onChange={e => updateFixture(i, 'vendor', e.target.value)}
+                        title="Vendor"
+                      >
+                        {vendorsForCategory(DRAIN_CAT.fixture).map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                        <option value="House">House</option>
+                      </select>
+                    </td>
                     <td className="py-1 pr-2">
                       <div className="flex items-center gap-1">
                         <select
@@ -1006,14 +1153,14 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                       </div>
                     </td>
                     <td className="py-1 pr-2">
-                      <NumInput value={row.qty} onChange={v => updateFixture(i, 'qty', v)} />
+                      <NumInput value={row.qty} onChange={v => updateFixture(i, 'qty', v)} className="w-full" />
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
                       <span className="inline-flex items-center justify-end">
                         {rate ? `$${cost.toFixed(2)}` : '—'}
                         <RateEditPopover
                           table="material_rates"
-                          name={rate?.dbName || row.type}
+                          name={dbName || row.type}
                           category="Drainage"
                           unitLabel="ea"
                           currentValue={cost}
