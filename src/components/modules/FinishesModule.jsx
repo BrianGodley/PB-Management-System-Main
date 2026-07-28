@@ -62,7 +62,6 @@ const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 1', hours: '', materials: '', subCost: '' },
   { label: 'Misc 2', hours: '', materials: '', subCost: '' },
   { label: 'Misc 3', hours: '', materials: '', subCost: '' },
-  { label: 'Misc 4', hours: '', materials: '', subCost: '' },
 ]
 
 const DEFAULT_CAP_ROWS = [

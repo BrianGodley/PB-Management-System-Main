@@ -401,6 +401,7 @@ const DEFAULT_STATE = {
   manualRows: [
     { label: '', hours: '', materials: '', subCost: '' },
     { label: '', hours: '', materials: '', subCost: '' },
+    { label: '', hours: '', materials: '', subCost: '' },
   ],
 
   // ── Subcontractor tab — independent copies of every mirrored field so the

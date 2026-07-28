@@ -244,7 +244,7 @@ function makeInitial(data = {}) {
       manualSubCost: '',
     },
     steel: data.steel ?? { manualSubCost: '' },
-    manualRows: data.manualRows ?? [newManualRow()],
+    manualRows: data.manualRows ?? [newManualRow(), newManualRow(), newManualRow()],
     laborRatePerHour: data.laborRatePerHour ?? 35,
     laborBurdenPct: data.laborBurdenPct ?? LABOR_BURDEN,
     gpmd: data.gpmd ?? 425,

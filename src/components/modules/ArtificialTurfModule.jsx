@@ -415,7 +415,6 @@ const DEFAULT_STATE = {
     { label: '', hours: '', materials: '', subCost: '' },
     { label: '', hours: '', materials: '', subCost: '' },
     { label: '', hours: '', materials: '', subCost: '' },
-    { label: '', hours: '', materials: '', subCost: '' },
   ],
 }
 

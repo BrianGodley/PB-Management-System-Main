@@ -225,6 +225,7 @@ const DEFAULT_STATE = {
   manualRows: [
     { label: '', hours: '', materials: '', subCost: '' },
     { label: '', hours: '', materials: '', subCost: '' },
+    { label: '', hours: '', materials: '', subCost: '' },
   ],
 }
 

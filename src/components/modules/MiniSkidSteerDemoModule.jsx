@@ -616,7 +616,6 @@ const DEFAULT_STATE = {
     { label: '', hours: '', materials: '', subCost: '' },
     { label: '', hours: '', materials: '', subCost: '' },
     { label: '', hours: '', materials: '', subCost: '' },
-    { label: '', hours: '', materials: '', subCost: '' },
   ],
   // Sub tab has its OWN manual rows — independent of In-House.
   subManualRows: [
