@@ -4759,7 +4759,9 @@ const STAT_SOURCE_CATALOG = {
       { col: 'gross_profit', label: 'Gross Profit', stat_type: 'currency' },
       { col: 'gpmd', label: 'GPMD %', stat_type: 'percentage' },
     ],
-    filterFields: [],
+    filterFields: [
+      { col: 'status', label: 'Job status', options: ['active', 'complete'] },
+    ],
   },
   bids: {
     label: 'Bids',
@@ -4772,7 +4774,9 @@ const STAT_SOURCE_CATALOG = {
       { col: 'total_price', label: 'Total Price', stat_type: 'currency' },
       { col: 'gross_profit', label: 'Gross Profit', stat_type: 'currency' },
     ],
-    filterFields: [],
+    filterFields: [
+      { col: 'status', label: 'Bid status', options: ['pending', 'presented', 'sold', 'lost'] },
+    ],
   },
   schedule_items: {
     label: 'Schedule Items',
