@@ -221,7 +221,8 @@ function AppRoutes() {
             path="portal/internal"
             element={<PortalPlaceholder label="Internal Users" icon="👥" />}
           />
-          <Route path="portal/subs" element={<SubsVendors />} />
+          <Route path="portal/subs" element={<SubsVendors mode="sub" />} />
+          <Route path="portal/vendors" element={<SubsVendors mode="vendor" />} />
           <Route path="training" element={<LMS />} />
           <Route path="hr" element={<HR />} />
           <Route path="hr/employee/:id" element={<EmployeeDetail />} />

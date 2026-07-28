@@ -99,14 +99,13 @@ async function fetchSubsData() {
 }
 
 // ── Main Page ────────────────────────────────────────────────
-export default function SubsVendors() {
+export default function SubsVendors({ mode = 'sub' }) {
   // Cached data — instant on revisit; refresh() forces a refetch after writes.
   const { data: subsData, loading, refresh } = useCachedData('subs_vendors:all', fetchSubsData)
   const subs = subsData ?? []
   const [search, setSearch] = useState('')
-  const [svTab, setSvTab] = useState('directory') // 'directory' | 'settings'
+  const [svTab, setSvTab] = useState('directory') // 'directory' | 'contracts' | 'quotes' | 'settings'
   const [svSettingsTab, setSvSettingsTab] = useState('general')
-  const [typeView, setTypeView] = useState('sub') // 'sub' | 'vendor'
   const [showModal, setShowModal] = useState(false)
   const [editSub, setEditSub] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
@@ -114,8 +113,6 @@ export default function SubsVendors() {
   const [error, setError] = useState('')
   const [sortDir, setSortDir] = useState('asc')
   const [selected, setSelected] = useState(new Set())
-  // Import/Export panel type selector (inside Settings)
-  const [ieType, setIeType] = useState('sub') // 'sub' | 'vendor'
   // Import flow: null → 'mapping' → 'preview'
   const [importStep, setImportStep] = useState(null)
   const [importType, setImportType] = useState('sub') // type being imported
@@ -131,22 +128,28 @@ export default function SubsVendors() {
 
   function openNew(type) {
     setEditSub(null)
-    setForm({ ...EMPTY_FORM, type: type || typeView })
+    setForm({ ...EMPTY_FORM, type: type || mode })
     setError('')
     setShowModal(true)
   }
 
   // Dashboard "Quick Add Vendor/Sub" deep-link: ?new=sub|vendor opens the add
-  // modal on the matching directory.
+  // modal — but only when the param matches this module's mode.
   useEffect(() => {
     const t = searchParams.get('new')
-    if (t === 'sub' || t === 'vendor') {
-      setTypeView(t)
+    if (t === mode) {
       openNew(t)
       setSearchParams({}, { replace: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // If the active tab isn't valid for this mode (e.g. 'contracts' on a vendor
+  // module), fall back to the directory so no blank panel shows.
+  useEffect(() => {
+    if (svTab === 'contracts' && mode !== 'sub') setSvTab('directory')
+    if (svTab === 'quotes' && mode !== 'vendor') setSvTab('directory')
+  }, [svTab, mode])
 
   function openEdit(sub) {
     setEditSub(sub)
@@ -529,7 +532,7 @@ export default function SubsVendors() {
 
   // Filter + search
   const filtered = subs
-    .filter(s => (s.type || 'sub') === typeView)
+    .filter(s => (s.type || 'sub') === mode)
     .filter(s => {
       const q = search.toLowerCase()
       return (
@@ -562,8 +565,8 @@ export default function SubsVendors() {
         <div className="flex items-center justify-center flex-1 min-w-0 overflow-x-auto">
           {[
             { key: 'directory', label: '📋 Directory' },
-            { key: 'contracts', label: '📑 Contracts' },
-            { key: 'quotes', label: '🧾 Quotes' },
+            ...(mode === 'sub' ? [{ key: 'contracts', label: '📑 Contracts' }] : []),
+            ...(mode === 'vendor' ? [{ key: 'quotes', label: '🧾 Quotes' }] : []),
             { key: 'settings', label: '⚙️ Settings', mobileHide: true },
           ].map(t => (
             <button
@@ -580,20 +583,23 @@ export default function SubsVendors() {
           ))}
         </div>
         <div className="flex items-center gap-2 pr-2 flex-shrink-0">
-          <button onClick={() => openNew('sub')} className="btn-primary text-xs px-3 py-1.5 whitespace-nowrap">
-            + Add Subcontractor
-          </button>
-          <button onClick={() => openNew('vendor')} className="btn-primary text-xs px-3 py-1.5 whitespace-nowrap">
-            + Add Vendor
-          </button>
+          {mode === 'sub' ? (
+            <button onClick={() => openNew('sub')} className="btn-primary text-xs px-3 py-1.5 whitespace-nowrap">
+              + Add Subcontractor
+            </button>
+          ) : (
+            <button onClick={() => openNew('vendor')} className="btn-primary text-xs px-3 py-1.5 whitespace-nowrap">
+              + Add Vendor
+            </button>
+          )}
         </div>
       </div>
 
-      {/* ── Contracts ── */}
-      {svTab === 'contracts' && <SubVendorContracts />}
+      {/* ── Contracts (subs only) ── */}
+      {svTab === 'contracts' && mode === 'sub' && <SubVendorContracts />}
 
-      {/* ── Quotes ── */}
-      {svTab === 'quotes' && <SubVendorQuotes />}
+      {/* ── Quotes (vendors only) ── */}
+      {svTab === 'quotes' && mode === 'vendor' && <SubVendorQuotes />}
 
       {/* ── Settings ── */}
       {svTab === 'settings' && (
@@ -623,7 +629,7 @@ export default function SubsVendors() {
                 <div>
                   <p className="text-4xl mb-3">⚙️</p>
                   <h2 className="text-base font-semibold text-gray-800 mb-1">
-                    Subs & Vendors Settings
+                    {mode === 'sub' ? 'Subcontractor Settings' : 'Vendor Settings'}
                   </h2>
                   <p className="text-sm text-gray-500">
                     Configuration options will be available here.
@@ -637,47 +643,20 @@ export default function SubsVendors() {
               <div className="w-full">
                 <h2 className="text-sm font-semibold text-gray-800 mb-4">Import / Export</h2>
 
-                {/* Type selector */}
-                <div className="mb-5">
-                  <p className="text-xs font-medium text-gray-500 mb-2">Choose record type</p>
-                  <div className="inline-flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
-                    <button
-                      onClick={() => setIeType('sub')}
-                      className={`px-5 py-2 text-sm font-semibold transition-colors ${
-                        ieType === 'sub'
-                          ? 'bg-green-700 text-white'
-                          : 'bg-white text-gray-500 hover:bg-gray-50'
-                      }`}
-                    >
-                      🚜 Subcontractors
-                    </button>
-                    <button
-                      onClick={() => setIeType('vendor')}
-                      className={`px-5 py-2 text-sm font-semibold border-l border-gray-200 transition-colors ${
-                        ieType === 'vendor'
-                          ? 'bg-green-700 text-white'
-                          : 'bg-white text-gray-500 hover:bg-gray-50'
-                      }`}
-                    >
-                      🛒 Vendors
-                    </button>
-                  </div>
-                </div>
-
                 {/* Import card */}
                 <div className="bg-white rounded-xl border border-gray-200 p-5 mb-4">
                   <div className="flex items-start gap-4">
                     <div className="text-2xl">📥</div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-800 mb-0.5">
-                        Import {ieType === 'sub' ? 'Subcontractors' : 'Vendors'}
+                        Import {mode === 'sub' ? 'Subcontractors' : 'Vendors'}
                       </p>
                       <p className="text-xs text-gray-500 mb-3">
                         Upload an .xlsx file. You'll map columns before anything is saved.
                       </p>
                       <button
                         onClick={() => {
-                          setImportType(ieType)
+                          setImportType(mode)
                           importFileRef.current?.click()
                         }}
                         className="text-sm px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors font-medium"
@@ -694,14 +673,14 @@ export default function SubsVendors() {
                     <div className="text-2xl">📤</div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-800 mb-0.5">
-                        Export {ieType === 'sub' ? 'Subcontractors' : 'Vendors'}
+                        Export {mode === 'sub' ? 'Subcontractors' : 'Vendors'}
                       </p>
                       <p className="text-xs text-gray-500 mb-3">
-                        Download all {ieType === 'sub' ? 'subcontractors' : 'vendors'} as an Excel
+                        Download all {mode === 'sub' ? 'subcontractors' : 'vendors'} as an Excel
                         spreadsheet.
                       </p>
                       <button
-                        onClick={() => exportXLSX(ieType)}
+                        onClick={() => exportXLSX(mode)}
                         className="text-sm px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors font-medium"
                       >
                         Download .xlsx
@@ -728,7 +707,7 @@ export default function SubsVendors() {
 
       {svTab === 'directory' && (
         <>
-          {/* ── Search + Type toggle on one row ────────────────── */}
+          {/* ── Search ────────────────── */}
           <div className="flex flex-wrap items-center gap-3 mb-4 mt-4 flex-shrink-0">
             <input
               type="text"
@@ -737,28 +716,6 @@ export default function SubsVendors() {
               onChange={e => setSearch(e.target.value)}
               className="input text-sm flex-1 min-w-[10rem] sm:flex-none sm:w-64"
             />
-            <div className="flex-shrink-0 flex rounded-xl overflow-hidden border border-gray-200 shadow-sm sm:ml-auto">
-              <button
-                onClick={() => setTypeView('sub')}
-                className={`px-4 py-1.5 text-xs font-semibold transition-colors ${
-                  typeView === 'sub'
-                    ? 'bg-green-700 text-white'
-                    : 'bg-white text-gray-500 hover:bg-gray-50'
-                }`}
-              >
-                🚜 Subs
-              </button>
-              <button
-                onClick={() => setTypeView('vendor')}
-                className={`px-4 py-1.5 text-xs font-semibold border-l border-gray-200 transition-colors ${
-                  typeView === 'vendor'
-                    ? 'bg-green-700 text-white'
-                    : 'bg-white text-gray-500 hover:bg-gray-50'
-                }`}
-              >
-                🛒 Vendors
-              </button>
-            </div>
           </div>
 
           {loading ? (
@@ -771,11 +728,11 @@ export default function SubsVendors() {
               <p className="text-sm font-medium text-gray-500">
                 {search
                   ? 'No results found'
-                  : `No ${typeView === 'sub' ? 'subcontractors' : 'vendors'} yet`}
+                  : `No ${mode === 'sub' ? 'subcontractors' : 'vendors'} yet`}
               </p>
               {!search && (
-                <button onClick={openNew} className="btn-primary text-sm px-4 py-2 mt-4">
-                  Add First {typeView === 'sub' ? 'Subcontractor' : 'Vendor'}
+                <button onClick={() => openNew(mode)} className="btn-primary text-sm px-4 py-2 mt-4">
+                  Add First {mode === 'sub' ? 'Subcontractor' : 'Vendor'}
                 </button>
               )}
             </div>
@@ -789,8 +746,8 @@ export default function SubsVendors() {
                     <col style={{ width: '22%' }} /> {/* company name */}
                     <col style={{ width: '15%' }} /> {/* primary contact */}
                     <col style={{ width: '20%' }} /> {/* trades / materials */}
-                    {typeView === 'sub' && <col style={{ width: '150px' }} />}
-                    {typeView === 'vendor' && <col style={{ width: '150px' }} />}
+                    {mode === 'sub' && <col style={{ width: '150px' }} />}
+                    {mode === 'vendor' && <col style={{ width: '150px' }} />}
                     <col style={{ width: '120px' }} /> {/* cell */}
                     <col style={{ width: '120px' }} /> {/* phone */}
                     <col style={{ width: '44px' }} /> {/* actions */}
@@ -815,14 +772,14 @@ export default function SubsVendors() {
                         Primary Contact
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                        {typeView === 'sub' ? 'Trades' : 'Materials'}
+                        {mode === 'sub' ? 'Trades' : 'Materials'}
                       </th>
-                      {typeView === 'sub' && (
+                      {mode === 'sub' && (
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
                           Services Pricing
                         </th>
                       )}
-                      {typeView === 'vendor' && (
+                      {mode === 'vendor' && (
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
                           Price List
                         </th>
@@ -864,12 +821,12 @@ export default function SubsVendors() {
                               <span className="text-gray-300 italic">—</span>
                             )}
                           </td>
-                          {typeView === 'sub' && (
+                          {mode === 'sub' && (
                             <td className="px-4 py-3 text-gray-600 truncate">
                               {sub.services_pricing || <span className="text-gray-300">—</span>}
                             </td>
                           )}
-                          {typeView === 'vendor' && (
+                          {mode === 'vendor' && (
                             <td className="px-4 py-3 text-gray-600 truncate">
                               {sub.price_list || <span className="text-gray-300">—</span>}
                             </td>
@@ -1269,6 +1226,7 @@ export default function SubsVendors() {
               toggleDivision={toggleDivision}
               recordType={form.type}
               recordId={editSub?.id}
+              mode={mode}
             />
           )}
         </>
@@ -1297,9 +1255,26 @@ function SubModal({
   toggleDivision,
   recordType,
   recordId,
+  mode = 'sub',
 }) {
   const [customInput, setCustomInput] = useState('')
   const [stab, setStab] = useState('details') // 'details' | 'quotes' | 'contracts'
+  // Subs get Details + Contracts; vendors get Details + Quotes.
+  const partyTabs =
+    mode === 'sub'
+      ? [
+          { k: 'details', l: 'Details' },
+          { k: 'contracts', l: 'Contracts' },
+        ]
+      : [
+          { k: 'details', l: 'Details' },
+          { k: 'quotes', l: 'Quotes' },
+        ]
+  // Never leave the active tab on a kind that's hidden for this mode.
+  useEffect(() => {
+    if (stab === 'quotes' && mode !== 'vendor') setStab('details')
+    if (stab === 'contracts' && mode !== 'sub') setStab('details')
+  }, [stab, mode])
   const [uploading, setUploading] = useState(false)
   const [viewerDoc, setViewerDoc] = useState(null) // { name, url } for in-app viewer
   const priceFileInputRef = useRef(null)
@@ -1400,11 +1375,7 @@ function SubModal({
         {/* Tabs — only when editing an existing record */}
         {isEdit && recordId && (
           <div className="flex gap-0 border-b border-gray-100 px-3 flex-shrink-0">
-            {[
-              { k: 'details', l: 'Details' },
-              { k: 'quotes', l: 'Quotes' },
-              { k: 'contracts', l: 'Contracts' },
-            ].map(t => (
+            {partyTabs.map(t => (
               <button
                 key={t.k}
                 type="button"
