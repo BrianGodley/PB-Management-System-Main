@@ -974,7 +974,10 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   // explicit user pick.
   const [vendorDefaultsApplied, setVendorDefaultsApplied] = useState(false)
   useEffect(() => {
-    if (vendorDefaultsApplied || initialData || !vendors.length) return
+    // Only skip for a genuinely SAVED estimate (has a price snapshot). A new
+    // module always receives a non-empty initialData (gpmd/notes/etc.), so
+    // guarding on `initialData` alone would wrongly suppress the defaults.
+    if (vendorDefaultsApplied || initialData?.materialPrices || !vendors.length) return
     setVendorDefaultsApplied(true)
     const mig = (cat, rows) =>
       (rows || []).map(r => (r.vendor === 'House' || !r.vendor ? { ...r, vendor: defaultVendorFor(cat) } : r))
