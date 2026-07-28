@@ -87,6 +87,7 @@ const EMPTY_FORM = {
   price_list: '',
   price_list_files: [],
   services_pricing: '',
+  supplied_categories: [],
 }
 
 // ── Data fetch ───────────────────────────────────────────────
@@ -125,6 +126,71 @@ export default function SubsVendors({ mode = 'sub' }) {
   const [importing, setImporting] = useState(false)
   const importFileRef = useRef(null)
   const [searchParams, setSearchParams] = useSearchParams()
+
+  // ── Material Categories (vendor module only) ────────────────
+  const [materialCategories, setMaterialCategories] = useState([])
+  const [newCategory, setNewCategory] = useState('')
+  const [editingCatId, setEditingCatId] = useState(null)
+  const [editingCatName, setEditingCatName] = useState('')
+
+  async function loadMaterialCategories() {
+    const { data, error: mcErr } = await supabase
+      .from('material_categories')
+      .select('id, name')
+      .order('name')
+    if (mcErr) {
+      console.error('material_categories load failed:', mcErr)
+      return
+    }
+    setMaterialCategories(data || [])
+  }
+
+  useEffect(() => {
+    loadMaterialCategories()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function addMaterialCategory() {
+    const name = newCategory.trim()
+    if (!name) return
+    // tenant_id is filled by a DB trigger — do NOT pass it from JS.
+    const { error: mcErr } = await supabase.from('material_categories').insert({ name })
+    if (mcErr) {
+      console.error('material_categories insert failed:', mcErr)
+      alert('Could not add category: ' + mcErr.message)
+      return
+    }
+    setNewCategory('')
+    loadMaterialCategories()
+  }
+
+  async function renameMaterialCategory(id, name) {
+    const trimmed = (name || '').trim()
+    if (!trimmed) return
+    const { error: mcErr } = await supabase
+      .from('material_categories')
+      .update({ name: trimmed })
+      .eq('id', id)
+    if (mcErr) {
+      console.error('material_categories update failed:', mcErr)
+      alert('Could not rename category: ' + mcErr.message)
+      return
+    }
+    setEditingCatId(null)
+    setEditingCatName('')
+    loadMaterialCategories()
+  }
+
+  async function deleteMaterialCategory(cat) {
+    if (!confirm(`Delete category "${cat.name}"? This cannot be undone.`)) return
+    const { error: mcErr } = await supabase.from('material_categories').delete().eq('id', cat.id)
+    if (mcErr) {
+      console.error('material_categories delete failed:', mcErr)
+      alert('Could not delete category: ' + mcErr.message)
+      return
+    }
+    loadMaterialCategories()
+  }
 
   function openNew(type) {
     setEditSub(null)
@@ -170,6 +236,7 @@ export default function SubsVendors({ mode = 'sub' }) {
       price_list: sub.price_list || '',
       price_list_files: Array.isArray(sub.price_list_files) ? sub.price_list_files : [],
       services_pricing: sub.services_pricing || '',
+      supplied_categories: Array.isArray(sub.supplied_categories) ? sub.supplied_categories : [],
     })
     setError('')
     setShowModal(true)
@@ -213,6 +280,7 @@ export default function SubsVendors({ mode = 'sub' }) {
       price_list: form.price_list.trim() || null,
       price_list_files: Array.isArray(form.price_list_files) ? form.price_list_files : [],
       services_pricing: form.services_pricing.trim() || null,
+      supplied_categories: form.supplied_categories || [],
       updated_at: new Date().toISOString(),
     }
     const { error } = editSub
@@ -607,6 +675,9 @@ export default function SubsVendors({ mode = 'sub' }) {
           <div className="flex border border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0 rounded-xl mb-3">
             {[
               { key: 'general', label: '⚙️ General' },
+              ...(mode === 'vendor'
+                ? [{ key: 'materials', label: '🧱 Material Categories' }]
+                : []),
               { key: 'import-export', label: '📥 Import / Export' },
             ].map(t => (
               <button
@@ -634,6 +705,133 @@ export default function SubsVendors({ mode = 'sub' }) {
                   <p className="text-sm text-gray-500">
                     Configuration options will be available here.
                   </p>
+                </div>
+              </div>
+            )}
+
+            {/* Material Categories (vendors only) */}
+            {svSettingsTab === 'materials' && mode === 'vendor' && (
+              <div className="w-full max-w-2xl">
+                <h2 className="text-sm font-semibold text-gray-800 mb-1">Material Categories</h2>
+                <p className="text-xs text-gray-500 mb-4">
+                  Manage the list of material categories vendors can supply.
+                </p>
+
+                {/* Add category */}
+                <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Add category
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newCategory}
+                      onChange={e => setNewCategory(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          addMaterialCategory()
+                        }
+                      }}
+                      placeholder="e.g. Lumber, Concrete, Fasteners…"
+                      className="input text-sm flex-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={addMaterialCategory}
+                      disabled={!newCategory.trim()}
+                      className="px-4 py-2 text-sm rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 disabled:opacity-40 transition-colors whitespace-nowrap"
+                    >
+                      + Add
+                    </button>
+                  </div>
+                </div>
+
+                {/* Category list */}
+                <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+                  {materialCategories.length === 0 ? (
+                    <p className="text-sm text-gray-400 px-4 py-6 text-center">
+                      No categories yet. Add one above.
+                    </p>
+                  ) : (
+                    materialCategories.map(cat => (
+                      <div key={cat.id} className="flex items-center gap-2 px-4 py-2.5">
+                        {editingCatId === cat.id ? (
+                          <>
+                            <input
+                              type="text"
+                              value={editingCatName}
+                              onChange={e => setEditingCatName(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault()
+                                  renameMaterialCategory(cat.id, editingCatName)
+                                } else if (e.key === 'Escape') {
+                                  setEditingCatId(null)
+                                  setEditingCatName('')
+                                }
+                              }}
+                              className="input text-sm flex-1"
+                              autoFocus
+                            />
+                            <button
+                              type="button"
+                              onClick={() => renameMaterialCategory(cat.id, editingCatName)}
+                              disabled={!editingCatName.trim()}
+                              className="px-3 py-1.5 text-xs rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 disabled:opacity-40 transition-colors"
+                            >
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingCatId(null)
+                                setEditingCatName('')
+                              }}
+                              className="px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <span className="flex-1 text-sm text-gray-800 truncate">{cat.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingCatId(cat.id)
+                                setEditingCatName(cat.name)
+                              }}
+                              className="p-1.5 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-700"
+                              title="Rename"
+                            >
+                              <svg
+                                className="w-3.5 h-3.5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 0l.172.172a2 2 0 010 2.828L12 16H9v-3z"
+                                />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => deleteMaterialCategory(cat)}
+                              className="p-1.5 rounded hover:bg-red-100 text-gray-400 hover:text-red-500"
+                              title="Delete"
+                            >
+                              ✕
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             )}
@@ -1227,6 +1425,7 @@ export default function SubsVendors({ mode = 'sub' }) {
               recordType={form.type}
               recordId={editSub?.id}
               mode={mode}
+              materialCategories={materialCategories}
             />
           )}
         </>
@@ -1256,6 +1455,7 @@ function SubModal({
   recordType,
   recordId,
   mode = 'sub',
+  materialCategories = [],
 }) {
   const [customInput, setCustomInput] = useState('')
   const [stab, setStab] = useState('details') // 'details' | 'quotes' | 'contracts'
@@ -1352,7 +1552,7 @@ function SubModal({
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-[560px] flex flex-col max-h-[95dvh]">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-[1120px] flex flex-col max-h-[95dvh]">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <h2 className="text-base font-bold text-gray-900">
@@ -1502,6 +1702,52 @@ function SubModal({
               </button>
             </div>
           </div>
+
+          {/* Categories Supplied (vendors only) */}
+          {mode === 'vendor' && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-2">
+                Categories Supplied
+              </label>
+              {materialCategories.length === 0 ? (
+                <p className="text-xs text-gray-400">
+                  No material categories yet. Add them in Settings → Material Categories.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                  {materialCategories.map(cat => {
+                    const selected = (form.supplied_categories || []).includes(cat.name)
+                    return (
+                      <label
+                        key={cat.id}
+                        className="flex items-center gap-2 text-sm text-gray-700 px-2 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() =>
+                            setForm(f => {
+                              const cur = Array.isArray(f.supplied_categories)
+                                ? f.supplied_categories
+                                : []
+                              return {
+                                ...f,
+                                supplied_categories: cur.includes(cat.name)
+                                  ? cur.filter(n => n !== cat.name)
+                                  : [...cur, cat.name],
+                              }
+                            })
+                          }
+                          className="accent-green-700 flex-shrink-0"
+                        />
+                        <span className="truncate">{cat.name}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Contact info */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
