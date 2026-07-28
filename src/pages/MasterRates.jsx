@@ -812,6 +812,7 @@ export default function MasterRates() {
   const [labor, setLabor] = useState([])
   const [subs, setSubs] = useState([])
   const [vendors, setVendors] = useState([])
+  const [materialCategories, setMaterialCategories] = useState([])
   const [paverPrices, setPaverPrices] = useState([])
   const [loading, setLoading] = useState(true)
   const [laborRatePerHour, setLaborRatePerHour] = useState('35')
@@ -830,15 +831,25 @@ export default function MasterRates() {
     [vendors]
   )
 
+  // Category select options for the material rows (value === category name,
+  // matching how `subcategory` is stored on material_rates).
+  const categoryOptions = useMemo(
+    () => [
+      { value: '', label: '— none —' },
+      ...materialCategories.map(c => ({ value: c.name, label: c.name })),
+    ],
+    [materialCategories]
+  )
+
   // Materials columns are built inside the component so the Vendor select can
   // close over the fetched vendor list.
   const materialColumns = useMemo(
     () => [
       ...MATERIAL_COLUMNS,
       { key: 'vendor_id', label: 'Vendor', type: 'select', options: vendorOptions },
-      { key: 'subcategory', label: 'Subcategory', placeholder: 'e.g. Gravel, Soils, Sod' },
+      { key: 'subcategory', label: 'Category', type: 'select', options: categoryOptions },
     ],
-    [vendorOptions]
+    [vendorOptions, categoryOptions]
   )
 
   useEffect(() => {
@@ -847,11 +858,12 @@ export default function MasterRates() {
 
   async function fetchAll() {
     setLoading(true)
-    const [matRes, labRes, subRes, vendorRes, settingsRes, paverRes] = await Promise.all([
+    const [matRes, labRes, subRes, vendorRes, catRes, settingsRes, paverRes] = await Promise.all([
       supabase.from('material_rates').select('*').order('name'),
       supabase.from('labor_rates').select('*').order('name'),
       supabase.from('subcontractor_rates').select('*').order('company_name'),
       supabase.from('subs_vendors').select('id, company_name').order('company_name'),
+      supabase.from('material_categories').select('id, name').order('name'),
       supabase.from('company_settings').select('labor_rate_per_hour, sub_markup_rate').single(),
       supabase.from('paver_prices').select('*').order('brand').order('name'),
     ])
@@ -859,6 +871,7 @@ export default function MasterRates() {
     if (labRes.data) setLabor(labRes.data)
     if (subRes.data) setSubs(subRes.data)
     if (vendorRes.data) setVendors(vendorRes.data)
+    setMaterialCategories(catRes.data || [])
     if (paverRes.data) setPaverPrices(paverRes.data)
     if (settingsRes.data?.labor_rate_per_hour != null)
       setLaborRatePerHour(settingsRes.data.labor_rate_per_hour.toString())

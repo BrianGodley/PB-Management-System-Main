@@ -209,19 +209,29 @@ function calcGroundTreatments(
   gpmd = DEFAULTS.gpmd,
   walkAccess = null,
   laborBurdenPct = DEFAULTS.laborBurdenPct,
-  opts = {}
+  opts = {},
+  materialRows = []
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
-  // Per-section resolved type option lists (vendor-aware). Default to the
-  // hardcoded House arrays so the calc still works if opts is not supplied.
+  // Sod stays single-choice, so its option list is still supplied via opts.
+  // Default to the hardcoded House array so the calc works if opts is absent.
   const _opts = {
-    gravel: opts.gravel || GRAVEL_TYPES,
-    pebble: opts.pebble || PEBBLE_TYPES,
-    cobble: opts.cobble || COBBLE_TYPES,
-    soils: opts.soils || SOIL_TYPES,
-    mulch: opts.mulch || MULCH_TYPES,
-    dg: opts.dg || DG_TYPES,
     sod: opts.sod || SOD_TYPES,
+  }
+  // Per-ROW type option resolver (vendor-aware). 'House' (or missing vendor on
+  // an old estimate) → hardcoded House array. A vendor id → that vendor's
+  // products for the row's material category, priced at the vendor's unit_cost.
+  const rowOpt = (cat, row, houseArray) => {
+    if (!row.vendor || row.vendor === 'House') return resolveType(row.type, houseArray, houseArray)
+    const rows = (materialRows || []).filter(
+      r => r.subcategory === cat && r.vendor_id === row.vendor
+    )
+    const opts = rows.map(r => ({
+      label: r.name.replace(new RegExp('^' + cat + ' - '), '').replace(/^.*? - /, ''),
+      dbName: r.name,
+      fallback: parseFloat(r.unit_cost) || 0,
+    }))
+    return resolveType(row.type, opts, houseArray)
   }
   const {
     difficulty,
@@ -260,7 +270,7 @@ function calcGroundTreatments(
       if (!(n(r.sf) > 0)) return
       anyMulch = true
       const CY = (n(r.sf) * (n(r.depth) / 12)) / 27
-      const mt = resolveType(r.type, _opts.mulch, MULCH_TYPES)
+      const mt = rowOpt('Mulch', r, MULCH_TYPES)
       mulchMat += CY * p(mt.dbName, mt.fallback)
       mulchLab += (CY / mulchCYPerDay) * 8 + (n(r.sf) / 3200) * 8
       if (r.weedFabric === 'Yes') {
@@ -312,7 +322,7 @@ function calcGroundTreatments(
   ;(soilsRows || []).forEach(r => {
     if (!n(r.sf)) return
     const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
-    const st = resolveType(r.type, _opts.soils, SOIL_TYPES)
+    const st = rowOpt('Soils', r, SOIL_TYPES)
     soilsMat += CY * p(st.dbName, st.fallback)
   })
 
@@ -366,7 +376,7 @@ function calcGroundTreatments(
       if (!(n(r.sf) > 0)) return
       const tons = (n(r.sf) * n(r.depth)) / 200
       const cement = r.cement === 'Yes'
-      const dgt = resolveType(r.type, _opts.dg, DG_TYPES)
+      const dgt = rowOpt('DG', r, DG_TYPES)
       const baseHrs =
         r.method === 'Hand'
           ? (tons * 1.62) / dgHandRate + (n(r.sf) / 1000) * 8 + tons
@@ -398,7 +408,7 @@ function calcGroundTreatments(
     const fabricLab =
       n(r.sf) * p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
     gravelLab += excavLab + fabricLab
-    const gtype = resolveType(r.type, _opts.gravel, GRAVEL_TYPES)
+    const gtype = rowOpt('Gravel', r, GRAVEL_TYPES)
     const costPerCY = p(gtype.dbName, gtype.fallback)
     gravelMat +=
       CY * costPerCY +
@@ -418,7 +428,7 @@ function calcGroundTreatments(
     const fabricLab =
       n(r.sf) * p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
     pebbleLab += excavLab + fabricLab
-    const ptype = resolveType(r.type, _opts.pebble, PEBBLE_TYPES)
+    const ptype = rowOpt('Pebble', r, PEBBLE_TYPES)
     const costPerCY = p(ptype.dbName, ptype.fallback)
     pebbleMat +=
       CY * costPerCY +
@@ -438,7 +448,7 @@ function calcGroundTreatments(
     const fabricLab =
       n(r.sf) * p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
     cobbleLab += excavLab + fabricLab
-    const ctype = resolveType(r.type, _opts.cobble, COBBLE_TYPES)
+    const ctype = rowOpt('Cobbles', r, COBBLE_TYPES)
     const costPerCY = p(ctype.dbName, ctype.fallback)
     cobbleMat +=
       CY * costPerCY +
@@ -591,28 +601,28 @@ function VendorPicker({ vendors = [], value = 'House', onChange, label = 'Vendor
 }
 
 const DEFAULT_GRAVEL_ROWS = [
-  { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3' },
-  { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3' },
+  { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3', vendor: 'House' },
+  { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3', vendor: 'House' },
 ]
 const DEFAULT_SOILS_ROWS = [
-  { type: 'Topsoil (Sandy Loam)', sf: '', depthIn: '2' },
-  { type: 'Topsoil (Sandy Loam)', sf: '', depthIn: '2' },
+  { type: 'Topsoil (Sandy Loam)', sf: '', depthIn: '2', vendor: 'House' },
+  { type: 'Topsoil (Sandy Loam)', sf: '', depthIn: '2', vendor: 'House' },
 ]
 const DEFAULT_PEBBLE_ROWS = [
-  { sf: '', method: 'Hand', type: 'Arizona River Rock', depthIn: '3' },
-  { sf: '', method: 'Hand', type: 'Arizona River Rock', depthIn: '3' },
+  { sf: '', method: 'Hand', type: 'Arizona River Rock', depthIn: '3', vendor: 'House' },
+  { sf: '', method: 'Hand', type: 'Arizona River Rock', depthIn: '3', vendor: 'House' },
 ]
 const DEFAULT_COBBLE_ROWS = [
-  { sf: '', method: 'Hand', type: 'Granite River Rock', depthIn: '3' },
-  { sf: '', method: 'Hand', type: 'Granite River Rock', depthIn: '3' },
+  { sf: '', method: 'Hand', type: 'Granite River Rock', depthIn: '3', vendor: 'House' },
+  { sf: '', method: 'Hand', type: 'Granite River Rock', depthIn: '3', vendor: 'House' },
 ]
 const DEFAULT_MULCH_ROWS = [
-  { type: 'Premium Mulch', sf: '', depth: '2', weedFabric: 'No' },
-  { type: 'Premium Mulch', sf: '', depth: '2', weedFabric: 'No' },
+  { type: 'Premium Mulch', sf: '', depth: '2', weedFabric: 'No', vendor: 'House' },
+  { type: 'Premium Mulch', sf: '', depth: '2', weedFabric: 'No', vendor: 'House' },
 ]
 const DEFAULT_DG_ROWS = [
-  { type: 'Decomposed Granite', sf: '', depth: '3.5', weedFabric: 'No', method: 'Machine', cement: 'No' },
-  { type: 'Decomposed Granite', sf: '', depth: '3.5', weedFabric: 'No', method: 'Machine', cement: 'No' },
+  { type: 'Decomposed Granite', sf: '', depth: '3.5', weedFabric: 'No', method: 'Machine', cement: 'No', vendor: 'House' },
+  { type: 'Decomposed Granite', sf: '', depth: '3.5', weedFabric: 'No', method: 'Machine', cement: 'No', vendor: 'House' },
 ]
 const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 1', hours: '', materials: '', subCost: '' },
@@ -655,10 +665,16 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
         .from('material_rates')
         .select('name, unit_cost, subcategory, vendor_id')
         .eq('category', 'Ground Treatments'),
-      supabase.from('subs_vendors').select('id, company_name').eq('type', 'vendor').order('company_name'),
+      supabase.from('subs_vendors').select('id, company_name, supplied_categories').eq('type', 'vendor').order('company_name'),
     ])
     setMaterialRows(matRowsRes.data || [])
-    setVendors((venRes.data || []).map(v => ({ id: v.id, name: v.company_name })))
+    setVendors(
+      (venRes.data || []).map(v => ({
+        id: v.id,
+        name: v.company_name,
+        categories: v.supplied_categories || [],
+      }))
+    )
   }, [])
 
   // Re-fetch the merged labor+material rate map. Called on mount and after any
@@ -672,7 +688,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
         .from('material_rates')
         .select('name, unit_cost, subcategory, vendor_id')
         .eq('category', 'Ground Treatments'),
-      supabase.from('subs_vendors').select('id, company_name').eq('type', 'vendor').order('company_name'),
+      supabase.from('subs_vendors').select('id, company_name, supplied_categories').eq('type', 'vendor').order('company_name'),
     ])
     const prices = {}
     ;(matRes.data || []).forEach(r => {
@@ -683,7 +699,13 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     })
     setMaterialPrices(prices)
     setMaterialRows(matRowsRes.data || [])
-    setVendors((venRes.data || []).map(v => ({ id: v.id, name: v.company_name })))
+    setVendors(
+      (venRes.data || []).map(v => ({
+        id: v.id,
+        name: v.company_name,
+        categories: v.supplied_categories || [],
+      }))
+    )
   }, [])
 
   useEffect(() => {
@@ -786,14 +808,9 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   const [cobbleRows, setCobbleRows] = useState(initialData?.cobbleRows ?? DEFAULT_COBBLE_ROWS)
   const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
 
-  // Per-section vendor selection. 'House' (default) = hardcoded type list; a
-  // vendor id filters that section's Type dropdown to the vendor's products.
-  const [gravelVendor, setGravelVendor] = useState(initialData?.gravelVendor ?? 'House')
-  const [pebbleVendor, setPebbleVendor] = useState(initialData?.pebbleVendor ?? 'House')
-  const [cobbleVendor, setCobbleVendor] = useState(initialData?.cobbleVendor ?? 'House')
-  const [soilsVendor, setSoilsVendor] = useState(initialData?.soilsVendor ?? 'House')
-  const [mulchVendor, setMulchVendor] = useState(initialData?.mulchVendor ?? 'House')
-  const [dgVendor, setDgVendor] = useState(initialData?.dgVendor ?? 'House')
+  // Vendor is now selected PER ROW (first column of each material table),
+  // filtered by which vendors supply that row's category. Sod stays a single
+  // choice, so it keeps a per-section vendor picker.
   const [sodVendor, setSodVendor] = useState(initialData?.sodVendor ?? 'House')
 
   // ── Sales tax — applied to totalMat across every module so the bid
@@ -835,12 +852,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     cobbleRows,
     manualRows,
     distanceLF,
-    gravelVendor,
-    pebbleVendor,
-    cobbleVendor,
-    soilsVendor,
-    mulchVendor,
-    dgVendor,
     sodVendor,
   }
 
@@ -862,12 +873,10 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     }))
   }
 
-  const gravelOpts = sectionOptions('Gravel', gravelVendor, GRAVEL_TYPES)
-  const pebbleOpts = sectionOptions('Pebble', pebbleVendor, PEBBLE_TYPES)
-  const cobbleOpts = sectionOptions('Cobbles', cobbleVendor, COBBLE_TYPES)
-  const soilsOpts = sectionOptions('Soils', soilsVendor, SOIL_TYPES)
-  const mulchOpts = sectionOptions('Mulch', mulchVendor, MULCH_TYPES)
-  const dgOpts = sectionOptions('DG', dgVendor, DG_TYPES)
+  // Vendors that supply a given material category — drives the per-row vendor
+  // dropdowns so each row only offers vendors that carry that category.
+  const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
+
   const sodOpts = sectionOptions('Sod', sodVendor, SOD_TYPES)
 
   const calcRaw = calcGroundTreatments(
@@ -877,15 +886,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     gpmd,
     walkAccess,
     laborBurdenPct,
-    {
-      gravel: gravelOpts,
-      pebble: pebbleOpts,
-      cobble: cobbleOpts,
-      soils: soilsOpts,
-      mulch: mulchOpts,
-      dg: dgOpts,
-      sod: sodOpts,
-    }
+    { sod: sodOpts },
+    materialRows
   )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
@@ -926,37 +928,12 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     setManualRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
 
-  // Changing a section's vendor swaps its product list, so reset that section's
-  // row type(s) to the first option of the new list.
-  function changeGravelVendor(v) {
-    setGravelVendor(v)
-    const first = sectionOptions('Gravel', v, GRAVEL_TYPES)[0]?.label
-    if (first) setGravelRows(rows => rows.map(r => ({ ...r, type: first })))
-  }
-  function changePebbleVendor(v) {
-    setPebbleVendor(v)
-    const first = sectionOptions('Pebble', v, PEBBLE_TYPES)[0]?.label
-    if (first) setPebbleRows(rows => rows.map(r => ({ ...r, type: first })))
-  }
-  function changeCobbleVendor(v) {
-    setCobbleVendor(v)
-    const first = sectionOptions('Cobbles', v, COBBLE_TYPES)[0]?.label
-    if (first) setCobbleRows(rows => rows.map(r => ({ ...r, type: first })))
-  }
-  function changeSoilsVendor(v) {
-    setSoilsVendor(v)
-    const first = sectionOptions('Soils', v, SOIL_TYPES)[0]?.label
-    if (first) setSoilsRows(rows => rows.map(r => ({ ...r, type: first })))
-  }
-  function changeMulchVendor(v) {
-    setMulchVendor(v)
-    const first = sectionOptions('Mulch', v, MULCH_TYPES)[0]?.label
-    if (first) setMulchRows(rows => rows.map(r => ({ ...r, type: first })))
-  }
-  function changeDgVendor(v) {
-    setDgVendor(v)
-    const first = sectionOptions('DG', v, DG_TYPES)[0]?.label
-    if (first) setDgRows(rows => rows.map(r => ({ ...r, type: first })))
+  // Changing a ROW's vendor swaps that row's product list, so reset the row's
+  // type to the first option of the new (vendor-filtered) list.
+  function changeRowVendor(cat, houseArray, updateFn, i, v) {
+    updateFn(i, 'vendor', v)
+    const first = sectionOptions(cat, v, houseArray)[0]?.label
+    if (first) updateFn(i, 'type', first)
   }
   function changeSodVendor(v) {
     setSodVendor(v)
@@ -1102,14 +1079,12 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       {/* ── Soils ── */}
       <div>
         <SectionHeader title="Soils" />
-        <div className="mb-2">
-          <VendorPicker vendors={vendors} value={soilsVendor} onChange={changeSoilsVendor} />
-        </div>
-        <p className="text-xs text-gray-400 mb-2">Optional soil / amendment lines (material only).</p>
+        <p className="text-xs text-gray-400 mb-2">Optional soil / amendment lines (material only). Vendor is per-row.</p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-1 font-medium">Vendor</th>
                 <th className="text-left pb-1 pr-1 font-medium">Type</th>
                 <th className="text-left pb-1 pr-1 font-medium">Area (SF)</th>
                 <th className="text-left pb-1 pr-1 font-medium">Depth (in)</th>
@@ -1119,7 +1094,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             </thead>
             <tbody>
               {soilsRows.map((row, i) => {
-                const st = resolveType(row.type, soilsOpts, SOIL_TYPES)
+                const rowOpts = sectionOptions('Soils', row.vendor, SOIL_TYPES)
+                const st = resolveType(row.type, rowOpts, SOIL_TYPES)
                 const typeCost = p(st.dbName, st.fallback)
                 const CY = (n(row.sf) * (n(row.depthIn) / 12)) / 27
                 const mat = CY * typeCost
@@ -1128,10 +1104,24 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.type || soilsOpts[0]?.label}
+                        value={row.vendor || 'House'}
+                        onChange={e => changeRowVendor('Soils', SOIL_TYPES, updateSoils, i, e.target.value)}
+                      >
+                        <option value="House">House</option>
+                        {vendorsForCategory('Soils').map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.type || rowOpts[0]?.label}
                         onChange={e => updateSoils(i, 'type', e.target.value)}
                       >
-                        {soilsOpts.map(t => (
+                        {rowOpts.map(t => (
                           <option key={t.label} value={t.label}>
                             {t.label}
                           </option>
@@ -1139,13 +1129,14 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <NumInput value={row.sf} onChange={v => updateSoils(i, 'sf', v)} />
+                      <NumInput value={row.sf} onChange={v => updateSoils(i, 'sf', v)} className="w-16" />
                     </td>
                     <td className="py-1 pr-1">
                       <NumInput
                         value={row.depthIn}
                         onChange={v => updateSoils(i, 'depthIn', v)}
                         placeholder="2"
+                        className="w-20"
                       />
                     </td>
                     <td className="py-1 pr-1">
@@ -1187,7 +1178,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             onClick={() =>
               setSoilsRows(r => [
                 ...r,
-                { type: soilsOpts[0]?.label ?? 'Topsoil (Sandy Loam)', sf: '', depthIn: '2' },
+                { type: SOIL_TYPES[0]?.label ?? 'Topsoil (Sandy Loam)', sf: '', depthIn: '2', vendor: 'House' },
               ])
             }
           >
@@ -1200,7 +1191,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       <div>
         <SectionHeader title="Sod" />
         <div className="mb-2">
-          <VendorPicker vendors={vendors} value={sodVendor} onChange={changeSodVendor} label="Sod Vendor" />
+          <VendorPicker vendors={vendorsForCategory('Sod')} value={sodVendor} onChange={changeSodVendor} label="Sod Vendor" />
         </div>
         <div className="space-y-0">
           <LabeledRow
@@ -1345,13 +1336,14 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       {/* ── Mulch ── */}
       <div>
         <SectionHeader title="Mulch" />
-        <div className="mb-2">
-          <VendorPicker vendors={vendors} value={mulchVendor} onChange={changeMulchVendor} />
-        </div>
         <p className="text-xs text-gray-400 mb-2 inline-flex items-center flex-wrap gap-x-2">
           <span className="inline-flex items-center gap-1">
             {(() => {
-              const mt = resolveType(mulchRows[0]?.type, mulchOpts, MULCH_TYPES)
+              const mt = resolveType(
+                mulchRows[0]?.type,
+                sectionOptions('Mulch', mulchRows[0]?.vendor, MULCH_TYPES),
+                MULCH_TYPES
+              )
               return (
                 <>
                   Type ${p(mt.dbName, mt.fallback).toFixed(2)}/CY
@@ -1419,6 +1411,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-1 font-medium">Vendor</th>
                 <th className="text-left pb-1 pr-1 font-medium">Type</th>
                 <th className="text-left pb-1 pr-1 font-medium">Area (SF)</th>
                 <th className="text-left pb-1 pr-1 font-medium">Depth (in)</th>
@@ -1427,15 +1420,30 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             </thead>
             <tbody>
               {mulchRows.map((row, i) => {
+                const rowOpts = sectionOptions('Mulch', row.vendor, MULCH_TYPES)
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.type || mulchOpts[0]?.label}
+                        value={row.vendor || 'House'}
+                        onChange={e => changeRowVendor('Mulch', MULCH_TYPES, updateMulch, i, e.target.value)}
+                      >
+                        <option value="House">House</option>
+                        {vendorsForCategory('Mulch').map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.type || rowOpts[0]?.label}
                         onChange={e => updateMulch(i, 'type', e.target.value)}
                       >
-                        {mulchOpts.map(t => (
+                        {rowOpts.map(t => (
                           <option key={t.label} value={t.label}>
                             {t.label}
                           </option>
@@ -1443,11 +1451,11 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <NumInput value={row.sf} onChange={v => updateMulch(i, 'sf', v)} />
+                      <NumInput value={row.sf} onChange={v => updateMulch(i, 'sf', v)} className="w-16" />
                     </td>
                     <td className="py-1 pr-1">
                       <select
-                        className="input text-sm py-1.5"
+                        className="input text-sm py-1.5 w-20"
                         value={row.depth}
                         onChange={e => updateMulch(i, 'depth', e.target.value)}
                       >
@@ -1490,7 +1498,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             onClick={() =>
               setMulchRows(r => [
                 ...r,
-                { type: mulchOpts[0]?.label ?? 'Premium Mulch', sf: '', depth: '2', weedFabric: 'No' },
+                { type: MULCH_TYPES[0]?.label ?? 'Premium Mulch', sf: '', depth: '2', weedFabric: 'No', vendor: 'House' },
               ])
             }
             className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
@@ -1503,13 +1511,14 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       {/* ── Decomposed Granite ── */}
       <div>
         <SectionHeader title="Decomposed Granite (D.G.)" />
-        <div className="mb-2">
-          <VendorPicker vendors={vendors} value={dgVendor} onChange={changeDgVendor} />
-        </div>
         <p className="text-xs text-gray-400 mb-2 inline-flex items-center flex-wrap gap-x-2">
           <span className="inline-flex items-center gap-1">
             {(() => {
-              const dt = resolveType(dgRows[0]?.type, dgOpts, DG_TYPES)
+              const dt = resolveType(
+                dgRows[0]?.type,
+                sectionOptions('DG', dgRows[0]?.vendor, DG_TYPES),
+                DG_TYPES
+              )
               return (
                 <>
                   Type ${p(dt.dbName, dt.fallback).toFixed(2)}/ton
@@ -1590,6 +1599,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-1 font-medium">Vendor</th>
                 <th className="text-left pb-1 pr-1 font-medium">Type</th>
                 <th className="text-left pb-1 pr-1 font-medium">Area (SF)</th>
                 <th className="text-left pb-1 pr-1 font-medium">Depth (in)</th>
@@ -1600,15 +1610,30 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             </thead>
             <tbody>
               {dgRows.map((row, i) => {
+                const rowOpts = sectionOptions('DG', row.vendor, DG_TYPES)
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.type || dgOpts[0]?.label}
+                        value={row.vendor || 'House'}
+                        onChange={e => changeRowVendor('DG', DG_TYPES, updateDg, i, e.target.value)}
+                      >
+                        <option value="House">House</option>
+                        {vendorsForCategory('DG').map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.type || rowOpts[0]?.label}
                         onChange={e => updateDg(i, 'type', e.target.value)}
                       >
-                        {dgOpts.map(t => (
+                        {rowOpts.map(t => (
                           <option key={t.label} value={t.label}>
                             {t.label}
                           </option>
@@ -1616,13 +1641,14 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <NumInput value={row.sf} onChange={v => updateDg(i, 'sf', v)} />
+                      <NumInput value={row.sf} onChange={v => updateDg(i, 'sf', v)} className="w-16" />
                     </td>
                     <td className="py-1 pr-1">
                       <NumInput
                         value={row.depth}
                         onChange={v => updateDg(i, 'depth', v)}
                         placeholder="3.5"
+                        className="w-20"
                       />
                     </td>
                     <td className="py-1 pr-1">
@@ -1680,12 +1706,13 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               setDgRows(r => [
                 ...r,
                 {
-                  type: dgOpts[0]?.label ?? 'Decomposed Granite',
+                  type: DG_TYPES[0]?.label ?? 'Decomposed Granite',
                   sf: '',
                   depth: '3.5',
                   weedFabric: 'No',
                   method: 'Machine',
                   cement: 'No',
+                  vendor: 'House',
                 },
               ])
             }
@@ -1709,9 +1736,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       {/* ── Gravel ── */}
       <div>
         <SectionHeader title="Gravel" />
-        <div className="mb-2">
-          <VendorPicker vendors={vendors} value={gravelVendor} onChange={changeGravelVendor} />
-        </div>
         <p className="text-xs text-gray-400 mb-2 inline-flex items-center flex-wrap gap-x-2">
           <span className="inline-flex items-center gap-1">
             Fabric ${p(GT_RATES.gravelFabricMat.dbName, 0.1).toFixed(2)}/SF mat
@@ -1765,6 +1789,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-1 font-medium">Vendor</th>
                 <th className="text-left pb-1 pr-1 font-medium">Type</th>
                 <th className="text-left pb-1 pr-1 font-medium">SF</th>
                 <th className="text-left pb-1 pr-1 font-medium">Method</th>
@@ -1774,17 +1799,32 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             </thead>
             <tbody>
               {gravelRows.map((row, i) => {
-                const gtype = resolveType(row.type, gravelOpts, GRAVEL_TYPES)
+                const rowOpts = sectionOptions('Gravel', row.vendor, GRAVEL_TYPES)
+                const gtype = resolveType(row.type, rowOpts, GRAVEL_TYPES)
                 const typeCost = p(gtype.dbName, gtype.fallback)
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.type || gravelOpts[0]?.label}
+                        value={row.vendor || 'House'}
+                        onChange={e => changeRowVendor('Gravel', GRAVEL_TYPES, updateGravel, i, e.target.value)}
+                      >
+                        <option value="House">House</option>
+                        {vendorsForCategory('Gravel').map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.type || rowOpts[0]?.label}
                         onChange={e => updateGravel(i, 'type', e.target.value)}
                       >
-                        {gravelOpts.map(t => (
+                        {rowOpts.map(t => (
                           <option key={t.label} value={t.label}>
                             {t.label}
                           </option>
@@ -1792,7 +1832,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <NumInput value={row.sf} onChange={v => updateGravel(i, 'sf', v)} />
+                      <NumInput value={row.sf} onChange={v => updateGravel(i, 'sf', v)} className="w-16" />
                     </td>
                     <td className="py-1 pr-1">
                       <select
@@ -1823,6 +1863,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                           value={row.depthIn}
                           onChange={v => updateGravel(i, 'depthIn', v)}
                           placeholder="3"
+                          className="w-20"
                         />
                         {gravelRows.length > 1 && (
                           <button
@@ -1847,7 +1888,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             onClick={() =>
               setGravelRows(r => [
                 ...r,
-                { sf: '', method: 'Hand', type: gravelOpts[0]?.label ?? 'Crushed Pea Gravel', depthIn: '3' },
+                { sf: '', method: 'Hand', type: GRAVEL_TYPES[0]?.label ?? 'Crushed Pea Gravel', depthIn: '3', vendor: 'House' },
               ])
             }
           >
@@ -1859,7 +1900,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               {gravelRows.map((row, i) => {
                 if (!n(row.sf)) return null
                 const CY = (n(row.sf) * (n(row.depthIn) / 12)) / 27
-                const gtype = resolveType(row.type, gravelOpts, GRAVEL_TYPES)
+                const gtype = resolveType(row.type, sectionOptions('Gravel', row.vendor, GRAVEL_TYPES), GRAVEL_TYPES)
                 const mat =
                   CY * p(gtype.dbName, gtype.fallback) +
                   n(row.sf) * p(GT_RATES.gravelFabricMat.dbName, 0.1)
@@ -1877,9 +1918,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       {/* ── Pebble ── */}
       <div>
         <SectionHeader title="Pebble" />
-        <div className="mb-2">
-          <VendorPicker vendors={vendors} value={pebbleVendor} onChange={changePebbleVendor} />
-        </div>
         <p className="text-xs text-gray-400 mb-2 inline-flex items-center flex-wrap gap-x-2">
           <span className="inline-flex items-center gap-1">
             Fabric ${p(GT_RATES.gravelFabricMat.dbName, 0.1).toFixed(2)}/SF mat
@@ -1933,6 +1971,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-1 font-medium">Vendor</th>
                 <th className="text-left pb-1 pr-1 font-medium">Type</th>
                 <th className="text-left pb-1 pr-1 font-medium">SF</th>
                 <th className="text-left pb-1 pr-1 font-medium">Method</th>
@@ -1942,17 +1981,32 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             </thead>
             <tbody>
               {pebbleRows.map((row, i) => {
-                const ptype = resolveType(row.type, pebbleOpts, PEBBLE_TYPES)
+                const rowOpts = sectionOptions('Pebble', row.vendor, PEBBLE_TYPES)
+                const ptype = resolveType(row.type, rowOpts, PEBBLE_TYPES)
                 const typeCost = p(ptype.dbName, ptype.fallback)
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.type || pebbleOpts[0]?.label}
+                        value={row.vendor || 'House'}
+                        onChange={e => changeRowVendor('Pebble', PEBBLE_TYPES, updatePebble, i, e.target.value)}
+                      >
+                        <option value="House">House</option>
+                        {vendorsForCategory('Pebble').map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.type || rowOpts[0]?.label}
                         onChange={e => updatePebble(i, 'type', e.target.value)}
                       >
-                        {pebbleOpts.map(t => (
+                        {rowOpts.map(t => (
                           <option key={t.label} value={t.label}>
                             {t.label}
                           </option>
@@ -1960,7 +2014,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <NumInput value={row.sf} onChange={v => updatePebble(i, 'sf', v)} />
+                      <NumInput value={row.sf} onChange={v => updatePebble(i, 'sf', v)} className="w-16" />
                     </td>
                     <td className="py-1 pr-1">
                       <select
@@ -1990,6 +2044,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         value={row.depthIn}
                         onChange={v => updatePebble(i, 'depthIn', v)}
                         placeholder="3"
+                        className="w-20"
                       />
                     </td>
                   </tr>
@@ -2003,7 +2058,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             onClick={() =>
               setPebbleRows(r => [
                 ...r,
-                { sf: '', method: 'Hand', type: pebbleOpts[0]?.label ?? 'Arizona River Rock', depthIn: '3' },
+                { sf: '', method: 'Hand', type: PEBBLE_TYPES[0]?.label ?? 'Arizona River Rock', depthIn: '3', vendor: 'House' },
               ])
             }
           >
@@ -2015,7 +2070,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               {pebbleRows.map((row, i) => {
                 if (!n(row.sf)) return null
                 const CY = (n(row.sf) * (n(row.depthIn) / 12)) / 27
-                const ptype = resolveType(row.type, pebbleOpts, PEBBLE_TYPES)
+                const ptype = resolveType(row.type, sectionOptions('Pebble', row.vendor, PEBBLE_TYPES), PEBBLE_TYPES)
                 const mat =
                   CY * p(ptype.dbName, ptype.fallback) +
                   n(row.sf) * p(GT_RATES.gravelFabricMat.dbName, 0.1)
@@ -2033,9 +2088,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       {/* ── Cobbles & Boulders ── */}
       <div>
         <SectionHeader title="Cobbles & Boulders" />
-        <div className="mb-2">
-          <VendorPicker vendors={vendors} value={cobbleVendor} onChange={changeCobbleVendor} />
-        </div>
         <p className="text-xs text-gray-400 mb-2 inline-flex items-center flex-wrap gap-x-2">
           <span className="inline-flex items-center gap-1">
             Fabric ${p(GT_RATES.gravelFabricMat.dbName, 0.1).toFixed(2)}/SF mat
@@ -2089,6 +2141,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-1 font-medium">Vendor</th>
                 <th className="text-left pb-1 pr-1 font-medium">Type</th>
                 <th className="text-left pb-1 pr-1 font-medium">SF</th>
                 <th className="text-left pb-1 pr-1 font-medium">Method</th>
@@ -2098,17 +2151,32 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             </thead>
             <tbody>
               {cobbleRows.map((row, i) => {
-                const ctype = resolveType(row.type, cobbleOpts, COBBLE_TYPES)
+                const rowOpts = sectionOptions('Cobbles', row.vendor, COBBLE_TYPES)
+                const ctype = resolveType(row.type, rowOpts, COBBLE_TYPES)
                 const typeCost = p(ctype.dbName, ctype.fallback)
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.type || cobbleOpts[0]?.label}
+                        value={row.vendor || 'House'}
+                        onChange={e => changeRowVendor('Cobbles', COBBLE_TYPES, updateCobble, i, e.target.value)}
+                      >
+                        <option value="House">House</option>
+                        {vendorsForCategory('Cobbles').map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.type || rowOpts[0]?.label}
                         onChange={e => updateCobble(i, 'type', e.target.value)}
                       >
-                        {cobbleOpts.map(t => (
+                        {rowOpts.map(t => (
                           <option key={t.label} value={t.label}>
                             {t.label}
                           </option>
@@ -2116,7 +2184,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <NumInput value={row.sf} onChange={v => updateCobble(i, 'sf', v)} />
+                      <NumInput value={row.sf} onChange={v => updateCobble(i, 'sf', v)} className="w-16" />
                     </td>
                     <td className="py-1 pr-1">
                       <select
@@ -2146,6 +2214,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         value={row.depthIn}
                         onChange={v => updateCobble(i, 'depthIn', v)}
                         placeholder="3"
+                        className="w-20"
                       />
                     </td>
                   </tr>
@@ -2159,7 +2228,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             onClick={() =>
               setCobbleRows(r => [
                 ...r,
-                { sf: '', method: 'Hand', type: cobbleOpts[0]?.label ?? 'Granite River Rock', depthIn: '3' },
+                { sf: '', method: 'Hand', type: COBBLE_TYPES[0]?.label ?? 'Granite River Rock', depthIn: '3', vendor: 'House' },
               ])
             }
           >
@@ -2171,7 +2240,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               {cobbleRows.map((row, i) => {
                 if (!n(row.sf)) return null
                 const CY = (n(row.sf) * (n(row.depthIn) / 12)) / 27
-                const ctype = resolveType(row.type, cobbleOpts, COBBLE_TYPES)
+                const ctype = resolveType(row.type, sectionOptions('Cobbles', row.vendor, COBBLE_TYPES), COBBLE_TYPES)
                 const mat =
                   CY * p(ctype.dbName, ctype.fallback) +
                   n(row.sf) * p(GT_RATES.gravelFabricMat.dbName, 0.1)

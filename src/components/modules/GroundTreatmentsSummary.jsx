@@ -234,6 +234,22 @@ export default function GroundTreatmentsSummary({ module }) {
     return defaultVal
   }
 
+  // Vendor-aware, per-row price. Vendor is now stored PER ROW (row.vendor). For a
+  // vendor row, price by the reconstructed full material name ("<Subcat> - <label>")
+  // read from the saved materialPrices snapshot, since materialRows aren't
+  // snapshotted; if that (and the raw label) miss, fall back to the House
+  // resolution. Rows without a vendor (old saves) resolve exactly as before.
+  const priceForRow = (subcat, row, houseArray, defaultVal) => {
+    const type = row?.type
+    const vendor = row?.vendor
+    if (vendor && vendor !== 'House') {
+      if (type != null && materialPrices[`${subcat} - ${type}`] != null)
+        return materialPrices[`${subcat} - ${type}`]
+      if (type != null && materialPrices[type] != null) return materialPrices[type]
+    }
+    return priceForType(subcat, type, houseArray, defaultVal)
+  }
+
   // ── Soil Prep ────────────────────────────────────────────────────────────────
   let soilPrepLine = null
   if (n(soilPrepSF) > 0) {
@@ -261,7 +277,7 @@ export default function GroundTreatmentsSummary({ module }) {
   // ── Sod ──────────────────────────────────────────────────────────────────────
   let sodLine = null
   if (n(sodSF) > 0) {
-    const rate = priceForType('Sod', sodType, SOD_TYPES, SOD_TYPES[0].fallback)
+    const rate = priceForRow('Sod', { type: sodType, vendor: data.sodVendor }, SOD_TYPES, SOD_TYPES[0].fallback)
     const mat = n(sodSF) * rate
     const hrs = n(sodSF) * mp(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback)
     sodLine = {
@@ -305,7 +321,7 @@ export default function GroundTreatmentsSummary({ module }) {
       if (!(n(r.sf) > 0)) return null
       const CY = (n(r.sf) * (n(r.depth) / 12)) / 27
       const fabric = r.weedFabric === 'Yes'
-      let mat = CY * priceForType('Mulch', r.type, MULCH_TYPES, MULCH_TYPES[0].fallback)
+      let mat = CY * priceForRow('Mulch', r, MULCH_TYPES, MULCH_TYPES[0].fallback)
       if (!_mulchDeliveryDone) {
         mat += mp(GT_RATES.mulchDelivery.dbName, GT_RATES.mulchDelivery.fallback)
         _mulchDeliveryDone = true
@@ -350,7 +366,7 @@ export default function GroundTreatmentsSummary({ module }) {
       const tons = (n(r.sf) * n(r.depth)) / 200
       const cement = r.cement === 'Yes'
       const fabric = r.weedFabric === 'Yes'
-      const perTon = priceForType('DG', r.type, DG_TYPES, DG_TYPES[0].fallback)
+      const perTon = priceForRow('DG', r, DG_TYPES, DG_TYPES[0].fallback)
       const matBase =
         tons * perTon +
         (cement ? tons * mp(GT_RATES.dgCementPerTon.dbName, GT_RATES.dgCementPerTon.fallback) : 0)
@@ -380,7 +396,7 @@ export default function GroundTreatmentsSummary({ module }) {
       const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
       // New modules store row.type (drives $/CY via material_rates); legacy
       // modules store a manual row.costPerCY — fall back to that.
-      const costPerCY = priceForType('Gravel', r.type, GRAVEL_TYPES, n(r.costPerCY) || 130)
+      const costPerCY = priceForRow('Gravel', r, GRAVEL_TYPES, n(r.costPerCY) || 130)
       const mat =
         CY * costPerCY +
         n(r.sf) * mp(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)
@@ -405,7 +421,7 @@ export default function GroundTreatmentsSummary({ module }) {
     .map((r, i) => {
       if (!n(r.sf)) return null
       const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
-      const rate = priceForType('Soils', r.type, SOIL_TYPES, SOIL_TYPES[0].fallback)
+      const rate = priceForRow('Soils', r, SOIL_TYPES, SOIL_TYPES[0].fallback)
       return {
         key: i,
         label: `${r.type || 'Soil'} — ${n(r.sf).toLocaleString()} SF × ${n(r.depthIn)}"`,
@@ -420,9 +436,9 @@ export default function GroundTreatmentsSummary({ module }) {
     .map((r, i) => {
       if (!n(r.sf)) return null
       const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
-      const costPerCY = priceForType(
+      const costPerCY = priceForRow(
         'Pebble',
-        r.type,
+        r,
         PEBBLE_TYPES,
         n(r.costPerCY) || PEBBLE_TYPES[0].fallback
       )
@@ -450,9 +466,9 @@ export default function GroundTreatmentsSummary({ module }) {
     .map((r, i) => {
       if (!n(r.sf)) return null
       const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
-      const costPerCY = priceForType(
+      const costPerCY = priceForRow(
         'Cobbles',
-        r.type,
+        r,
         COBBLE_TYPES,
         n(r.costPerCY) || COBBLE_TYPES[0].fallback
       )
