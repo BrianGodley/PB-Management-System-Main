@@ -139,6 +139,9 @@ const FERTILIZER_TYPES = [
   { label: 'Marathon All Season (24-2-4)', dbName: 'Fertilizer - Marathon All Season', fallback: 20.84 },
   { label: 'Sod & Seed Starter (15-15-15)', dbName: 'Fertilizer - Sod Seed Starter', fallback: 20.87 },
 ]
+const SOIL_PREP_TYPES = [
+  { label: 'Soil Prep', dbName: GT_RATES.soilPrepMat.dbName, fallback: GT_RATES.soilPrepMat.fallback },
+]
 
 // Soil products — mirror of the module ($/CY).
 const SOIL_TYPES = [
@@ -202,9 +205,11 @@ export default function GroundTreatmentsSummary({ module }) {
     metalEdgingLF = 0,
     soilPrepSF = 0,
     sodSoilPrepSF = 0,
+    sodSoilPrepType = 'Soil Prep',
     sodSF = 0,
     sodType = 'Marathon',
     sodFertilizer = 'None',
+    sodFertilizerSF = 0,
     flagstoneSF = 0,
     flagstoneRate,
     precastSF = 0,
@@ -278,7 +283,13 @@ export default function GroundTreatmentsSummary({ module }) {
   // ── Sod bed soil prep (same rates, entered in the Sod section) ─────────────────
   let sodSoilPrepLine = null
   if (n(sodSoilPrepSF) > 0) {
-    const mat = n(sodSoilPrepSF) * mp(GT_RATES.soilPrepMat.dbName, GT_RATES.soilPrepMat.fallback)
+    const rate = priceForRow(
+      'Soil Prep',
+      { type: sodSoilPrepType, vendor: data.sodSoilPrepVendor },
+      SOIL_PREP_TYPES,
+      GT_RATES.soilPrepMat.fallback
+    )
+    const mat = n(sodSoilPrepSF) * rate
     const hrs = n(sodSoilPrepSF) * mp(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
     sodSoilPrepLine = {
       label: `Soil Prep — ${n(sodSoilPrepSF).toLocaleString()} SF`,
@@ -304,9 +315,10 @@ export default function GroundTreatmentsSummary({ module }) {
   let fertLine = null
   {
     const ft = FERTILIZER_TYPES.find(t => t.label === sodFertilizer)
-    if (ft && ft.dbName && n(sodSF) > 0) {
+    const fertSF = n(sodFertilizerSF) || n(sodSF)
+    if (ft && ft.dbName && fertSF > 0) {
       const sfPerBag = mp(GT_RATES.fertilizerSFPerBag.dbName, GT_RATES.fertilizerSFPerBag.fallback)
-      const bags = sfPerBag > 0 ? Math.ceil(n(sodSF) / sfPerBag) : 0
+      const bags = sfPerBag > 0 ? Math.ceil(fertSF / sfPerBag) : 0
       const mat = bags * mp(ft.dbName, ft.fallback)
       if (bags > 0)
         fertLine = {

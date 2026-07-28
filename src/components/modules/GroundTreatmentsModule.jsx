@@ -173,6 +173,12 @@ const SOD_TYPES = [
   { label: 'St. Augustine', dbName: 'Sod - St. Augustine', fallback: 1.73 },
 ]
 
+// Soil-prep bed material — single House type; vendors may supply a 'Soil Prep'
+// category so the Sod section's Soil Prep line matches the Vendor|Type format.
+const SOIL_PREP_TYPES = [
+  { label: 'Soil Prep', dbName: GT_RATES.soilPrepMat.dbName, fallback: GT_RATES.soilPrepMat.fallback },
+]
+
 // Fertilizer options — Southland Sod Farms, $/18-lb bag (material_rates). Bags are
 // auto-figured from the sod SF via the SF-per-bag coverage coefficient.
 const FERTILIZER_TYPES = [
@@ -259,10 +265,13 @@ function calcGroundTreatments(
     metalEdgingLF,
     soilPrepSF,
     sodSoilPrepSF,
+    sodSoilPrepVendor,
+    sodSoilPrepType,
     sodSF,
     sodType,
     sodFertilizer,
     sodFertilizerVendor,
+    sodFertilizerSF,
     flagstoneSoilSF,
     flagstoneConcreteSF,
     precastSoilSF,
@@ -336,8 +345,12 @@ function calcGroundTreatments(
   // Sod bed prep — same rates as Planting Bed Prep, entered in the Sod section.
   const sodSoilLab =
     n(sodSoilPrepSF) * p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
-  const sodSoilMat =
-    n(sodSoilPrepSF) * p(GT_RATES.soilPrepMat.dbName, GT_RATES.soilPrepMat.fallback)
+  const sodSoilT = rowOpt(
+    'Soil Prep',
+    { vendor: sodSoilPrepVendor, type: sodSoilPrepType },
+    SOIL_PREP_TYPES
+  )
+  const sodSoilMat = n(sodSoilPrepSF) * p(sodSoilT.dbName, sodSoilT.fallback)
 
   // ── Sod ────────────────────────────────────────────────────────────────────
   const sodLab = n(sodSF) * p(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback)
@@ -354,9 +367,10 @@ function calcGroundTreatments(
     _fertV && _fertV !== 'House'
       ? rowOpt('Fertilizer', { vendor: _fertV, type: sodFertilizer }, FERTILIZER_TYPES)
       : FERTILIZER_TYPES.find(t => t.label === sodFertilizer)
-  if (fertT && fertT.dbName && n(sodSF) > 0) {
+  const _fertSF = n(sodFertilizerSF) || n(sodSF)
+  if (fertT && fertT.dbName && _fertSF > 0) {
     const sfPerBag = p(GT_RATES.fertilizerSFPerBag.dbName, GT_RATES.fertilizerSFPerBag.fallback)
-    const bags = sfPerBag > 0 ? Math.ceil(n(sodSF) / sfPerBag) : 0
+    const bags = sfPerBag > 0 ? Math.ceil(_fertSF / sfPerBag) : 0
     fertMat = bags * p(fertT.dbName, fertT.fallback)
   }
 
@@ -809,6 +823,13 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   const [metalEdgingLF, setMetalEdgingLF] = useState(initialData?.metalEdgingLF ?? '')
   const [soilPrepSF, setSoilPrepSF] = useState(initialData?.soilPrepSF ?? '')
   const [sodSoilPrepSF, setSodSoilPrepSF] = useState(initialData?.sodSoilPrepSF ?? '')
+  const [sodSoilPrepVendor, setSodSoilPrepVendor] = useState(
+    initialData?.sodSoilPrepVendor ?? 'House'
+  )
+  const [sodSoilPrepType, setSodSoilPrepType] = useState(
+    initialData?.sodSoilPrepType ?? 'Soil Prep'
+  )
+  const [sodFertilizerSF, setSodFertilizerSF] = useState(initialData?.sodFertilizerSF ?? '')
   const [sodSF, setSodSF] = useState(initialData?.sodSF ?? '')
   const [sodType, setSodType] = useState(initialData?.sodType ?? 'Marathon')
   const [sodFertilizer, setSodFertilizer] = useState(initialData?.sodFertilizer ?? 'None')
@@ -898,10 +919,13 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     metalEdgingLF,
     soilPrepSF,
     sodSoilPrepSF,
+    sodSoilPrepVendor,
+    sodSoilPrepType,
     sodSF,
     sodType,
     sodFertilizer,
     sodFertilizerVendor,
+    sodFertilizerSF,
     flagstoneSoilSF,
     flagstoneConcreteSF,
     precastSoilSF,
@@ -962,6 +986,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     setDgRows(rows => mig('DG', rows))
     setSodVendor(v => (v === 'House' ? defaultVendorFor('Sod') : v))
     setSodFertilizerVendor(v => (v === 'House' ? defaultVendorFor('Fertilizer') : v))
+    setSodSoilPrepVendor(v => (v === 'House' ? defaultVendorFor('Soil Prep') : v))
     setStepperVendor(sv => {
       const d = defaultVendorFor('Steppers')
       const nv = { ...sv }
@@ -982,6 +1007,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   }, [vendors, initialData, vendorDefaultsApplied])
 
   const sodOpts = sectionOptions('Sod', sodVendor, SOD_TYPES)
+  const soilPrepOpts = sectionOptions('Soil Prep', sodSoilPrepVendor, SOIL_PREP_TYPES)
 
   const calcRaw = calcGroundTreatments(
     state,
@@ -1295,30 +1321,60 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       <div>
         <SectionHeader title="Sod" />
         <div className="space-y-0">
-          <LabeledRow
-            label="Soil Prep"
-            note={
-              n(sodSoilPrepSF) > 0
-                ? `$${(n(sodSoilPrepSF) * p(GT_RATES.soilPrepMat.dbName, 0.1558)).toFixed(2)} mat`
-                : null
-            }
-          >
+          <LabeledRow label="Soil Prep">
+            <select
+              className="input text-sm py-1.5 w-32"
+              value={sodSoilPrepVendor}
+              onChange={e => {
+                const v = e.target.value
+                setSodSoilPrepVendor(v)
+                const opts = sectionOptions('Soil Prep', v, SOIL_PREP_TYPES)
+                if (!opts.some(o => o.label === sodSoilPrepType))
+                  setSodSoilPrepType(opts[0]?.label)
+              }}
+              title="Vendor"
+            >
+              <option value="House">House</option>
+              {vendorsForCategory('Soil Prep').map(v => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
+            <select
+              className="input text-sm py-1.5 flex-1"
+              value={sodSoilPrepType}
+              onChange={e => setSodSoilPrepType(e.target.value)}
+            >
+              {soilPrepOpts.map(t => (
+                <option key={t.label} value={t.label}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
             <NumInput
               value={sodSoilPrepSF}
               onChange={setSodSoilPrepSF}
               placeholder="SF"
-              className="w-28"
+              className="w-24"
             />
             <span className="text-xs text-gray-400 inline-flex items-center gap-1">
-              ${p(GT_RATES.soilPrepMat.dbName, 0.1558).toFixed(2)}/SF
-              <RateEditPopover
-                table="material_rates"
-                name={GT_RATES.soilPrepMat.dbName}
-                category="Ground Treatments"
-                unitLabel="SF"
-                currentValue={p(GT_RATES.soilPrepMat.dbName, GT_RATES.soilPrepMat.fallback)}
-                onSaved={refreshAllRates}
-              />
+              {(() => {
+                const st = resolveType(sodSoilPrepType, soilPrepOpts, SOIL_PREP_TYPES)
+                return (
+                  <>
+                    ${p(st.dbName, st.fallback).toFixed(4)}/SF
+                    <RateEditPopover
+                      table="material_rates"
+                      name={st.dbName}
+                      category="Ground Treatments"
+                      unitLabel="SF"
+                      currentValue={p(st.dbName, st.fallback)}
+                      onSaved={refreshAllRates}
+                    />
+                  </>
+                )
+              })()}
               <RateEditPopover
                 table="labor_rates"
                 name={GT_RATES.soilPrepLab.dbName}
@@ -1329,6 +1385,16 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 onSaved={refreshAllRates}
               />
             </span>
+            {n(sodSoilPrepSF) > 0 && (
+              <span className="text-xs text-gray-400">
+                $
+                {(() => {
+                  const st = resolveType(sodSoilPrepType, soilPrepOpts, SOIL_PREP_TYPES)
+                  return (n(sodSoilPrepSF) * p(st.dbName, st.fallback)).toFixed(2)
+                })()}{' '}
+                mat
+              </span>
+            )}
           </LabeledRow>
           <LabeledRow label="Sod">
             <select
@@ -1344,7 +1410,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 </option>
               ))}
             </select>
-            <NumInput value={sodSF} onChange={setSodSF} placeholder="SF" className="w-24" />
             <select
               className="input text-sm py-1.5 flex-1"
               value={sodType}
@@ -1356,6 +1421,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 </option>
               ))}
             </select>
+            <NumInput value={sodSF} onChange={setSodSF} placeholder="SF" className="w-24" />
             <span className="text-xs text-gray-400 inline-flex items-center gap-1">
               {(() => {
                 const st = resolveType(sodType, sodOpts, SOD_TYPES)
@@ -1430,6 +1496,12 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 </option>
               ))}
             </select>
+            <NumInput
+              value={sodFertilizerSF}
+              onChange={setSodFertilizerSF}
+              placeholder="SF"
+              className="w-24"
+            />
             {(() => {
               const ft =
                 sodFertilizerVendor === 'House'
@@ -1444,7 +1516,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 GT_RATES.fertilizerSFPerBag.dbName,
                 GT_RATES.fertilizerSFPerBag.fallback
               )
-              const bags = sfPerBag > 0 && n(sodSF) > 0 ? Math.ceil(n(sodSF) / sfPerBag) : 0
+              const fertSF = n(sodFertilizerSF) || n(sodSF)
+              const bags = sfPerBag > 0 && fertSF > 0 ? Math.ceil(fertSF / sfPerBag) : 0
               return (
                 <span className="text-xs text-gray-400 inline-flex items-center gap-1 flex-wrap">
                   ${p(ft.dbName, ft.fallback).toFixed(2)}/bag
