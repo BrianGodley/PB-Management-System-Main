@@ -106,7 +106,7 @@ const PREVIEW_ICONS = {
   '/': '🏠', '/org-chart': '🏢', '/hr': '👥', '/training': '🎓',
   '/contacts': '📇', '/clients': '💡', '/edocuments': '📄', '/accounting': '🧮',
   '/collections': '💰', '/design': '📐', '/bids': '📋', '/jobs': '🏡',
-  '/equipment-tracking': '🚜', '/portal/subs': '🧑‍🔧', '/statistics': '📈',
+  '/equipment-tracking': '🚜', '/portal/subs': '🧑‍🔧', '/portal/vendors': '🛒', '/statistics': '📈',
 }
 const PREVIEW_ITEMS = MENU_ITEMS.map(i => ({ ...i, icon: PREVIEW_ICONS[i.path] || '•' }))
 

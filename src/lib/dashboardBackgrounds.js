@@ -75,7 +75,8 @@ export const CUSTOMIZE_MODULES = [
   { key: '/equipment-tracking', label: 'Equipment' },
   { key: '/statistics', label: 'Statistics' },
   { key: '/x/formulas', label: 'Formulas' },
-  { key: '/portal/subs', label: 'Subs & Vendors' },
+  { key: '/portal/subs', label: 'Subcontractors' },
+  { key: '/portal/vendors', label: 'Vendors' },
   { key: '/customize', label: 'Customize' },
   { key: '/admin', label: 'Admin' },
   { key: '/help', label: 'Help Desk' },
@@ -128,7 +129,8 @@ export const MENU_ITEMS = [
   { path: '/jobs', label: 'Jobs' },
   { path: '/equipment-tracking', label: 'Equipment' },
   { path: '/x/formulas', label: 'Formulas' },
-  { path: '/portal/subs', label: 'Subs & Vendors' },
+  { path: '/portal/subs', label: 'Subcontractors' },
+  { path: '/portal/vendors', label: 'Vendors' },
   { path: '/statistics', label: 'Statistics' },
 ]
 
