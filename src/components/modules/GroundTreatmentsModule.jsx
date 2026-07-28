@@ -979,22 +979,26 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     // guarding on `initialData` alone would wrongly suppress the defaults.
     if (vendorDefaultsApplied || initialData?.materialPrices || !vendors.length) return
     setVendorDefaultsApplied(true)
+    // A field/row that hasn't been explicitly set yet — the 'auto' sentinel that
+    // default rows ship with, a leftover 'House', or an empty value. Only these
+    // get pushed to the category's first real vendor; an explicit user pick stays.
+    const needsDefault = v => !v || v === 'House' || v === 'auto'
     const mig = (cat, rows) =>
-      (rows || []).map(r => (r.vendor === 'House' || !r.vendor ? { ...r, vendor: defaultVendorFor(cat) } : r))
+      (rows || []).map(r => (needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor(cat) } : r))
     setGravelRows(rows => mig('Gravel', rows))
     setPebbleRows(rows => mig('Pebble', rows))
     setCobbleRows(rows => mig('Cobbles', rows))
     setSoilsRows(rows => mig('Soils', rows))
     setMulchRows(rows => mig('Mulch', rows))
     setDgRows(rows => mig('DG', rows))
-    setSodVendor(v => (v === 'House' ? defaultVendorFor('Sod') : v))
-    setSodFertilizerVendor(v => (v === 'House' ? defaultVendorFor('Fertilizer') : v))
-    setSodSoilPrepVendor(v => (v === 'House' ? defaultVendorFor('Soil Prep') : v))
+    setSodVendor(v => (needsDefault(v) ? defaultVendorFor('Sod') : v))
+    setSodFertilizerVendor(v => (needsDefault(v) ? defaultVendorFor('Fertilizer') : v))
+    setSodSoilPrepVendor(v => (needsDefault(v) ? defaultVendorFor('Soil Prep') : v))
     setStepperVendor(sv => {
       const d = defaultVendorFor('Steppers')
       const nv = { ...sv }
       Object.keys(nv).forEach(k => {
-        if (nv[k] === 'House') nv[k] = d
+        if (needsDefault(nv[k])) nv[k] = d
       })
       return nv
     })
@@ -1002,7 +1006,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       const d = defaultVendorFor('Edging')
       const nv = { ...ev }
       Object.keys(nv).forEach(k => {
-        if (nv[k] === 'House') nv[k] = d
+        if (needsDefault(nv[k])) nv[k] = d
       })
       return nv
     })
@@ -1311,7 +1315,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             onClick={() =>
               setSoilsRows(r => [
                 ...r,
-                { type: SOIL_TYPES[0]?.label ?? 'Topsoil (Sandy Loam)', sf: '', depthIn: '2', vendor: 'House' },
+                { type: SOIL_TYPES[0]?.label ?? 'Topsoil (Sandy Loam)', sf: '', depthIn: '2', vendor: defaultVendorFor('Soils') },
               ])
             }
           >
@@ -1719,7 +1723,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             onClick={() =>
               setMulchRows(r => [
                 ...r,
-                { type: MULCH_TYPES[0]?.label ?? 'Premium Mulch', sf: '', depth: '2', weedFabric: 'No', vendor: 'House' },
+                { type: MULCH_TYPES[0]?.label ?? 'Premium Mulch', sf: '', depth: '2', weedFabric: 'No', vendor: defaultVendorFor('Mulch') },
               ])
             }
             className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
@@ -1933,7 +1937,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                   weedFabric: 'No',
                   method: 'Machine',
                   cement: 'No',
-                  vendor: 'House',
+                  vendor: defaultVendorFor('DG'),
                 },
               ])
             }
@@ -2109,7 +2113,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             onClick={() =>
               setGravelRows(r => [
                 ...r,
-                { sf: '', method: 'Hand', type: GRAVEL_TYPES[0]?.label ?? 'Crushed Pea Gravel', depthIn: '3', vendor: 'House' },
+                { sf: '', method: 'Hand', type: GRAVEL_TYPES[0]?.label ?? 'Crushed Pea Gravel', depthIn: '3', vendor: defaultVendorFor('Gravel') },
               ])
             }
           >
@@ -2279,7 +2283,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             onClick={() =>
               setPebbleRows(r => [
                 ...r,
-                { sf: '', method: 'Hand', type: PEBBLE_TYPES[0]?.label ?? 'Arizona River Rock', depthIn: '3', vendor: 'House' },
+                { sf: '', method: 'Hand', type: PEBBLE_TYPES[0]?.label ?? 'Arizona River Rock', depthIn: '3', vendor: defaultVendorFor('Pebble') },
               ])
             }
           >
@@ -2449,7 +2453,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             onClick={() =>
               setCobbleRows(r => [
                 ...r,
-                { sf: '', method: 'Hand', type: COBBLE_TYPES[0]?.label ?? 'Granite River Rock', depthIn: '3', vendor: 'House' },
+                { sf: '', method: 'Hand', type: COBBLE_TYPES[0]?.label ?? 'Granite River Rock', depthIn: '3', vendor: defaultVendorFor('Cobbles') },
               ])
             }
           >
