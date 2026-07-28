@@ -1261,7 +1261,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           <div className={!isSub ? 'col-span-2' : undefined}>
             <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap">
               Installation (Sq Ft)
-              {isSub ? (
+              {isSub && (
                 <span className="text-gray-400 inline-flex items-center gap-1">
                   — ${subSlabRate}/SF all-in
                   <RateEditPopover
@@ -1270,18 +1270,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                     category="Concrete"
                     unitLabel="/SF"
                     currentValue={subSlabRate}
-                    onSaved={refreshAllRates}
-                  />
-                </span>
-              ) : (
-                <span className="text-gray-400 inline-flex items-center gap-1">
-                  — ${calc.concretePerCY}/CY
-                  <RateEditPopover
-                    table="material_rates"
-                    name="Concrete - Per CY"
-                    category="Concrete"
-                    unitLabel="CY"
-                    currentValue={calc.concretePerCY}
                     onSaved={refreshAllRates}
                   />
                 </span>
@@ -1301,9 +1289,9 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 <div className="flex items-center gap-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
                   <span className="w-24 shrink-0" />
                   <span className="w-28 shrink-0">Vendor</span>
-                  <span className="flex-1 min-w-0">Type</span>
+                  <span className="w-40 shrink-0">Type</span>
                   <span className="w-16 shrink-0">Sq Ft</span>
-                  <span className="w-14 shrink-0">Depth</span>
+                  <span className="w-16 shrink-0">Depth (In)</span>
                 </div>
                 {INSTALL_TIERS.map(t => {
                   const rate = laborRates[t.rateName] ?? t.def
@@ -1331,7 +1319,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                         <option value="House">House</option>
                       </select>
                       <select
-                        className="input text-xs py-1 flex-1 min-w-0"
+                        className="input text-xs py-1 w-40 shrink-0"
                         value={mt.label}
                         onChange={e =>
                           setInstallTierType({ ...installTierType, [t.key]: e.target.value })
@@ -1351,7 +1339,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                           placeholder="0"
                         />
                       </div>
-                      <div className="w-14 shrink-0">
+                      <div className="w-16 shrink-0">
                         <NumInput
                           value={installTierDepth[t.key] ?? ''}
                           onChange={v => setInstallTierDepth({ ...installTierDepth, [t.key]: v })}
