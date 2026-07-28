@@ -521,7 +521,7 @@ const DEFAULT_STATE = {
   // Rebar add-on
   rebarSF: '',
   // Misc flat (SF + Depth)
-  miscFlatRows: Array(4)
+  miscFlatRows: Array(3)
     .fill(null)
     .map(() => ({ label: '', sf: '', depth: 4 })),
   // Sub tab: its OWN misc-flat rows (2), independent of In-House.
@@ -529,15 +529,15 @@ const DEFAULT_STATE = {
     .fill(null)
     .map(() => ({ label: '', sf: '', depth: 4 })),
   // Misc vertical (LF × Height × Width)
-  miscVertRows: Array(4)
+  miscVertRows: Array(3)
     .fill(null)
     .map(() => ({ label: '', lf: '', heightIn: '', widthIn: 8 })),
   // Footing (LF × Height × Width)
-  footingRows: Array(4)
+  footingRows: Array(3)
     .fill(null)
     .map(() => ({ label: '', lf: '', heightIn: '', widthIn: 8 })),
   // Hand Bucket Areas
-  bucketRows: Array(4)
+  bucketRows: Array(3)
     .fill(null)
     .map(() => ({ label: '', sf: '', depth: 4 })),
   // Grading
