@@ -1,6 +1,13 @@
 
 node_modules
 dist
+
+# Vite temp files (regenerated whenever Vite loads an ESM config) + stray junk
+vite.config.js.timestamp-*.mjs
+vite.config.*.timestamp-*.mjs
+/Method
+.vercel
+
 .env
 .env.local
 .env.*
