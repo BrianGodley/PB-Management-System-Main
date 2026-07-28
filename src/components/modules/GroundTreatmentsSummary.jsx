@@ -220,6 +220,20 @@ export default function GroundTreatmentsSummary({ module }) {
   const mp = (dbName, fallback) =>
     materialPrices[dbName] != null ? materialPrices[dbName] : fallback
 
+  // Resolve a section product's saved per-unit price. Vendor products are stored
+  // on the row by their (possibly prefix-stripped) LABEL, while the saved
+  // materialPrices snapshot is keyed by the full material_rates name (dbName).
+  // Order: hardcoded House array match → raw label as a name → reconstructed
+  // "<Subcat> - <label>" name → default.
+  const priceForType = (subcat, type, houseArray, defaultVal) => {
+    const hit = type != null ? houseArray.find(t => t.label === type) : null
+    if (hit) return mp(hit.dbName, hit.fallback)
+    if (type != null && materialPrices[type] != null) return materialPrices[type]
+    if (type != null && materialPrices[`${subcat} - ${type}`] != null)
+      return materialPrices[`${subcat} - ${type}`]
+    return defaultVal
+  }
+
   // ── Soil Prep ────────────────────────────────────────────────────────────────
   let soilPrepLine = null
   if (n(soilPrepSF) > 0) {
@@ -247,8 +261,7 @@ export default function GroundTreatmentsSummary({ module }) {
   // ── Sod ──────────────────────────────────────────────────────────────────────
   let sodLine = null
   if (n(sodSF) > 0) {
-    const st = SOD_TYPES.find(t => t.label === sodType) || SOD_TYPES[0]
-    const rate = mp(st.dbName, st.fallback)
+    const rate = priceForType('Sod', sodType, SOD_TYPES, SOD_TYPES[0].fallback)
     const mat = n(sodSF) * rate
     const hrs = n(sodSF) * mp(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback)
     sodLine = {
@@ -291,9 +304,8 @@ export default function GroundTreatmentsSummary({ module }) {
     .map((r, i) => {
       if (!(n(r.sf) > 0)) return null
       const CY = (n(r.sf) * (n(r.depth) / 12)) / 27
-      const mt = MULCH_TYPES.find(t => t.label === r.type) || MULCH_TYPES[0]
       const fabric = r.weedFabric === 'Yes'
-      let mat = CY * mp(mt.dbName, mt.fallback)
+      let mat = CY * priceForType('Mulch', r.type, MULCH_TYPES, MULCH_TYPES[0].fallback)
       if (!_mulchDeliveryDone) {
         mat += mp(GT_RATES.mulchDelivery.dbName, GT_RATES.mulchDelivery.fallback)
         _mulchDeliveryDone = true
@@ -338,9 +350,9 @@ export default function GroundTreatmentsSummary({ module }) {
       const tons = (n(r.sf) * n(r.depth)) / 200
       const cement = r.cement === 'Yes'
       const fabric = r.weedFabric === 'Yes'
-      const dgt = DG_TYPES.find(t => t.label === r.type) || DG_TYPES[0]
+      const perTon = priceForType('DG', r.type, DG_TYPES, DG_TYPES[0].fallback)
       const matBase =
-        tons * mp(dgt.dbName, dgt.fallback) +
+        tons * perTon +
         (cement ? tons * mp(GT_RATES.dgCementPerTon.dbName, GT_RATES.dgCementPerTon.fallback) : 0)
       let mat = matBase * 1.1
       const baseHrs =
@@ -368,8 +380,7 @@ export default function GroundTreatmentsSummary({ module }) {
       const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
       // New modules store row.type (drives $/CY via material_rates); legacy
       // modules store a manual row.costPerCY — fall back to that.
-      const gtype = r.type ? GRAVEL_TYPES.find(t => t.label === r.type) : null
-      const costPerCY = gtype ? mp(gtype.dbName, gtype.fallback) : n(r.costPerCY) || 130
+      const costPerCY = priceForType('Gravel', r.type, GRAVEL_TYPES, n(r.costPerCY) || 130)
       const mat =
         CY * costPerCY +
         n(r.sf) * mp(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)
@@ -394,8 +405,7 @@ export default function GroundTreatmentsSummary({ module }) {
     .map((r, i) => {
       if (!n(r.sf)) return null
       const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
-      const st = SOIL_TYPES.find(t => t.label === r.type) || SOIL_TYPES[0]
-      const rate = mp(st.dbName, st.fallback)
+      const rate = priceForType('Soils', r.type, SOIL_TYPES, SOIL_TYPES[0].fallback)
       return {
         key: i,
         label: `${r.type || 'Soil'} — ${n(r.sf).toLocaleString()} SF × ${n(r.depthIn)}"`,
@@ -410,8 +420,12 @@ export default function GroundTreatmentsSummary({ module }) {
     .map((r, i) => {
       if (!n(r.sf)) return null
       const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
-      const ptype = r.type ? PEBBLE_TYPES.find(t => t.label === r.type) : null
-      const costPerCY = ptype ? mp(ptype.dbName, ptype.fallback) : n(r.costPerCY) || PEBBLE_TYPES[0].fallback
+      const costPerCY = priceForType(
+        'Pebble',
+        r.type,
+        PEBBLE_TYPES,
+        n(r.costPerCY) || PEBBLE_TYPES[0].fallback
+      )
       const mat =
         CY * costPerCY +
         n(r.sf) * mp(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)
@@ -436,8 +450,12 @@ export default function GroundTreatmentsSummary({ module }) {
     .map((r, i) => {
       if (!n(r.sf)) return null
       const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
-      const ctype = r.type ? COBBLE_TYPES.find(t => t.label === r.type) : null
-      const costPerCY = ctype ? mp(ctype.dbName, ctype.fallback) : n(r.costPerCY) || COBBLE_TYPES[0].fallback
+      const costPerCY = priceForType(
+        'Cobbles',
+        r.type,
+        COBBLE_TYPES,
+        n(r.costPerCY) || COBBLE_TYPES[0].fallback
+      )
       const mat =
         CY * costPerCY +
         n(r.sf) * mp(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)
