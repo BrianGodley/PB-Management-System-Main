@@ -289,22 +289,19 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
 
 // ── Default blank rows ─────────────────────────────────────────────────────────
 const DEFAULT_TRENCH_ROWS = [
-  { equipment: 'Trench', lf: '', width: '', depth: '' },
-  { equipment: 'Trench', lf: '', width: '', depth: '' },
   { equipment: 'Hand', lf: '', width: '', depth: '' },
-  { equipment: 'Trench', lf: '', width: '', depth: '' },
+  { equipment: 'Hand', lf: '', width: '', depth: '' },
+  { equipment: 'Hand', lf: '', width: '', depth: '' },
 ]
 const DEFAULT_PIPE_ROWS = [
-  { type: '4" SDR 35', lf: '' },
-  { type: '4" SDR 35', lf: '' },
-  { type: '4" SDR 35', lf: '' },
-  { type: '4" SDR 35', lf: '' },
+  { type: '3" SDR 35', lf: '' },
+  { type: '3" SDR 35', lf: '' },
+  { type: '3" SDR 35', lf: '' },
 ]
 const DEFAULT_FIXTURE_ROWS = [
   { type: '3" Area Drain', qty: '' },
   { type: '3" Area Drain', qty: '' },
   { type: '3" Area Drain', qty: '' },
-  { type: '3" Atrium Drain', qty: '' },
 ]
 const DEFAULT_ADDITIONAL = {
   pumpVaultQty: '',
@@ -830,7 +827,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-left pb-1 pr-2 font-medium">Equipment</th>
+                <th className="text-left pb-1 pr-2 font-medium">Method</th>
                 <th className="text-left pb-1 pr-2 font-medium">Linear Feet</th>
                 <th className="text-left pb-1 pr-2 font-medium">Width (In)</th>
                 <th className="text-left pb-1 font-medium">Depth (In)</th>
