@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 
 // ── Universal Sub Markup — pinned first row in Subs panel ──────
@@ -164,10 +164,18 @@ function RateRow({ row, columns, onSave, onDelete }) {
                   value={form[col.key] || ''}
                   onChange={e => setForm(p => ({ ...p, [col.key]: e.target.value }))}
                 >
-                  <option value="">--</option>
-                  {col.options.map(o => (
-                    <option key={o}>{o}</option>
-                  ))}
+                  {!col.options.some(o => (typeof o === 'object' ? o.value : o) === '') && (
+                    <option value="">--</option>
+                  )}
+                  {col.options.map(o => {
+                    const val = typeof o === 'object' ? o.value : o
+                    const lab = typeof o === 'object' ? o.label : o
+                    return (
+                      <option key={val} value={val}>
+                        {lab}
+                      </option>
+                    )
+                  })}
                 </select>
               ) : (
                 <input
@@ -238,7 +246,13 @@ function RateRow({ row, columns, onSave, onDelete }) {
                   {col.prefix}
                   {col.type === 'number'
                     ? parseFloat(row[col.key] || 0).toLocaleString()
-                    : row[col.key] || '—'}
+                    : col.type === 'select' && col.options?.some(o => typeof o === 'object')
+                      ? col.options.find(
+                          o => typeof o === 'object' && o.value === (row[col.key] || '')
+                        )?.label ||
+                        row[col.key] ||
+                        '—'
+                      : row[col.key] || '—'}
                   {col.suffix}
                 </p>
               )}
@@ -281,10 +295,18 @@ function AddRowForm({ columns, onSave, onCancel }) {
                 value={form[col.key] || ''}
                 onChange={e => setForm(p => ({ ...p, [col.key]: e.target.value }))}
               >
-                <option value="">--</option>
-                {col.options.map(o => (
-                  <option key={o}>{o}</option>
-                ))}
+                {!col.options.some(o => (typeof o === 'object' ? o.value : o) === '') && (
+                  <option value="">--</option>
+                )}
+                {col.options.map(o => {
+                  const val = typeof o === 'object' ? o.value : o
+                  const lab = typeof o === 'object' ? o.label : o
+                  return (
+                    <option key={val} value={val}>
+                      {lab}
+                    </option>
+                  )
+                })}
               </select>
             ) : (
               <input
@@ -789,13 +811,35 @@ export default function MasterRates() {
   const [materials, setMaterials] = useState([])
   const [labor, setLabor] = useState([])
   const [subs, setSubs] = useState([])
+  const [vendors, setVendors] = useState([])
   const [paverPrices, setPaverPrices] = useState([])
   const [loading, setLoading] = useState(true)
   const [laborRatePerHour, setLaborRatePerHour] = useState('35')
   const [subMarkupRate, setSubMarkupRate] = useState(0.35)
   const [matCategory, setMatCategory] = useState('All')
+  const [materialVendorFilter, setMaterialVendorFilter] = useState('')
   const [labCategory, setLabCategory] = useState('All')
   const [subCategory, setSubCategory] = useState('All')
+
+  // Vendor select options for the material rows (null vendor === "House")
+  const vendorOptions = useMemo(
+    () => [
+      { value: '', label: 'House (unassigned)' },
+      ...vendors.map(v => ({ value: v.id, label: v.company_name })),
+    ],
+    [vendors]
+  )
+
+  // Materials columns are built inside the component so the Vendor select can
+  // close over the fetched vendor list.
+  const materialColumns = useMemo(
+    () => [
+      ...MATERIAL_COLUMNS,
+      { key: 'vendor_id', label: 'Vendor', type: 'select', options: vendorOptions },
+      { key: 'subcategory', label: 'Subcategory', placeholder: 'e.g. Gravel, Soils, Sod' },
+    ],
+    [vendorOptions]
+  )
 
   useEffect(() => {
     fetchAll()
@@ -803,16 +847,18 @@ export default function MasterRates() {
 
   async function fetchAll() {
     setLoading(true)
-    const [matRes, labRes, subRes, settingsRes, paverRes] = await Promise.all([
+    const [matRes, labRes, subRes, vendorRes, settingsRes, paverRes] = await Promise.all([
       supabase.from('material_rates').select('*').order('name'),
       supabase.from('labor_rates').select('*').order('name'),
       supabase.from('subcontractor_rates').select('*').order('company_name'),
+      supabase.from('subs_vendors').select('id, company_name').order('company_name'),
       supabase.from('company_settings').select('labor_rate_per_hour, sub_markup_rate').single(),
       supabase.from('paver_prices').select('*').order('brand').order('name'),
     ])
     if (matRes.data) setMaterials(matRes.data)
     if (labRes.data) setLabor(labRes.data)
     if (subRes.data) setSubs(subRes.data)
+    if (vendorRes.data) setVendors(vendorRes.data)
     if (paverRes.data) setPaverPrices(paverRes.data)
     if (settingsRes.data?.labor_rate_per_hour != null)
       setLaborRatePerHour(settingsRes.data.labor_rate_per_hour.toString())
@@ -848,6 +894,8 @@ export default function MasterRates() {
         unit: form.unit,
         unit_cost: parseFloat(form.unit_cost) || 0,
         category: form.category?.trim(),
+        vendor_id: form.vendor_id || null,
+        subcategory: form.subcategory?.trim() || null,
       })
       .select()
       .single()
@@ -861,6 +909,8 @@ export default function MasterRates() {
         unit: form.unit,
         unit_cost: parseFloat(form.unit_cost) || 0,
         category: form.category?.trim(),
+        vendor_id: form.vendor_id || null,
+        subcategory: form.subcategory?.trim() || null,
       })
       .eq('id', form.id)
       .select()
@@ -1005,28 +1055,48 @@ export default function MasterRates() {
           const matCats = Array.from(new Set(materials.map(m => m.category).filter(Boolean))).sort()
           const cats = ['All', ...matCats, 'Pavers']
           return (
-            <div className="flex gap-1 flex-wrap pb-2 items-start content-start">
-              {cats.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setMatCategory(cat)}
-                  className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
-                    matCategory === cat
-                      ? 'bg-green-700 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {cat}
-                  {cat === 'Pavers' && (
-                    <span className="ml-1 opacity-70">({paverPrices.length})</span>
-                  )}
-                  {cat !== 'All' && cat !== 'Pavers' && (
-                    <span className="ml-1 opacity-70">
-                      ({materials.filter(m => m.category === cat).length})
-                    </span>
-                  )}
-                </button>
-              ))}
+            <div className="pb-2">
+              <div className="flex gap-1 flex-wrap items-start content-start">
+                {cats.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setMatCategory(cat)}
+                    className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
+                      matCategory === cat
+                        ? 'bg-green-700 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {cat}
+                    {cat === 'Pavers' && (
+                      <span className="ml-1 opacity-70">({paverPrices.length})</span>
+                    )}
+                    {cat !== 'All' && cat !== 'Pavers' && (
+                      <span className="ml-1 opacity-70">
+                        ({materials.filter(m => m.category === cat).length})
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              {matCategory !== 'Pavers' && (
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  <label className="text-xs text-gray-500">Vendor</label>
+                  <select
+                    value={materialVendorFilter}
+                    onChange={e => setMaterialVendorFilter(e.target.value)}
+                    className="border border-gray-200 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-green-400"
+                  >
+                    <option value="">All vendors</option>
+                    <option value="__HOUSE__">House (unassigned)</option>
+                    {vendors.map(v => (
+                      <option key={v.id} value={v.id}>
+                        {v.company_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           )
         })()}
@@ -1104,12 +1174,13 @@ export default function MasterRates() {
           ) : (
             <RatesPanel
               title="Materials"
-              rows={
-                matCategory === 'All'
-                  ? materials
-                  : materials.filter(m => m.category === matCategory)
-              }
-              columns={MATERIAL_COLUMNS}
+              rows={materials.filter(m => {
+                if (matCategory !== 'All' && m.category !== matCategory) return false
+                if (materialVendorFilter === '__HOUSE__') return m.vendor_id == null
+                if (materialVendorFilter) return m.vendor_id === materialVendorFilter
+                return true
+              })}
+              columns={materialColumns}
               onAdd={addMaterial}
               onSave={saveMaterial}
               onDelete={deleteMaterial}
