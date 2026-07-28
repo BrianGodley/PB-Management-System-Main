@@ -16,7 +16,7 @@ function buildSections(f, isSub) {
     .map(r => ({
       label: `${r.label || 'Base'}${r.method ? ` (${r.method})` : ''}`,
       value: `${n(r.sf).toLocaleString()} SF`,
-      sub: `${r.depth || 2}"`,
+      sub: `${r.depth || 2}"${r.type ? ` · ${r.type}` : ''}`,
     }))
 
   const install = []
@@ -30,12 +30,14 @@ function buildSections(f, isSub) {
       s2000plus: '2000+ SF',
     }
     Object.entries(TIER_LABELS).forEach(([k, label]) => {
-      if (n(f.installTiers[k]) > 0)
+      if (n(f.installTiers[k]) > 0) {
+        const mix = (f.installTierType || {})[k]
         install.push({
           label: `Install (${label})`,
           value: `${n(f.installTiers[k]).toLocaleString()} SF`,
-          sub: `${f.depthIn || 4}"`,
+          sub: `${f.depthIn || 4}"${mix ? ` · ${mix}` : ''}`,
         })
+      }
     })
   } else if (n(f.installSF) > 0)
     install.push({ label: 'Pour + Finish', value: `${n(f.installSF).toLocaleString()} SF`, sub: `${f.depthIn || 4}"` })
@@ -95,6 +97,7 @@ export default function ConcreteSummary({ module }) {
   const inHouseSections = buildSections(
     {
       installTiers: d.installTiers,
+      installTierType: d.installTierType,
       depthIn: d.depthIn,
       rebarSF: d.rebarSF,
       formLF: d.formLF,

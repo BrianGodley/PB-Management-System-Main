@@ -113,6 +113,28 @@ const R = {
   commissionRate: 0.12,
 }
 
+// ── Vendor catalog: House type lists (single default each; vendors add more) ──
+// Base Install material and the Concrete mix each map to one House product;
+// vendors tagged to the 'Concrete Base' / 'Concrete Mix' categories supply
+// additional priced types via material_rates (subcategory + vendor_id).
+const BASE_TYPES = [
+  { label: 'Import Base', dbName: 'Concrete - Import Base', fallback: R.costBase },
+]
+const MIX_TYPES = [
+  { label: 'Concrete Mix', dbName: 'Concrete - Per CY', fallback: R.concretePerCY },
+]
+
+// Resolve a picked Type label against the vendor option list, then the House
+// array, else the first available option. Shared by the calc + the render.
+function resolveType(label, opts, houseArray) {
+  return (
+    (label != null && opts.find(o => o.label === label)) ||
+    (label != null && houseArray.find(o => o.label === label)) ||
+    opts[0] ||
+    houseArray[0]
+  )
+}
+
 // ── Calculation engine ────────────────────────────────────────────────────────
 
 const n = v => parseFloat(v) || 0
@@ -125,8 +147,26 @@ function calcConcrete(
   sr = {},
   gpmd = R.gpmd,
   walkAccess = null,
-  laborBurdenPct = R.laborBurdenPct
+  laborBurdenPct = R.laborBurdenPct,
+  materialRows = [],
+  catDefaults = {}
 ) {
+  // Per-row/line vendor-aware price resolver. 'House' (or a missing/'auto'
+  // vendor → the category default) uses the House array; a real vendor id →
+  // that vendor's products for the category, priced from material_rates.
+  const rowOpt = (cat, row, houseArray) => {
+    const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : catDefaults[cat] || 'House'
+    if (!vsel || vsel === 'House') return resolveType(row.type, houseArray, houseArray)
+    const prefix = `${cat} - `
+    const opts = (materialRows || [])
+      .filter(r => r.subcategory === cat && r.vendor_id === vsel)
+      .map(r => ({
+        label: r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name,
+        dbName: r.name,
+        fallback: n(r.unit_cost),
+      }))
+    return resolveType(row.type, opts, houseArray)
+  }
   // Subcontractor rates: a one-off adjustment saved on THIS estimate
   // (state.rateOverrides) takes precedence over the master rate.
   sr = { ...(sr || {}) }
@@ -195,7 +235,8 @@ function calcConcrete(
     // takes precedence over the hardcoded fallback in BASE_RATES.
     const rate = lr[BASE_METHOD_LABOR_NAME[r.method]] ?? BASE_RATES[r.method] ?? 10.0
     const hrs = tons / rate
-    const mat = tons * costBase
+    const bt = rowOpt('Concrete Base', r, BASE_TYPES)
+    const mat = tons * (mr[bt.dbName] ?? bt.fallback)
     baseHrsTot += hrs
     baseMatTot += mat
     return { tons, hrs, mat, rate }
@@ -218,7 +259,22 @@ function calcConcrete(
     const rate = lr[t.rateName] ?? t.def
     return s + (rate > 0 ? sf / rate : 0)
   }, 0)
-  const concreteMat = concreteCY * concretePerCY
+  // Concrete mix material — per size-tier: each tier's SF drives its own CY,
+  // priced at that tier's picked mix Vendor/Type. House defaults to
+  // 'Concrete - Per CY', so an all-House job matches the old flat calc.
+  const installTierVendor = state.installTierVendor || {}
+  const installTierType = state.installTierType || {}
+  const concreteMat = INSTALL_TIERS.reduce((s, t) => {
+    const sf = n(installTiers[t.key])
+    if (!sf) return s
+    const tierCY = ((depthIn / 12) * sf) / 27
+    const mt = rowOpt(
+      'Concrete Mix',
+      { vendor: installTierVendor[t.key], type: installTierType[t.key] },
+      MIX_TYPES
+    )
+    return s + tierCY * (mr[mt.dbName] ?? mt.fallback)
+  }, 0)
 
   const rebarHrs = rebarSF > 0 ? rebarSF / rebarSFPerHr : 0
   const rebarMat = rebarSF * rebarSFPrice
@@ -432,9 +488,9 @@ function NumInput({ value, onChange, placeholder = '0', className = '', step = '
 // ── Default state ─────────────────────────────────────────────────────────────
 
 const DEFAULT_BASE_ROWS = [
-  { label: 'Area 1', method: 'Skid Steer Good', sf: '', depth: '2' },
-  { label: 'Area 2', method: 'Skid Steer Good', sf: '', depth: '2' },
-  { label: 'Area 3', method: 'Skid Steer Good', sf: '', depth: '2' },
+  { label: 'Area 1', method: 'Skid Steer Good', sf: '', depth: '2', vendor: 'auto', type: 'Import Base' },
+  { label: 'Area 2', method: 'Skid Steer Good', sf: '', depth: '2', vendor: 'auto', type: 'Import Base' },
+  { label: 'Area 3', method: 'Skid Steer Good', sf: '', depth: '2', vendor: 'auto', type: 'Import Base' },
 ]
 
 const DEFAULT_MANUAL_ROWS = [
@@ -462,6 +518,10 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const [laborRates, setLaborRates] = useState(initialData?.laborRates ?? {})
   const [materialRates, setMaterialRates] = useState(initialData?.materialRates ?? {})
   const [subRates, setSubRates] = useState(initialData?.subRates ?? {})
+  // Vendor catalog: material_rates rows (with subcategory + vendor_id) and the
+  // vendor list, used to build the per-line Vendor/Type pickers.
+  const [materialRows, setMaterialRows] = useState(initialData?.materialRows ?? [])
+  const [vendors, setVendors] = useState([])
   // One-off subcontractor rates for this estimate only (undefined clears one).
   const [rateOverrides, setRateOverrides] = useState(initialData?.rateOverrides ?? {})
   const setOverride = (name, value) =>
@@ -489,11 +549,28 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   // the user saves an edit from a RateEditPopover so the calc picks up the
   // change without a page reload.
   const refreshAllRates = useCallback(async () => {
-    const [lrRes, mrRes, srRes] = await Promise.all([
+    const [lrRes, mrRes, srRes, matRowsRes, venRes] = await Promise.all([
       supabase.from('labor_rates').select('name, rate').eq('category', 'Concrete'),
       supabase.from('material_rates').select('name, unit_cost').eq('category', 'Concrete'),
       supabase.from('subcontractor_rates').select('company_name, rate').eq('category', 'Concrete'),
+      supabase
+        .from('material_rates')
+        .select('name, unit_cost, subcategory, vendor_id')
+        .eq('category', 'Concrete'),
+      supabase
+        .from('subs_vendors')
+        .select('id, company_name, supplied_categories')
+        .eq('type', 'vendor')
+        .order('company_name'),
     ])
+    setMaterialRows(matRowsRes.data || [])
+    setVendors(
+      (venRes.data || []).map(v => ({
+        id: v.id,
+        name: v.company_name,
+        categories: v.supplied_categories || [],
+      }))
+    )
     if (lrRes.data) {
       const m = {}
       lrRes.data.forEach(r => {
@@ -526,6 +603,36 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     refreshAllRates()
   }, [refreshAllRates])
 
+  // Always load the vendor list + material rows (even when re-editing a saved
+  // estimate) so the per-line Vendor/Type pickers work.
+  useEffect(() => {
+    let alive = true
+    Promise.all([
+      supabase
+        .from('material_rates')
+        .select('name, unit_cost, subcategory, vendor_id')
+        .eq('category', 'Concrete'),
+      supabase
+        .from('subs_vendors')
+        .select('id, company_name, supplied_categories')
+        .eq('type', 'vendor')
+        .order('company_name'),
+    ]).then(([matRowsRes, venRes]) => {
+      if (!alive) return
+      setMaterialRows(matRowsRes.data || [])
+      setVendors(
+        (venRes.data || []).map(v => ({
+          id: v.id,
+          name: v.company_name,
+          categories: v.supplied_categories || [],
+        }))
+      )
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+
   // Settings
   const [difficulty, setDifficulty] = useState(initialData?.difficulty ?? '')
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Masonry')
@@ -539,6 +646,9 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
 
   // Install
   const [installTiers, setInstallTiers] = useState(initialData?.installTiers ?? {})
+  // Per size-tier concrete-mix Vendor + Type (objects keyed by INSTALL_TIERS key)
+  const [installTierVendor, setInstallTierVendor] = useState(initialData?.installTierVendor ?? {})
+  const [installTierType, setInstallTierType] = useState(initialData?.installTierType ?? {})
   const [depthIn, setDepthIn] = useState(initialData?.depthIn ?? '4')
   const [rebarSF, setRebarSF] = useState(initialData?.rebarSF ?? '')
   const [formLF, setFormLF] = useState(initialData?.formLF ?? '')
@@ -604,6 +714,8 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     finishingType,
     hoursAdj,
     installTiers,
+    installTierVendor,
+    installTierType,
     depthIn,
     rebarSF,
     formLF,
@@ -619,6 +731,64 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   }
   const gpmd = initialData?.gpmd ?? R.gpmd
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
+
+  // ── Vendor catalog helpers (per-line Vendor/Type pickers) ────────────────
+  const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
+  const defaultVendorFor = cat => vendorsForCategory(cat)[0]?.id || 'House'
+  const catDefaults = {
+    'Concrete Base': defaultVendorFor('Concrete Base'),
+    'Concrete Mix': defaultVendorFor('Concrete Mix'),
+  }
+  // Build a section's Type option list for a given vendor selection. 'House'
+  // (or a vendor with no catalog rows) → the House array; a vendor id → that
+  // vendor's products for the category (priced from material_rates).
+  function sectionOptions(subcat, vendorSel, houseArray) {
+    const vsel = vendorSel && vendorSel !== 'auto' ? vendorSel : catDefaults[subcat] || 'House'
+    if (!vsel || vsel === 'House') return houseArray
+    const rows = (materialRows || []).filter(
+      r => r.subcategory === subcat && r.vendor_id === vsel
+    )
+    if (!rows.length) return houseArray
+    const prefix = `${subcat} - `
+    return rows.map(r => ({
+      label: r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name,
+      dbName: r.name,
+      fallback: n(r.unit_cost),
+    }))
+  }
+  // Effective vendor for a stored value: 'auto'/unset/House → category default.
+  const effVendor = (cat, v) => (v && v !== 'auto' && v !== 'House' ? v : catDefaults[cat])
+
+  // On a NEW estimate, once vendor catalogs load, default the Base rows and each
+  // install tier to the first real vendor for their category. Never overrides a
+  // saved estimate (has a materialRates snapshot) or an explicit pick.
+  const [vendorDefaultsApplied, setVendorDefaultsApplied] = useState(false)
+  useEffect(() => {
+    const isSaved =
+      initialData?.materialRates && Object.keys(initialData.materialRates).length > 0
+    if (vendorDefaultsApplied || isSaved || !vendors.length) return
+    setVendorDefaultsApplied(true)
+    const needsDefault = v => !v || v === 'House' || v === 'auto'
+    setBaseRows(rows =>
+      (rows || []).map(r =>
+        needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor('Concrete Base') } : r
+      )
+    )
+    setSubBaseRows(rows =>
+      (rows || []).map(r =>
+        needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor('Concrete Base') } : r
+      )
+    )
+    setInstallTierVendor(v => {
+      const d = defaultVendorFor('Concrete Mix')
+      const nv = { ...v }
+      INSTALL_TIERS.forEach(t => {
+        if (needsDefault(nv[t.key])) nv[t.key] = d
+      })
+      return nv
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendors, vendorDefaultsApplied])
 
   // Active-tab wiring: the mirrored field sections edit whichever set matches
   // the current tab, so In-House and Subcontractor are fully independent
@@ -668,7 +838,9 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     subRates,
     gpmd,
     walkAccess,
-    laborBurdenPct
+    laborBurdenPct,
+    materialRows,
+    catDefaults
   )
 
   // ── Sub-side cost — a single fully-loaded subcontractor cost figure.
@@ -813,6 +985,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
         laborRates, // ← production rate snapshot
         materialRates, // ← material cost snapshot
         subRates, // ← sub/equipment cost snapshot
+        materialRows, // ← vendor catalog snapshot (for re-edit pricing)
         calc,
       },
     })
@@ -960,6 +1133,8 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-left pb-1 pr-2 font-medium">Area</th>
+                <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
+                <th className="text-left pb-1 pr-2 font-medium">Type</th>
                 <th className="text-left pb-1 pr-2 font-medium">Method</th>
                 <th className="text-left pb-1 pr-2 font-medium">Sq Ft</th>
                 <th className="text-left pb-1 pr-2 font-medium">Depth (in)</th>
@@ -973,9 +1148,12 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 const _tons = _sf > 0 ? (_sf / 200) * _depth : 0
                 const methodRate =
                   laborRates[BASE_METHOD_LABOR_NAME[row.method]] ?? BASE_RATES[row.method] ?? 10.0
+                const baseOpts = sectionOptions('Concrete Base', row.vendor, BASE_TYPES)
+                const bt = resolveType(row.type, baseOpts, BASE_TYPES)
+                const baseRate = materialRates[bt.dbName] ?? bt.fallback
                 const c = {
                   hrs: _tons > 0 ? _tons / methodRate : 0,
-                  mat: _tons * (calc.costBase ?? R.costBase),
+                  mat: _tons * baseRate,
                 }
                 return (
                   <tr key={i} className="border-b border-gray-100">
@@ -985,6 +1163,44 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                         value={row.label}
                         onChange={e => updateBaseRow(i, 'label', e.target.value)}
                       />
+                    </td>
+                    <td className="py-1 pr-2">
+                      <select
+                        className="input text-sm py-1 min-w-0"
+                        value={effVendor('Concrete Base', row.vendor)}
+                        onChange={e => updateBaseRow(i, 'vendor', e.target.value)}
+                        title="Vendor"
+                      >
+                        {vendorsForCategory('Concrete Base').map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                        <option value="House">House</option>
+                      </select>
+                    </td>
+                    <td className="py-1 pr-2">
+                      <div className="flex items-center gap-1">
+                        <select
+                          className="input text-sm py-1 min-w-0"
+                          value={bt.label}
+                          onChange={e => updateBaseRow(i, 'type', e.target.value)}
+                        >
+                          {baseOpts.map(o => (
+                            <option key={o.label} value={o.label}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                        <RateEditPopover
+                          table="material_rates"
+                          name={bt.dbName}
+                          category="Concrete"
+                          unitLabel="ton"
+                          currentValue={baseRate}
+                          onSaved={refreshAllRates}
+                        />
+                      </div>
                     </td>
                     <td className="py-1 pr-2">
                       <div className="flex items-center gap-1">
@@ -1078,16 +1294,59 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                   const rate = laborRates[t.rateName] ?? t.def
                   const is300plus = t.key !== 's100_300'
                   const hasSF = n(installTiers[t.key]) > 0
+                  const mixOpts = sectionOptions('Concrete Mix', installTierVendor[t.key], MIX_TYPES)
+                  const mt = resolveType(installTierType[t.key], mixOpts, MIX_TYPES)
+                  const mixRate = materialRates[mt.dbName] ?? mt.fallback
                   return (
-                    <div key={t.key} className="flex items-center gap-2">
+                    <div key={t.key} className="flex items-center gap-2 flex-wrap">
                       <span className="text-[11px] text-gray-500 w-24 shrink-0">{t.label}</span>
-                      <div className="flex-1 min-w-0">
+                      <div className="w-20 shrink-0">
                         <NumInput
                           value={installTiers[t.key] ?? ''}
                           onChange={v => setInstallTiers({ ...installTiers, [t.key]: v })}
                           placeholder="0 SF"
                         />
                       </div>
+                      <select
+                        className="input text-xs py-1 w-28 shrink-0"
+                        value={effVendor('Concrete Mix', installTierVendor[t.key])}
+                        onChange={e =>
+                          setInstallTierVendor({ ...installTierVendor, [t.key]: e.target.value })
+                        }
+                        title="Mix vendor"
+                      >
+                        {vendorsForCategory('Concrete Mix').map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                        <option value="House">House</option>
+                      </select>
+                      <select
+                        className="input text-xs py-1 flex-1 min-w-0"
+                        value={mt.label}
+                        onChange={e =>
+                          setInstallTierType({ ...installTierType, [t.key]: e.target.value })
+                        }
+                        title="Mix type"
+                      >
+                        {mixOpts.map(o => (
+                          <option key={o.label} value={o.label}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="text-[11px] text-gray-400 inline-flex items-center gap-1 shrink-0 whitespace-nowrap">
+                        ${Number(mixRate).toFixed(0)}/CY
+                        <RateEditPopover
+                          table="material_rates"
+                          name={mt.dbName}
+                          category="Concrete"
+                          unitLabel="CY"
+                          currentValue={mixRate}
+                          onSaved={refreshAllRates}
+                        />
+                      </span>
                       {is300plus && hasSF && (
                         <span className="text-[10px] text-green-600 shrink-0 whitespace-nowrap">
                           pump incl.
