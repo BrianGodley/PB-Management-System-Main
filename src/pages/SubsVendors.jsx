@@ -1478,7 +1478,9 @@ function SubModal({
   materialCategories = [],
 }) {
   const [customInput, setCustomInput] = useState('')
-  const [stab, setStab] = useState('details') // 'details' | 'quotes' | 'contracts'
+  const [stab, setStab] = useState('details') // 'details' | 'materials' | 'pricing' | 'quotes' | 'contracts'
+  // View vs edit: existing records open read-only; a new record opens editable.
+  const [editing, setEditing] = useState(!isEdit)
   // Subs get Details + Contracts; vendors get Details + Quotes.
   const partyTabs = (mode === 'sub'
     ? [
@@ -1499,6 +1501,11 @@ function SubModal({
     if (stab === 'materials' && mode !== 'vendor') setStab('details')
     if (stab === 'contracts' && mode !== 'sub') setStab('details')
   }, [stab, mode])
+  // Reset to view-mode (and the Details tab) whenever a different record opens.
+  useEffect(() => {
+    setEditing(!isEdit)
+    setStab('details')
+  }, [recordId, isEdit])
   const [uploading, setUploading] = useState(false)
   const [viewerDoc, setViewerDoc] = useState(null) // { name, url } for in-app viewer
   const priceFileInputRef = useRef(null)
@@ -1581,7 +1588,7 @@ function SubModal({
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <h2 className="text-base font-bold text-gray-900">
             {isEdit
-              ? `Edit ${form.type === 'vendor' ? 'Vendor' : 'Subcontractor'}`
+              ? `${form.company_name || (form.type === 'vendor' ? 'Vendor' : 'Subcontractor')} Details`
               : `Add ${form.type === 'vendor' ? 'Vendor' : 'Subcontractor'}`}
           </h2>
           <button onClick={onClose} className="text-gray-300 hover:text-gray-500 p-2">
@@ -1616,8 +1623,12 @@ function SubModal({
           </div>
         )}
 
-        {/* Body */}
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-5 space-y-4">
+        {/* Body — form controls are disabled in view mode via the fieldset. */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-5">
+          <fieldset
+            disabled={!editing && stab !== 'quotes' && stab !== 'contracts'}
+            className="space-y-4 border-0 p-0 m-0 min-w-0 disabled:opacity-90"
+          >
           {stab === 'quotes' ? (
             <PartyHistory partyId={recordId} kind="quotes" />
           ) : stab === 'contracts' ? (
@@ -2032,26 +2043,36 @@ function SubModal({
           {error && <p className="text-xs text-red-500">{error}</p>}
           </>
           )}
+          </fieldset>
         </div>
 
         {/* Footer */}
         <div className="px-5 py-4 flex gap-2 flex-shrink-0 border-t border-gray-100">
-          {stab !== 'quotes' && stab !== 'contracts' && (
-            <button
-              onClick={onSave}
-              disabled={saving}
-              className="flex-1 btn-primary text-sm py-3 disabled:opacity-50"
-            >
-              {saving ? 'Saving…' : isEdit ? 'Update' : 'Save'}
-            </button>
-          )}
+          {stab !== 'quotes' &&
+            stab !== 'contracts' &&
+            (editing ? (
+              <button
+                onClick={onSave}
+                disabled={saving}
+                className="flex-1 btn-primary text-sm py-3 disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : isEdit ? 'Update' : 'Save'}
+              </button>
+            ) : (
+              <button
+                onClick={() => setEditing(true)}
+                className="flex-1 btn-primary text-sm py-3"
+              >
+                Edit
+              </button>
+            ))}
           <button
             onClick={onClose}
             className="px-5 py-3 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
           >
-            Cancel
+            {editing ? 'Cancel' : 'Close'}
           </button>
-          {onDelete && (
+          {onDelete && editing && (
             <button
               onClick={onDelete}
               className="px-3 py-3 text-sm rounded-lg border border-red-100 text-red-400 hover:bg-red-50 hover:text-red-600"
