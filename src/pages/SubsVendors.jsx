@@ -79,6 +79,10 @@ const EMPTY_FORM = {
   email: '',
   cell: '',
   phone: '',
+  address: '',
+  city: '',
+  state: '',
+  zip: '',
   trade_agreement_status: '',
   liability_exp: '',
   workers_comp_exp: '',
@@ -228,6 +232,10 @@ export default function SubsVendors({ mode = 'sub' }) {
       email: sub.email || '',
       cell: sub.cell || '',
       phone: sub.phone || '',
+      address: sub.address || '',
+      city: sub.city || '',
+      state: sub.state || '',
+      zip: sub.zip || '',
       trade_agreement_status: sub.trade_agreement_status || '',
       liability_exp: sub.liability_exp || '',
       workers_comp_exp: sub.workers_comp_exp || '',
@@ -272,6 +280,10 @@ export default function SubsVendors({ mode = 'sub' }) {
       email: form.email.trim() || null,
       cell: form.cell.trim() || null,
       phone: form.phone.trim() || null,
+      address: form.address.trim() || null,
+      city: form.city.trim() || null,
+      state: form.state.trim() || null,
+      zip: form.zip.trim() || null,
       trade_agreement_status: form.trade_agreement_status.trim() || null,
       liability_exp: form.liability_exp || null,
       workers_comp_exp: form.workers_comp_exp || null,
@@ -313,12 +325,18 @@ export default function SubsVendors({ mode = 'sub' }) {
     const rows = subs.filter(s => (s.type || 'sub') === type)
     const data = rows.map(s => ({
       'Company Name': s.company_name || '',
-      Divisions: (s.divisions || []).join(' | '),
+      [type === 'vendor' ? 'Categories' : 'Divisions']: (
+        (type === 'vendor' ? s.supplied_categories : s.divisions) || []
+      ).join(' | '),
       Status: statusInfo(s.status).label,
       'Primary Contact': s.primary_contact || '',
       Email: s.email || '',
       Cell: s.cell || '',
       Phone: s.phone || '',
+      Address: s.address || '',
+      City: s.city || '',
+      State: s.state || '',
+      ZIP: s.zip || '',
       'Trade Agreement Status': s.trade_agreement_status || '',
       'Liability Exp Date': s.liability_exp || '',
       'Workers Comp Exp Date': s.workers_comp_exp || '',
@@ -608,6 +626,8 @@ export default function SubsVendors({ mode = 'sub' }) {
         (s.company_name || '').toLowerCase().includes(q) ||
         (s.primary_contact || '').toLowerCase().includes(q) ||
         (s.divisions || []).some(d => d.toLowerCase().includes(q)) ||
+        (s.supplied_categories || []).some(d => d.toLowerCase().includes(q)) ||
+        (s.city || '').toLowerCase().includes(q) ||
         (s.cell || '').includes(q) ||
         (s.phone || '').includes(q)
       )
@@ -970,7 +990,7 @@ export default function SubsVendors({ mode = 'sub' }) {
                         Primary Contact
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                        {mode === 'sub' ? 'Trades' : 'Materials'}
+                        {mode === 'sub' ? 'Trades' : 'Categories'}
                       </th>
                       {mode === 'sub' && (
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
@@ -1015,9 +1035,9 @@ export default function SubsVendors({ mode = 'sub' }) {
                             {sub.primary_contact || <span className="text-gray-300">—</span>}
                           </td>
                           <td className="px-4 py-3 text-gray-600 truncate">
-                            {(sub.divisions || []).join(', ') || (
-                              <span className="text-gray-300 italic">—</span>
-                            )}
+                            {((mode === 'vendor' ? sub.supplied_categories : sub.divisions) || []).join(
+                              ', '
+                            ) || <span className="text-gray-300 italic">—</span>}
                           </td>
                           {mode === 'sub' && (
                             <td className="px-4 py-3 text-gray-600 truncate">
@@ -1460,19 +1480,23 @@ function SubModal({
   const [customInput, setCustomInput] = useState('')
   const [stab, setStab] = useState('details') // 'details' | 'quotes' | 'contracts'
   // Subs get Details + Contracts; vendors get Details + Quotes.
-  const partyTabs =
-    mode === 'sub'
-      ? [
-          { k: 'details', l: 'Details' },
-          { k: 'contracts', l: 'Contracts' },
-        ]
-      : [
-          { k: 'details', l: 'Details' },
-          { k: 'quotes', l: 'Quotes' },
-        ]
+  const partyTabs = (mode === 'sub'
+    ? [
+        { k: 'details', l: 'Details' },
+        { k: 'pricing', l: 'Pricing' },
+        { k: 'contracts', l: 'Contracts' },
+      ]
+    : [
+        { k: 'details', l: 'Details' },
+        { k: 'materials', l: 'Materials' },
+        { k: 'pricing', l: 'Pricing' },
+        { k: 'quotes', l: 'Quotes' },
+      ]
+  ).filter(t => (t.k === 'quotes' || t.k === 'contracts' ? recordId : true))
   // Never leave the active tab on a kind that's hidden for this mode.
   useEffect(() => {
     if (stab === 'quotes' && mode !== 'vendor') setStab('details')
+    if (stab === 'materials' && mode !== 'vendor') setStab('details')
     if (stab === 'contracts' && mode !== 'sub') setStab('details')
   }, [stab, mode])
   const [uploading, setUploading] = useState(false)
@@ -1572,18 +1596,18 @@ function SubModal({
           </button>
         </div>
 
-        {/* Tabs — only when editing an existing record */}
-        {isEdit && recordId && (
-          <div className="flex gap-0 border-b border-gray-100 px-3 flex-shrink-0">
+        {/* Tabs (editable tabs always; history tabs only for a saved record) */}
+        {partyTabs.length > 1 && (
+          <div className="flex gap-1 border-b border-gray-200 px-3 flex-shrink-0">
             {partyTabs.map(t => (
               <button
                 key={t.k}
                 type="button"
                 onClick={() => setStab(t.k)}
-                className={`px-3 py-2 text-xs font-semibold border-b-2 transition-colors ${
+                className={`px-4 py-2.5 text-sm font-semibold border-b-[3px] -mb-px transition-colors ${
                   stab === t.k
-                    ? 'border-green-700 text-green-700'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                    ? 'border-green-700 text-green-700 bg-green-50/60'
+                    : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-50'
                 }`}
               >
                 {t.l}
@@ -1598,264 +1622,58 @@ function SubModal({
             <PartyHistory partyId={recordId} kind="quotes" />
           ) : stab === 'contracts' ? (
             <PartyHistory partyId={recordId} kind="contracts" />
-          ) : (
+          ) : stab === 'materials' ? (
           <>
-          {/* Company name */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Company Name <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={form.company_name}
-              onChange={e => setForm(f => ({ ...f, company_name: e.target.value }))}
-              placeholder="e.g. SUB - ABC Electric"
-              className="input text-sm w-full"
-              autoFocus
-            />
-          </div>
-
-          {/* Status */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
-            <select
-              value={form.status}
-              onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
-              className="input text-sm w-full"
-            >
-              {STATUS_OPTIONS.map(s => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Divisions */}
+          {/* Categories Supplied (vendors only) */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-2">
-              {recordType === 'vendor' ? 'Materials' : 'Trades'}
+              Categories Supplied
             </label>
-            <select
-              value=""
-              onChange={e => {
-                const val = e.target.value
-                if (val && !form.divisions.includes(val)) {
-                  setForm(f => ({ ...f, divisions: [...f.divisions, val] }))
-                }
-              }}
-              className="input text-sm w-full"
-            >
-              <option value="">
-                — Select one or more {recordType === 'vendor' ? 'materials' : 'trades'} —
-              </option>
-              {(recordType === 'vendor' ? MATERIAL_OPTIONS : DIVISION_OPTIONS)
-                .filter(d => !form.divisions.includes(d))
-                .map(d => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-            </select>
-
-            {form.divisions.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {form.divisions.map(div => (
-                  <span
-                    key={div}
-                    className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-green-700 text-white"
-                  >
-                    {div}
-                    <button
-                      type="button"
-                      onClick={() => toggleDivision(div)}
-                      className="hover:text-green-200 leading-none"
+            <p className="text-xs text-gray-400 mb-2">
+              These drive which estimator sections list this vendor.
+            </p>
+            {materialCategories.length === 0 ? (
+              <p className="text-xs text-gray-400">
+                No material categories yet. Add them in Settings → Material Categories.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                {materialCategories.map(cat => {
+                  const selected = (form.supplied_categories || []).includes(cat.name)
+                  return (
+                    <label
+                      key={cat.id}
+                      className="flex items-center gap-2 text-sm text-gray-700 px-2 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer"
                     >
-                      ✕
-                    </button>
-                  </span>
-                ))}
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() =>
+                          setForm(f => {
+                            const cur = Array.isArray(f.supplied_categories)
+                              ? f.supplied_categories
+                              : []
+                            return {
+                              ...f,
+                              supplied_categories: cur.includes(cat.name)
+                                ? cur.filter(n => n !== cat.name)
+                                : [...cur, cat.name],
+                            }
+                          })
+                        }
+                        className="accent-green-700 flex-shrink-0"
+                      />
+                      <span className="truncate">{cat.name}</span>
+                    </label>
+                  )
+                })}
               </div>
             )}
-
-            <div className="flex gap-2 mt-2">
-              <input
-                type="text"
-                value={customInput}
-                onChange={e => setCustomInput(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    addCustom()
-                  }
-                }}
-                placeholder={`Add custom ${recordType === 'vendor' ? 'material' : 'trade'}…`}
-                className="input text-xs flex-1"
-              />
-              <button
-                type="button"
-                onClick={addCustom}
-                disabled={!customInput.trim()}
-                className="px-3 py-1.5 text-xs rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 disabled:opacity-40 transition-colors"
-              >
-                + Add
-              </button>
-            </div>
           </div>
-
-          {/* Categories Supplied (vendors only) */}
-          {mode === 'vendor' && (
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-2">
-                Categories Supplied
-              </label>
-              {materialCategories.length === 0 ? (
-                <p className="text-xs text-gray-400">
-                  No material categories yet. Add them in Settings → Material Categories.
-                </p>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                  {materialCategories.map(cat => {
-                    const selected = (form.supplied_categories || []).includes(cat.name)
-                    return (
-                      <label
-                        key={cat.id}
-                        className="flex items-center gap-2 text-sm text-gray-700 px-2 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selected}
-                          onChange={() =>
-                            setForm(f => {
-                              const cur = Array.isArray(f.supplied_categories)
-                                ? f.supplied_categories
-                                : []
-                              return {
-                                ...f,
-                                supplied_categories: cur.includes(cat.name)
-                                  ? cur.filter(n => n !== cat.name)
-                                  : [...cur, cat.name],
-                              }
-                            })
-                          }
-                          className="accent-green-700 flex-shrink-0"
-                        />
-                        <span className="truncate">{cat.name}</span>
-                      </label>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Contact info */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Primary Contact
-              </label>
-              <input
-                type="text"
-                value={form.primary_contact}
-                onChange={e => setForm(f => ({ ...f, primary_contact: e.target.value }))}
-                placeholder="Full name"
-                className="input text-sm w-full"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
-              <input
-                type="email"
-                value={form.email}
-                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                placeholder="email@example.com"
-                className="input text-sm w-full"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Cell</label>
-              <input
-                type="tel"
-                value={form.cell}
-                onChange={e => setForm(f => ({ ...f, cell: formatPhone(e.target.value) }))}
-                placeholder="(818) 555-0000"
-                className="input text-sm w-full"
-                maxLength={14}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Phone</label>
-              <div className="flex gap-2">
-                <input
-                  type="tel"
-                  value={form.phone}
-                  onChange={e => setForm(f => ({ ...f, phone: formatPhone(e.target.value) }))}
-                  placeholder="(818) 555-0000"
-                  className="input text-sm flex-1"
-                  maxLength={14}
-                />
-                <div className="flex flex-col gap-0.5">
-                  <label className="text-[10px] text-gray-400">Ext.</label>
-                  <input
-                    type="text"
-                    value={form.phone_ext}
-                    onChange={e =>
-                      setForm(f => ({
-                        ...f,
-                        phone_ext: e.target.value.replace(/\D/g, '').slice(0, 6),
-                      }))
-                    }
-                    placeholder="1234"
-                    className="input text-sm w-16 text-center"
-                    maxLength={6}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Insurance */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-2">Insurance</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] text-gray-400 mb-1">Liability Exp. Date</label>
-                <input
-                  type="date"
-                  value={form.liability_exp}
-                  onChange={e => setForm(f => ({ ...f, liability_exp: e.target.value }))}
-                  className="input text-sm w-full"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] text-gray-400 mb-1">
-                  Worker's Comp Exp. Date
-                </label>
-                <input
-                  type="date"
-                  value={form.workers_comp_exp}
-                  onChange={e => setForm(f => ({ ...f, workers_comp_exp: e.target.value }))}
-                  className="input text-sm w-full"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Trade agreement status */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Trade Agreement Status
-            </label>
-            <input
-              type="text"
-              value={form.trade_agreement_status}
-              onChange={e => setForm(f => ({ ...f, trade_agreement_status: e.target.value }))}
-              placeholder="e.g. Signed, Pending, Not required"
-              className="input text-sm w-full"
-            />
-          </div>
-
+          {error && <p className="text-xs text-red-500">{error}</p>}
+          </>
+          ) : stab === 'pricing' ? (
+          <>
           {/* Services Pricing (subs only) */}
           {recordType === 'sub' && (
             <div>
@@ -1941,6 +1759,263 @@ function SubModal({
               {uploading ? 'Uploading…' : '⬆ Upload price list file'}
             </button>
           </div>
+          {error && <p className="text-xs text-red-500">{error}</p>}
+          </>
+          ) : (
+          <>
+          {/* Company name */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Company Name <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="text"
+              value={form.company_name}
+              onChange={e => setForm(f => ({ ...f, company_name: e.target.value }))}
+              placeholder="e.g. SUB - ABC Electric"
+              className="input text-sm w-full"
+              autoFocus
+            />
+          </div>
+
+          {/* Contact info */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Primary Contact
+              </label>
+              <input
+                type="text"
+                value={form.primary_contact}
+                onChange={e => setForm(f => ({ ...f, primary_contact: e.target.value }))}
+                placeholder="Full name"
+                className="input text-sm w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+              <input
+                type="email"
+                value={form.email}
+                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                placeholder="email@example.com"
+                className="input text-sm w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Cell</label>
+              <input
+                type="tel"
+                value={form.cell}
+                onChange={e => setForm(f => ({ ...f, cell: formatPhone(e.target.value) }))}
+                placeholder="(818) 555-0000"
+                className="input text-sm w-full"
+                maxLength={14}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Phone</label>
+              <div className="flex gap-2">
+                <input
+                  type="tel"
+                  value={form.phone}
+                  onChange={e => setForm(f => ({ ...f, phone: formatPhone(e.target.value) }))}
+                  placeholder="(818) 555-0000"
+                  className="input text-sm flex-1"
+                  maxLength={14}
+                />
+                <input
+                  type="text"
+                  value={form.phone_ext}
+                  onChange={e =>
+                    setForm(f => ({
+                      ...f,
+                      phone_ext: e.target.value.replace(/\D/g, '').slice(0, 6),
+                    }))
+                  }
+                  placeholder="Ext."
+                  className="input text-sm w-20 text-center"
+                  maxLength={6}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Address */}
+          <div className="grid grid-cols-1 sm:grid-cols-6 gap-3">
+            <div className="sm:col-span-6">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Address</label>
+              <input
+                type="text"
+                value={form.address}
+                onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
+                placeholder="Street address"
+                className="input text-sm w-full"
+              />
+            </div>
+            <div className="sm:col-span-3">
+              <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
+              <input
+                type="text"
+                value={form.city}
+                onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
+                placeholder="City"
+                className="input text-sm w-full"
+              />
+            </div>
+            <div className="sm:col-span-1">
+              <label className="block text-xs font-medium text-gray-600 mb-1">State</label>
+              <input
+                type="text"
+                value={form.state}
+                onChange={e => setForm(f => ({ ...f, state: e.target.value.toUpperCase().slice(0, 2) }))}
+                placeholder="CA"
+                className="input text-sm w-full uppercase"
+                maxLength={2}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-medium text-gray-600 mb-1">ZIP</label>
+              <input
+                type="text"
+                value={form.zip}
+                onChange={e => setForm(f => ({ ...f, zip: e.target.value.replace(/[^\d-]/g, '').slice(0, 10) }))}
+                placeholder="90210"
+                className="input text-sm w-full"
+              />
+            </div>
+          </div>
+
+          {/* Status */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
+            <select
+              value={form.status}
+              onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
+              className="input text-sm w-full"
+            >
+              {STATUS_OPTIONS.map(s => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Trades (subs only — vendors use the Materials tab / Categories Supplied) */}
+          {recordType === 'sub' && (
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-2">
+              Trades
+            </label>
+            <select
+              value=""
+              onChange={e => {
+                const val = e.target.value
+                if (val && !form.divisions.includes(val)) {
+                  setForm(f => ({ ...f, divisions: [...f.divisions, val] }))
+                }
+              }}
+              className="input text-sm w-full"
+            >
+              <option value="">
+                — Select one or more {recordType === 'vendor' ? 'materials' : 'trades'} —
+              </option>
+              {(recordType === 'vendor' ? MATERIAL_OPTIONS : DIVISION_OPTIONS)
+                .filter(d => !form.divisions.includes(d))
+                .map(d => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+            </select>
+
+            {form.divisions.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {form.divisions.map(div => (
+                  <span
+                    key={div}
+                    className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-green-700 text-white"
+                  >
+                    {div}
+                    <button
+                      type="button"
+                      onClick={() => toggleDivision(div)}
+                      className="hover:text-green-200 leading-none"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-2 mt-2">
+              <input
+                type="text"
+                value={customInput}
+                onChange={e => setCustomInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    addCustom()
+                  }
+                }}
+                placeholder={`Add custom ${recordType === 'vendor' ? 'material' : 'trade'}…`}
+                className="input text-xs flex-1"
+              />
+              <button
+                type="button"
+                onClick={addCustom}
+                disabled={!customInput.trim()}
+                className="px-3 py-1.5 text-xs rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 disabled:opacity-40 transition-colors"
+              >
+                + Add
+              </button>
+            </div>
+          </div>
+          )}
+
+          {/* Insurance */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-2">Insurance</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] text-gray-400 mb-1">Liability Exp. Date</label>
+                <input
+                  type="date"
+                  value={form.liability_exp}
+                  onChange={e => setForm(f => ({ ...f, liability_exp: e.target.value }))}
+                  className="input text-sm w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-gray-400 mb-1">
+                  Worker's Comp Exp. Date
+                </label>
+                <input
+                  type="date"
+                  value={form.workers_comp_exp}
+                  onChange={e => setForm(f => ({ ...f, workers_comp_exp: e.target.value }))}
+                  className="input text-sm w-full"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Trade agreement status */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Trade Agreement Status
+            </label>
+            <input
+              type="text"
+              value={form.trade_agreement_status}
+              onChange={e => setForm(f => ({ ...f, trade_agreement_status: e.target.value }))}
+              placeholder="e.g. Signed, Pending, Not required"
+              className="input text-sm w-full"
+            />
+          </div>
 
           {/* Notes */}
           <div>
@@ -1961,7 +2036,7 @@ function SubModal({
 
         {/* Footer */}
         <div className="px-5 py-4 flex gap-2 flex-shrink-0 border-t border-gray-100">
-          {stab === 'details' && (
+          {stab !== 'quotes' && stab !== 'contracts' && (
             <button
               onClick={onSave}
               disabled={saving}
