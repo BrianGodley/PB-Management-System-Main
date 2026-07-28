@@ -655,7 +655,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
         .from('material_rates')
         .select('name, unit_cost, subcategory, vendor_id')
         .eq('category', 'Ground Treatments'),
-      supabase.from('subs_vendors').select('id, company_name').order('company_name'),
+      supabase.from('subs_vendors').select('id, company_name').eq('type', 'vendor').order('company_name'),
     ])
     setMaterialRows(matRowsRes.data || [])
     setVendors((venRes.data || []).map(v => ({ id: v.id, name: v.company_name })))
@@ -672,7 +672,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
         .from('material_rates')
         .select('name, unit_cost, subcategory, vendor_id')
         .eq('category', 'Ground Treatments'),
-      supabase.from('subs_vendors').select('id, company_name').order('company_name'),
+      supabase.from('subs_vendors').select('id, company_name').eq('type', 'vendor').order('company_name'),
     ])
     const prices = {}
     ;(matRes.data || []).forEach(r => {
