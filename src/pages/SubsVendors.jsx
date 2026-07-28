@@ -1576,7 +1576,7 @@ function SubModal({
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-[1120px] flex flex-col max-h-[95dvh]">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-[1120px] flex flex-col h-[88dvh] max-h-[95dvh]">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <h2 className="text-base font-bold text-gray-900">
