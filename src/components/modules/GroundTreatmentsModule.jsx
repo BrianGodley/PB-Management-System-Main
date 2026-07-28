@@ -244,6 +244,7 @@ function calcGroundTreatments(
     sodSF,
     sodType,
     sodFertilizer,
+    sodFertilizerVendor,
     flagstoneSoilSF,
     flagstoneConcreteSF,
     precastSoilSF,
@@ -310,7 +311,10 @@ function calcGroundTreatments(
 
   // Fertilizer — auto-figured bags from sod SF × coverage (SF/bag). Material only.
   let fertMat = 0
-  const fertT = FERTILIZER_TYPES.find(t => t.label === sodFertilizer)
+  const fertT =
+    sodFertilizerVendor && sodFertilizerVendor !== 'House'
+      ? rowOpt('Fertilizer', { vendor: sodFertilizerVendor, type: sodFertilizer }, FERTILIZER_TYPES)
+      : FERTILIZER_TYPES.find(t => t.label === sodFertilizer)
   if (fertT && fertT.dbName && n(sodSF) > 0) {
     const sfPerBag = p(GT_RATES.fertilizerSFPerBag.dbName, GT_RATES.fertilizerSFPerBag.fallback)
     const bags = sfPerBag > 0 ? Math.ceil(n(sodSF) / sfPerBag) : 0
@@ -812,6 +816,9 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   // filtered by which vendors supply that row's category. Sod stays a single
   // choice, so it keeps a per-section vendor picker.
   const [sodVendor, setSodVendor] = useState(initialData?.sodVendor ?? 'House')
+  const [sodFertilizerVendor, setSodFertilizerVendor] = useState(
+    initialData?.sodFertilizerVendor ?? 'House'
+  )
 
   // ── Sales tax — applied to totalMat across every module so the bid
   //    reflects supplier-invoiced material cost. Sourced from
@@ -841,6 +848,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     sodSF,
     sodType,
     sodFertilizer,
+    sodFertilizerVendor,
     flagstoneSoilSF,
     flagstoneConcreteSF,
     precastSoilSF,
@@ -1190,9 +1198,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       {/* ── Sod ── */}
       <div>
         <SectionHeader title="Sod" />
-        <div className="mb-2">
-          <VendorPicker vendors={vendorsForCategory('Sod')} value={sodVendor} onChange={changeSodVendor} label="Sod Vendor" />
-        </div>
         <div className="space-y-0">
           <LabeledRow
             label="Soil Prep"
@@ -1230,7 +1235,20 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             </span>
           </LabeledRow>
           <LabeledRow label="Sod">
-            <NumInput value={sodSF} onChange={setSodSF} placeholder="SF" className="w-28" />
+            <select
+              className="input text-sm py-1.5 w-32"
+              value={sodVendor}
+              onChange={e => changeSodVendor(e.target.value)}
+              title="Vendor"
+            >
+              <option value="House">House</option>
+              {vendorsForCategory('Sod').map(v => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
+            <NumInput value={sodSF} onChange={setSodSF} placeholder="SF" className="w-24" />
             <select
               className="input text-sm py-1.5 flex-1"
               value={sodType}
@@ -1282,18 +1300,49 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           </LabeledRow>
           <LabeledRow label="Fertilizer">
             <select
+              className="input text-sm py-1.5 w-32"
+              value={sodFertilizerVendor}
+              onChange={e => {
+                const v = e.target.value
+                setSodFertilizerVendor(v)
+                const opts =
+                  v === 'House'
+                    ? FERTILIZER_TYPES
+                    : [FERTILIZER_TYPES[0], ...sectionOptions('Fertilizer', v, [])]
+                if (!opts.some(o => o.label === sodFertilizer)) setSodFertilizer(opts[0].label)
+              }}
+              title="Vendor"
+            >
+              <option value="House">House</option>
+              {vendorsForCategory('Fertilizer').map(v => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
+            <select
               className="input text-sm py-1.5 flex-1"
               value={sodFertilizer}
               onChange={e => setSodFertilizer(e.target.value)}
             >
-              {FERTILIZER_TYPES.map(t => (
+              {(sodFertilizerVendor === 'House'
+                ? FERTILIZER_TYPES
+                : [FERTILIZER_TYPES[0], ...sectionOptions('Fertilizer', sodFertilizerVendor, [])]
+              ).map(t => (
                 <option key={t.label} value={t.label}>
                   {t.label}
                 </option>
               ))}
             </select>
             {(() => {
-              const ft = FERTILIZER_TYPES.find(t => t.label === sodFertilizer)
+              const ft =
+                sodFertilizerVendor === 'House'
+                  ? FERTILIZER_TYPES.find(t => t.label === sodFertilizer)
+                  : resolveType(
+                      sodFertilizer,
+                      [FERTILIZER_TYPES[0], ...sectionOptions('Fertilizer', sodFertilizerVendor, [])],
+                      FERTILIZER_TYPES
+                    )
               if (!ft || !ft.dbName) return null
               const sfPerBag = p(
                 GT_RATES.fertilizerSFPerBag.dbName,
