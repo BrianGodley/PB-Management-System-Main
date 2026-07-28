@@ -1259,9 +1259,9 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
         <SectionHeader title="Concrete Install" />
         <div className="grid grid-cols-2 gap-3 items-end">
           <div className={!isSub ? 'col-span-2' : undefined}>
-            <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap">
-              Installation (Sq Ft)
-              {isSub && (
+            {isSub && (
+              <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap">
+                Installation (Sq Ft)
                 <span className="text-gray-400 inline-flex items-center gap-1">
                   — ${subSlabRate}/SF all-in
                   <RateEditPopover
@@ -1273,8 +1273,8 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                     onSaved={refreshAllRates}
                   />
                 </span>
-              )}
-            </label>
+              </label>
+            )}
             {isSub ? (
               <NumInput
                 value={activeInstallSF}
@@ -1286,12 +1286,13 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             ) : (
               <div className="space-y-1">
                 {/* Column labels */}
-                <div className="flex items-center gap-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
-                  <span className="w-24 shrink-0" />
-                  <span className="w-28 shrink-0">Vendor</span>
-                  <span className="w-40 shrink-0">Type</span>
-                  <span className="w-16 shrink-0">Sq Ft</span>
-                  <span className="w-16 shrink-0">Depth (In)</span>
+                <div className="grid grid-cols-[6rem_7rem_minmax(0,1fr)_4.5rem_4.5rem_auto] items-center gap-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                  <span />
+                  <span>Vendor</span>
+                  <span>Type</span>
+                  <span>Sq Ft</span>
+                  <span>Depth (In)</span>
+                  <span />
                 </div>
                 {INSTALL_TIERS.map(t => {
                   const rate = laborRates[t.rateName] ?? t.def
@@ -1301,10 +1302,13 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                   const mt = resolveType(installTierType[t.key], mixOpts, MIX_TYPES)
                   const mixRate = materialRates[mt.dbName] ?? mt.fallback
                   return (
-                    <div key={t.key} className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[11px] text-gray-500 w-24 shrink-0">{t.label}</span>
+                    <div
+                      key={t.key}
+                      className="grid grid-cols-[6rem_7rem_minmax(0,1fr)_4.5rem_4.5rem_auto] items-center gap-2"
+                    >
+                      <span className="text-[11px] text-gray-500">{t.label}</span>
                       <select
-                        className="input text-xs py-1 w-28 shrink-0"
+                        className="input text-xs py-1 w-full"
                         value={effVendor('Concrete Mix', installTierVendor[t.key])}
                         onChange={e =>
                           setInstallTierVendor({ ...installTierVendor, [t.key]: e.target.value })
@@ -1319,7 +1323,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                         <option value="House">House</option>
                       </select>
                       <select
-                        className="input text-xs py-1 w-40 shrink-0"
+                        className="input text-xs py-1 w-full"
                         value={mt.label}
                         onChange={e =>
                           setInstallTierType({ ...installTierType, [t.key]: e.target.value })
@@ -1332,48 +1336,46 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                           </option>
                         ))}
                       </select>
-                      <div className="w-16 shrink-0">
-                        <NumInput
-                          value={installTiers[t.key] ?? ''}
-                          onChange={v => setInstallTiers({ ...installTiers, [t.key]: v })}
-                          placeholder="0"
-                        />
-                      </div>
-                      <div className="w-16 shrink-0">
-                        <NumInput
-                          value={installTierDepth[t.key] ?? ''}
-                          onChange={v => setInstallTierDepth({ ...installTierDepth, [t.key]: v })}
-                          placeholder="4"
-                        />
-                      </div>
-                      <span className="text-[11px] text-gray-400 inline-flex items-center gap-1 shrink-0 whitespace-nowrap">
-                        ${Number(mixRate).toFixed(0)}/CY
-                        <RateEditPopover
-                          table="material_rates"
-                          name={mt.dbName}
-                          category="Concrete"
-                          unitLabel="CY"
-                          currentValue={mixRate}
-                          onSaved={refreshAllRates}
-                        />
-                      </span>
-                      {is300plus && hasSF && (
-                        <span className="text-[10px] text-green-600 shrink-0 whitespace-nowrap">
-                          pump incl.
+                      <NumInput
+                        value={installTiers[t.key] ?? ''}
+                        onChange={v => setInstallTiers({ ...installTiers, [t.key]: v })}
+                        placeholder="0"
+                        className="w-full"
+                      />
+                      <NumInput
+                        value={installTierDepth[t.key] ?? ''}
+                        onChange={v => setInstallTierDepth({ ...installTierDepth, [t.key]: v })}
+                        placeholder="4"
+                        className="w-full"
+                      />
+                      <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                        <span className="text-[11px] text-gray-400 inline-flex items-center gap-1">
+                          ${Number(mixRate).toFixed(0)}/CY
+                          <RateEditPopover
+                            table="material_rates"
+                            name={mt.dbName}
+                            category="Concrete"
+                            unitLabel="CY"
+                            currentValue={mixRate}
+                            onSaved={refreshAllRates}
+                          />
                         </span>
-                      )}
-                      <span className="text-[11px] text-gray-400 inline-flex items-center gap-1 shrink-0 whitespace-nowrap">
-                        {rate} SF/hr
-                        <RateEditPopover
-                          table="labor_rates"
-                          name={t.rateName}
-                          category="Concrete"
-                          mode="coefficient"
-                          unitLabel="SF/hr"
-                          currentValue={rate}
-                          onSaved={refreshAllRates}
-                        />
-                      </span>
+                        {is300plus && hasSF && (
+                          <span className="text-[10px] text-green-600">pump incl.</span>
+                        )}
+                        <span className="text-[11px] text-gray-400 inline-flex items-center gap-1">
+                          {rate} SF/hr
+                          <RateEditPopover
+                            table="labor_rates"
+                            name={t.rateName}
+                            category="Concrete"
+                            mode="coefficient"
+                            unitLabel="SF/hr"
+                            currentValue={rate}
+                            onSaved={refreshAllRates}
+                          />
+                        </span>
+                      </div>
                     </div>
                   )
                 })}
