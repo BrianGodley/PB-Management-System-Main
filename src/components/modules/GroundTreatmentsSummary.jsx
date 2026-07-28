@@ -110,6 +110,19 @@ const DG_TYPES = [
   { label: 'Grey Stabilized Rock Dust', dbName: 'DG - Grey Stabilized Rock Dust', fallback: 145 },
 ]
 
+// Stepper stone types (material_rates, per TON) — mirror of the module. Legacy
+// modules without stepperType/stepperVendor fall back to the fixed per-stone rate.
+const STEPPER_TYPES = [
+  { label: 'Flagstone', dbName: 'Flagstone Steppers', fallback: 500 },
+  { label: 'Precast',   dbName: 'Precast Steppers',   fallback: 200 },
+]
+// Edging types (material_rates, per LF) — mirror of the module. Legacy modules
+// without edgingType/edgingVendor fall back to the fixed Plastic/Metal rate.
+const EDGING_TYPES = [
+  { label: 'Plastic', dbName: 'Plastic Edging', fallback: 1.2 },
+  { label: 'Metal',   dbName: 'Metal Edging',   fallback: 4.0 },
+]
+
 // Sod varieties + fertilizer — mirror of the module.
 const SOD_TYPES = [
   { label: 'Marathon', dbName: 'Sod - Marathon', fallback: 1.0 },
@@ -495,26 +508,38 @@ export default function GroundTreatmentsSummary({ module }) {
   const edgingLines = []
 
   if (n(plasticEdgingLF) > 0) {
-    const mat =
-      n(plasticEdgingLF) * mp(GT_RATES.plasticEdgingMat.dbName, GT_RATES.plasticEdgingMat.fallback)
+    // Material rate now comes from the picked Vendor+Type; labor stays per line.
+    // Old estimates (no edgingType/edgingVendor) fall back to the fixed Plastic rate.
+    const rate = priceForRow(
+      'Edging',
+      { type: data.edgingType?.plastic, vendor: data.edgingVendor?.plastic },
+      EDGING_TYPES,
+      mp(GT_RATES.plasticEdgingMat.dbName, GT_RATES.plasticEdgingMat.fallback)
+    )
+    const mat = n(plasticEdgingLF) * rate
     const hrs =
       n(plasticEdgingLF) * mp(GT_RATES.plasticEdgingLab.dbName, GT_RATES.plasticEdgingLab.fallback)
     edgingLines.push({
       label: `Plastic Edging — ${n(plasticEdgingLF).toLocaleString()} LF`,
       value: fmt2(mat),
-      sub: `${hrs.toFixed(2)} hrs`,
+      sub: `${hrs.toFixed(2)} hrs · ${fmt2(rate)}/LF`,
     })
   }
 
   if (n(metalEdgingLF) > 0) {
-    const mat =
-      n(metalEdgingLF) * mp(GT_RATES.metalEdgingMat.dbName, GT_RATES.metalEdgingMat.fallback)
+    const rate = priceForRow(
+      'Edging',
+      { type: data.edgingType?.metal, vendor: data.edgingVendor?.metal },
+      EDGING_TYPES,
+      mp(GT_RATES.metalEdgingMat.dbName, GT_RATES.metalEdgingMat.fallback)
+    )
+    const mat = n(metalEdgingLF) * rate
     const hrs =
       n(metalEdgingLF) * mp(GT_RATES.metalEdgingLab.dbName, GT_RATES.metalEdgingLab.fallback)
     edgingLines.push({
       label: `Metal Edging — ${n(metalEdgingLF).toLocaleString()} LF`,
       value: fmt2(mat),
-      sub: `${hrs.toFixed(2)} hrs`,
+      sub: `${hrs.toFixed(2)} hrs · ${fmt2(rate)}/LF`,
     })
   }
 
@@ -523,30 +548,45 @@ export default function GroundTreatmentsSummary({ module }) {
   // line — same per-ton material rate, different (slower) concrete labor rate.
   // Legacy modules stored a single flagstoneSF/precastSF (+ optional
   // flagstoneRate/precastRate); those fall through to the soil-set line.
+  // Material rate now resolves per line from the saved Vendor+Type
+  // (d.stepperVendor / d.stepperType, keyed by line id). Old saves lack those
+  // objects → fall back to the legacy fixed per-stone rate (matOverride /
+  // matRate). Labor stays per-line (its own SF/day rate). Money still comes from
+  // d.calc; these lines are the display breakdown.
   const stepperLines = []
+  const _stepperVendor = data.stepperVendor || {}
+  const _stepperType = data.stepperType || {}
   const stepperDefs = [
     {
+      key: 'flagSoil',
       label: 'Flagstone Steppers (Soil Set)',
+      houseType: 'Flagstone',
       sf: n(flagstoneSoilSF) || n(flagstoneSF),
       matRate: GT_RATES.flagstonePerTon,
       matOverride: flagstoneRate,
       labRate: GT_RATES.flagstoneSoilLab,
     },
     {
+      key: 'flagConc',
       label: 'Flagstone Steppers (Concrete Set)',
+      houseType: 'Flagstone',
       sf: n(flagstoneConcreteSF),
       matRate: GT_RATES.flagstonePerTon,
       labRate: GT_RATES.flagstoneConcreteLab,
     },
     {
+      key: 'precSoil',
       label: 'Precast Steppers (Soil Set)',
+      houseType: 'Precast',
       sf: n(precastSoilSF) || n(precastSF),
       matRate: GT_RATES.precastPerTon,
       matOverride: precastRate,
       labRate: GT_RATES.precastSoilLab,
     },
     {
+      key: 'precConc',
       label: 'Precast Steppers (Concrete Set)',
+      houseType: 'Precast',
       sf: n(precastConcreteSF),
       matRate: GT_RATES.precastPerTon,
       labRate: GT_RATES.precastConcreteLab,
@@ -555,14 +595,23 @@ export default function GroundTreatmentsSummary({ module }) {
   stepperDefs.forEach(def => {
     if (def.sf <= 0) return
     const tons = def.sf / 80
-    const rate = n(def.matOverride) || mp(def.matRate.dbName, def.matRate.fallback)
+    const savedType = _stepperType[def.key]
+    const savedVendor = _stepperVendor[def.key]
+    const legacyRate = n(def.matOverride) || mp(def.matRate.dbName, def.matRate.fallback)
+    // New saves resolve the picked Vendor+Type via the material_rates snapshot;
+    // House / old saves keep the legacy per-stone rate.
+    const rate =
+      savedType != null
+        ? priceForRow('Steppers', { type: savedType, vendor: savedVendor }, STEPPER_TYPES, legacyRate)
+        : legacyRate
     const sfPerDay = mp(def.labRate.dbName, def.labRate.fallback)
     const mat = tons * rate
     const hrs = sfPerDay > 0 ? (def.sf / sfPerDay) * 8 : 0
+    const typeSuffix = savedType && savedType !== def.houseType ? ` · ${savedType}` : ''
     stepperLines.push({
       label: `${def.label} — ${def.sf.toLocaleString()} SF`,
       value: fmt2(mat),
-      sub: `${hrs.toFixed(2)} hrs · ${tons.toFixed(2)} tons · ${fmt2(rate)}/ton`,
+      sub: `${hrs.toFixed(2)} hrs · ${tons.toFixed(2)} tons · ${fmt2(rate)}/ton${typeSuffix}`,
     })
   })
 

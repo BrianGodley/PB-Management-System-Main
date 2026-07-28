@@ -140,6 +140,20 @@ const DG_TYPES = [
   { label: 'Grey Stabilized Rock Dust', dbName: 'DG - Grey Stabilized Rock Dust', fallback: 145 }, // C&M $145/CY
 ]
 
+// Stepper stone types (material_rates, per TON). House defaults keep existing
+// estimates unchanged (Flagstone / Precast). Vendor rows filter to subcategory
+// 'Steppers'. Labor stays per-line (Soil vs Concrete SF/day), not from the type.
+const STEPPER_TYPES = [
+  { label: 'Flagstone', dbName: 'Flagstone Steppers', fallback: 500 },
+  { label: 'Precast',   dbName: 'Precast Steppers',   fallback: 200 },
+]
+// Edging types (material_rates, per LF). House defaults keep existing estimates
+// unchanged (Plastic / Metal). Vendor rows filter to subcategory 'Edging'.
+const EDGING_TYPES = [
+  { label: 'Plastic', dbName: 'Plastic Edging', fallback: 1.2 },
+  { label: 'Metal',   dbName: 'Metal Edging',   fallback: 4.0 },
+]
+
 const DEFAULTS = {
   laborRatePerHour: 35,
   laborBurdenPct: 0.29,
@@ -249,6 +263,10 @@ function calcGroundTreatments(
     flagstoneConcreteSF,
     precastSoilSF,
     precastConcreteSF,
+    stepperVendor,
+    stepperType,
+    edgingVendor,
+    edgingType,
     dgRows,
     gravelRows,
     soilsRows,
@@ -286,14 +304,27 @@ function calcGroundTreatments(
   }
 
   // ── Edging ─────────────────────────────────────────────────────────────────
+  // Labor stays per-line (unchanged). Material rate now comes from the picked
+  // Type (filtered to the picked Vendor's catalog); House defaults to
+  // Plastic/Metal so old estimates price identically.
   const plasticLab =
     n(plasticEdgingLF) * p(GT_RATES.plasticEdgingLab.dbName, GT_RATES.plasticEdgingLab.fallback)
+  const _plasticEdgeOpt = rowOpt(
+    'Edging',
+    { vendor: (edgingVendor || {}).plastic, type: (edgingType || {}).plastic || 'Plastic' },
+    EDGING_TYPES
+  )
   const plasticMat =
-    n(plasticEdgingLF) * p(GT_RATES.plasticEdgingMat.dbName, GT_RATES.plasticEdgingMat.fallback)
+    n(plasticEdgingLF) * p(_plasticEdgeOpt.dbName, _plasticEdgeOpt.fallback)
   const metalLab =
     n(metalEdgingLF) * p(GT_RATES.metalEdgingLab.dbName, GT_RATES.metalEdgingLab.fallback)
+  const _metalEdgeOpt = rowOpt(
+    'Edging',
+    { vendor: (edgingVendor || {}).metal, type: (edgingType || {}).metal || 'Metal' },
+    EDGING_TYPES
+  )
   const metalMat =
-    n(metalEdgingLF) * p(GT_RATES.metalEdgingMat.dbName, GT_RATES.metalEdgingMat.fallback)
+    n(metalEdgingLF) * p(_metalEdgeOpt.dbName, _metalEdgeOpt.fallback)
 
   // ── Soil Prep ──────────────────────────────────────────────────────────────
   const soilLab = n(soilPrepSF) * p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
@@ -330,44 +361,44 @@ function calcGroundTreatments(
     soilsMat += CY * p(st.dbName, st.fallback)
   })
 
-  // ── Flagstone Steppers (Soil Set + Concrete Set) ────────────────────────────
-  // Each set has its own labor rate (SF/day); material is tons*perTon for both,
-  // where tons = SF/80. Concrete Set adds NO extra concrete/mortar material —
-  // it only differs by a (slower) labor rate (values TBD, easy to extend later).
+  // ── Steppers (Flagstone + Precast, Soil Set + Concrete Set) ─────────────────
+  // Each of the 4 lines now resolves its own material rate from a per-line
+  // Vendor + Type pick (House defaults → Flagstone/Precast so old estimates are
+  // unchanged). Labor stays per-line (its own SF/day rate). material = tons *
+  // perTon, tons = SF/80. flagLab/flagMat/precastLab/precastMat are retained for
+  // the return shape; stepLab/stepMat are the section totals fed to the bid.
+  let stepLab = 0,
+    stepMat = 0
   let flagLab = 0,
-    flagMat = 0
-  {
-    const perTon = p(GT_RATES.flagstonePerTon.dbName, GT_RATES.flagstonePerTon.fallback)
-    const soilSfPerDay = p(GT_RATES.flagstoneSoilLab.dbName, GT_RATES.flagstoneSoilLab.fallback)
-    const concSfPerDay = p(
-      GT_RATES.flagstoneConcreteLab.dbName,
-      GT_RATES.flagstoneConcreteLab.fallback
-    )
-    if (n(flagstoneSoilSF) > 0) {
-      flagLab += (n(flagstoneSoilSF) / soilSfPerDay) * 8
-      flagMat += (n(flagstoneSoilSF) / 80) * perTon
-    }
-    if (n(flagstoneConcreteSF) > 0) {
-      flagLab += (n(flagstoneConcreteSF) / concSfPerDay) * 8
-      flagMat += (n(flagstoneConcreteSF) / 80) * perTon
-    }
-  }
-
-  // ── Precast Steppers (Soil Set + Concrete Set) ──────────────────────────────
-  let precastLab = 0,
+    flagMat = 0,
+    precastLab = 0,
     precastMat = 0
   {
-    const perTon = p(GT_RATES.precastPerTon.dbName, GT_RATES.precastPerTon.fallback)
-    const soilSfPerDay = p(GT_RATES.precastSoilLab.dbName, GT_RATES.precastSoilLab.fallback)
-    const concSfPerDay = p(GT_RATES.precastConcreteLab.dbName, GT_RATES.precastConcreteLab.fallback)
-    if (n(precastSoilSF) > 0) {
-      precastLab += (n(precastSoilSF) / soilSfPerDay) * 8
-      precastMat += (n(precastSoilSF) / 80) * perTon
-    }
-    if (n(precastConcreteSF) > 0) {
-      precastLab += (n(precastConcreteSF) / concSfPerDay) * 8
-      precastMat += (n(precastConcreteSF) / 80) * perTon
-    }
+    const _sv = stepperVendor || {}
+    const _st = stepperType || {}
+    const stepLines = [
+      { key: 'flagSoil', sf: flagstoneSoilSF, labRate: GT_RATES.flagstoneSoilLab, defType: 'Flagstone', bucket: 'flag' },
+      { key: 'flagConc', sf: flagstoneConcreteSF, labRate: GT_RATES.flagstoneConcreteLab, defType: 'Flagstone', bucket: 'flag' },
+      { key: 'precSoil', sf: precastSoilSF, labRate: GT_RATES.precastSoilLab, defType: 'Precast', bucket: 'precast' },
+      { key: 'precConc', sf: precastConcreteSF, labRate: GT_RATES.precastConcreteLab, defType: 'Precast', bucket: 'precast' },
+    ]
+    stepLines.forEach(ln => {
+      if (!(n(ln.sf) > 0)) return
+      const opt = rowOpt('Steppers', { vendor: _sv[ln.key], type: _st[ln.key] || ln.defType }, STEPPER_TYPES)
+      const perTon = p(opt.dbName, opt.fallback)
+      const sfPerDay = p(ln.labRate.dbName, ln.labRate.fallback)
+      const lab = sfPerDay > 0 ? (n(ln.sf) / sfPerDay) * 8 : 0
+      const mat = (n(ln.sf) / 80) * perTon
+      stepLab += lab
+      stepMat += mat
+      if (ln.bucket === 'flag') {
+        flagLab += lab
+        flagMat += mat
+      } else {
+        precastLab += lab
+        precastMat += mat
+      }
+    })
   }
 
   // ── Decomposed Granite (multi-row) ──────────────────────────────────────────
@@ -477,8 +508,7 @@ function calcGroundTreatments(
     soilLab +
     sodSoilLab +
     sodLab +
-    flagLab +
-    precastLab +
+    stepLab +
     dgLab +
     gravelLab +
     pebbleLab +
@@ -497,8 +527,7 @@ function calcGroundTreatments(
     sodSoilMat +
     sodMat +
     fertMat +
-    flagMat +
-    precastMat +
+    stepMat +
     dgMat +
     gravelMat +
     pebbleMat +
@@ -781,6 +810,22 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   )
   const [precastSoilSF, setPrecastSoilSF] = useState(initialData?.precastSoilSF ?? '')
   const [precastConcreteSF, setPrecastConcreteSF] = useState(initialData?.precastConcreteSF ?? '')
+  // Steppers now pick Vendor + Type per line (4 lines). House defaults keep the
+  // legacy Flagstone/Precast material behavior; labor stays per-line.
+  const [stepperVendor, setStepperVendor] = useState(
+    initialData?.stepperVendor ?? { flagSoil: 'House', flagConc: 'House', precSoil: 'House', precConc: 'House' }
+  )
+  const [stepperType, setStepperType] = useState(
+    initialData?.stepperType ?? { flagSoil: 'Flagstone', flagConc: 'Flagstone', precSoil: 'Precast', precConc: 'Precast' }
+  )
+  // Edging picks Vendor + Type per line (Plastic / Metal). House defaults keep
+  // the legacy Plastic/Metal material behavior; labor stays per-line.
+  const [edgingVendor, setEdgingVendor] = useState(
+    initialData?.edgingVendor ?? { plastic: 'House', metal: 'House' }
+  )
+  const [edgingType, setEdgingType] = useState(
+    initialData?.edgingType ?? { plastic: 'Plastic', metal: 'Metal' }
+  )
   // D.G. is now a multi-row table. Backward-compat: migrate a legacy single DG
   // entry (dgSF/dgType/…) into the first row + one blank row.
   const [dgRows, setDgRows] = useState(
@@ -853,6 +898,10 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     flagstoneConcreteSF,
     precastSoilSF,
     precastConcreteSF,
+    stepperVendor,
+    stepperType,
+    edgingVendor,
+    edgingType,
     dgRows,
     gravelRows,
     soilsRows,
@@ -2308,85 +2357,153 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       <div>
         <SectionHeader title="Edging" />
         <div className="space-y-0">
-          {/* Plastic Edging */}
-          <LabeledRow
-            label="Plastic Edging"
-            note={
-              n(plasticEdgingLF) > 0
-                ? `$${(n(plasticEdgingLF) * p(GT_RATES.plasticEdgingMat.dbName, 1.2)).toFixed(2)} mat`
-                : null
-            }
-          >
-            <NumInput
-              value={plasticEdgingLF}
-              onChange={setPlasticEdgingLF}
-              placeholder="LF"
-              className="w-28"
-            />
-            <span className="text-xs text-gray-400 inline-flex items-center gap-1">
-              ${p(GT_RATES.plasticEdgingMat.dbName, 1.2).toFixed(2)}/LF
-              <RateEditPopover
-                table="material_rates"
-                name={GT_RATES.plasticEdgingMat.dbName}
-                category="Ground Treatments"
-                unitLabel="LF"
-                currentValue={p(
-                  GT_RATES.plasticEdgingMat.dbName,
-                  GT_RATES.plasticEdgingMat.fallback
-                )}
-                onSaved={refreshAllRates}
-              />
-              <RateEditPopover
-                table="labor_rates"
-                name={GT_RATES.plasticEdgingLab.dbName}
-                category="Ground Treatments"
-                mode="coefficient"
-                unitLabel="hrs/LF"
-                currentValue={p(
-                  GT_RATES.plasticEdgingLab.dbName,
-                  GT_RATES.plasticEdgingLab.fallback
-                )}
-                onSaved={refreshAllRates}
-              />
-            </span>
-          </LabeledRow>
+          {/* Plastic Edging — Vendor + Type per line (material from picked type; labor per line) */}
+          {(() => {
+            const opts = sectionOptions('Edging', edgingVendor.plastic, EDGING_TYPES)
+            const t = resolveType(edgingType.plastic, opts, EDGING_TYPES)
+            const rate = p(t.dbName, t.fallback)
+            return (
+              <LabeledRow
+                label="Plastic Edging"
+                note={
+                  n(plasticEdgingLF) > 0 ? `$${(n(plasticEdgingLF) * rate).toFixed(2)} mat` : null
+                }
+              >
+                <select
+                  className="input text-sm py-1.5 w-32"
+                  value={edgingVendor.plastic || 'House'}
+                  onChange={e => {
+                    const v = e.target.value
+                    setEdgingVendor(ev => ({ ...ev, plastic: v }))
+                    const first = sectionOptions('Edging', v, EDGING_TYPES)[0]?.label
+                    if (first) setEdgingType(et => ({ ...et, plastic: first }))
+                  }}
+                  title="Vendor"
+                >
+                  <option value="House">House</option>
+                  {vendorsForCategory('Edging').map(v => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="input text-sm py-1.5"
+                  value={edgingType.plastic}
+                  onChange={e => setEdgingType(et => ({ ...et, plastic: e.target.value }))}
+                  title="Type"
+                >
+                  {opts.map(o => (
+                    <option key={o.label} value={o.label}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                <NumInput
+                  value={plasticEdgingLF}
+                  onChange={setPlasticEdgingLF}
+                  placeholder="LF"
+                  className="w-28"
+                />
+                <span className="text-xs text-gray-400 inline-flex items-center gap-1">
+                  ${rate.toFixed(2)}/LF
+                  <RateEditPopover
+                    table="material_rates"
+                    name={t.dbName}
+                    category="Ground Treatments"
+                    unitLabel="LF"
+                    currentValue={rate}
+                    onSaved={refreshAllRates}
+                  />
+                  <RateEditPopover
+                    table="labor_rates"
+                    name={GT_RATES.plasticEdgingLab.dbName}
+                    category="Ground Treatments"
+                    mode="coefficient"
+                    unitLabel="hrs/LF"
+                    currentValue={p(
+                      GT_RATES.plasticEdgingLab.dbName,
+                      GT_RATES.plasticEdgingLab.fallback
+                    )}
+                    onSaved={refreshAllRates}
+                  />
+                </span>
+              </LabeledRow>
+            )
+          })()}
 
-          {/* Metal Edging */}
-          <LabeledRow
-            label="Metal Edging"
-            note={
-              n(metalEdgingLF) > 0
-                ? `$${(n(metalEdgingLF) * p(GT_RATES.metalEdgingMat.dbName, 4.0)).toFixed(2)} mat`
-                : null
-            }
-          >
-            <NumInput
-              value={metalEdgingLF}
-              onChange={setMetalEdgingLF}
-              placeholder="LF"
-              className="w-28"
-            />
-            <span className="text-xs text-gray-400 inline-flex items-center gap-1">
-              ${p(GT_RATES.metalEdgingMat.dbName, 4.0).toFixed(2)}/LF
-              <RateEditPopover
-                table="material_rates"
-                name={GT_RATES.metalEdgingMat.dbName}
-                category="Ground Treatments"
-                unitLabel="LF"
-                currentValue={p(GT_RATES.metalEdgingMat.dbName, GT_RATES.metalEdgingMat.fallback)}
-                onSaved={refreshAllRates}
-              />
-              <RateEditPopover
-                table="labor_rates"
-                name={GT_RATES.metalEdgingLab.dbName}
-                category="Ground Treatments"
-                mode="coefficient"
-                unitLabel="hrs/LF"
-                currentValue={p(GT_RATES.metalEdgingLab.dbName, GT_RATES.metalEdgingLab.fallback)}
-                onSaved={refreshAllRates}
-              />
-            </span>
-          </LabeledRow>
+          {/* Metal Edging — Vendor + Type per line (material from picked type; labor per line) */}
+          {(() => {
+            const opts = sectionOptions('Edging', edgingVendor.metal, EDGING_TYPES)
+            const t = resolveType(edgingType.metal, opts, EDGING_TYPES)
+            const rate = p(t.dbName, t.fallback)
+            return (
+              <LabeledRow
+                label="Metal Edging"
+                note={n(metalEdgingLF) > 0 ? `$${(n(metalEdgingLF) * rate).toFixed(2)} mat` : null}
+              >
+                <select
+                  className="input text-sm py-1.5 w-32"
+                  value={edgingVendor.metal || 'House'}
+                  onChange={e => {
+                    const v = e.target.value
+                    setEdgingVendor(ev => ({ ...ev, metal: v }))
+                    const first = sectionOptions('Edging', v, EDGING_TYPES)[0]?.label
+                    if (first) setEdgingType(et => ({ ...et, metal: first }))
+                  }}
+                  title="Vendor"
+                >
+                  <option value="House">House</option>
+                  {vendorsForCategory('Edging').map(v => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="input text-sm py-1.5"
+                  value={edgingType.metal}
+                  onChange={e => setEdgingType(et => ({ ...et, metal: e.target.value }))}
+                  title="Type"
+                >
+                  {opts.map(o => (
+                    <option key={o.label} value={o.label}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                <NumInput
+                  value={metalEdgingLF}
+                  onChange={setMetalEdgingLF}
+                  placeholder="LF"
+                  className="w-28"
+                />
+                <span className="text-xs text-gray-400 inline-flex items-center gap-1">
+                  ${rate.toFixed(2)}/LF
+                  <RateEditPopover
+                    table="material_rates"
+                    name={t.dbName}
+                    category="Ground Treatments"
+                    unitLabel="LF"
+                    currentValue={rate}
+                    onSaved={refreshAllRates}
+                  />
+                  <RateEditPopover
+                    table="labor_rates"
+                    name={GT_RATES.metalEdgingLab.dbName}
+                    category="Ground Treatments"
+                    mode="coefficient"
+                    unitLabel="hrs/LF"
+                    currentValue={p(
+                      GT_RATES.metalEdgingLab.dbName,
+                      GT_RATES.metalEdgingLab.fallback
+                    )}
+                    onSaved={refreshAllRates}
+                  />
+                </span>
+              </LabeledRow>
+            )
+          })()}
         </div>
       </div>
 
@@ -2402,6 +2519,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
+                <th className="text-left pb-1 pr-2 font-medium">Type</th>
                 <th className="text-left pb-1 pr-2 font-medium">Line</th>
                 <th className="text-left pb-1 pr-2 font-medium">Area (SF)</th>
                 <th className="text-left pb-1 pr-2 font-medium">Labor</th>
@@ -2413,42 +2532,80 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             <tbody>
               {[
                 {
+                  key: 'flagSoil',
                   label: 'Flagstone — Soil Set',
                   sf: flagstoneSoilSF,
                   set: setFlagstoneSoilSF,
                   labRate: GT_RATES.flagstoneSoilLab,
-                  matRate: GT_RATES.flagstonePerTon,
                 },
                 {
+                  key: 'flagConc',
                   label: 'Flagstone — Concrete Set',
                   sf: flagstoneConcreteSF,
                   set: setFlagstoneConcreteSF,
                   labRate: GT_RATES.flagstoneConcreteLab,
-                  matRate: GT_RATES.flagstonePerTon,
                 },
                 {
+                  key: 'precSoil',
                   label: 'Precast — Soil Set',
                   sf: precastSoilSF,
                   set: setPrecastSoilSF,
                   labRate: GT_RATES.precastSoilLab,
-                  matRate: GT_RATES.precastPerTon,
                 },
                 {
+                  key: 'precConc',
                   label: 'Precast — Concrete Set',
                   sf: precastConcreteSF,
                   set: setPrecastConcreteSF,
                   labRate: GT_RATES.precastConcreteLab,
-                  matRate: GT_RATES.precastPerTon,
                 },
-              ].map((row, i) => {
+              ].map(row => {
+                const rowOpts = sectionOptions('Steppers', stepperVendor[row.key], STEPPER_TYPES)
+                const st = resolveType(stepperType[row.key], rowOpts, STEPPER_TYPES)
                 const sfPerDay = p(row.labRate.dbName, row.labRate.fallback)
-                const perTon = p(row.matRate.dbName, row.matRate.fallback)
+                const perTon = p(st.dbName, st.fallback)
                 const sfN = n(row.sf)
                 const tons = sfN / 80
                 const mat = tons * perTon
                 const hrs = sfPerDay > 0 ? (sfN / sfPerDay) * 8 : 0
                 return (
-                  <tr key={i} className="border-b border-gray-100">
+                  <tr key={row.key} className="border-b border-gray-100">
+                    <td className="py-1 pr-2">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={stepperVendor[row.key] || 'House'}
+                        onChange={e => {
+                          const v = e.target.value
+                          setStepperVendor(sv => ({ ...sv, [row.key]: v }))
+                          const first = sectionOptions('Steppers', v, STEPPER_TYPES)[0]?.label
+                          if (first) setStepperType(st => ({ ...st, [row.key]: first }))
+                        }}
+                        title="Vendor"
+                      >
+                        <option value="House">House</option>
+                        {vendorsForCategory('Steppers').map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1 pr-2">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={stepperType[row.key] || rowOpts[0]?.label}
+                        onChange={e =>
+                          setStepperType(st => ({ ...st, [row.key]: e.target.value }))
+                        }
+                        title="Type"
+                      >
+                        {rowOpts.map(o => (
+                          <option key={o.label} value={o.label}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
                     <td className="py-1 pr-2 text-xs text-gray-700 whitespace-nowrap">{row.label}</td>
                     <td className="py-1 pr-2">
                       <NumInput value={row.sf} onChange={row.set} />
@@ -2472,7 +2629,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         ${perTon.toFixed(2)}/ton
                         <RateEditPopover
                           table="material_rates"
-                          name={row.matRate.dbName}
+                          name={st.dbName}
                           category="Ground Treatments"
                           unitLabel="ton"
                           currentValue={perTon}
