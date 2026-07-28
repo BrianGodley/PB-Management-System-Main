@@ -31,6 +31,7 @@ const GT_RATES = {
   soilPrepLab: { dbName: 'Soil Prep - Labor Rate', fallback: 0.012 },
   sodMarathonMat: { dbName: 'Sod - Marathon', fallback: 1.2 },
   sodStAugMat: { dbName: 'Sod - St. Augustine', fallback: 1.97 },
+  fertilizerSFPerBag: { dbName: 'Fertilizer - SF Per Bag', fallback: 4000 },
   sodLab: { dbName: 'Sod - Labor Rate', fallback: 0.01143 },
   flagstonePerTon: { dbName: 'Flagstone Steppers', fallback: 500.0 },
   flagstoneSoilLab: { dbName: 'Flagstone Steppers - Soil Labor', fallback: 35 },
@@ -109,6 +110,23 @@ const DG_TYPES = [
   { label: 'Grey Stabilized Rock Dust', dbName: 'DG - Grey Stabilized Rock Dust', fallback: 145 },
 ]
 
+// Sod varieties + fertilizer — mirror of the module.
+const SOD_TYPES = [
+  { label: 'Marathon', dbName: 'Sod - Marathon', fallback: 1.0 },
+  { label: 'Marathon II', dbName: 'Sod - Marathon II', fallback: 1.01 },
+  { label: 'Marathon Lite', dbName: 'Sod - Marathon Lite', fallback: 1.16 },
+  { label: 'Marathon II Lite', dbName: 'Sod - Marathon II Lite', fallback: 1.17 },
+  { label: 'PureBlue Lite', dbName: 'Sod - PureBlue Lite', fallback: 1.26 },
+  { label: 'GreenWave Lite', dbName: 'Sod - GreenWave Lite', fallback: 1.26 },
+  { label: 'Hybrid Bermuda', dbName: 'Sod - Hybrid Bermuda', fallback: 1.0 },
+  { label: 'St. Augustine', dbName: 'Sod - St. Augustine', fallback: 1.73 },
+]
+const FERTILIZER_TYPES = [
+  { label: 'None', dbName: null, fallback: 0 },
+  { label: 'Marathon All Season (24-2-4)', dbName: 'Fertilizer - Marathon All Season', fallback: 20.84 },
+  { label: 'Sod & Seed Starter (15-15-15)', dbName: 'Fertilizer - Sod Seed Starter', fallback: 20.87 },
+]
+
 const n = v => parseFloat(v) || 0
 const fmt2 = v =>
   `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -154,7 +172,8 @@ export default function GroundTreatmentsSummary({ module }) {
     soilPrepSF = 0,
     sodSoilPrepSF = 0,
     sodSF = 0,
-    sodType = 'Marathon I/II',
+    sodType = 'Marathon',
+    sodFertilizer = 'None',
     flagstoneSF = 0,
     flagstoneRate,
     precastSF = 0,
@@ -209,16 +228,31 @@ export default function GroundTreatmentsSummary({ module }) {
   // ── Sod ──────────────────────────────────────────────────────────────────────
   let sodLine = null
   if (n(sodSF) > 0) {
-    const rate =
-      sodType === 'St. Augustine'
-        ? mp(GT_RATES.sodStAugMat.dbName, GT_RATES.sodStAugMat.fallback)
-        : mp(GT_RATES.sodMarathonMat.dbName, GT_RATES.sodMarathonMat.fallback)
+    const st = SOD_TYPES.find(t => t.label === sodType) || SOD_TYPES[0]
+    const rate = mp(st.dbName, st.fallback)
     const mat = n(sodSF) * rate
     const hrs = n(sodSF) * mp(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback)
     sodLine = {
       label: `Sod (${sodType}) — ${n(sodSF).toLocaleString()} SF`,
       value: fmt2(mat),
       sub: `${hrs.toFixed(2)} hrs · ${fmt2(rate)}/SF`,
+    }
+  }
+
+  // ── Fertilizer (auto bags from sod SF) ─────────────────────────────────────────
+  let fertLine = null
+  {
+    const ft = FERTILIZER_TYPES.find(t => t.label === sodFertilizer)
+    if (ft && ft.dbName && n(sodSF) > 0) {
+      const sfPerBag = mp(GT_RATES.fertilizerSFPerBag.dbName, GT_RATES.fertilizerSFPerBag.fallback)
+      const bags = sfPerBag > 0 ? Math.ceil(n(sodSF) / sfPerBag) : 0
+      const mat = bags * mp(ft.dbName, ft.fallback)
+      if (bags > 0)
+        fertLine = {
+          label: `Fertilizer (${sodFertilizer})`,
+          value: fmt2(mat),
+          sub: `${bags} bag${bags > 1 ? 's' : ''} · ${fmt2(mp(ft.dbName, ft.fallback))}/bag`,
+        }
     }
   }
 
@@ -472,6 +506,7 @@ export default function GroundTreatmentsSummary({ module }) {
     soilPrepLine ||
     sodSoilPrepLine ||
     sodLine ||
+    fertLine ||
     mulchLines.length ||
     dgLines.length ||
     gravelLines.length ||
@@ -539,7 +574,7 @@ export default function GroundTreatmentsSummary({ module }) {
             </>
           )}
 
-          {(sodSoilPrepLine || sodLine) && (
+          {(sodSoilPrepLine || sodLine || fertLine) && (
             <>
               <SectionLabel title="Sod" />
               {sodSoilPrepLine && (
@@ -551,6 +586,9 @@ export default function GroundTreatmentsSummary({ module }) {
               )}
               {sodLine && (
                 <LineRow label={sodLine.label} value={sodLine.value} sub={sodLine.sub} />
+              )}
+              {fertLine && (
+                <LineRow label={fertLine.label} value={fertLine.value} sub={fertLine.sub} />
               )}
             </>
           )}

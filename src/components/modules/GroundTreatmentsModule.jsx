@@ -35,6 +35,7 @@ const GT_RATES = {
   sodMarathonMat: { dbName: 'Sod - Marathon', fallback: 1.2 }, // $/SF
   sodStAugMat: { dbName: 'Sod - St. Augustine', fallback: 1.97 }, // $/SF
   sodLab: { dbName: 'Sod - Labor Rate', fallback: 0.01143 }, // hrs/SF (≈8/700)
+  fertilizerSFPerBag: { dbName: 'Fertilizer - SF Per Bag', fallback: 4000 }, // SF covered per 18-lb bag (labor_rates coefficient)
 
   // ── Steppers ───────────────────────────────────────────────────────────────
   // Each stone (Flagstone / Precast) has ONE per-ton material key shared across
@@ -146,7 +147,25 @@ const DEFAULTS = {
   commissionRate: 0.12,
 }
 
-const SOD_TYPES = ['Marathon I/II', 'St. Augustine']
+// Sod varieties — Southland Sod Farms wholesale, Zone 2 delivered $/SF (material_rates).
+const SOD_TYPES = [
+  { label: 'Marathon', dbName: 'Sod - Marathon', fallback: 1.0 },
+  { label: 'Marathon II', dbName: 'Sod - Marathon II', fallback: 1.01 },
+  { label: 'Marathon Lite', dbName: 'Sod - Marathon Lite', fallback: 1.16 },
+  { label: 'Marathon II Lite', dbName: 'Sod - Marathon II Lite', fallback: 1.17 },
+  { label: 'PureBlue Lite', dbName: 'Sod - PureBlue Lite', fallback: 1.26 },
+  { label: 'GreenWave Lite', dbName: 'Sod - GreenWave Lite', fallback: 1.26 },
+  { label: 'Hybrid Bermuda', dbName: 'Sod - Hybrid Bermuda', fallback: 1.0 },
+  { label: 'St. Augustine', dbName: 'Sod - St. Augustine', fallback: 1.73 },
+]
+
+// Fertilizer options — Southland Sod Farms, $/18-lb bag (material_rates). Bags are
+// auto-figured from the sod SF via the SF-per-bag coverage coefficient.
+const FERTILIZER_TYPES = [
+  { label: 'None', dbName: null, fallback: 0 },
+  { label: 'Marathon All Season (24-2-4)', dbName: 'Fertilizer - Marathon All Season', fallback: 20.84 },
+  { label: 'Sod & Seed Starter (15-15-15)', dbName: 'Fertilizer - Sod Seed Starter', fallback: 20.87 },
+]
 const DG_METHODS = ['Machine', 'Hand']
 
 const n = v => parseFloat(v) || 0
@@ -171,6 +190,7 @@ function calcGroundTreatments(
     sodSoilPrepSF,
     sodSF,
     sodType,
+    sodFertilizer,
     flagstoneSoilSF,
     flagstoneConcreteSF,
     precastSoilSF,
@@ -231,11 +251,17 @@ function calcGroundTreatments(
 
   // ── Sod ────────────────────────────────────────────────────────────────────
   const sodLab = n(sodSF) * p(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback)
-  const sodMat =
-    n(sodSF) *
-    (sodType === 'St. Augustine'
-      ? p(GT_RATES.sodStAugMat.dbName, GT_RATES.sodStAugMat.fallback)
-      : p(GT_RATES.sodMarathonMat.dbName, GT_RATES.sodMarathonMat.fallback))
+  const sodT = SOD_TYPES.find(t => t.label === sodType) || SOD_TYPES[0]
+  const sodMat = n(sodSF) * p(sodT.dbName, sodT.fallback)
+
+  // Fertilizer — auto-figured bags from sod SF × coverage (SF/bag). Material only.
+  let fertMat = 0
+  const fertT = FERTILIZER_TYPES.find(t => t.label === sodFertilizer)
+  if (fertT && fertT.dbName && n(sodSF) > 0) {
+    const sfPerBag = p(GT_RATES.fertilizerSFPerBag.dbName, GT_RATES.fertilizerSFPerBag.fallback)
+    const bags = sfPerBag > 0 ? Math.ceil(n(sodSF) / sfPerBag) : 0
+    fertMat = bags * p(fertT.dbName, fertT.fallback)
+  }
 
   // ── Flagstone Steppers (Soil Set + Concrete Set) ────────────────────────────
   // Each set has its own labor rate (SF/day); material is tons*perTon for both,
@@ -403,6 +429,7 @@ function calcGroundTreatments(
     soilMat +
     sodSoilMat +
     sodMat +
+    fertMat +
     flagMat +
     precastMat +
     dgMat +
@@ -607,7 +634,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   const [soilPrepSF, setSoilPrepSF] = useState(initialData?.soilPrepSF ?? '')
   const [sodSoilPrepSF, setSodSoilPrepSF] = useState(initialData?.sodSoilPrepSF ?? '')
   const [sodSF, setSodSF] = useState(initialData?.sodSF ?? '')
-  const [sodType, setSodType] = useState(initialData?.sodType ?? 'Marathon I/II')
+  const [sodType, setSodType] = useState(initialData?.sodType ?? 'Marathon')
+  const [sodFertilizer, setSodFertilizer] = useState(initialData?.sodFertilizer ?? 'None')
   const [flagstoneSoilSF, setFlagstoneSoilSF] = useState(initialData?.flagstoneSoilSF ?? '')
   const [flagstoneConcreteSF, setFlagstoneConcreteSF] = useState(
     initialData?.flagstoneConcreteSF ?? ''
@@ -671,6 +699,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     sodSoilPrepSF,
     sodSF,
     sodType,
+    sodFertilizer,
     flagstoneSoilSF,
     flagstoneConcreteSF,
     precastSoilSF,
@@ -908,38 +937,28 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               onChange={e => setSodType(e.target.value)}
             >
               {SOD_TYPES.map(t => (
-                <option key={t}>{t}</option>
+                <option key={t.label} value={t.label}>
+                  {t.label}
+                </option>
               ))}
             </select>
             <span className="text-xs text-gray-400 inline-flex items-center gap-1">
-              {sodType === 'St. Augustine' ? (
-                <>
-                  ${p(GT_RATES.sodStAugMat.dbName, 1.97).toFixed(2)}/SF
-                  <RateEditPopover
-                    table="material_rates"
-                    name={GT_RATES.sodStAugMat.dbName}
-                    category="Ground Treatments"
-                    unitLabel="SF"
-                    currentValue={p(GT_RATES.sodStAugMat.dbName, GT_RATES.sodStAugMat.fallback)}
-                    onSaved={refreshAllRates}
-                  />
-                </>
-              ) : (
-                <>
-                  ${p(GT_RATES.sodMarathonMat.dbName, 1.2).toFixed(2)}/SF
-                  <RateEditPopover
-                    table="material_rates"
-                    name={GT_RATES.sodMarathonMat.dbName}
-                    category="Ground Treatments"
-                    unitLabel="SF"
-                    currentValue={p(
-                      GT_RATES.sodMarathonMat.dbName,
-                      GT_RATES.sodMarathonMat.fallback
-                    )}
-                    onSaved={refreshAllRates}
-                  />
-                </>
-              )}
+              {(() => {
+                const st = SOD_TYPES.find(t => t.label === sodType) || SOD_TYPES[0]
+                return (
+                  <>
+                    ${p(st.dbName, st.fallback).toFixed(2)}/SF
+                    <RateEditPopover
+                      table="material_rates"
+                      name={st.dbName}
+                      category="Ground Treatments"
+                      unitLabel="SF"
+                      currentValue={p(st.dbName, st.fallback)}
+                      onSaved={refreshAllRates}
+                    />
+                  </>
+                )
+              })()}
               <RateEditPopover
                 table="labor_rates"
                 name={GT_RATES.sodLab.dbName}
@@ -953,15 +972,63 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             {n(sodSF) > 0 && (
               <span className="text-xs text-gray-400">
                 $
-                {(
-                  n(sodSF) *
-                  (sodType === 'St. Augustine'
-                    ? p(GT_RATES.sodStAugMat.dbName, 1.97)
-                    : p(GT_RATES.sodMarathonMat.dbName, 1.2))
-                ).toFixed(2)}{' '}
+                {(() => {
+                  const st = SOD_TYPES.find(t => t.label === sodType) || SOD_TYPES[0]
+                  return (n(sodSF) * p(st.dbName, st.fallback)).toFixed(2)
+                })()}{' '}
                 mat
               </span>
             )}
+          </LabeledRow>
+          <LabeledRow label="Fertilizer">
+            <select
+              className="input text-sm py-1.5 flex-1"
+              value={sodFertilizer}
+              onChange={e => setSodFertilizer(e.target.value)}
+            >
+              {FERTILIZER_TYPES.map(t => (
+                <option key={t.label} value={t.label}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+            {(() => {
+              const ft = FERTILIZER_TYPES.find(t => t.label === sodFertilizer)
+              if (!ft || !ft.dbName) return null
+              const sfPerBag = p(
+                GT_RATES.fertilizerSFPerBag.dbName,
+                GT_RATES.fertilizerSFPerBag.fallback
+              )
+              const bags = sfPerBag > 0 && n(sodSF) > 0 ? Math.ceil(n(sodSF) / sfPerBag) : 0
+              return (
+                <span className="text-xs text-gray-400 inline-flex items-center gap-1 flex-wrap">
+                  ${p(ft.dbName, ft.fallback).toFixed(2)}/bag
+                  <RateEditPopover
+                    table="material_rates"
+                    name={ft.dbName}
+                    category="Ground Treatments"
+                    unitLabel="bag"
+                    currentValue={p(ft.dbName, ft.fallback)}
+                    onSaved={refreshAllRates}
+                  />
+                  · 1 bag / {sfPerBag} SF
+                  <RateEditPopover
+                    table="labor_rates"
+                    name={GT_RATES.fertilizerSFPerBag.dbName}
+                    category="Ground Treatments"
+                    mode="coefficient"
+                    unitLabel="SF/bag"
+                    currentValue={sfPerBag}
+                    onSaved={refreshAllRates}
+                  />
+                  {bags > 0 && (
+                    <span className="text-gray-500">
+                      = {bags} bag{bags > 1 ? 's' : ''} · ${(bags * p(ft.dbName, ft.fallback)).toFixed(2)}
+                    </span>
+                  )}
+                </span>
+              )
+            })()}
           </LabeledRow>
         </div>
       </div>

@@ -257,3 +257,46 @@ FROM (VALUES
 ) AS v(name, unit_cost, notes)
 CROSS JOIN (SELECT DISTINCT tenant_id FROM public.material_rates) AS t
 ON CONFLICT DO NOTHING;
+
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- GROUND TREATMENTS — Sod varieties (Southland Sod Farms, Zone 2 delivered $/SF)
+-- Existing 'Sod - Marathon'/'Sod - St. Augustine' get UPDATED to Zone 2; the rest
+-- are new inserts. (2026-07-28)
+-- ═════════════════════════════════════════════════════════════════════════════
+UPDATE public.material_rates SET unit_cost = 1.00 WHERE category='Ground Treatments' AND name='Sod - Marathon';
+UPDATE public.material_rates SET unit_cost = 1.73 WHERE category='Ground Treatments' AND name='Sod - St. Augustine';
+
+INSERT INTO public.material_rates (name, unit_cost, category, notes, tenant_id)
+SELECT v.name, v.unit_cost, 'Ground Treatments', v.notes, t.tenant_id
+FROM (VALUES
+  ('Sod - Marathon II',      1.01, 'Southland Marathon II, Zone 2 $/SF'),
+  ('Sod - Marathon Lite',    1.16, 'Southland Marathon Lite, Zone 2 $/SF'),
+  ('Sod - Marathon II Lite', 1.17, 'Southland Marathon II Lite, Zone 2 $/SF'),
+  ('Sod - PureBlue Lite',    1.26, 'Southland PureBlue Lite, Zone 2 $/SF'),
+  ('Sod - GreenWave Lite',   1.26, 'Southland GreenWave Lite (creeping red fescue), Zone 2 $/SF'),
+  ('Sod - Hybrid Bermuda',   1.00, 'Southland Hybrid Bermuda, Zone 2 $/SF')
+) AS v(name, unit_cost, notes)
+CROSS JOIN (SELECT DISTINCT tenant_id FROM public.material_rates) AS t
+ON CONFLICT DO NOTHING;
+
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- GROUND TREATMENTS — Fertilizer ($/18-lb bag) + coverage (SF/bag, labor_rates)
+-- ═════════════════════════════════════════════════════════════════════════════
+INSERT INTO public.material_rates (name, unit_cost, category, notes, tenant_id)
+SELECT v.name, v.unit_cost, 'Ground Treatments', v.notes, t.tenant_id
+FROM (VALUES
+  ('Fertilizer - Marathon All Season', 20.84, 'Southland Marathon All Season 24-2-4, 18-lb bag'),
+  ('Fertilizer - Sod Seed Starter',    20.87, 'Southland Marathon Sod & Seed Starter 15-15-15, 18-lb bag')
+) AS v(name, unit_cost, notes)
+CROSS JOIN (SELECT DISTINCT tenant_id FROM public.material_rates) AS t
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.labor_rates (name, rate, unit, category, notes, tenant_id)
+SELECT v.name, v.rate, v.unit, 'Ground Treatments', v.notes, t.tenant_id
+FROM (VALUES
+  ('Fertilizer - SF Per Bag', 4000, 'SF/bag', 'Coverage: SF of sod per 18-lb fertilizer bag (adjust to your real rate)')
+) AS v(name, rate, unit, notes)
+CROSS JOIN (SELECT DISTINCT tenant_id FROM public.labor_rates) AS t
+ON CONFLICT DO NOTHING;
