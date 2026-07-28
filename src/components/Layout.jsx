@@ -448,7 +448,7 @@ export default function Layout() {
   // plan (moduleKeys === null) every module shows — today's behavior.
   const { moduleKeys, activeExtensions } = useEntitlements()
   const allowedNav = [
-    ...navItems.filter(i => isModuleEnabled(moduleKeys, i.path)),
+    ...navItems.filter(i => isModuleEnabled(moduleKeys, i.moduleKey || i.path)),
     // Paid extensions enabled for this tenant contribute their own nav entries.
     ...getExtensionModules(activeExtensions).map(m => ({ path: m.path, label: m.label, icon: m.icon })),
   ]
@@ -459,7 +459,7 @@ export default function Layout() {
     i =>
       i.path !== '/' &&
       (location.pathname === i.path || location.pathname.startsWith(i.path + '/')) &&
-      !isModuleEnabled(moduleKeys, i.path)
+      !isModuleEnabled(moduleKeys, i.moduleKey || i.path)
   )
   // Top-position entries: driven entirely by the user's Menu grouping. With no
   // groups defined every item shows flat (no hard-coded preset groups).
