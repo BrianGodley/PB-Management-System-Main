@@ -84,7 +84,7 @@ const APPLIANCE_TYPES = [
   'Other',
 ]
 const applianceRateName = type => `BBQ Equip - ${type}`
-const EQUIP_ROW = () => ({ vendor: 'House', type: 'BBQ Grill', clientProvided: false, hours: '' })
+const EQUIP_ROW = () => ({ vendor: 'House', type: 'BBQ Grill', qty: '1', clientProvided: false, hours: '' })
 
 const n = v => parseFloat(v) || 0
 
@@ -168,6 +168,9 @@ const LINE_TYPE_ARR = Object.entries(UTILITY_LINE_TYPES).map(([label, t]) => ({ 
 const GAS_TYPE_ARR = Object.entries(GAS_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, fallback: t.cost, laborDbName: t.laborDbName, laborFallback: t.laborHrs }))
 const ELEC_TYPE_ARR = Object.entries(ELECTRICAL_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, fallback: t.cost, laborDbName: t.laborDbName, laborFallback: t.laborHrs }))
 const UTIL_CAT = { line: 'Utility Lines', gas: 'Gas Fixtures', elec: 'Electrical Fixtures' }
+// Trenching for utility lines (machine trench, min/cf; from the Utilities schedule).
+const OK_TRENCH_RATE_NAME = 'Utilities Trench Excavation'
+const OK_TRENCH_FALLBACK_MIN_PER_CF = 10
 function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
   const builtIn = houseArr.find(o => o.label === row.type) || houseArr[0]
   const laborVal = mp[builtIn?.laborDbName] ?? builtIn?.laborFallback ?? 0
@@ -214,7 +217,7 @@ function EpTable({
     setRows(rs => rs.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   return (
     <div>
-      <p className="text-xs font-semibold text-gray-600 mb-1">{title}</p>
+      {title && <p className="text-xs font-semibold text-gray-600 mb-1">{title}</p>}
       <div className="overflow-x-auto">
         <table className="w-full text-sm table-fixed">
           <colgroup>
@@ -373,7 +376,12 @@ function calcOutdoorKitchen(
     epElecRows,
   } = state
 
-  // ── Electrical & Plumbing (Utility Lines / Gas / Electrical Fixtures) ───────
+  // ── Utility Lines / Gas / Electrical Fixtures ───────────────────────────────
+  // Utility Lines combine the line's install labor + material PLUS trenching for
+  // a 6" wide × 24" deep trench (per LF) using the Utilities trench excavation
+  // rate (min/cf). 6"×24" = 1.0 cf per LF.
+  const TRENCH_CF_PER_LF = (6 / 12) * (24 / 12) // = 1.0
+  const trenchMinsPerCF = mp[OK_TRENCH_RATE_NAME] ?? OK_TRENCH_FALLBACK_MIN_PER_CF
   let epHrs = 0
   let epMat = 0
   ;(epLineRows || []).forEach(r => {
@@ -382,6 +390,7 @@ function calcOutdoorKitchen(
     const { matCost, laborVal } = resolveUtilRow(UTIL_CAT.line, r, LINE_TYPE_ARR, materialRows, mp)
     epMat += lf * matCost
     epHrs += lf * laborVal
+    epHrs += (lf * TRENCH_CF_PER_LF * trenchMinsPerCF) / 60 // trenching 6"×24"
   })
   ;[
     [epGasRows, UTIL_CAT.gas, GAS_TYPE_ARR],
@@ -485,8 +494,10 @@ function calcOutdoorKitchen(
   let equipHrs = 0
   let equipMat = 0
   ;(equipmentRows || []).forEach(r => {
-    equipHrs += n(r.hours)
-    if (!r.clientProvided) equipMat += p(applianceRateName(r.type), 0)
+    // Missing qty (older estimates) counts as 1; each unit multiplies labor + material.
+    const q = r.qty === undefined || r.qty === null ? 1 : n(r.qty)
+    equipHrs += q * n(r.hours)
+    if (!r.clientProvided) equipMat += q * p(applianceRateName(r.type), 0)
   })
   const installAppHrs =
     n(applianceCount) > 0
@@ -1199,6 +1210,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
               <colgroup>
                 <col className="w-[128px]" />
                 <col />
+                <col className="w-[64px]" />
                 <col className="w-[104px]" />
                 <col className="w-[88px]" />
                 <col className="w-[96px]" />
@@ -1208,6 +1220,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                 <tr className="text-xs text-gray-500 border-b border-gray-200">
                   <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
                   <th className="text-left pb-1 pr-2 font-medium">Type</th>
+                  <th className="text-left pb-1 pr-2 font-medium">Qty</th>
                   <th className="text-left pb-1 pr-2 font-medium">Client Provided</th>
                   <th className="text-left pb-1 pr-2 font-medium">Labor (hrs)</th>
                   <th className="text-right pb-1 pr-2 font-medium text-gray-400">Material $</th>
@@ -1216,7 +1229,8 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
               </thead>
               <tbody>
                 {equipmentRows.map((row, i) => {
-                  const eqMat = row.clientProvided ? 0 : p(applianceRateName(row.type), 0)
+                  const eqQty = row.qty === undefined || row.qty === null ? 1 : n(row.qty)
+                  const eqMat = row.clientProvided ? 0 : eqQty * p(applianceRateName(row.type), 0)
                   const setRow = (field, val) =>
                     setEquipmentRows(rs =>
                       rs.map((r, idx) => (idx === i ? { ...r, [field]: val } : r))
@@ -1305,56 +1319,64 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
       </div>
 
 
-      {/* ── Electrical & Plumbing (ported from Utilities) ── */}
+      {/* ── Utility Lines (line labor + material + 6"×24" trenching) ── */}
       <div>
-        <SectionHeader title="Electrical & Plumbing" />
-        <div className="space-y-4">
-          <EpTable
-            title="Utility Lines"
-            rows={epLineRows}
-            setRows={setEpLineRows}
-            arr={LINE_TYPE_ARR}
-            cat={UTIL_CAT.line}
-            qtyField="lf"
-            qtyLabel="Linear Feet"
-            unitLabel="LF"
-            newRow={EP_LINE_ROW}
-            materialRows={materialRows}
-            materialPrices={materialPrices}
-            refreshAllRates={refreshAllRates}
-            vendorsForCategory={vendorsForCategory}
-          />
-          <EpTable
-            title="Gas Fixtures"
-            rows={epGasRows}
-            setRows={setEpGasRows}
-            arr={GAS_TYPE_ARR}
-            cat={UTIL_CAT.gas}
-            qtyField="qty"
-            qtyLabel="Qty"
-            unitLabel="ea"
-            newRow={EP_GAS_ROW}
-            materialRows={materialRows}
-            materialPrices={materialPrices}
-            refreshAllRates={refreshAllRates}
-            vendorsForCategory={vendorsForCategory}
-          />
-          <EpTable
-            title="Electrical Fixtures"
-            rows={epElecRows}
-            setRows={setEpElecRows}
-            arr={ELEC_TYPE_ARR}
-            cat={UTIL_CAT.elec}
-            qtyField="qty"
-            qtyLabel="Qty"
-            unitLabel="ea"
-            newRow={EP_ELEC_ROW}
-            materialRows={materialRows}
-            materialPrices={materialPrices}
-            refreshAllRates={refreshAllRates}
-            vendorsForCategory={vendorsForCategory}
-          />
-        </div>
+        <SectionHeader title="Utility Lines" />
+        <EpTable
+          rows={epLineRows}
+          setRows={setEpLineRows}
+          arr={LINE_TYPE_ARR}
+          cat={UTIL_CAT.line}
+          qtyField="lf"
+          qtyLabel="Linear Feet"
+          unitLabel="LF"
+          newRow={EP_LINE_ROW}
+          materialRows={materialRows}
+          materialPrices={materialPrices}
+          refreshAllRates={refreshAllRates}
+          vendorsForCategory={vendorsForCategory}
+        />
+        <p className="mt-1 text-[11px] text-gray-400 italic">
+          Includes trenching for a 6" wide × 24" deep trench per linear foot.
+        </p>
+      </div>
+
+      {/* ── Gas Fixtures ── */}
+      <div>
+        <SectionHeader title="Gas Fixtures" />
+        <EpTable
+          rows={epGasRows}
+          setRows={setEpGasRows}
+          arr={GAS_TYPE_ARR}
+          cat={UTIL_CAT.gas}
+          qtyField="qty"
+          qtyLabel="Qty"
+          unitLabel="ea"
+          newRow={EP_GAS_ROW}
+          materialRows={materialRows}
+          materialPrices={materialPrices}
+          refreshAllRates={refreshAllRates}
+          vendorsForCategory={vendorsForCategory}
+        />
+      </div>
+
+      {/* ── Electrical Fixtures ── */}
+      <div>
+        <SectionHeader title="Electrical Fixtures" />
+        <EpTable
+          rows={epElecRows}
+          setRows={setEpElecRows}
+          arr={ELEC_TYPE_ARR}
+          cat={UTIL_CAT.elec}
+          qtyField="qty"
+          qtyLabel="Qty"
+          unitLabel="ea"
+          newRow={EP_ELEC_ROW}
+          materialRows={materialRows}
+          materialPrices={materialPrices}
+          refreshAllRates={refreshAllRates}
+          vendorsForCategory={vendorsForCategory}
+        />
       </div>
 
       {/* ── Wall Finishes ── */}
