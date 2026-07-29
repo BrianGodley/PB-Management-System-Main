@@ -1189,13 +1189,21 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
         )}
       </div>
 
-      {/* ── Appliances & Services ── */}
+      {/* ── Appliances ── */}
       <div>
-        <SectionHeader title="Appliances & Services" />
+        <SectionHeader title="Appliances" />
         <div className="space-y-0">
           {/* Equipment — Vendor · Type · Client Provided · Labor · Material */}
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm table-fixed">
+              <colgroup>
+                <col className="w-[128px]" />
+                <col />
+                <col className="w-[104px]" />
+                <col className="w-[88px]" />
+                <col className="w-[96px]" />
+                <col className="w-6" />
+              </colgroup>
               <thead>
                 <tr className="text-xs text-gray-500 border-b border-gray-200">
                   <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
@@ -1203,7 +1211,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                   <th className="text-left pb-1 pr-2 font-medium">Client Provided</th>
                   <th className="text-left pb-1 pr-2 font-medium">Labor (hrs)</th>
                   <th className="text-right pb-1 pr-2 font-medium text-gray-400">Material $</th>
-                  <th className="w-6"></th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -1217,7 +1225,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                     <tr key={i} className="border-b border-gray-100">
                       <td className="py-1 pr-2">
                         <select
-                          className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white w-32"
+                          className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white w-full"
                           value={row.vendor || 'House'}
                           onChange={e => setRow('vendor', e.target.value)}
                         >
@@ -1230,9 +1238,9 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                         </select>
                       </td>
                       <td className="py-1 pr-2">
-                        <span className="inline-flex items-center gap-1">
+                        <span className="flex items-center gap-1">
                           <select
-                            className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
+                            className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white flex-1 min-w-0"
                             value={row.type}
                             onChange={e => setRow('type', e.target.value)}
                           >
@@ -1254,7 +1262,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                       </td>
                       <td className="py-1 pr-2">
                         <select
-                          className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white w-20"
+                          className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white w-full"
                           value={row.clientProvided ? 'Yes' : 'No'}
                           onChange={e => setRow('clientProvided', e.target.value === 'Yes')}
                         >
@@ -1263,7 +1271,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                         </select>
                       </td>
                       <td className="py-1 pr-2">
-                        <NumInput value={row.hours} onChange={v => setRow('hours', v)} className="w-24" />
+                        <NumInput value={row.hours} onChange={v => setRow('hours', v)} className="w-full" />
                       </td>
                       <td className="py-1 pr-2 text-right text-xs text-gray-600">
                         {row.clientProvided ? 'client' : eqMat > 0 ? `$${eqMat.toFixed(2)}` : '—'}
