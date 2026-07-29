@@ -1291,11 +1291,11 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         </div>
       )}
 
-      {/* ── Sub Pricing Breakdown (unit priced per LF) ── */}
+      {/* ── Sub Materials Breakdown (per-tab, independent) ── */}
       {isSub && calc.subCost > 0 && (
         <div className="bg-gray-50 rounded-lg p-3 text-xs">
           <p className="font-semibold text-gray-600 uppercase tracking-wide text-xs mb-2">
-            Sub Pricing Breakdown
+            Sub Materials Breakdown
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-gray-600">
             {(calc.matSections || [])
@@ -1316,6 +1316,10 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
               </span>
             )}
           </div>
+          <p className="mt-1.5 text-[11px] text-gray-400 italic">
+            Sub step material is bundled into the flat per-LF price, so line items
+            reflect all-in sub cost per section.
+          </p>
           <p className="mt-2 pt-2 border-t border-gray-200 font-semibold text-gray-800">
             Total Sub Cost: {fmt2(calc.subCost)}
           </p>
