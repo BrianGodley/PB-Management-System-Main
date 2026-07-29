@@ -84,7 +84,7 @@ const APPLIANCE_TYPES = [
   'Other',
 ]
 const applianceRateName = type => `BBQ Equip - ${type}`
-const EQUIP_ROW = () => ({ vendor: 'House', type: 'BBQ Grill', qty: '0', clientProvided: false, hours: '' })
+const EQUIP_ROW = () => ({ vendor: 'House', type: 'BBQ Grill', qty: '0', unitCost: '', clientProvided: false, hours: '' })
 
 const n = v => parseFloat(v) || 0
 
@@ -496,8 +496,11 @@ function calcOutdoorKitchen(
   ;(equipmentRows || []).forEach(r => {
     // Missing qty (older estimates) counts as 1; each unit multiplies labor + material.
     const q = r.qty === undefined || r.qty === null ? 1 : n(r.qty)
+    // Unit material $: the inline $/ea if entered, else the master rate for the type.
+    const unit =
+      r.unitCost !== '' && r.unitCost != null ? n(r.unitCost) : p(applianceRateName(r.type), 0)
     equipHrs += q * n(r.hours)
-    if (!r.clientProvided) equipMat += q * p(applianceRateName(r.type), 0)
+    if (!r.clientProvided) equipMat += q * unit
   })
   const installAppHrs =
     n(applianceCount) > 0
@@ -604,6 +607,7 @@ function calcOutdoorKitchen(
     equipMat,
     epMat,
     epHrs,
+    manMat,
     wallFinishCalc,
   }
 }
@@ -1208,12 +1212,13 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
           <div className="overflow-x-auto">
             <table className="w-full text-sm table-fixed">
               <colgroup>
-                <col className="w-[128px]" />
+                <col className="w-[120px]" />
                 <col />
-                <col className="w-[64px]" />
-                <col className="w-[104px]" />
-                <col className="w-[88px]" />
+                <col className="w-[56px]" />
+                <col className="w-[80px]" />
                 <col className="w-[96px]" />
+                <col className="w-[80px]" />
+                <col className="w-[92px]" />
                 <col className="w-6" />
               </colgroup>
               <thead>
@@ -1221,6 +1226,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                   <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
                   <th className="text-left pb-1 pr-2 font-medium">Type</th>
                   <th className="text-left pb-1 pr-2 font-medium">Qty</th>
+                  <th className="text-left pb-1 pr-2 font-medium">$/ea</th>
                   <th className="text-left pb-1 pr-2 font-medium">Client Provided</th>
                   <th className="text-left pb-1 pr-2 font-medium">Labor (hrs)</th>
                   <th className="text-right pb-1 pr-2 font-medium text-gray-400">Material $</th>
@@ -1230,7 +1236,11 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
               <tbody>
                 {equipmentRows.map((row, i) => {
                   const eqQty = row.qty === undefined || row.qty === null ? 1 : n(row.qty)
-                  const eqMat = row.clientProvided ? 0 : eqQty * p(applianceRateName(row.type), 0)
+                  const eqUnit =
+                    row.unitCost !== '' && row.unitCost != null
+                      ? n(row.unitCost)
+                      : p(applianceRateName(row.type), 0)
+                  const eqMat = row.clientProvided ? 0 : eqQty * eqUnit
                   const setRow = (field, val) =>
                     setEquipmentRows(rs =>
                       rs.map((r, idx) => (idx === i ? { ...r, [field]: val } : r))
@@ -1275,7 +1285,15 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                         </span>
                       </td>
                       <td className="py-1 pr-2">
-                        <NumInput value={row.qty} onChange={v => setRow('qty', v)} className="w-full" placeholder="1" />
+                        <NumInput value={row.qty} onChange={v => setRow('qty', v)} className="w-full" placeholder="0" />
+                      </td>
+                      <td className="py-1 pr-2">
+                        <NumInput
+                          value={row.unitCost}
+                          onChange={v => setRow('unitCost', v)}
+                          className="w-full"
+                          placeholder={p(applianceRateName(row.type), 0).toFixed(2)}
+                        />
                       </td>
                       <td className="py-1 pr-2">
                         <select
@@ -1529,6 +1547,104 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
           </button>
         </div>
       </div>
+
+      {/* ── In House Materials Breakdown ── */}
+      {subType !== 'Subcontractor' && (
+        <div className="bg-gray-50 rounded-lg p-3 text-xs">
+          <p className="font-semibold text-gray-600 uppercase tracking-wide text-xs mb-2">
+            In House Materials Breakdown
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-gray-600">
+            {calc.structureMat > 0 && (
+              <span>
+                Structure: <strong>${calc.structureMat.toFixed(2)}</strong>
+              </span>
+            )}
+            {calc.counterMat > 0 && (
+              <span>
+                Countertop: <strong>${calc.counterMat.toFixed(2)}</strong>
+              </span>
+            )}
+            {calc.equipMat > 0 && (
+              <span>
+                Appliances: <strong>${calc.equipMat.toFixed(2)}</strong>
+              </span>
+            )}
+            {calc.epMat > 0 && (
+              <span>
+                Electrical & Plumbing: <strong>${calc.epMat.toFixed(2)}</strong>
+              </span>
+            )}
+            {calc.finishMat > 0 && (
+              <span>
+                Wall Finishes: <strong>${calc.finishMat.toFixed(2)}</strong>
+              </span>
+            )}
+            {calc.manMat > 0 && (
+              <span>
+                Manual: <strong>${calc.manMat.toFixed(2)}</strong>
+              </span>
+            )}
+            {calc.salesTax > 0 && (
+              <span>
+                Sales Tax: <strong>${calc.salesTax.toFixed(2)}</strong>
+              </span>
+            )}
+          </div>
+          <p className="mt-2 pt-2 border-t border-gray-200 font-semibold text-gray-800">
+            Total Materials: ${(calc.totalMat || 0).toFixed(2)}
+          </p>
+        </div>
+      )}
+
+      {/* ── Sub Materials Breakdown ── */}
+      {subType === 'Subcontractor' && (
+        <div className="bg-gray-50 rounded-lg p-3 text-xs">
+          <p className="font-semibold text-gray-600 uppercase tracking-wide text-xs mb-2">
+            Sub Materials Breakdown
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-gray-600">
+            {calc.structureMat > 0 && (
+              <span>
+                Structure: <strong>${calc.structureMat.toFixed(2)}</strong>
+              </span>
+            )}
+            {calc.counterMat > 0 && (
+              <span>
+                Countertop: <strong>${calc.counterMat.toFixed(2)}</strong>
+              </span>
+            )}
+            {calc.equipMat > 0 && (
+              <span>
+                Appliances: <strong>${calc.equipMat.toFixed(2)}</strong>
+              </span>
+            )}
+            {calc.epMat > 0 && (
+              <span>
+                Electrical & Plumbing: <strong>${calc.epMat.toFixed(2)}</strong>
+              </span>
+            )}
+            {calc.finishMat > 0 && (
+              <span>
+                Wall Finishes: <strong>${calc.finishMat.toFixed(2)}</strong>
+              </span>
+            )}
+            {calc.manMat > 0 && (
+              <span>
+                Manual: <strong>${calc.manMat.toFixed(2)}</strong>
+              </span>
+            )}
+            {calc.salesTax > 0 && (
+              <span>
+                Sales Tax: <strong>${calc.salesTax.toFixed(2)}</strong>
+              </span>
+            )}
+          </div>
+          <p className="mt-2 pt-2 border-t border-gray-200 font-semibold text-gray-800">
+            Total Materials: ${(calc.totalMat || 0).toFixed(2)}
+          </p>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex gap-3 pt-2">
