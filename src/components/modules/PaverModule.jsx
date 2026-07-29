@@ -1077,7 +1077,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       {!isSub && (
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Paver Choices</span>
+          <span>Paver Material</span>
           {calc.totalInstallSF > 0 && (
             <span className="font-normal normal-case text-gray-400">
               {calc.totalInstallSF.toLocaleString()} SF total
@@ -1299,8 +1299,14 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                   />
                 </span>
               </td>
-              <td className={`${num} text-gray-500`}>
-                {calc.totalInstallSF > 0 ? calc.totalInstallSF.toLocaleString() : '—'} SF
+              <td className={td}>
+                <input
+                  type="text"
+                  readOnly
+                  value={calc.totalInstallSF > 0 ? `${calc.totalInstallSF.toLocaleString()} SF` : ''}
+                  placeholder="auto"
+                  className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm bg-gray-50 text-gray-500 focus:outline-none"
+                />
               </td>
               <td className={num}>{fh(calc.installHrs)}</td>
               <td className="py-1 text-xs text-gray-400">auto from areas</td>
