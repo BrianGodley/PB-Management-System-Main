@@ -90,6 +90,29 @@ const MAT_DEFAULTS = {
 }
 
 // ── Calculation engine ────────────────────────────────────────────────────────
+// ── Vendor catalog (subs_vendors + material_rates) ───────────────────────────
+const PAVER_CAT = { paver: 'Paver Material', base: 'Base Material' }
+
+// Option list for a section = the vendor's catalog items (label = name minus the
+// '<subcategory> - ' prefix). Empty for House/Custom/unset vendors.
+function paverOptions(cat, vendorSel, materialRows) {
+  if (!vendorSel || vendorSel === 'House' || vendorSel === 'Custom') return []
+  const prefix = `${cat} - `
+  return (materialRows || [])
+    .filter(r => r.subcategory === cat && r.vendor_id === vendorSel)
+    .map(r => ({
+      label: r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name,
+      row: r,
+    }))
+}
+// The material_rates row for a row's vendor + type (falls back to the vendor's
+// first item so a freshly-picked vendor prices something).
+function paverItemFor(cat, vendorSel, typeLabel, materialRows) {
+  const opts = paverOptions(cat, vendorSel, materialRows)
+  if (!opts.length) return null
+  return (opts.find(o => o.label === typeLabel) || opts[0]).row
+}
+
 function calcPaver(
   state,
   laborRatePerHour,
@@ -98,7 +121,8 @@ function calcPaver(
   paverPrices,
   gpmd = 425,
   walkAccess = null,
-  laborBurdenPct = 0.29
+  laborBurdenPct = 0.29,
+  materialRows = []
 ) {
   const lr = laborRates || {}
   const mr = materialRates || {}
@@ -160,19 +184,52 @@ function calcPaver(
     const baseRate = BASE_RATE_MAP[row.method] ?? baseBobcatOK
     const baseHrs = baseTons > 0 ? baseTons / baseRate : 0
 
-    // Custom-brand rows bypass the paver_prices lookup and use whatever
-    // $/SF the user typed in. They don't carry a pallet count — pallet
-    // charges are skipped for custom material since we have no SF/pallet.
-    const isCustom = row.paverBrand === 'Custom'
-    const paverData = isCustom
-      ? null
-      : pp.find(p => p.brand === row.paverBrand && p.name === row.paverName)
-    const pricePerSF = isCustom ? n(row.customPricePerSF) : paverData?.price_per_sf || 0
-    const sfPerPallet = isCustom ? 0 : paverData?.sf_per_pallet || 0
+    // Base material $/ton — vendor-aware. A real vendor overrides via its
+    // catalog item; House ('Class II Roadbase') uses the seeded rate, falling
+    // back to the legacy single base-rock rate.
+    let baseTonRate
+    if (row.baseVendor && row.baseVendor !== 'House' && row.baseVendor !== 'auto') {
+      const bItem = paverItemFor(PAVER_CAT.base, row.baseVendor, row.baseType, materialRows)
+      baseTonRate = bItem ? n(bItem.unit_cost) : baseRockPerTon
+    } else {
+      baseTonRate = mr['Base Material - Class II Roadbase'] ?? baseRockPerTon
+    }
+    const baseMatCost = baseTons * baseTonRate
+
+    // Paver material — vendor catalog (Vendor + Type) with a Custom inline-price
+    // fallback. Old estimates (paverBrand/paverName) still price via paver_prices.
+    const isCustom = row.paverVendor === 'Custom' || row.paverBrand === 'Custom'
+    let pricePerSF = 0
+    let sfPerPallet = 0
+    if (isCustom) {
+      pricePerSF = n(row.customPricePerSF)
+    } else if (row.paverVendor) {
+      const item = paverItemFor(PAVER_CAT.paver, row.paverVendor, row.paverType, materialRows)
+      if (item) {
+        pricePerSF = n(item.unit_cost)
+        sfPerPallet = n(item.sf_per_pallet)
+      }
+    } else if (row.paverBrand) {
+      const paverData = pp.find(p => p.brand === row.paverBrand && p.name === row.paverName)
+      pricePerSF = paverData?.price_per_sf || 0
+      sfPerPallet = paverData?.sf_per_pallet || 0
+    }
     const pallets = sf > 0 && sfPerPallet > 0 ? Math.ceil(sf / sfPerPallet) : 0
     const paverCost = sf * pricePerSF
 
-    return { sf, baseSf, depthIn, baseTons, baseHrs, paverCost, pallets, pricePerSF, sfPerPallet }
+    return {
+      sf,
+      baseSf,
+      depthIn,
+      baseTons,
+      baseHrs,
+      baseTonRate,
+      baseMatCost,
+      paverCost,
+      pallets,
+      pricePerSF,
+      sfPerPallet,
+    }
   })
 
   const totalInstallSF = areas.reduce((s, a) => s + a.sf, 0)
@@ -201,15 +258,19 @@ function calcPaver(
   const addColorHrs = n(state.numColors) * addColorPer
 
   // ── Vertical soldier ─────────────────────────────────────────────────────────
-  const isVertCustom = state.vertPaverBrand === 'Custom'
-  const vertPaverData = isVertCustom
-    ? null
-    : pp.find(
-        p => p.brand === state.vertPaverBrand && p.name === state.vertPaverName
-      )
-  const vertPricePerLF = isVertCustom
-    ? n(state.vertCustomPricePerLF)
-    : vertPaverData?.price_per_lf_vert || 0
+  // Vendor + Type from the paver catalog (price_per_lf_vert), Custom inline
+  // fallback, and back-compat with old paverBrand/paverName estimates.
+  const isVertCustom = state.vertVendor === 'Custom' || state.vertPaverBrand === 'Custom'
+  let vertPricePerLF = 0
+  if (isVertCustom) {
+    vertPricePerLF = n(state.vertCustomPricePerLF)
+  } else if (state.vertVendor) {
+    const vItem = paverItemFor(PAVER_CAT.paver, state.vertVendor, state.vertType, materialRows)
+    vertPricePerLF = vItem ? n(vItem.price_per_lf_vert) : 0
+  } else if (state.vertPaverBrand) {
+    const vpd = pp.find(p => p.brand === state.vertPaverBrand && p.name === state.vertPaverName)
+    vertPricePerLF = vpd?.price_per_lf_vert || 0
+  }
   const vertPaverCost = n(state.vertSoldierLF) * vertPricePerLF
 
   const totalPallets = totalAreaPallets
@@ -244,7 +305,8 @@ function calcPaver(
   const totalHrs = _preWalkHrs + walkHrs
 
   // ── Materials ─────────────────────────────────────────────────────────────────
-  const baseRockCost = totalBaseTons * baseRockPerTon
+  // Base rock is now priced per-area (vendor/type aware); sum the area costs.
+  const baseRockCost = areas.reduce((s, a) => s + (a.baseMatCost || 0), 0)
   const beddingSandCost = sfToTons(totalInstallSF, 1) * beddingSandPerTon
   const jointSandCost = totalInstallSF * jointSandPerSF
   const polySandCost = state.polySand ? totalInstallSF * polySandPerSF : 0
@@ -374,9 +436,9 @@ const DEFAULT_STATE = {
   crewType: 'Paver',
   hoursAdj: 0,
   areaRows: [
-    { label: 'Area 1', method: 'Skid OK', sf: '', depth: 6, paverBrand: '', paverName: '', customPricePerSF: '' },
-    { label: 'Area 2', method: 'Skid OK', sf: '', depth: 6, paverBrand: '', paverName: '', customPricePerSF: '' },
-    { label: 'Area 3', method: 'Skid OK', sf: '', depth: 6, paverBrand: '', paverName: '', customPricePerSF: '' },
+    { label: 'Area 1', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: 'House', baseType: 'Class II Roadbase' },
+    { label: 'Area 2', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: 'House', baseType: 'Class II Roadbase' },
+    { label: 'Area 3', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: 'House', baseType: 'Class II Roadbase' },
   ],
   straightCutLF: '',
   curvedCutLF: '',
@@ -385,9 +447,9 @@ const DEFAULT_STATE = {
   numColors: '',
   sleevesLF: '',
   vertSoldierLF: '',
-  vertPaverBrand: '',
-  vertPaverName: '',
-  // Used only when vertPaverBrand === 'Custom'
+  vertVendor: '',
+  vertType: '',
+  // Used only when vertVendor === 'Custom'
   vertCustomPricePerLF: '',
   sealerSF: '',
   is80mm: false,
@@ -687,6 +749,10 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
     }
   )
   const [paverPrices, setPaverPrices] = useState(initialData?.paverPrices || [])
+  // Vendor catalog (material_rates rows w/ subcategory + vendor_id + paver attrs)
+  // and the vendor list, driving the per-row Vendor/Type pickers.
+  const [materialRows, setMaterialRows] = useState(initialData?.materialRows || [])
+  const [vendors, setVendors] = useState([])
 
   // ── Sales tax — applied to totalMat across every module so the bid
   //    reflects supplier-invoiced material cost. Sourced from
@@ -708,9 +774,18 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   // Re-fetch all Paver rate maps. Called once on mount and again whenever the
   // user saves an edit from a RateEditPopover so the calc picks up the change.
   const refreshAllRates = useCallback(async () => {
-    const [lrRes, mrRes] = await Promise.all([
+    const [lrRes, mrRes, matRowsRes, venRes] = await Promise.all([
       supabase.from('labor_rates').select('name,rate').eq('category', 'Paver'),
       supabase.from('material_rates').select('name,unit_cost').eq('category', 'Paver'),
+      supabase
+        .from('material_rates')
+        .select('name, unit_cost, subcategory, vendor_id, sf_per_pallet, price_per_lf_vert')
+        .eq('category', 'Paver'),
+      supabase
+        .from('subs_vendors')
+        .select('id, company_name, supplied_categories')
+        .eq('type', 'vendor')
+        .order('company_name'),
     ])
     if (lrRes.data) {
       const m = {}
@@ -726,6 +801,14 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       })
       setMaterialRates(m)
     }
+    setMaterialRows(matRowsRes.data || [])
+    setVendors(
+      (venRes.data || []).map(v => ({
+        id: v.id,
+        name: v.company_name,
+        categories: v.supplied_categories || [],
+      }))
+    )
   }, [])
 
   useEffect(() => {
@@ -822,6 +905,9 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   const sleevesSubRate = laborRates['Paver Sub - Sleeves LF'] ?? 12
   const subInstall = state.subInstall || {}
 
+  // ── Vendor catalog helpers (per-row Vendor/Type pickers) ─────────────────
+  const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
+
   // In-House engine — always reads the raw In-House fields (state.areaRows …).
   const inHouse = calcPaver(
     state,
@@ -831,7 +917,8 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
     paverPrices,
     gpmd,
     walkAccess,
-    laborBurdenPct
+    laborBurdenPct,
+    materialRows
   )
 
   // ── Sub side — per-SF / per-LF unit pricing ─────────────────────────────────
@@ -1107,9 +1194,9 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         <table className="w-full text-xs">
           <TH
             cols={[
-              { label: 'Area', w: 'w-20' },
+              { label: 'Vendor', w: 'w-40' },
+              { label: 'Type' },
               { label: 'SF', w: 'w-24' },
-              { label: 'Paver Brand / Type' },
               { label: '$/SF', w: 'w-12' },
               { label: 'Pallets', w: 'w-12' },
               { label: 'Cost', w: 'w-20' },
@@ -1118,36 +1205,49 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           <tbody className="divide-y divide-gray-50">
             {state[kArea].map((row, i) => {
               const a = calc.areas[i] || {}
+              const pOpts = paverOptions(PAVER_CAT.paver, row.paverVendor, materialRows)
               return (
                 <tr key={i}>
                   <td className={td}>
-                    <Inp
-                      type="text"
-                      value={row.label}
-                      onChange={e => setRow(kArea, i, 'label', e.target.value)}
-                      placeholder={`Area ${i + 1}`}
-                    />
+                    <select
+                      className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      value={row.paverVendor || ''}
+                      onChange={e => {
+                        const v = e.target.value
+                        setRow(kArea, i, 'paverVendor', v)
+                        const opts = paverOptions(PAVER_CAT.paver, v, materialRows)
+                        setRow(kArea, i, 'paverType', opts[0]?.label || '')
+                      }}
+                    >
+                      <option value="">— Vendor —</option>
+                      {vendorsForCategory(PAVER_CAT.paver).map(v => (
+                        <option key={v.id} value={v.id}>
+                          {v.name}
+                        </option>
+                      ))}
+                      <option value="Custom">Custom (inline price)</option>
+                    </select>
+                  </td>
+                  <td className={td}>
+                    {row.paverVendor === 'Custom' ? (
+                      <Inp
+                        value={row.customPricePerSF || ''}
+                        onChange={e => setRow(kArea, i, 'customPricePerSF', e.target.value)}
+                        placeholder="$/SF"
+                      />
+                    ) : (
+                      <Sel
+                        value={row.paverType || ''}
+                        onChange={e => setRow(kArea, i, 'paverType', e.target.value)}
+                        options={pOpts.map(o => o.label)}
+                      />
+                    )}
                   </td>
                   <td className={td}>
                     <Inp
                       value={row.sf}
                       onChange={e => setRow(kArea, i, 'sf', e.target.value)}
                       placeholder="Paver SF"
-                    />
-                  </td>
-                  <td className={td}>
-                    <PaverPicker
-                      brand={row.paverBrand}
-                      name={row.paverName}
-                      onSelect={(b, nm) => {
-                        setRow(kArea, i, 'paverBrand', b)
-                        setRow(kArea, i, 'paverName', nm)
-                      }}
-                      paverPrices={paverPrices}
-                      customPrice={row.customPricePerSF || ''}
-                      onCustomPriceChange={v =>
-                        setRow(kArea, i, 'customPricePerSF', v)
-                      }
                     />
                   </td>
                   <td className={num}>{a.pricePerSF > 0 ? fmt2(a.pricePerSF) : '—'}</td>
@@ -1195,7 +1295,8 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         <table className="w-full text-xs">
           <TH
             cols={[
-              { label: 'Area', w: 'w-20' },
+              { label: 'Vendor', w: 'w-36' },
+              { label: 'Type', w: 'w-40' },
               { label: 'Base SF', w: 'w-24' },
               { label: 'Base Install', w: 'w-36' },
               { label: 'Base (in)', w: 'w-14' },
@@ -1216,7 +1317,39 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                       : calc.baseHand
               return (
                 <tr key={i}>
-                  <td className={`${td} text-gray-500`}>{row.label || `Area ${i + 1}`}</td>
+                  <td className={td}>
+                    <select
+                      className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      value={row.baseVendor || 'House'}
+                      onChange={e => {
+                        const v = e.target.value
+                        setRow(kArea, i, 'baseVendor', v)
+                        const opts =
+                          v === 'House'
+                            ? ['Class II Roadbase']
+                            : paverOptions(PAVER_CAT.base, v, materialRows).map(o => o.label)
+                        setRow(kArea, i, 'baseType', opts[0] || '')
+                      }}
+                    >
+                      <option value="House">House</option>
+                      {vendorsForCategory(PAVER_CAT.base).map(v => (
+                        <option key={v.id} value={v.id}>
+                          {v.name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className={td}>
+                    <Sel
+                      value={row.baseType || 'Class II Roadbase'}
+                      onChange={e => setRow(kArea, i, 'baseType', e.target.value)}
+                      options={
+                        row.baseVendor && row.baseVendor !== 'House'
+                          ? paverOptions(PAVER_CAT.base, row.baseVendor, materialRows).map(o => o.label)
+                          : ['Class II Roadbase']
+                      }
+                    />
+                  </td>
                   <td className={td}>
                     <Inp
                       value={row.baseSf ?? ''}
@@ -1687,18 +1820,43 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         </div>
         <div className="sm:col-span-2">
           <p className="text-xs text-gray-500 mb-0.5">Paver (priced per LF)</p>
-          <PaverPicker
-            brand={state[kVertBrand]}
-            name={state[kVertName]}
-            onSelect={(b, nm) => {
-              set(kVertBrand, b)
-              set(kVertName, nm)
-            }}
-            paverPrices={paverPrices.filter(p => p.price_per_lf_vert > 0)}
-            showLF
-            customPrice={state[kVertCustom] || ''}
-            onCustomPriceChange={v => set(kVertCustom, v)}
-          />
+          <div className="flex items-center gap-2">
+            <select
+              className="w-40 shrink-0 border border-gray-200 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+              value={state.vertVendor || ''}
+              onChange={e => {
+                const v = e.target.value
+                set('vertVendor', v)
+                const opts = paverOptions(PAVER_CAT.paver, v, materialRows)
+                set('vertType', opts[0]?.label || '')
+              }}
+            >
+              <option value="">— Vendor —</option>
+              {vendorsForCategory(PAVER_CAT.paver).map(v => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
+              ))}
+              <option value="Custom">Custom (inline)</option>
+            </select>
+            <div className="flex-1 min-w-0">
+              {state.vertVendor === 'Custom' ? (
+                <Inp
+                  value={state.vertCustomPricePerLF || ''}
+                  onChange={e => set('vertCustomPricePerLF', e.target.value)}
+                  placeholder="$/LF"
+                />
+              ) : (
+                <Sel
+                  value={state.vertType || ''}
+                  onChange={e => set('vertType', e.target.value)}
+                  options={paverOptions(PAVER_CAT.paver, state.vertVendor, materialRows).map(
+                    o => o.label
+                  )}
+                />
+              )}
+            </div>
+          </div>
           {calc.vertPaverCost > 0 && (
             <p className="text-xs text-gray-400 mt-0.5">
               {n(state[kVertSoldier]).toLocaleString()} LF × {fmt2(calc.vertPricePerLF)}/LF ={' '}

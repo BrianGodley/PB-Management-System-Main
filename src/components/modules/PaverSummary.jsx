@@ -15,9 +15,11 @@ function paverSections(f, isSub) {
     .filter(r => n(r.sf) > 0)
     .map(r => {
       const label =
-        r.paverBrand === 'Custom'
+        r.paverVendor === 'Custom' || r.paverBrand === 'Custom'
           ? 'Custom paver'
-          : [r.paverBrand, r.paverName].filter(Boolean).join(' ') || 'Pavers'
+          : r.paverType ||
+            [r.paverBrand, r.paverName].filter(Boolean).join(' ') ||
+            'Pavers'
       const sub = [r.depth ? `${r.depth}"` : null, r.method].filter(Boolean).join(' · ')
       return { label, value: `${n(r.sf).toLocaleString()} SF`, sub: sub || undefined }
     })
@@ -34,7 +36,7 @@ function paverSections(f, isSub) {
     details.push({ label: 'Sleeves', value: `${n(f.sleevesLF).toLocaleString()} LF` })
   if (n(f.vertSoldierLF) > 0)
     details.push({
-      label: `Vertical soldier${f.vertPaverName ? ` (${f.vertPaverName})` : ''}`,
+      label: `Vertical soldier${f.vertType || f.vertPaverName ? ` (${f.vertType || f.vertPaverName})` : ''}`,
       value: `${n(f.vertSoldierLF).toLocaleString()} LF`,
     })
   if (n(f.sealerSF) > 0)
@@ -80,6 +82,7 @@ export default function PaverSummary({ module }) {
       sleevesLF: d.sleevesLF,
       vertSoldierLF: d.vertSoldierLF,
       vertPaverName: d.vertPaverName,
+      vertType: d.vertType,
       sealerSF: d.sealerSF,
       polySand: d.polySand,
       polySandExistingSF: d.polySandExistingSF,
