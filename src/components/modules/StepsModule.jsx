@@ -1255,7 +1255,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
       </div>
 
       {/* ── In-House Materials Breakdown (independent) ── */}
-      {!isSub && calc.totalMat > 0 && (
+      {!isSub && (calc.totalMat > 0 || calc.totalHrs > 0) && (
         <div className="bg-gray-50 rounded-lg p-3 text-xs">
           <p className="font-semibold text-gray-600 uppercase tracking-wide text-xs mb-2">
             In House Materials Breakdown
