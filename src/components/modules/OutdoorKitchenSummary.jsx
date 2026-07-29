@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // OutdoorKitchenSummary — read-only detail view. Uses the shared DemoSummaryView
 // layout (In House / Subcontractor quantity sections + green Summary box), same
-// as Concrete / Paver / demo modules. Reads the current module data shape
-// (equipmentRows, wallFinishRows, ep* rows) and the saved calc snapshot.
+// as Concrete / Paver / Steps. In-House and Sub are independent tab records
+// (data.ihData / data.subData), with a flat-field fallback for legacy estimates.
 // ─────────────────────────────────────────────────────────────────────────────
 import DemoSummaryView from './DemoSummaryView'
 
@@ -10,37 +10,25 @@ const n = v => parseFloat(v) || 0
 const fmt2 = v =>
   `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-const WF_LABEL = t => t || 'Finish'
-
-export default function OutdoorKitchenSummary({ module }) {
-  const d = module?.data || {}
-
-  // ── Structure ──────────────────────────────────────────────────────────────
-  const structureRows = []
-  if (n(d.bbqLengthLF) > 0) {
-    structureRows.push({
-      label: 'BBQ Wall',
-      value: `${n(d.bbqLengthLF)} LF × ${n(d.bbqHeightIn) || 48}"`,
-    })
-  }
-  if (n(d.backLengthLF) > 0) {
-    structureRows.push({
+// Build the quantity sections for one tab record (In-House or Sub).
+function buildSections(t = {}, { sub = false } = {}) {
+  const structure = []
+  if (n(t.bbqLengthLF) > 0)
+    structure.push({ label: 'BBQ Wall', value: `${n(t.bbqLengthLF)} LF × ${n(t.bbqHeightIn) || 48}"` })
+  if (n(t.backLengthLF) > 0)
+    structure.push({
       label: 'Backsplash',
-      value: `${n(d.backLengthLF)} LF × ${n(d.backHeightIn) || 48}"`,
+      value: `${n(t.backLengthLF)} LF × ${n(t.backHeightIn) || 48}"`,
     })
-  }
 
-  // ── Countertop ─────────────────────────────────────────────────────────────
-  const counterRows = []
-  if (n(d.counterSF) > 0) {
-    counterRows.push({
-      label: `Countertop (${d.counterFinish || 'Broom Finish'})`,
-      value: `${n(d.counterSF)} SF`,
+  const counter = []
+  if (n(t.counterSF) > 0)
+    counter.push({
+      label: `Countertop (${t.counterFinish || 'Broom Finish'})`,
+      value: `${n(t.counterSF)} SF`,
     })
-  }
 
-  // ── Appliances ─────────────────────────────────────────────────────────────
-  const applianceRows = (d.equipmentRows || [])
+  const appliances = (t.equipmentRows || [])
     .filter(r => n(r.qty) > 0)
     .map(r => ({
       label: `${r.type || 'Equipment'}${r.clientProvided ? ' (client provided)' : ''}`,
@@ -48,44 +36,50 @@ export default function OutdoorKitchenSummary({ module }) {
       sub: n(r.hours) > 0 ? `${n(r.hours)} hrs/ea` : undefined,
     }))
 
-  // ── Electrical & Plumbing ──────────────────────────────────────────────────
-  const epRows = []
-  ;(d.epLineRows || [])
+  const ep = []
+  ;(t.epLineRows || [])
     .filter(r => n(r.lf) > 0)
-    .forEach(r => epRows.push({ label: r.type || 'Utility line', value: `${n(r.lf)} LF` }))
-  ;(d.epGasRows || [])
+    .forEach(r => ep.push({ label: r.type || 'Utility line', value: `${n(r.lf)} LF` }))
+  ;(t.epGasRows || [])
     .filter(r => n(r.qty) > 0)
-    .forEach(r => epRows.push({ label: r.type || 'Gas fixture', value: `× ${n(r.qty)}` }))
-  ;(d.epElecRows || [])
+    .forEach(r => ep.push({ label: r.type || 'Gas fixture', value: `× ${n(r.qty)}` }))
+  ;(t.epElecRows || [])
     .filter(r => n(r.qty) > 0)
-    .forEach(r => epRows.push({ label: r.type || 'Electrical fixture', value: `× ${n(r.qty)}` }))
+    .forEach(r => ep.push({ label: r.type || 'Electrical fixture', value: `× ${n(r.qty)}` }))
 
-  // ── Wall Finishes ──────────────────────────────────────────────────────────
-  const finishRows = (d.wallFinishRows || [])
+  const finishes = (t.wallFinishRows || [])
     .filter(r => n(r.sf) > 0)
-    .map(r => ({ label: WF_LABEL(r.type), value: `${n(r.sf)} SF` }))
+    .map(r => ({ label: r.type || 'Finish', value: `${n(r.sf)} SF` }))
 
-  // ── Manual ─────────────────────────────────────────────────────────────────
-  const manualRows = (d.manualRows || [])
-    .filter(r => n(r.hours) > 0 || n(r.materials) > 0)
-    .map((r, i) => ({
-      label: r.label || `Item ${i + 1}`,
-      value: n(r.hours) > 0 ? `${n(r.hours)} hrs` : fmt2(r.materials),
-      sub: n(r.hours) > 0 && n(r.materials) > 0 ? `${fmt2(r.materials)} mat.` : undefined,
-    }))
-  const subManual = (d.manualRows || [])
-    .filter(r => n(r.subCost) > 0)
-    .map((r, i) => ({ label: r.label || `Item ${i + 1}`, value: fmt2(r.subCost) }))
+  const manual = sub
+    ? (t.manualRows || [])
+        .filter(r => n(r.subCost) > 0)
+        .map((r, i) => ({ label: r.label || `Item ${i + 1}`, value: fmt2(r.subCost) }))
+    : (t.manualRows || [])
+        .filter(r => n(r.hours) > 0 || n(r.materials) > 0)
+        .map((r, i) => ({
+          label: r.label || `Item ${i + 1}`,
+          value: n(r.hours) > 0 ? `${n(r.hours)} hrs` : fmt2(r.materials),
+          sub: n(r.hours) > 0 && n(r.materials) > 0 ? `${fmt2(r.materials)} mat.` : undefined,
+        }))
 
-  const inHouseSections = [
-    { title: 'Structure', rows: structureRows },
-    { title: 'Countertop', rows: counterRows },
-    { title: 'Appliances', rows: applianceRows },
-    { title: 'Electrical & Plumbing', rows: epRows },
-    { title: 'Wall Finishes', rows: finishRows },
-    { title: 'Manual Entry', rows: manualRows },
+  return [
+    { title: 'Structure', rows: structure },
+    { title: 'Countertop', rows: counter },
+    { title: 'Appliances', rows: appliances },
+    { title: 'Electrical & Plumbing', rows: ep },
+    { title: 'Wall Finishes', rows: finishes },
+    { title: 'Manual Entry', rows: manual },
   ]
-  const subSections = [{ title: 'Manual Entry', rows: subManual }]
+}
+
+export default function OutdoorKitchenSummary({ module }) {
+  const d = module?.data || {}
+  const ih = d.ihData || d // legacy estimates stored flat = In-House
+  const sub = d.subData || {}
+
+  const inHouseSections = buildSections(ih, { sub: false })
+  const subSections = buildSections(sub, { sub: true })
 
   // ── Totals from saved calc snapshot ────────────────────────────────────────
   const c = d.calc || {}

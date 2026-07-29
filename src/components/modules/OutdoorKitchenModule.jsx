@@ -640,6 +640,30 @@ const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 3', hours: '', materials: '', subCost: '' },
 ]
 
+// Per-tab input record. In-House and Sub each hold their own independent copy so
+// the two tabs are separate calculators.
+function makeTab(src = {}) {
+  return {
+    difficulty: src.difficulty ?? '',
+    hoursAdj: src.hoursAdj ?? '',
+    distanceLF: src.distanceLF ?? '',
+    bbqLengthLF: src.bbqLengthLF ?? '',
+    bbqHeightIn: src.bbqHeightIn ?? '48',
+    backLengthLF: src.backLengthLF ?? '',
+    backHeightIn: src.backHeightIn ?? '48',
+    footingWidthIn: src.footingWidthIn ?? '12',
+    footingDepthIn: src.footingDepthIn ?? '12',
+    counterSF: src.counterSF ?? '',
+    counterFinish: src.counterFinish ?? 'Broom Finish',
+    equipmentRows: src.equipmentRows ?? [EQUIP_ROW(), EQUIP_ROW(), EQUIP_ROW(), EQUIP_ROW()],
+    epLineRows: src.epLineRows ?? [EP_LINE_ROW(), EP_LINE_ROW()],
+    epGasRows: src.epGasRows ?? [EP_GAS_ROW(), EP_GAS_ROW()],
+    epElecRows: src.epElecRows ?? [EP_ELEC_ROW(), EP_ELEC_ROW()],
+    wallFinishRows: src.wallFinishRows ?? [WF_ROW(), WF_ROW()],
+    manualRows: src.manualRows ?? DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
+  }
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function OutdoorKitchenModule({ onSave, onBack, saving, initialData }) {
   const [laborRatePerHour, setLaborRatePerHour] = useState(
@@ -653,7 +677,6 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
   // takeoffs here via create_estimate_from_takeoff, and the user can
   // overwrite / append their own.
   const [notes, setNotes] = useState(initialData?.notes ?? '')
-  const [distanceLF, setDistanceLF] = useState(initialData?.distanceLF ?? '')
   const [walkAccess, setWalkAccess] = useState(
     initialData?.walkAccess ?? {
       paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
@@ -734,43 +757,52 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
   // ── State ──────────────────────────────────────────────────────────────────
-  const [difficulty, setDifficulty] = useState(initialData?.difficulty ?? '')
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Masonry')
   const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
-  const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
-  const [layoutHrs, setLayoutHrs] = useState(initialData?.layoutHrs ?? '')
-  // Structure
-  const [bbqLengthLF, setBbqLengthLF] = useState(initialData?.bbqLengthLF ?? '')
-  const [bbqHeightIn, setBbqHeightIn] = useState(initialData?.bbqHeightIn ?? '48')
-  const [backLengthLF, setBackLengthLF] = useState(initialData?.backLengthLF ?? '')
-  const [backHeightIn, setBackHeightIn] = useState(initialData?.backHeightIn ?? '48')
-  const [footingWidthIn, setFootingWidthIn] = useState(initialData?.footingWidthIn ?? '12')
-  const [footingDepthIn, setFootingDepthIn] = useState(initialData?.footingDepthIn ?? '12')
-  // Countertop
-  const [counterSF, setCounterSF] = useState(initialData?.counterSF ?? '')
-  const [counterFinish, setCounterFinish] = useState(initialData?.counterFinish ?? 'Broom Finish')
-  // Appliances / Services
-  const [applianceCount, setApplianceCount] = useState(initialData?.applianceCount ?? '')
-  const [gficCount, setGficCount] = useState(initialData?.gficCount ?? '')
-  const [sinkYN, setSinkYN] = useState(initialData?.sinkYN ?? 'No')
-  const [gasTrenchLF, setGasTrenchLF] = useState(initialData?.gasTrenchLF ?? '')
-  // Appliances / Equipment
-  const [equipmentRows, setEquipmentRows] = useState(
-    initialData?.equipmentRows ?? [EQUIP_ROW(), EQUIP_ROW(), EQUIP_ROW(), EQUIP_ROW()]
-  )
-  // Electrical & Plumbing (ported from Utilities)
-  const [epLineRows, setEpLineRows] = useState(
-    initialData?.epLineRows ?? [EP_LINE_ROW(), EP_LINE_ROW()]
-  )
-  const [epGasRows, setEpGasRows] = useState(initialData?.epGasRows ?? [EP_GAS_ROW(), EP_GAS_ROW()])
-  const [epElecRows, setEpElecRows] = useState(
-    initialData?.epElecRows ?? [EP_ELEC_ROW(), EP_ELEC_ROW()]
-  )
-  // Wall Finishes — 2 rows; Type picked from the finish master list.
-  const [wallFinishRows, setWallFinishRows] = useState(
-    initialData?.wallFinishRows ?? [WF_ROW(), WF_ROW()]
-  )
-  const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
+  // Independent In-House vs Sub input records — each tab is its own calculator.
+  const [ihTab, setIhTab] = useState(() => makeTab(initialData?.ihData || initialData))
+  const [subTab, setSubTab] = useState(() => makeTab(initialData?.subData || {}))
+  const isSub = subType === 'Subcontractor'
+  const cur = isSub ? subTab : ihTab
+  const setCur = isSub ? setSubTab : setIhTab
+  // A single setter factory: accepts a value (scalar fields) or an updater fn (row arrays).
+  const setField = k => v =>
+    setCur(p => ({ ...p, [k]: typeof v === 'function' ? v(p[k]) : v }))
+  // Derived active-tab field accessors — render bindings stay unchanged.
+  const difficulty = cur.difficulty
+  const setDifficulty = setField('difficulty')
+  const hoursAdj = cur.hoursAdj
+  const setHoursAdj = setField('hoursAdj')
+  const distanceLF = cur.distanceLF
+  const setDistanceLF = setField('distanceLF')
+  const bbqLengthLF = cur.bbqLengthLF
+  const setBbqLengthLF = setField('bbqLengthLF')
+  const bbqHeightIn = cur.bbqHeightIn
+  const setBbqHeightIn = setField('bbqHeightIn')
+  const backLengthLF = cur.backLengthLF
+  const setBackLengthLF = setField('backLengthLF')
+  const backHeightIn = cur.backHeightIn
+  const setBackHeightIn = setField('backHeightIn')
+  const footingWidthIn = cur.footingWidthIn
+  const setFootingWidthIn = setField('footingWidthIn')
+  const footingDepthIn = cur.footingDepthIn
+  const setFootingDepthIn = setField('footingDepthIn')
+  const counterSF = cur.counterSF
+  const setCounterSF = setField('counterSF')
+  const counterFinish = cur.counterFinish
+  const setCounterFinish = setField('counterFinish')
+  const equipmentRows = cur.equipmentRows
+  const setEquipmentRows = setField('equipmentRows')
+  const epLineRows = cur.epLineRows
+  const setEpLineRows = setField('epLineRows')
+  const epGasRows = cur.epGasRows
+  const setEpGasRows = setField('epGasRows')
+  const epElecRows = cur.epElecRows
+  const setEpElecRows = setField('epElecRows')
+  const wallFinishRows = cur.wallFinishRows
+  const setWallFinishRows = setField('wallFinishRows')
+  const manualRows = cur.manualRows
+  const setManualRows = setField('manualRows')
 
   // ── Sales tax — applied to totalMat across every module so the bid
   //    reflects supplier-invoiced material cost. Sourced from
@@ -787,33 +819,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
     }
   }, [])
 
-  const state = {
-    crewType,
-    subType,
-    difficulty,
-    hoursAdj,
-    layoutHrs,
-    bbqLengthLF,
-    bbqHeightIn,
-    backLengthLF,
-    backHeightIn,
-    footingWidthIn,
-    footingDepthIn,
-    counterSF,
-    counterFinish,
-    applianceCount,
-    gficCount,
-    sinkYN,
-    gasTrenchLF,
-    wallFinishRows,
-    manualRows,
-    distanceLF,
-    materialRows,
-    equipmentRows,
-    epLineRows,
-    epGasRows,
-    epElecRows,
-  }
+  const state = { crewType, subType, ...cur, materialRows }
   const calcRaw = calcOutdoorKitchen(
     state,
     laborRatePerHour,
@@ -848,7 +854,17 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
       notes,
       man_days: parseFloat(calc.manDays.toFixed(2)),
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
-      data: { ...state, walkAccess, laborRatePerHour, laborBurdenPct, gpmd, materialPrices, calc },
+      data: {
+        ...state,
+        ihData: ihTab,
+        subData: subTab,
+        walkAccess,
+        laborRatePerHour,
+        laborBurdenPct,
+        gpmd,
+        materialPrices,
+        calc,
+      },
     })
   }
 
