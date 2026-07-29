@@ -173,7 +173,7 @@ function calcPaver(
   }
 
   // ── Paver areas ─────────────────────────────────────────────────────────────
-  const areas = (state.areaRows || []).map(row => {
+  const computeArea = row => {
     const sf = n(row.sf)
     const depthIn = n(row.depth) || 6
     // Base area can be larger than the paver field (overdig, edge transitions,
@@ -230,13 +230,22 @@ function calcPaver(
       pricePerSF,
       sfPerPallet,
     }
-  })
+  }
+  // In-House areas drive labor; the Subcontractor tab has its own area rows.
+  // MATERIAL (pavers, base rock, pallets, sands, delivery) follows the ACTIVE
+  // tab's rows so the Sub tab's Paver/Base Material sections price too — while
+  // in-house LABOR still reads the in-house rows (0 on the Sub tab).
+  const areas = (state.areaRows || []).map(computeArea)
+  const subAreas = (state.subAreaRows || []).map(computeArea)
+  const isSubTab = state.subType === 'Subcontractor'
+  const matAreas = isSubTab ? subAreas : areas
 
-  const totalInstallSF = areas.reduce((s, a) => s + a.sf, 0)
-  const totalBaseTons = areas.reduce((s, a) => s + a.baseTons, 0)
+  const totalInstallSF = areas.reduce((s, a) => s + a.sf, 0) // in-house labor SF
+  const matInstallSF = matAreas.reduce((s, a) => s + a.sf, 0) // material SF (active tab)
+  const totalBaseTons = matAreas.reduce((s, a) => s + a.baseTons, 0)
   const totalBaseHrs = areas.reduce((s, a) => s + a.baseHrs, 0)
-  const totalPaverCost = areas.reduce((s, a) => s + a.paverCost, 0)
-  const totalAreaPallets = areas.reduce((s, a) => s + a.pallets, 0)
+  const totalPaverCost = matAreas.reduce((s, a) => s + a.paverCost, 0)
+  const totalAreaPallets = matAreas.reduce((s, a) => s + a.pallets, 0)
 
   // ── Install labor hours ──────────────────────────────────────────────────────
   const installHrs = totalInstallSF > 0 ? totalInstallSF / installRate : 0
@@ -305,10 +314,11 @@ function calcPaver(
   const totalHrs = _preWalkHrs + walkHrs
 
   // ── Materials ─────────────────────────────────────────────────────────────────
-  // Base rock is now priced per-area (vendor/type aware); sum the area costs.
-  const baseRockCost = areas.reduce((s, a) => s + (a.baseMatCost || 0), 0)
-  const beddingSandCost = sfToTons(totalInstallSF, 1) * beddingSandPerTon
-  const jointSandCost = totalInstallSF * jointSandPerSF
+  // Base rock is priced per-area (vendor/type aware) from the ACTIVE tab's rows;
+  // sands/delivery follow the active tab's material SF.
+  const baseRockCost = matAreas.reduce((s, a) => s + (a.baseMatCost || 0), 0)
+  const beddingSandCost = sfToTons(matInstallSF, 1) * beddingSandPerTon
+  const jointSandCost = matInstallSF * jointSandPerSF
   const polySandCost = state.polySand ? totalInstallSF * polySandPerSF : 0
   const polySandExistingCost = polySandExistingSFVal * polySandExistingPerSF
   const sealerMatCost = n(state.sealerSF) * sealerMatPerSF
@@ -319,8 +329,8 @@ function calcPaver(
   // per 900 SF increment (rounded up). The base rate ($442.75 by default) lives
   // in material_rates as "Paver - Delivery" and represents the per-increment
   // fee, not a one-time flat charge.
-  const paverSelected = totalInstallSF > 0
-  const deliveryIncrements = paverSelected ? Math.ceil(totalInstallSF / 900) : 0
+  const paverSelected = matInstallSF > 0
+  const deliveryIncrements = paverSelected ? Math.ceil(matInstallSF / 900) : 0
   const deliveryCost = deliveryIncrements * deliveryFlat
   const shipping = n(state.shippingCharge)
   const salesTaxRate = n(state.salesTax) / 100
@@ -369,7 +379,9 @@ function calcPaver(
     commission,
     price,
     areas,
+    subAreas,
     totalInstallSF,
+    matInstallSF,
     totalBaseTons,
     totalPallets,
     totalAreaPallets,
@@ -472,9 +484,9 @@ const DEFAULT_STATE = {
   //    are NOT mirrored. Sub cost itself uses an install-only whole-job rate
   //    (see calc below); the other mirrored fields are captured for scope.
   subAreaRows: [
-    { label: 'Area 1', method: 'Skid OK', sf: '', depth: 6, paverBrand: '', paverName: '', customPricePerSF: '', installType: 'Hand Demo', largeFormat: false, under500: false },
-    { label: 'Area 2', method: 'Skid OK', sf: '', depth: 6, paverBrand: '', paverName: '', customPricePerSF: '', installType: 'Hand Demo', largeFormat: false, under500: false },
-    { label: 'Area 3', method: 'Skid OK', sf: '', depth: 6, paverBrand: '', paverName: '', customPricePerSF: '', installType: 'Hand Demo', largeFormat: false, under500: false },
+    { label: 'Area 1', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: 'House', baseType: 'Class II Roadbase', installType: 'Hand Demo', largeFormat: false, under500: false },
+    { label: 'Area 2', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: 'House', baseType: 'Class II Roadbase', installType: 'Hand Demo', largeFormat: false, under500: false },
+    { label: 'Area 3', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: 'House', baseType: 'Class II Roadbase', installType: 'Hand Demo', largeFormat: false, under500: false },
   ],
   // Sub install line items — SF per install type + two surcharge lines.
   subInstall: {
@@ -1160,14 +1172,13 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         </>
       )}
 
-      {/* ── Paver Choices — In-House only ───────────────────────────────────────── */}
-      {!isSub && (
+      {/* ── Paver Material — In-House + Subcontractor (materials on both tabs) ──── */}
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           <span>Paver Material</span>
-          {calc.totalInstallSF > 0 && (
+          {calc.matInstallSF > 0 && (
             <span className="font-normal normal-case text-gray-400">
-              {calc.totalInstallSF.toLocaleString()} SF total
+              {calc.matInstallSF.toLocaleString()} SF total
             </span>
           )}
           <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
@@ -1204,7 +1215,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           />
           <tbody className="divide-y divide-gray-50">
             {state[kArea].map((row, i) => {
-              const a = calc.areas[i] || {}
+              const a = (isSub ? calc.subAreas : calc.areas)[i] || {}
               const pOpts = paverOptions(PAVER_CAT.paver, row.paverVendor, materialRows)
               return (
                 <tr key={i}>
@@ -1259,10 +1270,8 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           </tbody>
         </table>
       </div>
-      )}
 
-      {/* ── Base Material — In-House only ───────────────────────────────────────── */}
-      {!isSub && (
+      {/* ── Base Material — In-House + Subcontractor ──────────────────────────── */}
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           <span>Base Material</span>
@@ -1306,7 +1315,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           />
           <tbody className="divide-y divide-gray-50">
             {state[kArea].map((row, i) => {
-              const a = calc.areas[i] || {}
+              const a = (isSub ? calc.subAreas : calc.areas)[i] || {}
               const baseRate =
                 row.method === 'Skid Good'
                   ? calc.baseBobcatGood
@@ -1392,12 +1401,11 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           </tbody>
         </table>
       </div>
-      )}
 
-      {/* ── Paver Labor (In-House) / Paver and Demo Installation (Sub) ─────────── */}
+      {/* ── Paver Labor (In-House) / Paver/Demo Installation (Sub) ─────────── */}
       <div>
         <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          {isSub ? 'Paver and Demo Installation' : 'Paver Labor'}
+          {isSub ? 'Paver/Demo Installation' : 'Paver Labor'}
           {!isSub && (
             <span className="ml-2 font-normal normal-case text-gray-400">
               {calc.installRate} SF/hr install · {calc.straightCutRate}/{calc.curvedCutRate} LF/hr
