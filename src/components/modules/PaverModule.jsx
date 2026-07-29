@@ -267,11 +267,21 @@ function calcPaver(
   const addColorHrs = n(state.numColors) * addColorPer
 
   // ── Vertical soldier ─────────────────────────────────────────────────────────
-  // Vendor + Type from the paver catalog (price_per_lf_vert), Custom inline
-  // fallback, and back-compat with old paverBrand/paverName estimates.
-  const isVertCustom = state.vertVendor === 'Custom' || state.vertPaverBrand === 'Custom'
+  // Priced from the ACTIVE tab's fields so each tab's material is independent.
+  // In-House uses Vendor + Type from the paver catalog (price_per_lf_vert) with
+  // Custom / legacy brand-name fallbacks; the Sub tab uses its own brand/name.
+  const vSoldierLF = isSubTab ? n(state.subVertSoldierLF) : n(state.vertSoldierLF)
   let vertPricePerLF = 0
-  if (isVertCustom) {
+  if (isSubTab) {
+    if (state.subVertPaverBrand === 'Custom') {
+      vertPricePerLF = n(state.subVertCustomPricePerLF)
+    } else if (state.subVertPaverBrand) {
+      const vpd = pp.find(
+        p => p.brand === state.subVertPaverBrand && p.name === state.subVertPaverName
+      )
+      vertPricePerLF = vpd?.price_per_lf_vert || 0
+    }
+  } else if (state.vertVendor === 'Custom' || state.vertPaverBrand === 'Custom') {
     vertPricePerLF = n(state.vertCustomPricePerLF)
   } else if (state.vertVendor) {
     const vItem = paverItemFor(PAVER_CAT.paver, state.vertVendor, state.vertType, materialRows)
@@ -280,7 +290,7 @@ function calcPaver(
     const vpd = pp.find(p => p.brand === state.vertPaverBrand && p.name === state.vertPaverName)
     vertPricePerLF = vpd?.price_per_lf_vert || 0
   }
-  const vertPaverCost = n(state.vertSoldierLF) * vertPricePerLF
+  const vertPaverCost = vSoldierLF * vertPricePerLF
 
   const totalPallets = totalAreaPallets
 
@@ -289,7 +299,12 @@ function calcPaver(
     r => n(r.hours) > 0 || n(r.materials) > 0 || n(r.subCost) > 0
   )
   const manualHrs = manualRows.reduce((s, r) => s + n(r.hours), 0)
-  const manualMat = manualRows.reduce((s, r) => s + n(r.materials), 0)
+  // Material follows the ACTIVE tab (In-House vs Sub manual rows) so each tab's
+  // breakdown is independent; hours/subCost above stay In-House for labor.
+  const manualMat = (isSubTab ? state.subManualRows || [] : state.manualRows || []).reduce(
+    (s, r) => s + n(r.materials),
+    0
+  )
   const manualSub = manualRows.reduce((s, r) => s + n(r.subCost), 0)
 
   // ── Hour totals ───────────────────────────────────────────────────────────────
@@ -314,16 +329,23 @@ function calcPaver(
   const totalHrs = _preWalkHrs + walkHrs
 
   // ── Materials ─────────────────────────────────────────────────────────────────
+  // Every material input follows the ACTIVE tab so each tab's Materials
+  // Breakdown is fully independent (labor above still reads In-House fields).
+  const mSealerSF = isSubTab ? n(state.subSealerSF) : n(state.sealerSF)
+  const mRestraintsLF = isSubTab ? n(state.subRestraintsLF) : n(state.restraintsLF)
+  const mSleevesLF = isSubTab ? n(state.subSleevesLF) : n(state.sleevesLF)
+  const mPolySand = isSubTab ? state.subPolySand : state.polySand
+  const mPolyExistingSF = isSubTab ? n(state.subPolySandExistingSF) : n(state.polySandExistingSF)
   // Base rock is priced per-area (vendor/type aware) from the ACTIVE tab's rows;
   // sands/delivery follow the active tab's material SF.
   const baseRockCost = matAreas.reduce((s, a) => s + (a.baseMatCost || 0), 0)
   const beddingSandCost = sfToTons(matInstallSF, 1) * beddingSandPerTon
   const jointSandCost = matInstallSF * jointSandPerSF
-  const polySandCost = state.polySand ? totalInstallSF * polySandPerSF : 0
-  const polySandExistingCost = polySandExistingSFVal * polySandExistingPerSF
-  const sealerMatCost = n(state.sealerSF) * sealerMatPerSF
-  const restraintMatCost = n(state.restraintsLF) * restraintConcrLF
-  const sleevesMatCost = n(state.sleevesLF) * sleevesMatLF
+  const polySandCost = mPolySand ? matInstallSF * polySandPerSF : 0
+  const polySandExistingCost = mPolyExistingSF * polySandExistingPerSF
+  const sealerMatCost = mSealerSF * sealerMatPerSF
+  const restraintMatCost = mRestraintsLF * restraintConcrLF
+  const sleevesMatCost = mSleevesLF * sleevesMatLF
   const palletCost = totalPallets * palletCharge
   // Delivery is automatic whenever any paver is selected and is charged once
   // per 900 SF increment (rounded up). The base rate ($442.75 by default) lives
@@ -332,7 +354,7 @@ function calcPaver(
   const paverSelected = matInstallSF > 0
   const deliveryIncrements = paverSelected ? Math.ceil(matInstallSF / 900) : 0
   const deliveryCost = deliveryIncrements * deliveryFlat
-  const shipping = n(state.shippingCharge)
+  const shipping = isSubTab ? 0 : n(state.shippingCharge)
   const salesTaxRate = n(state.salesTax) / 100
   const salesTaxCost = (totalPaverCost + vertPaverCost) * salesTaxRate
 
@@ -1990,11 +2012,11 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         </button>
       </div>
 
-      {/* ── Materials Summary ─────────────────────────────────────────────────── */}
+      {/* ── Materials Summary (per-tab, independent) ──────────────────────────── */}
       {calc.totalMat > 0 && (
         <div className="bg-gray-50 rounded-lg p-3 text-xs">
           <p className="font-semibold text-gray-600 uppercase tracking-wide text-xs mb-2">
-            Materials Breakdown
+            {isSub ? 'Sub' : 'In House'} Materials Breakdown
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-gray-600">
             {calc.totalPaverCost > 0 && (
