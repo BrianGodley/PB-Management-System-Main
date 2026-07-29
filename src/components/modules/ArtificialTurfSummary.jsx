@@ -60,6 +60,7 @@ export default function ArtificialTurfSummary({ module }) {
     distanceLF = 0,
     demo = {},
     base = {},
+    baseRows = null,
     useZeoFill = false,
     rolls = [],
     strips = {},
@@ -92,12 +93,21 @@ export default function ArtificialTurfSummary({ module }) {
   }).filter(d => d.sf > 0)
 
   // Base items included — omitted entirely on the Sub tab (no base section).
+  const BASE_LABELS = { Gravel: '2" Gravel Base', DG: '1" DG Base', Weed: 'Weed Barrier Fabric' }
   const baseLines = []
   if (!isSub) {
-    if (base.useGravel) baseLines.push(`2" Gravel Base (${n(base.gravelSF) || turfAreaSF} SF)`)
-    if (base.useDG) baseLines.push(`1" DG Base (${n(base.dgSF) || turfAreaSF} SF)`)
-    if (base.useWeedFabric)
-      baseLines.push(`Weed Barrier Fabric (${n(base.weedSF) || turfAreaSF} SF)`)
+    if (Array.isArray(baseRows)) {
+      baseRows.forEach(r => {
+        const label = BASE_LABELS[r.material] || r.material
+        baseLines.push(`${label} (${n(r.sf) || turfAreaSF} SF)`)
+      })
+    } else {
+      // Legacy fixed-base snapshots.
+      if (base.useGravel) baseLines.push(`2" Gravel Base (${n(base.gravelSF) || turfAreaSF} SF)`)
+      if (base.useDG) baseLines.push(`1" DG Base (${n(base.dgSF) || turfAreaSF} SF)`)
+      if (base.useWeedFabric)
+        baseLines.push(`Weed Barrier Fabric (${n(base.weedSF) || turfAreaSF} SF)`)
+    }
   }
 
   // Active rolls — Sub uses entered install SF, In-House uses edge LF.

@@ -143,6 +143,14 @@ const n = v => parseFloat(v) || 0
 // a real vendor only overrides the MATERIAL price for that item (matched by
 // label in the vendor's catalog), never labor.
 const TURF_CAT = { base: 'Turf Base', turf: 'Turf Material' }
+// Base-install material picker options. Each computes qty differently:
+// Gravel/DG are priced per ton, Weed per roll. Vendor overrides material price
+// only (matched by label); labor is per-material preset math.
+const BASE_MATERIALS = [
+  { key: 'Gravel', label: '2" Gravel Base', matKey: 'Turf - Gravel Base', fallbackKey: 'gravelBase', qtyUnit: 't' },
+  { key: 'DG', label: '1" DG Base', matKey: 'Turf - DG Base', fallbackKey: 'dgBase', qtyUnit: 't' },
+  { key: 'Weed', label: 'Weed Barrier Fabric', matKey: 'Turf - Weed Barrier Fabric', fallbackKey: 'weedFabric', qtyUnit: 'roll' },
+]
 function turfMatPrice(cat, vendorSel, typeLabel, houseName, houseFallback, materialRows, catDefaults, mp) {
   const vsel = vendorSel && vendorSel !== 'auto' ? vendorSel : catDefaults?.[cat] || 'House'
   if (vsel && vsel !== 'House') {
@@ -212,74 +220,43 @@ function calcTurf(
   const turfAreaSF = Math.max(...DEMO_ROWS.map(r => n(state.demo[r.key]?.sf))) || 0
 
   // ── Base installation ─────────────────────────────────────────────────────
+  // Rows: pick a material (Gravel/DG priced per ton, Weed per roll); Vendor
+  // overrides the material price only. Labor is per-material preset math.
+  //   Gravel: tons=(SF/200)*2, hrs=(SF/baseSFPerHr)*baseInstallRate
+  //   DG:     tons=(SF*(1/12))/27, hrs handled by walk-access penalty (0 here)
+  //   Weed:   rolls=ceil(SF/1800), hrs=(SF/1000)*weedFabricHrPer1kSF
   let baseHrs = 0,
     baseMat = 0
-
-  // Gravel Base: tons=(SF/200)*2, hrs=(SF/10)*0.25, mat=$6.90*tons
-  const gravelSF = n(state.base.gravelSF) || turfAreaSF
-  const gravelTons = gravelSF > 0 ? (gravelSF / 200) * 2 : 0
-  const gravelHrs =
-    gravelSF > 0 ? (gravelSF / RATE_DEFAULTS.baseSFPerHr) * RATE_DEFAULTS.baseInstallRate : 0
-  const gravelMat =
-    gravelTons *
-    turfMatPrice(
+  const baseCalc = (state.baseRows || []).map(row => {
+    const def = BASE_MATERIALS.find(m => m.key === row.material) || BASE_MATERIALS[0]
+    const sf = n(row.sf) || turfAreaSF
+    const price = turfMatPrice(
       TURF_CAT.base,
-      state.base.gravelVendor,
-      'Gravel Base',
-      'Turf - Gravel Base',
-      RATE_DEFAULTS.gravelBase,
+      row.vendor,
+      def.label,
+      def.matKey,
+      RATE_DEFAULTS[def.fallbackKey],
       materialRows,
       catDefaults,
       mp
     ).price
-  if (state.base.useGravel) {
-    baseHrs += gravelHrs
-    baseMat += gravelMat
-  }
-
-  // DG Base: tons=(SF*(1/12))/27, trips=SF/400, hrs=(trips*dist*2)/wheelFtHr/60
-  const dgSF = n(state.base.dgSF) || turfAreaSF
-  const dgTons = dgSF > 0 ? (dgSF * (1 / 12)) / 27 : 0
-  const dgTrips = dgSF > 0 ? Math.ceil(dgSF / 400) : 0
-  // Old per-module dgHrs (wheelbarrow trip × distance) retired — now handled by unified walk-access penalty below.
-  const dgHrs = 0
-  const dgMat =
-    dgTons *
-    turfMatPrice(
-      TURF_CAT.base,
-      state.base.dgVendor,
-      'DG Base',
-      'Turf - DG Base',
-      RATE_DEFAULTS.dgBase,
-      materialRows,
-      catDefaults,
-      mp
-    ).price
-  if (state.base.useDG) {
-    baseHrs += dgHrs
-    baseMat += dgMat
-  }
-
-  // Weed Barrier Fabric: rolls=ceil(SF/1800), hrs=(SF/1000)*8, mat=$165*rolls
-  const weedSF = n(state.base.weedSF) || turfAreaSF
-  const weedRolls = weedSF > 0 ? Math.ceil(weedSF / 1800) : 0
-  const weedHrs = weedSF > 0 ? (weedSF / 1000) * RATE_DEFAULTS.weedFabricHrPer1kSF : 0
-  const weedMat =
-    weedRolls *
-    turfMatPrice(
-      TURF_CAT.base,
-      state.base.weedVendor,
-      'Weed Barrier Fabric',
-      'Turf - Weed Barrier Fabric',
-      RATE_DEFAULTS.weedFabric,
-      materialRows,
-      catDefaults,
-      mp
-    ).price
-  if (state.base.useWeedFabric) {
-    baseHrs += weedHrs
-    baseMat += weedMat
-  }
+    let qty = 0,
+      hrs = 0
+    if (def.key === 'Gravel') {
+      qty = sf > 0 ? (sf / 200) * 2 : 0
+      hrs = sf > 0 ? (sf / RATE_DEFAULTS.baseSFPerHr) * RATE_DEFAULTS.baseInstallRate : 0
+    } else if (def.key === 'DG') {
+      qty = sf > 0 ? (sf * (1 / 12)) / 27 : 0
+      hrs = 0
+    } else {
+      qty = sf > 0 ? Math.ceil(sf / 1800) : 0
+      hrs = sf > 0 ? (sf / 1000) * RATE_DEFAULTS.weedFabricHrPer1kSF : 0
+    }
+    const mat = qty * price
+    baseHrs += hrs
+    baseMat += mat
+    return { material: def.key, label: def.label, qtyUnit: def.qtyUnit, sf: n(row.sf), qty, hrs, mat, price }
+  })
 
   // On the Sub tab there is no Base Installation section — the subcontractor's
   // flat SF/LF pricing is all-in — so base labor + material never apply.
@@ -370,7 +347,7 @@ function calcTurf(
   // ZeoFill (pet): $30/bag, bags=ceil(SF/30)
   // Standard Durafill: $0.62/SF
   const infillAreaSF =
-    turfAreaSF || n(state.base.gravelSF) || n(state.base.dgSF) || n(state.base.weedSF)
+    turfAreaSF || (state.baseRows || []).reduce((m, r) => Math.max(m, n(r.sf)), 0)
   let infillMat = 0
   if (!isSub && infillAreaSF > 0) {
     if (state.useZeoFill) {
@@ -419,16 +396,7 @@ function calcTurf(
     infillAreaSF,
     demoCalc,
     turfAreaSF,
-    gravelTons,
-    gravelHrs,
-    gravelMat,
-    dgTons,
-    dgTrips,
-    dgHrs,
-    dgMat,
-    weedRolls,
-    weedHrs,
-    weedMat,
+    baseCalc,
     rollCalc,
     totalEdgeLF,
     turfHrs,
@@ -468,17 +436,11 @@ const DEFAULT_STATE = {
     soil: { sf: '', inches: '4', method: 'Skid Steer Good' },
     lawn: { sf: '', inches: '4', method: 'Skid Steer Good' },
   },
-  base: {
-    useGravel: true,
-    gravelSF: '',
-    gravelVendor: 'House',
-    useDG: true,
-    dgSF: '',
-    dgVendor: 'House',
-    useWeedFabric: true,
-    weedSF: '',
-    weedVendor: 'House',
-  },
+  baseRows: [
+    { material: 'Gravel', sf: '', vendor: 'House' },
+    { material: 'DG', sf: '', vendor: 'House' },
+    { material: 'Weed', sf: '', vendor: 'House' },
+  ],
   useZeoFill: false,
   rolls: [
     { brand: 'Socal Blen Supreme 80', edgeLF: '', vendor: 'House' },
@@ -557,7 +519,20 @@ function Toggle({ checked, onChange, label }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function ArtificialTurfModule({ initialData, onSave, onCancel }) {
-  const [state, setState] = useState(() => ({ ...DEFAULT_STATE, ...(initialData || {}) }))
+  const [state, setState] = useState(() => {
+    const init = { ...DEFAULT_STATE, ...(initialData || {}) }
+    // Migrate legacy fixed base object → baseRows list.
+    if (initialData && !initialData.baseRows && initialData.base) {
+      const b = initialData.base
+      const rows = [
+        b.useGravel !== false && { material: 'Gravel', sf: b.gravelSF || '', vendor: b.gravelVendor || 'House' },
+        b.useDG !== false && { material: 'DG', sf: b.dgSF || '', vendor: b.dgVendor || 'House' },
+        b.useWeedFabric !== false && { material: 'Weed', sf: b.weedSF || '', vendor: b.weedVendor || 'House' },
+      ].filter(Boolean)
+      init.baseRows = rows.length ? rows : DEFAULT_STATE.baseRows.map(r => ({ ...r }))
+    }
+    return init
+  })
 
   // Free-text notes for this module — Sam writes auto-generated
   // takeoffs here via create_estimate_from_takeoff, and the user can
@@ -708,8 +683,26 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       setState(p => ({ ...p, demo: { ...p.demo, [type]: { ...p.demo[type], [field]: val } } })),
     []
   )
-  const setBase = useCallback(
-    (field, val) => setState(p => ({ ...p, base: { ...p.base, [field]: val } })),
+  const setBaseRow = useCallback(
+    (i, field, val) =>
+      setState(p => {
+        const baseRows = (p.baseRows || []).map((r, idx) =>
+          idx === i ? { ...r, [field]: val } : r
+        )
+        return { ...p, baseRows }
+      }),
+    []
+  )
+  const addBaseRow = useCallback(
+    () =>
+      setState(p => ({
+        ...p,
+        baseRows: [...(p.baseRows || []), { material: 'Gravel', sf: '', vendor: 'House' }],
+      })),
+    []
+  )
+  const removeBaseRow = useCallback(
+    i => setState(p => ({ ...p, baseRows: (p.baseRows || []).filter((_, idx) => idx !== i) })),
     []
   )
   const setRoll = useCallback(
@@ -914,196 +907,105 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         <table className="w-full text-xs">
           <TH
             cols={[
-              { label: 'Include', w: 'w-14' },
-              { label: 'Base Type' },
               { label: 'Vendor', w: 'w-28' },
+              { label: 'Material' },
               { label: 'Sq Ft', w: 'w-20' },
               { label: 'Qty', w: 'w-16' },
               { label: 'Hrs', w: 'w-16' },
               { label: 'Material', w: 'w-24' },
+              { label: '', w: 'w-8' },
             ]}
           />
           <tbody className="divide-y divide-gray-50">
-            {/* Gravel Base */}
-            <tr>
-              <td className={td}>
-                <input
-                  type="checkbox"
-                  checked={state.base.useGravel}
-                  onChange={e => setBase('useGravel', e.target.checked)}
-                  className="w-4 h-4 accent-blue-600"
-                />
-              </td>
-              <td className={`${td} font-medium text-gray-700`}>
-                <span className="inline-flex items-center gap-1">
-                  2" Gravel Base
-                  <span className="text-gray-400 font-normal">
-                    $
-                    {n(materialPrices['Turf - Gravel Base'] || RATE_DEFAULTS.gravelBase).toFixed(2)}
-                    /ton
-                  </span>
-                  <RateEditPopover
-                    table="material_rates"
-                    name="Turf - Gravel Base"
-                    category="Artificial Turf"
-                    unitLabel="ton"
-                    currentValue={n(
-                      materialPrices['Turf - Gravel Base'] || RATE_DEFAULTS.gravelBase
+            {(state.baseRows || []).map((row, i) => {
+              const def = BASE_MATERIALS.find(m => m.key === row.material) || BASE_MATERIALS[0]
+              const bc = calc.baseCalc?.[i] || {}
+              const unitLabel = def.qtyUnit === 'roll' ? 'roll' : 'ton'
+              const rate = n(materialPrices[def.matKey] || RATE_DEFAULTS[def.fallbackKey])
+              return (
+                <tr key={i}>
+                  <td className={td}>
+                    <select
+                      className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
+                      value={row.vendor || 'House'}
+                      onChange={e => setBaseRow(i, 'vendor', e.target.value)}
+                      title="Vendor"
+                    >
+                      {vendorsForCategory(TURF_CAT.base).map(v => (
+                        <option key={v.id} value={v.id}>
+                          {v.name}
+                        </option>
+                      ))}
+                      <option value="House">House</option>
+                    </select>
+                  </td>
+                  <td className={td}>
+                    <div className="flex items-center gap-1">
+                      <select
+                        className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
+                        value={row.material}
+                        onChange={e => setBaseRow(i, 'material', e.target.value)}
+                        title="Material"
+                      >
+                        {BASE_MATERIALS.map(m => (
+                          <option key={m.key} value={m.key}>
+                            {m.label}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="text-gray-400 whitespace-nowrap">
+                        ${rate.toFixed(2)}/{unitLabel}
+                      </span>
+                      <RateEditPopover
+                        table="material_rates"
+                        name={def.matKey}
+                        category="Artificial Turf"
+                        unitLabel={unitLabel}
+                        currentValue={rate}
+                        onSaved={refreshAllRates}
+                      />
+                    </div>
+                  </td>
+                  <td className={td}>
+                    <Inp
+                      value={row.sf}
+                      onChange={e => setBaseRow(i, 'sf', e.target.value)}
+                      placeholder={calc.turfAreaSF || '0'}
+                    />
+                  </td>
+                  <td className={num}>
+                    {bc.qty > 0
+                      ? def.qtyUnit === 'roll'
+                        ? `${bc.qty} ${bc.qty === 1 ? 'roll' : 'rolls'}`
+                        : `${bc.qty.toFixed(2)} t`
+                      : '—'}
+                  </td>
+                  <td className={num}>{bc.hrs > 0 ? fh(bc.hrs) : '—'}</td>
+                  <td className={num}>{bc.mat > 0 ? fmt2(bc.mat) : '—'}</td>
+                  <td className={num}>
+                    {(state.baseRows || []).length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeBaseRow(i)}
+                        className="text-gray-300 hover:text-red-500"
+                        title="Remove row"
+                      >
+                        ×
+                      </button>
                     )}
-                    onSaved={refreshAllRates}
-                  />
-                </span>
-              </td>
-              <td className={td}>
-                <select
-                  className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
-                  value={state.base.gravelVendor || 'House'}
-                  onChange={e => setBase('gravelVendor', e.target.value)}
-                  title="Vendor"
-                >
-                  {vendorsForCategory(TURF_CAT.base).map(v => (
-                    <option key={v.id} value={v.id}>
-                      {v.name}
-                    </option>
-                  ))}
-                  <option value="House">House</option>
-                </select>
-              </td>
-              <td className={td}>
-                <Inp
-                  value={state.base.gravelSF}
-                  onChange={e => setBase('gravelSF', e.target.value)}
-                  placeholder={calc.turfAreaSF || '0'}
-                />
-              </td>
-              <td className={num}>
-                {state.base.useGravel && calc.gravelTons > 0
-                  ? `${calc.gravelTons.toFixed(2)} t`
-                  : '—'}
-              </td>
-              <td className={num}>{state.base.useGravel ? fh(calc.gravelHrs) : '—'}</td>
-              <td className={num}>
-                {state.base.useGravel && calc.gravelMat > 0 ? fmt2(calc.gravelMat) : '—'}
-              </td>
-            </tr>
-            {/* DG Base */}
-            <tr>
-              <td className={td}>
-                <input
-                  type="checkbox"
-                  checked={state.base.useDG}
-                  onChange={e => setBase('useDG', e.target.checked)}
-                  className="w-4 h-4 accent-blue-600"
-                />
-              </td>
-              <td className={`${td} font-medium text-gray-700`}>
-                <span className="inline-flex items-center gap-1">
-                  1" DG Base
-                  <span className="text-gray-400 font-normal">
-                    ${n(materialPrices['Turf - DG Base'] || RATE_DEFAULTS.dgBase).toFixed(2)}/ton
-                  </span>
-                  <RateEditPopover
-                    table="material_rates"
-                    name="Turf - DG Base"
-                    category="Artificial Turf"
-                    unitLabel="ton"
-                    currentValue={n(materialPrices['Turf - DG Base'] || RATE_DEFAULTS.dgBase)}
-                    onSaved={refreshAllRates}
-                  />
-                </span>
-              </td>
-              <td className={td}>
-                <select
-                  className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
-                  value={state.base.dgVendor || 'House'}
-                  onChange={e => setBase('dgVendor', e.target.value)}
-                  title="Vendor"
-                >
-                  {vendorsForCategory(TURF_CAT.base).map(v => (
-                    <option key={v.id} value={v.id}>
-                      {v.name}
-                    </option>
-                  ))}
-                  <option value="House">House</option>
-                </select>
-              </td>
-              <td className={td}>
-                <Inp
-                  value={state.base.dgSF}
-                  onChange={e => setBase('dgSF', e.target.value)}
-                  placeholder={calc.turfAreaSF || '0'}
-                />
-              </td>
-              <td className={num}>
-                {state.base.useDG && calc.dgTrips > 0 ? `${calc.dgTrips} trips` : '—'}
-              </td>
-              <td className={num}>{state.base.useDG ? fh(calc.dgHrs) : '—'}</td>
-              <td className={num}>{state.base.useDG && calc.dgMat > 0 ? fmt2(calc.dgMat) : '—'}</td>
-            </tr>
-            {/* Weed Barrier */}
-            <tr>
-              <td className={td}>
-                <input
-                  type="checkbox"
-                  checked={state.base.useWeedFabric}
-                  onChange={e => setBase('useWeedFabric', e.target.checked)}
-                  className="w-4 h-4 accent-blue-600"
-                />
-              </td>
-              <td className={`${td} font-medium text-gray-700`}>
-                <span className="inline-flex items-center gap-1">
-                  Weed Barrier Fabric
-                  <span className="text-gray-400 font-normal">
-                    $
-                    {n(
-                      materialPrices['Turf - Weed Barrier Fabric'] || RATE_DEFAULTS.weedFabric
-                    ).toFixed(2)}
-                    /roll (1,800 SF)
-                  </span>
-                  <RateEditPopover
-                    table="material_rates"
-                    name="Turf - Weed Barrier Fabric"
-                    category="Artificial Turf"
-                    unitLabel="roll"
-                    currentValue={n(
-                      materialPrices['Turf - Weed Barrier Fabric'] || RATE_DEFAULTS.weedFabric
-                    )}
-                    onSaved={refreshAllRates}
-                  />
-                </span>
-              </td>
-              <td className={td}>
-                <select
-                  className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
-                  value={state.base.weedVendor || 'House'}
-                  onChange={e => setBase('weedVendor', e.target.value)}
-                  title="Vendor"
-                >
-                  {vendorsForCategory(TURF_CAT.base).map(v => (
-                    <option key={v.id} value={v.id}>
-                      {v.name}
-                    </option>
-                  ))}
-                  <option value="House">House</option>
-                </select>
-              </td>
-              <td className={td}>
-                <Inp
-                  value={state.base.weedSF}
-                  onChange={e => setBase('weedSF', e.target.value)}
-                  placeholder={calc.turfAreaSF || '0'}
-                />
-              </td>
-              <td className={num}>
-                {state.base.useWeedFabric && calc.weedRolls > 0 ? `${calc.weedRolls} rolls` : '—'}
-              </td>
-              <td className={num}>{state.base.useWeedFabric ? fh(calc.weedHrs) : '—'}</td>
-              <td className={num}>
-                {state.base.useWeedFabric && calc.weedMat > 0 ? fmt2(calc.weedMat) : '—'}
-              </td>
-            </tr>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
+        <button
+          type="button"
+          onClick={addBaseRow}
+          className="mt-2 text-xs text-blue-600 hover:text-blue-700 font-medium"
+        >
+          ＋ Add base material
+        </button>
 
         {/* ZeoFill toggle */}
         <div className="mt-3 flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
