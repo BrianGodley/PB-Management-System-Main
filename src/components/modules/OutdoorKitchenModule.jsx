@@ -1275,6 +1275,9 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                         </span>
                       </td>
                       <td className="py-1 pr-2">
+                        <NumInput value={row.qty} onChange={v => setRow('qty', v)} className="w-full" placeholder="1" />
+                      </td>
+                      <td className="py-1 pr-2">
                         <select
                           className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white w-full"
                           value={row.clientProvided ? 'Yes' : 'No'}
