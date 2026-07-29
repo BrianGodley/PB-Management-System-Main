@@ -475,6 +475,7 @@ function calcDemo(
     gradingHrs,
     vegHrs,
     manualHrs,
+    manualMat,
     dumpMatCost,
     isSub,
     subHaulCost,
@@ -1943,6 +1944,40 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           Note: trunks over 24" must be subcontracted.
         </p>
       </div>
+
+      {/* ── Materials Breakdown ──────────────────────────────────────────────── */}
+      {calc.totalMat > 0 && (
+        <div className="bg-gray-50 rounded-lg p-3 text-xs">
+          <p className="font-semibold text-gray-600 uppercase tracking-wide text-xs mb-2">
+            Materials Breakdown
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-gray-600">
+            {calc.dumpMatCost > 0 && (
+              <span>
+                Dump / Disposal: <strong>{fmt2(calc.dumpMatCost)}</strong>
+              </span>
+            )}
+            {calc.baseMat > 0 && (
+              <span>
+                Import Base: <strong>{fmt2(calc.baseMat)}</strong>
+              </span>
+            )}
+            {calc.manualMat > 0 && (
+              <span>
+                Manual: <strong>{fmt2(calc.manualMat)}</strong>
+              </span>
+            )}
+            {calc.salesTax > 0 && (
+              <span>
+                Sales Tax: <strong>{fmt2(calc.salesTax)}</strong>
+              </span>
+            )}
+          </div>
+          <p className="mt-2 pt-2 border-t border-gray-200 font-semibold text-gray-800">
+            Total Materials: {fmt2(calc.totalMat)}
+          </p>
+        </div>
+      )}
 
       {/* Manual */}
       <div>
