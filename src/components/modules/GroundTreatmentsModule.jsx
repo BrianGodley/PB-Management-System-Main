@@ -684,6 +684,73 @@ const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 2', hours: '', materials: '', subCost: '' },
   { label: 'Misc 3', hours: '', materials: '', subCost: '' },
 ]
+// Per-tab input record. In-House and Sub each hold their own independent copy so
+// the two tabs are separate calculators. Shared fields (rates, vendors list,
+// crewType, notes, walkAccess, subType) live on the component, not here.
+function makeTab(src = {}) {
+  return {
+    difficulty: src.difficulty ?? '',
+    hoursAdj: src.hoursAdj ?? '',
+    distanceLF: src.distanceLF ?? '',
+    // Mulch multi-row. Backward-compat: migrate a legacy single mulch entry.
+    mulchRows:
+      src.mulchRows ??
+      (src.mulchSF != null && src.mulchSF !== ''
+        ? [
+            {
+              type: src.mulchType || 'Premium Mulch',
+              sf: src.mulchSF,
+              depth: src.mulchDepth || '2',
+              weedFabric: src.mulchWeedFabric || 'No',
+            },
+            { type: 'Premium Mulch', sf: '', depth: '2', weedFabric: 'No' },
+          ]
+        : DEFAULT_MULCH_ROWS.map(r => ({ ...r }))),
+    plasticEdgingLF: src.plasticEdgingLF ?? '',
+    metalEdgingLF: src.metalEdgingLF ?? '',
+    soilPrepSF: src.soilPrepSF ?? '',
+    sodSoilPrepSF: src.sodSoilPrepSF ?? '',
+    sodSoilPrepVendor: src.sodSoilPrepVendor ?? 'House',
+    sodSoilPrepType: src.sodSoilPrepType ?? 'Soil Prep',
+    sodFertilizerSF: src.sodFertilizerSF ?? '',
+    sodSF: src.sodSF ?? '',
+    sodType: src.sodType ?? 'Marathon',
+    sodFertilizer: src.sodFertilizer ?? 'None',
+    flagstoneSoilSF: src.flagstoneSoilSF ?? '',
+    flagstoneConcreteSF: src.flagstoneConcreteSF ?? '',
+    precastSoilSF: src.precastSoilSF ?? '',
+    precastConcreteSF: src.precastConcreteSF ?? '',
+    stepperVendor:
+      src.stepperVendor ?? { flagSoil: 'House', flagConc: 'House', precSoil: 'House', precConc: 'House' },
+    stepperType:
+      src.stepperType ?? { flagSoil: 'Flagstone', flagConc: 'Flagstone', precSoil: 'Precast', precConc: 'Precast' },
+    edgingVendor: src.edgingVendor ?? { plastic: 'House', metal: 'House' },
+    edgingType: src.edgingType ?? { plastic: 'Plastic', metal: 'Metal' },
+    // D.G. multi-row. Backward-compat: migrate a legacy single DG entry.
+    dgRows:
+      src.dgRows ??
+      (src.dgSF != null && src.dgSF !== ''
+        ? [
+            {
+              type: src.dgType || 'Decomposed Granite',
+              sf: src.dgSF,
+              depth: src.dgDepth || '3.5',
+              weedFabric: src.dgWeedFabric || 'No',
+              method: src.dgMethod || 'Machine',
+              cement: src.dgCement || 'No',
+            },
+            { type: 'Decomposed Granite', sf: '', depth: '3.5', weedFabric: 'No', method: 'Machine', cement: 'No' },
+          ]
+        : DEFAULT_DG_ROWS.map(r => ({ ...r }))),
+    gravelRows: src.gravelRows ?? DEFAULT_GRAVEL_ROWS.map(r => ({ ...r })),
+    soilsRows: src.soilsRows ?? DEFAULT_SOILS_ROWS.map(r => ({ ...r })),
+    pebbleRows: src.pebbleRows ?? DEFAULT_PEBBLE_ROWS.map(r => ({ ...r })),
+    cobbleRows: src.cobbleRows ?? DEFAULT_COBBLE_ROWS.map(r => ({ ...r })),
+    manualRows: src.manualRows ?? DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
+    sodVendor: src.sodVendor ?? 'House',
+    sodFertilizerVendor: src.sodFertilizerVendor ?? 'House',
+  }
+}
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function GroundTreatmentsModule({ onSave, onBack, saving, initialData }) {
@@ -698,7 +765,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   // takeoffs here via create_estimate_from_takeoff, and the user can
   // overwrite / append their own.
   const [notes, setNotes] = useState(initialData?.notes ?? '')
-  const [distanceLF, setDistanceLF] = useState(initialData?.distanceLF ?? '')
   const [walkAccess, setWalkAccess] = useState(
     initialData?.walkAccess ?? {
       paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
@@ -799,100 +865,79 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
   // ── State ──────────────────────────────────────────────────────────────────
-  const [difficulty, setDifficulty] = useState(initialData?.difficulty ?? '')
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Landscape')
   const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
-  const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
-  // Mulch is now a multi-row table. Backward-compat: migrate a legacy single
-  // mulch entry (mulchSF/mulchType/…) into the first row + one blank row.
-  const [mulchRows, setMulchRows] = useState(
-    initialData?.mulchRows ??
-      (initialData?.mulchSF != null && initialData?.mulchSF !== ''
-        ? [
-            {
-              type: initialData.mulchType || 'Premium Mulch',
-              sf: initialData.mulchSF,
-              depth: initialData.mulchDepth || '2',
-              weedFabric: initialData.mulchWeedFabric || 'No',
-            },
-            { type: 'Premium Mulch', sf: '', depth: '2', weedFabric: 'No' },
-          ]
-        : DEFAULT_MULCH_ROWS)
-  )
-  const [plasticEdgingLF, setPlasticEdgingLF] = useState(initialData?.plasticEdgingLF ?? '')
-  const [metalEdgingLF, setMetalEdgingLF] = useState(initialData?.metalEdgingLF ?? '')
-  const [soilPrepSF, setSoilPrepSF] = useState(initialData?.soilPrepSF ?? '')
-  const [sodSoilPrepSF, setSodSoilPrepSF] = useState(initialData?.sodSoilPrepSF ?? '')
-  const [sodSoilPrepVendor, setSodSoilPrepVendor] = useState(
-    initialData?.sodSoilPrepVendor ?? 'House'
-  )
-  const [sodSoilPrepType, setSodSoilPrepType] = useState(
-    initialData?.sodSoilPrepType ?? 'Soil Prep'
-  )
-  const [sodFertilizerSF, setSodFertilizerSF] = useState(initialData?.sodFertilizerSF ?? '')
-  const [sodSF, setSodSF] = useState(initialData?.sodSF ?? '')
-  const [sodType, setSodType] = useState(initialData?.sodType ?? 'Marathon')
-  const [sodFertilizer, setSodFertilizer] = useState(initialData?.sodFertilizer ?? 'None')
-  const [flagstoneSoilSF, setFlagstoneSoilSF] = useState(initialData?.flagstoneSoilSF ?? '')
-  const [flagstoneConcreteSF, setFlagstoneConcreteSF] = useState(
-    initialData?.flagstoneConcreteSF ?? ''
-  )
-  const [precastSoilSF, setPrecastSoilSF] = useState(initialData?.precastSoilSF ?? '')
-  const [precastConcreteSF, setPrecastConcreteSF] = useState(initialData?.precastConcreteSF ?? '')
-  // Steppers now pick Vendor + Type per line (4 lines). House defaults keep the
-  // legacy Flagstone/Precast material behavior; labor stays per-line.
-  const [stepperVendor, setStepperVendor] = useState(
-    initialData?.stepperVendor ?? { flagSoil: 'House', flagConc: 'House', precSoil: 'House', precConc: 'House' }
-  )
-  const [stepperType, setStepperType] = useState(
-    initialData?.stepperType ?? { flagSoil: 'Flagstone', flagConc: 'Flagstone', precSoil: 'Precast', precConc: 'Precast' }
-  )
-  // Edging picks Vendor + Type per line (Plastic / Metal). House defaults keep
-  // the legacy Plastic/Metal material behavior; labor stays per-line.
-  const [edgingVendor, setEdgingVendor] = useState(
-    initialData?.edgingVendor ?? { plastic: 'House', metal: 'House' }
-  )
-  const [edgingType, setEdgingType] = useState(
-    initialData?.edgingType ?? { plastic: 'Plastic', metal: 'Metal' }
-  )
-  // D.G. is now a multi-row table. Backward-compat: migrate a legacy single DG
-  // entry (dgSF/dgType/…) into the first row + one blank row.
-  const [dgRows, setDgRows] = useState(
-    initialData?.dgRows ??
-      (initialData?.dgSF != null && initialData?.dgSF !== ''
-        ? [
-            {
-              type: initialData.dgType || 'Decomposed Granite',
-              sf: initialData.dgSF,
-              depth: initialData.dgDepth || '3.5',
-              weedFabric: initialData.dgWeedFabric || 'No',
-              method: initialData.dgMethod || 'Machine',
-              cement: initialData.dgCement || 'No',
-            },
-            {
-              type: 'Decomposed Granite',
-              sf: '',
-              depth: '3.5',
-              weedFabric: 'No',
-              method: 'Machine',
-              cement: 'No',
-            },
-          ]
-        : DEFAULT_DG_ROWS)
-  )
-  const [gravelRows, setGravelRows] = useState(initialData?.gravelRows ?? DEFAULT_GRAVEL_ROWS)
-  const [soilsRows, setSoilsRows] = useState(initialData?.soilsRows ?? DEFAULT_SOILS_ROWS)
-  const [pebbleRows, setPebbleRows] = useState(initialData?.pebbleRows ?? DEFAULT_PEBBLE_ROWS)
-  const [cobbleRows, setCobbleRows] = useState(initialData?.cobbleRows ?? DEFAULT_COBBLE_ROWS)
-  const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
 
-  // Vendor is now selected PER ROW (first column of each material table),
-  // filtered by which vendors supply that row's category. Sod stays a single
-  // choice, so it keeps a per-section vendor picker.
-  const [sodVendor, setSodVendor] = useState(initialData?.sodVendor ?? 'House')
-  const [sodFertilizerVendor, setSodFertilizerVendor] = useState(
-    initialData?.sodFertilizerVendor ?? 'House'
-  )
+  // Independent In-House vs Sub input records — each tab is its own calculator.
+  const [ihTab, setIhTab] = useState(() => makeTab(initialData?.ihData || initialData))
+  const [subTab, setSubTab] = useState(() => makeTab(initialData?.subData || {}))
+  const isSub = subType === 'Subcontractor'
+  const cur = isSub ? subTab : ihTab
+  const setCur = isSub ? setSubTab : setIhTab
+  // Single setter factory: accepts a value (scalar fields) or an updater fn (rows).
+  const setField = k => v =>
+    setCur(p => ({ ...p, [k]: typeof v === 'function' ? v(p[k]) : v }))
+  // Derived active-tab accessors — render bindings below stay unchanged.
+  const difficulty = cur.difficulty
+  const setDifficulty = setField('difficulty')
+  const hoursAdj = cur.hoursAdj
+  const setHoursAdj = setField('hoursAdj')
+  const distanceLF = cur.distanceLF
+  const setDistanceLF = setField('distanceLF')
+  const mulchRows = cur.mulchRows
+  const setMulchRows = setField('mulchRows')
+  const plasticEdgingLF = cur.plasticEdgingLF
+  const setPlasticEdgingLF = setField('plasticEdgingLF')
+  const metalEdgingLF = cur.metalEdgingLF
+  const setMetalEdgingLF = setField('metalEdgingLF')
+  const soilPrepSF = cur.soilPrepSF
+  const setSoilPrepSF = setField('soilPrepSF')
+  const sodSoilPrepSF = cur.sodSoilPrepSF
+  const setSodSoilPrepSF = setField('sodSoilPrepSF')
+  const sodSoilPrepVendor = cur.sodSoilPrepVendor
+  const setSodSoilPrepVendor = setField('sodSoilPrepVendor')
+  const sodSoilPrepType = cur.sodSoilPrepType
+  const setSodSoilPrepType = setField('sodSoilPrepType')
+  const sodFertilizerSF = cur.sodFertilizerSF
+  const setSodFertilizerSF = setField('sodFertilizerSF')
+  const sodSF = cur.sodSF
+  const setSodSF = setField('sodSF')
+  const sodType = cur.sodType
+  const setSodType = setField('sodType')
+  const sodFertilizer = cur.sodFertilizer
+  const setSodFertilizer = setField('sodFertilizer')
+  const flagstoneSoilSF = cur.flagstoneSoilSF
+  const setFlagstoneSoilSF = setField('flagstoneSoilSF')
+  const flagstoneConcreteSF = cur.flagstoneConcreteSF
+  const setFlagstoneConcreteSF = setField('flagstoneConcreteSF')
+  const precastSoilSF = cur.precastSoilSF
+  const setPrecastSoilSF = setField('precastSoilSF')
+  const precastConcreteSF = cur.precastConcreteSF
+  const setPrecastConcreteSF = setField('precastConcreteSF')
+  const stepperVendor = cur.stepperVendor
+  const setStepperVendor = setField('stepperVendor')
+  const stepperType = cur.stepperType
+  const setStepperType = setField('stepperType')
+  const edgingVendor = cur.edgingVendor
+  const setEdgingVendor = setField('edgingVendor')
+  const edgingType = cur.edgingType
+  const setEdgingType = setField('edgingType')
+  const dgRows = cur.dgRows
+  const setDgRows = setField('dgRows')
+  const gravelRows = cur.gravelRows
+  const setGravelRows = setField('gravelRows')
+  const soilsRows = cur.soilsRows
+  const setSoilsRows = setField('soilsRows')
+  const pebbleRows = cur.pebbleRows
+  const setPebbleRows = setField('pebbleRows')
+  const cobbleRows = cur.cobbleRows
+  const setCobbleRows = setField('cobbleRows')
+  const manualRows = cur.manualRows
+  const setManualRows = setField('manualRows')
+  const sodVendor = cur.sodVendor
+  const setSodVendor = setField('sodVendor')
+  const sodFertilizerVendor = cur.sodFertilizerVendor
+  const setSodFertilizerVendor = setField('sodFertilizerVendor')
 
   // ── Sales tax — applied to totalMat across every module so the bid
   //    reflects supplier-invoiced material cost. Sourced from
@@ -909,40 +954,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     }
   }, [])
 
-  const state = {
-    crewType,
-    subType,
-    difficulty,
-    hoursAdj,
-    mulchRows,
-    plasticEdgingLF,
-    metalEdgingLF,
-    soilPrepSF,
-    sodSoilPrepSF,
-    sodSoilPrepVendor,
-    sodSoilPrepType,
-    sodSF,
-    sodType,
-    sodFertilizer,
-    sodFertilizerVendor,
-    sodFertilizerSF,
-    flagstoneSoilSF,
-    flagstoneConcreteSF,
-    precastSoilSF,
-    precastConcreteSF,
-    stepperVendor,
-    stepperType,
-    edgingVendor,
-    edgingType,
-    dgRows,
-    gravelRows,
-    soilsRows,
-    pebbleRows,
-    cobbleRows,
-    manualRows,
-    distanceLF,
-    sodVendor,
-  }
+  const state = { crewType, subType, ...cur, materialRows }
 
   // Build a section's Type option list. 'House' → hardcoded array (unchanged).
   // A vendor → that vendor's products for the section's subcategory, priced at
@@ -983,33 +995,38 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     // default rows ship with, a leftover 'House', or an empty value. Only these
     // get pushed to the category's first real vendor; an explicit user pick stays.
     const needsDefault = v => !v || v === 'House' || v === 'auto'
-    const mig = (cat, rows) =>
+    const migRows = (cat, rows) =>
       (rows || []).map(r => (needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor(cat) } : r))
-    setGravelRows(rows => mig('Gravel', rows))
-    setPebbleRows(rows => mig('Pebble', rows))
-    setCobbleRows(rows => mig('Cobbles', rows))
-    setSoilsRows(rows => mig('Soils', rows))
-    setMulchRows(rows => mig('Mulch', rows))
-    setDgRows(rows => mig('DG', rows))
-    setSodVendor(v => (needsDefault(v) ? defaultVendorFor('Sod') : v))
-    setSodFertilizerVendor(v => (needsDefault(v) ? defaultVendorFor('Fertilizer') : v))
-    setSodSoilPrepVendor(v => (needsDefault(v) ? defaultVendorFor('Soil Prep') : v))
-    setStepperVendor(sv => {
-      const d = defaultVendorFor('Steppers')
-      const nv = { ...sv }
+    const migMap = (obj, cat) => {
+      const d = defaultVendorFor(cat)
+      const nv = { ...(obj || {}) }
       Object.keys(nv).forEach(k => {
         if (needsDefault(nv[k])) nv[k] = d
       })
       return nv
+    }
+    // Migrate BOTH tabs so each independent calculator gets its section vendor
+    // defaults (In-House and Sub stay separate).
+    const migTab = t => ({
+      ...t,
+      gravelRows: migRows('Gravel', t.gravelRows),
+      pebbleRows: migRows('Pebble', t.pebbleRows),
+      cobbleRows: migRows('Cobbles', t.cobbleRows),
+      soilsRows: migRows('Soils', t.soilsRows),
+      mulchRows: migRows('Mulch', t.mulchRows),
+      dgRows: migRows('DG', t.dgRows),
+      sodVendor: needsDefault(t.sodVendor) ? defaultVendorFor('Sod') : t.sodVendor,
+      sodFertilizerVendor: needsDefault(t.sodFertilizerVendor)
+        ? defaultVendorFor('Fertilizer')
+        : t.sodFertilizerVendor,
+      sodSoilPrepVendor: needsDefault(t.sodSoilPrepVendor)
+        ? defaultVendorFor('Soil Prep')
+        : t.sodSoilPrepVendor,
+      stepperVendor: migMap(t.stepperVendor, 'Steppers'),
+      edgingVendor: migMap(t.edgingVendor, 'Edging'),
     })
-    setEdgingVendor(ev => {
-      const d = defaultVendorFor('Edging')
-      const nv = { ...ev }
-      Object.keys(nv).forEach(k => {
-        if (needsDefault(nv[k])) nv[k] = d
-      })
-      return nv
-    })
+    setIhTab(migTab)
+    setSubTab(migTab)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendors, initialData, vendorDefaultsApplied])
 
@@ -1083,7 +1100,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       notes,
       man_days: parseFloat(calc.manDays.toFixed(2)),
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
-      data: { ...state, walkAccess, laborRatePerHour, laborBurdenPct, gpmd, materialPrices, calc },
+      data: { ...state, ihData: ihTab, subData: subTab, walkAccess, laborRatePerHour, laborBurdenPct, gpmd, materialPrices, calc },
     })
   }
 

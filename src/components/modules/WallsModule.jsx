@@ -479,6 +479,73 @@ const DEFAULT_CAP_ROWS = [
 ]
 const CAP_TYPES = ['None', 'Flagstone', 'Precast', 'PIP Concrete', 'Bullnose Brick']
 
+// ── Per-tab input record ──────────────────────────────────────────────────────
+// In-House and Sub each hold their own independent copy so the two tabs are
+// separate calculators. Backward-compat: legacy single-entry / flat fields are
+// migrated into the array forms below.
+function initCmuWalls(src = {}) {
+  if (src.cmuWalls) return src.cmuWalls.map(w => ({ blockType: DEFAULT_BLOCK_NAME, ...w }))
+  if (src.cmuLF !== undefined)
+    return [
+      {
+        blockType: DEFAULT_BLOCK_NAME,
+        lf: src.cmuLF,
+        heightIn: src.cmuHeightIn,
+        footingWIn: src.cmuFootingWIn ?? '12',
+        footingDIn: src.cmuFootingDIn ?? '12',
+        rebarSpIn: src.cmuRebarSpIn ?? '16',
+        horizBars: src.cmuHorizBars ?? '2',
+        bondBeams: src.cmuBondBeams ?? '1',
+        pctGrouted: src.cmuPctGrouted ?? '100',
+        pctCurved: src.cmuPctCurved ?? '0',
+      },
+    ]
+  return [DEFAULT_CMU()]
+}
+function initPipWalls(src = {}) {
+  if (src.pipWalls) return src.pipWalls
+  if (src.pipLF !== undefined) return [{ lf: src.pipLF, heightIn: src.pipHeightIn }]
+  return [DEFAULT_PIP()]
+}
+function initWpRows(src = {}) {
+  if (Array.isArray(src.wpRows) && src.wpRows.length) return src.wpRows
+  if (src.wpType || src.wpSF) return [{ type: src.wpType || 'None', sf: src.wpSF || '' }]
+  return [{ type: 'None', sf: '' }]
+}
+function makeTab(src = {}) {
+  return {
+    difficulty: src.difficulty ?? '',
+    hoursAdj: src.hoursAdj ?? '',
+    wallType: src.wallType ?? 'CMU',
+    distanceLF: src.distanceLF ?? '',
+    cmuWalls: initCmuWalls(src),
+    cmuFootingPump: src.cmuFootingPump ?? 'No',
+    cmuGroutPump: src.cmuGroutPump ?? 'No',
+    pipWalls: initPipWalls(src),
+    timberLF: src.timberLF ?? '',
+    timberHeightIn: src.timberHeightIn ?? '',
+    timberType: src.timberType ?? 'Railroad Treated',
+    timberPosts: src.timberPosts ?? '',
+    sandStuccoSF: src.sandStuccoSF ?? '',
+    sandStuccoRateIn: src.sandStuccoRateIn ?? '',
+    smoothStuccoSF: src.smoothStuccoSF ?? '',
+    smoothStuccoRateIn: src.smoothStuccoRateIn ?? '',
+    ledgerstoneSF: src.ledgerstoneSF ?? '',
+    ledgerstoneRateIn: src.ledgerstoneRateIn ?? '',
+    stackedStoneSF: src.stackedStoneSF ?? '',
+    stackedStoneRateIn: src.stackedStoneRateIn ?? '',
+    tileSF: src.tileSF ?? '',
+    tileRateIn: src.tileRateIn ?? '',
+    flagstoneSF: src.flagstoneSF ?? '',
+    flagstoneRateIn: src.flagstoneRateIn ?? '',
+    realStoneSF: src.realStoneSF ?? '',
+    realStoneRateIn: src.realStoneRateIn ?? '',
+    capRows: src.capRows ?? DEFAULT_CAP_ROWS.map(r => ({ ...r })),
+    wpRows: initWpRows(src),
+    manualRows: src.manualRows ?? DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
+  }
+}
+
 // ── CMU Wall Entry ────────────────────────────────────────────────────────────
 function CmuWallEntry({
   wall,
@@ -760,88 +827,78 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
   const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
-  // ── Shared state ──────────────────────────────────────────────────────────
-  const [difficulty, setDifficulty] = useState(initialData?.difficulty ?? '')
+  // ── Shared (not per-tab) selections ─────────────────────────────────────────
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Masonry')
   const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
-  const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
-  const [wallType, setWallType] = useState(initialData?.wallType ?? 'CMU')
-  const [distanceLF, setDistanceLF] = useState(initialData?.distanceLF ?? '')
 
-  // ── CMU walls array ───────────────────────────────────────────────────────
-  // Backward-compat: if old single-entry format, wrap it
-  const initCmuWalls = () => {
-    if (initialData?.cmuWalls) {
-      // Backfill blockType on legacy entries saved before block-type support.
-      return initialData.cmuWalls.map(w => ({ blockType: DEFAULT_BLOCK_NAME, ...w }))
-    }
-    if (initialData?.cmuLF !== undefined)
-      return [
-        {
-          blockType: DEFAULT_BLOCK_NAME,
-          lf: initialData.cmuLF,
-          heightIn: initialData.cmuHeightIn,
-          footingWIn: initialData.cmuFootingWIn ?? '12',
-          footingDIn: initialData.cmuFootingDIn ?? '12',
-          rebarSpIn: initialData.cmuRebarSpIn ?? '16',
-          horizBars: initialData.cmuHorizBars ?? '2',
-          bondBeams: initialData.cmuBondBeams ?? '1',
-          pctGrouted: initialData.cmuPctGrouted ?? '100',
-          pctCurved: initialData.cmuPctCurved ?? '0',
-        },
-      ]
-    return [DEFAULT_CMU()]
-  }
-  const [cmuWalls, setCmuWalls] = useState(initCmuWalls)
-  const [cmuFootingPump, setCmuFootingPump] = useState(initialData?.cmuFootingPump ?? 'No')
-  const [cmuGroutPump, setCmuGroutPump] = useState(initialData?.cmuGroutPump ?? 'No')
+  // Independent In-House vs Sub input records — each tab is its own calculator.
+  const [ihTab, setIhTab] = useState(() => makeTab(initialData?.ihData || initialData))
+  const [subTab, setSubTab] = useState(() => makeTab(initialData?.subData || {}))
+  const isSub = subType === 'Subcontractor'
+  const cur = isSub ? subTab : ihTab
+  const setCur = isSub ? setSubTab : setIhTab
+  // A single setter factory: accepts a value (scalar fields) or an updater fn (row arrays).
+  const setField = k => v => setCur(p => ({ ...p, [k]: typeof v === 'function' ? v(p[k]) : v }))
 
-  // ── PIP walls array ───────────────────────────────────────────────────────
-  const initPipWalls = () => {
-    if (initialData?.pipWalls) return initialData.pipWalls
-    if (initialData?.pipLF !== undefined)
-      return [{ lf: initialData.pipLF, heightIn: initialData.pipHeightIn }]
-    return [DEFAULT_PIP()]
-  }
-  const [pipWalls, setPipWalls] = useState(initPipWalls)
-
-  // ── Timber (single) ───────────────────────────────────────────────────────
-  const [timberLF, setTimberLF] = useState(initialData?.timberLF ?? '')
-  const [timberHeightIn, setTimberHeightIn] = useState(initialData?.timberHeightIn ?? '')
-  const [timberType, setTimberType] = useState(initialData?.timberType ?? 'Railroad Treated')
-  const [timberPosts, setTimberPosts] = useState(initialData?.timberPosts ?? '')
-
-  // ── Wall Finishes ─────────────────────────────────────────────────────────
-  const [sandStuccoSF, setSandStuccoSF] = useState(initialData?.sandStuccoSF ?? '')
-  const [sandStuccoRateIn, setSandStuccoRateIn] = useState(initialData?.sandStuccoRateIn ?? '')
-  const [smoothStuccoSF, setSmoothStuccoSF] = useState(initialData?.smoothStuccoSF ?? '')
-  const [smoothStuccoRateIn, setSmoothStuccoRateIn] = useState(
-    initialData?.smoothStuccoRateIn ?? ''
-  )
-  const [ledgerstoneSF, setLedgerstoneSF] = useState(initialData?.ledgerstoneSF ?? '')
-  const [ledgerstoneRateIn, setLedgerstoneRateIn] = useState(initialData?.ledgerstoneRateIn ?? '')
-  const [stackedStoneSF, setStackedStoneSF] = useState(initialData?.stackedStoneSF ?? '')
-  const [stackedStoneRateIn, setStackedStoneRateIn] = useState(
-    initialData?.stackedStoneRateIn ?? ''
-  )
-  const [tileSF, setTileSF] = useState(initialData?.tileSF ?? '')
-  const [tileRateIn, setTileRateIn] = useState(initialData?.tileRateIn ?? '')
-  const [flagstoneSF, setFlagstoneSF] = useState(initialData?.flagstoneSF ?? '')
-  const [flagstoneRateIn, setFlagstoneRateIn] = useState(initialData?.flagstoneRateIn ?? '')
-  const [realStoneSF, setRealStoneSF] = useState(initialData?.realStoneSF ?? '')
-  const [realStoneRateIn, setRealStoneRateIn] = useState(initialData?.realStoneRateIn ?? '')
-
-  // ── Caps / Waterproofing / Manual ─────────────────────────────────────────
-  const [capRows, setCapRows] = useState(initialData?.capRows ?? DEFAULT_CAP_ROWS)
-  // Multi-row waterproofing. Migrate legacy single-entry initialData on
-  // mount so existing saved walls keep their waterproofing line.
-  const [wpRows, setWpRows] = useState(() => {
-    if (Array.isArray(initialData?.wpRows) && initialData.wpRows.length) return initialData.wpRows
-    if (initialData?.wpType || initialData?.wpSF) {
-      return [{ type: initialData.wpType || 'None', sf: initialData.wpSF || '' }]
-    }
-    return [{ type: 'None', sf: '' }]
-  })
+  // Derived active-tab field accessors — render bindings below stay unchanged.
+  const difficulty = cur.difficulty
+  const setDifficulty = setField('difficulty')
+  const hoursAdj = cur.hoursAdj
+  const setHoursAdj = setField('hoursAdj')
+  const wallType = cur.wallType
+  const setWallType = setField('wallType')
+  const distanceLF = cur.distanceLF
+  const setDistanceLF = setField('distanceLF')
+  const cmuWalls = cur.cmuWalls
+  const setCmuWalls = setField('cmuWalls')
+  const cmuFootingPump = cur.cmuFootingPump
+  const setCmuFootingPump = setField('cmuFootingPump')
+  const cmuGroutPump = cur.cmuGroutPump
+  const setCmuGroutPump = setField('cmuGroutPump')
+  const pipWalls = cur.pipWalls
+  const setPipWalls = setField('pipWalls')
+  const timberLF = cur.timberLF
+  const setTimberLF = setField('timberLF')
+  const timberHeightIn = cur.timberHeightIn
+  const setTimberHeightIn = setField('timberHeightIn')
+  const timberType = cur.timberType
+  const setTimberType = setField('timberType')
+  const timberPosts = cur.timberPosts
+  const setTimberPosts = setField('timberPosts')
+  const sandStuccoSF = cur.sandStuccoSF
+  const setSandStuccoSF = setField('sandStuccoSF')
+  const sandStuccoRateIn = cur.sandStuccoRateIn
+  const setSandStuccoRateIn = setField('sandStuccoRateIn')
+  const smoothStuccoSF = cur.smoothStuccoSF
+  const setSmoothStuccoSF = setField('smoothStuccoSF')
+  const smoothStuccoRateIn = cur.smoothStuccoRateIn
+  const setSmoothStuccoRateIn = setField('smoothStuccoRateIn')
+  const ledgerstoneSF = cur.ledgerstoneSF
+  const setLedgerstoneSF = setField('ledgerstoneSF')
+  const ledgerstoneRateIn = cur.ledgerstoneRateIn
+  const setLedgerstoneRateIn = setField('ledgerstoneRateIn')
+  const stackedStoneSF = cur.stackedStoneSF
+  const setStackedStoneSF = setField('stackedStoneSF')
+  const stackedStoneRateIn = cur.stackedStoneRateIn
+  const setStackedStoneRateIn = setField('stackedStoneRateIn')
+  const tileSF = cur.tileSF
+  const setTileSF = setField('tileSF')
+  const tileRateIn = cur.tileRateIn
+  const setTileRateIn = setField('tileRateIn')
+  const flagstoneSF = cur.flagstoneSF
+  const setFlagstoneSF = setField('flagstoneSF')
+  const flagstoneRateIn = cur.flagstoneRateIn
+  const setFlagstoneRateIn = setField('flagstoneRateIn')
+  const realStoneSF = cur.realStoneSF
+  const setRealStoneSF = setField('realStoneSF')
+  const realStoneRateIn = cur.realStoneRateIn
+  const setRealStoneRateIn = setField('realStoneRateIn')
+  const capRows = cur.capRows
+  const setCapRows = setField('capRows')
+  const wpRows = cur.wpRows
+  const setWpRows = setField('wpRows')
+  const manualRows = cur.manualRows
+  const setManualRows = setField('manualRows')
   function updateWpRow(i, field, val) {
     setWpRows(rs => rs.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
@@ -851,7 +908,6 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
   function removeWpRow(idx) {
     setWpRows(rs => (rs.length > 1 ? rs.filter((_, i) => i !== idx) : rs))
   }
-  const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
 
   // ── Sales tax — applied to totalMat across every module so the bid
   //    reflects supplier-invoiced material cost. Sourced from
@@ -868,12 +924,22 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
     }
   }, [])
 
+  // Backfill the flagstone / real-stone $/unit override with the master rate
+  // when it hasn't been set. Each tab is filled independently so In-House and
+  // Sub stay separate.
   useEffect(() => {
     if (Object.keys(materialPrices).length === 0) return
-    if (!initialData?.flagstoneRateIn && materialPrices[WALL_RATES.flagstone.db])
-      setFlagstoneRateIn(materialPrices[WALL_RATES.flagstone.db].toString())
-    if (!initialData?.realStoneRateIn && materialPrices[WALL_RATES.realStone.db])
-      setRealStoneRateIn(materialPrices[WALL_RATES.realStone.db].toString())
+    const fs = materialPrices[WALL_RATES.flagstone.db]
+    const rs = materialPrices[WALL_RATES.realStone.db]
+    const fill = setTab =>
+      setTab(t => {
+        let next = t
+        if (fs && !next.flagstoneRateIn) next = { ...next, flagstoneRateIn: fs.toString() }
+        if (rs && !next.realStoneRateIn) next = { ...next, realStoneRateIn: rs.toString() }
+        return next
+      })
+    fill(setIhTab)
+    fill(setSubTab)
   }, [materialPrices])
 
   // ── Array helpers ─────────────────────────────────────────────────────────
@@ -906,39 +972,9 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
 
   const r = key => materialPrices[WALL_RATES[key].db] ?? WALL_RATES[key].fb
 
-  const state = {
-    crewType,
-    subType,
-    difficulty,
-    hoursAdj,
-    wallType,
-    distanceLF,
-    cmuWalls,
-    cmuFootingPump,
-    cmuGroutPump,
-    pipWalls,
-    timberLF,
-    timberHeightIn,
-    timberType,
-    timberPosts,
-    sandStuccoSF,
-    sandStuccoRateIn,
-    smoothStuccoSF,
-    smoothStuccoRateIn,
-    ledgerstoneSF,
-    ledgerstoneRateIn,
-    stackedStoneSF,
-    stackedStoneRateIn,
-    tileSF,
-    tileRateIn,
-    flagstoneSF,
-    flagstoneRateIn,
-    realStoneSF,
-    realStoneRateIn,
-    capRows,
-    wpRows,
-    manualRows,
-  }
+  // The calc runs against the ACTIVE tab only — entering data on one tab never
+  // affects the other. Shared selections (crew/sub type) are merged on top.
+  const state = { crewType, subType, ...cur }
   const calcRaw = calcWalls(
     state,
     laborRatePerHour,
@@ -967,7 +1003,17 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
       notes,
       man_days: parseFloat(calc.manDays.toFixed(2)),
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
-      data: { ...state, laborRatePerHour, laborBurdenPct, gpmd, materialPrices, walkAccess, calc },
+      data: {
+        ...state,
+        ihData: ihTab,
+        subData: subTab,
+        laborRatePerHour,
+        laborBurdenPct,
+        gpmd,
+        materialPrices,
+        walkAccess,
+        calc,
+      },
     })
   }
 

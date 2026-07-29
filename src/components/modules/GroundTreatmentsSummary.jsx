@@ -193,6 +193,11 @@ function LineRow({ label, value, sub, highlight }) {
 
 export default function GroundTreatmentsSummary({ module }) {
   const data = module?.data || {}
+  // In-House and Sub are now independent tab records (data.ihData / data.subData),
+  // with a flat-field fallback for legacy estimates. This single-column view is
+  // driven by the In-House record; shared fields (rates/prices/calc) stay top-level.
+  const ih = data.ihData || data
+  const sub = data.subData || {}
   const {
     difficulty = 0,
     hoursAdj = 0,
@@ -230,10 +235,9 @@ export default function GroundTreatmentsSummary({ module }) {
     pebbleRows = [],
     cobbleRows = [],
     manualRows = [],
-    laborRatePerHour = 35,
-    materialPrices = {},
-    calc = null,
-  } = data
+  } = ih
+  // Shared fields (not per-tab) — always read from the top-level saved data.
+  const { laborRatePerHour = 35, materialPrices = {}, calc = null } = data
 
   const mp = (dbName, fallback) =>
     materialPrices[dbName] != null ? materialPrices[dbName] : fallback
@@ -285,7 +289,7 @@ export default function GroundTreatmentsSummary({ module }) {
   if (n(sodSoilPrepSF) > 0) {
     const rate = priceForRow(
       'Soil Prep',
-      { type: sodSoilPrepType, vendor: data.sodSoilPrepVendor },
+      { type: sodSoilPrepType, vendor: ih.sodSoilPrepVendor },
       SOIL_PREP_TYPES,
       GT_RATES.soilPrepMat.fallback
     )
@@ -301,7 +305,7 @@ export default function GroundTreatmentsSummary({ module }) {
   // ── Sod ──────────────────────────────────────────────────────────────────────
   let sodLine = null
   if (n(sodSF) > 0) {
-    const rate = priceForRow('Sod', { type: sodType, vendor: data.sodVendor }, SOD_TYPES, SOD_TYPES[0].fallback)
+    const rate = priceForRow('Sod', { type: sodType, vendor: ih.sodVendor }, SOD_TYPES, SOD_TYPES[0].fallback)
     const mat = n(sodSF) * rate
     const hrs = n(sodSF) * mp(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback)
     sodLine = {
@@ -524,7 +528,7 @@ export default function GroundTreatmentsSummary({ module }) {
     // Old estimates (no edgingType/edgingVendor) fall back to the fixed Plastic rate.
     const rate = priceForRow(
       'Edging',
-      { type: data.edgingType?.plastic, vendor: data.edgingVendor?.plastic },
+      { type: ih.edgingType?.plastic, vendor: ih.edgingVendor?.plastic },
       EDGING_TYPES,
       mp(GT_RATES.plasticEdgingMat.dbName, GT_RATES.plasticEdgingMat.fallback)
     )
@@ -541,7 +545,7 @@ export default function GroundTreatmentsSummary({ module }) {
   if (n(metalEdgingLF) > 0) {
     const rate = priceForRow(
       'Edging',
-      { type: data.edgingType?.metal, vendor: data.edgingVendor?.metal },
+      { type: ih.edgingType?.metal, vendor: ih.edgingVendor?.metal },
       EDGING_TYPES,
       mp(GT_RATES.metalEdgingMat.dbName, GT_RATES.metalEdgingMat.fallback)
     )
@@ -566,8 +570,8 @@ export default function GroundTreatmentsSummary({ module }) {
   // matRate). Labor stays per-line (its own SF/day rate). Money still comes from
   // d.calc; these lines are the display breakdown.
   const stepperLines = []
-  const _stepperVendor = data.stepperVendor || {}
-  const _stepperType = data.stepperType || {}
+  const _stepperVendor = ih.stepperVendor || {}
+  const _stepperType = ih.stepperType || {}
   const stepperDefs = [
     {
       key: 'flagSoil',

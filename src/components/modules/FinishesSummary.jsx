@@ -36,6 +36,10 @@ function LineRow({ label, value, sub, highlight }) {
 
 export default function FinishesSummary({ module }) {
   const data = module?.data || {}
+  // In-House and Sub are independent tab records. Show the tab that was saved as
+  // this module's work type; legacy estimates stored fields flat (= In-House).
+  const isSub = data.subType === 'Subcontractor'
+  const tab = isSub ? data.subData || {} : data.ihData || data
   const {
     difficulty = 0,
     hoursAdj = 0,
@@ -52,8 +56,8 @@ export default function FinishesSummary({ module }) {
     wallFlagstoneSF = 0,
     realStoneSF = 0,
     manualRows = [],
-    calc = {},
-  } = data
+  } = tab
+  const calc = data.calc || {}
 
   const activeFlatwork = [
     { label: 'Tile Over Slab', sf: tileFlatSF },

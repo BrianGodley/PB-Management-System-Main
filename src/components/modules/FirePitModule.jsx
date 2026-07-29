@@ -397,6 +397,39 @@ const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 3', hours: '', materials: '', subCost: '' },
 ]
 
+// Per-tab input record. In-House and Sub each hold their own independent copy so
+// the two tabs are separate calculators.
+function makeTab(src = {}) {
+  return {
+    difficulty: src.difficulty ?? '',
+    hoursAdj: src.hoursAdj ?? '',
+    layoutHrs: src.layoutHrs ?? '',
+    distanceLF: src.distanceLF ?? '',
+    wallLF: src.wallLF ?? '',
+    wallHeightIn: src.wallHeightIn ?? '40',
+    footingWidthIn: src.footingWidthIn ?? '12',
+    footingDepthIn: src.footingDepthIn ?? '12',
+    rebarSpacingIn: src.rebarSpacingIn ?? '16',
+    bondBeamCourses: src.bondBeamCourses ?? '1',
+    pctGrouted: src.pctGrouted ?? '100',
+    pctCurved: src.pctCurved ?? '0',
+    useGroutPump: src.useGroutPump ?? 'No',
+    capRows: src.capRows ?? DEFAULT_CAP_ROWS.map(r => ({ ...r })),
+    gasRingCount: src.gasRingCount ?? '',
+    gasTrenchLF: src.gasTrenchLF ?? '',
+    sandStuccoSF: src.sandStuccoSF ?? '',
+    smoothStuccoSF: src.smoothStuccoSF ?? '',
+    ledgerstoneSF: src.ledgerstoneSF ?? '',
+    stackedStoneSF: src.stackedStoneSF ?? '',
+    tileSF: src.tileSF ?? '',
+    flagstoneSF: src.flagstoneSF ?? '',
+    flagstoneRateInput: src.flagstoneRateInput ?? '',
+    realStoneSF: src.realStoneSF ?? '',
+    realStoneRateInput: src.realStoneRateInput ?? '',
+    manualRows: src.manualRows ?? DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
+  }
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function FirePitModule({ onSave, onBack, saving, initialData }) {
   const [laborRatePerHour, setLaborRatePerHour] = useState(
@@ -410,7 +443,6 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
   // takeoffs here via create_estimate_from_takeoff, and the user can
   // overwrite / append their own.
   const [notes, setNotes] = useState(initialData?.notes ?? '')
-  const [distanceLF, setDistanceLF] = useState(initialData?.distanceLF ?? '')
   const [walkAccess, setWalkAccess] = useState(
     initialData?.walkAccess ?? {
       paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
@@ -483,41 +515,70 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
   // ── State ──────────────────────────────────────────────────────────────────
-  const [difficulty, setDifficulty] = useState(initialData?.difficulty ?? '')
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Masonry')
   const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
-  const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
-  const [layoutHrs, setLayoutHrs] = useState(initialData?.layoutHrs ?? '')
-  // Structure
-  const [wallLF, setWallLF] = useState(initialData?.wallLF ?? '')
-  const [wallHeightIn, setWallHeightIn] = useState(initialData?.wallHeightIn ?? '40')
-  const [footingWidthIn, setFootingWidthIn] = useState(initialData?.footingWidthIn ?? '12')
-  const [footingDepthIn, setFootingDepthIn] = useState(initialData?.footingDepthIn ?? '12')
-  const [rebarSpacingIn, setRebarSpacingIn] = useState(initialData?.rebarSpacingIn ?? '16')
-  const [bondBeamCourses, setBondBeamCourses] = useState(initialData?.bondBeamCourses ?? '1')
-  const [pctGrouted, setPctGrouted] = useState(initialData?.pctGrouted ?? '100')
-  const [pctCurved, setPctCurved] = useState(initialData?.pctCurved ?? '0')
-  const [useGroutPump, setUseGroutPump] = useState(initialData?.useGroutPump ?? 'No')
-  // Wall cap (seat/perimeter cap on top of the wall) — same model as Walls
-  const [capRows, setCapRows] = useState(initialData?.capRows ?? DEFAULT_CAP_ROWS)
-  // Fixtures
-  const [gasRingCount, setGasRingCount] = useState(initialData?.gasRingCount ?? '')
-  const [gasTrenchLF, setGasTrenchLF] = useState(initialData?.gasTrenchLF ?? '')
-  // Wall Finishes
-  const [sandStuccoSF, setSandStuccoSF] = useState(initialData?.sandStuccoSF ?? '')
-  const [smoothStuccoSF, setSmoothStuccoSF] = useState(initialData?.smoothStuccoSF ?? '')
-  const [ledgerstoneSF, setLedgerstoneSF] = useState(initialData?.ledgerstoneSF ?? '')
-  const [stackedStoneSF, setStackedStoneSF] = useState(initialData?.stackedStoneSF ?? '')
-  const [tileSF, setTileSF] = useState(initialData?.tileSF ?? '')
-  const [flagstoneSF, setFlagstoneSF] = useState(initialData?.flagstoneSF ?? '')
-  const [flagstoneRateInput, setFlagstoneRateInput] = useState(
-    initialData?.flagstoneRateInput ?? ''
-  )
-  const [realStoneSF, setRealStoneSF] = useState(initialData?.realStoneSF ?? '')
-  const [realStoneRateInput, setRealStoneRateInput] = useState(
-    initialData?.realStoneRateInput ?? ''
-  )
-  const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
+  // Independent In-House vs Sub input records — each tab is its own calculator.
+  const [ihTab, setIhTab] = useState(() => makeTab(initialData?.ihData || initialData))
+  const [subTab, setSubTab] = useState(() => makeTab(initialData?.subData || {}))
+  const isSub = subType === 'Subcontractor'
+  const cur = isSub ? subTab : ihTab
+  const setCur = isSub ? setSubTab : setIhTab
+  // A single setter factory: accepts a value (scalar fields) or an updater fn (row arrays).
+  const setField = k => v =>
+    setCur(p => ({ ...p, [k]: typeof v === 'function' ? v(p[k]) : v }))
+  // Derived active-tab field accessors — render bindings stay unchanged.
+  const difficulty = cur.difficulty
+  const setDifficulty = setField('difficulty')
+  const hoursAdj = cur.hoursAdj
+  const setHoursAdj = setField('hoursAdj')
+  const layoutHrs = cur.layoutHrs
+  const setLayoutHrs = setField('layoutHrs')
+  const distanceLF = cur.distanceLF
+  const setDistanceLF = setField('distanceLF')
+  const wallLF = cur.wallLF
+  const setWallLF = setField('wallLF')
+  const wallHeightIn = cur.wallHeightIn
+  const setWallHeightIn = setField('wallHeightIn')
+  const footingWidthIn = cur.footingWidthIn
+  const setFootingWidthIn = setField('footingWidthIn')
+  const footingDepthIn = cur.footingDepthIn
+  const setFootingDepthIn = setField('footingDepthIn')
+  const rebarSpacingIn = cur.rebarSpacingIn
+  const setRebarSpacingIn = setField('rebarSpacingIn')
+  const bondBeamCourses = cur.bondBeamCourses
+  const setBondBeamCourses = setField('bondBeamCourses')
+  const pctGrouted = cur.pctGrouted
+  const setPctGrouted = setField('pctGrouted')
+  const pctCurved = cur.pctCurved
+  const setPctCurved = setField('pctCurved')
+  const useGroutPump = cur.useGroutPump
+  const setUseGroutPump = setField('useGroutPump')
+  const capRows = cur.capRows
+  const setCapRows = setField('capRows')
+  const gasRingCount = cur.gasRingCount
+  const setGasRingCount = setField('gasRingCount')
+  const gasTrenchLF = cur.gasTrenchLF
+  const setGasTrenchLF = setField('gasTrenchLF')
+  const sandStuccoSF = cur.sandStuccoSF
+  const setSandStuccoSF = setField('sandStuccoSF')
+  const smoothStuccoSF = cur.smoothStuccoSF
+  const setSmoothStuccoSF = setField('smoothStuccoSF')
+  const ledgerstoneSF = cur.ledgerstoneSF
+  const setLedgerstoneSF = setField('ledgerstoneSF')
+  const stackedStoneSF = cur.stackedStoneSF
+  const setStackedStoneSF = setField('stackedStoneSF')
+  const tileSF = cur.tileSF
+  const setTileSF = setField('tileSF')
+  const flagstoneSF = cur.flagstoneSF
+  const setFlagstoneSF = setField('flagstoneSF')
+  const flagstoneRateInput = cur.flagstoneRateInput
+  const setFlagstoneRateInput = setField('flagstoneRateInput')
+  const realStoneSF = cur.realStoneSF
+  const setRealStoneSF = setField('realStoneSF')
+  const realStoneRateInput = cur.realStoneRateInput
+  const setRealStoneRateInput = setField('realStoneRateInput')
+  const manualRows = cur.manualRows
+  const setManualRows = setField('manualRows')
 
   // ── Sales tax — applied to totalMat across every module so the bid
   //    reflects supplier-invoiced material cost. Sourced from
@@ -534,47 +595,23 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
     }
   }, [])
 
-  // Pre-fill editable stone rates once DB prices load
+  // Pre-fill editable stone rates once DB prices load — applied independently to
+  // each tab record so In-House and Sub stay separate calculators.
   useEffect(() => {
     if (Object.keys(materialPrices).length === 0) return
-    if (!initialData?.flagstoneRateInput && materialPrices[FP_RATES.realFlagstone.dbName]) {
-      setFlagstoneRateInput(materialPrices[FP_RATES.realFlagstone.dbName].toString())
+    const flag = materialPrices[FP_RATES.realFlagstone.dbName]
+    const real = materialPrices[FP_RATES.realStone.dbName]
+    const fill = t => {
+      let next = t
+      if (!next.flagstoneRateInput && flag) next = { ...next, flagstoneRateInput: flag.toString() }
+      if (!next.realStoneRateInput && real) next = { ...next, realStoneRateInput: real.toString() }
+      return next
     }
-    if (!initialData?.realStoneRateInput && materialPrices[FP_RATES.realStone.dbName]) {
-      setRealStoneRateInput(materialPrices[FP_RATES.realStone.dbName].toString())
-    }
+    setIhTab(prev => fill(prev))
+    setSubTab(prev => fill(prev))
   }, [materialPrices])
 
-  const state = {
-    crewType,
-    subType,
-    difficulty,
-    hoursAdj,
-    layoutHrs,
-    wallLF,
-    wallHeightIn,
-    footingWidthIn,
-    footingDepthIn,
-    rebarSpacingIn,
-    bondBeamCourses,
-    pctGrouted,
-    pctCurved,
-    useGroutPump,
-    capRows,
-    gasRingCount,
-    gasTrenchLF,
-    sandStuccoSF,
-    smoothStuccoSF,
-    ledgerstoneSF,
-    stackedStoneSF,
-    tileSF,
-    flagstoneSF,
-    flagstoneRateInput,
-    realStoneSF,
-    realStoneRateInput,
-    manualRows,
-    distanceLF,
-  }
+  const state = { crewType, subType, ...cur }
   const calcRaw = calcFirePit(
     state,
     laborRatePerHour,
@@ -613,7 +650,17 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
       notes,
       man_days: parseFloat(calc.manDays.toFixed(2)),
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
-      data: { ...state, walkAccess, laborRatePerHour, laborBurdenPct, gpmd, materialPrices, calc },
+      data: {
+        ...state,
+        ihData: ihTab,
+        subData: subTab,
+        walkAccess,
+        laborRatePerHour,
+        laborBurdenPct,
+        gpmd,
+        materialPrices,
+        calc,
+      },
     })
   }
 

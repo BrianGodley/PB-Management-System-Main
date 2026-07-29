@@ -332,6 +332,32 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
   )
 }
 
+// Per-tab input record. In-House and Sub each hold their own independent copy so
+// the two tabs are separate calculators.
+function makeTab(src = {}) {
+  return {
+    difficulty: src.difficulty ?? '',
+    hoursAdj: src.hoursAdj ?? '',
+    distanceLF: src.distanceLF ?? '',
+    tileFlatSF: src.tileFlatSF ?? '',
+    brickFlatSF: src.brickFlatSF ?? '',
+    flagstoneFlatSF: src.flagstoneFlatSF ?? '',
+    flagstoneFlatRateIn: src.flagstoneFlatRateIn ?? '',
+    porcelainFlatSF: src.porcelainFlatSF ?? '',
+    capRows: src.capRows ?? DEFAULT_CAP_ROWS.map(r => ({ ...r })),
+    sandStuccoSF: src.sandStuccoSF ?? '',
+    smoothStuccoSF: src.smoothStuccoSF ?? '',
+    ledgerstoneSF: src.ledgerstoneSF ?? '',
+    stackedStoneSF: src.stackedStoneSF ?? '',
+    tileSF: src.tileSF ?? '',
+    wallFlagstoneSF: src.wallFlagstoneSF ?? '',
+    wallFlagstoneRateIn: src.wallFlagstoneRateIn ?? '',
+    realStoneSF: src.realStoneSF ?? '',
+    realStoneRateIn: src.realStoneRateIn ?? '',
+    manualRows: src.manualRows ?? DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
+  }
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function FinishesModule({ onSave, onBack, saving, initialData }) {
   const [laborRatePerHour, setLaborRatePerHour] = useState(
@@ -345,7 +371,6 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
   // takeoffs here via create_estimate_from_takeoff, and the user can
   // overwrite / append their own.
   const [notes, setNotes] = useState(initialData?.notes ?? '')
-  const [distanceLF, setDistanceLF] = useState(initialData?.distanceLF ?? '')
   const [walkAccess, setWalkAccess] = useState(
     initialData?.walkAccess ?? {
       paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
@@ -401,34 +426,60 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
   // ── State ──────────────────────────────────────────────────────────────
-  const [difficulty, setDifficulty] = useState(initialData?.difficulty ?? '')
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Masonry')
   const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
-  const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
+  // Independent In-House vs Sub input records — each tab is its own calculator.
+  const [ihTab, setIhTab] = useState(() => makeTab(initialData?.ihData || initialData))
+  const [subTab, setSubTab] = useState(() => makeTab(initialData?.subData || {}))
+  const isSub = subType === 'Subcontractor'
+  const cur = isSub ? subTab : ihTab
+  const setCur = isSub ? setSubTab : setIhTab
+  // A single setter factory: accepts a value (scalar fields) or an updater fn (row arrays).
+  const setField = k => v =>
+    setCur(prev => ({ ...prev, [k]: typeof v === 'function' ? v(prev[k]) : v }))
+  // Derived active-tab field accessors — render bindings stay unchanged.
+  const difficulty = cur.difficulty
+  const setDifficulty = setField('difficulty')
+  const hoursAdj = cur.hoursAdj
+  const setHoursAdj = setField('hoursAdj')
+  const distanceLF = cur.distanceLF
+  const setDistanceLF = setField('distanceLF')
   // Flatwork
-  const [tileFlatSF, setTileFlatSF] = useState(initialData?.tileFlatSF ?? '')
-  const [brickFlatSF, setBrickFlatSF] = useState(initialData?.brickFlatSF ?? '')
-  const [flagstoneFlatSF, setFlagstoneFlatSF] = useState(initialData?.flagstoneFlatSF ?? '')
-  const [flagstoneFlatRateIn, setFlagstoneFlatRateIn] = useState(
-    initialData?.flagstoneFlatRateIn ?? ''
-  )
-  const [porcelainFlatSF, setPorcelainFlatSF] = useState(initialData?.porcelainFlatSF ?? '')
+  const tileFlatSF = cur.tileFlatSF
+  const setTileFlatSF = setField('tileFlatSF')
+  const brickFlatSF = cur.brickFlatSF
+  const setBrickFlatSF = setField('brickFlatSF')
+  const flagstoneFlatSF = cur.flagstoneFlatSF
+  const setFlagstoneFlatSF = setField('flagstoneFlatSF')
+  const flagstoneFlatRateIn = cur.flagstoneFlatRateIn
+  const setFlagstoneFlatRateIn = setField('flagstoneFlatRateIn')
+  const porcelainFlatSF = cur.porcelainFlatSF
+  const setPorcelainFlatSF = setField('porcelainFlatSF')
   // Wall Caps
-  const [capRows, setCapRows] = useState(initialData?.capRows ?? DEFAULT_CAP_ROWS)
+  const capRows = cur.capRows
+  const setCapRows = setField('capRows')
   // Wall Finishes
-  const [sandStuccoSF, setSandStuccoSF] = useState(initialData?.sandStuccoSF ?? '')
-  const [smoothStuccoSF, setSmoothStuccoSF] = useState(initialData?.smoothStuccoSF ?? '')
-  const [ledgerstoneSF, setLedgerstoneSF] = useState(initialData?.ledgerstoneSF ?? '')
-  const [stackedStoneSF, setStackedStoneSF] = useState(initialData?.stackedStoneSF ?? '')
-  const [tileSF, setTileSF] = useState(initialData?.tileSF ?? '')
-  const [wallFlagstoneSF, setWallFlagstoneSF] = useState(initialData?.wallFlagstoneSF ?? '')
-  const [wallFlagstoneRateIn, setWallFlagstoneRateIn] = useState(
-    initialData?.wallFlagstoneRateIn ?? ''
-  )
-  const [realStoneSF, setRealStoneSF] = useState(initialData?.realStoneSF ?? '')
-  const [realStoneRateIn, setRealStoneRateIn] = useState(initialData?.realStoneRateIn ?? '')
+  const sandStuccoSF = cur.sandStuccoSF
+  const setSandStuccoSF = setField('sandStuccoSF')
+  const smoothStuccoSF = cur.smoothStuccoSF
+  const setSmoothStuccoSF = setField('smoothStuccoSF')
+  const ledgerstoneSF = cur.ledgerstoneSF
+  const setLedgerstoneSF = setField('ledgerstoneSF')
+  const stackedStoneSF = cur.stackedStoneSF
+  const setStackedStoneSF = setField('stackedStoneSF')
+  const tileSF = cur.tileSF
+  const setTileSF = setField('tileSF')
+  const wallFlagstoneSF = cur.wallFlagstoneSF
+  const setWallFlagstoneSF = setField('wallFlagstoneSF')
+  const wallFlagstoneRateIn = cur.wallFlagstoneRateIn
+  const setWallFlagstoneRateIn = setField('wallFlagstoneRateIn')
+  const realStoneSF = cur.realStoneSF
+  const setRealStoneSF = setField('realStoneSF')
+  const realStoneRateIn = cur.realStoneRateIn
+  const setRealStoneRateIn = setField('realStoneRateIn')
   // Manual
-  const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
+  const manualRows = cur.manualRows
+  const setManualRows = setField('manualRows')
 
   // ── Sales tax — applied to totalMat across every module so the bid
   //    reflects supplier-invoiced material cost. Sourced from
@@ -445,43 +496,38 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
     }
   }, [])
 
-  // Pre-fill editable stone rates once DB prices load
+  // Pre-fill editable stone rates once DB prices load — independently for each tab.
   useEffect(() => {
     if (Object.keys(materialPrices).length === 0) return
-    if (!initialData?.flagstoneFlatRateIn && materialPrices[FINISHES_RATES.flatFlagstone.db]) {
-      setFlagstoneFlatRateIn(materialPrices[FINISHES_RATES.flatFlagstone.db].toString())
-    }
-    if (!initialData?.wallFlagstoneRateIn && materialPrices[FINISHES_RATES.realFlagstone.db]) {
-      setWallFlagstoneRateIn(materialPrices[FINISHES_RATES.realFlagstone.db].toString())
-    }
-    if (!initialData?.realStoneRateIn && materialPrices[FINISHES_RATES.realStone.db]) {
-      setRealStoneRateIn(materialPrices[FINISHES_RATES.realStone.db].toString())
-    }
+    const fill = setTab =>
+      setTab(prev => {
+        let next = prev
+        if (!prev.flagstoneFlatRateIn && materialPrices[FINISHES_RATES.flatFlagstone.db]) {
+          next = {
+            ...next,
+            flagstoneFlatRateIn: materialPrices[FINISHES_RATES.flatFlagstone.db].toString(),
+          }
+        }
+        if (!prev.wallFlagstoneRateIn && materialPrices[FINISHES_RATES.realFlagstone.db]) {
+          next = {
+            ...next,
+            wallFlagstoneRateIn: materialPrices[FINISHES_RATES.realFlagstone.db].toString(),
+          }
+        }
+        if (!prev.realStoneRateIn && materialPrices[FINISHES_RATES.realStone.db]) {
+          next = {
+            ...next,
+            realStoneRateIn: materialPrices[FINISHES_RATES.realStone.db].toString(),
+          }
+        }
+        return next
+      })
+    fill(setIhTab)
+    fill(setSubTab)
   }, [materialPrices])
 
-  const state = {
-    crewType,
-    subType,
-    difficulty,
-    hoursAdj,
-    tileFlatSF,
-    brickFlatSF,
-    flagstoneFlatSF,
-    flagstoneFlatRateIn,
-    porcelainFlatSF,
-    capRows,
-    sandStuccoSF,
-    smoothStuccoSF,
-    ledgerstoneSF,
-    stackedStoneSF,
-    tileSF,
-    wallFlagstoneSF,
-    wallFlagstoneRateIn,
-    realStoneSF,
-    realStoneRateIn,
-    manualRows,
-    distanceLF,
-  }
+  // Active tab drives the calc — the other tab stays untouched.
+  const state = { crewType, subType, ...cur }
   const calcRaw = calcFinishes(
     state,
     laborRatePerHour,
@@ -520,7 +566,17 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
       notes,
       man_days: parseFloat(calc.manDays.toFixed(2)),
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
-      data: { ...state, walkAccess, laborRatePerHour, laborBurdenPct, gpmd, materialPrices, calc },
+      data: {
+        ...state,
+        ihData: ihTab,
+        subData: subTab,
+        walkAccess,
+        laborRatePerHour,
+        laborBurdenPct,
+        gpmd,
+        materialPrices,
+        calc,
+      },
     })
   }
 

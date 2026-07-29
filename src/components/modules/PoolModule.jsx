@@ -410,10 +410,14 @@ const newRaisedSurface = () => ({ matType: '6" Square Tile', sqft: '', curvePct:
 const newEquipRow = () => ({ category: 'Pump', model: 'VSHP270AUT', qty: '1', unitCost: '' })
 const newManualRow = () => ({ label: '', hours: '', materials: '', subCost: '' })
 
-function makeInitial(data = {}) {
+// Per-tab input record. In-House and Sub each hold their own independent copy so
+// the two tabs are separate calculators. Only these user-input fields live here;
+// rate maps, crew type, labor rate, etc. stay shared at the top level of state.
+function makeTab(data = {}) {
   return {
     hoursAdj: data.hoursAdj ?? '',
     difficulty: data.difficulty ?? '',
+    distanceLF: data.distanceLF ?? '',
     pool: data.pool ?? defaultStruct(true),
     spa: data.spa ?? defaultStruct(),
     basin: data.basin ?? defaultStruct(),
@@ -454,10 +458,23 @@ function makeInitial(data = {}) {
     epGasRows: data.epGasRows ?? [EP_GAS_ROW(), EP_GAS_ROW()],
     epElecRows: data.epElecRows ?? [EP_ELEC_ROW(), EP_ELEC_ROW()],
     manualRows: data.manualRows ?? [newManualRow(), newManualRow(), newManualRow()],
+  }
+}
+
+function makeInitial(data = {}) {
+  return {
+    // Independent In-House vs Sub input records — each tab is its own calculator.
+    // Legacy estimates stored their inputs flat → load them as the In-House tab.
+    ihData: makeTab(data.ihData || data),
+    subData: makeTab(data.subData || {}),
+    // ── Shared (top-level) fields — never per-tab ──
     laborRatePerHour: data.laborRatePerHour ?? 35,
     laborBurdenPct: data.laborBurdenPct ?? LABOR_BURDEN,
     gpmd: data.gpmd ?? 425,
     crewType: data.crewType ?? 'Specialty',
+    subType: data.subType ?? 'In-House',
+    rateOverrides: data.rateOverrides,
+    walkAccess: data.walkAccess,
   }
 }
 
@@ -835,6 +852,24 @@ function StructDims({ label, data, onChange, alwaysEnabled }) {
 export default function PoolModule({ onSave, onBack, saving, initialData }) {
   const [state, setState] = useState(() => makeInitial(initialData))
 
+  // ── Active-tab selection ──────────────────────────────────────────────────
+  // In-House and Sub are fully independent input records (state.ihData /
+  // state.subData). `T` is the active tab's inputs; every input binding reads
+  // from T and writes via updT so the two tabs never affect each other.
+  const subType = state.subType || 'In-House'
+  const isSub = subType === 'Subcontractor'
+  const T = (isSub ? state.subData : state.ihData) || {}
+  // Write a single input field to the active tab. `val` may be a value or an
+  // updater fn (used by row-array helpers).
+  const updT = (key, val) =>
+    setState(p => {
+      const k = p.subType === 'Subcontractor' ? 'subData' : 'ihData'
+      const cur = p[k] || {}
+      return { ...p, [k]: { ...cur, [key]: typeof val === 'function' ? val(cur[key]) : val } }
+    })
+  // Write a shared (top-level) field.
+  const updShared = (key, val) => setState(p => ({ ...p, [key]: val }))
+
   // Free-text notes for this module — Sam writes auto-generated
   // takeoffs here via create_estimate_from_takeoff, and the user can
   // overwrite / append their own.
@@ -936,8 +971,10 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
     refreshAllRates().finally(() => setLoadingRates(false))
   }, [refreshAllRates])
 
-  const upd = (key, val) => setState(p => ({ ...p, [key]: val }))
+  // Generic input writers target the ACTIVE tab (all input fields are per-tab).
+  const upd = (key, val) => updT(key, val)
   // One-off subcontractor rate for this estimate only (undefined clears it).
+  // rateOverrides are SHARED across both tabs (top-level).
   const setOverride = (name, value) =>
     setState(p => {
       const next = { ...(p.rateOverrides || {}) }
@@ -945,12 +982,16 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       else next[name] = Number(value)
       return { ...p, rateOverrides: next }
     })
-  const updStruct = (key, val) => setState(p => ({ ...p, [key]: val }))
+  const updStruct = (key, val) => updT(key, val)
   const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
-  const setEpRows = key => fn => setState(p => ({ ...p, [key]: fn(p[key] || []) }))
+  const setEpRows = key => fn => updT(key, arr => fn(arr || []))
 
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
-  const calcRaw = calcPool(state, materialPrices, laborRates, subRates, state.walkAccess, materialRows)
+  // Effective calc input: shared top-level fields + the active tab's inputs.
+  // calcPool reads its input fields off this merged object, so the running
+  // total reflects only the tab currently being edited.
+  const eff = { ...state, ...T }
+  const calcRaw = calcPool(eff, materialPrices, laborRates, subRates, state.walkAccess, materialRows)
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
@@ -971,7 +1012,10 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
 
   function handleSave() {
     const data = {
+      // state already carries both ihData & subData plus shared fields.
+      // Spread the active tab's inputs flat too so legacy readers still work.
       ...state,
+      ...T,
       materialPrices,
       laborRates,
       subRates,
@@ -992,48 +1036,48 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
   }
 
   // ── Spillway helpers ──────────────────────────────────────────────────────────
-  const addSpillway = () => upd('spillways', [...state.spillways, newSpillway()])
+  const addSpillway = () => upd('spillways', [...T.spillways, newSpillway()])
   const updSpillway = (i, key, val) => {
-    const arr = [...state.spillways]
+    const arr = [...T.spillways]
     arr[i] = { ...arr[i], [key]: val }
     upd('spillways', arr)
   }
   const removeSpillway = i =>
     upd(
       'spillways',
-      state.spillways.filter((_, idx) => idx !== i)
+      T.spillways.filter((_, idx) => idx !== i)
     )
 
   // ── Coping helpers ────────────────────────────────────────────────────────────
-  const addCoping = () => upd('copingRows', [...state.copingRows, newCopingRow()])
+  const addCoping = () => upd('copingRows', [...T.copingRows, newCopingRow()])
   const updCoping = (i, key, val) => {
-    const arr = [...state.copingRows]
+    const arr = [...T.copingRows]
     arr[i] = { ...arr[i], [key]: val }
     upd('copingRows', arr)
   }
   const removeCoping = i =>
     upd(
       'copingRows',
-      state.copingRows.filter((_, idx) => idx !== i)
+      T.copingRows.filter((_, idx) => idx !== i)
     )
 
   // ── Raised surface helpers ────────────────────────────────────────────────────
-  const addRaised = () => upd('raisedSurfaces', [...state.raisedSurfaces, newRaisedSurface()])
+  const addRaised = () => upd('raisedSurfaces', [...T.raisedSurfaces, newRaisedSurface()])
   const updRaised = (i, key, val) => {
-    const arr = [...state.raisedSurfaces]
+    const arr = [...T.raisedSurfaces]
     arr[i] = { ...arr[i], [key]: val }
     upd('raisedSurfaces', arr)
   }
   const removeRaised = i =>
     upd(
       'raisedSurfaces',
-      state.raisedSurfaces.filter((_, idx) => idx !== i)
+      T.raisedSurfaces.filter((_, idx) => idx !== i)
     )
 
   // ── Equipment helpers ─────────────────────────────────────────────────────────
-  const addEquip = () => upd('equipment', [...state.equipment, newEquipRow()])
+  const addEquip = () => upd('equipment', [...T.equipment, newEquipRow()])
   const updEquip = (i, key, val) => {
-    const arr = [...state.equipment]
+    const arr = [...T.equipment]
     arr[i] = { ...arr[i], [key]: val }
     // Auto-fill price when model changes
     if (key === 'model') {
@@ -1053,27 +1097,27 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
   const removeEquip = i =>
     upd(
       'equipment',
-      state.equipment.filter((_, idx) => idx !== i)
+      T.equipment.filter((_, idx) => idx !== i)
     )
 
   // ── Manual row helpers ────────────────────────────────────────────────────────
-  const addManual = () => upd('manualRows', [...state.manualRows, newManualRow()])
+  const addManual = () => upd('manualRows', [...T.manualRows, newManualRow()])
   const updManual = (i, key, val) => {
-    const arr = [...state.manualRows]
+    const arr = [...T.manualRows]
     arr[i] = { ...arr[i], [key]: val }
     upd('manualRows', arr)
   }
   const removeManual = i =>
     upd(
       'manualRows',
-      state.manualRows.filter((_, idx) => idx !== i)
+      T.manualRows.filter((_, idx) => idx !== i)
     )
 
   const activeStructList = [
-    ['Pool', state.pool, true],
-    ['Spa', state.spa, false],
-    ['Infinity Basin', state.basin, false],
-    ['Cover Vault', state.vault, false],
+    ['Pool', T.pool, true],
+    ['Spa', T.spa, false],
+    ['Infinity Basin', T.basin, false],
+    ['Cover Vault', T.vault, false],
   ]
     .filter(([, s, always]) => always || s.enabled)
     .map(([k]) => k)
@@ -1114,14 +1158,14 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         <ModuleNotesField value={notes} onChange={setNotes} />
       </div>
 
-      <WorkTypeChooser value={state.subType || 'In-House'} onChange={v => upd('subType', v)} />
+      <WorkTypeChooser value={state.subType || 'In-House'} onChange={v => updShared('subType', v)} />
 
       {/* Crew Type */}
       <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
         <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
         <select
           value={state.crewType}
-          onChange={e => upd('crewType', e.target.value)}
+          onChange={e => updShared('crewType', e.target.value)}
           className="input text-sm py-1 w-36"
         >
           <option value="Demo">Demo</option>
@@ -1142,7 +1186,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           <input
             type="number"
             step="5"
-            value={state.difficulty ?? ''}
+            value={T.difficulty ?? ''}
             onChange={e => upd('difficulty', e.target.value)}
             placeholder="0"
             className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
@@ -1158,7 +1202,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           <input
             type="number"
             step="5"
-            value={state.distanceLF}
+            value={T.distanceLF ?? ''}
             onChange={e => upd('distanceLF', e.target.value)}
             placeholder="0"
             className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
@@ -1174,7 +1218,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           <input
             type="number"
             step="0.5"
-            value={state.hoursAdj ?? ''}
+            value={T.hoursAdj ?? ''}
             onChange={e => upd('hoursAdj', e.target.value)}
             placeholder="0"
             className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
@@ -1195,19 +1239,19 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <StructDims
             label="Pool"
-            data={state.pool}
+            data={T.pool}
             onChange={v => updStruct('pool', v)}
             alwaysEnabled
           />
-          <StructDims label="Spa" data={state.spa} onChange={v => updStruct('spa', v)} />
+          <StructDims label="Spa" data={T.spa} onChange={v => updStruct('spa', v)} />
           <StructDims
             label="Infinity Basin"
-            data={state.basin}
+            data={T.basin}
             onChange={v => updStruct('basin', v)}
           />
           <StructDims
             label="Cover Vault"
-            data={state.vault}
+            data={T.vault}
             onChange={v => updStruct('vault', v)}
           />
         </div>
@@ -1232,19 +1276,19 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             <div className="flex items-center gap-1">
               <select
                 className="input text-sm py-1.5 flex-1 min-w-0"
-                value={state.excavation.equipment}
+                value={T.excavation.equipment}
                 onChange={e =>
-                  upd('excavation', { ...state.excavation, equipment: e.target.value })
+                  upd('excavation', { ...T.excavation, equipment: e.target.value })
                 }
               >
                 {EXCAVATION_TYPES.map(t => (
                   <option key={t}>{t}</option>
                 ))}
               </select>
-              {EXCAVATION_LABOR_NAME[state.excavation.equipment] && (
+              {EXCAVATION_LABOR_NAME[T.excavation.equipment] && (
                 <RateEditPopover
                   table="labor_rates"
-                  name={EXCAVATION_LABOR_NAME[state.excavation.equipment]}
+                  name={EXCAVATION_LABOR_NAME[T.excavation.equipment]}
                   category="Pool"
                   mode="coefficient"
                   unitLabel="CY/hr"
@@ -1257,18 +1301,18 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           <div>
             <Label text="From Trucks" sub="LF" />
             <NumInput
-              value={state.excavation.fromTrucksLF}
-              onChange={v => upd('excavation', { ...state.excavation, fromTrucksLF: v })}
+              value={T.excavation.fromTrucksLF}
+              onChange={v => upd('excavation', { ...T.excavation, fromTrucksLF: v })}
             />
           </div>
           <div>
             <Label text="To Dump" sub="miles" />
             <NumInput
-              value={state.excavation.toDumpMiles}
-              onChange={v => upd('excavation', { ...state.excavation, toDumpMiles: v })}
+              value={T.excavation.toDumpMiles}
+              onChange={v => upd('excavation', { ...T.excavation, toDumpMiles: v })}
             />
           </div>
-          {state.excavation.equipment === 'Sub Bobcat / Mini Bob' && (
+          {T.excavation.equipment === 'Sub Bobcat / Mini Bob' && (
             <div>
               <Label text="Sub Cost" />
               <div className="relative">
@@ -1276,8 +1320,8 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                   $
                 </span>
                 <NumInput
-                  value={state.excavation.subCost}
-                  onChange={v => upd('excavation', { ...state.excavation, subCost: v })}
+                  value={T.excavation.subCost}
+                  onChange={v => upd('excavation', { ...T.excavation, subCost: v })}
                   className="pl-6"
                 />
               </div>
@@ -1286,7 +1330,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         </div>
         {calc.excavHrs > 0 && (
           <p className="text-xs text-gray-500 mt-2 px-1">
-            {EXCAVATION_RATES[state.excavation.equipment] ?? '—'} CY/hr →{' '}
+            {EXCAVATION_RATES[T.excavation.equipment] ?? '—'} CY/hr →{' '}
             <strong>{calc.excavHrs.toFixed(1)} hrs</strong>
           </p>
         )}
@@ -1303,7 +1347,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           <div>
             <Label text="Auto Sub Total" />
             <div className="input text-sm py-1.5 bg-gray-50 text-gray-600">
-              {fmt2(calcPool(state, materialPrices, laborRates, subRates).shotcreteSub)}
+              {fmt2(calcPool(eff, materialPrices, laborRates, subRates).shotcreteSub)}
               <span className="text-xs text-gray-400 ml-1">auto</span>
             </div>
           </div>
@@ -1314,8 +1358,8 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                 $
               </span>
               <NumInput
-                value={state.shotcrete.manualSubCost}
-                onChange={v => upd('shotcrete', { ...state.shotcrete, manualSubCost: v })}
+                value={T.shotcrete.manualSubCost}
+                onChange={v => upd('shotcrete', { ...T.shotcrete, manualSubCost: v })}
                 className="pl-6"
                 placeholder="leave blank for auto"
               />
@@ -1361,14 +1405,14 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         <SectionHeader title="Waterline Tile" />
         <div className="space-y-3">
           {[
-            ['Pool', state.pool],
-            ['Spa', state.spa],
-            ['Infinity Basin', state.basin],
-            ['Cover Vault', state.vault],
+            ['Pool', T.pool],
+            ['Spa', T.spa],
+            ['Infinity Basin', T.basin],
+            ['Cover Vault', T.vault],
           ]
             .filter(([, s]) => s.enabled)
             .map(([k]) => {
-              const t = state.tile[k] || defaultTileStruct()
+              const t = T.tile[k] || defaultTileStruct()
               return (
                 <div key={k} className="border border-gray-200 rounded-lg p-3">
                   <p className="text-xs font-semibold text-gray-700 mb-2">{k}</p>
@@ -1377,7 +1421,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                       <Label text="Waterline LF" />
                       <NumInput
                         value={t.lf}
-                        onChange={v => upd('tile', { ...state.tile, [k]: { ...t, lf: v } })}
+                        onChange={v => upd('tile', { ...T.tile, [k]: { ...t, lf: v } })}
                       />
                     </div>
                     <div>
@@ -1388,7 +1432,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                           value={t.installType}
                           onChange={e =>
                             upd('tile', {
-                              ...state.tile,
+                              ...T.tile,
                               [k]: { ...t, installType: e.target.value },
                             })
                           }
@@ -1418,7 +1462,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                         value={t.matPricePerSF}
                         onChange={e =>
                           upd('tile', {
-                            ...state.tile,
+                            ...T.tile,
                             [k]: { ...t, matPricePerSF: e.target.value },
                           })
                         }
@@ -1435,7 +1479,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                           checked={t.waterproof}
                           onChange={e =>
                             upd('tile', {
-                              ...state.tile,
+                              ...T.tile,
                               [k]: { ...t, waterproof: e.target.checked },
                             })
                           }
@@ -1461,7 +1505,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       <div>
         <SectionHeader title="Spillways" />
         <div className="space-y-2">
-          {state.spillways.map((sw, i) => (
+          {T.spillways.map((sw, i) => (
             <div key={i} className="grid grid-cols-5 gap-2 items-end">
               <div>
                 <Label text="Structure" />
@@ -1543,7 +1587,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       <div>
         <SectionHeader title="Coping" />
         <div className="space-y-2">
-          {state.copingRows.map((cr, i) => (
+          {T.copingRows.map((cr, i) => (
             <div key={i} className="grid grid-cols-5 gap-2 items-end">
               <div>
                 <Label text="Structure" />
@@ -1632,7 +1676,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       <div>
         <SectionHeader title="Raised Surfaces" />
         <div className="space-y-2">
-          {state.raisedSurfaces.map((rs, i) => (
+          {T.raisedSurfaces.map((rs, i) => (
             <div key={i} className="grid grid-cols-5 gap-2 items-end">
               <div className="col-span-2">
                 <Label text="Surface Type" />
@@ -1717,14 +1761,14 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         <SectionHeader title="Interior Finish (Sub)" />
         <div className="space-y-3">
           {[
-            ['Pool', state.pool],
-            ['Spa', state.spa],
-            ['Infinity Basin', state.basin],
-            ['Cover Vault', state.vault],
+            ['Pool', T.pool],
+            ['Spa', T.spa],
+            ['Infinity Basin', T.basin],
+            ['Cover Vault', T.vault],
           ]
             .filter(([, s]) => s.enabled)
             .map(([k, s]) => {
-              const fin = state.interiorFinish[k] || defaultInteriorStruct()
+              const fin = T.interiorFinish[k] || defaultInteriorStruct()
               const priceSF =
                 subRates[`Interior Finish - ${fin.type}`] ?? INTERIOR_DEFAULTS[fin.type] ?? 45
               const autoSub = n(s.waterSF) * priceSF
@@ -1740,7 +1784,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                           value={fin.type}
                           onChange={e =>
                             upd('interiorFinish', {
-                              ...state.interiorFinish,
+                              ...T.interiorFinish,
                               [k]: { ...fin, type: e.target.value },
                             })
                           }
@@ -1775,7 +1819,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                           value={fin.subCost}
                           onChange={v =>
                             upd('interiorFinish', {
-                              ...state.interiorFinish,
+                              ...T.interiorFinish,
                               [k]: { ...fin, subCost: v },
                             })
                           }
@@ -1795,7 +1839,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       <div>
         <SectionHeader title="Pool Equipment (Sub)" />
         <div className="space-y-2">
-          {state.equipment.map((eq, i) => {
+          {T.equipment.map((eq, i) => {
             const models = EQUIPMENT_CATALOG[eq.category] || []
             const catalogPrice = models.find(m => m.model === eq.model)?.price ?? 0
             const matRate = materialPrices[eq.model] ?? catalogPrice
@@ -1895,8 +1939,8 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             <div className="flex items-center gap-1">
               <select
                 className="input text-sm py-1.5 flex-1 min-w-0"
-                value={state.plumbing.baseType}
-                onChange={e => upd('plumbing', { ...state.plumbing, baseType: e.target.value })}
+                value={T.plumbing.baseType}
+                onChange={e => upd('plumbing', { ...T.plumbing, baseType: e.target.value })}
               >
                 {Object.keys(PLUMBING_BASES).map(k => (
                   <option key={k}>{k}</option>
@@ -1904,12 +1948,12 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
               </select>
               <RateEditPopover
                 table="subcontractor_rates"
-                name={`Plumbing ${state.plumbing.baseType}`}
+                name={`Plumbing ${T.plumbing.baseType}`}
                 category="Pool"
                 unitLabel="flat"
                 currentValue={
-                  subRates[`Plumbing ${state.plumbing.baseType}`] ??
-                  PLUMBING_BASES[state.plumbing.baseType]
+                  subRates[`Plumbing ${T.plumbing.baseType}`] ??
+                  PLUMBING_BASES[T.plumbing.baseType]
                 }
                 onSaved={refreshAllRates}
               />
@@ -1919,8 +1963,8 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             <Label text="Extra Lights" sub="qty" />
             <div className="flex items-center gap-1">
               <NumInput
-                value={state.plumbing.extraLights}
-                onChange={v => upd('plumbing', { ...state.plumbing, extraLights: v })}
+                value={T.plumbing.extraLights}
+                onChange={v => upd('plumbing', { ...T.plumbing, extraLights: v })}
               />
               <RateEditPopover
                 table="subcontractor_rates"
@@ -1936,8 +1980,8 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             <Label text="Sheer Descents" sub="qty" />
             <div className="flex items-center gap-1">
               <NumInput
-                value={state.plumbing.sheerDescents}
-                onChange={v => upd('plumbing', { ...state.plumbing, sheerDescents: v })}
+                value={T.plumbing.sheerDescents}
+                onChange={v => upd('plumbing', { ...T.plumbing, sheerDescents: v })}
               />
               <RateEditPopover
                 table="subcontractor_rates"
@@ -1953,8 +1997,8 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             <label className="flex items-center gap-1.5 cursor-pointer">
               <input
                 type="checkbox"
-                checked={state.plumbing.over20ft}
-                onChange={e => upd('plumbing', { ...state.plumbing, over20ft: e.target.checked })}
+                checked={T.plumbing.over20ft}
+                onChange={e => upd('plumbing', { ...T.plumbing, over20ft: e.target.checked })}
                 className="rounded"
               />
               <span className="text-xs text-gray-600">
@@ -1972,8 +2016,8 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             <label className="flex items-center gap-1.5 cursor-pointer">
               <input
                 type="checkbox"
-                checked={state.plumbing.remodel}
-                onChange={e => upd('plumbing', { ...state.plumbing, remodel: e.target.checked })}
+                checked={T.plumbing.remodel}
+                onChange={e => upd('plumbing', { ...T.plumbing, remodel: e.target.checked })}
                 className="rounded"
               />
               <span className="text-xs text-gray-600">
@@ -1996,8 +2040,8 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                 $
               </span>
               <NumInput
-                value={state.plumbing.manualSubCost}
-                onChange={v => upd('plumbing', { ...state.plumbing, manualSubCost: v })}
+                value={T.plumbing.manualSubCost}
+                onChange={v => upd('plumbing', { ...T.plumbing, manualSubCost: v })}
                 className="pl-6"
                 placeholder="leave blank for auto"
               />
@@ -2009,18 +2053,18 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
               <br />
               Base: $
               {(
-                subRates[`Plumbing ${state.plumbing.baseType}`] ??
-                PLUMBING_BASES[state.plumbing.baseType] ??
+                subRates[`Plumbing ${T.plumbing.baseType}`] ??
+                PLUMBING_BASES[T.plumbing.baseType] ??
                 4500
               ).toLocaleString()}
               <RateEditPopover
                 table="subcontractor_rates"
-                name={`Plumbing ${state.plumbing.baseType}`}
+                name={`Plumbing ${T.plumbing.baseType}`}
                 category="Pool"
                 unitLabel="flat"
                 currentValue={
-                  subRates[`Plumbing ${state.plumbing.baseType}`] ??
-                  PLUMBING_BASES[state.plumbing.baseType]
+                  subRates[`Plumbing ${T.plumbing.baseType}`] ??
+                  PLUMBING_BASES[T.plumbing.baseType]
                 }
                 onSaved={refreshAllRates}
               />
@@ -2047,8 +2091,8 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                 $
               </span>
               <NumInput
-                value={state.steel.manualSubCost}
-                onChange={v => upd('steel', { ...state.steel, manualSubCost: v })}
+                value={T.steel.manualSubCost}
+                onChange={v => upd('steel', { ...T.steel, manualSubCost: v })}
                 className="pl-6"
                 placeholder="leave blank for auto"
               />
@@ -2065,7 +2109,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                 currentValue={subRates['Steel Per LF'] ?? 8}
                 onSaved={refreshAllRates}
               />
-              {state.spa.enabled && (
+              {T.spa.enabled && (
                 <>
                   + ${subRates['Steel Spa Bonus'] ?? 200} spa
                   <RateEditPopover
@@ -2089,7 +2133,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         <div className="space-y-4">
           <EpTable
             title="Utility Lines"
-            rows={state.epLineRows || []}
+            rows={T.epLineRows || []}
             setRows={setEpRows('epLineRows')}
             arr={LINE_TYPE_ARR}
             cat={UTIL_CAT.line}
@@ -2104,7 +2148,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           />
           <EpTable
             title="Gas Fixtures"
-            rows={state.epGasRows || []}
+            rows={T.epGasRows || []}
             setRows={setEpRows('epGasRows')}
             arr={GAS_TYPE_ARR}
             cat={UTIL_CAT.gas}
@@ -2119,7 +2163,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           />
           <EpTable
             title="Electrical Fixtures"
-            rows={state.epElecRows || []}
+            rows={T.epElecRows || []}
             setRows={setEpRows('epElecRows')}
             arr={ELEC_TYPE_ARR}
             cat={UTIL_CAT.elec}
@@ -2139,7 +2183,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       <div>
         <SectionHeader title="Manual Entry" />
         <div className="space-y-2">
-          {state.manualRows.map((r, i) => (
+          {T.manualRows.map((r, i) => (
             <div key={i} className="grid grid-cols-5 gap-2 items-end">
               <div className="col-span-2">
                 {i === 0 && <Label text="Description" />}

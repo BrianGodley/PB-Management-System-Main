@@ -36,9 +36,14 @@ export default function ArtificialTurfSummary({ module }) {
   const c = d.calc || {}
   const turfAreaSF = n(c.turfAreaSF)
 
-  // ── Turf Prep (Demo) ────────────────────────────────────────────────────────
+  // Independent per-tab input records. In-House reads d.ihData (legacy flat data
+  // falls back to `d` itself); Sub reads d.subData. Each tab is its own calculator.
+  const ih = d.ihData || d
+  const sub = d.subData || {}
+
+  // ── Turf Prep (Demo) — In House ─────────────────────────────────────────────
   const demoRows = DEMO_ROWS.map(row => {
-    const dd = (d.demo || {})[row.key] || {}
+    const dd = (ih.demo || {})[row.key] || {}
     return {
       label: `${row.label} · ${dd.method || 'Skid Steer Good'}`,
       value: `${n(dd.sf).toLocaleString()} SF`,
@@ -49,9 +54,9 @@ export default function ArtificialTurfSummary({ module }) {
     .filter(r => r.sf > 0)
     .map(({ sf, ...r }) => r) // eslint-disable-line no-unused-vars
 
-  // ── Base Installation ───────────────────────────────────────────────────────
-  const baseRows = Array.isArray(d.baseRows)
-    ? d.baseRows
+  // ── Base Installation — In House ────────────────────────────────────────────
+  const baseRows = Array.isArray(ih.baseRows)
+    ? ih.baseRows
         .filter(r => n(r.sf) > 0 || turfAreaSF > 0)
         .map(r => ({
           label: BASE_LABELS[r.material] || r.material || 'Base',
@@ -60,26 +65,32 @@ export default function ArtificialTurfSummary({ module }) {
     : []
 
   // ── Turf Installation ───────────────────────────────────────────────────────
-  const rollInHouse = (d.rolls || [])
+  const rollInHouse = (ih.rolls || [])
     .filter(r => n(r.edgeLF) > 0)
     .map(r => ({ label: brandLabel(r.brand), value: `${n(r.edgeLF).toLocaleString()} LF edge` }))
-  const rollSub = (d.rolls || [])
+  const rollSub = (sub.rolls || [])
     .filter(r => n(r.installSF) > 0)
     .map(r => ({ label: brandLabel(r.brand), value: `${n(r.installSF).toLocaleString()} SF` }))
 
   // ── Turf Strips ─────────────────────────────────────────────────────────────
   const stripRows =
-    n(d.strips?.lf) > 0 ? [{ label: 'Turf Strips', value: `${n(d.strips.lf).toLocaleString()} LF` }] : []
+    n(ih.strips?.lf) > 0
+      ? [{ label: 'Turf Strips', value: `${n(ih.strips.lf).toLocaleString()} LF` }]
+      : []
+  const subStripRows =
+    n(sub.strips?.lf) > 0
+      ? [{ label: 'Turf Strips', value: `${n(sub.strips.lf).toLocaleString()} LF` }]
+      : []
 
   // ── Manual ─────────────────────────────────────────────────────────────────
-  const manualRows = (d.manualRows || [])
+  const manualRows = (ih.manualRows || [])
     .filter(r => n(r.hours) > 0 || n(r.materials) > 0)
     .map((r, i) => ({
       label: r.label || `Item ${i + 1}`,
       value: n(r.hours) > 0 ? `${n(r.hours)} hrs` : fmt2(r.materials),
       sub: n(r.hours) > 0 && n(r.materials) > 0 ? `${fmt2(r.materials)} mat.` : undefined,
     }))
-  const subManual = (d.manualRows || [])
+  const subManual = (sub.manualRows || [])
     .filter(r => n(r.subCost) > 0)
     .map((r, i) => ({ label: r.label || `Item ${i + 1}`, value: fmt2(r.subCost) }))
 
@@ -92,6 +103,7 @@ export default function ArtificialTurfSummary({ module }) {
   ]
   const subSections = [
     { title: 'Turf Installation', rows: rollSub },
+    { title: 'Turf Strips', rows: subStripRows },
     { title: 'Manual Entry', rows: subManual },
   ]
 

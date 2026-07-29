@@ -455,6 +455,29 @@ const DEFAULT_STATE = {
   ],
 }
 
+// ── Per-tab input record ──────────────────────────────────────────────────────
+// In-House and Sub each hold their own independent copy of every user-input
+// field, so the two tabs are separate calculators. Shared fields (crewType,
+// subType, rate maps, notes) live at the top level of `state`, not here.
+function makeTurfTab(src = {}) {
+  const d = DEFAULT_STATE
+  return {
+    difficulty: src.difficulty ?? d.difficulty,
+    hoursAdj: src.hoursAdj ?? d.hoursAdj,
+    distanceLF: src.distanceLF ?? d.distanceLF,
+    demo: {
+      concrete: { ...d.demo.concrete, ...(src.demo?.concrete) },
+      soil: { ...d.demo.soil, ...(src.demo?.soil) },
+      lawn: { ...d.demo.lawn, ...(src.demo?.lawn) },
+    },
+    baseRows: (src.baseRows || d.baseRows).map(r => ({ ...r })),
+    useZeoFill: src.useZeoFill ?? d.useZeoFill,
+    rolls: (src.rolls || d.rolls).map(r => ({ ...r })),
+    strips: { ...d.strips, ...(src.strips || {}) },
+    manualRows: (src.manualRows || d.manualRows).map(r => ({ ...r })),
+  }
+}
+
 // ── UI helpers ────────────────────────────────────────────────────────────────
 function SecHdr({ title }) {
   return (
@@ -520,8 +543,11 @@ function Toggle({ checked, onChange, label }) {
 // ── Main component ────────────────────────────────────────────────────────────
 export default function ArtificialTurfModule({ initialData, onSave, onCancel }) {
   const [state, setState] = useState(() => {
-    const init = { ...DEFAULT_STATE, ...(initialData || {}) }
-    // Migrate legacy fixed base object → baseRows list.
+    // Legacy flat state (pre per-tab): input fields lived at the top level. Seed
+    // the In-House tab from those; the Sub tab starts empty unless the estimate
+    // already stored subData.
+    const legacy = { ...DEFAULT_STATE, ...(initialData || {}) }
+    // Migrate legacy fixed base object → baseRows list (In-House seed only).
     if (initialData && !initialData.baseRows && initialData.base) {
       const b = initialData.base
       const rows = [
@@ -529,9 +555,15 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         b.useDG !== false && { material: 'DG', sf: b.dgSF || '', vendor: b.dgVendor || 'House' },
         b.useWeedFabric !== false && { material: 'Weed', sf: b.weedSF || '', vendor: b.weedVendor || 'House' },
       ].filter(Boolean)
-      init.baseRows = rows.length ? rows : DEFAULT_STATE.baseRows.map(r => ({ ...r }))
+      legacy.baseRows = rows.length ? rows : DEFAULT_STATE.baseRows.map(r => ({ ...r }))
     }
-    return init
+    return {
+      crewType: initialData?.crewType ?? DEFAULT_STATE.crewType,
+      subType: initialData?.subType ?? 'In-House',
+      // Independent In-House vs Sub input records — each tab is its own calculator.
+      ihData: makeTurfTab(initialData?.ihData || legacy),
+      subData: makeTurfTab(initialData?.subData || {}),
+    }
   })
 
   // Free-text notes for this module — Sam writes auto-generated
@@ -677,54 +709,100 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
     }
   }, [refreshAllRates])
 
+  // Active tab helpers. `isSub` selects which per-tab record (ihData/subData)
+  // every input reads from and writes to, so the two tabs never affect each other.
+  const isSub = state.subType === 'Subcontractor'
+  const T = isSub ? state.subData : state.ihData
+  const tabKey = p => (p.subType === 'Subcontractor' ? 'subData' : 'ihData')
+
+  // Top-level shared setter (crewType, subType).
   const set = useCallback((f, v) => setState(p => ({ ...p, [f]: v })), [])
+  // Active-tab scalar setter (difficulty, hoursAdj, distanceLF, useZeoFill, manualRows…).
+  const setT = useCallback(
+    (f, v) =>
+      setState(p => {
+        const k = tabKey(p)
+        return { ...p, [k]: { ...p[k], [f]: v } }
+      }),
+    []
+  )
   const setDemo = useCallback(
     (type, field, val) =>
-      setState(p => ({ ...p, demo: { ...p.demo, [type]: { ...p.demo[type], [field]: val } } })),
+      setState(p => {
+        const k = tabKey(p)
+        const cur = p[k]
+        return {
+          ...p,
+          [k]: { ...cur, demo: { ...cur.demo, [type]: { ...cur.demo[type], [field]: val } } },
+        }
+      }),
     []
   )
   const setBaseRow = useCallback(
     (i, field, val) =>
       setState(p => {
-        const baseRows = (p.baseRows || []).map((r, idx) =>
+        const k = tabKey(p)
+        const cur = p[k]
+        const baseRows = (cur.baseRows || []).map((r, idx) =>
           idx === i ? { ...r, [field]: val } : r
         )
-        return { ...p, baseRows }
+        return { ...p, [k]: { ...cur, baseRows } }
       }),
     []
   )
   const addBaseRow = useCallback(
     () =>
-      setState(p => ({
-        ...p,
-        baseRows: [...(p.baseRows || []), { material: 'Gravel', sf: '', vendor: 'House' }],
-      })),
+      setState(p => {
+        const k = tabKey(p)
+        const cur = p[k]
+        return {
+          ...p,
+          [k]: {
+            ...cur,
+            baseRows: [...(cur.baseRows || []), { material: 'Gravel', sf: '', vendor: 'House' }],
+          },
+        }
+      }),
     []
   )
   const removeBaseRow = useCallback(
-    i => setState(p => ({ ...p, baseRows: (p.baseRows || []).filter((_, idx) => idx !== i) })),
+    i =>
+      setState(p => {
+        const k = tabKey(p)
+        const cur = p[k]
+        return { ...p, [k]: { ...cur, baseRows: (cur.baseRows || []).filter((_, idx) => idx !== i) } }
+      }),
     []
   )
   const setRoll = useCallback(
     (i, field, val) =>
       setState(p => {
-        const rolls = [...p.rolls]
+        const k = tabKey(p)
+        const cur = p[k]
+        const rolls = [...cur.rolls]
         rolls[i] = { ...rolls[i], [field]: val }
-        return { ...p, rolls }
+        return { ...p, [k]: { ...cur, rolls } }
       }),
     []
   )
   const setRow = useCallback(
     (i, f, v) =>
       setState(p => {
-        const rows = [...p.manualRows]
+        const k = tabKey(p)
+        const cur = p[k]
+        const rows = [...cur.manualRows]
         rows[i] = { ...rows[i], [f]: v }
-        return { ...p, manualRows: rows }
+        return { ...p, [k]: { ...cur, manualRows: rows } }
       }),
     []
   )
   const setStrips = useCallback(
-    (field, val) => setState(p => ({ ...p, strips: { ...p.strips, [field]: val } })),
+    (field, val) =>
+      setState(p => {
+        const k = tabKey(p)
+        const cur = p[k]
+        return { ...p, [k]: { ...cur, strips: { ...cur.strips, [field]: val } } }
+      }),
     []
   )
 
@@ -735,8 +813,11 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
   const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
   const catDefaults = {} // Turf defaults to House; a real vendor is an explicit pick.
 
+  // Feed the calc only the ACTIVE tab's inputs plus the shared top-level fields
+  // (crewType, subType). Each tab thus prices from its own independent data.
+  const calcState = { ...T, crewType: state.crewType, subType: state.subType }
   const calcRaw = calcTurf(
-    state,
+    calcState,
     laborRatePerHour,
     materialPrices,
     laborRates,
@@ -866,8 +947,8 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
           <Inp
-            value={state.difficulty}
-            onChange={e => set('difficulty', e.target.value)}
+            value={T.difficulty}
+            onChange={e => setT('difficulty', e.target.value)}
             step="5"
           />
         </div>
@@ -879,8 +960,8 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
             Truck → Work Area (Avg LF)
           </p>
           <Inp
-            value={state.distanceLF}
-            onChange={e => set('distanceLF', e.target.value)}
+            value={T.distanceLF}
+            onChange={e => setT('distanceLF', e.target.value)}
             step="5"
           />
           {calc.walkHrs > 0 && (
@@ -891,7 +972,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
-          <Inp value={state.hoursAdj} onChange={e => set('hoursAdj', e.target.value)} step="0.5" />
+          <Inp value={T.hoursAdj} onChange={e => setT('hoursAdj', e.target.value)} step="0.5" />
         </div>
       </div>
         </>
@@ -917,7 +998,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
             ]}
           />
           <tbody className="divide-y divide-gray-50">
-            {(state.baseRows || []).map((row, i) => {
+            {(T.baseRows || []).map((row, i) => {
               const def = BASE_MATERIALS.find(m => m.key === row.material) || BASE_MATERIALS[0]
               const bc = calc.baseCalc?.[i] || {}
               const unitLabel = def.qtyUnit === 'roll' ? 'roll' : 'ton'
@@ -983,7 +1064,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                   <td className={num}>{bc.hrs > 0 ? fh(bc.hrs) : '—'}</td>
                   <td className={num}>{bc.mat > 0 ? fmt2(bc.mat) : '—'}</td>
                   <td className={num}>
-                    {(state.baseRows || []).length > 1 && (
+                    {(T.baseRows || []).length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeBaseRow(i)}
@@ -1010,12 +1091,12 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         {/* ZeoFill toggle */}
         <div className="mt-3 flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
           <Toggle
-            checked={state.useZeoFill}
-            onChange={v => set('useZeoFill', v)}
+            checked={T.useZeoFill}
+            onChange={v => setT('useZeoFill', v)}
             label="ZeoFill Pet Odor Infill (upgrade)"
           />
           <span className="text-xs text-amber-700 ml-auto inline-flex items-center gap-1">
-            {state.useZeoFill ? (
+            {T.useZeoFill ? (
               <>
                 {Math.ceil(calc.infillAreaSF / 30)} bags @ $
                 {n(materialPrices['Turf - Infill ZeoFill'] || RATE_DEFAULTS.infillZeoFill).toFixed(
@@ -1096,7 +1177,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
             }
           />
           <tbody className="divide-y divide-gray-50">
-            {state.rolls.map((roll, i) => {
+            {T.rolls.map((roll, i) => {
               const cr = calc.rollCalc[i]
               const brand = TURF_BRANDS.find(b => b.key === roll.brand) || TURF_BRANDS[0]
               return (
@@ -1221,7 +1302,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         {calc.infillAreaSF > 0 && (
           <div className="mt-1 bg-gray-50 rounded-lg px-3 py-2 text-xs flex justify-between">
             <span className="text-gray-600 font-medium">
-              {state.useZeoFill ? 'ZeoFill Pet Infill' : 'Durafill Infill'}
+              {T.useZeoFill ? 'ZeoFill Pet Infill' : 'Durafill Infill'}
               <span className="text-gray-400 font-normal ml-2">
                 ({calc.infillAreaSF.toLocaleString()} SF)
               </span>
@@ -1275,7 +1356,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
               <td className={td}>
                 <select
                   className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
-                  value={state.strips?.vendor || 'House'}
+                  value={T.strips?.vendor || 'House'}
                   onChange={e => setStrips('vendor', e.target.value)}
                   title="Vendor"
                 >
@@ -1291,7 +1372,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                 <div className="flex items-center gap-1">
                   <div className="flex-1 min-w-0">
                     <Sel
-                      value={state.strips?.brand || brandKeys[0]}
+                      value={T.strips?.brand || brandKeys[0]}
                       onChange={e => setStrips('brand', e.target.value)}
                       options={brandKeys}
                       optionLabels={brandLabels}
@@ -1299,7 +1380,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                   </div>
                   {(() => {
                     const stripBrand =
-                      TURF_BRANDS.find(b => b.key === state.strips?.brand) || TURF_BRANDS[0]
+                      TURF_BRANDS.find(b => b.key === T.strips?.brand) || TURF_BRANDS[0]
                     return (
                       <>
                         <RateEditPopover
@@ -1337,13 +1418,13 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
               </td>
               <td className={td}>
                 <Inp
-                  value={state.strips?.lf || ''}
+                  value={T.strips?.lf || ''}
                   onChange={e => setStrips('lf', e.target.value)}
                 />
               </td>
               <td className={td}>
                 <Inp
-                  value={state.strips?.widthIn || '12'}
+                  value={T.strips?.widthIn || '12'}
                   onChange={e => setStrips('widthIn', e.target.value)}
                   placeholder="12"
                   step="1"
@@ -1378,7 +1459,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
             ]}
           />
           <tbody className="divide-y divide-gray-50">
-            {state.manualRows.map((r, i) => (
+            {T.manualRows.map((r, i) => (
               <tr key={i}>
                 <td className={td}>
                   <Inp
@@ -1415,7 +1496,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         </table>
         <button
           type="button"
-          onClick={() => set('manualRows', [...state.manualRows, { label: '', hours: '', materials: '', subCost: '' }])}
+          onClick={() => setT('manualRows', [...T.manualRows, { label: '', hours: '', materials: '', subCost: '' }])}
           className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
         >
           + Add manual entry

@@ -72,6 +72,11 @@ function LineRow({ label, value, sub, highlight }) {
 
 export default function FirePitSummary({ module }) {
   const data = module?.data || {}
+  // In-House and Sub are independent tab records (data.ihData / data.subData);
+  // legacy estimates stored their inputs flat = In-House. The detail view below
+  // re-derives from the In-House record; shared rate/price inputs stay top-level.
+  const ih = data.ihData || data
+  const sub = data.subData || {}
   const {
     difficulty = 0,
     hoursAdj = 0,
@@ -97,10 +102,14 @@ export default function FirePitSummary({ module }) {
     realStoneSF = 0,
     realStoneRateInput,
     manualRows = [],
+  } = ih
+  const {
     laborRatePerHour = DEFAULTS.laborRatePerHour,
     gpmd = DEFAULTS.gpmd,
     materialPrices = {},
   } = data
+  // Reference the Sub record so it is available for future breakdown use.
+  void sub
 
   const mp = (dbName, fallback) => materialPrices[dbName] ?? fallback
 

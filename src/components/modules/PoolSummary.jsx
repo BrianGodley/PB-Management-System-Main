@@ -55,6 +55,13 @@ const INTERIOR_DEFAULTS = { 'White Plaster': 45, Quartzscapes: 87, Stonescapes: 
 
 export default function PoolSummary({ module }) {
   const data = module?.data || {}
+  // In-House and Sub are independent tab records. Legacy estimates stored their
+  // inputs flat = In-House. Display the quantities for the tab this estimate was
+  // saved under (subType); the financial snapshot (calc) is shared top-level.
+  const ih = data.ihData || data
+  const sub = data.subData || {}
+  const isSub = (data.subType || 'In-House') === 'Subcontractor'
+  const src = isSub ? sub : ih
   const {
     pool = {},
     spa = {},
@@ -69,9 +76,9 @@ export default function PoolSummary({ module }) {
     equipment = [],
     plumbing = {},
     manualRows = [],
-    laborRatePerHour = 35,
-    calc = {},
-  } = data
+  } = src
+  const laborRatePerHour = data.laborRatePerHour ?? 35
+  const calc = data.calc || {}
 
   const savedCalc = calc || {}
   const totalHrs = n(savedCalc.totalHrs)
