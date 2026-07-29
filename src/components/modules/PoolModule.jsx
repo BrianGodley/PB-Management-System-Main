@@ -182,6 +182,212 @@ const EQUIPMENT_CATEGORIES = Object.keys(EQUIPMENT_CATALOG)
 
 const n = v => parseFloat(v) || 0
 
+
+// ── Electrical & Plumbing catalog (ported from the Utilities module) ──────────
+// Rates live in material_rates / labor_rates under category 'Utilities' so they
+// stay a single source of truth shared with the Utilities module. Fallbacks
+// below are used only when the DB row is absent. A vendor overrides ONLY the
+// material price for the selected item; labor always comes from the built-in.
+const UTILITY_LINE_TYPES = {
+  'PVC Conduit with Electrical': { costPerLF: 1.92, dbName: 'PVC Conduit with Electrical', laborPerLF: 0.05, laborDbName: 'PVC Conduit with Electrical - Labor Rate' },
+  '1-1/2" Poly Gas Pipe': { costPerLF: 4.25, dbName: '1-1/2" Poly Gas Pipe', laborPerLF: 0.05, laborDbName: '1-1/2" Poly Gas Pipe - Labor Rate' },
+  '1" Black Iron Gas Pipe': { costPerLF: 2.76, dbName: '1" Black Iron Gas Pipe', laborPerLF: 0.15, laborDbName: '1" Black Iron Gas Pipe - Labor Rate' },
+  '1-1/2" Black Iron Gas Pipe': { costPerLF: 4.23, dbName: '1-1/2" Black Iron Gas Pipe', laborPerLF: 0.2, laborDbName: '1-1/2" Black Iron Gas Pipe - Labor Rate' },
+  '2" Black Iron Gas Pipe': { costPerLF: 5.72, dbName: '2" Black Iron Gas Pipe', laborPerLF: 0.25, laborDbName: '2" Black Iron Gas Pipe - Labor Rate' },
+}
+const GAS_FIXTURE_TYPES = {
+  '12" Single Gas Ring': { cost: 61.75, dbName: '12" Single Gas Ring', laborHrs: 2, laborDbName: '12" Single Gas Ring - Labor Rate' },
+  '18" Single Gas Ring': { cost: 84.75, dbName: '18" Single Gas Ring', laborHrs: 2, laborDbName: '18" Single Gas Ring - Labor Rate' },
+  '24" Single Gas Ring': { cost: 107.75, dbName: '24" Single Gas Ring', laborHrs: 2, laborDbName: '24" Single Gas Ring - Labor Rate' },
+  '24" Double Gas Ring': { cost: 163.25, dbName: '24" Double Gas Ring', laborHrs: 2, laborDbName: '24" Double Gas Ring - Labor Rate' },
+  "2' Straight Gas Bar": { cost: 35.5, dbName: "2' Straight Gas Bar", laborHrs: 2, laborDbName: "2' Straight Gas Bar - Labor Rate" },
+  "3' Straight Gas Bar": { cost: 56.0, dbName: "3' Straight Gas Bar", laborHrs: 2.5, laborDbName: "3' Straight Gas Bar - Labor Rate" },
+  "4' Straight Gas Bar": { cost: 68.5, dbName: "4' Straight Gas Bar", laborHrs: 3, laborDbName: "4' Straight Gas Bar - Labor Rate" },
+  'Gas Shut-Off Valve': { cost: 89.7, dbName: 'Gas Shut-Off Valve', laborHrs: 2, laborDbName: 'Gas Shut-Off Valve - Labor Rate' },
+}
+const ELECTRICAL_FIXTURE_TYPES = {
+  'Electric Sub-panel': { cost: 300, dbName: 'Electric Sub-panel', laborHrs: 4.5, laborDbName: 'Electric Sub-panel - Labor Rate' },
+  'Electric Disconnect': { cost: 150, dbName: 'Electric Disconnect', laborHrs: 2.5, laborDbName: 'Electric Disconnect - Labor Rate' },
+  'GFCI Protected Receptacles': { cost: 86.25, dbName: 'GFCI Protected Receptacles', laborHrs: 2, laborDbName: 'GFCI Protected Receptacles - Labor Rate' },
+  'Bubble Covers for Receptacles': { cost: 19.19, dbName: 'Bubble Covers for Receptacles', laborHrs: 0.25, laborDbName: 'Bubble Covers for Receptacles - Labor Rate' },
+  'Infratech W2024SS 2000W 240V Heater (Stainless)': { cost: 725.22, dbName: 'Infratech W2024SS 2000W 240V Heater (Stainless)', laborHrs: 6, laborDbName: 'Infratech W2024SS 2000W 240V Heater (Stainless) - Labor Rate' },
+  'Infratech W39 Flush Mount Frame': { cost: 572.26, dbName: 'Infratech W39 Flush Mount Frame', laborHrs: 2, laborDbName: 'Infratech W39 Flush Mount Frame - Labor Rate' },
+  'Infratech Single Duplex Switch in Surface Mount Gang Box': { cost: 206.11, dbName: 'Infratech Single Duplex Switch in Surface Mount Gang Box', laborHrs: 2, laborDbName: 'Infratech Single Duplex Switch in Surface Mount Gang Box - Labor Rate' },
+}
+const LINE_TYPE_ARR = Object.entries(UTILITY_LINE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, fallback: t.costPerLF, laborDbName: t.laborDbName, laborFallback: t.laborPerLF }))
+const GAS_TYPE_ARR = Object.entries(GAS_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, fallback: t.cost, laborDbName: t.laborDbName, laborFallback: t.laborHrs }))
+const ELEC_TYPE_ARR = Object.entries(ELECTRICAL_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, fallback: t.cost, laborDbName: t.laborDbName, laborFallback: t.laborHrs }))
+const UTIL_CAT = { line: 'Utility Lines', gas: 'Gas Fixtures', elec: 'Electrical Fixtures' }
+function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
+  const builtIn = houseArr.find(o => o.label === row.type) || houseArr[0]
+  const laborVal = mp[builtIn?.laborDbName] ?? builtIn?.laborFallback ?? 0
+  let matDbName = builtIn?.dbName
+  let matFallback = builtIn?.fallback ?? 0
+  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : 'House'
+  if (vsel && vsel !== 'House') {
+    const prefix = `${cat} - `
+    const vrow = (materialRows || []).find(r => {
+      if (r.subcategory !== cat || r.vendor_id !== vsel) return false
+      const label = r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name
+      return label === builtIn?.label
+    })
+    if (vrow) {
+      matDbName = vrow.name
+      matFallback = n(vrow.unit_cost)
+    }
+  }
+  const matCost = mp[matDbName] ?? matFallback
+  const matOpt = { label: builtIn?.label, dbName: matDbName, fallback: matFallback }
+  return { opts: houseArr, matOpt, matCost, laborVal, laborBuiltIn: builtIn }
+}
+const EP_LINE_ROW = () => ({ type: 'PVC Conduit with Electrical', lf: '', vendor: 'House' })
+const EP_GAS_ROW = () => ({ type: '12" Single Gas Ring', qty: '', vendor: 'House' })
+const EP_ELEC_ROW = () => ({ type: 'GFCI Protected Receptacles', qty: '', vendor: 'House' })
+
+// Reusable Electrical & Plumbing table (Utility Lines / Gas / Electrical).
+function EpTable({
+  title,
+  rows,
+  setRows,
+  arr,
+  cat,
+  qtyField,
+  qtyLabel,
+  unitLabel,
+  newRow,
+  materialRows,
+  materialPrices,
+  refreshAllRates,
+  vendorsForCategory,
+}) {
+  const upd = (i, field, val) =>
+    setRows(rs => rs.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  return (
+    <div>
+      <p className="text-xs font-semibold text-gray-600 mb-1">{title}</p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm table-fixed">
+          <colgroup>
+            <col className="w-[128px]" />
+            <col />
+            <col className="w-[84px]" />
+            <col className="w-[96px]" />
+            <col className="w-[96px]" />
+            <col className="w-6" />
+          </colgroup>
+          <thead>
+            <tr className="text-xs text-gray-500 border-b border-gray-200">
+              <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
+              <th className="text-left pb-1 pr-2 font-medium">Type</th>
+              <th className="text-left pb-1 pr-2 font-medium">{qtyLabel}</th>
+              <th className="text-right pb-1 pr-2 font-medium text-gray-400">$/{unitLabel}</th>
+              <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => {
+              const { opts, matOpt, matCost, laborVal, laborBuiltIn } = resolveUtilRow(
+                cat,
+                row,
+                arr,
+                materialRows,
+                materialPrices
+              )
+              const mat = n(row[qtyField]) * matCost
+              return (
+                <tr key={i} className="border-b border-gray-100">
+                  <td className="py-1 pr-2">
+                    <select
+                      className="input text-sm py-1 w-full"
+                      value={row.vendor || 'House'}
+                      onChange={e => upd(i, 'vendor', e.target.value)}
+                      title="Vendor"
+                    >
+                      {vendorsForCategory(cat).map(v => (
+                        <option key={v.id} value={v.id}>
+                          {v.name}
+                        </option>
+                      ))}
+                      <option value="House">House</option>
+                    </select>
+                  </td>
+                  <td className="py-1 pr-2">
+                    <div className="flex items-center gap-1">
+                      <select
+                        className="input text-sm py-1 flex-1 min-w-0"
+                        value={matOpt?.label}
+                        onChange={e => upd(i, 'type', e.target.value)}
+                      >
+                        {opts.map(o => (
+                          <option key={o.label} value={o.label}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                      {laborBuiltIn && (
+                        <RateEditPopover
+                          table="labor_rates"
+                          name={laborBuiltIn.laborDbName}
+                          category="Utilities"
+                          mode="coefficient"
+                          unitLabel={`hrs/${unitLabel}`}
+                          currentValue={laborVal}
+                          onSaved={refreshAllRates}
+                        />
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-1 pr-2">
+                    <NumInput value={row[qtyField]} onChange={v => upd(i, qtyField, v)} className="w-full" />
+                  </td>
+                  <td className="py-1 text-right text-gray-400 text-xs pr-2">
+                    <span className="inline-flex items-center justify-end gap-1">
+                      ${matCost.toFixed(2)}
+                      {matOpt?.dbName && (
+                        <RateEditPopover
+                          table="material_rates"
+                          name={matOpt.dbName}
+                          category="Utilities"
+                          unitLabel={unitLabel}
+                          currentValue={matCost}
+                          onSaved={refreshAllRates}
+                        />
+                      )}
+                    </span>
+                  </td>
+                  <td className="py-1 text-right text-gray-600 text-xs">
+                    {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
+                  </td>
+                  <td className="py-1 text-center">
+                    {rows.length > 1 && (
+                      <button
+                        type="button"
+                        className="text-gray-300 hover:text-red-500"
+                        title="Remove row"
+                        onClick={() => setRows(rs => rs.filter((_, idx) => idx !== i))}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        <button
+          type="button"
+          className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+          onClick={() => setRows(rs => [...rs, newRow()])}
+        >
+          + Add row
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Default state factories ────────────────────────────────────────────────────
 const defaultStruct = (enabled = false) => ({
   enabled,
@@ -244,6 +450,9 @@ function makeInitial(data = {}) {
       manualSubCost: '',
     },
     steel: data.steel ?? { manualSubCost: '' },
+    epLineRows: data.epLineRows ?? [EP_LINE_ROW(), EP_LINE_ROW()],
+    epGasRows: data.epGasRows ?? [EP_GAS_ROW(), EP_GAS_ROW()],
+    epElecRows: data.epElecRows ?? [EP_ELEC_ROW(), EP_ELEC_ROW()],
     manualRows: data.manualRows ?? [newManualRow(), newManualRow(), newManualRow()],
     laborRatePerHour: data.laborRatePerHour ?? 35,
     laborBurdenPct: data.laborBurdenPct ?? LABOR_BURDEN,
@@ -253,7 +462,7 @@ function makeInitial(data = {}) {
 }
 
 // ── Main Calculation ──────────────────────────────────────────────────────────
-function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess = null) {
+function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess = null, materialRows = []) {
   // Subcontractor rates: a one-off adjustment saved on THIS estimate
   // (state.rateOverrides) takes precedence over the master rate.
   subRates = { ...(subRates || {}) }
@@ -464,6 +673,29 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     manSub += n(r.subCost)
   })
 
+  // ── Electrical & Plumbing (Utility Lines / Gas / Electrical Fixtures) ───────
+  let epHrs = 0
+  let epMat = 0
+  ;(state.epLineRows || []).forEach(r => {
+    const lf = n(r.lf)
+    if (lf <= 0) return
+    const { matCost, laborVal } = resolveUtilRow(UTIL_CAT.line, r, LINE_TYPE_ARR, materialRows, materialPrices)
+    epMat += lf * matCost
+    epHrs += lf * laborVal
+  })
+  ;[
+    [state.epGasRows, UTIL_CAT.gas, GAS_TYPE_ARR],
+    [state.epElecRows, UTIL_CAT.elec, ELEC_TYPE_ARR],
+  ].forEach(([rows, cat, arr]) => {
+    ;(rows || []).forEach(r => {
+      const qty = n(r.qty)
+      if (qty <= 0) return
+      const { matCost, laborVal } = resolveUtilRow(cat, r, arr, materialRows, materialPrices)
+      epMat += qty * matCost
+      epHrs += qty * laborVal
+    })
+  })
+
   const _preWalkHrs =
     excavHrs +
     tileHrs +
@@ -471,12 +703,13 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     copingHrs +
     raisedHrs +
     equipmentHrs +
+    epHrs +
     manHrs +
     (parseFloat(state.hoursAdj) || 0)
   const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
   const totalHrs = _preWalkHrs + walkHrs
   const manDays = totalHrs / 8
-  const totalMat = tileMat + spillwayMat + copingMat + raisedMat + manMat
+  const totalMat = tileMat + spillwayMat + copingMat + raisedMat + epMat + manMat
   const subCost =
     excavSub + shotcreteSub + interiorSub + equipmentSub + plumbSub + steelSub + manSub
   const laborCost = totalHrs * lrph
@@ -609,6 +842,8 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
   const [materialPrices, setMaterialPrices] = useState({})
   const [laborRates, setLaborRates] = useState({})
   const [subRates, setSubRates] = useState({})
+  const [materialRows, setMaterialRows] = useState([])
+  const [vendors, setVendors] = useState([])
   const [loadingRates, setLoadingRates] = useState(true)
 
   // ── Sales tax — applied to totalMat across every module so the bid
@@ -655,10 +890,22 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
 
   // Re-fetch all three Pool rate tables. Called on mount and after edits.
   const refreshAllRates = useCallback(async () => {
-    const [matRes, labRes, subRes] = await Promise.all([
-      supabase.from('material_rates').select('name,unit_cost').eq('category', 'Pool'),
-      supabase.from('labor_rates').select('name,rate').eq('category', 'Pool'),
+    const [matRes, labRes, subRes, matRowsRes, venRes] = await Promise.all([
+      supabase
+        .from('material_rates')
+        .select('name,unit_cost')
+        .in('category', ['Pool', 'Utilities']),
+      supabase.from('labor_rates').select('name,rate').in('category', ['Pool', 'Utilities']),
       supabase.from('subcontractor_rates').select('trade,rate').eq('category', 'Pool'),
+      supabase
+        .from('material_rates')
+        .select('name, unit_cost, subcategory, vendor_id')
+        .not('vendor_id', 'is', null),
+      supabase
+        .from('subs_vendors')
+        .select('id, company_name, supplied_categories')
+        .eq('type', 'vendor')
+        .order('company_name'),
     ])
     const mp = {}
     ;(matRes.data || []).forEach(r => {
@@ -675,6 +922,14 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
     setMaterialPrices(mp)
     setLaborRates(lr)
     setSubRates(sr)
+    setMaterialRows(matRowsRes.data || [])
+    setVendors(
+      (venRes.data || []).map(v => ({
+        id: v.id,
+        name: v.company_name,
+        categories: v.supplied_categories || [],
+      }))
+    )
   }, [])
 
   useEffect(() => {
@@ -691,9 +946,11 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       return { ...p, rateOverrides: next }
     })
   const updStruct = (key, val) => setState(p => ({ ...p, [key]: val }))
+  const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
+  const setEpRows = key => fn => setState(p => ({ ...p, [key]: fn(p[key] || []) }))
 
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
-  const calcRaw = calcPool(state, materialPrices, laborRates, subRates, state.walkAccess)
+  const calcRaw = calcPool(state, materialPrices, laborRates, subRates, state.walkAccess, materialRows)
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
@@ -1823,6 +2080,58 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
               )}
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* ─── Electrical & Plumbing (ported from Utilities) ─── */}
+      <div>
+        <SectionHeader title="Electrical & Plumbing" />
+        <div className="space-y-4">
+          <EpTable
+            title="Utility Lines"
+            rows={state.epLineRows || []}
+            setRows={setEpRows('epLineRows')}
+            arr={LINE_TYPE_ARR}
+            cat={UTIL_CAT.line}
+            qtyField="lf"
+            qtyLabel="Linear Feet"
+            unitLabel="LF"
+            newRow={EP_LINE_ROW}
+            materialRows={materialRows}
+            materialPrices={materialPrices}
+            refreshAllRates={refreshAllRates}
+            vendorsForCategory={vendorsForCategory}
+          />
+          <EpTable
+            title="Gas Fixtures"
+            rows={state.epGasRows || []}
+            setRows={setEpRows('epGasRows')}
+            arr={GAS_TYPE_ARR}
+            cat={UTIL_CAT.gas}
+            qtyField="qty"
+            qtyLabel="Qty"
+            unitLabel="ea"
+            newRow={EP_GAS_ROW}
+            materialRows={materialRows}
+            materialPrices={materialPrices}
+            refreshAllRates={refreshAllRates}
+            vendorsForCategory={vendorsForCategory}
+          />
+          <EpTable
+            title="Electrical Fixtures"
+            rows={state.epElecRows || []}
+            setRows={setEpRows('epElecRows')}
+            arr={ELEC_TYPE_ARR}
+            cat={UTIL_CAT.elec}
+            qtyField="qty"
+            qtyLabel="Qty"
+            unitLabel="ea"
+            newRow={EP_ELEC_ROW}
+            materialRows={materialRows}
+            materialPrices={materialPrices}
+            refreshAllRates={refreshAllRates}
+            vendorsForCategory={vendorsForCategory}
+          />
         </div>
       </div>
 
