@@ -65,6 +65,36 @@ const COUNTER_FINISHES = ['Broom Finish', 'Polished Finish']
 
 const n = v => parseFloat(v) || 0
 
+// ── Wall-finish vendor catalog ───────────────────────────────────────────────
+// A real vendor overrides ONLY the material unit price for a finish (matched by
+// its Type label in the vendor's 'Wall Finish' catalog); House keeps the
+// built-in per-estimate / master-rate price. Labor is never affected.
+const WF_CAT = 'Wall Finish'
+function wfVendorPrice(vendorSel, typeLabel, materialRows) {
+  if (!vendorSel || vendorSel === 'House' || vendorSel === 'auto') return null
+  const prefix = `${WF_CAT} - `
+  const rows = (materialRows || []).filter(
+    r => r.subcategory === WF_CAT && r.vendor_id === vendorSel
+  )
+  if (!rows.length) return null
+  const match =
+    rows.find(r => {
+      const label = r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name
+      return label === typeLabel
+    }) || rows[0]
+  return match ? n(match.unit_cost) : null
+}
+// Type labels used to match each finish against the vendor catalog.
+const WF_TYPE_LABEL = {
+  sandStucco: 'Sand Stucco',
+  smoothStucco: 'Smooth Stucco',
+  ledgerstone: 'Ledgerstone Veneer',
+  stackedStone: 'Stacked Stone Veneer',
+  tile: 'Tile',
+  flagstone: 'Real Flagstone',
+  realStone: 'Real Stone',
+}
+
 // ── Calculation engine ────────────────────────────────────────────────────────
 function calcOutdoorKitchen(
   state,
@@ -102,9 +132,16 @@ function calcOutdoorKitchen(
     realStoneRateInput,
     manualRows,
     finishPrices,
+    finishVendors,
+    materialRows,
   } = state
 
+  const fv = finishVendors || {}
   const p = (dbName, fallback) => mp[dbName] ?? fallback
+  // Effective material unit price for a finish: the vendor's catalog price when
+  // a real vendor is picked, otherwise the built-in House unit price.
+  const finishUnit = (key, houseUnit) =>
+    wfVendorPrice(fv[key], WF_TYPE_LABEL[key], materialRows) ?? houseUnit
   // Per-finish $/SF: an editable override when the user typed one, otherwise
   // the fixed default price from Master Rates (DB) / fallback.
   const fp = finishPrices || {}
@@ -225,31 +262,42 @@ function calcOutdoorKitchen(
     sinkYN === 'Yes' ? p(OK_RATES.sinkPlumbing.dbName, OK_RATES.sinkPlumbing.fallback) : 0
   const gasMat = n(gasTrenchLF) * p(OK_RATES.gasPipe.dbName, OK_RATES.gasPipe.fallback)
 
-  // Finish materials
-  const sandStuccoMat = n(sandStuccoSF) * priceFor('sandStucco')
-  const smoothStuccoMat = n(smoothStuccoSF) * priceFor('smoothStucco')
+  // Finish materials — each unit price is vendor-overridable (labor unchanged).
+  const sandStuccoMat = n(sandStuccoSF) * finishUnit('sandStucco', priceFor('sandStucco'))
+  const smoothStuccoMat = n(smoothStuccoSF) * finishUnit('smoothStucco', priceFor('smoothStucco'))
   const ledgerstoneMat =
     n(ledgerstoneSF) > 0
-      ? n(ledgerstoneSF) * p(OK_RATES.ledgerstone.dbName, OK_RATES.ledgerstone.fallback) * 1.1 +
+      ? n(ledgerstoneSF) *
+          finishUnit('ledgerstone', p(OK_RATES.ledgerstone.dbName, OK_RATES.ledgerstone.fallback)) *
+          1.1 +
         (n(ledgerstoneSF) / 5) * 2
       : 0
   const stackedStoneMat =
     n(stackedStoneSF) > 0
-      ? n(stackedStoneSF) * p(OK_RATES.stackedStone.dbName, OK_RATES.stackedStone.fallback) * 1.1 +
+      ? n(stackedStoneSF) *
+          finishUnit(
+            'stackedStone',
+            p(OK_RATES.stackedStone.dbName, OK_RATES.stackedStone.fallback)
+          ) *
+          1.1 +
         (n(stackedStoneSF) / 5) * 2
       : 0
   const tileMat =
     n(tileSF) > 0
-      ? n(tileSF) * p(OK_RATES.tile.dbName, OK_RATES.tile.fallback) + n(tileSF) // +$1/SF adhesive/grout
+      ? n(tileSF) * finishUnit('tile', p(OK_RATES.tile.dbName, OK_RATES.tile.fallback)) + n(tileSF) // +$1/SF adhesive/grout
       : 0
-  const realFlagRate =
+  const realFlagRate = finishUnit(
+    'flagstone',
     n(flagstoneRateInput) || p(OK_RATES.realFlagstone.dbName, OK_RATES.realFlagstone.fallback)
+  )
   const flagstoneMat =
     n(flagstoneSF) > 0
       ? (n(flagstoneSF) / 80) * realFlagRate + (n(flagstoneSF) / 80) * 80 + 268.75 // stone + $80/ton delivery + $268.75 misc
       : 0
-  const realStoneRt =
+  const realStoneRt = finishUnit(
+    'realStone',
     n(realStoneRateInput) || p(OK_RATES.realStone.dbName, OK_RATES.realStone.fallback)
+  )
   const realStoneMat =
     n(realStoneSF) > 0
       ? (n(realStoneSF) / 70) * realStoneRt + (n(realStoneSF) / 70) * 180 + n(realStoneSF)
@@ -413,12 +461,23 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
   )
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
   const [pricesLoading, setPricesLoading] = useState(!initialData?.materialPrices)
+  const [materialRows, setMaterialRows] = useState(initialData?.materialRows ?? [])
+  const [vendors, setVendors] = useState([])
 
   // Re-fetch Outdoor Kitchen merged labor+material map. Used on mount and after save.
   const refreshAllRates = useCallback(async () => {
-    const [matRes, labRes] = await Promise.all([
+    const [matRes, labRes, matRowsRes, venRes] = await Promise.all([
       supabase.from('material_rates').select('name, unit_cost').eq('category', 'Outdoor Kitchen'),
       supabase.from('labor_rates').select('name, rate').eq('category', 'Outdoor Kitchen'),
+      supabase
+        .from('material_rates')
+        .select('name, unit_cost, subcategory, vendor_id')
+        .not('vendor_id', 'is', null),
+      supabase
+        .from('subs_vendors')
+        .select('id, company_name, supplied_categories')
+        .eq('type', 'vendor')
+        .order('company_name'),
     ])
     const prices = {}
     ;(matRes.data || []).forEach(r => {
@@ -428,6 +487,14 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
       prices[r.name] = parseFloat(r.rate) || 0
     })
     setMaterialPrices(prices)
+    setMaterialRows(matRowsRes.data || [])
+    setVendors(
+      (venRes.data || []).map(v => ({
+        id: v.id,
+        name: v.company_name,
+        categories: v.supplied_categories || [],
+      }))
+    )
   }, [])
 
   useEffect(() => {
@@ -483,6 +550,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
   const [gasTrenchLF, setGasTrenchLF] = useState(initialData?.gasTrenchLF ?? '')
   // Wall Finishes
   const [finishPrices, setFinishPrices] = useState(initialData?.finishPrices ?? {})
+  const [finishVendors, setFinishVendors] = useState(initialData?.finishVendors ?? {})
   const [sandStuccoSF, setSandStuccoSF] = useState(initialData?.sandStuccoSF ?? '')
   const [smoothStuccoSF, setSmoothStuccoSF] = useState(initialData?.smoothStuccoSF ?? '')
   const [ledgerstoneSF, setLedgerstoneSF] = useState(initialData?.ledgerstoneSF ?? '')
@@ -554,6 +622,8 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
     manualRows,
     distanceLF,
     finishPrices,
+    finishVendors,
+    materialRows,
   }
   const calcRaw = calcOutdoorKitchen(
     state,
@@ -592,6 +662,26 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
       data: { ...state, walkAccess, laborRatePerHour, laborBurdenPct, gpmd, materialPrices, calc },
     })
   }
+
+  const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
+  const setFinishVendor = (key, val) => setFinishVendors(m => ({ ...m, [key]: val }))
+  const finishVendorCell = vkey => (
+    <td className="py-1 pr-2">
+      <select
+        className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white w-32"
+        value={finishVendors[vkey] || 'House'}
+        onChange={e => setFinishVendor(vkey, e.target.value)}
+        title="Vendor — overrides material price"
+      >
+        <option value="House">House</option>
+        {vendorsForCategory(WF_CAT).map(v => (
+          <option key={v.id} value={v.id}>
+            {v.name}
+          </option>
+        ))}
+      </select>
+    </td>
+  )
 
   return (
     <div className="space-y-5">
@@ -1087,6 +1177,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-left pb-1 pr-2 font-medium">Type</th>
                 <th className="text-left pb-1 pr-2 font-medium">SF</th>
                 <th className="text-left pb-1 pr-2 font-medium">Rate</th>
@@ -1142,6 +1233,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                 },
               ].map(({ label, sf, setSf, matKey, labKey, matCalc, fallback }) => (
                 <tr key={label} className="border-b border-gray-100">
+                  {finishVendorCell(matKey)}
                   <td className="py-1 pr-2 text-xs text-gray-700">{label}</td>
                   <td className="py-1 pr-2">
                     <NumInput value={sf} onChange={setSf} />
@@ -1184,6 +1276,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
               ))}
               {/* Real Flagstone — editable $/ton */}
               <tr className="border-b border-gray-100">
+                {finishVendorCell('flagstone')}
                 <td className="py-1 pr-2 text-xs text-gray-700">
                   <span className="inline-flex items-center gap-1">
                     Real Flagstone (Flat)
@@ -1242,6 +1335,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
               </tr>
               {/* Real Stone — editable $/ton */}
               <tr className="border-b border-gray-100">
+                {finishVendorCell('realStone')}
                 <td className="py-1 pr-2 text-xs text-gray-700">
                   <span className="inline-flex items-center gap-1">
                     Real Stone
