@@ -63,6 +63,29 @@ const DEFAULTS = {
 
 const COUNTER_FINISHES = ['Broom Finish', 'Polished Finish']
 
+// Fixed equipment list for the Appliances table. Each priced from an editable
+// master material rate `BBQ Equip - <type>` (category 'Outdoor Kitchen',
+// default 0). Client-provided equipment zeroes material but keeps labor.
+const APPLIANCE_TYPES = [
+  'BBQ Grill',
+  'Side Burner',
+  'Power Burner',
+  'Refrigerator',
+  'Ice Bin / Cooler',
+  'Kegerator',
+  'Access Door',
+  'Drawer Set',
+  'Trash Drawer',
+  'Sink',
+  'Vent Hood',
+  'Warming Drawer',
+  'Pizza Oven',
+  'Kamado / Egg',
+  'Other',
+]
+const applianceRateName = type => `BBQ Equip - ${type}`
+const EQUIP_ROW = () => ({ vendor: 'House', type: 'BBQ Grill', clientProvided: false, hours: '' })
+
 const n = v => parseFloat(v) || 0
 
 // ── Wall-finish vendor catalog ───────────────────────────────────────────────
@@ -134,6 +157,7 @@ function calcOutdoorKitchen(
     finishPrices,
     finishVendors,
     materialRows,
+    equipmentRows,
   } = state
 
   const fv = finishVendors || {}
@@ -205,6 +229,15 @@ function calcOutdoorKitchen(
     counterFinish === 'Polished Finish'
       ? (n(counterSF) / p(OK_RATES.counterPolishLab.dbName, OK_RATES.counterPolishLab.fallback)) * 8
       : 0
+  // Equipment table — per-line labor (hours entered directly, replacing the old
+  // single Layout Hours field) + material from the master rate, zeroed when the
+  // client provides the unit.
+  let equipHrs = 0
+  let equipMat = 0
+  ;(equipmentRows || []).forEach(r => {
+    equipHrs += n(r.hours)
+    if (!r.clientProvided) equipMat += p(applianceRateName(r.type), 0)
+  })
   const installAppHrs =
     n(applianceCount) > 0
       ? (n(applianceCount) / p(OK_RATES.applianceLab.dbName, OK_RATES.applianceLab.fallback)) * 8
@@ -315,7 +348,7 @@ function calcOutdoorKitchen(
 
   // ── Totals ──────────────────────────────────────────────────────────────────
   const baseHrs =
-    layoutLab +
+    equipHrs +
     excavateHrs +
     rebarHrs +
     pourFootingHrs +
@@ -325,7 +358,6 @@ function calcOutdoorKitchen(
     counterPourHrs +
     counterBroomHrs +
     counterPolishHrs +
-    installAppHrs +
     gficHrs +
     sinkHrs +
     gasHrs +
@@ -351,7 +383,7 @@ function calcOutdoorKitchen(
     fillMat +
     counterConcMat +
     counterPolishMat +
-    applianceMat +
+    equipMat +
     gficMat +
     sinkMat +
     gasMat +
@@ -548,6 +580,10 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
   const [gficCount, setGficCount] = useState(initialData?.gficCount ?? '')
   const [sinkYN, setSinkYN] = useState(initialData?.sinkYN ?? 'No')
   const [gasTrenchLF, setGasTrenchLF] = useState(initialData?.gasTrenchLF ?? '')
+  // Appliances / Equipment
+  const [equipmentRows, setEquipmentRows] = useState(
+    initialData?.equipmentRows ?? [EQUIP_ROW(), EQUIP_ROW(), EQUIP_ROW(), EQUIP_ROW()]
+  )
   // Wall Finishes
   const [finishPrices, setFinishPrices] = useState(initialData?.finishPrices ?? {})
   const [finishVendors, setFinishVendors] = useState(initialData?.finishVendors ?? {})
@@ -624,6 +660,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
     finishPrices,
     finishVendors,
     materialRows,
+    equipmentRows,
   }
   const calcRaw = calcOutdoorKitchen(
     state,
@@ -1035,45 +1072,105 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
       <div>
         <SectionHeader title="Appliances & Services" />
         <div className="space-y-0">
-          <div className="flex items-center gap-3 py-1.5 border-b border-gray-100">
-            <span className="text-xs text-gray-700 w-44 shrink-0">Layout Time (Hours)</span>
-            <NumInput value={layoutHrs} onChange={setLayoutHrs} placeholder="0" className="w-28" />
-          </div>
-          <div className="flex items-center gap-3 py-1.5 border-b border-gray-100">
-            <span className="text-xs text-gray-700 w-44 shrink-0 inline-flex items-center gap-1">
-              Appliances / Openings
-              <RateEditPopover
-                table="labor_rates"
-                name={OK_RATES.applianceLab.dbName}
-                category="Outdoor Kitchen"
-                mode="coefficient"
-                unitLabel="per day"
-                currentValue={p(OK_RATES.applianceLab.dbName, OK_RATES.applianceLab.fallback)}
-                onSaved={refreshAllRates}
-              />
-              <RateEditPopover
-                table="material_rates"
-                name={OK_RATES.applianceHardware.dbName}
-                category="Outdoor Kitchen"
-                unitLabel="ea"
-                currentValue={p(
-                  OK_RATES.applianceHardware.dbName,
-                  OK_RATES.applianceHardware.fallback
-                )}
-                onSaved={refreshAllRates}
-              />
-            </span>
-            <NumInput
-              value={applianceCount}
-              onChange={setApplianceCount}
-              placeholder="0"
-              className="w-28"
-            />
-            {n(applianceCount) > 0 && (
-              <span className="text-xs text-gray-400 shrink-0">
-                {(n(applianceCount) / 2.75).toFixed(2)} days
-              </span>
-            )}
+          {/* Equipment — Vendor · Type · Client Provided · Labor · Material */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-gray-500 border-b border-gray-200">
+                  <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
+                  <th className="text-left pb-1 pr-2 font-medium">Type</th>
+                  <th className="text-left pb-1 pr-2 font-medium">Client Provided</th>
+                  <th className="text-left pb-1 pr-2 font-medium">Labor (hrs)</th>
+                  <th className="text-right pb-1 pr-2 font-medium text-gray-400">Material $</th>
+                  <th className="w-6"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {equipmentRows.map((row, i) => {
+                  const eqMat = row.clientProvided ? 0 : p(applianceRateName(row.type), 0)
+                  const setRow = (field, val) =>
+                    setEquipmentRows(rs =>
+                      rs.map((r, idx) => (idx === i ? { ...r, [field]: val } : r))
+                    )
+                  return (
+                    <tr key={i} className="border-b border-gray-100">
+                      <td className="py-1 pr-2">
+                        <select
+                          className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white w-32"
+                          value={row.vendor || 'House'}
+                          onChange={e => setRow('vendor', e.target.value)}
+                        >
+                          <option value="House">House</option>
+                          {vendorsForCategory('Appliance').map(v => (
+                            <option key={v.id} value={v.id}>
+                              {v.name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="py-1 pr-2">
+                        <span className="inline-flex items-center gap-1">
+                          <select
+                            className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
+                            value={row.type}
+                            onChange={e => setRow('type', e.target.value)}
+                          >
+                            {APPLIANCE_TYPES.map(t => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </select>
+                          <RateEditPopover
+                            table="material_rates"
+                            name={applianceRateName(row.type)}
+                            category="Outdoor Kitchen"
+                            unitLabel="ea"
+                            currentValue={p(applianceRateName(row.type), 0)}
+                            onSaved={refreshAllRates}
+                          />
+                        </span>
+                      </td>
+                      <td className="py-1 pr-2">
+                        <select
+                          className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white w-20"
+                          value={row.clientProvided ? 'Yes' : 'No'}
+                          onChange={e => setRow('clientProvided', e.target.value === 'Yes')}
+                        >
+                          <option value="No">No</option>
+                          <option value="Yes">Yes</option>
+                        </select>
+                      </td>
+                      <td className="py-1 pr-2">
+                        <NumInput value={row.hours} onChange={v => setRow('hours', v)} className="w-24" />
+                      </td>
+                      <td className="py-1 pr-2 text-right text-xs text-gray-600">
+                        {row.clientProvided ? 'client' : eqMat > 0 ? `$${eqMat.toFixed(2)}` : '—'}
+                      </td>
+                      <td className="py-1 text-center">
+                        {equipmentRows.length > 1 && (
+                          <button
+                            type="button"
+                            className="text-gray-300 hover:text-red-500"
+                            title="Remove row"
+                            onClick={() => setEquipmentRows(rs => rs.filter((_, idx) => idx !== i))}
+                          >
+                            ×
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            <button
+              type="button"
+              onClick={() => setEquipmentRows(rs => [...rs, EQUIP_ROW()])}
+              className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+            >
+              + Add equipment
+            </button>
           </div>
           <div className="flex items-center gap-3 py-1.5 border-b border-gray-100">
             <span className="text-xs text-gray-700 w-44 shrink-0 inline-flex items-center gap-1">
