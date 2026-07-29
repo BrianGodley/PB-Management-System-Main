@@ -1386,7 +1386,14 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
       <div>
         <SectionHeader title="Wall Finishes" />
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              <col className="w-[128px]" />
+              <col />
+              <col className="w-[72px]" />
+              <col className="w-[96px]" />
+              <col className="w-[112px]" />
+            </colgroup>
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
@@ -1404,7 +1411,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
                       <select
-                        className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white w-32"
+                        className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white w-full"
                         value={row.vendor || 'House'}
                         onChange={e => setWallFinishRow(i, 'vendor', e.target.value)}
                         title="Vendor — overrides material price"
@@ -1418,9 +1425,9 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                       </select>
                     </td>
                     <td className="py-1 pr-2">
-                      <span className="inline-flex items-center gap-1">
+                      <span className="flex items-center gap-1">
                         <select
-                          className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
+                          className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white flex-1 min-w-0"
                           value={row.type}
                           onChange={e => setWallFinishRow(i, 'type', e.target.value)}
                         >
@@ -1454,7 +1461,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                       </span>
                     </td>
                     <td className="py-1 pr-2">
-                      <NumInput value={row.sf} onChange={v => setWallFinishRow(i, 'sf', v)} className="w-24" />
+                      <NumInput value={row.sf} onChange={v => setWallFinishRow(i, 'sf', v)} className="w-full" />
                     </td>
                     <td className="py-1 pr-2 text-right text-gray-400 text-xs">
                       {rc.unit ? `$${rc.unit.toFixed(2)}/${meta?.unit === 'ton' ? 'ton' : 'SF'}` : '—'}
