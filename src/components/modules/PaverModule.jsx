@@ -1931,6 +1931,65 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         </div>
       </div>
 
+      {/* ── Manual Entry ──────────────────────────────────────────────────────── */}
+      <div>
+        <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
+          Manual Entry
+        </div>
+        <table className="w-full text-xs">
+          <TH
+            cols={[
+              { label: 'Description' },
+              { label: 'Hours', w: 'w-20' },
+              { label: 'Materials ($)', w: 'w-28' },
+              { label: 'Sub Cost ($)', w: 'w-28' },
+            ]}
+          />
+          <tbody className="divide-y divide-gray-50">
+            {state[kManual].map((r, i) => (
+              <tr key={i}>
+                <td className={td}>
+                  <Inp
+                    type="text"
+                    value={r.label}
+                    onChange={e => setRow(kManual, i, 'label', e.target.value)}
+                    placeholder="Description"
+                  />
+                </td>
+                <td className={td}>
+                  <Inp
+                    value={r.hours}
+                    onChange={e => setRow(kManual, i, 'hours', e.target.value)}
+                    step="0.5"
+                  />
+                </td>
+                <td className={td}>
+                  <Inp
+                    value={r.materials}
+                    onChange={e => setRow(kManual, i, 'materials', e.target.value)}
+                    step="1"
+                  />
+                </td>
+                <td className={td}>
+                  <Inp
+                    value={r.subCost}
+                    onChange={e => setRow(kManual, i, 'subCost', e.target.value)}
+                    step="1"
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <button
+          type="button"
+          onClick={() => set(kManual, [...state[kManual], { label: '', hours: '', materials: '', subCost: '' }])}
+          className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+        >
+          + Add manual entry
+        </button>
+      </div>
+
       {/* ── Materials Summary ─────────────────────────────────────────────────── */}
       {calc.totalMat > 0 && (
         <div className="bg-gray-50 rounded-lg p-3 text-xs">
@@ -2020,65 +2079,6 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           </p>
         </div>
       )}
-
-      {/* ── Manual Entry ──────────────────────────────────────────────────────── */}
-      <div>
-        <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          Manual Entry
-        </div>
-        <table className="w-full text-xs">
-          <TH
-            cols={[
-              { label: 'Description' },
-              { label: 'Hours', w: 'w-20' },
-              { label: 'Materials ($)', w: 'w-28' },
-              { label: 'Sub Cost ($)', w: 'w-28' },
-            ]}
-          />
-          <tbody className="divide-y divide-gray-50">
-            {state[kManual].map((r, i) => (
-              <tr key={i}>
-                <td className={td}>
-                  <Inp
-                    type="text"
-                    value={r.label}
-                    onChange={e => setRow(kManual, i, 'label', e.target.value)}
-                    placeholder="Description"
-                  />
-                </td>
-                <td className={td}>
-                  <Inp
-                    value={r.hours}
-                    onChange={e => setRow(kManual, i, 'hours', e.target.value)}
-                    step="0.5"
-                  />
-                </td>
-                <td className={td}>
-                  <Inp
-                    value={r.materials}
-                    onChange={e => setRow(kManual, i, 'materials', e.target.value)}
-                    step="1"
-                  />
-                </td>
-                <td className={td}>
-                  <Inp
-                    value={r.subCost}
-                    onChange={e => setRow(kManual, i, 'subCost', e.target.value)}
-                    step="1"
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <button
-          type="button"
-          onClick={() => set(kManual, [...state[kManual], { label: '', hours: '', materials: '', subCost: '' }])}
-          className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
-        >
-          + Add manual entry
-        </button>
-      </div>
 
       {/* ── GPMD Summary Bar ─────────────────────────────────────────────────── */}
 

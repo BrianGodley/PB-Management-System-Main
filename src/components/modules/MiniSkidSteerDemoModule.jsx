@@ -288,6 +288,7 @@ function calcDemo(
     r => n(r.hours) > 0 || n(r.materials) > 0 || n(r.subCost) > 0
   )
   const manualSub = subManualEntries.reduce((s, r) => s + n(r.subCost), 0)
+  const subManualMat = subManualEntries.reduce((s, r) => s + n(r.materials), 0)
 
   // ── Sub Haul cost — per 1.5 tons, goes into subCost (not materials) ──────────
   // DB values (subcontractor_rates category='Sub Haul') take precedence over defaults
@@ -504,6 +505,7 @@ function calcDemo(
     vegHrs,
     manualHrs,
     manualMat,
+    subManualMat,
     dumpMatCost,
     baseMat,
     laborGrass,
@@ -2054,40 +2056,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
         </table>
       </div>
 
-      {/* ── Materials Breakdown ──────────────────────────────────────────────── */}
-      {calc.totalMat > 0 && (
-        <div className="bg-gray-50 rounded-lg p-3 text-xs">
-          <p className="font-semibold text-gray-600 uppercase tracking-wide text-xs mb-2">
-            Materials Breakdown
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-gray-600">
-            {calc.dumpMatCost > 0 && (
-              <span>
-                Dump / Disposal: <strong>{fmt2(calc.dumpMatCost)}</strong>
-              </span>
-            )}
-            {calc.baseMat > 0 && (
-              <span>
-                Import Base: <strong>{fmt2(calc.baseMat)}</strong>
-              </span>
-            )}
-            {calc.manualMat > 0 && (
-              <span>
-                Manual: <strong>{fmt2(calc.manualMat)}</strong>
-              </span>
-            )}
-            {calc.salesTax > 0 && (
-              <span>
-                Sales Tax: <strong>{fmt2(calc.salesTax)}</strong>
-              </span>
-            )}
-          </div>
-          <p className="mt-2 pt-2 border-t border-gray-200 font-semibold text-gray-800">
-            Total Materials: {fmt2(calc.totalMat)}
-          </p>
-        </div>
-      )}
-
       {/* Manual */}
       <div>
         <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
@@ -2146,6 +2114,60 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           + Add manual entry
         </button>
       </div>
+
+      {/* ── Materials Breakdown (per tab) ─────────────────────────────────────── */}
+      {!calc.isSub && calc.totalMat > 0 && (
+        <div className="bg-gray-50 rounded-lg p-3 text-xs">
+          <p className="font-semibold text-gray-600 uppercase tracking-wide text-xs mb-2">
+            In-House Materials Breakdown
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-gray-600">
+            {calc.dumpMatCost > 0 && (
+              <span>
+                Dump / Disposal: <strong>{fmt2(calc.dumpMatCost)}</strong>
+              </span>
+            )}
+            {calc.baseMat > 0 && (
+              <span>
+                Import Base: <strong>{fmt2(calc.baseMat)}</strong>
+              </span>
+            )}
+            {calc.manualMat > 0 && (
+              <span>
+                Manual: <strong>{fmt2(calc.manualMat)}</strong>
+              </span>
+            )}
+            {calc.salesTax > 0 && (
+              <span>
+                Sales Tax: <strong>{fmt2(calc.salesTax)}</strong>
+              </span>
+            )}
+          </div>
+          <p className="mt-2 pt-2 border-t border-gray-200 font-semibold text-gray-800">
+            Total Materials: {fmt2(calc.totalMat)}
+          </p>
+        </div>
+      )}
+      {calc.isSub && (
+        <div className="bg-gray-50 rounded-lg p-3 text-xs">
+          <p className="font-semibold text-gray-600 uppercase tracking-wide text-xs mb-2">
+            Sub Materials Breakdown
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-gray-600">
+            {calc.subManualMat > 0 && (
+              <span>
+                Manual: <strong>{fmt2(calc.subManualMat)}</strong>
+              </span>
+            )}
+          </div>
+          <p className="mt-2 pt-2 border-t border-gray-200 text-gray-500 italic">
+            Demo material is bundled into the flat subcontractor pricing, so most lines are $0.
+          </p>
+          <p className="mt-1 font-semibold text-gray-800">
+            Total Materials: {fmt2(calc.subManualMat)}
+          </p>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex gap-3 pt-2">
