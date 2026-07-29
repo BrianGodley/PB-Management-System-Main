@@ -1,7 +1,9 @@
 import FinancialSummaryList from './FinancialSummaryList'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// StepsSummary — read-only detail view for a saved Steps module
+// StepsSummary — read-only detail view for a saved Steps module. Reads the
+// per-tab row structure (paverRows / concRows / manualRows, or their sub*
+// counterparts) based on the module's saved subType.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const n = v => parseFloat(v) || 0
@@ -21,9 +23,7 @@ function LineRow({ label, value, highlight }) {
     <div
       className={`flex items-center justify-between py-1 border-b border-gray-50 ${highlight ? 'font-semibold' : ''}`}
     >
-      <span className={`text-xs ${highlight ? 'text-gray-800' : 'text-gray-600'} pr-2`}>
-        {label}
-      </span>
+      <span className={`text-xs ${highlight ? 'text-gray-800' : 'text-gray-600'} pr-2`}>{label}</span>
       <span
         className={`text-xs shrink-0 ${highlight ? 'text-gray-900 font-semibold' : 'text-gray-700'}`}
       >
@@ -36,20 +36,19 @@ function LineRow({ label, value, highlight }) {
 export default function StepsSummary({ module }) {
   const data = module?.data || {}
   const {
+    subType = 'In-House',
     difficulty = 0,
     hoursAdj = 0,
-    straightLF = 0,
-    curvedLF = 0,
-    groutedBullnose = false,
-    paverBrand = '',
-    paverName = '',
-    paverSF = 0,
-    manualRows = [],
     calc = {},
   } = data
+  const isSub = subType === 'Subcontractor'
 
-  const hasSteps = n(straightLF) > 0 || n(curvedLF) > 0
-  const hasPaver = n(paverSF) > 0 && paverBrand
+  const paverRows = (isSub ? data.subPaverRows : data.paverRows) || []
+  const concRows = (isSub ? data.subConcRows : data.concRows) || []
+  const manualRows = (isSub ? data.subManualRows : data.manualRows) || []
+
+  const activePaver = paverRows.filter(r => n(r.sf) > 0)
+  const activeConc = concRows.filter(r => n(r.sf) > 0)
   const activeMan = manualRows.filter(r => n(r.hours) > 0 || n(r.materials) > 0 || n(r.subCost) > 0)
 
   return (
@@ -57,32 +56,32 @@ export default function StepsSummary({ module }) {
       <FinancialSummaryList module={module} />
 
       {/* Paver Steps */}
-      {(hasSteps || hasPaver) && (
+      {activePaver.length > 0 && (
         <>
           <SectionLabel title="Paver Steps" />
-          {n(straightLF) > 0 && (
+          {activePaver.map((r, i) => (
             <LineRow
-              label="Straight Steps"
-              value={`${n(straightLF)} LF${calc.straightHrs ? ` · ${calc.straightHrs.toFixed(2)} hrs` : ''}`}
+              key={i}
+              label={[r.type || 'Paver', r.form, r.grouted ? 'grouted' : null]
+                .filter(Boolean)
+                .join(' · ')}
+              value={`${n(r.sf)} SF`}
             />
-          )}
-          {n(curvedLF) > 0 && (
+          ))}
+        </>
+      )}
+
+      {/* Concrete Steps */}
+      {activeConc.length > 0 && (
+        <>
+          <SectionLabel title="Concrete Steps" />
+          {activeConc.map((r, i) => (
             <LineRow
-              label="Curved Steps"
-              value={`${n(curvedLF)} LF${calc.curvedHrs ? ` · ${calc.curvedHrs.toFixed(2)} hrs` : ''}`}
+              key={i}
+              label={[r.type, r.finish, r.form].filter(Boolean).join(' · ')}
+              value={`${n(r.sf)} SF`}
             />
-          )}
-          {groutedBullnose && <LineRow label="Grouted / Bullnose" value="Yes" />}
-          {hasPaver && (
-            <>
-              <LineRow label="Step Paver" value={`${paverBrand} — ${paverName}`} />
-              <LineRow label="Paver SF" value={`${n(paverSF)} SF`} />
-              {calc.pallets > 0 && <LineRow label="Pallets" value={`${calc.pallets}`} />}
-              {calc.paverCost > 0 && (
-                <LineRow label="Paver Cost" value={fmt2(calc.paverCost)} highlight />
-              )}
-            </>
-          )}
+          ))}
         </>
       )}
 
@@ -106,20 +105,8 @@ export default function StepsSummary({ module }) {
         </>
       )}
 
-      {/* Labor breakdown */}
+      {/* Totals */}
       <SectionLabel title="Labor" />
-      {n(straightLF) > 0 && calc.straightHrs > 0 && (
-        <LineRow
-          label={`Straight (${calc.straightRate} LF/hr)`}
-          value={`${calc.straightHrs.toFixed(2)} hrs`}
-        />
-      )}
-      {n(curvedLF) > 0 && calc.curvedHrs > 0 && (
-        <LineRow
-          label={`Curved (${calc.curvedRate} LF/hr)`}
-          value={`${calc.curvedHrs.toFixed(2)} hrs`}
-        />
-      )}
       {n(difficulty) > 0 && <LineRow label="Difficulty Add" value={`${n(difficulty)}%`} />}
       {n(hoursAdj) !== 0 && (
         <LineRow label="Hours Adjustment" value={`${n(hoursAdj) > 0 ? '+' : ''}${n(hoursAdj)}`} />

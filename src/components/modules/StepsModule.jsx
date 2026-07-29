@@ -1,97 +1,181 @@
 import WorkTypeChooser from './WorkTypeChooser'
 import { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import ModuleNotesField from './ModuleNotesField'
-import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Steps Module
-// Labor rates (category='Steps') from labor_rates:
-//   Steps - Straight          1.5 LF/hr  (paver steps)
-//   Steps - Curved            1.0 LF/hr  (paver steps)
-//   Steps - Concrete Straight 1.0 LF/hr  (concrete steps)
-//   Steps - Concrete Curved   0.5 LF/hr  (concrete steps)
 //
-// Material rates (category='Steps') from material_rates:
-//   Steps - Concrete          $12.00/LF
+// Two row-based sections, each replicated on the In-House and Sub tabs with
+// their OWN rows so every tab is an independent calculator:
 //
-// Paver material selection pulled from paver_prices table (same as PaverModule).
+//   Paver Steps — Vendor · Type · Form · SF · Grouted?
+//     Vendor + Type come from the shared Paver Material catalog (subs_vendors +
+//     material_rates, category='Paver', subcategory='Paver Material'), same as
+//     the Paver module. Form (Straight/Curved) sets the labor LF/hr rate. SF
+//     drives BOTH labor (SF ÷ form rate) and material (SF × vendor $/SF).
+//
+//   Concrete Steps — Vendor · Type · Form · SF · Finish
+//     Type ∈ {Standard, Standard Colored, Cantilevered, Cantilevered Colored}
+//     Finish ∈ {Smooth, Broom, Sanded, Salted, Exposed Aggregate}
+//     A single "Edit Rates" modal edits a labor + material modifier for every
+//     Type, Finish, and Form choice (all category='Steps', default 0 / 1 —
+//     zero to start, tuned later). Vendor is captured for scope + future
+//     material-price override once a concrete catalog exists.
+//
+// Material Breakdown at the bottom is fully per-tab independent (In House vs
+// Sub) — only the active tab's entered rows contribute.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DEFAULTS = { laborRatePerHour: 35, laborBurdenPct: 0.29, gpmd: 425, commissionRate: 0.12 }
 const n = v => parseFloat(v) || 0
+const fmt2 = v => `$${(n(v)).toFixed(2)}`
+
+const PAVER_STEP_CAT = 'Paver Material' // shared Paver catalog subcategory
+const CONC_VENDOR_CAT = 'Concrete Mix' // supplied_categories tag for concrete vendors
+const STEP_FORMS = ['Straight', 'Curved']
+const CONC_TYPES = ['Standard', 'Standard Colored', 'Cantilevered', 'Cantilevered Colored']
+const CONC_FINISHES = ['Smooth', 'Broom', 'Sanded', 'Salted', 'Exposed Aggregate']
+
+// ── Rate-key builders (category 'Steps') ─────────────────────────────────────
+const kPaverForm = form => `Steps - ${form}` // labor LF/hr
+const kConcTypeHrs = t => `Steps - Conc ${t} Hrs/SF` // labor hrs/SF
+const kConcTypeMat = t => `Steps - Conc ${t} $/SF` // material $/SF
+const kFinishHrs = f => `Steps - Finish ${f} Hrs/SF` // labor +hrs/SF
+const kFinishMat = f => `Steps - Finish ${f} $/SF` // material +$/SF
+const kConcForm = form => `Steps - Conc Form ${form}` // labor multiplier
+
+const PAVER_FORM_DEFAULT = { Straight: 1.5, Curved: 1.0 } // LF/hr fallbacks
+
+// ── Vendor-catalog helpers (same as PaverModule) ─────────────────────────────
+function paverOptions(cat, vendorSel, materialRows) {
+  if (!vendorSel || vendorSel === 'House' || vendorSel === 'Custom') return []
+  const prefix = `${cat} - `
+  return (materialRows || [])
+    .filter(r => r.subcategory === cat && r.vendor_id === vendorSel)
+    .map(r => ({
+      label: r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name,
+      row: r,
+    }))
+}
+function paverItemFor(cat, vendorSel, typeLabel, materialRows) {
+  const opts = paverOptions(cat, vendorSel, materialRows)
+  if (!opts.length) return null
+  return (opts.find(o => o.label === typeLabel) || opts[0]).row
+}
+
+// ── Per-row calculators ──────────────────────────────────────────────────────
+function paverRowCalc(r, laborRates, materialRows) {
+  const sf = n(r.sf)
+  const rate = n(laborRates[kPaverForm(r.form)] ?? PAVER_FORM_DEFAULT[r.form] ?? 0)
+  const hrs = sf > 0 && rate > 0 ? sf / rate : 0
+  let price = 0
+  let sfPerPallet = 0
+  if (r.vendor && r.vendor !== 'House' && r.vendor !== 'Custom') {
+    const item = paverItemFor(PAVER_STEP_CAT, r.vendor, r.type, materialRows)
+    if (item) {
+      price = n(item.unit_cost)
+      sfPerPallet = n(item.sf_per_pallet)
+    }
+  }
+  const mat = sf * price
+  const pallets = sf > 0 && sfPerPallet > 0 ? Math.ceil(sf / sfPerPallet) : 0
+  return { sf, hrs, mat, price, pallets }
+}
+
+function concRowCalc(r, laborRates, materialRates) {
+  const sf = n(r.sf)
+  const typeHrs = n(laborRates[kConcTypeHrs(r.type)] ?? 0)
+  const finishHrs = n(laborRates[kFinishHrs(r.finish)] ?? 0)
+  const formMult = n(laborRates[kConcForm(r.form)] ?? 1)
+  const hrs = sf * (typeHrs + finishHrs) * formMult
+  const typeMat = n(materialRates[kConcTypeMat(r.type)] ?? 0)
+  const finishMat = n(materialRates[kFinishMat(r.finish)] ?? 0)
+  const mat = sf * (typeMat + finishMat)
+  return { sf, hrs, mat }
+}
 
 // ── Calculation engine ────────────────────────────────────────────────────────
+// Labor always reads the In-House rows; MATERIAL follows the active tab so each
+// tab's Materials Breakdown is fully independent.
 function calcSteps(
   state,
   lrph,
   laborRates,
   materialRates,
-  paverPrices,
+  materialRows,
   gpmd = DEFAULTS.gpmd,
   walkAccess = null,
-  laborBurdenPct = DEFAULTS.laborBurdenPct
+  laborBurdenPct = DEFAULTS.laborBurdenPct,
+  subGpMarkupRate = 0.2
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const lr = laborRates || {}
   const mr = materialRates || {}
-  const pp = paverPrices || []
+  const isSub = state.subType === 'Subcontractor'
 
-  // Paver step rates
-  const straightRate = lr['Steps - Straight'] ?? 1.5 // LF/hr
-  const curvedRate = lr['Steps - Curved'] ?? 1.0 // LF/hr
+  const ihPaver = state.paverRows || []
+  const ihConc = state.concRows || []
+  const matPaver = isSub ? state.subPaverRows || [] : ihPaver
+  const matConc = isSub ? state.subConcRows || [] : ihConc
 
-  // Concrete step rates
-  const concStraightRate = lr['Steps - Concrete Straight'] ?? 1.0 // LF/hr
-  const concCurvedRate = lr['Steps - Concrete Curved'] ?? 0.5 // LF/hr
-  const concMatPerLF = mr['Steps - Concrete'] ?? 12.0 // $/LF
-
-  // Paver step labor hours
-  const straightHrs = n(state.straightLF) > 0 ? n(state.straightLF) / straightRate : 0
-  const curvedHrs = n(state.curvedLF) > 0 ? n(state.curvedLF) / curvedRate : 0
-
-  // Paver step material cost
-  const stepPaverData = pp.find(p => p.brand === state.paverBrand && p.name === state.paverName)
-  const pricePerSF = stepPaverData?.price_per_sf || 0
-  const sfPerPallet = stepPaverData?.sf_per_pallet || 0
-  const paverSF = n(state.paverSF)
-  const paverCost = paverSF * pricePerSF
-  const pallets = paverSF > 0 && sfPerPallet > 0 ? Math.ceil(paverSF / sfPerPallet) : 0
-
-  // Concrete step labor hours + material
-  const concStraightHrs =
-    n(state.concStraightLF) > 0 ? n(state.concStraightLF) / concStraightRate : 0
-  const concCurvedHrs = n(state.concCurvedLF) > 0 ? n(state.concCurvedLF) / concCurvedRate : 0
-  const concTotalLF = n(state.concStraightLF) + n(state.concCurvedLF)
-  const concMat = concTotalLF * concMatPerLF
-
-  // Manual entry
-  let manHrs = 0,
-    manMat = 0,
-    manSub = 0
-  ;(state.manualRows || []).forEach(r => {
-    manHrs += n(r.hours)
-    manMat += n(r.materials)
-    manSub += n(r.subCost)
+  // ── Labor (In-House rows only) ───────────────────────────────────────────
+  let laborHrs = 0
+  ihPaver.forEach(r => {
+    laborHrs += paverRowCalc(r, lr, materialRows).hrs
+  })
+  ihConc.forEach(r => {
+    laborHrs += concRowCalc(r, lr, mr).hrs
   })
 
-  const baseHrs = straightHrs + curvedHrs + concStraightHrs + concCurvedHrs + manHrs
+  // ── Material (active tab rows) ───────────────────────────────────────────
+  let paverMat = 0
+  let pallets = 0
+  const matPaverCalc = matPaver.map(r => {
+    const c = paverRowCalc(r, lr, materialRows)
+    paverMat += c.mat
+    pallets += c.pallets
+    return c
+  })
+  let concMat = 0
+  const matConcCalc = matConc.map(r => {
+    const c = concRowCalc(r, lr, mr)
+    concMat += c.mat
+    return c
+  })
+
+  // ── Manual entry ─────────────────────────────────────────────────────────
+  const ihManual = state.manualRows || []
+  const matManual = isSub ? state.subManualRows || [] : ihManual
+  let manHrs = 0
+  ihManual.forEach(r => {
+    manHrs += n(r.hours)
+  })
+  const manMat = matManual.reduce((s, r) => s + n(r.materials), 0)
+  const manSub = [...(state.manualRows || []), ...(state.subManualRows || [])].reduce(
+    (s, r) => s + n(r.subCost),
+    0
+  )
+
+  const baseHrs = laborHrs + manHrs
   const diffMod = 1 + n(state.difficulty) / 100
   const _preWalkHrs = baseHrs * diffMod + n(state.hoursAdj)
   const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
   const totalHrs = _preWalkHrs + walkHrs
   const manDays = totalHrs / 8
-  const totalMat = paverCost + concMat + manMat
+  const totalMat = paverMat + concMat + manMat
 
   const laborCost = totalHrs * (n(lrph) || DEFAULTS.laborRatePerHour)
   const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
   const gp = manDays * gpmd
-  const commission = gp * DEFAULTS.commissionRate
   const subCost = manSub
-  const price = totalMat + laborCost + burden + gp + commission + subCost
+  const subGp = subCost * subGpMarkupRate
+  const commission = (gp + subGp) * DEFAULTS.commissionRate
+  const price = totalMat + laborCost + burden + gp + subCost + subGp + commission
 
   return {
     walkHrs,
@@ -101,33 +185,263 @@ function calcSteps(
     laborCost,
     burden,
     gp,
+    subGp,
     commission,
     subCost,
     price,
-    straightHrs,
-    curvedHrs,
-    paverCost,
-    pallets,
-    pricePerSF,
-    straightRate,
-    curvedRate,
-    concStraightHrs,
-    concCurvedHrs,
+    paverMat,
     concMat,
-    concMatPerLF,
-    concStraightRate,
-    concCurvedRate,
+    manMat,
+    pallets,
+    matPaverCalc,
+    matConcCalc,
+    isSub,
   }
 }
 
+// ── Edit-Rates modal (Concrete Type/Finish/Form + Paver Form) ────────────────
+async function upsertRate(table, name, field, value) {
+  const v = Number(value)
+  const val = Number.isFinite(v) ? v : 0
+  const { data: up } = await supabase
+    .from(table)
+    .update({ [field]: val })
+    .eq('name', name)
+    .eq('category', 'Steps')
+    .select('id')
+  if (up && up.length) return
+  const { data: any } = await supabase.from(table).select('id').eq('name', name).limit(1)
+  if (any && any.length) {
+    await supabase.from(table).update({ [field]: val, category: 'Steps' }).eq('id', any[0].id)
+  } else {
+    await supabase.from(table).insert({ name, category: 'Steps', [field]: val })
+  }
+}
+
+function StepsRatesModal({ open, onClose, onSaved }) {
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [draft, setDraft] = useState({})
+
+  useEffect(() => {
+    if (!open) return
+    let gone = false
+    setLoading(true)
+    Promise.all([
+      supabase.from('labor_rates').select('name, rate').eq('category', 'Steps'),
+      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Steps'),
+    ]).then(([lrRes, mrRes]) => {
+      if (gone) return
+      const lr = {}
+      ;(lrRes.data || []).forEach(r => {
+        lr[r.name] = parseFloat(r.rate)
+      })
+      const mr = {}
+      ;(mrRes.data || []).forEach(r => {
+        mr[r.name] = parseFloat(r.unit_cost)
+      })
+      const d = { paverForm: {}, typeHrs: {}, typeMat: {}, finHrs: {}, finMat: {}, concForm: {} }
+      STEP_FORMS.forEach(f => {
+        d.paverForm[f] = lr[kPaverForm(f)] ?? PAVER_FORM_DEFAULT[f]
+        d.concForm[f] = lr[kConcForm(f)] ?? 1
+      })
+      CONC_TYPES.forEach(t => {
+        d.typeHrs[t] = lr[kConcTypeHrs(t)] ?? 0
+        d.typeMat[t] = mr[kConcTypeMat(t)] ?? 0
+      })
+      CONC_FINISHES.forEach(f => {
+        d.finHrs[f] = lr[kFinishHrs(f)] ?? 0
+        d.finMat[f] = mr[kFinishMat(f)] ?? 0
+      })
+      setDraft(d)
+      setLoading(false)
+    })
+    return () => {
+      gone = true
+    }
+  }, [open])
+
+  if (!open) return null
+
+  const setD = (group, key, val) =>
+    setDraft(p => ({ ...p, [group]: { ...p[group], [key]: val } }))
+
+  async function saveAll() {
+    setSaving(true)
+    const jobs = []
+    STEP_FORMS.forEach(f => {
+      jobs.push(upsertRate('labor_rates', kPaverForm(f), 'rate', draft.paverForm[f]))
+      jobs.push(upsertRate('labor_rates', kConcForm(f), 'rate', draft.concForm[f]))
+    })
+    CONC_TYPES.forEach(t => {
+      jobs.push(upsertRate('labor_rates', kConcTypeHrs(t), 'rate', draft.typeHrs[t]))
+      jobs.push(upsertRate('material_rates', kConcTypeMat(t), 'unit_cost', draft.typeMat[t]))
+    })
+    CONC_FINISHES.forEach(f => {
+      jobs.push(upsertRate('labor_rates', kFinishHrs(f), 'rate', draft.finHrs[f]))
+      jobs.push(upsertRate('material_rates', kFinishMat(f), 'unit_cost', draft.finMat[f]))
+    })
+    await Promise.all(jobs)
+    setSaving(false)
+    if (onSaved) await onSaved()
+    onClose()
+  }
+
+  const numCell = (group, key) => (
+    <input
+      type="number"
+      step="any"
+      value={draft[group]?.[key] ?? ''}
+      onChange={e => setD(group, key, e.target.value)}
+      className="w-20 border border-gray-200 rounded px-1.5 py-1 text-xs text-right"
+    />
+  )
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
+      onMouseDown={e => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <div
+        className="bg-white border border-gray-200 rounded-xl shadow-2xl w-full max-w-2xl p-5 relative max-h-[88vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">
+              Master Rates → Steps
+            </p>
+            <p className="text-base font-semibold text-gray-900">Step Labor & Material Modifiers</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              All values save to master Steps rates. Zero is fine to start.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-300 hover:text-gray-600 text-xl leading-none p-1 -mt-1"
+          >
+            ×
+          </button>
+        </div>
+
+        {loading ? (
+          <p className="text-sm text-gray-400 py-6 text-center">Loading current rates…</p>
+        ) : (
+          <div className="space-y-5">
+            {/* Paver Form labor */}
+            <div>
+              <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">
+                Paver Steps — Form Labor (LF/hr)
+              </p>
+              <div className="flex gap-6">
+                {STEP_FORMS.map(f => (
+                  <label key={f} className="flex items-center gap-2 text-xs text-gray-700">
+                    {f}
+                    {numCell('paverForm', f)}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Concrete Type */}
+            <div>
+              <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">
+                Concrete Type
+              </p>
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-gray-400 border-b border-gray-200">
+                    <th className="text-left pb-1 font-medium">Type</th>
+                    <th className="text-right pb-1 font-medium">Labor (hrs/SF)</th>
+                    <th className="text-right pb-1 font-medium">Material ($/SF)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {CONC_TYPES.map(t => (
+                    <tr key={t} className="border-b border-gray-50">
+                      <td className="py-1 text-gray-700">{t}</td>
+                      <td className="py-1 text-right">{numCell('typeHrs', t)}</td>
+                      <td className="py-1 text-right">{numCell('typeMat', t)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Finish modifiers */}
+            <div>
+              <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">
+                Finish (added to Type)
+              </p>
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-gray-400 border-b border-gray-200">
+                    <th className="text-left pb-1 font-medium">Finish</th>
+                    <th className="text-right pb-1 font-medium">+Labor (hrs/SF)</th>
+                    <th className="text-right pb-1 font-medium">+Material ($/SF)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {CONC_FINISHES.map(f => (
+                    <tr key={f} className="border-b border-gray-50">
+                      <td className="py-1 text-gray-700">{f}</td>
+                      <td className="py-1 text-right">{numCell('finHrs', f)}</td>
+                      <td className="py-1 text-right">{numCell('finMat', f)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Concrete Form multiplier */}
+            <div>
+              <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">
+                Concrete — Form Labor Multiplier (×)
+              </p>
+              <div className="flex gap-6">
+                {STEP_FORMS.map(f => (
+                  <label key={f} className="flex items-center gap-2 text-xs text-gray-700">
+                    {f}
+                    {numCell('concForm', f)}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-2 mt-6">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={saveAll}
+            disabled={saving || loading}
+            className="flex-1 py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : 'Save Rates'}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 // ── UI helpers ────────────────────────────────────────────────────────────────
-function SectionHeader({ title, sub }) {
+function SectionHeader({ title, sub, right }) {
   return (
-    <div className="bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200 mb-2">
+    <div className="bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200 mb-2 flex items-center justify-between gap-2">
       <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wider">
         {title}
         {sub && <span className="ml-2 font-normal normal-case text-gray-400">{sub}</span>}
       </h3>
+      {right}
     </div>
   )
 }
@@ -145,92 +459,15 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
   )
 }
 
-// ── Paver picker (brand dropdown + searchable model) ─────────────────────────
-function PaverPicker({ brand, name, onSelect, paverPrices }) {
-  const [search, setSearch] = useState(name || '')
-  const [open, setOpen] = useState(false)
+const cellSel =
+  'w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400'
 
-  useEffect(() => {
-    setSearch(name || '')
-  }, [name])
+const PAVER_ROW = () => ({ vendor: 'House', type: '', form: 'Straight', sf: '', grouted: false })
+const CONC_ROW = () => ({ vendor: 'House', type: 'Standard', form: 'Straight', sf: '', finish: 'Smooth' })
+const MANUAL_ROW = () => ({ label: '', hours: '', materials: '', subCost: '' })
 
-  const brands = [...new Set(paverPrices.map(p => p.brand))].filter(Boolean).sort()
-  const filtered = paverPrices.filter(p => {
-    if (brand && p.brand !== brand) return false
-    if (!search) return true
-    return p.name.toLowerCase().includes(search.toLowerCase())
-  })
-
-  return (
-    <div className="flex gap-1.5">
-      <select
-        value={brand || ''}
-        onChange={e => {
-          onSelect(e.target.value, '')
-          setSearch('')
-        }}
-        className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400 flex-shrink-0 w-24"
-      >
-        <option value="">— Brand —</option>
-        {brands.map(b => (
-          <option key={b} value={b}>
-            {b}
-          </option>
-        ))}
-      </select>
-
-      <div className="relative min-w-0 flex-[2]">
-        <input
-          type="text"
-          value={search}
-          onChange={e => {
-            setSearch(e.target.value)
-            setOpen(true)
-          }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 200)}
-          placeholder={brand ? 'Search model…' : 'Select brand first'}
-          disabled={!brand}
-          className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:bg-gray-50 disabled:text-gray-400"
-        />
-        {open && brand && filtered.length > 0 && (
-          <div className="absolute z-50 top-full left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-md shadow-lg max-h-52 overflow-y-auto">
-            {filtered.map(p => {
-              const isSelected = p.name === name
-              return (
-                <button
-                  key={p.name}
-                  onMouseDown={() => {
-                    onSelect(p.brand, p.name)
-                    setSearch(p.name)
-                    setOpen(false)
-                  }}
-                  className={`w-full text-left px-2.5 py-1.5 hover:bg-blue-50 border-b border-gray-50 last:border-0 ${isSelected ? 'bg-blue-50' : ''}`}
-                >
-                  <span
-                    className={`block text-xs truncate ${isSelected ? 'font-semibold text-blue-800' : 'text-gray-800'}`}
-                  >
-                    {p.name}
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    ${parseFloat(p.price_per_sf || 0).toFixed(2)}/SF
-                    {p.sf_per_pallet ? ` · ${p.sf_per_pallet} SF/pallet` : ''}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        )}
-        {open && brand && filtered.length === 0 && search && (
-          <div className="absolute z-50 top-full left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-md shadow-sm px-3 py-2 text-xs text-gray-400">
-            No models match "{search}"
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
+const DEFAULT_PAVER_ROWS = [PAVER_ROW(), PAVER_ROW(), PAVER_ROW()]
+const DEFAULT_CONC_ROWS = [CONC_ROW(), CONC_ROW(), CONC_ROW()]
 const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 1', hours: '', materials: '', subCost: '' },
   { label: 'Misc 2', hours: '', materials: '', subCost: '' },
@@ -246,27 +483,31 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
     initialData?.laborBurdenPct ?? DEFAULTS.laborBurdenPct
   )
 
-  // Free-text notes for this module — Sam writes auto-generated
-  // takeoffs here via create_estimate_from_takeoff, and the user can
-  // overwrite / append their own.
   const [notes, setNotes] = useState(initialData?.notes ?? '')
   const [distanceLF, setDistanceLF] = useState(initialData?.distanceLF ?? '')
   const [walkAccess] = useState(
-    initialData?.walkAccess ?? {
-      paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
-    }
+    initialData?.walkAccess ?? { paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN }
   )
   const [laborRates, setLaborRates] = useState(initialData?.laborRates || {})
   const [materialRates, setMaterialRates] = useState(initialData?.materialRates || {})
-  const [paverPrices, setPaverPrices] = useState(initialData?.paverPrices || [])
+  const [materialRows, setMaterialRows] = useState(initialData?.materialRows || [])
+  const [vendors, setVendors] = useState([])
   const [loading, setLoading] = useState(true)
+  const [ratesModalOpen, setRatesModalOpen] = useState(false)
 
-  // Re-fetch Steps rate maps. Called once on mount and again after any
-  // RateEditPopover save so the calc picks up the change immediately.
   const refreshAllRates = useCallback(async () => {
-    const [lrRes, mrRes] = await Promise.all([
+    const [lrRes, mrRes, matRowsRes, venRes] = await Promise.all([
       supabase.from('labor_rates').select('name, rate').eq('category', 'Steps'),
       supabase.from('material_rates').select('name, unit_cost').eq('category', 'Steps'),
+      supabase
+        .from('material_rates')
+        .select('name, unit_cost, subcategory, vendor_id, sf_per_pallet')
+        .eq('category', 'Paver'),
+      supabase
+        .from('subs_vendors')
+        .select('id, company_name, supplied_categories')
+        .eq('type', 'vendor')
+        .order('company_name'),
     ])
     if (lrRes.data) {
       const m = {}
@@ -282,6 +523,14 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
       })
       setMaterialRates(m)
     }
+    setMaterialRows(matRowsRes.data || [])
+    setVendors(
+      (venRes.data || []).map(v => ({
+        id: v.id,
+        name: v.company_name,
+        categories: v.supplied_categories || [],
+      }))
+    )
   }, [])
 
   useEffect(() => {
@@ -299,14 +548,6 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
               setLaborBurdenPct(parseFloat(data.labor_burden_pct))
           }),
       refreshAllRates(),
-      supabase
-        .from('paver_prices')
-        .select('brand, name, price_per_sf, sf_per_pallet')
-        .order('brand')
-        .order('name')
-        .then(({ data }) => {
-          if (!gone && data) setPaverPrices(data)
-        }),
     ]).then(() => {
       if (!gone) setLoading(false)
     })
@@ -324,25 +565,15 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
   const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
   const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
 
-  // Paver Steps
-  const [straightLF, setStraightLF] = useState(initialData?.straightLF ?? '')
-  const [curvedLF, setCurvedLF] = useState(initialData?.curvedLF ?? '')
-  const [groutedBullnose, setGroutedBullnose] = useState(initialData?.groutedBullnose ?? false)
-  const [paverBrand, setPaverBrand] = useState(initialData?.paverBrand ?? '')
-  const [paverName, setPaverName] = useState(initialData?.paverName ?? '')
-  const [paverSF, setPaverSF] = useState(initialData?.paverSF ?? '')
-
-  // Concrete Steps
-  const [concStraightLF, setConcStraightLF] = useState(initialData?.concStraightLF ?? '')
-  const [concCurvedLF, setConcCurvedLF] = useState(initialData?.concCurvedLF ?? '')
-
-  // Manual entry
+  const [paverRows, setPaverRows] = useState(initialData?.paverRows ?? DEFAULT_PAVER_ROWS)
+  const [subPaverRows, setSubPaverRows] = useState(initialData?.subPaverRows ?? DEFAULT_PAVER_ROWS)
+  const [concRows, setConcRows] = useState(initialData?.concRows ?? DEFAULT_CONC_ROWS)
+  const [subConcRows, setSubConcRows] = useState(initialData?.subConcRows ?? DEFAULT_CONC_ROWS)
   const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
+  const [subManualRows, setSubManualRows] = useState(
+    initialData?.subManualRows ?? [MANUAL_ROW(), MANUAL_ROW()]
+  )
 
-  // ── Sales tax — applied to totalMat across every module so the bid
-  //    reflects supplier-invoiced material cost. Sourced from
-  //    company_settings.sales_tax_rate via fetchSalesTaxRate(). Default
-  //    0 (no tax) until the admin sets it in Opportunities → Settings.
   const [salesTaxRate, setSalesTaxRate] = useState(0)
   useEffect(() => {
     let alive = true
@@ -354,20 +585,19 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
     }
   }, [])
 
+  const isSub = subType === 'Subcontractor'
+
   const state = {
     crewType,
     subType,
     difficulty,
     hoursAdj,
-    straightLF,
-    curvedLF,
-    groutedBullnose,
-    paverBrand,
-    paverName,
-    paverSF,
-    concStraightLF,
-    concCurvedLF,
+    paverRows,
+    subPaverRows,
+    concRows,
+    subConcRows,
     manualRows,
+    subManualRows,
     distanceLF,
   }
 
@@ -376,15 +606,12 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
     laborRatePerHour,
     laborRates,
     materialRates,
-    paverPrices,
+    materialRows,
     gpmd,
     walkAccess,
-    laborBurdenPct
+    laborBurdenPct,
+    subGpMarkupRate
   )
-  // Apply company sales tax to the module's total material cost so the
-  // estimate price matches what suppliers actually invoice. Stored
-  // material_cost (saved with the module) ends up tax-inclusive too,
-  // so bid totals add up to GpmdBar's displayed price.
   const _salesTaxAmt = (calcRaw.totalMat || 0) * (salesTaxRate || 0)
   const calc =
     _salesTaxAmt > 0
@@ -396,9 +623,22 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         }
       : calcRaw
 
-  function updateManual(i, field, val) {
-    setManualRows(rows => rows.map((row, idx) => (idx === i ? { ...row, [field]: val } : row)))
-  }
+  // ── Active-tab row accessors ─────────────────────────────────────────────
+  const curPaver = isSub ? subPaverRows : paverRows
+  const setCurPaver = isSub ? setSubPaverRows : setPaverRows
+  const curConc = isSub ? subConcRows : concRows
+  const setCurConc = isSub ? setSubConcRows : setConcRows
+  const curManual = isSub ? subManualRows : manualRows
+  const setCurManual = isSub ? setSubManualRows : setManualRows
+
+  const setPaverRow = (i, field, val) =>
+    setCurPaver(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  const setConcRow = (i, field, val) =>
+    setCurConc(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  const setManual = (i, field, val) =>
+    setCurManual(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+
+  const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
 
   function handleSave() {
     onSave({
@@ -411,22 +651,21 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         laborRatePerHour,
         laborBurdenPct,
         gpmd,
+        subGpMarkupRate,
         laborRates,
         materialRates,
-        paverPrices,
+        materialRows,
         calc,
       },
     })
   }
-
-  const fmt2 = v => `$${(v || 0).toFixed(2)}`
 
   return (
     <div className="space-y-5">
       {/* ── Sticky GPMD bar ── */}
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
         <GpmdBar
-          variant={subType === 'Subcontractor' ? 'sub' : 'inhouse'}
+          variant={isSub ? 'sub' : 'inhouse'}
           sticky
           totalMat={calc.totalMat}
           totalHrs={calc.totalHrs}
@@ -441,10 +680,8 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           price={calc.price}
           subMarkupRate={subGpMarkupRate}
         />
-            </div>
+      </div>
 
-      {/* Notes — pinned in its own sticky container just below the
-          GPMD bar. Plain white textarea, no card chrome. */}
       <div className="sticky top-[56px] z-10 -mx-6 px-6 pt-2 pb-2 mt-2 bg-transparent">
         <ModuleNotesField value={notes} onChange={setNotes} />
       </div>
@@ -468,198 +705,260 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
       </div>
 
       {loading && (
-        <div className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
-          Loading rates…
-        </div>
+        <div className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">Loading rates…</div>
       )}
 
       {/* Settings — In-House tab only */}
-      {subType !== 'Subcontractor' && (
+      {!isSub && (
         <>
-      <SectionHeader title="Job Site Conditions" />
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
-          <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
-        </div>
-        <div>
-          <p
-            className="text-xs text-gray-500 mb-0.5"
-            title="Average Distance from Truck to Work Area"
-          >
-            Truck → Work Area (Avg LF)
-          </p>
-          <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
-          {calc.walkHrs > 0 && (
-            <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">
-              +{calc.walkHrs.toFixed(2)} hrs walk-access
-            </p>
-          )}
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
-          <NumInput value={hoursAdj} onChange={setHoursAdj} placeholder="0" />
-        </div>
-      </div>
+          <SectionHeader title="Job Site Conditions" />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
+              <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-0.5" title="Average Distance from Truck to Work Area">
+                Truck → Work Area (Avg LF)
+              </p>
+              <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
+              {calc.walkHrs > 0 && (
+                <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">
+                  +{calc.walkHrs.toFixed(2)} hrs walk-access
+                </p>
+              )}
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
+              <NumInput value={hoursAdj} onChange={setHoursAdj} placeholder="0" />
+            </div>
+          </div>
         </>
       )}
 
       {/* ── Paver Steps ── */}
       <div>
-        <SectionHeader
-          title="Paver Steps"
-          sub={`straight ${calc.straightRate} LF/hr · curved ${calc.curvedRate} LF/hr`}
-        />
-
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {/* Straight Steps */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1 inline-flex items-center gap-1">
-              Straight Steps (LF) — {calc.straightRate} LF/hr
-              <RateEditPopover
-                table="labor_rates"
-                name="Steps - Straight"
-                category="Steps"
-                mode="coefficient"
-                unitLabel="LF/hr"
-                currentValue={calc.straightRate}
-                onSaved={refreshAllRates}
-              />
-            </label>
-            <NumInput value={straightLF} onChange={setStraightLF} placeholder="0" />
-            {calc.straightHrs > 0 && (
-              <p className="text-xs text-gray-400 mt-0.5">{calc.straightHrs.toFixed(2)} hrs</p>
-            )}
-          </div>
-
-          {/* Curved Steps */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1 inline-flex items-center gap-1">
-              Curved Steps (LF) — {calc.curvedRate} LF/hr
-              <RateEditPopover
-                table="labor_rates"
-                name="Steps - Curved"
-                category="Steps"
-                mode="coefficient"
-                unitLabel="LF/hr"
-                currentValue={calc.curvedRate}
-                onSaved={refreshAllRates}
-              />
-            </label>
-            <NumInput value={curvedLF} onChange={setCurvedLF} placeholder="0" />
-            {calc.curvedHrs > 0 && (
-              <p className="text-xs text-gray-400 mt-0.5">{calc.curvedHrs.toFixed(2)} hrs</p>
-            )}
-          </div>
-
-          {/* Step Paver SF */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Step Paver SF</label>
-            <NumInput value={paverSF} onChange={setPaverSF} placeholder="0" />
-            {calc.pallets > 0 && (
-              <p className="text-xs text-gray-400 mt-0.5">
-                {calc.pallets} pallet{calc.pallets !== 1 ? 's' : ''}
-              </p>
-            )}
-          </div>
-
-          {/* Grouted / Bullnose toggle */}
-          <div className="flex flex-col justify-center pt-4">
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={groutedBullnose}
-                onChange={e => setGroutedBullnose(e.target.checked)}
-                className="w-4 h-4 rounded accent-blue-600"
-              />
-              <span className="text-sm text-gray-700">Grouted / Bullnose</span>
-            </label>
-          </div>
-        </div>
-
-        {/* Paver picker */}
-        <div className="mt-3">
-          <label className="block text-xs text-gray-500 mb-1">Step Paver Selection</label>
-          <PaverPicker
-            brand={paverBrand}
-            name={paverName}
-            onSelect={(b, nm) => {
-              setPaverBrand(b)
-              setPaverName(nm)
-            }}
-            paverPrices={paverPrices}
-          />
-          {calc.paverCost > 0 && (
-            <p className="text-xs text-gray-400 mt-1">
-              {n(paverSF)} SF × {fmt2(calc.pricePerSF)}/SF = {fmt2(calc.paverCost)}
-            </p>
-          )}
-        </div>
+        <SectionHeader title="Paver Steps" sub="Vendor · Type · Form · SF · Grouted" />
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-gray-400 border-b border-gray-200">
+              <th className="text-left pb-1 pr-2 font-medium w-40">Vendor</th>
+              <th className="text-left pb-1 pr-2 font-medium">Type</th>
+              <th className="text-left pb-1 pr-2 font-medium w-24">Form</th>
+              <th className="text-left pb-1 pr-2 font-medium w-20">SF</th>
+              <th className="text-left pb-1 pr-2 font-medium w-24">Grouted?</th>
+              <th className="text-right pb-1 pr-2 font-medium w-28">Hrs · Mat</th>
+              <th className="w-6"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {curPaver.map((row, i) => {
+              const opts = paverOptions(PAVER_STEP_CAT, row.vendor, materialRows)
+              const c = paverRowCalc(row, laborRates, materialRows)
+              return (
+                <tr key={i} className="border-b border-gray-50">
+                  <td className="py-1 pr-2">
+                    <select
+                      className={cellSel}
+                      value={row.vendor}
+                      onChange={e => setPaverRow(i, 'vendor', e.target.value)}
+                    >
+                      <option value="House">House</option>
+                      {vendorsForCategory(PAVER_STEP_CAT).map(v => (
+                        <option key={v.id} value={v.id}>
+                          {v.name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="py-1 pr-2">
+                    <select
+                      className={cellSel}
+                      value={row.type}
+                      onChange={e => setPaverRow(i, 'type', e.target.value)}
+                      disabled={!opts.length}
+                    >
+                      <option value="">{opts.length ? '— Type —' : 'Pick vendor first'}</option>
+                      {opts.map(o => (
+                        <option key={o.label} value={o.label}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="py-1 pr-2">
+                    <select
+                      className={cellSel}
+                      value={row.form}
+                      onChange={e => setPaverRow(i, 'form', e.target.value)}
+                    >
+                      {STEP_FORMS.map(f => (
+                        <option key={f} value={f}>
+                          {f}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="py-1 pr-2">
+                    <NumInput value={row.sf} onChange={v => setPaverRow(i, 'sf', v)} />
+                  </td>
+                  <td className="py-1 pr-2">
+                    <select
+                      className={cellSel}
+                      value={row.grouted ? 'Yes' : 'No'}
+                      onChange={e => setPaverRow(i, 'grouted', e.target.value === 'Yes')}
+                    >
+                      <option value="No">No</option>
+                      <option value="Yes">Yes</option>
+                    </select>
+                  </td>
+                  <td className="py-1 pr-2 text-right text-gray-400 whitespace-nowrap">
+                    {c.hrs > 0 ? `${c.hrs.toFixed(1)}h` : '—'}
+                    {c.mat > 0 ? ` · ${fmt2(c.mat)}` : ''}
+                    {c.pallets > 0 ? ` · ${c.pallets}p` : ''}
+                  </td>
+                  <td className="py-1 text-center">
+                    {curPaver.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setCurPaver(rows => rows.filter((_, idx) => idx !== i))}
+                        className="text-gray-300 hover:text-red-500"
+                        title="Remove row"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        <button
+          type="button"
+          onClick={() => setCurPaver(rows => [...rows, PAVER_ROW()])}
+          className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+        >
+          + Add paver step
+        </button>
       </div>
 
       {/* ── Concrete Steps ── */}
       <div>
         <SectionHeader
           title="Concrete Steps"
-          sub={`straight ${calc.concStraightRate} LF/hr · curved ${calc.concCurvedRate} LF/hr · $${calc.concMatPerLF}/LF mat`}
+          sub="Vendor · Type · Form · SF · Finish"
+          right={
+            <button
+              type="button"
+              onClick={() => setRatesModalOpen(true)}
+              className="text-xs px-2.5 py-1 rounded border border-green-300 bg-green-50 text-green-700 font-semibold hover:bg-green-100 whitespace-nowrap"
+            >
+              Edit Rates
+            </button>
+          }
         />
-        <div className="flex items-center gap-2 mb-2 -mt-1 flex-wrap text-xs text-gray-400">
-          <span className="inline-flex items-center gap-1">
-            Material ${calc.concMatPerLF}/LF
-            <RateEditPopover
-              table="material_rates"
-              name="Steps - Concrete"
-              category="Steps"
-              unitLabel="LF"
-              currentValue={calc.concMatPerLF}
-              onSaved={refreshAllRates}
-            />
-          </span>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1 inline-flex items-center gap-1">
-              Straight Steps (LF) — {calc.concStraightRate} LF/hr
-              <RateEditPopover
-                table="labor_rates"
-                name="Steps - Concrete Straight"
-                category="Steps"
-                mode="coefficient"
-                unitLabel="LF/hr"
-                currentValue={calc.concStraightRate}
-                onSaved={refreshAllRates}
-              />
-            </label>
-            <NumInput value={concStraightLF} onChange={setConcStraightLF} placeholder="0" />
-            {calc.concStraightHrs > 0 && (
-              <p className="text-xs text-gray-400 mt-0.5">{calc.concStraightHrs.toFixed(2)} hrs</p>
-            )}
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1 inline-flex items-center gap-1">
-              Curved Steps (LF) — {calc.concCurvedRate} LF/hr
-              <RateEditPopover
-                table="labor_rates"
-                name="Steps - Concrete Curved"
-                category="Steps"
-                mode="coefficient"
-                unitLabel="LF/hr"
-                currentValue={calc.concCurvedRate}
-                onSaved={refreshAllRates}
-              />
-            </label>
-            <NumInput value={concCurvedLF} onChange={setConcCurvedLF} placeholder="0" />
-            {calc.concCurvedHrs > 0 && (
-              <p className="text-xs text-gray-400 mt-0.5">{calc.concCurvedHrs.toFixed(2)} hrs</p>
-            )}
-          </div>
-        </div>
-        {calc.concMat > 0 && (
-          <p className="text-xs text-gray-400 mt-2">
-            {n(concStraightLF) + n(concCurvedLF)} LF × {fmt2(calc.concMatPerLF)}/LF ={' '}
-            {fmt2(calc.concMat)}
-          </p>
-        )}
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-gray-400 border-b border-gray-200">
+              <th className="text-left pb-1 pr-2 font-medium w-40">Vendor</th>
+              <th className="text-left pb-1 pr-2 font-medium">Type</th>
+              <th className="text-left pb-1 pr-2 font-medium w-24">Form</th>
+              <th className="text-left pb-1 pr-2 font-medium w-20">SF</th>
+              <th className="text-left pb-1 pr-2 font-medium">Finish</th>
+              <th className="text-right pb-1 pr-2 font-medium w-28">Hrs · Mat</th>
+              <th className="w-6"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {curConc.map((row, i) => {
+              const c = concRowCalc(row, laborRates, materialRates)
+              return (
+                <tr key={i} className="border-b border-gray-50">
+                  <td className="py-1 pr-2">
+                    <select
+                      className={cellSel}
+                      value={row.vendor}
+                      onChange={e => setConcRow(i, 'vendor', e.target.value)}
+                    >
+                      <option value="House">House</option>
+                      {vendorsForCategory(CONC_VENDOR_CAT).map(v => (
+                        <option key={v.id} value={v.id}>
+                          {v.name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="py-1 pr-2">
+                    <select
+                      className={cellSel}
+                      value={row.type}
+                      onChange={e => setConcRow(i, 'type', e.target.value)}
+                    >
+                      {CONC_TYPES.map(t => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="py-1 pr-2">
+                    <select
+                      className={cellSel}
+                      value={row.form}
+                      onChange={e => setConcRow(i, 'form', e.target.value)}
+                    >
+                      {STEP_FORMS.map(f => (
+                        <option key={f} value={f}>
+                          {f}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="py-1 pr-2">
+                    <NumInput value={row.sf} onChange={v => setConcRow(i, 'sf', v)} />
+                  </td>
+                  <td className="py-1 pr-2">
+                    <select
+                      className={cellSel}
+                      value={row.finish}
+                      onChange={e => setConcRow(i, 'finish', e.target.value)}
+                    >
+                      {CONC_FINISHES.map(f => (
+                        <option key={f} value={f}>
+                          {f}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="py-1 pr-2 text-right text-gray-400 whitespace-nowrap">
+                    {c.hrs > 0 ? `${c.hrs.toFixed(1)}h` : '—'}
+                    {c.mat > 0 ? ` · ${fmt2(c.mat)}` : ''}
+                  </td>
+                  <td className="py-1 text-center">
+                    {curConc.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setCurConc(rows => rows.filter((_, idx) => idx !== i))}
+                        className="text-gray-300 hover:text-red-500"
+                        title="Remove row"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        <button
+          type="button"
+          onClick={() => setCurConc(rows => [...rows, CONC_ROW()])}
+          className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+        >
+          + Add concrete step
+        </button>
       </div>
 
       {/* ── Manual Entry ── */}
@@ -675,24 +974,23 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
             </tr>
           </thead>
           <tbody>
-            {manualRows.map((row, i) => (
+            {curManual.map((row, i) => (
               <tr key={i} className="border-b border-gray-100">
                 <td className="py-1 pr-2">
                   <input
                     className="input text-sm py-1"
                     value={row.label}
-                    onChange={e => updateManual(i, 'label', e.target.value)}
+                    onChange={e => setManual(i, 'label', e.target.value)}
                   />
                 </td>
                 <td className="py-1 pr-2">
-                  <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} />
+                  <NumInput value={row.hours} onChange={v => setManual(i, 'hours', v)} />
                 </td>
                 <td className="py-1 pr-2">
-                  <NumInput value={row.materials} onChange={v => updateManual(i, 'materials', v)} />
+                  <NumInput value={row.materials} onChange={v => setManual(i, 'materials', v)} />
                 </td>
                 <td className="py-1">
-                  {' '}
-                  <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} />
+                  <NumInput value={row.subCost} onChange={v => setManual(i, 'subCost', v)} />
                 </td>
               </tr>
             ))}
@@ -700,12 +998,47 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         </table>
         <button
           type="button"
-          onClick={() => setManualRows(rows => [...rows, { label: '', hours: '', materials: '', subCost: '' }])}
+          onClick={() => setCurManual(rows => [...rows, MANUAL_ROW()])}
           className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
         >
           + Add manual entry
         </button>
       </div>
+
+      {/* ── Materials Breakdown (per-tab, independent) ── */}
+      {calc.totalMat > 0 && (
+        <div className="bg-gray-50 rounded-lg p-3 text-xs">
+          <p className="font-semibold text-gray-600 uppercase tracking-wide text-xs mb-2">
+            {isSub ? 'Sub' : 'In House'} Materials Breakdown
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-gray-600">
+            {calc.paverMat > 0 && (
+              <span>
+                Paver Material: <strong>{fmt2(calc.paverMat)}</strong>
+                {calc.pallets > 0 ? ` (${calc.pallets}p)` : ''}
+              </span>
+            )}
+            {calc.concMat > 0 && (
+              <span>
+                Concrete Material: <strong>{fmt2(calc.concMat)}</strong>
+              </span>
+            )}
+            {calc.manMat > 0 && (
+              <span>
+                Manual: <strong>{fmt2(calc.manMat)}</strong>
+              </span>
+            )}
+            {calc.salesTax > 0 && (
+              <span>
+                Sales Tax: <strong>{fmt2(calc.salesTax)}</strong>
+              </span>
+            )}
+          </div>
+          <p className="mt-2 pt-2 border-t border-gray-200 font-semibold text-gray-800">
+            Total Materials: {fmt2(calc.totalMat)}
+          </p>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex gap-3 pt-2">
@@ -716,6 +1049,12 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           {saving ? 'Saving...' : 'Add Module'}
         </button>
       </div>
+
+      <StepsRatesModal
+        open={ratesModalOpen}
+        onClose={() => setRatesModalOpen(false)}
+        onSaved={refreshAllRates}
+      />
     </div>
   )
 }
