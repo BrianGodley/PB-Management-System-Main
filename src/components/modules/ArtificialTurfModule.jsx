@@ -138,6 +138,25 @@ const RATE_DEFAULTS = {
 // ── Calculation engine ────────────────────────────────────────────────────────
 const n = v => parseFloat(v) || 0
 
+// ── Vendor catalog: material-only price override ─────────────────────────────
+// The Type (turf brand / base material) still sets the item and its House price;
+// a real vendor only overrides the MATERIAL price for that item (matched by
+// label in the vendor's catalog), never labor.
+const TURF_CAT = { base: 'Turf Base', turf: 'Turf Material' }
+function turfMatPrice(cat, vendorSel, typeLabel, houseName, houseFallback, materialRows, catDefaults, mp) {
+  const vsel = vendorSel && vendorSel !== 'auto' ? vendorSel : catDefaults?.[cat] || 'House'
+  if (vsel && vsel !== 'House') {
+    const prefix = `${cat} - `
+    const vrow = (materialRows || []).find(r => {
+      if (r.subcategory !== cat || r.vendor_id !== vsel) return false
+      const label = r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name
+      return label === typeLabel
+    })
+    if (vrow) return { price: n(vrow.unit_cost), dbName: vrow.name }
+  }
+  return { price: n(mp[houseName]) || houseFallback, dbName: houseName }
+}
+
 function calcTurf(
   state,
   laborRatePerHour,
@@ -146,7 +165,9 @@ function calcTurf(
   gpmd = 425,
   walkAccess = null,
   laborBurdenPct = 0.29,
-  subRates = {}
+  subRates = {},
+  materialRows = [],
+  catDefaults = {}
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const mp = materialPrices || {}
@@ -199,7 +220,18 @@ function calcTurf(
   const gravelTons = gravelSF > 0 ? (gravelSF / 200) * 2 : 0
   const gravelHrs =
     gravelSF > 0 ? (gravelSF / RATE_DEFAULTS.baseSFPerHr) * RATE_DEFAULTS.baseInstallRate : 0
-  const gravelMat = gravelTons * (n(mp['Turf - Gravel Base']) || RATE_DEFAULTS.gravelBase)
+  const gravelMat =
+    gravelTons *
+    turfMatPrice(
+      TURF_CAT.base,
+      state.base.gravelVendor,
+      'Gravel Base',
+      'Turf - Gravel Base',
+      RATE_DEFAULTS.gravelBase,
+      materialRows,
+      catDefaults,
+      mp
+    ).price
   if (state.base.useGravel) {
     baseHrs += gravelHrs
     baseMat += gravelMat
@@ -211,7 +243,18 @@ function calcTurf(
   const dgTrips = dgSF > 0 ? Math.ceil(dgSF / 400) : 0
   // Old per-module dgHrs (wheelbarrow trip × distance) retired — now handled by unified walk-access penalty below.
   const dgHrs = 0
-  const dgMat = dgTons * (n(mp['Turf - DG Base']) || RATE_DEFAULTS.dgBase)
+  const dgMat =
+    dgTons *
+    turfMatPrice(
+      TURF_CAT.base,
+      state.base.dgVendor,
+      'DG Base',
+      'Turf - DG Base',
+      RATE_DEFAULTS.dgBase,
+      materialRows,
+      catDefaults,
+      mp
+    ).price
   if (state.base.useDG) {
     baseHrs += dgHrs
     baseMat += dgMat
@@ -221,7 +264,18 @@ function calcTurf(
   const weedSF = n(state.base.weedSF) || turfAreaSF
   const weedRolls = weedSF > 0 ? Math.ceil(weedSF / 1800) : 0
   const weedHrs = weedSF > 0 ? (weedSF / 1000) * RATE_DEFAULTS.weedFabricHrPer1kSF : 0
-  const weedMat = weedRolls * (n(mp['Turf - Weed Barrier Fabric']) || RATE_DEFAULTS.weedFabric)
+  const weedMat =
+    weedRolls *
+    turfMatPrice(
+      TURF_CAT.base,
+      state.base.weedVendor,
+      'Weed Barrier Fabric',
+      'Turf - Weed Barrier Fabric',
+      RATE_DEFAULTS.weedFabric,
+      materialRows,
+      catDefaults,
+      mp
+    ).price
   if (state.base.useWeedFabric) {
     baseHrs += weedHrs
     baseMat += weedMat
@@ -247,7 +301,16 @@ function calcTurf(
     const edgeLF = n(roll.edgeLF)
     const installSF = n(roll.installSF)
     const brand = TURF_BRANDS.find(b => b.key === roll.brand) || TURF_BRANDS[0]
-    const pricePerSF = n(mp[brand.matKey]) || brand.fallback
+    const pricePerSF = turfMatPrice(
+      TURF_CAT.turf,
+      roll.vendor,
+      brand.label,
+      brand.matKey,
+      brand.fallback,
+      materialRows,
+      catDefaults,
+      mp
+    ).price
     // In-house derives SF from the 15' roll edge; the Sub tab uses the
     // installed SF the estimator enters directly.
     const sf = isSub ? installSF : edgeLF * 15
@@ -269,7 +332,16 @@ function calcTurf(
   const stripsLF = n(state.strips?.lf)
   const stripsWidthIn = n(state.strips?.widthIn) || 12
   const stripsBrand = TURF_BRANDS.find(b => b.key === state.strips?.brand) || TURF_BRANDS[0]
-  const stripsPrice = n(mp[stripsBrand.matKey]) || stripsBrand.fallback
+  const stripsPrice = turfMatPrice(
+    TURF_CAT.turf,
+    state.strips?.vendor,
+    stripsBrand.label,
+    stripsBrand.matKey,
+    stripsBrand.fallback,
+    materialRows,
+    catDefaults,
+    mp
+  ).price
   const stripsSF = stripsLF * (stripsWidthIn / 12)
   // Labor rate is DB-editable (LF/hr). Legacy (LF/100)*8 == LF/12.5.
   const stripLFHr = n(lr['Turf - Strip Install LF/hr']) || RATE_DEFAULTS.stripLFHr
@@ -399,18 +471,21 @@ const DEFAULT_STATE = {
   base: {
     useGravel: true,
     gravelSF: '',
+    gravelVendor: 'House',
     useDG: true,
     dgSF: '',
+    dgVendor: 'House',
     useWeedFabric: true,
     weedSF: '',
+    weedVendor: 'House',
   },
   useZeoFill: false,
   rolls: [
-    { brand: 'Socal Blen Supreme 80', edgeLF: '' },
-    { brand: 'Socal Blen Supreme 80', edgeLF: '' },
-    { brand: 'Socal Blen Supreme 80', edgeLF: '' },
+    { brand: 'Socal Blen Supreme 80', edgeLF: '', vendor: 'House' },
+    { brand: 'Socal Blen Supreme 80', edgeLF: '', vendor: 'House' },
+    { brand: 'Socal Blen Supreme 80', edgeLF: '', vendor: 'House' },
   ],
-  strips: { lf: '', widthIn: '12', brand: 'Socal Blen Supreme 80' },
+  strips: { lf: '', widthIn: '12', brand: 'Socal Blen Supreme 80', vendor: 'House' },
   manualRows: [
     { label: '', hours: '', materials: '', subCost: '' },
     { label: '', hours: '', materials: '', subCost: '' },
@@ -491,6 +566,9 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices || {})
   const [laborRates, setLaborRates] = useState(initialData?.laborRates || {})
   const [subRates, setSubRates] = useState(initialData?.subRates || {})
+  // Vendor catalog: material_rates rows (subcategory + vendor_id) + vendor list.
+  const [materialRows, setMaterialRows] = useState(initialData?.materialRows || [])
+  const [vendors, setVendors] = useState([])
   const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? 35)
   const [laborBurdenPct, setLaborBurdenPct] = useState(initialData?.laborBurdenPct ?? 0.29)
   const [walkAccess] = useState(
@@ -518,7 +596,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
 
   // Re-fetch Turf rate maps. Used on mount and after any RateEditPopover save.
   const refreshAllRates = useCallback(async () => {
-    const [matRes, labRes, subRes] = await Promise.all([
+    const [matRes, labRes, subRes, matRowsRes, venRes] = await Promise.all([
       supabase
         .from('material_rates')
         .select('name, unit_cost')
@@ -528,7 +606,24 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         .from('subcontractor_rates')
         .select('company_name, rate')
         .eq('category', 'Artificial Turf'),
+      supabase
+        .from('material_rates')
+        .select('name, unit_cost, subcategory, vendor_id')
+        .eq('category', 'Artificial Turf'),
+      supabase
+        .from('subs_vendors')
+        .select('id, company_name, supplied_categories')
+        .eq('type', 'vendor')
+        .order('company_name'),
     ])
+    setMaterialRows(matRowsRes.data || [])
+    setVendors(
+      (venRes.data || []).map(v => ({
+        id: v.id,
+        name: v.company_name,
+        categories: v.supplied_categories || [],
+      }))
+    )
     if (matRes.data) {
       const m = {}
       matRes.data.forEach(r => {
@@ -549,6 +644,36 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         m[r.company_name] = parseFloat(r.rate) || 0
       })
       setSubRates(m)
+    }
+  }, [])
+
+  // Always load the vendor list + material rows (even when re-editing a saved
+  // estimate) so the per-line Vendor pickers work.
+  useEffect(() => {
+    let alive = true
+    Promise.all([
+      supabase
+        .from('material_rates')
+        .select('name, unit_cost, subcategory, vendor_id')
+        .eq('category', 'Artificial Turf'),
+      supabase
+        .from('subs_vendors')
+        .select('id, company_name, supplied_categories')
+        .eq('type', 'vendor')
+        .order('company_name'),
+    ]).then(([matRowsRes, venRes]) => {
+      if (!alive) return
+      setMaterialRows(matRowsRes.data || [])
+      setVendors(
+        (venRes.data || []).map(v => ({
+          id: v.id,
+          name: v.company_name,
+          categories: v.supplied_categories || [],
+        }))
+      )
+    })
+    return () => {
+      alive = false
     }
   }, [])
 
@@ -612,6 +737,11 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
 
   const gpmd = initialData?.gpmd ?? 425
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
+
+  // ── Vendor catalog helpers (material-only per-line Vendor pickers) ────────
+  const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
+  const catDefaults = {} // Turf defaults to House; a real vendor is an explicit pick.
+
   const calcRaw = calcTurf(
     state,
     laborRatePerHour,
@@ -620,7 +750,9 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
     gpmd,
     walkAccess,
     laborBurdenPct,
-    subRates
+    subRates,
+    materialRows,
+    catDefaults
   )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
@@ -784,6 +916,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
             cols={[
               { label: 'Include', w: 'w-14' },
               { label: 'Base Type' },
+              { label: 'Vendor', w: 'w-28' },
               { label: 'Sq Ft', w: 'w-20' },
               { label: 'Qty', w: 'w-16' },
               { label: 'Hrs', w: 'w-16' },
@@ -820,6 +953,21 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                     onSaved={refreshAllRates}
                   />
                 </span>
+              </td>
+              <td className={td}>
+                <select
+                  className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
+                  value={state.base.gravelVendor || 'House'}
+                  onChange={e => setBase('gravelVendor', e.target.value)}
+                  title="Vendor"
+                >
+                  {vendorsForCategory(TURF_CAT.base).map(v => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}
+                    </option>
+                  ))}
+                  <option value="House">House</option>
+                </select>
               </td>
               <td className={td}>
                 <Inp
@@ -865,6 +1013,21 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                 </span>
               </td>
               <td className={td}>
+                <select
+                  className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
+                  value={state.base.dgVendor || 'House'}
+                  onChange={e => setBase('dgVendor', e.target.value)}
+                  title="Vendor"
+                >
+                  {vendorsForCategory(TURF_CAT.base).map(v => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}
+                    </option>
+                  ))}
+                  <option value="House">House</option>
+                </select>
+              </td>
+              <td className={td}>
                 <Inp
                   value={state.base.dgSF}
                   onChange={e => setBase('dgSF', e.target.value)}
@@ -908,6 +1071,21 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                     onSaved={refreshAllRates}
                   />
                 </span>
+              </td>
+              <td className={td}>
+                <select
+                  className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
+                  value={state.base.weedVendor || 'House'}
+                  onChange={e => setBase('weedVendor', e.target.value)}
+                  title="Vendor"
+                >
+                  {vendorsForCategory(TURF_CAT.base).map(v => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}
+                    </option>
+                  ))}
+                  <option value="House">House</option>
+                </select>
               </td>
               <td className={td}>
                 <Inp
@@ -999,12 +1177,14 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
             cols={
               calc.isSub
                 ? [
+                    { label: 'Vendor', w: 'w-28' },
                     { label: 'Turf Brand' },
                     { label: 'Install SF', w: 'w-24' },
                     { label: 'Edge LF', w: 'w-20' },
                     { label: 'Material', w: 'w-24' },
                   ]
                 : [
+                    { label: 'Vendor', w: 'w-28' },
                     { label: 'Turf Brand' },
                     { label: 'Edge LF', w: 'w-20' },
                     { label: 'Sq Ft', w: 'w-20' },
@@ -1019,6 +1199,21 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
               const brand = TURF_BRANDS.find(b => b.key === roll.brand) || TURF_BRANDS[0]
               return (
                 <tr key={i}>
+                  <td className={td}>
+                    <select
+                      className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
+                      value={roll.vendor || 'House'}
+                      onChange={e => setRoll(i, 'vendor', e.target.value)}
+                      title="Vendor"
+                    >
+                      {vendorsForCategory(TURF_CAT.turf).map(v => (
+                        <option key={v.id} value={v.id}>
+                          {v.name}
+                        </option>
+                      ))}
+                      <option value="House">House</option>
+                    </select>
+                  </td>
                   <td className={td}>
                     <div className="flex items-center gap-1">
                       <div className="flex-1 min-w-0">
@@ -1156,12 +1351,14 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
             cols={
               calc.isSub
                 ? [
+                    { label: 'Vendor', w: 'w-28' },
                     { label: 'Turf Brand' },
                     { label: 'Length (LF)', w: 'w-24' },
                     { label: 'Width (in)', w: 'w-20' },
                     { label: 'Material', w: 'w-24' },
                   ]
                 : [
+                    { label: 'Vendor', w: 'w-28' },
                     { label: 'Turf Brand' },
                     { label: 'Length (LF)', w: 'w-24' },
                     { label: 'Width (in)', w: 'w-20' },
@@ -1173,6 +1370,21 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           />
           <tbody>
             <tr>
+              <td className={td}>
+                <select
+                  className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
+                  value={state.strips?.vendor || 'House'}
+                  onChange={e => setStrips('vendor', e.target.value)}
+                  title="Vendor"
+                >
+                  {vendorsForCategory(TURF_CAT.turf).map(v => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}
+                    </option>
+                  ))}
+                  <option value="House">House</option>
+                </select>
+              </td>
               <td className={td}>
                 <div className="flex items-center gap-1">
                   <div className="flex-1 min-w-0">
