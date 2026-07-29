@@ -2106,7 +2106,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
       </div>
 
       {/* ── Materials Breakdown (per tab) ─────────────────────────────────────── */}
-      {!calc.isSub && calc.totalMat > 0 && (
+      {!calc.isSub && (
         <div className="bg-gray-50 rounded-lg p-3 text-xs">
           <p className="font-semibold text-gray-600 uppercase tracking-wide text-xs mb-2">
             In-House Materials Breakdown

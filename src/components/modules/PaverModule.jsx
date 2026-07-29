@@ -2013,7 +2013,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       </div>
 
       {/* ── Materials Summary (per-tab, independent) ──────────────────────────── */}
-      {calc.totalMat > 0 && (
+      {Number.isFinite(calc.totalMat) && (
         <div className="bg-gray-50 rounded-lg p-3 text-xs">
           <p className="font-semibold text-gray-600 uppercase tracking-wide text-xs mb-2">
             {isSub ? 'Sub' : 'In House'} Materials Breakdown
