@@ -49,7 +49,28 @@ const kFinishHrs = f => `Steps - Finish ${f} Hrs/SF` // labor +hrs/SF
 const kFinishMat = f => `Steps - Finish ${f} $/SF` // material +$/SF
 const kConcForm = form => `Steps - Conc Form ${form}` // labor multiplier
 
+// Subcontractor pricing is UNIT priced per linear foot — no hourly labor. A
+// base $/LF for paver + concrete steps, plus per-LF modifiers that add to the
+// base. All stored in material_rates (category 'Steps').
+const kSubPaverBase = 'Steps - Sub Paver Base' // $/LF
+const kSubConcBase = 'Steps - Sub Conc Base' // $/LF
+const kSubForm = form => `Steps - Sub Form ${form}` // +$/LF
+const kSubGrouted = 'Steps - Sub Grouted' // +$/LF (paver, when grouted)
+const kSubType = t => `Steps - Sub Type ${t}` // +$/LF (concrete type)
+const kSubFinish = f => `Steps - Sub Finish ${f}` // +$/LF (concrete finish)
+
 const PAVER_FORM_DEFAULT = { Straight: 1.5, Curved: 1.0 } // LF/hr fallbacks
+const SUB_BASE_DEFAULT = 30 // $/LF starting base for every sub step section
+
+// Vendor/Type step sections. Each pulls Type options from its own material
+// catalog subcategory (subs_vendors + material_rates). Shape mirrors Paver
+// Steps: Vendor · Type · Form · SF · Grouted?.
+const MAT_SECTIONS = [
+  { key: 'paver', title: 'Paver Steps', cat: 'Paver Material', rowsKey: 'paverRows', subKey: 'subPaverRows', baseKey: kSubPaverBase },
+  { key: 'brick', title: 'Brick Steps', cat: 'Brick', rowsKey: 'brickRows', subKey: 'subBrickRows', baseKey: 'Steps - Sub Brick Base' },
+  { key: 'tile', title: 'Tiled Steps', cat: 'Tile', rowsKey: 'tileRows', subKey: 'subTileRows', baseKey: 'Steps - Sub Tile Base' },
+  { key: 'flag', title: 'Flagstone Steps', cat: 'Flagstone', rowsKey: 'flagRows', subKey: 'subFlagRows', baseKey: 'Steps - Sub Flagstone Base' },
+]
 
 // ── Vendor-catalog helpers (same as PaverModule) ─────────────────────────────
 function paverOptions(cat, vendorSel, materialRows) {
@@ -69,14 +90,16 @@ function paverItemFor(cat, vendorSel, typeLabel, materialRows) {
 }
 
 // ── Per-row calculators ──────────────────────────────────────────────────────
-function paverRowCalc(r, laborRates, materialRows) {
+// Shared by every Vendor/Type step section (Paver/Brick/Tile/Flagstone); `cat`
+// selects which material catalog subcategory the Type options come from.
+function matStepRowCalc(r, laborRates, materialRows, cat = PAVER_STEP_CAT) {
   const sf = n(r.sf)
   const rate = n(laborRates[kPaverForm(r.form)] ?? PAVER_FORM_DEFAULT[r.form] ?? 0)
   const hrs = sf > 0 && rate > 0 ? sf / rate : 0
   let price = 0
   let sfPerPallet = 0
   if (r.vendor && r.vendor !== 'House' && r.vendor !== 'Custom') {
-    const item = paverItemFor(PAVER_STEP_CAT, r.vendor, r.type, materialRows)
+    const item = paverItemFor(cat, r.vendor, r.type, materialRows)
     if (item) {
       price = n(item.unit_cost)
       sfPerPallet = n(item.sf_per_pallet)
@@ -99,6 +122,26 @@ function concRowCalc(r, laborRates, materialRates) {
   return { sf, hrs, mat }
 }
 
+// Sub rows are unit priced per LF: rate = base + applicable per-LF modifiers.
+// On the Sub tab the row quantity field represents linear feet.
+function matStepSubRowCalc(r, mr, baseKey = kSubPaverBase) {
+  const lf = n(r.sf)
+  const base = n(mr[baseKey] ?? SUB_BASE_DEFAULT)
+  const form = n(mr[kSubForm(r.form)] ?? 0)
+  const grouted = r.grouted ? n(mr[kSubGrouted] ?? 0) : 0
+  const rate = base + form + grouted
+  return { lf, rate, cost: lf * rate }
+}
+function concSubRowCalc(r, mr) {
+  const lf = n(r.sf)
+  const base = n(mr[kSubConcBase] ?? SUB_BASE_DEFAULT)
+  const form = n(mr[kSubForm(r.form)] ?? 0)
+  const type = n(mr[kSubType(r.type)] ?? 0)
+  const finish = n(mr[kSubFinish(r.finish)] ?? 0)
+  const rate = base + form + type + finish
+  return { lf, rate, cost: lf * rate }
+}
+
 // ── Calculation engine ────────────────────────────────────────────────────────
 // Labor always reads the In-House rows; MATERIAL follows the active tab so each
 // tab's Materials Breakdown is fully independent.
@@ -118,44 +161,52 @@ function calcSteps(
   const mr = materialRates || {}
   const isSub = state.subType === 'Subcontractor'
 
-  const ihPaver = state.paverRows || []
   const ihConc = state.concRows || []
-  const matPaver = isSub ? state.subPaverRows || [] : ihPaver
-  const matConc = isSub ? state.subConcRows || [] : ihConc
 
-  // ── Labor (In-House rows only) ───────────────────────────────────────────
+  // ── Vendor/Type step sections (Paver/Brick/Tile/Flagstone) ───────────────
+  // Labor + In-House material from In-House rows; sub cost ($/LF) from Sub rows.
   let laborHrs = 0
-  ihPaver.forEach(r => {
-    laborHrs += paverRowCalc(r, lr, materialRows).hrs
+  const matSections = MAT_SECTIONS.map(sec => {
+    let labor = 0
+    let mat = 0
+    let pallets = 0
+    ;(state[sec.rowsKey] || []).forEach(r => {
+      const c = matStepRowCalc(r, lr, materialRows, sec.cat)
+      labor += c.hrs
+      mat += c.mat
+      pallets += c.pallets
+    })
+    let subCost = 0
+    ;(state[sec.subKey] || []).forEach(r => {
+      subCost += matStepSubRowCalc(r, mr, sec.baseKey).cost
+    })
+    laborHrs += labor
+    return { key: sec.key, title: sec.title, mat, pallets, subCost }
   })
-  ihConc.forEach(r => {
-    laborHrs += concRowCalc(r, lr, mr).hrs
-  })
+  const stepMat = matSections.reduce((s, x) => s + x.mat, 0)
+  const pallets = matSections.reduce((s, x) => s + x.pallets, 0)
+  const subStepCost = matSections.reduce((s, x) => s + x.subCost, 0)
 
-  // ── Material (active tab rows) ───────────────────────────────────────────
-  let paverMat = 0
-  let pallets = 0
-  const matPaverCalc = matPaver.map(r => {
-    const c = paverRowCalc(r, lr, materialRows)
-    paverMat += c.mat
-    pallets += c.pallets
-    return c
-  })
+  // ── Concrete steps ───────────────────────────────────────────────────────
   let concMat = 0
-  const matConcCalc = matConc.map(r => {
+  ihConc.forEach(r => {
     const c = concRowCalc(r, lr, mr)
+    laborHrs += c.hrs
     concMat += c.mat
-    return c
   })
+  let subConcCost = 0
+  ;(state.subConcRows || []).forEach(r => {
+    subConcCost += concSubRowCalc(r, mr).cost
+  })
+  const subRowCost = subStepCost + subConcCost
 
   // ── Manual entry ─────────────────────────────────────────────────────────
   const ihManual = state.manualRows || []
-  const matManual = isSub ? state.subManualRows || [] : ihManual
   let manHrs = 0
   ihManual.forEach(r => {
     manHrs += n(r.hours)
   })
-  const manMat = matManual.reduce((s, r) => s + n(r.materials), 0)
+  const manMat = ihManual.reduce((s, r) => s + n(r.materials), 0)
   const manSub = [...(state.manualRows || []), ...(state.subManualRows || [])].reduce(
     (s, r) => s + n(r.subCost),
     0
@@ -167,12 +218,14 @@ function calcSteps(
   const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
   const totalHrs = _preWalkHrs + walkHrs
   const manDays = totalHrs / 8
-  const totalMat = paverMat + concMat + manMat
+  // In-House material (hourly model). Sub steps are bundled into the flat
+  // per-LF sub price, so they never contribute to material.
+  const totalMat = stepMat + concMat + manMat
 
   const laborCost = totalHrs * (n(lrph) || DEFAULTS.laborRatePerHour)
   const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
   const gp = manDays * gpmd
-  const subCost = manSub
+  const subCost = subRowCost + manSub
   const subGp = subCost * subGpMarkupRate
   const commission = (gp + subGp) * DEFAULTS.commissionRate
   const price = totalMat + laborCost + burden + gp + subCost + subGp + commission
@@ -188,13 +241,16 @@ function calcSteps(
     subGp,
     commission,
     subCost,
+    matSections,
+    stepMat,
+    subStepCost,
+    subConcCost,
+    subRowCost,
+    manSub,
     price,
-    paverMat,
     concMat,
     manMat,
     pallets,
-    matPaverCalc,
-    matConcCalc,
     isSub,
   }
 }
@@ -218,7 +274,7 @@ async function upsertRate(table, name, field, value) {
   }
 }
 
-function StepsRatesModal({ open, onClose, onSaved }) {
+function StepsRatesModal({ open, onClose, onSaved, isSub = false }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [draft, setDraft] = useState({})
@@ -240,19 +296,38 @@ function StepsRatesModal({ open, onClose, onSaved }) {
       ;(mrRes.data || []).forEach(r => {
         mr[r.name] = parseFloat(r.unit_cost)
       })
-      const d = { paverForm: {}, typeHrs: {}, typeMat: {}, finHrs: {}, finMat: {}, concForm: {} }
+      const d = {
+        paverForm: {},
+        typeHrs: {},
+        typeMat: {},
+        finHrs: {},
+        finMat: {},
+        concForm: {},
+        subBase: {},
+        subForm: {},
+        subType: {},
+        subFinish: {},
+        subGrouted: mr[kSubGrouted] ?? 0,
+      }
       STEP_FORMS.forEach(f => {
         d.paverForm[f] = lr[kPaverForm(f)] ?? PAVER_FORM_DEFAULT[f]
         d.concForm[f] = lr[kConcForm(f)] ?? 1
+        d.subForm[f] = mr[kSubForm(f)] ?? 0
       })
       CONC_TYPES.forEach(t => {
         d.typeHrs[t] = lr[kConcTypeHrs(t)] ?? 0
         d.typeMat[t] = mr[kConcTypeMat(t)] ?? 0
+        d.subType[t] = mr[kSubType(t)] ?? 0
       })
       CONC_FINISHES.forEach(f => {
         d.finHrs[f] = lr[kFinishHrs(f)] ?? 0
         d.finMat[f] = mr[kFinishMat(f)] ?? 0
+        d.subFinish[f] = mr[kSubFinish(f)] ?? 0
       })
+      MAT_SECTIONS.forEach(sec => {
+        d.subBase[sec.key] = mr[sec.baseKey] ?? SUB_BASE_DEFAULT
+      })
+      d.subBase.conc = mr[kSubConcBase] ?? SUB_BASE_DEFAULT
       setDraft(d)
       setLoading(false)
     })
@@ -280,6 +355,21 @@ function StepsRatesModal({ open, onClose, onSaved }) {
     CONC_FINISHES.forEach(f => {
       jobs.push(upsertRate('labor_rates', kFinishHrs(f), 'rate', draft.finHrs[f]))
       jobs.push(upsertRate('material_rates', kFinishMat(f), 'unit_cost', draft.finMat[f]))
+    })
+    // Subcontractor per-LF rates (stored in material_rates).
+    MAT_SECTIONS.forEach(sec => {
+      jobs.push(upsertRate('material_rates', sec.baseKey, 'unit_cost', draft.subBase[sec.key]))
+    })
+    jobs.push(upsertRate('material_rates', kSubConcBase, 'unit_cost', draft.subBase.conc))
+    jobs.push(upsertRate('material_rates', kSubGrouted, 'unit_cost', draft.subGrouted))
+    STEP_FORMS.forEach(f => {
+      jobs.push(upsertRate('material_rates', kSubForm(f), 'unit_cost', draft.subForm[f]))
+    })
+    CONC_TYPES.forEach(t => {
+      jobs.push(upsertRate('material_rates', kSubType(t), 'unit_cost', draft.subType[t]))
+    })
+    CONC_FINISHES.forEach(f => {
+      jobs.push(upsertRate('material_rates', kSubFinish(f), 'unit_cost', draft.subFinish[f]))
     })
     await Promise.all(jobs)
     setSaving(false)
@@ -313,9 +403,13 @@ function StepsRatesModal({ open, onClose, onSaved }) {
             <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">
               Master Rates → Steps
             </p>
-            <p className="text-base font-semibold text-gray-900">Step Labor & Material Modifiers</p>
+            <p className="text-base font-semibold text-gray-900">
+              {isSub ? 'Subcontractor Step Pricing ($/LF)' : 'Step Labor & Material Modifiers'}
+            </p>
             <p className="text-xs text-gray-500 mt-0.5">
-              All values save to master Steps rates. Zero is fine to start.
+              {isSub
+                ? 'Unit price per linear foot — base plus per-LF modifiers.'
+                : 'All values save to master Steps rates. Zero is fine to start.'}
             </p>
           </div>
           <button
@@ -330,6 +424,8 @@ function StepsRatesModal({ open, onClose, onSaved }) {
           <p className="text-sm text-gray-400 py-6 text-center">Loading current rates…</p>
         ) : (
           <div className="space-y-5">
+            {!isSub && (
+              <>
             {/* Paver Form labor */}
             <div>
               <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">
@@ -409,6 +505,89 @@ function StepsRatesModal({ open, onClose, onSaved }) {
                 ))}
               </div>
             </div>
+              </>
+            )}
+
+            {isSub && (
+              <>
+                <div>
+                  <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">
+                    Subcontractor — Base ($/LF)
+                  </p>
+                  <div className="flex gap-6 flex-wrap">
+                    {MAT_SECTIONS.map(sec => (
+                      <label
+                        key={sec.key}
+                        className="flex items-center gap-2 text-xs text-gray-700"
+                      >
+                        {sec.title.replace(' Steps', '')}
+                        {numCell('subBase', sec.key)}
+                      </label>
+                    ))}
+                    <label className="flex items-center gap-2 text-xs text-gray-700">
+                      Concrete
+                      {numCell('subBase', 'conc')}
+                    </label>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">
+                    Form Modifier (+$/LF)
+                  </p>
+                  <div className="flex gap-6 flex-wrap">
+                    {STEP_FORMS.map(f => (
+                      <label key={f} className="flex items-center gap-2 text-xs text-gray-700">
+                        {f}
+                        {numCell('subForm', f)}
+                      </label>
+                    ))}
+                    <label className="flex items-center gap-2 text-xs text-gray-700">
+                      Grouted (paver)
+                      <input
+                        type="number"
+                        step="any"
+                        value={draft.subGrouted ?? ''}
+                        onChange={e => setDraft(p => ({ ...p, subGrouted: e.target.value }))}
+                        className="w-20 border border-gray-200 rounded px-1.5 py-1 text-xs text-right"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">
+                    Concrete Type Modifier (+$/LF)
+                  </p>
+                  <table className="w-full text-xs">
+                    <tbody>
+                      {CONC_TYPES.map(t => (
+                        <tr key={t} className="border-b border-gray-50">
+                          <td className="py-1 text-gray-700">{t}</td>
+                          <td className="py-1 text-right">{numCell('subType', t)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div>
+                  <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">
+                    Concrete Finish Modifier (+$/LF)
+                  </p>
+                  <table className="w-full text-xs">
+                    <tbody>
+                      {CONC_FINISHES.map(f => (
+                        <tr key={f} className="border-b border-gray-50">
+                          <td className="py-1 text-gray-700">{f}</td>
+                          <td className="py-1 text-right">{numCell('subFinish', f)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -466,8 +645,145 @@ const PAVER_ROW = () => ({ vendor: 'House', type: '', form: 'Straight', sf: '', 
 const CONC_ROW = () => ({ vendor: 'House', type: 'Standard', form: 'Straight', sf: '', finish: 'Smooth' })
 const MANUAL_ROW = () => ({ label: '', hours: '', materials: '', subCost: '' })
 
-const DEFAULT_PAVER_ROWS = [PAVER_ROW(), PAVER_ROW(), PAVER_ROW()]
+const DEFAULT_PAVER_ROWS = () => [PAVER_ROW(), PAVER_ROW(), PAVER_ROW()]
 const DEFAULT_CONC_ROWS = [CONC_ROW(), CONC_ROW(), CONC_ROW()]
+
+// Reusable Vendor · Type · Form · SF · Grouted step section (Paver / Brick /
+// Tiled / Flagstone). Type options come from the given catalog subcategory.
+function MaterialStepSection({
+  title,
+  cat,
+  baseKey,
+  rows,
+  setRows,
+  isSub,
+  materialRows,
+  materialRates,
+  laborRates,
+  vendors,
+}) {
+  const vForCat = vendors.filter(v => (v.categories || []).includes(cat))
+  const setRow = (i, field, val) =>
+    setRows(rs => rs.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  return (
+    <div>
+      <SectionHeader title={title} sub="Vendor · Type · Form · SF · Grouted" />
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="text-gray-400 border-b border-gray-200">
+            <th className="text-left pb-1 pr-2 font-medium w-40">Vendor</th>
+            <th className="text-left pb-1 pr-2 font-medium">Type</th>
+            <th className="text-left pb-1 pr-2 font-medium w-24">Form</th>
+            <th className="text-left pb-1 pr-2 font-medium w-20">{isSub ? 'LF' : 'SF'}</th>
+            <th className="text-left pb-1 pr-2 font-medium w-24">Grouted?</th>
+            <th className="text-right pb-1 pr-2 font-medium w-28">{isSub ? 'Sub $' : 'Hrs · Mat'}</th>
+            <th className="w-6"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => {
+            const opts = paverOptions(cat, row.vendor, materialRows)
+            const c = matStepRowCalc(row, laborRates, materialRows, cat)
+            const sc = matStepSubRowCalc(row, materialRates, baseKey)
+            return (
+              <tr key={i} className="border-b border-gray-50">
+                <td className="py-1 pr-2">
+                  <select
+                    className={cellSel}
+                    value={row.vendor}
+                    onChange={e => setRow(i, 'vendor', e.target.value)}
+                  >
+                    <option value="House">House</option>
+                    {vForCat.map(v => (
+                      <option key={v.id} value={v.id}>
+                        {v.name}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td className="py-1 pr-2">
+                  <select
+                    className={cellSel}
+                    value={row.type}
+                    onChange={e => setRow(i, 'type', e.target.value)}
+                    disabled={!opts.length}
+                  >
+                    <option value="">{opts.length ? '— Type —' : 'Pick vendor first'}</option>
+                    {opts.map(o => (
+                      <option key={o.label} value={o.label}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td className="py-1 pr-2">
+                  <select
+                    className={cellSel}
+                    value={row.form}
+                    onChange={e => setRow(i, 'form', e.target.value)}
+                  >
+                    {STEP_FORMS.map(f => (
+                      <option key={f} value={f}>
+                        {f}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td className="py-1 pr-2">
+                  <NumInput value={row.sf} onChange={v => setRow(i, 'sf', v)} />
+                </td>
+                <td className="py-1 pr-2">
+                  <select
+                    className={cellSel}
+                    value={row.grouted ? 'Yes' : 'No'}
+                    onChange={e => setRow(i, 'grouted', e.target.value === 'Yes')}
+                  >
+                    <option value="No">No</option>
+                    <option value="Yes">Yes</option>
+                  </select>
+                </td>
+                <td className="py-1 pr-2 text-right text-gray-400 whitespace-nowrap">
+                  {isSub ? (
+                    sc.cost > 0 ? (
+                      fmt2(sc.cost)
+                    ) : (
+                      '—'
+                    )
+                  ) : (
+                    <>
+                      {c.hrs > 0 ? `${c.hrs.toFixed(1)}h` : '—'}
+                      {c.mat > 0 ? ` · ${fmt2(c.mat)}` : ''}
+                      {c.pallets > 0 ? ` · ${c.pallets}p` : ''}
+                    </>
+                  )}
+                </td>
+                <td className="py-1 text-center">
+                  {rows.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setRows(rs => rs.filter((_, idx) => idx !== i))}
+                      className="text-gray-300 hover:text-red-500"
+                      title="Remove row"
+                    >
+                      ×
+                    </button>
+                  )}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+      <button
+        type="button"
+        onClick={() => setRows(rs => [...rs, PAVER_ROW()])}
+        className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+      >
+        + Add row
+      </button>
+    </div>
+  )
+}
 const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 1', hours: '', materials: '', subCost: '' },
   { label: 'Misc 2', hours: '', materials: '', subCost: '' },
@@ -502,7 +818,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
       supabase
         .from('material_rates')
         .select('name, unit_cost, subcategory, vendor_id, sf_per_pallet')
-        .eq('category', 'Paver'),
+        .not('vendor_id', 'is', null),
       supabase
         .from('subs_vendors')
         .select('id, company_name, supplied_categories')
@@ -565,8 +881,14 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
   const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
   const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
 
-  const [paverRows, setPaverRows] = useState(initialData?.paverRows ?? DEFAULT_PAVER_ROWS)
-  const [subPaverRows, setSubPaverRows] = useState(initialData?.subPaverRows ?? DEFAULT_PAVER_ROWS)
+  const [paverRows, setPaverRows] = useState(initialData?.paverRows ?? DEFAULT_PAVER_ROWS())
+  const [subPaverRows, setSubPaverRows] = useState(initialData?.subPaverRows ?? DEFAULT_PAVER_ROWS())
+  const [brickRows, setBrickRows] = useState(initialData?.brickRows ?? DEFAULT_PAVER_ROWS())
+  const [subBrickRows, setSubBrickRows] = useState(initialData?.subBrickRows ?? DEFAULT_PAVER_ROWS())
+  const [tileRows, setTileRows] = useState(initialData?.tileRows ?? DEFAULT_PAVER_ROWS())
+  const [subTileRows, setSubTileRows] = useState(initialData?.subTileRows ?? DEFAULT_PAVER_ROWS())
+  const [flagRows, setFlagRows] = useState(initialData?.flagRows ?? DEFAULT_PAVER_ROWS())
+  const [subFlagRows, setSubFlagRows] = useState(initialData?.subFlagRows ?? DEFAULT_PAVER_ROWS())
   const [concRows, setConcRows] = useState(initialData?.concRows ?? DEFAULT_CONC_ROWS)
   const [subConcRows, setSubConcRows] = useState(initialData?.subConcRows ?? DEFAULT_CONC_ROWS)
   const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
@@ -594,11 +916,25 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
     hoursAdj,
     paverRows,
     subPaverRows,
+    brickRows,
+    subBrickRows,
+    tileRows,
+    subTileRows,
+    flagRows,
+    subFlagRows,
     concRows,
     subConcRows,
     manualRows,
     subManualRows,
     distanceLF,
+  }
+
+  // Per-section active-tab rows + setters, keyed by MAT_SECTIONS[].key.
+  const sectionState = {
+    paver: { rows: isSub ? subPaverRows : paverRows, set: isSub ? setSubPaverRows : setPaverRows },
+    brick: { rows: isSub ? subBrickRows : brickRows, set: isSub ? setSubBrickRows : setBrickRows },
+    tile: { rows: isSub ? subTileRows : tileRows, set: isSub ? setSubTileRows : setTileRows },
+    flag: { rows: isSub ? subFlagRows : flagRows, set: isSub ? setSubFlagRows : setFlagRows },
   }
 
   const calcRaw = calcSteps(
@@ -624,15 +960,11 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
       : calcRaw
 
   // ── Active-tab row accessors ─────────────────────────────────────────────
-  const curPaver = isSub ? subPaverRows : paverRows
-  const setCurPaver = isSub ? setSubPaverRows : setPaverRows
   const curConc = isSub ? subConcRows : concRows
   const setCurConc = isSub ? setSubConcRows : setConcRows
   const curManual = isSub ? subManualRows : manualRows
   const setCurManual = isSub ? setSubManualRows : setManualRows
 
-  const setPaverRow = (i, field, val) =>
-    setCurPaver(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   const setConcRow = (i, field, val) =>
     setCurConc(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   const setManual = (i, field, val) =>
@@ -736,112 +1068,22 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         </>
       )}
 
-      {/* ── Paver Steps ── */}
-      <div>
-        <SectionHeader title="Paver Steps" sub="Vendor · Type · Form · SF · Grouted" />
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="text-gray-400 border-b border-gray-200">
-              <th className="text-left pb-1 pr-2 font-medium w-40">Vendor</th>
-              <th className="text-left pb-1 pr-2 font-medium">Type</th>
-              <th className="text-left pb-1 pr-2 font-medium w-24">Form</th>
-              <th className="text-left pb-1 pr-2 font-medium w-20">SF</th>
-              <th className="text-left pb-1 pr-2 font-medium w-24">Grouted?</th>
-              <th className="text-right pb-1 pr-2 font-medium w-28">Hrs · Mat</th>
-              <th className="w-6"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {curPaver.map((row, i) => {
-              const opts = paverOptions(PAVER_STEP_CAT, row.vendor, materialRows)
-              const c = paverRowCalc(row, laborRates, materialRows)
-              return (
-                <tr key={i} className="border-b border-gray-50">
-                  <td className="py-1 pr-2">
-                    <select
-                      className={cellSel}
-                      value={row.vendor}
-                      onChange={e => setPaverRow(i, 'vendor', e.target.value)}
-                    >
-                      <option value="House">House</option>
-                      {vendorsForCategory(PAVER_STEP_CAT).map(v => (
-                        <option key={v.id} value={v.id}>
-                          {v.name}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="py-1 pr-2">
-                    <select
-                      className={cellSel}
-                      value={row.type}
-                      onChange={e => setPaverRow(i, 'type', e.target.value)}
-                      disabled={!opts.length}
-                    >
-                      <option value="">{opts.length ? '— Type —' : 'Pick vendor first'}</option>
-                      {opts.map(o => (
-                        <option key={o.label} value={o.label}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="py-1 pr-2">
-                    <select
-                      className={cellSel}
-                      value={row.form}
-                      onChange={e => setPaverRow(i, 'form', e.target.value)}
-                    >
-                      {STEP_FORMS.map(f => (
-                        <option key={f} value={f}>
-                          {f}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="py-1 pr-2">
-                    <NumInput value={row.sf} onChange={v => setPaverRow(i, 'sf', v)} />
-                  </td>
-                  <td className="py-1 pr-2">
-                    <select
-                      className={cellSel}
-                      value={row.grouted ? 'Yes' : 'No'}
-                      onChange={e => setPaverRow(i, 'grouted', e.target.value === 'Yes')}
-                    >
-                      <option value="No">No</option>
-                      <option value="Yes">Yes</option>
-                    </select>
-                  </td>
-                  <td className="py-1 pr-2 text-right text-gray-400 whitespace-nowrap">
-                    {c.hrs > 0 ? `${c.hrs.toFixed(1)}h` : '—'}
-                    {c.mat > 0 ? ` · ${fmt2(c.mat)}` : ''}
-                    {c.pallets > 0 ? ` · ${c.pallets}p` : ''}
-                  </td>
-                  <td className="py-1 text-center">
-                    {curPaver.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => setCurPaver(rows => rows.filter((_, idx) => idx !== i))}
-                        className="text-gray-300 hover:text-red-500"
-                        title="Remove row"
-                      >
-                        ×
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-        <button
-          type="button"
-          onClick={() => setCurPaver(rows => [...rows, PAVER_ROW()])}
-          className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
-        >
-          + Add paver step
-        </button>
-      </div>
+      {/* ── Vendor/Type step sections: Paver · Brick · Tiled · Flagstone ── */}
+      {MAT_SECTIONS.map(sec => (
+        <MaterialStepSection
+          key={sec.key}
+          title={sec.title}
+          cat={sec.cat}
+          baseKey={sec.baseKey}
+          rows={sectionState[sec.key].rows}
+          setRows={sectionState[sec.key].set}
+          isSub={isSub}
+          materialRows={materialRows}
+          materialRates={materialRates}
+          laborRates={laborRates}
+          vendors={vendors}
+        />
+      ))}
 
       {/* ── Concrete Steps ── */}
       <div>
@@ -864,15 +1106,16 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
               <th className="text-left pb-1 pr-2 font-medium w-40">Vendor</th>
               <th className="text-left pb-1 pr-2 font-medium">Type</th>
               <th className="text-left pb-1 pr-2 font-medium w-24">Form</th>
-              <th className="text-left pb-1 pr-2 font-medium w-20">SF</th>
+              <th className="text-left pb-1 pr-2 font-medium w-20">{isSub ? 'LF' : 'SF'}</th>
               <th className="text-left pb-1 pr-2 font-medium">Finish</th>
-              <th className="text-right pb-1 pr-2 font-medium w-28">Hrs · Mat</th>
+              <th className="text-right pb-1 pr-2 font-medium w-28">{isSub ? 'Sub $' : 'Hrs · Mat'}</th>
               <th className="w-6"></th>
             </tr>
           </thead>
           <tbody>
             {curConc.map((row, i) => {
               const c = concRowCalc(row, laborRates, materialRates)
+              const sc = concSubRowCalc(row, materialRates)
               return (
                 <tr key={i} className="border-b border-gray-50">
                   <td className="py-1 pr-2">
@@ -932,8 +1175,14 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
                     </select>
                   </td>
                   <td className="py-1 pr-2 text-right text-gray-400 whitespace-nowrap">
-                    {c.hrs > 0 ? `${c.hrs.toFixed(1)}h` : '—'}
-                    {c.mat > 0 ? ` · ${fmt2(c.mat)}` : ''}
+                    {isSub ? (
+                      sc.cost > 0 ? fmt2(sc.cost) : '—'
+                    ) : (
+                      <>
+                        {c.hrs > 0 ? `${c.hrs.toFixed(1)}h` : '—'}
+                        {c.mat > 0 ? ` · ${fmt2(c.mat)}` : ''}
+                      </>
+                    )}
                   </td>
                   <td className="py-1 text-center">
                     {curConc.length > 1 && (
@@ -1005,19 +1254,21 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         </button>
       </div>
 
-      {/* ── Materials Breakdown (per-tab, independent) ── */}
-      {calc.totalMat > 0 && (
+      {/* ── In-House Materials Breakdown (independent) ── */}
+      {!isSub && calc.totalMat > 0 && (
         <div className="bg-gray-50 rounded-lg p-3 text-xs">
           <p className="font-semibold text-gray-600 uppercase tracking-wide text-xs mb-2">
-            {isSub ? 'Sub' : 'In House'} Materials Breakdown
+            In House Materials Breakdown
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-gray-600">
-            {calc.paverMat > 0 && (
-              <span>
-                Paver Material: <strong>{fmt2(calc.paverMat)}</strong>
-                {calc.pallets > 0 ? ` (${calc.pallets}p)` : ''}
-              </span>
-            )}
+            {(calc.matSections || [])
+              .filter(s => s.mat > 0)
+              .map(s => (
+                <span key={s.key}>
+                  {s.title}: <strong>{fmt2(s.mat)}</strong>
+                  {s.pallets > 0 ? ` (${s.pallets}p)` : ''}
+                </span>
+              ))}
             {calc.concMat > 0 && (
               <span>
                 Concrete Material: <strong>{fmt2(calc.concMat)}</strong>
@@ -1040,6 +1291,37 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         </div>
       )}
 
+      {/* ── Sub Pricing Breakdown (unit priced per LF) ── */}
+      {isSub && calc.subCost > 0 && (
+        <div className="bg-gray-50 rounded-lg p-3 text-xs">
+          <p className="font-semibold text-gray-600 uppercase tracking-wide text-xs mb-2">
+            Sub Pricing Breakdown
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-gray-600">
+            {(calc.matSections || [])
+              .filter(s => s.subCost > 0)
+              .map(s => (
+                <span key={s.key}>
+                  {s.title}: <strong>{fmt2(s.subCost)}</strong>
+                </span>
+              ))}
+            {calc.subConcCost > 0 && (
+              <span>
+                Concrete Steps: <strong>{fmt2(calc.subConcCost)}</strong>
+              </span>
+            )}
+            {calc.manSub > 0 && (
+              <span>
+                Manual Sub: <strong>{fmt2(calc.manSub)}</strong>
+              </span>
+            )}
+          </div>
+          <p className="mt-2 pt-2 border-t border-gray-200 font-semibold text-gray-800">
+            Total Sub Cost: {fmt2(calc.subCost)}
+          </p>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex gap-3 pt-2">
         <button onClick={onBack} className="btn-secondary flex-1">
@@ -1054,6 +1336,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         open={ratesModalOpen}
         onClose={() => setRatesModalOpen(false)}
         onSaved={refreshAllRates}
+        isSub={isSub}
       />
     </div>
   )

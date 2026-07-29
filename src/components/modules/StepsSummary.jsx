@@ -43,11 +43,20 @@ export default function StepsSummary({ module }) {
   } = data
   const isSub = subType === 'Subcontractor'
 
-  const paverRows = (isSub ? data.subPaverRows : data.paverRows) || []
+  const MAT_SECTIONS = [
+    { title: 'Paver Steps', rows: 'paverRows', sub: 'subPaverRows' },
+    { title: 'Brick Steps', rows: 'brickRows', sub: 'subBrickRows' },
+    { title: 'Tiled Steps', rows: 'tileRows', sub: 'subTileRows' },
+    { title: 'Flagstone Steps', rows: 'flagRows', sub: 'subFlagRows' },
+  ]
+  const matSections = MAT_SECTIONS.map(sec => ({
+    title: sec.title,
+    rows: ((isSub ? data[sec.sub] : data[sec.rows]) || []).filter(r => n(r.sf) > 0),
+  })).filter(s => s.rows.length > 0)
+
   const concRows = (isSub ? data.subConcRows : data.concRows) || []
   const manualRows = (isSub ? data.subManualRows : data.manualRows) || []
 
-  const activePaver = paverRows.filter(r => n(r.sf) > 0)
   const activeConc = concRows.filter(r => n(r.sf) > 0)
   const activeMan = manualRows.filter(r => n(r.hours) > 0 || n(r.materials) > 0 || n(r.subCost) > 0)
 
@@ -55,21 +64,21 @@ export default function StepsSummary({ module }) {
     <div>
       <FinancialSummaryList module={module} />
 
-      {/* Paver Steps */}
-      {activePaver.length > 0 && (
-        <>
-          <SectionLabel title="Paver Steps" />
-          {activePaver.map((r, i) => (
+      {/* Vendor/Type step sections */}
+      {matSections.map(sec => (
+        <div key={sec.title}>
+          <SectionLabel title={sec.title} />
+          {sec.rows.map((r, i) => (
             <LineRow
               key={i}
-              label={[r.type || 'Paver', r.form, r.grouted ? 'grouted' : null]
+              label={[r.type || sec.title.replace(' Steps', ''), r.form, r.grouted ? 'grouted' : null]
                 .filter(Boolean)
                 .join(' · ')}
-              value={`${n(r.sf)} SF`}
+              value={`${n(r.sf)} ${isSub ? 'LF' : 'SF'}`}
             />
           ))}
-        </>
-      )}
+        </div>
+      ))}
 
       {/* Concrete Steps */}
       {activeConc.length > 0 && (
@@ -79,7 +88,7 @@ export default function StepsSummary({ module }) {
             <LineRow
               key={i}
               label={[r.type, r.finish, r.form].filter(Boolean).join(' · ')}
-              value={`${n(r.sf)} SF`}
+              value={`${n(r.sf)} ${isSub ? 'LF' : 'SF'}`}
             />
           ))}
         </>
