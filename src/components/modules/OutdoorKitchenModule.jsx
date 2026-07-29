@@ -84,7 +84,7 @@ const APPLIANCE_TYPES = [
   'Other',
 ]
 const applianceRateName = type => `BBQ Equip - ${type}`
-const EQUIP_ROW = () => ({ vendor: 'House', type: 'BBQ Grill', qty: '1', clientProvided: false, hours: '' })
+const EQUIP_ROW = () => ({ vendor: 'House', type: 'BBQ Grill', qty: '0', clientProvided: false, hours: '' })
 
 const n = v => parseFloat(v) || 0
 
