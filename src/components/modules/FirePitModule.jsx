@@ -9,7 +9,9 @@ import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Fire Pit Module — based on Fire Pit Module tab in Excel estimator
-// Covers: CMU block walls, gas fixtures, wall finishes, manual entry
+// Covers: CMU block walls, wall caps, gas line + gas fixtures, wall finishes,
+//         manual entry. Wall finishes + caps + gas use the same vendor·type
+//         picker patterns ported from the Outdoor Kitchen module.
 // Standard CMU block: 16"L × 8"H × 8"W
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -19,15 +21,17 @@ const FP_RATES = {
   fpRebar: { dbName: 'FP Rebar', fallback: 0.5 }, // $/LF
   fpConcrete: { dbName: 'FP Concrete', fallback: 149.5 }, // $/CY (footing & grout)
   fpGroutPump: { dbName: 'FP Grout Pump Setup', fallback: 150.0 }, // flat fee when pump used
-  fpGasRing: { dbName: 'FP Gas Ring/Burner', fallback: 25.0 }, // $/unit hardware
-  fpGasPipe: { dbName: 'FP Gas Pipe', fallback: 3.0 }, // $/LF
-  // ── Wall cap costs — SHARED with Walls > Wall Caps. These reference the
-  //    exact same Walls-category rate rows, so editing a cap rate here also
-  //    updates the Walls module (and vice-versa). Edited under category 'Walls'.
-  capFlagstone: { dbName: 'Wall Cap Flagstone', fallback: 500.0 }, // $/ton
-  capPrecast: { dbName: 'Wall Cap Precast', fallback: 50.0 }, // $/ea (keyed to 8" cap)
-  capBullnose: { dbName: 'Wall Cap Bullnose Brick', fallback: 5.0 }, // $/LF
-  capConcrete: { dbName: 'Wall Concrete Truck', fallback: 185.0 }, // $/CY (PIP poured cap)
+
+  // ── Wall cap costs — simple $/LF master rate + hrs/LF labor coefficient per
+  //    cap type, resolved by Type like the OK finishes (vendor-overridable).
+  capFlagstone: { dbName: 'FP Cap Flagstone', fallback: 18.0 }, // $/LF
+  capPrecast: { dbName: 'FP Cap Precast', fallback: 12.0 }, // $/LF
+  capPipConcrete: { dbName: 'FP Cap PIP Concrete', fallback: 10.0 }, // $/LF
+  capBullnose: { dbName: 'FP Cap Bullnose Brick', fallback: 5.0 }, // $/LF
+  capFlagstoneLab: { dbName: 'FP Cap Flagstone Labor Rate', fallback: 0.25 }, // hrs/LF
+  capPrecastLab: { dbName: 'FP Cap Precast Labor Rate', fallback: 0.2 }, // hrs/LF
+  capPipConcreteLab: { dbName: 'FP Cap PIP Concrete Labor Rate', fallback: 0.15 }, // hrs/LF
+  capBullnoseLab: { dbName: 'FP Cap Bullnose Brick Labor Rate', fallback: 0.08 }, // hrs/LF
 
   // ── Wall finish material costs ──────────────────────────────────────────────
   sandStucco: { dbName: 'Sand Stucco - FP', fallback: 0.0 }, // $/SF (labor only by default)
@@ -44,7 +48,6 @@ const FP_RATES = {
   blockLab: { dbName: 'FP Set Blocks Labor Rate', fallback: 10.4 }, // blocks/hr
   handGroutLab: { dbName: 'FP Hand Grout Labor Rate', fallback: 5.5 }, // CF/hr
   pumpGroutLab: { dbName: 'FP Pump Grout Labor Rate', fallback: 81.0 }, // CF/hr
-  gasTrenchLab: { dbName: 'FP Gas Trench Labor Rate', fallback: 35.0 }, // LF/day
   sandStuccoLab: { dbName: 'Sand Stucco - FP Labor Rate', fallback: 92 }, // SF/day
   smoothStuccoLab: { dbName: 'Smooth Stucco - FP Labor Rate', fallback: 65 }, // SF/day
   ledgerstoneLab: { dbName: 'Ledgerstone - FP Labor Rate', fallback: 24 }, // SF/day
@@ -70,6 +73,248 @@ const BLOCK_WIDTH_IN = 8
 // Interior void per block (CF) — (L-2) × H × (W-2) / 1728
 const GROUT_CF_PER_BLOCK = ((BLOCK_LENGTH_IN - 2) * BLOCK_HEIGHT_IN * (BLOCK_WIDTH_IN - 2)) / 1728
 
+// ── Wall-finish vendor catalog (ported from Outdoor Kitchen) ──────────────────
+// A real vendor overrides ONLY the material unit price for a finish (matched by
+// its Type label in the vendor's catalog under the given subcategory); House
+// keeps the built-in per-estimate / master-rate price. Labor is never affected.
+const WF_CAT = 'Wall Finish'
+const CAP_CAT = 'Wall Cap'
+function wfVendorPrice(vendorSel, typeLabel, materialRows, cat = WF_CAT) {
+  if (!vendorSel || vendorSel === 'House' || vendorSel === 'auto') return null
+  const prefix = `${cat} - `
+  const rows = (materialRows || []).filter(
+    r => r.subcategory === cat && r.vendor_id === vendorSel
+  )
+  if (!rows.length) return null
+  const match =
+    rows.find(r => {
+      const label = r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name
+      return label === typeLabel
+    }) || rows[0]
+  return match ? n(match.unit_cost) : null
+}
+// Wall-finish master list. Each Type resolves a material unit price (FP_RATES
+// key, vendor-overridable) + a labor rate. `unit:'SF'` prices per SF (optional
+// waste / screw / adhesive add-ons); `unit:'ton'` prices per ton (SF÷tonPerSF)
+// with delivery + misc. labMode 'perDay' → hrs=(SF/rate)*8, 'perSF' → hrs=SF*rate.
+const WF_META = {
+  'Sand Stucco': { key: 'sandStucco', labKey: 'sandStuccoLab', unit: 'SF', labMode: 'perDay' },
+  'Smooth Stucco': { key: 'smoothStucco', labKey: 'smoothStuccoLab', unit: 'SF', labMode: 'perDay' },
+  'Ledgerstone Veneer': { key: 'ledgerstone', labKey: 'ledgerstoneLab', unit: 'SF', labMode: 'perDay', waste: 1.1, screwPer5: 2 },
+  'Stacked Stone Veneer': { key: 'stackedStone', labKey: 'stackedStoneLab', unit: 'SF', labMode: 'perDay', waste: 1.1, screwPer5: 2 },
+  Tile: { key: 'tile', labKey: 'tileLab', unit: 'SF', labMode: 'perSF', adhesivePerSF: 1 },
+  'Real Flagstone': { key: 'realFlagstone', labKey: 'flagstoneLab', unit: 'ton', tonPerSF: 80, labMode: 'perSF', delivPerTon: 80, misc: 268.75 },
+  'Real Stone': { key: 'realStone', labKey: 'realStoneLab', unit: 'ton', tonPerSF: 70, labMode: 'perSF', delivPerTon: 180, addPerSF: 1 },
+}
+const WF_LIST = Object.keys(WF_META)
+const WF_ROW = () => ({ vendor: 'House', type: 'Tile', sf: '' })
+
+// ── Wall cap catalog ──────────────────────────────────────────────────────────
+// Caps are measured in LINEAR FEET. Each Type resolves a $/LF master material
+// rate (vendor-overridable) + an hrs/LF labor coefficient, mirroring how the
+// wall finishes resolve material + labor by type.
+const CAP_META = {
+  Flagstone: { matKey: 'capFlagstone', labKey: 'capFlagstoneLab' },
+  Precast: { matKey: 'capPrecast', labKey: 'capPrecastLab' },
+  'PIP Concrete': { matKey: 'capPipConcrete', labKey: 'capPipConcreteLab' },
+  'Bullnose Brick': { matKey: 'capBullnose', labKey: 'capBullnoseLab' },
+}
+const CAP_LIST = Object.keys(CAP_META)
+const CAP_ROW = () => ({ vendor: 'House', type: 'Flagstone', lf: '' })
+
+// ── Electrical & Plumbing catalog — GAS ONLY (ported from Utilities module) ────
+// Rates live in material_rates / labor_rates under category 'Utilities' so they
+// stay a single source of truth shared with the Utilities module. Fallbacks
+// below are used only when the DB row is absent. A vendor overrides ONLY the
+// material price for the selected item; labor always comes from the built-in.
+const UTILITY_LINE_TYPES = {
+  '1-1/2" Poly Gas Pipe': { costPerLF: 4.25, dbName: '1-1/2" Poly Gas Pipe', laborPerLF: 0.05, laborDbName: '1-1/2" Poly Gas Pipe - Labor Rate' },
+  '1" Black Iron Gas Pipe': { costPerLF: 2.76, dbName: '1" Black Iron Gas Pipe', laborPerLF: 0.15, laborDbName: '1" Black Iron Gas Pipe - Labor Rate' },
+  '1-1/2" Black Iron Gas Pipe': { costPerLF: 4.23, dbName: '1-1/2" Black Iron Gas Pipe', laborPerLF: 0.2, laborDbName: '1-1/2" Black Iron Gas Pipe - Labor Rate' },
+  '2" Black Iron Gas Pipe': { costPerLF: 5.72, dbName: '2" Black Iron Gas Pipe', laborPerLF: 0.25, laborDbName: '2" Black Iron Gas Pipe - Labor Rate' },
+}
+const GAS_FIXTURE_TYPES = {
+  '12" Single Gas Ring': { cost: 61.75, dbName: '12" Single Gas Ring', laborHrs: 2, laborDbName: '12" Single Gas Ring - Labor Rate' },
+  '18" Single Gas Ring': { cost: 84.75, dbName: '18" Single Gas Ring', laborHrs: 2, laborDbName: '18" Single Gas Ring - Labor Rate' },
+  '24" Single Gas Ring': { cost: 107.75, dbName: '24" Single Gas Ring', laborHrs: 2, laborDbName: '24" Single Gas Ring - Labor Rate' },
+  '24" Double Gas Ring': { cost: 163.25, dbName: '24" Double Gas Ring', laborHrs: 2, laborDbName: '24" Double Gas Ring - Labor Rate' },
+  "2' Straight Gas Bar": { cost: 35.5, dbName: "2' Straight Gas Bar", laborHrs: 2, laborDbName: "2' Straight Gas Bar - Labor Rate" },
+  "3' Straight Gas Bar": { cost: 56.0, dbName: "3' Straight Gas Bar", laborHrs: 2.5, laborDbName: "3' Straight Gas Bar - Labor Rate" },
+  "4' Straight Gas Bar": { cost: 68.5, dbName: "4' Straight Gas Bar", laborHrs: 3, laborDbName: "4' Straight Gas Bar - Labor Rate" },
+  'Gas Shut-Off Valve': { cost: 89.7, dbName: 'Gas Shut-Off Valve', laborHrs: 2, laborDbName: 'Gas Shut-Off Valve - Labor Rate' },
+}
+const LINE_TYPE_ARR = Object.entries(UTILITY_LINE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, fallback: t.costPerLF, laborDbName: t.laborDbName, laborFallback: t.laborPerLF }))
+const GAS_TYPE_ARR = Object.entries(GAS_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, fallback: t.cost, laborDbName: t.laborDbName, laborFallback: t.laborHrs }))
+const UTIL_CAT = { line: 'Utility Lines', gas: 'Gas Fixtures' }
+function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
+  const builtIn = houseArr.find(o => o.label === row.type) || houseArr[0]
+  const laborVal = mp[builtIn?.laborDbName] ?? builtIn?.laborFallback ?? 0
+  let matDbName = builtIn?.dbName
+  let matFallback = builtIn?.fallback ?? 0
+  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : 'House'
+  if (vsel && vsel !== 'House') {
+    const prefix = `${cat} - `
+    const vrow = (materialRows || []).find(r => {
+      if (r.subcategory !== cat || r.vendor_id !== vsel) return false
+      const label = r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name
+      return label === builtIn?.label
+    })
+    if (vrow) {
+      matDbName = vrow.name
+      matFallback = n(vrow.unit_cost)
+    }
+  }
+  const matCost = mp[matDbName] ?? matFallback
+  const matOpt = { label: builtIn?.label, dbName: matDbName, fallback: matFallback }
+  return { opts: houseArr, matOpt, matCost, laborVal, laborBuiltIn: builtIn }
+}
+const EP_LINE_ROW = () => ({ type: '1-1/2" Poly Gas Pipe', lf: '', vendor: 'House' })
+const EP_GAS_ROW = () => ({ type: '12" Single Gas Ring', qty: '', vendor: 'House' })
+
+// Reusable Electrical & Plumbing table (Gas Line / Gas Fixtures).
+function EpTable({
+  title,
+  rows,
+  setRows,
+  arr,
+  cat,
+  qtyField,
+  qtyLabel,
+  unitLabel,
+  newRow,
+  materialRows,
+  materialPrices,
+  refreshAllRates,
+  vendorsForCategory,
+}) {
+  const upd = (i, field, val) =>
+    setRows(rs => rs.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  return (
+    <div>
+      {title && <p className="text-xs font-semibold text-gray-600 mb-1">{title}</p>}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm table-fixed">
+          <colgroup>
+            <col className="w-[128px]" />
+            <col />
+            <col className="w-[84px]" />
+            <col className="w-[96px]" />
+            <col className="w-[96px]" />
+            <col className="w-6" />
+          </colgroup>
+          <thead>
+            <tr className="text-xs text-gray-500 border-b border-gray-200">
+              <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
+              <th className="text-left pb-1 pr-2 font-medium">Type</th>
+              <th className="text-left pb-1 pr-2 font-medium">{qtyLabel}</th>
+              <th className="text-right pb-1 pr-2 font-medium text-gray-400">$/{unitLabel}</th>
+              <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => {
+              const { opts, matOpt, matCost, laborVal, laborBuiltIn } = resolveUtilRow(
+                cat,
+                row,
+                arr,
+                materialRows,
+                materialPrices
+              )
+              const mat = n(row[qtyField]) * matCost
+              return (
+                <tr key={i} className="border-b border-gray-100">
+                  <td className="py-1 pr-2">
+                    <select
+                      className="input text-sm py-1 w-full"
+                      value={row.vendor || 'House'}
+                      onChange={e => upd(i, 'vendor', e.target.value)}
+                      title="Vendor"
+                    >
+                      {vendorsForCategory(cat).map(v => (
+                        <option key={v.id} value={v.id}>
+                          {v.name}
+                        </option>
+                      ))}
+                      <option value="House">House</option>
+                    </select>
+                  </td>
+                  <td className="py-1 pr-2">
+                    <div className="flex items-center gap-1">
+                      <select
+                        className="input text-sm py-1 flex-1 min-w-0"
+                        value={matOpt?.label}
+                        onChange={e => upd(i, 'type', e.target.value)}
+                      >
+                        {opts.map(o => (
+                          <option key={o.label} value={o.label}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                      {laborBuiltIn && (
+                        <RateEditPopover
+                          table="labor_rates"
+                          name={laborBuiltIn.laborDbName}
+                          category="Utilities"
+                          mode="coefficient"
+                          unitLabel={`hrs/${unitLabel}`}
+                          currentValue={laborVal}
+                          onSaved={refreshAllRates}
+                        />
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-1 pr-2">
+                    <NumInput value={row[qtyField]} onChange={v => upd(i, qtyField, v)} className="w-full" />
+                  </td>
+                  <td className="py-1 text-right text-gray-400 text-xs pr-2">
+                    <span className="inline-flex items-center justify-end gap-1">
+                      ${matCost.toFixed(2)}
+                      {matOpt?.dbName && (
+                        <RateEditPopover
+                          table="material_rates"
+                          name={matOpt.dbName}
+                          category="Utilities"
+                          unitLabel={unitLabel}
+                          currentValue={matCost}
+                          onSaved={refreshAllRates}
+                        />
+                      )}
+                    </span>
+                  </td>
+                  <td className="py-1 text-right text-gray-600 text-xs">
+                    {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
+                  </td>
+                  <td className="py-1 text-center">
+                    {rows.length > 1 && (
+                      <button
+                        type="button"
+                        className="text-gray-300 hover:text-red-500"
+                        title="Remove row"
+                        onClick={() => setRows(rs => rs.filter((_, idx) => idx !== i))}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        <button
+          type="button"
+          className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+          onClick={() => setRows(rs => [...rs, newRow()])}
+        >
+          + Add row
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Calculation engine ────────────────────────────────────────────────────────
 function calcFirePit(
   state,
@@ -93,21 +338,82 @@ function calcFirePit(
     pctGrouted,
     pctCurved,
     useGroutPump,
-    gasRingCount,
-    gasTrenchLF,
-    sandStuccoSF,
-    smoothStuccoSF,
-    ledgerstoneSF,
-    stackedStoneSF,
-    tileSF,
-    flagstoneSF,
-    flagstoneRateInput,
-    realStoneSF,
-    realStoneRateInput,
+    capRows,
+    wallFinishRows,
+    epLineRows,
+    epGasRows,
     manualRows,
+    materialRows,
   } = state
 
   const p = (dbName, fallback) => mp[dbName] ?? fallback
+
+  // ── Wall finish per-row calc: material (vendor-overridable unit) + labor ──────
+  const finishRowCalc = row => {
+    const meta = WF_META[row.type]
+    const sf = n(row.sf)
+    if (!meta || sf <= 0) return { mat: 0, hrs: 0 }
+    const houseUnit = p(FP_RATES[meta.key].dbName, FP_RATES[meta.key].fallback)
+    const unit = wfVendorPrice(row.vendor, row.type, materialRows, WF_CAT) ?? houseUnit
+    let mat = 0
+    if (meta.unit === 'ton') {
+      const tons = sf / meta.tonPerSF
+      mat =
+        tons * unit +
+        tons * (meta.delivPerTon || 0) +
+        (meta.misc || 0) +
+        (meta.addPerSF ? sf * meta.addPerSF : 0)
+    } else {
+      mat =
+        sf * unit * (meta.waste || 1) +
+        (meta.screwPer5 ? (sf / 5) * meta.screwPer5 : 0) +
+        (meta.adhesivePerSF ? sf * meta.adhesivePerSF : 0)
+    }
+    const labRate = p(FP_RATES[meta.labKey].dbName, FP_RATES[meta.labKey].fallback)
+    const hrs = meta.labMode === 'perDay' ? (labRate > 0 ? (sf / labRate) * 8 : 0) : sf * labRate
+    return { mat, hrs, unit }
+  }
+  const wallFinishCalc = (wallFinishRows || []).map(finishRowCalc)
+  const finishMat = wallFinishCalc.reduce((s, c) => s + c.mat, 0)
+  const finishHrs = wallFinishCalc.reduce((s, c) => s + c.hrs, 0)
+
+  // ── Wall cap per-row calc: $/LF material (vendor-overridable) + hrs/LF labor ──
+  const capRowCalc = row => {
+    const meta = CAP_META[row.type]
+    const lf = n(row.lf)
+    if (!meta || lf <= 0) return { mat: 0, hrs: 0 }
+    const houseUnit = p(FP_RATES[meta.matKey].dbName, FP_RATES[meta.matKey].fallback)
+    const unit = wfVendorPrice(row.vendor, row.type, materialRows, CAP_CAT) ?? houseUnit
+    const labCoef = p(FP_RATES[meta.labKey].dbName, FP_RATES[meta.labKey].fallback)
+    return { mat: lf * unit, hrs: lf * labCoef, unit }
+  }
+  const capCalc = (capRows || []).map(capRowCalc)
+  const capMat = capCalc.reduce((s, c) => s + c.mat, 0)
+  const capHrs = capCalc.reduce((s, c) => s + c.hrs, 0)
+
+  // ── Gas Line + Gas Fixtures (Utilities catalog, gas only) ─────────────────────
+  // Gas Line = pipe labor + material PLUS trenching (6" wide × 24" deep per LF,
+  // = 1.0 cf/LF at the Utilities trench excavation rate) — this replaces the old
+  // separate Trench section. Vendor overrides only the material unit price.
+  const GAS_TRENCH_CF_PER_LF = (6 / 12) * (24 / 12) // = 1.0
+  const gasTrenchMinsPerCF = mp['Utilities Trench Excavation'] ?? 10
+  let epHrs = 0
+  let epMat = 0
+  ;(epLineRows || []).forEach(r => {
+    const lf = n(r.lf)
+    if (lf <= 0) return
+    const { matCost, laborVal } = resolveUtilRow(UTIL_CAT.line, r, LINE_TYPE_ARR, materialRows, mp)
+    epMat += lf * matCost
+    epHrs += lf * laborVal
+    epHrs += (lf * GAS_TRENCH_CF_PER_LF * gasTrenchMinsPerCF) / 60 // 6"×24" trenching
+  })
+  ;(epGasRows || []).forEach(r => {
+    const qty = n(r.qty)
+    if (qty <= 0) return
+    const { matCost, laborVal } = resolveUtilRow(UTIL_CAT.gas, r, GAS_TYPE_ARR, materialRows, mp)
+    epMat += qty * matCost
+    epHrs += qty * laborVal
+  })
 
   // ── Block geometry ───────────────────────────────────────────────────────────
   const blocksPerCourse = n(wallLF) > 0 ? Math.ceil((n(wallLF) * 12) / BLOCK_LENGTH_IN) : 0
@@ -141,74 +447,10 @@ function calcFirePit(
       ? p(FP_RATES.pumpGroutLab.dbName, FP_RATES.pumpGroutLab.fallback)
       : p(FP_RATES.handGroutLab.dbName, FP_RATES.handGroutLab.fallback)
   const groutHrs = groutCF > 0 ? groutCF / groutRate : 0
-  const gasTrenchHrs =
-    n(gasTrenchLF) > 0
-      ? (n(gasTrenchLF) / p(FP_RATES.gasTrenchLab.dbName, FP_RATES.gasTrenchLab.fallback)) * 8
-      : 0
-  // ── Wall cap (identical calculator to Walls > Wall Caps) ──
-  // Per-row cap: Flagstone / Precast / PIP Concrete / Bullnose Brick, each
-  // with the same material formula and labor coefficient used in WallsModule.
-  let capHrs = 0,
-    capMat = 0
-  ;(state.capRows || []).forEach(cap => {
-    const lf = n(cap.lf),
-      qty = n(cap.qty)
-    if (cap.type === 'Flagstone') {
-      capMat +=
-        (((n(cap.widthIn) / 12) * lf * 0.0833 * 100) / 2000) *
-        p(FP_RATES.capFlagstone.dbName, FP_RATES.capFlagstone.fallback)
-      capHrs += lf * 0.25
-    } else if (cap.type === 'Precast') {
-      // Width scales the unit price — base $/ea is keyed to an 8" cap.
-      const widthFactor = (n(cap.widthIn) || 8) / 8
-      capMat += qty * p(FP_RATES.capPrecast.dbName, FP_RATES.capPrecast.fallback) * widthFactor
-      capHrs += qty * 0.2
-    } else if (cap.type === 'PIP Concrete') {
-      capMat +=
-        ((lf * (n(cap.widthIn) / 12) * 0.333) / 27) *
-        p(FP_RATES.capConcrete.dbName, FP_RATES.capConcrete.fallback)
-      capHrs += lf * 0.15
-    } else if (cap.type === 'Bullnose Brick') {
-      capMat += lf * p(FP_RATES.capBullnose.dbName, FP_RATES.capBullnose.fallback)
-      capHrs += lf * 0.08
-    }
-  })
 
   // Curved adjustment: curved sections take 25% more structural labor
   const structuralBaseHrs = digHrs + rebarHrs + setBlockHrs + groutHrs
   const curveAddHrs = structuralBaseHrs * (n(pctCurved) / 100) * 0.25
-
-  // ── Wall finish labor ─────────────────────────────────────────────────────────
-  const sandStuccoHrs =
-    n(sandStuccoSF) > 0
-      ? (n(sandStuccoSF) / p(FP_RATES.sandStuccoLab.dbName, FP_RATES.sandStuccoLab.fallback)) * 8
-      : 0
-  const smoothStuccoHrs =
-    n(smoothStuccoSF) > 0
-      ? (n(smoothStuccoSF) /
-          p(FP_RATES.smoothStuccoLab.dbName, FP_RATES.smoothStuccoLab.fallback)) *
-        8
-      : 0
-  const ledgerstoneHrs =
-    n(ledgerstoneSF) > 0
-      ? (n(ledgerstoneSF) / p(FP_RATES.ledgerstoneLab.dbName, FP_RATES.ledgerstoneLab.fallback)) * 8
-      : 0
-  const stackedStoneHrs =
-    n(stackedStoneSF) > 0
-      ? (n(stackedStoneSF) /
-          p(FP_RATES.stackedStoneLab.dbName, FP_RATES.stackedStoneLab.fallback)) *
-        8
-      : 0
-  const tileHrs =
-    n(tileSF) > 0 ? n(tileSF) * p(FP_RATES.tileLab.dbName, FP_RATES.tileLab.fallback) : 0
-  const flagstoneHrs =
-    n(flagstoneSF) > 0
-      ? n(flagstoneSF) * p(FP_RATES.flagstoneLab.dbName, FP_RATES.flagstoneLab.fallback)
-      : 0
-  const realStoneHrs =
-    n(realStoneSF) > 0
-      ? n(realStoneSF) * p(FP_RATES.realStoneLab.dbName, FP_RATES.realStoneLab.fallback)
-      : 0
 
   // ── Manual ───────────────────────────────────────────────────────────────────
   let manHrs = 0,
@@ -229,54 +471,15 @@ function calcFirePit(
     useGroutPump === 'Yes' && groutCF > 0
       ? p(FP_RATES.fpGroutPump.dbName, FP_RATES.fpGroutPump.fallback)
       : 0
-  const gasRingMat = n(gasRingCount) * p(FP_RATES.fpGasRing.dbName, FP_RATES.fpGasRing.fallback)
-  const gasPipeMat = n(gasTrenchLF) * p(FP_RATES.fpGasPipe.dbName, FP_RATES.fpGasPipe.fallback)
-
-  const sandStuccoMat =
-    n(sandStuccoSF) * p(FP_RATES.sandStucco.dbName, FP_RATES.sandStucco.fallback)
-  const smoothStuccoMat =
-    n(smoothStuccoSF) * p(FP_RATES.smoothStucco.dbName, FP_RATES.smoothStucco.fallback)
-  const ledgerstoneMat =
-    n(ledgerstoneSF) > 0
-      ? n(ledgerstoneSF) * p(FP_RATES.ledgerstone.dbName, FP_RATES.ledgerstone.fallback) * 1.1 +
-        (n(ledgerstoneSF) / 5) * 2
-      : 0
-  const stackedStoneMat =
-    n(stackedStoneSF) > 0
-      ? n(stackedStoneSF) * p(FP_RATES.stackedStone.dbName, FP_RATES.stackedStone.fallback) * 1.1 +
-        (n(stackedStoneSF) / 5) * 2
-      : 0
-  const tileMat =
-    n(tileSF) > 0
-      ? n(tileSF) * p(FP_RATES.tile.dbName, FP_RATES.tile.fallback) + n(tileSF) // +$1/SF adhesive/grout
-      : 0
-  const realFlagRate =
-    n(flagstoneRateInput) || p(FP_RATES.realFlagstone.dbName, FP_RATES.realFlagstone.fallback)
-  const flagstoneMat =
-    n(flagstoneSF) > 0
-      ? (n(flagstoneSF) / 80) * realFlagRate + (n(flagstoneSF) / 80) * 80 + 268.75
-      : 0
-  const realStoneRt =
-    n(realStoneRateInput) || p(FP_RATES.realStone.dbName, FP_RATES.realStone.fallback)
-  const realStoneMat =
-    n(realStoneSF) > 0
-      ? (n(realStoneSF) / 70) * realStoneRt + (n(realStoneSF) / 70) * 180 + n(realStoneSF)
-      : 0
 
   // ── Totals ───────────────────────────────────────────────────────────────────
   const baseHrs =
     layoutHrsN +
     structuralBaseHrs +
     curveAddHrs +
-    gasTrenchHrs +
     capHrs +
-    sandStuccoHrs +
-    smoothStuccoHrs +
-    ledgerstoneHrs +
-    stackedStoneHrs +
-    tileHrs +
-    flagstoneHrs +
-    realStoneHrs +
+    finishHrs +
+    epHrs +
     manHrs
 
   const diffMod = 1 + n(difficulty) / 100
@@ -291,16 +494,9 @@ function calcFirePit(
     footingMat +
     groutMat +
     pumpSetupMat +
-    gasRingMat +
-    gasPipeMat +
     capMat +
-    sandStuccoMat +
-    smoothStuccoMat +
-    ledgerstoneMat +
-    stackedStoneMat +
-    tileMat +
-    flagstoneMat +
-    realStoneMat +
+    finishMat +
+    epMat +
     manMat
 
   const laborCost = totalHrs * lrph
@@ -350,22 +546,14 @@ function calcFirePit(
     structureMat: blockMat + rebarMat + footingMat + groutMat + pumpSetupMat + capMat,
     capMat,
     capHrs,
-    fixturesMat: gasRingMat + gasPipeMat,
-    finishesMat:
-      sandStuccoMat +
-      smoothStuccoMat +
-      ledgerstoneMat +
-      stackedStoneMat +
-      tileMat +
-      flagstoneMat +
-      realStoneMat,
-    sandStuccoMat,
-    smoothStuccoMat,
-    ledgerstoneMat,
-    stackedStoneMat,
-    tileMat,
-    flagstoneMat,
-    realStoneMat,
+    capCalc,
+    finishMat,
+    finishHrs,
+    finishesMat: finishMat,
+    wallFinishCalc,
+    epMat,
+    epHrs,
+    manMat,
   }
 }
 
@@ -401,12 +589,6 @@ function LabeledRow({ label, children, note }) {
   )
 }
 
-const CAP_TYPES = ['None', 'Flagstone', 'Precast', 'PIP Concrete', 'Bullnose Brick']
-const DEFAULT_CAP_ROWS = [
-  { type: 'None', widthIn: '', lf: '', qty: '' },
-  { type: 'None', widthIn: '', lf: '', qty: '' },
-]
-
 const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 1', hours: '', materials: '', subCost: '' },
   { label: 'Misc 2', hours: '', materials: '', subCost: '' },
@@ -430,18 +612,10 @@ function makeTab(src = {}) {
     pctGrouted: src.pctGrouted ?? '100',
     pctCurved: src.pctCurved ?? '0',
     useGroutPump: src.useGroutPump ?? 'No',
-    capRows: src.capRows ?? DEFAULT_CAP_ROWS.map(r => ({ ...r })),
-    gasRingCount: src.gasRingCount ?? '',
-    gasTrenchLF: src.gasTrenchLF ?? '',
-    sandStuccoSF: src.sandStuccoSF ?? '',
-    smoothStuccoSF: src.smoothStuccoSF ?? '',
-    ledgerstoneSF: src.ledgerstoneSF ?? '',
-    stackedStoneSF: src.stackedStoneSF ?? '',
-    tileSF: src.tileSF ?? '',
-    flagstoneSF: src.flagstoneSF ?? '',
-    flagstoneRateInput: src.flagstoneRateInput ?? '',
-    realStoneSF: src.realStoneSF ?? '',
-    realStoneRateInput: src.realStoneRateInput ?? '',
+    capRows: src.capRows ?? [CAP_ROW(), CAP_ROW()],
+    wallFinishRows: src.wallFinishRows ?? [WF_ROW(), WF_ROW()],
+    epLineRows: src.epLineRows ?? [EP_LINE_ROW(), EP_LINE_ROW()],
+    epGasRows: src.epGasRows ?? [EP_GAS_ROW(), EP_GAS_ROW()],
     manualRows: src.manualRows ?? DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
   }
 }
@@ -466,26 +640,31 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
   )
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
   const [pricesLoading, setPricesLoading] = useState(!initialData?.materialPrices)
+  const [materialRows, setMaterialRows] = useState(initialData?.materialRows ?? [])
+  const [vendors, setVendors] = useState([])
 
-  // Re-fetch Fire Pit merged labor+material map. Used on mount and after edit.
+  // Re-fetch Fire Pit merged labor+material map + the vendor catalog. Used on
+  // mount and after edit. The 'Utilities' category rates (shared with the
+  // Utilities module) merge into the same price map the gas sections read.
   const refreshAllRates = useCallback(async () => {
-    // Wall caps share the Walls-category rate rows, so pull those too. The
-    // cap rate keys (Wall Cap Flagstone / Precast / Bullnose Brick + Wall
-    // Concrete Truck) merge into the same price map the module reads.
-    const CAP_RATE_NAMES = [
-      'Wall Cap Flagstone',
-      'Wall Cap Precast',
-      'Wall Cap Bullnose Brick',
-      'Wall Concrete Truck',
-    ]
-    const [matRes, labRes, capRes] = await Promise.all([
-      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Fire Pit'),
-      supabase.from('labor_rates').select('name, rate').eq('category', 'Fire Pit'),
+    const [matRes, labRes, matRowsRes, venRes] = await Promise.all([
       supabase
         .from('material_rates')
         .select('name, unit_cost')
-        .eq('category', 'Walls')
-        .in('name', CAP_RATE_NAMES),
+        .in('category', ['Fire Pit', 'Utilities']),
+      supabase
+        .from('labor_rates')
+        .select('name, rate')
+        .in('category', ['Fire Pit', 'Utilities']),
+      supabase
+        .from('material_rates')
+        .select('name, unit_cost, subcategory, vendor_id')
+        .not('vendor_id', 'is', null),
+      supabase
+        .from('subs_vendors')
+        .select('id, company_name, supplied_categories')
+        .eq('type', 'vendor')
+        .order('company_name'),
     ])
     const prices = {}
     ;(matRes.data || []).forEach(r => {
@@ -494,10 +673,15 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
     ;(labRes.data || []).forEach(r => {
       prices[r.name] = parseFloat(r.rate) || 0
     })
-    ;(capRes.data || []).forEach(r => {
-      prices[r.name] = parseFloat(r.unit_cost) || 0
-    })
     setMaterialPrices(prices)
+    setMaterialRows(matRowsRes.data || [])
+    setVendors(
+      (venRes.data || []).map(v => ({
+        id: v.id,
+        name: v.company_name,
+        categories: v.supplied_categories || [],
+      }))
+    )
   }, [])
 
   useEffect(() => {
@@ -571,28 +755,12 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
   const setUseGroutPump = setField('useGroutPump')
   const capRows = cur.capRows
   const setCapRows = setField('capRows')
-  const gasRingCount = cur.gasRingCount
-  const setGasRingCount = setField('gasRingCount')
-  const gasTrenchLF = cur.gasTrenchLF
-  const setGasTrenchLF = setField('gasTrenchLF')
-  const sandStuccoSF = cur.sandStuccoSF
-  const setSandStuccoSF = setField('sandStuccoSF')
-  const smoothStuccoSF = cur.smoothStuccoSF
-  const setSmoothStuccoSF = setField('smoothStuccoSF')
-  const ledgerstoneSF = cur.ledgerstoneSF
-  const setLedgerstoneSF = setField('ledgerstoneSF')
-  const stackedStoneSF = cur.stackedStoneSF
-  const setStackedStoneSF = setField('stackedStoneSF')
-  const tileSF = cur.tileSF
-  const setTileSF = setField('tileSF')
-  const flagstoneSF = cur.flagstoneSF
-  const setFlagstoneSF = setField('flagstoneSF')
-  const flagstoneRateInput = cur.flagstoneRateInput
-  const setFlagstoneRateInput = setField('flagstoneRateInput')
-  const realStoneSF = cur.realStoneSF
-  const setRealStoneSF = setField('realStoneSF')
-  const realStoneRateInput = cur.realStoneRateInput
-  const setRealStoneRateInput = setField('realStoneRateInput')
+  const wallFinishRows = cur.wallFinishRows
+  const setWallFinishRows = setField('wallFinishRows')
+  const epLineRows = cur.epLineRows
+  const setEpLineRows = setField('epLineRows')
+  const epGasRows = cur.epGasRows
+  const setEpGasRows = setField('epGasRows')
   const manualRows = cur.manualRows
   const setManualRows = setField('manualRows')
 
@@ -611,23 +779,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
     }
   }, [])
 
-  // Pre-fill editable stone rates once DB prices load — applied independently to
-  // each tab record so In-House and Sub stay separate calculators.
-  useEffect(() => {
-    if (Object.keys(materialPrices).length === 0) return
-    const flag = materialPrices[FP_RATES.realFlagstone.dbName]
-    const real = materialPrices[FP_RATES.realStone.dbName]
-    const fill = t => {
-      let next = t
-      if (!next.flagstoneRateInput && flag) next = { ...next, flagstoneRateInput: flag.toString() }
-      if (!next.realStoneRateInput && real) next = { ...next, realStoneRateInput: real.toString() }
-      return next
-    }
-    setIhTab(prev => fill(prev))
-    setSubTab(prev => fill(prev))
-  }, [materialPrices])
-
-  const state = { crewType, subType, subGpMarkupRate, ...cur }
+  const state = { crewType, subType, subGpMarkupRate, ...cur, materialRows }
   const calcRaw = calcFirePit(
     state,
     laborRatePerHour,
@@ -657,9 +809,12 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
     setManualRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
 
-  function updateCap(i, field, val) {
+  const setCapRow = (i, field, val) =>
     setCapRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
-  }
+  const setWallFinishRow = (i, field, val) =>
+    setWallFinishRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+
+  const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
 
   function handleSave() {
     onSave({
@@ -936,6 +1091,10 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
           </select>
         </LabeledRow>
 
+        <LabeledRow label="Layout Time (Hours)">
+          <NumInput value={layoutHrs} onChange={setLayoutHrs} placeholder="0" className="w-28" />
+        </LabeledRow>
+
         {n(wallLF) > 0 && (
           <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-gray-600 flex flex-wrap gap-4">
             <span>
@@ -963,380 +1122,253 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
       {/* ── Wall Caps ── */}
       <div>
         <SectionHeader title="Wall Caps" />
-        <p className="text-xs text-gray-400 mb-1 inline-flex items-center flex-wrap gap-x-2">
-          <span className="inline-flex items-center gap-1">
-            Flagstone ${p(FP_RATES.capFlagstone.dbName, FP_RATES.capFlagstone.fallback)}/ton
-            <RateEditPopover
-              table="material_rates"
-              name={FP_RATES.capFlagstone.dbName}
-              category="Walls"
-              unitLabel="ton"
-              currentValue={p(FP_RATES.capFlagstone.dbName, FP_RATES.capFlagstone.fallback)}
-              onSaved={refreshAllRates}
-            />
-          </span>
-          ·
-          <span className="inline-flex items-center gap-1">
-            Precast ${p(FP_RATES.capPrecast.dbName, FP_RATES.capPrecast.fallback)}/ea
-            <RateEditPopover
-              table="material_rates"
-              name={FP_RATES.capPrecast.dbName}
-              category="Walls"
-              unitLabel="ea"
-              currentValue={p(FP_RATES.capPrecast.dbName, FP_RATES.capPrecast.fallback)}
-              onSaved={refreshAllRates}
-            />
-          </span>
-          ·
-          <span className="inline-flex items-center gap-1">
-            Bullnose ${p(FP_RATES.capBullnose.dbName, FP_RATES.capBullnose.fallback)}/LF
-            <RateEditPopover
-              table="material_rates"
-              name={FP_RATES.capBullnose.dbName}
-              category="Walls"
-              unitLabel="LF"
-              currentValue={p(FP_RATES.capBullnose.dbName, FP_RATES.capBullnose.fallback)}
-              onSaved={refreshAllRates}
-            />
-          </span>
-        </p>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-xs text-gray-500 border-b border-gray-200">
-              <th className="text-left pb-1 pr-2 font-medium">Type</th>
-              <th className="text-left pb-1 pr-2 font-medium">Width (in)</th>
-              <th className="text-left pb-1 font-medium">Lin. Ft / Qty</th>
-            </tr>
-          </thead>
-          <tbody>
-            {capRows.map((cap, i) => {
-              const isActive = cap.type !== 'None'
-              return (
-                <tr key={i} className="border-b border-gray-100">
-                  <td className="py-1 pr-2">
-                    <select
-                      className="input text-sm py-1 w-36"
-                      value={cap.type}
-                      onChange={e => updateCap(i, 'type', e.target.value)}
-                    >
-                      {CAP_TYPES.map(t => (
-                        <option key={t}>{t}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="py-1 pr-2">
-                    {isActive && (
-                      <NumInput
-                        value={cap.widthIn}
-                        onChange={v => updateCap(i, 'widthIn', v)}
-                        className="w-20"
-                        placeholder="4"
-                      />
-                    )}
-                  </td>
-                  <td className="py-1">
-                    {isActive && (
-                      <NumInput
-                        value={cap.type === 'Precast' ? cap.qty : cap.lf}
-                        onChange={v => updateCap(i, cap.type === 'Precast' ? 'qty' : 'lf', v)}
-                        className="w-20"
-                        placeholder="0"
-                      />
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-        {calc.capMat > 0 && (
-          <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-gray-600 flex flex-wrap gap-4">
-            <span>
-              Cap material: <strong>${calc.capMat.toFixed(2)}</strong>
-            </span>
-            <span>
-              Cap install: <strong>{calc.capHrs.toFixed(2)} hrs</strong>
-            </span>
-          </div>
-        )}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              <col className="w-[128px]" />
+              <col />
+              <col className="w-[84px]" />
+              <col className="w-[96px]" />
+              <col className="w-[112px]" />
+              <col className="w-6" />
+            </colgroup>
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
+                <th className="text-left pb-1 pr-2 font-medium">Type</th>
+                <th className="text-left pb-1 pr-2 font-medium">LF</th>
+                <th className="text-right pb-1 pr-2 font-medium text-gray-400">$/LF</th>
+                <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {capRows.map((row, i) => {
+                const meta = CAP_META[row.type]
+                const rc = calc.capCalc?.[i] || {}
+                return (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-2">
+                      <select
+                        className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white w-full"
+                        value={row.vendor || 'House'}
+                        onChange={e => setCapRow(i, 'vendor', e.target.value)}
+                        title="Vendor — overrides material price"
+                      >
+                        <option value="House">House</option>
+                        {vendorsForCategory(CAP_CAT).map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1 pr-2">
+                      <span className="flex items-center gap-1">
+                        <select
+                          className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white flex-1 min-w-0"
+                          value={row.type}
+                          onChange={e => setCapRow(i, 'type', e.target.value)}
+                        >
+                          {CAP_LIST.map(t => (
+                            <option key={t} value={t}>
+                              {t}
+                            </option>
+                          ))}
+                        </select>
+                        {meta && (
+                          <RateEditPopover
+                            table="material_rates"
+                            name={FP_RATES[meta.matKey].dbName}
+                            category="Fire Pit"
+                            unitLabel="LF"
+                            currentValue={p(FP_RATES[meta.matKey].dbName, FP_RATES[meta.matKey].fallback)}
+                            onSaved={refreshAllRates}
+                          />
+                        )}
+                        {meta && (
+                          <RateEditPopover
+                            table="labor_rates"
+                            name={FP_RATES[meta.labKey].dbName}
+                            category="Fire Pit"
+                            mode="coefficient"
+                            unitLabel="hrs/LF"
+                            currentValue={p(FP_RATES[meta.labKey].dbName, FP_RATES[meta.labKey].fallback)}
+                            onSaved={refreshAllRates}
+                          />
+                        )}
+                      </span>
+                    </td>
+                    <td className="py-1 pr-2">
+                      <NumInput value={row.lf} onChange={v => setCapRow(i, 'lf', v)} className="w-full" />
+                    </td>
+                    <td className="py-1 pr-2 text-right text-gray-400 text-xs">
+                      {rc.unit ? `$${rc.unit.toFixed(2)}/LF` : '—'}
+                    </td>
+                    <td className="py-1 text-right text-xs text-gray-600">
+                      {rc.mat > 0 ? `$${rc.mat.toFixed(2)}` : '—'}
+                      {rc.hrs > 0 ? (
+                        <span className="text-gray-400"> · {rc.hrs.toFixed(1)}h</span>
+                      ) : null}
+                    </td>
+                    <td className="py-1 text-center">
+                      {capRows.length > 1 && (
+                        <button
+                          type="button"
+                          className="text-gray-300 hover:text-red-500"
+                          title="Remove row"
+                          onClick={() => setCapRows(rs => rs.filter((_, idx) => idx !== i))}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <button
+            type="button"
+            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+            onClick={() => setCapRows(rs => [...rs, CAP_ROW()])}
+          >
+            + Add row
+          </button>
+        </div>
       </div>
 
-      {/* ── Gas Fixtures & Trench ── */}
+      {/* ── Gas Line ── */}
       <div>
-        <SectionHeader title="Gas Fixtures & Trench" />
-        <div className="space-y-0">
-          <div className="flex items-center gap-3 py-1.5 border-b border-gray-100">
-            <span className="text-xs text-gray-700 w-44 shrink-0">Layout Time (Hours)</span>
-            <NumInput value={layoutHrs} onChange={setLayoutHrs} placeholder="0" className="w-28" />
-          </div>
-          <div className="flex items-center gap-3 py-1.5 border-b border-gray-100">
-            <span className="text-xs text-gray-700 w-44 shrink-0 inline-flex items-center gap-1">
-              Gas Ring / Burner Openings
-              <RateEditPopover
-                table="material_rates"
-                name={FP_RATES.fpGasRing.dbName}
-                category="Fire Pit"
-                unitLabel="ea"
-                currentValue={p(FP_RATES.fpGasRing.dbName, FP_RATES.fpGasRing.fallback)}
-                onSaved={refreshAllRates}
-              />
-            </span>
-            <NumInput
-              value={gasRingCount}
-              onChange={setGasRingCount}
-              placeholder="0"
-              className="w-28"
-            />
-            {n(gasRingCount) > 0 && (
-              <span className="text-xs text-gray-400 shrink-0">
-                ${(n(gasRingCount) * p(FP_RATES.fpGasRing.dbName, 25)).toFixed(2)} mat
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-3 py-1.5 border-b border-gray-100">
-            <span className="text-xs text-gray-700 w-44 shrink-0 inline-flex items-center gap-1">
-              Gas Trench / Run (LF)
-              <RateEditPopover
-                table="labor_rates"
-                name={FP_RATES.gasTrenchLab.dbName}
-                category="Fire Pit"
-                mode="coefficient"
-                unitLabel="LF/day"
-                currentValue={p(FP_RATES.gasTrenchLab.dbName, FP_RATES.gasTrenchLab.fallback)}
-                onSaved={refreshAllRates}
-              />
-              <RateEditPopover
-                table="material_rates"
-                name={FP_RATES.fpGasPipe.dbName}
-                category="Fire Pit"
-                unitLabel="LF"
-                currentValue={p(FP_RATES.fpGasPipe.dbName, FP_RATES.fpGasPipe.fallback)}
-                onSaved={refreshAllRates}
-              />
-            </span>
-            <NumInput
-              value={gasTrenchLF}
-              onChange={setGasTrenchLF}
-              placeholder="0"
-              className="w-28"
-            />
-            {n(gasTrenchLF) > 0 && (
-              <span className="text-xs text-gray-400 shrink-0">
-                ${(n(gasTrenchLF) * p(FP_RATES.fpGasPipe.dbName, 3)).toFixed(2)} mat
-              </span>
-            )}
-          </div>
-        </div>
+        <SectionHeader title="Gas Line" />
+        <EpTable
+          rows={epLineRows}
+          setRows={setEpLineRows}
+          arr={LINE_TYPE_ARR}
+          cat={UTIL_CAT.line}
+          qtyField="lf"
+          qtyLabel="Linear Feet"
+          unitLabel="LF"
+          newRow={EP_LINE_ROW}
+          materialRows={materialRows}
+          materialPrices={materialPrices}
+          refreshAllRates={refreshAllRates}
+          vendorsForCategory={vendorsForCategory}
+        />
+      </div>
+
+      {/* ── Gas Fixtures ── */}
+      <div>
+        <SectionHeader title="Gas Fixtures" />
+        <EpTable
+          rows={epGasRows}
+          setRows={setEpGasRows}
+          arr={GAS_TYPE_ARR}
+          cat={UTIL_CAT.gas}
+          qtyField="qty"
+          qtyLabel="Qty"
+          unitLabel="ea"
+          newRow={EP_GAS_ROW}
+          materialRows={materialRows}
+          materialPrices={materialPrices}
+          refreshAllRates={refreshAllRates}
+          vendorsForCategory={vendorsForCategory}
+        />
       </div>
 
       {/* ── Wall Finishes ── */}
       <div>
         <SectionHeader title="Wall Finishes" />
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              <col className="w-[128px]" />
+              <col />
+              <col className="w-[72px]" />
+              <col className="w-[96px]" />
+              <col className="w-[112px]" />
+            </colgroup>
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-left pb-1 pr-2 font-medium">Type</th>
                 <th className="text-left pb-1 pr-2 font-medium">SF</th>
-                <th className="text-left pb-1 pr-2 font-medium">Rate</th>
+                <th className="text-right pb-1 pr-2 font-medium text-gray-400">$/Unit</th>
                 <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
               </tr>
             </thead>
             <tbody>
-              {[
-                {
-                  label: 'Sand Stucco',
-                  sf: sandStuccoSF,
-                  setSf: setSandStuccoSF,
-                  mat: calc.sandStuccoMat,
-                  matKey: 'sandStucco',
-                  labKey: 'sandStuccoLab',
-                  fallback: 0,
-                },
-                {
-                  label: 'Smooth Stucco',
-                  sf: smoothStuccoSF,
-                  setSf: setSmoothStuccoSF,
-                  mat: calc.smoothStuccoMat,
-                  matKey: 'smoothStucco',
-                  labKey: 'smoothStuccoLab',
-                  fallback: 0,
-                },
-                {
-                  label: 'Ledgerstone Veneer',
-                  sf: ledgerstoneSF,
-                  setSf: setLedgerstoneSF,
-                  mat: calc.ledgerstoneMat,
-                  matKey: 'ledgerstone',
-                  labKey: 'ledgerstoneLab',
-                  fallback: 10,
-                },
-                {
-                  label: 'Stacked Stone',
-                  sf: stackedStoneSF,
-                  setSf: setStackedStoneSF,
-                  mat: calc.stackedStoneMat,
-                  matKey: 'stackedStone',
-                  labKey: 'stackedStoneLab',
-                  fallback: 10,
-                },
-                {
-                  label: 'Tile',
-                  sf: tileSF,
-                  setSf: setTileSF,
-                  mat: calc.tileMat,
-                  matKey: 'tile',
-                  labKey: 'tileLab',
-                  fallback: 6.5,
-                },
-              ].map(({ label, sf, setSf, mat, matKey, labKey, fallback }) => (
-                <tr key={label} className="border-b border-gray-100">
-                  <td className="py-1 pr-2 text-xs text-gray-700">{label}</td>
-                  <td className="py-1 pr-2">
-                    <NumInput value={sf} onChange={setSf} />
-                  </td>
-                  <td className="py-1 pr-2 text-xs text-gray-400">
-                    <span className="inline-flex items-center gap-1 flex-wrap">
-                      ${p(FP_RATES[matKey].dbName, fallback).toFixed(2)}/SF
-                      <RateEditPopover
-                        table="material_rates"
-                        name={FP_RATES[matKey].dbName}
-                        category="Fire Pit"
-                        unitLabel="SF"
-                        currentValue={p(FP_RATES[matKey].dbName, FP_RATES[matKey].fallback)}
-                        onSaved={refreshAllRates}
-                      />
-                      <RateEditPopover
-                        table="labor_rates"
-                        name={FP_RATES[labKey].dbName}
-                        category="Fire Pit"
-                        mode="coefficient"
-                        unitLabel="rate"
-                        currentValue={p(FP_RATES[labKey].dbName, FP_RATES[labKey].fallback)}
-                        onSaved={refreshAllRates}
-                      />
-                    </span>
-                  </td>
-                  <td className="py-1 text-right text-xs text-gray-600">
-                    {n(sf) > 0 ? `$${mat.toFixed(2)}` : '—'}
-                  </td>
-                </tr>
-              ))}
-
-              {/* Real Flagstone — editable $/ton */}
-              <tr className="border-b border-gray-100">
-                <td className="py-1 pr-2 text-xs text-gray-700">
-                  <span className="inline-flex items-center gap-1">
-                    Real Flagstone
-                    <RateEditPopover
-                      table="labor_rates"
-                      name={FP_RATES.flagstoneLab.dbName}
-                      category="Fire Pit"
-                      mode="coefficient"
-                      unitLabel="hrs/SF"
-                      currentValue={p(FP_RATES.flagstoneLab.dbName, FP_RATES.flagstoneLab.fallback)}
-                      onSaved={refreshAllRates}
-                    />
-                  </span>
-                </td>
-                <td className="py-1 pr-2">
-                  <NumInput value={flagstoneSF} onChange={setFlagstoneSF} />
-                </td>
-                <td className="py-1 pr-2">
-                  <div className="flex items-center gap-1">
-                    <div className="relative w-24">
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                        $
+              {wallFinishRows.map((row, i) => {
+                const meta = WF_META[row.type]
+                const rc = calc.wallFinishCalc?.[i] || {}
+                return (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-2">
+                      <select
+                        className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white w-full"
+                        value={row.vendor || 'House'}
+                        onChange={e => setWallFinishRow(i, 'vendor', e.target.value)}
+                        title="Vendor — overrides material price"
+                      >
+                        <option value="House">House</option>
+                        {vendorsForCategory(WF_CAT).map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1 pr-2">
+                      <span className="flex items-center gap-1">
+                        <select
+                          className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white flex-1 min-w-0"
+                          value={row.type}
+                          onChange={e => setWallFinishRow(i, 'type', e.target.value)}
+                        >
+                          {WF_LIST.map(t => (
+                            <option key={t} value={t}>
+                              {t}
+                            </option>
+                          ))}
+                        </select>
+                        {meta && (
+                          <RateEditPopover
+                            table="material_rates"
+                            name={FP_RATES[meta.key].dbName}
+                            category="Fire Pit"
+                            unitLabel={meta.unit === 'ton' ? 'ton' : 'SF'}
+                            currentValue={p(FP_RATES[meta.key].dbName, FP_RATES[meta.key].fallback)}
+                            onSaved={refreshAllRates}
+                          />
+                        )}
+                        {meta && (
+                          <RateEditPopover
+                            table="labor_rates"
+                            name={FP_RATES[meta.labKey].dbName}
+                            category="Fire Pit"
+                            mode="coefficient"
+                            unitLabel={meta.labMode === 'perDay' ? 'SF/day' : 'hrs/SF'}
+                            currentValue={p(FP_RATES[meta.labKey].dbName, FP_RATES[meta.labKey].fallback)}
+                            onSaved={refreshAllRates}
+                          />
+                        )}
                       </span>
-                      <input
-                        type="number"
-                        step="any"
-                        className="input text-sm py-1.5 pl-5 w-full"
-                        placeholder={p(FP_RATES.realFlagstone.dbName, 400).toString()}
-                        value={flagstoneRateInput}
-                        onChange={e => setFlagstoneRateInput(e.target.value)}
-                      />
-                    </div>
-                    <RateEditPopover
-                      table="material_rates"
-                      name={FP_RATES.realFlagstone.dbName}
-                      category="Fire Pit"
-                      unitLabel="ton"
-                      currentValue={p(
-                        FP_RATES.realFlagstone.dbName,
-                        FP_RATES.realFlagstone.fallback
-                      )}
-                      onSaved={refreshAllRates}
-                    />
-                  </div>
-                </td>
-                <td className="py-1 text-right text-xs text-gray-600">
-                  {n(flagstoneSF) > 0 ? (
-                    <div className="text-right">
-                      <div>${calc.flagstoneMat.toFixed(2)}</div>
-                      <div className="text-gray-400">{(n(flagstoneSF) / 80).toFixed(2)} tons</div>
-                    </div>
-                  ) : (
-                    '—'
-                  )}
-                </td>
-              </tr>
-
-              {/* Real Stone — editable $/ton */}
-              <tr className="border-b border-gray-100">
-                <td className="py-1 pr-2 text-xs text-gray-700">
-                  <span className="inline-flex items-center gap-1">
-                    Real Stone
-                    <RateEditPopover
-                      table="labor_rates"
-                      name={FP_RATES.realStoneLab.dbName}
-                      category="Fire Pit"
-                      mode="coefficient"
-                      unitLabel="hrs/SF"
-                      currentValue={p(FP_RATES.realStoneLab.dbName, FP_RATES.realStoneLab.fallback)}
-                      onSaved={refreshAllRates}
-                    />
-                  </span>
-                </td>
-                <td className="py-1 pr-2">
-                  <NumInput value={realStoneSF} onChange={setRealStoneSF} />
-                </td>
-                <td className="py-1 pr-2">
-                  <div className="flex items-center gap-1">
-                    <div className="relative w-24">
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                        $
-                      </span>
-                      <input
-                        type="number"
-                        step="any"
-                        className="input text-sm py-1.5 pl-5 w-full"
-                        placeholder={p(FP_RATES.realStone.dbName, 400).toString()}
-                        value={realStoneRateInput}
-                        onChange={e => setRealStoneRateInput(e.target.value)}
-                      />
-                    </div>
-                    <RateEditPopover
-                      table="material_rates"
-                      name={FP_RATES.realStone.dbName}
-                      category="Fire Pit"
-                      unitLabel="ton"
-                      currentValue={p(FP_RATES.realStone.dbName, FP_RATES.realStone.fallback)}
-                      onSaved={refreshAllRates}
-                    />
-                  </div>
-                </td>
-                <td className="py-1 text-right text-xs text-gray-600">
-                  {n(realStoneSF) > 0 ? (
-                    <div className="text-right">
-                      <div>${calc.realStoneMat.toFixed(2)}</div>
-                      <div className="text-gray-400">{(n(realStoneSF) / 70).toFixed(2)} tons</div>
-                    </div>
-                  ) : (
-                    '—'
-                  )}
-                </td>
-              </tr>
+                    </td>
+                    <td className="py-1 pr-2">
+                      <NumInput value={row.sf} onChange={v => setWallFinishRow(i, 'sf', v)} className="w-full" />
+                    </td>
+                    <td className="py-1 pr-2 text-right text-gray-400 text-xs">
+                      {rc.unit ? `$${rc.unit.toFixed(2)}/${meta?.unit === 'ton' ? 'ton' : 'SF'}` : '—'}
+                    </td>
+                    <td className="py-1 text-right text-xs text-gray-600">
+                      {rc.mat > 0 ? `$${rc.mat.toFixed(2)}` : '—'}
+                      {rc.hrs > 0 ? (
+                        <span className="text-gray-400"> · {rc.hrs.toFixed(1)}h</span>
+                      ) : null}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

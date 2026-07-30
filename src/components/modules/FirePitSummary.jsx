@@ -9,8 +9,10 @@ const FP_RATES = {
   fpRebar: { dbName: 'FP Rebar', fallback: 0.5 },
   fpConcrete: { dbName: 'FP Concrete', fallback: 149.5 },
   fpGroutPump: { dbName: 'FP Grout Pump Setup', fallback: 150.0 },
-  fpGasRing: { dbName: 'FP Gas Ring/Burner', fallback: 25.0 },
-  fpGasPipe: { dbName: 'FP Gas Pipe', fallback: 3.0 },
+  capFlagstone: { dbName: 'FP Cap Flagstone', fallback: 18.0 },
+  capPrecast: { dbName: 'FP Cap Precast', fallback: 12.0 },
+  capPipConcrete: { dbName: 'FP Cap PIP Concrete', fallback: 10.0 },
+  capBullnose: { dbName: 'FP Cap Bullnose Brick', fallback: 5.0 },
   sandStucco: { dbName: 'Sand Stucco - FP', fallback: 0.0 },
   smoothStucco: { dbName: 'Smooth Stucco - FP', fallback: 0.0 },
   ledgerstone: { dbName: 'Ledgerstone - FP', fallback: 10.0 },
@@ -23,7 +25,10 @@ const FP_RATES = {
   blockLab: { dbName: 'FP Set Blocks Labor Rate', fallback: 10.4 },
   handGroutLab: { dbName: 'FP Hand Grout Labor Rate', fallback: 5.5 },
   pumpGroutLab: { dbName: 'FP Pump Grout Labor Rate', fallback: 81.0 },
-  gasTrenchLab: { dbName: 'FP Gas Trench Labor Rate', fallback: 35.0 },
+  capFlagstoneLab: { dbName: 'FP Cap Flagstone Labor Rate', fallback: 0.25 },
+  capPrecastLab: { dbName: 'FP Cap Precast Labor Rate', fallback: 0.2 },
+  capPipConcreteLab: { dbName: 'FP Cap PIP Concrete Labor Rate', fallback: 0.15 },
+  capBullnoseLab: { dbName: 'FP Cap Bullnose Brick Labor Rate', fallback: 0.08 },
   sandStuccoLab: { dbName: 'Sand Stucco - FP Labor Rate', fallback: 92 },
   smoothStuccoLab: { dbName: 'Smooth Stucco - FP Labor Rate', fallback: 65 },
   ledgerstoneLab: { dbName: 'Ledgerstone - FP Labor Rate', fallback: 24 },
@@ -31,6 +36,60 @@ const FP_RATES = {
   tileLab: { dbName: 'Tile - FP Labor Rate', fallback: 0.2867 },
   flagstoneLab: { dbName: 'Real Flagstone - FP Labor Rate', fallback: 0.4487 },
   realStoneLab: { dbName: 'Real Stone - FP Labor Rate', fallback: 0.8954 },
+}
+
+const CAP_META = {
+  Flagstone: { matKey: 'capFlagstone', labKey: 'capFlagstoneLab' },
+  Precast: { matKey: 'capPrecast', labKey: 'capPrecastLab' },
+  'PIP Concrete': { matKey: 'capPipConcrete', labKey: 'capPipConcreteLab' },
+  'Bullnose Brick': { matKey: 'capBullnose', labKey: 'capBullnoseLab' },
+}
+
+// Wall-finish master list (mirrors the module) — material unit price + labor by Type.
+const WF_META = {
+  'Sand Stucco': { key: 'sandStucco', labKey: 'sandStuccoLab', unit: 'SF', labMode: 'perDay' },
+  'Smooth Stucco': { key: 'smoothStucco', labKey: 'smoothStuccoLab', unit: 'SF', labMode: 'perDay' },
+  'Ledgerstone Veneer': { key: 'ledgerstone', labKey: 'ledgerstoneLab', unit: 'SF', labMode: 'perDay', waste: 1.1, screwPer5: 2 },
+  'Stacked Stone Veneer': { key: 'stackedStone', labKey: 'stackedStoneLab', unit: 'SF', labMode: 'perDay', waste: 1.1, screwPer5: 2 },
+  Tile: { key: 'tile', labKey: 'tileLab', unit: 'SF', labMode: 'perSF', adhesivePerSF: 1 },
+  'Real Flagstone': { key: 'realFlagstone', labKey: 'flagstoneLab', unit: 'ton', tonPerSF: 80, labMode: 'perSF', delivPerTon: 80, misc: 268.75 },
+  'Real Stone': { key: 'realStone', labKey: 'realStoneLab', unit: 'ton', tonPerSF: 70, labMode: 'perSF', delivPerTon: 180, addPerSF: 1 },
+}
+
+// Gas line + gas fixture labor fallbacks (Utilities catalog, hrs per unit).
+const GAS_LINE_LAB_FALLBACK = {
+  '1-1/2" Poly Gas Pipe': 0.05,
+  '1" Black Iron Gas Pipe': 0.15,
+  '1-1/2" Black Iron Gas Pipe': 0.2,
+  '2" Black Iron Gas Pipe': 0.25,
+}
+const GAS_FIXTURE_LAB_FALLBACK = {
+  '12" Single Gas Ring': 2,
+  '18" Single Gas Ring': 2,
+  '24" Single Gas Ring': 2,
+  '24" Double Gas Ring': 2,
+  "2' Straight Gas Bar": 2,
+  "3' Straight Gas Bar": 2.5,
+  "4' Straight Gas Bar": 3,
+  'Gas Shut-Off Valve': 2,
+}
+
+// Gas fixture + gas line material fallbacks (Utilities catalog).
+const GAS_FIXTURE_FALLBACK = {
+  '12" Single Gas Ring': 61.75,
+  '18" Single Gas Ring': 84.75,
+  '24" Single Gas Ring': 107.75,
+  '24" Double Gas Ring': 163.25,
+  "2' Straight Gas Bar": 35.5,
+  "3' Straight Gas Bar": 56.0,
+  "4' Straight Gas Bar": 68.5,
+  'Gas Shut-Off Valve': 89.7,
+}
+const GAS_LINE_FALLBACK = {
+  '1-1/2" Poly Gas Pipe': 4.25,
+  '1" Black Iron Gas Pipe': 2.76,
+  '1-1/2" Black Iron Gas Pipe': 4.23,
+  '2" Black Iron Gas Pipe': 5.72,
 }
 
 const BLOCK_LENGTH_IN = 16
@@ -90,17 +149,10 @@ export default function FirePitSummary({ module }) {
     pctGrouted = 100,
     pctCurved = 0,
     useGroutPump = 'No',
-    gasRingCount = 0,
-    gasTrenchLF = 0,
-    sandStuccoSF = 0,
-    smoothStuccoSF = 0,
-    ledgerstoneSF = 0,
-    stackedStoneSF = 0,
-    tileSF = 0,
-    flagstoneSF = 0,
-    flagstoneRateInput,
-    realStoneSF = 0,
-    realStoneRateInput,
+    capRows = [],
+    wallFinishRows = [],
+    epLineRows = [],
+    epGasRows = [],
     manualRows = [],
   } = ih
   const {
@@ -142,45 +194,76 @@ export default function FirePitSummary({ module }) {
       ? mp(FP_RATES.pumpGroutLab.dbName, FP_RATES.pumpGroutLab.fallback)
       : mp(FP_RATES.handGroutLab.dbName, FP_RATES.handGroutLab.fallback)
   const groutHrs = groutCF > 0 ? groutCF / groutRate : 0
-  const gasTrenchHrs =
-    n(gasTrenchLF) > 0
-      ? (n(gasTrenchLF) / mp(FP_RATES.gasTrenchLab.dbName, FP_RATES.gasTrenchLab.fallback)) * 8
-      : 0
 
   const structuralBaseHrs = digHrs + rebarHrs + setBlockHrs + groutHrs
   const curveAddHrs = structuralBaseHrs * (n(pctCurved) / 100) * 0.25
 
-  const sandStuccoHrs =
-    n(sandStuccoSF) > 0
-      ? (n(sandStuccoSF) / mp(FP_RATES.sandStuccoLab.dbName, FP_RATES.sandStuccoLab.fallback)) * 8
-      : 0
-  const smoothStuccoHrs =
-    n(smoothStuccoSF) > 0
-      ? (n(smoothStuccoSF) /
-          mp(FP_RATES.smoothStuccoLab.dbName, FP_RATES.smoothStuccoLab.fallback)) *
-        8
-      : 0
-  const ledgerstoneHrs =
-    n(ledgerstoneSF) > 0
-      ? (n(ledgerstoneSF) / mp(FP_RATES.ledgerstoneLab.dbName, FP_RATES.ledgerstoneLab.fallback)) *
-        8
-      : 0
-  const stackedStoneHrs =
-    n(stackedStoneSF) > 0
-      ? (n(stackedStoneSF) /
-          mp(FP_RATES.stackedStoneLab.dbName, FP_RATES.stackedStoneLab.fallback)) *
-        8
-      : 0
-  const tileHrs =
-    n(tileSF) > 0 ? n(tileSF) * mp(FP_RATES.tileLab.dbName, FP_RATES.tileLab.fallback) : 0
-  const flagstoneHrs =
-    n(flagstoneSF) > 0
-      ? n(flagstoneSF) * mp(FP_RATES.flagstoneLab.dbName, FP_RATES.flagstoneLab.fallback)
-      : 0
-  const realStoneHrs =
-    n(realStoneSF) > 0
-      ? n(realStoneSF) * mp(FP_RATES.realStoneLab.dbName, FP_RATES.realStoneLab.fallback)
-      : 0
+  // ── Wall caps ($/LF material) ────────────────────────────────────────────────
+  const capLines = (capRows || [])
+    .map(r => {
+      const meta = CAP_META[r.type]
+      const lf = n(r.lf)
+      if (!meta || lf <= 0) return null
+      const unit = mp(FP_RATES[meta.matKey].dbName, FP_RATES[meta.matKey].fallback)
+      const labCoef = mp(FP_RATES[meta.labKey].dbName, FP_RATES[meta.labKey].fallback)
+      return { label: r.type, lf, mat: lf * unit, hrs: lf * labCoef }
+    })
+    .filter(Boolean)
+  const capMat = capLines.reduce((s, c) => s + c.mat, 0)
+  const capHrs = capLines.reduce((s, c) => s + c.hrs, 0)
+
+  // ── Wall finishes ────────────────────────────────────────────────────────────
+  const finishLines = (wallFinishRows || [])
+    .map(r => {
+      const meta = WF_META[r.type]
+      const sf = n(r.sf)
+      if (!meta || sf <= 0) return null
+      const unit = mp(FP_RATES[meta.key].dbName, FP_RATES[meta.key].fallback)
+      let mat = 0
+      if (meta.unit === 'ton') {
+        const tons = sf / meta.tonPerSF
+        mat =
+          tons * unit +
+          tons * (meta.delivPerTon || 0) +
+          (meta.misc || 0) +
+          (meta.addPerSF ? sf * meta.addPerSF : 0)
+      } else {
+        mat =
+          sf * unit * (meta.waste || 1) +
+          (meta.screwPer5 ? (sf / 5) * meta.screwPer5 : 0) +
+          (meta.adhesivePerSF ? sf * meta.adhesivePerSF : 0)
+      }
+      const labRate = mp(FP_RATES[meta.labKey].dbName, FP_RATES[meta.labKey].fallback)
+      const hrs = meta.labMode === 'perDay' ? (labRate > 0 ? (sf / labRate) * 8 : 0) : sf * labRate
+      return { label: r.type, sf, mat, hrs }
+    })
+    .filter(Boolean)
+  const finishMat = finishLines.reduce((s, c) => s + c.mat, 0)
+  const finishHrs = finishLines.reduce((s, c) => s + c.hrs, 0)
+
+  // ── Gas line + gas fixtures (material fallbacks; DB rate overrides when present) ──
+  const gasLineLines = (epLineRows || [])
+    .map(r => {
+      const lf = n(r.lf)
+      if (lf <= 0) return null
+      const unit = mp(r.type, GAS_LINE_FALLBACK[r.type] ?? 0)
+      const labCoef = mp(`${r.type} - Labor Rate`, GAS_LINE_LAB_FALLBACK[r.type] ?? 0)
+      return { label: r.type, qty: `${lf} LF`, mat: lf * unit, hrs: lf * labCoef }
+    })
+    .filter(Boolean)
+  const gasFixtureLines = (epGasRows || [])
+    .map(r => {
+      const qty = n(r.qty)
+      if (qty <= 0) return null
+      const unit = mp(r.type, GAS_FIXTURE_FALLBACK[r.type] ?? 0)
+      const labCoef = mp(`${r.type} - Labor Rate`, GAS_FIXTURE_LAB_FALLBACK[r.type] ?? 0)
+      return { label: r.type, qty: `${qty} ea`, mat: qty * unit, hrs: qty * labCoef }
+    })
+    .filter(Boolean)
+  const gasMat =
+    gasLineLines.reduce((s, c) => s + c.mat, 0) + gasFixtureLines.reduce((s, c) => s + c.mat, 0)
+  const gasHrs =
+    gasLineLines.reduce((s, c) => s + c.hrs, 0) + gasFixtureLines.reduce((s, c) => s + c.hrs, 0)
 
   let manHrs = 0,
     manMat = 0,
@@ -200,50 +283,14 @@ export default function FirePitSummary({ module }) {
     useGroutPump === 'Yes' && groutCF > 0
       ? mp(FP_RATES.fpGroutPump.dbName, FP_RATES.fpGroutPump.fallback)
       : 0
-  const gasRingMat = n(gasRingCount) * mp(FP_RATES.fpGasRing.dbName, FP_RATES.fpGasRing.fallback)
-  const gasPipeMat = n(gasTrenchLF) * mp(FP_RATES.fpGasPipe.dbName, FP_RATES.fpGasPipe.fallback)
-
-  const sandStuccoMat =
-    n(sandStuccoSF) * mp(FP_RATES.sandStucco.dbName, FP_RATES.sandStucco.fallback)
-  const smoothStuccoMat =
-    n(smoothStuccoSF) * mp(FP_RATES.smoothStucco.dbName, FP_RATES.smoothStucco.fallback)
-  const ledgerstoneMat =
-    n(ledgerstoneSF) > 0
-      ? n(ledgerstoneSF) * mp(FP_RATES.ledgerstone.dbName, FP_RATES.ledgerstone.fallback) * 1.1 +
-        (n(ledgerstoneSF) / 5) * 2
-      : 0
-  const stackedStoneMat =
-    n(stackedStoneSF) > 0
-      ? n(stackedStoneSF) * mp(FP_RATES.stackedStone.dbName, FP_RATES.stackedStone.fallback) * 1.1 +
-        (n(stackedStoneSF) / 5) * 2
-      : 0
-  const tileMat =
-    n(tileSF) > 0 ? n(tileSF) * mp(FP_RATES.tile.dbName, FP_RATES.tile.fallback) + n(tileSF) : 0
-  const realFlagRate =
-    n(flagstoneRateInput) || mp(FP_RATES.realFlagstone.dbName, FP_RATES.realFlagstone.fallback)
-  const flagstoneMat =
-    n(flagstoneSF) > 0
-      ? (n(flagstoneSF) / 80) * realFlagRate + (n(flagstoneSF) / 80) * 80 + 268.75
-      : 0
-  const realStoneRt =
-    n(realStoneRateInput) || mp(FP_RATES.realStone.dbName, FP_RATES.realStone.fallback)
-  const realStoneMat =
-    n(realStoneSF) > 0
-      ? (n(realStoneSF) / 70) * realStoneRt + (n(realStoneSF) / 70) * 180 + n(realStoneSF)
-      : 0
 
   const baseHrs =
     layoutHrsN +
     structuralBaseHrs +
     curveAddHrs +
-    gasTrenchHrs +
-    sandStuccoHrs +
-    smoothStuccoHrs +
-    ledgerstoneHrs +
-    stackedStoneHrs +
-    tileHrs +
-    flagstoneHrs +
-    realStoneHrs +
+    capHrs +
+    finishHrs +
+    gasHrs +
     manHrs
   const diffMod = 1 + n(difficulty) / 100
   const totalHrs = baseHrs * diffMod + n(hoursAdj)
@@ -254,15 +301,9 @@ export default function FirePitSummary({ module }) {
     footingMat +
     groutMat +
     pumpSetupMat +
-    gasRingMat +
-    gasPipeMat +
-    sandStuccoMat +
-    smoothStuccoMat +
-    ledgerstoneMat +
-    stackedStoneMat +
-    tileMat +
-    flagstoneMat +
-    realStoneMat +
+    capMat +
+    finishMat +
+    gasMat +
     manMat
   const laborCost = totalHrs * laborRatePerHour
   const burden = laborCost * DEFAULTS.laborBurdenPct
@@ -313,48 +354,43 @@ export default function FirePitSummary({ module }) {
         </>
       )}
 
-      {/* Gas fixtures */}
-      {(n(gasRingCount) > 0 || n(gasTrenchLF) > 0) && (
+      {/* Wall Caps */}
+      {capLines.length > 0 && (
         <>
-          <SectionLabel title="Gas Fixtures & Trench" />
-          {n(gasRingCount) > 0 && (
-            <LineRow
-              label="Gas Rings/Burners"
-              value={`${n(gasRingCount)} openings`}
-              sub={fmt(gasRingMat)}
-            />
-          )}
-          {n(gasTrenchLF) > 0 && (
-            <LineRow label="Gas Trench" value={`${n(gasTrenchLF)} LF`} sub={fmt(gasPipeMat)} />
-          )}
+          <SectionLabel title="Wall Caps" />
+          {capLines.map((c, i) => (
+            <LineRow key={i} label={c.label} value={`${c.lf} LF`} sub={fmt(c.mat)} />
+          ))}
+        </>
+      )}
+
+      {/* Gas Line */}
+      {gasLineLines.length > 0 && (
+        <>
+          <SectionLabel title="Gas Line" />
+          {gasLineLines.map((c, i) => (
+            <LineRow key={i} label={c.label} value={c.qty} sub={fmt(c.mat)} />
+          ))}
+        </>
+      )}
+
+      {/* Gas Fixtures */}
+      {gasFixtureLines.length > 0 && (
+        <>
+          <SectionLabel title="Gas Fixtures" />
+          {gasFixtureLines.map((c, i) => (
+            <LineRow key={i} label={c.label} value={c.qty} sub={fmt(c.mat)} />
+          ))}
         </>
       )}
 
       {/* Wall finishes */}
-      {[
-        { label: 'Sand Stucco', sf: sandStuccoSF, mat: sandStuccoMat },
-        { label: 'Smooth Stucco', sf: smoothStuccoSF, mat: smoothStuccoMat },
-        { label: 'Ledgerstone', sf: ledgerstoneSF, mat: ledgerstoneMat },
-        { label: 'Stacked Stone', sf: stackedStoneSF, mat: stackedStoneMat },
-        { label: 'Tile', sf: tileSF, mat: tileMat },
-        { label: 'Real Flagstone', sf: flagstoneSF, mat: flagstoneMat },
-        { label: 'Real Stone', sf: realStoneSF, mat: realStoneMat },
-      ].filter(f => n(f.sf) > 0).length > 0 && (
+      {finishLines.length > 0 && (
         <>
           <SectionLabel title="Wall Finishes" />
-          {[
-            { label: 'Sand Stucco', sf: sandStuccoSF, mat: sandStuccoMat },
-            { label: 'Smooth Stucco', sf: smoothStuccoSF, mat: smoothStuccoMat },
-            { label: 'Ledgerstone', sf: ledgerstoneSF, mat: ledgerstoneMat },
-            { label: 'Stacked Stone', sf: stackedStoneSF, mat: stackedStoneMat },
-            { label: 'Tile', sf: tileSF, mat: tileMat },
-            { label: 'Real Flagstone', sf: flagstoneSF, mat: flagstoneMat },
-            { label: 'Real Stone', sf: realStoneSF, mat: realStoneMat },
-          ]
-            .filter(f => n(f.sf) > 0)
-            .map(f => (
-              <LineRow key={f.label} label={f.label} value={`${n(f.sf)} SF`} sub={fmt(f.mat)} />
-            ))}
+          {finishLines.map((c, i) => (
+            <LineRow key={i} label={c.label} value={`${c.sf} SF`} sub={fmt(c.mat)} />
+          ))}
         </>
       )}
 
