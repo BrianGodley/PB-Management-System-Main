@@ -11,6 +11,8 @@ const FINISH_TYPES = {
     dbName: 'Sand Stucco',
     laborDbName: 'Sand Stucco - Labor Rate',
     laborHrsPerSF: 0.05,
+    subDbName: 'Sand Stucco - Sub SF',
+    subFallback: 0,
   },
   'Smooth Stucco': {
     costPerSF: 0,
@@ -18,6 +20,8 @@ const FINISH_TYPES = {
     dbName: 'Smooth Stucco',
     laborDbName: 'Smooth Stucco - Labor Rate',
     laborHrsPerSF: 0.05,
+    subDbName: 'Smooth Stucco - Sub SF',
+    subFallback: 0,
   },
   'Ledgerstone Veneer Panels': {
     costPerSF: 10.0,
@@ -25,6 +29,8 @@ const FINISH_TYPES = {
     dbName: 'Ledgerstone Veneer Panels',
     laborDbName: 'Ledgerstone Veneer Panels - Labor Rate',
     laborHrsPerSF: 0.1,
+    subDbName: 'Ledgerstone Veneer Panels - Sub SF',
+    subFallback: 0,
   },
   'Stacked Stone Veneer': {
     costPerSF: 10.0,
@@ -32,6 +38,8 @@ const FINISH_TYPES = {
     dbName: 'Stacked Stone Veneer',
     laborDbName: 'Stacked Stone Veneer - Labor Rate',
     laborHrsPerSF: 0.1,
+    subDbName: 'Stacked Stone Veneer - Sub SF',
+    subFallback: 0,
   },
   Tile: {
     costPerSF: 6.5,
@@ -39,6 +47,8 @@ const FINISH_TYPES = {
     dbName: 'Tile - Columns',
     laborDbName: 'Tile - Columns - Labor Rate',
     laborHrsPerSF: 0.125,
+    subDbName: 'Tile - Columns - Sub SF',
+    subFallback: 0,
   },
   'Real Flagstone, Flat': {
     costPerTon: 400.0,
@@ -46,6 +56,8 @@ const FINISH_TYPES = {
     dbName: 'Real Flagstone Flat',
     laborDbName: 'Real Flagstone Flat - Labor Rate',
     laborHrsPer: 0.5,
+    subDbName: 'Real Flagstone Flat - Sub SF',
+    subFallback: 0,
   },
   'Real Stone': {
     costPerTon: 400.0,
@@ -53,6 +65,8 @@ const FINISH_TYPES = {
     dbName: 'Real Stone - Columns',
     laborDbName: 'Real Stone - Columns - Labor Rate',
     laborHrsPer: 0.5,
+    subDbName: 'Real Stone - Columns - Sub SF',
+    subFallback: 0,
   },
 }
 
@@ -64,16 +78,6 @@ const BLOCK_RATES = {
   excavateLaborHrs: { dbName: 'Excavate Footing Labor', fallback: 0.5 },
   pourLaborHrs: { dbName: 'Pour Footing Labor', fallback: 0.25 },
   fillLaborHrs: { dbName: 'Fill Labor', fallback: 0.05 },
-}
-
-const MISC_RATES = {
-  bbqBlock: { dbName: 'BBQ Block', matCost: 5.0, laborHrs: 0.1, label: 'BBQ Block' },
-  backsplashBlock: {
-    dbName: 'Backsplash Block',
-    matCost: 3.5,
-    laborHrs: 0.05,
-    label: 'Backsplash Block',
-  },
 }
 
 function columnGeometry(heightIn, widthIn) {
@@ -124,12 +128,13 @@ export default function ColumnsSummary({ module }) {
     heightIn = 0,
     widthIn = 0,
     finishRows = [],
-    miscQty = {},
     manualRows = [],
+    subType = 'In-House',
     laborRatePerHour = 35,
     materialPrices = {},
     calc = null,
   } = data
+  const isSub = subType === 'Subcontractor'
 
   const price = (dbName, fallback) =>
     materialPrices[dbName] != null ? materialPrices[dbName] : fallback
@@ -202,6 +207,17 @@ export default function ColumnsSummary({ module }) {
     .map((r, i) => {
       const rate = FINISH_TYPES[r.type]
       if (!rate || !n(r.qty)) return null
+      if (isSub) {
+        // Sub tab: flat $/SF, no labor
+        const flat = price(rate.subDbName, rate.subFallback ?? 0)
+        const mat = n(r.qty) * flat
+        return {
+          key: i,
+          label: `${r.type} — ${n(r.qty)} SF`,
+          value: fmt2(mat),
+          sub: `${fmt2(flat)}/SF flat`,
+        }
+      }
       const isTon = rate.unit === 'ton'
       const cost = price(rate.dbName, isTon ? rate.costPerTon : rate.costPerSF)
       const labHrs = price(rate.laborDbName, isTon ? rate.laborHrsPer : rate.laborHrsPerSF)
@@ -212,21 +228,6 @@ export default function ColumnsSummary({ module }) {
         label: `${r.type} — ${n(r.qty)} ${rate.unit}`,
         value: fmt2(mat),
         sub: `${hrs.toFixed(2)} hrs labor  ·  ${fmt2(cost)}/${rate.unit}`,
-      }
-    })
-    .filter(Boolean)
-
-  // ── Additional Items ─────────────────────────────────────────────────────────
-  const miscLines = Object.entries(MISC_RATES)
-    .map(([key, rate]) => {
-      const q = n(miscQty[`${key}Qty`])
-      if (!q) return null
-      const matCostEa = price(rate.dbName, rate.matCost)
-      return {
-        key,
-        label: `${rate.label} × ${q}`,
-        value: fmt2(q * matCostEa),
-        sub: `${(q * rate.laborHrs).toFixed(2)} hrs labor  ·  ${fmt2(matCostEa)}/ea`,
       }
     })
     .filter(Boolean)
@@ -251,7 +252,6 @@ export default function ColumnsSummary({ module }) {
   const hasAnyLines =
     (n(qty) > 0 && n(heightIn) > 0 && n(widthIn) > 0) ||
     finishLines.length ||
-    miscLines.length ||
     manualLines.length
 
   return (
@@ -295,15 +295,6 @@ export default function ColumnsSummary({ module }) {
             <>
               <SectionLabel title="Finishes" />
               {finishLines.map(l => (
-                <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />
-              ))}
-            </>
-          )}
-
-          {miscLines.length > 0 && (
-            <>
-              <SectionLabel title="Additional Items" />
-              {miscLines.map(l => (
                 <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />
               ))}
             </>

@@ -15,6 +15,9 @@ import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../
 
 // dbName = name in material_rates (category = 'Columns')
 // Hardcoded values are fallbacks when DB row is absent.
+// subDbName / subFallback = flat Subcontractor $/SF price for the finish
+// (Sub tab prices finishes as a single flat rate per SF — no in-house
+//  material + labor breakdown). subFallback seeds a starting value.
 const FINISH_TYPES = {
   'Sand Stucco': {
     costPerSF: 0,
@@ -22,6 +25,8 @@ const FINISH_TYPES = {
     dbName: 'Sand Stucco',
     laborDbName: 'Sand Stucco - Labor Rate',
     laborHrsPerSF: 0.05,
+    subDbName: 'Sand Stucco - Sub SF',
+    subFallback: 0,
   },
   'Smooth Stucco': {
     costPerSF: 0,
@@ -29,6 +34,8 @@ const FINISH_TYPES = {
     dbName: 'Smooth Stucco',
     laborDbName: 'Smooth Stucco - Labor Rate',
     laborHrsPerSF: 0.05,
+    subDbName: 'Smooth Stucco - Sub SF',
+    subFallback: 0,
   },
   'Ledgerstone Veneer Panels': {
     costPerSF: 10.0,
@@ -36,6 +43,8 @@ const FINISH_TYPES = {
     dbName: 'Ledgerstone Veneer Panels',
     laborDbName: 'Ledgerstone Veneer Panels - Labor Rate',
     laborHrsPerSF: 0.1,
+    subDbName: 'Ledgerstone Veneer Panels - Sub SF',
+    subFallback: 0,
   },
   'Stacked Stone Veneer': {
     costPerSF: 10.0,
@@ -43,6 +52,8 @@ const FINISH_TYPES = {
     dbName: 'Stacked Stone Veneer',
     laborDbName: 'Stacked Stone Veneer - Labor Rate',
     laborHrsPerSF: 0.1,
+    subDbName: 'Stacked Stone Veneer - Sub SF',
+    subFallback: 0,
   },
   Tile: {
     costPerSF: 6.5,
@@ -50,6 +61,8 @@ const FINISH_TYPES = {
     dbName: 'Tile - Columns',
     laborDbName: 'Tile - Columns - Labor Rate',
     laborHrsPerSF: 0.125,
+    subDbName: 'Tile - Columns - Sub SF',
+    subFallback: 0,
   },
   'Real Flagstone, Flat': {
     costPerTon: 400.0,
@@ -57,6 +70,8 @@ const FINISH_TYPES = {
     dbName: 'Real Flagstone Flat',
     laborDbName: 'Real Flagstone Flat - Labor Rate',
     laborHrsPer: 0.5,
+    subDbName: 'Real Flagstone Flat - Sub SF',
+    subFallback: 0,
   },
   'Real Stone': {
     costPerTon: 400.0,
@@ -64,6 +79,8 @@ const FINISH_TYPES = {
     dbName: 'Real Stone - Columns',
     laborDbName: 'Real Stone - Columns - Labor Rate',
     laborHrsPer: 0.5,
+    subDbName: 'Real Stone - Columns - Sub SF',
+    subFallback: 0,
   },
 }
 
@@ -77,16 +94,6 @@ const BLOCK_RATES = {
   excavateLaborHrs: { dbName: 'Excavate Footing Labor', fallback: 0.5 }, // hrs per column
   pourLaborHrs: { dbName: 'Pour Footing Labor', fallback: 0.25 }, // hrs per column
   fillLaborHrs: { dbName: 'Fill Labor', fallback: 0.05 }, // hrs per block
-}
-
-const MISC_RATES = {
-  bbqBlock: { dbName: 'BBQ Block', matCost: 5.0, laborHrs: 0.1, label: 'BBQ Block' },
-  backsplashBlock: {
-    dbName: 'Backsplash Block',
-    matCost: 3.5,
-    laborHrs: 0.05,
-    label: 'Backsplash Block',
-  },
 }
 
 const DEFAULTS = {
@@ -120,7 +127,8 @@ function calcColumns(
   laborBurdenPct = DEFAULTS.laborBurdenPct
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
-  const { difficulty, hoursAdj, qty, heightIn, widthIn, finishRows, miscQty, manualRows } = state
+  const { difficulty, hoursAdj, qty, heightIn, widthIn, finishRows, manualRows } = state
+  const isSub = state.subType === 'Subcontractor'
 
   const mp = (dbName, fallback) => materialPrices[dbName] ?? fallback
 
@@ -152,7 +160,10 @@ function calcColumns(
   finishRows.forEach(r => {
     const rate = FINISH_TYPES[r.type]
     if (!rate || !n(r.qty)) return
-    if (rate.unit === 'SF') {
+    if (isSub) {
+      // Sub tab: flat $/SF, no separate labor
+      finishMat += n(r.qty) * mp(rate.subDbName, rate.subFallback ?? 0)
+    } else if (rate.unit === 'SF') {
       const cost = mp(rate.dbName, rate.costPerSF)
       const labRate = mp(rate.laborDbName, rate.laborHrsPerSF)
       finishMat += n(r.qty) * cost
@@ -166,17 +177,6 @@ function calcColumns(
     }
   })
 
-  // Misc (BBQ block, backsplash)
-  let miscHrs = 0,
-    miscMat = 0
-  Object.entries(MISC_RATES).forEach(([key, rate]) => {
-    const q = n(miscQty[`${key}Qty`])
-    if (q > 0) {
-      miscMat += q * mp(rate.dbName, rate.matCost)
-      miscHrs += q * rate.laborHrs
-    }
-  })
-
   // Manual
   let manHrs = 0,
     manMat = 0,
@@ -187,19 +187,32 @@ function calcColumns(
     manSub += n(r.subCost)
   })
 
-  const baseHrs = installHrs + finishHrs + miscHrs + manHrs
+  const baseHrs = installHrs + finishHrs + manHrs
   const diffMod = 1 + n(difficulty) / 100
   const _preWalkHrs = baseHrs * diffMod + n(hoursAdj)
   const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
   const totalHrs = _preWalkHrs + walkHrs
   const manDays = totalHrs / 8
-  const totalMat = installMat + finishMat + miscMat + manMat
+  const totalMat = installMat + finishMat + manMat
   const laborCost = totalHrs * laborRatePerHour
   const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
-  const gp = manDays * gpmd
-  const commission = gp * DEFAULTS.commissionRate
-  const subCost = manSub
-  const price = totalMat + laborCost + burden + gp + commission + subCost
+
+  // Sub tab: GpmdBar's 'sub' variant totals subCost + subGp + commission and
+  // ignores totalMat/laborCost/gp, so route the itemized scope INTO subCost.
+  let gp, subCost, subGp, commission, price
+  if (isSub) {
+    gp = 0
+    subCost = totalMat + laborCost + burden + manSub
+    subGp = subCost * (n(state.subGpMarkupRate) || 0.2)
+    commission = subGp * DEFAULTS.commissionRate
+    price = subCost + subGp + commission
+  } else {
+    gp = manDays * gpmd
+    subGp = 0
+    commission = gp * DEFAULTS.commissionRate
+    subCost = manSub
+    price = totalMat + laborCost + burden + gp + commission + subCost
+  }
 
   return {
     totalHrs,
@@ -208,6 +221,7 @@ function calcColumns(
     laborCost,
     burden,
     gp,
+    subGp,
     commission,
     subCost,
     price,
@@ -248,7 +262,6 @@ const DEFAULT_FINISH_ROWS = [
   { type: 'Ledgerstone Veneer Panels', qty: '' },
   { type: 'Tile', qty: '' },
 ]
-const DEFAULT_MISC_QTY = { bbqBlockQty: '', backsplashBlockQty: '' }
 const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 1', hours: '', materials: '', subCost: '' },
   { label: 'Misc 2', hours: '', materials: '', subCost: '' },
@@ -326,12 +339,12 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
   const [difficulty, setDifficulty] = useState(initialData?.difficulty ?? '')
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Masonry')
   const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
+  const isSub = subType === 'Subcontractor'
   const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
   const [qty, setQty] = useState(initialData?.qty ?? '')
   const [heightIn, setHeightIn] = useState(initialData?.heightIn ?? '')
   const [widthIn, setWidthIn] = useState(initialData?.widthIn ?? '')
   const [finishRows, setFinishRows] = useState(initialData?.finishRows ?? DEFAULT_FINISH_ROWS)
-  const [miscQty, setMiscQty] = useState(initialData?.miscQty ?? DEFAULT_MISC_QTY)
   const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
 
   // ── Sales tax — applied to totalMat across every module so the bid
@@ -350,7 +363,18 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
   }, [])
 
   const calcRaw = calcColumns(
-    { difficulty, hoursAdj, qty, heightIn, widthIn, finishRows, miscQty, manualRows, distanceLF },
+    {
+      difficulty,
+      hoursAdj,
+      qty,
+      heightIn,
+      widthIn,
+      finishRows,
+      manualRows,
+      distanceLF,
+      subType,
+      subGpMarkupRate,
+    },
     laborRatePerHour,
     materialPrices,
     gpmd,
@@ -395,8 +419,10 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
         heightIn,
         widthIn,
         finishRows,
-        miscQty,
         manualRows,
+        crewType,
+        subType,
+        subGpMarkupRate,
         laborRatePerHour,
         laborBurdenPct,
         gpmd,
@@ -684,9 +710,13 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
                 const rate = FINISH_TYPES[row.type]
                 const isTon = rate?.unit === 'ton'
                 const defCost = isTon ? rate?.costPerTon : rate?.costPerSF
-                const cost = materialPrices[rate?.dbName] ?? defCost ?? 0
+                // Sub tab: flat $/SF rate; In-House: material cost per unit
+                const cost = isSub
+                  ? materialPrices[rate?.subDbName] ?? rate?.subFallback ?? 0
+                  : materialPrices[rate?.dbName] ?? defCost ?? 0
                 const defLab = isTon ? rate?.laborHrsPer : rate?.laborHrsPerSF
                 const labRate = materialPrices[rate?.laborDbName] ?? defLab ?? 0
+                const unitLabel = isSub ? 'SF' : rate?.unit ?? 'SF'
                 const mat = n(row.qty) * cost
                 return (
                   <tr key={i} className="border-b border-gray-100">
@@ -701,7 +731,8 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
                             <option key={t}>{t}</option>
                           ))}
                         </select>
-                        {rate && (
+                        {/* In-House only: labor coefficient edit */}
+                        {rate && !isSub && (
                           <RateEditPopover
                             table="labor_rates"
                             name={rate.laborDbName}
@@ -717,16 +748,16 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
                     <td className="py-1 pr-2">
                       <NumInput value={row.qty} onChange={v => updateFinish(i, 'qty', v)} />
                     </td>
-                    <td className="py-1 pr-2 text-xs text-gray-400">{rate?.unit ?? 'SF'}</td>
+                    <td className="py-1 pr-2 text-xs text-gray-400">{unitLabel}</td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
                       <span className="inline-flex items-center justify-end gap-1">
                         ${cost.toFixed(2)}
                         {rate && (
                           <RateEditPopover
                             table="material_rates"
-                            name={rate.dbName}
+                            name={isSub ? rate.subDbName : rate.dbName}
                             category="Columns"
-                            unitLabel={rate.unit}
+                            unitLabel={unitLabel}
                             currentValue={cost}
                             onSaved={refreshAllRates}
                           />
@@ -748,43 +779,6 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
           >
             + Add row
           </button>
-        </div>
-      </div>
-
-      {/* ── Additional Items ── */}
-      <div>
-        <SectionHeader title="Additional Items" />
-        <div className="space-y-2">
-          {Object.entries(MISC_RATES).map(([key, rate]) => {
-            const q = n(miscQty[`${key}Qty`])
-            const matCost = materialPrices[rate.dbName] ?? rate.matCost
-            return (
-              <div key={key} className="flex items-center gap-3 py-1.5 border-b border-gray-100">
-                <span className="text-xs text-gray-700 flex-1 inline-flex items-center gap-1">
-                  {rate.label}
-                  <RateEditPopover
-                    table="material_rates"
-                    name={rate.dbName}
-                    category="Columns"
-                    unitLabel="ea"
-                    currentValue={matCost}
-                    onSaved={refreshAllRates}
-                  />
-                </span>
-                <input
-                  type="number"
-                  step="1"
-                  className="input text-sm py-1 w-24"
-                  placeholder="Qty"
-                  value={miscQty[`${key}Qty`]}
-                  onChange={e => setMiscQty(p => ({ ...p, [`${key}Qty`]: e.target.value }))}
-                />
-                <span className="text-xs text-gray-400 w-24 text-right">
-                  {q > 0 ? `$${(q * matCost).toFixed(2)} mat` : '—'}
-                </span>
-              </div>
-            )
-          })}
         </div>
       </div>
 
