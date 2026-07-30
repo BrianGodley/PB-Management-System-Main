@@ -192,7 +192,7 @@ async function uploadPhoto(file) {
   return supabase.storage.from('rate-photos').getPublicUrl(path).data.publicUrl
 }
 
-function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loading, addLabel = 'Add Row' }) {
+function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loading, addLabel = 'Add Row', filters = null, count = null }) {
   const [editingId, setEditingId] = useState(null)
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({})
@@ -313,15 +313,19 @@ function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loadin
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="flex justify-end px-3 py-2 bg-gray-50 border-b border-gray-200">
-        {!adding && (
-          <button
-            onClick={startAdd}
-            className="text-xs text-green-700 font-semibold hover:underline"
-          >
-            + {addLabel}
-          </button>
-        )}
+      <div className="flex flex-wrap items-center gap-3 px-3 py-2 bg-gray-50 border-b border-gray-200">
+        {filters}
+        <div className="ml-auto flex items-center gap-3">
+          {!adding && (
+            <button
+              onClick={startAdd}
+              className="text-sm text-green-700 font-semibold hover:underline"
+            >
+              + {addLabel}
+            </button>
+          )}
+          {count != null && <span className="text-xs text-gray-400">{count} items</span>}
+        </div>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs min-w-[820px]">
@@ -738,33 +742,35 @@ export default function MasterRates() {
       {/* Materials */}
       {activeTab === 'materials' && (
         <div>
-          <div className="flex flex-wrap items-center gap-3 mb-2">
-            <div className="flex items-center gap-1.5">
-              <label className="text-xs text-gray-500">Category</label>
-              <select value={matCategory} onChange={e => setMatCategory(e.target.value)} className={filterSelect}>
-                {matCats.map(c => (
-                  <option key={c} value={c}>
-                    {c === 'All' ? 'All categories' : c}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <label className="text-xs text-gray-500">Vendor</label>
-              <select value={matVendor} onChange={e => setMatVendor(e.target.value)} className={filterSelect}>
-                <option value="All">All vendors</option>
-                <option value="__HOUSE__">House (unassigned)</option>
-                {vendors.map(v => (
-                  <option key={v.id} value={v.id}>
-                    {v.company_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <span className="text-xs text-gray-400 ml-auto">{visibleMaterials.length} items</span>
-          </div>
           <RateTable
             addLabel="Add Material"
+            count={visibleMaterials.length}
+            filters={
+              <>
+                <div className="flex items-center gap-1.5">
+                  <label className="text-xs text-gray-500">Category</label>
+                  <select value={matCategory} onChange={e => setMatCategory(e.target.value)} className={filterSelect}>
+                    {matCats.map(c => (
+                      <option key={c} value={c}>
+                        {c === 'All' ? 'All categories' : c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <label className="text-xs text-gray-500">Vendor</label>
+                  <select value={matVendor} onChange={e => setMatVendor(e.target.value)} className={filterSelect}>
+                    <option value="All">All vendors</option>
+                    <option value="__HOUSE__">House (unassigned)</option>
+                    {vendors.map(v => (
+                      <option key={v.id} value={v.id}>
+                        {v.company_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            }
             columns={materialColumns}
             rows={visibleMaterials}
             onAdd={addMaterial}
@@ -788,21 +794,21 @@ export default function MasterRates() {
       {/* Labor */}
       {activeTab === 'labor' && (
         <div>
-          <div className="flex flex-wrap items-center gap-3 mb-2">
-            <div className="flex items-center gap-1.5">
-              <label className="text-xs text-gray-500">Category</label>
-              <select value={labCategory} onChange={e => setLabCategory(e.target.value)} className={filterSelect}>
-                {labCats.map(c => (
-                  <option key={c} value={c}>
-                    {c === 'All' ? 'All categories' : c}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <span className="text-xs text-gray-400 ml-auto">{visibleLabor.length} items</span>
-          </div>
           <RateTable
             addLabel="Add Labor Rate"
+            count={visibleLabor.length}
+            filters={
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs text-gray-500">Category</label>
+                <select value={labCategory} onChange={e => setLabCategory(e.target.value)} className={filterSelect}>
+                  {labCats.map(c => (
+                    <option key={c} value={c}>
+                      {c === 'All' ? 'All categories' : c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            }
             columns={laborColumns}
             rows={visibleLabor}
             onAdd={addLabor}
@@ -824,31 +830,33 @@ export default function MasterRates() {
       {/* Subs */}
       {activeTab === 'subs' && (
         <div>
-          <div className="flex flex-wrap items-center gap-3 mb-2">
-            <div className="flex items-center gap-1.5">
-              <label className="text-xs text-gray-500">Subcontractor</label>
-              <select value={subCompany} onChange={e => setSubCompany(e.target.value)} className={filterSelect}>
-                {subCompanies.map(c => (
-                  <option key={c} value={c}>
-                    {c === 'All' ? 'All subcontractors' : c}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <label className="text-xs text-gray-500">Category</label>
-              <select value={subCategory} onChange={e => setSubCategory(e.target.value)} className={filterSelect}>
-                {subCats.map(c => (
-                  <option key={c} value={c}>
-                    {c === 'All' ? 'All categories' : c}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <span className="text-xs text-gray-400 ml-auto">{visibleSubs.length} items</span>
-          </div>
           <RateTable
             addLabel="Add Subcontractor"
+            count={visibleSubs.length}
+            filters={
+              <>
+                <div className="flex items-center gap-1.5">
+                  <label className="text-xs text-gray-500">Subcontractor</label>
+                  <select value={subCompany} onChange={e => setSubCompany(e.target.value)} className={filterSelect}>
+                    {subCompanies.map(c => (
+                      <option key={c} value={c}>
+                        {c === 'All' ? 'All subcontractors' : c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <label className="text-xs text-gray-500">Category</label>
+                  <select value={subCategory} onChange={e => setSubCategory(e.target.value)} className={filterSelect}>
+                    {subCats.map(c => (
+                      <option key={c} value={c}>
+                        {c === 'All' ? 'All categories' : c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            }
             columns={subColumns}
             rows={visibleSubs}
             onAdd={addSub}
