@@ -192,7 +192,7 @@ async function uploadPhoto(file) {
   return supabase.storage.from('rate-photos').getPublicUrl(path).data.publicUrl
 }
 
-function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loading }) {
+function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loading, addLabel = 'Add Row' }) {
   const [editingId, setEditingId] = useState(null)
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({})
@@ -319,7 +319,7 @@ function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loadin
             onClick={startAdd}
             className="text-xs text-green-700 font-semibold hover:underline"
           >
-            + Add Row
+            + {addLabel}
           </button>
         )}
       </div>
@@ -764,6 +764,7 @@ export default function MasterRates() {
             <span className="text-xs text-gray-400 ml-auto">{visibleMaterials.length} items</span>
           </div>
           <RateTable
+            addLabel="Add Material"
             columns={materialColumns}
             rows={visibleMaterials}
             onAdd={addMaterial}
@@ -801,6 +802,7 @@ export default function MasterRates() {
             <span className="text-xs text-gray-400 ml-auto">{visibleLabor.length} items</span>
           </div>
           <RateTable
+            addLabel="Add Labor Rate"
             columns={laborColumns}
             rows={visibleLabor}
             onAdd={addLabor}
@@ -846,6 +848,7 @@ export default function MasterRates() {
             <span className="text-xs text-gray-400 ml-auto">{visibleSubs.length} items</span>
           </div>
           <RateTable
+            addLabel="Add Subcontractor"
             columns={subColumns}
             rows={visibleSubs}
             onAdd={addSub}
