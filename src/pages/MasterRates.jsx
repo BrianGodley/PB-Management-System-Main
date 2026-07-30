@@ -155,6 +155,13 @@ function displayItem(row, v) {
   if (sc && out.toLowerCase().startsWith(sc.toLowerCase())) {
     out = out.slice(sc.length).replace(/^[\s\-–—:]+/, '')
   }
+  // Drop the standalone word "Material" from the displayed item
+  out = out
+    .replace(/\bMaterial\b/gi, '')
+    .replace(/\s*[-–—]\s*/g, ' - ')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/^[\s\-–—:]+|[\s\-–—:]+$/g, '')
+    .trim()
   return out || v || ''
 }
 
