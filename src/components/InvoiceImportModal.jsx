@@ -27,6 +27,26 @@ export default function InvoiceImportModal({ jobId, jobName, vendors = [], onClo
   const [rows, setRows] = useState([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [selected, setSelected] = useState(() => new Set())
+  const [search, setSearch] = useState('')
+  const [bulkCat, setBulkCat] = useState('')
+  const [bulkUnit, setBulkUnit] = useState('')
+
+  const matchesSearch = r => {
+    const q = norm(search)
+    if (!q) return true
+    return norm(`${r.description} ${r.matchName || ''} ${r.unit || ''} ${r.category || ''}`).includes(q)
+  }
+  const toggleSel = i =>
+    setSelected(s => {
+      const n = new Set(s)
+      n.has(i) ? n.delete(i) : n.add(i)
+      return n
+    })
+  const selectWhere = pred =>
+    setSelected(new Set(rows.map((r, i) => (pred(r) && matchesSearch(r) ? i : -1)).filter(i => i >= 0)))
+  const applyToSelected = patch =>
+    setRows(rs => rs.map((r, i) => (selected.has(i) ? { ...r, ...patch } : r)))
 
   const vendorList = (vendors || []).filter(v => !v.type || v.type === 'vendor')
   const vendorName = useMemo(() => vendors.find(v => v.id === vendorId)?.company_name || '', [vendors, vendorId])
@@ -270,47 +290,111 @@ export default function InvoiceImportModal({ jobId, jobName, vendors = [], onClo
               </div>
             </div>
 
+            {/* Two-step bulk editor: (1) pick which rows, (2) change them together */}
+            <div className="mb-3 border border-gray-200 rounded-lg overflow-hidden text-xs">
+              <div className="flex flex-wrap items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200">
+                <span className="font-bold text-gray-800">Step 1 · Pick rows</span>
+                <span className="text-gray-600 ml-1">Filter</span>
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="type to narrow, e.g. gravel"
+                  className="border border-gray-300 rounded px-2 py-1 w-44"
+                />
+                <span className="text-gray-600">Select</span>
+                {[
+                  ['Matched only', () => selectWhere(r => !!r.matchId)],
+                  ['Unmatched only', () => selectWhere(r => !r.matchId)],
+                  ['Flagged only', () => selectWhere(r => r.variance != null && Math.abs(r.variance) >= VARIANCE_FLAG)],
+                  ['All shown', () => selectWhere(() => true)],
+                  ['None', () => setSelected(new Set())],
+                ].map(([label, fn]) => (
+                  <button key={label} onClick={fn} className="px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100">
+                    {label}
+                  </button>
+                ))}
+                <span className="ml-auto font-bold text-green-700">{selected.size} selected</span>
+              </div>
+              <div className={`px-3 py-2 ${selected.size ? '' : 'opacity-50 pointer-events-none'}`}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-bold text-gray-800">Step 2 · Change selected</span>
+                  <span className="text-gray-600 ml-1">Include on job?</span>
+                  <button onClick={() => applyToSelected({ include: true })} className="px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100">Include</button>
+                  <button onClick={() => applyToSelected({ include: false })} className="px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100">Exclude</button>
+                  <span className="mx-1 h-4 w-px bg-gray-300" />
+                  <span className="text-gray-600">Set value</span>
+                  <input value={bulkCat} onChange={e => setBulkCat(e.target.value)} placeholder="Category" className="border border-gray-300 rounded px-2 py-1 w-36" />
+                  <button onClick={() => applyToSelected({ category: bulkCat })} className="px-2 py-1 bg-gray-800 text-white rounded hover:bg-gray-900">Apply →</button>
+                  <input value={bulkUnit} onChange={e => setBulkUnit(e.target.value)} placeholder="Unit" list="inv-units" className="border border-gray-300 rounded px-2 py-1 w-24" />
+                  <button onClick={() => applyToSelected({ unit: bulkUnit })} className="px-2 py-1 bg-gray-800 text-white rounded hover:bg-gray-900">Apply →</button>
+                </div>
+                <datalist id="inv-units">
+                  {['each', 'roll', 'yard', 'CY', 'ton', 'LF', 'linear ft', 'SF', 'sqft', 'bag', 'pallet', 'gallon', 'hour', 'box'].map(u => (
+                    <option key={u} value={u} />
+                  ))}
+                </datalist>
+              </div>
+            </div>
+
             <div className="overflow-x-auto border border-gray-200 rounded-lg max-h-[52vh]">
               <table className="w-full text-xs">
                 <thead className="bg-gray-50 sticky top-0">
-                  <tr className="text-left text-gray-500">
-                    <th className="px-2 py-2 font-semibold w-8"></th>
+                  <tr className="text-left text-gray-700">
+                    <th className="px-2 py-2 font-semibold w-8">
+                      <input
+                        type="checkbox"
+                        checked={selected.size > 0 && selected.size === rows.length}
+                        onChange={e => (e.target.checked ? selectWhere(() => true) : setSelected(new Set()))}
+                      />
+                    </th>
+                    <th className="px-2 py-2 font-semibold">Incl</th>
                     <th className="px-2 py-2 font-semibold">Line</th>
+                    <th className="px-2 py-2 font-semibold">Unit</th>
                     <th className="px-2 py-2 font-semibold text-right">Qty</th>
                     <th className="px-2 py-2 font-semibold text-right">Inv $</th>
                     <th className="px-2 py-2 font-semibold text-right">Master $</th>
                     <th className="px-2 py-2 font-semibold text-right">Δ</th>
                     <th className="px-2 py-2 font-semibold text-right">Amount</th>
+                    <th className="px-2 py-2 font-semibold">Category</th>
                     <th className="px-2 py-2 font-semibold">Matched item</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {rows.map((r, i) => {
+                    if (!matchesSearch(r)) return null
                     const flagged = r.variance != null && Math.abs(r.variance) >= VARIANCE_FLAG
                     return (
-                      <tr key={i} className={r.include ? '' : 'opacity-40'}>
+                      <tr key={i} className={selected.has(i) ? 'bg-green-50' : ''}>
+                        <td className="px-2 py-1.5">
+                          <input type="checkbox" checked={selected.has(i)} onChange={() => toggleSel(i)} />
+                        </td>
                         <td className="px-2 py-1.5">
                           <input type="checkbox" checked={r.include} onChange={e => setRow(i, { include: e.target.checked })} />
                         </td>
                         <td className="px-2 py-1.5">
                           <div className="font-medium text-gray-800">{r.description}</div>
-                          <div className="text-gray-400">{r.unit}</div>
                         </td>
-                        <td className="px-2 py-1.5 text-right text-gray-600">{r.qty ?? '—'}</td>
+                        <td className="px-2 py-1.5">
+                          <input value={r.unit || ''} onChange={e => setRow(i, { unit: e.target.value })} list="inv-units" className="border border-gray-200 rounded px-1.5 py-1 w-24" />
+                        </td>
+                        <td className="px-2 py-1.5 text-right text-gray-700">{r.qty ?? '—'}</td>
                         <td className="px-2 py-1.5 text-right text-gray-800">{r.unit_price != null ? fmt(r.unit_price) : '—'}</td>
-                        <td className="px-2 py-1.5 text-right text-gray-500">{r.master != null ? fmt(r.master) : <span className="text-amber-600">no match</span>}</td>
-                        <td className={`px-2 py-1.5 text-right ${flagged ? 'font-semibold text-red-600' : r.variance < 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                        <td className="px-2 py-1.5 text-right text-gray-700">{r.master != null ? fmt(r.master) : <span className="text-amber-600">no match</span>}</td>
+                        <td className={`px-2 py-1.5 text-right ${flagged ? 'font-semibold text-red-600' : r.variance < 0 ? 'text-green-600' : 'text-gray-500'}`}>
                           {r.variance == null ? '—' : `${r.variance > 0 ? '+' : ''}${r.variance.toFixed(0)}%`}
                         </td>
                         <td className="px-2 py-1.5 text-right font-semibold text-gray-800">{r.amount != null ? fmt(r.amount) : '—'}</td>
-                        <td className="px-2 py-1.5 text-gray-600">{r.matchName || <span className="text-amber-600">—</span>}</td>
+                        <td className="px-2 py-1.5">
+                          <input value={r.category || ''} onChange={e => setRow(i, { category: e.target.value })} placeholder="—" className="border border-gray-200 rounded px-1.5 py-1 w-32" />
+                        </td>
+                        <td className="px-2 py-1.5 text-gray-800">{r.matchName || <span className="text-amber-600">—</span>}</td>
                       </tr>
                     )
                   })}
                 </tbody>
               </table>
             </div>
-            <p className="text-[11px] text-gray-400 mt-2">Lines priced ≥{VARIANCE_FLAG}% off the master price are flagged in red. Uncheck a line to leave it off the job expenses.</p>
+            <p className="text-[11px] text-gray-500 mt-2">Lines priced ≥{VARIANCE_FLAG}% off the master price are flagged in red. Untick <strong>Incl</strong> to leave a line off the job expenses.</p>
             <div className="flex justify-end gap-2 pt-3">
               <button onClick={() => setStep('form')} className="text-sm text-gray-500 px-3 py-1.5">Back</button>
               <button onClick={post} disabled={busy} className="text-sm bg-green-600 text-white font-semibold rounded px-4 py-1.5 disabled:opacity-50">
