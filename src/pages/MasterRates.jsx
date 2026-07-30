@@ -198,6 +198,33 @@ function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loadin
   const [form, setForm] = useState({})
   const [lightbox, setLightbox] = useState(null)
   const [uploading, setUploading] = useState(false)
+  const [sort, setSort] = useState({ key: null, dir: 'asc' })
+
+  function toggleSort(key) {
+    setSort(s => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }))
+  }
+  // Comparable value for a column: numeric for number columns, otherwise the
+  // displayed text (so sorting matches what the user sees), '—' treated empty.
+  function sortValue(row, col) {
+    if (col.type === 'number') return parseFloat(row[col.key]) || 0
+    const s = displayCell(row, col)
+    return s == null || s === '—' ? '' : String(s)
+  }
+  const sortedRows = useMemo(() => {
+    if (!sort.key) return rows
+    const col = columns.find(c => c.key === sort.key)
+    if (!col) return rows
+    const arr = [...rows]
+    arr.sort((ra, rb) => {
+      const va = sortValue(ra, col)
+      const vb = sortValue(rb, col)
+      let cmp
+      if (typeof va === 'number' && typeof vb === 'number') cmp = va - vb
+      else cmp = String(va).localeCompare(String(vb), undefined, { numeric: true, sensitivity: 'base' })
+      return sort.dir === 'asc' ? cmp : -cmp
+    })
+    return arr
+  }, [rows, sort, columns])
 
   function startEdit(row) {
     setForm(row)
@@ -300,15 +327,25 @@ function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loadin
         <table className="w-full text-xs min-w-[820px]">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              {columns.map(col => (
-                <th
-                  key={col.key}
-                  className="px-3 py-2 text-left font-semibold text-gray-600 uppercase whitespace-nowrap"
-                  style={col.width ? { width: col.width } : undefined}
-                >
-                  {col.label}
-                </th>
-              ))}
+              {columns.map(col => {
+                const active = sort.key === col.key
+                return (
+                  <th
+                    key={col.key}
+                    onClick={() => toggleSort(col.key)}
+                    title="Sort"
+                    className="px-3 py-2 text-left font-semibold text-gray-600 uppercase whitespace-nowrap cursor-pointer select-none hover:bg-gray-100"
+                    style={col.width ? { width: col.width } : undefined}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      {col.label}
+                      <span className={active ? 'text-gray-700' : 'text-gray-300'}>
+                        {active ? (sort.dir === 'asc' ? '▲' : '▼') : '↕'}
+                      </span>
+                    </span>
+                  </th>
+                )
+              })}
               <th className="px-3 py-2 w-24" />
             </tr>
           </thead>
@@ -339,7 +376,7 @@ function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loadin
                 </td>
               </tr>
             ) : (
-              rows.map(row =>
+              sortedRows.map(row =>
                 editingId === row.id ? (
                   <tr key={row.id} className="bg-green-50">
                     {editCells}
