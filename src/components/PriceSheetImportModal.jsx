@@ -48,6 +48,7 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
     const f = filter
     if (f.status === 'new' && r.matchId) return false
     if (f.status === 'matched' && !r.matchId) return false
+    if (f.status === 'unaccounted' && r.reviewed) return false
     if (f.text) {
       const q = norm(f.text)
       if (!norm(`${r.item} ${r.notes || ''} ${r.matchName || ''} ${r.unit || ''}`).includes(q)) return false
@@ -109,9 +110,11 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
           current: hit ? Number(hit.unit_cost) : null,
           category: hit?.category || '',
           sub_category: hit?.sub_category || '',
-          // Every item is accounted for: matched+same price = unchanged,
-          // matched+different = update, unmatched = add (new).
+          // Suggested action; the user must still confirm every item before
+          // importing. matched+same price = unchanged, matched+different =
+          // update, unmatched = add (new).
           action: hit ? (Number(hit.unit_cost) === Number(r.unit_price) ? 'unchanged' : 'update') : 'add',
+          reviewed: false, // becomes true once the user accounts for the row
         }
       })
       setRows(merged)
@@ -128,13 +131,14 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
   }
 
   const counts = useMemo(() => {
-    let unchanged = 0, updated = 0, added = 0
+    let unchanged = 0, updated = 0, added = 0, accounted = 0
     for (const r of rows) {
       if (r.action === 'add') added++
       else if (r.action === 'update') updated++
       else unchanged++
+      if (r.reviewed) accounted++
     }
-    return { unchanged, updated, added, total: rows.length }
+    return { unchanged, updated, added, accounted, total: rows.length, remaining: rows.length - accounted }
   }, [rows])
 
   // Description custom change — Sam applies a plain-language rule to the rows
@@ -167,6 +171,7 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
             unit_price: newPrice,
             notes: e.notes ?? r.notes,
             action: changed ? 'update' : r.action,
+            reviewed: true,
           }
         })
       )
@@ -342,10 +347,23 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
               <span className="text-gray-600">effective {effectiveDate}</span>
               <span className="ml-auto text-gray-700">
                 {counts.unchanged} unchanged · {counts.updated} updated · {counts.added} new
-                <span className="text-gray-400"> (of {counts.total})</span>
               </span>
             </div>
-            <p className="text-[11px] text-gray-600 mb-2">Every item must be accounted for — marked <strong>unchanged</strong> or <strong>updated</strong> (new items are added). Use the filter to find a group, then apply a change to all of them.</p>
+            <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px]">
+              <span className={`font-semibold ${counts.remaining === 0 ? 'text-green-700' : 'text-amber-700'}`}>
+                {counts.accounted} of {counts.total} accounted for
+                {counts.remaining > 0 ? ` · ${counts.remaining} still need review` : ' · ready to import'}
+              </span>
+              {counts.remaining > 0 && (
+                <button
+                  onClick={() => { setFilterDraft(f => ({ ...f, status: 'unaccounted' })); setFilter(f => ({ ...f, status: 'unaccounted' })) }}
+                  className="text-amber-700 underline"
+                >
+                  show unaccounted
+                </button>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-600 mb-2">Filter a group, then mark them (Leave Unchanged / Update). Repeat until every item is accounted for — then Import Pricing unlocks.</p>
 
             <div className="mb-3 border border-gray-200 rounded-lg overflow-hidden text-xs">
               {/* Step 1 — Filter Items */}
@@ -374,6 +392,7 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                   <option value="all">All</option>
                   <option value="new">New</option>
                   <option value="matched">Matched</option>
+                  <option value="unaccounted">Unaccounted</option>
                 </select>
                 <button onClick={() => setFilter(filterDraft)} className="px-3 py-1 bg-gray-800 text-white rounded hover:bg-gray-900 font-semibold">Search</button>
                 <button onClick={() => { setFilterDraft({ text: '', price: '', status: 'all' }); setFilter({ text: '', price: '', status: 'all' }) }} className="text-gray-500 hover:underline">Clear</button>
@@ -384,8 +403,9 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
               <div className="px-3 py-2 space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-bold text-gray-800">Step 2 · Change filtered</span>
-                  <button onClick={() => applyToVisible({ action: 'unchanged' })} className="px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100">Leave Unchanged</button>
-                  <button onClick={() => applyToVisibleMatched({ action: 'update' })} className="px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100">Update pricing (all matches)</button>
+                  <button onClick={() => applyToVisible({ action: 'unchanged', reviewed: true })} className="px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100">Leave Unchanged</button>
+                  <button onClick={() => applyToVisibleMatched({ action: 'update', reviewed: true })} className="px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100">Update pricing (all matches)</button>
+                  <button onClick={() => applyToVisible({ reviewed: true })} className="px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100">Mark accounted</button>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-gray-600 w-16">Unit</span>
@@ -469,11 +489,14 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                           {delta == null ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(0)}%`}
                         </td>
                         <td className="px-2 py-1.5">
-                          <select value={r.action} onChange={e => setRow(i, { action: e.target.value })} className="border border-gray-200 rounded px-1.5 py-1 bg-white">
-                            <option value="unchanged">Unchanged</option>
-                            {r.matchId && <option value="update">Update</option>}
-                            <option value="add">Add new</option>
-                          </select>
+                          <div className="flex items-center gap-1">
+                            <select value={r.action} onChange={e => setRow(i, { action: e.target.value, reviewed: true })} className="border border-gray-200 rounded px-1.5 py-1 bg-white">
+                              <option value="unchanged">Unchanged</option>
+                              {r.matchId && <option value="update">Update</option>}
+                              <option value="add">Add new</option>
+                            </select>
+                            {!r.reviewed && <span title="Not yet accounted for" className="text-amber-500">●</span>}
+                          </div>
                         </td>
                         <td className="px-2 py-1.5">
                           {r.action === 'add' ? (
@@ -501,14 +524,18 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                 </tbody>
               </table>
             </div>
-            <div className="flex justify-end gap-2 pt-3">
+            <div className="flex items-center justify-end gap-3 pt-3">
+              {counts.remaining > 0 && (
+                <span className="text-[11px] text-amber-700">{counts.remaining} item(s) still need to be accounted for</span>
+              )}
               <button onClick={() => setStep('form')} className="text-sm text-gray-500 px-3 py-1.5">Back</button>
               <button
                 onClick={apply}
-                disabled={busy}
-                className="text-sm bg-green-600 text-white font-semibold rounded px-4 py-1.5 disabled:opacity-50"
+                disabled={busy || counts.remaining > 0}
+                title={counts.remaining > 0 ? 'Account for every item first' : undefined}
+                className="text-sm bg-green-600 text-white font-semibold rounded px-4 py-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {busy ? 'Applying…' : 'Apply changes'}
+                {busy ? 'Importing…' : 'Import Pricing'}
               </button>
             </div>
           </div>
