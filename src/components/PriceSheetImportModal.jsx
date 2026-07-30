@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import VendorCombo from './VendorCombo'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PriceSheetImportModal — upload a vendor price sheet, let Sam extract the line
@@ -250,12 +251,7 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Vendor</label>
-                <select value={vendorId} onChange={e => setVendorId(e.target.value)} className="input w-full text-sm py-1.5">
-                  <option value="">— Select vendor —</option>
-                  {vendorList.map(v => (
-                    <option key={v.id} value={v.id}>{v.company_name}</option>
-                  ))}
-                </select>
+                <VendorCombo vendors={vendorList} value={vendorId} onChange={setVendorId} placeholder="Search vendor…" />
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Effective date</label>

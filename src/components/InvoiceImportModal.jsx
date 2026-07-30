@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import VendorCombo from './VendorCombo'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // InvoiceImportModal — upload a vendor invoice for a job. Sam extracts the
@@ -240,12 +241,14 @@ export default function InvoiceImportModal({ jobId, jobName, vendors = [], onClo
           <div className="p-5 space-y-4">
             <div>
               <label className="block text-xs text-gray-500 mb-1">Vendor (optional — auto-detected if blank)</label>
-              <select value={vendorId} onChange={e => setVendorId(e.target.value)} className="input w-full text-sm py-1.5">
-                <option value="">— Auto-detect from invoice —</option>
-                {vendorList.map(v => (
-                  <option key={v.id} value={v.id}>{v.company_name}</option>
-                ))}
-              </select>
+              <VendorCombo
+                vendors={vendorList}
+                value={vendorId}
+                onChange={setVendorId}
+                allowNone
+                noneLabel="— Auto-detect from invoice —"
+                placeholder="Auto-detect, or search vendor…"
+              />
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">Invoice file (PDF or image)</label>
@@ -271,10 +274,7 @@ export default function InvoiceImportModal({ jobId, jobName, vendors = [], onClo
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-3">
               <div>
                 <label className="block text-[11px] text-gray-500 mb-0.5">Vendor</label>
-                <select value={vendorId} onChange={e => changeVendor(e.target.value)} className="input w-full text-xs py-1">
-                  <option value="">— none —</option>
-                  {vendorList.map(v => <option key={v.id} value={v.id}>{v.company_name}</option>)}
-                </select>
+                <VendorCombo vendors={vendorList} value={vendorId} onChange={changeVendor} allowNone placeholder="Search vendor…" />
               </div>
               <div>
                 <label className="block text-[11px] text-gray-500 mb-0.5">Invoice #</label>
