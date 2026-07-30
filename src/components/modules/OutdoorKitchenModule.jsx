@@ -43,7 +43,8 @@ const OK_RATES = {
   counterPourLab: { dbName: 'BBQ Counter Pour Labor Rate', fallback: 50 }, // SF/day
   counterBroomLab: { dbName: 'BBQ Counter Broom Labor Rate', fallback: 60 }, // SF/day
   counterPolishLab: { dbName: 'BBQ Counter Polish Labor Rate', fallback: 18 }, // SF/day
-  applianceLab: { dbName: 'BBQ Appliance Labor Rate', fallback: 2.75 }, // appliances/day
+  applianceLab: { dbName: 'BBQ Appliance Labor Rate', fallback: 2.75 }, // appliances/day (legacy)
+  applianceInstallHrs: { dbName: 'BBQ Appliance Install Hrs', fallback: 2.9 }, // hrs per appliance (install labor coefficient)
   gficLab: { dbName: 'BBQ GFIC Labor Rate', fallback: 2 }, // hrs/unit
   sinkLab: { dbName: 'BBQ Sink Labor Rate', fallback: 4 }, // hrs flat
   gasTrenchLab: { dbName: 'BBQ Gas Trench Labor Rate', fallback: 35 }, // LF/day
@@ -493,6 +494,9 @@ function calcOutdoorKitchen(
   // Equipment table — per-line labor (hours entered directly, replacing the old
   // single Layout Hours field) + material from the master rate, zeroed when the
   // client provides the unit.
+  // Install labor per appliance: master coefficient (hrs/ea), overridable per row
+  // by typing a value in the Labor (hrs) field.
+  const applianceHrsEa = p(OK_RATES.applianceInstallHrs.dbName, OK_RATES.applianceInstallHrs.fallback)
   let equipHrs = 0
   let equipMat = 0
   ;(equipmentRows || []).forEach(r => {
@@ -501,7 +505,9 @@ function calcOutdoorKitchen(
     // Unit material $: the inline $/ea if entered, else the master rate for the type.
     const unit =
       r.unitCost !== '' && r.unitCost != null ? n(r.unitCost) : p(applianceRateName(r.type), 0)
-    equipHrs += q * n(r.hours)
+    // Labor hrs/ea: explicit override if entered, else the install coefficient.
+    const hrsEa = r.hours !== '' && r.hours != null ? n(r.hours) : applianceHrsEa
+    equipHrs += q * hrsEa
     if (!r.clientProvided) equipMat += q * unit
   })
   const installAppHrs =
@@ -1301,7 +1307,23 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                   <th className="text-left pb-1 pr-2 font-medium">Qty</th>
                   <th className="text-left pb-1 pr-2 font-medium">$/ea</th>
                   <th className="text-left pb-1 pr-2 font-medium">Client Provided</th>
-                  <th className="text-left pb-1 pr-2 font-medium">Labor (hrs)</th>
+                  <th className="text-left pb-1 pr-2 font-medium">
+                    <span className="inline-flex items-center gap-1">
+                      Labor (hrs/ea)
+                      <RateEditPopover
+                        table="labor_rates"
+                        name={OK_RATES.applianceInstallHrs.dbName}
+                        category="Outdoor Kitchen"
+                        mode="coefficient"
+                        unitLabel="hrs/ea"
+                        currentValue={p(
+                          OK_RATES.applianceInstallHrs.dbName,
+                          OK_RATES.applianceInstallHrs.fallback
+                        )}
+                        onSaved={refreshAllRates}
+                      />
+                    </span>
+                  </th>
                   <th className="text-right pb-1 pr-2 font-medium text-gray-400">Material $</th>
                   <th></th>
                 </tr>
@@ -1379,7 +1401,15 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                         </select>
                       </td>
                       <td className="py-1 pr-2">
-                        <NumInput value={row.hours} onChange={v => setRow('hours', v)} className="w-full" />
+                        <NumInput
+                          value={row.hours}
+                          onChange={v => setRow('hours', v)}
+                          className="w-full"
+                          placeholder={p(
+                            OK_RATES.applianceInstallHrs.dbName,
+                            OK_RATES.applianceInstallHrs.fallback
+                          ).toFixed(2)}
+                        />
                       </td>
                       <td className="py-1 pr-2 text-right text-xs text-gray-600">
                         {row.clientProvided ? 'client' : eqMat > 0 ? `$${eqMat.toFixed(2)}` : '—'}
