@@ -93,24 +93,34 @@ const MAT_DEFAULTS = {
 // ── Vendor catalog (subs_vendors + material_rates) ───────────────────────────
 const PAVER_CAT = { paver: 'Paver Material', base: 'Base Material' }
 
-// Option list for a section = the vendor's catalog items (label = name minus the
-// '<subcategory> - ' prefix). Empty for House/Custom/unset vendors.
+// Option list for a section = the vendor's catalog items. Each option carries
+// the material_rates row id (the STABLE key a selection is stored/matched by —
+// rename-proof) plus a human label (name minus the '<subcategory> - ' prefix,
+// and minus the sub_category collection so it reads clean). Empty for
+// House/Custom/unset vendors.
 function paverOptions(cat, vendorSel, materialRows) {
   if (!vendorSel || vendorSel === 'House' || vendorSel === 'Custom') return []
   const prefix = `${cat} - `
   return (materialRows || [])
     .filter(r => r.subcategory === cat && r.vendor_id === vendorSel)
-    .map(r => ({
-      label: r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name,
-      row: r,
-    }))
+    .map(r => {
+      // Human label = name minus the '<subcategory> - ' prefix.
+      const nm = r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name
+      // value = row id (the STABLE, rename-proof key a selection is matched by).
+      return { id: r.id, value: r.id, label: nm, stored: nm, row: r }
+    })
 }
-// The material_rates row for a row's vendor + type (falls back to the vendor's
-// first item so a freshly-picked vendor prices something).
-function paverItemFor(cat, vendorSel, typeLabel, materialRows) {
+// Resolve a selection to its material_rates row. `key` is the row id (new
+// estimates store the id); we fall back to matching the old descriptive label
+// (estimates saved before the id migration) and finally the vendor's first item.
+function paverItemFor(cat, vendorSel, key, materialRows) {
   const opts = paverOptions(cat, vendorSel, materialRows)
   if (!opts.length) return null
-  return (opts.find(o => o.label === typeLabel) || opts[0]).row
+  if (!key) return opts[0].row
+  const byId = opts.find(o => o.id === key)
+  if (byId) return byId.row
+  const byLabel = opts.find(o => o.stored === key || o.label === key)
+  return (byLabel || opts[0]).row
 }
 
 function calcPaver(
@@ -189,7 +199,12 @@ function calcPaver(
     // back to the legacy single base-rock rate.
     let baseTonRate
     if (row.baseVendor && row.baseVendor !== 'House' && row.baseVendor !== 'auto') {
-      const bItem = paverItemFor(PAVER_CAT.base, row.baseVendor, row.baseType, materialRows)
+      const bItem = paverItemFor(
+        PAVER_CAT.base,
+        row.baseVendor,
+        row.baseId || row.baseType,
+        materialRows
+      )
       baseTonRate = bItem ? n(bItem.unit_cost) : baseRockPerTon
     } else {
       baseTonRate = mr['Base Material - Class II Roadbase'] ?? baseRockPerTon
@@ -204,7 +219,12 @@ function calcPaver(
     if (isCustom) {
       pricePerSF = n(row.customPricePerSF)
     } else if (row.paverVendor) {
-      const item = paverItemFor(PAVER_CAT.paver, row.paverVendor, row.paverType, materialRows)
+      const item = paverItemFor(
+        PAVER_CAT.paver,
+        row.paverVendor,
+        row.paverId || row.paverType,
+        materialRows
+      )
       if (item) {
         pricePerSF = n(item.unit_cost)
         sfPerPallet = n(item.sf_per_pallet)
@@ -284,7 +304,12 @@ function calcPaver(
   } else if (state.vertVendor === 'Custom' || state.vertPaverBrand === 'Custom') {
     vertPricePerLF = n(state.vertCustomPricePerLF)
   } else if (state.vertVendor) {
-    const vItem = paverItemFor(PAVER_CAT.paver, state.vertVendor, state.vertType, materialRows)
+    const vItem = paverItemFor(
+      PAVER_CAT.paver,
+      state.vertVendor,
+      state.vertId || state.vertType,
+      materialRows
+    )
     vertPricePerLF = vItem ? n(vItem.price_per_lf_vert) : 0
   } else if (state.vertPaverBrand) {
     const vpd = pp.find(p => p.brand === state.vertPaverBrand && p.name === state.vertPaverName)
@@ -571,11 +596,15 @@ function Sel({ value, onChange, options }) {
       onChange={onChange}
       className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
     >
-      {options.map(o => (
-        <option key={o} value={o}>
-          {o}
-        </option>
-      ))}
+      {options.map(o => {
+        const val = typeof o === 'object' ? o.value : o
+        const lab = typeof o === 'object' ? o.label : o
+        return (
+          <option key={val} value={val}>
+            {lab}
+          </option>
+        )
+      })}
     </select>
   )
 }
@@ -1249,7 +1278,8 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                         const v = e.target.value
                         setRow(kArea, i, 'paverVendor', v)
                         const opts = paverOptions(PAVER_CAT.paver, v, materialRows)
-                        setRow(kArea, i, 'paverType', opts[0]?.label || '')
+                        setRow(kArea, i, 'paverId', opts[0]?.id || '')
+                        setRow(kArea, i, 'paverType', opts[0]?.stored || '')
                       }}
                     >
                       <option value="">— Vendor —</option>
@@ -1270,9 +1300,14 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                       />
                     ) : (
                       <Sel
-                        value={row.paverType || ''}
-                        onChange={e => setRow(kArea, i, 'paverType', e.target.value)}
-                        options={pOpts.map(o => o.label)}
+                        value={row.paverId || ''}
+                        onChange={e => {
+                          const id = e.target.value
+                          const opt = pOpts.find(o => o.id === id)
+                          setRow(kArea, i, 'paverId', id)
+                          setRow(kArea, i, 'paverType', opt ? opt.stored : '')
+                        }}
+                        options={pOpts}
                       />
                     )}
                   </td>
@@ -1346,6 +1381,10 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                     : row.method === 'Mini Skid'
                       ? calc.baseMiniBobcat
                       : calc.baseHand
+              const isRealBase = row.baseVendor && row.baseVendor !== 'House'
+              const bOpts = isRealBase
+                ? paverOptions(PAVER_CAT.base, row.baseVendor, materialRows)
+                : ['Class II Roadbase']
               return (
                 <tr key={i}>
                   <td className={td}>
@@ -1355,11 +1394,14 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                       onChange={e => {
                         const v = e.target.value
                         setRow(kArea, i, 'baseVendor', v)
-                        const opts =
-                          v === 'House'
-                            ? ['Class II Roadbase']
-                            : paverOptions(PAVER_CAT.base, v, materialRows).map(o => o.label)
-                        setRow(kArea, i, 'baseType', opts[0] || '')
+                        if (v === 'House') {
+                          setRow(kArea, i, 'baseId', '')
+                          setRow(kArea, i, 'baseType', 'Class II Roadbase')
+                        } else {
+                          const opts = paverOptions(PAVER_CAT.base, v, materialRows)
+                          setRow(kArea, i, 'baseId', opts[0]?.id || '')
+                          setRow(kArea, i, 'baseType', opts[0]?.stored || '')
+                        }
                       }}
                     >
                       <option value="House">House</option>
@@ -1372,13 +1414,20 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                   </td>
                   <td className={td}>
                     <Sel
-                      value={row.baseType || 'Class II Roadbase'}
-                      onChange={e => setRow(kArea, i, 'baseType', e.target.value)}
-                      options={
-                        row.baseVendor && row.baseVendor !== 'House'
-                          ? paverOptions(PAVER_CAT.base, row.baseVendor, materialRows).map(o => o.label)
-                          : ['Class II Roadbase']
+                      value={
+                        isRealBase ? row.baseId || '' : row.baseType || 'Class II Roadbase'
                       }
+                      onChange={e => {
+                        if (!isRealBase) {
+                          setRow(kArea, i, 'baseType', e.target.value)
+                          return
+                        }
+                        const id = e.target.value
+                        const opt = bOpts.find(o => o.id === id)
+                        setRow(kArea, i, 'baseId', id)
+                        setRow(kArea, i, 'baseType', opt ? opt.stored : '')
+                      }}
+                      options={bOpts}
                     />
                   </td>
                   <td className={td}>
@@ -1858,7 +1907,8 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                 const v = e.target.value
                 set('vertVendor', v)
                 const opts = paverOptions(PAVER_CAT.paver, v, materialRows)
-                set('vertType', opts[0]?.label || '')
+                set('vertId', opts[0]?.id || '')
+                set('vertType', opts[0]?.stored || '')
               }}
             >
               <option value="">— Vendor —</option>
@@ -1878,11 +1928,15 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                 />
               ) : (
                 <Sel
-                  value={state.vertType || ''}
-                  onChange={e => set('vertType', e.target.value)}
-                  options={paverOptions(PAVER_CAT.paver, state.vertVendor, materialRows).map(
-                    o => o.label
-                  )}
+                  value={state.vertId || ''}
+                  onChange={e => {
+                    const id = e.target.value
+                    const vopts = paverOptions(PAVER_CAT.paver, state.vertVendor, materialRows)
+                    const opt = vopts.find(o => o.id === id)
+                    set('vertId', id)
+                    set('vertType', opt ? opt.stored : '')
+                  }}
+                  options={paverOptions(PAVER_CAT.paver, state.vertVendor, materialRows)}
                 />
               )}
             </div>

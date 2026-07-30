@@ -491,7 +491,9 @@ export default function MasterRates() {
         unit_cost: parseFloat(form.unit_cost) || 0,
         category: form.category?.trim(),
         vendor_id: form.vendor_id || null,
-        subcategory: form.subcategory?.trim() || null,
+        subcategory:
+          form.subcategory?.trim() ||
+          (form.category?.trim() === 'Paver' && form.vendor_id ? 'Paver Material' : null),
         sub_category: form.sub_category?.trim() || null,
         photo_url: form.photo_url || null,
       })
@@ -508,7 +510,9 @@ export default function MasterRates() {
         unit_cost: parseFloat(form.unit_cost) || 0,
         category: form.category?.trim(),
         vendor_id: form.vendor_id || null,
-        subcategory: form.subcategory?.trim() || null,
+        subcategory:
+          form.subcategory?.trim() ||
+          (form.category?.trim() === 'Paver' && form.vendor_id ? 'Paver Material' : null),
         sub_category: form.sub_category?.trim() || null,
         photo_url: form.photo_url || null,
       })
