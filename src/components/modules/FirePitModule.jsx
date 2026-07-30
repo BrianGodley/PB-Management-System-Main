@@ -22,6 +22,13 @@ const FP_RATES = {
   fpConcrete: { dbName: 'FP Concrete', fallback: 149.5 }, // $/CY (footing & grout)
   fpGroutPump: { dbName: 'FP Grout Pump Setup', fallback: 150.0 }, // flat fee when pump used
 
+  // ── Subcontractor flat structure rates (Sub tab only) ───────────────────────
+  // On the Sub tab the itemized block/rebar/footing/grout takeoff is replaced by
+  // a flat price: wall perimeter × $/LF + wall face area × $/SF. This covers the
+  // wall build AND cap install labor.
+  fpSubStructLF: { dbName: 'FP Sub Structure $/LF', fallback: 0 }, // $/LF wall build
+  fpSubStructHtSF: { dbName: 'FP Sub Structure Ht $/SF', fallback: 0 }, // $/SF wall face
+
   // ── Wall cap costs — simple $/LF master rate + hrs/LF labor coefficient per
   //    cap type, resolved by Type like the OK finishes (vendor-overridable).
   capFlagstone: { dbName: 'FP Cap Flagstone', fallback: 18.0 }, // $/LF
@@ -347,6 +354,7 @@ function calcFirePit(
   } = state
 
   const p = (dbName, fallback) => mp[dbName] ?? fallback
+  const isSubTab = state.subType === 'Subcontractor'
 
   // ── Wall finish per-row calc: material (vendor-overridable unit) + labor ──────
   const finishRowCalc = row => {
@@ -389,7 +397,9 @@ function calcFirePit(
   }
   const capCalc = (capRows || []).map(capRowCalc)
   const capMat = capCalc.reduce((s, c) => s + c.mat, 0)
-  const capHrs = capCalc.reduce((s, c) => s + c.hrs, 0)
+  // Cap install labor is billed on the In-House tab only; on the Sub tab the flat
+  // structure price already covers cap install labor (cap material still counts).
+  const capHrs = isSubTab ? 0 : capCalc.reduce((s, c) => s + c.hrs, 0)
 
   // ── Gas Line + Gas Fixtures (Utilities catalog, gas only) ─────────────────────
   // Gas Line = pipe labor + material PLUS trenching (6" wide × 24" deep per LF,
@@ -472,11 +482,23 @@ function calcFirePit(
       ? p(FP_RATES.fpGroutPump.dbName, FP_RATES.fpGroutPump.fallback)
       : 0
 
+  // ── Structure roll-up (In-House itemized vs Sub flat rate) ───────────────────
+  // structureHrs = itemized structure labor; structureMatVal = itemized structure
+  // material. Both are EXCLUDED on the Sub tab and replaced by structureSubCost, a
+  // flat price driven by wall perimeter + wall face area (covers wall build + cap
+  // install labor).
+  const structureHrs = layoutHrsN + structuralBaseHrs + curveAddHrs
+  const structureMatVal = blockMat + rebarMat + footingMat + groutMat + pumpSetupMat
+  const structureSubCost = isSubTab
+    ? n(wallLF) * p(FP_RATES.fpSubStructLF.dbName, FP_RATES.fpSubStructLF.fallback) +
+      n(wallLF) *
+        (n(wallHeightIn) / 12) *
+        p(FP_RATES.fpSubStructHtSF.dbName, FP_RATES.fpSubStructHtSF.fallback)
+    : 0
+
   // ── Totals ───────────────────────────────────────────────────────────────────
   const baseHrs =
-    layoutHrsN +
-    structuralBaseHrs +
-    curveAddHrs +
+    (isSubTab ? 0 : structureHrs) +
     capHrs +
     finishHrs +
     epHrs +
@@ -489,11 +511,7 @@ function calcFirePit(
   const manDays = totalHrs / 8
 
   const totalMat =
-    blockMat +
-    rebarMat +
-    footingMat +
-    groutMat +
-    pumpSetupMat +
+    (isSubTab ? 0 : structureMatVal) +
     capMat +
     finishMat +
     epMat +
@@ -504,12 +522,11 @@ function calcFirePit(
   // On the Sub tab the itemized scope's cost IS the subcontractor cost — labor +
   // burden + material + any manual sub — and profit is the markup (Sub GP). The
   // in-house GP model applies only to the In-House tab.
-  const isSubTab = state.subType === 'Subcontractor'
   const subMarkup = n(state.subGpMarkupRate) || 0.2
   let gp, subCost, subGp, commission, price
   if (isSubTab) {
     gp = 0
-    subCost = totalMat + laborCost + burden + manSub
+    subCost = totalMat + laborCost + burden + structureSubCost + manSub
     subGp = subCost * subMarkup
     commission = subGp * DEFAULTS.commissionRate
     price = subCost + subGp + commission
@@ -554,6 +571,7 @@ function calcFirePit(
     epMat,
     epHrs,
     manMat,
+    structureSubCost,
   }
 }
 
@@ -922,6 +940,40 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
       {/* ── Fire Pit Structure ── */}
       <div>
         <SectionHeader title="Fire Pit Structure (CMU Block)" />
+        {isSub ? (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3 text-[11px] text-gray-500">
+            <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">
+              Subcontractor Structure Rates
+            </p>
+            <div className="flex flex-wrap gap-x-3 gap-y-1">
+              <span className="inline-flex items-center gap-1">
+                Structure ${p(FP_RATES.fpSubStructLF.dbName, 0).toFixed(2)}/LF
+                <RateEditPopover
+                  table="material_rates"
+                  name={FP_RATES.fpSubStructLF.dbName}
+                  category="Fire Pit"
+                  unitLabel="LF"
+                  currentValue={p(FP_RATES.fpSubStructLF.dbName, FP_RATES.fpSubStructLF.fallback)}
+                  onSaved={refreshAllRates}
+                />
+              </span>
+              <span className="inline-flex items-center gap-1">
+                Wall Face ${p(FP_RATES.fpSubStructHtSF.dbName, 0).toFixed(2)}/SF
+                <RateEditPopover
+                  table="material_rates"
+                  name={FP_RATES.fpSubStructHtSF.dbName}
+                  category="Fire Pit"
+                  unitLabel="SF"
+                  currentValue={p(FP_RATES.fpSubStructHtSF.dbName, FP_RATES.fpSubStructHtSF.fallback)}
+                  onSaved={refreshAllRates}
+                />
+              </span>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1 italic">
+              Flat sub price covers the wall build and cap install labor.
+            </p>
+          </div>
+        ) : (
         <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3 text-[11px] text-gray-500">
           <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">
             FP Structural Rates (click any to edit)
@@ -1035,6 +1087,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
             </span>
           </div>
         </div>
+        )}
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div>
             <label className="block text-xs text-gray-500 mb-1">Wall Perimeter (LF)</label>
@@ -1044,6 +1097,8 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
             <label className="block text-xs text-gray-500 mb-1">Wall Height (inches)</label>
             <NumInput value={wallHeightIn} onChange={setWallHeightIn} placeholder="40" />
           </div>
+          {!isSub && (
+            <>
           <div>
             <label className="block text-xs text-gray-500 mb-1">Footing Width (inches)</label>
             <NumInput value={footingWidthIn} onChange={setFootingWidthIn} placeholder="12" />
@@ -1078,8 +1133,12 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
               </span>
             </div>
           </div>
+            </>
+          )}
         </div>
 
+        {!isSub && (
+          <>
         <LabeledRow label="Use Grout Pump?">
           <select
             className="input text-sm py-1.5 w-28"
@@ -1116,6 +1175,8 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
               </span>
             )}
           </div>
+        )}
+          </>
         )}
       </div>
 
