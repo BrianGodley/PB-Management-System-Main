@@ -366,7 +366,7 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
             <div className="overflow-x-auto border border-gray-200 rounded-lg max-h-[55vh]">
               <table className="w-full text-xs">
                 <thead className="bg-gray-50 sticky top-0">
-                  <tr className="text-left text-gray-500">
+                  <tr className="text-left text-gray-700">
                     <th className="px-2 py-2 font-semibold w-8">
                       <input
                         type="checkbox"
@@ -392,13 +392,13 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                         ? ((r.unit_price - r.current) / r.current) * 100
                         : null
                     return (
-                      <tr key={i} className={`${r.action === 'skip' ? 'opacity-50' : ''} ${selected.has(i) ? 'bg-green-50' : ''}`}>
+                      <tr key={i} className={selected.has(i) ? 'bg-green-50' : ''}>
                         <td className="px-2 py-1.5">
                           <input type="checkbox" checked={selected.has(i)} onChange={() => toggleSel(i)} />
                         </td>
                         <td className="px-2 py-1.5">
                           <div className="font-medium text-gray-800">{r.item}</div>
-                          {r.notes && <div className="text-gray-400">{r.notes}</div>}
+                          {r.notes && <div className="text-gray-600">{r.notes}</div>}
                         </td>
                         <td className="px-2 py-1.5">
                           <input
@@ -408,8 +408,8 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                             className="border border-gray-200 rounded px-1.5 py-1 w-24"
                           />
                         </td>
-                        <td className="px-2 py-1.5 text-gray-600">{r.matchName || <span className="text-amber-600">— new item —</span>}</td>
-                        <td className="px-2 py-1.5 text-right text-gray-500">{r.current != null ? fmt(r.current) : '—'}</td>
+                        <td className="px-2 py-1.5 text-gray-800">{r.matchName || <span className="text-amber-600">— new item —</span>}</td>
+                        <td className="px-2 py-1.5 text-right text-gray-700">{r.current != null ? fmt(r.current) : '—'}</td>
                         <td className="px-2 py-1.5 text-right font-semibold text-gray-800">{fmt(r.unit_price)}</td>
                         <td className={`px-2 py-1.5 text-right ${delta > 0 ? 'text-red-600' : delta < 0 ? 'text-green-600' : 'text-gray-400'}`}>
                           {delta == null ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(0)}%`}
