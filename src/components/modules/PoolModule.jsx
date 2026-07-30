@@ -727,13 +727,35 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   const totalHrs = _preWalkHrs + walkHrs
   const manDays = totalHrs / 8
   const totalMat = tileMat + spillwayMat + copingMat + raisedMat + epMat + manMat
-  const subCost =
+  // Pool's genuine sub trades (excavation / shotcrete / interior / equipment /
+  // plumbing / steel / manual-sub). These are sub costs on either tab.
+  const subTradeCost =
     excavSub + shotcreteSub + interiorSub + equipmentSub + plumbSub + steelSub + manSub
   const laborCost = totalHrs * lrph
   const burden = laborCost * (n(laborBurdenPct) || LABOR_BURDEN)
-  const gp = manDays * gpmdVal
-  const commission = gp * COMMISSION_RATE
-  const price = totalMat + laborCost + burden + subCost + gp + commission
+  // On the Sub tab every itemized cost — the in-house-style material + labor +
+  // burden (waterline tile, coping, spillways, raised surfaces, E&P, manual) AND
+  // the pool sub trades — IS the subcontractor cost. Roll it all into subCost so
+  // GpmdBar's 'sub' view (total = subCost + subGp + commission) captures the full
+  // scope instead of silently dropping the in-house buckets it ignores. The
+  // in-house GP model applies only to the In-House tab. Matches the
+  // OutdoorKitchen reference; sub-trade computation above is untouched.
+  const isSubTab = state.subType === 'Subcontractor'
+  const subMarkup = n(state.subGpMarkupRate) || 0.2
+  let gp, subCost, subGp, commission, price
+  if (isSubTab) {
+    gp = 0
+    subCost = totalMat + laborCost + burden + subTradeCost
+    subGp = subCost * subMarkup
+    commission = subGp * COMMISSION_RATE
+    price = subCost + subGp + commission
+  } else {
+    gp = manDays * gpmdVal
+    subCost = subTradeCost
+    subGp = 0
+    commission = gp * COMMISSION_RATE
+    price = totalMat + laborCost + burden + subCost + gp + commission
+  }
 
   return {
     totalHrs,
@@ -743,6 +765,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     burden,
     subCost,
     gp,
+    subGp,
     commission,
     price,
     walkHrs,
@@ -990,7 +1013,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
   // Effective calc input: shared top-level fields + the active tab's inputs.
   // calcPool reads its input fields off this merged object, so the running
   // total reflects only the tab currently being edited.
-  const eff = { ...state, ...T }
+  const eff = { ...state, ...T, subGpMarkupRate }
   const calcRaw = calcPool(eff, materialPrices, laborRates, subRates, state.walkAccess, materialRows)
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored

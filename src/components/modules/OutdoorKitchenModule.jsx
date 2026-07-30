@@ -19,6 +19,8 @@ const OK_RATES = {
   bbqRebar: { dbName: 'BBQ Rebar', fallback: 0.4 }, // $/LF
   bbqConcrete: { dbName: 'BBQ Concrete', fallback: 149.5 }, // $/CY (footing & counter)
   bbqFillMat: { dbName: 'BBQ Fill Material', fallback: 60.0 }, // $/CY grout/fill
+  bbqSubWallLF: { dbName: 'BBQ Sub Wall LF', fallback: 150.0 }, // $/LF flat sub price (BBQ wall)
+  bbqSubBackLF: { dbName: 'BBQ Sub Backsplash LF', fallback: 100.0 }, // $/LF flat sub price (backsplash)
   applianceHardware: { dbName: 'BBQ Appliance Hardware', fallback: 3.0 }, // $/appliance (misc hardware)
   gficOutlet: { dbName: 'GFIC Outlet - BBQ', fallback: 80.0 }, // $/outlet
   sinkPlumbing: { dbName: 'Sink Plumbing - BBQ', fallback: 115.0 }, // $ flat
@@ -538,13 +540,20 @@ function calcOutdoorKitchen(
   })
 
   // ── Totals ──────────────────────────────────────────────────────────────────
+  const isSubTab = state.subType === 'Subcontractor'
+  // BBQ structure: In-House = itemized block/footing takeoff; Sub = a flat $/LF
+  // price (wall LF + backsplash LF), so the itemized structure labor + material
+  // are excluded on the Sub tab and replaced by structureSubCost (added to sub cost).
+  const structureHrs =
+    excavateHrs + rebarHrs + pourFootingHrs + installBlockHrs + fillBlockHrs
+  const structureMatVal = blockMat + rebarMat + footingMat + fillMat
+  const structureSubCost = isSubTab
+    ? n(bbqLengthLF) * p(OK_RATES.bbqSubWallLF.dbName, OK_RATES.bbqSubWallLF.fallback) +
+      n(backLengthLF) * p(OK_RATES.bbqSubBackLF.dbName, OK_RATES.bbqSubBackLF.fallback)
+    : 0
   const baseHrs =
     equipHrs +
-    excavateHrs +
-    rebarHrs +
-    pourFootingHrs +
-    installBlockHrs +
-    fillBlockHrs +
+    (isSubTab ? 0 : structureHrs) +
     counterFormHrs +
     counterPourHrs +
     counterBroomHrs +
@@ -560,10 +569,7 @@ function calcOutdoorKitchen(
   const manDays = totalHrs / 8
 
   const totalMat =
-    blockMat +
-    rebarMat +
-    footingMat +
-    fillMat +
+    (isSubTab ? 0 : structureMatVal) +
     counterConcMat +
     counterPolishMat +
     equipMat +
@@ -574,14 +580,13 @@ function calcOutdoorKitchen(
   const laborCost = totalHrs * lrph
   const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
   // On the Sub tab the itemized scope's cost IS the subcontractor cost — labor +
-  // burden + material + any manual sub — and profit is the markup (Sub GP). The
-  // in-house GP model applies only to the In-House tab.
-  const isSubTab = state.subType === 'Subcontractor'
+  // burden + material + flat BBQ structure + any manual sub — and profit is the
+  // markup (Sub GP). The in-house GP model applies only to the In-House tab.
   const subMarkup = n(state.subGpMarkupRate) || 0.2
   let gp, subCost, subGp, commission, price
   if (isSubTab) {
     gp = 0
-    subCost = totalMat + laborCost + burden + manSub
+    subCost = totalMat + laborCost + burden + structureSubCost + manSub
     subGp = subCost * subMarkup
     commission = subGp * DEFAULTS.commissionRate
     price = subCost + subGp + commission
@@ -975,6 +980,37 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
       {/* ── BBQ Structure ── */}
       <div>
         <SectionHeader title="BBQ Structure" />
+        {isSub ? (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3 text-[11px] text-gray-500">
+            <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">
+              Subcontractor Structure Rates ($/LF)
+            </p>
+            <div className="flex flex-wrap gap-x-3 gap-y-1">
+              <span className="inline-flex items-center gap-1">
+                BBQ Wall ${p(OK_RATES.bbqSubWallLF.dbName, 150).toFixed(2)}/LF
+                <RateEditPopover
+                  table="material_rates"
+                  name={OK_RATES.bbqSubWallLF.dbName}
+                  category="Outdoor Kitchen"
+                  unitLabel="LF"
+                  currentValue={p(OK_RATES.bbqSubWallLF.dbName, OK_RATES.bbqSubWallLF.fallback)}
+                  onSaved={refreshAllRates}
+                />
+              </span>
+              <span className="inline-flex items-center gap-1">
+                Backsplash ${p(OK_RATES.bbqSubBackLF.dbName, 100).toFixed(2)}/LF
+                <RateEditPopover
+                  table="material_rates"
+                  name={OK_RATES.bbqSubBackLF.dbName}
+                  category="Outdoor Kitchen"
+                  unitLabel="LF"
+                  currentValue={p(OK_RATES.bbqSubBackLF.dbName, OK_RATES.bbqSubBackLF.fallback)}
+                  onSaved={refreshAllRates}
+                />
+              </span>
+            </div>
+          </div>
+        ) : (
         <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3 text-[11px] text-gray-500">
           <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">
             BBQ Structural Rates (click any to edit)
@@ -1088,35 +1124,40 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
             </span>
           </div>
         </div>
+        )}
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div>
             <label className="block text-xs text-gray-500 mb-1">BBQ Wall Length (LF)</label>
             <NumInput value={bbqLengthLF} onChange={setBbqLengthLF} placeholder="0" />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">BBQ Wall Height (inches)</label>
-            <NumInput value={bbqHeightIn} onChange={setBbqHeightIn} placeholder="48" />
-          </div>
-          <div>
             <label className="block text-xs text-gray-500 mb-1">Backsplash Wall Length (LF)</label>
             <NumInput value={backLengthLF} onChange={setBackLengthLF} placeholder="0" />
           </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">
-              Backsplash Wall Height (inches)
-            </label>
-            <NumInput value={backHeightIn} onChange={setBackHeightIn} placeholder="48" />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Footing Width (inches)</label>
-            <NumInput value={footingWidthIn} onChange={setFootingWidthIn} placeholder="12" />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Footing Depth (inches)</label>
-            <NumInput value={footingDepthIn} onChange={setFootingDepthIn} placeholder="12" />
-          </div>
+          {!isSub && (
+            <>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">BBQ Wall Height (inches)</label>
+                <NumInput value={bbqHeightIn} onChange={setBbqHeightIn} placeholder="48" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">
+                  Backsplash Wall Height (inches)
+                </label>
+                <NumInput value={backHeightIn} onChange={setBackHeightIn} placeholder="48" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Footing Width (inches)</label>
+                <NumInput value={footingWidthIn} onChange={setFootingWidthIn} placeholder="12" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Footing Depth (inches)</label>
+                <NumInput value={footingDepthIn} onChange={setFootingDepthIn} placeholder="12" />
+              </div>
+            </>
+          )}
         </div>
-        {(n(bbqLengthLF) > 0 || n(backLengthLF) > 0) && (
+        {!isSub && (n(bbqLengthLF) > 0 || n(backLengthLF) > 0) && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-gray-600 flex flex-wrap gap-4">
             <span>
               Blocks: <strong>{calc.blockOrdered.toFixed(0)}</strong>

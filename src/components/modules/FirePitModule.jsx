@@ -305,10 +305,25 @@ function calcFirePit(
 
   const laborCost = totalHrs * lrph
   const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
-  const gp = manDays * gpmd
-  const commission = gp * DEFAULTS.commissionRate
-  const subCost = manSub
-  const price = totalMat + laborCost + burden + gp + commission + subCost
+  // On the Sub tab the itemized scope's cost IS the subcontractor cost — labor +
+  // burden + material + any manual sub — and profit is the markup (Sub GP). The
+  // in-house GP model applies only to the In-House tab.
+  const isSubTab = state.subType === 'Subcontractor'
+  const subMarkup = n(state.subGpMarkupRate) || 0.2
+  let gp, subCost, subGp, commission, price
+  if (isSubTab) {
+    gp = 0
+    subCost = totalMat + laborCost + burden + manSub
+    subGp = subCost * subMarkup
+    commission = subGp * DEFAULTS.commissionRate
+    price = subCost + subGp + commission
+  } else {
+    gp = manDays * gpmd
+    subCost = manSub
+    subGp = 0
+    commission = gp * DEFAULTS.commissionRate
+    price = totalMat + laborCost + burden + gp + commission + subCost
+  }
 
   return {
     walkHrs,
@@ -318,6 +333,7 @@ function calcFirePit(
     laborCost,
     burden,
     gp,
+    subGp,
     commission,
     subCost,
     price,
@@ -611,7 +627,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
     setSubTab(prev => fill(prev))
   }, [materialPrices])
 
-  const state = { crewType, subType, ...cur }
+  const state = { crewType, subType, subGpMarkupRate, ...cur }
   const calcRaw = calcFirePit(
     state,
     laborRatePerHour,
