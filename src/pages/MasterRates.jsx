@@ -151,9 +151,11 @@ function displayItem(row, v) {
   const pfx = row.subcategory ? `${row.subcategory} - ` : ''
   if (pfx && out.startsWith(pfx)) out = out.slice(pfx.length)
   else out = stripCategory(out, row.category)
+  // Drop the collection (sub_category) wherever it appears in the item —
+  // it lives in its own Sub Category column, so it shouldn't repeat here.
   const sc = row.sub_category
-  if (sc && out.toLowerCase().startsWith(sc.toLowerCase())) {
-    out = out.slice(sc.length).replace(/^[\s\-–—:]+/, '')
+  if (sc) {
+    out = out.replace(new RegExp(`\\b${escapeRe(sc)}\\b`, 'gi'), '')
   }
   // Drop the standalone word "Material" from the displayed item
   out = out
