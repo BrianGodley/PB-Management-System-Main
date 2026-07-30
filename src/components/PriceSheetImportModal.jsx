@@ -204,7 +204,8 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
     }
   }
 
-  const vendorList = (vendors || []).filter(v => v.type === 'vendor')
+  // Accept vendors whether or not a `type` field was loaded (defensive).
+  const vendorList = (vendors || []).filter(v => !v.type || v.type === 'vendor')
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-y-auto">

@@ -28,7 +28,7 @@ export default function InvoiceImportModal({ jobId, jobName, vendors = [], onClo
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  const vendorList = (vendors || []).filter(v => v.type === 'vendor')
+  const vendorList = (vendors || []).filter(v => !v.type || v.type === 'vendor')
   const vendorName = useMemo(() => vendors.find(v => v.id === vendorId)?.company_name || '', [vendors, vendorId])
 
   // Match each extracted line to a material for the chosen vendor + price-check.

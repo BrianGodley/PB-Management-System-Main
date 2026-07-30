@@ -515,7 +515,7 @@ export default function MasterRates() {
       supabase.from('material_rates').select('*').order('name'),
       supabase.from('labor_rates').select('*').order('name'),
       supabase.from('subcontractor_rates').select('*').order('company_name'),
-      supabase.from('subs_vendors').select('id, company_name').order('company_name'),
+      supabase.from('subs_vendors').select('id, company_name, type').order('company_name'),
     ])
     if (matRes.data) setMaterials(matRes.data)
     if (labRes.data) setLabor(labRes.data)
