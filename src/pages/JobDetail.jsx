@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import InvoiceImportModal from '../components/InvoiceImportModal'
 
 const STATUS_LABELS = {
   active: 'badge-active',
@@ -23,6 +24,16 @@ export default function JobDetail() {
   const [files, setFiles] = useState([])
   const [filesLoading, setFilesLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [showInvoice, setShowInvoice] = useState(false)
+  const [vendors, setVendors] = useState([])
+
+  useEffect(() => {
+    supabase
+      .from('subs_vendors')
+      .select('id, company_name, type')
+      .eq('type', 'vendor')
+      .then(({ data }) => setVendors(data || []))
+  }, [])
 
   const [coForm, setCOForm] = useState({
     description: '',
@@ -213,6 +224,15 @@ export default function JobDetail() {
 
   return (
     <div className="max-w-3xl mx-auto">
+      {showInvoice && (
+        <InvoiceImportModal
+          jobId={job.id}
+          jobName={job.client_name}
+          vendors={vendors}
+          onClose={() => setShowInvoice(false)}
+          onPosted={() => {}}
+        />
+      )}
       {/* Header */}
       <div className="flex items-center gap-3 mb-4">
         <Link to="/" className="text-gray-400 hover:text-gray-600 text-sm">
@@ -230,6 +250,12 @@ export default function JobDetail() {
             <p className="text-gray-500 text-sm">{job.job_address}</p>
           </div>
           <div className="flex flex-col items-end gap-2">
+            <button
+              onClick={() => setShowInvoice(true)}
+              className="text-xs bg-green-600 text-white font-semibold rounded px-3 py-1.5 hover:bg-green-700"
+            >
+              Import Invoice
+            </button>
             {editingStatus ? (
               <select
                 className="input text-sm w-32"
