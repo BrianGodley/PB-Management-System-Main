@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 
 // ── Which estimate modules consume a given rate ──────────────────────────────
@@ -155,10 +156,23 @@ function displayCell(row, col) {
   return v || '—'
 }
 
+async function uploadPhoto(file) {
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+  const { error } = await supabase.storage.from('rate-photos').upload(path, file, { upsert: false })
+  if (error) {
+    alert('Photo upload failed: ' + error.message)
+    return null
+  }
+  return supabase.storage.from('rate-photos').getPublicUrl(path).data.publicUrl
+}
+
 function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loading }) {
   const [editingId, setEditingId] = useState(null)
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({})
+  const [lightbox, setLightbox] = useState(null)
+  const [uploading, setUploading] = useState(false)
 
   function startEdit(row) {
     setForm(row)
@@ -183,7 +197,38 @@ function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loadin
 
   const editCells = columns.map(col => (
     <td key={col.key} className="px-3 py-1.5 align-top">
-      {col.editable === false ? (
+      {col.photo ? (
+        <div className="flex items-center gap-2">
+          {form[col.key] && (
+            <img src={form[col.key]} alt="" className="w-8 h-8 object-cover rounded border border-gray-200" />
+          )}
+          <label className="text-[11px] text-green-700 font-semibold cursor-pointer hover:underline">
+            {uploading ? 'Uploading…' : form[col.key] ? 'Replace' : 'Upload'}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={async e => {
+                const f = e.target.files?.[0]
+                if (!f) return
+                setUploading(true)
+                const url = await uploadPhoto(f)
+                setUploading(false)
+                if (url) setField(col.key, url)
+              }}
+            />
+          </label>
+          {form[col.key] && (
+            <button
+              type="button"
+              onClick={() => setField(col.key, '')}
+              className="text-[11px] text-red-400 hover:text-red-600"
+            >
+              remove
+            </button>
+          )}
+        </div>
+      ) : col.editable === false ? (
         <span className="text-gray-400">{col.render ? col.render(form) : '—'}</span>
       ) : col.type === 'select' ? (
         <select
@@ -289,7 +334,22 @@ function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loadin
                         key={col.key}
                         className={`px-3 py-1.5 whitespace-nowrap ${col.bold ? 'font-semibold text-gray-900' : 'text-gray-600'}`}
                       >
-                        {col.render ? col.render(row) : displayCell(row, col)}
+                        {col.photo ? (
+                          row[col.key] ? (
+                            <img
+                              src={row[col.key]}
+                              alt=""
+                              onClick={() => setLightbox(row[col.key])}
+                              className="w-8 h-8 object-cover rounded border border-gray-200 cursor-pointer hover:ring-2 hover:ring-green-400"
+                            />
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )
+                        ) : col.render ? (
+                          col.render(row)
+                        ) : (
+                          displayCell(row, col)
+                        )}
                       </td>
                     ))}
                     <td className="px-3 py-1.5 text-right whitespace-nowrap">
@@ -313,6 +373,21 @@ function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loadin
           </tbody>
         </table>
       </div>
+      {lightbox &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[9999] bg-black/70 flex items-center justify-center p-6 cursor-zoom-out"
+            onClick={() => setLightbox(null)}
+          >
+            <img
+              src={lightbox}
+              alt=""
+              className="max-w-full max-h-full rounded-lg shadow-2xl"
+              onClick={e => e.stopPropagation()}
+            />
+          </div>,
+          document.body
+        )}
     </div>
   )
 }
@@ -392,6 +467,8 @@ export default function MasterRates() {
         category: form.category?.trim(),
         vendor_id: form.vendor_id || null,
         subcategory: form.subcategory?.trim() || null,
+        sub_category: form.sub_category?.trim() || null,
+        photo_url: form.photo_url || null,
       })
       .select()
       .single()
@@ -407,6 +484,8 @@ export default function MasterRates() {
         category: form.category?.trim(),
         vendor_id: form.vendor_id || null,
         subcategory: form.subcategory?.trim() || null,
+        sub_category: form.sub_category?.trim() || null,
+        photo_url: form.photo_url || null,
       })
       .eq('id', form.id)
       .select()
@@ -430,6 +509,7 @@ export default function MasterRates() {
         category: form.category?.trim() || 'General',
         rate_per_day: parseFloat(form.rate) || 0,
         notes: form.notes?.trim(),
+        sub_category: form.sub_category?.trim() || null,
       })
       .select()
       .single()
@@ -445,6 +525,7 @@ export default function MasterRates() {
         category: form.category?.trim() || 'General',
         rate_per_day: parseFloat(form.rate) || 0,
         notes: form.notes?.trim(),
+        sub_category: form.sub_category?.trim() || null,
       })
       .eq('id', form.id)
       .select()
@@ -467,6 +548,7 @@ export default function MasterRates() {
         rate: parseFloat(form.rate) || 0,
         unit: form.unit,
         category: form.category?.trim() || 'General',
+        sub_category: form.sub_category?.trim() || null,
       })
       .select()
       .single()
@@ -482,6 +564,7 @@ export default function MasterRates() {
         rate: parseFloat(form.rate) || 0,
         unit: form.unit,
         category: form.category?.trim() || 'General',
+        sub_category: form.sub_category?.trim() || null,
       })
       .eq('id', form.id)
       .select()
@@ -497,7 +580,9 @@ export default function MasterRates() {
   // ── Column configs ──
   const materialColumns = [
     { key: 'category', label: 'Category', placeholder: 'e.g. Hardscape' },
+    { key: 'sub_category', label: 'Sub Category', placeholder: 'describe…' },
     { key: 'name', label: 'Item', bold: true, stripCat: true, placeholder: 'e.g. Decomposed Granite' },
+    { key: 'photo_url', label: 'Photo', photo: true },
     {
       key: 'vendor_id',
       label: 'Vendor',
@@ -516,6 +601,7 @@ export default function MasterRates() {
   ]
   const laborColumns = [
     { key: 'category', label: 'Category', type: 'select', options: LABOR_CATEGORY_OPTIONS },
+    { key: 'sub_category', label: 'Sub Category', placeholder: 'describe…' },
     { key: 'name', label: 'Item', bold: true, stripCat: true, placeholder: 'e.g. Demo - Tree Small' },
     { key: 'unit', label: 'Unit', type: 'select', options: LABOR_UNIT_OPTIONS },
     { key: 'rate', label: 'Rate', type: 'number', step: '0.0001' },
@@ -529,6 +615,7 @@ export default function MasterRates() {
   ]
   const subColumns = [
     { key: 'category', label: 'Category', type: 'select', options: SUB_CATEGORY_OPTIONS },
+    { key: 'sub_category', label: 'Sub Category', placeholder: 'describe…' },
     { key: 'trade', label: 'Item', bold: true, stripCat: true, placeholder: 'e.g. Flatwork Pour' },
     { key: 'company_name', label: 'Subcontractor', placeholder: 'e.g. ABC Concrete Co.' },
     { key: 'unit', label: 'Unit', type: 'select', options: SUB_UNIT_OPTIONS },
@@ -620,9 +707,11 @@ export default function MasterRates() {
               name: '',
               vendor_id: '',
               category: matCategory !== 'All' ? matCategory : '',
+              sub_category: '',
               unit: 'each',
               unit_cost: '',
               subcategory: '',
+              photo_url: '',
             })}
             loading={loading}
           />
@@ -654,6 +743,7 @@ export default function MasterRates() {
             addTemplate={() => ({
               name: '',
               category: labCategory !== 'All' ? labCategory : 'General',
+              sub_category: '',
               unit: 'per day',
               rate: '',
               notes: '',
@@ -699,6 +789,7 @@ export default function MasterRates() {
               company_name: '',
               trade: '',
               category: subCategory !== 'All' ? subCategory : 'General',
+              sub_category: '',
               unit: 'per day',
               rate: '',
             })}
