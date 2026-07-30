@@ -552,6 +552,8 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
       {/* ── Column Install ── */}
       <div>
         <SectionHeader title="Column Install" />
+        {/* Rates reference box — In-House only (hidden on Sub tab) */}
+        {!isSub && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3 text-[11px] text-gray-500">
           <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">
             Column Install Rates (click any to edit)
@@ -684,6 +686,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
             </span>
           </div>
         </div>
+        )}
         <div className="grid grid-cols-3 gap-3 mb-3">
           <div>
             <label className="block text-xs text-gray-500 mb-1">Quantity of Columns</label>
