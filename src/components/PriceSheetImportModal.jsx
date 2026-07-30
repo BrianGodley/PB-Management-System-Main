@@ -35,6 +35,20 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
   const [error, setError] = useState('')
   const [rows, setRows] = useState([]) // { item, unit, unit_price, matchId, matchName, current, action, category }
   const [applied, setApplied] = useState({ updated: 0, added: 0, skipped: 0 })
+  const [selected, setSelected] = useState(() => new Set())
+  const [bulkCat, setBulkCat] = useState('')
+  const [bulkSub, setBulkSub] = useState('')
+
+  const toggleSel = i =>
+    setSelected(s => {
+      const n = new Set(s)
+      n.has(i) ? n.delete(i) : n.add(i)
+      return n
+    })
+  const selectWhere = pred =>
+    setSelected(new Set(rows.map((r, i) => (pred(r) ? i : -1)).filter(i => i >= 0)))
+  const applyToSelected = patch =>
+    setRows(rs => rs.map((r, i) => (selected.has(i) ? { ...r, ...patch } : r)))
 
   const vendorName = useMemo(
     () => vendors.find(v => v.id === vendorId)?.company_name || '',
@@ -270,10 +284,54 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                 {counts.updated} update ({counts.changed} price change) · {counts.added} new · {counts.skipped} skip
               </span>
             </div>
+
+            {/* Bulk toolbar — assign action/category/sub to many rows at once */}
+            <div className="flex flex-wrap items-center gap-2 mb-2 text-xs bg-gray-50 border border-gray-200 rounded px-2 py-2">
+              <span className="text-gray-500 font-medium">Bulk:</span>
+              <button onClick={() => selectWhere(r => !r.matchId)} className="text-green-700 hover:underline">Select all new</button>
+              <button onClick={() => selectWhere(r => !!r.matchId)} className="text-green-700 hover:underline">Select all matched</button>
+              <button onClick={() => selectWhere(() => true)} className="text-green-700 hover:underline">Select all</button>
+              <button onClick={() => setSelected(new Set())} className="text-gray-500 hover:underline">Clear</button>
+              <span className="text-gray-400">{selected.size} selected</span>
+              <span className="mx-1 h-4 w-px bg-gray-300" />
+              <select
+                disabled={!selected.size}
+                onChange={e => { if (e.target.value) applyToSelected({ action: e.target.value }); e.target.value = '' }}
+                className="border border-gray-200 rounded px-1.5 py-1 bg-white disabled:opacity-50"
+              >
+                <option value="">Set action…</option>
+                <option value="update">Update</option>
+                <option value="add">Add new</option>
+                <option value="skip">Skip</option>
+              </select>
+              <input value={bulkCat} onChange={e => setBulkCat(e.target.value)} placeholder="Category" className="border border-gray-200 rounded px-1.5 py-1 w-36" />
+              <button
+                disabled={!selected.size}
+                onClick={() => applyToSelected({ category: bulkCat })}
+                className="text-green-700 font-semibold hover:underline disabled:opacity-40"
+              >
+                Apply category
+              </button>
+              <input value={bulkSub} onChange={e => setBulkSub(e.target.value)} placeholder="Sub category" className="border border-gray-200 rounded px-1.5 py-1 w-36" />
+              <button
+                disabled={!selected.size}
+                onClick={() => applyToSelected({ sub_category: bulkSub })}
+                className="text-green-700 font-semibold hover:underline disabled:opacity-40"
+              >
+                Apply sub
+              </button>
+            </div>
             <div className="overflow-x-auto border border-gray-200 rounded-lg max-h-[55vh]">
               <table className="w-full text-xs">
                 <thead className="bg-gray-50 sticky top-0">
                   <tr className="text-left text-gray-500">
+                    <th className="px-2 py-2 font-semibold w-8">
+                      <input
+                        type="checkbox"
+                        checked={selected.size > 0 && selected.size === rows.length}
+                        onChange={e => (e.target.checked ? selectWhere(() => true) : setSelected(new Set()))}
+                      />
+                    </th>
                     <th className="px-2 py-2 font-semibold">On sheet</th>
                     <th className="px-2 py-2 font-semibold">Matches</th>
                     <th className="px-2 py-2 font-semibold text-right">Current</th>
@@ -290,7 +348,10 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                         ? ((r.unit_price - r.current) / r.current) * 100
                         : null
                     return (
-                      <tr key={i} className={r.action === 'skip' ? 'opacity-50' : ''}>
+                      <tr key={i} className={`${r.action === 'skip' ? 'opacity-50' : ''} ${selected.has(i) ? 'bg-green-50' : ''}`}>
+                        <td className="px-2 py-1.5">
+                          <input type="checkbox" checked={selected.has(i)} onChange={() => toggleSel(i)} />
+                        </td>
                         <td className="px-2 py-1.5">
                           <div className="font-medium text-gray-800">{r.item}</div>
                           <div className="text-gray-400">{r.unit}{r.notes ? ` · ${r.notes}` : ''}</div>
