@@ -142,9 +142,25 @@ const SUB_UNIT_OPTIONS = [
 ]
 
 // ── Generic full-width editable rate table ───────────────────────────────────
+// Clean item text for the Item column: drop the "<subcategory> - " prefix
+// (e.g. "Paver Material - ") and, if the collection leads the remaining text,
+// drop it too (it's shown in the Sub Category column). Falls back to the
+// generic category-word strip for rows without a subcategory prefix.
+function displayItem(row, v) {
+  let out = v || ''
+  const pfx = row.subcategory ? `${row.subcategory} - ` : ''
+  if (pfx && out.startsWith(pfx)) out = out.slice(pfx.length)
+  else out = stripCategory(out, row.category)
+  const sc = row.sub_category
+  if (sc && out.toLowerCase().startsWith(sc.toLowerCase())) {
+    out = out.slice(sc.length).replace(/^[\s\-–—:]+/, '')
+  }
+  return out || v || ''
+}
+
 function displayCell(row, col) {
   const v = row[col.key]
-  if (col.stripCat) return stripCategory(v, row.category) || '—'
+  if (col.stripCat) return displayItem(row, v) || '—'
   if (col.type === 'select' && Array.isArray(col.options) && col.options.some(o => typeof o === 'object')) {
     const opt = col.options.find(o => typeof o === 'object' && o.value === (v || ''))
     return opt ? opt.label : v || '—'
