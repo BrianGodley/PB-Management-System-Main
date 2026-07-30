@@ -331,6 +331,7 @@ export default function MasterRates() {
   const [matVendor, setMatVendor] = useState('All')
   const [labCategory, setLabCategory] = useState('All')
   const [subCategory, setSubCategory] = useState('All')
+  const [subCompany, setSubCompany] = useState('All')
 
   const vendorOptions = useMemo(
     () => [
@@ -497,7 +498,7 @@ export default function MasterRates() {
     { key: 'name', label: 'Item', bold: true, placeholder: 'e.g. Demo - Tree Small' },
     { key: 'category', label: 'Category', type: 'select', options: LABOR_CATEGORY_OPTIONS },
     { key: 'unit', label: 'Unit', type: 'select', options: LABOR_UNIT_OPTIONS },
-    { key: 'rate', label: 'Unit Price', type: 'number', step: '0.0001' },
+    { key: 'rate', label: 'Rate', type: 'number', step: '0.0001' },
     { key: 'notes', label: 'Labor Description', placeholder: 'Optional notes' },
     {
       key: '__modules',
@@ -507,7 +508,8 @@ export default function MasterRates() {
     },
   ]
   const subColumns = [
-    { key: 'company_name', label: 'Item', bold: true, placeholder: 'e.g. ABC Concrete Co.' },
+    { key: 'trade', label: 'Item', bold: true, placeholder: 'e.g. Flatwork Pour' },
+    { key: 'company_name', label: 'Subcontractor', placeholder: 'e.g. ABC Concrete Co.' },
     { key: 'category', label: 'Category', type: 'select', options: SUB_CATEGORY_OPTIONS },
     { key: 'unit', label: 'Unit', type: 'select', options: SUB_UNIT_OPTIONS },
     { key: 'rate', label: 'Unit Price', type: 'number', step: '0.01', prefix: '$' },
@@ -522,6 +524,7 @@ export default function MasterRates() {
   const matCats = ['All', ...Array.from(new Set(materials.map(m => m.category).filter(Boolean))).sort()]
   const labCats = ['All', ...Array.from(new Set(labor.map(r => r.category).filter(Boolean))).sort()]
   const subCats = ['All', ...Array.from(new Set(subs.map(r => r.category).filter(Boolean))).sort()]
+  const subCompanies = ['All', ...Array.from(new Set(subs.map(r => r.company_name).filter(Boolean))).sort()]
 
   const visibleMaterials = materials.filter(m => {
     if (matCategory !== 'All' && m.category !== matCategory) return false
@@ -530,7 +533,11 @@ export default function MasterRates() {
     return true
   })
   const visibleLabor = labCategory === 'All' ? labor : labor.filter(r => r.category === labCategory)
-  const visibleSubs = subCategory === 'All' ? subs : subs.filter(r => r.category === subCategory)
+  const visibleSubs = subs.filter(r => {
+    if (subCategory !== 'All' && r.category !== subCategory) return false
+    if (subCompany !== 'All' && (r.company_name || '') !== subCompany) return false
+    return true
+  })
 
   const filterSelect = 'border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-green-400'
 
@@ -640,6 +647,16 @@ export default function MasterRates() {
       {activeTab === 'subs' && (
         <div>
           <div className="flex flex-wrap items-center gap-3 mb-2">
+            <div className="flex items-center gap-1.5">
+              <label className="text-xs text-gray-500">Subcontractor</label>
+              <select value={subCompany} onChange={e => setSubCompany(e.target.value)} className={filterSelect}>
+                {subCompanies.map(c => (
+                  <option key={c} value={c}>
+                    {c === 'All' ? 'All subcontractors' : c}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="flex items-center gap-1.5">
               <label className="text-xs text-gray-500">Category</label>
               <select value={subCategory} onChange={e => setSubCategory(e.target.value)} className={filterSelect}>
