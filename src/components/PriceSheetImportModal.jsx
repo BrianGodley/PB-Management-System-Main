@@ -280,7 +280,7 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                     <th className="px-2 py-2 font-semibold text-right">New</th>
                     <th className="px-2 py-2 font-semibold text-right">Δ</th>
                     <th className="px-2 py-2 font-semibold">Action</th>
-                    <th className="px-2 py-2 font-semibold">Category (new)</th>
+                    <th className="px-2 py-2 font-semibold">Category / Sub (new)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -310,12 +310,20 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                         </td>
                         <td className="px-2 py-1.5">
                           {r.action === 'add' ? (
-                            <input
-                              value={r.category}
-                              onChange={e => setRow(i, { category: e.target.value })}
-                              placeholder="e.g. Ground Treatments"
-                              className="border border-gray-200 rounded px-1.5 py-1 w-40"
-                            />
+                            <div className="flex flex-col gap-1">
+                              <input
+                                value={r.category}
+                                onChange={e => setRow(i, { category: e.target.value })}
+                                placeholder="Category (e.g. Ground Treatments)"
+                                className="border border-gray-200 rounded px-1.5 py-1 w-48"
+                              />
+                              <input
+                                value={r.sub_category}
+                                onChange={e => setRow(i, { sub_category: e.target.value })}
+                                placeholder="Sub category (optional)"
+                                className="border border-gray-200 rounded px-1.5 py-1 w-48"
+                              />
+                            </div>
                           ) : (
                             <span className="text-gray-300">—</span>
                           )}
