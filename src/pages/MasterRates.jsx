@@ -474,7 +474,7 @@ function ModuleTags({ modules }) {
 const TABS = [
   { key: 'materials', label: 'Materials' },
   { key: 'labor', label: 'Labor Rates' },
-  { key: 'subs', label: 'Subcontractor Pricing' },
+  { key: 'subs', label: 'Subcontractors' },
 ]
 
 export default function MasterRates() {
@@ -646,9 +646,6 @@ export default function MasterRates() {
   // ── Column configs ──
   const materialColumns = [
     { key: 'category', label: 'Category', placeholder: 'e.g. Hardscape' },
-    { key: 'sub_category', label: 'Sub Category', placeholder: 'describe…' },
-    { key: 'name', label: 'Item', bold: true, stripCat: true, placeholder: 'e.g. Decomposed Granite' },
-    { key: 'photo_url', label: 'Photo', photo: true },
     {
       key: 'vendor_id',
       label: 'Vendor',
@@ -656,6 +653,9 @@ export default function MasterRates() {
       options: vendorOptions,
       render: r => vendorName(r.vendor_id),
     },
+    { key: 'sub_category', label: 'Sub Category', placeholder: 'describe…' },
+    { key: 'name', label: 'Item', bold: true, stripCat: true, placeholder: 'e.g. Decomposed Granite' },
+    { key: 'photo_url', label: 'Photo', photo: true },
     { key: 'unit', label: 'Unit', type: 'select', options: MATERIAL_UNIT_OPTIONS },
     { key: 'unit_cost', label: 'Price', type: 'number', step: '0.0001', prefix: '$' },
     {
@@ -669,9 +669,9 @@ export default function MasterRates() {
     { key: 'category', label: 'Category', type: 'select', options: LABOR_CATEGORY_OPTIONS },
     { key: 'sub_category', label: 'Sub Category', placeholder: 'describe…' },
     { key: 'name', label: 'Item', bold: true, stripCat: true, placeholder: 'e.g. Demo - Tree Small' },
+    { key: 'notes', label: 'Labor Description', placeholder: 'Optional notes' },
     { key: 'unit', label: 'Unit', type: 'select', options: LABOR_UNIT_OPTIONS },
     { key: 'rate', label: 'Rate', type: 'number', step: '0.0001' },
-    { key: 'notes', label: 'Labor Description', placeholder: 'Optional notes' },
     {
       key: '__modules',
       label: 'Estimate Module',
@@ -681,9 +681,9 @@ export default function MasterRates() {
   ]
   const subColumns = [
     { key: 'category', label: 'Category', type: 'select', options: SUB_CATEGORY_OPTIONS },
+    { key: 'company_name', label: 'Subcontractor', placeholder: 'e.g. ABC Concrete Co.' },
     { key: 'sub_category', label: 'Sub Category', placeholder: 'describe…' },
     { key: 'trade', label: 'Item', bold: true, stripCat: true, placeholder: 'e.g. Flatwork Pour' },
-    { key: 'company_name', label: 'Subcontractor', placeholder: 'e.g. ABC Concrete Co.' },
     { key: 'unit', label: 'Unit', type: 'select', options: SUB_UNIT_OPTIONS },
     { key: 'rate', label: 'Unit Price', type: 'number', step: '0.01', prefix: '$' },
     {
