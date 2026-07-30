@@ -328,9 +328,9 @@ function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loadin
           {count != null && <span className="text-xs text-gray-400">{count} items</span>}
         </div>
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-auto max-h-[calc(100vh-15rem)]">
         <table className="w-full text-xs min-w-[820px]">
-          <thead>
+          <thead className="sticky top-0 z-10">
             <tr className="bg-gray-50 border-b border-gray-200">
               {columns.map(col => {
                 const active = sort.key === col.key
@@ -339,7 +339,7 @@ function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loadin
                     key={col.key}
                     onClick={() => toggleSort(col.key)}
                     title="Sort"
-                    className="px-3 py-2 text-left font-semibold text-gray-600 uppercase whitespace-nowrap cursor-pointer select-none hover:bg-gray-100"
+                    className="px-3 py-2 text-left font-semibold text-gray-600 uppercase whitespace-nowrap cursor-pointer select-none bg-gray-50 hover:bg-gray-100"
                     style={col.width ? { width: col.width } : undefined}
                   >
                     <span className="inline-flex items-center gap-1">
@@ -351,7 +351,7 @@ function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loadin
                   </th>
                 )
               })}
-              <th className="px-3 py-2 w-24" />
+              <th className="px-3 py-2 w-24 bg-gray-50" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
