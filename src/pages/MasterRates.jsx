@@ -142,7 +142,7 @@ function UniversalLaborRate({ hourlyRate, onSave }) {
 }
 
 // ── Generic editable row component ──────────────────────────
-function RateRow({ row, columns, onSave, onDelete }) {
+function RateRow({ row, columns, onSave, onDelete, primaryKey, skipKeys }) {
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState(row)
 
@@ -201,79 +201,66 @@ function RateRow({ row, columns, onSave, onDelete }) {
     )
   }
 
-  // Build display lines: merge consecutive 'rate'+'unit' sibling columns into one line
-  const displayLines = []
-  let skip = false
+  // ── Single-line "table" row ────────────────────────────────────────────────
+  // Primary label (first column, or an explicit primaryKey when the first column
+  // is used as the group header). All other columns render as compact inline
+  // cells on the SAME line (no wrapping); rate+unit are merged.
+  const primary = primaryKey || columns[0].key
+  const skip = new Set(skipKeys || [])
+  const cellText = col => {
+    if (col.type === 'select' && col.options?.some(o => typeof o === 'object')) {
+      return (
+        col.options.find(o => typeof o === 'object' && o.value === (row[col.key] || ''))?.label ||
+        row[col.key] ||
+        ''
+      )
+    }
+    if (col.type === 'number') {
+      return `${col.prefix || ''}${parseFloat(row[col.key] || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}${col.suffix || ''}`
+    }
+    return row[col.key] || ''
+  }
+  const cells = []
+  let mergeSkip = false
   columns.forEach((col, i) => {
-    if (skip) {
-      skip = false
+    if (col.key === primary || skip.has(col.key)) return
+    if (mergeSkip) {
+      mergeSkip = false
       return
     }
     const next = columns[i + 1]
     if (col.key === 'rate' && next?.key === 'unit') {
-      // Combine: "0.75 hrs/ea"
-      const rateVal = parseFloat(row['rate'] || 0)
-      const unitVal = row['unit'] || ''
-      displayLines.push({
-        combined: true,
-        value:
-          `${rateVal.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${unitVal}`.trim(),
+      const rateVal = parseFloat(row.rate || 0)
+      cells.push({
+        key: 'rate-unit',
+        text: `${rateVal.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${row.unit || ''}`.trim(),
       })
-      skip = true
+      mergeSkip = true
     } else {
-      displayLines.push({ col, i })
+      cells.push({ key: col.key, text: cellText(col) })
     }
   })
 
   return (
-    <div className="flex items-start justify-between px-3 py-2.5 border-b border-gray-100 hover:bg-gray-50 group">
-      <div className="flex-1 min-w-0">
-        {displayLines.map(line => {
-          if (line.combined) {
-            return (
-              <p key="rate-unit" className="text-xs text-gray-500 truncate">
-                {line.value}
-              </p>
-            )
-          }
-          const { col, i } = line
-          return (
-            <div key={col.key}>
-              {i === 0 ? (
-                <p className="text-sm font-medium text-gray-900 truncate">{row[col.key] || '—'}</p>
-              ) : (
-                <p className="text-xs text-gray-500 truncate">
-                  {col.prefix}
-                  {col.type === 'number'
-                    ? parseFloat(row[col.key] || 0).toLocaleString()
-                    : col.type === 'select' && col.options?.some(o => typeof o === 'object')
-                      ? col.options.find(
-                          o => typeof o === 'object' && o.value === (row[col.key] || '')
-                        )?.label ||
-                        row[col.key] ||
-                        '—'
-                      : row[col.key] || '—'}
-                  {col.suffix}
-                </p>
-              )}
-            </div>
-          )
-        })}
-      </div>
-      <div className="flex gap-2 ml-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-        <button
-          onClick={() => setEditing(true)}
-          className="text-xs text-gray-500 hover:text-gray-800"
-        >
+    <div className="flex items-center gap-3 px-3 py-1 border-b border-gray-100 hover:bg-gray-50 group text-xs">
+      <span className="flex-1 min-w-0 truncate font-medium text-gray-800">
+        {row[primary] || '—'}
+      </span>
+      {cells
+        .filter(c => c.text !== '' && c.text != null)
+        .map(c => (
+          <span key={c.key} className="shrink-0 whitespace-nowrap text-gray-500">
+            {c.text}
+          </span>
+        ))}
+      <span className="shrink-0 flex gap-2 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button onClick={() => setEditing(true)} className="text-gray-500 hover:text-gray-800">
           Edit
         </button>
-        <button
-          onClick={() => onDelete(row.id)}
-          className="text-xs text-red-400 hover:text-red-600"
-        >
+        <button onClick={() => onDelete(row.id)} className="text-red-400 hover:text-red-600">
           ✕
         </button>
-      </div>
+      </span>
     </div>
   )
 }
@@ -334,8 +321,37 @@ function AddRowForm({ columns, onSave, onCancel }) {
 }
 
 // ── Panel wrapper ────────────────────────────────────────────
-function RatesPanel({ title, rows, columns, onAdd, onSave, onDelete, loading, pinnedHeader }) {
+function RatesPanel({
+  title,
+  rows,
+  columns,
+  onAdd,
+  onSave,
+  onDelete,
+  loading,
+  pinnedHeader,
+  groupBy,
+  primaryKey,
+  skipKeys,
+}) {
   const [showAdd, setShowAdd] = useState(false)
+
+  // Group rows (e.g. Materials by vendor, Subs by subcontractor). Without a
+  // groupBy the whole list is a single unlabeled group. House sorts first.
+  const groups = useMemo(() => {
+    if (!groupBy) return [{ key: '__all__', label: null, rows }]
+    const map = new Map()
+    rows.forEach(r => {
+      const g = groupBy(r)
+      if (!map.has(g.key)) map.set(g.key, { key: g.key, label: g.label, rows: [] })
+      map.get(g.key).rows.push(r)
+    })
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.label === 'House') return -1
+      if (b.label === 'House') return 1
+      return String(a.label || '').localeCompare(String(b.label || ''))
+    })
+  }, [rows, groupBy])
 
   async function handleAdd(form) {
     await onAdd(form)
@@ -382,8 +398,25 @@ function RatesPanel({ title, rows, columns, onAdd, onSave, onDelete, loading, pi
             </button>
           </div>
         ) : (
-          rows.map(row => (
-            <RateRow key={row.id} row={row} columns={columns} onSave={onSave} onDelete={onDelete} />
+          groups.map(g => (
+            <div key={g.key}>
+              {g.label != null && (
+                <div className="px-3 py-1 bg-gray-100 border-b border-gray-200 text-[11px] font-bold uppercase tracking-wide text-gray-600 sticky top-0 z-[1]">
+                  {g.label} <span className="text-gray-400 font-normal">({g.rows.length})</span>
+                </div>
+              )}
+              {g.rows.map(row => (
+                <RateRow
+                  key={row.id}
+                  row={row}
+                  columns={columns}
+                  primaryKey={primaryKey}
+                  skipKeys={skipKeys}
+                  onSave={onSave}
+                  onDelete={onDelete}
+                />
+              ))}
+            </div>
           ))
         )}
       </div>
@@ -1063,113 +1096,77 @@ export default function MasterRates() {
           same vertical position regardless of how many category pills each has.
           Row 2: the three panel cards. */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-4 gap-y-0">
-        {/* ── Filter bar: Materials ── */}
+        {/* ── Filter dropdown: Materials ── */}
         {(() => {
           const matCats = Array.from(new Set(materials.map(m => m.category).filter(Boolean))).sort()
           const cats = ['All', ...matCats, 'Pavers']
           return (
             <div className="pb-2">
-              <div className="flex gap-1 flex-wrap items-start content-start">
+              <select
+                value={matCategory}
+                onChange={e => setMatCategory(e.target.value)}
+                className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-green-400"
+              >
                 {cats.map(cat => (
-                  <button
-                    key={cat}
-                    onClick={() => setMatCategory(cat)}
-                    className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
-                      matCategory === cat
-                        ? 'bg-green-700 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    {cat}
-                    {cat === 'Pavers' && (
-                      <span className="ml-1 opacity-70">({paverPrices.length})</span>
-                    )}
-                    {cat !== 'All' && cat !== 'Pavers' && (
-                      <span className="ml-1 opacity-70">
-                        ({materials.filter(m => m.category === cat).length})
-                      </span>
-                    )}
-                  </button>
+                  <option key={cat} value={cat}>
+                    {cat === 'All'
+                      ? 'All materials'
+                      : cat === 'Pavers'
+                        ? `Pavers (${paverPrices.length})`
+                        : `${cat} (${materials.filter(m => m.category === cat).length})`}
+                  </option>
                 ))}
-              </div>
-              {matCategory !== 'Pavers' && (
-                <div className="mt-1.5 flex items-center gap-1.5">
-                  <label className="text-xs text-gray-500">Vendor</label>
-                  <select
-                    value={materialVendorFilter}
-                    onChange={e => setMaterialVendorFilter(e.target.value)}
-                    className="border border-gray-200 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-green-400"
-                  >
-                    <option value="">All vendors</option>
-                    <option value="__HOUSE__">House (unassigned)</option>
-                    {vendors.map(v => (
-                      <option key={v.id} value={v.id}>
-                        {v.company_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              </select>
             </div>
           )
         })()}
 
-        {/* ── Filter bar: Labor ── */}
+        {/* ── Filter dropdown: Labor ── */}
         {(() => {
           const cats = [
             'All',
             ...Array.from(new Set(labor.map(r => r.category).filter(Boolean))).sort(),
           ]
           return (
-            <div className="flex gap-1 flex-wrap pb-2 items-start content-start">
-              {cats.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setLabCategory(cat)}
-                  className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
-                    labCategory === cat
-                      ? 'bg-green-700 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {cat}
-                  {cat !== 'All' && (
-                    <span className="ml-1 opacity-70">
-                      ({labor.filter(r => r.category === cat).length})
-                    </span>
-                  )}
-                </button>
-              ))}
+            <div className="pb-2">
+              <select
+                value={labCategory}
+                onChange={e => setLabCategory(e.target.value)}
+                className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-green-400"
+              >
+                {cats.map(cat => (
+                  <option key={cat} value={cat}>
+                    {cat === 'All'
+                      ? 'All categories'
+                      : `${cat} (${labor.filter(r => r.category === cat).length})`}
+                  </option>
+                ))}
+              </select>
             </div>
           )
         })()}
 
-        {/* ── Filter bar: Subs ── */}
+        {/* ── Filter dropdown: Subs ── */}
         {(() => {
           const cats = [
             'All',
             ...Array.from(new Set(subs.map(r => r.category).filter(Boolean))).sort(),
           ]
           return (
-            <div className="flex gap-1 flex-wrap pb-2 items-start content-start">
-              {cats.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setSubCategory(cat)}
-                  className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
-                    subCategory === cat
-                      ? 'bg-green-700 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {cat}
-                  {cat !== 'All' && (
-                    <span className="ml-1 opacity-70">
-                      ({subs.filter(r => r.category === cat).length})
-                    </span>
-                  )}
-                </button>
-              ))}
+            <div className="pb-2">
+              <select
+                value={subCategory}
+                onChange={e => setSubCategory(e.target.value)}
+                className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-green-400"
+              >
+                {cats.map(cat => (
+                  <option key={cat} value={cat}>
+                    {cat === 'All'
+                      ? 'All categories'
+                      : `${cat} (${subs.filter(r => r.category === cat).length})`}
+                  </option>
+                ))}
+              </select>
             </div>
           )
         })()}
@@ -1189,8 +1186,6 @@ export default function MasterRates() {
               title="Materials"
               rows={materials.filter(m => {
                 if (matCategory !== 'All' && m.category !== matCategory) return false
-                if (materialVendorFilter === '__HOUSE__') return m.vendor_id == null
-                if (materialVendorFilter) return m.vendor_id === materialVendorFilter
                 return true
               })}
               columns={materialColumns}
@@ -1198,6 +1193,13 @@ export default function MasterRates() {
               onSave={saveMaterial}
               onDelete={deleteMaterial}
               loading={loading}
+              skipKeys={['vendor_id']}
+              groupBy={m => ({
+                key: m.vendor_id || '__house__',
+                label: m.vendor_id
+                  ? vendors.find(v => v.id === m.vendor_id)?.company_name || 'Vendor'
+                  : 'House',
+              })}
             />
           )}
         </div>
@@ -1212,13 +1214,10 @@ export default function MasterRates() {
             onSave={saveLabor}
             onDelete={deleteLabor}
             loading={loading}
-            pinnedHeader={
-              <UniversalLaborRate hourlyRate={laborRatePerHour} onSave={saveLaborRatePerHour} />
-            }
           />
         </div>
 
-        {/* ── Panel: Subs ── */}
+        {/* ── Panel: Subs (grouped by subcontractor) ── */}
         <div className="flex flex-col" style={{ minHeight: '500px' }}>
           <RatesPanel
             title="Subcontractor Pricing"
@@ -1228,9 +1227,9 @@ export default function MasterRates() {
             onSave={saveSub}
             onDelete={deleteSub}
             loading={loading}
-            pinnedHeader={
-              <UniversalSubMarkup markupRate={subMarkupRate} onSave={saveSubMarkupRate} />
-            }
+            primaryKey="trade"
+            skipKeys={['company_name']}
+            groupBy={s => ({ key: s.company_name || '—', label: s.company_name || '—' })}
           />
         </div>
       </div>
