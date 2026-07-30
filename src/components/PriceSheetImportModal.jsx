@@ -298,70 +298,72 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
         {step === 'review' && (
           <div className="p-5">
             <div className="flex flex-wrap items-center gap-3 mb-3 text-xs">
-              <span className="font-semibold text-gray-700">{vendorName}</span>
-              <span className="text-gray-400">effective {effectiveDate}</span>
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Filter items…"
-                className="border border-gray-200 rounded px-2 py-1 w-48"
-              />
-              <button onClick={extract} disabled={busy} className="text-gray-500 hover:underline disabled:opacity-40">
+              <span className="font-semibold text-gray-800">{vendorName}</span>
+              <span className="text-gray-600">effective {effectiveDate}</span>
+              <button onClick={extract} disabled={busy} className="text-gray-600 hover:underline disabled:opacity-40">
                 {busy ? 'Re-reading…' : '↻ Re-extract'}
               </button>
-              <span className="ml-auto text-gray-500">
+              <span className="ml-auto text-gray-600">
                 {counts.updated} update ({counts.changed} price change) · {counts.added} new · {counts.skipped} skip
               </span>
             </div>
 
-            {/* Bulk toolbar — assign action/category/sub to many rows at once */}
-            <div className="flex flex-wrap items-center gap-2 mb-2 text-xs bg-gray-50 border border-gray-200 rounded px-2 py-2">
-              <span className="text-gray-500 font-medium">Bulk:</span>
-              <button onClick={() => selectWhere(r => !r.matchId)} className="text-green-700 hover:underline">Select all new</button>
-              <button onClick={() => selectWhere(r => !!r.matchId)} className="text-green-700 hover:underline">Select all matched</button>
-              <button onClick={() => selectWhere(() => true)} className="text-green-700 hover:underline">Select all</button>
-              <button onClick={() => setSelected(new Set())} className="text-gray-500 hover:underline">Clear</button>
-              <span className="text-gray-400">{selected.size} selected</span>
-              <span className="mx-1 h-4 w-px bg-gray-300" />
-              <select
-                disabled={!selected.size}
-                onChange={e => { if (e.target.value) applyToSelected({ action: e.target.value }); e.target.value = '' }}
-                className="border border-gray-200 rounded px-1.5 py-1 bg-white disabled:opacity-50"
-              >
-                <option value="">Set action…</option>
-                <option value="update">Update</option>
-                <option value="add">Add new</option>
-                <option value="skip">Skip</option>
-              </select>
-              <input value={bulkCat} onChange={e => setBulkCat(e.target.value)} placeholder="Category" className="border border-gray-200 rounded px-1.5 py-1 w-36" />
-              <button
-                disabled={!selected.size}
-                onClick={() => applyToSelected({ category: bulkCat })}
-                className="text-green-700 font-semibold hover:underline disabled:opacity-40"
-              >
-                Apply category
-              </button>
-              <input value={bulkSub} onChange={e => setBulkSub(e.target.value)} placeholder="Sub category" className="border border-gray-200 rounded px-1.5 py-1 w-36" />
-              <button
-                disabled={!selected.size}
-                onClick={() => applyToSelected({ sub_category: bulkSub })}
-                className="text-green-700 font-semibold hover:underline disabled:opacity-40"
-              >
-                Apply sub
-              </button>
-              <input value={bulkUnit} onChange={e => setBulkUnit(e.target.value)} placeholder="Unit" list="ps-units" className="border border-gray-200 rounded px-1.5 py-1 w-24" />
-              <button
-                disabled={!selected.size}
-                onClick={() => applyToSelected({ unit: bulkUnit })}
-                className="text-green-700 font-semibold hover:underline disabled:opacity-40"
-              >
-                Apply unit
-              </button>
-              <datalist id="ps-units">
-                {['each', 'roll', 'yard', 'CY', 'ton', 'LF', 'linear ft', 'SF', 'sqft', 'bag', 'pallet', 'gallon', 'box'].map(u => (
-                  <option key={u} value={u} />
+            {/* Two-step bulk editor: (1) pick which rows, (2) change them together */}
+            <div className="mb-3 border border-gray-200 rounded-lg overflow-hidden text-xs">
+              {/* Step 1 — select which rows */}
+              <div className="flex flex-wrap items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200">
+                <span className="font-bold text-gray-800">Step 1 · Pick rows</span>
+                <span className="text-gray-600 ml-1">Filter</span>
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="type to narrow, e.g. cobble"
+                  className="border border-gray-300 rounded px-2 py-1 w-44"
+                />
+                <span className="text-gray-600">Select</span>
+                {[
+                  ['New only', () => selectWhere(r => !r.matchId)],
+                  ['Matched only', () => selectWhere(r => !!r.matchId)],
+                  ['All shown', () => selectWhere(() => true)],
+                  ['None', () => setSelected(new Set())],
+                ].map(([label, fn]) => (
+                  <button key={label} onClick={fn} className="px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100">
+                    {label}
+                  </button>
                 ))}
-              </datalist>
+                <span className="ml-auto font-bold text-green-700">{selected.size} selected</span>
+              </div>
+
+              {/* Step 2 — change the selected rows */}
+              <div className={`px-3 py-2 ${selected.size ? '' : 'opacity-50 pointer-events-none'}`}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-bold text-gray-800">Step 2 · Change selected</span>
+                  <span className="text-gray-600 ml-1">Action</span>
+                  {[
+                    ['Update', 'update'],
+                    ['Add new', 'add'],
+                    ['Skip', 'skip'],
+                  ].map(([label, val]) => (
+                    <button key={val} onClick={() => applyToSelected({ action: val })} className="px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100">
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  <span className="text-gray-600">Set value</span>
+                  <input value={bulkCat} onChange={e => setBulkCat(e.target.value)} placeholder="Category" className="border border-gray-300 rounded px-2 py-1 w-36" />
+                  <button onClick={() => applyToSelected({ category: bulkCat })} className="px-2 py-1 bg-gray-800 text-white rounded hover:bg-gray-900">Apply →</button>
+                  <input value={bulkSub} onChange={e => setBulkSub(e.target.value)} placeholder="Sub category" className="border border-gray-300 rounded px-2 py-1 w-36" />
+                  <button onClick={() => applyToSelected({ sub_category: bulkSub })} className="px-2 py-1 bg-gray-800 text-white rounded hover:bg-gray-900">Apply →</button>
+                  <input value={bulkUnit} onChange={e => setBulkUnit(e.target.value)} placeholder="Unit" list="ps-units" className="border border-gray-300 rounded px-2 py-1 w-24" />
+                  <button onClick={() => applyToSelected({ unit: bulkUnit })} className="px-2 py-1 bg-gray-800 text-white rounded hover:bg-gray-900">Apply →</button>
+                </div>
+                <datalist id="ps-units">
+                  {['each', 'roll', 'yard', 'CY', 'ton', 'LF', 'linear ft', 'SF', 'sqft', 'bag', 'pallet', 'gallon', 'box'].map(u => (
+                    <option key={u} value={u} />
+                  ))}
+                </datalist>
+              </div>
             </div>
             <div className="overflow-x-auto border border-gray-200 rounded-lg max-h-[55vh]">
               <table className="w-full text-xs">
