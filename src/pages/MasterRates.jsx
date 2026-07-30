@@ -198,7 +198,7 @@ function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loadin
   const [form, setForm] = useState({})
   const [lightbox, setLightbox] = useState(null)
   const [uploading, setUploading] = useState(false)
-  const [sort, setSort] = useState({ key: null, dir: 'asc' })
+  const [sort, setSort] = useState({ key: 'category', dir: 'asc' })
 
   function toggleSort(key) {
     setSort(s => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }))
