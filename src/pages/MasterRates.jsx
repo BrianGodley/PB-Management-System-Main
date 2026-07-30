@@ -42,6 +42,25 @@ function estimateModules(category, subcategory) {
   return category ? [category] : []
 }
 
+// Display-only: strip words that duplicate the row's category from the item
+// name (the underlying DB name is unchanged so module rate lookups still work).
+const escapeRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+function stripCategory(name, category) {
+  if (!name || !category) return name || ''
+  let out = name
+  // Remove the full category phrase first, then each individual word.
+  ;[category, ...category.split(/\s+/)].forEach(w => {
+    if (w) out = out.replace(new RegExp(`\\b${escapeRe(w)}\\b`, 'gi'), '')
+  })
+  out = out
+    .replace(/^[\s\-–—:]+|[\s\-–—:]+$/g, '') // trim leading/trailing separators
+    .replace(/\s*[-–—]\s*/g, ' - ') // normalize dashes
+    .replace(/\s{2,}/g, ' ')
+    .replace(/^[-–—\s]+|[-–—\s]+$/g, '')
+    .trim()
+  return out || name // if everything was stripped, keep the original
+}
+
 // ── Option lists ─────────────────────────────────────────────────────────────
 const MATERIAL_UNIT_OPTIONS = [
   'sqft',
@@ -124,6 +143,7 @@ const SUB_UNIT_OPTIONS = [
 // ── Generic full-width editable rate table ───────────────────────────────────
 function displayCell(row, col) {
   const v = row[col.key]
+  if (col.stripCat) return stripCategory(v, row.category) || '—'
   if (col.type === 'select' && Array.isArray(col.options) && col.options.some(o => typeof o === 'object')) {
     const opt = col.options.find(o => typeof o === 'object' && o.value === (v || ''))
     return opt ? opt.label : v || '—'
@@ -476,7 +496,8 @@ export default function MasterRates() {
 
   // ── Column configs ──
   const materialColumns = [
-    { key: 'name', label: 'Item', bold: true, placeholder: 'e.g. Decomposed Granite' },
+    { key: 'category', label: 'Category', placeholder: 'e.g. Hardscape' },
+    { key: 'name', label: 'Item', bold: true, stripCat: true, placeholder: 'e.g. Decomposed Granite' },
     {
       key: 'vendor_id',
       label: 'Vendor',
@@ -484,7 +505,6 @@ export default function MasterRates() {
       options: vendorOptions,
       render: r => vendorName(r.vendor_id),
     },
-    { key: 'category', label: 'Category', placeholder: 'e.g. Hardscape' },
     { key: 'unit', label: 'Unit', type: 'select', options: MATERIAL_UNIT_OPTIONS },
     { key: 'unit_cost', label: 'Price', type: 'number', step: '0.0001', prefix: '$' },
     {
@@ -495,8 +515,8 @@ export default function MasterRates() {
     },
   ]
   const laborColumns = [
-    { key: 'name', label: 'Item', bold: true, placeholder: 'e.g. Demo - Tree Small' },
     { key: 'category', label: 'Category', type: 'select', options: LABOR_CATEGORY_OPTIONS },
+    { key: 'name', label: 'Item', bold: true, stripCat: true, placeholder: 'e.g. Demo - Tree Small' },
     { key: 'unit', label: 'Unit', type: 'select', options: LABOR_UNIT_OPTIONS },
     { key: 'rate', label: 'Rate', type: 'number', step: '0.0001' },
     { key: 'notes', label: 'Labor Description', placeholder: 'Optional notes' },
@@ -508,9 +528,9 @@ export default function MasterRates() {
     },
   ]
   const subColumns = [
-    { key: 'trade', label: 'Item', bold: true, placeholder: 'e.g. Flatwork Pour' },
-    { key: 'company_name', label: 'Subcontractor', placeholder: 'e.g. ABC Concrete Co.' },
     { key: 'category', label: 'Category', type: 'select', options: SUB_CATEGORY_OPTIONS },
+    { key: 'trade', label: 'Item', bold: true, stripCat: true, placeholder: 'e.g. Flatwork Pour' },
+    { key: 'company_name', label: 'Subcontractor', placeholder: 'e.g. ABC Concrete Co.' },
     { key: 'unit', label: 'Unit', type: 'select', options: SUB_UNIT_OPTIONS },
     { key: 'rate', label: 'Unit Price', type: 'number', step: '0.01', prefix: '$' },
     {
