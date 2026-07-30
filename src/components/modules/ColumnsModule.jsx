@@ -281,7 +281,6 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
   // takeoffs here via create_estimate_from_takeoff, and the user can
   // overwrite / append their own.
   const [notes, setNotes] = useState(initialData?.notes ?? '')
-  const [distanceLF, setDistanceLF] = useState(initialData?.distanceLF ?? '')
   const [walkAccess, setWalkAccess] = useState(
     initialData?.walkAccess ?? {
       paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
@@ -336,16 +335,47 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
   const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
-  const [difficulty, setDifficulty] = useState(initialData?.difficulty ?? '')
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Masonry')
   const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
   const isSub = subType === 'Subcontractor'
-  const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
-  const [qty, setQty] = useState(initialData?.qty ?? '')
-  const [heightIn, setHeightIn] = useState(initialData?.heightIn ?? '')
-  const [widthIn, setWidthIn] = useState(initialData?.widthIn ?? '')
-  const [finishRows, setFinishRows] = useState(initialData?.finishRows ?? DEFAULT_FINISH_ROWS)
-  const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
+
+  // ── Per-tab independence — In-House and Subcontractor keep their own
+  //    takeoff inputs so entering data on one tab never changes the other.
+  //    makeTab() seeds a tab's defaults; ihData/subData persist both.
+  //    Legacy modules (flat data, no ihData) load into the In-House tab.
+  const makeTab = (src = {}) => ({
+    difficulty: src.difficulty ?? '',
+    hoursAdj: src.hoursAdj ?? '',
+    qty: src.qty ?? '',
+    heightIn: src.heightIn ?? '',
+    widthIn: src.widthIn ?? '',
+    distanceLF: src.distanceLF ?? '',
+    finishRows: src.finishRows ? src.finishRows.map(r => ({ ...r })) : DEFAULT_FINISH_ROWS.map(r => ({ ...r })),
+    manualRows: src.manualRows ? src.manualRows.map(r => ({ ...r })) : DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
+  })
+  const [ihTab, setIhTab] = useState(() => makeTab(initialData?.ihData ?? initialData))
+  const [subTab, setSubTab] = useState(() => makeTab(initialData?.subData))
+  const cur = isSub ? subTab : ihTab
+  const setCur = isSub ? setSubTab : setIhTab
+  const setField = k => v =>
+    setCur(p => ({ ...p, [k]: typeof v === 'function' ? v(p[k]) : v }))
+
+  const difficulty = cur.difficulty
+  const setDifficulty = setField('difficulty')
+  const hoursAdj = cur.hoursAdj
+  const setHoursAdj = setField('hoursAdj')
+  const qty = cur.qty
+  const setQty = setField('qty')
+  const heightIn = cur.heightIn
+  const setHeightIn = setField('heightIn')
+  const widthIn = cur.widthIn
+  const setWidthIn = setField('widthIn')
+  const distanceLF = cur.distanceLF
+  const setDistanceLF = setField('distanceLF')
+  const finishRows = cur.finishRows
+  const setFinishRows = setField('finishRows')
+  const manualRows = cur.manualRows
+  const setManualRows = setField('manualRows')
 
   // ── Sales tax — applied to totalMat across every module so the bid
   //    reflects supplier-invoiced material cost. Sourced from
@@ -418,6 +448,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
         qty,
         heightIn,
         widthIn,
+        distanceLF,
         finishRows,
         manualRows,
         crewType,
@@ -427,6 +458,8 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
         laborBurdenPct,
         gpmd,
         materialPrices,
+        ihData: ihTab,
+        subData: subTab,
         calc,
       },
     })
