@@ -35,31 +35,35 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [rows, setRows] = useState([]) // { item, unit, unit_price, matchId, matchName, current, action, category }
-  const [applied, setApplied] = useState({ updated: 0, added: 0, skipped: 0 })
-  const [selected, setSelected] = useState(() => new Set())
+  const [applied, setApplied] = useState({ updated: 0, added: 0, unchanged: 0 })
   const [bulkCat, setBulkCat] = useState('')
   const [bulkSub, setBulkSub] = useState('')
-  const [bulkUnit, setBulkUnit] = useState('')
+  const [descInstr, setDescInstr] = useState('')
   const [instructions, setInstructions] = useState('')
-  const [search, setSearch] = useState('')
+  // Filter Items: draft inputs vs the applied filter (applied on Search click).
+  const [filterDraft, setFilterDraft] = useState({ text: '', price: '', status: 'all' })
+  const [filter, setFilter] = useState({ text: '', price: '', status: 'all' })
 
-  const matchesSearch = r => {
-    const q = norm(search)
-    if (!q) return true
-    return norm(`${r.item} ${r.notes || ''} ${r.matchName || ''} ${r.unit || ''}`).includes(q)
+  const matchesFilter = r => {
+    const f = filter
+    if (f.status === 'new' && r.matchId) return false
+    if (f.status === 'matched' && !r.matchId) return false
+    if (f.text) {
+      const q = norm(f.text)
+      if (!norm(`${r.item} ${r.notes || ''} ${r.matchName || ''} ${r.unit || ''}`).includes(q)) return false
+    }
+    if (f.price && String(f.price).trim()) {
+      const p = String(f.price).trim()
+      const inNew = String(r.unit_price ?? '').includes(p)
+      const inCur = r.current != null && String(r.current).includes(p)
+      if (!inNew && !inCur) return false
+    }
+    return true
   }
-
-  const toggleSel = i =>
-    setSelected(s => {
-      const n = new Set(s)
-      n.has(i) ? n.delete(i) : n.add(i)
-      return n
-    })
-  // Selection respects the current text filter — only visible rows are picked.
-  const selectWhere = pred =>
-    setSelected(new Set(rows.map((r, i) => (pred(r) && matchesSearch(r) ? i : -1)).filter(i => i >= 0)))
-  const applyToSelected = patch =>
-    setRows(rs => rs.map((r, i) => (selected.has(i) ? { ...r, ...patch } : r)))
+  // Step 2 changes apply to the rows currently matching the filter.
+  const applyToVisible = patch => setRows(rs => rs.map(r => (matchesFilter(r) ? { ...r, ...patch } : r)))
+  const applyToVisibleMatched = patch =>
+    setRows(rs => rs.map(r => (matchesFilter(r) && r.matchId ? { ...r, ...patch } : r)))
 
   const vendorName = useMemo(
     () => vendors.find(v => v.id === vendorId)?.company_name || '',
@@ -105,7 +109,9 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
           current: hit ? Number(hit.unit_cost) : null,
           category: hit?.category || '',
           sub_category: hit?.sub_category || '',
-          action: hit ? 'update' : 'skip', // unmatched default to skip until a category is set
+          // Every item is accounted for: matched+same price = unchanged,
+          // matched+different = update, unmatched = add (new).
+          action: hit ? (Number(hit.unit_cost) === Number(r.unit_price) ? 'unchanged' : 'update') : 'add',
         }
       })
       setRows(merged)
@@ -122,22 +128,60 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
   }
 
   const counts = useMemo(() => {
-    let updated = 0, added = 0, skipped = 0, changed = 0
+    let unchanged = 0, updated = 0, added = 0
     for (const r of rows) {
-      if (r.action === 'update') {
-        updated++
-        if (r.current == null || Number(r.current) !== Number(r.unit_price)) changed++
-      } else if (r.action === 'add') added++
-      else skipped++
+      if (r.action === 'add') added++
+      else if (r.action === 'update') updated++
+      else unchanged++
     }
-    return { updated, added, skipped, changed }
+    return { unchanged, updated, added, total: rows.length }
   }, [rows])
+
+  // Description custom change — Sam applies a plain-language rule to the rows
+  // currently matching the filter (e.g. "the ones with Plastic → unit = roll").
+  async function applyDescription() {
+    if (!descInstr.trim()) return
+    setError('')
+    setBusy(true)
+    try {
+      const target = rows.filter(matchesFilter)
+      const { data, error: fnErr } = await supabase.functions.invoke('apply-price-edits', {
+        body: {
+          instruction: descInstr,
+          rows: target.map(r => ({ item: r.item, unit: r.unit, unit_price: r.unit_price, notes: r.notes })),
+        },
+      })
+      if (fnErr) throw new Error(fnErr.message || 'Edit failed.')
+      if (data?.error) throw new Error(data.error)
+      const editByItem = new Map((data?.rows || []).map(e => [norm(e.item), e]))
+      setRows(rs =>
+        rs.map(r => {
+          if (!matchesFilter(r)) return r
+          const e = editByItem.get(norm(r.item))
+          if (!e) return r
+          const newPrice = e.unit_price != null ? Number(e.unit_price) : r.unit_price
+          const changed = r.matchId && r.current != null && Number(newPrice) !== Number(r.current)
+          return {
+            ...r,
+            unit: e.unit ?? r.unit,
+            unit_price: newPrice,
+            notes: e.notes ?? r.notes,
+            action: changed ? 'update' : r.action,
+          }
+        })
+      )
+    } catch (e) {
+      setError(String(e.message || e))
+    } finally {
+      setBusy(false)
+    }
+  }
 
   async function apply() {
     setError('')
     // New items must have a category (it's the estimate module the rate feeds).
     const badNew = rows.find(r => r.action === 'add' && !r.category.trim())
-    if (badNew) return setError(`Set a Category for new item "${badNew.item}" (or set it to Skip).`)
+    if (badNew) return setError(`Set a Category for new item "${badNew.item}" (or set it to Leave Unchanged to skip it).`)
     setBusy(true)
     try {
       const { data: imp, error: impErr } = await supabase
@@ -154,10 +198,10 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
       const importId = imp.id
       const startDate = effectiveDate
       const priorEnd = dayBefore(effectiveDate)
-      let updated = 0, added = 0, skipped = 0
+      let updated = 0, added = 0, unchanged = 0
 
       for (const r of rows) {
-        if (r.action === 'skip') { skipped++; continue }
+        if (r.action !== 'update' && r.action !== 'add') { unchanged++; continue }
 
         if (r.action === 'update' && r.matchId) {
           // Only write history/price when the price actually changed.
@@ -219,7 +263,7 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
           added++
         }
       }
-      setApplied({ updated, added, skipped })
+      setApplied({ updated, added, unchanged })
       setStep('done')
       onApplied?.()
     } catch (e) {
@@ -293,107 +337,119 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
 
         {step === 'review' && (
           <div className="p-5">
-            <div className="flex flex-wrap items-center gap-3 mb-3 text-xs">
+            <div className="flex flex-wrap items-center gap-3 mb-2 text-xs">
               <span className="font-semibold text-gray-800">{vendorName}</span>
               <span className="text-gray-600">effective {effectiveDate}</span>
-              <button onClick={extract} disabled={busy} className="text-gray-600 hover:underline disabled:opacity-40">
-                {busy ? 'Re-reading…' : '↻ Re-extract'}
-              </button>
-              <span className="ml-auto text-gray-600">
-                {counts.updated} update ({counts.changed} price change) · {counts.added} new · {counts.skipped} skip
+              <span className="ml-auto text-gray-700">
+                {counts.unchanged} unchanged · {counts.updated} updated · {counts.added} new
+                <span className="text-gray-400"> (of {counts.total})</span>
               </span>
             </div>
+            <p className="text-[11px] text-gray-600 mb-2">Every item must be accounted for — marked <strong>unchanged</strong> or <strong>updated</strong> (new items are added). Use the filter to find a group, then apply a change to all of them.</p>
 
-            {/* Two-step bulk editor: (1) pick which rows, (2) change them together */}
             <div className="mb-3 border border-gray-200 rounded-lg overflow-hidden text-xs">
-              {/* Step 1 — select which rows */}
+              {/* Step 1 — Filter Items */}
               <div className="flex flex-wrap items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200">
-                <span className="font-bold text-gray-800">Step 1 · Pick rows</span>
-                <span className="text-gray-600 ml-1">Filter</span>
+                <span className="font-bold text-gray-800">Step 1 · Filter Items</span>
+                <span className="text-gray-600 ml-1">By Text</span>
                 <input
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  placeholder="type to narrow, e.g. cobble"
-                  className="border border-gray-300 rounded px-2 py-1 w-44"
+                  value={filterDraft.text}
+                  onChange={e => setFilterDraft(f => ({ ...f, text: e.target.value }))}
+                  placeholder="e.g. cobble"
+                  className="border border-gray-300 rounded px-2 py-1 w-36"
                 />
-                <span className="text-gray-600">Select</span>
-                {[
-                  ['New only', () => selectWhere(r => !r.matchId)],
-                  ['Matched only', () => selectWhere(r => !!r.matchId)],
-                  ['All shown', () => selectWhere(() => true)],
-                  ['None', () => setSelected(new Set())],
-                ].map(([label, fn]) => (
-                  <button key={label} onClick={fn} className="px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100">
-                    {label}
-                  </button>
-                ))}
-                <span className="ml-auto font-bold text-green-700">{selected.size} selected</span>
+                <span className="text-gray-600">By Price</span>
+                <input
+                  value={filterDraft.price}
+                  onChange={e => setFilterDraft(f => ({ ...f, price: e.target.value }))}
+                  placeholder="e.g. 300"
+                  className="border border-gray-300 rounded px-2 py-1 w-24"
+                />
+                <span className="text-gray-600">By Status</span>
+                <select
+                  value={filterDraft.status}
+                  onChange={e => setFilterDraft(f => ({ ...f, status: e.target.value }))}
+                  className="border border-gray-300 rounded px-2 py-1 bg-white"
+                >
+                  <option value="all">All</option>
+                  <option value="new">New</option>
+                  <option value="matched">Matched</option>
+                </select>
+                <button onClick={() => setFilter(filterDraft)} className="px-3 py-1 bg-gray-800 text-white rounded hover:bg-gray-900 font-semibold">Search</button>
+                <button onClick={() => { setFilterDraft({ text: '', price: '', status: 'all' }); setFilter({ text: '', price: '', status: 'all' }) }} className="text-gray-500 hover:underline">Clear</button>
+                <span className="ml-auto font-bold text-green-700">{rows.filter(matchesFilter).length} shown</span>
               </div>
 
-              {/* Step 2 — change the selected rows */}
-              <div className={`px-3 py-2 ${selected.size ? '' : 'opacity-50 pointer-events-none'}`}>
+              {/* Step 2 — change the filtered rows */}
+              <div className="px-3 py-2 space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-bold text-gray-800">Step 2 · Change selected</span>
-                  <span className="text-gray-600 ml-1">Action</span>
-                  {[
-                    ['Update', 'update'],
-                    ['Add new', 'add'],
-                    ['Skip', 'skip'],
-                  ].map(([label, val]) => (
-                    <button key={val} onClick={() => applyToSelected({ action: val })} className="px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100">
-                      {label}
-                    </button>
-                  ))}
+                  <span className="font-bold text-gray-800">Step 2 · Change filtered</span>
+                  <button onClick={() => applyToVisible({ action: 'unchanged' })} className="px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100">Leave Unchanged</button>
+                  <button onClick={() => applyToVisibleMatched({ action: 'update' })} className="px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100">Update pricing (all matches)</button>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 mt-2">
-                  <span className="text-gray-600">Set value</span>
-                  <input value={bulkCat} onChange={e => setBulkCat(e.target.value)} placeholder="Category" className="border border-gray-300 rounded px-2 py-1 w-36" />
-                  <button onClick={() => applyToSelected({ category: bulkCat })} className="px-2 py-1 bg-gray-800 text-white rounded hover:bg-gray-900">Apply →</button>
-                  <input value={bulkSub} onChange={e => setBulkSub(e.target.value)} placeholder="Sub category" className="border border-gray-300 rounded px-2 py-1 w-36" />
-                  <button onClick={() => applyToSelected({ sub_category: bulkSub })} className="px-2 py-1 bg-gray-800 text-white rounded hover:bg-gray-900">Apply →</button>
-                  <input value={bulkUnit} onChange={e => setBulkUnit(e.target.value)} placeholder="Unit" list="ps-units" className="border border-gray-300 rounded px-2 py-1 w-24" />
-                  <button onClick={() => applyToSelected({ unit: bulkUnit })} className="px-2 py-1 bg-gray-800 text-white rounded hover:bg-gray-900">Apply →</button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-gray-600 w-16">Unit</span>
+                  <select
+                    onChange={e => { if (e.target.value) applyToVisible({ unit: e.target.value }); e.target.value = '' }}
+                    className="border border-gray-300 rounded px-2 py-1 bg-white"
+                  >
+                    <option value="">Change unit to…</option>
+                    {['each', 'roll', 'yard', 'CY', 'ton', 'LF', 'linear ft', 'SF', 'sqft', 'bag', 'pallet', 'gallon', 'box'].map(u => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                  </select>
                 </div>
-                <datalist id="ps-units">
-                  {['each', 'roll', 'yard', 'CY', 'ton', 'LF', 'linear ft', 'SF', 'sqft', 'bag', 'pallet', 'gallon', 'box'].map(u => (
-                    <option key={u} value={u} />
-                  ))}
-                </datalist>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-gray-600 w-16">Category</span>
+                  <input value={bulkCat} onChange={e => setBulkCat(e.target.value)} placeholder="set category" className="border border-gray-300 rounded px-2 py-1 w-40" />
+                  <button onClick={() => applyToVisible({ category: bulkCat })} className="px-2 py-1 bg-gray-800 text-white rounded hover:bg-gray-900">Apply →</button>
+                  <span className="text-gray-600 ml-2">Sub Category</span>
+                  <input value={bulkSub} onChange={e => setBulkSub(e.target.value)} placeholder="set sub category" className="border border-gray-300 rounded px-2 py-1 w-40" />
+                  <button onClick={() => applyToVisible({ sub_category: bulkSub })} className="px-2 py-1 bg-gray-800 text-white rounded hover:bg-gray-900">Apply →</button>
+                </div>
+                <div className="flex flex-wrap items-start gap-2">
+                  <span className="text-gray-600 w-16 pt-1">Description</span>
+                  <textarea
+                    value={descInstr}
+                    onChange={e => setDescInstr(e.target.value)}
+                    rows={2}
+                    placeholder='Custom change for the filtered items, e.g. "the ones with Plastic in the name → set unit to roll"'
+                    className="border border-gray-300 rounded px-2 py-1 flex-1 min-w-[16rem]"
+                  />
+                  <button onClick={applyDescription} disabled={busy} className="px-2 py-1 bg-gray-800 text-white rounded hover:bg-gray-900 disabled:opacity-40 mt-0.5">
+                    {busy ? 'Applying…' : 'Apply →'}
+                  </button>
+                </div>
               </div>
             </div>
-            <div className="overflow-x-auto border border-gray-200 rounded-lg max-h-[55vh]">
+            <datalist id="ps-units">
+              {['each', 'roll', 'yard', 'CY', 'ton', 'LF', 'linear ft', 'SF', 'sqft', 'bag', 'pallet', 'gallon', 'box'].map(u => (
+                <option key={u} value={u} />
+              ))}
+            </datalist>
+            <div className="overflow-x-auto border border-gray-200 rounded-lg max-h-[50vh]">
               <table className="w-full text-xs">
                 <thead className="bg-gray-50 sticky top-0">
                   <tr className="text-left text-gray-700">
-                    <th className="px-2 py-2 font-semibold w-8">
-                      <input
-                        type="checkbox"
-                        checked={selected.size > 0 && selected.size === rows.length}
-                        onChange={e => (e.target.checked ? selectWhere(() => true) : setSelected(new Set()))}
-                      />
-                    </th>
                     <th className="px-2 py-2 font-semibold">On sheet</th>
                     <th className="px-2 py-2 font-semibold">Unit</th>
                     <th className="px-2 py-2 font-semibold">Matches</th>
                     <th className="px-2 py-2 font-semibold text-right">Current</th>
                     <th className="px-2 py-2 font-semibold text-right">New</th>
                     <th className="px-2 py-2 font-semibold text-right">Δ</th>
-                    <th className="px-2 py-2 font-semibold">Action</th>
+                    <th className="px-2 py-2 font-semibold">Status</th>
                     <th className="px-2 py-2 font-semibold">Category / Sub (new)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {rows.map((r, i) => {
-                    if (!matchesSearch(r)) return null
+                    if (!matchesFilter(r)) return null
                     const delta =
                       r.current != null && r.current !== 0
                         ? ((r.unit_price - r.current) / r.current) * 100
                         : null
                     return (
-                      <tr key={i} className={selected.has(i) ? 'bg-green-50' : ''}>
-                        <td className="px-2 py-1.5">
-                          <input type="checkbox" checked={selected.has(i)} onChange={() => toggleSel(i)} />
-                        </td>
+                      <tr key={i}>
                         <td className="px-2 py-1.5">
                           <div className="font-medium text-gray-800">{r.item}</div>
                           {r.notes && <div className="text-gray-600">{r.notes}</div>}
@@ -409,14 +465,14 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                         <td className="px-2 py-1.5 text-gray-800">{r.matchName || <span className="text-amber-600">— new item —</span>}</td>
                         <td className="px-2 py-1.5 text-right text-gray-700">{r.current != null ? fmt(r.current) : '—'}</td>
                         <td className="px-2 py-1.5 text-right font-semibold text-gray-800">{fmt(r.unit_price)}</td>
-                        <td className={`px-2 py-1.5 text-right ${delta > 0 ? 'text-red-600' : delta < 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                        <td className={`px-2 py-1.5 text-right ${delta > 0 ? 'text-red-600' : delta < 0 ? 'text-green-600' : 'text-gray-500'}`}>
                           {delta == null ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(0)}%`}
                         </td>
                         <td className="px-2 py-1.5">
                           <select value={r.action} onChange={e => setRow(i, { action: e.target.value })} className="border border-gray-200 rounded px-1.5 py-1 bg-white">
+                            <option value="unchanged">Unchanged</option>
                             {r.matchId && <option value="update">Update</option>}
                             <option value="add">Add new</option>
-                            <option value="skip">Skip</option>
                           </select>
                         </td>
                         <td className="px-2 py-1.5">
@@ -462,7 +518,7 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
           <div className="p-8 text-center">
             <p className="text-sm text-gray-700 mb-1 font-semibold">Price sheet applied</p>
             <p className="text-xs text-gray-500 mb-4">
-              {applied.updated} updated · {applied.added} added · {applied.skipped} skipped. A price-history period was recorded for {vendorName} effective {effectiveDate}.
+              {applied.updated} updated · {applied.added} added · {applied.unchanged} unchanged. A price-history period was recorded for {vendorName} effective {effectiveDate}.
             </p>
             <button onClick={onClose} className="text-sm bg-gray-800 text-white font-semibold rounded px-4 py-1.5">Done</button>
           </div>
