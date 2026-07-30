@@ -1,456 +1,63 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 
-// ── Universal Sub Markup — pinned first row in Subs panel ──────
-function UniversalSubMarkup({ markupRate, onSave }) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(markupRate)
-  const pct = parseFloat(markupRate) * 100 || 35
-
-  function handleSave() {
-    onSave(draft)
-    setEditing(false)
-  }
-
-  return (
-    <div className="border-b-2 border-green-200 bg-green-50">
-      {editing ? (
-        <div className="px-3 py-2 space-y-1.5">
-          <label className="text-xs font-semibold text-green-700">Universal Sub Markup (%)</label>
-          <input
-            type="number"
-            step="1"
-            min="0"
-            max="100"
-            className="input text-sm py-1"
-            value={Math.round((parseFloat(draft) || 0) * 100)}
-            onChange={e => setDraft((parseFloat(e.target.value) || 0) / 100)}
-            autoFocus
-          />
-          <p className="text-xs text-gray-500">Applied as GP markup on all sub dump costs</p>
-          <div className="flex gap-2 pt-1">
-            <button
-              onClick={() => {
-                setDraft(markupRate)
-                setEditing(false)
-              }}
-              className="btn-secondary text-xs py-1 flex-1"
-            >
-              Cancel
-            </button>
-            <button onClick={handleSave} className="btn-primary text-xs py-1 flex-1">
-              Save
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex items-center justify-between px-3 py-2.5 group">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="inline-block w-2 h-2 rounded-full bg-green-500"></span>
-              <p className="text-sm font-semibold text-green-900">Universal Sub Markup</p>
-            </div>
-            <p className="text-xs text-green-700 mt-0.5 pl-4">
-              {pct.toFixed(0)}% of sub cost added to GP
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              setDraft(markupRate)
-              setEditing(true)
-            }}
-            className="text-xs text-gray-400 hover:text-gray-700 opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            Edit
-          </button>
-        </div>
-      )}
-    </div>
-  )
+// ── Which estimate modules consume a given rate ──────────────────────────────
+// Most rates carry a `category` that IS the module; a few categories / vendor
+// subcategories are shared across modules.
+const CATEGORY_MODULES = {
+  'Artificial Turf': ['Artificial Turf'],
+  Columns: ['Columns'],
+  Concrete: ['Concrete'],
+  Demo: ['Hand Demo', 'Skid Steer Demo', 'Mini Skid Steer Demo'],
+  Drainage: ['Drainage'],
+  Finishes: ['Finishes'],
+  'Fire Pit': ['Fire Pit'],
+  General: [],
+  'Ground Treatments': ['Ground Treatments'],
+  Irrigation: ['Irrigation'],
+  'Outdoor Kitchen': ['Outdoor Kitchen'],
+  Paver: ['Paver', 'Steps'],
+  Planting: ['Planting'],
+  Pool: ['Pool'],
+  Steps: ['Steps'],
+  Utilities: ['Utilities', 'Outdoor Kitchen', 'Fire Pit'],
+  Walls: ['Walls', 'Fire Pit'],
+}
+// Vendor-catalog subcategories map to specific modules regardless of category.
+const SUBCAT_MODULES = {
+  'Paver Material': ['Paver', 'Steps'],
+  'Base Material': ['Paver'],
+  'Wall Finish': ['Outdoor Kitchen', 'Fire Pit'],
+  'Wall Cap': ['Fire Pit'],
+  Tile: ['Steps'],
+  Flagstone: ['Steps'],
+  Brick: ['Steps'],
+  'Utility Lines': ['Utilities', 'Outdoor Kitchen', 'Fire Pit'],
+  'Gas Fixtures': ['Utilities', 'Outdoor Kitchen', 'Fire Pit'],
+  'Electrical Fixtures': ['Utilities', 'Outdoor Kitchen'],
+}
+function estimateModules(category, subcategory) {
+  if (subcategory && SUBCAT_MODULES[subcategory]) return SUBCAT_MODULES[subcategory]
+  if (category && CATEGORY_MODULES[category]) return CATEGORY_MODULES[category]
+  return category ? [category] : []
 }
 
-// ── Universal Labor Rate — pinned first row in Labor Rates panel ──
-function UniversalLaborRate({ hourlyRate, onSave }) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(hourlyRate)
-  const dayRate = (parseFloat(hourlyRate) || 0) * 8
-
-  function handleSave() {
-    onSave(draft)
-    setEditing(false)
-  }
-
-  return (
-    <div className="border-b-2 border-green-200 bg-green-50">
-      {editing ? (
-        <div className="px-3 py-2 space-y-1.5">
-          <label className="text-xs font-semibold text-green-700">
-            Universal Labor Rate ($/hr)
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            className="input text-sm py-1"
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            autoFocus
-          />
-          <p className="text-xs text-gray-500">
-            = ${((parseFloat(draft) || 0) * 8).toFixed(2)} per man day (8 hrs)
-          </p>
-          <div className="flex gap-2 pt-1">
-            <button
-              onClick={() => {
-                setDraft(hourlyRate)
-                setEditing(false)
-              }}
-              className="btn-secondary text-xs py-1 flex-1"
-            >
-              Cancel
-            </button>
-            <button onClick={handleSave} className="btn-primary text-xs py-1 flex-1">
-              Save
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex items-center justify-between px-3 py-2.5 group">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="inline-block w-2 h-2 rounded-full bg-green-500"></span>
-              <p className="text-sm font-semibold text-green-900">Universal Labor Rate</p>
-            </div>
-            <p className="text-xs text-green-700 mt-0.5 pl-4">
-              ${parseFloat(hourlyRate || 0).toFixed(2)}/hr &nbsp;·&nbsp; ${dayRate.toFixed(2)}/man
-              day
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              setDraft(hourlyRate)
-              setEditing(true)
-            }}
-            className="text-xs text-gray-400 hover:text-gray-700 opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            Edit
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Generic editable row component ──────────────────────────
-function RateRow({ row, columns, onSave, onDelete, primaryKey, skipKeys }) {
-  const [editing, setEditing] = useState(false)
-  const [form, setForm] = useState(row)
-
-  async function handleSave() {
-    await onSave(form)
-    setEditing(false)
-  }
-
-  if (editing) {
-    return (
-      <div className="px-3 py-2 bg-green-50 border-b border-green-100">
-        <div className="space-y-1.5 mb-2">
-          {columns.map(col => (
-            <div key={col.key}>
-              <label className="text-xs text-gray-500">{col.label}</label>
-              {col.type === 'select' ? (
-                <select
-                  className="input text-sm py-1"
-                  value={form[col.key] || ''}
-                  onChange={e => setForm(p => ({ ...p, [col.key]: e.target.value }))}
-                >
-                  {!col.options.some(o => (typeof o === 'object' ? o.value : o) === '') && (
-                    <option value="">--</option>
-                  )}
-                  {col.options.map(o => {
-                    const val = typeof o === 'object' ? o.value : o
-                    const lab = typeof o === 'object' ? o.label : o
-                    return (
-                      <option key={val} value={val}>
-                        {lab}
-                      </option>
-                    )
-                  })}
-                </select>
-              ) : (
-                <input
-                  className="input text-sm py-1"
-                  type={col.type || 'text'}
-                  step={col.step}
-                  value={form[col.key] || ''}
-                  onChange={e => setForm(p => ({ ...p, [col.key]: e.target.value }))}
-                />
-              )}
-            </div>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <button onClick={() => setEditing(false)} className="btn-secondary text-xs py-1 flex-1">
-            Cancel
-          </button>
-          <button onClick={handleSave} className="btn-primary text-xs py-1 flex-1">
-            Save
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  // ── Single-line "table" row ────────────────────────────────────────────────
-  // Primary label (first column, or an explicit primaryKey when the first column
-  // is used as the group header). All other columns render as compact inline
-  // cells on the SAME line (no wrapping); rate+unit are merged.
-  const primary = primaryKey || columns[0].key
-  const skip = new Set(skipKeys || [])
-  const cellText = col => {
-    if (col.type === 'select' && col.options?.some(o => typeof o === 'object')) {
-      return (
-        col.options.find(o => typeof o === 'object' && o.value === (row[col.key] || ''))?.label ||
-        row[col.key] ||
-        ''
-      )
-    }
-    if (col.type === 'number') {
-      return `${col.prefix || ''}${parseFloat(row[col.key] || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}${col.suffix || ''}`
-    }
-    return row[col.key] || ''
-  }
-  const cells = []
-  let mergeSkip = false
-  columns.forEach((col, i) => {
-    if (col.key === primary || skip.has(col.key)) return
-    if (mergeSkip) {
-      mergeSkip = false
-      return
-    }
-    const next = columns[i + 1]
-    if (col.key === 'rate' && next?.key === 'unit') {
-      const rateVal = parseFloat(row.rate || 0)
-      cells.push({
-        key: 'rate-unit',
-        text: `${rateVal.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${row.unit || ''}`.trim(),
-      })
-      mergeSkip = true
-    } else {
-      cells.push({ key: col.key, text: cellText(col) })
-    }
-  })
-
-  return (
-    <div className="flex items-center gap-3 px-3 py-1 border-b border-gray-100 hover:bg-gray-50 group text-xs">
-      <span className="flex-1 min-w-0 truncate font-medium text-gray-800">
-        {row[primary] || '—'}
-      </span>
-      {cells
-        .filter(c => c.text !== '' && c.text != null)
-        .map(c => (
-          <span key={c.key} className="shrink-0 whitespace-nowrap text-gray-500">
-            {c.text}
-          </span>
-        ))}
-      <span className="shrink-0 flex gap-2 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={() => setEditing(true)} className="text-gray-500 hover:text-gray-800">
-          Edit
-        </button>
-        <button onClick={() => onDelete(row.id)} className="text-red-400 hover:text-red-600">
-          ✕
-        </button>
-      </span>
-    </div>
-  )
-}
-
-// ── Generic add-row form ─────────────────────────────────────
-function AddRowForm({ columns, onSave, onCancel }) {
-  const initial = Object.fromEntries(columns.map(c => [c.key, '']))
-  const [form, setForm] = useState(initial)
-
-  return (
-    <div className="px-3 py-2 bg-green-50 border-t border-green-100">
-      <div className="space-y-1.5 mb-2">
-        {columns.map(col => (
-          <div key={col.key}>
-            <label className="text-xs text-gray-500">{col.label}</label>
-            {col.type === 'select' ? (
-              <select
-                className="input text-sm py-1"
-                value={form[col.key] || ''}
-                onChange={e => setForm(p => ({ ...p, [col.key]: e.target.value }))}
-              >
-                {!col.options.some(o => (typeof o === 'object' ? o.value : o) === '') && (
-                  <option value="">--</option>
-                )}
-                {col.options.map(o => {
-                  const val = typeof o === 'object' ? o.value : o
-                  const lab = typeof o === 'object' ? o.label : o
-                  return (
-                    <option key={val} value={val}>
-                      {lab}
-                    </option>
-                  )
-                })}
-              </select>
-            ) : (
-              <input
-                className="input text-sm py-1"
-                type={col.type || 'text'}
-                step={col.step}
-                placeholder={col.placeholder || ''}
-                value={form[col.key] || ''}
-                onChange={e => setForm(p => ({ ...p, [col.key]: e.target.value }))}
-              />
-            )}
-          </div>
-        ))}
-      </div>
-      <div className="flex gap-2">
-        <button onClick={onCancel} className="btn-secondary text-xs py-1 flex-1">
-          Cancel
-        </button>
-        <button onClick={() => onSave(form)} className="btn-primary text-xs py-1 flex-1">
-          Add
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ── Panel wrapper ────────────────────────────────────────────
-function RatesPanel({
-  title,
-  rows,
-  columns,
-  onAdd,
-  onSave,
-  onDelete,
-  loading,
-  pinnedHeader,
-  groupBy,
-  primaryKey,
-  skipKeys,
-}) {
-  const [showAdd, setShowAdd] = useState(false)
-
-  // Group rows (e.g. Materials by vendor, Subs by subcontractor). Without a
-  // groupBy the whole list is a single unlabeled group. House sorts first.
-  const groups = useMemo(() => {
-    if (!groupBy) return [{ key: '__all__', label: null, rows }]
-    const map = new Map()
-    rows.forEach(r => {
-      const g = groupBy(r)
-      if (!map.has(g.key)) map.set(g.key, { key: g.key, label: g.label, rows: [] })
-      map.get(g.key).rows.push(r)
-    })
-    return Array.from(map.values()).sort((a, b) => {
-      if (a.label === 'House') return -1
-      if (b.label === 'House') return 1
-      return String(a.label || '').localeCompare(String(b.label || ''))
-    })
-  }, [rows, groupBy])
-
-  async function handleAdd(form) {
-    await onAdd(form)
-    setShowAdd(false)
-  }
-
-  return (
-    <div
-      className="flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden"
-      style={{ minHeight: '500px' }}
-    >
-      {/* Header */}
-      <div className="relative px-4 py-3 bg-gray-50 border-b border-gray-200">
-        <h2 className="text-lg font-bold text-gray-900 text-center">{title}</h2>
-        {!showAdd && (
-          <button
-            onClick={() => setShowAdd(true)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-green-700 font-semibold hover:underline"
-          >
-            + Add Row
-          </button>
-        )}
-      </div>
-
-      {/* Pinned header slot (e.g. Universal Labor Rate) */}
-      {pinnedHeader}
-
-      {/* Add form — appears at top of list */}
-      {showAdd && (
-        <AddRowForm columns={columns} onSave={handleAdd} onCancel={() => setShowAdd(false)} />
-      )}
-
-      {/* Rows */}
-      <div className="flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="flex items-center justify-center py-10">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-700"></div>
-          </div>
-        ) : rows.length === 0 && !showAdd ? (
-          <div className="p-6 text-center text-gray-400 text-sm">
-            <p className="mb-3">No entries yet.</p>
-            <button onClick={() => setShowAdd(true)} className="btn-primary text-xs">
-              + Add First Row
-            </button>
-          </div>
-        ) : (
-          groups.map(g => (
-            <div key={g.key}>
-              {g.label != null && (
-                <div className="px-3 py-1 bg-gray-100 border-b border-gray-200 text-[11px] font-bold uppercase tracking-wide text-gray-600 sticky top-0 z-[1]">
-                  {g.label} <span className="text-gray-400 font-normal">({g.rows.length})</span>
-                </div>
-              )}
-              {g.rows.map(row => (
-                <RateRow
-                  key={row.id}
-                  row={row}
-                  columns={columns}
-                  primaryKey={primaryKey}
-                  skipKeys={skipKeys}
-                  onSave={onSave}
-                  onDelete={onDelete}
-                />
-              ))}
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ── Column definitions ───────────────────────────────────────
-const MATERIAL_COLUMNS = [
-  { key: 'name', label: 'Material Name', placeholder: 'e.g. Decomposed Granite' },
-  {
-    key: 'unit',
-    label: 'Unit',
-    type: 'select',
-    options: [
-      'sqft',
-      'linear ft',
-      'cubic yard',
-      'ton',
-      'each',
-      'bag',
-      'pallet',
-      'gallon',
-      '5gal',
-      'roll',
-      'LF',
-      'per zone',
-      'per unit',
-    ],
-  },
-  { key: 'unit_cost', label: 'Unit Cost ($)', type: 'number', step: '0.0001', prefix: '$' },
-  { key: 'category', label: 'Category', placeholder: 'e.g. Hardscape, Irrigation' },
+// ── Option lists ─────────────────────────────────────────────────────────────
+const MATERIAL_UNIT_OPTIONS = [
+  'sqft',
+  'linear ft',
+  'cubic yard',
+  'ton',
+  'each',
+  'bag',
+  'pallet',
+  'gallon',
+  '5gal',
+  'roll',
+  'LF',
+  'per zone',
+  'per unit',
 ]
-
 const LABOR_CATEGORY_OPTIONS = [
   'Artificial Turf',
   'Columns',
@@ -468,10 +75,10 @@ const LABOR_CATEGORY_OPTIONS = [
   'Utilities',
   'Walls',
 ]
-
 const LABOR_UNIT_OPTIONS = [
   'per day',
   'per hour',
+  'per plant',
   'hrs/ea',
   'hrs/ft',
   'hrs/linear ft',
@@ -496,366 +103,235 @@ const LABOR_UNIT_OPTIONS = [
   '$/400SF',
   '$',
 ]
-
-const LABOR_COLUMNS = [
-  { key: 'name', label: 'Description', placeholder: 'e.g. Demo - Tree Small' },
-  { key: 'rate', label: 'Rate', type: 'number', step: '0.0001', prefix: '' },
-  { key: 'unit', label: 'Per / Unit', type: 'select', options: LABOR_UNIT_OPTIONS },
-  { key: 'category', label: 'Category', type: 'select', options: LABOR_CATEGORY_OPTIONS },
-  { key: 'notes', label: 'Notes', placeholder: 'Optional notes' },
-]
-
 const SUB_CATEGORY_OPTIONS = ['Concrete', 'Demo', 'General', 'Pool', 'Sub Haul']
-
-const SUB_COLUMNS = [
-  { key: 'company_name', label: 'Company / Name', placeholder: 'e.g. ABC Concrete Co.' },
-  { key: 'trade', label: 'Trade', placeholder: 'e.g. Concrete, Irrigation' },
-  { key: 'rate', label: 'Rate ($)', type: 'number', step: '0.01', prefix: '$' },
-  {
-    key: 'unit',
-    label: 'Unit',
-    type: 'select',
-    options: [
-      'per day',
-      'per hour',
-      'per sqft',
-      'per linear ft',
-      'per unit',
-      'per cubic yard',
-      'per 400 sqft',
-      'lump sum',
-      '$/SF',
-      '$/CY',
-      '$/LF',
-      '$/ea',
-      'each',
-      '$/1.5T',
-    ],
-  },
-  { key: 'category', label: 'Category', type: 'select', options: SUB_CATEGORY_OPTIONS },
+const SUB_UNIT_OPTIONS = [
+  'per day',
+  'per hour',
+  'per sqft',
+  'per linear ft',
+  'per unit',
+  'per cubic yard',
+  'per 400 sqft',
+  'lump sum',
+  '$/SF',
+  '$/CY',
+  '$/LF',
+  '$/ea',
+  'each',
+  '$/1.5T',
 ]
 
-// ── Paver Prices Panel ───────────────────────────────────────
-function PaverPriceRow({ row, brands, onSave, onDelete }) {
-  const [editing, setEditing] = useState(false)
-  const [form, setForm] = useState(row)
-
-  async function handleSave() {
-    await onSave(form)
-    setEditing(false)
+// ── Generic full-width editable rate table ───────────────────────────────────
+function displayCell(row, col) {
+  const v = row[col.key]
+  if (col.type === 'select' && Array.isArray(col.options) && col.options.some(o => typeof o === 'object')) {
+    const opt = col.options.find(o => typeof o === 'object' && o.value === (v || ''))
+    return opt ? opt.label : v || '—'
   }
-
-  if (editing) {
-    return (
-      <div className="px-3 py-2 bg-green-50 border-b border-green-100">
-        <div className="grid grid-cols-2 gap-1.5 mb-2">
-          <div>
-            <label className="text-xs text-gray-500">Paver Brand</label>
-            <input
-              list="paver-brands-list"
-              className="input text-sm py-1"
-              value={form.brand || ''}
-              onChange={e => setForm(p => ({ ...p, brand: e.target.value }))}
-              placeholder="e.g. Belgard"
-            />
-            <datalist id="paver-brands-list">
-              {brands.map(b => (
-                <option key={b} value={b} />
-              ))}
-            </datalist>
-          </div>
-          <div>
-            <label className="text-xs text-gray-500">Paver Type / Model</label>
-            <input
-              className="input text-sm py-1"
-              value={form.name || ''}
-              onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-              placeholder="e.g. Cambridge Cobble 6x9"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-gray-500">Price per SF ($)</label>
-            <input
-              type="number"
-              step="0.0001"
-              min="0"
-              className="input text-sm py-1"
-              value={form.price_per_sf || ''}
-              onChange={e => setForm(p => ({ ...p, price_per_sf: e.target.value }))}
-              placeholder="0.00"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-gray-500">SF per Pallet</label>
-            <input
-              type="number"
-              step="0.5"
-              min="0"
-              className="input text-sm py-1"
-              value={form.sf_per_pallet || ''}
-              onChange={e => setForm(p => ({ ...p, sf_per_pallet: e.target.value }))}
-              placeholder="0"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-gray-500">
-              Price per LF Vert ($) <span className="text-gray-400">optional</span>
-            </label>
-            <input
-              type="number"
-              step="0.0001"
-              min="0"
-              className="input text-sm py-1"
-              value={form.price_per_lf_vert || ''}
-              onChange={e => setForm(p => ({ ...p, price_per_lf_vert: e.target.value }))}
-              placeholder="0.00"
-            />
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={() => setEditing(false)} className="btn-secondary text-xs py-1 flex-1">
-            Cancel
-          </button>
-          <button onClick={handleSave} className="btn-primary text-xs py-1 flex-1">
-            Save
-          </button>
-        </div>
-      </div>
-    )
+  if (col.type === 'number') {
+    if (v === '' || v == null) return '—'
+    return `${col.prefix || ''}${parseFloat(v || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}${col.suffix || ''}`
   }
+  return v || '—'
+}
+
+function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loading }) {
+  const [editingId, setEditingId] = useState(null)
+  const [adding, setAdding] = useState(false)
+  const [form, setForm] = useState({})
+
+  function startEdit(row) {
+    setForm(row)
+    setEditingId(row.id)
+    setAdding(false)
+  }
+  function startAdd() {
+    setForm(addTemplate())
+    setAdding(true)
+    setEditingId(null)
+  }
+  function cancel() {
+    setEditingId(null)
+    setAdding(false)
+  }
+  async function save() {
+    if (adding) await onAdd(form)
+    else await onSave(form)
+    cancel()
+  }
+  const setField = (k, v) => setForm(p => ({ ...p, [k]: v }))
+
+  const editCells = columns.map(col => (
+    <td key={col.key} className="px-3 py-1.5 align-top">
+      {col.editable === false ? (
+        <span className="text-gray-400">{col.render ? col.render(form) : '—'}</span>
+      ) : col.type === 'select' ? (
+        <select
+          className="w-full border border-gray-200 rounded-md px-2 py-1 text-xs bg-white"
+          value={form[col.key] ?? ''}
+          onChange={e => setField(col.key, e.target.value)}
+        >
+          {col.options.map(o => {
+            const val = typeof o === 'object' ? o.value : o
+            const lab = typeof o === 'object' ? o.label : o
+            return (
+              <option key={val} value={val}>
+                {lab}
+              </option>
+            )
+          })}
+        </select>
+      ) : (
+        <input
+          className="w-full border border-gray-200 rounded-md px-2 py-1 text-xs"
+          type={col.type || 'text'}
+          step={col.step}
+          value={form[col.key] ?? ''}
+          placeholder={col.placeholder || ''}
+          onChange={e => setField(col.key, e.target.value)}
+        />
+      )}
+    </td>
+  ))
 
   return (
-    <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 hover:bg-gray-50 group text-xs">
-      <div className="flex-1 min-w-0">
-        <p className="font-medium text-gray-900 truncate">{row.name}</p>
-        <p className="text-gray-400">
-          ${parseFloat(row.price_per_sf || 0).toFixed(2)}/SF
-          {row.sf_per_pallet > 0 && ` · ${row.sf_per_pallet} SF/pallet`}
-          {row.price_per_lf_vert > 0 &&
-            ` · $${parseFloat(row.price_per_lf_vert).toFixed(2)}/LF vert`}
-        </p>
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="flex justify-end px-3 py-2 bg-gray-50 border-b border-gray-200">
+        {!adding && (
+          <button
+            onClick={startAdd}
+            className="text-xs text-green-700 font-semibold hover:underline"
+          >
+            + Add Row
+          </button>
+        )}
       </div>
-      <div className="flex gap-2 ml-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-        <button
-          onClick={() => setEditing(true)}
-          className="text-xs text-gray-500 hover:text-gray-800"
-        >
-          Edit
-        </button>
-        <button
-          onClick={() => onDelete(row.id)}
-          className="text-xs text-red-400 hover:text-red-600"
-        >
-          ✕
-        </button>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs min-w-[820px]">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-200">
+              {columns.map(col => (
+                <th
+                  key={col.key}
+                  className="px-3 py-2 text-left font-semibold text-gray-600 uppercase whitespace-nowrap"
+                  style={col.width ? { width: col.width } : undefined}
+                >
+                  {col.label}
+                </th>
+              ))}
+              <th className="px-3 py-2 w-24" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {adding && (
+              <tr className="bg-green-50">
+                {editCells}
+                <td className="px-3 py-1.5 text-right whitespace-nowrap">
+                  <button onClick={save} className="text-green-700 font-semibold mr-2">
+                    Save
+                  </button>
+                  <button onClick={cancel} className="text-gray-400">
+                    Cancel
+                  </button>
+                </td>
+              </tr>
+            )}
+            {loading ? (
+              <tr>
+                <td colSpan={columns.length + 1} className="px-4 py-8 text-center text-gray-400">
+                  Loading…
+                </td>
+              </tr>
+            ) : rows.length === 0 && !adding ? (
+              <tr>
+                <td colSpan={columns.length + 1} className="px-4 py-8 text-center text-gray-400">
+                  No entries.
+                </td>
+              </tr>
+            ) : (
+              rows.map(row =>
+                editingId === row.id ? (
+                  <tr key={row.id} className="bg-green-50">
+                    {editCells}
+                    <td className="px-3 py-1.5 text-right whitespace-nowrap">
+                      <button onClick={save} className="text-green-700 font-semibold mr-2">
+                        Save
+                      </button>
+                      <button onClick={cancel} className="text-gray-400">
+                        Cancel
+                      </button>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={row.id} className="hover:bg-gray-50 group">
+                    {columns.map(col => (
+                      <td
+                        key={col.key}
+                        className={`px-3 py-1.5 whitespace-nowrap ${col.bold ? 'font-semibold text-gray-900' : 'text-gray-600'}`}
+                      >
+                        {col.render ? col.render(row) : displayCell(row, col)}
+                      </td>
+                    ))}
+                    <td className="px-3 py-1.5 text-right whitespace-nowrap">
+                      <button
+                        onClick={() => startEdit(row)}
+                        className="text-gray-500 hover:text-gray-800 opacity-0 group-hover:opacity-100 transition-opacity mr-2"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => onDelete(row.id)}
+                        className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        ✕
+                      </button>
+                    </td>
+                  </tr>
+                )
+              )
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   )
 }
 
-function PaverPricesPanel({ paverPrices, loading, onAdd, onSave, onDelete }) {
-  const [brandFilter, setBrandFilter] = useState('All')
-  const [search, setSearch] = useState('')
-  const [showAdd, setShowAdd] = useState(false)
-  const [addForm, setAddForm] = useState({
-    brand: '',
-    name: '',
-    price_per_sf: '',
-    sf_per_pallet: '',
-    price_per_lf_vert: '',
-  })
-
-  const brands = [
-    'All',
-    ...Array.from(new Set(paverPrices.map(p => p.brand).filter(Boolean))).sort(),
-  ]
-  const brandOptions = brands.filter(b => b !== 'All')
-
-  const visible = paverPrices.filter(p => {
-    if (brandFilter !== 'All' && p.brand !== brandFilter) return false
-    if (search && !p.name?.toLowerCase().includes(search.toLowerCase())) return false
-    return true
-  })
-
-  async function handleAdd() {
-    await onAdd(addForm)
-    setAddForm({ brand: '', name: '', price_per_sf: '', sf_per_pallet: '', price_per_lf_vert: '' })
-    setShowAdd(false)
-  }
-
+function ModuleTags({ modules }) {
+  if (!modules.length) return <span className="text-gray-300">—</span>
   return (
-    <div className="flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden flex-1">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
-        <h2 className="font-semibold text-gray-900 text-sm">Paver Prices</h2>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400">{paverPrices.length} entries</span>
-          {!showAdd && (
-            <button
-              onClick={() => setShowAdd(true)}
-              className="text-xs text-green-700 font-semibold hover:underline"
-            >
-              + Add Paver
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Add form */}
-      {showAdd && (
-        <div className="px-3 py-3 bg-green-50 border-b border-green-100">
-          <p className="text-xs font-semibold text-green-700 mb-2">New Paver Entry</p>
-          <div className="space-y-1.5 mb-2">
-            <div>
-              <label className="text-xs text-gray-500">Paver Brand</label>
-              <input
-                list="paver-brands-add"
-                className="input text-sm py-1"
-                value={addForm.brand}
-                onChange={e => setAddForm(p => ({ ...p, brand: e.target.value }))}
-                placeholder="e.g. Belgard"
-              />
-              <datalist id="paver-brands-add">
-                {brandOptions.map(b => (
-                  <option key={b} value={b} />
-                ))}
-              </datalist>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">Paver Type / Model</label>
-              <input
-                className="input text-sm py-1"
-                value={addForm.name}
-                onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))}
-                placeholder="e.g. Cambridge Cobble 6x9 (60mm)"
-              />
-            </div>
-            <div className="grid grid-cols-3 gap-1.5">
-              <div>
-                <label className="text-xs text-gray-500">$/SF</label>
-                <input
-                  type="number"
-                  step="0.0001"
-                  min="0"
-                  className="input text-sm py-1"
-                  value={addForm.price_per_sf}
-                  onChange={e => setAddForm(p => ({ ...p, price_per_sf: e.target.value }))}
-                  placeholder="0.00"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500">SF/Pallet</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0"
-                  className="input text-sm py-1"
-                  value={addForm.sf_per_pallet}
-                  onChange={e => setAddForm(p => ({ ...p, sf_per_pallet: e.target.value }))}
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500">$/LF Vert</label>
-                <input
-                  type="number"
-                  step="0.0001"
-                  min="0"
-                  className="input text-sm py-1"
-                  value={addForm.price_per_lf_vert}
-                  onChange={e => setAddForm(p => ({ ...p, price_per_lf_vert: e.target.value }))}
-                  placeholder="opt."
-                />
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={() => setShowAdd(false)} className="btn-secondary text-xs py-1 flex-1">
-              Cancel
-            </button>
-            <button
-              onClick={handleAdd}
-              disabled={!addForm.brand || !addForm.name}
-              className="btn-primary text-xs py-1 flex-1 disabled:opacity-40"
-            >
-              Add
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Brand filter + search */}
-      <div className="px-3 py-2 border-b border-gray-100 space-y-1.5">
-        <div className="flex gap-1 flex-wrap">
-          {brands.map(b => (
-            <button
-              key={b}
-              onClick={() => setBrandFilter(b)}
-              className={`text-xs px-2 py-0.5 rounded-full font-medium transition-colors ${
-                brandFilter === b
-                  ? 'bg-green-700 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {b}
-              {b !== 'All' && (
-                <span className="ml-1 opacity-70">
-                  ({paverPrices.filter(p => p.brand === b).length})
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-        <input
-          type="text"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search paver type…"
-          className="w-full border border-gray-200 rounded-md px-2.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
-        />
-      </div>
-
-      {/* List */}
-      <div className="flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="flex items-center justify-center py-10">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-700" />
-          </div>
-        ) : visible.length === 0 ? (
-          <div className="p-6 text-center text-gray-400 text-sm">No pavers found.</div>
-        ) : (
-          visible.map(row => (
-            <PaverPriceRow
-              key={row.id}
-              row={row}
-              brands={brandOptions}
-              onSave={onSave}
-              onDelete={onDelete}
-            />
-          ))
-        )}
-      </div>
-    </div>
+    <span className="flex flex-wrap gap-1">
+      {modules.map(m => (
+        <span
+          key={m}
+          className="inline-block px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-medium whitespace-nowrap"
+        >
+          {m}
+        </span>
+      ))}
+    </span>
   )
 }
 
 // ── Main page ────────────────────────────────────────────────
+const TABS = [
+  { key: 'materials', label: 'Materials' },
+  { key: 'labor', label: 'Labor Rates' },
+  { key: 'subs', label: 'Subcontractor Pricing' },
+]
+
 export default function MasterRates() {
+  const [activeTab, setActiveTab] = useState('materials')
   const [materials, setMaterials] = useState([])
   const [labor, setLabor] = useState([])
   const [subs, setSubs] = useState([])
   const [vendors, setVendors] = useState([])
-  const [materialCategories, setMaterialCategories] = useState([])
-  const [paverPrices, setPaverPrices] = useState([])
   const [loading, setLoading] = useState(true)
-  const [laborRatePerHour, setLaborRatePerHour] = useState('35')
-  const [subMarkupRate, setSubMarkupRate] = useState(0.35)
   const [matCategory, setMatCategory] = useState('All')
-  const [materialVendorFilter, setMaterialVendorFilter] = useState('')
+  const [matVendor, setMatVendor] = useState('All')
   const [labCategory, setLabCategory] = useState('All')
   const [subCategory, setSubCategory] = useState('All')
 
-  // Vendor select options for the material rows (null vendor === "House")
   const vendorOptions = useMemo(
     () => [
       { value: '', label: 'House (unassigned)' },
@@ -863,27 +339,7 @@ export default function MasterRates() {
     ],
     [vendors]
   )
-
-  // Category select options for the material rows (value === category name,
-  // matching how `subcategory` is stored on material_rates).
-  const categoryOptions = useMemo(
-    () => [
-      { value: '', label: '— none —' },
-      ...materialCategories.map(c => ({ value: c.name, label: c.name })),
-    ],
-    [materialCategories]
-  )
-
-  // Materials columns are built inside the component so the Vendor select can
-  // close over the fetched vendor list.
-  const materialColumns = useMemo(
-    () => [
-      ...MATERIAL_COLUMNS,
-      { key: 'vendor_id', label: 'Vendor', type: 'select', options: vendorOptions },
-      { key: 'subcategory', label: 'Category', type: 'select', options: categoryOptions },
-    ],
-    [vendorOptions, categoryOptions]
-  )
+  const vendorName = id => vendors.find(v => v.id === id)?.company_name || 'House'
 
   useEffect(() => {
     fetchAll()
@@ -891,44 +347,17 @@ export default function MasterRates() {
 
   async function fetchAll() {
     setLoading(true)
-    const [matRes, labRes, subRes, vendorRes, catRes, settingsRes, paverRes] = await Promise.all([
+    const [matRes, labRes, subRes, vendorRes] = await Promise.all([
       supabase.from('material_rates').select('*').order('name'),
       supabase.from('labor_rates').select('*').order('name'),
       supabase.from('subcontractor_rates').select('*').order('company_name'),
       supabase.from('subs_vendors').select('id, company_name').order('company_name'),
-      supabase.from('material_categories').select('id, name').order('name'),
-      supabase.from('company_settings').select('labor_rate_per_hour, sub_markup_rate').single(),
-      supabase.from('paver_prices').select('*').order('brand').order('name'),
     ])
     if (matRes.data) setMaterials(matRes.data)
     if (labRes.data) setLabor(labRes.data)
     if (subRes.data) setSubs(subRes.data)
     if (vendorRes.data) setVendors(vendorRes.data)
-    setMaterialCategories(catRes.data || [])
-    if (paverRes.data) setPaverPrices(paverRes.data)
-    if (settingsRes.data?.labor_rate_per_hour != null)
-      setLaborRatePerHour(settingsRes.data.labor_rate_per_hour.toString())
-    if (settingsRes.data?.sub_markup_rate != null)
-      setSubMarkupRate(parseFloat(settingsRes.data.sub_markup_rate))
     setLoading(false)
-  }
-
-  async function saveLaborRatePerHour(newVal) {
-    const val = parseFloat(newVal) || 35
-    await supabase
-      .from('company_settings')
-      .update({ labor_rate_per_hour: val, updated_at: new Date().toISOString() })
-      .eq('id', 1)
-    setLaborRatePerHour(val.toString())
-  }
-
-  async function saveSubMarkupRate(newVal) {
-    const val = parseFloat(newVal) || 0.35
-    await supabase
-      .from('company_settings')
-      .update({ sub_markup_rate: val, updated_at: new Date().toISOString() })
-      .eq('id', 1)
-    setSubMarkupRate(val)
   }
 
   // ── Materials CRUD ──
@@ -978,7 +407,7 @@ export default function MasterRates() {
         rate: parseFloat(form.rate) || 0,
         unit: form.unit || 'per day',
         category: form.category?.trim() || 'General',
-        rate_per_day: parseFloat(form.rate) || 0, // keep legacy column in sync
+        rate_per_day: parseFloat(form.rate) || 0,
         notes: form.notes?.trim(),
       })
       .select()
@@ -993,7 +422,7 @@ export default function MasterRates() {
         rate: parseFloat(form.rate) || 0,
         unit: form.unit || 'per day',
         category: form.category?.trim() || 'General',
-        rate_per_day: parseFloat(form.rate) || 0, // keep legacy column in sync
+        rate_per_day: parseFloat(form.rate) || 0,
         notes: form.notes?.trim(),
       })
       .eq('id', form.id)
@@ -1044,195 +473,202 @@ export default function MasterRates() {
     setSubs(p => p.filter(r => r.id !== id))
   }
 
-  // ── Paver Prices CRUD ──
-  async function addPaverPrice(form) {
-    const { data } = await supabase
-      .from('paver_prices')
-      .insert({
-        brand: form.brand?.trim(),
-        name: form.name?.trim(),
-        price_per_sf: parseFloat(form.price_per_sf) || 0,
-        sf_per_pallet: parseFloat(form.sf_per_pallet) || 0,
-        price_per_lf_vert: parseFloat(form.price_per_lf_vert) || 0,
-      })
-      .select()
-      .single()
-    if (data)
-      setPaverPrices(p =>
-        [...p, data].sort((a, b) => a.brand.localeCompare(b.brand) || a.name.localeCompare(b.name))
-      )
-  }
-  async function savePaverPrice(form) {
-    const { data } = await supabase
-      .from('paver_prices')
-      .update({
-        brand: form.brand?.trim(),
-        name: form.name?.trim(),
-        price_per_sf: parseFloat(form.price_per_sf) || 0,
-        sf_per_pallet: parseFloat(form.sf_per_pallet) || 0,
-        price_per_lf_vert: parseFloat(form.price_per_lf_vert) || 0,
-      })
-      .eq('id', form.id)
-      .select()
-      .single()
-    if (data) setPaverPrices(p => p.map(r => (r.id === data.id ? data : r)))
-  }
-  async function deletePaverPrice(id) {
-    if (!confirm('Delete this paver entry?')) return
-    await supabase.from('paver_prices').delete().eq('id', id)
-    setPaverPrices(p => p.filter(r => r.id !== id))
-  }
+  // ── Column configs ──
+  const materialColumns = [
+    { key: 'name', label: 'Item', bold: true, placeholder: 'e.g. Decomposed Granite' },
+    {
+      key: 'vendor_id',
+      label: 'Vendor',
+      type: 'select',
+      options: vendorOptions,
+      render: r => vendorName(r.vendor_id),
+    },
+    { key: 'category', label: 'Category', placeholder: 'e.g. Hardscape' },
+    { key: 'unit', label: 'Unit', type: 'select', options: MATERIAL_UNIT_OPTIONS },
+    { key: 'unit_cost', label: 'Price', type: 'number', step: '0.0001', prefix: '$' },
+    {
+      key: '__modules',
+      label: 'Estimate Module',
+      editable: false,
+      render: r => <ModuleTags modules={estimateModules(r.category, r.subcategory)} />,
+    },
+  ]
+  const laborColumns = [
+    { key: 'name', label: 'Item', bold: true, placeholder: 'e.g. Demo - Tree Small' },
+    { key: 'category', label: 'Category', type: 'select', options: LABOR_CATEGORY_OPTIONS },
+    { key: 'unit', label: 'Unit', type: 'select', options: LABOR_UNIT_OPTIONS },
+    { key: 'rate', label: 'Unit Price', type: 'number', step: '0.0001' },
+    { key: 'notes', label: 'Labor Description', placeholder: 'Optional notes' },
+    {
+      key: '__modules',
+      label: 'Estimate Module',
+      editable: false,
+      render: r => <ModuleTags modules={estimateModules(r.category)} />,
+    },
+  ]
+  const subColumns = [
+    { key: 'company_name', label: 'Item', bold: true, placeholder: 'e.g. ABC Concrete Co.' },
+    { key: 'category', label: 'Category', type: 'select', options: SUB_CATEGORY_OPTIONS },
+    { key: 'unit', label: 'Unit', type: 'select', options: SUB_UNIT_OPTIONS },
+    { key: 'rate', label: 'Unit Price', type: 'number', step: '0.01', prefix: '$' },
+    {
+      key: '__modules',
+      label: 'Estimate Module',
+      editable: false,
+      render: r => <ModuleTags modules={estimateModules(r.category)} />,
+    },
+  ]
+
+  const matCats = ['All', ...Array.from(new Set(materials.map(m => m.category).filter(Boolean))).sort()]
+  const labCats = ['All', ...Array.from(new Set(labor.map(r => r.category).filter(Boolean))).sort()]
+  const subCats = ['All', ...Array.from(new Set(subs.map(r => r.category).filter(Boolean))).sort()]
+
+  const visibleMaterials = materials.filter(m => {
+    if (matCategory !== 'All' && m.category !== matCategory) return false
+    if (matVendor === '__HOUSE__') return m.vendor_id == null
+    if (matVendor !== 'All') return m.vendor_id === matVendor
+    return true
+  })
+  const visibleLabor = labCategory === 'All' ? labor : labor.filter(r => r.category === labCategory)
+  const visibleSubs = subCategory === 'All' ? subs : subs.filter(r => r.category === subCategory)
+
+  const filterSelect = 'border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-green-400'
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
-        <h1 className="text-xl font-bold text-gray-900">Master Rates</h1>
+      <h1 className="text-xl font-bold text-gray-900 mb-4">Master Rates</h1>
+
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-gray-200 mb-3">
+        {TABS.map(t => (
+          <button
+            key={t.key}
+            onClick={() => setActiveTab(t.key)}
+            className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+              activeTab === t.key
+                ? 'border-green-700 text-green-800'
+                : 'border-transparent text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      {/* Three-panel layout
-          Row 1 (auto-height): all three filter bars in the same grid row so they
-          stretch to match the tallest one, ensuring panels always start at the
-          same vertical position regardless of how many category pills each has.
-          Row 2: the three panel cards. */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-4 gap-y-0">
-        {/* ── Filter dropdown: Materials ── */}
-        {(() => {
-          const matCats = Array.from(new Set(materials.map(m => m.category).filter(Boolean))).sort()
-          const cats = ['All', ...matCats, 'Pavers']
-          return (
-            <div className="pb-2">
-              <select
-                value={matCategory}
-                onChange={e => setMatCategory(e.target.value)}
-                className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-green-400"
-              >
-                {cats.map(cat => (
-                  <option key={cat} value={cat}>
-                    {cat === 'All'
-                      ? 'All materials'
-                      : cat === 'Pavers'
-                        ? `Pavers (${paverPrices.length})`
-                        : `${cat} (${materials.filter(m => m.category === cat).length})`}
+      {/* Materials */}
+      {activeTab === 'materials' && (
+        <div>
+          <div className="flex flex-wrap items-center gap-3 mb-2">
+            <div className="flex items-center gap-1.5">
+              <label className="text-xs text-gray-500">Category</label>
+              <select value={matCategory} onChange={e => setMatCategory(e.target.value)} className={filterSelect}>
+                {matCats.map(c => (
+                  <option key={c} value={c}>
+                    {c === 'All' ? 'All categories' : c}
                   </option>
                 ))}
               </select>
             </div>
-          )
-        })()}
-
-        {/* ── Filter dropdown: Labor ── */}
-        {(() => {
-          const cats = [
-            'All',
-            ...Array.from(new Set(labor.map(r => r.category).filter(Boolean))).sort(),
-          ]
-          return (
-            <div className="pb-2">
-              <select
-                value={labCategory}
-                onChange={e => setLabCategory(e.target.value)}
-                className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-green-400"
-              >
-                {cats.map(cat => (
-                  <option key={cat} value={cat}>
-                    {cat === 'All'
-                      ? 'All categories'
-                      : `${cat} (${labor.filter(r => r.category === cat).length})`}
+            <div className="flex items-center gap-1.5">
+              <label className="text-xs text-gray-500">Vendor</label>
+              <select value={matVendor} onChange={e => setMatVendor(e.target.value)} className={filterSelect}>
+                <option value="All">All vendors</option>
+                <option value="__HOUSE__">House (unassigned)</option>
+                {vendors.map(v => (
+                  <option key={v.id} value={v.id}>
+                    {v.company_name}
                   </option>
                 ))}
               </select>
             </div>
-          )
-        })()}
-
-        {/* ── Filter dropdown: Subs ── */}
-        {(() => {
-          const cats = [
-            'All',
-            ...Array.from(new Set(subs.map(r => r.category).filter(Boolean))).sort(),
-          ]
-          return (
-            <div className="pb-2">
-              <select
-                value={subCategory}
-                onChange={e => setSubCategory(e.target.value)}
-                className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-green-400"
-              >
-                {cats.map(cat => (
-                  <option key={cat} value={cat}>
-                    {cat === 'All'
-                      ? 'All categories'
-                      : `${cat} (${subs.filter(r => r.category === cat).length})`}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )
-        })()}
-
-        {/* ── Panel: Materials ── */}
-        <div className="flex flex-col" style={{ minHeight: '500px' }}>
-          {matCategory === 'Pavers' ? (
-            <PaverPricesPanel
-              paverPrices={paverPrices}
-              loading={loading}
-              onAdd={addPaverPrice}
-              onSave={savePaverPrice}
-              onDelete={deletePaverPrice}
-            />
-          ) : (
-            <RatesPanel
-              title="Materials"
-              rows={materials.filter(m => {
-                if (matCategory !== 'All' && m.category !== matCategory) return false
-                return true
-              })}
-              columns={materialColumns}
-              onAdd={addMaterial}
-              onSave={saveMaterial}
-              onDelete={deleteMaterial}
-              loading={loading}
-              skipKeys={['vendor_id']}
-              groupBy={m => ({
-                key: m.vendor_id || '__house__',
-                label: m.vendor_id
-                  ? vendors.find(v => v.id === m.vendor_id)?.company_name || 'Vendor'
-                  : 'House',
-              })}
-            />
-          )}
+            <span className="text-xs text-gray-400 ml-auto">{visibleMaterials.length} items</span>
+          </div>
+          <RateTable
+            columns={materialColumns}
+            rows={visibleMaterials}
+            onAdd={addMaterial}
+            onSave={saveMaterial}
+            onDelete={deleteMaterial}
+            addTemplate={() => ({
+              name: '',
+              vendor_id: '',
+              category: matCategory !== 'All' ? matCategory : '',
+              unit: 'each',
+              unit_cost: '',
+              subcategory: '',
+            })}
+            loading={loading}
+          />
         </div>
+      )}
 
-        {/* ── Panel: Labor ── */}
-        <div className="flex flex-col" style={{ minHeight: '500px' }}>
-          <RatesPanel
-            title="Labor Rates & Amounts"
-            rows={labCategory === 'All' ? labor : labor.filter(r => r.category === labCategory)}
-            columns={LABOR_COLUMNS}
+      {/* Labor */}
+      {activeTab === 'labor' && (
+        <div>
+          <div className="flex flex-wrap items-center gap-3 mb-2">
+            <div className="flex items-center gap-1.5">
+              <label className="text-xs text-gray-500">Category</label>
+              <select value={labCategory} onChange={e => setLabCategory(e.target.value)} className={filterSelect}>
+                {labCats.map(c => (
+                  <option key={c} value={c}>
+                    {c === 'All' ? 'All categories' : c}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <span className="text-xs text-gray-400 ml-auto">{visibleLabor.length} items</span>
+          </div>
+          <RateTable
+            columns={laborColumns}
+            rows={visibleLabor}
             onAdd={addLabor}
             onSave={saveLabor}
             onDelete={deleteLabor}
+            addTemplate={() => ({
+              name: '',
+              category: labCategory !== 'All' ? labCategory : 'General',
+              unit: 'per day',
+              rate: '',
+              notes: '',
+            })}
             loading={loading}
           />
         </div>
+      )}
 
-        {/* ── Panel: Subs (grouped by subcontractor) ── */}
-        <div className="flex flex-col" style={{ minHeight: '500px' }}>
-          <RatesPanel
-            title="Subcontractor Pricing"
-            rows={subCategory === 'All' ? subs : subs.filter(r => r.category === subCategory)}
-            columns={SUB_COLUMNS}
+      {/* Subs */}
+      {activeTab === 'subs' && (
+        <div>
+          <div className="flex flex-wrap items-center gap-3 mb-2">
+            <div className="flex items-center gap-1.5">
+              <label className="text-xs text-gray-500">Category</label>
+              <select value={subCategory} onChange={e => setSubCategory(e.target.value)} className={filterSelect}>
+                {subCats.map(c => (
+                  <option key={c} value={c}>
+                    {c === 'All' ? 'All categories' : c}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <span className="text-xs text-gray-400 ml-auto">{visibleSubs.length} items</span>
+          </div>
+          <RateTable
+            columns={subColumns}
+            rows={visibleSubs}
             onAdd={addSub}
             onSave={saveSub}
             onDelete={deleteSub}
+            addTemplate={() => ({
+              company_name: '',
+              trade: '',
+              category: subCategory !== 'All' ? subCategory : 'General',
+              unit: 'per day',
+              rate: '',
+            })}
             loading={loading}
-            primaryKey="trade"
-            skipKeys={['company_name']}
-            groupBy={s => ({ key: s.company_name || '—', label: s.company_name || '—' })}
           />
         </div>
-      </div>
+      )}
     </div>
   )
 }
