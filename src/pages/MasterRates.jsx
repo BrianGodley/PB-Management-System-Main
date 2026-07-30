@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
+import PriceSheetImportModal from '../components/PriceSheetImportModal'
 
 // ── Which estimate modules consume a given rate ──────────────────────────────
 // Most rates carry a `category` that IS the module; a few categories / vendor
@@ -483,6 +484,7 @@ const TABS = [
 
 export default function MasterRates() {
   const [activeTab, setActiveTab] = useState('materials')
+  const [showImport, setShowImport] = useState(false)
   const [materials, setMaterials] = useState([])
   const [labor, setLabor] = useState([])
   const [subs, setSubs] = useState([])
@@ -720,7 +722,22 @@ export default function MasterRates() {
 
   return (
     <div>
-      <h1 className="text-xl font-bold text-gray-900 mb-4">Master Rates</h1>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-xl font-bold text-gray-900">Master Rates</h1>
+        <button
+          onClick={() => setShowImport(true)}
+          className="text-sm bg-green-600 text-white font-semibold rounded px-4 py-1.5 hover:bg-green-700"
+        >
+          Import Price Sheet
+        </button>
+      </div>
+      {showImport && (
+        <PriceSheetImportModal
+          vendors={vendors}
+          onClose={() => setShowImport(false)}
+          onApplied={fetchAll}
+        />
+      )}
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-gray-200 mb-3">
