@@ -99,7 +99,7 @@ Deno.serve(async req => {
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405)
 
   try {
-    const { file_path, text, vendor_name, effective_date } = await req.json().catch(() => ({}))
+    const { file_path, text, vendor_name, effective_date, instructions } = await req.json().catch(() => ({}))
 
     const admin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -133,6 +133,8 @@ Deno.serve(async req => {
     const hints: string[] = []
     if (vendor_name) hints.push(`Vendor hint: ${vendor_name}`)
     if (effective_date) hints.push(`Effective date hint: ${effective_date}`)
+    if (instructions && String(instructions).trim())
+      hints.push(`IMPORTANT user instructions for THIS sheet (follow carefully):\n${String(instructions).slice(0, 2000)}`)
     hints.push('Extract every priced line item now by calling the extract_price_sheet tool.')
     content.push({ type: 'text', text: hints.join('\n') })
 

@@ -38,6 +38,15 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
   const [selected, setSelected] = useState(() => new Set())
   const [bulkCat, setBulkCat] = useState('')
   const [bulkSub, setBulkSub] = useState('')
+  const [bulkUnit, setBulkUnit] = useState('')
+  const [instructions, setInstructions] = useState('')
+  const [search, setSearch] = useState('')
+
+  const matchesSearch = r => {
+    const q = norm(search)
+    if (!q) return true
+    return norm(`${r.item} ${r.notes || ''} ${r.matchName || ''} ${r.unit || ''}`).includes(q)
+  }
 
   const toggleSel = i =>
     setSelected(s => {
@@ -45,8 +54,9 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
       n.has(i) ? n.delete(i) : n.add(i)
       return n
     })
+  // Selection respects the current text filter — only visible rows are picked.
   const selectWhere = pred =>
-    setSelected(new Set(rows.map((r, i) => (pred(r) ? i : -1)).filter(i => i >= 0)))
+    setSelected(new Set(rows.map((r, i) => (pred(r) && matchesSearch(r) ? i : -1)).filter(i => i >= 0)))
   const applyToSelected = patch =>
     setRows(rs => rs.map((r, i) => (selected.has(i) ? { ...r, ...patch } : r)))
 
@@ -67,7 +77,7 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
       if (upErr) throw new Error(`Upload failed: ${upErr.message}`)
 
       const { data, error: fnErr } = await supabase.functions.invoke('process-price-sheet', {
-        body: { file_path: path, vendor_name: vendorName, effective_date: effectiveDate },
+        body: { file_path: path, vendor_name: vendorName, effective_date: effectiveDate, instructions },
       })
       if (fnErr) throw new Error(fnErr.message || 'Extraction failed.')
       if (data?.error) throw new Error(data.error)
@@ -181,7 +191,7 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
             source: 'price_sheet',
             import_id: importId,
           })
-          await supabase.from('material_rates').update({ unit_cost: r.unit_price }).eq('id', r.matchId)
+          await supabase.from('material_rates').update({ unit_cost: r.unit_price, unit: r.unit }).eq('id', r.matchId)
           updated++
         } else if (r.action === 'add') {
           const { data: nm, error: addErr } = await supabase
@@ -262,6 +272,16 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
               />
               <p className="text-[11px] text-gray-400 mt-1">Sam reads the sheet and lists every priced item for your review. Nothing is saved until you approve.</p>
             </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Instructions for Sam (optional)</label>
+              <textarea
+                value={instructions}
+                onChange={e => setInstructions(e.target.value)}
+                rows={3}
+                placeholder="e.g. The pricing unit (per LF, per roll, per SF) is printed on the right side of the item-name cell — capture it as the unit for each line."
+                className="input w-full text-sm py-1.5"
+              />
+            </div>
             <div className="flex justify-end gap-2 pt-2">
               <button onClick={onClose} className="text-sm text-gray-500 px-3 py-1.5">Cancel</button>
               <button
@@ -280,6 +300,15 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
             <div className="flex flex-wrap items-center gap-3 mb-3 text-xs">
               <span className="font-semibold text-gray-700">{vendorName}</span>
               <span className="text-gray-400">effective {effectiveDate}</span>
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Filter items…"
+                className="border border-gray-200 rounded px-2 py-1 w-48"
+              />
+              <button onClick={extract} disabled={busy} className="text-gray-500 hover:underline disabled:opacity-40">
+                {busy ? 'Re-reading…' : '↻ Re-extract'}
+              </button>
               <span className="ml-auto text-gray-500">
                 {counts.updated} update ({counts.changed} price change) · {counts.added} new · {counts.skipped} skip
               </span>
@@ -320,6 +349,19 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
               >
                 Apply sub
               </button>
+              <input value={bulkUnit} onChange={e => setBulkUnit(e.target.value)} placeholder="Unit" list="ps-units" className="border border-gray-200 rounded px-1.5 py-1 w-24" />
+              <button
+                disabled={!selected.size}
+                onClick={() => applyToSelected({ unit: bulkUnit })}
+                className="text-green-700 font-semibold hover:underline disabled:opacity-40"
+              >
+                Apply unit
+              </button>
+              <datalist id="ps-units">
+                {['each', 'roll', 'yard', 'CY', 'ton', 'LF', 'linear ft', 'SF', 'sqft', 'bag', 'pallet', 'gallon', 'box'].map(u => (
+                  <option key={u} value={u} />
+                ))}
+              </datalist>
             </div>
             <div className="overflow-x-auto border border-gray-200 rounded-lg max-h-[55vh]">
               <table className="w-full text-xs">
@@ -333,6 +375,7 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                       />
                     </th>
                     <th className="px-2 py-2 font-semibold">On sheet</th>
+                    <th className="px-2 py-2 font-semibold">Unit</th>
                     <th className="px-2 py-2 font-semibold">Matches</th>
                     <th className="px-2 py-2 font-semibold text-right">Current</th>
                     <th className="px-2 py-2 font-semibold text-right">New</th>
@@ -343,6 +386,7 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {rows.map((r, i) => {
+                    if (!matchesSearch(r)) return null
                     const delta =
                       r.current != null && r.current !== 0
                         ? ((r.unit_price - r.current) / r.current) * 100
@@ -354,7 +398,15 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                         </td>
                         <td className="px-2 py-1.5">
                           <div className="font-medium text-gray-800">{r.item}</div>
-                          <div className="text-gray-400">{r.unit}{r.notes ? ` · ${r.notes}` : ''}</div>
+                          {r.notes && <div className="text-gray-400">{r.notes}</div>}
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <input
+                            value={r.unit || ''}
+                            onChange={e => setRow(i, { unit: e.target.value })}
+                            list="ps-units"
+                            className="border border-gray-200 rounded px-1.5 py-1 w-24"
+                          />
                         </td>
                         <td className="px-2 py-1.5 text-gray-600">{r.matchName || <span className="text-amber-600">— new item —</span>}</td>
                         <td className="px-2 py-1.5 text-right text-gray-500">{r.current != null ? fmt(r.current) : '—'}</td>
