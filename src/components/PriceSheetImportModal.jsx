@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import VendorCombo from './VendorCombo'
 
@@ -75,6 +75,25 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
     () => vendors.find(v => v.id === vendorId)?.company_name || '',
     [vendors, vendorId]
   )
+
+  // Existing categories / sub-categories → dropdown suggestions (you can also
+  // type a brand-new value directly into any category or sub-category box).
+  const [catOptions, setCatOptions] = useState([])
+  const [subOptions, setSubOptions] = useState([])
+  useEffect(() => {
+    supabase
+      .from('material_rates')
+      .select('category, sub_category')
+      .then(({ data }) => {
+        const cats = new Set(), subs = new Set()
+        for (const r of data || []) {
+          if (r.category) cats.add(r.category)
+          if (r.sub_category) subs.add(r.sub_category)
+        }
+        setCatOptions([...cats].sort())
+        setSubOptions([...subs].sort())
+      })
+  }, [])
 
   async function extract() {
     setError('')
@@ -424,10 +443,10 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-gray-600 w-16">Category</span>
-                  <input value={bulkCat} onChange={e => setBulkCat(e.target.value)} placeholder="set category" className="border border-gray-300 rounded px-2 py-1 w-40" />
+                  <input value={bulkCat} onChange={e => setBulkCat(e.target.value)} list="ps-cats" placeholder="pick or type new…" className="border border-gray-300 rounded px-2 py-1 w-44" />
                   <button onClick={() => applyToVisible({ category: bulkCat })} className="px-2 py-1 bg-gray-800 text-white rounded hover:bg-gray-900">Apply →</button>
                   <span className="text-gray-600 ml-2">Sub Category</span>
-                  <input value={bulkSub} onChange={e => setBulkSub(e.target.value)} placeholder="set sub category" className="border border-gray-300 rounded px-2 py-1 w-40" />
+                  <input value={bulkSub} onChange={e => setBulkSub(e.target.value)} list="ps-subs" placeholder="pick or type new…" className="border border-gray-300 rounded px-2 py-1 w-44" />
                   <button onClick={() => applyToVisible({ sub_category: bulkSub })} className="px-2 py-1 bg-gray-800 text-white rounded hover:bg-gray-900">Apply →</button>
                 </div>
                 <div className="flex flex-wrap items-start gap-2">
@@ -451,8 +470,8 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                     onClick={() => {
                       applyToVisible({ reviewed: true })
                       setExcluded(new Set())
-                      // Return to the shrinking "still to review" list.
-                      const next = { text: '', price: '', status: 'unaccounted' }
+                      // Reset every filter to no input after a commit.
+                      const next = { text: '', price: '', status: 'all' }
                       setFilterDraft(next)
                       setFilter(next)
                     }}
@@ -467,6 +486,12 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
               {['each', 'roll', 'yard', 'CY', 'ton', 'LF', 'linear ft', 'SF', 'sqft', 'bag', 'pallet', 'gallon', 'box'].map(u => (
                 <option key={u} value={u} />
               ))}
+            </datalist>
+            <datalist id="ps-cats">
+              {catOptions.map(c => <option key={c} value={c} />)}
+            </datalist>
+            <datalist id="ps-subs">
+              {subOptions.map(s => <option key={s} value={s} />)}
             </datalist>
             <div className="overflow-x-auto border border-gray-200 rounded-lg max-h-[50vh]">
               <table className="w-full text-xs">
@@ -533,13 +558,15 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                               <input
                                 value={r.category}
                                 onChange={e => setRow(i, { category: e.target.value, reviewed: true })}
-                                placeholder="Category (e.g. Ground Treatments)"
+                                list="ps-cats"
+                                placeholder="Category — pick or type new"
                                 className="border border-gray-200 rounded px-1.5 py-1 w-48"
                               />
                               <input
                                 value={r.sub_category}
                                 onChange={e => setRow(i, { sub_category: e.target.value, reviewed: true })}
-                                placeholder="Sub category (optional)"
+                                list="ps-subs"
+                                placeholder="Sub category — pick or type new"
                                 className="border border-gray-200 rounded px-1.5 py-1 w-48"
                               />
                             </div>
