@@ -433,7 +433,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
         {/* GPMD summary bar */}
         <GpmdBar
-          variant={subType === 'Subcontractor' ? 'sub' : 'inhouse'}
+          variant={state.subType === 'Subcontractor' ? 'sub' : 'inhouse'}
           sticky
           totalMat={calc.totalMat}
           totalHrs={calc.totalHrs}
@@ -480,7 +480,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
       )}
 
       {/* Settings — Job Site Conditions is In-House only (hidden on Sub tab) */}
-      {subType !== 'Subcontractor' && (
+      {state.subType !== 'Subcontractor' && (
         <>
       <SecHdr title="Job Site Conditions" />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
