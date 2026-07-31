@@ -43,6 +43,9 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
   // Filter Items: draft inputs vs the applied filter (applied on Search click).
   const [filterDraft, setFilterDraft] = useState({ text: '', price: '', status: 'all' })
   const [filter, setFilter] = useState({ text: '', price: '', status: 'all' })
+  // Rows the user pulled OUT of the current filter result (by index); they drop
+  // from this batch and stay unaccounted. Cleared on each new Search.
+  const [excluded, setExcluded] = useState(() => new Set())
 
   const matchesFilter = r => {
     const f = filter
@@ -61,10 +64,12 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
     }
     return true
   }
-  // Step 2 changes apply to the rows currently matching the filter.
-  const applyToVisible = patch => setRows(rs => rs.map(r => (matchesFilter(r) ? { ...r, ...patch } : r)))
+  // A row is in the current batch if it matches the filter and wasn't removed.
+  const inBatch = (r, i) => matchesFilter(r) && !excluded.has(i)
+  const applyToVisible = patch => setRows(rs => rs.map((r, i) => (inBatch(r, i) ? { ...r, ...patch } : r)))
   const applyToVisibleMatched = patch =>
-    setRows(rs => rs.map(r => (matchesFilter(r) && r.matchId ? { ...r, ...patch } : r)))
+    setRows(rs => rs.map((r, i) => (inBatch(r, i) && r.matchId ? { ...r, ...patch } : r)))
+  const runSearch = () => { setFilter(filterDraft); setExcluded(new Set()) }
 
   const vendorName = useMemo(
     () => vendors.find(v => v.id === vendorId)?.company_name || '',
@@ -148,7 +153,7 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
     setError('')
     setBusy(true)
     try {
-      const target = rows.filter(matchesFilter)
+      const target = rows.filter((r, i) => inBatch(r, i))
       const { data, error: fnErr } = await supabase.functions.invoke('apply-price-edits', {
         body: {
           instruction: descInstr,
@@ -159,8 +164,8 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
       if (data?.error) throw new Error(data.error)
       const editByItem = new Map((data?.rows || []).map(e => [norm(e.item), e]))
       setRows(rs =>
-        rs.map(r => {
-          if (!matchesFilter(r)) return r
+        rs.map((r, i) => {
+          if (!inBatch(r, i)) return r
           const e = editByItem.get(norm(r.item))
           if (!e) return r
           const newPrice = e.unit_price != null ? Number(e.unit_price) : r.unit_price
@@ -171,7 +176,6 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
             unit_price: newPrice,
             notes: e.notes ?? r.notes,
             action: changed ? 'update' : r.action,
-            reviewed: true,
           }
         })
       )
@@ -394,18 +398,17 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                   <option value="matched">Matched</option>
                   <option value="unaccounted">Unaccounted</option>
                 </select>
-                <button onClick={() => setFilter(filterDraft)} className="px-3 py-1 bg-gray-800 text-white rounded hover:bg-gray-900 font-semibold">Search</button>
-                <button onClick={() => { setFilterDraft({ text: '', price: '', status: 'all' }); setFilter({ text: '', price: '', status: 'all' }) }} className="text-gray-500 hover:underline">Clear</button>
-                <span className="ml-auto font-bold text-green-700">{rows.filter(matchesFilter).length} shown</span>
+                <button onClick={runSearch} className="px-3 py-1 bg-gray-800 text-white rounded hover:bg-gray-900 font-semibold">Search</button>
+                <button onClick={() => { setFilterDraft({ text: '', price: '', status: 'all' }); setFilter({ text: '', price: '', status: 'all' }); setExcluded(new Set()) }} className="text-gray-500 hover:underline">Clear</button>
+                <span className="ml-auto font-bold text-green-700">{rows.filter((r, i) => inBatch(r, i)).length} in batch</span>
               </div>
 
               {/* Step 2 — change the filtered rows */}
               <div className="px-3 py-2 space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-bold text-gray-800">Step 2 · Change filtered</span>
-                  <button onClick={() => applyToVisible({ action: 'unchanged', reviewed: true })} className="px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100">Leave Unchanged</button>
-                  <button onClick={() => applyToVisibleMatched({ action: 'update', reviewed: true })} className="px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100">Update pricing (all matches)</button>
-                  <button onClick={() => applyToVisible({ reviewed: true })} className="px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100">Mark accounted</button>
+                  <button onClick={() => applyToVisible({ action: 'unchanged' })} className="px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100">Leave Unchanged</button>
+                  <button onClick={() => applyToVisibleMatched({ action: 'update' })} className="px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100">Update pricing (all matches)</button>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-gray-600 w-16">Unit</span>
@@ -440,6 +443,17 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                     {busy ? 'Applying…' : 'Apply →'}
                   </button>
                 </div>
+                {/* Step 3 — commit the batch as accounted for */}
+                <div className="flex flex-wrap items-center gap-2 pt-2 mt-1 border-t border-gray-200">
+                  <span className="font-bold text-gray-800">Step 3 · Commit</span>
+                  <span className="text-gray-600">Mark these {rows.filter((r, i) => inBatch(r, i)).length} item(s) as accounted for.</span>
+                  <button
+                    onClick={() => { applyToVisible({ reviewed: true }); setExcluded(new Set()) }}
+                    className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 font-semibold"
+                  >
+                    Commit batch
+                  </button>
+                </div>
               </div>
             </div>
             <datalist id="ps-units">
@@ -463,7 +477,7 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {rows.map((r, i) => {
-                    if (!matchesFilter(r)) return null
+                    if (!inBatch(r, i)) return null
                     const delta =
                       r.current != null && r.current !== 0
                         ? ((r.unit_price - r.current) / r.current) * 100
@@ -471,8 +485,19 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                     return (
                       <tr key={i}>
                         <td className="px-2 py-1.5">
-                          <div className="font-medium text-gray-800">{r.item}</div>
-                          {r.notes && <div className="text-gray-600">{r.notes}</div>}
+                          <div className="flex items-start gap-1">
+                            <button
+                              onClick={() => setExcluded(s => new Set(s).add(i))}
+                              title="Remove from this batch (back to unaccounted)"
+                              className="text-gray-300 hover:text-red-500 leading-none mt-0.5"
+                            >
+                              ✕
+                            </button>
+                            <div>
+                              <div className="font-medium text-gray-800">{r.item}</div>
+                              {r.notes && <div className="text-gray-600">{r.notes}</div>}
+                            </div>
+                          </div>
                         </td>
                         <td className="px-2 py-1.5">
                           <input
@@ -490,7 +515,7 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                         </td>
                         <td className="px-2 py-1.5">
                           <div className="flex items-center gap-1">
-                            <select value={r.action} onChange={e => setRow(i, { action: e.target.value, reviewed: true })} className="border border-gray-200 rounded px-1.5 py-1 bg-white">
+                            <select value={r.action} onChange={e => setRow(i, { action: e.target.value })} className="border border-gray-200 rounded px-1.5 py-1 bg-white">
                               <option value="unchanged">Unchanged</option>
                               {r.matchId && <option value="update">Update</option>}
                               <option value="add">Add new</option>
