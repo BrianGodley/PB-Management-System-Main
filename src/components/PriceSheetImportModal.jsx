@@ -490,13 +490,13 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                         ? ((r.unit_price - r.current) / r.current) * 100
                         : null
                     return (
-                      <tr key={i}>
+                      <tr key={i} className={r.reviewed ? 'bg-green-50' : 'bg-amber-50'}>
                         <td className="px-2 py-1.5">
                           <div className="flex items-start gap-1">
                             <button
                               onClick={() => setExcluded(s => new Set(s).add(i))}
                               title="Remove from this batch (back to unaccounted)"
-                              className="text-gray-300 hover:text-red-500 leading-none mt-0.5"
+                              className="text-gray-400 hover:text-red-500 leading-none mt-0.5"
                             >
                               ✕
                             </button>
@@ -509,7 +509,7 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                         <td className="px-2 py-1.5">
                           <input
                             value={r.unit || ''}
-                            onChange={e => setRow(i, { unit: e.target.value })}
+                            onChange={e => setRow(i, { unit: e.target.value, reviewed: true })}
                             list="ps-units"
                             className="border border-gray-200 rounded px-1.5 py-1 w-24"
                           />
@@ -521,27 +521,24 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                           {delta == null ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(0)}%`}
                         </td>
                         <td className="px-2 py-1.5">
-                          <div className="flex items-center gap-1">
-                            <select value={r.action} onChange={e => setRow(i, { action: e.target.value })} className="border border-gray-200 rounded px-1.5 py-1 bg-white">
-                              <option value="unchanged">Unchanged</option>
-                              {r.matchId && <option value="update">Update</option>}
-                              <option value="add">Add new</option>
-                            </select>
-                            {!r.reviewed && <span title="Not yet accounted for" className="text-amber-500">●</span>}
-                          </div>
+                          <select value={r.action} onChange={e => setRow(i, { action: e.target.value, reviewed: true })} className="border border-gray-200 rounded px-1.5 py-1 bg-white">
+                            <option value="unchanged">Unchanged</option>
+                            {r.matchId && <option value="update">Update</option>}
+                            <option value="add">Add new</option>
+                          </select>
                         </td>
                         <td className="px-2 py-1.5">
                           {r.action === 'add' ? (
                             <div className="flex flex-col gap-1">
                               <input
                                 value={r.category}
-                                onChange={e => setRow(i, { category: e.target.value })}
+                                onChange={e => setRow(i, { category: e.target.value, reviewed: true })}
                                 placeholder="Category (e.g. Ground Treatments)"
                                 className="border border-gray-200 rounded px-1.5 py-1 w-48"
                               />
                               <input
                                 value={r.sub_category}
-                                onChange={e => setRow(i, { sub_category: e.target.value })}
+                                onChange={e => setRow(i, { sub_category: e.target.value, reviewed: true })}
                                 placeholder="Sub category (optional)"
                                 className="border border-gray-200 rounded px-1.5 py-1 w-48"
                               />
