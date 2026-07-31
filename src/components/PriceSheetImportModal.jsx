@@ -448,7 +448,14 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                   <span className="font-bold text-gray-800">Step 3 · Commit</span>
                   <span className="text-gray-600">Mark these {rows.filter((r, i) => inBatch(r, i)).length} item(s) as accounted for.</span>
                   <button
-                    onClick={() => { applyToVisible({ reviewed: true }); setExcluded(new Set()) }}
+                    onClick={() => {
+                      applyToVisible({ reviewed: true })
+                      setExcluded(new Set())
+                      // Return to the shrinking "still to review" list.
+                      const next = { text: '', price: '', status: 'unaccounted' }
+                      setFilterDraft(next)
+                      setFilter(next)
+                    }}
                     className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 font-semibold"
                   >
                     Commit batch
