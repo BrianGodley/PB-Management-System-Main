@@ -9,9 +9,21 @@ import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Finishes Module — Flatwork, Wall Caps, Wall Finishes
-// Covers: tile, brick, flagstone, porcelain flatwork finishes; wall caps;
-// wall finishes (stucco, veneer, tile, stone)
+//
+// Each of the three sections is an add/remove ROW table with a Vendor column +
+// an Item (type) column. The Item dropdown is ALWAYS the section's fixed type
+// list — the type drives the pricing/labor FORMULA. The Vendor only changes
+// where the MATERIAL price comes from (House named-rate fallback vs. a vendor's
+// material_rates row). Every coverage / geometry / labor formula is preserved
+// exactly from the original calc — the Vendor selection feeds a different
+// material $ into the same math.
+//
+// In-House and Subcontractor are independent calculators (makeTab / ihTab /
+// subTab). The Sub tab prices each row at a flat $/unit with NO labor hours and
+// routes the itemized cost into subCost (GpmdBar's 'sub' variant).
 // ─────────────────────────────────────────────────────────────────────────────
+
+const FINISHES_CATEGORY = 'Finishes'
 
 const FINISHES_RATES = {
   // ── Flatwork material costs ────────────────────────────────────────────────
@@ -57,177 +69,242 @@ const DEFAULTS = {
 }
 
 const n = v => parseFloat(v) || 0
+const r2 = x => Math.round(((x || 0) + Number.EPSILON) * 100) / 100
 
-const DEFAULT_MANUAL_ROWS = [
-  { label: 'Misc 1', hours: '', materials: '', subCost: '' },
-  { label: 'Misc 2', hours: '', materials: '', subCost: '' },
-  { label: 'Misc 3', hours: '', materials: '', subCost: '' },
-]
-
-const DEFAULT_CAP_ROWS = [
-  { type: 'None', widthIn: '', lf: '', qty: '' },
-  { type: 'None', widthIn: '', lf: '', qty: '' },
-]
-
+// ── Fixed per-section type lists (the Item dropdown; NOT from the DB) ─────────
+const FLAT_TYPES = ['Tile', 'Brick', 'Flagstone', 'Porcelain']
 const CAP_TYPES = ['None', 'Flagstone', 'Precast', 'PIP Concrete', 'Bullnose Brick']
+const WALL_FINISH_TYPES = [
+  'Sand Stucco',
+  'Smooth Stucco',
+  'Ledgerstone',
+  'Stacked Stone',
+  'Tile',
+  'Real Flagstone',
+  'Real Stone',
+]
+
+// Per-type rate metadata: which FINISHES_RATES material + labor key each type
+// uses, its display unit, and whether it carries an editable $/ton override.
+const FLAT_META = {
+  Tile: { matKey: 'flatTile', labKey: 'flatTileLab', matUnit: 'SF', labUnit: 'hrs/SF' },
+  Brick: { matKey: 'flatBrick', labKey: 'flatBrickLab', matUnit: 'brick', labUnit: 'hrs/SF' },
+  Flagstone: {
+    matKey: 'flatFlagstone',
+    labKey: 'flatFlagstoneLab',
+    matUnit: 'ton',
+    labUnit: 'hrs/SF',
+    override: true,
+  },
+  Porcelain: { matKey: 'flatPorcelain', labKey: 'flatPorcelainLab', matUnit: 'SF', labUnit: 'hrs/SF' },
+}
+const WALL_META = {
+  'Sand Stucco': { matKey: 'sandStucco', labKey: 'sandStuccoLab', matUnit: 'SF', labUnit: 'SF/day' },
+  'Smooth Stucco': { matKey: 'smoothStucco', labKey: 'smoothStuccoLab', matUnit: 'SF', labUnit: 'SF/day' },
+  Ledgerstone: { matKey: 'ledgerstone', labKey: 'ledgerstoneLab', matUnit: 'SF', labUnit: 'SF/day' },
+  'Stacked Stone': { matKey: 'stackedStone', labKey: 'stackedStoneLab', matUnit: 'SF', labUnit: 'SF/day' },
+  Tile: { matKey: 'tile', labKey: 'tileLab', matUnit: 'SF', labUnit: 'hrs/SF' },
+  'Real Flagstone': {
+    matKey: 'realFlagstone',
+    labKey: 'flagstoneLab',
+    matUnit: 'ton',
+    labUnit: 'hrs/SF',
+    override: true,
+  },
+  'Real Stone': {
+    matKey: 'realStone',
+    labKey: 'realStoneLab',
+    matUnit: 'ton',
+    labUnit: 'hrs/SF',
+    override: true,
+  },
+}
+const CAP_META = {
+  Flagstone: { matKey: 'capFlagstone', matUnit: 'ton' },
+  Precast: { matKey: 'capPrecast', matUnit: 'ea' },
+  'PIP Concrete': { matKey: 'concreteTruck', matUnit: 'CY' },
+  'Bullnose Brick': { matKey: 'capBullnose', matUnit: 'LF' },
+}
+
+// ── Vendor-catalog material price ─────────────────────────────────────────────
+// The ONLY thing the Vendor selection changes: the material $ source.
+// If a real vendor is selected AND a material_rates row exists whose name===dbName
+// and vendor_id===vendorId, use that row's unit_cost. Otherwise fall back to the
+// House price (name-keyed materialPrices[dbName]) and finally the hard fallback.
+function finishMatPrice(dbName, vendorId, materialRows, mp, fallback) {
+  if (vendorId && vendorId !== 'House') {
+    const row = (materialRows || []).find(r => r.name === dbName && r.vendor_id === vendorId)
+    if (row && row.unit_cost != null && row.unit_cost !== '') return n(row.unit_cost)
+  }
+  return mp?.[dbName] ?? fallback
+}
+
+// ── Per-row calculators — identical formulas to the original calcFinishes, just
+//    fed the vendor-resolved material price. Each returns { mat, hrs, subUnit,
+//    subEach, subMat, tons, unit }. subUnit is the flat $/unit default used on
+//    the Sub tab; subMat = quantity × the (editable) flat price. ───────────────
+function computeFlatRow(row, mp, materialRows) {
+  const sf = n(row.sf)
+  const v = row.vendor
+  const price = k => finishMatPrice(FINISHES_RATES[k].db, v, materialRows, mp, FINISHES_RATES[k].fb)
+  const lab = k => mp?.[FINISHES_RATES[k].db] ?? FINISHES_RATES[k].fb
+  let mat = 0,
+    hrs = 0,
+    subUnit = 0,
+    tons = 0
+  switch (row.type) {
+    case 'Tile':
+      mat = sf * price('flatTile')
+      hrs = sf > 0 ? sf * lab('flatTileLab') : 0
+      subUnit = price('flatTile')
+      break
+    case 'Brick':
+      mat = sf * 2 * price('flatBrick')
+      hrs = sf > 0 ? sf * lab('flatBrickLab') : 0
+      subUnit = 2 * price('flatBrick')
+      break
+    case 'Flagstone': {
+      const rate = n(row.rateIn) || price('flatFlagstone')
+      mat = sf > 0 ? (sf / 80) * rate : 0
+      hrs = sf > 0 ? sf * lab('flatFlagstoneLab') : 0
+      subUnit = rate / 80
+      tons = sf / 80
+      break
+    }
+    case 'Porcelain':
+      mat = sf * price('flatPorcelain')
+      hrs = sf > 0 ? sf * lab('flatPorcelainLab') : 0
+      subUnit = price('flatPorcelain')
+      break
+    default:
+      break
+  }
+  const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : subUnit
+  return { mat, hrs, subUnit, subEach, subMat: sf * subEach, tons, unit: 'SF' }
+}
+
+function computeCapRow(row, mp, materialRows) {
+  const lf = n(row.lf),
+    widthIn = n(row.widthIn),
+    qty = n(row.qty)
+  const v = row.vendor
+  const price = k => finishMatPrice(FINISHES_RATES[k].db, v, materialRows, mp, FINISHES_RATES[k].fb)
+  let mat = 0,
+    hrs = 0,
+    subUnit = 0,
+    subQty = 0,
+    unit = 'LF'
+  switch (row.type) {
+    case 'Flagstone':
+      mat = (((widthIn / 12) * lf * 0.0833 * 100) / 2000) * price('capFlagstone')
+      hrs = lf * 0.25
+      subUnit = (((widthIn / 12) * 0.0833 * 100) / 2000) * price('capFlagstone')
+      subQty = lf
+      break
+    case 'Precast':
+      mat = qty * price('capPrecast')
+      hrs = qty * 0.2
+      subUnit = price('capPrecast')
+      subQty = qty
+      unit = 'Qty'
+      break
+    case 'PIP Concrete':
+      mat = ((lf * (widthIn / 12) * 0.333) / 27) * price('concreteTruck')
+      hrs = lf * 0.15
+      subUnit = (((widthIn / 12) * 0.333) / 27) * price('concreteTruck')
+      subQty = lf
+      break
+    case 'Bullnose Brick':
+      mat = lf * price('capBullnose')
+      hrs = lf * 0.08
+      subUnit = price('capBullnose')
+      subQty = lf
+      break
+    default:
+      break
+  }
+  const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : subUnit
+  return { mat, hrs, subUnit, subEach, subMat: subQty * subEach, unit, lf, qty, widthIn }
+}
+
+function computeWallRow(row, mp, materialRows) {
+  const sf = n(row.sf)
+  const v = row.vendor
+  const price = k => finishMatPrice(FINISHES_RATES[k].db, v, materialRows, mp, FINISHES_RATES[k].fb)
+  const lab = k => mp?.[FINISHES_RATES[k].db] ?? FINISHES_RATES[k].fb
+  let mat = 0,
+    hrs = 0,
+    subUnit = 0,
+    tons = 0
+  switch (row.type) {
+    case 'Sand Stucco':
+      hrs = sf > 0 ? (sf / lab('sandStuccoLab')) * 8 : 0
+      mat = sf * price('sandStucco')
+      subUnit = price('sandStucco')
+      break
+    case 'Smooth Stucco':
+      hrs = sf > 0 ? (sf / lab('smoothStuccoLab')) * 8 : 0
+      mat = sf * price('smoothStucco')
+      subUnit = price('smoothStucco')
+      break
+    case 'Ledgerstone':
+      hrs = sf > 0 ? (sf / lab('ledgerstoneLab')) * 8 : 0
+      mat = sf > 0 ? sf * price('ledgerstone') * 1.1 + (sf / 5) * 2 : 0
+      subUnit = price('ledgerstone') * 1.1 + 0.4 // (sf/5)*2 per SF = 0.4
+      break
+    case 'Stacked Stone':
+      hrs = sf > 0 ? (sf / lab('stackedStoneLab')) * 8 : 0
+      mat = sf > 0 ? sf * price('stackedStone') * 1.1 + (sf / 5) * 2 : 0
+      subUnit = price('stackedStone') * 1.1 + 0.4
+      break
+    case 'Tile':
+      hrs = sf > 0 ? sf * lab('tileLab') : 0
+      mat = sf > 0 ? sf * price('tile') + sf : 0 // +$1/SF adhesive/grout
+      subUnit = price('tile') + 1
+      break
+    case 'Real Flagstone': {
+      const rate = n(row.rateIn) || price('realFlagstone')
+      hrs = sf > 0 ? sf * lab('flagstoneLab') : 0
+      mat = sf > 0 ? (sf / 80) * rate : 0
+      subUnit = rate / 80
+      tons = sf / 80
+      break
+    }
+    case 'Real Stone': {
+      const rate = n(row.rateIn) || price('realStone')
+      hrs = sf > 0 ? sf * lab('realStoneLab') : 0
+      mat = sf > 0 ? (sf / 70) * rate : 0
+      subUnit = rate / 70
+      tons = sf / 70
+      break
+    }
+    default:
+      break
+  }
+  const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : subUnit
+  return { mat, hrs, subUnit, subEach, subMat: sf * subEach, tons, unit: 'SF' }
+}
 
 // ── Calculation engine ────────────────────────────────────────────────────────
+// In-House: coverage/geometry material + labor hours (all preserved exactly).
+// Sub: flat $/unit per row, NO labor hours, routed into subCost.
 function calcFinishes(
   state,
   lrph = DEFAULTS.laborRatePerHour,
   mp = {},
   gpmd = DEFAULTS.gpmd,
   walkAccess = null,
-  laborBurdenPct = DEFAULTS.laborBurdenPct
+  laborBurdenPct = DEFAULTS.laborBurdenPct,
+  materialRows = []
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
-  const {
-    difficulty,
-    hoursAdj,
-    tileFlatSF,
-    brickFlatSF,
-    flagstoneFlatSF,
-    flagstoneFlatRateIn,
-    porcelainFlatSF,
-    capRows,
-    sandStuccoSF,
-    smoothStuccoSF,
-    ledgerstoneSF,
-    stackedStoneSF,
-    tileSF,
-    wallFlagstoneSF,
-    wallFlagstoneRateIn,
-    realStoneSF,
-    realStoneRateIn,
-    manualRows,
-  } = state
+  const { difficulty, hoursAdj, flatworkRows, capRows, wallFinishRows, manualRows } = state
+  const isSubTab = state.subType === 'Subcontractor'
 
-  const p = db => mp[db] ?? undefined
-
-  // ── Flatwork hours ───────────────────────────────────────────────────────
-  const tileFlatHrs =
-    n(tileFlatSF) > 0
-      ? n(tileFlatSF) * (p(FINISHES_RATES.flatTileLab.db) ?? FINISHES_RATES.flatTileLab.fb)
-      : 0
-  const brickFlatHrs =
-    n(brickFlatSF) > 0
-      ? n(brickFlatSF) * (p(FINISHES_RATES.flatBrickLab.db) ?? FINISHES_RATES.flatBrickLab.fb)
-      : 0
-  const flagstoneFlatHrs =
-    n(flagstoneFlatSF) > 0
-      ? n(flagstoneFlatSF) *
-        (p(FINISHES_RATES.flatFlagstoneLab.db) ?? FINISHES_RATES.flatFlagstoneLab.fb)
-      : 0
-  const porcelainFlatHrs =
-    n(porcelainFlatSF) > 0
-      ? n(porcelainFlatSF) *
-        (p(FINISHES_RATES.flatPorcelainLab.db) ?? FINISHES_RATES.flatPorcelainLab.fb)
-      : 0
-
-  // ── Flatwork materials ───────────────────────────────────────────────────
-  const tileFlatMat = n(tileFlatSF) * (p(FINISHES_RATES.flatTile.db) ?? FINISHES_RATES.flatTile.fb)
-  const brickFlatMat =
-    n(brickFlatSF) * 2 * (p(FINISHES_RATES.flatBrick.db) ?? FINISHES_RATES.flatBrick.fb)
-  const flagstoneFlatRate =
-    n(flagstoneFlatRateIn) ||
-    (p(FINISHES_RATES.flatFlagstone.db) ?? FINISHES_RATES.flatFlagstone.fb)
-  const flagstoneFlatMat =
-    n(flagstoneFlatSF) > 0 ? (n(flagstoneFlatSF) / 80) * flagstoneFlatRate : 0
-  const porcelainFlatMat =
-    n(porcelainFlatSF) * (p(FINISHES_RATES.flatPorcelain.db) ?? FINISHES_RATES.flatPorcelain.fb)
-
-  // ── Wall Caps ──────────────────────────────────────────────────────────
-  let capHrs = 0,
-    capMat = 0
-  ;(capRows || []).forEach(cap => {
-    const lf = n(cap.lf),
-      widthIn = n(cap.widthIn),
-      qty = n(cap.qty)
-    if (cap.type === 'Flagstone') {
-      capMat +=
-        (((widthIn / 12) * lf * 0.0833 * 100) / 2000) *
-        (p(FINISHES_RATES.capFlagstone.db) ?? FINISHES_RATES.capFlagstone.fb)
-      capHrs += lf * 0.25
-    } else if (cap.type === 'Precast') {
-      capMat += qty * (p(FINISHES_RATES.capPrecast.db) ?? FINISHES_RATES.capPrecast.fb)
-      capHrs += qty * 0.2
-    } else if (cap.type === 'PIP Concrete') {
-      capMat +=
-        ((lf * (widthIn / 12) * 0.333) / 27) *
-        (p(FINISHES_RATES.concreteTruck.db) ?? FINISHES_RATES.concreteTruck.fb)
-      capHrs += lf * 0.15
-    } else if (cap.type === 'Bullnose Brick') {
-      capMat += lf * (p(FINISHES_RATES.capBullnose.db) ?? FINISHES_RATES.capBullnose.fb)
-      capHrs += lf * 0.08
-    }
-  })
-
-  // ── Wall Finishes ─────────────────────────────────────────────────────
-  const sandStuccoHrs =
-    n(sandStuccoSF) > 0
-      ? (n(sandStuccoSF) /
-          (p(FINISHES_RATES.sandStuccoLab.db) ?? FINISHES_RATES.sandStuccoLab.fb)) *
-        8
-      : 0
-  const smoothStuccoHrs =
-    n(smoothStuccoSF) > 0
-      ? (n(smoothStuccoSF) /
-          (p(FINISHES_RATES.smoothStuccoLab.db) ?? FINISHES_RATES.smoothStuccoLab.fb)) *
-        8
-      : 0
-  const ledgerstoneHrs =
-    n(ledgerstoneSF) > 0
-      ? (n(ledgerstoneSF) /
-          (p(FINISHES_RATES.ledgerstoneLab.db) ?? FINISHES_RATES.ledgerstoneLab.fb)) *
-        8
-      : 0
-  const stackedStoneHrs =
-    n(stackedStoneSF) > 0
-      ? (n(stackedStoneSF) /
-          (p(FINISHES_RATES.stackedStoneLab.db) ?? FINISHES_RATES.stackedStoneLab.fb)) *
-        8
-      : 0
-  const tileHrs =
-    n(tileSF) > 0 ? n(tileSF) * (p(FINISHES_RATES.tileLab.db) ?? FINISHES_RATES.tileLab.fb) : 0
-  const wallFlagstoneHrs =
-    n(wallFlagstoneSF) > 0
-      ? n(wallFlagstoneSF) * (p(FINISHES_RATES.flagstoneLab.db) ?? FINISHES_RATES.flagstoneLab.fb)
-      : 0
-  const realStoneHrs =
-    n(realStoneSF) > 0
-      ? n(realStoneSF) * (p(FINISHES_RATES.realStoneLab.db) ?? FINISHES_RATES.realStoneLab.fb)
-      : 0
-
-  const sandStuccoMat =
-    n(sandStuccoSF) * (p(FINISHES_RATES.sandStucco.db) ?? FINISHES_RATES.sandStucco.fb)
-  const smoothStuccoMat =
-    n(smoothStuccoSF) * (p(FINISHES_RATES.smoothStucco.db) ?? FINISHES_RATES.smoothStucco.fb)
-  const ledgerstoneMat =
-    n(ledgerstoneSF) > 0
-      ? n(ledgerstoneSF) *
-          (p(FINISHES_RATES.ledgerstone.db) ?? FINISHES_RATES.ledgerstone.fb) *
-          1.1 +
-        (n(ledgerstoneSF) / 5) * 2
-      : 0
-  const stackedStoneMat =
-    n(stackedStoneSF) > 0
-      ? n(stackedStoneSF) *
-          (p(FINISHES_RATES.stackedStone.db) ?? FINISHES_RATES.stackedStone.fb) *
-          1.1 +
-        (n(stackedStoneSF) / 5) * 2
-      : 0
-  const tileMat =
-    n(tileSF) > 0
-      ? n(tileSF) * (p(FINISHES_RATES.tile.db) ?? FINISHES_RATES.tile.fb) + n(tileSF) // +$1/SF adhesive/grout
-      : 0
-  const wallFlagstoneRate =
-    n(wallFlagstoneRateIn) ||
-    (p(FINISHES_RATES.realFlagstone.db) ?? FINISHES_RATES.realFlagstone.fb)
-  const wallFlagStoneMat =
-    n(wallFlagstoneSF) > 0 ? (n(wallFlagstoneSF) / 80) * wallFlagstoneRate : 0
-  const realStoneRate =
-    n(realStoneRateIn) || (p(FINISHES_RATES.realStone.db) ?? FINISHES_RATES.realStone.fb)
-  const realStoneMat = n(realStoneSF) > 0 ? (n(realStoneSF) / 70) * realStoneRate : 0
+  const flat = (flatworkRows || []).map(row => computeFlatRow(row, mp, materialRows))
+  const caps = (capRows || []).map(row => computeCapRow(row, mp, materialRows))
+  const walls = (wallFinishRows || []).map(row => computeWallRow(row, mp, materialRows))
+  const sum = (arr, k) => arr.reduce((a, x) => a + (x[k] || 0), 0)
 
   // ── Manual ──────────────────────────────────────────────────────────────
   let manHrs = 0,
@@ -239,58 +316,46 @@ function calcFinishes(
     manSub += n(r.subCost)
   })
 
-  // ── Totals ──────────────────────────────────────────────────────────────
-  const baseHrs =
-    tileFlatHrs +
-    brickFlatHrs +
-    flagstoneFlatHrs +
-    porcelainFlatHrs +
-    capHrs +
-    sandStuccoHrs +
-    smoothStuccoHrs +
-    ledgerstoneHrs +
-    stackedStoneHrs +
-    tileHrs +
-    wallFlagstoneHrs +
-    realStoneHrs +
-    manHrs
-
+  // ── In-House totals ───────────────────────────────────────────────────────
+  const baseHrs = sum(flat, 'hrs') + sum(caps, 'hrs') + sum(walls, 'hrs') + manHrs
   const diffMod = 1 + n(difficulty) / 100
   const _preWalkHrs = baseHrs * diffMod + n(hoursAdj)
   const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
-  const totalHrs = _preWalkHrs + walkHrs
-  const manDays = totalHrs / 8
+  const totalHrsIH = _preWalkHrs + walkHrs
 
-  const totalMat =
-    tileFlatMat +
-    brickFlatMat +
-    flagstoneFlatMat +
-    porcelainFlatMat +
-    capMat +
-    sandStuccoMat +
-    smoothStuccoMat +
-    ledgerstoneMat +
-    stackedStoneMat +
-    tileMat +
-    wallFlagStoneMat +
-    realStoneMat +
-    manMat
+  const totalMatIH = sum(flat, 'mat') + sum(caps, 'mat') + sum(walls, 'mat') + manMat
+  const totalSubMat = sum(flat, 'subMat') + sum(caps, 'subMat') + sum(walls, 'subMat')
 
-  const laborCost = totalHrs * lrph
-  const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
-  // On the Sub tab the itemized scope's cost IS the subcontractor cost — labor +
-  // burden + material + any manual sub — and profit is the markup (Sub GP). The
-  // in-house GP model applies only to the In-House tab.
-  const isSubTab = state.subType === 'Subcontractor'
   const subMarkup = n(state.subGpMarkupRate) || 0.2
-  let gp, subCost, subGp, commission, price
+  let gp,
+    subCost,
+    subGp,
+    commission,
+    price,
+    totalHrs,
+    manDays,
+    totalMat,
+    laborCost,
+    burden
   if (isSubTab) {
+    // Sub tab: flat per-unit pricing, NO labor hours. The itemized flat cost IS
+    // the subcontractor cost; profit is the markup (Sub GP).
+    totalHrs = 0
+    manDays = 0
+    laborCost = 0
+    burden = 0
+    totalMat = totalSubMat // shown as the sub material readout
     gp = 0
-    subCost = totalMat + laborCost + burden + manSub
+    subCost = totalSubMat + manSub
     subGp = subCost * subMarkup
     commission = subGp * DEFAULTS.commissionRate
     price = subCost + subGp + commission
   } else {
+    totalHrs = totalHrsIH
+    manDays = totalHrs / 8
+    totalMat = totalMatIH
+    laborCost = totalHrs * lrph
+    burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
     gp = manDays * gpmd
     subCost = manSub
     subGp = 0
@@ -310,19 +375,9 @@ function calcFinishes(
     commission,
     subCost,
     price,
-    tileFlatMat,
-    brickFlatMat,
-    flagstoneFlatMat,
-    porcelainFlatMat,
-    capMat,
-    capHrs,
-    sandStuccoMat,
-    smoothStuccoMat,
-    ledgerstoneMat,
-    stackedStoneMat,
-    tileMat,
-    wallFlagStoneMat,
-    realStoneMat,
+    flat,
+    caps,
+    walls,
   }
 }
 
@@ -348,29 +403,35 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
   )
 }
 
+// ── Default rows / factories ──────────────────────────────────────────────────
+const blankFlatRow = () => ({ vendor: 'House', type: 'Tile', sf: '', rateIn: '', subEach: '' })
+const blankCapRow = () => ({ vendor: 'House', type: 'None', widthIn: '', lf: '', qty: '', subEach: '' })
+const blankWallRow = () => ({ vendor: 'House', type: 'Sand Stucco', sf: '', rateIn: '', subEach: '' })
+
+const DEFAULT_FLAT_ROWS = () => [blankFlatRow(), { ...blankFlatRow(), type: 'Flagstone' }]
+const DEFAULT_CAP_ROWS = () => [blankCapRow(), blankCapRow()]
+const DEFAULT_WALL_ROWS = () => [blankWallRow(), { ...blankWallRow(), type: 'Ledgerstone' }]
+
+const DEFAULT_MANUAL_ROWS = [
+  { label: 'Misc 1', hours: '', materials: '', subCost: '' },
+  { label: 'Misc 2', hours: '', materials: '', subCost: '' },
+  { label: 'Misc 3', hours: '', materials: '', subCost: '' },
+]
+
 // Per-tab input record. In-House and Sub each hold their own independent copy so
-// the two tabs are separate calculators.
+// the two tabs are separate calculators. Legacy flat saves (no *Rows arrays)
+// fall back to fresh defaults so nothing crashes.
 function makeTab(src = {}) {
   return {
     difficulty: src.difficulty ?? '',
     hoursAdj: src.hoursAdj ?? '',
     distanceLF: src.distanceLF ?? '',
-    tileFlatSF: src.tileFlatSF ?? '',
-    brickFlatSF: src.brickFlatSF ?? '',
-    flagstoneFlatSF: src.flagstoneFlatSF ?? '',
-    flagstoneFlatRateIn: src.flagstoneFlatRateIn ?? '',
-    porcelainFlatSF: src.porcelainFlatSF ?? '',
-    capRows: src.capRows ?? DEFAULT_CAP_ROWS.map(r => ({ ...r })),
-    sandStuccoSF: src.sandStuccoSF ?? '',
-    smoothStuccoSF: src.smoothStuccoSF ?? '',
-    ledgerstoneSF: src.ledgerstoneSF ?? '',
-    stackedStoneSF: src.stackedStoneSF ?? '',
-    tileSF: src.tileSF ?? '',
-    wallFlagstoneSF: src.wallFlagstoneSF ?? '',
-    wallFlagstoneRateIn: src.wallFlagstoneRateIn ?? '',
-    realStoneSF: src.realStoneSF ?? '',
-    realStoneRateIn: src.realStoneRateIn ?? '',
-    manualRows: src.manualRows ?? DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
+    flatworkRows: src.flatworkRows ? src.flatworkRows.map(r => ({ ...r })) : DEFAULT_FLAT_ROWS(),
+    capRows: src.capRows ? src.capRows.map(r => ({ ...r })) : DEFAULT_CAP_ROWS(),
+    wallFinishRows: src.wallFinishRows
+      ? src.wallFinishRows.map(r => ({ ...r }))
+      : DEFAULT_WALL_ROWS(),
+    manualRows: src.manualRows ? src.manualRows.map(r => ({ ...r })) : DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
   }
 }
 
@@ -392,14 +453,29 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
       paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
     }
   )
-  const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
-  const [pricesLoading, setPricesLoading] = useState(!initialData?.materialPrices)
 
-  // Re-fetch Finishes merged labor+material map. Used on mount and after edits.
+  // Name-keyed House material + labor rate map (House fallback + labor rates).
+  const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
+  // Full Finishes material_rates catalog (id/name/vendor_id/unit/unit_cost) used
+  // to resolve a vendor's material price. Plus the vendor list for the pickers.
+  const [materialRows, setMaterialRows] = useState(initialData?.materialRows || [])
+  const [vendors, setVendors] = useState([])
+  const [pricesLoading, setPricesLoading] = useState(true)
+
+  // Re-fetch the Finishes rate map + vendor catalog. Used on mount + after edits.
   const refreshAllRates = useCallback(async () => {
-    const [matRes, labRes] = await Promise.all([
-      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Finishes'),
-      supabase.from('labor_rates').select('name, rate').eq('category', 'Finishes'),
+    const [matRes, labRes, catRes, venRes] = await Promise.all([
+      supabase.from('material_rates').select('name, unit_cost').eq('category', FINISHES_CATEGORY),
+      supabase.from('labor_rates').select('name, rate').eq('category', FINISHES_CATEGORY),
+      supabase
+        .from('material_rates')
+        .select('id,name,vendor_id,unit,unit_cost')
+        .eq('category', FINISHES_CATEGORY),
+      supabase
+        .from('subs_vendors')
+        .select('id, company_name, supplied_categories')
+        .eq('type', 'vendor')
+        .order('company_name'),
     ])
     const prices = {}
     ;(matRes.data || []).forEach(r => {
@@ -409,6 +485,14 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
       prices[r.name] = parseFloat(r.rate) || 0
     })
     setMaterialPrices(prices)
+    setMaterialRows(catRes.data || [])
+    setVendors(
+      (venRes.data || []).map(v => ({
+        id: v.id,
+        name: v.company_name,
+        categories: v.supplied_categories || [],
+      }))
+    )
   }, [])
 
   useEffect(() => {
@@ -421,8 +505,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
           if (!data) return
           if (data.labor_rate_per_hour != null)
             setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
-          if (data.labor_burden_pct != null)
-            setLaborBurdenPct(parseFloat(data.labor_burden_pct))
+          if (data.labor_burden_pct != null) setLaborBurdenPct(parseFloat(data.labor_burden_pct))
           if (data.walk_access_pace_lf_per_min != null) {
             const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
             setWalkAccess({
@@ -434,7 +517,6 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
           }
         })
     }
-    if (initialData?.materialPrices) return
     refreshAllRates().then(() => setPricesLoading(false))
   }, [refreshAllRates])
 
@@ -450,57 +532,27 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
   const isSub = subType === 'Subcontractor'
   const cur = isSub ? subTab : ihTab
   const setCur = isSub ? setSubTab : setIhTab
-  // A single setter factory: accepts a value (scalar fields) or an updater fn (row arrays).
   const setField = k => v =>
     setCur(prev => ({ ...prev, [k]: typeof v === 'function' ? v(prev[k]) : v }))
-  // Derived active-tab field accessors — render bindings stay unchanged.
+
+  // Derived active-tab accessors.
   const difficulty = cur.difficulty
   const setDifficulty = setField('difficulty')
   const hoursAdj = cur.hoursAdj
   const setHoursAdj = setField('hoursAdj')
   const distanceLF = cur.distanceLF
   const setDistanceLF = setField('distanceLF')
-  // Flatwork
-  const tileFlatSF = cur.tileFlatSF
-  const setTileFlatSF = setField('tileFlatSF')
-  const brickFlatSF = cur.brickFlatSF
-  const setBrickFlatSF = setField('brickFlatSF')
-  const flagstoneFlatSF = cur.flagstoneFlatSF
-  const setFlagstoneFlatSF = setField('flagstoneFlatSF')
-  const flagstoneFlatRateIn = cur.flagstoneFlatRateIn
-  const setFlagstoneFlatRateIn = setField('flagstoneFlatRateIn')
-  const porcelainFlatSF = cur.porcelainFlatSF
-  const setPorcelainFlatSF = setField('porcelainFlatSF')
-  // Wall Caps
+  const flatworkRows = cur.flatworkRows
+  const setFlatworkRows = setField('flatworkRows')
   const capRows = cur.capRows
   const setCapRows = setField('capRows')
-  // Wall Finishes
-  const sandStuccoSF = cur.sandStuccoSF
-  const setSandStuccoSF = setField('sandStuccoSF')
-  const smoothStuccoSF = cur.smoothStuccoSF
-  const setSmoothStuccoSF = setField('smoothStuccoSF')
-  const ledgerstoneSF = cur.ledgerstoneSF
-  const setLedgerstoneSF = setField('ledgerstoneSF')
-  const stackedStoneSF = cur.stackedStoneSF
-  const setStackedStoneSF = setField('stackedStoneSF')
-  const tileSF = cur.tileSF
-  const setTileSF = setField('tileSF')
-  const wallFlagstoneSF = cur.wallFlagstoneSF
-  const setWallFlagstoneSF = setField('wallFlagstoneSF')
-  const wallFlagstoneRateIn = cur.wallFlagstoneRateIn
-  const setWallFlagstoneRateIn = setField('wallFlagstoneRateIn')
-  const realStoneSF = cur.realStoneSF
-  const setRealStoneSF = setField('realStoneSF')
-  const realStoneRateIn = cur.realStoneRateIn
-  const setRealStoneRateIn = setField('realStoneRateIn')
-  // Manual
+  const wallFinishRows = cur.wallFinishRows
+  const setWallFinishRows = setField('wallFinishRows')
   const manualRows = cur.manualRows
   const setManualRows = setField('manualRows')
 
   // ── Sales tax — applied to totalMat across every module so the bid
-  //    reflects supplier-invoiced material cost. Sourced from
-  //    company_settings.sales_tax_rate via fetchSalesTaxRate(). Default
-  //    0 (no tax) until the admin sets it in Opportunities → Settings.
+  //    reflects supplier-invoiced material cost. ────────────────────────────
   const [salesTaxRate, setSalesTaxRate] = useState(0)
   useEffect(() => {
     let alive = true
@@ -512,36 +564,6 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
     }
   }, [])
 
-  // Pre-fill editable stone rates once DB prices load — independently for each tab.
-  useEffect(() => {
-    if (Object.keys(materialPrices).length === 0) return
-    const fill = setTab =>
-      setTab(prev => {
-        let next = prev
-        if (!prev.flagstoneFlatRateIn && materialPrices[FINISHES_RATES.flatFlagstone.db]) {
-          next = {
-            ...next,
-            flagstoneFlatRateIn: materialPrices[FINISHES_RATES.flatFlagstone.db].toString(),
-          }
-        }
-        if (!prev.wallFlagstoneRateIn && materialPrices[FINISHES_RATES.realFlagstone.db]) {
-          next = {
-            ...next,
-            wallFlagstoneRateIn: materialPrices[FINISHES_RATES.realFlagstone.db].toString(),
-          }
-        }
-        if (!prev.realStoneRateIn && materialPrices[FINISHES_RATES.realStone.db]) {
-          next = {
-            ...next,
-            realStoneRateIn: materialPrices[FINISHES_RATES.realStone.db].toString(),
-          }
-        }
-        return next
-      })
-    fill(setIhTab)
-    fill(setSubTab)
-  }, [materialPrices])
-
   // Active tab drives the calc — the other tab stays untouched.
   const state = { crewType, subType, subGpMarkupRate, ...cur }
   const calcRaw = calcFinishes(
@@ -550,12 +572,9 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
     materialPrices,
     gpmd,
     walkAccess,
-    laborBurdenPct
+    laborBurdenPct,
+    materialRows
   )
-  // Apply company sales tax to the module's total material cost so the
-  // estimate price matches what suppliers actually invoice. Stored
-  // material_cost (saved with the module) ends up tax-inclusive too,
-  // so bid totals add up to GpmdBar's displayed price.
   const _salesTaxAmt = (calcRaw.totalMat || 0) * (salesTaxRate || 0)
   const calc =
     _salesTaxAmt > 0
@@ -568,14 +587,34 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
       : calcRaw
 
   const p = db => materialPrices[db] ?? undefined
+  const finishMat = (matKey, vendor) =>
+    finishMatPrice(FINISHES_RATES[matKey].db, vendor, materialRows, materialPrices, FINISHES_RATES[matKey].fb)
+
+  // ── Vendor / row helpers ──────────────────────────────────────────────────
+  const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
+  const vendorOptions = [
+    { value: 'House', label: 'House' },
+    ...vendorsForCategory(FINISHES_CATEGORY).map(v => ({ value: v.id, label: v.name })),
+  ]
 
   function updateManual(i, field, val) {
     setManualRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
 
-  function updateCap(i, field, val) {
-    setCapRows(rows => rows.map((row, idx) => (idx === i ? { ...row, [field]: val } : row)))
+  // patch one row; when recompute, refresh the Sub flat default off the new inputs.
+  function patchRow(setRows, i, patch, compute, recompute) {
+    setRows(rows =>
+      rows.map((r, idx) => {
+        if (idx !== i) return r
+        const next = { ...r, ...patch }
+        if (recompute && isSub) next.subEach = String(r2(compute(next, materialPrices, materialRows).subUnit))
+        return next
+      })
+    )
   }
+  const addRow = (setRows, blank) => setRows(rows => [...rows, blank()])
+  const removeRow = (setRows, i) =>
+    setRows(rows => (rows.length > 1 ? rows.filter((_, idx) => idx !== i) : rows))
 
   function handleSave() {
     onSave({
@@ -586,14 +625,323 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
         ...state,
         ihData: ihTab,
         subData: subTab,
+        subType,
+        subGpMarkupRate,
         walkAccess,
         laborRatePerHour,
         laborBurdenPct,
         gpmd,
         materialPrices,
+        materialRows,
+        vendorNames: Object.fromEntries(vendors.map(v => [v.id, v.name])),
         calc,
       },
     })
+  }
+
+  const fmt2 = v =>
+    `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+  // ── Rate cell (material price + edit popovers + optional $/ton override) ────
+  function rateCell(row, meta, setRows, i, compute) {
+    if (!meta || !meta.matKey) return <span className="text-xs text-gray-300">—</span>
+    const isHouse = !row.vendor || row.vendor === 'House'
+    return (
+      <div className="flex items-center gap-1 flex-wrap">
+        {meta.override ? (
+          <div className="relative w-24">
+            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+            <input
+              type="number"
+              step="any"
+              className="input text-sm py-1.5 pl-5 w-full"
+              placeholder={finishMat(meta.matKey, row.vendor).toString()}
+              value={row.rateIn ?? ''}
+              onChange={e => patchRow(setRows, i, { rateIn: e.target.value }, compute, true)}
+            />
+          </div>
+        ) : (
+          <span className="text-xs text-gray-400">
+            ${finishMat(meta.matKey, row.vendor).toFixed(2)}/{meta.matUnit}
+          </span>
+        )}
+        {isHouse && (
+          <RateEditPopover
+            table="material_rates"
+            name={FINISHES_RATES[meta.matKey].db}
+            category="Finishes"
+            unitLabel={meta.matUnit}
+            currentValue={p(FINISHES_RATES[meta.matKey].db) ?? FINISHES_RATES[meta.matKey].fb}
+            onSaved={refreshAllRates}
+          />
+        )}
+        {isHouse && meta.labKey && (
+          <RateEditPopover
+            table="labor_rates"
+            name={FINISHES_RATES[meta.labKey].db}
+            category="Finishes"
+            mode="coefficient"
+            unitLabel={meta.labUnit || 'rate'}
+            currentValue={p(FINISHES_RATES[meta.labKey].db) ?? FINISHES_RATES[meta.labKey].fb}
+            onSaved={refreshAllRates}
+          />
+        )}
+      </div>
+    )
+  }
+
+  // ── SF-based section renderer (Flatwork + Wall Finishes) ───────────────────
+  function renderSfSection(title, rows, setRows, TYPES, META, compute, blank) {
+    return (
+      <div>
+        <SectionHeader title={title} />
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-2 font-medium w-40">Vendor</th>
+                <th className="text-left pb-1 pr-2 font-medium w-36">Item</th>
+                <th className="text-left pb-1 pr-2 font-medium w-24">SF</th>
+                <th className="text-left pb-1 pr-2 font-medium">Rate</th>
+                <th className="text-right pb-1 pr-2 font-medium text-gray-400 w-24">
+                  {isSub ? 'Flat $/unit' : 'Labor hrs'}
+                </th>
+                <th className="text-right pb-1 pr-2 font-medium text-gray-400 w-24">Material $</th>
+                <th className="w-6" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => {
+                const c = compute(row, materialPrices, materialRows)
+                const meta = META[row.type] || {}
+                return (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1.5 pr-2">
+                      <select
+                        className="input text-sm py-1 w-full"
+                        value={row.vendor || 'House'}
+                        onChange={e =>
+                          patchRow(setRows, i, { vendor: e.target.value }, compute, true)
+                        }
+                      >
+                        {vendorOptions.map(o => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1.5 pr-2">
+                      <select
+                        className="input text-sm py-1 w-full"
+                        value={row.type}
+                        onChange={e =>
+                          patchRow(setRows, i, { type: e.target.value }, compute, true)
+                        }
+                      >
+                        {TYPES.map(t => (
+                          <option key={t}>{t}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1.5 pr-2">
+                      <NumInput
+                        value={row.sf}
+                        onChange={v => patchRow(setRows, i, { sf: v }, compute, false)}
+                        className="w-24"
+                      />
+                    </td>
+                    <td className="py-1.5 pr-2">{rateCell(row, meta, setRows, i, compute)}</td>
+                    <td className="py-1.5 text-right text-xs pr-2">
+                      {isSub ? (
+                        <input
+                          type="number"
+                          step="any"
+                          className="input text-sm py-1 w-24 text-right"
+                          placeholder={r2(c.subUnit).toString()}
+                          value={row.subEach ?? ''}
+                          onChange={e =>
+                            patchRow(setRows, i, { subEach: e.target.value }, compute, false)
+                          }
+                        />
+                      ) : (
+                        <span className="text-gray-400">{c.hrs > 0 ? c.hrs.toFixed(2) : '—'}</span>
+                      )}
+                    </td>
+                    <td className="py-1.5 text-right text-xs text-gray-600">
+                      {(isSub ? c.subMat : c.mat) > 0 ? (
+                        <div className="text-right">
+                          <div>{fmt2(isSub ? c.subMat : c.mat)}</div>
+                          {!isSub && c.tons > 0 && (
+                            <div className="text-gray-400">{c.tons.toFixed(2)} tons</div>
+                          )}
+                        </div>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td className="py-1.5 text-right">
+                      <button
+                        type="button"
+                        onClick={() => removeRow(setRows, i)}
+                        className="text-gray-300 hover:text-red-500 text-xs px-1"
+                        title="Remove row"
+                      >
+                        ✕
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <button
+            type="button"
+            onClick={() => addRow(setRows, blank)}
+            className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+          >
+            + Add row
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Wall Caps section renderer ─────────────────────────────────────────────
+  function renderCapSection() {
+    return (
+      <div>
+        <SectionHeader title="Wall Caps" />
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-2 font-medium w-40">Vendor</th>
+                <th className="text-left pb-1 pr-2 font-medium w-36">Item</th>
+                <th className="text-left pb-1 pr-2 font-medium w-20">Width (in)</th>
+                <th className="text-left pb-1 pr-2 font-medium w-24">LF / Qty</th>
+                <th className="text-left pb-1 pr-2 font-medium">Rate</th>
+                <th className="text-right pb-1 pr-2 font-medium text-gray-400 w-24">
+                  {isSub ? 'Flat $/unit' : 'Labor hrs'}
+                </th>
+                <th className="text-right pb-1 pr-2 font-medium text-gray-400 w-24">Material $</th>
+                <th className="w-6" />
+              </tr>
+            </thead>
+            <tbody>
+              {capRows.map((row, i) => {
+                const c = computeCapRow(row, materialPrices, materialRows)
+                const meta = CAP_META[row.type] || {}
+                const isActive = row.type !== 'None'
+                return (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1.5 pr-2">
+                      <select
+                        className="input text-sm py-1 w-full"
+                        value={row.vendor || 'House'}
+                        onChange={e =>
+                          patchRow(setCapRows, i, { vendor: e.target.value }, computeCapRow, true)
+                        }
+                      >
+                        {vendorOptions.map(o => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1.5 pr-2">
+                      <select
+                        className="input text-sm py-1 w-full"
+                        value={row.type}
+                        onChange={e =>
+                          patchRow(setCapRows, i, { type: e.target.value }, computeCapRow, true)
+                        }
+                      >
+                        {CAP_TYPES.map(t => (
+                          <option key={t}>{t}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1.5 pr-2">
+                      {isActive && row.type !== 'Precast' && (
+                        <NumInput
+                          value={row.widthIn}
+                          onChange={v => patchRow(setCapRows, i, { widthIn: v }, computeCapRow, true)}
+                          className="w-20"
+                          placeholder="4"
+                        />
+                      )}
+                    </td>
+                    <td className="py-1.5 pr-2">
+                      {isActive && (
+                        <NumInput
+                          value={row.type === 'Precast' ? row.qty : row.lf}
+                          onChange={v =>
+                            patchRow(
+                              setCapRows,
+                              i,
+                              row.type === 'Precast' ? { qty: v } : { lf: v },
+                              computeCapRow,
+                              false
+                            )
+                          }
+                          className="w-20"
+                          placeholder="0"
+                        />
+                      )}
+                    </td>
+                    <td className="py-1.5 pr-2">
+                      {isActive ? rateCell(row, meta, setCapRows, i, computeCapRow) : (
+                        <span className="text-xs text-gray-300">—</span>
+                      )}
+                    </td>
+                    <td className="py-1.5 text-right text-xs pr-2">
+                      {!isActive ? (
+                        <span className="text-gray-300">—</span>
+                      ) : isSub ? (
+                        <input
+                          type="number"
+                          step="any"
+                          className="input text-sm py-1 w-24 text-right"
+                          placeholder={r2(c.subUnit).toString()}
+                          value={row.subEach ?? ''}
+                          onChange={e =>
+                            patchRow(setCapRows, i, { subEach: e.target.value }, computeCapRow, false)
+                          }
+                        />
+                      ) : (
+                        <span className="text-gray-400">{c.hrs > 0 ? c.hrs.toFixed(2) : '—'}</span>
+                      )}
+                    </td>
+                    <td className="py-1.5 text-right text-xs text-gray-600">
+                      {(isSub ? c.subMat : c.mat) > 0 ? fmt2(isSub ? c.subMat : c.mat) : '—'}
+                    </td>
+                    <td className="py-1.5 text-right">
+                      <button
+                        type="button"
+                        onClick={() => removeRow(setCapRows, i)}
+                        className="text-gray-300 hover:text-red-500 text-xs px-1"
+                        title="Remove row"
+                      >
+                        ✕
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <button
+            type="button"
+            onClick={() => addRow(setCapRows, blankCapRow)}
+            className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+          >
+            + Add row
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -601,7 +949,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
       {/* ── Sticky GPMD bar ── */}
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
         <GpmdBar
-          variant={subType === 'Subcontractor' ? 'sub' : 'inhouse'}
+          variant={isSub ? 'sub' : 'inhouse'}
           sticky
           totalMat={calc.totalMat}
           totalHrs={calc.totalHrs}
@@ -616,7 +964,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
           price={calc.price}
           subMarkupRate={subGpMarkupRate}
         />
-            </div>
+      </div>
 
       {/* Notes — pinned in its own sticky container just below the
           GPMD bar. Plain white textarea, no card chrome. */}
@@ -649,506 +997,60 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
       )}
 
       {/* Settings — Job Site Conditions is In-House only (hidden on Sub tab) */}
-      {subType !== 'Subcontractor' && (
+      {!isSub && (
         <>
-      <SectionHeader title="Job Site Conditions" />
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
-          <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
-        </div>
-        <div>
-          <p
-            className="text-xs text-gray-500 mb-0.5"
-            title="Average Distance from Truck to Work Area"
-          >
-            Truck → Work Area (Avg LF)
-          </p>
-          <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
-          {calc.walkHrs > 0 && (
-            <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">
-              +{calc.walkHrs.toFixed(2)} hrs walk-access
-            </p>
-          )}
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
-          <NumInput value={hoursAdj} onChange={setHoursAdj} placeholder="0" />
-        </div>
-      </div>
+          <SectionHeader title="Job Site Conditions" />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
+              <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
+            </div>
+            <div>
+              <p
+                className="text-xs text-gray-500 mb-0.5"
+                title="Average Distance from Truck to Work Area"
+              >
+                Truck → Work Area (Avg LF)
+              </p>
+              <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
+              {calc.walkHrs > 0 && (
+                <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">
+                  +{calc.walkHrs.toFixed(2)} hrs walk-access
+                </p>
+              )}
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
+              <NumInput value={hoursAdj} onChange={setHoursAdj} placeholder="0" />
+            </div>
+          </div>
         </>
       )}
 
       {/* ── Flatwork Finish ── */}
-      <div>
-        <SectionHeader title="Flatwork Finish" />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-left pb-1 pr-2 font-medium">Type</th>
-                <th className="text-left pb-1 pr-2 font-medium">SF</th>
-                <th className="text-left pb-1 pr-2 font-medium">Rate</th>
-                <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                {
-                  label: 'Tile Over Slab',
-                  sf: tileFlatSF,
-                  setSf: setTileFlatSF,
-                  mat: calc.tileFlatMat,
-                  matKey: 'flatTile',
-                  labKey: 'flatTileLab',
-                  matUnit: 'SF',
-                  rateLabel: `$${(p(FINISHES_RATES.flatTile.db) ?? FINISHES_RATES.flatTile.fb).toFixed(2)}/SF`,
-                },
-                {
-                  label: 'Brick Over Slab',
-                  sf: brickFlatSF,
-                  setSf: setBrickFlatSF,
-                  mat: calc.brickFlatMat,
-                  matKey: 'flatBrick',
-                  labKey: 'flatBrickLab',
-                  matUnit: 'brick',
-                  rateLabel: `$${(p(FINISHES_RATES.flatBrick.db) ?? FINISHES_RATES.flatBrick.fb).toFixed(2)}/brick`,
-                },
-                {
-                  label: 'Porcelain Paver',
-                  sf: porcelainFlatSF,
-                  setSf: setPorcelainFlatSF,
-                  mat: calc.porcelainFlatMat,
-                  matKey: 'flatPorcelain',
-                  labKey: 'flatPorcelainLab',
-                  matUnit: 'SF',
-                  rateLabel: `$${(p(FINISHES_RATES.flatPorcelain.db) ?? FINISHES_RATES.flatPorcelain.fb).toFixed(2)}/SF`,
-                },
-              ].map(({ label, sf, setSf, mat, matKey, labKey, matUnit, rateLabel }) => (
-                <tr key={label} className="border-b border-gray-100">
-                  <td className="py-1 pr-2 text-xs text-gray-700">{label}</td>
-                  <td className="py-1 pr-2">
-                    <NumInput value={sf} onChange={setSf} />
-                  </td>
-                  <td className="py-1 pr-2 text-xs text-gray-400">
-                    <span className="inline-flex items-center gap-1 flex-wrap">
-                      {rateLabel}
-                      <RateEditPopover
-                        table="material_rates"
-                        name={FINISHES_RATES[matKey].db}
-                        category="Finishes"
-                        unitLabel={matUnit}
-                        currentValue={p(FINISHES_RATES[matKey].db) ?? FINISHES_RATES[matKey].fb}
-                        onSaved={refreshAllRates}
-                      />
-                      <RateEditPopover
-                        table="labor_rates"
-                        name={FINISHES_RATES[labKey].db}
-                        category="Finishes"
-                        mode="coefficient"
-                        unitLabel="hrs/SF"
-                        currentValue={p(FINISHES_RATES[labKey].db) ?? FINISHES_RATES[labKey].fb}
-                        onSaved={refreshAllRates}
-                      />
-                    </span>
-                  </td>
-                  <td className="py-1 text-right text-xs text-gray-600">
-                    {n(sf) > 0 ? `$${mat.toFixed(2)}` : '—'}
-                  </td>
-                </tr>
-              ))}
-
-              {/* Flagstone Flatwork — editable $/ton */}
-              <tr className="border-b border-gray-100">
-                <td className="py-1 pr-2 text-xs text-gray-700">
-                  <span className="inline-flex items-center gap-1">
-                    Flagstone Over Slab
-                    <RateEditPopover
-                      table="labor_rates"
-                      name={FINISHES_RATES.flatFlagstoneLab.db}
-                      category="Finishes"
-                      mode="coefficient"
-                      unitLabel="hrs/SF"
-                      currentValue={
-                        p(FINISHES_RATES.flatFlagstoneLab.db) ?? FINISHES_RATES.flatFlagstoneLab.fb
-                      }
-                      onSaved={refreshAllRates}
-                    />
-                  </span>
-                </td>
-                <td className="py-1 pr-2">
-                  <NumInput value={flagstoneFlatSF} onChange={setFlagstoneFlatSF} />
-                </td>
-                <td className="py-1 pr-2">
-                  <div className="flex items-center gap-1">
-                    <div className="relative w-24">
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                        $
-                      </span>
-                      <input
-                        type="number"
-                        step="any"
-                        className="input text-sm py-1.5 pl-5 w-full"
-                        placeholder={(
-                          p(FINISHES_RATES.flatFlagstone.db) ?? FINISHES_RATES.flatFlagstone.fb
-                        ).toString()}
-                        value={flagstoneFlatRateIn}
-                        onChange={e => setFlagstoneFlatRateIn(e.target.value)}
-                      />
-                    </div>
-                    <RateEditPopover
-                      table="material_rates"
-                      name={FINISHES_RATES.flatFlagstone.db}
-                      category="Finishes"
-                      unitLabel="ton"
-                      currentValue={
-                        p(FINISHES_RATES.flatFlagstone.db) ?? FINISHES_RATES.flatFlagstone.fb
-                      }
-                      onSaved={refreshAllRates}
-                    />
-                  </div>
-                </td>
-                <td className="py-1 text-right text-xs text-gray-600">
-                  {n(flagstoneFlatSF) > 0 ? (
-                    <div className="text-right">
-                      <div>${calc.flagstoneFlatMat.toFixed(2)}</div>
-                      <div className="text-gray-400">
-                        {(n(flagstoneFlatSF) / 80).toFixed(2)} tons
-                      </div>
-                    </div>
-                  ) : (
-                    '—'
-                  )}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {renderSfSection(
+        'Flatwork Finish',
+        flatworkRows,
+        setFlatworkRows,
+        FLAT_TYPES,
+        FLAT_META,
+        computeFlatRow,
+        blankFlatRow
+      )}
 
       {/* ── Wall Caps ── */}
-      <div>
-        <SectionHeader title="Wall Caps" />
-        <p className="text-xs text-gray-400 mb-1 inline-flex items-center flex-wrap gap-x-2">
-          <span className="inline-flex items-center gap-1">
-            Flagstone $
-            {(p(FINISHES_RATES.capFlagstone.db) ?? FINISHES_RATES.capFlagstone.fb).toFixed(2)}/ton
-            <RateEditPopover
-              table="material_rates"
-              name={FINISHES_RATES.capFlagstone.db}
-              category="Finishes"
-              unitLabel="ton"
-              currentValue={p(FINISHES_RATES.capFlagstone.db) ?? FINISHES_RATES.capFlagstone.fb}
-              onSaved={refreshAllRates}
-            />
-          </span>
-          ·
-          <span className="inline-flex items-center gap-1">
-            Precast ${(p(FINISHES_RATES.capPrecast.db) ?? FINISHES_RATES.capPrecast.fb).toFixed(2)}
-            /ea
-            <RateEditPopover
-              table="material_rates"
-              name={FINISHES_RATES.capPrecast.db}
-              category="Finishes"
-              unitLabel="ea"
-              currentValue={p(FINISHES_RATES.capPrecast.db) ?? FINISHES_RATES.capPrecast.fb}
-              onSaved={refreshAllRates}
-            />
-          </span>
-          ·
-          <span className="inline-flex items-center gap-1">
-            Bullnose $
-            {(p(FINISHES_RATES.capBullnose.db) ?? FINISHES_RATES.capBullnose.fb).toFixed(2)}/LF
-            <RateEditPopover
-              table="material_rates"
-              name={FINISHES_RATES.capBullnose.db}
-              category="Finishes"
-              unitLabel="LF"
-              currentValue={p(FINISHES_RATES.capBullnose.db) ?? FINISHES_RATES.capBullnose.fb}
-              onSaved={refreshAllRates}
-            />
-          </span>
-          ·
-          <span className="inline-flex items-center gap-1">
-            Concrete $
-            {(p(FINISHES_RATES.concreteTruck.db) ?? FINISHES_RATES.concreteTruck.fb).toFixed(2)}/CY
-            <RateEditPopover
-              table="material_rates"
-              name={FINISHES_RATES.concreteTruck.db}
-              category="Finishes"
-              unitLabel="CY"
-              currentValue={p(FINISHES_RATES.concreteTruck.db) ?? FINISHES_RATES.concreteTruck.fb}
-              onSaved={refreshAllRates}
-            />
-          </span>
-        </p>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-xs text-gray-500 border-b border-gray-200">
-              <th className="text-left pb-1 pr-2 font-medium">Type</th>
-              <th className="text-left pb-1 pr-2 font-medium">Width (in)</th>
-              <th className="text-left pb-1 font-medium">Lin. Ft / Qty</th>
-            </tr>
-          </thead>
-          <tbody>
-            {capRows.map((cap, i) => {
-              const isActive = cap.type !== 'None'
-              return (
-                <tr key={i} className="border-b border-gray-100">
-                  <td className="py-1 pr-2">
-                    <select
-                      className="input text-sm py-1 w-36"
-                      value={cap.type}
-                      onChange={e => updateCap(i, 'type', e.target.value)}
-                    >
-                      {CAP_TYPES.map(t => (
-                        <option key={t}>{t}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="py-1 pr-2">
-                    {isActive && cap.type !== 'Precast' && (
-                      <NumInput
-                        value={cap.widthIn}
-                        onChange={v => updateCap(i, 'widthIn', v)}
-                        className="w-20"
-                        placeholder="4"
-                      />
-                    )}
-                  </td>
-                  <td className="py-1">
-                    {isActive && (
-                      <NumInput
-                        value={cap.type === 'Precast' ? cap.qty : cap.lf}
-                        onChange={v => updateCap(i, cap.type === 'Precast' ? 'qty' : 'lf', v)}
-                        className="w-20"
-                        placeholder="0"
-                      />
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+      {renderCapSection()}
 
       {/* ── Wall Finishes ── */}
-      <div>
-        <SectionHeader title="Wall Finishes" />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-left pb-1 pr-2 font-medium">Type</th>
-                <th className="text-left pb-1 pr-2 font-medium">SF</th>
-                <th className="text-left pb-1 pr-2 font-medium">Rate</th>
-                <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                {
-                  label: 'Sand Stucco',
-                  sf: sandStuccoSF,
-                  setSf: setSandStuccoSF,
-                  mat: calc.sandStuccoMat,
-                  matKey: 'sandStucco',
-                  labKey: 'sandStuccoLab',
-                },
-                {
-                  label: 'Smooth Stucco',
-                  sf: smoothStuccoSF,
-                  setSf: setSmoothStuccoSF,
-                  mat: calc.smoothStuccoMat,
-                  matKey: 'smoothStucco',
-                  labKey: 'smoothStuccoLab',
-                },
-                {
-                  label: 'Ledgerstone Veneer',
-                  sf: ledgerstoneSF,
-                  setSf: setLedgerstoneSF,
-                  mat: calc.ledgerstoneMat,
-                  matKey: 'ledgerstone',
-                  labKey: 'ledgerstoneLab',
-                },
-                {
-                  label: 'Stacked Stone',
-                  sf: stackedStoneSF,
-                  setSf: setStackedStoneSF,
-                  mat: calc.stackedStoneMat,
-                  matKey: 'stackedStone',
-                  labKey: 'stackedStoneLab',
-                },
-                {
-                  label: 'Tile',
-                  sf: tileSF,
-                  setSf: setTileSF,
-                  mat: calc.tileMat,
-                  matKey: 'tile',
-                  labKey: 'tileLab',
-                },
-              ].map(({ label, sf, setSf, mat, matKey, labKey }) => (
-                <tr key={label} className="border-b border-gray-100">
-                  <td className="py-1 pr-2 text-xs text-gray-700">{label}</td>
-                  <td className="py-1 pr-2">
-                    <NumInput value={sf} onChange={setSf} />
-                  </td>
-                  <td className="py-1 pr-2 text-xs text-gray-400">
-                    <span className="inline-flex items-center gap-1 flex-wrap">
-                      ${(p(FINISHES_RATES[matKey].db) ?? FINISHES_RATES[matKey].fb).toFixed(2)}/SF
-                      <RateEditPopover
-                        table="material_rates"
-                        name={FINISHES_RATES[matKey].db}
-                        category="Finishes"
-                        unitLabel="SF"
-                        currentValue={p(FINISHES_RATES[matKey].db) ?? FINISHES_RATES[matKey].fb}
-                        onSaved={refreshAllRates}
-                      />
-                      <RateEditPopover
-                        table="labor_rates"
-                        name={FINISHES_RATES[labKey].db}
-                        category="Finishes"
-                        mode="coefficient"
-                        unitLabel="rate"
-                        currentValue={p(FINISHES_RATES[labKey].db) ?? FINISHES_RATES[labKey].fb}
-                        onSaved={refreshAllRates}
-                      />
-                    </span>
-                  </td>
-                  <td className="py-1 text-right text-xs text-gray-600">
-                    {n(sf) > 0 ? `$${mat.toFixed(2)}` : '—'}
-                  </td>
-                </tr>
-              ))}
-
-              {/* Real Flagstone — editable $/ton */}
-              <tr className="border-b border-gray-100">
-                <td className="py-1 pr-2 text-xs text-gray-700">
-                  <span className="inline-flex items-center gap-1">
-                    Real Flagstone
-                    <RateEditPopover
-                      table="labor_rates"
-                      name={FINISHES_RATES.flagstoneLab.db}
-                      category="Finishes"
-                      mode="coefficient"
-                      unitLabel="hrs/SF"
-                      currentValue={
-                        p(FINISHES_RATES.flagstoneLab.db) ?? FINISHES_RATES.flagstoneLab.fb
-                      }
-                      onSaved={refreshAllRates}
-                    />
-                  </span>
-                </td>
-                <td className="py-1 pr-2">
-                  <NumInput value={wallFlagstoneSF} onChange={setWallFlagstoneSF} />
-                </td>
-                <td className="py-1 pr-2">
-                  <div className="flex items-center gap-1">
-                    <div className="relative w-24">
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                        $
-                      </span>
-                      <input
-                        type="number"
-                        step="any"
-                        className="input text-sm py-1.5 pl-5 w-full"
-                        placeholder={(
-                          p(FINISHES_RATES.realFlagstone.db) ?? FINISHES_RATES.realFlagstone.fb
-                        ).toString()}
-                        value={wallFlagstoneRateIn}
-                        onChange={e => setWallFlagstoneRateIn(e.target.value)}
-                      />
-                    </div>
-                    <RateEditPopover
-                      table="material_rates"
-                      name={FINISHES_RATES.realFlagstone.db}
-                      category="Finishes"
-                      unitLabel="ton"
-                      currentValue={
-                        p(FINISHES_RATES.realFlagstone.db) ?? FINISHES_RATES.realFlagstone.fb
-                      }
-                      onSaved={refreshAllRates}
-                    />
-                  </div>
-                </td>
-                <td className="py-1 text-right text-xs text-gray-600">
-                  {n(wallFlagstoneSF) > 0 ? (
-                    <div className="text-right">
-                      <div>${calc.wallFlagStoneMat.toFixed(2)}</div>
-                      <div className="text-gray-400">
-                        {(n(wallFlagstoneSF) / 80).toFixed(2)} tons
-                      </div>
-                    </div>
-                  ) : (
-                    '—'
-                  )}
-                </td>
-              </tr>
-
-              {/* Real Stone — editable $/ton */}
-              <tr className="border-b border-gray-100">
-                <td className="py-1 pr-2 text-xs text-gray-700">
-                  <span className="inline-flex items-center gap-1">
-                    Real Stone
-                    <RateEditPopover
-                      table="labor_rates"
-                      name={FINISHES_RATES.realStoneLab.db}
-                      category="Finishes"
-                      mode="coefficient"
-                      unitLabel="hrs/SF"
-                      currentValue={
-                        p(FINISHES_RATES.realStoneLab.db) ?? FINISHES_RATES.realStoneLab.fb
-                      }
-                      onSaved={refreshAllRates}
-                    />
-                  </span>
-                </td>
-                <td className="py-1 pr-2">
-                  <NumInput value={realStoneSF} onChange={setRealStoneSF} />
-                </td>
-                <td className="py-1 pr-2">
-                  <div className="flex items-center gap-1">
-                    <div className="relative w-24">
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                        $
-                      </span>
-                      <input
-                        type="number"
-                        step="any"
-                        className="input text-sm py-1.5 pl-5 w-full"
-                        placeholder={(
-                          p(FINISHES_RATES.realStone.db) ?? FINISHES_RATES.realStone.fb
-                        ).toString()}
-                        value={realStoneRateIn}
-                        onChange={e => setRealStoneRateIn(e.target.value)}
-                      />
-                    </div>
-                    <RateEditPopover
-                      table="material_rates"
-                      name={FINISHES_RATES.realStone.db}
-                      category="Finishes"
-                      unitLabel="ton"
-                      currentValue={p(FINISHES_RATES.realStone.db) ?? FINISHES_RATES.realStone.fb}
-                      onSaved={refreshAllRates}
-                    />
-                  </div>
-                </td>
-                <td className="py-1 text-right text-xs text-gray-600">
-                  {n(realStoneSF) > 0 ? (
-                    <div className="text-right">
-                      <div>${calc.realStoneMat.toFixed(2)}</div>
-                      <div className="text-gray-400">{(n(realStoneSF) / 70).toFixed(2)} tons</div>
-                    </div>
-                  ) : (
-                    '—'
-                  )}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {renderSfSection(
+        'Wall Finishes',
+        wallFinishRows,
+        setWallFinishRows,
+        WALL_FINISH_TYPES,
+        WALL_META,
+        computeWallRow,
+        blankWallRow
+      )}
 
       {/* ── Manual Entry ── */}
       <div>

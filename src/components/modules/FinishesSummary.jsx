@@ -1,12 +1,194 @@
 import FinancialSummaryList from './FinancialSummaryList'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FinishesSummary — read-only detail view for a saved Finishes module
+// FinishesSummary — read-only detail view for a saved Finishes module.
+//
+// Consumes the row-based catalog shape (ihData / subData holding flatworkRows /
+// capRows / wallFinishRows). Recomputes each row's material / labor from the
+// saved rate maps so lines show Vendor · Item · qty/SF · Material (+ hrs on
+// In-House, flat $ on Sub). Falls back gracefully to legacy flat saves so old
+// estimates never crash.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const n = v => parseFloat(v) || 0
 const fmt = v =>
   `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+const FINISHES_RATES = {
+  flatTile: { db: 'Finishes Tile Flatwork', fb: 6.5 },
+  flatBrick: { db: 'Finishes Brick Flatwork', fb: 3.0 },
+  flatFlagstone: { db: 'Finishes Flagstone Flatwork', fb: 400.0 },
+  flatPorcelain: { db: 'Finishes Porcelain Flatwork', fb: 10.0 },
+  capFlagstone: { db: 'Finishes Cap Flagstone', fb: 500.0 },
+  capPrecast: { db: 'Finishes Cap Precast', fb: 50.0 },
+  capBullnose: { db: 'Finishes Cap Bullnose Brick', fb: 5.0 },
+  concreteTruck: { db: 'Finishes Concrete Truck', fb: 185.0 },
+  sandStucco: { db: 'Sand Stucco - Finishes', fb: 0.0 },
+  smoothStucco: { db: 'Smooth Stucco - Finishes', fb: 0.0 },
+  ledgerstone: { db: 'Ledgerstone - Finishes', fb: 10.0 },
+  stackedStone: { db: 'Stacked Stone - Finishes', fb: 10.0 },
+  tile: { db: 'Tile - Finishes', fb: 6.5 },
+  realFlagstone: { db: 'Real Flagstone - Finishes', fb: 400.0 },
+  realStone: { db: 'Real Stone - Finishes', fb: 400.0 },
+  flatTileLab: { db: 'Finishes Tile Flatwork Labor Rate', fb: 0.2867 },
+  flatBrickLab: { db: 'Finishes Brick Flatwork Labor Rate', fb: 0.35 },
+  flatFlagstoneLab: { db: 'Finishes Flagstone Flatwork Labor Rate', fb: 0.4487 },
+  flatPorcelainLab: { db: 'Finishes Porcelain Flatwork Labor Rate', fb: 0.267 },
+  sandStuccoLab: { db: 'Sand Stucco - Finishes Labor Rate', fb: 92 },
+  smoothStuccoLab: { db: 'Smooth Stucco - Finishes Labor Rate', fb: 65 },
+  ledgerstoneLab: { db: 'Ledgerstone - Finishes Labor Rate', fb: 24 },
+  stackedStoneLab: { db: 'Stacked Stone - Finishes Labor Rate', fb: 24 },
+  tileLab: { db: 'Tile - Finishes Labor Rate', fb: 0.2867 },
+  flagstoneLab: { db: 'Real Flagstone - Finishes Labor Rate', fb: 0.4487 },
+  realStoneLab: { db: 'Real Stone - Finishes Labor Rate', fb: 0.8954 },
+}
+
+function finishMatPrice(dbName, vendorId, materialRows, mp, fallback) {
+  if (vendorId && vendorId !== 'House') {
+    const row = (materialRows || []).find(r => r.name === dbName && r.vendor_id === vendorId)
+    if (row && row.unit_cost != null && row.unit_cost !== '') return n(row.unit_cost)
+  }
+  return mp?.[dbName] ?? fallback
+}
+
+function computeFlatRow(row, mp, materialRows) {
+  const sf = n(row.sf)
+  const price = k =>
+    finishMatPrice(FINISHES_RATES[k].db, row.vendor, materialRows, mp, FINISHES_RATES[k].fb)
+  const lab = k => mp?.[FINISHES_RATES[k].db] ?? FINISHES_RATES[k].fb
+  let mat = 0,
+    hrs = 0,
+    subUnit = 0
+  switch (row.type) {
+    case 'Tile':
+      mat = sf * price('flatTile')
+      hrs = sf > 0 ? sf * lab('flatTileLab') : 0
+      subUnit = price('flatTile')
+      break
+    case 'Brick':
+      mat = sf * 2 * price('flatBrick')
+      hrs = sf > 0 ? sf * lab('flatBrickLab') : 0
+      subUnit = 2 * price('flatBrick')
+      break
+    case 'Flagstone': {
+      const rate = n(row.rateIn) || price('flatFlagstone')
+      mat = sf > 0 ? (sf / 80) * rate : 0
+      hrs = sf > 0 ? sf * lab('flatFlagstoneLab') : 0
+      subUnit = rate / 80
+      break
+    }
+    case 'Porcelain':
+      mat = sf * price('flatPorcelain')
+      hrs = sf > 0 ? sf * lab('flatPorcelainLab') : 0
+      subUnit = price('flatPorcelain')
+      break
+    default:
+      break
+  }
+  const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : subUnit
+  return { qty: sf, unit: 'SF', mat, hrs, subEach, subMat: sf * subEach }
+}
+
+function computeCapRow(row, mp, materialRows) {
+  const lf = n(row.lf),
+    widthIn = n(row.widthIn),
+    qty = n(row.qty)
+  const price = k =>
+    finishMatPrice(FINISHES_RATES[k].db, row.vendor, materialRows, mp, FINISHES_RATES[k].fb)
+  let mat = 0,
+    hrs = 0,
+    subUnit = 0,
+    subQty = 0,
+    unit = 'LF',
+    dispQty = lf
+  switch (row.type) {
+    case 'Flagstone':
+      mat = (((widthIn / 12) * lf * 0.0833 * 100) / 2000) * price('capFlagstone')
+      hrs = lf * 0.25
+      subUnit = (((widthIn / 12) * 0.0833 * 100) / 2000) * price('capFlagstone')
+      subQty = lf
+      break
+    case 'Precast':
+      mat = qty * price('capPrecast')
+      hrs = qty * 0.2
+      subUnit = price('capPrecast')
+      subQty = qty
+      unit = 'ea'
+      dispQty = qty
+      break
+    case 'PIP Concrete':
+      mat = ((lf * (widthIn / 12) * 0.333) / 27) * price('concreteTruck')
+      hrs = lf * 0.15
+      subUnit = (((widthIn / 12) * 0.333) / 27) * price('concreteTruck')
+      subQty = lf
+      break
+    case 'Bullnose Brick':
+      mat = lf * price('capBullnose')
+      hrs = lf * 0.08
+      subUnit = price('capBullnose')
+      subQty = lf
+      break
+    default:
+      break
+  }
+  const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : subUnit
+  return { qty: dispQty, unit, mat, hrs, subEach, subMat: subQty * subEach, widthIn }
+}
+
+function computeWallRow(row, mp, materialRows) {
+  const sf = n(row.sf)
+  const price = k =>
+    finishMatPrice(FINISHES_RATES[k].db, row.vendor, materialRows, mp, FINISHES_RATES[k].fb)
+  const lab = k => mp?.[FINISHES_RATES[k].db] ?? FINISHES_RATES[k].fb
+  let mat = 0,
+    hrs = 0,
+    subUnit = 0
+  switch (row.type) {
+    case 'Sand Stucco':
+      hrs = sf > 0 ? (sf / lab('sandStuccoLab')) * 8 : 0
+      mat = sf * price('sandStucco')
+      subUnit = price('sandStucco')
+      break
+    case 'Smooth Stucco':
+      hrs = sf > 0 ? (sf / lab('smoothStuccoLab')) * 8 : 0
+      mat = sf * price('smoothStucco')
+      subUnit = price('smoothStucco')
+      break
+    case 'Ledgerstone':
+      hrs = sf > 0 ? (sf / lab('ledgerstoneLab')) * 8 : 0
+      mat = sf > 0 ? sf * price('ledgerstone') * 1.1 + (sf / 5) * 2 : 0
+      subUnit = price('ledgerstone') * 1.1 + 0.4
+      break
+    case 'Stacked Stone':
+      hrs = sf > 0 ? (sf / lab('stackedStoneLab')) * 8 : 0
+      mat = sf > 0 ? sf * price('stackedStone') * 1.1 + (sf / 5) * 2 : 0
+      subUnit = price('stackedStone') * 1.1 + 0.4
+      break
+    case 'Tile':
+      hrs = sf > 0 ? sf * lab('tileLab') : 0
+      mat = sf > 0 ? sf * price('tile') + sf : 0
+      subUnit = price('tile') + 1
+      break
+    case 'Real Flagstone': {
+      const rate = n(row.rateIn) || price('realFlagstone')
+      hrs = sf > 0 ? sf * lab('flagstoneLab') : 0
+      mat = sf > 0 ? (sf / 80) * rate : 0
+      subUnit = rate / 80
+      break
+    }
+    case 'Real Stone': {
+      const rate = n(row.rateIn) || price('realStone')
+      hrs = sf > 0 ? sf * lab('realStoneLab') : 0
+      mat = sf > 0 ? (sf / 70) * rate : 0
+      subUnit = rate / 70
+      break
+    }
+    default:
+      break
+  }
+  const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : subUnit
+  return { qty: sf, unit: 'SF', mat, hrs, subEach, subMat: sf * subEach }
+}
 
 function SectionLabel({ title }) {
   return (
@@ -36,49 +218,60 @@ function LineRow({ label, value, sub, highlight }) {
 
 export default function FinishesSummary({ module }) {
   const data = module?.data || {}
-  // In-House and Sub are independent tab records. Show the tab that was saved as
-  // this module's work type; legacy estimates stored fields flat (= In-House).
   const isSub = data.subType === 'Subcontractor'
   const tab = isSub ? data.subData || {} : data.ihData || data
+  const materialPrices = data.materialPrices || {}
+  const materialRows = data.materialRows || []
+  const vendorNames = data.vendorNames || {}
+  const calc = data.calc || {}
   const {
     difficulty = 0,
     hoursAdj = 0,
-    tileFlatSF = 0,
-    brickFlatSF = 0,
-    flagstoneFlatSF = 0,
-    porcelainFlatSF = 0,
+    flatworkRows = [],
     capRows = [],
-    sandStuccoSF = 0,
-    smoothStuccoSF = 0,
-    ledgerstoneSF = 0,
-    stackedStoneSF = 0,
-    tileSF = 0,
-    wallFlagstoneSF = 0,
-    realStoneSF = 0,
+    wallFinishRows = [],
     manualRows = [],
   } = tab
-  const calc = data.calc || {}
 
-  const activeFlatwork = [
-    { label: 'Tile Over Slab', sf: tileFlatSF },
-    { label: 'Brick Over Slab', sf: brickFlatSF },
-    { label: 'Flagstone Over Slab', sf: flagstoneFlatSF },
-    { label: 'Porcelain Paver', sf: porcelainFlatSF },
-  ].filter(f => n(f.sf) > 0)
+  const vendorLabel = v => (!v || v === 'House' ? 'House' : vendorNames[v] || 'Vendor')
 
-  const activeCaps = (capRows || []).filter(
-    c => c.type && c.type !== 'None' && (n(c.lf) > 0 || n(c.qty) > 0)
+  // Build display lines for one section. `compute` returns qty/unit/mat/hrs/subMat.
+  function sectionLines(rows, compute, isActiveFn) {
+    return (rows || [])
+      .map((row, i) => {
+        if (!isActiveFn(row)) return null
+        const c = compute(row, materialPrices, materialRows)
+        const material = isSub ? c.subMat : c.mat
+        const subParts = []
+        if (!isSub && c.hrs > 0) subParts.push(`${c.hrs.toFixed(2)} hrs`)
+        if (isSub) subParts.push(`${fmt(c.subEach)}/${c.unit}`)
+        return {
+          key: i,
+          label: `${vendorLabel(row.vendor)} · ${row.type}`,
+          value: `${n(c.qty)} ${c.unit}`,
+          sub: [material > 0 ? fmt(material) : null, subParts.join(' · ') || null]
+            .filter(Boolean)
+            .join('  ·  '),
+        }
+      })
+      .filter(Boolean)
+  }
+
+  const flatLines = sectionLines(
+    flatworkRows,
+    computeFlatRow,
+    r => n(r.sf) > 0
   )
-
-  const activeFinishes = [
-    { label: 'Sand Stucco', sf: sandStuccoSF },
-    { label: 'Smooth Stucco', sf: smoothStuccoSF },
-    { label: 'Ledgerstone', sf: ledgerstoneSF },
-    { label: 'Stacked Stone', sf: stackedStoneSF },
-    { label: 'Tile', sf: tileSF },
-    { label: 'Real Flagstone', sf: wallFlagstoneSF },
-    { label: 'Real Stone', sf: realStoneSF },
-  ].filter(f => n(f.sf) > 0)
+  const capLines = sectionLines(
+    capRows,
+    computeCapRow,
+    r => r.type && r.type !== 'None' && (n(r.lf) > 0 || n(r.qty) > 0)
+  )
+  const wallLines = sectionLines(
+    wallFinishRows,
+    computeWallRow,
+    r => n(r.sf) > 0
+  )
 
   const financeRows = [
     { label: 'Materials', value: fmt(calc.totalMat) },
@@ -95,43 +288,46 @@ export default function FinishesSummary({ module }) {
       {/* Financial summary */}
       <FinancialSummaryList rows={financeRows} />
 
+      {isSub && (
+        <div className="flex flex-wrap gap-2 pt-1">
+          <span className="text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded font-medium">
+            Subcontractor
+          </span>
+        </div>
+      )}
+
       {/* Flatwork */}
-      {activeFlatwork.length > 0 && (
+      {flatLines.length > 0 && (
         <>
           <SectionLabel title="Flatwork Finish" />
-          {activeFlatwork.map(f => (
-            <LineRow key={f.label} label={f.label} value={`${n(f.sf)} SF`} />
+          {flatLines.map(l => (
+            <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />
           ))}
         </>
       )}
 
       {/* Wall Caps */}
-      {activeCaps.length > 0 && (
+      {capLines.length > 0 && (
         <>
           <SectionLabel title="Wall Caps" />
-          {activeCaps.map((cap, i) => (
-            <LineRow
-              key={i}
-              label={cap.type}
-              value={cap.type === 'Precast' ? `${n(cap.qty)} pieces` : `${n(cap.lf)} LF`}
-              sub={cap.type !== 'Precast' && cap.widthIn ? `${cap.widthIn}" wide` : null}
-            />
+          {capLines.map(l => (
+            <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />
           ))}
         </>
       )}
 
       {/* Wall Finishes */}
-      {activeFinishes.length > 0 && (
+      {wallLines.length > 0 && (
         <>
           <SectionLabel title="Wall Finishes" />
-          {activeFinishes.map(f => (
-            <LineRow key={f.label} label={f.label} value={`${n(f.sf)} SF`} />
+          {wallLines.map(l => (
+            <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />
           ))}
         </>
       )}
 
-      {/* Labor breakdown */}
-      {(calc.totalHrs || n(difficulty) || n(hoursAdj)) && (
+      {/* Labor breakdown (In-House only carries hours) */}
+      {!isSub && (n(calc.totalHrs) || n(difficulty) || n(hoursAdj)) ? (
         <>
           <SectionLabel title="Labor" />
           <LineRow label="Total Hours" value={`${(calc.totalHrs || 0).toFixed(2)} hrs`} />
@@ -139,7 +335,7 @@ export default function FinishesSummary({ module }) {
           {n(difficulty) > 0 && <LineRow label="Difficulty Add" value={`${n(difficulty)}%`} />}
           {n(hoursAdj) !== 0 && <LineRow label="Hours Adjustment" value={`${n(hoursAdj)} hrs`} />}
         </>
-      )}
+      ) : null}
 
       {/* Manual */}
       {manualRows.filter(r => n(r.hours) || n(r.materials) || n(r.subCost)).length > 0 && (
