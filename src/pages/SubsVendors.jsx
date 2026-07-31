@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx'
 import DocViewerModal from '../components/DocViewerModal'
 import SubVendorContracts from '../components/SubVendorContracts'
 import SubVendorQuotes from '../components/SubVendorQuotes'
+import VendorInvoicing from '../components/VendorInvoicing'
 import PartyHistory from '../components/PartyHistory'
 
 // ── Constants ────────────────────────────────────────────────
@@ -653,6 +654,7 @@ export default function SubsVendors({ mode = 'sub' }) {
         <div className="flex items-center justify-center flex-1 min-w-0 overflow-x-auto">
           {[
             { key: 'directory', label: '📋 Directory' },
+            ...(mode === 'vendor' ? [{ key: 'invoicing', label: '📥 Invoicing' }] : []),
             ...(mode === 'sub' ? [{ key: 'contracts', label: '📑 Contracts' }] : []),
             ...(mode === 'vendor' ? [{ key: 'quotes', label: '🧾 Quotes' }] : []),
             { key: 'settings', label: '⚙️ Settings', mobileHide: true },
@@ -682,6 +684,11 @@ export default function SubsVendors({ mode = 'sub' }) {
           )}
         </div>
       </div>
+
+      {/* ── Invoicing (vendors only) ── */}
+      {svTab === 'invoicing' && mode === 'vendor' && (
+        <VendorInvoicing vendors={(subsData || []).filter(s => (s.type || 'sub') === 'vendor')} />
+      )}
 
       {/* ── Contracts (subs only) ── */}
       {svTab === 'contracts' && mode === 'sub' && <SubVendorContracts />}

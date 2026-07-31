@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import VendorCombo from './VendorCombo'
 
@@ -18,11 +18,27 @@ const norm = s =>
 
 const fmt = v => `$${(Number(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-export default function InvoiceImportModal({ jobId, jobName, vendors = [], onClose, onPosted }) {
+export default function InvoiceImportModal({ jobId: jobIdProp, jobName: jobNameProp, vendors = [], onClose, onPosted }) {
   const today = new Date().toISOString().slice(0, 10)
   const [step, setStep] = useState('form') // form | review | done
   const [file, setFile] = useState(null)
   const [vendorId, setVendorId] = useState('')
+  // Job may come from a prop (opened on a Job page) or be picked here (opened
+  // from Vendors → Invoicing). jobList is used for the searchable picker.
+  const [pickJobId, setPickJobId] = useState('')
+  const [jobList, setJobList] = useState([])
+  const jobId = jobIdProp || pickJobId
+  const jobName = jobNameProp || (jobList.find(j => j.id === jobId)?.company_name || '')
+  useEffect(() => {
+    if (jobIdProp) return
+    supabase
+      .from('jobs')
+      .select('id, client_name, job_address')
+      .order('client_name')
+      .then(({ data }) =>
+        setJobList((data || []).map(j => ({ id: j.id, company_name: `${j.client_name}${j.job_address ? ' — ' + j.job_address : ''}` })))
+      )
+  }, [jobIdProp])
   const [filePath, setFilePath] = useState('')
   const [header, setHeader] = useState({ invoice_no: '', invoice_date: today, subtotal: null, total: null, vendor_name: '' })
   const [rows, setRows] = useState([])
@@ -91,7 +107,7 @@ export default function InvoiceImportModal({ jobId, jobName, vendors = [], onClo
     setBusy(true)
     try {
       const safe = file.name.replace(/[^a-zA-Z0-9._-]+/g, '_')
-      const path = `${jobId}/${Date.now()}-${safe}`
+      const path = `${jobId || 'inbox'}/${Date.now()}-${safe}`
       const { error: upErr } = await supabase.storage.from('vendor-invoices').upload(path, file)
       if (upErr) throw new Error(`Upload failed: ${upErr.message}`)
       setFilePath(path)
@@ -157,6 +173,7 @@ export default function InvoiceImportModal({ jobId, jobName, vendors = [], onClo
 
   async function post() {
     setError('')
+    if (!jobId) return setError('Pick a job to post these expenses to.')
     setBusy(true)
     try {
       const { data: inv, error: invErr } = await supabase
@@ -250,6 +267,12 @@ export default function InvoiceImportModal({ jobId, jobName, vendors = [], onClo
                 placeholder="Auto-detect, or search vendor…"
               />
             </div>
+            {!jobIdProp && (
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Job (expenses post here)</label>
+                <VendorCombo vendors={jobList} value={pickJobId} onChange={setPickJobId} placeholder="Search job…" />
+              </div>
+            )}
             <div>
               <label className="block text-xs text-gray-500 mb-1">Invoice file (PDF or image)</label>
               <input
