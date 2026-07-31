@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import VendorCombo from './VendorCombo'
+import QuickAddVendorModal from './QuickAddVendorModal'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // InvoiceImportModal — upload a vendor invoice for a job. Sam extracts the
@@ -65,8 +66,11 @@ export default function InvoiceImportModal({ jobId: jobIdProp, jobName: jobNameP
   const applyToSelected = patch =>
     setRows(rs => rs.map((r, i) => (selected.has(i) ? { ...r, ...patch } : r)))
 
-  const vendorList = (vendors || []).filter(v => !v.type || v.type === 'vendor')
-  const vendorName = useMemo(() => vendors.find(v => v.id === vendorId)?.company_name || '', [vendors, vendorId])
+  const [extraVendors, setExtraVendors] = useState([])
+  const [showNewVendor, setShowNewVendor] = useState(false)
+  const allVendors = [...(vendors || []), ...extraVendors]
+  const vendorList = allVendors.filter(v => !v.type || v.type === 'vendor')
+  const vendorName = useMemo(() => allVendors.find(v => v.id === vendorId)?.company_name || '', [allVendors, vendorId])
 
   // Match each extracted line to a material for the chosen vendor + price-check.
   async function matchAndCheck(vId, extracted, invDate) {
@@ -242,6 +246,12 @@ export default function InvoiceImportModal({ jobId: jobIdProp, jobName: jobNameP
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-y-auto">
+      {showNewVendor && (
+        <QuickAddVendorModal
+          onClose={() => setShowNewVendor(false)}
+          onCreated={v => { setExtraVendors(a => [...a, v]); setVendorId(v.id); setShowNewVendor(false) }}
+        />
+      )}
       <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl my-8">
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
           <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">
@@ -257,7 +267,10 @@ export default function InvoiceImportModal({ jobId: jobIdProp, jobName: jobNameP
         {step === 'form' && (
           <div className="p-5 space-y-4">
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Vendor (optional — auto-detected if blank)</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs text-gray-500">Vendor (optional — auto-detected if blank)</label>
+                <button type="button" onClick={() => setShowNewVendor(true)} className="text-xs text-green-700 font-semibold hover:underline">+ New vendor</button>
+              </div>
               <VendorCombo
                 vendors={vendorList}
                 value={vendorId}

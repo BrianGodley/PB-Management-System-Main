@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import VendorCombo from './VendorCombo'
+import QuickAddVendorModal from './QuickAddVendorModal'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PriceSheetImportModal — upload a vendor price sheet, let Sam extract the line
@@ -72,8 +73,8 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
   const runSearch = () => { setFilter(filterDraft); setExcluded(new Set()) }
 
   const vendorName = useMemo(
-    () => vendors.find(v => v.id === vendorId)?.company_name || '',
-    [vendors, vendorId]
+    () => allVendors.find(v => v.id === vendorId)?.company_name || '',
+    [allVendors, vendorId]
   )
 
   // Existing categories / sub-categories → dropdown suggestions (you can also
@@ -301,11 +302,22 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
     }
   }
 
+  // Vendors created via the quick-add modal are appended locally so they show
+  // in the picker immediately without a parent refresh.
+  const [extraVendors, setExtraVendors] = useState([])
+  const [showNewVendor, setShowNewVendor] = useState(false)
+  const allVendors = [...(vendors || []), ...extraVendors]
   // Accept vendors whether or not a `type` field was loaded (defensive).
-  const vendorList = (vendors || []).filter(v => !v.type || v.type === 'vendor')
+  const vendorList = allVendors.filter(v => !v.type || v.type === 'vendor')
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-y-auto">
+      {showNewVendor && (
+        <QuickAddVendorModal
+          onClose={() => setShowNewVendor(false)}
+          onCreated={v => { setExtraVendors(a => [...a, v]); setVendorId(v.id); setShowNewVendor(false) }}
+        />
+      )}
       <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl my-8">
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
           <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Import Price Sheet</h2>
@@ -322,7 +334,10 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
           <div className="p-5 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Vendor</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs text-gray-500">Vendor</label>
+                  <button type="button" onClick={() => setShowNewVendor(true)} className="text-xs text-green-700 font-semibold hover:underline">+ New vendor</button>
+                </div>
                 <VendorCombo vendors={vendorList} value={vendorId} onChange={setVendorId} placeholder="Search vendor…" />
               </div>
               <div>
