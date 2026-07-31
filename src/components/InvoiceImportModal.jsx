@@ -408,7 +408,13 @@ export default function InvoiceImportModal({ jobId: jobIdProp, jobName: jobNameP
                           <input type="checkbox" checked={r.include} onChange={e => setRow(i, { include: e.target.checked })} />
                         </td>
                         <td className="px-2 py-1.5">
-                          <div className="font-medium text-gray-800">{r.description}</div>
+                          <input
+                            value={r.description || ''}
+                            onChange={e => setRow(i, { description: e.target.value })}
+                            title={r.description}
+                            placeholder="Describe this line…"
+                            className={`border rounded px-1.5 py-1 w-64 font-medium text-gray-800 ${r.matchId ? 'border-gray-200' : 'border-amber-300 bg-amber-50'}`}
+                          />
                         </td>
                         <td className="px-2 py-1.5">
                           <input value={r.unit || ''} onChange={e => setRow(i, { unit: e.target.value })} list="inv-units" className="border border-gray-200 rounded px-1.5 py-1 w-24" />
