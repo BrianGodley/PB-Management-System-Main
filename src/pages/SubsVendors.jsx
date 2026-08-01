@@ -7,6 +7,7 @@ import DocViewerModal from '../components/DocViewerModal'
 import SubVendorContracts from '../components/SubVendorContracts'
 import SubVendorQuotes from '../components/SubVendorQuotes'
 import VendorInvoicing from '../components/VendorInvoicing'
+import MasterRates from './MasterRates'
 import VendorCatalog from '../components/VendorCatalog'
 import PartyHistory from '../components/PartyHistory'
 
@@ -656,8 +657,10 @@ export default function SubsVendors({ mode = 'sub' }) {
           {[
             { key: 'directory', label: '📋 Directory' },
             ...(mode === 'vendor' ? [{ key: 'invoicing', label: '📥 Invoicing' }] : []),
+            ...(mode === 'vendor' ? [{ key: 'materialRates', label: '📊 Master Material Rates' }] : []),
             ...(mode === 'vendor' ? [{ key: 'catalog', label: '📦 Catalog' }] : []),
             ...(mode === 'sub' ? [{ key: 'contracts', label: '📑 Contracts' }] : []),
+            ...(mode === 'sub' ? [{ key: 'subRates', label: '📊 Master Subcontractor Rates' }] : []),
             ...(mode === 'vendor' ? [{ key: 'quotes', label: '🧾 Quotes' }] : []),
             { key: 'settings', label: '⚙️ Settings', mobileHide: true },
           ].map(t => (
@@ -695,6 +698,20 @@ export default function SubsVendors({ mode = 'sub' }) {
       {/* ── Catalog (vendors only) ── */}
       {svTab === 'catalog' && mode === 'vendor' && (
         <VendorCatalog vendors={(subsData || []).filter(s => (s.type || 'sub') === 'vendor')} />
+      )}
+
+      {/* ── Master Material Rates (vendors only) ── */}
+      {svTab === 'materialRates' && mode === 'vendor' && (
+        <div className="mt-3 flex-1 overflow-y-auto">
+          <MasterRates only="materials" />
+        </div>
+      )}
+
+      {/* ── Master Subcontractor Rates (subs only) ── */}
+      {svTab === 'subRates' && mode === 'sub' && (
+        <div className="mt-3 flex-1 overflow-y-auto">
+          <MasterRates only="subs" />
+        </div>
       )}
 
       {/* ── Contracts (subs only) ── */}

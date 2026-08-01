@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { fetchAllPaginated } from '../lib/fetchAll'
 import { useAuth } from '../contexts/AuthContext'
-import MasterRates from './MasterRates'
 import { DEFAULT_ESTIMATE_GPMD, DEFAULT_SALES_TAX_RATE } from '../lib/companyDefaults'
 import ConsultantPicker from '../components/ConsultantPicker'
 import FunnelsBoard from '../components/FunnelsBoard'
@@ -1469,7 +1468,6 @@ export default function Clients() {
           <div className="flex border border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0 rounded-xl mb-3">
             {[
               { key: 'general', label: '⚙️ General' },
-              { key: 'rates', label: '📊 Master Rates' },
             ].map(t => (
               <button
                 key={t.key}
@@ -1491,7 +1489,6 @@ export default function Clients() {
                 <SalesTaxRateCard />
               </div>
             )}
-            {clientSettingsTab === 'rates' && <MasterRates />}
           </div>
         </div>
       )}

@@ -14,6 +14,7 @@ import AllJobsTracking from '../components/AllJobsTracking'
 import AllJobsTasks from '../components/AllJobsTasks'
 import AllJobsChangeOrders from '../components/AllJobsChangeOrders'
 import MasterCrews from './MasterCrews'
+import MasterRates from './MasterRates'
 import COEstimatePanel from '../components/COEstimatePanel'
 import CODetailModal from '../components/CODetailModal'
 import JobInfoModal, { nameInitials, JOB_ROLES } from '../components/JobInfoModal'
@@ -3512,6 +3513,7 @@ function JobScheduleSettings({
           { key: 'templates', label: '📋 Job Templates' },
           { key: 'email-templates', label: '✉️ E-Mail Templates' },
           { key: 'crews', label: '👷 Master Crews' },
+          { key: 'labor-rates', label: '📊 Master Labor Rates' },
         ].map(t => (
           <button
             key={t.key}
@@ -3532,6 +3534,8 @@ function JobScheduleSettings({
         {settingsTab === 'email-templates' && <EmailTemplatesManager />}
 
         {settingsTab === 'crews' && <MasterCrews />}
+
+        {settingsTab === 'labor-rates' && <MasterRates only="labor" />}
 
         {settingsTab === 'general' && (
           <div className="w-full space-y-6">

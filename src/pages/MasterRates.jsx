@@ -482,8 +482,11 @@ const TABS = [
   { key: 'subs', label: 'Subcontractors' },
 ]
 
-export default function MasterRates() {
-  const [activeTab, setActiveTab] = useState('materials')
+export default function MasterRates({ only } = {}) {
+  // `only` = 'materials' | 'labor' | 'subs' renders just that one table (used
+  // when embedded as a tab under Vendors / Subcontractors / Jobs settings).
+  const [activeTabState, setActiveTab] = useState('materials')
+  const activeTab = only || activeTabState
   const [showImport, setShowImport] = useState(false)
   const [materials, setMaterials] = useState([])
   const [labor, setLabor] = useState([])
@@ -722,15 +725,19 @@ export default function MasterRates() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold text-gray-900">Master Rates</h1>
-        <button
-          onClick={() => setShowImport(true)}
-          className="text-sm bg-green-600 text-white font-semibold rounded px-4 py-1.5 hover:bg-green-700"
-        >
-          Import Price Sheet
-        </button>
-      </div>
+      {(!only || activeTab === 'materials') && (
+        <div className="flex items-center justify-between mb-4">
+          {!only ? <h1 className="text-xl font-bold text-gray-900">Master Rates</h1> : <span />}
+          {activeTab === 'materials' && (
+            <button
+              onClick={() => setShowImport(true)}
+              className="text-sm bg-green-600 text-white font-semibold rounded px-4 py-1.5 hover:bg-green-700 ml-auto"
+            >
+              Import Price Sheet
+            </button>
+          )}
+        </div>
+      )}
       {showImport && (
         <PriceSheetImportModal
           vendors={vendors}
@@ -739,22 +746,24 @@ export default function MasterRates() {
         />
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-gray-200 mb-3">
-        {TABS.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setActiveTab(t.key)}
-            className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
-              activeTab === t.key
-                ? 'border-green-700 text-green-800'
-                : 'border-transparent text-gray-500 hover:text-gray-800'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {/* Tabs (hidden when embedded as a single-table view) */}
+      {!only && (
+        <div className="flex gap-1 border-b border-gray-200 mb-3">
+          {TABS.map(t => (
+            <button
+              key={t.key}
+              onClick={() => setActiveTab(t.key)}
+              className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+                activeTab === t.key
+                  ? 'border-green-700 text-green-800'
+                  : 'border-transparent text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Materials */}
       {activeTab === 'materials' && (
