@@ -20,7 +20,21 @@ import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../
 //   Gopher Basket - Install Rate:    rate = min/basket
 //   Mesh Flat - Install Rate:        rate = min/sqft
 //   Jute Fabric - Install Rate:      rate = min/sqft
+//
+// Vendor + Item catalog SELECTION
+//   Every material section (Small Plants, Large Plants, Planting Add-Ons) is an
+//   add/remove ROW table with a Vendor column + an Item column. The Item drives
+//   the pricing/labor FORMULA (per-plant/day, per-size, install rate) exactly as
+//   before; the Vendor ONLY changes where the MATERIAL unit price comes from
+//   (House named-rate fallback vs. a vendor's material_rates row). Vendor 'House'
+//   resolves to the original math, so In-House numbers never move.
+//
+//   In-House and Subcontractor are independent calculators (makeTab / ihTab /
+//   subTab). The Sub tab prices each row at a flat $/unit with NO labor hours and
+//   routes the itemized cost into subCost (GpmdBar's 'sub' variant).
 // ─────────────────────────────────────────────────────────────────────────────
+
+const PLANTING_CATEGORY = 'Planting'
 
 // Hardcoded fallbacks (used when DB row not present yet)
 const SMALL_PLANT_DEFAULTS = {
@@ -85,6 +99,71 @@ const ADDON_MAT_DEFAULTS = {
   'Jute Fabric': 0.4,
 }
 
+// ── Planting Add-On item catalog (the Item dropdown; NOT from the DB) ──────────
+// Each add-on Item carries its own labor formula + material/labor DB names. The
+// labor formula is byte-for-byte identical to the original per-item math:
+//   mode 'perDay' → hrs = (qty / rate) * 8   (rate = units/day, guarded > 0)
+//   mode 'perMin' → hrs = (qty * rate) / 60  (rate = minutes/unit)
+const ADDON_META = {
+  'Tree Stake': {
+    matKey: 'Tree Stake',
+    labKey: 'Tree Stakes - Install Rate',
+    mode: 'perDay',
+    unit: 'ea',
+    labUnit: 'stakes/day',
+  },
+  'Root Barrier 12"': {
+    matKey: 'Root Barrier 12in',
+    labKey: 'Root Barrier - Install Rate',
+    mode: 'perMin',
+    unit: 'LF',
+    labUnit: 'min/LF',
+  },
+  'Root Barrier 24"': {
+    matKey: 'Root Barrier 24in',
+    labKey: 'Root Barrier - Install Rate',
+    mode: 'perMin',
+    unit: 'LF',
+    labUnit: 'min/LF',
+  },
+  'Gopher Basket 1 gal': {
+    matKey: 'Gopher Basket 1 Gal',
+    labKey: 'Gopher Basket - Install Rate',
+    mode: 'perMin',
+    unit: 'ea',
+    labUnit: 'min/ea',
+  },
+  'Gopher Basket 5 gal': {
+    matKey: 'Gopher Basket 5 Gal',
+    labKey: 'Gopher Basket - Install Rate',
+    mode: 'perMin',
+    unit: 'ea',
+    labUnit: 'min/ea',
+  },
+  'Gopher Basket 15 gal': {
+    matKey: 'Gopher Basket 15 Gal',
+    labKey: 'Gopher Basket - Install Rate',
+    mode: 'perMin',
+    unit: 'ea',
+    labUnit: 'min/ea',
+  },
+  'Mesh Flat': {
+    matKey: 'Mesh Flat',
+    labKey: 'Mesh Flat - Install Rate',
+    mode: 'perMin',
+    unit: 'SF',
+    labUnit: 'min/SF',
+  },
+  'Jute Fabric': {
+    matKey: 'Jute Fabric',
+    labKey: 'Jute Fabric - Install Rate',
+    mode: 'perMin',
+    unit: 'SF',
+    labUnit: 'min/SF',
+  },
+}
+const ADDON_TYPES = Object.keys(ADDON_META)
+
 const WORKER_DEFAULTS = {
   laborRatePerHour: 35,
   laborBurdenPct: 0.29,
@@ -93,6 +172,7 @@ const WORKER_DEFAULTS = {
 }
 
 const n = v => parseFloat(v) || 0
+const r2 = x => Math.round(((x || 0) + Number.EPSILON) * 100) / 100
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function lr(laborRates, key) {
@@ -109,7 +189,64 @@ function getLargePerDay(laborRates, type) {
   return laborRates[type] ?? LARGE_PLANT_DEFAULTS[type]?.perDay ?? 15
 }
 
+// ── Vendor-catalog material price ─────────────────────────────────────────────
+// The ONLY thing the Vendor selection changes: the material $ source. When a
+// real vendor is selected AND a material_rates row exists (name===dbName &&
+// vendor_id===vendorId) use that row's unit_cost; otherwise fall back to the
+// House price (name-keyed mp[dbName]) then the hard fallback. Vendor 'House'
+// resolves to exactly the original math, so In-House numbers never move.
+function plantMatPrice(dbName, vendorId, materialRows, materialPrices, fallback) {
+  if (vendorId && vendorId !== 'House') {
+    const row = (materialRows || []).find(r => r.name === dbName && r.vendor_id === vendorId)
+    if (row && row.unit_cost != null && row.unit_cost !== '') return n(row.unit_cost)
+  }
+  return materialPrices?.[dbName] ?? fallback
+}
+
+// ── Per-row calculators ───────────────────────────────────────────────────────
+// Plant row: In-House material = qty × the row's (editable, vendor-defaulted)
+// unit price — IDENTICAL to the original `qty * n(r.price)`, including the
+// perDay > 0 guard that skips both hrs and material when the labor rate is 0.
+function computePlantRow(row, perDay) {
+  const qty = n(row.qty)
+  let hrs = 0,
+    mat = 0
+  if (qty > 0 && perDay > 0) {
+    hrs = (qty / perDay) * 8
+    mat = qty * n(row.price)
+  }
+  const subUnit = n(row.price)
+  const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : subUnit
+  const subMat = qty > 0 ? qty * subEach : 0
+  return { qty, hrs, mat, subUnit, subEach, subMat }
+}
+
+// Add-on row: labor formula identical to the original per-item math; material is
+// vendor-resolved (House = original mp() price).
+function computeAddonRow(row, laborRates, materialPrices, materialRows) {
+  const meta = ADDON_META[row.type] || {}
+  const qty = n(row.qty)
+  const rate = lr(laborRates, meta.labKey)
+  let hrs = 0
+  if (meta.mode === 'perDay') hrs = rate > 0 ? (qty / rate) * 8 : 0
+  else if (meta.mode === 'perMin') hrs = (qty * rate) / 60
+  const unitPrice = plantMatPrice(
+    meta.matKey,
+    row.vendor,
+    materialRows,
+    materialPrices,
+    ADDON_MAT_DEFAULTS[meta.matKey] ?? 0
+  )
+  const mat = qty * unitPrice
+  const subUnit = unitPrice
+  const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : subUnit
+  const subMat = qty * subEach
+  return { qty, hrs, mat, subUnit, subEach, subMat, rate, unitPrice, unit: meta.unit }
+}
+
 // ── Calc ──────────────────────────────────────────────────────────────────────
+// In-House: every formula preserved byte-for-byte from the original calc.
+// Sub: flat $/unit per row, NO labor hours, itemized cost routed into subCost.
 function calcPlanting(
   state,
   laborRatePerHour,
@@ -117,11 +254,21 @@ function calcPlanting(
   materialPrices,
   laborRates,
   walkAccess = null,
-  laborBurdenPct = WORKER_DEFAULTS.laborBurdenPct
+  laborBurdenPct = WORKER_DEFAULTS.laborBurdenPct,
+  materialRows = []
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
-  const { tillSqft, difficulty, hoursAdj, smallPlantRows, largePlantRows, addons, manualRows } =
-    state
+  const {
+    tillSqft,
+    difficulty,
+    hoursAdj,
+    smallPlantRows,
+    largePlantRows,
+    addonRows,
+    otherAddons = {},
+    manualRows,
+  } = state
+  const isSubTab = state.subType === 'Subcontractor'
 
   // Till and Amend
   const sqft = n(tillSqft)
@@ -136,65 +283,35 @@ function calcPlanting(
   const tillHrs = tillManDays * 8
 
   // Small plants
-  let smallHrs = 0,
-    smallMat = 0
-  smallPlantRows.forEach(r => {
-    const qty = n(r.qty)
-    if (qty <= 0) return
-    const perDay = getSmallPerDay(laborRates, r.type)
-    if (perDay <= 0) return
-    smallHrs += (qty / perDay) * 8
-    smallMat += qty * n(r.price)
-  })
+  const smalls = (smallPlantRows || []).map(r =>
+    computePlantRow(r, getSmallPerDay(laborRates, r.type))
+  )
+  const smallHrs = smalls.reduce((a, x) => a + x.hrs, 0)
+  const smallMat = smalls.reduce((a, x) => a + x.mat, 0)
+  const smallSubMat = smalls.reduce((a, x) => a + x.subMat, 0)
 
   // Large plants
-  let largeHrs = 0,
-    largeMat = 0
-  largePlantRows.forEach(r => {
-    const qty = n(r.qty)
-    if (qty <= 0) return
-    const perDay = getLargePerDay(laborRates, r.type)
-    if (perDay <= 0) return
-    largeHrs += (qty / perDay) * 8
-    largeMat += qty * n(r.price)
-  })
+  const larges = (largePlantRows || []).map(r =>
+    computePlantRow(r, getLargePerDay(laborRates, r.type))
+  )
+  const largeHrs = larges.reduce((a, x) => a + x.hrs, 0)
+  const largeMat = larges.reduce((a, x) => a + x.mat, 0)
+  const largeSubMat = larges.reduce((a, x) => a + x.subMat, 0)
 
   const plantHrs = tillHrs + smallHrs + largeHrs
 
   // Add-on labor (all times in hours)
-  let addonHrs = 0,
-    addonMat = 0
-  const craneSub = n(addons.craneCost)
+  const addonResults = (addonRows || []).map(r =>
+    computeAddonRow(r, laborRates, materialPrices, materialRows)
+  )
+  let addonHrs = addonResults.reduce((a, x) => a + x.hrs, 0)
+  let addonMat = addonResults.reduce((a, x) => a + x.mat, 0)
+  const addonSubMat = addonResults.reduce((a, x) => a + x.subMat, 0)
 
-  const stakePerDay = lr(laborRates, 'Tree Stakes - Install Rate')
-  addonHrs += stakePerDay > 0 ? (n(addons.treeStakes) / stakePerDay) * 8 : 0
-  addonMat += n(addons.treeStakes) * mp(materialPrices, 'Tree Stake')
-
-  const rbRate = lr(laborRates, 'Root Barrier - Install Rate') // min/LF
-  addonHrs += (n(addons.rootBarrier12) * rbRate) / 60
-  addonHrs += (n(addons.rootBarrier24) * rbRate) / 60
-  addonMat += n(addons.rootBarrier12) * mp(materialPrices, 'Root Barrier 12in')
-  addonMat += n(addons.rootBarrier24) * mp(materialPrices, 'Root Barrier 24in')
-
-  const gopherRate = lr(laborRates, 'Gopher Basket - Install Rate') // min/basket
-  addonHrs += (n(addons.gopherBaskets1) * gopherRate) / 60
-  addonHrs += (n(addons.gopherBaskets5) * gopherRate) / 60
-  addonHrs += (n(addons.gopherBaskets15) * gopherRate) / 60
-  addonMat += n(addons.gopherBaskets1) * mp(materialPrices, 'Gopher Basket 1 Gal')
-  addonMat += n(addons.gopherBaskets5) * mp(materialPrices, 'Gopher Basket 5 Gal')
-  addonMat += n(addons.gopherBaskets15) * mp(materialPrices, 'Gopher Basket 15 Gal')
-
-  const meshRate = lr(laborRates, 'Mesh Flat - Install Rate') // min/sqft
-  addonHrs += (n(addons.meshFlat) * meshRate) / 60
-  addonMat += n(addons.meshFlat) * mp(materialPrices, 'Mesh Flat')
-
-  const juteRate = lr(laborRates, 'Jute Fabric - Install Rate') // min/sqft
-  addonHrs += (n(addons.juteFabric) * juteRate) / 60
-  addonMat += n(addons.juteFabric) * mp(materialPrices, 'Jute Fabric')
-
-  addonHrs += n(addons.addonHours)
-  addonMat += n(addons.addonMaterials)
-  addonMat += n(addons.deliveryCharges)
+  const craneSub = n(otherAddons.craneCost)
+  addonHrs += n(otherAddons.addonHours)
+  addonMat += n(otherAddons.addonMaterials)
+  addonMat += n(otherAddons.deliveryCharges)
 
   // Difficulty
   const diffPct = n(difficulty) / 100
@@ -204,7 +321,7 @@ function calcPlanting(
   let manHrs = 0,
     manMat = 0,
     manSub = 0
-  manualRows.forEach(r => {
+  ;(manualRows || []).forEach(r => {
     manHrs += n(r.hours)
     manMat += n(r.materials)
     manSub += n(r.subCost)
@@ -227,16 +344,51 @@ function calcPlanting(
   const yardCheckMat = ycOn ? (smallMat + largeMat) * (ycPct / 100) : 0
 
   const _preWalkHrs = plantHrs + addonHrs + diffHrs + manHrs + (parseFloat(hoursAdj) || 0)
-  const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
-  const totalHrs = _preWalkHrs + walkHrs + yardCheckHrs
-  const manDays = totalHrs / 8
-  const totalMat = smallMat + largeMat + addonMat + manMat + yardCheckMat
-  const laborCost = totalHrs * laborRatePerHour
-  const burden = laborCost * (n(laborBurdenPct) || WORKER_DEFAULTS.laborBurdenPct)
-  const subCost = craneSub + manSub
-  const gp = manDays * gpmd
-  const commission = gp * WORKER_DEFAULTS.commissionRate
-  const price = totalMat + laborCost + burden + gp + commission + subCost
+  const walkHrsIH = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
+  const totalHrsIH = _preWalkHrs + walkHrsIH + yardCheckHrs
+  const totalMatIH = smallMat + largeMat + addonMat + manMat + yardCheckMat
+  const totalSubMat = smallSubMat + largeSubMat + addonSubMat
+
+  const subMarkup = n(state.subGpMarkupRate) || 0.2
+  let totalHrs,
+    manDays,
+    totalMat,
+    laborCost,
+    burden,
+    gp,
+    subGp,
+    subCost,
+    commission,
+    price,
+    walkHrs
+  if (isSubTab) {
+    // Sub tab: flat per-unit material only, NO labor hours. The itemized flat
+    // cost IS the subcontractor cost; profit is the markup (Sub GP). Crane
+    // hiring + manual sub costs are subcontractor costs regardless of tab.
+    walkHrs = 0
+    totalHrs = 0
+    manDays = 0
+    laborCost = 0
+    burden = 0
+    totalMat = totalSubMat
+    gp = 0
+    subCost = totalSubMat + manSub + craneSub
+    subGp = subCost * subMarkup
+    commission = subGp * WORKER_DEFAULTS.commissionRate
+    price = subCost + subGp + commission
+  } else {
+    walkHrs = walkHrsIH
+    totalHrs = totalHrsIH
+    manDays = totalHrs / 8
+    totalMat = totalMatIH
+    laborCost = totalHrs * laborRatePerHour
+    burden = laborCost * (n(laborBurdenPct) || WORKER_DEFAULTS.laborBurdenPct)
+    subCost = craneSub + manSub
+    gp = manDays * gpmd
+    subGp = 0
+    commission = gp * WORKER_DEFAULTS.commissionRate
+    price = totalMat + laborCost + burden + gp + commission + subCost
+  }
 
   return {
     totalHrs,
@@ -246,6 +398,7 @@ function calcPlanting(
     burden,
     subCost,
     gp,
+    subGp,
     commission,
     price,
     walkHrs,
@@ -256,6 +409,9 @@ function calcPlanting(
     diffHrs,
     yardCheckHrs,
     yardCheckMat,
+    smalls,
+    larges,
+    addonResults,
   }
 }
 
@@ -281,63 +437,101 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
   )
 }
 
-// ── Default state ─────────────────────────────────────────────────────────────
-function newSmallRow(type = 'Flats of Groundcover', materialPrices = {}) {
-  const fallback = SMALL_PLANT_DEFAULTS[type]?.price ?? 0
-  return { type, qty: '', price: materialPrices[type] ?? fallback }
+// ── Default rows / factories ──────────────────────────────────────────────────
+function newSmallRow(type = 'Flats of Groundcover', materialPrices = {}, materialRows = []) {
+  const fb = SMALL_PLANT_DEFAULTS[type]?.price ?? 0
+  return { vendor: 'House', type, qty: '', price: plantMatPrice(type, 'House', materialRows, materialPrices, fb), subEach: '' }
 }
-function newLargeRow(type = '15 gallon standard', materialPrices = {}) {
-  const fallback = LARGE_PLANT_DEFAULTS[type]?.price ?? 0
-  return { type, qty: '', price: materialPrices[type] ?? fallback }
+function newLargeRow(type = '15 gallon standard', materialPrices = {}, materialRows = []) {
+  const fb = LARGE_PLANT_DEFAULTS[type]?.price ?? 0
+  return { vendor: 'House', type, qty: '', price: plantMatPrice(type, 'House', materialRows, materialPrices, fb), subEach: '' }
 }
+const blankAddonRow = () => ({ vendor: 'House', type: 'Tree Stake', qty: '', subEach: '' })
 
-const DEFAULT_SMALL_ROWS = () => [
-  {
+const DEFAULT_SMALL_ROWS = () =>
+  Array.from({ length: 4 }, () => ({
+    vendor: 'House',
     type: 'Flats of Groundcover',
     qty: '',
     price: SMALL_PLANT_DEFAULTS['Flats of Groundcover'].price,
-  },
-  {
-    type: 'Flats of Groundcover',
+    subEach: '',
+  }))
+const DEFAULT_LARGE_ROWS = () =>
+  Array.from({ length: 4 }, () => ({
+    vendor: 'House',
+    type: '15 gallon standard',
     qty: '',
-    price: SMALL_PLANT_DEFAULTS['Flats of Groundcover'].price,
-  },
-  {
-    type: 'Flats of Groundcover',
-    qty: '',
-    price: SMALL_PLANT_DEFAULTS['Flats of Groundcover'].price,
-  },
-  {
-    type: 'Flats of Groundcover',
-    qty: '',
-    price: SMALL_PLANT_DEFAULTS['Flats of Groundcover'].price,
-  },
-]
-const DEFAULT_LARGE_ROWS = () => [
-  { type: '15 gallon standard', qty: '', price: LARGE_PLANT_DEFAULTS['15 gallon standard'].price },
-  { type: '15 gallon standard', qty: '', price: LARGE_PLANT_DEFAULTS['15 gallon standard'].price },
-  { type: '15 gallon standard', qty: '', price: LARGE_PLANT_DEFAULTS['15 gallon standard'].price },
-  { type: '15 gallon standard', qty: '', price: LARGE_PLANT_DEFAULTS['15 gallon standard'].price },
-]
-const DEFAULT_ADDONS = {
+    price: LARGE_PLANT_DEFAULTS['15 gallon standard'].price,
+    subEach: '',
+  }))
+const DEFAULT_ADDON_ROWS = () => [blankAddonRow()]
+
+const OTHER_ADDON_DEFAULTS = {
   craneCost: '',
-  treeStakes: '',
-  rootBarrier12: '',
-  rootBarrier24: '',
   addonHours: '',
   addonMaterials: '',
-  gopherBaskets1: '',
-  gopherBaskets5: '',
-  gopherBaskets15: '',
-  meshFlat: '',
-  juteFabric: '',
   deliveryCharges: '',
 }
+
 const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 1', hours: '', materials: '', subCost: '' },
   { label: 'Misc 2', hours: '', materials: '', subCost: '' },
   { label: 'Misc 3', hours: '', materials: '', subCost: '' },
 ]
+
+// Migrate the legacy fixed `addons` object into the new Vendor+Item row model.
+// Only non-zero legacy items become rows, in the SAME order the original calc
+// summed them — so a legacy save's In-House add-on totals stay byte-for-byte
+// identical (adding zero-qty items changes nothing).
+function migrateAddonRows(a = {}) {
+  const rows = []
+  const push = (type, field) => {
+    if (n(a[field]) > 0) rows.push({ vendor: 'House', type, qty: a[field], subEach: '' })
+  }
+  push('Tree Stake', 'treeStakes')
+  push('Root Barrier 12"', 'rootBarrier12')
+  push('Root Barrier 24"', 'rootBarrier24')
+  push('Gopher Basket 1 gal', 'gopherBaskets1')
+  push('Gopher Basket 5 gal', 'gopherBaskets5')
+  push('Gopher Basket 15 gal', 'gopherBaskets15')
+  push('Mesh Flat', 'meshFlat')
+  push('Jute Fabric', 'juteFabric')
+  return rows.length ? rows : DEFAULT_ADDON_ROWS()
+}
+
+// Per-tab input record. In-House and Sub each hold their own independent copy so
+// the two tabs are separate calculators. Legacy flat saves (fields at the top
+// level, `addons` object) are migrated into In-House rows so nothing is lost.
+function makeTab(src = {}) {
+  const legacyAddons = src.addons || {}
+  return {
+    tillSqft: src.tillSqft ?? '',
+    difficulty: src.difficulty ?? '',
+    hoursAdj: src.hoursAdj ?? '',
+    distanceLF: src.distanceLF ?? '',
+    smallPlantRows: src.smallPlantRows
+      ? src.smallPlantRows.map(r => ({ vendor: 'House', subEach: '', ...r }))
+      : DEFAULT_SMALL_ROWS(),
+    largePlantRows: src.largePlantRows
+      ? src.largePlantRows.map(r => ({ vendor: 'House', subEach: '', ...r }))
+      : DEFAULT_LARGE_ROWS(),
+    addonRows: src.addonRows
+      ? src.addonRows.map(r => ({ vendor: 'House', subEach: '', ...r }))
+      : migrateAddonRows(legacyAddons),
+    otherAddons: src.otherAddons
+      ? { ...OTHER_ADDON_DEFAULTS, ...src.otherAddons }
+      : {
+          craneCost: legacyAddons.craneCost ?? '',
+          addonHours: legacyAddons.addonHours ?? '',
+          addonMaterials: legacyAddons.addonMaterials ?? '',
+          deliveryCharges: legacyAddons.deliveryCharges ?? '',
+        },
+    manualRows: src.manualRows
+      ? src.manualRows.map(r => ({ ...r }))
+      : DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
+    yardCheck: src.yardCheck ? { ...src.yardCheck } : { enabled: false, hours: '3', pct: '2' },
+  }
+}
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function PlantingModule({ onSave, onBack, saving, initialData }) {
@@ -352,38 +546,59 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
   // takeoffs here via create_estimate_from_takeoff, and the user can
   // overwrite / append their own.
   const [notes, setNotes] = useState(initialData?.notes ?? '')
-  const [walkAccess] = useState(
+  const [walkAccess, setWalkAccess] = useState(
     initialData?.walkAccess ?? {
       paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
     }
   )
-  // materialPrices: { 'Plant Name': unit_cost, ... }
+  // materialPrices: { 'Plant / Material Name': unit_cost, ... } (House fallback)
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
   // laborRates: { 'Plant Name or Rate Key': rate_value, ... }
   const [laborRates, setLaborRates] = useState(initialData?.laborRates ?? {})
+  // Full Planting material_rates catalog (id/name/vendor_id/unit/unit_cost) used
+  // to resolve a vendor's material price. Plus the vendor list for the pickers.
+  const [materialRows, setMaterialRows] = useState(initialData?.materialRows || [])
+  const [vendors, setVendors] = useState([])
   const [pricesLoading, setPricesLoading] = useState(!initialData?.materialPrices)
 
-  // Re-fetch Planting master-rate maps. Called once on mount and again after
-  // any RateEditPopover save so the calc reflects edits immediately.
+  // Re-fetch Planting master-rate maps + vendor catalog. Called once on mount and
+  // again after any RateEditPopover save so the calc reflects edits immediately.
   const refreshAllRates = useCallback(async () => {
-    const [matRes, labRes] = await Promise.all([
-      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Planting'),
-      supabase.from('labor_rates').select('name, rate').eq('category', 'Planting'),
+    const [matRes, labRes, catRes, venRes] = await Promise.all([
+      supabase.from('material_rates').select('name, unit_cost').eq('category', PLANTING_CATEGORY),
+      supabase.from('labor_rates').select('name, rate').eq('category', PLANTING_CATEGORY),
+      supabase
+        .from('material_rates')
+        .select('id,name,vendor_id,unit,unit_cost')
+        .eq('category', PLANTING_CATEGORY),
+      supabase
+        .from('subs_vendors')
+        .select('id, company_name, supplied_categories')
+        .eq('type', 'vendor')
+        .order('company_name'),
     ])
     if (matRes.data) {
-      const mp = {}
+      const p = {}
       matRes.data.forEach(r => {
-        mp[r.name] = parseFloat(r.unit_cost) || 0
+        p[r.name] = parseFloat(r.unit_cost) || 0
       })
-      setMaterialPrices(mp)
+      setMaterialPrices(p)
     }
     if (labRes.data) {
-      const lr = {}
+      const l = {}
       labRes.data.forEach(r => {
-        lr[r.name] = parseFloat(r.rate) || 0
+        l[r.name] = parseFloat(r.rate) || 0
       })
-      setLaborRates(lr)
+      setLaborRates(l)
     }
+    setMaterialRows(catRes.data || [])
+    setVendors(
+      (venRes.data || []).map(v => ({
+        id: v.id,
+        name: v.company_name,
+        categories: v.supplied_categories || [],
+      }))
+    )
   }, [])
 
   useEffect(() => {
@@ -399,36 +614,59 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
             )
             if (data.labor_burden_pct != null)
               setLaborBurdenPct(parseFloat(data.labor_burden_pct))
+            if (data.walk_access_pace_lf_per_min != null) {
+              const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
+              setWalkAccess({
+                paceLfPerMin:
+                  Number.isFinite(_wpace) && _wpace > 0
+                    ? _wpace
+                    : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+              })
+            }
           }
         })
     }
-
-    // If editing an existing module, use the saved snapshots
-    if (initialData?.materialPrices) return
-
+    // Always refresh so the vendor list + material catalog load, even when
+    // editing a saved estimate (which already carries a materialPrices map).
     refreshAllRates().then(() => setPricesLoading(false))
   }, [refreshAllRates])
 
   const gpmd = initialData?.gpmd ?? WORKER_DEFAULTS.gpmd
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
-  const [tillSqft, setTillSqft] = useState(initialData?.tillSqft ?? '')
-  const [difficulty, setDifficulty] = useState(initialData?.difficulty ?? '')
-  const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
+  // ── Shared (not per-tab) selections ─────────────────────────────────────────
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Landscape')
   const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
-  const [smallPlantRows, setSmallPlantRows] = useState(
-    initialData?.smallPlantRows ?? DEFAULT_SMALL_ROWS()
-  )
-  const [largePlantRows, setLargePlantRows] = useState(
-    initialData?.largePlantRows ?? DEFAULT_LARGE_ROWS()
-  )
-  const [addons, setAddons] = useState(initialData?.addons ?? DEFAULT_ADDONS)
-  const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
-  const [distanceLF, setDistanceLF] = useState(initialData?.distanceLF ?? '')
-  const [yardCheck, setYardCheck] = useState(
-    initialData?.yardCheck ?? { enabled: false, hours: '3', pct: '2' }
-  )
+
+  // Independent In-House vs Sub input records — each tab is its own calculator.
+  const [ihTab, setIhTab] = useState(() => makeTab(initialData?.ihData || initialData))
+  const [subTab, setSubTab] = useState(() => makeTab(initialData?.subData || {}))
+  const isSub = subType === 'Subcontractor'
+  const cur = isSub ? subTab : ihTab
+  const setCur = isSub ? setSubTab : setIhTab
+  const setField = k => v => setCur(p => ({ ...p, [k]: typeof v === 'function' ? v(p[k]) : v }))
+
+  // Derived active-tab accessors.
+  const tillSqft = cur.tillSqft
+  const setTillSqft = setField('tillSqft')
+  const difficulty = cur.difficulty
+  const setDifficulty = setField('difficulty')
+  const hoursAdj = cur.hoursAdj
+  const setHoursAdj = setField('hoursAdj')
+  const distanceLF = cur.distanceLF
+  const setDistanceLF = setField('distanceLF')
+  const smallPlantRows = cur.smallPlantRows
+  const setSmallPlantRows = setField('smallPlantRows')
+  const largePlantRows = cur.largePlantRows
+  const setLargePlantRows = setField('largePlantRows')
+  const addonRows = cur.addonRows
+  const setAddonRows = setField('addonRows')
+  const otherAddons = cur.otherAddons
+  const setOtherAddons = setField('otherAddons')
+  const manualRows = cur.manualRows
+  const setManualRows = setField('manualRows')
+  const yardCheck = cur.yardCheck
+  const setYardCheck = setField('yardCheck')
 
   // ── Sales tax — applied to totalMat across every module so the bid
   //    reflects supplier-invoiced material cost. Sourced from
@@ -445,24 +683,17 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
     }
   }, [])
 
+  // Active tab drives the calc — the other tab stays untouched.
+  const state = { crewType, subType, subGpMarkupRate, ...cur }
   const calcRaw = calcPlanting(
-    {
-      tillSqft,
-      difficulty,
-      hoursAdj,
-      smallPlantRows,
-      largePlantRows,
-      addons,
-      manualRows,
-      distanceLF,
-      yardCheck,
-    },
+    state,
     laborRatePerHour,
     gpmd,
     materialPrices,
     laborRates,
     walkAccess,
-    laborBurdenPct
+    laborBurdenPct,
+    materialRows
   )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
@@ -479,33 +710,50 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
         }
       : calcRaw
 
-  function updateSmall(i, field, val) {
-    setSmallPlantRows(rows =>
+  // ── Vendor helpers ──────────────────────────────────────────────────────────
+  const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
+  const vendorOptions = [
+    { value: 'House', label: 'House' },
+    ...vendorsForCategory(PLANTING_CATEGORY).map(v => ({ value: v.id, label: v.name })),
+  ]
+
+  // ── Row helpers ─────────────────────────────────────────────────────────────
+  // Plant row update. Changing Vendor or Item resets the unit price to the
+  // vendor-resolved default (House = original master-rate / catalog price), and
+  // (on the Sub tab) refreshes the flat $/unit default.
+  function plantUpdate(setRows, defaultsMap, i, field, val) {
+    setRows(rows =>
       rows.map((r, idx) => {
         if (idx !== i) return r
-        if (field === 'type') {
-          const fallback = SMALL_PLANT_DEFAULTS[val]?.price ?? 0
-          return { ...r, type: val, price: materialPrices[val] ?? fallback }
+        if (field === 'type' || field === 'vendor') {
+          const next = { ...r, [field]: val }
+          const fb = defaultsMap[next.type]?.price ?? 0
+          const price = plantMatPrice(next.type, next.vendor, materialRows, materialPrices, fb)
+          next.price = price
+          if (isSub) next.subEach = String(r2(price))
+          return next
         }
         return { ...r, [field]: val }
       })
     )
   }
-  function updateLarge(i, field, val) {
-    setLargePlantRows(rows =>
+  // Add-on row update. Changing Vendor or Item refreshes the Sub flat default.
+  function addonUpdate(i, field, val) {
+    setAddonRows(rows =>
       rows.map((r, idx) => {
         if (idx !== i) return r
-        if (field === 'type') {
-          const fallback = LARGE_PLANT_DEFAULTS[val]?.price ?? 0
-          return { ...r, type: val, price: materialPrices[val] ?? fallback }
-        }
-        return { ...r, [field]: val }
+        const next = { ...r, [field]: val }
+        if ((field === 'type' || field === 'vendor') && isSub)
+          next.subEach = String(r2(computeAddonRow(next, laborRates, materialPrices, materialRows).subUnit))
+        return next
       })
     )
   }
   function updateManual(i, field, val) {
     setManualRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
+  const removeRow = (setRows, i) =>
+    setRows(rows => (rows.length > 1 ? rows.filter((_, idx) => idx !== i) : rows))
 
   function handleSave() {
     onSave({
@@ -513,27 +761,368 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
       man_days: parseFloat(calc.manDays.toFixed(2)),
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
       data: {
-        tillSqft,
-        difficulty,
-        smallPlantRows,
-        largePlantRows,
-        addons,
-        manualRows,
-        distanceLF,
-        yardCheck,
+        ...state,
+        ihData: ihTab,
+        subData: subTab,
+        subType,
+        subGpMarkupRate,
+        walkAccess,
         laborRatePerHour,
         laborBurdenPct,
         gpmd,
         materialPrices, // snapshot so summary always reflects save-time prices
         laborRates, // snapshot so summary always reflects save-time rates
+        materialRows, // vendor-resolved catalog snapshot for the summary
+        vendorNames: Object.fromEntries(vendors.map(v => [v.id, v.name])),
         calc,
       },
     })
   }
 
-  // Helper: display the live per-day rate for a plant type
-  const smallPerDay = type => getSmallPerDay(laborRates, type)
-  const largePerDay = type => getLargePerDay(laborRates, type)
+  const fmt2 = v =>
+    `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+  // ── Plant section renderer (Small Plants / Large Plants) ────────────────────
+  function renderPlantSection(title, rows, setRows, defaultsMap, TYPES, perDayFn, addLabel) {
+    return (
+      <div>
+        <SectionHeader title={title} />
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-2 font-medium w-40">Vendor</th>
+                <th className="text-left pb-1 pr-2 font-medium">Plant Type</th>
+                <th className="text-left pb-1 pr-2 font-medium w-20">Qty</th>
+                {!isSub && <th className="text-left pb-1 pr-2 font-medium w-28">Price/Ea</th>}
+                {!isSub && (
+                  <th className="text-right pb-1 pr-2 font-medium text-gray-400">Plants/Day</th>
+                )}
+                <th className="text-right pb-1 pr-2 font-medium text-gray-400 w-24">
+                  {isSub ? 'Flat $/unit' : 'Est. Hrs'}
+                </th>
+                <th className="text-right pb-1 pr-2 font-medium text-gray-400 w-24">Material $</th>
+                <th className="w-6" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => {
+                const perDay = perDayFn(laborRates, row.type)
+                const c = computePlantRow(row, perDay)
+                const masterPrice =
+                  materialPrices[row.type] ?? defaultsMap[row.type]?.price ?? 0
+                const isHouse = !row.vendor || row.vendor === 'House'
+                return (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1.5 pr-2">
+                      <select
+                        className="input text-sm py-1 w-full"
+                        value={row.vendor || 'House'}
+                        onChange={e => plantUpdate(setRows, defaultsMap, i, 'vendor', e.target.value)}
+                      >
+                        {vendorOptions.map(o => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1.5 pr-2">
+                      <select
+                        className="input text-sm py-1 w-full"
+                        value={row.type}
+                        onChange={e => plantUpdate(setRows, defaultsMap, i, 'type', e.target.value)}
+                      >
+                        {TYPES.map(t => (
+                          <option key={t}>{t}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1.5 pr-2">
+                      <NumInput
+                        value={row.qty}
+                        onChange={v => plantUpdate(setRows, defaultsMap, i, 'qty', v)}
+                      />
+                    </td>
+                    {!isSub && (
+                      <td className="py-1.5 pr-2">
+                        <div className="flex items-center gap-1">
+                          <div className="relative flex-1">
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                              $
+                            </span>
+                            <input
+                              type="number"
+                              step="any"
+                              className="input text-sm py-1.5 pl-5 w-full"
+                              value={row.price}
+                              onChange={e => plantUpdate(setRows, defaultsMap, i, 'price', e.target.value)}
+                            />
+                          </div>
+                          {isHouse && (
+                            <RateEditPopover
+                              table="material_rates"
+                              name={row.type}
+                              category="Planting"
+                              unitLabel="ea"
+                              currentValue={masterPrice}
+                              onSaved={refreshAllRates}
+                            />
+                          )}
+                        </div>
+                      </td>
+                    )}
+                    {!isSub && (
+                      <td className="py-1.5 text-right text-gray-400 text-xs">
+                        <span className="inline-flex items-center justify-end gap-1">
+                          {perDay < 1 ? perDay.toFixed(2) : perDay.toLocaleString()}
+                          <RateEditPopover
+                            table="labor_rates"
+                            name={row.type}
+                            category="Planting"
+                            mode="coefficient"
+                            unitLabel="per day"
+                            currentValue={perDay}
+                            onSaved={refreshAllRates}
+                          />
+                        </span>
+                      </td>
+                    )}
+                    <td className="py-1.5 text-right text-xs pr-2">
+                      {isSub ? (
+                        <input
+                          type="number"
+                          step="any"
+                          className="input text-sm py-1 w-24 text-right"
+                          placeholder={r2(c.subUnit).toString()}
+                          value={row.subEach ?? ''}
+                          onChange={e => plantUpdate(setRows, defaultsMap, i, 'subEach', e.target.value)}
+                        />
+                      ) : (
+                        <span className="text-gray-600">{c.hrs > 0 ? c.hrs.toFixed(2) : '—'}</span>
+                      )}
+                    </td>
+                    <td className="py-1.5 text-right text-xs text-gray-600">
+                      {(isSub ? c.subMat : c.mat) > 0 ? fmt2(isSub ? c.subMat : c.mat) : '—'}
+                    </td>
+                    <td className="py-1.5 text-right">
+                      <button
+                        type="button"
+                        onClick={() => removeRow(setRows, i)}
+                        className="text-gray-300 hover:text-red-500 text-xs px-1"
+                        title="Remove row"
+                      >
+                        ✕
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        <button
+          type="button"
+          className="mt-2 text-xs text-green-700 hover:text-green-900 font-medium"
+          onClick={() =>
+            setRows(rows => [
+              ...rows,
+              defaultsMap === SMALL_PLANT_DEFAULTS
+                ? newSmallRow('Flats of Groundcover', materialPrices, materialRows)
+                : newLargeRow('15 gallon standard', materialPrices, materialRows),
+            ])
+          }
+        >
+          {addLabel}
+        </button>
+      </div>
+    )
+  }
+
+  // ── Planting Add-Ons section renderer ───────────────────────────────────────
+  function renderAddonSection() {
+    return (
+      <div>
+        <SectionHeader title="Planting Add-Ons" />
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-2 font-medium w-40">Vendor</th>
+                <th className="text-left pb-1 pr-2 font-medium">Item</th>
+                <th className="text-left pb-1 pr-2 font-medium w-20">Qty</th>
+                {!isSub && <th className="text-left pb-1 pr-2 font-medium">Rate</th>}
+                <th className="text-right pb-1 pr-2 font-medium text-gray-400 w-24">
+                  {isSub ? 'Flat $/unit' : 'Est. Hrs'}
+                </th>
+                <th className="text-right pb-1 pr-2 font-medium text-gray-400 w-24">Material $</th>
+                <th className="w-6" />
+              </tr>
+            </thead>
+            <tbody>
+              {addonRows.map((row, i) => {
+                const meta = ADDON_META[row.type] || {}
+                const c = computeAddonRow(row, laborRates, materialPrices, materialRows)
+                const isHouse = !row.vendor || row.vendor === 'House'
+                const houseMat = mp(materialPrices, meta.matKey)
+                return (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1.5 pr-2">
+                      <select
+                        className="input text-sm py-1 w-full"
+                        value={row.vendor || 'House'}
+                        onChange={e => addonUpdate(i, 'vendor', e.target.value)}
+                      >
+                        {vendorOptions.map(o => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1.5 pr-2">
+                      <select
+                        className="input text-sm py-1 w-full"
+                        value={row.type}
+                        onChange={e => addonUpdate(i, 'type', e.target.value)}
+                      >
+                        {ADDON_TYPES.map(t => (
+                          <option key={t}>{t}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1.5 pr-2">
+                      <NumInput value={row.qty} onChange={v => addonUpdate(i, 'qty', v)} />
+                    </td>
+                    {!isSub && (
+                      <td className="py-1.5 pr-2">
+                        <div className="flex items-center gap-1 flex-wrap text-xs text-gray-400">
+                          <span>
+                            ${c.unitPrice.toFixed(2)}/{meta.unit}
+                          </span>
+                          {isHouse && (
+                            <RateEditPopover
+                              table="material_rates"
+                              name={meta.matKey}
+                              category="Planting"
+                              unitLabel={meta.unit}
+                              currentValue={houseMat}
+                              onSaved={refreshAllRates}
+                            />
+                          )}
+                          {isHouse && meta.labKey && (
+                            <RateEditPopover
+                              table="labor_rates"
+                              name={meta.labKey}
+                              category="Planting"
+                              mode="coefficient"
+                              unitLabel={meta.labUnit || 'rate'}
+                              currentValue={lr(laborRates, meta.labKey)}
+                              onSaved={refreshAllRates}
+                            />
+                          )}
+                        </div>
+                      </td>
+                    )}
+                    <td className="py-1.5 text-right text-xs pr-2">
+                      {isSub ? (
+                        <input
+                          type="number"
+                          step="any"
+                          className="input text-sm py-1 w-24 text-right"
+                          placeholder={r2(c.subUnit).toString()}
+                          value={row.subEach ?? ''}
+                          onChange={e => addonUpdate(i, 'subEach', e.target.value)}
+                        />
+                      ) : (
+                        <span className="text-gray-600">{c.hrs > 0 ? c.hrs.toFixed(2) : '—'}</span>
+                      )}
+                    </td>
+                    <td className="py-1.5 text-right text-xs text-gray-600">
+                      {(isSub ? c.subMat : c.mat) > 0 ? fmt2(isSub ? c.subMat : c.mat) : '—'}
+                    </td>
+                    <td className="py-1.5 text-right">
+                      <button
+                        type="button"
+                        onClick={() => removeRow(setAddonRows, i)}
+                        className="text-gray-300 hover:text-red-500 text-xs px-1"
+                        title="Remove row"
+                      >
+                        ✕
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        <button
+          type="button"
+          className="mt-2 text-xs text-green-700 hover:text-green-900 font-medium"
+          onClick={() => setAddonRows(rows => [...rows, blankAddonRow()])}
+        >
+          + Add Row
+        </button>
+
+        {/* Other Add-Ons — crane (sub cost) + flat manual / delivery. */}
+        <div className="space-y-2 mt-4">
+          <div className="flex items-center gap-3">
+            <label className="text-sm text-gray-700 w-52 shrink-0">Crane (hiring cost $)</label>
+            <div className="relative w-36">
+              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                $
+              </span>
+              <NumInput
+                value={otherAddons.craneCost}
+                onChange={v => setOtherAddons(p => ({ ...p, craneCost: v }))}
+                className="pl-5"
+              />
+            </div>
+            <span className="text-xs text-gray-400">Sub cost</span>
+          </div>
+
+          {!isSub && (
+            <>
+              <div className="flex items-center gap-3">
+                <label className="text-sm text-gray-700 w-52 shrink-0">Manual Add-On (hrs)</label>
+                <NumInput
+                  value={otherAddons.addonHours}
+                  onChange={v => setOtherAddons(p => ({ ...p, addonHours: v }))}
+                  className="w-36"
+                />
+                <div className="relative w-36">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                    $
+                  </span>
+                  <NumInput
+                    value={otherAddons.addonMaterials}
+                    onChange={v => setOtherAddons(p => ({ ...p, addonMaterials: v }))}
+                    className="pl-5"
+                    placeholder="Mat $"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <label className="text-sm text-gray-700 w-52 shrink-0">Delivery Charges ($)</label>
+                <div className="relative w-36">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                    $
+                  </span>
+                  <NumInput
+                    value={otherAddons.deliveryCharges}
+                    onChange={v => setOtherAddons(p => ({ ...p, deliveryCharges: v }))}
+                    className="pl-5"
+                  />
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5">
@@ -541,7 +1130,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
         {/* GPMD summary bar */}
         <GpmdBar
-          variant={subType === 'Subcontractor' ? 'sub' : 'inhouse'}
+          variant={isSub ? 'sub' : 'inhouse'}
           sticky
           totalMat={calc.totalMat}
           totalHrs={calc.totalHrs}
@@ -556,7 +1145,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
           price={calc.price}
           subMarkupRate={subGpMarkupRate}
         />
-            </div>
+      </div>
 
       {/* Notes — pinned in its own sticky container just below the
           GPMD bar. Plain white textarea, no card chrome. */}
@@ -589,589 +1178,106 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
       )}
 
       {/* Settings — In-House tab only */}
-      {subType !== 'Subcontractor' && (
+      {!isSub && (
         <>
-      <SectionHeader title="Job Site Conditions" />
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
-          <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
-        </div>
-        <div>
-          <p
-            className="text-xs text-gray-500 mb-0.5"
-            title="Average Distance from Truck to Work Area"
-          >
-            Truck → Work Area (Avg LF)
-          </p>
-          <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
-          {calc.walkHrs > 0 && (
-            <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">
-              +{calc.walkHrs.toFixed(2)} hrs walk-access
-            </p>
-          )}
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
-          <NumInput value={hoursAdj} onChange={setHoursAdj} placeholder="0" />
-        </div>
-      </div>
+          <SectionHeader title="Job Site Conditions" />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
+              <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
+            </div>
+            <div>
+              <p
+                className="text-xs text-gray-500 mb-0.5"
+                title="Average Distance from Truck to Work Area"
+              >
+                Truck → Work Area (Avg LF)
+              </p>
+              <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
+              {calc.walkHrs > 0 && (
+                <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">
+                  +{calc.walkHrs.toFixed(2)} hrs walk-access
+                </p>
+              )}
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
+              <NumInput value={hoursAdj} onChange={setHoursAdj} placeholder="0" />
+            </div>
+          </div>
         </>
       )}
 
-      {/* Till & Amend Soil */}
-      <SectionHeader title="Till & Amend Soil" />
-      <div>
-        <div className="flex items-center flex-wrap gap-2 text-xs text-gray-400 mb-1">
-          <span>{lr(laborRates, 'Till - Soil Move Rate')} CY/d</span>
-          <RateEditPopover
-            table="labor_rates"
-            name="Till - Soil Move Rate"
-            category="Planting"
-            mode="coefficient"
-            unitLabel="CY/day"
-            currentValue={lr(laborRates, 'Till - Soil Move Rate')}
-            onSaved={refreshAllRates}
-          />
-          <span>· {lr(laborRates, 'Till - Tilling Rate')} SF/d</span>
-          <RateEditPopover
-            table="labor_rates"
-            name="Till - Tilling Rate"
-            category="Planting"
-            mode="coefficient"
-            unitLabel="SF/day"
-            currentValue={lr(laborRates, 'Till - Tilling Rate')}
-            onSaved={refreshAllRates}
-          />
-          <span>· {lr(laborRates, 'Till - Amend Rate')} SF/d</span>
-          <RateEditPopover
-            table="labor_rates"
-            name="Till - Amend Rate"
-            category="Planting"
-            mode="coefficient"
-            unitLabel="SF/day"
-            currentValue={lr(laborRates, 'Till - Amend Rate')}
-            onSaved={refreshAllRates}
-          />
-        </div>
-        <p className="text-xs text-gray-500 mb-0.5">Sqft</p>
-        <NumInput value={tillSqft} onChange={setTillSqft} placeholder="0" />
-        {n(tillSqft) > 0 && (
-          <p className="text-xs text-gray-400 mt-1">{calc.tillHrs.toFixed(2)} hrs estimated</p>
-        )}
-      </div>
+      {/* Till & Amend Soil — In-House only (labor, no material) */}
+      {!isSub && (
+        <>
+          <SectionHeader title="Till & Amend Soil" />
+          <div>
+            <div className="flex items-center flex-wrap gap-2 text-xs text-gray-400 mb-1">
+              <span>{lr(laborRates, 'Till - Soil Move Rate')} CY/d</span>
+              <RateEditPopover
+                table="labor_rates"
+                name="Till - Soil Move Rate"
+                category="Planting"
+                mode="coefficient"
+                unitLabel="CY/day"
+                currentValue={lr(laborRates, 'Till - Soil Move Rate')}
+                onSaved={refreshAllRates}
+              />
+              <span>· {lr(laborRates, 'Till - Tilling Rate')} SF/d</span>
+              <RateEditPopover
+                table="labor_rates"
+                name="Till - Tilling Rate"
+                category="Planting"
+                mode="coefficient"
+                unitLabel="SF/day"
+                currentValue={lr(laborRates, 'Till - Tilling Rate')}
+                onSaved={refreshAllRates}
+              />
+              <span>· {lr(laborRates, 'Till - Amend Rate')} SF/d</span>
+              <RateEditPopover
+                table="labor_rates"
+                name="Till - Amend Rate"
+                category="Planting"
+                mode="coefficient"
+                unitLabel="SF/day"
+                currentValue={lr(laborRates, 'Till - Amend Rate')}
+                onSaved={refreshAllRates}
+              />
+            </div>
+            <p className="text-xs text-gray-500 mb-0.5">Sqft</p>
+            <NumInput value={tillSqft} onChange={setTillSqft} placeholder="0" />
+            {n(tillSqft) > 0 && (
+              <p className="text-xs text-gray-400 mt-1">{calc.tillHrs.toFixed(2)} hrs estimated</p>
+            )}
+          </div>
+        </>
+      )}
 
       {/* ── Small Plants ── */}
-      <div>
-        <SectionHeader title="Small Plants" />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-left pb-1 pr-2 font-medium">Plant Type</th>
-                <th className="text-left pb-1 pr-2 font-medium w-20">Qty</th>
-                <th className="text-left pb-1 pr-2 font-medium w-24">Price/Ea</th>
-                <th className="text-right pb-1 font-medium text-gray-400">Plants/Day</th>
-                <th className="text-right pb-1 pl-2 font-medium text-gray-400">Est. Hrs</th>
-              </tr>
-            </thead>
-            <tbody>
-              {smallPlantRows.map((row, i) => {
-                const qty = n(row.qty)
-                const perDay = smallPerDay(row.type)
-                const hrs = qty > 0 && perDay > 0 ? (qty / perDay) * 8 : 0
-                const masterPrice =
-                  materialPrices[row.type] ?? SMALL_PLANT_DEFAULTS[row.type]?.price ?? 0
-                return (
-                  <tr key={i} className="border-b border-gray-100">
-                    <td className="py-1 pr-2">
-                      <select
-                        className="input text-sm py-1 w-full"
-                        value={row.type}
-                        onChange={e => updateSmall(i, 'type', e.target.value)}
-                      >
-                        {Object.keys(SMALL_PLANT_DEFAULTS).map(t => (
-                          <option key={t}>{t}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="py-1 pr-2">
-                      <NumInput value={row.qty} onChange={v => updateSmall(i, 'qty', v)} />
-                    </td>
-                    <td className="py-1 pr-2">
-                      <div className="flex items-center gap-1">
-                        <div className="relative flex-1">
-                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                            $
-                          </span>
-                          <input
-                            type="number"
-                            step="any"
-                            className="input text-sm py-1.5 pl-5 w-full"
-                            value={row.price}
-                            onChange={e => updateSmall(i, 'price', e.target.value)}
-                          />
-                        </div>
-                        <RateEditPopover
-                          table="material_rates"
-                          name={row.type}
-                          category="Planting"
-                          unitLabel="ea"
-                          currentValue={masterPrice}
-                          onSaved={refreshAllRates}
-                        />
-                      </div>
-                    </td>
-                    <td className="py-1 text-right text-gray-400 text-xs">
-                      <span className="inline-flex items-center justify-end gap-1">
-                        {perDay.toLocaleString()}
-                        <RateEditPopover
-                          table="labor_rates"
-                          name={row.type}
-                          category="Planting"
-                          mode="coefficient"
-                          unitLabel="per day"
-                          currentValue={perDay}
-                          onSaved={refreshAllRates}
-                        />
-                      </span>
-                    </td>
-                    <td className="py-1 text-right text-gray-600 text-xs pl-2">
-                      {hrs > 0 ? hrs.toFixed(2) : '—'}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-        <button
-          type="button"
-          className="mt-2 text-xs text-green-700 hover:text-green-900 font-medium"
-          onClick={() =>
-            setSmallPlantRows(rows => [
-              ...rows,
-              newSmallRow('Flats of Groundcover', materialPrices),
-            ])
-          }
-        >
-          + Add Row
-        </button>
-      </div>
+      {renderPlantSection(
+        'Small Plants',
+        smallPlantRows,
+        setSmallPlantRows,
+        SMALL_PLANT_DEFAULTS,
+        Object.keys(SMALL_PLANT_DEFAULTS),
+        getSmallPerDay,
+        '+ Add Row'
+      )}
 
       {/* ── Large Plants / Trees ── */}
-      <div>
-        <SectionHeader title="Large Plants / Trees" />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-left pb-1 pr-2 font-medium">Plant Type</th>
-                <th className="text-left pb-1 pr-2 font-medium w-20">Qty</th>
-                <th className="text-left pb-1 pr-2 font-medium w-24">Price/Ea</th>
-                <th className="text-right pb-1 font-medium text-gray-400">Plants/Day</th>
-                <th className="text-right pb-1 pl-2 font-medium text-gray-400">Est. Hrs</th>
-              </tr>
-            </thead>
-            <tbody>
-              {largePlantRows.map((row, i) => {
-                const qty = n(row.qty)
-                const perDay = largePerDay(row.type)
-                const hrs = qty > 0 && perDay > 0 ? (qty / perDay) * 8 : 0
-                const masterPrice =
-                  materialPrices[row.type] ?? LARGE_PLANT_DEFAULTS[row.type]?.price ?? 0
-                return (
-                  <tr key={i} className="border-b border-gray-100">
-                    <td className="py-1 pr-2">
-                      <select
-                        className="input text-sm py-1 w-full"
-                        value={row.type}
-                        onChange={e => updateLarge(i, 'type', e.target.value)}
-                      >
-                        {Object.keys(LARGE_PLANT_DEFAULTS).map(t => (
-                          <option key={t}>{t}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="py-1 pr-2">
-                      <NumInput value={row.qty} onChange={v => updateLarge(i, 'qty', v)} />
-                    </td>
-                    <td className="py-1 pr-2">
-                      <div className="flex items-center gap-1">
-                        <div className="relative flex-1">
-                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                            $
-                          </span>
-                          <input
-                            type="number"
-                            step="any"
-                            className="input text-sm py-1.5 pl-5 w-full"
-                            value={row.price}
-                            onChange={e => updateLarge(i, 'price', e.target.value)}
-                          />
-                        </div>
-                        <RateEditPopover
-                          table="material_rates"
-                          name={row.type}
-                          category="Planting"
-                          unitLabel="ea"
-                          currentValue={masterPrice}
-                          onSaved={refreshAllRates}
-                        />
-                      </div>
-                    </td>
-                    <td className="py-1 text-right text-gray-400 text-xs">
-                      <span className="inline-flex items-center justify-end gap-1">
-                        {perDay < 1 ? perDay.toFixed(2) : perDay.toLocaleString()}
-                        <RateEditPopover
-                          table="labor_rates"
-                          name={row.type}
-                          category="Planting"
-                          mode="coefficient"
-                          unitLabel="per day"
-                          currentValue={perDay}
-                          onSaved={refreshAllRates}
-                        />
-                      </span>
-                    </td>
-                    <td className="py-1 text-right text-gray-600 text-xs pl-2">
-                      {hrs > 0 ? hrs.toFixed(2) : '—'}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-        <button
-          type="button"
-          className="mt-2 text-xs text-green-700 hover:text-green-900 font-medium"
-          onClick={() =>
-            setLargePlantRows(rows => [...rows, newLargeRow('15 gallon standard', materialPrices)])
-          }
-        >
-          + Add Row
-        </button>
-      </div>
+      {renderPlantSection(
+        'Large Plants / Trees',
+        largePlantRows,
+        setLargePlantRows,
+        LARGE_PLANT_DEFAULTS,
+        Object.keys(LARGE_PLANT_DEFAULTS),
+        getLargePerDay,
+        '+ Add Row'
+      )}
 
       {/* ── Planting Add-Ons ── */}
-      <div>
-        <SectionHeader title="Planting Add-Ons" />
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <label className="text-sm text-gray-700 w-52 shrink-0">Crane (hiring cost $)</label>
-            <div className="relative w-36">
-              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                $
-              </span>
-              <NumInput
-                value={addons.craneCost}
-                onChange={v => setAddons(p => ({ ...p, craneCost: v }))}
-                className="pl-5"
-              />
-            </div>
-            <span className="text-xs text-gray-400">Sub cost</span>
-          </div>
-
-          <div className="flex items-center gap-3 flex-wrap">
-            <label className="text-sm text-gray-700 w-52 shrink-0 inline-flex items-center gap-1">
-              Tree Stakes (qty)
-              <RateEditPopover
-                table="labor_rates"
-                name="Tree Stakes - Install Rate"
-                category="Planting"
-                mode="coefficient"
-                unitLabel="stakes/day"
-                currentValue={lr(laborRates, 'Tree Stakes - Install Rate')}
-                onSaved={refreshAllRates}
-              />
-              <RateEditPopover
-                table="material_rates"
-                name="Tree Stake"
-                category="Planting"
-                unitLabel="ea"
-                currentValue={mp(materialPrices, 'Tree Stake')}
-                onSaved={refreshAllRates}
-              />
-            </label>
-            <NumInput
-              value={addons.treeStakes}
-              onChange={v => setAddons(p => ({ ...p, treeStakes: v }))}
-              className="w-36"
-            />
-            {n(addons.treeStakes) > 0 && (
-              <span className="text-xs text-gray-400">
-                {(
-                  (n(addons.treeStakes) / lr(laborRates, 'Tree Stakes - Install Rate')) *
-                  8
-                ).toFixed(2)}{' '}
-                hrs · ${(n(addons.treeStakes) * mp(materialPrices, 'Tree Stake')).toFixed(2)} mat
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3 flex-wrap">
-            <label className="text-sm text-gray-700 w-52 shrink-0 inline-flex items-center gap-1">
-              Root Barrier 12" (LF)
-              <RateEditPopover
-                table="labor_rates"
-                name="Root Barrier - Install Rate"
-                category="Planting"
-                mode="coefficient"
-                unitLabel="min/LF"
-                currentValue={lr(laborRates, 'Root Barrier - Install Rate')}
-                onSaved={refreshAllRates}
-              />
-              <RateEditPopover
-                table="material_rates"
-                name="Root Barrier 12in"
-                category="Planting"
-                unitLabel="LF"
-                currentValue={mp(materialPrices, 'Root Barrier 12in')}
-                onSaved={refreshAllRates}
-              />
-            </label>
-            <NumInput
-              value={addons.rootBarrier12}
-              onChange={v => setAddons(p => ({ ...p, rootBarrier12: v }))}
-              className="w-36"
-            />
-            {n(addons.rootBarrier12) > 0 && (
-              <span className="text-xs text-gray-400">
-                {(
-                  (n(addons.rootBarrier12) * lr(laborRates, 'Root Barrier - Install Rate')) /
-                  60
-                ).toFixed(2)}{' '}
-                hrs · $
-                {(n(addons.rootBarrier12) * mp(materialPrices, 'Root Barrier 12in')).toFixed(2)} mat
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3 flex-wrap">
-            <label className="text-sm text-gray-700 w-52 shrink-0 inline-flex items-center gap-1">
-              Root Barrier 24" (LF)
-              <RateEditPopover
-                table="material_rates"
-                name="Root Barrier 24in"
-                category="Planting"
-                unitLabel="LF"
-                currentValue={mp(materialPrices, 'Root Barrier 24in')}
-                onSaved={refreshAllRates}
-              />
-            </label>
-            <NumInput
-              value={addons.rootBarrier24}
-              onChange={v => setAddons(p => ({ ...p, rootBarrier24: v }))}
-              className="w-36"
-            />
-            {n(addons.rootBarrier24) > 0 && (
-              <span className="text-xs text-gray-400">
-                {(
-                  (n(addons.rootBarrier24) * lr(laborRates, 'Root Barrier - Install Rate')) /
-                  60
-                ).toFixed(2)}{' '}
-                hrs · $
-                {(n(addons.rootBarrier24) * mp(materialPrices, 'Root Barrier 24in')).toFixed(2)} mat
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3 flex-wrap">
-            <label className="text-sm text-gray-700 w-52 shrink-0 inline-flex items-center gap-1">
-              Gopher Baskets — 1 gal (qty)
-              <RateEditPopover
-                table="labor_rates"
-                name="Gopher Basket - Install Rate"
-                category="Planting"
-                mode="coefficient"
-                unitLabel="min/ea"
-                currentValue={lr(laborRates, 'Gopher Basket - Install Rate')}
-                onSaved={refreshAllRates}
-              />
-              <RateEditPopover
-                table="material_rates"
-                name="Gopher Basket 1 Gal"
-                category="Planting"
-                unitLabel="ea"
-                currentValue={mp(materialPrices, 'Gopher Basket 1 Gal')}
-                onSaved={refreshAllRates}
-              />
-            </label>
-            <NumInput
-              value={addons.gopherBaskets1}
-              onChange={v => setAddons(p => ({ ...p, gopherBaskets1: v }))}
-              className="w-36"
-            />
-            {n(addons.gopherBaskets1) > 0 && (
-              <span className="text-xs text-gray-400">
-                ${(n(addons.gopherBaskets1) * mp(materialPrices, 'Gopher Basket 1 Gal')).toFixed(2)}{' '}
-                mat
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3 flex-wrap">
-            <label className="text-sm text-gray-700 w-52 shrink-0 inline-flex items-center gap-1">
-              Gopher Baskets — 5 gal (qty)
-              <RateEditPopover
-                table="material_rates"
-                name="Gopher Basket 5 Gal"
-                category="Planting"
-                unitLabel="ea"
-                currentValue={mp(materialPrices, 'Gopher Basket 5 Gal')}
-                onSaved={refreshAllRates}
-              />
-            </label>
-            <NumInput
-              value={addons.gopherBaskets5}
-              onChange={v => setAddons(p => ({ ...p, gopherBaskets5: v }))}
-              className="w-36"
-            />
-            {n(addons.gopherBaskets5) > 0 && (
-              <span className="text-xs text-gray-400">
-                ${(n(addons.gopherBaskets5) * mp(materialPrices, 'Gopher Basket 5 Gal')).toFixed(2)}{' '}
-                mat
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3 flex-wrap">
-            <label className="text-sm text-gray-700 w-52 shrink-0 inline-flex items-center gap-1">
-              Gopher Baskets — 15 gal (qty)
-              <RateEditPopover
-                table="material_rates"
-                name="Gopher Basket 15 Gal"
-                category="Planting"
-                unitLabel="ea"
-                currentValue={mp(materialPrices, 'Gopher Basket 15 Gal')}
-                onSaved={refreshAllRates}
-              />
-            </label>
-            <NumInput
-              value={addons.gopherBaskets15}
-              onChange={v => setAddons(p => ({ ...p, gopherBaskets15: v }))}
-              className="w-36"
-            />
-            {n(addons.gopherBaskets15) > 0 && (
-              <span className="text-xs text-gray-400">
-                $
-                {(n(addons.gopherBaskets15) * mp(materialPrices, 'Gopher Basket 15 Gal')).toFixed(
-                  2
-                )}{' '}
-                mat
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3 flex-wrap">
-            <label className="text-sm text-gray-700 w-52 shrink-0 inline-flex items-center gap-1">
-              Mesh Flat (sqft)
-              <RateEditPopover
-                table="labor_rates"
-                name="Mesh Flat - Install Rate"
-                category="Planting"
-                mode="coefficient"
-                unitLabel="min/SF"
-                currentValue={lr(laborRates, 'Mesh Flat - Install Rate')}
-                onSaved={refreshAllRates}
-              />
-              <RateEditPopover
-                table="material_rates"
-                name="Mesh Flat"
-                category="Planting"
-                unitLabel="SF"
-                currentValue={mp(materialPrices, 'Mesh Flat')}
-                onSaved={refreshAllRates}
-              />
-            </label>
-            <NumInput
-              value={addons.meshFlat}
-              onChange={v => setAddons(p => ({ ...p, meshFlat: v }))}
-              className="w-36"
-            />
-            {n(addons.meshFlat) > 0 && (
-              <span className="text-xs text-gray-400">
-                {((n(addons.meshFlat) * lr(laborRates, 'Mesh Flat - Install Rate')) / 60).toFixed(
-                  2
-                )}{' '}
-                hrs · ${(n(addons.meshFlat) * mp(materialPrices, 'Mesh Flat')).toFixed(2)} mat
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3 flex-wrap">
-            <label className="text-sm text-gray-700 w-52 shrink-0 inline-flex items-center gap-1">
-              Jute Fabric (sqft)
-              <RateEditPopover
-                table="labor_rates"
-                name="Jute Fabric - Install Rate"
-                category="Planting"
-                mode="coefficient"
-                unitLabel="min/SF"
-                currentValue={lr(laborRates, 'Jute Fabric - Install Rate')}
-                onSaved={refreshAllRates}
-              />
-              <RateEditPopover
-                table="material_rates"
-                name="Jute Fabric"
-                category="Planting"
-                unitLabel="SF"
-                currentValue={mp(materialPrices, 'Jute Fabric')}
-                onSaved={refreshAllRates}
-              />
-            </label>
-            <NumInput
-              value={addons.juteFabric}
-              onChange={v => setAddons(p => ({ ...p, juteFabric: v }))}
-              className="w-36"
-            />
-            {n(addons.juteFabric) > 0 && (
-              <span className="text-xs text-gray-400">
-                {(
-                  (n(addons.juteFabric) * lr(laborRates, 'Jute Fabric - Install Rate')) /
-                  60
-                ).toFixed(2)}{' '}
-                hrs · ${(n(addons.juteFabric) * mp(materialPrices, 'Jute Fabric')).toFixed(2)} mat
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <label className="text-sm text-gray-700 w-52 shrink-0">Manual Add-On (hrs)</label>
-            <NumInput
-              value={addons.addonHours}
-              onChange={v => setAddons(p => ({ ...p, addonHours: v }))}
-              className="w-36"
-            />
-            <div className="relative w-36">
-              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                $
-              </span>
-              <NumInput
-                value={addons.addonMaterials}
-                onChange={v => setAddons(p => ({ ...p, addonMaterials: v }))}
-                className="pl-5"
-                placeholder="Mat $"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <label className="text-sm text-gray-700 w-52 shrink-0">Delivery Charges ($)</label>
-            <div className="relative w-36">
-              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                $
-              </span>
-              <NumInput
-                value={addons.deliveryCharges}
-                onChange={v => setAddons(p => ({ ...p, deliveryCharges: v }))}
-                className="pl-5"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+      {renderAddonSection()}
 
       {/* ── Manual Entry ── */}
       <div>
@@ -1214,7 +1320,9 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
           </table>
           <button
             type="button"
-            onClick={() => setManualRows(rows => [...rows, { label: '', hours: '', materials: '', subCost: '' }])}
+            onClick={() =>
+              setManualRows(rows => [...rows, { label: '', hours: '', materials: '', subCost: '' }])
+            }
             className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
           >
             + Add manual entry
@@ -1222,46 +1330,50 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
         </div>
       </div>
 
-      {/* ── Yard Checks (optional) ── */}
-      <SectionHeader title="Yard Checks (optional)" />
-      <div className="bg-white border border-gray-200 rounded-lg p-4 -mt-1">
-        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-          <input
-            type="checkbox"
-            checked={!!yardCheck.enabled}
-            onChange={e => setYardCheck(y => ({ ...y, enabled: e.target.checked }))}
-            className="accent-green-700"
-          />
-          Include yard checks (return visits for watering / health checks)
-        </label>
-        {yardCheck.enabled && (
-          <div className="grid grid-cols-2 gap-4 mt-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Hours</label>
-              <NumInput
-                value={yardCheck.hours ?? ''}
-                onChange={v => setYardCheck(y => ({ ...y, hours: v }))}
-                placeholder="3"
+      {/* ── Yard Checks (optional) — In-House only ── */}
+      {!isSub && (
+        <>
+          <SectionHeader title="Yard Checks (optional)" />
+          <div className="bg-white border border-gray-200 rounded-lg p-4 -mt-1">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <input
+                type="checkbox"
+                checked={!!yardCheck.enabled}
+                onChange={e => setYardCheck(y => ({ ...y, enabled: e.target.checked }))}
+                className="accent-green-700"
               />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">
-                % of plant material
-              </label>
-              <NumInput
-                value={yardCheck.pct}
-                onChange={v => setYardCheck(y => ({ ...y, pct: v }))}
-                placeholder="2"
-              />
-            </div>
-            <p className="col-span-2 text-xs text-gray-400">
-              Adds {calc.yardCheckHrs?.toFixed(1) || 0} hrs and $
-              {Math.round(calc.yardCheckMat || 0).toLocaleString()} material. Defaults: 3 hrs + 2% of
-              plant material.
-            </p>
+              Include yard checks (return visits for watering / health checks)
+            </label>
+            {yardCheck.enabled && (
+              <div className="grid grid-cols-2 gap-4 mt-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Hours</label>
+                  <NumInput
+                    value={yardCheck.hours ?? ''}
+                    onChange={v => setYardCheck(y => ({ ...y, hours: v }))}
+                    placeholder="3"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                    % of plant material
+                  </label>
+                  <NumInput
+                    value={yardCheck.pct}
+                    onChange={v => setYardCheck(y => ({ ...y, pct: v }))}
+                    placeholder="2"
+                  />
+                </div>
+                <p className="col-span-2 text-xs text-gray-400">
+                  Adds {calc.yardCheckHrs?.toFixed(1) || 0} hrs and $
+                  {Math.round(calc.yardCheckMat || 0).toLocaleString()} material. Defaults: 3 hrs +
+                  2% of plant material.
+                </p>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
 
       <div className="flex gap-3 pt-2">
         <button onClick={onBack} className="btn-secondary flex-1">

@@ -1,46 +1,52 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// PlantingSummary — read-only detail view for a saved Planting module
-// Uses materialPrices + laborRates snapshots saved at module-save time
+// PlantingSummary — read-only detail view for a saved Planting module.
+//
+// Consumes the row-based catalog shape (ihData / subData holding smallPlantRows /
+// largePlantRows / addonRows + otherAddons). Recomputes each row's material /
+// labor from the saved rate + vendor-catalog snapshots so lines show
+// Vendor · Item · qty · Material (+ hrs on In-House, flat $ on Sub). Falls back
+// gracefully to legacy flat saves (top-level fields + `addons` object) so old
+// estimates never crash.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import FinancialSummaryList from './FinancialSummaryList'
 
 const SMALL_PLANT_DEFAULTS = {
-  'Flats of Groundcover': { perDay: 25 },
-  'Flats of 4" pots': { perDay: 20 },
-  '4" pots standard': { perDay: 280 },
-  '4" pots succulents': { perDay: 280 },
-  '6" pots standard': { perDay: 180 },
-  '6" pots succulents': { perDay: 180 },
-  '1 gallon standard': { perDay: 70 },
-  '1 gallon premium': { perDay: 70 },
-  '1 gallon succulents': { perDay: 70 },
-  '3 gallon standard': { perDay: 70 },
-  '5 gallon standard': { perDay: 40 },
-  '5 gallon premium': { perDay: 40 },
-  '5 gallon succulents': { perDay: 40 },
-  '5 gallon bamboo': { perDay: 40 },
-  '5 gallon palm': { perDay: 40 },
+  'Flats of Groundcover': { perDay: 25, price: 18.0 },
+  'Flats of 4" pots': { perDay: 20, price: 20.0 },
+  '4" pots standard': { perDay: 280, price: 0.0 },
+  '4" pots succulents': { perDay: 280, price: 7.0 },
+  '6" pots standard': { perDay: 180, price: 0.0 },
+  '6" pots succulents': { perDay: 180, price: 12.0 },
+  '1 gallon standard': { perDay: 70, price: 6.5 },
+  '1 gallon premium': { perDay: 70, price: 8.0 },
+  '1 gallon succulents': { perDay: 70, price: 18.0 },
+  '3 gallon standard': { perDay: 70, price: 7.0 },
+  '5 gallon standard': { perDay: 40, price: 17.0 },
+  '5 gallon premium': { perDay: 40, price: 35.0 },
+  '5 gallon succulents': { perDay: 40, price: 39.0 },
+  '5 gallon bamboo': { perDay: 40, price: 40.0 },
+  '5 gallon palm': { perDay: 40, price: 50.0 },
 }
 
 const LARGE_PLANT_DEFAULTS = {
-  '15 gallon standard': { perDay: 15 },
-  '15 gallon premium': { perDay: 15 },
-  '15 gallon succulents': { perDay: 15 },
-  '15 gallon fruit': { perDay: 15 },
-  '15 gallon palms': { perDay: 15 },
-  '24" box standard': { perDay: 4 },
-  '24" box premium': { perDay: 4 },
-  '24" box fruit': { perDay: 4 },
-  '24" box palm': { perDay: 4 },
-  '36" box standard': { perDay: 0.75 },
-  '36" box premium': { perDay: 0.75 },
-  '36" box fruit': { perDay: 0.75 },
-  '36" box palm': { perDay: 0.75 },
-  '48" box standard': { perDay: 0.3 },
-  '48" box premium': { perDay: 0.3 },
-  '48" box fruit': { perDay: 0.3 },
-  '48" box palm': { perDay: 0.3 },
+  '15 gallon standard': { perDay: 15, price: 52.0 },
+  '15 gallon premium': { perDay: 15, price: 90.0 },
+  '15 gallon succulents': { perDay: 15, price: 225.0 },
+  '15 gallon fruit': { perDay: 15, price: 145.0 },
+  '15 gallon palms': { perDay: 15, price: 175.0 },
+  '24" box standard': { perDay: 4, price: 185.0 },
+  '24" box premium': { perDay: 4, price: 250.0 },
+  '24" box fruit': { perDay: 4, price: 0.0 },
+  '24" box palm': { perDay: 4, price: 0.0 },
+  '36" box standard': { perDay: 0.75, price: 450.0 },
+  '36" box premium': { perDay: 0.75, price: 600.0 },
+  '36" box fruit': { perDay: 0.75, price: 0.0 },
+  '36" box palm': { perDay: 0.75, price: 0.0 },
+  '48" box standard': { perDay: 0.3, price: 800.0 },
+  '48" box premium': { perDay: 0.3, price: 0.0 },
+  '48" box fruit': { perDay: 0.3, price: 0.0 },
+  '48" box palm': { perDay: 0.3, price: 0.0 },
 }
 
 const LABOR_DEFAULTS = {
@@ -65,9 +71,39 @@ const ADDON_MAT_DEFAULTS = {
   'Jute Fabric': 0.4,
 }
 
+const ADDON_META = {
+  'Tree Stake': { matKey: 'Tree Stake', labKey: 'Tree Stakes - Install Rate', mode: 'perDay', unit: 'ea' },
+  'Root Barrier 12"': { matKey: 'Root Barrier 12in', labKey: 'Root Barrier - Install Rate', mode: 'perMin', unit: 'LF' },
+  'Root Barrier 24"': { matKey: 'Root Barrier 24in', labKey: 'Root Barrier - Install Rate', mode: 'perMin', unit: 'LF' },
+  'Gopher Basket 1 gal': { matKey: 'Gopher Basket 1 Gal', labKey: 'Gopher Basket - Install Rate', mode: 'perMin', unit: 'ea' },
+  'Gopher Basket 5 gal': { matKey: 'Gopher Basket 5 Gal', labKey: 'Gopher Basket - Install Rate', mode: 'perMin', unit: 'ea' },
+  'Gopher Basket 15 gal': { matKey: 'Gopher Basket 15 Gal', labKey: 'Gopher Basket - Install Rate', mode: 'perMin', unit: 'ea' },
+  'Mesh Flat': { matKey: 'Mesh Flat', labKey: 'Mesh Flat - Install Rate', mode: 'perMin', unit: 'SF' },
+  'Jute Fabric': { matKey: 'Jute Fabric', labKey: 'Jute Fabric - Install Rate', mode: 'perMin', unit: 'SF' },
+}
+
+// Legacy `addons` field → new Item type, for old flat saves.
+const LEGACY_ADDON_MAP = [
+  ['Tree Stake', 'treeStakes'],
+  ['Root Barrier 12"', 'rootBarrier12'],
+  ['Root Barrier 24"', 'rootBarrier24'],
+  ['Gopher Basket 1 gal', 'gopherBaskets1'],
+  ['Gopher Basket 5 gal', 'gopherBaskets5'],
+  ['Gopher Basket 15 gal', 'gopherBaskets15'],
+  ['Mesh Flat', 'meshFlat'],
+  ['Jute Fabric', 'juteFabric'],
+]
+
 const n = v => parseFloat(v) || 0
 const lr = (rates, key) => rates[key] ?? LABOR_DEFAULTS[key] ?? 0
-const mp = (prices, key) => prices[key] ?? ADDON_MAT_DEFAULTS[key] ?? 0
+
+function plantMatPrice(dbName, vendorId, materialRows, materialPrices, fallback) {
+  if (vendorId && vendorId !== 'House') {
+    const row = (materialRows || []).find(r => r.name === dbName && r.vendor_id === vendorId)
+    if (row && row.unit_cost != null && row.unit_cost !== '') return n(row.unit_cost)
+  }
+  return materialPrices?.[dbName] ?? fallback
+}
 
 function SectionLabel({ title }) {
   return (
@@ -91,150 +127,137 @@ function LineRow({ label, value, sub }) {
 
 export default function PlantingSummary({ module }) {
   const data = module?.data || {}
-  const {
-    tillSqft = '',
-    difficulty = '',
-    smallPlantRows = [],
-    largePlantRows = [],
-    addons = {},
-    manualRows = [],
-    laborRatePerHour = 35,
-    materialPrices = {},
-    laborRates = {},
-    calc = null,
-  } = data
+  const isSub = data.subType === 'Subcontractor'
+  const tab = isSub ? data.subData || {} : data.ihData || data
+  const materialPrices = data.materialPrices || {}
+  const laborRates = data.laborRates || {}
+  const materialRows = data.materialRows || []
+  const vendorNames = data.vendorNames || {}
+  const savedCalc = data.calc || {}
 
-  const savedCalc = calc || {}
+  const tillSqft = tab.tillSqft ?? ''
+  const difficulty = tab.difficulty ?? ''
+  const smallPlantRows = tab.smallPlantRows || []
+  const largePlantRows = tab.largePlantRows || []
+  // Add-on rows: new shape, else migrate the legacy `addons` object for display.
+  const legacyAddons = tab.addons || {}
+  const addonRows =
+    tab.addonRows ||
+    LEGACY_ADDON_MAP.filter(([, field]) => n(legacyAddons[field]) > 0).map(([type, field]) => ({
+      vendor: 'House',
+      type,
+      qty: legacyAddons[field],
+    }))
+  const otherAddons = tab.otherAddons || legacyAddons
+  const manualRows = tab.manualRows || []
+
   const totalHrs = n(savedCalc.totalHrs)
   const manDays = n(savedCalc.manDays) || n(module.man_days)
   const totalMat = n(savedCalc.totalMat) || n(module.material_cost)
-  const laborCost = n(savedCalc.laborCost) || totalHrs * n(laborRatePerHour)
+  const laborRatePerHour = n(data.laborRatePerHour) || 35
+  const laborCost = n(savedCalc.laborCost) || totalHrs * laborRatePerHour
   const burden = n(savedCalc.burden)
   const gp = n(savedCalc.gp)
+  const subGp = n(savedCalc.subGp)
   const commission = n(savedCalc.commission) || gp * 0.12
   const subCost = n(savedCalc.subCost)
   const priceTotal = n(savedCalc.price)
 
   const fmt2 = v =>
     `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const vendorLabel = v => (!v || v === 'House' ? 'House' : vendorNames[v] || 'Vendor')
 
-  // Small plant lines
-  const smallLines = smallPlantRows
+  // Plant lines
+  function plantLines(rows, defaultsMap) {
+    return rows
+      .filter(r => n(r.qty) > 0)
+      .map((r, i) => {
+        const qty = n(r.qty)
+        const perDay = laborRates[r.type] ?? defaultsMap[r.type]?.perDay ?? 0
+        const unitPrice = n(r.price)
+        const hrs = perDay > 0 ? (qty / perDay) * 8 : 0
+        const subEach = r.subEach !== '' && r.subEach != null ? n(r.subEach) : unitPrice
+        const material = isSub ? qty * subEach : perDay > 0 ? qty * unitPrice : 0
+        const parts = []
+        if (isSub) parts.push(`${fmt2(subEach)}/ea flat`)
+        else {
+          parts.push(`${hrs.toFixed(2)} hrs`)
+          parts.push(`${perDay < 1 ? perDay.toFixed(2) : perDay.toLocaleString()} plants/day`)
+          parts.push(`${fmt2(unitPrice)}/ea`)
+        }
+        return {
+          key: i,
+          label: `${vendorLabel(r.vendor)} · ${r.type} × ${qty}`,
+          value: fmt2(material),
+          sub: parts.join(' · '),
+        }
+      })
+  }
+
+  const smallLines = plantLines(smallPlantRows, SMALL_PLANT_DEFAULTS)
+  const largeLines = plantLines(largePlantRows, LARGE_PLANT_DEFAULTS)
+
+  // Add-on lines
+  const addonLines = (addonRows || [])
     .filter(r => n(r.qty) > 0)
     .map((r, i) => {
+      const meta = ADDON_META[r.type] || {}
       const qty = n(r.qty)
-      const perDay = laborRates[r.type] ?? SMALL_PLANT_DEFAULTS[r.type]?.perDay ?? 25
-      const hrs = perDay > 0 ? (qty / perDay) * 8 : 0
-      const mat = qty * n(r.price)
+      const rate = lr(laborRates, meta.labKey)
+      const unitPrice = plantMatPrice(
+        meta.matKey,
+        r.vendor,
+        materialRows,
+        materialPrices,
+        ADDON_MAT_DEFAULTS[meta.matKey] ?? 0
+      )
+      let hrs = 0
+      if (meta.mode === 'perDay') hrs = rate > 0 ? (qty / rate) * 8 : 0
+      else if (meta.mode === 'perMin') hrs = (qty * rate) / 60
+      const subEach = r.subEach !== '' && r.subEach != null ? n(r.subEach) : unitPrice
+      const material = isSub ? qty * subEach : qty * unitPrice
       return {
         key: i,
-        label: `${r.type} × ${qty}`,
-        value: fmt2(mat),
-        sub: `${hrs.toFixed(2)} hrs · ${perDay.toLocaleString()} plants/day · $${n(r.price).toFixed(2)}/ea`,
+        label: `${vendorLabel(r.vendor)} · ${r.type} × ${qty}`,
+        value: fmt2(material),
+        sub: isSub ? `${fmt2(subEach)}/${meta.unit} flat` : `${hrs.toFixed(2)} hrs`,
       }
     })
 
-  // Large plant lines
-  const largeLines = largePlantRows
-    .filter(r => n(r.qty) > 0)
-    .map((r, i) => {
-      const qty = n(r.qty)
-      const perDay = laborRates[r.type] ?? LARGE_PLANT_DEFAULTS[r.type]?.perDay ?? 15
-      const hrs = perDay > 0 ? (qty / perDay) * 8 : 0
-      const mat = qty * n(r.price)
-      return {
-        key: i,
-        label: `${r.type} × ${qty}`,
-        value: fmt2(mat),
-        sub: `${hrs.toFixed(2)} hrs · ${perDay < 1 ? perDay.toFixed(2) : perDay} plants/day · $${n(r.price).toFixed(2)}/ea`,
-      }
-    })
+  // Other add-ons (crane / manual / delivery)
+  const otherLines = [
+    n(otherAddons.craneCost) > 0 && {
+      key: 'crane',
+      label: 'Crane',
+      value: fmt2(otherAddons.craneCost),
+      sub: 'Sub cost',
+    },
+    !isSub &&
+      (n(otherAddons.addonHours) > 0 || n(otherAddons.addonMaterials) > 0) && {
+        key: 'manualadd',
+        label: 'Manual Add-On',
+        value: fmt2(otherAddons.addonMaterials),
+        sub: `${n(otherAddons.addonHours).toFixed(2)} hrs`,
+      },
+    !isSub &&
+      n(otherAddons.deliveryCharges) > 0 && {
+        key: 'delivery',
+        label: 'Delivery Charges',
+        value: fmt2(otherAddons.deliveryCharges),
+      },
+  ].filter(Boolean)
 
   const manualLines = manualRows.filter(
     r => n(r.hours) > 0 || n(r.materials) > 0 || n(r.subCost) > 0
   )
 
-  // Add-on lines
-  const rbRate = lr(laborRates, 'Root Barrier - Install Rate')
-  const gopherRate = lr(laborRates, 'Gopher Basket - Install Rate')
-  const meshRate = lr(laborRates, 'Mesh Flat - Install Rate')
-  const juteRate = lr(laborRates, 'Jute Fabric - Install Rate')
-  const stakeRate = lr(laborRates, 'Tree Stakes - Install Rate')
-
-  const addonLines = [
-    n(addons.craneCost) > 0 && {
-      key: 'crane',
-      label: 'Crane',
-      value: fmt2(addons.craneCost),
-      sub: 'Sub cost',
-    },
-    n(addons.treeStakes) > 0 && {
-      key: 'stakes',
-      label: `Tree Stakes × ${addons.treeStakes}`,
-      value: fmt2(n(addons.treeStakes) * mp(materialPrices, 'Tree Stake')),
-      sub: `${stakeRate > 0 ? ((n(addons.treeStakes) / stakeRate) * 8).toFixed(2) : '—'} hrs`,
-    },
-    n(addons.rootBarrier12) > 0 && {
-      key: 'rb12',
-      label: `Root Barrier 12" — ${addons.rootBarrier12} LF`,
-      value: fmt2(n(addons.rootBarrier12) * mp(materialPrices, 'Root Barrier 12in')),
-      sub: `${((n(addons.rootBarrier12) * rbRate) / 60).toFixed(2)} hrs`,
-    },
-    n(addons.rootBarrier24) > 0 && {
-      key: 'rb24',
-      label: `Root Barrier 24" — ${addons.rootBarrier24} LF`,
-      value: fmt2(n(addons.rootBarrier24) * mp(materialPrices, 'Root Barrier 24in')),
-      sub: `${((n(addons.rootBarrier24) * rbRate) / 60).toFixed(2)} hrs`,
-    },
-    n(addons.gopherBaskets1) > 0 && {
-      key: 'goph1',
-      label: `Gopher Baskets 1 gal × ${addons.gopherBaskets1}`,
-      value: fmt2(n(addons.gopherBaskets1) * mp(materialPrices, 'Gopher Basket 1 Gal')),
-      sub: `${((n(addons.gopherBaskets1) * gopherRate) / 60).toFixed(2)} hrs`,
-    },
-    n(addons.gopherBaskets5) > 0 && {
-      key: 'goph5',
-      label: `Gopher Baskets 5 gal × ${addons.gopherBaskets5}`,
-      value: fmt2(n(addons.gopherBaskets5) * mp(materialPrices, 'Gopher Basket 5 Gal')),
-      sub: `${((n(addons.gopherBaskets5) * gopherRate) / 60).toFixed(2)} hrs`,
-    },
-    n(addons.gopherBaskets15) > 0 && {
-      key: 'goph15',
-      label: `Gopher Baskets 15 gal × ${addons.gopherBaskets15}`,
-      value: fmt2(n(addons.gopherBaskets15) * mp(materialPrices, 'Gopher Basket 15 Gal')),
-      sub: `${((n(addons.gopherBaskets15) * gopherRate) / 60).toFixed(2)} hrs`,
-    },
-    n(addons.meshFlat) > 0 && {
-      key: 'mesh',
-      label: `Mesh Flat — ${addons.meshFlat} sqft`,
-      value: fmt2(n(addons.meshFlat) * mp(materialPrices, 'Mesh Flat')),
-      sub: `${((n(addons.meshFlat) * meshRate) / 60).toFixed(2)} hrs`,
-    },
-    n(addons.juteFabric) > 0 && {
-      key: 'jute',
-      label: `Jute Fabric — ${addons.juteFabric} sqft`,
-      value: fmt2(n(addons.juteFabric) * mp(materialPrices, 'Jute Fabric')),
-      sub: `${((n(addons.juteFabric) * juteRate) / 60).toFixed(2)} hrs`,
-    },
-    (n(addons.addonHours) > 0 || n(addons.addonMaterials) > 0) && {
-      key: 'manualadd',
-      label: 'Manual Add-On',
-      value: fmt2(addons.addonMaterials),
-      sub: `${n(addons.addonHours).toFixed(2)} hrs`,
-    },
-    n(addons.deliveryCharges) > 0 && {
-      key: 'delivery',
-      label: 'Delivery Charges',
-      value: fmt2(addons.deliveryCharges),
-    },
-  ].filter(Boolean)
-
   const hasAny =
     smallLines.length ||
     largeLines.length ||
     addonLines.length ||
+    otherLines.length ||
     manualLines.length ||
-    n(tillSqft) > 0
+    (!isSub && n(tillSqft) > 0)
 
   return (
     <div className="space-y-1 text-sm">
@@ -250,7 +273,15 @@ export default function PlantingSummary({ module }) {
         </div>
       </div>
 
-      {n(difficulty) > 0 && (
+      {isSub && (
+        <div className="flex flex-wrap gap-2">
+          <span className="text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded font-medium">
+            Subcontractor
+          </span>
+        </div>
+      )}
+
+      {!isSub && n(difficulty) > 0 && (
         <div className="flex items-center justify-between text-xs text-amber-700 bg-amber-50 rounded px-3 py-1.5">
           <span>Difficulty modifier applied</span>
           <span className="font-semibold">+{difficulty}%</span>
@@ -261,7 +292,7 @@ export default function PlantingSummary({ module }) {
         <p className="text-xs text-gray-400 text-center py-4">No line items entered.</p>
       ) : (
         <>
-          {n(tillSqft) > 0 && (
+          {!isSub && n(tillSqft) > 0 && (
             <>
               <SectionLabel title="Till & Amend" />
               <LineRow
@@ -289,10 +320,13 @@ export default function PlantingSummary({ module }) {
             </>
           )}
 
-          {addonLines.length > 0 && (
+          {(addonLines.length > 0 || otherLines.length > 0) && (
             <>
               <SectionLabel title="Add-Ons" />
               {addonLines.map(a => (
+                <LineRow key={a.key} label={a.label} value={a.value} sub={a.sub} />
+              ))}
+              {otherLines.map(a => (
                 <LineRow key={a.key} label={a.label} value={a.value} sub={a.sub} />
               ))}
             </>
@@ -327,10 +361,11 @@ export default function PlantingSummary({ module }) {
         manDays={manDays}
         totalMat={totalMat}
         laborCost={laborCost}
-        lrph={n(laborRatePerHour)}
+        lrph={laborRatePerHour}
         burden={burden}
         subCost={subCost}
         gp={gp}
+        subGp={subGp}
         commission={commission}
         price={priceTotal}
       />
