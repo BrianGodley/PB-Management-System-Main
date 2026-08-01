@@ -167,7 +167,16 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
       const { data, error: fnErr } = await supabase.functions.invoke('process-vendor-catalog', {
         body: { file_path: path, vendor_name: vendorName, instructions },
       })
-      if (fnErr) throw new Error(fnErr.message || 'Extraction failed.')
+      if (fnErr) {
+        // supabase-js hides the function's JSON error behind a generic message;
+        // dig the real reason out of the response body.
+        let msg = fnErr.message || 'Extraction failed.'
+        try {
+          const body = await fnErr.context?.json?.()
+          if (body?.error) msg = body.error
+        } catch { /* keep generic */ }
+        throw new Error(msg)
+      }
       if (data?.error) throw new Error(data.error)
       const items = data?.items || []
       if (!items.length) throw new Error('No catalog items were found in that file.')
