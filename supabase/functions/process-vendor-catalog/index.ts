@@ -74,6 +74,7 @@ Rules:
 - Pricing is usually ABSENT in a catalog — only include unit_price when a real price is printed. Never invent a price.
 - For each product that has a PRODUCT PHOTO, give its location: the 1-based page number and photo_box = a tight normalized bounding box (x, y, w, h as fractions 0..1 of that page, top-left origin) around just that item's image. If a product has no picture, omit photo_box (and still return the item).
 - Ignore covers, tables of contents, legal/marketing pages, and anything that isn't a real product.
+- Be terse to fit the whole catalog: omit description/sku/unit unless clearly present, and round photo_box numbers to 2 decimals. Do not repeat text.
 - Always return via the extract_catalog tool. Emit no prose.`
 
 function mediaTypeFor(path: string): string | null {
@@ -110,7 +111,10 @@ Deno.serve(async req => {
       const media = mediaTypeFor(String(file_path))
       if (!media) return json({ error: 'Unsupported file type. Upload a PDF or image.' }, 400)
       const { data: blob, error: dlErr } = await admin.storage.from('vendor-catalogs').download(String(file_path))
-      if (dlErr || !blob) return json({ error: `Could not read the uploaded file: ${dlErr?.message || 'not found'}` }, 400)
+      if (dlErr || !blob) {
+        console.error('[catalog] download failed', file_path, dlErr?.message)
+        return json({ error: `Could not read the uploaded file: ${dlErr?.message || 'not found'}` }, 400)
+      }
       const b64 = toBase64(new Uint8Array(await blob.arrayBuffer()))
       if (media === 'application/pdf') content.push({ type: 'document', source: { type: 'base64', media_type: media, data: b64 } })
       else content.push({ type: 'image', source: { type: 'base64', media_type: media, data: b64 } })
@@ -127,7 +131,7 @@ Deno.serve(async req => {
 
     const body = {
       model: MODEL,
-      max_tokens: 8192,
+      max_tokens: 32000,
       system: SYSTEM,
       tools: [TOOL],
       tool_choice: { type: 'tool', name: 'extract_catalog' },
@@ -143,7 +147,8 @@ Deno.serve(async req => {
         body: JSON.stringify(body),
       })
       if (res.ok) { data = await res.json(); break }
-      lastErr = `${res.status}: ${(await res.text()).slice(0, 300)}`
+      lastErr = `${res.status}: ${(await res.text()).slice(0, 500)}`
+      console.error('[catalog] anthropic error', lastErr)
       const transient = res.status === 529 || res.status === 429 || res.status >= 500
       if (!transient || attempt === 3) return json({ error: `AI error ${lastErr}` }, 502)
       await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)))
@@ -151,7 +156,15 @@ Deno.serve(async req => {
 
     const toolBlock = (data?.content || []).find((b: any) => b?.type === 'tool_use' && b?.name === 'extract_catalog')
     const out = toolBlock?.input
-    if (!out || !Array.isArray(out.items)) return json({ error: 'The AI did not return usable items.' }, 502)
+    if (!out || !Array.isArray(out.items)) {
+      console.error('[catalog] no usable items; stop_reason=', data?.stop_reason, 'content=', JSON.stringify(data?.content || '').slice(0, 500))
+      const tooBig = data?.stop_reason === 'max_tokens'
+      return json({
+        error: tooBig
+          ? 'This catalog is too large to read in one pass. Split it into smaller sections (e.g. by product line or a page range) and import each separately.'
+          : 'The AI did not return usable items.',
+      }, 502)
+    }
 
     const items = out.items
       .filter((r: any) => r && r.name)
@@ -177,6 +190,7 @@ Deno.serve(async req => {
       items,
     })
   } catch (e) {
+    console.error('[catalog] unhandled error', String((e as Error)?.stack || e))
     return json({ error: String((e as Error)?.message || e) }, 500)
   }
 })

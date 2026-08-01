@@ -43,6 +43,7 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
   const [rows, setRows] = useState([]) // review rows
   const [search, setSearch] = useState('')
   const [added, setAdded] = useState(0)
+  const [skippedCount, setSkippedCount] = useState(0)
 
   // Vendors created via quick-add are appended locally so the picker updates
   // immediately without a parent refresh.
@@ -226,7 +227,29 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
     if (!included.length) return setError('Nothing to import — include at least one item with a name.')
     setBusy(true)
     try {
-      const payload = included.map(r => ({
+      // material_rates is unique on (tenant, name, category), so we can't insert
+      // a name that already exists in that category (or twice in one catalog).
+      // Dedupe within the batch, then skip anything already in the table.
+      const key = r => `${(r.category || '').trim().toLowerCase()}::${r.name.trim().toLowerCase()}`
+      const seen = new Set()
+      const uniq = []
+      for (const r of included) {
+        const k = key(r)
+        if (seen.has(k)) continue
+        seen.add(k)
+        uniq.push(r)
+      }
+      const { data: existingRows } = await supabase.from('material_rates').select('name, category')
+      const exists = new Set(
+        (existingRows || []).map(e => `${(e.category || '').toLowerCase()}::${(e.name || '').toLowerCase()}`)
+      )
+      const toInsert = uniq.filter(r => !exists.has(key(r)))
+      const skipped = included.length - toInsert.length
+      if (!toInsert.length) {
+        setBusy(false)
+        return setError('Every item already exists in the materials list — nothing new to import.')
+      }
+      const payload = toInsert.map(r => ({
         name: r.name.trim(),
         category: r.category.trim() || null,
         sub_category: r.sub_category.trim() || null,
@@ -235,6 +258,8 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
         unit_cost: r.price === '' ? null : Number(r.price),
         photo_url: r.photoUrl || null,
       }))
+      setAdded(payload.length)
+      setSkippedCount(skipped)
       const { error: insErr } = await supabase.from('material_rates').insert(payload)
       if (insErr) throw new Error(`Import failed: ${insErr.message}`)
       setAdded(payload.length)
@@ -406,7 +431,7 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
           <div className="p-8 text-center">
             <p className="text-sm text-gray-700 mb-1 font-semibold">Catalog imported</p>
             <p className="text-xs text-gray-500 mb-4">
-              {added} item(s) added to {vendorName}'s materials. You'll find them in the Catalog tab and in Master Rates.
+              {added} item(s) added to {vendorName}'s materials{skippedCount > 0 ? ` · ${skippedCount} skipped (already existed)` : ''}. You'll find them in the Catalog tab and in Master Rates.
             </p>
             <button onClick={onClose} className="text-sm bg-gray-800 text-white font-semibold rounded px-4 py-1.5">Done</button>
           </div>
