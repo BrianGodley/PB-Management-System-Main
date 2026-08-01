@@ -7,6 +7,7 @@ import DocViewerModal from '../components/DocViewerModal'
 import SubVendorContracts from '../components/SubVendorContracts'
 import SubVendorQuotes from '../components/SubVendorQuotes'
 import VendorInvoicing from '../components/VendorInvoicing'
+import VendorCatalog from '../components/VendorCatalog'
 import PartyHistory from '../components/PartyHistory'
 
 // ── Constants ────────────────────────────────────────────────
@@ -655,6 +656,7 @@ export default function SubsVendors({ mode = 'sub' }) {
           {[
             { key: 'directory', label: '📋 Directory' },
             ...(mode === 'vendor' ? [{ key: 'invoicing', label: '📥 Invoicing' }] : []),
+            ...(mode === 'vendor' ? [{ key: 'catalog', label: '📦 Catalog' }] : []),
             ...(mode === 'sub' ? [{ key: 'contracts', label: '📑 Contracts' }] : []),
             ...(mode === 'vendor' ? [{ key: 'quotes', label: '🧾 Quotes' }] : []),
             { key: 'settings', label: '⚙️ Settings', mobileHide: true },
@@ -688,6 +690,11 @@ export default function SubsVendors({ mode = 'sub' }) {
       {/* ── Invoicing (vendors only) ── */}
       {svTab === 'invoicing' && mode === 'vendor' && (
         <VendorInvoicing vendors={(subsData || []).filter(s => (s.type || 'sub') === 'vendor')} />
+      )}
+
+      {/* ── Catalog (vendors only) ── */}
+      {svTab === 'catalog' && mode === 'vendor' && (
+        <VendorCatalog vendors={(subsData || []).filter(s => (s.type || 'sub') === 'vendor')} />
       )}
 
       {/* ── Contracts (subs only) ── */}
