@@ -3,14 +3,189 @@ import FinancialSummaryList from './FinancialSummaryList'
 // ─────────────────────────────────────────────────────────────────────────────
 // WallsSummary — read-only detail view for a saved Walls module.
 // In-House and Sub are independent tab records (data.ihData / data.subData),
-// with a flat-field fallback for legacy estimates. Each tab renders its own
-// quantity block; the shared financial + labor breakdown comes from the saved
-// calc snapshot.
+// with a flat-field fallback for legacy estimates. The material sections
+// (Wall Finishes / Wall Caps / Waterproofing) are now Vendor + Item rows and
+// are re-priced from the saved rate maps so each line shows Vendor · Item ·
+// qty · Material (+ hrs In-House, flat $ on Sub). Structural walls keep their
+// geometry blocks (with a vendor label). Legacy saves never crash.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const n = v => parseFloat(v) || 0
 const fmt = v =>
   `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+// Rate metadata mirrored from WallsModule (finish + cap + wp material/labor).
+const WALL_RATES = {
+  concreteTruck: { db: 'Wall Concrete Truck', fb: 185.0 },
+  sandStucco: { db: 'Sand Stucco - Wall', fb: 0.0 },
+  smoothStucco: { db: 'Smooth Stucco - Wall', fb: 0.0 },
+  ledgerstone: { db: 'Ledgerstone - Wall', fb: 10.0 },
+  stackedStone: { db: 'Stacked Stone - Wall', fb: 10.0 },
+  tile: { db: 'Tile - Wall', fb: 6.5 },
+  flagstone: { db: 'Real Flagstone - Wall', fb: 400.0 },
+  realStone: { db: 'Real Stone - Wall', fb: 400.0 },
+  sandStuccoLab: { db: 'Sand Stucco - Wall Labor Rate', fb: 92 },
+  smoothStuccoLab: { db: 'Smooth Stucco - Wall Labor Rate', fb: 65 },
+  ledgerstoneLab: { db: 'Ledgerstone - Wall Labor Rate', fb: 24 },
+  stackedStoneLab: { db: 'Stacked Stone - Wall Labor Rate', fb: 24 },
+  tileLab: { db: 'Tile - Wall Labor Rate', fb: 0.2867 },
+  flagstoneLab: { db: 'Real Flagstone - Wall Labor Rate', fb: 0.4487 },
+  realStoneLab: { db: 'Real Stone - Wall Labor Rate', fb: 0.8954 },
+  capFlagstone: { db: 'Wall Cap Flagstone', fb: 500.0 },
+  capPrecast: { db: 'Wall Cap Precast', fb: 50.0 },
+  capBullnose: { db: 'Wall Cap Bullnose Brick', fb: 5.0 },
+  wpPrimerMembrane: { db: 'Wall WP Primer Membrane', fb: 1.8 },
+  wp3CoatRollOn: { db: 'Wall WP 3 Coat Roll On', fb: 1.2 },
+  wpThoroseal: { db: 'Wall WP Thoroseal Roll On', fb: 1.5 },
+  wpDimpleMembrane: { db: 'Wall WP Dimple Membrane', fb: 2.1 },
+}
+const WP_KEY = {
+  'Primer & Membrane': 'wpPrimerMembrane',
+  '3 Coats Roll On': 'wp3CoatRollOn',
+  'Thoroseal & Roll On': 'wpThoroseal',
+  'Dimple Membrane': 'wpDimpleMembrane',
+}
+
+function wallMatPrice(dbName, vendorId, materialRows, mp, fallback) {
+  if (vendorId && vendorId !== 'House') {
+    const row = (materialRows || []).find(r => r.name === dbName && r.vendor_id === vendorId)
+    if (row && row.unit_cost != null && row.unit_cost !== '') return n(row.unit_cost)
+  }
+  return mp?.[dbName] ?? fallback
+}
+
+function computeWallFinishRow(row, mp, materialRows) {
+  const sf = n(row.sf)
+  const v = row.vendor
+  const price = k => wallMatPrice(WALL_RATES[k].db, v, materialRows, mp, WALL_RATES[k].fb)
+  const lab = k => mp?.[WALL_RATES[k].db] ?? WALL_RATES[k].fb
+  const ovr = (input, k) => {
+    const x = parseFloat(input)
+    return Number.isFinite(x) && x > 0 ? x : price(k)
+  }
+  let mat = 0,
+    hrs = 0,
+    subUnit = 0
+  switch (row.type) {
+    case 'Sand Stucco': {
+      const rate = ovr(row.rateIn, 'sandStucco')
+      hrs = sf > 0 ? (sf / lab('sandStuccoLab')) * 8 : 0
+      mat = sf * rate
+      subUnit = rate
+      break
+    }
+    case 'Smooth Stucco': {
+      const rate = ovr(row.rateIn, 'smoothStucco')
+      hrs = sf > 0 ? (sf / lab('smoothStuccoLab')) * 8 : 0
+      mat = sf * rate
+      subUnit = rate
+      break
+    }
+    case 'Ledgerstone': {
+      const rate = ovr(row.rateIn, 'ledgerstone')
+      hrs = sf > 0 ? (sf / lab('ledgerstoneLab')) * 8 : 0
+      mat = sf > 0 ? sf * rate * 1.1 + (sf / 5) * 2 : 0
+      subUnit = rate * 1.1 + 0.4
+      break
+    }
+    case 'Stacked Stone': {
+      const rate = ovr(row.rateIn, 'stackedStone')
+      hrs = sf > 0 ? (sf / lab('stackedStoneLab')) * 8 : 0
+      mat = sf > 0 ? sf * rate * 1.1 + (sf / 5) * 2 : 0
+      subUnit = rate * 1.1 + 0.4
+      break
+    }
+    case 'Tile': {
+      const rate = ovr(row.rateIn, 'tile')
+      hrs = sf > 0 ? sf * lab('tileLab') : 0
+      mat = sf > 0 ? sf * rate + sf : 0
+      subUnit = rate + 1
+      break
+    }
+    case 'Real Flagstone': {
+      const rate = n(row.rateIn) || price('flagstone')
+      hrs = sf > 0 ? sf * lab('flagstoneLab') : 0
+      mat = sf > 0 ? (sf / 80) * rate + sf * 1.5 : 0
+      subUnit = rate / 80 + 1.5
+      break
+    }
+    case 'Real Stone': {
+      const rate = n(row.rateIn) || price('realStone')
+      hrs = sf > 0 ? sf * lab('realStoneLab') : 0
+      mat = sf > 0 ? (sf / 70) * rate + sf * 2 : 0
+      subUnit = rate / 70 + 2
+      break
+    }
+    default:
+      break
+  }
+  const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : subUnit
+  return { qty: sf, unit: 'SF', mat, hrs, subEach, subMat: sf * subEach }
+}
+
+function computeCapRow(row, mp, materialRows) {
+  const lf = n(row.lf),
+    widthIn = n(row.widthIn),
+    qty = n(row.qty)
+  const v = row.vendor
+  const price = k => wallMatPrice(WALL_RATES[k].db, v, materialRows, mp, WALL_RATES[k].fb)
+  let mat = 0,
+    hrs = 0,
+    subUnit = 0,
+    subQty = 0,
+    unit = 'LF',
+    dispQty = lf
+  switch (row.type) {
+    case 'Flagstone':
+      mat = (((widthIn / 12) * lf * 0.0833 * 100) / 2000) * price('capFlagstone')
+      hrs = lf * 0.25
+      subUnit = (((widthIn / 12) * 0.0833 * 100) / 2000) * price('capFlagstone')
+      subQty = lf
+      break
+    case 'Precast': {
+      const widthFactor = (widthIn || 8) / 8
+      mat = qty * price('capPrecast') * widthFactor
+      hrs = qty * 0.2
+      subUnit = price('capPrecast') * widthFactor
+      subQty = qty
+      unit = 'ea'
+      dispQty = qty
+      break
+    }
+    case 'PIP Concrete':
+      mat = ((lf * (widthIn / 12) * 0.333) / 27) * price('concreteTruck')
+      hrs = lf * 0.15
+      subUnit = (((widthIn / 12) * 0.333) / 27) * price('concreteTruck')
+      subQty = lf
+      break
+    case 'Bullnose Brick':
+      mat = lf * price('capBullnose')
+      hrs = lf * 0.08
+      subUnit = price('capBullnose')
+      subQty = lf
+      break
+    default:
+      break
+  }
+  const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : subUnit
+  return { qty: dispQty, unit, mat, hrs, subEach, subMat: subQty * subEach }
+}
+
+function computeWpRow(row, mp, materialRows) {
+  const sf = n(row?.sf)
+  const k = WP_KEY[row?.type]
+  let mat = 0,
+    hrs = 0,
+    subUnit = 0
+  if (sf > 0 && k) {
+    const pr = wallMatPrice(WALL_RATES[k].db, row.vendor, materialRows, mp, WALL_RATES[k].fb)
+    mat = sf * pr
+    hrs = sf / 200
+    subUnit = pr
+  }
+  const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : subUnit
+  return { qty: sf, unit: 'SF', mat, hrs, subEach, subMat: sf * subEach }
+}
 
 function SectionLabel({ title }) {
   return (
@@ -20,19 +195,20 @@ function SectionLabel({ title }) {
   )
 }
 
-function LineRow({ label, value, highlight }) {
+function LineRow({ label, value, sub, highlight }) {
   return (
     <div
-      className={`flex items-center justify-between py-1 border-b border-gray-50 ${highlight ? 'font-semibold' : ''}`}
+      className={`flex items-start justify-between py-1 border-b border-gray-50 ${highlight ? 'font-semibold' : ''}`}
     >
-      <span className={`text-xs ${highlight ? 'text-gray-800' : 'text-gray-600'} pr-2`}>
+      <span className={`text-xs ${highlight ? 'text-gray-800' : 'text-gray-600'} flex-1 pr-2`}>
         {label}
       </span>
-      <span
-        className={`text-xs ${highlight ? 'text-gray-900 font-semibold' : 'text-gray-700'} shrink-0`}
-      >
-        {value}
-      </span>
+      <div className="text-right shrink-0">
+        <span className={`text-xs ${highlight ? 'text-gray-900 font-semibold' : 'text-gray-700'}`}>
+          {value}
+        </span>
+        {sub && <p className="text-xs text-gray-400">{sub}</p>}
+      </div>
     </div>
   )
 }
@@ -43,33 +219,46 @@ const WALL_LABELS = {
   Timber: 'Timber / Lumber Wall',
 }
 
+// Legacy flat finish fields → row shape (so old saves still list finishes).
+function legacyFinishRows(t = {}) {
+  const rows = []
+  const push = (type, sfKey, rateKey) => {
+    if (n(t[sfKey]) > 0)
+      rows.push({ vendor: 'House', type, sf: t[sfKey], rateIn: t[rateKey] ?? '', subEach: '' })
+  }
+  push('Sand Stucco', 'sandStuccoSF', 'sandStuccoRateIn')
+  push('Smooth Stucco', 'smoothStuccoSF', 'smoothStuccoRateIn')
+  push('Ledgerstone', 'ledgerstoneSF', 'ledgerstoneRateIn')
+  push('Stacked Stone', 'stackedStoneSF', 'stackedStoneRateIn')
+  push('Tile', 'tileSF', 'tileRateIn')
+  push('Real Flagstone', 'flagstoneSF', 'flagstoneRateIn')
+  push('Real Stone', 'realStoneSF', 'realStoneRateIn')
+  return rows
+}
+
 // True when a tab record actually holds some wall / finish / cap / wp entry.
 function tabHasData(t = {}) {
   const cmu = (t.cmuWalls || []).some(w => n(w.lf) > 0 || n(w.heightIn) > 0)
   const pip = (t.pipWalls || []).some(w => n(w.lf) > 0 || n(w.heightIn) > 0)
   const timber = n(t.timberLF) > 0 || n(t.timberPosts) > 0
-  const finishes =
-    n(t.sandStuccoSF) > 0 ||
-    n(t.smoothStuccoSF) > 0 ||
-    n(t.ledgerstoneSF) > 0 ||
-    n(t.stackedStoneSF) > 0 ||
-    n(t.tileSF) > 0 ||
-    n(t.flagstoneSF) > 0 ||
-    n(t.realStoneSF) > 0
-  const caps = (t.capRows || []).some(c => c.type && c.type !== 'None' && (n(c.lf) > 0 || n(c.qty) > 0))
+  const finishRows = Array.isArray(t.wallFinishRows)
+    ? t.wallFinishRows.some(r => n(r.sf) > 0)
+    : legacyFinishRows(t).length > 0
+  const caps = (t.capRows || []).some(
+    c => c.type && c.type !== 'None' && (n(c.lf) > 0 || n(c.qty) > 0)
+  )
   const wp = (t.wpRows || []).some(w => w.type && w.type !== 'None' && n(w.sf) > 0)
-  const manual = (t.manualRows || []).some(m => n(m.hours) > 0 || n(m.materials) > 0 || n(m.subCost) > 0)
-  // Legacy flat fields (pre multi-wall / pre per-tab) still count as data.
+  const manual = (t.manualRows || []).some(
+    m => n(m.hours) > 0 || n(m.materials) > 0 || n(m.subCost) > 0
+  )
   const legacy = n(t.cmuLF) > 0 || n(t.pipLF) > 0
-  return cmu || pip || timber || finishes || caps || wp || manual || legacy
+  return cmu || pip || timber || finishRows || caps || wp || manual || legacy
 }
 
-// Quantity detail for a single tab record (In-House or Sub). Mirrors the
-// original single-column layout, now driven off the passed-in source.
-function WallQtyDetail({ t = {} }) {
+// Quantity + material detail for a single tab record (In-House or Sub).
+function WallQtyDetail({ t = {}, isSub, materialPrices, materialRows, vendorLabel }) {
   const {
     wallType = 'CMU',
-    // CMU (legacy flat single-entry fallback)
     cmuLF = 0,
     cmuHeightIn = 0,
     cmuFootingWIn = 12,
@@ -80,30 +269,15 @@ function WallQtyDetail({ t = {} }) {
     cmuPctCurved = 0,
     cmuFootingPump = 'No',
     cmuGroutPump = 'No',
-    // PIP (legacy flat)
     pipLF = 0,
     pipHeightIn = 0,
-    // Timber
     timberLF = 0,
     timberHeightIn = 0,
     timberType = 'Railroad Treated',
     timberPosts = 0,
-    // Finishes
-    sandStuccoSF = 0,
-    smoothStuccoSF = 0,
-    ledgerstoneSF = 0,
-    stackedStoneSF = 0,
-    tileSF = 0,
-    flagstoneSF = 0,
-    realStoneSF = 0,
-    // Caps
-    capRows = [],
-    // Waterproofing (legacy flat)
-    wpType = 'None',
-    wpSF = 0,
+    timberSubEach = '',
   } = t
 
-  // Prefer the multi-wall arrays when present, falling back to legacy flat.
   const cmuWalls = Array.isArray(t.cmuWalls)
     ? t.cmuWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0)
     : []
@@ -113,19 +287,30 @@ function WallQtyDetail({ t = {} }) {
   const wpRows = Array.isArray(t.wpRows)
     ? t.wpRows.filter(w => w.type && w.type !== 'None' && n(w.sf) > 0)
     : []
-
-  const activeCaps = (capRows || []).filter(
+  const finishRows = (
+    Array.isArray(t.wallFinishRows) ? t.wallFinishRows : legacyFinishRows(t)
+  ).filter(r => n(r.sf) > 0)
+  const activeCaps = (t.capRows || []).filter(
     c => c.type && c.type !== 'None' && (n(c.lf) > 0 || n(c.qty) > 0)
   )
-  const activeFinishes = [
-    { label: 'Sand Stucco', sf: sandStuccoSF },
-    { label: 'Smooth Stucco', sf: smoothStuccoSF },
-    { label: 'Ledgerstone Veneer', sf: ledgerstoneSF },
-    { label: 'Stacked Stone', sf: stackedStoneSF },
-    { label: 'Tile', sf: tileSF },
-    { label: 'Real Flagstone', sf: flagstoneSF },
-    { label: 'Real Stone', sf: realStoneSF },
-  ].filter(f => n(f.sf) > 0)
+
+  // Build a Vendor · Item line with recomputed material (+ hrs / flat $).
+  const rowLine = (row, c, i) => {
+    const material = isSub ? c.subMat : c.mat
+    const parts = []
+    if (!isSub && c.hrs > 0) parts.push(`${c.hrs.toFixed(2)} hrs`)
+    if (isSub) parts.push(`${fmt(c.subEach)}/${c.unit}`)
+    return (
+      <LineRow
+        key={i}
+        label={`${vendorLabel(row.vendor)} · ${row.type}`}
+        value={`${n(c.qty)} ${c.unit}`}
+        sub={[material > 0 ? fmt(material) : null, parts.join(' · ') || null]
+          .filter(Boolean)
+          .join('  ·  ')}
+      />
+    )
+  }
 
   return (
     <>
@@ -138,14 +323,23 @@ function WallQtyDetail({ t = {} }) {
         cmuWalls.map((w, i) => (
           <div key={i}>
             <SectionLabel title={cmuWalls.length > 1 ? `CMU Wall ${i + 1}` : 'CMU Structure'} />
+            {w.vendor && w.vendor !== 'House' && (
+              <LineRow label="Vendor" value={vendorLabel(w.vendor)} />
+            )}
             {w.blockType && <LineRow label="Block Type" value={w.blockType} />}
             <LineRow label="Linear Feet" value={`${n(w.lf)} LF`} />
             <LineRow label="Wall Height" value={`${n(w.heightIn)} in`} />
-            <LineRow label="Footing" value={`${n(w.footingWIn) || 12}"W × ${n(w.footingDIn) || 12}"D`} />
+            <LineRow
+              label="Footing"
+              value={`${n(w.footingWIn) || 12}"W × ${n(w.footingDIn) || 12}"D`}
+            />
             <LineRow label="Rebar Spacing" value={`${n(w.rebarSpIn) || 16}" on-center`} />
             <LineRow label="Bond Beam Courses" value={n(w.bondBeams).toString()} />
             <LineRow label="% Grouted" value={`${n(w.pctGrouted)}%`} />
             {n(w.pctCurved) > 0 && <LineRow label="% Curved" value={`${n(w.pctCurved)}%`} />}
+            {isSub && (n(w.subEach) > 0 || (w.subEach != null && w.subEach !== '')) && (
+              <LineRow label="Sub Flat" value={`${fmt(w.subEach)}/LF`} />
+            )}
           </div>
         ))}
       {cmuWalls.length === 0 && n(cmuLF) > 0 && (
@@ -171,9 +365,17 @@ function WallQtyDetail({ t = {} }) {
       {pipWalls.length > 0 &&
         pipWalls.map((w, i) => (
           <div key={i}>
-            <SectionLabel title={pipWalls.length > 1 ? `Poured In Place ${i + 1}` : 'Poured In Place'} />
+            <SectionLabel
+              title={pipWalls.length > 1 ? `Poured In Place ${i + 1}` : 'Poured In Place'}
+            />
+            {w.vendor && w.vendor !== 'House' && (
+              <LineRow label="Vendor" value={vendorLabel(w.vendor)} />
+            )}
             <LineRow label="Linear Feet" value={`${n(w.lf)} LF`} />
             <LineRow label="Wall Height" value={`${n(w.heightIn)} in`} />
+            {isSub && (n(w.subEach) > 0 || (w.subEach != null && w.subEach !== '')) && (
+              <LineRow label="Sub Flat" value={`${fmt(w.subEach)}/LF`} />
+            )}
           </div>
         ))}
       {pipWalls.length === 0 && n(pipLF) > 0 && (
@@ -192,6 +394,9 @@ function WallQtyDetail({ t = {} }) {
           <LineRow label="Linear Feet" value={`${n(timberLF)} LF`} />
           <LineRow label="Wall Height" value={`${n(timberHeightIn)} in`} />
           {n(timberPosts) > 0 && <LineRow label="Steel Posts" value={`${n(timberPosts)} qty`} />}
+          {isSub && timberSubEach != null && timberSubEach !== '' && (
+            <LineRow label="Sub Flat" value={`${fmt(timberSubEach)}/LF`} />
+          )}
         </>
       )}
 
@@ -199,25 +404,17 @@ function WallQtyDetail({ t = {} }) {
       {wpRows.length > 0 && (
         <>
           <SectionLabel title="Waterproofing" />
-          {wpRows.map((row, i) => (
-            <LineRow key={i} label={row.type} value={`${n(row.sf).toLocaleString()} SF`} />
-          ))}
-        </>
-      )}
-      {wpRows.length === 0 && wpType !== 'None' && n(wpSF) > 0 && (
-        <>
-          <SectionLabel title="Waterproofing" />
-          <LineRow label={wpType} value={`${n(wpSF).toLocaleString()} SF`} />
+          {wpRows.map((row, i) => rowLine(row, computeWpRow(row, materialPrices, materialRows), i))}
         </>
       )}
 
       {/* Wall Finishes */}
-      {activeFinishes.length > 0 && (
+      {finishRows.length > 0 && (
         <>
           <SectionLabel title="Wall Finishes" />
-          {activeFinishes.map(f => (
-            <LineRow key={f.label} label={f.label} value={`${n(f.sf).toLocaleString()} SF`} />
-          ))}
+          {finishRows.map((row, i) =>
+            rowLine(row, computeWallFinishRow(row, materialPrices, materialRows), i)
+          )}
         </>
       )}
 
@@ -225,13 +422,7 @@ function WallQtyDetail({ t = {} }) {
       {activeCaps.length > 0 && (
         <>
           <SectionLabel title="Wall Caps" />
-          {activeCaps.map((cap, i) => (
-            <LineRow
-              key={i}
-              label={cap.type}
-              value={cap.type === 'Precast' ? `${n(cap.qty)} pcs` : `${n(cap.lf)} LF`}
-            />
-          ))}
+          {activeCaps.map((row, i) => rowLine(row, computeCapRow(row, materialPrices, materialRows), i))}
         </>
       )}
     </>
@@ -243,7 +434,11 @@ export default function WallsSummary({ module }) {
   const ih = data.ihData || data // legacy estimates stored flat = In-House
   const sub = data.subData || {}
   const calc = data.calc || {}
+  const materialPrices = data.materialPrices || {}
+  const materialRows = data.materialRows || []
+  const vendorNames = data.vendorNames || {}
   const { difficulty = 0, hoursAdj = 0 } = ih
+  const vendorLabel = v => (!v || v === 'House' ? 'House' : vendorNames[v] || 'Vendor')
 
   const showSub = tabHasData(sub)
 
@@ -256,7 +451,13 @@ export default function WallsSummary({ module }) {
       {showSub && (
         <p className="text-xs font-bold text-green-700 uppercase tracking-wider mt-4">In House</p>
       )}
-      <WallQtyDetail t={ih} />
+      <WallQtyDetail
+        t={ih}
+        isSub={false}
+        materialPrices={materialPrices}
+        materialRows={materialRows}
+        vendorLabel={vendorLabel}
+      />
 
       {/* Sub quantities (only when the Sub tab has entries) */}
       {showSub && (
@@ -264,7 +465,13 @@ export default function WallsSummary({ module }) {
           <p className="text-xs font-bold text-green-700 uppercase tracking-wider mt-5">
             Subcontractor
           </p>
-          <WallQtyDetail t={sub} />
+          <WallQtyDetail
+            t={sub}
+            isSub={true}
+            materialPrices={materialPrices}
+            materialRows={materialRows}
+            vendorLabel={vendorLabel}
+          />
         </>
       )}
 
@@ -274,12 +481,8 @@ export default function WallsSummary({ module }) {
       {n(calc.finishHrs) > 0 && (
         <LineRow label="Finish Hours" value={`${n(calc.finishHrs).toFixed(2)} hrs`} />
       )}
-      {n(calc.capHrs) > 0 && (
-        <LineRow label="Cap Hours" value={`${n(calc.capHrs).toFixed(2)} hrs`} />
-      )}
-      {n(calc.finishMat) > 0 && (
-        <LineRow label="Finish Material Total" value={fmt(calc.finishMat)} />
-      )}
+      {n(calc.capHrs) > 0 && <LineRow label="Cap Hours" value={`${n(calc.capHrs).toFixed(2)} hrs`} />}
+      {n(calc.finishMat) > 0 && <LineRow label="Finish Material Total" value={fmt(calc.finishMat)} />}
       {n(difficulty) > 0 && <LineRow label="Difficulty Add" value={`${n(difficulty)}%`} />}
       {n(hoursAdj) !== 0 && (
         <LineRow label="Hours Adjustment" value={`${n(hoursAdj) > 0 ? '+' : ''}${n(hoursAdj)}`} />
