@@ -105,6 +105,23 @@ const DEFAULTS = {
 
 const n = v => parseFloat(v) || 0
 
+const COLUMNS_CATEGORY = 'Columns'
+
+// ── Vendor-catalog material price ─────────────────────────────────────────────
+// The ONLY thing the Vendor selection changes: the MATERIAL $ source.
+// If a real vendor is selected AND a material_rates row exists whose name===dbName
+// and vendor_id===vendorId, use that row's unit_cost. Otherwise fall back to the
+// House price (name-keyed materialPrices[dbName]) and finally the hard fallback.
+// With vendorId 'House' (or empty) this returns exactly (mp[dbName] ?? fallback),
+// i.e. the pre-vendor value — so In-House output is byte-for-byte unchanged.
+function colMatPrice(dbName, vendorId, materialRows, mp, fallback) {
+  if (vendorId && vendorId !== 'House') {
+    const row = (materialRows || []).find(r => r.name === dbName && r.vendor_id === vendorId)
+    if (row && row.unit_cost != null && row.unit_cost !== '') return n(row.unit_cost)
+  }
+  return mp?.[dbName] ?? fallback
+}
+
 // ── Column geometry helpers ───────────────────────────────────────────────────
 // Standard CMU blocks are 8"×8"×16" (face) or 8"×8"×8" (corner/half)
 // We use 8" module for both dimensions.
@@ -124,13 +141,20 @@ function calcColumns(
   materialPrices = {},
   gpmd = DEFAULTS.gpmd,
   walkAccess = null,
-  laborBurdenPct = DEFAULTS.laborBurdenPct
+  laborBurdenPct = DEFAULTS.laborBurdenPct,
+  materialRows = []
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const { difficulty, hoursAdj, qty, heightIn, widthIn, finishRows, manualRows } = state
   const isSub = state.subType === 'Subcontractor'
+  const installVendor = state.installVendor // section-level Vendor for Column Install materials
 
+  // mp() = name-keyed House lookup (labor coefficients + House material fallback).
+  // matP() = vendor-resolved MATERIAL price; with vendor 'House'/empty it returns
+  // exactly (materialPrices[dbName] ?? fallback) == the pre-vendor mp() value.
   const mp = (dbName, fallback) => materialPrices[dbName] ?? fallback
+  const matP = (dbName, fallback, vendorId) =>
+    colMatPrice(dbName, vendorId, materialRows, materialPrices, fallback)
 
   let installHrs = 0,
     installMat = 0
@@ -140,11 +164,11 @@ function calcColumns(
     const totalBlocks = geo.totalBlocks * n(qty)
     const totalRebar = geo.rebarLF * n(qty)
 
-    // Material costs
+    // Material costs — unit prices resolve through the section Vendor.
     installMat +=
-      totalBlocks * mp(BLOCK_RATES.blockMatCost.dbName, BLOCK_RATES.blockMatCost.fallback) +
-      totalBlocks * mp(BLOCK_RATES.fillMatCost.dbName, BLOCK_RATES.fillMatCost.fallback) +
-      totalRebar * mp(BLOCK_RATES.rebarMatCost.dbName, BLOCK_RATES.rebarMatCost.fallback)
+      totalBlocks * matP(BLOCK_RATES.blockMatCost.dbName, BLOCK_RATES.blockMatCost.fallback, installVendor) +
+      totalBlocks * matP(BLOCK_RATES.fillMatCost.dbName, BLOCK_RATES.fillMatCost.fallback, installVendor) +
+      totalRebar * matP(BLOCK_RATES.rebarMatCost.dbName, BLOCK_RATES.rebarMatCost.fallback, installVendor)
 
     // Labor hours
     installHrs +=
@@ -161,16 +185,16 @@ function calcColumns(
     const rate = FINISH_TYPES[r.type]
     if (!rate || !n(r.qty)) return
     if (isSub) {
-      // Sub tab: flat $/SF, no separate labor
-      finishMat += n(r.qty) * mp(rate.subDbName, rate.subFallback ?? 0)
+      // Sub tab: flat $/SF, no separate labor. Vendor overrides the flat source.
+      finishMat += n(r.qty) * matP(rate.subDbName, rate.subFallback ?? 0, r.vendor)
     } else if (rate.unit === 'SF') {
-      const cost = mp(rate.dbName, rate.costPerSF)
+      const cost = matP(rate.dbName, rate.costPerSF, r.vendor)
       const labRate = mp(rate.laborDbName, rate.laborHrsPerSF)
       finishMat += n(r.qty) * cost
       finishHrs += n(r.qty) * labRate
     } else {
-      // ton-based (flagstone, real stone)
-      const cost = mp(rate.dbName, rate.costPerTon)
+      // ton-based (flagstone, real stone) — Vendor overrides the material $ only.
+      const cost = matP(rate.dbName, rate.costPerTon, r.vendor)
       const labRate = mp(rate.laborDbName, rate.laborHrsPer)
       finishMat += n(r.qty) * cost
       finishHrs += n(r.qty) * labRate
@@ -257,10 +281,10 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
 const DEFAULT_FINISH_ROWS = [
-  { type: 'Sand Stucco', qty: '' },
-  { type: 'Sand Stucco', qty: '' },
-  { type: 'Ledgerstone Veneer Panels', qty: '' },
-  { type: 'Tile', qty: '' },
+  { type: 'Sand Stucco', qty: '', vendor: 'House' },
+  { type: 'Sand Stucco', qty: '', vendor: 'House' },
+  { type: 'Ledgerstone Veneer Panels', qty: '', vendor: 'House' },
+  { type: 'Tile', qty: '', vendor: 'House' },
 ]
 const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 1', hours: '', materials: '', subCost: '' },
@@ -287,13 +311,27 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
     }
   )
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
+  // Full Columns material_rates catalog (id/name/vendor_id/unit/unit_cost) used to
+  // resolve a chosen vendor's material price, plus the vendor list for the pickers.
+  const [materialRows, setMaterialRows] = useState(initialData?.materialRows || [])
+  const [vendors, setVendors] = useState([])
   const [pricesLoading, setPricesLoading] = useState(!initialData?.materialPrices)
 
-  // Re-fetch Columns merged labor+material map. Used on mount and after edits.
+  // Re-fetch Columns merged labor+material map + vendor catalog. Used on mount
+  // and after edits.
   const refreshAllRates = useCallback(async () => {
-    const [matRes, labRes] = await Promise.all([
-      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Columns'),
-      supabase.from('labor_rates').select('name, rate').eq('category', 'Columns'),
+    const [matRes, labRes, catRes, venRes] = await Promise.all([
+      supabase.from('material_rates').select('name, unit_cost').eq('category', COLUMNS_CATEGORY),
+      supabase.from('labor_rates').select('name, rate').eq('category', COLUMNS_CATEGORY),
+      supabase
+        .from('material_rates')
+        .select('id,name,vendor_id,unit,unit_cost')
+        .eq('category', COLUMNS_CATEGORY),
+      supabase
+        .from('subs_vendors')
+        .select('id, company_name, supplied_categories')
+        .eq('type', 'vendor')
+        .order('company_name'),
     ])
     const prices = {}
     ;(matRes.data || []).forEach(r => {
@@ -303,6 +341,14 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
       prices[r.name] = parseFloat(r.rate) || 0
     })
     setMaterialPrices(prices)
+    setMaterialRows(catRes.data || [])
+    setVendors(
+      (venRes.data || []).map(v => ({
+        id: v.id,
+        name: v.company_name,
+        categories: v.supplied_categories || [],
+      }))
+    )
   }, [])
 
   useEffect(() => {
@@ -328,7 +374,8 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
           }
         })
     }
-    if (initialData?.materialPrices) return
+    // Always refresh so the vendor catalog + material_rates rows load (matches the
+    // other vendor-catalog modules). House prices resolve identically either way.
     refreshAllRates().then(() => setPricesLoading(false))
   }, [refreshAllRates])
 
@@ -350,7 +397,11 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
     heightIn: src.heightIn ?? '',
     widthIn: src.widthIn ?? '',
     distanceLF: src.distanceLF ?? '',
-    finishRows: src.finishRows ? src.finishRows.map(r => ({ ...r })) : DEFAULT_FINISH_ROWS.map(r => ({ ...r })),
+    // Section-level Vendor for the Column Install materials. 'House' = current price.
+    installVendor: src.installVendor ?? 'House',
+    finishRows: src.finishRows
+      ? src.finishRows.map(r => ({ vendor: 'House', ...r }))
+      : DEFAULT_FINISH_ROWS.map(r => ({ ...r })),
     manualRows: src.manualRows ? src.manualRows.map(r => ({ ...r })) : DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
   })
   const [ihTab, setIhTab] = useState(() => makeTab(initialData?.ihData ?? initialData))
@@ -372,6 +423,8 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
   const setWidthIn = setField('widthIn')
   const distanceLF = cur.distanceLF
   const setDistanceLF = setField('distanceLF')
+  const installVendor = cur.installVendor ?? 'House'
+  const setInstallVendor = setField('installVendor')
   const finishRows = cur.finishRows
   const setFinishRows = setField('finishRows')
   const manualRows = cur.manualRows
@@ -392,6 +445,16 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
     }
   }, [])
 
+  // Vendor pickers: only vendors that supply the Columns category. 'House' first.
+  const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
+  const vendorOptions = [
+    { value: 'House', label: 'House' },
+    ...vendorsForCategory(COLUMNS_CATEGORY).map(v => ({ value: v.id, label: v.name })),
+  ]
+  // Vendor-resolved material price for display (calc uses colMatPrice internally).
+  const colMat = (dbName, vendorId, fallback) =>
+    colMatPrice(dbName, vendorId, materialRows, materialPrices, fallback)
+
   const calcRaw = calcColumns(
     {
       difficulty,
@@ -399,6 +462,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
       qty,
       heightIn,
       widthIn,
+      installVendor,
       finishRows,
       manualRows,
       distanceLF,
@@ -409,7 +473,8 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
     materialPrices,
     gpmd,
     walkAccess,
-    laborBurdenPct
+    laborBurdenPct,
+    materialRows
   )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
@@ -449,6 +514,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
         heightIn,
         widthIn,
         distanceLF,
+        installVendor,
         finishRows,
         manualRows,
         crewType,
@@ -458,6 +524,8 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
         laborBurdenPct,
         gpmd,
         materialPrices,
+        materialRows,
+        vendorNames: Object.fromEntries(vendors.map(v => [v.id, v.name])),
         ihData: ihTab,
         subData: subTab,
         calc,
@@ -552,6 +620,23 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
       {/* ── Column Install ── */}
       <div>
         <SectionHeader title="Column Install" />
+        {/* Section Vendor — overrides ONLY the material unit prices (CMU Block,
+            Fill/Grout, Rebar) used by the geometry calc. 'House' = current price. */}
+        <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200 mb-3">
+          <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Vendor</label>
+          <select
+            value={installVendor || 'House'}
+            onChange={e => setInstallVendor(e.target.value)}
+            className="input text-sm py-1 w-48"
+          >
+            {vendorOptions.map(o => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <span className="text-[11px] text-gray-400">material prices only</span>
+        </div>
         {/* Rates reference box — In-House only (hidden on Sub tab) */}
         {!isSub && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3 text-[11px] text-gray-500">
@@ -561,8 +646,10 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
           <div className="flex flex-wrap gap-x-3 gap-y-1">
             <span className="inline-flex items-center gap-1">
               Block $
-              {(
-                materialPrices[BLOCK_RATES.blockMatCost.dbName] ?? BLOCK_RATES.blockMatCost.fallback
+              {colMat(
+                BLOCK_RATES.blockMatCost.dbName,
+                installVendor,
+                BLOCK_RATES.blockMatCost.fallback
               ).toFixed(2)}
               /ea
               <RateEditPopover
@@ -579,8 +666,10 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
             </span>
             <span className="inline-flex items-center gap-1">
               Rebar $
-              {(
-                materialPrices[BLOCK_RATES.rebarMatCost.dbName] ?? BLOCK_RATES.rebarMatCost.fallback
+              {colMat(
+                BLOCK_RATES.rebarMatCost.dbName,
+                installVendor,
+                BLOCK_RATES.rebarMatCost.fallback
               ).toFixed(2)}
               /LF
               <RateEditPopover
@@ -597,8 +686,10 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
             </span>
             <span className="inline-flex items-center gap-1">
               Fill $
-              {(
-                materialPrices[BLOCK_RATES.fillMatCost.dbName] ?? BLOCK_RATES.fillMatCost.fallback
+              {colMat(
+                BLOCK_RATES.fillMatCost.dbName,
+                installVendor,
+                BLOCK_RATES.fillMatCost.fallback
               ).toFixed(2)}
               /block
               <RateEditPopover
@@ -734,6 +825,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-2 font-medium w-36">Vendor</th>
                 <th className="text-left pb-1 pr-2 font-medium">Finish Type</th>
                 <th className="text-left pb-1 pr-2 font-medium">Qty</th>
                 <th className="text-left pb-1 pr-2 font-medium text-gray-400">Unit</th>
@@ -746,16 +838,30 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
                 const rate = FINISH_TYPES[row.type]
                 const isTon = rate?.unit === 'ton'
                 const defCost = isTon ? rate?.costPerTon : rate?.costPerSF
-                // Sub tab: flat $/SF rate; In-House: material cost per unit
+                // Sub tab: flat $/SF rate; In-House: material cost per unit.
+                // Vendor overrides ONLY this material price (row.vendor).
                 const cost = isSub
-                  ? materialPrices[rate?.subDbName] ?? rate?.subFallback ?? 0
-                  : materialPrices[rate?.dbName] ?? defCost ?? 0
+                  ? colMat(rate?.subDbName, row.vendor, rate?.subFallback ?? 0)
+                  : colMat(rate?.dbName, row.vendor, defCost ?? 0)
                 const defLab = isTon ? rate?.laborHrsPer : rate?.laborHrsPerSF
                 const labRate = materialPrices[rate?.laborDbName] ?? defLab ?? 0
                 const unitLabel = isSub ? 'SF' : rate?.unit ?? 'SF'
                 const mat = n(row.qty) * cost
                 return (
                   <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-2">
+                      <select
+                        className="input text-sm py-1 w-full"
+                        value={row.vendor || 'House'}
+                        onChange={e => updateFinish(i, 'vendor', e.target.value)}
+                      >
+                        {vendorOptions.map(o => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
                     <td className="py-1 pr-2">
                       <div className="flex items-center gap-1">
                         <select
@@ -788,13 +894,18 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
                       <span className="inline-flex items-center justify-end gap-1">
                         ${cost.toFixed(2)}
-                        {rate && (
+                        {/* House rate edit — only when House vendor (edits the
+                            name-keyed House material_rates row, not a vendor's). */}
+                        {rate && (!row.vendor || row.vendor === 'House') && (
                           <RateEditPopover
                             table="material_rates"
                             name={isSub ? rate.subDbName : rate.dbName}
                             category="Columns"
                             unitLabel={unitLabel}
-                            currentValue={cost}
+                            currentValue={
+                              materialPrices[isSub ? rate.subDbName : rate.dbName] ??
+                              (isSub ? rate.subFallback ?? 0 : defCost ?? 0)
+                            }
                             onSaved={refreshAllRates}
                           />
                         )}
@@ -811,7 +922,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
           <button
             type="button"
             className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
-            onClick={() => setFinishRows(r => [...r, { type: 'Sand Stucco', qty: '' }])}
+            onClick={() => setFinishRows(r => [...r, { type: 'Sand Stucco', qty: '', vendor: 'House' }])}
           >
             + Add row
           </button>

@@ -93,6 +93,18 @@ function columnGeometry(heightIn, widthIn) {
 
 const n = v => parseFloat(v) || 0
 
+// Vendor-catalog material price. Mirrors ColumnsModule.colMatPrice: a real vendor's
+// material_rates row (name===dbName && vendor_id===vendorId) wins; otherwise fall
+// back to the House price (name-keyed materialPrices) then the hard fallback.
+// vendorId 'House'/empty returns exactly the pre-vendor value.
+function colMatPrice(dbName, vendorId, materialRows, mp, fallback) {
+  if (vendorId && vendorId !== 'House') {
+    const row = (materialRows || []).find(r => r.name === dbName && r.vendor_id === vendorId)
+    if (row && row.unit_cost != null && row.unit_cost !== '') return n(row.unit_cost)
+  }
+  return mp?.[dbName] != null ? mp[dbName] : fallback
+}
+
 function SectionLabel({ title }) {
   return (
     <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mt-4 mb-1 border-t border-gray-100 pt-3">
@@ -132,12 +144,20 @@ export default function ColumnsSummary({ module }) {
     subType = 'In-House',
     laborRatePerHour = 35,
     materialPrices = {},
+    materialRows = [],
+    vendorNames = {},
+    installVendor = 'House',
     calc = null,
   } = data
   const isSub = subType === 'Subcontractor'
 
+  // Labor / non-vendor prices stay House name-keyed.
   const price = (dbName, fallback) =>
     materialPrices[dbName] != null ? materialPrices[dbName] : fallback
+  // Material prices resolve through the saved Vendor selection.
+  const matPrice = (dbName, fallback, vendorId) =>
+    colMatPrice(dbName, vendorId, materialRows, materialPrices, fallback)
+  const vendorLabel = v => (!v || v === 'House' ? 'House' : vendorNames[v] || 'Vendor')
 
   const fmt2 = v =>
     `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -149,9 +169,21 @@ export default function ColumnsSummary({ module }) {
     const totalBlocks = geo.totalBlocks * n(qty)
     const totalRebar = geo.rebarLF * n(qty)
 
-    const blockCost = price(BLOCK_RATES.blockMatCost.dbName, BLOCK_RATES.blockMatCost.fallback)
-    const fillCost = price(BLOCK_RATES.fillMatCost.dbName, BLOCK_RATES.fillMatCost.fallback)
-    const rebarCost = price(BLOCK_RATES.rebarMatCost.dbName, BLOCK_RATES.rebarMatCost.fallback)
+    const blockCost = matPrice(
+      BLOCK_RATES.blockMatCost.dbName,
+      BLOCK_RATES.blockMatCost.fallback,
+      installVendor
+    )
+    const fillCost = matPrice(
+      BLOCK_RATES.fillMatCost.dbName,
+      BLOCK_RATES.fillMatCost.fallback,
+      installVendor
+    )
+    const rebarCost = matPrice(
+      BLOCK_RATES.rebarMatCost.dbName,
+      BLOCK_RATES.rebarMatCost.fallback,
+      installVendor
+    )
     const excavateLab = price(
       BLOCK_RATES.excavateLaborHrs.dbName,
       BLOCK_RATES.excavateLaborHrs.fallback
@@ -192,6 +224,9 @@ export default function ColumnsSummary({ module }) {
               {n(heightIn)}" × {n(widthIn)}"
             </strong>
           </span>
+          <span className="text-xs text-gray-600">
+            Vendor: <strong>{vendorLabel(installVendor)}</strong>
+          </span>
         </div>
         <LineRow
           label="CMU Blocks + Fill + Grout"
@@ -207,19 +242,20 @@ export default function ColumnsSummary({ module }) {
     .map((r, i) => {
       const rate = FINISH_TYPES[r.type]
       if (!rate || !n(r.qty)) return null
+      const vLabel = vendorLabel(r.vendor)
       if (isSub) {
-        // Sub tab: flat $/SF, no labor
-        const flat = price(rate.subDbName, rate.subFallback ?? 0)
+        // Sub tab: flat $/SF, no labor. Vendor overrides the flat $/SF source.
+        const flat = matPrice(rate.subDbName, rate.subFallback ?? 0, r.vendor)
         const mat = n(r.qty) * flat
         return {
           key: i,
           label: `${r.type} — ${n(r.qty)} SF`,
           value: fmt2(mat),
-          sub: `${fmt2(flat)}/SF flat`,
+          sub: `${fmt2(flat)}/SF flat  ·  ${vLabel}`,
         }
       }
       const isTon = rate.unit === 'ton'
-      const cost = price(rate.dbName, isTon ? rate.costPerTon : rate.costPerSF)
+      const cost = matPrice(rate.dbName, isTon ? rate.costPerTon : rate.costPerSF, r.vendor)
       const labHrs = price(rate.laborDbName, isTon ? rate.laborHrsPer : rate.laborHrsPerSF)
       const mat = n(r.qty) * cost
       const hrs = n(r.qty) * labHrs
@@ -227,7 +263,7 @@ export default function ColumnsSummary({ module }) {
         key: i,
         label: `${r.type} — ${n(r.qty)} ${rate.unit}`,
         value: fmt2(mat),
-        sub: `${hrs.toFixed(2)} hrs labor  ·  ${fmt2(cost)}/${rate.unit}`,
+        sub: `${hrs.toFixed(2)} hrs labor  ·  ${fmt2(cost)}/${rate.unit}  ·  ${vLabel}`,
       }
     })
     .filter(Boolean)

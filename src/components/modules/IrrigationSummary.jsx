@@ -1,7 +1,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// IrrigationSummary — read-only detail view for a saved Irrigation module
-// All rates pulled from the saved snapshot with fallbacks.
+// IrrigationSummary — read-only detail view for a saved Irrigation module.
+//
+// Consumes the row-based catalog shape (ihData / subData holding zoneRows /
+// timerRows / manualRows). Recomputes each row's material / labor from the saved
+// rate + vendor-catalog snapshots so lines show Vendor · Item · qty · Material
+// (+ hrs on In-House, flat $ on Sub). Falls back gracefully to legacy flat saves
+// (top-level zoneQtys / zoneModes / timerQtys) so old estimates never crash.
 // ─────────────────────────────────────────────────────────────────────────────
+
+import FinancialSummaryList from './FinancialSummaryList'
 
 const ZONE_TYPES = [
   {
@@ -45,24 +52,9 @@ const TIMER_TYPES = [
   { key: 'timer4', label: '4 Station', matKey: 'Irrigation Timer - 4 Station', matFallback: 69.0 },
   { key: 'timer6', label: '6 Station', matKey: 'Irrigation Timer - 6 Station', matFallback: 138.0 },
   { key: 'timer9', label: '9 Station', matKey: 'Irrigation Timer - 9 Station', matFallback: 184.0 },
-  {
-    key: 'timer12',
-    label: '12 Station',
-    matKey: 'Irrigation Timer - 12 Station',
-    matFallback: 270.25,
-  },
-  {
-    key: 'timer15',
-    label: '15 Station',
-    matKey: 'Irrigation Timer - 15 Station',
-    matFallback: 322.0,
-  },
-  {
-    key: 'timer18',
-    label: '18 Station',
-    matKey: 'Irrigation Timer - 18 Station',
-    matFallback: 402.5,
-  },
+  { key: 'timer12', label: '12 Station', matKey: 'Irrigation Timer - 12 Station', matFallback: 270.25 },
+  { key: 'timer15', label: '15 Station', matKey: 'Irrigation Timer - 15 Station', matFallback: 322.0 },
+  { key: 'timer18', label: '18 Station', matKey: 'Irrigation Timer - 18 Station', matFallback: 402.5 },
   {
     key: 'timerICC8',
     label: 'Hunter ICC 8 Station',
@@ -77,9 +69,22 @@ const TIMER_TYPES = [
   },
 ]
 
+const ZONE_BY_KEY = Object.fromEntries(ZONE_TYPES.map(z => [z.key, z]))
+const TIMER_BY_KEY = Object.fromEntries(TIMER_TYPES.map(t => [t.key, t]))
+const zoneMeta = key => ZONE_BY_KEY[key] || ZONE_TYPES[0]
+const timerMeta = key => TIMER_BY_KEY[key] || TIMER_TYPES[0]
+
 const RATE_DEFAULTS = { handRate: 16, trenchRate: 12.5, timerHrs: 0.5, salesTax: 0.095 }
 
 const n = v => parseFloat(v) || 0
+
+function irrMatPrice(dbName, vendorId, materialRows, materialPrices, fallback) {
+  if (vendorId && vendorId !== 'House') {
+    const row = (materialRows || []).find(r => r.name === dbName && r.vendor_id === vendorId)
+    if (row && row.unit_cost != null && row.unit_cost !== '') return n(row.unit_cost)
+  }
+  return materialPrices?.[dbName] ?? fallback
+}
 
 function SectionLabel({ title }) {
   return (
@@ -106,121 +111,133 @@ function LineRow({ label, value, sub, highlight }) {
   )
 }
 
-import FinancialSummaryList from './FinancialSummaryList'
+// Legacy flat save → zone/timer rows (for old estimates without ihData/zoneRows).
+function legacyZoneRows(src) {
+  const q = src.zoneQtys || {}
+  const m = src.zoneModes || {}
+  return ZONE_TYPES.map(z => ({ vendor: 'House', type: z.key, qty: q[z.key] ?? '', mode: m[z.key] || z.defaultMode }))
+}
+function legacyTimerRows(src) {
+  const q = src.timerQtys || {}
+  return TIMER_TYPES.map(t => ({ vendor: 'House', type: t.key, qty: q[t.key] ?? '' }))
+}
 
 export default function IrrigationSummary({ module }) {
   const data = module?.data || {}
-  const {
-    difficulty = 0,
-    hoursAdj = 0,
-    zoneQtys = {},
-    zoneModes = {},
-    timerQtys = {},
-    manualRows = [],
-    laborRatePerHour = 35,
-    materialPrices = {},
-    laborRates = {},
-    calc = null,
-  } = data
-
-  const mp = materialPrices || {}
-  const lr = laborRates || {}
+  const isSub = data.subType === 'Subcontractor'
+  const tab = isSub ? data.subData || {} : data.ihData || data
+  const mp = data.materialPrices || {}
+  const lr = data.laborRates || {}
+  const materialRows = data.materialRows || []
+  const vendorNames = data.vendorNames || {}
+  const savedCalc = data.calc || {}
 
   const handRate = lr['Irrigation - Hand Zone'] ?? RATE_DEFAULTS.handRate
   const trenchRate = lr['Irrigation - Trench Zone'] ?? RATE_DEFAULTS.trenchRate
   const timerHrs = lr['Irrigation - Timer Install'] ?? RATE_DEFAULTS.timerHrs
 
-  // Re-derive zone lines — rate is hrs/zone, so hrs = rate × qty
-  const zoneCalc = ZONE_TYPES.map(z => {
-    const qty = n(zoneQtys[z.key])
-    const mode = zoneModes[z.key] || z.defaultMode
-    const rate = mode === 'Hand' ? handRate : trenchRate
-    const hrs = qty > 0 ? qty * rate : 0
-    const mat = qty * (mp[z.matKey] ?? z.matFallback)
-    return { qty, mode, rate, hrs, mat }
-  })
-
-  // Re-derive timer lines
-  const timerCalc = TIMER_TYPES.map(t => {
-    const qty = n(timerQtys[t.key])
-    const hrs = qty * timerHrs
-    const mat = qty * (mp[t.matKey] ?? t.matFallback)
-    return { qty, hrs, mat }
-  })
-
-  const manualFiltered = manualRows.filter(
-    r => n(r.hours) > 0 || n(r.materials) > 0 || n(r.subCost) > 0
-  )
-
-  // Use saved calc snapshot
-  const savedCalc = calc || {}
-  const totalHrs = n(savedCalc.totalHrs)
-  const manDays = n(savedCalc.manDays) || n(module.man_days)
-  const totalMat = n(savedCalc.totalMat) || n(module.material_cost)
-  const laborCost = n(savedCalc.laborCost)
-  const burden = n(savedCalc.burden)
-  const gp = n(savedCalc.gp)
-  const commission = n(savedCalc.commission) || gp * 0.12
-  const subCost = n(savedCalc.subCost)
-  const priceTotal = n(savedCalc.price)
+  const zoneRows = tab.zoneRows || legacyZoneRows(tab)
+  const timerRows = tab.timerRows || legacyTimerRows(tab)
+  const manualRows = tab.manualRows || []
 
   const fmt2 = v =>
     `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   const fh = v => (v > 0 ? `${v.toFixed(2)} hrs` : null)
+  const vendorLabel = v => (!v || v === 'House' ? 'House' : vendorNames[v] || 'Vendor')
 
-  const hasZones = zoneCalc.some(r => r.qty > 0)
-  const hasTimers = timerCalc.some(r => r.qty > 0)
-  const hasLines = hasZones || hasTimers || manualFiltered.length > 0
+  // Zone lines
+  const zoneLines = (zoneRows || [])
+    .filter(r => n(r.qty) > 0)
+    .map((r, i) => {
+      const z = zoneMeta(r.type)
+      const qty = n(r.qty)
+      const mode = r.mode || z.defaultMode
+      const rate = mode === 'Hand' ? handRate : trenchRate
+      const hrs = qty > 0 ? qty * rate : 0
+      const unitPrice = irrMatPrice(z.matKey, r.vendor, materialRows, mp, z.matFallback)
+      const subEach = r.subEach !== '' && r.subEach != null ? n(r.subEach) : unitPrice
+      const material = isSub ? qty * subEach : qty * unitPrice
+      return {
+        key: i,
+        label: `${vendorLabel(r.vendor)} · ${z.label} × ${qty}`,
+        value: material > 0 ? fmt2(material) : '—',
+        sub: isSub ? `${fmt2(subEach)}/zone flat` : `${mode}${fh(hrs) ? ` · ${fh(hrs)}` : ''}`,
+      }
+    })
+
+  // Timer lines
+  const timerLines = (timerRows || [])
+    .filter(r => n(r.qty) > 0)
+    .map((r, i) => {
+      const t = timerMeta(r.type)
+      const qty = n(r.qty)
+      const hrs = qty * timerHrs
+      const unitPrice = irrMatPrice(t.matKey, r.vendor, materialRows, mp, t.matFallback)
+      const subEach = r.subEach !== '' && r.subEach != null ? n(r.subEach) : unitPrice
+      const material = isSub ? qty * subEach : qty * unitPrice
+      return {
+        key: i,
+        label: `${vendorLabel(r.vendor)} · ${t.label} × ${qty}`,
+        value: material > 0 ? fmt2(material) : '—',
+        sub: isSub ? `${fmt2(subEach)}/ea flat` : fh(hrs) || `${timerHrs} hrs/ea`,
+      }
+    })
+
+  const manualLines = (manualRows || []).filter(
+    r => n(r.hours) > 0 || n(r.materials) > 0 || n(r.subCost) > 0
+  )
+
+  // Financials from the saved calc snapshot.
+  const totalHrs = n(savedCalc.totalHrs)
+  const manDays = n(savedCalc.manDays) || n(module.man_days)
+  const totalMat = n(savedCalc.totalMat) || n(module.material_cost)
+  const laborRatePerHour = n(data.laborRatePerHour) || 35
+  const laborCost = n(savedCalc.laborCost)
+  const burden = n(savedCalc.burden)
+  const gp = n(savedCalc.gp)
+  const subGp = n(savedCalc.subGp)
+  const commission = n(savedCalc.commission) || (isSub ? subGp : gp) * 0.12
+  const subCost = n(savedCalc.subCost)
+  const priceTotal = n(savedCalc.price)
+
+  const hasLines = zoneLines.length || timerLines.length || manualLines.length
 
   return (
     <div className="space-y-1 text-sm">
+      {isSub && (
+        <div className="flex flex-wrap gap-2 mb-1">
+          <span className="text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded font-medium">
+            Subcontractor
+          </span>
+        </div>
+      )}
+
       {!hasLines ? (
         <p className="text-xs text-gray-400 text-center py-4">No line items entered.</p>
       ) : (
         <>
-          {/* Zones */}
-          {hasZones && (
+          {zoneLines.length > 0 && (
             <>
               <SectionLabel title="Irrigation Zones" />
-              {ZONE_TYPES.map((z, i) => {
-                const cr = zoneCalc[i]
-                if (!cr || cr.qty === 0) return null
-                return (
-                  <LineRow
-                    key={z.key}
-                    label={`${z.label} × ${cr.qty}`}
-                    value={fh(cr.hrs) || '—'}
-                    sub={`${cr.mode} · ${cr.rate} zones/hr${cr.mat > 0 ? ` · ${fmt2(cr.mat)} mat` : ''}`}
-                  />
-                )
-              })}
+              {zoneLines.map(l => (
+                <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />
+              ))}
             </>
           )}
 
-          {/* Timers */}
-          {hasTimers && (
+          {timerLines.length > 0 && (
             <>
               <SectionLabel title="Controllers / Timers" />
-              {TIMER_TYPES.map((t, i) => {
-                const cr = timerCalc[i]
-                if (!cr || cr.qty === 0) return null
-                return (
-                  <LineRow
-                    key={t.key}
-                    label={`${t.label} × ${cr.qty}`}
-                    value={fh(cr.hrs) || '—'}
-                    sub={`${timerHrs} hrs/ea${cr.mat > 0 ? ` · ${fmt2(cr.mat)} mat` : ''}`}
-                  />
-                )
-              })}
+              {timerLines.map(l => (
+                <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />
+              ))}
             </>
           )}
 
-          {/* Manual */}
-          {manualFiltered.length > 0 && (
+          {manualLines.length > 0 && (
             <>
               <SectionLabel title="Manual Entry" />
-              {manualFiltered.map((r, i) => (
+              {manualLines.map((r, i) => (
                 <div key={i} className="py-1 border-b border-gray-50">
                   <p className="text-xs font-medium text-gray-700">{r.label}</p>
                   <div className="flex gap-3 mt-0.5">
@@ -246,10 +263,11 @@ export default function IrrigationSummary({ module }) {
         manDays={manDays}
         totalMat={totalMat}
         laborCost={laborCost}
-        lrph={n(laborRatePerHour)}
+        lrph={laborRatePerHour}
         burden={burden}
         subCost={subCost}
         gp={gp}
+        subGp={subGp}
         commission={commission}
         price={priceTotal}
       />
