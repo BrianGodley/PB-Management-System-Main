@@ -135,6 +135,11 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
   const [selSearch, setSelSearch] = useState('');
   const [selCatFilter, setSelCatFilter] = useState('All');
 
+  // takeoff panel (Phase 3 — read-only aggregation)
+  const [showTakeoff, setShowTakeoff] = useState(false);
+  const [takeoffVisibleOnly, setTakeoffVisibleOnly] = useState(false);
+  const [takeoffCopied, setTakeoffCopied] = useState(false);
+
   // header / persistence
   const [name, setName] = useState(drawing ? drawing.name || 'Untitled' : 'Untitled');
   const [dirty, setDirty] = useState(false);
@@ -315,6 +320,9 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
   const areaLabel = unit === 'ft' ? 'SF' : `${unit}²`;
   const fmtLen = (v) => `${v.toFixed(1)} ${lenUnit}`;
   const fmtArea = (v) => `${v.toFixed(1)} ${areaLabel}`;
+  const fmtLF = (v) => `${v.toFixed(1)} LF`; // linear takeoff label
+  const fmtMoney = (v) =>
+    `$${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   // -------- selection ------------------------------------------------------
   const selected = useMemo(() => entities.find((e) => e.id === selectedId) || null, [entities, selectedId]);
@@ -368,6 +376,162 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
     return '';
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft, cursor, unit]);
+
+  // -------- takeoff aggregation (Phase 3, read-only) ----------------------
+  const takeoff = useMemo(() => {
+    const layerName = (id) => {
+      const l = layers.find((x) => x.id === id);
+      return l ? l.name : id || '—';
+    };
+    const layerVisible = (id) => {
+      const l = layers.find((x) => x.id === id);
+      return l ? l.visible !== false : true;
+    };
+    const src = entities.filter((e) => {
+      if (!e || e.type === 'text') return false; // ignore text
+      if (takeoffVisibleOnly && !layerVisible(e.layer)) return false;
+      return true;
+    });
+
+    // A) Selections (blocks) grouped by selectionId
+    const blockMap = new Map();
+    src
+      .filter((e) => e.type === 'block')
+      .forEach((e) => {
+        const p = e.props || {};
+        const key = p.selectionId || e.id;
+        let row = blockMap.get(key);
+        if (!row) {
+          const priceNum =
+            p.price != null && p.price !== '' && !Number.isNaN(Number(p.price)) ? Number(p.price) : null;
+          row = {
+            key,
+            label: p.label || 'Block',
+            category: p.category || '',
+            unit: p.unit || '',
+            price: priceNum,
+            photoUrl: p.photoUrl || '',
+            qty: 0,
+          };
+          blockMap.set(key, row);
+        }
+        row.qty += 1;
+      });
+    const blockRows = Array.from(blockMap.values()).map((r) => ({
+      ...r,
+      extended: r.price != null ? r.qty * r.price : null,
+    }));
+    blockRows.sort((a, b) => {
+      const c = (a.category || '').localeCompare(b.category || '');
+      if (c !== 0) return c;
+      return (a.label || '').localeCompare(b.label || '');
+    });
+    const blockTotalQty = blockRows.reduce((s, r) => s + r.qty, 0);
+    const blockTotalCost = blockRows.reduce((s, r) => s + (r.extended != null ? r.extended : 0), 0);
+    const catCountMap = {};
+    blockRows.forEach((r) => {
+      const c = r.category || 'Uncategorized';
+      catCountMap[c] = (catCountMap[c] || 0) + r.qty;
+    });
+    const categorySummary = Object.keys(catCountMap)
+      .sort()
+      .map((c) => ({ category: c, qty: catCountMap[c] }));
+
+    // B) Areas: rect, polygon, circle grouped by layer
+    const areaMap = new Map();
+    src
+      .filter((e) => e.type === 'rect' || e.type === 'polygon' || e.type === 'circle')
+      .forEach((e) => {
+        let row = areaMap.get(e.layer);
+        if (!row) {
+          row = { layer: e.layer, name: layerName(e.layer), count: 0, area: 0, perim: 0 };
+          areaMap.set(e.layer, row);
+        }
+        row.count += 1;
+        if (e.type === 'circle') {
+          const r = (e.props && e.props.radius) || 0;
+          row.area += Math.PI * r * r;
+          row.perim += 2 * Math.PI * r;
+        } else {
+          row.area += polygonArea(e.points);
+          row.perim += polygonPerimeter(e.points);
+        }
+      });
+    const areaRows = Array.from(areaMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+    const areaTotal = areaRows.reduce((s, r) => s + r.area, 0);
+    const areaPerimTotal = areaRows.reduce((s, r) => s + r.perim, 0);
+
+    // C) Linear: line, polyline grouped by layer
+    const linMap = new Map();
+    src
+      .filter((e) => e.type === 'line' || e.type === 'polyline')
+      .forEach((e) => {
+        let row = linMap.get(e.layer);
+        if (!row) {
+          row = { layer: e.layer, name: layerName(e.layer), count: 0, length: 0 };
+          linMap.set(e.layer, row);
+        }
+        row.count += 1;
+        row.length += polylineLength(e.points);
+      });
+    const linRows = Array.from(linMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+    const linTotal = linRows.reduce((s, r) => s + r.length, 0);
+
+    return {
+      blockRows,
+      blockTotalQty,
+      blockTotalCost,
+      categorySummary,
+      areaRows,
+      areaTotal,
+      areaPerimTotal,
+      linRows,
+      linTotal,
+    };
+  }, [entities, layers, takeoffVisibleOnly]);
+
+  // copy the whole takeoff as CSV to the clipboard (no file download)
+  const copyTakeoffCsv = useCallback(() => {
+    const esc = (v) => {
+      const s = v == null ? '' : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = [['Section', 'Item/Layer', 'Qty', 'Unit', 'Value', 'Unit Price', 'Extended']];
+    takeoff.blockRows.forEach((r) => {
+      rows.push([
+        'Selections',
+        r.label + (r.category ? ` (${r.category})` : ''),
+        r.qty,
+        r.unit || 'ea',
+        '',
+        r.price != null ? r.price.toFixed(2) : '',
+        r.extended != null ? r.extended.toFixed(2) : '',
+      ]);
+    });
+    takeoff.areaRows.forEach((r) => {
+      rows.push(['Areas', r.name, r.count, areaLabel, r.area.toFixed(1), '', '']);
+    });
+    takeoff.linRows.forEach((r) => {
+      rows.push(['Linear', r.name, r.count, 'LF', r.length.toFixed(1), '', '']);
+    });
+    rows.push(['Total', 'Material cost', '', '', '', '', takeoff.blockTotalCost.toFixed(2)]);
+    const csv = rows.map((r) => r.map(esc).join(',')).join('\n');
+    try {
+      const p = navigator.clipboard && navigator.clipboard.writeText(csv);
+      if (p && typeof p.then === 'function') {
+        p.then(() => {
+          setTakeoffCopied(true);
+          setTimeout(() => setTakeoffCopied(false), 1500);
+        }).catch(() => {});
+      } else {
+        setTakeoffCopied(true);
+        setTimeout(() => setTakeoffCopied(false), 1500);
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Takeoff copy failed', err);
+    }
+  }, [takeoff, areaLabel]);
 
   // -------- hit testing ---------------------------------------------------
   const hitTest = useCallback(
@@ -1218,6 +1382,8 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
                   if (!nv) {
                     setPlacingSelection(null);
                     if (tool === 'place') setTool('select');
+                  } else {
+                    setShowTakeoff(false); // one right-side overlay at a time
                   }
                   return nv;
                 });
@@ -1230,6 +1396,28 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
               }
             >
               🎨
+            </button>
+            <button
+              title="Takeoff"
+              onClick={() => {
+                setShowTakeoff((v) => {
+                  const nv = !v;
+                  if (nv) {
+                    setShowSelections(false);
+                    setPlacingSelection(null);
+                    if (tool === 'place') setTool('select');
+                  }
+                  return nv;
+                });
+              }}
+              className="w-9 h-9 flex items-center justify-center rounded-md text-base border"
+              style={
+                showTakeoff
+                  ? { backgroundColor: GREEN, color: '#fff', borderColor: GREEN }
+                  : { backgroundColor: '#fff', borderColor: '#e5e7eb', color: '#374151' }
+              }
+            >
+              📊
             </button>
             <div className="h-px bg-gray-200 my-1" />
             <button title="Zoom in" onClick={() => zoomBy(1.2)} className="w-9 h-9 rounded-md border border-gray-200 bg-white hover:bg-gray-100">
@@ -1547,6 +1735,201 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
                     })}
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* takeoff panel (Phase 3) */}
+          {showTakeoff && (
+            <div className="absolute top-2 right-2 bottom-2 w-[360px] bg-white border border-gray-200 rounded-md shadow-lg flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
+                <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Takeoff</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={copyTakeoffCsv}
+                    title="Copy the full takeoff as CSV to the clipboard"
+                    className="text-[11px] px-2 py-1 rounded border hover:bg-gray-100"
+                    style={
+                      takeoffCopied
+                        ? { borderColor: GREEN, color: GREEN }
+                        : { borderColor: '#e5e7eb', color: '#374151' }
+                    }
+                  >
+                    {takeoffCopied ? 'Copied ✓' : 'Copy CSV'}
+                  </button>
+                  <button
+                    onClick={() => setShowTakeoff(false)}
+                    title="Close"
+                    className="w-6 h-6 rounded border border-gray-200 hover:bg-gray-100 text-xs"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              {/* grand material cost */}
+              <div className="px-3 py-2 border-b border-gray-100">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xs text-gray-500">Material cost</span>
+                  <span className="text-lg font-semibold" style={{ color: GREEN }}>
+                    {fmtMoney(takeoff.blockTotalCost)}
+                  </span>
+                </div>
+                <div className="text-[10px] text-gray-400 mt-0.5">Only selections with a price contribute to cost.</div>
+                <label className="flex items-center gap-1.5 mt-2 text-[11px] text-gray-500">
+                  <input
+                    type="checkbox"
+                    checked={takeoffVisibleOnly}
+                    onChange={(e) => setTakeoffVisibleOnly(e.target.checked)}
+                  />
+                  Visible layers only
+                </label>
+              </div>
+
+              <div className="flex-1 overflow-auto p-3 space-y-4 text-xs">
+                {/* A) Selections */}
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">Selections</div>
+                  {takeoff.blockRows.length === 0 ? (
+                    <div className="text-gray-400">No selections placed yet.</div>
+                  ) : (
+                    <>
+                      <table className="w-full">
+                        <thead>
+                          <tr className="text-[10px] uppercase text-gray-400 border-b border-gray-100">
+                            <th className="text-left font-medium py-1">Item</th>
+                            <th className="text-right font-medium py-1">Qty</th>
+                            <th className="text-right font-medium py-1">Price</th>
+                            <th className="text-right font-medium py-1">Ext</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {takeoff.blockRows.map((r) => (
+                            <tr key={r.key} className="border-b border-gray-50 align-top">
+                              <td className="py-1 pr-1">
+                                <div className="flex items-center gap-1.5">
+                                  {r.photoUrl ? (
+                                    <img src={r.photoUrl} alt="" className="w-6 h-6 rounded object-cover shrink-0" />
+                                  ) : null}
+                                  <div className="min-w-0">
+                                    <div className="text-gray-700 truncate">{r.label}</div>
+                                    {r.category ? (
+                                      <div className="text-[10px] text-gray-400 truncate">{r.category}</div>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-1 text-right tabular-nums">{r.qty}</td>
+                              <td className="py-1 text-right tabular-nums text-gray-500">
+                                {r.price != null ? `$${r.price.toFixed(2)}` : '—'}
+                              </td>
+                              <td className="py-1 text-right tabular-nums text-gray-700">
+                                {r.extended != null ? `$${r.extended.toFixed(2)}` : ''}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t border-gray-200 font-medium text-gray-700">
+                            <td className="py-1">Subtotal</td>
+                            <td className="py-1 text-right tabular-nums">{takeoff.blockTotalQty}</td>
+                            <td></td>
+                            <td className="py-1 text-right tabular-nums" style={{ color: GREEN }}>
+                              {fmtMoney(takeoff.blockTotalCost)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                      {takeoff.categorySummary.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {takeoff.categorySummary.map((c) => (
+                            <span
+                              key={c.category}
+                              className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600"
+                            >
+                              {c.category}: {c.qty}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {/* B) Areas */}
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">Areas</div>
+                  {takeoff.areaRows.length === 0 ? (
+                    <div className="text-gray-400">No areas drawn yet.</div>
+                  ) : (
+                    <table className="w-full">
+                      <thead>
+                        <tr className="text-[10px] uppercase text-gray-400 border-b border-gray-100">
+                          <th className="text-left font-medium py-1">Layer</th>
+                          <th className="text-right font-medium py-1">#</th>
+                          <th className="text-right font-medium py-1">Area</th>
+                          <th className="text-right font-medium py-1">Perim</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {takeoff.areaRows.map((r) => (
+                          <tr key={r.layer} className="border-b border-gray-50">
+                            <td className="py-1 text-gray-700 truncate max-w-[110px]">{r.name}</td>
+                            <td className="py-1 text-right tabular-nums">{r.count}</td>
+                            <td className="py-1 text-right tabular-nums">{fmtArea(r.area)}</td>
+                            <td className="py-1 text-right tabular-nums text-gray-500">{fmtLF(r.perim)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t border-gray-200 font-medium text-gray-700">
+                          <td className="py-1">Total</td>
+                          <td></td>
+                          <td className="py-1 text-right tabular-nums" style={{ color: GREEN }}>
+                            {fmtArea(takeoff.areaTotal)}
+                          </td>
+                          <td className="py-1 text-right tabular-nums text-gray-500">{fmtLF(takeoff.areaPerimTotal)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  )}
+                </div>
+
+                {/* C) Linear */}
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">Linear</div>
+                  {takeoff.linRows.length === 0 ? (
+                    <div className="text-gray-400">No lines drawn yet.</div>
+                  ) : (
+                    <table className="w-full">
+                      <thead>
+                        <tr className="text-[10px] uppercase text-gray-400 border-b border-gray-100">
+                          <th className="text-left font-medium py-1">Layer</th>
+                          <th className="text-right font-medium py-1">#</th>
+                          <th className="text-right font-medium py-1">Length</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {takeoff.linRows.map((r) => (
+                          <tr key={r.layer} className="border-b border-gray-50">
+                            <td className="py-1 text-gray-700 truncate max-w-[150px]">{r.name}</td>
+                            <td className="py-1 text-right tabular-nums">{r.count}</td>
+                            <td className="py-1 text-right tabular-nums">{fmtLF(r.length)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t border-gray-200 font-medium text-gray-700">
+                          <td className="py-1">Total</td>
+                          <td></td>
+                          <td className="py-1 text-right tabular-nums" style={{ color: GREEN }}>
+                            {fmtLF(takeoff.linTotal)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  )}
+                </div>
               </div>
             </div>
           )}
