@@ -525,7 +525,7 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
           onCreated={v => { setExtraVendors(a => [...a, v]); setVendorId(v.id); setShowNewVendor(false) }}
         />
       )}
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-6xl my-8">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-[1500px] my-4">
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
           <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Import Vendor Catalog</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-lg leading-none">×</button>
@@ -596,28 +596,7 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
         )}
 
         {step === 'page' && (
-          <div className="p-5">
-            <div className="flex flex-wrap items-center gap-3 mb-3 text-xs">
-              <span className="font-semibold text-gray-800">{vendorName}</span>
-              <span className="inline-flex items-center gap-1">
-                <button
-                  onClick={() => goToPage(currentPage - 1)}
-                  disabled={busy || currentPage <= 1}
-                  className="px-2 py-1 rounded border border-gray-300 text-gray-700 disabled:opacity-40"
-                >‹ Prev</button>
-                <span className="px-1 font-medium text-gray-700">Page {currentPage} of {numPages}</span>
-                <button
-                  onClick={() => goToPage(currentPage + 1)}
-                  disabled={busy || currentPage >= numPages}
-                  className="px-2 py-1 rounded border border-gray-300 text-gray-700 disabled:opacity-40"
-                >Next ›</button>
-              </span>
-              {busy && <span className="text-gray-500">{progress || 'Working…'}</span>}
-              <span className="ml-auto text-gray-700 font-medium">
-                {added} imported so far{skippedCount > 0 ? ` · ${skippedCount} skipped` : ''}
-              </span>
-            </div>
-
+          <div className="p-4">
             {pageError && (
               <div className="mb-3 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-1.5">
                 Couldn't read this page automatically: {pageError} — you can still add items and boxes by hand, or move on.
@@ -625,12 +604,12 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
             )}
 
             <div className="flex flex-col lg:flex-row gap-4">
-              {/* Page image with adjustable boxes */}
+              {/* Page image with adjustable boxes — takes the full left column */}
               <div className="lg:flex-1 min-w-0">
-                <div className="border border-gray-200 rounded-lg bg-gray-100 p-2 overflow-auto max-h-[62vh] flex items-start justify-center">
+                <div className="border border-gray-200 rounded-lg bg-gray-100 p-2 overflow-auto max-h-[82vh] flex items-start justify-center">
                   {pageImageUrl ? (
                     <div ref={workRef} className="relative inline-block select-none leading-none">
-                      <img src={pageImageUrl} alt={`Page ${currentPage}`} draggable={false} className="block max-h-[58vh] w-auto" />
+                      <img src={pageImageUrl} alt={`Page ${currentPage}`} draggable={false} className="block max-h-[80vh] w-auto" />
                       {pageItems.map((it, idx) => {
                         if (!it.box) return null
                         const sel = idx === selectedIdx
@@ -667,16 +646,38 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
                     <div className="text-xs text-gray-400 py-16">{busy ? (progress || 'Loading…') : 'No page loaded.'}</div>
                   )}
                 </div>
-                <p className="text-[11px] text-gray-500 mt-1">Drag a box to move it, drag the green corner to resize, or ✕ to remove it. Boxes are saved with normalized coordinates so they stay put at any zoom.</p>
               </div>
 
-              {/* This page's items */}
-              <div className="lg:w-[420px] shrink-0">
+              {/* Right sidebar: page nav, instructions, items, actions */}
+              <div className="lg:w-[400px] shrink-0 flex flex-col max-h-[82vh]">
+                <div className="flex flex-wrap items-center gap-2 mb-2 text-xs">
+                  <span className="font-semibold text-gray-800">{vendorName}</span>
+                  <span className="inline-flex items-center gap-1">
+                    <button
+                      onClick={() => goToPage(currentPage - 1)}
+                      disabled={busy || currentPage <= 1}
+                      className="px-2 py-1 rounded border border-gray-300 text-gray-700 disabled:opacity-40"
+                    >‹ Prev</button>
+                    <span className="px-1 font-medium text-gray-700">Page {currentPage} of {numPages}</span>
+                    <button
+                      onClick={() => goToPage(currentPage + 1)}
+                      disabled={busy || currentPage >= numPages}
+                      className="px-2 py-1 rounded border border-gray-300 text-gray-700 disabled:opacity-40"
+                    >Next ›</button>
+                  </span>
+                  <span className="ml-auto text-gray-700 font-medium">
+                    {added} imported{skippedCount > 0 ? ` · ${skippedCount} skipped` : ''}
+                  </span>
+                  {busy && <span className="w-full text-gray-500">{progress || 'Working…'}</span>}
+                </div>
+
+                <p className="text-[11px] text-gray-500 mb-2">Drag a box to move it, drag the green corner to resize, or ✕ to remove it. Boxes stay put at any zoom.</p>
+
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs font-semibold text-gray-700">{pageItems.length} item(s) on this page</span>
                   <button onClick={addItem} className="text-xs text-green-700 font-semibold hover:underline">＋ add item</button>
                 </div>
-                <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-[58vh] overflow-y-auto">
+                <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 flex-1 min-h-[200px] overflow-y-auto">
                   {pageItems.length === 0 && (
                     <div className="text-[11px] text-gray-400 px-3 py-6 text-center">No items yet on this page.</div>
                   )}
@@ -763,31 +764,31 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
                     )
                   })}
                 </div>
-              </div>
-            </div>
 
-            <div className="flex items-center justify-between gap-3 pt-3">
-              <div className="flex items-center gap-2">
-                <button onClick={() => setStep('form')} className="text-sm text-gray-500 px-3 py-1.5">Back</button>
-                {added > 0 && (
-                  <button onClick={() => { setStep('done') }} className="text-sm text-gray-500 px-3 py-1.5">Finish now</button>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                {currentPage < numPages && (
-                  <button onClick={() => goToPage(currentPage + 1)} disabled={busy} className="text-sm border border-gray-300 text-gray-700 rounded px-3 py-1.5 disabled:opacity-50">Skip page ›</button>
-                )}
-                <button
-                  onClick={importCurrentPage}
-                  disabled={busy}
-                  className="text-sm bg-green-600 text-white font-semibold rounded px-4 py-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {busy
-                    ? (progress || 'Importing…')
-                    : currentPage < numPages
-                      ? `Import ${pageIncluded} & next page ›`
-                      : `Import ${pageIncluded} & finish`}
-                </button>
+                <div className="flex items-center justify-between gap-2 pt-3">
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setStep('form')} className="text-xs text-gray-500 px-2 py-1.5">Back</button>
+                    {added > 0 && (
+                      <button onClick={() => { setStep('done') }} className="text-xs text-gray-500 px-2 py-1.5">Finish now</button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {currentPage < numPages && (
+                      <button onClick={() => goToPage(currentPage + 1)} disabled={busy} className="text-xs border border-gray-300 text-gray-700 rounded px-2 py-1.5 disabled:opacity-50">Skip ›</button>
+                    )}
+                    <button
+                      onClick={importCurrentPage}
+                      disabled={busy}
+                      className="text-xs bg-green-600 text-white font-semibold rounded px-3 py-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {busy
+                        ? (progress || 'Importing…')
+                        : currentPage < numPages
+                          ? `Import ${pageIncluded} & next ›`
+                          : `Import ${pageIncluded} & finish`}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
