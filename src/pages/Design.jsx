@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import SelectionsBrowser from '../components/SelectionsBrowser'
 
 const FG = '#3A5038'
 
@@ -130,16 +131,8 @@ export default function Design() {
         </div>
       )}
 
-      {/* Selections — placeholder */}
-      {activeTab === 'selections' && (
-        <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center max-w-2xl mx-auto mt-4">
-          <p className="text-4xl mb-2">🎨</p>
-          <h2 className="text-base font-semibold text-gray-800 mb-1">Selections</h2>
-          <p className="text-sm text-gray-500">
-            Coming soon — track plant, hardscape, and material selections per project.
-          </p>
-        </div>
-      )}
+      {/* Selections — catalog browser */}
+      {activeTab === 'selections' && <SelectionsBrowser />}
 
       {/* Take Offs — the existing project list */}
       {activeTab === 'takeoffs' && (
