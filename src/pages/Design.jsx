@@ -12,6 +12,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import SelectionsBrowser from '../components/SelectionsBrowser'
+import CadEditor from '../components/cad/CadEditor'
 
 const FG = '#3A5038'
 
@@ -35,9 +36,59 @@ export default function Design() {
   const [creating, setCreating] = useState(false)
   const [createErr, setCreateErr] = useState('')
 
+  // ── CAD drawings ──────────────────────────────────────────────────────────
+  const [cadDrawings, setCadDrawings] = useState([])
+  const [cadLoading, setCadLoading] = useState(true)
+  const [openDrawing, setOpenDrawing] = useState(null) // the row being edited
+  const [showNewCad, setShowNewCad] = useState(false)
+  const [newCadName, setNewCadName] = useState('')
+  const [newCadDiscipline, setNewCadDiscipline] = useState('landscape')
+  const [creatingCad, setCreatingCad] = useState(false)
+  const [cadErr, setCadErr] = useState('')
+
   useEffect(() => {
     fetchAll()
+    fetchCadDrawings()
   }, [])
+
+  async function fetchCadDrawings() {
+    setCadLoading(true)
+    const { data } = await supabase
+      .from('cad_drawings')
+      .select('id, name, discipline, updated_at, created_at, design_project_id')
+      .eq('status', 'active')
+      .order('updated_at', { ascending: false })
+    setCadDrawings(data || [])
+    setCadLoading(false)
+  }
+
+  async function handleCreateCad(e) {
+    e?.preventDefault?.()
+    setCadErr('')
+    const name = newCadName.trim()
+    if (!name) { setCadErr('Drawing name is required.'); return }
+    setCreatingCad(true)
+    const { data, error } = await supabase
+      .from('cad_drawings')
+      .insert({ name, discipline: newCadDiscipline, created_by: user?.id || null })
+      .select()
+      .single()
+    setCreatingCad(false)
+    if (error) {
+      setCadErr(
+        error.message +
+          (error.message.toLowerCase().includes('cad_drawings')
+            ? ' — make sure you ran supabase-cad-drawings.sql in Supabase.'
+            : '')
+      )
+      return
+    }
+    setNewCadName('')
+    setNewCadDiscipline('landscape')
+    setShowNewCad(false)
+    setCadDrawings(d => [data, ...d])
+    setOpenDrawing(data) // jump straight into the editor
+  }
 
   async function fetchAll() {
     setLoading(true)
@@ -95,7 +146,7 @@ export default function Design() {
   }, [projects, search])
 
   const TABS = [
-    { id: 'cad', label: '📐 CAD Assist Drawing' },
+    { id: 'cad', label: '📐 CAD' },
     { id: 'selections', label: '🎨 Selections' },
     { id: 'takeoffs', label: '📊 Take Offs' },
     { id: 'settings', label: '⚙️ Settings' },
@@ -120,15 +171,70 @@ export default function Design() {
         ))}
       </div>
 
-      {/* CAD Assist Drawing — placeholder */}
-      {activeTab === 'cad' && (
-        <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center max-w-2xl mx-auto mt-4">
-          <p className="text-4xl mb-2">🛠️</p>
-          <h2 className="text-base font-semibold text-gray-800 mb-1">CAD Assist Drawing</h2>
-          <p className="text-sm text-gray-500">
-            Coming soon — AI-assisted drawing tools will live here.
-          </p>
+      {/* CAD — drawing list, or the editor when one is open */}
+      {activeTab === 'cad' && openDrawing && (
+        <div className="flex-1 min-h-0 mt-3">
+          <CadEditor
+            drawing={openDrawing}
+            onBack={() => { setOpenDrawing(null); fetchCadDrawings() }}
+            onSaved={row => {
+              setOpenDrawing(row)
+              setCadDrawings(d => d.map(x => (x.id === row.id ? { ...x, ...row } : x)))
+            }}
+          />
         </div>
+      )}
+
+      {activeTab === 'cad' && !openDrawing && (
+        <>
+          <div className="flex items-center gap-3 mb-6 mt-4">
+            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+              {cadDrawings.length} drawing{cadDrawings.length === 1 ? '' : 's'}
+            </span>
+            <button
+              onClick={() => { setShowNewCad(true); setCadErr('') }}
+              className="ml-auto text-sm font-bold text-white px-4 py-1.5 rounded-lg"
+              style={{ backgroundColor: FG }}
+            >
+              + New Drawing
+            </button>
+          </div>
+
+          {cadLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-700"></div>
+            </div>
+          ) : cadDrawings.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-200 text-center py-16 text-gray-400">
+              <p className="text-5xl mb-3">📐</p>
+              <p className="text-base font-medium text-gray-600">No drawings yet.</p>
+              <p className="text-sm mt-1">
+                Click <strong>+ New Drawing</strong> to start a plan set from scratch.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {cadDrawings.map(d => (
+                <button
+                  key={d.id}
+                  onClick={() => setOpenDrawing(d)}
+                  className="text-left bg-white border border-gray-200 rounded-2xl p-5 hover:shadow-md hover:border-green-600 transition-all"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-2xl">📐</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 bg-gray-100 rounded px-1.5 py-0.5">
+                      {d.discipline || 'landscape'}
+                    </span>
+                  </div>
+                  <div className="text-sm font-semibold text-gray-800 truncate" title={d.name}>{d.name}</div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    Updated {d.updated_at ? new Date(d.updated_at).toLocaleDateString() : '—'}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* Selections — catalog browser */}
@@ -314,6 +420,82 @@ export default function Design() {
                   style={{ backgroundColor: FG }}
                 >
                   {creating ? 'Creating…' : 'Create Project'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* New Drawing modal */}
+      {showNewCad && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          onClick={() => setShowNewCad(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div
+              className="flex items-center justify-between px-6 py-4 border-b border-gray-200"
+              style={{ backgroundColor: FG }}
+            >
+              <h2 className="text-base font-bold text-white">New CAD Drawing</h2>
+              <button
+                onClick={() => setShowNewCad(false)}
+                className="text-white/70 hover:text-white text-xl leading-none px-2"
+              >
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleCreateCad} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
+                  Drawing Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newCadName}
+                  onChange={e => setNewCadName(e.target.value)}
+                  placeholder="123 Main St — Landscape Plan"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700/30 focus:border-green-700"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Discipline</label>
+                <select
+                  value={newCadDiscipline}
+                  onChange={e => setNewCadDiscipline(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700/30 focus:border-green-700 bg-white"
+                >
+                  <option value="landscape">Landscape</option>
+                  <option value="construction">General Construction</option>
+                  <option value="detail">Construction Detail</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              {cadErr && (
+                <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-xs">
+                  {cadErr}
+                </div>
+              )}
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNewCad(false)}
+                  className="px-4 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingCad || !newCadName.trim()}
+                  className="px-5 py-2 rounded-lg text-sm font-bold text-white disabled:opacity-50"
+                  style={{ backgroundColor: FG }}
+                >
+                  {creatingCad ? 'Creating…' : 'Create & Open'}
                 </button>
               </div>
             </form>
