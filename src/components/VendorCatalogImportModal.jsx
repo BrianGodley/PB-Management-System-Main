@@ -123,6 +123,12 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
   const pdfRef = useRef(null)
   const workRef = useRef(null) // the page-image wrapper (for drag math)
   const extractedRef = useRef(new Set())
+  // A synchronous mirror of `pages` so the importer can read the current page's
+  // items without waiting for a re-render.
+  const pagesRef = useRef({})
+  useEffect(() => { pagesRef.current = pages }, [pages])
+  // Which pages have already been imported (so we can mark/skip them).
+  const importedPagesRef = useRef(new Set())
 
   const isPdf = useMemo(
     () => !!file && (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)),
@@ -234,9 +240,25 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
             ? { x: clamp01(it.photo_box.x), y: clamp01(it.photo_box.y), w: clamp01(it.photo_box.w), h: clamp01(it.photo_box.h) }
             : null,
       }))
-      setPages(p => ({ ...p, [pageNum]: { ...(p[pageNum] || {}), items, error: null } }))
+      setPages(p => { const next = { ...p, [pageNum]: { ...(p[pageNum] || {}), items, error: null } }; pagesRef.current = next; return next })
     } catch (e) {
-      setPages(p => ({ ...p, [pageNum]: { ...(p[pageNum] || {}), items: p[pageNum]?.items || [], error: String(e.message || e) } }))
+      setPages(p => { const next = { ...p, [pageNum]: { ...(p[pageNum] || {}), items: p[pageNum]?.items || [], error: String(e.message || e) } }; pagesRef.current = next; return next })
+    }
+  }
+
+  // Render (if needed) + extract (once) a page, WITHOUT navigating to it. Used
+  // both when the user opens a page and when Import sweeps every page.
+  async function ensurePageReady(pageNum) {
+    if (!canvasCache.current.has(pageNum)) {
+      setProgress(`Rendering page ${pageNum}…`)
+      const canvas = await ensurePageRendered(pageNum)
+      const imageUrl = canvas.toDataURL('image/jpeg', 0.9)
+      setPages(p => { const next = { ...p, [pageNum]: { ...(p[pageNum] || {}), imageUrl, items: p[pageNum]?.items || [] } }; pagesRef.current = next; return next })
+    }
+    if (!extractedRef.current.has(pageNum)) {
+      extractedRef.current.add(pageNum)
+      setProgress(`Sam is reading page ${pageNum}…`)
+      await extractPage(pageNum)
     }
   }
 
@@ -245,17 +267,7 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
     setBusy(true)
     setError('')
     try {
-      if (!canvasCache.current.has(pageNum)) {
-        setProgress(`Rendering page ${pageNum}…`)
-        const canvas = await ensurePageRendered(pageNum)
-        const imageUrl = canvas.toDataURL('image/jpeg', 0.9)
-        setPages(p => ({ ...p, [pageNum]: { ...(p[pageNum] || {}), imageUrl, items: p[pageNum]?.items || [] } }))
-      }
-      if (!extractedRef.current.has(pageNum)) {
-        extractedRef.current.add(pageNum)
-        setProgress(`Sam is reading page ${pageNum}…`)
-        await extractPage(pageNum)
-      }
+      await ensurePageReady(pageNum)
     } catch (e) {
       setError(String(e.message || e))
     } finally {
@@ -288,6 +300,10 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
       // Reset any prior run.
       canvasCache.current = new Map()
       extractedRef.current = new Set()
+      importedPagesRef.current = new Set()
+      pagesRef.current = {}
+      setAdded(0)
+      setSkippedCount(0)
       setPages({})
       setSelectedIdx(null)
       setNumPages(np)
@@ -308,6 +324,7 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
   const pageError = pages[currentPage]?.error || ''
   const pageImageUrl = pages[currentPage]?.imageUrl || ''
   const pageCanvas = canvasCache.current.get(currentPage) || null
+  const pageIncluded = pageItems.filter(it => it.include && it.name.trim()).length
 
   function setItem(idx, patch) {
     setPages(p => {
@@ -369,37 +386,36 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
     window.addEventListener('mouseup', up)
   }
 
-  // Running total of included, named items across ALL visited pages.
-  const totalIncluded = useMemo(() => {
-    let n = 0
-    for (const k of Object.keys(pages)) {
-      for (const it of pages[k].items || []) if (it.include && it.name.trim()) n++
-    }
-    return n
-  }, [pages])
+  // ── Import (one page at a time) ─────────────────────────────────────────────
+  // Imports THIS page's included items, then advances to the next page (which is
+  // read on arrival). Repeats page by page until the last one, then shows the
+  // summary. The admin can close out at any point — everything imported so far
+  // is kept. `added` / `skippedCount` accumulate across pages.
+  async function advancePage() {
+    importedPagesRef.current.add(currentPage)
+    if (currentPage < numPages) await goToPage(currentPage + 1)
+    else setStep('done')
+  }
 
-  // ── Import ─────────────────────────────────────────────────────────────────
-  async function importItems() {
+  async function importCurrentPage() {
     setError('')
-    // Flatten every included, named item across pages, keeping the page canvas
-    // for cropping its (adjusted) box.
-    const jobs = []
-    for (const k of Object.keys(pages)) {
-      const canvas = canvasCache.current.get(Number(k))
-      for (const it of pages[k].items || []) {
-        if (it.include && it.name.trim()) jobs.push({ it, canvas })
-      }
-    }
-    if (!jobs.length) return setError('Nothing to import — include at least one item with a name.')
+    const canvas = canvasCache.current.get(currentPage)
+    const pageData = pagesRef.current[currentPage] || pages[currentPage] || {}
+    const jobs = (pageData.items || [])
+      .filter(it => it.include && it.name.trim())
+      .map(it => ({ it }))
+
+    // Nothing to import on this page → just move on (or finish).
+    if (!jobs.length) return advancePage()
+
     setBusy(true)
     try {
-      // Crop each item's box from its page canvas → upload to rate-photos.
-      // Best-effort: any failure leaves the item with no photo and it still
-      // imports.
+      // Crop each item's box from this page's canvas → upload to rate-photos.
+      // Best-effort: a failed crop leaves the item photo-less but still imports.
       setProgress('Cropping photos…')
       const rows = []
       for (let i = 0; i < jobs.length; i++) {
-        const { it, canvas } = jobs[i]
+        const { it } = jobs[i]
         let photoUrl = null
         try {
           const blob = await cropBoxToBlob(canvas, it.box)
@@ -408,9 +424,7 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
             const { error: upErr } = await supabase.storage
               .from('rate-photos')
               .upload(path, blob, { contentType: 'image/jpeg', upsert: false })
-            if (!upErr) {
-              photoUrl = supabase.storage.from('rate-photos').getPublicUrl(path).data.publicUrl
-            }
+            if (!upErr) photoUrl = supabase.storage.from('rate-photos').getPublicUrl(path).data.publicUrl
           }
         } catch {
           photoUrl = null
@@ -421,14 +435,15 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
           sub_category: it.sub_category || '',
           unit: it.unit || '',
           price: it.price,
+          description: it.description || '',
+          sku: it.sku || '',
           photoUrl,
         })
       }
 
-      // ── Existing dedupe + skip-existing + insert logic (kept intact) ────────
-      // material_rates is unique on (tenant, name, category), so we can't insert
-      // a name that already exists in that category (or twice in one catalog).
-      // Dedupe within the batch, then skip anything already in the table.
+      // material_rates is unique on (tenant, name, category): dedupe within the
+      // page, then skip anything already in the table (existing rows just count
+      // as "skipped" — they never block the rest of the page).
       const included = rows.filter(r => r.name.trim())
       const key = r => `${(r.category || '').trim().toLowerCase()}::${r.name.trim().toLowerCase()}`
       const seen = new Set()
@@ -445,59 +460,58 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
       )
       const toInsert = uniq.filter(r => !exists.has(key(r)))
       const skipped = included.length - toInsert.length
-      if (!toInsert.length) {
-        setBusy(false)
-        setProgress('')
-        return setError('Every item already exists in the materials list — nothing new to import.')
+
+      if (toInsert.length) {
+        const payload = toInsert.map(r => ({
+          name: r.name.trim(),
+          category: r.category.trim() || null,
+          sub_category: r.sub_category.trim() || null,
+          vendor_id: vendorId,
+          unit: r.unit.trim() || null,
+          unit_cost: r.price === '' ? null : Number(r.price),
+          photo_url: r.photoUrl || null,
+        }))
+        const { error: insErr } = await supabase.from('material_rates').insert(payload)
+        if (insErr) throw new Error(`Import failed: ${insErr.message}`)
+
+        // Also duplicate into the design Selections catalog (best-effort — a
+        // failure here must not fail the material import). Dedupe per vendor.
+        try {
+          const { data: existSel } = await supabase
+            .from('selections')
+            .select('name, category')
+            .eq('vendor_id', vendorId)
+          const selExists = new Set(
+            (existSel || []).map(e => `${(e.category || '').toLowerCase()}::${(e.name || '').toLowerCase()}`)
+          )
+          const selRows = toInsert
+            .filter(r => !selExists.has(key(r)))
+            .map(r => ({
+              name: r.name.trim(),
+              category: r.category.trim() || null,
+              sub_category: r.sub_category.trim() || null,
+              description: r.description?.trim() || null,
+              photo_url: r.photoUrl || null,
+              type: r.category.trim() || null,
+              vendor_id: vendorId,
+              sku: r.sku?.trim() || null,
+              unit: r.unit.trim() || null,
+              price: r.price === '' ? null : Number(r.price),
+              source: 'catalog',
+            }))
+          if (selRows.length) await supabase.from('selections').insert(selRows)
+        } catch { /* selections is best-effort */ }
+
+        setAdded(a => a + payload.length)
       }
-      const payload = toInsert.map(r => ({
-        name: r.name.trim(),
-        category: r.category.trim() || null,
-        sub_category: r.sub_category.trim() || null,
-        vendor_id: vendorId,
-        unit: r.unit.trim() || null,
-        unit_cost: r.price === '' ? null : Number(r.price),
-        photo_url: r.photoUrl || null,
-      }))
-      setAdded(payload.length)
-      setSkippedCount(skipped)
-      const { error: insErr } = await supabase.from('material_rates').insert(payload)
-      if (insErr) throw new Error(`Import failed: ${insErr.message}`)
-
-      // Also duplicate into the design Selections catalog (best-effort — a
-      // failure here must not fail the material import). Dedupe per vendor.
-      try {
-        const { data: existSel } = await supabase
-          .from('selections')
-          .select('name, category')
-          .eq('vendor_id', vendorId)
-        const selExists = new Set(
-          (existSel || []).map(e => `${(e.category || '').toLowerCase()}::${(e.name || '').toLowerCase()}`)
-        )
-        const selRows = toInsert
-          .filter(r => !selExists.has(key(r)))
-          .map(r => ({
-            name: r.name.trim(),
-            category: r.category.trim() || null,
-            sub_category: r.sub_category.trim() || null,
-            description: r.description?.trim() || null,
-            photo_url: r.photoUrl || null,
-            type: r.category.trim() || null,
-            vendor_id: vendorId,
-            sku: r.sku?.trim() || null,
-            unit: r.unit.trim() || null,
-            price: r.price === '' ? null : Number(r.price),
-            source: 'catalog',
-          }))
-        if (selRows.length) await supabase.from('selections').insert(selRows)
-      } catch { /* selections is best-effort */ }
-
-      setAdded(payload.length)
-      setStep('done')
+      setSkippedCount(s => s + skipped)
       onImported?.()
+
+      setBusy(false)
+      setProgress('')
+      await advancePage()
     } catch (e) {
       setError(String(e.message || e))
-    } finally {
       setBusy(false)
       setProgress('')
     }
@@ -599,7 +613,9 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
                 >Next ›</button>
               </span>
               {busy && <span className="text-gray-500">{progress || 'Working…'}</span>}
-              <span className="ml-auto text-gray-700 font-medium">{totalIncluded} item(s) to import</span>
+              <span className="ml-auto text-gray-700 font-medium">
+                {added} imported so far{skippedCount > 0 ? ` · ${skippedCount} skipped` : ''}
+              </span>
             </div>
 
             {pageError && (
@@ -751,17 +767,26 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
             </div>
 
             <div className="flex items-center justify-between gap-3 pt-3">
-              <button onClick={() => setStep('form')} className="text-sm text-gray-500 px-3 py-1.5">Back</button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setStep('form')} className="text-sm text-gray-500 px-3 py-1.5">Back</button>
+                {added > 0 && (
+                  <button onClick={() => { setStep('done') }} className="text-sm text-gray-500 px-3 py-1.5">Finish now</button>
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 {currentPage < numPages && (
-                  <button onClick={() => goToPage(currentPage + 1)} disabled={busy} className="text-sm border border-gray-300 text-gray-700 rounded px-3 py-1.5 disabled:opacity-50">Next page ›</button>
+                  <button onClick={() => goToPage(currentPage + 1)} disabled={busy} className="text-sm border border-gray-300 text-gray-700 rounded px-3 py-1.5 disabled:opacity-50">Skip page ›</button>
                 )}
                 <button
-                  onClick={importItems}
-                  disabled={busy || totalIncluded === 0}
+                  onClick={importCurrentPage}
+                  disabled={busy}
                   className="text-sm bg-green-600 text-white font-semibold rounded px-4 py-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {busy ? (progress || 'Importing…') : `Import ${totalIncluded} item(s)`}
+                  {busy
+                    ? (progress || 'Importing…')
+                    : currentPage < numPages
+                      ? `Import ${pageIncluded} & next page ›`
+                      : `Import ${pageIncluded} & finish`}
                 </button>
               </div>
             </div>
