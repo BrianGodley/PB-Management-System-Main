@@ -157,52 +157,52 @@ export default function SelectionsBrowser() {
 
   return (
     <div className="flex flex-col mt-4">
-      {/* Tabs + search + new */}
-      <div className="flex flex-wrap items-center gap-2 mb-2">
-        <div className="flex flex-wrap gap-1">
-          {categories.map(c => (
-            <button
-              key={c}
-              onClick={() => setCategory(c)}
-              className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
-                category === c
-                  ? 'bg-green-700 border-green-700 text-white'
-                  : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {c === 'All' ? 'All' : c}
-            </button>
-          ))}
-        </div>
-        <div className="ml-auto flex items-center gap-2">
-          <input
-            type="text"
-            placeholder="Search selections…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-700/30 focus:border-green-700 w-56"
-          />
+      {/* Category tabs — centered white tab bar (Jobs main tab-bar style) */}
+      <div className="flex justify-center bg-white border-b border-gray-200 gap-0 flex-shrink-0 overflow-x-auto rounded-xl mb-3">
+        {categories.map(c => (
           <button
-            onClick={() => setEditing('new')}
-            className="text-sm font-bold text-white px-4 py-1.5 rounded-lg whitespace-nowrap"
-            style={{ backgroundColor: FG }}
+            key={c}
+            onClick={() => setCategory(c)}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+              category === c
+                ? 'border-green-700 text-green-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
           >
-            + New Selection
+            {c === 'All' ? 'All' : c}
           </button>
-        </div>
+        ))}
       </div>
 
-      {/* Sub-category sub-tabs */}
+      {/* Search + new */}
+      <div className="flex items-center justify-end gap-2 mb-3">
+        <input
+          type="text"
+          placeholder="Search selections…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-700/30 focus:border-green-700 w-56"
+        />
+        <button
+          onClick={() => setEditing('new')}
+          className="text-sm font-bold text-white px-4 py-1.5 rounded-lg whitespace-nowrap"
+          style={{ backgroundColor: FG }}
+        >
+          + New Selection
+        </button>
+      </div>
+
+      {/* Sub-category sub-tabs — Jobs > Settings sub-tab style */}
       {category !== 'All' && subCategories.length > 1 && (
-        <div className="flex flex-wrap gap-1 mb-3">
+        <div className="flex border border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0 rounded-xl mb-3">
           {subCategories.map(s => (
             <button
               key={s}
               onClick={() => setSubCategory(s)}
-              className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors ${
+              className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
                 subCategory === s
-                  ? 'bg-green-50 border-green-600 text-green-700'
-                  : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                  ? 'border-green-700 text-green-800'
+                  : 'border-transparent text-gray-500 hover:text-gray-800'
               }`}
             >
               {s === 'All' ? 'All' : s}
