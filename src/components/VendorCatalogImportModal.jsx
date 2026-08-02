@@ -532,17 +532,17 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
         </datalist>
 
         {step === 'form' && (
-          <div className="p-5 space-y-4">
+          <div className="p-5 space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs text-gray-500">Vendor</label>
+                  <label className="block text-xs text-gray-900">Vendor</label>
                   <button type="button" onClick={() => setShowNewVendor(true)} className="text-xs text-green-700 font-semibold hover:underline">+ New vendor</button>
                 </div>
                 <VendorCombo vendors={vendorList} value={vendorId} onChange={setVendorId} placeholder="Search vendor…" />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Default category (optional)</label>
+                <label className="block text-xs text-gray-900 mb-1">Default category (optional)</label>
                 <input
                   value={defaultCategory}
                   onChange={e => setDefaultCategory(e.target.value)}
@@ -553,17 +553,17 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
               </div>
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Catalog file (PDF or image)</label>
+              <label className="block text-xs text-gray-900 mb-1">Catalog file (PDF or image)</label>
               <input
                 type="file"
                 accept="application/pdf,image/*"
                 onChange={e => setFile(e.target.files?.[0] || null)}
-                className="block w-full text-xs text-gray-600 file:mr-3 file:rounded file:border-0 file:bg-green-50 file:px-3 file:py-1.5 file:text-green-700 file:font-semibold"
+                className="block w-full text-xs text-gray-900 file:mr-3 file:rounded-lg file:border-0 file:bg-green-600 file:px-4 file:py-2 file:text-white file:font-semibold file:cursor-pointer hover:file:bg-green-700"
               />
               <p className="text-[11px] text-gray-400 mt-1">You'll step through the catalog one page at a time. On each page Sam lists the products and marks each item's photo with an adjustable box you can drag, resize, delete, or add. Nothing is saved until you approve.</p>
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Instructions for Sam (optional)</label>
+              <label className="block text-xs text-gray-900 mb-1">Instructions for Sam (optional)</label>
               <textarea
                 value={instructions}
                 onChange={e => setInstructions(e.target.value)}

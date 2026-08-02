@@ -265,10 +265,10 @@ export default function InvoiceImportModal({ jobId: jobIdProp, jobName: jobNameP
         )}
 
         {step === 'form' && (
-          <div className="p-5 space-y-4">
+          <div className="p-5 space-y-6">
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs text-gray-500">Vendor (optional — auto-detected if blank)</label>
+                <label className="block text-xs text-gray-900">Vendor (optional — auto-detected if blank)</label>
                 <button type="button" onClick={() => setShowNewVendor(true)} className="text-xs text-green-700 font-semibold hover:underline">+ New vendor</button>
               </div>
               <VendorCombo
@@ -282,17 +282,17 @@ export default function InvoiceImportModal({ jobId: jobIdProp, jobName: jobNameP
             </div>
             {!jobIdProp && (
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Job (expenses post here)</label>
+                <label className="block text-xs text-gray-900 mb-1">Job (expenses post here)</label>
                 <VendorCombo vendors={jobList} value={pickJobId} onChange={setPickJobId} placeholder="Search job…" />
               </div>
             )}
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Invoice file (PDF or image)</label>
+              <label className="block text-xs text-gray-900 mb-1">Invoice file (PDF or image)</label>
               <input
                 type="file"
                 accept="application/pdf,image/*"
                 onChange={e => setFile(e.target.files?.[0] || null)}
-                className="block w-full text-xs text-gray-600 file:mr-3 file:rounded file:border-0 file:bg-green-50 file:px-3 file:py-1.5 file:text-green-700 file:font-semibold"
+                className="block w-full text-xs text-gray-900 file:mr-3 file:rounded-lg file:border-0 file:bg-green-600 file:px-4 file:py-2 file:text-white file:font-semibold file:cursor-pointer hover:file:bg-green-700"
               />
               <p className="text-[11px] text-gray-400 mt-1">Sam reads the invoice, matches each line to your price list, and flags anything priced off. Nothing posts until you approve.</p>
             </div>
