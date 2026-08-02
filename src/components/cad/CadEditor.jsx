@@ -23,6 +23,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { entitiesToDxf, parseDxf } from './dxf';
+import CadSheets from './CadSheets';
 
 // ---- constants -----------------------------------------------------------
 const ZOOM_MIN = 2;
@@ -102,6 +103,7 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
       layers: Array.isArray(d.layers) && d.layers.length ? d.layers : base.layers,
       entities: Array.isArray(d.entities) ? d.entities : base.entities,
       view: d.view && typeof d.view === 'object' ? { ...base.view, ...d.view } : base.view,
+      sheets: Array.isArray(d.sheets) ? d.sheets : [],
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawing && drawing.id]);
@@ -112,6 +114,10 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
   const [layers, setLayers] = useState(initial.layers);
   const [entities, setEntities] = useState(initial.entities);
   const [activeLayer, setActiveLayer] = useState(initial.layers[0].id);
+
+  // plan-set sheets (Phase 5) + view toggle
+  const [sheets, setSheets] = useState(initial.sheets);
+  const [showSheets, setShowSheets] = useState(false);
 
   // view (zoom + pan)
   const [zoom, setZoom] = useState(initial.view.zoom);
@@ -997,6 +1003,7 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
       layers,
       entities,
       view: { zoom, panX: pan.x, panY: pan.y },
+      sheets,
     };
     try {
       const { data: row, error } = await supabase
@@ -1017,7 +1024,7 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
     } finally {
       setSaving(false);
     }
-  }, [drawing, unit, gridSpacing, layers, entities, zoom, pan, name, onSaved]);
+  }, [drawing, unit, gridSpacing, layers, entities, zoom, pan, name, sheets, onSaved]);
 
   // -------- DXF export (read-only, no dirty) ------------------------------
   const exportDxf = useCallback(() => {
@@ -1450,6 +1457,18 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
             }}
           />
           <button
+            onClick={() => setShowSheets((v) => !v)}
+            title="Plan-set sheets & PDF plot"
+            className="px-2 py-1.5 text-sm rounded-md border"
+            style={
+              showSheets
+                ? { backgroundColor: GREEN, color: '#fff', borderColor: GREEN }
+                : { backgroundColor: '#fff', borderColor: '#d1d5db', color: '#374151' }
+            }
+          >
+            🗂 Sheets
+          </button>
+          <button
             onClick={save}
             disabled={saving}
             className="px-3 py-1.5 text-sm rounded-md text-white disabled:opacity-60"
@@ -1466,6 +1485,20 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
       )}
 
       {/* ===== Body ===== */}
+      {showSheets ? (
+        <CadSheets
+          unit={unit}
+          layers={layers}
+          entities={entities}
+          drawingName={name || drawing?.name}
+          sheets={sheets}
+          onChange={(next) => {
+            setSheets(next);
+            markDirty();
+          }}
+          onExit={() => setShowSheets(false)}
+        />
+      ) : (
       <div className="flex flex-1 min-h-0">
         {/* --- Left: toolbar + layers --- */}
         <div className="flex shrink-0">
@@ -2240,6 +2273,7 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
           </button>
         )}
       </div>
+      )}
 
       {/* ===== Status bar ===== */}
       <div className="flex items-center gap-4 px-3 py-1.5 border-t border-gray-200 bg-white text-xs text-gray-500 shrink-0">
