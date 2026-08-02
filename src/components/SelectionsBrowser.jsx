@@ -273,7 +273,7 @@ function SelectionCard({ item, vendorName, onClick }) {
     >
       <div className="aspect-square bg-gray-100 flex items-center justify-center overflow-hidden">
         {item.photo_url ? (
-          <img src={item.photo_url} alt="" className="w-full h-full object-cover" />
+          <img src={item.photo_url} alt="" className="w-full h-full object-contain" />
         ) : (
           <span className="text-4xl text-gray-400 select-none">{categoryGlyph(item.category)}</span>
         )}
@@ -319,7 +319,7 @@ function SelectionDetail({ item, vendorName, onClose, onEdit, onDelete }) {
                 src={item.photo_url}
                 alt=""
                 onClick={() => setLightbox(true)}
-                className="w-full h-full object-cover cursor-zoom-in"
+                className="w-full h-full object-contain cursor-zoom-in"
               />
             ) : (
               <span className="text-6xl text-gray-300 select-none">{categoryGlyph(item.category)}</span>
@@ -576,7 +576,7 @@ function SelectionForm({ row, vendors, categories, onClose, onSaved }) {
             <div className="flex items-center gap-3">
               <div className="w-20 h-20 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
                 {photoUrl ? (
-                  <img src={photoUrl} alt="" className="w-full h-full object-cover" />
+                  <img src={photoUrl} alt="" className="w-full h-full object-contain" />
                 ) : (
                   <span className="text-2xl text-gray-300">{categoryGlyph(category)}</span>
                 )}
