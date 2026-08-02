@@ -24,6 +24,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { entitiesToDxf, parseDxf } from './dxf';
 import CadSheets from './CadSheets';
+import SendToEstimateModal from './SendToEstimateModal';
 
 // ---- constants -----------------------------------------------------------
 const ZOOM_MIN = 2;
@@ -146,6 +147,7 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
   const [showTakeoff, setShowTakeoff] = useState(false);
   const [takeoffVisibleOnly, setTakeoffVisibleOnly] = useState(false);
   const [takeoffCopied, setTakeoffCopied] = useState(false);
+  const [showSendEstimate, setShowSendEstimate] = useState(false);
 
   // header / persistence
   const [name, setName] = useState(drawing ? drawing.name || 'Untitled' : 'Untitled');
@@ -1908,6 +1910,14 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
                     {takeoffCopied ? 'Copied ✓' : 'Copy CSV'}
                   </button>
                   <button
+                    onClick={() => setShowSendEstimate(true)}
+                    title="Send these quantities to an estimate"
+                    className="text-[11px] px-2 py-1 rounded border text-white font-semibold"
+                    style={{ backgroundColor: GREEN, borderColor: GREEN }}
+                  >
+                    → Estimate
+                  </button>
+                  <button
                     onClick={() => setShowTakeoff(false)}
                     title="Close"
                     className="w-6 h-6 rounded border border-gray-200 hover:bg-gray-100 text-xs"
@@ -2291,6 +2301,15 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
         {selected && !draftMeasurement && <span className="text-gray-700">{measurementOf(selected)}</span>}
         <span className="ml-auto text-gray-400">{entities.length} entit{entities.length === 1 ? 'y' : 'ies'}</span>
       </div>
+
+      {showSendEstimate && (
+        <SendToEstimateModal
+          takeoff={takeoff}
+          unit={unit}
+          drawingName={name || drawing?.name || ''}
+          onClose={() => setShowSendEstimate(false)}
+        />
+      )}
     </div>
   );
 }
