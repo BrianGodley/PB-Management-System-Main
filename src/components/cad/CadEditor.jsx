@@ -52,6 +52,15 @@ const TOOLS = [
 let _idc = 0;
 const uid = (p = 'e') => `${p}-${Date.now().toString(36)}-${(_idc++).toString(36)}`;
 
+// ---- category -> deterministic pleasant color ----------------------------
+function categoryColor(cat) {
+  if (!cat) return '#9ca3af'; // gray-400 default
+  let h = 0;
+  for (let i = 0; i < cat.length; i++) h = (h * 31 + cat.charCodeAt(i)) >>> 0;
+  const hue = h % 360;
+  return `hsl(${hue}, 52%, 55%)`;
+}
+
 // ---- geometry helpers ----------------------------------------------------
 function polylineLength(points) {
   if (!points || points.length < 2) return 0;
@@ -119,6 +128,13 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
   const [showLayers, setShowLayers] = useState(true);
   const [showProps, setShowProps] = useState(true);
 
+  // selections library (place-as-block)
+  const [selections, setSelections] = useState([]);
+  const [showSelections, setShowSelections] = useState(false);
+  const [placingSelection, setPlacingSelection] = useState(null);
+  const [selSearch, setSelSearch] = useState('');
+  const [selCatFilter, setSelCatFilter] = useState('All');
+
   // header / persistence
   const [name, setName] = useState(drawing ? drawing.name || 'Untitled' : 'Untitled');
   const [dirty, setDirty] = useState(false);
@@ -158,6 +174,56 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
       window.removeEventListener('resize', update);
     };
   }, []);
+
+  // -------- load selections library (once) --------------------------------
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('selections')
+          .select('id, category, sub_category, name, photo_url, price, unit, material_rate_id')
+          .order('category')
+          .order('name');
+        if (cancelled) return;
+        if (error) {
+          // eslint-disable-next-line no-console
+          console.error('CAD selections load failed', error);
+          setSelections([]);
+          return;
+        }
+        setSelections(Array.isArray(data) ? data : []);
+      } catch (err) {
+        if (cancelled) return;
+        // eslint-disable-next-line no-console
+        console.error('CAD selections load failed', err);
+        setSelections([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // distinct category list for the palette filter
+  const selectionCategories = useMemo(() => {
+    const set = new Set();
+    selections.forEach((s) => {
+      if (s.category) set.add(s.category);
+    });
+    return Array.from(set).sort();
+  }, [selections]);
+
+  // filtered selections for the palette
+  const filteredSelections = useMemo(() => {
+    const q = selSearch.trim().toLowerCase();
+    return selections.filter((s) => {
+      if (selCatFilter !== 'All' && (s.category || '') !== selCatFilter) return false;
+      if (!q) return true;
+      const hay = `${s.name || ''} ${s.category || ''} ${s.sub_category || ''}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [selections, selSearch, selCatFilter]);
 
   // -------- history -------------------------------------------------------
   const snapshot = useCallback(() => {
@@ -320,6 +386,15 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
           const p = ent.points[0];
           const fs = ent.props?.fontSize || 1;
           if (wp.x >= p.x - tol && wp.x <= p.x + fs * 8 && wp.y >= p.y - fs && wp.y <= p.y + tol) return ent;
+        } else if (ent.type === 'block') {
+          const c = ent.points[0];
+          const half = (ent.props?.size || 2) / 2;
+          const d = Math.hypot(wp.x - c.x, wp.y - c.y);
+          if (
+            (wp.x >= c.x - half - tol && wp.x <= c.x + half + tol && wp.y >= c.y - half - tol && wp.y <= c.y + half + tol) ||
+            d <= half + tol
+          )
+            return ent;
         } else if (ent.type === 'rect' || ent.type === 'polygon') {
           if (pointInPoly(wp, ent.points) || nearAnySegment(wp, ent.points, tol, true)) return ent;
         } else {
@@ -331,6 +406,51 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
     },
     [entities, zoom, isEntityInteractable]
   );
+
+  // place a Selection from the library as a 'block' entity
+  const placeBlock = useCallback(
+    (sel, wp) => {
+      if (!sel) return;
+      const stroke = activeLayerObj ? activeLayerObj.color : '#111827';
+      const ent = {
+        id: uid('block'),
+        type: 'block',
+        layer: activeLayer,
+        points: [{ x: wp.x, y: wp.y }],
+        props: {
+          selectionId: sel.id,
+          label: sel.name || '',
+          category: sel.category || '',
+          subCategory: sel.sub_category || '',
+          photoUrl: sel.photo_url || '',
+          price: sel.price ?? null,
+          unit: sel.unit || '',
+          materialRateId: sel.material_rate_id || null,
+          size: 2,
+          color: categoryColor(sel.category || ''),
+          stroke,
+          width: 2,
+        },
+      };
+      commit(() => setEntities((prev) => [...prev, ent]));
+      setSelectedId(ent.id);
+    },
+    [activeLayer, activeLayerObj, commit]
+  );
+
+  // choose a selection card -> enter place mode
+  const chooseSelection = useCallback((sel) => {
+    setPlacingSelection(sel);
+    setTool('place');
+    setDraft(null);
+    setSelectedId(null);
+  }, []);
+
+  // leave place mode
+  const stopPlacing = useCallback(() => {
+    setPlacingSelection(null);
+    setTool('select');
+  }, []);
 
   // -------- pointer handlers ---------------------------------------------
   const onSvgPointerDown = useCallback(
@@ -355,6 +475,11 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
         } else {
           setSelectedId(null);
         }
+        return;
+      }
+
+      if (tool === 'place') {
+        if (placingSelection) placeBlock(placingSelection, wp);
         return;
       }
 
@@ -404,7 +529,7 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tool, draft, pan, toWorld, snapWorld, hitTest, textEdit]
+    [tool, draft, pan, toWorld, snapWorld, hitTest, textEdit, placingSelection, placeBlock]
   );
 
   const onSvgPointerMove = useCallback(
@@ -588,6 +713,10 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
       if (e.key === 'Escape') {
         setDraft(null);
         setTextEdit(null);
+        if (placingSelection) {
+          setPlacingSelection(null);
+          setTool('select');
+        }
       }
       if (e.key === 'Enter' && draft && (draft.type === 'polyline' || draft.type === 'polygon')) {
         finishPolyDraft();
@@ -612,7 +741,7 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
       window.removeEventListener('keyup', ku);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft, selectedId, undo, redo, finishPolyDraft]);
+  }, [draft, selectedId, undo, redo, finishPolyDraft, placingSelection]);
 
   // -------- entity mutation helpers --------------------------------------
   const deleteSelected = useCallback(() => {
@@ -787,6 +916,67 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
           {p.text}
         </text>
       );
+    } else if (ent.type === 'block') {
+      const c = ent.points[0];
+      const size = p.size || 2;
+      const half = size / 2;
+      const fillColor = p.color || categoryColor(p.category || '');
+      const labelFs = size * 0.35;
+      shape = (
+        <g>
+          {p.photoUrl ? (
+            <>
+              <image
+                href={p.photoUrl}
+                x={c.x - half}
+                y={c.y - half}
+                width={size}
+                height={size}
+                preserveAspectRatio="xMidYMid meet"
+              />
+              <rect
+                x={c.x - half}
+                y={c.y - half}
+                width={size}
+                height={size}
+                fill="none"
+                stroke={stroke}
+                strokeWidth={1}
+                vectorEffect="non-scaling-stroke"
+              />
+            </>
+          ) : (
+            <>
+              <circle cx={c.x} cy={c.y} r={half} fill={fillColor} stroke={stroke} strokeWidth={1} vectorEffect="non-scaling-stroke" />
+              <text
+                x={c.x}
+                y={c.y}
+                fill="#fff"
+                fontSize={size * 0.55}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontFamily="sans-serif"
+                style={{ userSelect: 'none' }}
+              >
+                {(p.label || '?').charAt(0).toUpperCase()}
+              </text>
+            </>
+          )}
+          {p.label ? (
+            <text
+              x={c.x}
+              y={c.y + half + labelFs}
+              fill={stroke}
+              fontSize={labelFs}
+              textAnchor="middle"
+              fontFamily="sans-serif"
+              style={{ userSelect: 'none' }}
+            >
+              {p.label}
+            </text>
+          ) : null}
+        </g>
+      );
     }
     return (
       <g key={ent.id}>
@@ -806,6 +996,18 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
             cx={ent.points[0].x}
             cy={ent.points[0].y}
             r={ent.props?.radius || 0}
+            fill="none"
+            stroke={GREEN}
+            strokeDasharray="4 3"
+            strokeWidth={1.5}
+            vectorEffect="non-scaling-stroke"
+          />
+        ) : ent.type === 'block' ? (
+          <rect
+            x={ent.points[0].x - (ent.props?.size || 2) / 2}
+            y={ent.points[0].y - (ent.props?.size || 2) / 2}
+            width={ent.props?.size || 2}
+            height={ent.props?.size || 2}
             fill="none"
             stroke={GREEN}
             strokeDasharray="4 3"
@@ -907,6 +1109,28 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
     );
   };
 
+  // faint preview marker while placing a selection block
+  const renderPlacePreview = () => {
+    if (tool !== 'place' || !placingSelection) return null;
+    const size = 2;
+    const half = size / 2;
+    return (
+      <g opacity={0.5} pointerEvents="none">
+        <rect
+          x={cursor.x - half}
+          y={cursor.y - half}
+          width={size}
+          height={size}
+          fill={categoryColor(placingSelection.category || '')}
+          stroke={GREEN}
+          strokeDasharray="3 2"
+          strokeWidth={1.25}
+          vectorEffect="non-scaling-stroke"
+        />
+      </g>
+    );
+  };
+
   // -------- render --------------------------------------------------------
   const canPan = tool === 'pan';
   const cursorStyle = canPan ? 'grab' : tool === 'select' ? 'default' : 'crosshair';
@@ -973,6 +1197,7 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
                 onClick={() => {
                   setTool(t.id);
                   setDraft(null);
+                  setPlacingSelection(null);
                 }}
                 className="w-9 h-9 flex items-center justify-center rounded-md text-base border"
                 style={
@@ -984,6 +1209,28 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
                 {t.icon}
               </button>
             ))}
+            <div className="h-px bg-gray-200 my-1" />
+            <button
+              title="Selections"
+              onClick={() => {
+                setShowSelections((v) => {
+                  const nv = !v;
+                  if (!nv) {
+                    setPlacingSelection(null);
+                    if (tool === 'place') setTool('select');
+                  }
+                  return nv;
+                });
+              }}
+              className="w-9 h-9 flex items-center justify-center rounded-md text-base border"
+              style={
+                showSelections
+                  ? { backgroundColor: GREEN, color: '#fff', borderColor: GREEN }
+                  : { backgroundColor: '#fff', borderColor: '#e5e7eb', color: '#374151' }
+              }
+            >
+              🎨
+            </button>
             <div className="h-px bg-gray-200 my-1" />
             <button title="Zoom in" onClick={() => zoomBy(1.2)} className="w-9 h-9 rounded-md border border-gray-200 bg-white hover:bg-gray-100">
               +
@@ -1182,6 +1429,8 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
               {renderDraft()}
               {/* cursor crosshair */}
               {renderCursor()}
+              {/* place preview */}
+              {renderPlacePreview()}
             </g>
           </svg>
 
@@ -1211,6 +1460,96 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
               Click to add points · double-click / Enter to finish · Esc to cancel
             </div>
           )}
+
+          {/* place-mode hint */}
+          {tool === 'place' && placingSelection && (
+            <div className="absolute top-2 left-2 text-xs bg-white/90 border border-green-200 rounded px-2 py-1 text-green-700 shadow-sm">
+              Click on the drawing to place <span className="font-medium">{placingSelection.name}</span>. Esc to stop.
+            </div>
+          )}
+
+          {/* selections palette */}
+          {showSelections && (
+            <div className="absolute top-2 right-2 bottom-2 w-64 bg-white border border-gray-200 rounded-md shadow-lg flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
+                <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Selections</span>
+                <button
+                  onClick={() => {
+                    setShowSelections(false);
+                    setPlacingSelection(null);
+                    if (tool === 'place') setTool('select');
+                  }}
+                  title="Close"
+                  className="w-6 h-6 rounded border border-gray-200 hover:bg-gray-100 text-xs"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="p-2 space-y-2 border-b border-gray-100">
+                <input
+                  value={selSearch}
+                  onChange={(e) => setSelSearch(e.target.value)}
+                  placeholder="Search…"
+                  className="w-full text-xs px-2 py-1 border border-gray-300 rounded"
+                />
+                <select
+                  value={selCatFilter}
+                  onChange={(e) => setSelCatFilter(e.target.value)}
+                  className="w-full text-xs px-1 py-1 border border-gray-300 rounded"
+                >
+                  <option value="All">All categories</option>
+                  {selectionCategories.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex-1 overflow-auto p-2">
+                {filteredSelections.length === 0 ? (
+                  <div className="text-xs text-gray-400 px-1 py-2">
+                    {selections.length === 0 ? 'No selections found.' : 'No matches.'}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {filteredSelections.map((s) => {
+                      const active = placingSelection && placingSelection.id === s.id;
+                      return (
+                        <button
+                          key={s.id}
+                          onClick={() => chooseSelection(s)}
+                          title={s.name}
+                          className="flex flex-col text-left rounded border p-1 hover:bg-gray-50"
+                          style={
+                            active
+                              ? { borderColor: GREEN, boxShadow: `0 0 0 1px ${GREEN}` }
+                              : { borderColor: '#e5e7eb' }
+                          }
+                        >
+                          <div className="w-full aspect-square rounded overflow-hidden flex items-center justify-center bg-gray-100 mb-1">
+                            {s.photo_url ? (
+                              <img src={s.photo_url} alt={s.name} className="w-full h-full object-contain" />
+                            ) : (
+                              <div
+                                className="w-full h-full flex items-center justify-center text-white text-lg font-semibold"
+                                style={{ backgroundColor: categoryColor(s.category || '') }}
+                              >
+                                {(s.category || s.name || '?').charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                          </div>
+                          <span className="text-[11px] leading-tight font-medium text-gray-700 truncate w-full">{s.name}</span>
+                          {s.sub_category ? (
+                            <span className="text-[10px] leading-tight text-gray-400 truncate w-full">{s.sub_category}</span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* --- Right: properties --- */}
@@ -1231,7 +1570,52 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
                     <span className="text-gray-500">Type</span>
                     <span className="font-medium capitalize">{selected.type}</span>
                   </div>
-                  <div className="text-gray-700 bg-gray-50 rounded px-2 py-1.5 border border-gray-100">{measurementOf(selected)}</div>
+                  {selected.type !== 'block' && (
+                    <div className="text-gray-700 bg-gray-50 rounded px-2 py-1.5 border border-gray-100">{measurementOf(selected)}</div>
+                  )}
+
+                  {selected.type === 'block' && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-14 h-14 rounded border border-gray-200 overflow-hidden flex items-center justify-center bg-gray-100 shrink-0">
+                          {selected.props?.photoUrl ? (
+                            <img src={selected.props.photoUrl} alt={selected.props?.label || ''} className="w-full h-full object-contain" />
+                          ) : (
+                            <div
+                              className="w-full h-full flex items-center justify-center text-white text-base font-semibold"
+                              style={{ backgroundColor: selected.props?.color || categoryColor(selected.props?.category || '') }}
+                            >
+                              {(selected.props?.category || selected.props?.label || '?').charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-medium text-gray-700 truncate">{selected.props?.label || 'Block'}</div>
+                          {selected.props?.category ? <div className="text-gray-400 truncate">{selected.props.category}</div> : null}
+                        </div>
+                      </div>
+                      {selected.props?.price != null && selected.props?.price !== '' && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-gray-500">Price</span>
+                          <span className="text-gray-700">
+                            ${Number(selected.props.price).toFixed(2)}
+                            {selected.props?.unit ? ` / ${selected.props.unit}` : ''}
+                          </span>
+                        </div>
+                      )}
+                      <label className="flex items-center justify-between gap-2">
+                        <span className="text-gray-500">Size</span>
+                        <input
+                          type="number"
+                          min="0.1"
+                          step="0.1"
+                          value={Number(selected.props?.size || 2)}
+                          onChange={(e) => updateSelectedProps({ size: Math.max(0.1, parseFloat(e.target.value) || 1) })}
+                          className="w-16 border border-gray-300 rounded px-1 py-0.5"
+                        />
+                      </label>
+                    </div>
+                  )}
 
                   <label className="block">
                     <span className="text-gray-500 block mb-1">Layer</span>
@@ -1248,27 +1632,31 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
                     </select>
                   </label>
 
-                  <label className="flex items-center justify-between gap-2">
-                    <span className="text-gray-500">Stroke</span>
-                    <input
-                      type="color"
-                      value={selected.props?.stroke || '#111827'}
-                      onChange={(e) => updateSelectedProps({ stroke: e.target.value })}
-                      className="w-8 h-6 border border-gray-300 rounded"
-                    />
-                  </label>
+                  {selected.type !== 'block' && (
+                    <label className="flex items-center justify-between gap-2">
+                      <span className="text-gray-500">Stroke</span>
+                      <input
+                        type="color"
+                        value={selected.props?.stroke || '#111827'}
+                        onChange={(e) => updateSelectedProps({ stroke: e.target.value })}
+                        className="w-8 h-6 border border-gray-300 rounded"
+                      />
+                    </label>
+                  )}
 
-                  <label className="flex items-center justify-between gap-2">
-                    <span className="text-gray-500">Width</span>
-                    <input
-                      type="number"
-                      min="0.5"
-                      step="0.5"
-                      value={selected.props?.width || 2}
-                      onChange={(e) => updateSelectedProps({ width: Math.max(0.5, parseFloat(e.target.value) || 1) })}
-                      className="w-16 border border-gray-300 rounded px-1 py-0.5"
-                    />
-                  </label>
+                  {selected.type !== 'block' && (
+                    <label className="flex items-center justify-between gap-2">
+                      <span className="text-gray-500">Width</span>
+                      <input
+                        type="number"
+                        min="0.5"
+                        step="0.5"
+                        value={selected.props?.width || 2}
+                        onChange={(e) => updateSelectedProps({ width: Math.max(0.5, parseFloat(e.target.value) || 1) })}
+                        className="w-16 border border-gray-300 rounded px-1 py-0.5"
+                      />
+                    </label>
+                  )}
 
                   {(selected.type === 'rect' || selected.type === 'polygon' || selected.type === 'circle') && (
                     <div className="space-y-1">
