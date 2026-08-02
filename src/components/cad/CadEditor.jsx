@@ -22,6 +22,7 @@
  */
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
+import { entitiesToDxf, parseDxf } from './dxf';
 
 // ---- constants -----------------------------------------------------------
 const ZOOM_MIN = 2;
@@ -145,6 +146,10 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState(false);
+
+  // DXF import transient notice (short-lived status string)
+  const [importNotice, setImportNotice] = useState('');
+  const dxfFileRef = useRef(null);
 
   // text inline editor
   const [textEdit, setTextEdit] = useState(null); // { x, y, value, id? }
@@ -1014,6 +1019,88 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
     }
   }, [drawing, unit, gridSpacing, layers, entities, zoom, pan, name, onSaved]);
 
+  // -------- DXF export (read-only, no dirty) ------------------------------
+  const exportDxf = useCallback(() => {
+    try {
+      const dxf = entitiesToDxf({ unit, layers, entities });
+      const blob = new Blob([dxf], { type: 'application/dxf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${(drawing?.name || name || 'drawing')}.dxf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('DXF export failed', err);
+      alert(`Export failed: ${err.message || err}`);
+    }
+  }, [unit, layers, entities, drawing, name]);
+
+  // -------- DXF import (merge into current drawing) -----------------------
+  const importDxfFile = useCallback(
+    async (file) => {
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const parsed = parseDxf(text);
+        if (!parsed || !Array.isArray(parsed.entities) || parsed.entities.length === 0) {
+          setImportNotice('No drawable entities found in that DXF.');
+          setTimeout(() => setImportNotice(''), 4000);
+          return;
+        }
+
+        // Map imported layer ids → existing (by case-insensitive name) or self.
+        const nameToExisting = new Map();
+        layers.forEach((l) => nameToExisting.set((l.name || '').toLowerCase(), l.id));
+        const layerMap = {};
+        const newLayers = [];
+        (parsed.layers || []).forEach((il) => {
+          const key = (il.name || '').toLowerCase();
+          if (nameToExisting.has(key)) {
+            layerMap[il.id] = nameToExisting.get(key);
+          } else {
+            layerMap[il.id] = il.id; // keep its id, add as a new layer
+            newLayers.push(il);
+            nameToExisting.set(key, il.id);
+          }
+        });
+
+        const fallbackLayer = activeLayer || (layers[0] && layers[0].id);
+        const mapped = parsed.entities.map((ent) => ({
+          ...ent,
+          id: uid(ent.type || 'e'),
+          layer: layerMap[ent.layer] || fallbackLayer,
+        }));
+
+        commit(() => {
+          if (newLayers.length) setLayers((prev) => [...prev, ...newLayers]);
+          setEntities((prev) => [...prev, ...mapped]);
+        });
+
+        const skips = parsed.skipped && Object.keys(parsed.skipped).length
+          ? Object.entries(parsed.skipped)
+              .map(([t, c]) => `${t}×${c}`)
+              .join(', ')
+          : '';
+        setImportNotice(
+          skips
+            ? `Imported ${mapped.length} entities. Skipped unsupported: ${skips}.`
+            : `Imported ${mapped.length} entities.`
+        );
+        setTimeout(() => setImportNotice(''), 5000);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('DXF import failed', err);
+        setImportNotice(`Import failed: ${err.message || err}`);
+        setTimeout(() => setImportNotice(''), 5000);
+      }
+    },
+    [layers, activeLayer, commit]
+  );
+
   // -------- grid computation ---------------------------------------------
   const gridLines = useMemo(() => {
     const out = { minor: [], major: [] };
@@ -1338,6 +1425,31 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
             {saving ? 'Saving…' : dirty ? 'Unsaved changes' : savedAt ? 'Saved ✓' : ''}
           </span>
           <button
+            onClick={exportDxf}
+            title="Export drawing as DXF"
+            className="px-2 py-1.5 text-sm rounded-md border border-gray-300 hover:bg-gray-100"
+          >
+            ⬇ DXF
+          </button>
+          <button
+            onClick={() => dxfFileRef.current && dxfFileRef.current.click()}
+            title="Import a DXF file (merges into this drawing)"
+            className="px-2 py-1.5 text-sm rounded-md border border-gray-300 hover:bg-gray-100"
+          >
+            ⬆ DXF
+          </button>
+          <input
+            ref={dxfFileRef}
+            type="file"
+            accept=".dxf"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files && e.target.files[0];
+              importDxfFile(f);
+              e.target.value = ''; // allow re-importing the same file
+            }}
+          />
+          <button
             onClick={save}
             disabled={saving}
             className="px-3 py-1.5 text-sm rounded-md text-white disabled:opacity-60"
@@ -1347,6 +1459,11 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
           </button>
         </div>
       </div>
+      {importNotice && (
+        <div className="px-3 py-1.5 text-xs bg-green-50 text-green-800 border-b border-green-200 shrink-0">
+          {importNotice}
+        </div>
+      )}
 
       {/* ===== Body ===== */}
       <div className="flex flex-1 min-h-0">
