@@ -454,6 +454,9 @@ function makeTab(data = {}) {
       manualSubCost: '',
     },
     steel: data.steel ?? { manualSubCost: '' },
+    // In-House pool plumbing — labor hours + materials $ done in-house (not a
+    // sub trade). Blank strings default to the DB master rates in calcPool.
+    plumbingIH: data.plumbingIH ? { hours: '', materials: '', ...data.plumbingIH } : { hours: '', materials: '' },
     epLineRows: data.epLineRows ?? [EP_LINE_ROW(), EP_LINE_ROW()],
     epGasRows: data.epGasRows ?? [EP_GAS_ROW(), EP_GAS_ROW()],
     epElecRows: data.epElecRows ?? [EP_ELEC_ROW(), EP_ELEC_ROW()],
@@ -548,6 +551,12 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   const excavHrs = !isSubExcav && equipRate > 0 ? totalExcavCY / equipRate : 0
   const excavSub = isSubExcav ? n(excavation.subCost) : 0
 
+  // Shotcrete / Interior Finish / Plumbing / Steel auto-subs apply on the Sub
+  // tab ONLY. On the In-House tab their AUTO amount is not charged (done
+  // in-house or entered manually). A manual sub override is still honored on
+  // either tab.
+  const isSubTab = state.subType === 'Subcontractor'
+
   // ─ Shotcrete sub (rates from subcontractor_rates, category='Pool') ─
   const shotMatCY = subRates['Shotcrete Material'] ?? SHOTCRETE_MAT_PER_CY
   const shotLabCY = subRates['Shotcrete Labor'] ?? SHOTCRETE_LABOR_PER_CY
@@ -561,7 +570,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     totalShotCY > 0 ? totalShotCY * shotMatCY + Math.max(shotMin, totalShotCY * shotLabCY) : 0
   const shotcreteSub = hasOverride(shotcrete.manualSubCost)
     ? n(shotcrete.manualSubCost)
-    : autoShotcreteSub
+    : (isSubTab ? autoShotcreteSub : 0)
 
   // ─ Waterline Tile ─
   let tileHrs = 0,
@@ -629,7 +638,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     const manSub = n(fin.subCost)
     if (manSub > 0) {
       interiorSub += manSub
-    } else {
+    } else if (isSubTab) {
       const sf = n(s.waterSF)
       const priceSF = subRates[`Interior Finish - ${fin.type}`] ?? INTERIOR_DEFAULTS[fin.type] ?? 45
       interiorSub += sf * priceSF
@@ -656,8 +665,9 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   let plumbSub
   if (hasOverride(plumbing.manualSubCost)) {
     plumbSub = n(plumbing.manualSubCost)
-  } else if (n(pool.perimLF) > 0 || spa.enabled) {
-    // Only auto-charge the plumbing base when there's actual pool/spa scope.
+  } else if (isSubTab && (n(pool.perimLF) > 0 || spa.enabled)) {
+    // Only auto-charge the plumbing base when there's actual pool/spa scope,
+    // and only on the Sub tab (In-House does plumbing in-house).
     plumbSub =
       plumbBaseRate +
       (plumbing.over20ft ? (subRates['Plumbing Over 20ft Add'] ?? 300) : 0) +
@@ -673,11 +683,11 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   if (hasOverride(steel.manualSubCost)) {
     steelSub = n(steel.manualSubCost)
   } else {
-    // Steel is qty-driven (perimeter + spa), so it's already 0 with no scope.
+    // Steel is qty-driven (perimeter + spa). Auto-sub on the Sub tab only.
     const poolPerim = n(pool.perimLF)
     const steelPerLF = subRates['Steel Per LF'] ?? 8
     const steelSpaBonus = subRates['Steel Spa Bonus'] ?? 200
-    steelSub = poolPerim * steelPerLF + (spa.enabled ? steelSpaBonus : 0)
+    steelSub = isSubTab ? poolPerim * steelPerLF + (spa.enabled ? steelSpaBonus : 0) : 0
   }
 
   // ─ Manual rows ─
@@ -713,6 +723,21 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     })
   })
 
+  // ── In-House Plumbing (pool plumbing done in-house) ─────────────────────────
+  // Contributes in-house labor hours + materials only (never a sub cost). The
+  // section is shown on the In-House tab only, so gate on !isSubTab to be safe:
+  // its fields stay blank on the Sub tab and the DB default must not silently
+  // add cost there. A typed value overrides the DB default; a typed 0 => 0.
+  const plumbIH = state.plumbingIH || {}
+  const plumbHrsDefault = laborRates['Pool Plumbing - Base Hours'] ?? 16
+  const plumbMatDefault = materialPrices['Pool Plumbing - Materials'] ?? 350
+  const plumbHrsIH = isSubTab ? 0 : hasOverride(plumbIH.hours) ? n(plumbIH.hours) : plumbHrsDefault
+  const plumbMatIH = isSubTab
+    ? 0
+    : hasOverride(plumbIH.materials)
+      ? n(plumbIH.materials)
+      : plumbMatDefault
+
   const _preWalkHrs =
     excavHrs +
     tileHrs +
@@ -722,11 +747,12 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     equipmentHrs +
     epHrs +
     manHrs +
+    plumbHrsIH +
     (parseFloat(state.hoursAdj) || 0)
   const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
   const totalHrs = _preWalkHrs + walkHrs
   const manDays = totalHrs / 8
-  const totalMat = tileMat + spillwayMat + copingMat + raisedMat + epMat + manMat
+  const totalMat = tileMat + spillwayMat + copingMat + raisedMat + epMat + manMat + plumbMatIH
   // Pool's genuine sub trades (excavation / shotcrete / interior / equipment /
   // plumbing / steel / manual-sub). These are sub costs on either tab.
   const subTradeCost =
@@ -740,7 +766,6 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   // scope instead of silently dropping the in-house buckets it ignores. The
   // in-house GP model applies only to the In-House tab. Matches the
   // OutdoorKitchen reference; sub-trade computation above is untouched.
-  const isSubTab = state.subType === 'Subcontractor'
   const subMarkup = n(state.subGpMarkupRate) || 0.2
   let gp, subCost, subGp, commission, price
   if (isSubTab) {
@@ -782,6 +807,8 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     equipmentSub,
     plumbSub,
     steelSub,
+    plumbHrsIH, // effective in-house pool-plumbing hours (default or override)
+    plumbMatIH, // effective in-house pool-plumbing materials $
     equipRate, // resolved excavation CY/hr so the icon can show + edit it
   }
 }
@@ -2201,6 +2228,85 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           />
         </div>
       </div>
+
+      {/* ─── In-House Plumbing (In-House tab only) ─── */}
+      {subType !== 'Subcontractor' && (
+        <div>
+          <SectionHeader title="In-House Plumbing" />
+          <p className="text-xs text-gray-400 italic mb-2">
+            Pool plumbing done in-house — labor hours + materials $. Blank fields use the DB
+            master rate; type a value to override (a typed 0 removes it).
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <Label text="Labor Hours" sub="hrs" />
+              <div className="flex items-center gap-1">
+                <NumInput
+                  value={T.plumbingIH?.hours ?? ''}
+                  onChange={v => upd('plumbingIH', { ...(T.plumbingIH || {}), hours: v })}
+                  placeholder={`default ${laborRates['Pool Plumbing - Base Hours'] ?? 16}`}
+                  className="flex-1 min-w-0"
+                />
+                <RateEditPopover
+                  table="labor_rates"
+                  name="Pool Plumbing - Base Hours"
+                  category="Pool"
+                  mode="coefficient"
+                  unitLabel="hrs"
+                  currentValue={laborRates['Pool Plumbing - Base Hours'] ?? 16}
+                  onSaved={refreshAllRates}
+                />
+              </div>
+              {(T.plumbingIH?.hours ?? '') === '' && (
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  default {laborRates['Pool Plumbing - Base Hours'] ?? 16} hrs
+                </p>
+              )}
+            </div>
+            <div>
+              <Label text="Materials" sub="$" />
+              <div className="flex items-center gap-1">
+                <div className="relative flex-1 min-w-0">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+                    $
+                  </span>
+                  <NumInput
+                    value={T.plumbingIH?.materials ?? ''}
+                    onChange={v => upd('plumbingIH', { ...(T.plumbingIH || {}), materials: v })}
+                    placeholder={`default ${materialPrices['Pool Plumbing - Materials'] ?? 350}`}
+                    className="pl-6"
+                  />
+                </div>
+                <RateEditPopover
+                  table="material_rates"
+                  name="Pool Plumbing - Materials"
+                  category="Pool"
+                  unitLabel="ea"
+                  currentValue={materialPrices['Pool Plumbing - Materials'] ?? 350}
+                  onSaved={refreshAllRates}
+                />
+              </div>
+              {(T.plumbingIH?.materials ?? '') === '' && (
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  default $ {materialPrices['Pool Plumbing - Materials'] ?? 350}
+                </p>
+              )}
+            </div>
+          </div>
+          {(calc.plumbHrsIH > 0 || calc.plumbMatIH > 0) && (
+            <p className="text-xs text-gray-500 mt-2 px-1">
+              {calc.plumbHrsIH.toFixed(1)} hrs × ${n(state.laborRatePerHour)}/hr ={' '}
+              <strong>{fmt2(calc.plumbHrsIH * n(state.laborRatePerHour))}</strong> labor
+              {calc.plumbMatIH > 0 && (
+                <>
+                  {' '}
+                  + <strong>{fmt2(calc.plumbMatIH)}</strong> materials
+                </>
+              )}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* ─── 12. Manual Entry ─── */}
       <div>
