@@ -19,6 +19,7 @@ import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { SCALE_PRESETS } from '../components/cad/scales'
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`
 
@@ -49,32 +50,11 @@ const SYMBOL_OPTIONS = [
   { key: 'percent', label: '%' },
 ]
 
-// Standard architectural + engineering imperial scales. Drawing inches per
-// real-world foot. Assumes the PDF renders at 72 DPI at zoom = 1.0 (PDF
-// standard), so pixels_per_foot = 72 * drawing_in_per_foot.
-const IMPERIAL_SCALES = [
-  { label: '1/64" = 1\'-0"', ipf: 1 / 64 },
-  { label: '1/32" = 1\'-0"', ipf: 1 / 32 },
-  { label: '1/16" = 1\'-0"', ipf: 1 / 16 },
-  { label: '3/32" = 1\'-0"', ipf: 3 / 32 },
-  { label: '1/8" = 1\'-0"', ipf: 1 / 8 },
-  { label: '3/16" = 1\'-0"', ipf: 3 / 16 },
-  { label: '1/4" = 1\'-0"', ipf: 1 / 4 },
-  { label: '3/8" = 1\'-0"', ipf: 3 / 8 },
-  { label: '1/2" = 1\'-0"', ipf: 1 / 2 },
-  { label: '3/4" = 1\'-0"', ipf: 3 / 4 },
-  { label: '1" = 1\'-0"', ipf: 1 },
-  { label: '1 1/2" = 1\'-0"', ipf: 1.5 },
-  { label: '3" = 1\'-0"', ipf: 3 },
-  // Engineering scales (1 inch = N feet)
-  { label: '1" = 10\'', ipf: 1 / 10 },
-  { label: '1" = 20\'', ipf: 1 / 20 },
-  { label: '1" = 30\'', ipf: 1 / 30 },
-  { label: '1" = 40\'', ipf: 1 / 40 },
-  { label: '1" = 50\'', ipf: 1 / 50 },
-  { label: '1" = 60\'', ipf: 1 / 60 },
-  { label: '1" = 100\'', ipf: 1 / 100 },
-]
+// Standard architectural + engineering imperial scales — the SAME shared list
+// the CAD editor uses (src/components/cad/scales.js), so both tools stay in
+// sync. Drawing inches per real-world foot; assumes the PDF renders at 72 DPI
+// at zoom = 1.0, so pixels_per_foot = 72 * drawing_in_per_foot.
+const IMPERIAL_SCALES = SCALE_PRESETS.map(p => ({ label: p.label, ipf: p.inPerFt }))
 
 // Metric scales: 1:N (drawing units : real units). Same 72 DPI assumption.
 // 1 px at zoom 1.0 = 1/72 inch = 25.4/72 mm on the drawing → * N mm in reality.
