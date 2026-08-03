@@ -462,6 +462,9 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
       const skipped = included.length - toInsert.length
 
       if (toInsert.length) {
+        // One product record per item. show_in_selections=true so imported
+        // catalog items appear in Design → Selections (the design/spec lens of
+        // the same material_rates table). No separate selections write.
         const payload = toInsert.map(r => ({
           name: r.name.trim(),
           category: r.category.trim() || null,
@@ -470,37 +473,12 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
           unit: r.unit.trim() || null,
           unit_cost: r.price === '' ? null : Number(r.price),
           photo_url: r.photoUrl || null,
+          description: r.description?.trim() || null,
+          sku: r.sku?.trim() || null,
+          show_in_selections: true,
         }))
         const { error: insErr } = await supabase.from('material_rates').insert(payload)
         if (insErr) throw new Error(`Import failed: ${insErr.message}`)
-
-        // Also duplicate into the design Selections catalog (best-effort — a
-        // failure here must not fail the material import). Dedupe per vendor.
-        try {
-          const { data: existSel } = await supabase
-            .from('selections')
-            .select('name, category')
-            .eq('vendor_id', vendorId)
-          const selExists = new Set(
-            (existSel || []).map(e => `${(e.category || '').toLowerCase()}::${(e.name || '').toLowerCase()}`)
-          )
-          const selRows = toInsert
-            .filter(r => !selExists.has(key(r)))
-            .map(r => ({
-              name: r.name.trim(),
-              category: r.category.trim() || null,
-              sub_category: r.sub_category.trim() || null,
-              description: r.description?.trim() || null,
-              photo_url: r.photoUrl || null,
-              type: r.category.trim() || null,
-              vendor_id: vendorId,
-              sku: r.sku?.trim() || null,
-              unit: r.unit.trim() || null,
-              price: r.price === '' ? null : Number(r.price),
-              source: 'catalog',
-            }))
-          if (selRows.length) await supabase.from('selections').insert(selRows)
-        } catch { /* selections is best-effort */ }
 
         setAdded(a => a + payload.length)
       }

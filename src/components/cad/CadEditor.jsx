@@ -25,9 +25,10 @@ import { supabase } from '../../lib/supabase';
 import { entitiesToDxf, parseDxf } from './dxf';
 import CadSheets from './CadSheets';
 import SendToEstimateModal from './SendToEstimateModal';
+import { SCALE_PRESETS, scaleToZoom, zoomToInPerFt, scaleLabel as fmtScale } from './scales';
 
 // ---- constants -----------------------------------------------------------
-const ZOOM_MIN = 2;
+const ZOOM_MIN = 0.5; // px per world foot — low enough for engineering scales (1"=60')
 const ZOOM_MAX = 400;
 const HISTORY_CAP = 50;
 const GREEN = '#3A5038';
@@ -105,6 +106,7 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
       entities: Array.isArray(d.entities) ? d.entities : base.entities,
       view: d.view && typeof d.view === 'object' ? { ...base.view, ...d.view } : base.view,
       sheets: Array.isArray(d.sheets) ? d.sheets : [],
+      scale: typeof d.scale === 'number' && d.scale > 0 ? d.scale : 1 / 4, // paper in per world ft
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawing && drawing.id]);
@@ -119,6 +121,10 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
   // plan-set sheets (Phase 5) + view toggle
   const [sheets, setSheets] = useState(initial.sheets);
   const [showSheets, setShowSheets] = useState(false);
+
+  // Working drawing scale (paper inches per world foot). Drives the display
+  // zoom and the takeoff/plot scale readout; persisted in data.scale.
+  const [drawingScale, setDrawingScale] = useState(initial.scale);
 
   // view (zoom + pan)
   const [zoom, setZoom] = useState(initial.view.zoom);
@@ -194,13 +200,18 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
   }, []);
 
   // -------- load selections library (once) --------------------------------
+  // Selections are now the design/spec lens of material_rates (rows flagged
+  // show_in_selections). Normalize to the palette's expected shape so the rest
+  // of the palette/placeBlock code is unchanged: price=unit_cost, and the row's
+  // own id IS the material_rate id.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const { data, error } = await supabase
-          .from('selections')
-          .select('id, category, sub_category, name, photo_url, price, unit, material_rate_id')
+          .from('material_rates')
+          .select('id, category, sub_category, name, photo_url, unit_cost, unit')
+          .eq('show_in_selections', true)
           .order('category')
           .order('name');
         if (cancelled) return;
@@ -210,7 +221,17 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
           setSelections([]);
           return;
         }
-        setSelections(Array.isArray(data) ? data : []);
+        const norm = (Array.isArray(data) ? data : []).map((r) => ({
+          id: r.id,
+          category: r.category,
+          sub_category: r.sub_category,
+          name: r.name,
+          photo_url: r.photo_url,
+          unit: r.unit,
+          price: r.unit_cost,
+          material_rate_id: r.id,
+        }));
+        setSelections(norm);
       } catch (err) {
         if (cancelled) return;
         // eslint-disable-next-line no-console
@@ -1006,6 +1027,7 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
       entities,
       view: { zoom, panX: pan.x, panY: pan.y },
       sheets,
+      scale: drawingScale,
     };
     try {
       const { data: row, error } = await supabase
@@ -1026,7 +1048,7 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
     } finally {
       setSaving(false);
     }
-  }, [drawing, unit, gridSpacing, layers, entities, zoom, pan, name, sheets, onSaved]);
+  }, [drawing, unit, gridSpacing, layers, entities, zoom, pan, name, sheets, drawingScale, onSaved]);
 
   // -------- DXF export (read-only, no dirty) ------------------------------
   const exportDxf = useCallback(() => {
@@ -2294,8 +2316,26 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
           x: <span className="text-gray-700">{cursor.x.toFixed(2)}</span> y:{' '}
           <span className="text-gray-700">{cursor.y.toFixed(2)}</span> {unit}
         </span>
+        <span className="inline-flex items-center gap-1">
+          Scale:
+          <select
+            value={drawingScale}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setDrawingScale(v);
+              setZoom(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, scaleToZoom(v))));
+              markDirty();
+            }}
+            title="Set the working drawing scale (also used for takeoffs and default plot scale)"
+            className="border border-gray-300 rounded px-1 py-0.5 text-[11px] bg-white text-gray-700"
+          >
+            {SCALE_PRESETS.map((p) => (
+              <option key={p.label} value={p.inPerFt}>{p.label}</option>
+            ))}
+          </select>
+        </span>
         <span>
-          Zoom: <span className="text-gray-700">{Math.round((zoom / 20) * 100)}%</span> ({zoom.toFixed(1)} px/{unit})
+          Zoom: <span className="text-gray-700">{Math.round((zoom / 20) * 100)}%</span> (≈ {fmtScale(zoomToInPerFt(zoom))})
         </span>
         {draftMeasurement && <span className="text-green-700 font-medium">{draftMeasurement}</span>}
         {selected && !draftMeasurement && <span className="text-gray-700">{measurementOf(selected)}</span>}

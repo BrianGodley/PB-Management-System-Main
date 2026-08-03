@@ -6,8 +6,8 @@
 // `attributes` jsonb column. Supports search, add / edit (with photo upload to
 // the rate-photos bucket) and delete.
 //
-// DB: table `selections` — RLS is tenant-scoped and tenant_id is set by a
-// trigger, so we NEVER send tenant_id.
+// DB: table `material_rates` (rows with show_in_selections = true) — RLS is
+// tenant-scoped and tenant_id is set by a trigger, so we NEVER send tenant_id.
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
@@ -96,7 +96,7 @@ export default function SelectionsBrowser() {
   const load = useCallback(async () => {
     setLoading(true)
     const [{ data: sel }, { data: vs }] = await Promise.all([
-      supabase.from('selections').select('*').order('name'),
+      supabase.from('material_rates').select('*').eq('show_in_selections', true).order('name'),
       supabase.from('subs_vendors').select('id, company_name, type').order('company_name'),
     ])
     setItems(sel || [])
@@ -148,9 +148,9 @@ export default function SelectionsBrowser() {
   }, [items, category, subCategory, search])
 
   async function handleDelete(row) {
-    if (!confirm(`Delete "${row.name}"? This cannot be undone.`)) return
-    const { error } = await supabase.from('selections').delete().eq('id', row.id)
-    if (error) { alert('Delete failed: ' + error.message); return }
+    if (!confirm(`Remove "${row.name}" from Selections? The material/price record itself is kept.`)) return
+    const { error } = await supabase.from('material_rates').update({ show_in_selections: false }).eq('id', row.id)
+    if (error) { alert('Remove from Selections failed: ' + error.message); return }
     setDetail(null)
     load()
   }
@@ -265,7 +265,7 @@ export default function SelectionsBrowser() {
 // ---- card -----------------------------------------------------------------
 
 function SelectionCard({ item, vendorName, onClick }) {
-  const price = fmtPrice(item.price)
+  const price = fmtPrice(item.unit_cost)
   return (
     <button
       onClick={onClick}
@@ -303,7 +303,7 @@ function SelectionDetail({ item, vendorName, onClose, onEdit, onDelete }) {
     return Object.entries(a).filter(([, v]) => v != null && v !== '')
   }, [item.attributes])
 
-  const price = fmtPrice(item.price)
+  const price = fmtPrice(item.unit_cost)
 
   return createPortal(
     <div className="fixed inset-0 z-[9998] bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
@@ -389,7 +389,7 @@ function SelectionDetail({ item, vendorName, onClose, onEdit, onDelete }) {
               onClick={onDelete}
               className="px-4 py-2 text-sm font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50"
             >
-              Delete
+              Remove from Selections
             </button>
             <button
               onClick={onEdit}
@@ -432,7 +432,7 @@ function SelectionForm({ row, vendors, categories, onClose, onSaved }) {
   const [subCategory, setSubCategory] = useState(row?.sub_category || '')
   const [vendorId, setVendorId] = useState(row?.vendor_id || '')
   const [unit, setUnit] = useState(row?.unit || '')
-  const [price, setPrice] = useState(row?.price ?? '')
+  const [price, setPrice] = useState(row?.unit_cost ?? '')
   const [sku, setSku] = useState(row?.sku || '')
   const [description, setDescription] = useState(row?.description || '')
   const [photoUrl, setPhotoUrl] = useState(row?.photo_url || '')
@@ -486,19 +486,20 @@ function SelectionForm({ row, vendors, categories, onClose, onSaved }) {
       sub_category: subCategory.trim() || null,
       vendor_id: vendorId || null,
       unit: unit.trim() || null,
-      price: price === '' ? null : Number(price),
+      unit_cost: price === '' ? null : Number(price),
       sku: sku.trim() || null,
       description: description.trim() || null,
       photo_url: photoUrl || null,
       attributes: Object.keys(attributes).length ? attributes : {},
+      show_in_selections: true,
     }
 
     let error
     if (isEdit) {
-      ({ error } = await supabase.from('selections').update(payload).eq('id', row.id))
+      ({ error } = await supabase.from('material_rates').update(payload).eq('id', row.id))
     } else {
-      // source 'manual' on create; never send tenant_id (set by trigger).
-      ({ error } = await supabase.from('selections').insert({ ...payload, source: 'manual' }))
+      // never send tenant_id (set by trigger).
+      ({ error } = await supabase.from('material_rates').insert(payload))
     }
     setSaving(false)
     if (error) { setErr(error.message); return }
