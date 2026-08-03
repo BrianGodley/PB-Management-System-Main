@@ -759,7 +759,12 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
     onSave({
       notes,
       man_days: parseFloat(calc.manDays.toFixed(2)),
-      material_cost: parseFloat(calc.totalMat.toFixed(2)),
+      // material_cost is the IN-HOUSE materials column the estimate aggregates.
+      // On the Sub tab the materials belong to subCost (a subcontractor lump),
+      // so in-house materials must be 0 — otherwise they'd be double-counted as
+      // In-House Materials AND Sub Cost. The module's own summary still shows the
+      // sub materials from data.calc.totalMat.
+      material_cost: isSub ? 0 : parseFloat(calc.totalMat.toFixed(2)),
       data: {
         ...state,
         ihData: ihTab,

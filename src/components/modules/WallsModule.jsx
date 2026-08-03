@@ -1275,7 +1275,9 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
     onSave({
       notes,
       man_days: parseFloat(calc.manDays.toFixed(2)),
-      material_cost: parseFloat(calc.totalMat.toFixed(2)),
+      // In-house materials only; on the Sub tab the materials live in subCost,
+      // so keep this 0 to avoid double-counting them as In-House Materials.
+      material_cost: isSub ? 0 : parseFloat(calc.totalMat.toFixed(2)),
       data: {
         ...state,
         ihData: ihTab,
