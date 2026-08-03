@@ -1,5 +1,6 @@
 import WorkTypeChooser from './WorkTypeChooser'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useContext } from 'react'
+import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import ModuleNotesField from './ModuleNotesField'
@@ -622,9 +623,10 @@ function calcWalls(
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 function SectionHeader({ title }) {
+  const isSub = useContext(SubTabContext)
   return (
     <div className="bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200 mb-2">
-      <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wider">{title}</h3>
+      <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wider">{subSectionTitle(title, isSub)}</h3>
     </div>
   )
 }
@@ -1632,6 +1634,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
   }
 
   return (
+    <SubTabContext.Provider value={isSub}>
     <div className="space-y-5">
       {/* ── Sticky GPMD bar ── */}
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
@@ -2262,5 +2265,6 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
         </button>
       </div>
     </div>
+    </SubTabContext.Provider>
   )
 }

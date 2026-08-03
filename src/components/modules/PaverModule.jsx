@@ -33,7 +33,8 @@ import WorkTypeChooser from './WorkTypeChooser'
 // Paver prices from paver_prices table: brand, name, price_per_sf,
 //   sf_per_pallet, price_per_lf_vert
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useContext } from 'react'
+import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import ModuleNotesField from './ModuleNotesField'
@@ -568,9 +569,10 @@ const DEFAULT_STATE = {
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
 function SecHdr({ title, sub }) {
+  const isSub = useContext(SubTabContext)
   return (
     <div className="flex items-center gap-2 col-span-full text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-1">
-      {title}
+      {subSectionTitle(title, isSub)}
       {sub && <span className="ml-2 font-normal normal-case text-gray-400">{sub}</span>}
     </div>
   )
@@ -1081,6 +1083,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   }
 
   return (
+    <SubTabContext.Provider value={isSub}>
     <div className="space-y-4">
       {/* ── Sticky GPMD bar ── */}
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
@@ -1226,7 +1229,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       {/* ── Paver Material — In-House + Subcontractor (materials on both tabs) ──── */}
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Paver Material</span>
+          <span>{subSectionTitle('Paver Material', isSub)}</span>
           {calc.matInstallSF > 0 && (
             <span className="font-normal normal-case text-gray-400">
               {calc.matInstallSF.toLocaleString()} SF total
@@ -1331,7 +1334,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       {/* ── Base Material — In-House + Subcontractor ──────────────────────────── */}
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Base Material</span>
+          <span>{subSectionTitle('Base Material', isSub)}</span>
           {calc.totalBaseTons > 0 && (
             <span className="font-normal normal-case text-gray-400">
               {calc.totalBaseTons.toFixed(1)} tons base
@@ -1476,7 +1479,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       {/* ── Paver Labor (In-House) / Paver/Demo Installation (Sub) ─────────── */}
       <div>
         <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          {isSub ? 'Paver/Demo Installation' : 'Paver Labor'}
+          {subSectionTitle(isSub ? 'Paver/Demo Installation' : 'Paver Labor', isSub)}
           {!isSub && (
             <span className="ml-2 font-normal normal-case text-gray-400">
               {calc.installRate} SF/hr install · {calc.straightCutRate}/{calc.curvedCutRate} LF/hr
@@ -1875,7 +1878,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       {!isSub && (
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="col-span-full flex items-center flex-wrap gap-x-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-1">
-          <span>Vertical Soldier Course</span>
+          <span>{subSectionTitle('Vertical Soldier Course', isSub)}</span>
           <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
             {calc.vertSoldierRate} LF/hr
             <RateEditPopover
@@ -2010,7 +2013,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       {/* ── Manual Entry ──────────────────────────────────────────────────────── */}
       <div>
         <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          Manual Entry
+          {subSectionTitle('Manual Entry', isSub)}
         </div>
         <table className="w-full text-xs">
           <TH
@@ -2174,5 +2177,6 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         </button>
       </div>
     </div>
+    </SubTabContext.Provider>
   )
 }

@@ -17,7 +17,8 @@ import WorkTypeChooser from './WorkTypeChooser'
 //   • Misc Flat/Vert/Footing carry $36.21/ton concrete dump fee
 //   • Trees use $125.33/ton 'Demo - Mini Dump - Tree/Stump'
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useContext } from 'react'
+import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import ModuleNotesField from './ModuleNotesField'
@@ -632,9 +633,10 @@ const DEFAULT_STATE = {
 // ── UI helpers ────────────────────────────────────────────────────────────────
 
 function SecHdr({ title }) {
+  const isSub = useContext(SubTabContext)
   return (
     <div className="bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200 mb-2">
-      <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wider">{title}</h3>
+      <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wider">{subSectionTitle(title, isSub)}</h3>
     </div>
   )
 }
@@ -895,6 +897,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
   }
 
   return (
+    <SubTabContext.Provider value={isSub}>
     <SubRateOverrideProvider overrides={state.rateOverrides} setOverride={setOverride}>
     <div className="space-y-4">
       {/* ── Sticky GPMD bar ── */}
@@ -1125,7 +1128,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       {/* Demolition */}
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Demolition</span>
+          <span>{subSectionTitle('Demolition', isSub)}</span>
           {isSelf ? (
             <>
               <span className="font-normal normal-case">· Container ${calc.containerPrice}</span>
@@ -1340,7 +1343,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       {/* Misc Flat */}
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Misc Flat Demo{isSelf ? ` — ${calc.laborMiscFlat} hr/100sf·in` : ''}</span>
+          <span>{subSectionTitle('Misc Flat Demo', isSub)}{isSelf ? ` — ${calc.laborMiscFlat} hr/100sf·in` : ''}</span>
           {isSelf && (
             <>
               <RateEditPopover
@@ -1441,7 +1444,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       {/* Misc Vertical */}
       <div className={isSub ? 'hidden' : undefined}>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Misc Vertical / Structural Demo</span>
+          <span>{subSectionTitle('Misc Vertical / Structural Demo', isSub)}</span>
           {isSelf && (
             <>
               <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborMiscVert} hr/100sf·in equiv</span>
@@ -1521,7 +1524,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       {/* Footing */}
       <div className={isSub ? 'hidden' : undefined}>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Footing Demo</span>
+          <span>{subSectionTitle('Footing Demo', isSub)}</span>
           {isSelf && (
             <>
               <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborFooting} hr/100sf·in equiv</span>
@@ -1641,7 +1644,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       {/* Grading */}
       <div>
         <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          Grading
+          {subSectionTitle('Grading', isSub)}
         </div>
         {isSelf && (
         <table className="w-full text-xs">
@@ -1934,7 +1937,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       {/* Trees */}
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Tree Demo — qty × height × size multiplier</span>
+          <span>{subSectionTitle('Tree Demo', isSub)} — qty × height × size multiplier</span>
           {isSelf && (
           <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
             (S:{calc.treeSmall}
@@ -2059,7 +2062,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       {/* Manual */}
       <div>
         <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          Manual Entry
+          {subSectionTitle('Manual Entry', isSub)}
         </div>
         <table className="w-full text-xs">
           <TH
@@ -2186,5 +2189,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       </div>
     </div>
     </SubRateOverrideProvider>
+    </SubTabContext.Provider>
   )
 }

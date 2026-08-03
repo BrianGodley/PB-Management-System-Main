@@ -27,7 +27,8 @@ import WorkTypeChooser from './WorkTypeChooser'
 //   subTab). The Sub tab prices each row at a flat $/unit with NO labor hours and
 //   routes the itemized cost into subCost (GpmdBar's 'sub' variant).
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useContext } from 'react'
+import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import ModuleNotesField from './ModuleNotesField'
@@ -378,9 +379,10 @@ function makeTab(src = {}) {
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
 function SecHdr({ title }) {
+  const isSub = useContext(SubTabContext)
   return (
     <div className="bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200 mb-2">
-      <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wider">{title}</h3>
+      <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wider">{subSectionTitle(title, isSub)}</h3>
     </div>
   )
 }
@@ -668,6 +670,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
   }
 
   return (
+    <SubTabContext.Provider value={isSub}>
     <div className="space-y-4">
       {/* ── Sticky GPMD bar ── */}
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
@@ -753,7 +756,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
       {/* Zones */}
       <div>
         <div className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-5 mb-2 flex items-center flex-wrap gap-x-2 gap-y-1">
-          <span>Irrigation Zones —</span>
+          <span>{subSectionTitle('Irrigation Zones', isSub)} —</span>
           <span className="inline-flex items-center gap-1">
             Hand: {calc.handRate} hrs/zone
             <RateEditPopover
@@ -882,7 +885,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
       {/* Timers */}
       <div>
         <div className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-5 mb-2 flex items-center gap-2">
-          <span>Controllers / Timers — {calc.timerHrs} hrs install each</span>
+          <span>{subSectionTitle('Controllers / Timers', isSub)} — {calc.timerHrs} hrs install each</span>
           <RateEditPopover
             table="labor_rates"
             name="Irrigation - Timer Install"
@@ -1055,5 +1058,6 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
         </button>
       </div>
     </div>
+    </SubTabContext.Provider>
   )
 }

@@ -11,7 +11,8 @@ import WorkTypeChooser from './WorkTypeChooser'
 //   • No Skid Steer Compaction row
 //   • Adds "Hand Bucket Areas" section (tight access; rate 0.38 t/hr)
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useContext } from 'react'
+import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import ModuleNotesField from './ModuleNotesField'
@@ -600,9 +601,10 @@ const DEFAULT_STATE = {
 // ── Shared UI helpers ─────────────────────────────────────────────────────────
 
 function SecHdr({ title }) {
+  const isSub = useContext(SubTabContext)
   return (
     <div className="bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200 mb-2">
-      <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wider">{title}</h3>
+      <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wider">{subSectionTitle(title, isSub)}</h3>
     </div>
   )
 }
@@ -856,6 +858,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
   }
 
   return (
+    <SubTabContext.Provider value={isSub}>
     <SubRateOverrideProvider overrides={state.rateOverrides} setOverride={setOverride}>
     <div className="space-y-4">
       {/* ── Sticky GPMD bar ── */}
@@ -1050,7 +1053,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       {/* Demolition */}
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Demolition</span>
+          <span>{subSectionTitle('Demolition', isSub)}</span>
           {isSelf && (
             <>
               <span className="font-normal normal-case">Container ${calc.containerPrice}</span>
@@ -1216,7 +1219,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       {/* Misc Flat */}
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Misc Flat Demo</span>
+          <span>{subSectionTitle('Misc Flat Demo', isSub)}</span>
           {isSelf && (
             <>
               <span className="text-gray-400 font-normal">·</span>
@@ -1305,7 +1308,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       {/* Misc Vertical */}
       <div className={isSub ? 'hidden' : undefined}>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Misc Vertical / Structural Demo</span>
+          <span>{subSectionTitle('Misc Vertical / Structural Demo', isSub)}</span>
           {isSelf && (
             <>
               <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborMiscVert} hr/100sf·in equiv</span>
@@ -1370,7 +1373,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       {/* Footing */}
       <div className={isSub ? 'hidden' : undefined}>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Footing Demo</span>
+          <span>{subSectionTitle('Footing Demo', isSub)}</span>
           {isSelf && (
             <>
               <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborFooting} hr/100sf·in equiv</span>
@@ -1435,7 +1438,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       {/* Hand Bucket Areas */}
       <div className={isSub ? 'hidden' : undefined}>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Hand Bucket Areas</span>
+          <span>{subSectionTitle('Hand Bucket Areas', isSub)}</span>
           {isSelf && (
             <>
               <span className="font-normal normal-case text-gray-500">· tight/confined access · 2 × concrete rate = {calc.laborBucket} hr/100sf·in</span>
@@ -1535,7 +1538,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       {/* Grading */}
       <div>
         <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          Grading
+          {subSectionTitle('Grading', isSub)}
         </div>
         {isSelf && (
         <table className="w-full text-xs">
@@ -1816,7 +1819,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       {/* Trees */}
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Tree Demo</span>
+          <span>{subSectionTitle('Tree Demo', isSub)}</span>
           {isSelf && (
             <>
           <span className="font-normal normal-case text-gray-500">· qty × height × size multiplier</span>
@@ -1950,7 +1953,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       {/* Manual */}
       <div>
         <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          Manual Entry
+          {subSectionTitle('Manual Entry', isSub)}
         </div>
         <table className="w-full text-xs">
           <TH
@@ -2077,5 +2080,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       </div>
     </div>
     </SubRateOverrideProvider>
+    </SubTabContext.Provider>
   )
 }
