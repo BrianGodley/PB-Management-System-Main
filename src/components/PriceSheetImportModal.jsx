@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { topCandidates } from '../lib/matchScore'
 import VendorCombo from './VendorCombo'
 import QuickAddVendorModal from './QuickAddVendorModal'
 
@@ -35,7 +36,9 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
   const [file, setFile] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [rows, setRows] = useState([]) // { item, unit, unit_price, matchId, matchName, current, action, category }
+  const [rows, setRows] = useState([]) // { item, unit, unit_price, matchId, matchName, current, action, category, suggestion? }
+  const [allMaterials, setAllMaterials] = useState([]) // broad candidate pool for fuzzy "same product" matches
+  const [reconciling, setReconciling] = useState(false)
   const [applied, setApplied] = useState({ updated: 0, added: 0, unchanged: 0 })
   const [bulkCat, setBulkCat] = useState('')
   const [bulkSub, setBulkSub] = useState('')
@@ -122,6 +125,15 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
         .eq('vendor_id', vendorId)
       const byNorm = new Map((existing || []).map(m => [norm(m.name), m]))
 
+      // Broad candidate pool across ALL vendors — used to propose fuzzy
+      // "same product" matches (e.g. a catalog item that has a photo but no
+      // price yet) so we can merge price in instead of creating a duplicate.
+      const { data: pool } = await supabase
+        .from('material_rates')
+        .select('id, name, sku, category, sub_category, unit_cost, photo_url')
+        .limit(5000)
+      setAllMaterials(pool || [])
+
       const merged = extracted.map(r => {
         const key = norm(`${r.item} ${r.notes || ''}`)
         const hit = byNorm.get(norm(r.item)) || byNorm.get(key) || null
@@ -204,6 +216,134 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
     } finally {
       setBusy(false)
     }
+  }
+
+  // Reconcile pass — for every still-"add" row, propose a fuzzy "same product"
+  // match from the broad candidate pool so the user can merge the price into an
+  // existing (catalog) row rather than creating a duplicate. Sam ranks the
+  // candidates; on any failure we degrade to the top fuzzy candidate.
+  async function runReconcile() {
+    if (reconciling) return
+    setError('')
+    setReconciling(true)
+    try {
+      // Build the payload: only rows that are still 'add', have a name, and
+      // have at least one fuzzy candidate above the floor.
+      const scored = rows.map((r, i) => {
+        if (r.action !== 'add' || !String(r.item || '').trim()) return null
+        const cands = topCandidates(
+          { name: r.item, sku: r.sku, category: r.category },
+          allMaterials,
+          { limit: 6, floor: 0.4 }
+        )
+        if (!cands.length) return null
+        return { index: i, row: r, cands }
+      }).filter(Boolean)
+
+      if (!scored.length) {
+        // Nothing to propose — clear any stale suggestions and bail.
+        setRows(rs => rs.map(r => (r.suggestion ? { ...r, suggestion: null } : r)))
+        return
+      }
+
+      const byId = new Map(allMaterials.map(m => [m.id, m]))
+      const items = scored.map(({ index, row, cands }) => ({
+        index,
+        name: row.item,
+        sku: row.sku || '',
+        category: row.category || '',
+        sub_category: row.sub_category || '',
+        unit: row.unit || '',
+        price: row.unit_price,
+        candidates: cands.map(({ candidate: c }) => ({
+          id: c.id,
+          name: c.name,
+          sku: c.sku || '',
+          category: c.category || '',
+          sub_category: c.sub_category || '',
+          unit_cost: c.unit_cost,
+          has_photo: !!c.photo_url,
+        })),
+      }))
+
+      // Ask Sam to rank; degrade gracefully to the top fuzzy candidate.
+      let matchByIndex = new Map()
+      try {
+        const { data, error: fnErr } = await supabase.functions.invoke('reconcile-materials', {
+          body: { items },
+        })
+        if (fnErr) throw new Error(fnErr.message || 'Reconcile failed.')
+        if (data?.error) throw new Error(data.error)
+        matchByIndex = new Map((data?.matches || []).map(m => [m.index, m]))
+      } catch {
+        // Fall through to the fuzzy fallback below (matchByIndex stays empty).
+        matchByIndex = new Map()
+      }
+
+      // Build a suggestion per scored row.
+      const suggestionByIndex = new Map()
+      for (const { index, cands } of scored) {
+        const m = matchByIndex.get(index)
+        const top = cands[0]
+        let candId = null, confidence = null, reason = ''
+        if (m && m.candidate_id) {
+          candId = m.candidate_id
+          confidence = typeof m.confidence === 'number' ? m.confidence : (top ? top.score : null)
+          reason = m.reason || 'name similarity'
+        } else if (!m && top && top.score >= 0.6) {
+          // Sam call failed entirely → fuzzy fallback (only if strong enough).
+          candId = top.candidate.id
+          confidence = top.score
+          reason = 'name similarity'
+        }
+        // If Sam explicitly returned candidate_id null, we leave candId null (no
+        // suggestion). If the call failed, m is undefined → fallback above.
+        if (!candId) continue
+        const c = byId.get(candId)
+        if (!c) continue
+        suggestionByIndex.set(index, {
+          candidateId: candId,
+          candidateName: c.name,
+          candidatePhoto: c.photo_url || null,
+          candidateCost: c.unit_cost,
+          confidence,
+          reason,
+        })
+      }
+
+      setRows(rs =>
+        rs.map((r, i) => {
+          if (r.action !== 'add') return r.suggestion ? { ...r, suggestion: null } : r
+          const s = suggestionByIndex.get(i)
+          return { ...r, suggestion: s || null }
+        })
+      )
+    } catch (e) {
+      setError(String(e.message || e))
+    } finally {
+      setReconciling(false)
+    }
+  }
+
+  // Accept a suggestion → route the row through the existing update-in-place
+  // apply path (merge the sheet price into the existing catalog row).
+  function acceptSuggestion(i) {
+    setRows(rs =>
+      rs.map((r, idx) => {
+        if (idx !== i || !r.suggestion) return r
+        const cost = Number(r.suggestion.candidateCost)
+        const action = cost === Number(r.unit_price) ? 'unchanged' : 'update'
+        return {
+          ...r,
+          matchId: r.suggestion.candidateId,
+          matchName: r.suggestion.candidateName,
+          current: Number.isFinite(cost) ? cost : null,
+          action,
+          reviewed: true,
+          suggestion: null,
+        }
+      })
+    )
   }
 
   async function apply() {
@@ -434,6 +574,15 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                 </select>
                 <button onClick={runSearch} className="px-3 py-1 bg-gray-800 text-white rounded hover:bg-gray-900 font-semibold">Search</button>
                 <button onClick={() => { setFilterDraft({ text: '', price: '', status: 'all' }); setFilter({ text: '', price: '', status: 'all' }); setExcluded(new Set()) }} className="text-gray-500 hover:underline">Clear</button>
+                <button
+                  onClick={runReconcile}
+                  disabled={reconciling || counts.added === 0}
+                  title="Ask Sam to find likely same-product matches for the new items"
+                  className="px-3 py-1 rounded font-semibold text-white disabled:opacity-40"
+                  style={{ background: '#3A5038' }}
+                >
+                  {reconciling ? 'Finding matches…' : 'Find matches with Sam'}
+                </button>
                 <span className="ml-auto font-bold text-green-700">{rows.filter((r, i) => inBatch(r, i)).length} in batch</span>
               </div>
 
@@ -554,7 +703,52 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
                             className="border border-gray-200 rounded px-1.5 py-1 w-24"
                           />
                         </td>
-                        <td className="px-2 py-1.5 text-gray-800">{r.matchName || <span className="text-amber-600">— new item —</span>}</td>
+                        <td className="px-2 py-1.5 text-gray-800 align-top">
+                          {r.matchName || <span className="text-amber-600">— new item —</span>}
+                          {r.action === 'add' && r.suggestion && (
+                            <div className="mt-1 flex items-start gap-2 rounded border border-green-200 bg-green-50 px-2 py-1.5 max-w-[15rem]">
+                              {r.suggestion.candidatePhoto ? (
+                                <img
+                                  src={r.suggestion.candidatePhoto}
+                                  alt=""
+                                  className="w-10 h-10 rounded object-contain bg-white border border-gray-200 flex-shrink-0"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded bg-white border border-gray-200 flex items-center justify-center text-gray-300 text-[9px] flex-shrink-0">
+                                  no photo
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  <span className="font-semibold text-gray-800 truncate">{r.suggestion.candidateName}</span>
+                                  {r.suggestion.confidence != null && (
+                                    <span className="text-[10px] font-semibold text-white rounded px-1 py-0.5" style={{ background: '#3A5038' }}>
+                                      Sam: {Math.round(r.suggestion.confidence * 100)}%
+                                    </span>
+                                  )}
+                                </div>
+                                {r.suggestion.reason && (
+                                  <div className="text-[10px] text-gray-500 leading-tight">{r.suggestion.reason}</div>
+                                )}
+                                <div className="mt-1 flex items-center gap-2">
+                                  <button
+                                    onClick={() => acceptSuggestion(i)}
+                                    className="text-[11px] font-semibold text-white rounded px-2 py-0.5 hover:opacity-90"
+                                    style={{ background: '#3A5038' }}
+                                  >
+                                    Merge price in
+                                  </button>
+                                  <button
+                                    onClick={() => setRow(i, { suggestion: null })}
+                                    className="text-[11px] text-gray-500 hover:underline"
+                                  >
+                                    Keep as new
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </td>
                         <td className="px-2 py-1.5 text-right text-gray-700">{r.current != null ? fmt(r.current) : '—'}</td>
                         <td className="px-2 py-1.5 text-right font-semibold text-gray-800">{fmt(r.unit_price)}</td>
                         <td className={`px-2 py-1.5 text-right ${delta > 0 ? 'text-red-600' : delta < 0 ? 'text-green-600' : 'text-gray-500'}`}>

@@ -9,6 +9,7 @@
 // (feet by default); sheet.view.scale = paper inches per world unit.
 
 import { jsPDF } from 'jspdf'
+import { SCALE_PRESETS as SHARED_SCALES, scaleLabel as sharedScaleLabel } from './scales'
 
 // Portrait dimensions (w × h) in inches. Orientation swaps them.
 export const PAPER_SIZES = {
@@ -21,23 +22,8 @@ export const PAPER_SIZES = {
   ANSI_D:  { label: 'ANSI D (22×34)',   w: 22,   h: 34 },
 }
 
-// Scale presets → paper inches per 1 world foot. Assumes world unit = ft.
-export const SCALE_PRESETS = [
-  { label: '3/32" = 1\'', inPerFt: 3 / 32 },
-  { label: '1/8" = 1\'',  inPerFt: 1 / 8 },
-  { label: '3/16" = 1\'', inPerFt: 3 / 16 },
-  { label: '1/4" = 1\'',  inPerFt: 1 / 4 },
-  { label: '3/8" = 1\'',  inPerFt: 3 / 8 },
-  { label: '1/2" = 1\'',  inPerFt: 1 / 2 },
-  { label: '3/4" = 1\'',  inPerFt: 3 / 4 },
-  { label: '1" = 1\'',    inPerFt: 1 },
-  { label: '1" = 10\'',   inPerFt: 1 / 10 },
-  { label: '1" = 20\'',   inPerFt: 1 / 20 },
-  { label: '1" = 30\'',   inPerFt: 1 / 30 },
-  { label: '1" = 40\'',   inPerFt: 1 / 40 },
-  { label: '1" = 50\'',   inPerFt: 1 / 50 },
-  { label: '1" = 100\'',  inPerFt: 1 / 100 },
-]
+// Scale presets → paper inches per 1 world foot (shared canonical list).
+export const SCALE_PRESETS = SHARED_SCALES
 
 export const MARGIN = 0.5 // inches
 
@@ -109,10 +95,9 @@ export function fitView(entities, sheet) {
   return { cx: (bb.minx + bb.maxx) / 2, cy: (bb.miny + bb.maxy) / 2, scale: s }
 }
 
-// Human label for the current numeric scale (nearest preset, else raw).
+// Human label for the current numeric scale (shared canonical labels).
 export function scaleLabel(scale) {
-  for (const p of SCALE_PRESETS) if (Math.abs(p.inPerFt - scale) < 1e-6) return p.label
-  return `${(scale).toFixed(4)} in/unit`
+  return sharedScaleLabel(scale)
 }
 
 function hexToRgb(hex) {

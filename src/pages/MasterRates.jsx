@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import PriceSheetImportModal from '../components/PriceSheetImportModal'
+import VendorCatalogImportModal from '../components/VendorCatalogImportModal'
+import MergeDuplicatesModal from '../components/MergeDuplicatesModal'
 
 // ── Which estimate modules consume a given rate ──────────────────────────────
 // Most rates carry a `category` that IS the module; a few categories / vendor
@@ -488,6 +490,8 @@ export default function MasterRates({ only } = {}) {
   const [activeTabState, setActiveTab] = useState('materials')
   const activeTab = only || activeTabState
   const [showImport, setShowImport] = useState(false)
+  const [showMerge, setShowMerge] = useState(false)
+  const [showCatalog, setShowCatalog] = useState(false)
   const [materials, setMaterials] = useState([])
   const [labor, setLabor] = useState([])
   const [subs, setSubs] = useState([])
@@ -729,12 +733,26 @@ export default function MasterRates({ only } = {}) {
         <div className="flex items-center justify-between mb-4">
           {!only ? <h1 className="text-xl font-bold text-gray-900">Master Rates</h1> : <span />}
           {activeTab === 'materials' && (
-            <button
-              onClick={() => setShowImport(true)}
-              className="text-sm bg-green-600 text-white font-semibold rounded px-4 py-1.5 hover:bg-green-700 ml-auto"
-            >
-              Import Price Sheet
-            </button>
+            <div className="flex items-center gap-2 ml-auto">
+              <button
+                onClick={() => setShowMerge(true)}
+                className="text-sm bg-white border border-green-600 text-green-700 font-semibold rounded px-4 py-1.5 hover:bg-green-50"
+              >
+                🔀 Merge duplicates
+              </button>
+              <button
+                onClick={() => setShowCatalog(true)}
+                className="text-sm bg-white border border-green-600 text-green-700 font-semibold rounded px-4 py-1.5 hover:bg-green-50"
+              >
+                Import Catalog
+              </button>
+              <button
+                onClick={() => setShowImport(true)}
+                className="text-sm bg-green-600 text-white font-semibold rounded px-4 py-1.5 hover:bg-green-700"
+              >
+                Import Price Sheet
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -744,6 +762,16 @@ export default function MasterRates({ only } = {}) {
           onClose={() => setShowImport(false)}
           onApplied={fetchAll}
         />
+      )}
+      {showCatalog && (
+        <VendorCatalogImportModal
+          vendors={vendors}
+          onClose={() => setShowCatalog(false)}
+          onImported={fetchAll}
+        />
+      )}
+      {showMerge && (
+        <MergeDuplicatesModal onClose={() => setShowMerge(false)} onMerged={fetchAll} />
       )}
 
       {/* Tabs (hidden when embedded as a single-table view) */}
