@@ -370,7 +370,10 @@ function calcPlanting(
     manDays = 0
     laborCost = 0
     burden = 0
-    totalMat = totalSubMat
+    // In-house materials are 0 on the Sub tab — the sub materials live entirely
+    // in subCost. (Keeping them in totalMat made them show as "In-House
+    // Materials" and pulled sales tax onto the in-house side.)
+    totalMat = 0
     gp = 0
     subCost = totalSubMat + manSub + craneSub
     subGp = subCost * subMarkup

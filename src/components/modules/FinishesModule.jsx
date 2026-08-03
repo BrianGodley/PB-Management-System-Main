@@ -344,7 +344,9 @@ function calcFinishes(
     manDays = 0
     laborCost = 0
     burden = 0
-    totalMat = totalSubMat // shown as the sub material readout
+    // In-house materials are 0 on the Sub tab — sub materials live in subCost
+    // (shown under "Subs"), so they don't double-appear or pull tax in-house.
+    totalMat = 0
     gp = 0
     subCost = totalSubMat + manSub
     subGp = subCost * subMarkup
