@@ -444,7 +444,7 @@ function makeTab(data = {}) {
       'Infinity Basin': defaultInteriorStruct(),
       'Cover Vault': defaultInteriorStruct(),
     },
-    equipment: data.equipment ?? [],
+    equipment: data.equipment ?? [newEquipRow(), newEquipRow()],
     plumbing: data.plumbing ?? {
       baseType: 'Pool Only',
       over20ft: false,
@@ -1806,7 +1806,8 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         </div>
       </div>
 
-      {/* ─── 8. Interior Finish ─── */}
+      {/* ─── 8. Interior Finish — Sub tab only ─── */}
+      {isSub && (
       <div>
         <SectionHeader title="Interior Finish (Sub)" />
         <div className="space-y-3">
@@ -1884,10 +1885,11 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             })}
         </div>
       </div>
+      )}
 
-      {/* ─── 9. Pool Equipment (Sub) ─── */}
+      {/* ─── 9. Pool Equipment — "(Sub)" only on the Sub tab ─── */}
       <div>
-        <SectionHeader title="Pool Equipment (Sub)" />
+        <SectionHeader title={`Pool Equipment${isSub ? ' (Sub)' : ''}`} />
         <div className="space-y-2">
           {T.equipment.map((eq, i) => {
             const models = EQUIPMENT_CATALOG[eq.category] || []
@@ -1949,24 +1951,27 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                 </div>
                 <div>
                   <Label text="Unit $" />
-                  <div className="relative">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                      $
-                    </span>
-                    <NumInput
-                      value={eq.unitCost}
-                      onChange={v => updEquip(i, 'unitCost', v)}
-                      className="pl-5"
-                    />
+                  <div className="flex items-center gap-1">
+                    <div className="relative flex-1 min-w-0">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                        $
+                      </span>
+                      <NumInput
+                        value={eq.unitCost}
+                        onChange={v => updEquip(i, 'unitCost', v)}
+                        className="pl-5"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeEquip(i)}
+                      title="Remove row"
+                      className="text-gray-300 hover:text-red-400 text-lg leading-none shrink-0"
+                    >
+                      ✕
+                    </button>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => removeEquip(i)}
-                  className="text-gray-300 hover:text-red-400 text-lg pb-1"
-                >
-                  ✕
-                </button>
               </div>
             )
           })}
