@@ -10830,7 +10830,7 @@ export default function Statistics() {
       )}
       {/* ── GROUP VIEW (grid of mini graphs) ─────────────────────────────── */}
       {viewMode === 'graphs' && showGroupView && (
-        <div className="flex-1 overflow-y-auto bg-gray-100">
+        <div className="flex-1 overflow-y-auto">
           {/* Sticky (frozen) group tab bar — stays put while the grid scrolls. */}
           <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-3 py-2 flex items-center gap-2 flex-wrap">
             <button
