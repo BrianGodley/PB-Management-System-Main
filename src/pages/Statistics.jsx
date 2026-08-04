@@ -8806,6 +8806,109 @@ function ArchivedView({ onRestored }) {
   )
 }
 
+// ── StatMiniGraph ─────────────────────────────────────────────────────────────
+// Lightweight per-stat card used by the Group View grid. Computes a
+// {label, value} period series from this ONE stat's values (same period-matching
+// logic as the main chartData / EditValueHistoryModal), holds its own from/to
+// date window driven by the shared DateRangeScrubber, and renders a compact
+// recharts line chart with visible X + Y axes. No target lines, overlays,
+// upside-down, notes, or cursor — just the line + axes + slider.
+function StatMiniGraph({ stat, values, weekEndingDay }) {
+  // Full date extent of this stat's values. Fall back to a 90-day window so the
+  // scrubber always has a valid, non-zero span even when there's no data yet.
+  const dateExtent = useMemo(() => {
+    const dates = (values || []).map(v => v.period_date).filter(Boolean).sort()
+    if (!dates.length) return { min: daysAgo(90), max: today() }
+    return { min: dates[0], max: dates[dates.length - 1] }
+  }, [values])
+
+  const [from, setFrom] = useState(dateExtent.min)
+  const [to, setTo] = useState(dateExtent.max)
+
+  // Reset this card's window to the full extent whenever the underlying data
+  // changes (group tab / tracking switch delivering a fresh slice).
+  useEffect(() => {
+    setFrom(dateExtent.min)
+    setTo(dateExtent.max)
+  }, [dateExtent.min, dateExtent.max])
+
+  // Period series for this card's window — walk every period in [from,to] for
+  // the stat's tracking and pull the value whose date matches that bucket.
+  const data = useMemo(() => {
+    const wed = weekEndingDay ?? 5
+    const periods = generatePeriods(from, to, stat.tracking, wed)
+    return periods.map(p => {
+      const match = (values || []).find(v => matchesPeriod(v.period_date, p, stat.tracking, wed))
+      return { label: periodLabel(p, stat.tracking), value: match ? Number(match.value) : null }
+    })
+  }, [values, from, to, stat.tracking, weekEndingDay])
+
+  const hasData = data.some(d => d.value != null)
+  // Clamp the scrubber props defensively so a stale from/to can never fall
+  // outside the current extent (which would break the handle math).
+  const fromClamped = from < dateExtent.min ? dateExtent.min : from > dateExtent.max ? dateExtent.max : from
+  const toClamped = to > dateExtent.max ? dateExtent.max : to < dateExtent.min ? dateExtent.min : to
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col">
+      <div className="px-3 pt-2 pb-1 border-b border-gray-100">
+        <div className="text-xs font-semibold text-gray-800 truncate" title={stat.name}>
+          {stat.name}
+        </div>
+        <div className="text-[10px] text-gray-400 capitalize">{stat.tracking}</div>
+      </div>
+      {/* Per-card date window slider — the same scrubber the main graph uses. */}
+      <DateRangeScrubber
+        minDate={dateExtent.min}
+        maxDate={dateExtent.max}
+        fromDate={fromClamped}
+        toDate={toClamped}
+        onFromChange={setFrom}
+        onToChange={setTo}
+      />
+      <div className="px-1 pb-2" style={{ height: 150 }}>
+        {hasData ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data} margin={{ top: 6, right: 10, bottom: 4, left: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 8, fill: '#9ca3af' }}
+                interval="preserveStartEnd"
+                minTickGap={12}
+                height={18}
+              />
+              <YAxis
+                tick={{ fontSize: 8, fill: '#9ca3af' }}
+                width={40}
+                tickFormatter={v => fmtShort(v, stat.stat_type)}
+              />
+              <Tooltip
+                formatter={v => fmt(v, stat.stat_type)}
+                labelStyle={{ fontSize: 11 }}
+                contentStyle={{ fontSize: 11, padding: '4px 8px' }}
+              />
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke={FG}
+                strokeWidth={2}
+                dot={false}
+                connectNulls
+                isAnimationActive={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="h-full flex items-center justify-center text-[11px] text-gray-300">
+            No data
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Main Statistics Page ──────────────────────────────────────────────────────
 export default function Statistics() {
   const { user } = useAuth()
@@ -8862,6 +8965,15 @@ export default function Statistics() {
   // the sidebar list only shows stats whose id is in that group's stat_ids.
   const [statGroups, setStatGroups] = useState([])
   const [filterGroupId, setFilterGroupId] = useState(null) // null = no filter
+  // ── Group View (grid of miniaturised stat graphs) ─────────────────────────
+  // Toggles the graphs body between the normal list/chart split and a grid of
+  // per-stat mini charts, tabbed by stat group.
+  const [showGroupView, setShowGroupView] = useState(false)
+  const [groupViewGroupId, setGroupViewGroupId] = useState(null) // null = All
+  const [groupViewValues, setGroupViewValues] = useState([]) // values for all shown stats
+  const [groupViewLoading, setGroupViewLoading] = useState(false)
+  // Customize popover (default-stat picker) anchored to the stat-list header.
+  const [showCustomize, setShowCustomize] = useState(false)
   const [showShares, setShowShares] = useState(false)
   const [userShares, setUserShares] = useState({}) // statId -> 'view'|'edit' for the current user
   // When the Shared Permissions button is clicked from inside a stat-edit
@@ -9844,6 +9956,54 @@ export default function Statistics() {
     statGroups,
   ])
 
+  // ── Group View data ───────────────────────────────────────────────────────
+  // Stats shown in the Group View grid — "All" = every accessible (active,
+  // non-archived) stat; a specific group = its stat_ids ∩ accessible list.
+  // Mirrors the same group→stats membership the sidebar filterGroupId uses.
+  const groupViewStats = useMemo(() => {
+    if (!showGroupView) return []
+    if (groupViewGroupId === null) return accessibleStats
+    const g = (statGroups || []).find(x => x.id === groupViewGroupId)
+    const ids = new Set((g?.stat_ids || []).map(Number))
+    return accessibleStats.filter(s => ids.has(Number(s.id)))
+  }, [showGroupView, groupViewGroupId, accessibleStats, statGroups])
+
+  // Load every value for the stats currently on the grid in a single query,
+  // then slice per-stat below. Re-runs when the grid opens / group / stats change.
+  useEffect(() => {
+    if (!showGroupView) return
+    const ids = groupViewStats.map(s => s.id)
+    if (!ids.length) {
+      setGroupViewValues([])
+      return
+    }
+    let cancelled = false
+    setGroupViewLoading(true)
+    supabase
+      .from('statistic_values')
+      .select('statistic_id, period_date, value')
+      .in('statistic_id', ids)
+      .order('period_date')
+      .then(({ data }) => {
+        if (cancelled) return
+        setGroupViewValues(data || [])
+        setGroupViewLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [showGroupView, groupViewStats])
+
+  // statId → its slice of the loaded values.
+  const groupViewValuesByStat = useMemo(() => {
+    const m = new Map()
+    for (const v of groupViewValues) {
+      if (!m.has(v.statistic_id)) m.set(v.statistic_id, [])
+      m.get(v.statistic_id).push(v)
+    }
+    return m
+  }, [groupViewValues])
+
   // Period hierarchy — used to determine valid aggregation options
   const PERIOD_ORDER = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly']
 
@@ -10566,8 +10726,92 @@ export default function Statistics() {
           </div>
         </div>
       )}
+      {/* ── GROUP VIEW (grid of mini graphs) ─────────────────────────────── */}
+      {viewMode === 'graphs' && showGroupView && (
+        <div className="flex-1 overflow-y-auto bg-gray-50">
+          {/* Sticky (frozen) group tab bar — stays put while the grid scrolls. */}
+          <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-3 py-2 flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setShowGroupView(false)}
+              title="Back to the stat list"
+              className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold border border-gray-300 text-gray-600 bg-white hover:bg-gray-50 transition-colors flex-shrink-0"
+            >
+              <span className="text-base leading-none font-black">‹</span>
+              List View
+            </button>
+            <div className="w-px h-5 bg-gray-200 mx-0.5 hidden sm:block" />
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                onClick={() => setGroupViewGroupId(null)}
+                className={`px-3 py-1 rounded text-xs font-semibold border transition-colors ${
+                  groupViewGroupId === null
+                    ? 'text-white border-transparent'
+                    : 'text-gray-500 border-gray-200 bg-white hover:border-green-400 hover:text-green-700'
+                }`}
+                style={groupViewGroupId === null ? { backgroundColor: FG, borderColor: FG } : {}}
+              >
+                All
+              </button>
+              {(statGroups || []).map(g => (
+                <button
+                  key={g.id}
+                  onClick={() => setGroupViewGroupId(g.id)}
+                  title={g.name}
+                  className={`px-3 py-1 rounded text-xs font-semibold border transition-colors max-w-[12rem] truncate ${
+                    groupViewGroupId === g.id
+                      ? 'text-white border-transparent'
+                      : 'text-gray-500 border-gray-200 bg-white hover:border-green-400 hover:text-green-700'
+                  }`}
+                  style={groupViewGroupId === g.id ? { backgroundColor: FG, borderColor: FG } : {}}
+                >
+                  {g.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-4">
+            {groupViewLoading ? (
+              <div className="flex items-center justify-center py-24 text-gray-400">
+                <svg className="animate-spin h-6 w-6" viewBox="0 0 24 24" fill="none">
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
+                </svg>
+              </div>
+            ) : groupViewStats.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center text-gray-400">
+                <div className="text-4xl mb-3">📊</div>
+                <p className="text-sm font-medium">No statistics in this group</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {groupViewStats.map(s => (
+                  <StatMiniGraph
+                    key={s.id}
+                    stat={s}
+                    values={groupViewValuesByStat.get(s.id) || []}
+                    weekEndingDay={weekEndingDay}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── BODY (Graphs mode only) ──────────────────────────────────────── */}
-      {viewMode === 'graphs' && (
+      {viewMode === 'graphs' && !showGroupView && (
         <div className="flex flex-1 overflow-hidden">
           {/* ── LEFT PANEL ─────────────────────────────────────────────────── */}
           {/* On phones, once a stat is picked the chart takes over the whole
@@ -10576,6 +10820,72 @@ export default function Statistics() {
           <aside
             className={`${selectedStat ? 'hidden md:flex' : 'flex'} w-full md:w-56 xl:w-64 md:flex-shrink-0 flex-col bg-white border border-gray-200 overflow-hidden rounded-l-xl`}
           >
+            {/* Top bar — Group View entry + Customize (default stat) popover. */}
+            <div className="px-2 py-1.5 border-b border-gray-100 flex items-center justify-between gap-1">
+              <button
+                onClick={() => setShowGroupView(true)}
+                title="View all stats as a grid of mini graphs"
+                className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold border border-green-600 text-green-700 bg-green-50 hover:bg-green-100 transition-colors"
+              >
+                <span aria-hidden>▦</span>
+                Group View
+              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setShowCustomize(v => !v)}
+                  title="Customize — choose your default statistic"
+                  className={`px-1.5 py-1 rounded text-sm border transition-colors ${
+                    showCustomize
+                      ? 'border-green-600 text-green-700 bg-green-50'
+                      : 'border-gray-200 text-gray-400 bg-white hover:text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  <span aria-hidden>⚙</span>
+                </button>
+                {showCustomize && (
+                  <>
+                    {/* Click-catcher to dismiss the popover. */}
+                    <div className="fixed inset-0 z-20" onClick={() => setShowCustomize(false)} />
+                    <div className="absolute right-0 top-full mt-1 z-30 w-56 bg-white border border-gray-200 rounded-lg shadow-lg p-3">
+                      <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                        Default statistic
+                      </div>
+                      <select
+                        value={defaultStatId == null ? '' : String(defaultStatId)}
+                        onChange={e => {
+                          const raw = e.target.value
+                          const id = raw ? Number(raw) || raw : null
+                          if (!defaultStatKey) return
+                          if (!id) {
+                            setDefaultStatId(null)
+                            try {
+                              window.localStorage.removeItem(defaultStatKey)
+                            } catch {}
+                          } else {
+                            setDefaultStatId(id)
+                            try {
+                              window.localStorage.setItem(defaultStatKey, String(id))
+                            } catch {}
+                          }
+                        }}
+                        className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                      >
+                        <option value="">None (no default)</option>
+                        {folderStats.map(s => (
+                          <option key={s.id} value={String(s.id)}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[10px] text-gray-400 mt-1.5">
+                        This stat opens automatically next time you visit.
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
             {/* Folder rows — hidden entirely when admin disables the archive folder */}
             {showStatArchiveFolder && (
               <div className="px-2 py-2 border-b border-gray-100 space-y-0.5">
