@@ -8877,7 +8877,8 @@ function periodsBackFrom(endDateStr, count, tracking, wed) {
   return `${base.getFullYear() - back}-01-01`
 }
 
-function StatMiniGraph({ stat, values, weekEndingDay }) {
+function StatMiniGraph({ stat, values, weekEndingDay, height = 248, onExpand }) {
+  const large = height > 300
   // Full date extent of this stat's values. Fall back to a 90-day window so the
   // scrubber always has a valid, non-zero span even when there's no data yet.
   const dateExtent = useMemo(() => {
@@ -8929,11 +8930,28 @@ function StatMiniGraph({ stat, values, weekEndingDay }) {
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col">
-      <div className="px-3 pt-2 pb-1 border-b border-gray-100">
-        <div className="text-xs font-semibold text-gray-800 truncate" title={stat.name}>
-          {stat.name}
+      <div className="px-3 pt-2 pb-1 border-b border-gray-100 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold text-gray-800 truncate" title={stat.name}>
+            {stat.name}
+          </div>
+          <div className="text-[10px] text-gray-400 capitalize">{stat.tracking}</div>
         </div>
-        <div className="text-[10px] text-gray-400 capitalize">{stat.tracking}</div>
+        {onExpand && (
+          <button
+            type="button"
+            onClick={onExpand}
+            title="Expand"
+            className="flex-shrink-0 -mt-0.5 -mr-1 p-1 rounded text-gray-400 hover:text-green-700 hover:bg-green-50 transition-colors"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 3 21 3 21 9" />
+              <polyline points="9 21 3 21 3 15" />
+              <line x1="21" y1="3" x2="14" y2="10" />
+              <line x1="3" y1="21" x2="10" y2="14" />
+            </svg>
+          </button>
+        )}
       </div>
       {/* Per-card date window slider — the same scrubber the main graph uses. */}
       <DateRangeScrubber
@@ -8945,21 +8963,25 @@ function StatMiniGraph({ stat, values, weekEndingDay }) {
         onFromChange={setFrom}
         onToChange={setTo}
       />
-      <div className="px-1 pb-2" style={{ height: 150 }}>
+      <div
+        className={`px-1 pb-2 ${onExpand ? 'cursor-zoom-in' : ''}`}
+        style={{ height }}
+        onClick={onExpand}
+      >
         {hasData ? (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 6, right: 10, bottom: 4, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 8, fill: '#9ca3af' }}
+                tick={{ fontSize: large ? 11 : 8, fill: '#9ca3af' }}
                 interval="preserveStartEnd"
-                minTickGap={12}
-                height={18}
+                minTickGap={large ? 24 : 12}
+                height={large ? 24 : 18}
               />
               <YAxis
-                tick={{ fontSize: 8, fill: '#9ca3af' }}
-                width={40}
+                tick={{ fontSize: large ? 11 : 8, fill: '#9ca3af' }}
+                width={large ? 52 : 40}
                 tickFormatter={v => fmtShort(v, stat.stat_type)}
               />
               <Tooltip
@@ -8972,7 +8994,7 @@ function StatMiniGraph({ stat, values, weekEndingDay }) {
                 dataKey="value"
                 stroke={FG}
                 strokeWidth={2}
-                dot={false}
+                dot={large ? { r: 2 } : false}
                 connectNulls
                 isAnimationActive={false}
               />
@@ -9048,6 +9070,7 @@ export default function Statistics() {
   // Toggles the graphs body between the normal list/chart split and a grid of
   // per-stat mini charts, tabbed by stat group.
   const [showGroupView, setShowGroupView] = useState(false)
+  const [expandedStat, setExpandedStat] = useState(null) // mini-graph clicked → detail modal
   const [groupViewGroupId, setGroupViewGroupId] = useState(null) // null = All
   const [groupViewValues, setGroupViewValues] = useState([]) // values for all shown stats
   const [groupViewLoading, setGroupViewLoading] = useState(false)
@@ -10881,10 +10904,55 @@ export default function Statistics() {
                     stat={s}
                     values={groupViewValuesByStat.get(s.id) || []}
                     weekEndingDay={weekEndingDay}
+                    onExpand={() => setExpandedStat(s)}
                   />
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Expanded mini-stat detail modal ──────────────────────────────────
+          Clicking any mini card (or its expand icon) opens a large version of
+          the same graph for easier reading, over a dimmed backdrop. */}
+      {expandedStat && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setExpandedStat(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-gray-900 truncate" title={expandedStat.name}>
+                  {expandedStat.name}
+                </div>
+                <div className="text-[11px] text-gray-400 capitalize">{expandedStat.tracking}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExpandedStat(null)}
+                title="Close"
+                className="flex-shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-4">
+              <StatMiniGraph
+                key={`exp-${expandedStat.id}`}
+                stat={expandedStat}
+                values={groupViewValuesByStat.get(expandedStat.id) || []}
+                weekEndingDay={weekEndingDay}
+                height={460}
+              />
+            </div>
           </div>
         </div>
       )}
