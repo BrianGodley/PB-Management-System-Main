@@ -1131,196 +1131,199 @@ function DashboardSettings({
   }
 
   return (
-    <div className="w-full space-y-5">
-      {/* Dashboard Features */}
-      <div className="card">
-        <h3 className="text-sm font-bold text-gray-800 mb-3">Dashboard Features</h3>
+    <div className="w-full">
+      {/* Sub-tab bar — styled like the main tabs / other modules. */}
+      <div className="bg-white border-b border-gray-200 flex justify-center gap-0 mb-5 rounded-xl">
+        {[
+          { key: 'selection', label: 'Features Selection' },
+          { key: 'customize', label: 'Customize Features' },
+          { key: 'weather', label: 'Weather Location' },
+        ].map(t => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setSubTab(t.key)}
+            className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              subTab === t.key
+                ? 'border-green-700 text-green-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-        {/* Sub-tabs */}
-        <div className="flex gap-1 border-b border-gray-200 mb-4">
-          {[
-            { key: 'selection', label: 'Features Selection' },
-            { key: 'customize', label: 'Customize Features' },
-          ].map(t => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setSubTab(t.key)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                subTab === t.key
-                  ? 'border-green-700 text-green-700'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* ── Features Selection ── */}
-        {subTab === 'selection' && (
-          <div>
-            <p className="text-xs text-gray-500 mb-4">
-              Pick which features appear on your dashboard. Selected features are highlighted in
-              green.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {FEATURE_TYPES.map(t => {
-                const on = isTypePresent(t.type)
-                return (
-                  <div
-                    key={t.type}
-                    className={`rounded-xl border p-4 flex flex-col transition-colors ${
-                      on ? 'border-green-400 bg-green-50 ring-1 ring-green-200' : 'border-gray-200 bg-white'
+      {/* ── Features Selection ── */}
+      {subTab === 'selection' && (
+        <div className="card">
+          <p className="text-xs text-gray-500 mb-4">
+            Pick which features appear on your dashboard. Selected features are highlighted in
+            green.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {FEATURE_TYPES.map(t => {
+              const on = isTypePresent(t.type)
+              return (
+                <div
+                  key={t.type}
+                  className={`rounded-2xl border-2 aspect-square flex flex-col items-center text-center p-5 transition-colors ${
+                    on ? 'border-green-400 bg-green-50' : 'border-gray-200 bg-white'
+                  }`}
+                >
+                  <span className="text-5xl mt-3 leading-none">{t.icon}</span>
+                  <p className="mt-3 text-base font-bold text-gray-800">{t.label}</p>
+                  <p className="mt-1 text-xs text-gray-500 px-1">{t.desc}</p>
+                  <button
+                    type="button"
+                    onClick={() => toggleType(t.type)}
+                    className={`mt-auto px-8 py-2 rounded-lg text-sm font-semibold border transition-colors ${
+                      on
+                        ? 'border-red-300 text-red-600 bg-white hover:bg-red-50'
+                        : 'border-green-600 text-green-700 bg-green-50 hover:bg-green-100'
                     }`}
                   >
-                    <div className="flex items-start gap-3">
-                      <span className="text-3xl leading-none">{t.icon}</span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-gray-800">{t.label}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">{t.desc}</p>
-                      </div>
-                    </div>
+                    {on ? 'Remove' : 'Add'}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+          <div className="flex items-center gap-3 mt-5 pt-4 border-t border-gray-100">
+            <button onClick={saveStats} disabled={savingStats} className="btn-primary text-sm">
+              {savingStats ? 'Saving…' : 'Save Features'}
+            </button>
+            <SaveMsg msg={statsMsg} />
+          </div>
+        </div>
+      )}
+
+      {/* ── Customize Features ── */}
+      {subTab === 'customize' && (
+        <div className="card">
+          <p className="text-xs text-gray-500 mb-4">
+            Configure each feature — choose the statistic for stat graphs. To rearrange or resize
+            cards, use <span className="font-semibold">Edit</span> on the dashboard.
+          </p>
+          <div className="space-y-3">
+            {draft.map((f, i) => {
+              const meta = FEATURE_TYPES.find(t => t.type === f.type)
+              const usedElsewhere = draft
+                .filter((x, idx) => idx !== i && x.type === 'stat')
+                .map(x => x.statId)
+              return (
+                <div key={f.id} className="rounded-xl border border-gray-200 p-3">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-sm font-semibold text-gray-800">
+                      {meta ? `${meta.icon} ${meta.label}` : f.type}
+                    </span>
                     <button
                       type="button"
-                      onClick={() => toggleType(t.type)}
-                      className={`mt-3 self-start px-4 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-                        on
-                          ? 'border-red-300 text-red-600 bg-white hover:bg-red-50'
-                          : 'border-green-600 text-green-700 bg-green-50 hover:bg-green-100'
-                      }`}
+                      onClick={() => removeFeature(i)}
+                      title="Remove this feature"
+                      className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-colors"
                     >
-                      {on ? 'Remove' : 'Add'}
+                      ✕
                     </button>
                   </div>
-                )
-              })}
-            </div>
+
+                  {f.type === 'stat' && (
+                    <select
+                      className="input w-full"
+                      value={f.statId ?? ''}
+                      onChange={e =>
+                        patchFeature(i, {
+                          statId: e.target.value ? Number(e.target.value) : undefined,
+                        })
+                      }
+                    >
+                      <option value="">— Choose a statistic —</option>
+                      {stats
+                        .filter(st => st.id === f.statId || !usedElsewhere.includes(st.id))
+                        .map(st => (
+                          <option key={st.id} value={st.id}>
+                            {st.name}
+                            {st.stat_category ? ` (${st.stat_category})` : ''}
+                          </option>
+                        ))}
+                    </select>
+                  )}
+                </div>
+              )
+            })}
+            {draft.length === 0 && (
+              <p className="text-xs text-gray-400">
+                No features yet — add some from the Features Selection tab.
+              </p>
+            )}
           </div>
-        )}
 
-        {/* ── Customize Features ── */}
-        {subTab === 'customize' && (
-          <div>
-            <p className="text-xs text-gray-500 mb-4">
-              Configure each feature — choose the statistic for stat graphs. To rearrange or
-              resize cards, use <span className="font-semibold">Edit</span> on the dashboard.
-            </p>
-            <div className="space-y-3">
-              {draft.map((f, i) => {
-                const meta = FEATURE_TYPES.find(t => t.type === f.type)
-                const usedElsewhere = draft
-                  .filter((x, idx) => idx !== i && x.type === 'stat')
-                  .map(x => x.statId)
-                return (
-                  <div key={f.id} className="rounded-xl border border-gray-200 p-3">
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="text-sm font-semibold text-gray-800">
-                        {meta ? `${meta.icon} ${meta.label}` : f.type}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => removeFeature(i)}
-                        title="Remove this feature"
-                        className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-colors"
-                      >
-                        ✕
-                      </button>
-                    </div>
-
-                    {f.type === 'stat' && (
-                      <select
-                        className="input w-full"
-                        value={f.statId ?? ''}
-                        onChange={e =>
-                          patchFeature(i, {
-                            statId: e.target.value ? Number(e.target.value) : undefined,
-                          })
-                        }
-                      >
-                        <option value="">— Choose a statistic —</option>
-                        {stats
-                          .filter(st => st.id === f.statId || !usedElsewhere.includes(st.id))
-                          .map(st => (
-                            <option key={st.id} value={st.id}>
-                              {st.name}
-                              {st.stat_category ? ` (${st.stat_category})` : ''}
-                            </option>
-                          ))}
-                      </select>
-                    )}
-                  </div>
-                )
-              })}
-              {draft.length === 0 && (
-                <p className="text-xs text-gray-400">
-                  No features yet — add some from the Features Selection tab.
-                </p>
-              )}
-            </div>
-
-            {/* Add another (e.g. a second stat graph) */}
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="text-xs text-gray-500">Add another:</span>
-              {FEATURE_TYPES.map(t => (
-                <button
-                  key={t.type}
-                  type="button"
-                  onClick={() => addFeature(t.type)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-green-600 text-green-700 bg-green-50 hover:bg-green-100 transition-colors"
-                >
-                  + {t.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Shared Save */}
-        <div className="flex items-center gap-3 mt-5 pt-4 border-t border-gray-100">
-          <button onClick={saveStats} disabled={savingStats} className="btn-primary text-sm">
-            {savingStats ? 'Saving…' : 'Save Features'}
-          </button>
-          <SaveMsg msg={statsMsg} />
-        </div>
-        {stats.length === 0 && (
-          <p className="text-xs text-gray-400 mt-2">
-            No statistics found yet — create some in the Statistics module first.
-          </p>
-        )}
-      </div>
-
-      {/* Weather location — admin only */}
-      <div className="card">
-        <h3 className="text-sm font-bold text-gray-800 mb-1">Weather Location</h3>
-        {isAdmin ? (
-          <>
-            <p className="text-xs text-gray-500 mb-4">
-              The company-wide default weather location. Each user can override it on their own
-              dashboard using the pencil on the weather widget. Enter a city, e.g.{' '}
-              <em>Anaheim, CA</em>, or a ZIP code.
-            </p>
-            <div className="flex items-center gap-3 flex-wrap">
-              <input
-                className="input max-w-xs"
-                value={loc}
-                onChange={e => setLoc(e.target.value)}
-                placeholder="City, State or ZIP"
-              />
-              <button onClick={saveLocation} disabled={savingLoc} className="btn-primary text-sm">
-                {savingLoc ? 'Saving…' : 'Save'}
+          {/* Add another (e.g. a second stat graph) */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-gray-500">Add another:</span>
+            {FEATURE_TYPES.map(t => (
+              <button
+                key={t.type}
+                type="button"
+                onClick={() => addFeature(t.type)}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-green-600 text-green-700 bg-green-50 hover:bg-green-100 transition-colors"
+              >
+                + {t.label}
               </button>
-              <SaveMsg msg={locMsg} />
-            </div>
-          </>
-        ) : (
-          <p className="text-xs text-gray-500">
-            {weatherLocation
-              ? `Currently set to "${weatherLocation}". Only an admin can change this.`
-              : 'No location set yet. Ask an admin to set the company weather location.'}
-          </p>
-        )}
-      </div>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-3 mt-5 pt-4 border-t border-gray-100">
+            <button onClick={saveStats} disabled={savingStats} className="btn-primary text-sm">
+              {savingStats ? 'Saving…' : 'Save Features'}
+            </button>
+            <SaveMsg msg={statsMsg} />
+          </div>
+          {stats.length === 0 && (
+            <p className="text-xs text-gray-400 mt-2">
+              No statistics found yet — create some in the Statistics module first.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ── Weather Location (company-wide) ── */}
+      {subTab === 'weather' && (
+        <div className="card">
+          <h3 className="text-sm font-bold text-gray-800 mb-1">Weather Location</h3>
+          {isAdmin ? (
+            <>
+              <p className="text-xs text-gray-500 mb-4">
+                The company-wide default weather location. Each user can override it on their own
+                dashboard using the pencil on the weather widget. Enter a city, e.g.{' '}
+                <em>Anaheim, CA</em>, or a ZIP code.
+              </p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <input
+                  className="input max-w-xs"
+                  value={loc}
+                  onChange={e => setLoc(e.target.value)}
+                  placeholder="City, State or ZIP"
+                />
+                <button
+                  onClick={saveLocation}
+                  disabled={savingLoc}
+                  className="btn-primary text-sm"
+                >
+                  {savingLoc ? 'Saving…' : 'Save'}
+                </button>
+                <SaveMsg msg={locMsg} />
+              </div>
+            </>
+          ) : (
+            <p className="text-xs text-gray-500">
+              {weatherLocation
+                ? `Currently set to "${weatherLocation}". Only an admin can change this.`
+                : 'No location set yet. Ask an admin to set the company weather location.'}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   )
 }
