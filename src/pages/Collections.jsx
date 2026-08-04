@@ -46,14 +46,16 @@ const PAY_CATS = [
   {
     key: 'prelim',
     label: 'Prelims',
-    cols: ['payee', 'starting_balance', 'new_charges', 'amount_current'],
+    // Same format as Credit Cards: enter Starting + Ending Balance; New Charges
+    // auto-calculates (Ending − Starting).
+    cols: ['payee', 'starting_balance', 'amount_current', 'new_charges'],
     subtotalCol: 'amount_current',
     colLabels: {
-      amount_current: 'New Balance',
+      amount_current: 'Ending Balance',
       starting_balance: 'Starting Balance',
       new_charges: 'New Charges',
     },
-    readOnlyCols: ['starting_balance', 'amount_current'],
+    readOnlyCols: ['starting_balance', 'new_charges'],
   },
   {
     key: 'credit_card',
@@ -99,6 +101,14 @@ function fmtC(n) {
     maximumFractionDigits: 2,
   })
   return v < 0 ? `($${s})` : `$${s}`
+}
+
+// Parse a user-typed money string, tolerating "$", thousands separators, and
+// whitespace so "$12,500" becomes 12500 instead of being truncated at the comma.
+function parseMoney(v) {
+  if (v == null || v === '') return 0
+  const n = parseFloat(String(v).replace(/[$,\s]/g, ''))
+  return Number.isFinite(n) ? n : 0
 }
 
 function calcEnd(row) {
@@ -151,7 +161,7 @@ function CellInput({
   useEffect(() => setLocal(value ?? ''), [value])
   const display =
     !focused && local !== '' && local !== 0 && local !== '0'
-      ? `$${parseFloat(local).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      ? `$${parseMoney(local).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       : local
   return (
     <input
@@ -688,8 +698,26 @@ export default function Collections() {
             is_paid: false,
           }))
 
+        // Reserves (Solvency → Total Reserves) — carry the running reserve
+        // balance forward. Preserve formula fields in case it's a % row.
+        const reservesRows = (sourceFinancial || [])
+          .filter(f => f.section === 'reserves')
+          .map(f => ({
+            week_id: targetWeek.id,
+            section: 'reserves',
+            subsection: f.subsection || null,
+            label: f.label || 'Total Reserves',
+            amount: f.is_formula ? 0 : parseFloat(f.amount) || 0,
+            is_formula: f.is_formula ?? false,
+            formula_type: f.formula_type || null,
+            formula_pct: f.formula_pct ?? null,
+            sort_order: f.sort_order ?? 0,
+            source_payable_id: null,
+            is_paid: false,
+          }))
+
         // Section 4 — Payable Allocations: always starts blank (user re-adds each week)
-        const allNewFinancial = [...cashRows, ...copiedRows, ...payrollRows]
+        const allNewFinancial = [...cashRows, ...copiedRows, ...payrollRows, ...reservesRows]
         if (allNewFinancial.length) {
           const { error: finErr } = await supabase
             .from('collection_financial')
@@ -794,7 +822,7 @@ export default function Collections() {
   }
 
   async function updateRow(id, field, value) {
-    const parsed = NUM_FIELDS.includes(field) ? parseFloat(value) || 0 : value
+    const parsed = NUM_FIELDS.includes(field) ? parseMoney(value) : value
     setRows(prev => prev.map(r => (r.id === id ? { ...r, [field]: parsed } : r)))
     await supabase
       .from('collection_rows')
@@ -824,20 +852,17 @@ export default function Collections() {
 
   async function updatePayable(id, field, value) {
     const numericFields = ['amount_current', 'amount_future', 'starting_balance', 'new_charges']
-    const parsed = numericFields.includes(field) ? parseFloat(value) || 0 : value
+    const parsed = numericFields.includes(field) ? parseMoney(value) : value
 
     const updatePayload = { [field]: parsed }
     const row = payables.find(p => p.id === id)
 
-    if (row?.category === 'credit_card') {
-      // Credit Cards: user enters Ending Balance (amount_current);
-      // New Charges auto-calculates as Ending Balance − Starting Balance.
+    // Credit Cards AND Prelims: user enters the Ending Balance (amount_current);
+    // New Charges auto-calculates as Ending Balance − Starting Balance.
+    if (row?.category === 'credit_card' || row?.category === 'prelim') {
       if (field === 'amount_current') {
-        updatePayload.new_charges = parsed - (parseFloat(row.starting_balance) || 0)
+        updatePayload.new_charges = parsed - parseMoney(row.starting_balance)
       }
-    } else if (field === 'new_charges' && row?.category === 'prelim') {
-      // Prelims keep the original pattern: New Charges → New Balance
-      updatePayload.amount_current = (parseFloat(row.starting_balance) || 0) + parsed
     }
 
     setPayables(prev => prev.map(p => (p.id === id ? { ...p, ...updatePayload } : p)))
@@ -886,7 +911,7 @@ export default function Collections() {
   }
 
   async function updateFinancial(id, field, value) {
-    const parsed = field === 'amount' ? parseFloat(value) || 0 : value
+    const parsed = field === 'amount' ? parseMoney(value) : value
     setFinancial(prev => prev.map(f => (f.id === id ? { ...f, [field]: parsed } : f)))
     const { error } = await supabase
       .from('collection_financial')
@@ -961,7 +986,7 @@ export default function Collections() {
 
   async function saveReserves(value) {
     if (!selectedWeek) return
-    const parsed = parseFloat(value) || 0
+    const parsed = parseMoney(value)
     if (reservesRow) {
       // Optimistic local update + persist
       setFinancial(prev =>
@@ -1571,7 +1596,24 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
       grouped[r.manager].push(r)
     } else noManager.push(r)
   })
+  // Keep each group's rows in sort_order so re-alphabetizing (which rewrites
+  // sort_order) reflects immediately.
+  const bySort = (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+  Object.values(grouped).forEach(g => g.sort(bySort))
+  noManager.sort(bySort)
   const allGroups = [...Object.entries(grouped), ...(noManager.length ? [['', noManager]] : [])]
+
+  // Re-alphabetize a group's client rows by name, reusing the group's existing
+  // sort_order slots so only the within-group order changes.
+  const alphabetizeGroup = mRows => {
+    const slots = mRows.map(r => r.sort_order ?? 0).slice().sort((a, b) => a - b)
+    const alpha = [...mRows].sort((a, b) =>
+      (a.client_name || '').localeCompare(b.client_name || '', undefined, { sensitivity: 'base' })
+    )
+    alpha.forEach((r, i) => {
+      if ((r.sort_order ?? 0) !== slots[i]) onUpdate(r.id, 'sort_order', slots[i])
+    })
+  }
 
   return (
     <div className="rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
@@ -1708,6 +1750,13 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
                             title="Edit group name"
                           >
                             ✏
+                          </button>
+                          <button
+                            onClick={() => alphabetizeGroup(mRows)}
+                            className="ml-1 w-4 h-4 flex items-center justify-center rounded text-[11px] font-bold text-green-600 hover:text-white hover:bg-green-600 border border-green-400 leading-none"
+                            title="Alphabetize this group's clients"
+                          >
+                            A
                           </button>
                         </>
                       )}
@@ -2205,6 +2254,12 @@ function FinancialTable({
         <h3 className="text-sm font-bold">{sec.label}</h3>
         <span className="text-xs font-bold text-blue-100">{fmtC(total)}</span>
       </div>
+      {/* Payroll must be filled in each week — flag it red until it has values. */}
+      {sec.key === 'payroll' && rows.length > 0 && rows.every(r => parseMoney(r.amount) === 0) && (
+        <div className="px-3 py-2 bg-red-50 border-b border-red-200 text-center text-xs font-bold text-red-600 flex-shrink-0">
+          No Values Entered
+        </div>
+      )}
       <table className="w-full text-xs">
         <thead className="bg-gray-50 border-b border-gray-200">
           <tr>
