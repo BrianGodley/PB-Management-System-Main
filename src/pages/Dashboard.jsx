@@ -652,10 +652,12 @@ export default function Dashboard() {
   // Clicking a feature's expand control opens an enlarged modal (like stats).
   const [expanded, setExpanded] = useState(null)
 
-  // Free-position drag — like the Workflows graph. Initiated by a RIGHT-click
-  // hold on a card; the card follows the cursor and drops on release. Absolute
-  // x/y are stored per feature.
+  // Free-position drag — like the Workflows graph. Click-and-hold a card, drag
+  // it anywhere, release to drop. Uses pointer events (works for mouse + touch)
+  // and window-level listeners so the drag continues past the card edge.
   function onMoveStart(e, i) {
+    // Ignore drags that begin on the resize handle (it stops propagation) or on
+    // form fields the user may want to interact with.
     e.preventDefault()
     e.stopPropagation()
     const startX = e.clientX
@@ -669,15 +671,15 @@ export default function Dashboard() {
       setFeatures(prev => prev.map((ff, idx) => (idx === i ? { ...ff, x: nx, y: ny } : ff)))
     }
     const up = () => {
-      window.removeEventListener('mousemove', move)
-      window.removeEventListener('mouseup', up)
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
       setFeatures(prev => {
         persistFeatures(prev)
         return prev
       })
     }
-    window.addEventListener('mousemove', move)
-    window.addEventListener('mouseup', up)
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
   }
 
   // Corner-handle resize. Percentages are relative to the base card size
@@ -796,15 +798,11 @@ export default function Dashboard() {
         <>
           {editMode && (
             <p className="text-xs text-gray-500 mb-3">
-              <span className="font-semibold">Right-click and hold</span> a feature to drag it
-              anywhere, then release to drop. Drag the corner handle to resize.
+              <span className="font-semibold">Click and hold</span> a feature to drag it anywhere,
+              then release to drop. Drag the corner handle to resize.
             </p>
           )}
-          <div
-            className="relative"
-            style={{ minHeight: canvasHeight }}
-            onContextMenu={editMode ? e => e.preventDefault() : undefined}
-          >
+          <div className="relative" style={{ minHeight: canvasHeight }}>
             {features.map((f, i) => {
               const dims = featureDims(f)
               return (
@@ -815,15 +813,9 @@ export default function Dashboard() {
                     left: Number(f.x) || 0,
                     top: Number(f.y) || 0,
                     width: dims.width,
+                    touchAction: editMode ? 'none' : undefined,
                   }}
-                  onMouseDown={
-                    editMode
-                      ? e => {
-                          if (e.button === 2) onMoveStart(e, i)
-                        }
-                      : undefined
-                  }
-                  onContextMenu={editMode ? e => e.preventDefault() : undefined}
+                  onPointerDown={editMode ? e => onMoveStart(e, i) : undefined}
                   className={`group ${
                     editMode ? 'ring-2 ring-green-300 rounded-xl select-none cursor-move' : ''
                   }`}
