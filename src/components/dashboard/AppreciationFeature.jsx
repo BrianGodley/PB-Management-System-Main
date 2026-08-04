@@ -5,23 +5,28 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 
-export default function AppreciationFeature({ userId, style }) {
+export default function AppreciationFeature({ userId, lineCount = 3, style }) {
+  const n = Math.max(1, Number(lineCount) || 3)
   const key = userId ? `dashboard:appreciation:${userId}` : null
-  const [lines, setLines] = useState(['', '', ''])
+  const [lines, setLines] = useState(() => Array.from({ length: n }, () => ''))
   const [showSend, setShowSend] = useState(false)
 
   useEffect(() => {
-    if (!key) return
-    try {
-      const raw = localStorage.getItem(key)
-      if (raw) {
-        const a = JSON.parse(raw)
-        if (Array.isArray(a)) setLines([a[0] || '', a[1] || '', a[2] || ''])
+    let saved = []
+    if (key) {
+      try {
+        const raw = localStorage.getItem(key)
+        if (raw) {
+          const a = JSON.parse(raw)
+          if (Array.isArray(a)) saved = a
+        }
+      } catch {
+        /* ignore */
       }
-    } catch {
-      /* ignore */
     }
-  }, [key])
+    // Fit the saved entries to the configured line count (pad/truncate).
+    setLines(Array.from({ length: n }, (_, i) => saved[i] || ''))
+  }, [key, n])
 
   const setLine = (i, v) => {
     const next = lines.map((l, idx) => (idx === i ? v : l))

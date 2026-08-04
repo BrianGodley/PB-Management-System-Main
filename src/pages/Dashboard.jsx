@@ -46,30 +46,35 @@ const FEATURE_TYPES = [
     label: 'Weather',
     icon: '🌤️',
     desc: 'Current conditions and a 5-day forecast for your location.',
+    customizable: false,
   },
   {
     type: 'stat',
-    label: 'Stat Graph',
+    label: 'Stat Graphs',
     icon: '📈',
-    desc: 'A mini trend graph for a statistic you choose. Add several.',
+    desc: 'Mini trend graphs for the statistics you choose.',
+    customizable: true,
   },
   {
     type: 'inspirations',
     label: 'Inspiration',
     icon: '✨',
     desc: 'A fresh inspirational quote featured every day.',
+    customizable: false,
   },
   {
     type: 'appreciation',
     label: 'Appreciation',
     icon: '🙏',
     desc: 'Note what you’re grateful for and send appreciation to a coworker.',
+    customizable: true,
   },
   {
     type: 'quickLinks',
     label: 'Quick Links',
     icon: '⚡',
     desc: 'One-tap shortcuts to common actions and pages.',
+    customizable: true,
   },
 ]
 
@@ -82,32 +87,54 @@ function newFeatureId() {
 // existing dashboards keep working.
 function buildFeatures(prefs) {
   const layout = prefs?.layout || {}
-  const raw =
+  const rawList =
     Array.isArray(layout.features) && layout.features.length
       ? layout.features
       : (() => {
           const w = Number(layout.statW) || 100
           const h = Number(layout.statH) || 100
           const f = [{ type: 'weather', w, h }]
-          for (const id of prefs?.stat_ids || []) f.push({ type: 'stat', statId: Number(id), w, h })
+          const ids = (prefs?.stat_ids || []).map(Number)
+          if (ids.length) f.push({ type: 'stat', statIds: ids, w, h })
           f.push({ type: 'quickLinks', w: 100, h: 100 })
           return f
         })()
-  // Normalize each feature; assign a default grid position for any without x/y
-  // (features are free-positioned on an absolute canvas, like the Workflows graph).
-  return raw.map((f, i) => {
+
+  // Collapse to at most one feature per type. All stat graphs are ONE feature,
+  // so merge any legacy per-stat features into a single statIds list.
+  const byType = new Map()
+  for (const f of rawList) {
+    const type = f.type || 'stat'
+    if (!byType.has(type)) byType.set(type, { ...f, type })
+    if (type === 'stat') {
+      const cur = byType.get('stat')
+      const ids = new Set((cur.statIds || []).map(Number))
+      if (Array.isArray(f.statIds)) f.statIds.forEach(id => ids.add(Number(id)))
+      if (f.statId != null) ids.add(Number(f.statId))
+      cur.statIds = [...ids]
+    }
+  }
+
+  // Normalize + assign default positions for anything without x/y.
+  let i = 0
+  const out = []
+  for (const f of byType.values()) {
     const col = i % 3
     const row = Math.floor(i / 3)
-    return {
+    out.push({
       id: f.id || newFeatureId(),
-      type: f.type || 'stat',
+      type: f.type,
       w: Number(f.w) || 100,
       h: Number(f.h) || 100,
       x: Number.isFinite(f.x) ? f.x : col * 356,
       y: Number.isFinite(f.y) ? f.y : row * 340,
-      statId: f.statId != null ? Number(f.statId) : undefined,
-    }
-  })
+      statIds: f.type === 'stat' ? (f.statIds || []).map(Number) : undefined,
+      lines: f.type === 'appreciation' ? Number(f.lines) || 3 : undefined,
+      links: f.type === 'quickLinks' && Array.isArray(f.links) ? f.links : undefined,
+    })
+    i++
+  }
+  return out
 }
 
 // ── Quick-link buttons. Batch 1 wires each to its page; richer behaviour
@@ -639,7 +666,10 @@ export default function Dashboard() {
   async function persistFeatures(feats) {
     if (!user?.id) return
     const nextLayout = { ...(prefs.layout || {}), features: feats }
-    const stat_ids = feats.filter(f => f.type === 'stat' && f.statId).map(f => f.statId)
+    const stat_ids = feats
+      .filter(f => f.type === 'stat')
+      .flatMap(f => f.statIds || [])
+      .map(Number)
     await supabase.from('dashboard_preferences').upsert(
       { user_id: user.id, stat_ids, layout: nextLayout, updated_at: new Date().toISOString() },
       { onConflict: 'user_id' }
@@ -721,7 +751,11 @@ export default function Dashboard() {
       statHeight: scaled,
       minHeight: scaled,
       // Rough on-canvas block height (card chrome + body) for sizing the canvas.
-      blockHeight: (f.type === 'stat' ? scaled + 130 : scaled + 40),
+      // The stat feature stacks one graph per selected statistic.
+      blockHeight:
+        f.type === 'stat'
+          ? (scaled + 130) * Math.max(1, (f.statIds || []).length) + 16
+          : scaled + 40,
     }
   }
 
@@ -843,23 +877,40 @@ export default function Dashboard() {
                     />
                   )}
                   {f.type === 'stat' && (
-                    <StatMiniGraph
-                      stat={stats.find(s => s.id === f.statId) || null}
-                      allStats={stats}
-                      height={dims.statHeight}
-                    />
+                    <div className="flex flex-col gap-4">
+                      {(f.statIds || []).map(id => (
+                        <StatMiniGraph
+                          key={id}
+                          stat={stats.find(s => s.id === id) || null}
+                          allStats={stats}
+                          height={dims.statHeight}
+                        />
+                      ))}
+                      {(!f.statIds || f.statIds.length === 0) && (
+                        <div className="bg-white border border-gray-200 rounded-xl p-6 text-center text-xs text-gray-400">
+                          No statistics yet — use Customize on the Stat Graphs feature.
+                        </div>
+                      )}
+                    </div>
                   )}
                   {f.type === 'inspirations' && (
                     <InspirationFeature style={{ minHeight: dims.minHeight }} />
                   )}
                   {f.type === 'appreciation' && (
-                    <AppreciationFeature userId={user?.id} style={{ minHeight: dims.minHeight }} />
+                    <AppreciationFeature
+                      userId={user?.id}
+                      lineCount={f.lines || 3}
+                      style={{ minHeight: dims.minHeight }}
+                    />
                   )}
                   {f.type === 'quickLinks' && (
                     <div className="card" style={{ minHeight: dims.minHeight }}>
                       <h3 className="text-sm font-bold text-gray-800 mb-3">Quick Links</h3>
                       <div className="grid grid-cols-2 gap-2">
-                        {quickLinks.map(q => (
+                        {(f.links
+                          ? quickLinks.filter(q => f.links.includes(q.key || q.to || q.label))
+                          : quickLinks
+                        ).map(q => (
                           <button
                             key={q.label}
                             onClick={() => {
@@ -924,21 +975,33 @@ export default function Dashboard() {
                     />
                   )}
                   {expanded.type === 'stat' && (
-                    <StatMiniGraph
-                      stat={stats.find(s => s.id === expanded.statId) || null}
-                      allStats={stats}
-                      height={460}
-                    />
+                    <div className="flex flex-col gap-4">
+                      {(expanded.statIds || []).map(id => (
+                        <StatMiniGraph
+                          key={id}
+                          stat={stats.find(s => s.id === id) || null}
+                          allStats={stats}
+                          height={460}
+                        />
+                      ))}
+                    </div>
                   )}
                   {expanded.type === 'inspirations' && (
                     <InspirationFeature style={{ minHeight: 320 }} />
                   )}
                   {expanded.type === 'appreciation' && (
-                    <AppreciationFeature userId={user?.id} style={{ minHeight: 320 }} />
+                    <AppreciationFeature
+                      userId={user?.id}
+                      lineCount={expanded.lines || 3}
+                      style={{ minHeight: 320 }}
+                    />
                   )}
                   {expanded.type === 'quickLinks' && (
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                      {quickLinks.map(q => (
+                      {(expanded.links
+                        ? quickLinks.filter(q => expanded.links.includes(q.key || q.to || q.label))
+                        : quickLinks
+                      ).map(q => (
                         <button
                           key={q.label}
                           onClick={() => {
@@ -1052,7 +1115,167 @@ export default function Dashboard() {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// SETTINGS TAB — pick the two mini-graph stats; admins set the weather location.
+// Feature customize modal — per-feature options (stat list, appreciation lines,
+// quick-link selection). Edits the draft feature via onPatch; committed on Save.
+// ═════════════════════════════════════════════════════════════════════════════
+function FeatureCustomizeModal({ type, feature, stats, onPatch, onClose }) {
+  const meta = FEATURE_TYPES.find(t => t.type === type)
+  const linkId = q => q.key || q.to || q.label
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[85vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <h3 className="text-sm font-bold text-gray-900">
+            Customize {meta ? `${meta.icon} ${meta.label}` : type}
+          </h3>
+          <button
+            onClick={onClose}
+            title="Done"
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="p-4 space-y-3">
+          {type === 'stat' &&
+            (() => {
+              const selected = feature?.statIds || []
+              const available = stats.filter(s => !selected.includes(s.id))
+              return (
+                <>
+                  <p className="text-xs text-gray-500">
+                    Choose which statistics show in this feature. They stack top to bottom.
+                  </p>
+                  <div className="space-y-2">
+                    {selected.length === 0 && (
+                      <p className="text-xs text-gray-400">No statistics selected yet.</p>
+                    )}
+                    {selected.map(id => {
+                      const st = stats.find(s => s.id === id)
+                      return (
+                        <div
+                          key={id}
+                          className="flex items-center justify-between gap-2 rounded-lg border border-gray-200 px-3 py-2"
+                        >
+                          <span className="text-sm text-gray-800 truncate">
+                            {st ? st.name : `Stat #${id}`}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => onPatch({ statIds: selected.filter(x => x !== id) })}
+                            className="flex-shrink-0 text-gray-400 hover:text-red-600"
+                            title="Remove"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <select
+                    className="input w-full"
+                    value=""
+                    onChange={e => {
+                      const id = Number(e.target.value)
+                      if (id) onPatch({ statIds: [...selected, id] })
+                    }}
+                  >
+                    <option value="">+ Add a statistic…</option>
+                    {available.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                        {s.stat_category ? ` (${s.stat_category})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )
+            })()}
+
+          {type === 'appreciation' &&
+            (() => {
+              const lines = feature?.lines || 3
+              return (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-700">Number of lines</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onPatch({ lines: Math.max(1, lines - 1) })}
+                      className="w-8 h-8 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50"
+                    >
+                      −
+                    </button>
+                    <span className="w-8 text-center text-sm font-semibold">{lines}</span>
+                    <button
+                      type="button"
+                      onClick={() => onPatch({ lines: Math.min(10, lines + 1) })}
+                      className="w-8 h-8 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              )
+            })()}
+
+          {type === 'quickLinks' &&
+            (() => {
+              const links = feature?.links // undefined = show all
+              const isOn = q => (links ? links.includes(linkId(q)) : true)
+              const toggle = q => {
+                const cur = links ?? QUICK_LINKS.map(linkId)
+                const id = linkId(q)
+                const next = cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]
+                onPatch({ links: next })
+              }
+              return (
+                <>
+                  <p className="text-xs text-gray-500">Choose which quick links to show.</p>
+                  <div className="space-y-1.5">
+                    {QUICK_LINKS.map(q => (
+                      <label
+                        key={linkId(q)}
+                        className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isOn(q)}
+                          onChange={() => toggle(q)}
+                          className="accent-green-700"
+                        />
+                        <span>
+                          {q.icon} {q.label}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </>
+              )
+            })()}
+        </div>
+        <div className="px-4 py-3 border-t border-gray-100 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 rounded-lg text-sm font-semibold bg-green-700 text-white hover:bg-green-800"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// SETTINGS TAB — Features Selection + Weather Location sub-tabs.
 // ═════════════════════════════════════════════════════════════════════════════
 function DashboardSettings({
   prefs,
@@ -1067,7 +1290,8 @@ function DashboardSettings({
 }) {
   // Draft copy of the feature list, edited here and committed on Save.
   const [draft, setDraft] = useState(initialFeatures || [])
-  const [subTab, setSubTab] = useState('selection') // 'selection' | 'customize'
+  const [subTab, setSubTab] = useState('selection') // 'selection' | 'weather'
+  const [customizing, setCustomizing] = useState(null) // feature type being customized
   const [savingStats, setSavingStats] = useState(false)
   const [statsMsg, setStatsMsg] = useState('')
 
@@ -1075,13 +1299,10 @@ function DashboardSettings({
   const [savingLoc, setSavingLoc] = useState(false)
   const [locMsg, setLocMsg] = useState('')
 
-  const patchFeature = (i, patch) =>
-    setDraft(prev => prev.map((f, idx) => (idx === i ? { ...f, ...patch } : f)))
-  const removeFeature = i => setDraft(prev => prev.filter((_, idx) => idx !== i))
-  const addFeature = type => {
-    // For a new stat feature, default to the first stat not already shown.
-    const usedStatIds = draft.filter(f => f.type === 'stat').map(f => f.statId)
-    const firstFree = stats.find(s => !usedStatIds.includes(s.id))
+  // Merge a patch into the single feature of a given type.
+  const patchType = (type, patch) =>
+    setDraft(prev => prev.map(f => (f.type === type ? { ...f, ...patch } : f)))
+  const addFeature = type =>
     setDraft(prev => [
       ...prev,
       {
@@ -1089,13 +1310,17 @@ function DashboardSettings({
         type,
         w: 100,
         h: 100,
-        statId: type === 'stat' ? firstFree?.id : undefined,
+        x: (prev.length % 3) * 356,
+        y: Math.floor(prev.length / 3) * 340,
+        statIds: type === 'stat' ? [] : undefined,
+        lines: type === 'appreciation' ? 3 : undefined,
+        links: type === 'quickLinks' ? undefined : undefined,
       },
     ])
-  }
   const removeAllOfType = type => setDraft(prev => prev.filter(f => f.type !== type))
   const isTypePresent = type => draft.some(f => f.type === type)
   const toggleType = type => (isTypePresent(type) ? removeAllOfType(type) : addFeature(type))
+  const featureOfType = type => draft.find(f => f.type === type) || null
 
   async function saveStats() {
     if (!userId) return
@@ -1136,7 +1361,6 @@ function DashboardSettings({
       <div className="bg-white border-b border-gray-200 flex justify-center gap-0 mb-5 rounded-xl">
         {[
           { key: 'selection', label: 'Features Selection' },
-          { key: 'customize', label: 'Customize Features' },
           { key: 'weather', label: 'Weather Location' },
         ].map(t => (
           <button
@@ -1159,7 +1383,7 @@ function DashboardSettings({
         <div className="card">
           <p className="text-xs text-gray-500 mb-4">
             Pick which features appear on your dashboard. Selected features are highlighted in
-            green.
+            green. Use <span className="font-semibold">Customize</span> to configure a feature.
           </p>
           <div className="flex flex-wrap gap-4">
             {FEATURE_TYPES.map(t => {
@@ -1174,17 +1398,28 @@ function DashboardSettings({
                   <span className="text-5xl mt-3 leading-none">{t.icon}</span>
                   <p className="mt-3 text-base font-bold text-gray-800">{t.label}</p>
                   <p className="mt-1 text-xs text-gray-500 px-1">{t.desc}</p>
-                  <button
-                    type="button"
-                    onClick={() => toggleType(t.type)}
-                    className={`mt-auto px-8 py-2 rounded-lg text-sm font-semibold border transition-colors ${
-                      on
-                        ? 'border-red-300 text-red-600 bg-white hover:bg-red-50'
-                        : 'border-green-600 text-green-700 bg-green-50 hover:bg-green-100'
-                    }`}
-                  >
-                    {on ? 'Remove' : 'Add'}
-                  </button>
+                  <div className="mt-auto flex flex-col items-center gap-2 w-full">
+                    {on && t.customizable && (
+                      <button
+                        type="button"
+                        onClick={() => setCustomizing(t.type)}
+                        className="px-8 py-2 rounded-lg text-sm font-semibold border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                      >
+                        Customize
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => toggleType(t.type)}
+                      className={`px-8 py-2 rounded-lg text-sm font-semibold border transition-colors ${
+                        on
+                          ? 'border-red-300 text-red-600 bg-white hover:bg-red-50'
+                          : 'border-green-600 text-green-700 bg-green-50 hover:bg-green-100'
+                      }`}
+                    >
+                      {on ? 'Remove' : 'Add'}
+                    </button>
+                  </div>
                 </div>
               )
             })}
@@ -1198,93 +1433,15 @@ function DashboardSettings({
         </div>
       )}
 
-      {/* ── Customize Features ── */}
-      {subTab === 'customize' && (
-        <div className="card">
-          <p className="text-xs text-gray-500 mb-4">
-            Configure each feature — choose the statistic for stat graphs. To rearrange or resize
-            cards, use <span className="font-semibold">Edit</span> on the dashboard.
-          </p>
-          <div className="space-y-3">
-            {draft.map((f, i) => {
-              const meta = FEATURE_TYPES.find(t => t.type === f.type)
-              const usedElsewhere = draft
-                .filter((x, idx) => idx !== i && x.type === 'stat')
-                .map(x => x.statId)
-              return (
-                <div key={f.id} className="rounded-xl border border-gray-200 p-3">
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="text-sm font-semibold text-gray-800">
-                      {meta ? `${meta.icon} ${meta.label}` : f.type}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeFeature(i)}
-                      title="Remove this feature"
-                      className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-colors"
-                    >
-                      ✕
-                    </button>
-                  </div>
-
-                  {f.type === 'stat' && (
-                    <select
-                      className="input w-full"
-                      value={f.statId ?? ''}
-                      onChange={e =>
-                        patchFeature(i, {
-                          statId: e.target.value ? Number(e.target.value) : undefined,
-                        })
-                      }
-                    >
-                      <option value="">— Choose a statistic —</option>
-                      {stats
-                        .filter(st => st.id === f.statId || !usedElsewhere.includes(st.id))
-                        .map(st => (
-                          <option key={st.id} value={st.id}>
-                            {st.name}
-                            {st.stat_category ? ` (${st.stat_category})` : ''}
-                          </option>
-                        ))}
-                    </select>
-                  )}
-                </div>
-              )
-            })}
-            {draft.length === 0 && (
-              <p className="text-xs text-gray-400">
-                No features yet — add some from the Features Selection tab.
-              </p>
-            )}
-          </div>
-
-          {/* Add another (e.g. a second stat graph) */}
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-gray-500">Add another:</span>
-            {FEATURE_TYPES.map(t => (
-              <button
-                key={t.type}
-                type="button"
-                onClick={() => addFeature(t.type)}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-green-600 text-green-700 bg-green-50 hover:bg-green-100 transition-colors"
-              >
-                + {t.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-3 mt-5 pt-4 border-t border-gray-100">
-            <button onClick={saveStats} disabled={savingStats} className="btn-primary text-sm">
-              {savingStats ? 'Saving…' : 'Save Features'}
-            </button>
-            <SaveMsg msg={statsMsg} />
-          </div>
-          {stats.length === 0 && (
-            <p className="text-xs text-gray-400 mt-2">
-              No statistics found yet — create some in the Statistics module first.
-            </p>
-          )}
-        </div>
+      {/* ── Feature customize modal ── */}
+      {customizing && (
+        <FeatureCustomizeModal
+          type={customizing}
+          feature={featureOfType(customizing)}
+          stats={stats}
+          onPatch={patch => patchType(customizing, patch)}
+          onClose={() => setCustomizing(null)}
+        />
       )}
 
       {/* ── Weather Location (company-wide) ── */}
