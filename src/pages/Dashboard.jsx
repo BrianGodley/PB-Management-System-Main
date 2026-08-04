@@ -339,7 +339,7 @@ function WeatherWidget({ location, onSaveLocation }) {
 // stat) and renders the SHARED StatMiniGraph so it matches the Statistics Group
 // View config exactly (circle-handle scrubber, default_periods window, angular
 // line, click-to-expand). weekEndingDay is self-fetched by the shared component.
-function StatMiniGraph({ stat, allStats = [] }) {
+function StatMiniGraph({ stat, allStats = [], height }) {
   const [values, setValues] = useState(null)
 
   useEffect(() => {
@@ -387,7 +387,7 @@ function StatMiniGraph({ stat, allStats = [] }) {
       </div>
     )
   }
-  return <StatMiniGraphShared stat={stat} values={values} />
+  return <StatMiniGraphShared stat={stat} values={values} height={height} />
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -551,8 +551,14 @@ export default function Dashboard() {
   const positions = data?.positions || []
 
   const statIds = (prefs.stat_ids || []).map(Number)
-  const stat1 = stats.find(s => s.id === statIds[0]) || null
-  const stat2 = stats.find(s => s.id === statIds[1]) || null
+  // Per-user mini-graph sizing (stored in dashboard_preferences.layout). Percent
+  // of the default: 100 = current size. Width scales each card's basis; height
+  // scales the graph body (285px base).
+  const layout = prefs.layout || {}
+  const statW = Number(layout.statW) || 100
+  const statH = Number(layout.statH) || 100
+  const cardWidth = `min(100%, ${Math.round(340 * (statW / 100))}px)`
+  const cardHeight = Math.round(285 * (statH / 100))
 
   // Sync the saved per-user background from the DB once prefs load (so the
   // choice follows the user across devices). Runs once; user changes after
@@ -603,10 +609,19 @@ export default function Dashboard() {
 
       {tab === 'dashboard' && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <WeatherWidget location={myWeatherLocation} onSaveLocation={saveWeatherLocation} />
-            <StatMiniGraph stat={stat1} allStats={stats} />
-            <StatMiniGraph stat={stat2} allStats={stats} />
+          <div className="flex flex-wrap gap-4 items-start">
+            <div style={{ width: cardWidth }}>
+              <WeatherWidget location={myWeatherLocation} onSaveLocation={saveWeatherLocation} />
+            </div>
+            {statIds.map((id, i) => (
+              <div key={`${id}-${i}`} style={{ width: cardWidth }}>
+                <StatMiniGraph
+                  stat={stats.find(s => s.id === id) || null}
+                  allStats={stats}
+                  height={cardHeight}
+                />
+              </div>
+            ))}
           </div>
 
           {/* Quick Links */}
@@ -720,8 +735,15 @@ export default function Dashboard() {
 // SETTINGS TAB — pick the two mini-graph stats; admins set the weather location.
 // ═════════════════════════════════════════════════════════════════════════════
 function DashboardSettings({ prefs, stats, userId, isAdmin, weatherLocation, settingsId, onSaved }) {
-  const [s1, setS1] = useState(prefs.stat_ids?.[0] || '')
-  const [s2, setS2] = useState(prefs.stat_ids?.[1] || '')
+  // Dynamic list of chosen stat ids (as strings for <select>). Start with the
+  // saved picks, or two empty rows so there's always something to fill in.
+  const [slots, setSlots] = useState(() => {
+    const saved = (prefs.stat_ids || []).map(String)
+    return saved.length ? saved : ['', '']
+  })
+  // Per-user mini-graph sizing (percent of default). Seeded from prefs.layout.
+  const [statW, setStatW] = useState(Number(prefs.layout?.statW) || 100)
+  const [statH, setStatH] = useState(Number(prefs.layout?.statH) || 100)
   const [savingStats, setSavingStats] = useState(false)
   const [statsMsg, setStatsMsg] = useState('')
 
@@ -729,16 +751,22 @@ function DashboardSettings({ prefs, stats, userId, isAdmin, weatherLocation, set
   const [savingLoc, setSavingLoc] = useState(false)
   const [locMsg, setLocMsg] = useState('')
 
+  const setSlot = (i, v) => setSlots(prev => prev.map((s, idx) => (idx === i ? v : s)))
+  const addSlot = () => setSlots(prev => [...prev, ''])
+  const removeSlot = i => setSlots(prev => prev.filter((_, idx) => idx !== i))
+
   async function saveStats() {
     if (!userId) return
     setSavingStats(true)
     setStatsMsg('')
     // Stat ids are integers — coerce so they land in the bigint[] column.
-    const stat_ids = [s1, s2].filter(Boolean).map(Number)
+    const stat_ids = slots.filter(Boolean).map(Number)
+    // Preserve any other layout keys; store the two size percentages.
+    const nextLayout = { ...(prefs.layout || {}), statW: Number(statW), statH: Number(statH) }
     const { error } = await supabase
       .from('dashboard_preferences')
       .upsert(
-        { user_id: userId, stat_ids, updated_at: new Date().toISOString() },
+        { user_id: userId, stat_ids, layout: nextLayout, updated_at: new Date().toISOString() },
         { onConflict: 'user_id' }
       )
     setSavingStats(false)
@@ -775,29 +803,82 @@ function DashboardSettings({ prefs, stats, userId, isAdmin, weatherLocation, set
       <div className="card">
         <h3 className="text-sm font-bold text-gray-800 mb-1">Dashboard Stats</h3>
         <p className="text-xs text-gray-500 mb-4">
-          Choose two statistics to show as mini trend graphs on your dashboard.
+          Choose the statistics to show as mini trend graphs on your dashboard. Add as many as
+          you like.
         </p>
         <div className="space-y-3">
-          {[
-            { n: 1, val: s1, set: setS1, other: s2 },
-            { n: 2, val: s2, set: setS2, other: s1 },
-          ].map(({ n, val, set, other }) => (
-            <div key={n}>
-              <label className="label">Stat {n}</label>
-              <select className="input" value={val} onChange={e => set(e.target.value)}>
-                <option value="">— None —</option>
-                {stats
-                  .filter(st => st.id === val || st.id !== other)
-                  .map(st => (
-                    <option key={st.id} value={st.id}>
-                      {st.name}
-                      {st.stat_category ? ` (${st.stat_category})` : ''}
-                    </option>
-                  ))}
-              </select>
+          {slots.map((val, i) => (
+            <div key={i}>
+              <label className="label">Stat {i + 1}</label>
+              <div className="flex items-center gap-2">
+                <select
+                  className="input flex-1"
+                  value={val}
+                  onChange={e => setSlot(i, e.target.value)}
+                >
+                  <option value="">— None —</option>
+                  {stats
+                    // Exclude ids already chosen in OTHER slots.
+                    .filter(
+                      st => String(st.id) === val || !slots.some((s, idx) => idx !== i && s === String(st.id))
+                    )
+                    .map(st => (
+                      <option key={st.id} value={st.id}>
+                        {st.name}
+                        {st.stat_category ? ` (${st.stat_category})` : ''}
+                      </option>
+                    ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => removeSlot(i)}
+                  title="Remove this stat"
+                  className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
           ))}
         </div>
+        <button
+          type="button"
+          onClick={addSlot}
+          className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border border-green-600 text-green-700 bg-green-50 hover:bg-green-100 transition-colors"
+        >
+          + Add Stat
+        </button>
+
+        {/* Mini-graph sizing — per-user, percent of the default size. */}
+        <div className="mt-5 pt-4 border-t border-gray-100">
+          <h4 className="text-xs font-bold text-gray-700 mb-0.5">Graph Size</h4>
+          <p className="text-[11px] text-gray-400 mb-3">
+            Scale your dashboard mini graphs. 100% = default.
+          </p>
+          <div className="space-y-3 max-w-sm">
+            {[
+              { label: 'Width', val: statW, set: setStatW },
+              { label: 'Height', val: statH, set: setStatH },
+            ].map(({ label, val, set }) => (
+              <div key={label} className="flex items-center gap-3">
+                <span className="text-xs text-gray-600 w-14">{label}</span>
+                <input
+                  type="range"
+                  min="50"
+                  max="200"
+                  step="5"
+                  value={val}
+                  onChange={e => set(Number(e.target.value))}
+                  className="flex-1 accent-green-700"
+                />
+                <span className="text-xs font-semibold text-gray-700 w-12 text-right tabular-nums">
+                  {val}%
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div className="flex items-center gap-3 mt-4">
           <button onClick={saveStats} disabled={savingStats} className="btn-primary text-sm">
             {savingStats ? 'Saving…' : 'Save Stats'}

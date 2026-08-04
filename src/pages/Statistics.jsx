@@ -7635,6 +7635,39 @@ function PrintMultipleView({ stats, weekEndingDay }) {
 // ── StatGroups ────────────────────────────────────────────────────────────────
 function StatGroups({ stats }) {
   const activeStats = (stats || []).filter(s => !s.archived)
+  const { user } = useAuth()
+
+  // Per-user Group View mini-graph sizing (percent of default). Stored in
+  // localStorage and broadcast via a 'stat-group-graph-size' event so the live
+  // Group View grid updates without a reload.
+  const groupSizeKey = user?.id ? `stats:groupGraphSize:${user.id}` : null
+  const [gW, setGW] = useState(100)
+  const [gH, setGH] = useState(100)
+  useEffect(() => {
+    if (!groupSizeKey) return
+    try {
+      const raw = localStorage.getItem(groupSizeKey)
+      if (raw) {
+        const v = JSON.parse(raw)
+        setGW(Number(v.w) || 100)
+        setGH(Number(v.h) || 100)
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [groupSizeKey])
+  function saveGroupSize(w, h) {
+    setGW(w)
+    setGH(h)
+    if (groupSizeKey) {
+      try {
+        localStorage.setItem(groupSizeKey, JSON.stringify({ w, h }))
+      } catch {
+        /* ignore */
+      }
+    }
+    window.dispatchEvent(new CustomEvent('stat-group-graph-size', { detail: { w, h } }))
+  }
 
   const [groups, setGroups] = useState([])
   const [loading, setLoading] = useState(true)
@@ -7756,6 +7789,37 @@ function StatGroups({ stats }) {
             + New Group
           </button>
         )}
+      </div>
+
+      {/* Group View graph size — its own section above the groups list. Per-user. */}
+      <div className="card mb-4">
+        <h4 className="text-sm font-bold text-gray-800 mb-0.5">Group View Graph Size</h4>
+        <p className="text-xs text-gray-400 mb-3">
+          Scale the mini graphs in the Statistics Group View. 100% = default. Applies to your
+          view only.
+        </p>
+        <div className="space-y-3 max-w-sm">
+          {[
+            { label: 'Width', val: gW, apply: v => saveGroupSize(v, gH) },
+            { label: 'Height', val: gH, apply: v => saveGroupSize(gW, v) },
+          ].map(({ label, val, apply }) => (
+            <div key={label} className="flex items-center gap-3">
+              <span className="text-xs text-gray-600 w-14">{label}</span>
+              <input
+                type="range"
+                min="50"
+                max="200"
+                step="5"
+                value={val}
+                onChange={e => apply(Number(e.target.value))}
+                className="flex-1 accent-green-700"
+              />
+              <span className="text-xs font-semibold text-gray-700 w-12 text-right tabular-nums">
+                {val}%
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {msg && (
@@ -8932,6 +8996,32 @@ export default function Statistics() {
   const [quickValue, setQuickValue] = useState('')
   const [quickSaving, setQuickSaving] = useState(false)
   const [quickSaveMsg, setQuickSaveMsg] = useState('')
+
+  // Per-user Group View mini-graph sizing (percent of default). Stored in
+  // localStorage; the Stat Groups settings tab writes it and dispatches a
+  // 'stat-group-graph-size' event that this listener picks up live.
+  const groupSizeKey = user?.id ? `stats:groupGraphSize:${user.id}` : null
+  const [groupSize, setGroupSize] = useState({ w: 100, h: 100 })
+  useEffect(() => {
+    if (!groupSizeKey) return
+    try {
+      const raw = localStorage.getItem(groupSizeKey)
+      if (raw) {
+        const v = JSON.parse(raw)
+        setGroupSize({ w: Number(v.w) || 100, h: Number(v.h) || 100 })
+      }
+    } catch {
+      /* ignore */
+    }
+    const onSize = e => {
+      const d = e.detail || {}
+      setGroupSize({ w: Number(d.w) || 100, h: Number(d.h) || 100 })
+    }
+    window.addEventListener('stat-group-graph-size', onSize)
+    return () => window.removeEventListener('stat-group-graph-size', onSize)
+  }, [groupSizeKey])
+  const groupCardWidth = `min(100%, ${Math.round(340 * (groupSize.w / 100))}px)`
+  const groupCardHeight = Math.round(285 * (groupSize.h / 100))
 
   // Company settings
   const [weekEndingDay, setWeekEndingDay] = useState(null)
@@ -10735,15 +10825,17 @@ export default function Statistics() {
                 <p className="text-sm font-medium">No statistics in this group</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="flex flex-wrap gap-4 items-start">
                 {groupViewStats.map(s => (
-                  <StatMiniGraph
-                    key={s.id}
-                    stat={s}
-                    values={groupViewValuesByStat.get(s.id) || []}
-                    weekEndingDay={weekEndingDay}
-                    onExpand={() => setExpandedStat(s)}
-                  />
+                  <div key={s.id} style={{ width: groupCardWidth }}>
+                    <StatMiniGraph
+                      stat={s}
+                      values={groupViewValuesByStat.get(s.id) || []}
+                      weekEndingDay={weekEndingDay}
+                      height={groupCardHeight}
+                      onExpand={() => setExpandedStat(s)}
+                    />
+                  </div>
                 ))}
               </div>
             )}
