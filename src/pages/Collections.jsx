@@ -338,8 +338,13 @@ async function backfillSolvencyAllWeeks(statIds, allWeeks) {
         if (f.formula_type === 'pct_cash_on_hand') return s + cash * (f.formula_pct ?? 0.01)
         return s + (parseFloat(f.amount) || 0)
       }, 0)
+    // Reserves (section='reserves') — part of the live Total Solvency line and
+    // must be included so backfilled history matches what the planner shows.
+    const reserves = wFin
+      .filter(f => f.section === 'reserves')
+      .reduce((s, f) => s + (parseFloat(f.amount) || 0), 0)
 
-    const solvency = tRec + (cash - payroll) - tPay
+    const solvency = tRec + (cash - payroll) + reserves - tPay
     for (const sid of statIds) {
       upserts.push({ statistic_id: sid, period_date: week.week_ending, value: solvency })
     }
