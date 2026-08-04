@@ -681,7 +681,9 @@ export default function Collections() {
           ...r,
         }))
 
-        // Section 2 — Auto Allocations: copy from previous week, non-formula amounts preserved
+        // Section 2 — Auto Allocations: copy the DEFINITION (label + formula)
+        // only, never the entered dollar value. Amount always resets to 0 so
+        // formula rows (e.g. % of Cash On Hand) recalculate off THIS week's cash.
         const copiedRows = (sourceFinancial || [])
           .filter(f => f.section === 'auto_alloc')
           .map(f => ({
@@ -689,7 +691,7 @@ export default function Collections() {
             section: f.section,
             subsection: f.subsection || null,
             label: f.label || null,
-            amount: f.is_formula ? 0 : parseFloat(f.amount) || 0,
+            amount: 0,
             is_formula: f.is_formula ?? false,
             formula_type: f.formula_type || null,
             formula_pct: f.formula_pct ?? null,
