@@ -11,13 +11,15 @@
 //   • company_settings.weather_location — company-wide weather location (text)
 // Run the SQL provided alongside this file before using the Settings tab.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useCachedData } from '../lib/useCachedData'
 import { resolveStatSeries } from '../lib/equationStat'
 import StatMiniGraphShared from '../components/StatMiniGraph'
+import InspirationFeature from '../components/dashboard/InspirationFeature'
+import AppreciationFeature from '../components/dashboard/AppreciationFeature'
 import AddEmployeeModal from '../components/AddEmployeeModal'
 import CoursePlayer from '../components/lms/CoursePlayer'
 import QuickEstimateModal from '../components/QuickEstimateModal'
@@ -33,6 +35,43 @@ import {
 } from 'recharts'
 
 const FG = '#3A5038' // forest green
+
+// ── Dashboard Features ───────────────────────────────────────────────────────
+// Each dashboard item is a "Feature": a typed card with its own size (percent of
+// default) and, for stat features, a chosen statistic. The ordered list lives
+// per-user in dashboard_preferences.layout.features.
+const FEATURE_TYPES = [
+  { type: 'weather', label: '🌤️ Weather' },
+  { type: 'stat', label: '📈 Stat Graph' },
+  { type: 'inspirations', label: '✨ Inspiration' },
+  { type: 'appreciation', label: '🙏 Appreciation' },
+]
+
+function newFeatureId() {
+  return 'f' + Math.random().toString(36).slice(2, 9)
+}
+
+// Build the feature list from saved prefs. Uses layout.features when present;
+// otherwise migrates the legacy shape (weather + one card per stat_id) so
+// existing dashboards keep working.
+function buildFeatures(prefs) {
+  const layout = prefs?.layout || {}
+  if (Array.isArray(layout.features) && layout.features.length) {
+    return layout.features.map(f => ({
+      id: f.id || newFeatureId(),
+      type: f.type || 'stat',
+      w: Number(f.w) || 100,
+      h: Number(f.h) || 100,
+      statId: f.statId != null ? Number(f.statId) : undefined,
+    }))
+  }
+  const w = Number(layout.statW) || 100
+  const h = Number(layout.statH) || 100
+  const feats = [{ id: newFeatureId(), type: 'weather', w, h }]
+  for (const id of prefs?.stat_ids || [])
+    feats.push({ id: newFeatureId(), type: 'stat', statId: Number(id), w, h })
+  return feats
+}
 
 // ── Quick-link buttons. Batch 1 wires each to its page; richer behaviour
 // (auto-opening modals, the multi-step Quick Estimate flow) follows in later
@@ -202,7 +241,7 @@ function WeatherWidget({ location, onSaveLocation }) {
     <div className="card">
       {/* Header — title + editable per-user location */}
       <div className="flex items-center justify-between mb-3 gap-2">
-        <h3 className="text-sm font-bold text-gray-800 flex-shrink-0">Weather</h3>
+        <h3 className="text-base font-bold text-gray-800 flex-shrink-0">Weather</h3>
         {editing ? (
           <div className="flex items-center gap-1 flex-1 min-w-0">
             <input
@@ -259,11 +298,11 @@ function WeatherWidget({ location, onSaveLocation }) {
       {wx.status === 'ok' && wx.current && (
         <>
           {/* Current conditions */}
-          <div className="flex items-center gap-3 mb-4">
-            <span className="text-4xl leading-none">{wxInfo(wx.current.code)[0]}</span>
+          <div className="flex items-center gap-4 mb-5">
+            <span className="text-6xl leading-none">{wxInfo(wx.current.code)[0]}</span>
             <div>
-              <p className="text-3xl font-bold text-gray-900 leading-none">{wx.current.temp}°</p>
-              <p className="text-xs text-gray-500 mt-1">{wxInfo(wx.current.code)[1]}</p>
+              <p className="text-5xl font-bold text-gray-900 leading-none">{wx.current.temp}°</p>
+              <p className="text-base text-gray-600 mt-1.5">{wxInfo(wx.current.code)[1]}</p>
             </div>
           </div>
           {/* 5-day outlook — click a day for detail */}
@@ -272,16 +311,16 @@ function WeatherWidget({ location, onSaveLocation }) {
               <button
                 key={d.date}
                 onClick={() => setDayIdx(dayIdx === i ? null : i)}
-                className={`text-center rounded-lg py-1 transition-colors ${
+                className={`text-center rounded-lg py-1.5 transition-colors ${
                   dayIdx === i ? 'bg-green-50 ring-1 ring-green-200' : 'hover:bg-gray-50'
                 }`}
               >
-                <p className="text-[10px] font-semibold text-gray-500 uppercase">
+                <p className="text-xs font-semibold text-gray-500 uppercase">
                   {dayLabel(d.date, i)}
                 </p>
-                <p className="text-lg leading-tight my-0.5">{wxInfo(d.code)[0]}</p>
-                <p className="text-[11px] font-semibold text-gray-800">{d.hi}°</p>
-                <p className="text-[11px] text-gray-400">{d.lo}°</p>
+                <p className="text-2xl leading-tight my-1">{wxInfo(d.code)[0]}</p>
+                <p className="text-sm font-semibold text-gray-800">{d.hi}°</p>
+                <p className="text-sm text-gray-400">{d.lo}°</p>
               </button>
             ))}
           </div>
@@ -299,15 +338,15 @@ function WeatherWidget({ location, onSaveLocation }) {
                 </button>
               </div>
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-3xl leading-none">{wxInfo(sel.code)[0]}</span>
+                <span className="text-4xl leading-none">{wxInfo(sel.code)[0]}</span>
                 <div>
-                  <p className="text-sm font-semibold text-gray-800">
+                  <p className="text-base font-semibold text-gray-800">
                     {sel.hi}° / {sel.lo}°
                   </p>
-                  <p className="text-xs text-gray-500">{wxInfo(sel.code)[1]}</p>
+                  <p className="text-sm text-gray-500">{wxInfo(sel.code)[1]}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
                 {[
                   ['Feels like', `${sel.feelsHi}° / ${sel.feelsLo}°`],
                   ['Rain chance', `${sel.precipChance}%`],
@@ -550,15 +589,48 @@ export default function Dashboard() {
   const isAdmin = data?.role === 'admin' || data?.role === 'super_admin'
   const positions = data?.positions || []
 
-  const statIds = (prefs.stat_ids || []).map(Number)
-  // Per-user mini-graph sizing (stored in dashboard_preferences.layout). Percent
-  // of the default: 100 = current size. Width scales each card's basis; height
-  // scales the graph body (285px base).
-  const layout = prefs.layout || {}
-  const statW = Number(layout.statW) || 100
-  const statH = Number(layout.statH) || 100
-  const cardWidth = `min(100%, ${Math.round(340 * (statW / 100))}px)`
-  const cardHeight = Math.round(285 * (statH / 100))
+  // ── Dashboard Features (typed, resizable, drag-to-reorder) ─────────────────
+  // Live feature list, seeded from saved prefs and re-synced whenever the
+  // dashboard data reloads (e.g. after saving in Settings).
+  const savedFeatures = useMemo(() => buildFeatures(prefs), [data])
+  const [features, setFeatures] = useState(savedFeatures)
+  useEffect(() => {
+    setFeatures(savedFeatures)
+  }, [savedFeatures])
+
+  // Persist the ordered feature list (+ derived stat_ids for compatibility).
+  async function persistFeatures(feats) {
+    if (!user?.id) return
+    const nextLayout = { ...(prefs.layout || {}), features: feats }
+    const stat_ids = feats.filter(f => f.type === 'stat' && f.statId).map(f => f.statId)
+    await supabase.from('dashboard_preferences').upsert(
+      { user_id: user.id, stat_ids, layout: nextLayout, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id' }
+    )
+  }
+
+  // Drag-to-reorder (HTML5 DnD via each card's grip handle).
+  const dragIdx = useRef(null)
+  function onDropAt(toIdx) {
+    const from = dragIdx.current
+    dragIdx.current = null
+    if (from == null || from === toIdx) return
+    setFeatures(prev => {
+      const next = prev.slice()
+      const [moved] = next.splice(from, 1)
+      next.splice(toIdx, 0, moved)
+      persistFeatures(next)
+      return next
+    })
+  }
+
+  function featureDims(f) {
+    return {
+      width: `min(100%, ${Math.round(340 * ((Number(f.w) || 100) / 100))}px)`,
+      statHeight: Math.round(285 * ((Number(f.h) || 100) / 100)),
+      minHeight: Math.round(240 * ((Number(f.h) || 100) / 100)),
+    }
+  }
 
   // Sync the saved per-user background from the DB once prefs load (so the
   // choice follows the user across devices). Runs once; user changes after
@@ -610,18 +682,52 @@ export default function Dashboard() {
       {tab === 'dashboard' && (
         <>
           <div className="flex flex-wrap gap-4 items-start">
-            <div style={{ width: cardWidth }}>
-              <WeatherWidget location={myWeatherLocation} onSaveLocation={saveWeatherLocation} />
-            </div>
-            {statIds.map((id, i) => (
-              <div key={`${id}-${i}`} style={{ width: cardWidth }}>
-                <StatMiniGraph
-                  stat={stats.find(s => s.id === id) || null}
-                  allStats={stats}
-                  height={cardHeight}
-                />
-              </div>
-            ))}
+            {features.map((f, i) => {
+              const dims = featureDims(f)
+              return (
+                <div
+                  key={f.id}
+                  style={{ width: dims.width }}
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={() => onDropAt(i)}
+                  className="relative group"
+                >
+                  {/* Drag handle — appears on hover; drag to reorder. */}
+                  <div
+                    draggable
+                    onDragStart={() => {
+                      dragIdx.current = i
+                    }}
+                    onDragEnd={() => {
+                      dragIdx.current = null
+                    }}
+                    title="Drag to reorder"
+                    className="absolute -top-2 -left-2 z-30 w-6 h-6 flex items-center justify-center rounded-full bg-white border border-gray-200 shadow-sm text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    ⠿
+                  </div>
+                  {f.type === 'weather' && (
+                    <WeatherWidget
+                      location={myWeatherLocation}
+                      onSaveLocation={saveWeatherLocation}
+                    />
+                  )}
+                  {f.type === 'stat' && (
+                    <StatMiniGraph
+                      stat={stats.find(s => s.id === f.statId) || null}
+                      allStats={stats}
+                      height={dims.statHeight}
+                    />
+                  )}
+                  {f.type === 'inspirations' && (
+                    <InspirationFeature style={{ minHeight: dims.minHeight }} />
+                  )}
+                  {f.type === 'appreciation' && (
+                    <AppreciationFeature userId={user?.id} style={{ minHeight: dims.minHeight }} />
+                  )}
+                </div>
+              )
+            })}
           </div>
 
           {/* Quick Links */}
@@ -724,6 +830,11 @@ export default function Dashboard() {
           isAdmin={isAdmin}
           weatherLocation={weatherLocation}
           settingsId={settingsId}
+          initialFeatures={features}
+          onSaveFeatures={feats => {
+            setFeatures(feats)
+            persistFeatures(feats)
+          }}
           onSaved={refresh}
         />
       )}
@@ -734,16 +845,19 @@ export default function Dashboard() {
 // ═════════════════════════════════════════════════════════════════════════════
 // SETTINGS TAB — pick the two mini-graph stats; admins set the weather location.
 // ═════════════════════════════════════════════════════════════════════════════
-function DashboardSettings({ prefs, stats, userId, isAdmin, weatherLocation, settingsId, onSaved }) {
-  // Dynamic list of chosen stat ids (as strings for <select>). Start with the
-  // saved picks, or two empty rows so there's always something to fill in.
-  const [slots, setSlots] = useState(() => {
-    const saved = (prefs.stat_ids || []).map(String)
-    return saved.length ? saved : ['', '']
-  })
-  // Per-user mini-graph sizing (percent of default). Seeded from prefs.layout.
-  const [statW, setStatW] = useState(Number(prefs.layout?.statW) || 100)
-  const [statH, setStatH] = useState(Number(prefs.layout?.statH) || 100)
+function DashboardSettings({
+  prefs,
+  stats,
+  userId,
+  isAdmin,
+  weatherLocation,
+  settingsId,
+  initialFeatures,
+  onSaveFeatures,
+  onSaved,
+}) {
+  // Draft copy of the feature list, edited here and committed on Save.
+  const [draft, setDraft] = useState(initialFeatures || [])
   const [savingStats, setSavingStats] = useState(false)
   const [statsMsg, setStatsMsg] = useState('')
 
@@ -751,32 +865,38 @@ function DashboardSettings({ prefs, stats, userId, isAdmin, weatherLocation, set
   const [savingLoc, setSavingLoc] = useState(false)
   const [locMsg, setLocMsg] = useState('')
 
-  const setSlot = (i, v) => setSlots(prev => prev.map((s, idx) => (idx === i ? v : s)))
-  const addSlot = () => setSlots(prev => [...prev, ''])
-  const removeSlot = i => setSlots(prev => prev.filter((_, idx) => idx !== i))
+  const patchFeature = (i, patch) =>
+    setDraft(prev => prev.map((f, idx) => (idx === i ? { ...f, ...patch } : f)))
+  const removeFeature = i => setDraft(prev => prev.filter((_, idx) => idx !== i))
+  const addFeature = type => {
+    // For a new stat feature, default to the first stat not already shown.
+    const usedStatIds = draft.filter(f => f.type === 'stat').map(f => f.statId)
+    const firstFree = stats.find(s => !usedStatIds.includes(s.id))
+    setDraft(prev => [
+      ...prev,
+      {
+        id: newFeatureId(),
+        type,
+        w: 100,
+        h: 100,
+        statId: type === 'stat' ? firstFree?.id : undefined,
+      },
+    ])
+  }
 
   async function saveStats() {
     if (!userId) return
     setSavingStats(true)
     setStatsMsg('')
-    // Stat ids are integers — coerce so they land in the bigint[] column.
-    const stat_ids = slots.filter(Boolean).map(Number)
-    // Preserve any other layout keys; store the two size percentages.
-    const nextLayout = { ...(prefs.layout || {}), statW: Number(statW), statH: Number(statH) }
-    const { error } = await supabase
-      .from('dashboard_preferences')
-      .upsert(
-        { user_id: userId, stat_ids, layout: nextLayout, updated_at: new Date().toISOString() },
-        { onConflict: 'user_id' }
-      )
-    setSavingStats(false)
-    if (error) {
-      setStatsMsg(`error:${error.message}`)
-      return
+    try {
+      await onSaveFeatures(draft)
+      setStatsMsg('ok:Saved.')
+      setTimeout(() => setStatsMsg(''), 3000)
+    } catch (e) {
+      setStatsMsg(`error:${e?.message || 'Save failed'}`)
+    } finally {
+      setSavingStats(false)
     }
-    setStatsMsg('ok:Saved.')
-    setTimeout(() => setStatsMsg(''), 3000)
-    onSaved()
   }
 
   async function saveLocation() {
@@ -799,89 +919,107 @@ function DashboardSettings({ prefs, stats, userId, isAdmin, weatherLocation, set
 
   return (
     <div className="w-full space-y-5">
-      {/* Mini-graph stats */}
+      {/* Dashboard Features */}
       <div className="card">
-        <h3 className="text-sm font-bold text-gray-800 mb-1">Dashboard Stats</h3>
+        <h3 className="text-sm font-bold text-gray-800 mb-1">Dashboard Features</h3>
         <p className="text-xs text-gray-500 mb-4">
-          Choose the statistics to show as mini trend graphs on your dashboard. Add as many as
-          you like.
+          Add, remove, and resize the cards on your dashboard. Drag cards on the dashboard itself
+          to reorder them.
         </p>
-        <div className="space-y-3">
-          {slots.map((val, i) => (
-            <div key={i}>
-              <label className="label">Stat {i + 1}</label>
-              <div className="flex items-center gap-2">
-                <select
-                  className="input flex-1"
-                  value={val}
-                  onChange={e => setSlot(i, e.target.value)}
-                >
-                  <option value="">— None —</option>
-                  {stats
-                    // Exclude ids already chosen in OTHER slots.
-                    .filter(
-                      st => String(st.id) === val || !slots.some((s, idx) => idx !== i && s === String(st.id))
-                    )
-                    .map(st => (
-                      <option key={st.id} value={st.id}>
-                        {st.name}
-                        {st.stat_category ? ` (${st.stat_category})` : ''}
-                      </option>
-                    ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => removeSlot(i)}
-                  title="Remove this stat"
-                  className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-colors"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={addSlot}
-          className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border border-green-600 text-green-700 bg-green-50 hover:bg-green-100 transition-colors"
-        >
-          + Add Stat
-        </button>
 
-        {/* Mini-graph sizing — per-user, percent of the default size. */}
-        <div className="mt-5 pt-4 border-t border-gray-100">
-          <h4 className="text-xs font-bold text-gray-700 mb-0.5">Graph Size</h4>
-          <p className="text-[11px] text-gray-400 mb-3">
-            Scale your dashboard mini graphs. 100% = default.
-          </p>
-          <div className="space-y-3 max-w-sm">
-            {[
-              { label: 'Width', val: statW, set: setStatW },
-              { label: 'Height', val: statH, set: setStatH },
-            ].map(({ label, val, set }) => (
-              <div key={label} className="flex items-center gap-3">
-                <span className="text-xs text-gray-600 w-14">{label}</span>
-                <input
-                  type="range"
-                  min="50"
-                  max="200"
-                  step="5"
-                  value={val}
-                  onChange={e => set(Number(e.target.value))}
-                  className="flex-1 accent-green-700"
-                />
-                <span className="text-xs font-semibold text-gray-700 w-12 text-right tabular-nums">
-                  {val}%
-                </span>
+        <div className="space-y-3">
+          {draft.map((f, i) => {
+            const meta = FEATURE_TYPES.find(t => t.type === f.type)
+            const usedElsewhere = draft
+              .filter((x, idx) => idx !== i && x.type === 'stat')
+              .map(x => x.statId)
+            return (
+              <div key={f.id} className="rounded-xl border border-gray-200 p-3">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <span className="text-sm font-semibold text-gray-800">
+                    {meta?.label || f.type}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeFeature(i)}
+                    title="Remove this feature"
+                    className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {f.type === 'stat' && (
+                  <select
+                    className="input w-full mb-2"
+                    value={f.statId ?? ''}
+                    onChange={e =>
+                      patchFeature(i, {
+                        statId: e.target.value ? Number(e.target.value) : undefined,
+                      })
+                    }
+                  >
+                    <option value="">— Choose a statistic —</option>
+                    {stats
+                      .filter(st => st.id === f.statId || !usedElsewhere.includes(st.id))
+                      .map(st => (
+                        <option key={st.id} value={st.id}>
+                          {st.name}
+                          {st.stat_category ? ` (${st.stat_category})` : ''}
+                        </option>
+                      ))}
+                  </select>
+                )}
+
+                {/* Per-feature size */}
+                <div className="space-y-2">
+                  {[
+                    { label: 'Width', key: 'w' },
+                    { label: 'Height', key: 'h' },
+                  ].map(({ label, key }) => (
+                    <div key={key} className="flex items-center gap-3">
+                      <span className="text-xs text-gray-500 w-12">{label}</span>
+                      <input
+                        type="range"
+                        min="50"
+                        max="200"
+                        step="5"
+                        value={f[key] || 100}
+                        onChange={e => patchFeature(i, { [key]: Number(e.target.value) })}
+                        className="flex-1 accent-green-700"
+                      />
+                      <span className="text-xs font-semibold text-gray-700 w-12 text-right tabular-nums">
+                        {f[key] || 100}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
+            )
+          })}
+          {draft.length === 0 && (
+            <p className="text-xs text-gray-400">No features yet — add one below.</p>
+          )}
+        </div>
+
+        {/* Add a feature */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-gray-500">Add:</span>
+          {FEATURE_TYPES.map(t => (
+            <button
+              key={t.type}
+              type="button"
+              onClick={() => addFeature(t.type)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-green-600 text-green-700 bg-green-50 hover:bg-green-100 transition-colors"
+            >
+              + {t.label}
+            </button>
+          ))}
         </div>
 
         <div className="flex items-center gap-3 mt-4">
           <button onClick={saveStats} disabled={savingStats} className="btn-primary text-sm">
-            {savingStats ? 'Saving…' : 'Save Stats'}
+            {savingStats ? 'Saving…' : 'Save Features'}
           </button>
           <SaveMsg msg={statsMsg} />
         </div>
