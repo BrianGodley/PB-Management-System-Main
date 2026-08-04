@@ -114,7 +114,29 @@ export default function PaverSummary({ module }) {
   const subManual = (d.subManualRows || [])
     .filter(r => n(r.subCost) > 0)
     .map((r, i) => ({ label: r.label || `Item ${i + 1}`, value: fmt2(r.subCost) }))
+  // Sub MATERIAL $ breakdown (from the saved calc snapshot). Shows the sub
+  // paver material as itemized dollars so the Sub cost isn't just a lump.
+  const smi = (d.calc || {}).subMatItems || {}
+  const subMaterialRows = [
+    ['paver', 'Paver Material'],
+    ['vert', 'Vertical Soldier'],
+    ['base', 'Base Rock'],
+    ['bedding', 'Bedding Sand'],
+    ['joint', 'Joint Sand'],
+    ['poly', 'Poly Sand'],
+    ['polyExisting', 'Poly Sand (Existing)'],
+    ['sealer', 'Sealer'],
+    ['restraint', 'Restraint Concrete'],
+    ['sleeves', 'Sleeves'],
+    ['pallet', 'Pallet Charges'],
+    ['delivery', 'Delivery'],
+    ['tax', 'Sales Tax'],
+    ['manual', 'Manual Material'],
+  ]
+    .filter(([k]) => n(smi[k]) > 0)
+    .map(([k, label]) => ({ label, value: fmt2(smi[k]) }))
   const subSections = [
+    { title: 'Sub Material', rows: subMaterialRows },
     { title: 'Paver & Demo Installation', rows: installRows },
     { title: 'Manual Entry', rows: subManual },
   ]

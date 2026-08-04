@@ -1045,6 +1045,28 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
     subAreaCost,
     subSideCost,
     subPaverMat,
+    // Itemized Sub-side breakdown for the module detail summary: the sub
+    // MATERIAL components (from the sub area rows) and the sub install/rate cost.
+    subInstallCost: subSideCost,
+    subMatItems: {
+      paver: subEngine.totalPaverCost,
+      vert: subEngine.vertPaverCost,
+      base: subEngine.baseRockCost,
+      baseTons: subEngine.totalBaseTons,
+      bedding: subEngine.beddingSandCost,
+      joint: subEngine.jointSandCost,
+      poly: subEngine.polySandCost,
+      polyExisting: subEngine.polySandExistingCost,
+      sealer: subEngine.sealerMatCost,
+      restraint: subEngine.restraintMatCost,
+      sleeves: subEngine.sleevesMatCost,
+      pallet: subEngine.palletCost,
+      pallets: subEngine.totalPallets,
+      delivery: subEngine.deliveryCost,
+      tax: subEngine.salesTaxCost,
+      manual: subEngine.manualMat,
+      total: subEngine.totalMat,
+    },
   }
 
   // Apply company sales tax to the module's total material cost so the
@@ -1104,6 +1126,11 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       },
     })
   }
+
+  // Active-tab material engine for the per-tab material readout: shows ONLY the
+  // active tab's materials (In-House on the In-House tab, Sub on the Sub tab).
+  // The financial calc still sums both sides.
+  const matBd = isSub ? subEngine : inHouse
 
   return (
     <SubTabContext.Provider value={isSub}>
@@ -2099,85 +2126,85 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             {isSub ? 'Sub' : 'In House'} Materials Breakdown
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-gray-600">
-            {calc.totalPaverCost > 0 && (
+            {matBd.totalPaverCost > 0 && (
               <span>
-                Paver Material: <strong>{fmt2(calc.totalPaverCost)}</strong>
+                Paver Material: <strong>{fmt2(matBd.totalPaverCost)}</strong>
               </span>
             )}
-            {calc.vertPaverCost > 0 && (
+            {matBd.vertPaverCost > 0 && (
               <span>
-                Vert Soldier: <strong>{fmt2(calc.vertPaverCost)}</strong>
+                Vert Soldier: <strong>{fmt2(matBd.vertPaverCost)}</strong>
               </span>
             )}
-            {calc.baseRockCost > 0 && (
+            {matBd.baseRockCost > 0 && (
               <span>
-                Base Rock ({calc.totalBaseTons.toFixed(1)}T):{' '}
-                <strong>{fmt2(calc.baseRockCost)}</strong>
+                Base Rock ({matBd.totalBaseTons.toFixed(1)}T):{' '}
+                <strong>{fmt2(matBd.baseRockCost)}</strong>
               </span>
             )}
-            {calc.beddingSandCost > 0 && (
+            {matBd.beddingSandCost > 0 && (
               <span>
-                Bedding Sand: <strong>{fmt2(calc.beddingSandCost)}</strong>
+                Bedding Sand: <strong>{fmt2(matBd.beddingSandCost)}</strong>
               </span>
             )}
-            {calc.jointSandCost > 0 && (
+            {matBd.jointSandCost > 0 && (
               <span>
-                Joint Sand: <strong>{fmt2(calc.jointSandCost)}</strong>
+                Joint Sand: <strong>{fmt2(matBd.jointSandCost)}</strong>
               </span>
             )}
-            {calc.polySandCost > 0 && (
+            {matBd.polySandCost > 0 && (
               <span>
-                Poly Sand: <strong>{fmt2(calc.polySandCost)}</strong>
+                Poly Sand: <strong>{fmt2(matBd.polySandCost)}</strong>
               </span>
             )}
-            {calc.polySandExistingCost > 0 && (
+            {matBd.polySandExistingCost > 0 && (
               <span>
-                Poly Sand (Existing): <strong>{fmt2(calc.polySandExistingCost)}</strong>
+                Poly Sand (Existing): <strong>{fmt2(matBd.polySandExistingCost)}</strong>
               </span>
             )}
-            {calc.sealerMatCost > 0 && (
+            {matBd.sealerMatCost > 0 && (
               <span>
-                Sealer: <strong>{fmt2(calc.sealerMatCost)}</strong>
+                Sealer: <strong>{fmt2(matBd.sealerMatCost)}</strong>
               </span>
             )}
-            {calc.restraintMatCost > 0 && (
+            {matBd.restraintMatCost > 0 && (
               <span>
-                Restraint Concrete: <strong>{fmt2(calc.restraintMatCost)}</strong>
+                Restraint Concrete: <strong>{fmt2(matBd.restraintMatCost)}</strong>
               </span>
             )}
-            {calc.sleevesMatCost > 0 && (
+            {matBd.sleevesMatCost > 0 && (
               <span>
-                Sleeves: <strong>{fmt2(calc.sleevesMatCost)}</strong>
+                Sleeves: <strong>{fmt2(matBd.sleevesMatCost)}</strong>
               </span>
             )}
-            {calc.palletCost > 0 && (
+            {matBd.palletCost > 0 && (
               <span>
-                Pallet Charges ({calc.totalPallets}): <strong>{fmt2(calc.palletCost)}</strong>
+                Pallet Charges ({matBd.totalPallets}): <strong>{fmt2(matBd.palletCost)}</strong>
               </span>
             )}
-            {calc.deliveryCost > 0 && (
+            {matBd.deliveryCost > 0 && (
               <span>
-                Delivery: <strong>{fmt2(calc.deliveryCost)}</strong>
+                Delivery: <strong>{fmt2(matBd.deliveryCost)}</strong>
               </span>
             )}
-            {calc.shipping > 0 && (
+            {matBd.shipping > 0 && (
               <span>
-                Shipping: <strong>{fmt2(calc.shipping)}</strong>
+                Shipping: <strong>{fmt2(matBd.shipping)}</strong>
               </span>
             )}
-            {calc.salesTaxCost > 0 && (
+            {matBd.salesTaxCost > 0 && (
               <span>
-                Sales Tax: <strong>{fmt2(calc.salesTaxCost)}</strong>
+                Sales Tax: <strong>{fmt2(matBd.salesTaxCost)}</strong>
               </span>
             )}
-            {calc.manualMat > 0 && (
+            {matBd.manualMat > 0 && (
               <span>
-                Manual: <strong>{fmt2(calc.manualMat)}</strong>
+                Manual: <strong>{fmt2(matBd.manualMat)}</strong>
               </span>
             )}
           </div>
           <p className="mt-2 pt-2 border-t border-gray-200 font-semibold text-gray-800">
-            Total Materials: {fmt2(calc.totalMat)}
+            Total Materials: {fmt2(matBd.totalMat)}
           </p>
         </div>
       )}
