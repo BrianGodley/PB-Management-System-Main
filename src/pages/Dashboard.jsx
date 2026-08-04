@@ -223,7 +223,7 @@ function SaveMsg({ msg }) {
 // WEATHER WIDGET — current conditions + 5-day outlook from the keyless
 // Open-Meteo API. `location` is a free-text place name (city/state or ZIP).
 // ═════════════════════════════════════════════════════════════════════════════
-function WeatherWidget({ location, onSaveLocation }) {
+function WeatherWidget({ location, onSaveLocation, forecastDays = 5 }) {
   const [wx, setWx] = useState({ status: 'loading', current: null, days: [], place: '' })
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -254,7 +254,7 @@ function WeatherWidget({ location, onSaveLocation }) {
             `apparent_temperature_min,precipitation_sum,precipitation_probability_max,` +
             `wind_speed_10m_max,wind_gusts_10m_max,uv_index_max,sunrise,sunset` +
             `&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch` +
-            `&timezone=auto&forecast_days=5`
+            `&timezone=auto&forecast_days=${forecastDays}`
         ).then(r => r.json())
         if (!alive) return
         const d = fc.daily || {}
@@ -290,7 +290,7 @@ function WeatherWidget({ location, onSaveLocation }) {
     return () => {
       alive = false
     }
-  }, [location])
+  }, [location, forecastDays])
 
   const dayLabel = (iso, idx) => {
     if (idx === 0) return 'Today'
@@ -1071,6 +1071,7 @@ export default function Dashboard() {
                     <WeatherWidget
                       location={myWeatherLocation}
                       onSaveLocation={saveWeatherLocation}
+                      forecastDays={10}
                     />
                   )}
                   {expanded.type === 'stat' && (
@@ -1093,6 +1094,7 @@ export default function Dashboard() {
                       userId={user?.id}
                       lineCount={expanded.lines || 3}
                       style={{ minHeight: 320 }}
+                      expanded
                     />
                   )}
                   {expanded.type === 'quickLinks' && (

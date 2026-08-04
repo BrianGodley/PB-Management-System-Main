@@ -1,49 +1,51 @@
-// Appreciation dashboard feature — three quick "grateful for" lines the user
-// can type right on the dashboard (persisted per-user in localStorage), plus a
-// button to send a note of appreciation to a coworker. Sending opens the user's
-// own email (mailto:) or texting (sms:) app with the note prefilled — no backend.
+// Appreciation dashboard feature — quick "grateful for" lines the user types
+// each day, saved per-day to the dashboard_appreciations table so history is
+// searchable. Plus a button to send a note of appreciation to a coworker
+// (opens the user's own email/text app prefilled — no backend send).
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 
-export default function AppreciationFeature({ userId, lineCount = 3, style }) {
+const todayStr = () => new Date().toISOString().slice(0, 10)
+
+export default function AppreciationFeature({ userId, lineCount = 3, style, expanded = false }) {
   const n = Math.max(1, Number(lineCount) || 3)
-  const key = userId ? `dashboard:appreciation:${userId}` : null
   const [lines, setLines] = useState(() => Array.from({ length: n }, () => ''))
   const [showSend, setShowSend] = useState(false)
 
+  // Load today's entry from the DB, fit to the configured line count.
   useEffect(() => {
-    let saved = []
-    if (key) {
-      try {
-        const raw = localStorage.getItem(key)
-        if (raw) {
-          const a = JSON.parse(raw)
-          if (Array.isArray(a)) saved = a
-        }
-      } catch {
-        /* ignore */
-      }
+    if (!userId) return
+    let alive = true
+    supabase
+      .from('dashboard_appreciations')
+      .select('lines')
+      .eq('user_id', userId)
+      .eq('entry_date', todayStr())
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!alive) return
+        const saved = Array.isArray(data?.lines) ? data.lines : []
+        setLines(Array.from({ length: n }, (_, i) => saved[i] || ''))
+      })
+    return () => {
+      alive = false
     }
-    // Fit the saved entries to the configured line count (pad/truncate).
-    setLines(Array.from({ length: n }, (_, i) => saved[i] || ''))
-  }, [key, n])
+  }, [userId, n])
 
-  const setLine = (i, v) => {
-    const next = lines.map((l, idx) => (idx === i ? v : l))
-    setLines(next)
-    if (key) {
-      try {
-        localStorage.setItem(key, JSON.stringify(next))
-      } catch {
-        /* ignore */
-      }
-    }
+  const setLine = (i, v) => setLines(prev => prev.map((l, idx) => (idx === i ? v : l)))
+  // Persist today's lines (called on blur so we don't write on every keystroke).
+  const commit = async () => {
+    if (!userId) return
+    await supabase.from('dashboard_appreciations').upsert(
+      { user_id: userId, entry_date: todayStr(), lines, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id,entry_date' }
+    )
   }
 
   return (
     <div className="card flex flex-col" style={style}>
       <h3 className="text-sm font-bold text-gray-800 mb-1">🙏 Appreciation</h3>
-      <p className="text-xs text-gray-400 mb-3">Three things you’re grateful for today.</p>
+      <p className="text-xs text-gray-400 mb-3">Things you’re grateful for today.</p>
       <div className="space-y-2 flex-1">
         {lines.map((l, i) => (
           <div key={i} className="flex items-center gap-2">
@@ -51,6 +53,7 @@ export default function AppreciationFeature({ userId, lineCount = 3, style }) {
             <input
               value={l}
               onChange={e => setLine(i, e.target.value)}
+              onBlur={commit}
               placeholder="I’m grateful for…"
               className="input flex-1 text-sm py-1.5"
             />
@@ -64,7 +67,64 @@ export default function AppreciationFeature({ userId, lineCount = 3, style }) {
       >
         💌 Send Appreciation
       </button>
+      {expanded && <AppreciationHistory userId={userId} />}
       {showSend && <SendModal onClose={() => setShowSend(false)} />}
+    </div>
+  )
+}
+
+// History browser (expanded view): pick a past date and see what was written.
+function AppreciationHistory({ userId }) {
+  const [date, setDate] = useState(() => todayStr())
+  const [entries, setEntries] = useState(null) // null = loading
+
+  useEffect(() => {
+    if (!userId) return
+    let alive = true
+    setEntries(null)
+    supabase
+      .from('dashboard_appreciations')
+      .select('lines')
+      .eq('user_id', userId)
+      .eq('entry_date', date)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!alive) return
+        setEntries(Array.isArray(data?.lines) ? data.lines.filter(Boolean) : [])
+      })
+    return () => {
+      alive = false
+    }
+  }, [userId, date])
+
+  return (
+    <div className="mt-5 pt-4 border-t border-gray-100">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <h4 className="text-xs font-bold text-gray-700">History</h4>
+        <input
+          type="date"
+          value={date}
+          max={todayStr()}
+          onChange={e => setDate(e.target.value)}
+          className="input text-xs py-1 w-40"
+        />
+      </div>
+      {entries === null ? (
+        <div className="flex justify-center py-4">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-700" />
+        </div>
+      ) : entries.length === 0 ? (
+        <p className="text-xs text-gray-400">No appreciations written on this day.</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {entries.map((l, i) => (
+            <li key={i} className="flex gap-2 text-sm text-gray-700">
+              <span className="text-green-600 leading-none">•</span>
+              <span>{l}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
