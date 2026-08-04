@@ -62,7 +62,19 @@ export default function StepsSummary({ module }) {
 
   return (
     <div>
-      <FinancialSummaryList module={module} />
+      <FinancialSummaryList
+        totalHrs={n(calc.totalHrs)}
+        manDays={n(calc.manDays)}
+        totalMat={n(calc.totalMat)}
+        laborCost={n(calc.laborCost)}
+        lrph={n(data.laborRatePerHour) || 35}
+        burden={n(calc.burden)}
+        subCost={n(calc.subCost)}
+        gp={n(calc.gp)}
+        subGp={n(calc.subGp)}
+        commission={n(calc.commission)}
+        price={n(calc.price)}
+      />
 
       {/* Vendor/Type step sections */}
       {matSections.map(sec => (

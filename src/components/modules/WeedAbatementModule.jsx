@@ -17,11 +17,12 @@
 // In-House vs Sub are INDEPENDENT calculators with their own inputs (ihData /
 // subData); the GPMD bar switches to its 'sub' variant on the Sub tab.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import ModuleNotesField from './ModuleNotesField'
 import WorkTypeChooser from './WorkTypeChooser'
+import RateEditPopover from '../RateEditPopover'
 
 const n = v => parseFloat(v) || 0
 const R = { laborRatePerHour: 35, laborBurdenPct: 0.29, gpmd: 425, commissionRate: 0.12 }
@@ -39,7 +40,7 @@ function makeTab(src = {}) {
     visits: src.visits ?? '1',
     flatSF: src.flatSF ?? '',
     hillSF: src.hillSF ?? '',
-    subRatePer1k: src.subRatePer1k ?? '', // Sub tab: $/1,000 SF
+    subRatePerSF: src.subRatePerSF ?? '', // Sub tab: strict $/SF
     subFlat: src.subFlat ?? '', // Sub tab: optional flat add
   }
 }
@@ -59,16 +60,18 @@ function calcWeed(
   const subMarkup = n(state.subGpMarkupRate) || 0.2
 
   if (isSub) {
-    // Sub tab: flat subcontractor pricing. No in-house labor or materials.
+    // Sub tab: STRICT price per square foot — no labor hours. subCost is purely
+    // $/SF × area × visits, plus an optional flat add.
     const subArea = flatSF + hillSF
-    const subCost = (subArea / 1000) * n(state.subRatePer1k) * visits + n(state.subFlat)
+    const subRatePerSF = n(state.subRatePerSF)
+    const subCost = subArea * subRatePerSF * visits + n(state.subFlat)
     const subGp = subCost * subMarkup
     const commission = subGp * R.commissionRate
     return {
       isSub: true, mode, visits, flatSF, hillSF,
       travelHrs: 0, flatHrs: 0, hillHrs: 0, laborHrs: 0, totalHrs: 0, manDays: 0,
       totalMat: 0, laborCost: 0, burden: 0, gp: 0,
-      subArea, subRatePer1k: n(state.subRatePer1k), subFlat: n(state.subFlat),
+      subArea, subRatePerSF, subFlat: n(state.subFlat),
       subCost, subGp, commission,
       price: subCost + subGp + commission,
     }
@@ -105,6 +108,10 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
   const [notes, setNotes] = useState(initialData?.notes ?? '')
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
+  // Master-rate default for the Sub $/SF. Used only when the user leaves the
+  // Subcontractor Rate field blank; a typed value always wins.
+  const [subRateDefault, setSubRateDefault] = useState(null)
+
   // Independent In-House / Sub tabs. Legacy flat saves load into In-House.
   const [ihTab, setIhTab] = useState(() => makeTab(initialData?.ihData || initialData))
   const [subTab, setSubTab] = useState(() => makeTab(initialData?.subData || {}))
@@ -118,6 +125,23 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
   const visits = cur.visits
   const flatSF = cur.flatSF
   const hillSF = cur.hillSF
+
+  // Load the master Sub $/SF rate so the Sub tab has a sensible default when
+  // the user leaves the rate field blank. Re-fetched after a RateEditPopover
+  // save so the hint + fallback reflect the edit immediately.
+  const refreshRates = useCallback(async () => {
+    const { data } = await supabase
+      .from('material_rates')
+      .select('name, unit_cost')
+      .eq('category', 'Weed Abatement')
+    const row = (data || []).find(r => r.name === 'Weed Abatement - Sub $/SF')
+    const v = row ? parseFloat(row.unit_cost) : NaN
+    setSubRateDefault(Number.isFinite(v) ? v : null)
+  }, [])
+
+  useEffect(() => {
+    refreshRates()
+  }, [refreshRates])
 
   // Pull the company labor rate + burden % (HR → Labor Rates). Skip when
   // re-editing a saved module so it keeps the rate it was built with.
@@ -133,7 +157,11 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
       })
   }, [])
 
-  const state = { subType, subGpMarkupRate, ...cur }
+  // Effective Sub $/SF for the calc: the user's typed value is authoritative;
+  // only fall back to the master-rate default when the field is left blank.
+  const effSubRatePerSF =
+    cur.subRatePerSF === '' || cur.subRatePerSF == null ? (subRateDefault ?? '') : cur.subRatePerSF
+  const state = { subType, subGpMarkupRate, ...cur, subRatePerSF: effSubRatePerSF }
   const calc = calcWeed(state, laborRatePerHour, gpmd, laborBurdenPct)
 
   function handleSave() {
@@ -231,9 +259,24 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
       {isSub && (
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
-            <label className={lbl}>Subcontractor Rate ($ / 1,000 SF)</label>
-            <input type="number" value={cur.subRatePer1k} onChange={e => setField('subRatePer1k')(e.target.value)} placeholder="0" className={inp} />
-            <p className="text-[11px] text-gray-400 mt-1">Applied to total area × visits.</p>
+            <div className="flex items-center mb-1">
+              <label className={`${lbl} mb-0`}>Subcontractor Rate ($ / SF)</label>
+              <RateEditPopover
+                table="material_rates"
+                name="Weed Abatement - Sub $/SF"
+                category="Weed Abatement"
+                unitLabel="SF"
+                currentValue={subRateDefault ?? ''}
+                onSaved={refreshRates}
+              />
+            </div>
+            <input type="number" step="0.001" value={cur.subRatePerSF} onChange={e => setField('subRatePerSF')(e.target.value)} placeholder={subRateDefault != null ? String(subRateDefault) : '0.00'} className={inp} />
+            <p className="text-[11px] text-gray-400 mt-1">
+              Strict price per square foot × area × visits.
+              {subRateDefault != null && (cur.subRatePerSF === '' || cur.subRatePerSF == null) && (
+                <span className="ml-1">default {fmt(subRateDefault)}/SF</span>
+              )}
+            </p>
           </div>
           <div>
             <label className={lbl}>Additional Flat Sub Cost (optional)</label>
@@ -251,7 +294,7 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">Rate</span>
-            <span className="font-medium">{fmt(calc.subRatePer1k)} / 1,000 SF</span>
+            <span className="font-medium">{fmt(calc.subRatePerSF)} / SF</span>
           </div>
           {calc.subFlat > 0 && (
             <div className="flex justify-between">

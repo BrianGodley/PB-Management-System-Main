@@ -444,8 +444,20 @@ export default function WallsSummary({ module }) {
 
   return (
     <div>
-      {/* Financial summary */}
-      <FinancialSummaryList module={module} />
+      {/* Financial summary — FinancialSummaryList reads NAMED props */}
+      <FinancialSummaryList
+        totalHrs={n(calc.totalHrs)}
+        manDays={n(calc.manDays)}
+        totalMat={n(calc.totalMat)}
+        laborCost={n(calc.laborCost)}
+        lrph={n(data.laborRatePerHour) || 35}
+        burden={n(calc.burden)}
+        subCost={n(calc.subCost)}
+        gp={n(calc.gp)}
+        subGp={n(calc.subGp)}
+        commission={n(calc.commission)}
+        price={n(calc.price)}
+      />
 
       {/* In-House quantities */}
       {showSub && (

@@ -422,7 +422,19 @@ export default function FirePitSummary({ module }) {
       <LineRow label="Man Days" value={`${manDays.toFixed(2)} days`} />
 
       <div className="mt-3">
-        <FinancialSummaryList rows={financeRows} />
+        <FinancialSummaryList
+          totalHrs={n(totalHrs)}
+          manDays={n(manDays)}
+          totalMat={n(totalMat)}
+          laborCost={n(laborCost)}
+          lrph={n(laborRatePerHour) || 35}
+          burden={n(burden)}
+          subCost={n(manSub)}
+          gp={n(gp)}
+          subGp={0}
+          commission={n(commission)}
+          price={n(price)}
+        />
       </div>
     </div>
   )

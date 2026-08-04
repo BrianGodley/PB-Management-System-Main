@@ -44,6 +44,7 @@ import FinishesSummary from '../components/modules/FinishesSummary'
 const StepsModule = lazy(() => import('../components/modules/StepsModule'))
 import StepsSummary from '../components/modules/StepsSummary'
 const WeedAbatementModule = lazy(() => import('../components/modules/WeedAbatementModule'))
+import WeedAbatementSummary from '../components/modules/WeedAbatementSummary'
 import GpmdBar from '../components/modules/GpmdBar'
 import EstimateWhatIfModal from '../components/EstimateWhatIfModal'
 
@@ -2192,6 +2193,8 @@ export default function EstimateDetail() {
                   <StepsSummary module={selectedModule} />
                 ) : selectedModule.module_type === 'Pool' ? (
                   <PoolSummary module={selectedModule} />
+                ) : selectedModule.module_type === 'Weed Abatement' ? (
+                  <WeedAbatementSummary module={selectedModule} />
                 ) : (
                   /* Generic fallback for modules not yet built out */
                   <div className="space-y-3">

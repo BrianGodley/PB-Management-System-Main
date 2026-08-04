@@ -2105,7 +2105,7 @@ function TargetLineSegments({
 }
 
 // ── Dual-handle Date Range Scrubber ──────────────────────────────────────────
-function DateRangeScrubber({ minDate, maxDate, fromDate, toDate, onFromChange, onToChange }) {
+function DateRangeScrubber({ minDate, maxDate, fromDate, toDate, onFromChange, onToChange, compact }) {
   const trackRef = useRef(null)
   const draggingRef = useRef(null) // 'from' | 'to'
   const stateRef = useRef({}) // always-current values without re-registering listeners
@@ -2175,6 +2175,45 @@ function DateRangeScrubber({ minDate, maxDate, fromDate, toDate, onFromChange, o
   const startTo = e => {
     e.preventDefault?.()
     draggingRef.current = 'to'
+  }
+
+  // Compact variant (mini stat cards): the round dots ARE the drag handles —
+  // no date flags on the circles. The current window is shown once, in a small
+  // centered field below the track, and updates live as the handles move.
+  if (compact) {
+    return (
+      <div className="px-3 pt-1 pb-1.5 select-none flex-shrink-0">
+        <div ref={trackRef} className="relative h-4 flex items-center select-none">
+          {/* Track */}
+          <div className="absolute inset-x-0 h-1.5 bg-gray-200 rounded-full" />
+          {/* Selected range fill */}
+          <div
+            className="absolute h-1.5 rounded-full bg-green-100 border border-green-200"
+            style={{ left: `${leftPct}%`, right: `${100 - rightPct}%` }}
+          />
+          {/* From handle — the circle itself is the grab target */}
+          <div
+            onMouseDown={startFrom}
+            onTouchStart={startFrom}
+            className="absolute w-3.5 h-3.5 rounded-full border-2 bg-white z-20 cursor-grab active:cursor-grabbing touch-none shadow-sm"
+            style={{ left: `${leftPct}%`, transform: 'translateX(-50%)', borderColor: FG }}
+            title="Drag to change start date"
+          />
+          {/* To handle */}
+          <div
+            onMouseDown={startTo}
+            onTouchStart={startTo}
+            className="absolute w-3.5 h-3.5 rounded-full border-2 bg-white z-20 cursor-grab active:cursor-grabbing touch-none shadow-sm"
+            style={{ left: `${rightPct}%`, transform: 'translateX(-50%)', borderColor: FG }}
+            title="Drag to change end date"
+          />
+        </div>
+        {/* Live date-range readout — centered, moves value with the handles. */}
+        <div className="text-center text-[10px] text-gray-500 mt-1 tabular-nums">
+          {fmtLabel(fromDate)} – {fmtLabel(toDate)}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -8813,6 +8852,33 @@ function ArchivedView({ onRestored }) {
 // date window driven by the shared DateRangeScrubber, and renders a compact
 // recharts line chart with visible X + Y axes. No target lines, overlays,
 // upside-down, notes, or cursor — just the line + axes + slider.
+// Module-level twin of the main view's defaultRangeFor — computes the from/to
+// window for a stat's default_periods so mini cards open on the same number of
+// periods the big graph does. Returns null when the stat has no default_periods.
+function defaultRangeForStat(stat, wed) {
+  if (!stat?.default_periods) return null
+  const count = stat.default_periods
+  const wday = wed ?? 5
+  const now = new Date()
+  let from
+  if (stat.tracking === 'daily') {
+    const d = new Date()
+    d.setDate(d.getDate() - (count - 1))
+    from = isoDate(d)
+  } else if (stat.tracking === 'weekly') {
+    const we = new Date(getWeekEndingDate(today(), wday) + 'T00:00:00')
+    we.setDate(we.getDate() - (count - 1) * 7)
+    from = isoDate(we)
+  } else if (stat.tracking === 'monthly') {
+    from = isoDate(new Date(now.getFullYear(), now.getMonth() - (count - 1), 1))
+  } else if (stat.tracking === 'quarterly') {
+    from = isoDate(new Date(now.getFullYear(), now.getMonth() - (count - 1) * 3, 1))
+  } else {
+    from = `${now.getFullYear() - (count - 1)}-01-01`
+  }
+  return { from, to: today() }
+}
+
 function StatMiniGraph({ stat, values, weekEndingDay }) {
   // Full date extent of this stat's values. Fall back to a 90-day window so the
   // scrubber always has a valid, non-zero span even when there's no data yet.
@@ -8822,15 +8888,27 @@ function StatMiniGraph({ stat, values, weekEndingDay }) {
     return { min: dates[0], max: dates[dates.length - 1] }
   }, [values])
 
-  const [from, setFrom] = useState(dateExtent.min)
-  const [to, setTo] = useState(dateExtent.max)
+  // Default window = the stat's default_periods span (same count the main graph
+  // opens on), clamped into the available data extent. Falls back to the full
+  // extent when the stat has no default_periods.
+  const defWindow = useMemo(() => {
+    const min = dateExtent.min
+    const max = dateExtent.max
+    const dr = defaultRangeForStat(stat, weekEndingDay)
+    if (!dr) return { from: min, to: max }
+    const f = dr.from < min ? min : dr.from > max ? min : dr.from
+    return { from: f, to: max }
+  }, [stat, weekEndingDay, dateExtent.min, dateExtent.max])
 
-  // Reset this card's window to the full extent whenever the underlying data
-  // changes (group tab / tracking switch delivering a fresh slice).
+  const [from, setFrom] = useState(defWindow.from)
+  const [to, setTo] = useState(defWindow.to)
+
+  // Reset this card's window to the default_periods span whenever the data or
+  // that default changes (group tab / tracking switch delivering a fresh slice).
   useEffect(() => {
-    setFrom(dateExtent.min)
-    setTo(dateExtent.max)
-  }, [dateExtent.min, dateExtent.max])
+    setFrom(defWindow.from)
+    setTo(defWindow.to)
+  }, [defWindow.from, defWindow.to])
 
   // Period series for this card's window — walk every period in [from,to] for
   // the stat's tracking and pull the value whose date matches that bucket.
@@ -8859,6 +8937,7 @@ function StatMiniGraph({ stat, values, weekEndingDay }) {
       </div>
       {/* Per-card date window slider — the same scrubber the main graph uses. */}
       <DateRangeScrubber
+        compact
         minDate={dateExtent.min}
         maxDate={dateExtent.max}
         fromDate={fromClamped}
@@ -8889,7 +8968,7 @@ function StatMiniGraph({ stat, values, weekEndingDay }) {
                 contentStyle={{ fontSize: 11, padding: '4px 8px' }}
               />
               <Line
-                type="monotone"
+                type="linear"
                 dataKey="value"
                 stroke={FG}
                 strokeWidth={2}
