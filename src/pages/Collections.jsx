@@ -395,6 +395,7 @@ export default function Collections() {
   // company_settings.auto_allocations. These drive Financial Planning section 2.
   const [autoAllocations, setAutoAllocations] = useState([])
   const [companySettingsId, setCompanySettingsId] = useState(null)
+  const [editingWeekAllocs, setEditingWeekAllocs] = useState(false)
   const [newWeekModal, setNewWeekModal] = useState(null) // { lastDataWeek, nextDate }
   const [deleteWeekConfirm, setDeleteWeekConfirm] = useState(false)
   const [deletingWeek, setDeletingWeek] = useState(false)
@@ -511,7 +512,9 @@ export default function Collections() {
     if (!targetWeek) {
       const { data, error } = await supabase
         .from('collection_weeks')
-        .insert({ week_ending: nextDate })
+        // Snapshot the current company-wide allocation template onto the new
+        // week so editing the template (or another week) never changes this one.
+        .insert({ week_ending: nextDate, auto_allocations: autoAllocations })
         .select()
         .single()
       if (error || !data) {
@@ -968,6 +971,19 @@ export default function Collections() {
     if (data?.id && companySettingsId == null) setCompanySettingsId(data.id)
   }
 
+  // Save allocations for the SELECTED week only (per-week override).
+  async function saveWeekAllocations(next) {
+    if (!selectedWeek) return
+    setWeeks(prev =>
+      prev.map(w => (w.id === selectedWeek.id ? { ...w, auto_allocations: next } : w))
+    )
+    const { error } = await supabase
+      .from('collection_weeks')
+      .update({ auto_allocations: next })
+      .eq('id', selectedWeek.id)
+    if (error) throw error
+  }
+
   // ── Summaries ───────────────────────────────────────────────────────────────
   function collSummary(section) {
     const sRows = rows.filter(r => r.section === section)
@@ -1023,7 +1039,12 @@ export default function Collections() {
       payroll: payrollAlloc,
       available_cash: cashOnHand - payrollAlloc,
     })[key] ?? cashOnHand
-  const autoAllocComputed = (autoAllocations || []).map(a => ({
+  // Per-week allocations: a week uses its own snapshot when present, otherwise
+  // the company-wide template. Editing one week never affects the others.
+  const weekAllocs = Array.isArray(selectedWeek?.auto_allocations)
+    ? selectedWeek.auto_allocations
+    : autoAllocations
+  const autoAllocComputed = (weekAllocs || []).map(a => ({
     id: a.id,
     name: a.name || (a.kind === 'percentage' ? 'Percentage' : 'Fixed'),
     kind: a.kind,
@@ -1434,6 +1455,7 @@ export default function Collections() {
                         label={sec.label}
                         items={autoAllocComputed}
                         total={autoAlloc}
+                        onEdit={inputsLocked ? undefined : () => setEditingWeekAllocs(true)}
                       />
                     ) : (
                       <FinancialTable
@@ -1658,17 +1680,66 @@ export default function Collections() {
           )}
         </>
       )}
+
+      {/* Per-week Auto Allocations override editor */}
+      {editingWeekAllocs && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setEditingWeekAllocs(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">Auto Allocations — This Week</h3>
+                <p className="text-[11px] text-gray-400">
+                  Changes here apply only to {selectedWeek?.week_ending || 'this week'}.
+                </p>
+              </div>
+              <button
+                onClick={() => setEditingWeekAllocs(false)}
+                title="Close"
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4">
+              <AutoAllocSettings
+                value={weekAllocs}
+                onSave={async next => {
+                  await saveWeekAllocations(next)
+                  setEditingWeekAllocs(false)
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 // ── Auto Allocations (read-only) view for Financial Planning section 2 ────────
-function AutoAllocView({ label, items, total }) {
+function AutoAllocView({ label, items, total, onEdit }) {
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
       <div className="bg-blue-800 text-white px-4 py-2.5 flex items-center justify-between flex-shrink-0">
         <h3 className="text-sm font-bold">{label}</h3>
-        <span className="text-xs font-bold text-blue-100">{fmtC(total)}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-blue-100">{fmtC(total)}</span>
+          {onEdit && (
+            <button
+              onClick={onEdit}
+              title="Edit this week's allocations"
+              className="text-blue-100 hover:text-white text-xs leading-none"
+            >
+              ✏
+            </button>
+          )}
+        </div>
       </div>
       <table className="w-full text-xs">
         <thead className="bg-gray-50 border-b border-gray-200">
