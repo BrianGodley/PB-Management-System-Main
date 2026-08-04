@@ -1161,13 +1161,13 @@ function DashboardSettings({
             Pick which features appear on your dashboard. Selected features are highlighted in
             green.
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="flex flex-wrap gap-4">
             {FEATURE_TYPES.map(t => {
               const on = isTypePresent(t.type)
               return (
                 <div
                   key={t.type}
-                  className={`rounded-2xl border-2 aspect-square flex flex-col items-center text-center p-5 transition-colors ${
+                  className={`w-72 h-72 flex-shrink-0 rounded-2xl border-2 flex flex-col items-center text-center p-5 transition-colors ${
                     on ? 'border-green-400 bg-green-50' : 'border-gray-200 bg-white'
                   }`}
                 >
