@@ -65,6 +65,12 @@ const FEATURE_TYPES = [
     icon: '🙏',
     desc: 'Note what you’re grateful for and send appreciation to a coworker.',
   },
+  {
+    type: 'quickLinks',
+    label: 'Quick Links',
+    icon: '⚡',
+    desc: 'One-tap shortcuts to common actions and pages.',
+  },
 ]
 
 function newFeatureId() {
@@ -90,6 +96,7 @@ function buildFeatures(prefs) {
   const feats = [{ id: newFeatureId(), type: 'weather', w, h }]
   for (const id of prefs?.stat_ids || [])
     feats.push({ id: newFeatureId(), type: 'stat', statId: Number(id), w, h })
+  feats.push({ id: newFeatureId(), type: 'quickLinks', w: 100, h: 100 })
   return feats
 }
 
@@ -629,6 +636,12 @@ export default function Dashboard() {
     )
   }
 
+  // Edit mode: when on, features can be dragged to reorder and resized by a
+  // corner handle (like resizing an image). Off = normal read-only dashboard.
+  const [editMode, setEditMode] = useState(false)
+  // Clicking a feature's expand control opens an enlarged modal (like stats).
+  const [expanded, setExpanded] = useState(null)
+
   // Drag-to-reorder (HTML5 DnD via each card's grip handle).
   const dragIdx = useRef(null)
   function onDropAt(toIdx) {
@@ -644,11 +657,41 @@ export default function Dashboard() {
     })
   }
 
+  // Corner-handle resize. Percentages are relative to the base card size
+  // (340px wide × 285px tall). Live-updates while dragging, persists on release.
+  const clampPct = v => Math.max(40, Math.min(300, v))
+  function onResizeStart(e, i) {
+    e.preventDefault()
+    e.stopPropagation()
+    const startX = e.clientX
+    const startY = e.clientY
+    const f0 = features[i]
+    const startW = Number(f0.w) || 100
+    const startH = Number(f0.h) || 100
+    const move = ev => {
+      const dx = ev.clientX - startX
+      const dy = ev.clientY - startY
+      const newW = clampPct(Math.round(((340 * startW) / 100 + dx) / 340 * 100 / 5) * 5)
+      const newH = clampPct(Math.round(((285 * startH) / 100 + dy) / 285 * 100 / 5) * 5)
+      setFeatures(prev => prev.map((ff, idx) => (idx === i ? { ...ff, w: newW, h: newH } : ff)))
+    }
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      setFeatures(prev => {
+        persistFeatures(prev)
+        return prev
+      })
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+
   function featureDims(f) {
     return {
       width: `min(100%, ${Math.round(340 * ((Number(f.w) || 100) / 100))}px)`,
       statHeight: Math.round(285 * ((Number(f.h) || 100) / 100)),
-      minHeight: Math.round(240 * ((Number(f.h) || 100) / 100)),
+      minHeight: Math.round(285 * ((Number(f.h) || 100) / 100)),
     }
   }
 
@@ -680,7 +723,7 @@ export default function Dashboard() {
   return (
     <div>
       {/* Tab bar */}
-      <div className="bg-white border-b border-gray-200 flex justify-center gap-0 mb-5 rounded-xl">
+      <div className="relative bg-white border-b border-gray-200 flex justify-center gap-0 mb-5 rounded-xl">
         {[
           { key: 'dashboard', label: '🏠 Dashboard' },
           { key: 'settings', label: '⚙️ Settings' },
@@ -697,6 +740,22 @@ export default function Dashboard() {
             {t.label}
           </button>
         ))}
+        {/* Edit / Done — drag + resize dashboard features. */}
+        {tab === 'dashboard' && (
+          <button
+            onClick={() => {
+              if (editMode) persistFeatures(features)
+              setEditMode(v => !v)
+            }}
+            className={`absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 rounded-lg text-sm font-semibold border transition-colors ${
+              editMode
+                ? 'bg-green-700 text-white border-green-700 hover:bg-green-800'
+                : 'border-gray-300 text-gray-600 bg-white hover:bg-gray-50'
+            }`}
+          >
+            {editMode ? '✓ Done' : '✎ Edit'}
+          </button>
+        )}
       </div>
 
       {tab === 'dashboard' && (
@@ -708,24 +767,44 @@ export default function Dashboard() {
                 <div
                   key={f.id}
                   style={{ width: dims.width }}
-                  onDragOver={e => e.preventDefault()}
-                  onDrop={() => onDropAt(i)}
-                  className="relative group"
+                  onDragOver={e => editMode && e.preventDefault()}
+                  onDrop={() => editMode && onDropAt(i)}
+                  className={`relative group ${
+                    editMode ? 'ring-2 ring-green-300 ring-offset-2 rounded-xl' : ''
+                  }`}
                 >
-                  {/* Drag handle — appears on hover; drag to reorder. */}
-                  <div
-                    draggable
-                    onDragStart={() => {
-                      dragIdx.current = i
-                    }}
-                    onDragEnd={() => {
-                      dragIdx.current = null
-                    }}
-                    title="Drag to reorder"
-                    className="absolute -top-2 -left-2 z-30 w-6 h-6 flex items-center justify-center rounded-full bg-white border border-gray-200 shadow-sm text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    ⠿
-                  </div>
+                  {/* Drag handle — edit mode only. */}
+                  {editMode && (
+                    <div
+                      draggable
+                      onDragStart={() => {
+                        dragIdx.current = i
+                      }}
+                      onDragEnd={() => {
+                        dragIdx.current = null
+                      }}
+                      title="Drag to reorder"
+                      className="absolute -top-2 -left-2 z-30 w-6 h-6 flex items-center justify-center rounded-full bg-green-700 text-white shadow cursor-grab active:cursor-grabbing"
+                    >
+                      ⠿
+                    </div>
+                  )}
+                  {/* Enlarge — view mode. Stat cards have their own built-in expand. */}
+                  {!editMode && f.type !== 'stat' && (
+                    <button
+                      type="button"
+                      onClick={() => setExpanded(f)}
+                      title="Enlarge"
+                      className="absolute -top-2 -right-2 z-30 w-6 h-6 flex items-center justify-center rounded-full bg-white border border-gray-200 shadow-sm text-gray-400 hover:text-green-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="15 3 21 3 21 9" />
+                        <polyline points="9 21 3 21 3 15" />
+                        <line x1="21" y1="3" x2="14" y2="10" />
+                        <line x1="3" y1="21" x2="10" y2="14" />
+                      </svg>
+                    </button>
+                  )}
                   {f.type === 'weather' && (
                     <WeatherWidget
                       location={myWeatherLocation}
@@ -745,35 +824,114 @@ export default function Dashboard() {
                   {f.type === 'appreciation' && (
                     <AppreciationFeature userId={user?.id} style={{ minHeight: dims.minHeight }} />
                   )}
+                  {f.type === 'quickLinks' && (
+                    <div className="card" style={{ minHeight: dims.minHeight }}>
+                      <h3 className="text-sm font-bold text-gray-800 mb-3">Quick Links</h3>
+                      <div className="grid grid-cols-2 gap-2">
+                        {quickLinks.map(q => (
+                          <button
+                            key={q.label}
+                            onClick={() => {
+                              if (editMode) return
+                              if (q.key === 'add-employee') setShowAddEmp(true)
+                              else if (q.key === 'continue-training') setShowTraining(true)
+                              else if (q.key === 'quick-estimate') setShowQuickEst(true)
+                              else if (q.key === 'add-vendor') setShowVendorChoose(true)
+                              else navigate(q.to)
+                            }}
+                            className="flex flex-col items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-3 py-4 hover:border-green-300 hover:bg-green-50 transition-colors"
+                          >
+                            <span className="text-2xl leading-none">{q.icon}</span>
+                            <span className="text-xs font-medium text-gray-700 text-center leading-tight">
+                              {q.label}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* Resize handle — edit mode only; drag the corner like an image. */}
+                  {editMode && (
+                    <div
+                      onPointerDown={e => onResizeStart(e, i)}
+                      title="Drag to resize"
+                      className="absolute -bottom-1.5 -right-1.5 z-30 w-4 h-4 rounded-sm bg-green-700 border-2 border-white shadow cursor-nwse-resize"
+                    />
+                  )}
                 </div>
               )
             })}
           </div>
 
-          {/* Quick Links */}
-          <div className="card mt-4">
-            <h3 className="text-sm font-bold text-gray-800 mb-3">Quick Links</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {quickLinks.map(q => (
-                <button
-                  key={q.label}
-                  onClick={() => {
-                    if (q.key === 'add-employee') setShowAddEmp(true)
-                    else if (q.key === 'continue-training') setShowTraining(true)
-                    else if (q.key === 'quick-estimate') setShowQuickEst(true)
-                    else if (q.key === 'add-vendor') setShowVendorChoose(true)
-                    else navigate(q.to)
-                  }}
-                  className="flex flex-col items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-3 py-4 hover:border-green-300 hover:bg-green-50 transition-colors"
-                >
-                  <span className="text-2xl leading-none">{q.icon}</span>
-                  <span className="text-xs font-medium text-gray-700 text-center leading-tight">
-                    {q.label}
-                  </span>
-                </button>
-              ))}
+          {/* Enlarged feature modal (click a card's ⤢ to open) */}
+          {expanded && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+              onClick={() => setExpanded(null)}
+            >
+              <div
+                className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                  <h3 className="text-sm font-bold text-gray-900">
+                    {FEATURE_TYPES.find(t => t.type === expanded.type)?.label || 'Feature'}
+                  </h3>
+                  <button
+                    onClick={() => setExpanded(null)}
+                    title="Close"
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="p-4">
+                  {expanded.type === 'weather' && (
+                    <WeatherWidget
+                      location={myWeatherLocation}
+                      onSaveLocation={saveWeatherLocation}
+                    />
+                  )}
+                  {expanded.type === 'stat' && (
+                    <StatMiniGraph
+                      stat={stats.find(s => s.id === expanded.statId) || null}
+                      allStats={stats}
+                      height={460}
+                    />
+                  )}
+                  {expanded.type === 'inspirations' && (
+                    <InspirationFeature style={{ minHeight: 320 }} />
+                  )}
+                  {expanded.type === 'appreciation' && (
+                    <AppreciationFeature userId={user?.id} style={{ minHeight: 320 }} />
+                  )}
+                  {expanded.type === 'quickLinks' && (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                      {quickLinks.map(q => (
+                        <button
+                          key={q.label}
+                          onClick={() => {
+                            setExpanded(null)
+                            if (q.key === 'add-employee') setShowAddEmp(true)
+                            else if (q.key === 'continue-training') setShowTraining(true)
+                            else if (q.key === 'quick-estimate') setShowQuickEst(true)
+                            else if (q.key === 'add-vendor') setShowVendorChoose(true)
+                            else navigate(q.to)
+                          }}
+                          className="flex flex-col items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-3 py-5 hover:border-green-300 hover:bg-green-50 transition-colors"
+                        >
+                          <span className="text-3xl leading-none">{q.icon}</span>
+                          <span className="text-sm font-medium text-gray-700 text-center leading-tight">
+                            {q.label}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
 
           {showAddEmp && (
             <AddEmployeeModal
@@ -1014,8 +1172,8 @@ function DashboardSettings({
         {subTab === 'customize' && (
           <div>
             <p className="text-xs text-gray-500 mb-4">
-              Configure each feature — choose the statistic for stat graphs and resize any card
-              (percent of default). Drag cards on the dashboard to reorder.
+              Configure each feature — choose the statistic for stat graphs. To rearrange or
+              resize cards, use <span className="font-semibold">Edit</span> on the dashboard.
             </p>
             <div className="space-y-3">
               {draft.map((f, i) => {
@@ -1041,7 +1199,7 @@ function DashboardSettings({
 
                     {f.type === 'stat' && (
                       <select
-                        className="input w-full mb-2"
+                        className="input w-full"
                         value={f.statId ?? ''}
                         onChange={e =>
                           patchFeature(i, {
@@ -1060,30 +1218,6 @@ function DashboardSettings({
                           ))}
                       </select>
                     )}
-
-                    {/* Per-feature size */}
-                    <div className="space-y-2">
-                      {[
-                        { label: 'Width', key: 'w' },
-                        { label: 'Height', key: 'h' },
-                      ].map(({ label, key }) => (
-                        <div key={key} className="flex items-center gap-3">
-                          <span className="text-xs text-gray-500 w-12">{label}</span>
-                          <input
-                            type="range"
-                            min="50"
-                            max="200"
-                            step="5"
-                            value={f[key] || 100}
-                            onChange={e => patchFeature(i, { [key]: Number(e.target.value) })}
-                            className="flex-1 accent-green-700"
-                          />
-                          <span className="text-xs font-semibold text-gray-700 w-12 text-right tabular-nums">
-                            {f[key] || 100}%
-                          </span>
-                        </div>
-                      ))}
-                    </div>
                   </div>
                 )
               })}
