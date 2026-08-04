@@ -1000,20 +1000,27 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
     (state.subManualRows || []).reduce((s, r) => s + n(r.subCost), 0)
 
   // ── Combine In-House + Sub, apply the Sub GP markup ─────────────────────────
-  const _subCost = inHouse.subCost + subSideCost
+  // On the Sub tab, the paver MATERIAL (inHouse.totalMat, computed from the sub
+  // area rows) is a SUBCONTRACTOR cost — route it into subCost and keep in-house
+  // materials at 0 so the two sides stay completely separate. On the In-House
+  // tab it stays an in-house material as before.
+  const subPaverMat = isSub ? inHouse.totalMat || 0 : 0
+  const ihTotalMat = isSub ? 0 : inHouse.totalMat
+  const _subCost = inHouse.subCost + subSideCost + subPaverMat
   const _subGp = _subCost * subGpMarkupRate
   const _gp = inHouse.gp
   const _commission = (_gp + _subGp) * 0.12
   const _price =
     inHouse.laborCost +
     inHouse.burden +
-    inHouse.totalMat +
+    ihTotalMat +
     _gp +
     _subCost +
     _subGp +
     _commission
   const calcRaw = {
     ...inHouse,
+    totalMat: ihTotalMat,
     subCost: _subCost,
     subGp: _subGp,
     gp: _gp,
@@ -1022,6 +1029,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
     subInstallSF,
     subAreaCost,
     subSideCost,
+    subPaverMat,
   }
 
   // Apply company sales tax to the module's total material cost so the
