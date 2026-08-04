@@ -1680,6 +1680,59 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
         </select>
       </div>
 
+      {/* Wall Type */}
+      <div>
+        <SectionHeader title="Wall Type" />
+        <div className="flex gap-2">
+          {[
+            {
+              key: 'CMU',
+              label: 'CMU Block',
+              count: cmuWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0).length,
+            },
+            {
+              key: 'PIP',
+              label: 'Poured In Place',
+              count: pipWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0).length,
+            },
+            {
+              key: 'Modular',
+              label: 'Modular',
+              count: 0,
+            },
+            {
+              key: 'Brick',
+              label: 'Brick',
+              count: 0,
+            },
+            {
+              key: 'Timber',
+              label: 'Timber / Lumber',
+              count: n(timberLF) > 0 || n(timberPosts) > 0 ? 1 : 0,
+            },
+          ].map(t => (
+            <button
+              key={t.key}
+              onClick={() => setWallType(t.key)}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                wallType === t.key
+                  ? 'bg-green-700 text-white border-green-700'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {t.label}
+              {t.count > 0 ? ` (${t.count})` : ''}
+            </button>
+          ))}
+        </div>
+        {/* Reassurance line — explains the new behavior so users coming
+            from the old toggle don't worry about data loss. */}
+        <p className="text-[11px] text-gray-500 mt-1">
+          Switching tabs only changes what you see — every wall type's entries continue to
+          contribute to the totals.
+        </p>
+      </div>
+
       {pricesLoading && (
         <div className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
           Loading material prices from Master Rates…
@@ -1716,49 +1769,6 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
       </div>
         </>
       )}
-
-      {/* Wall Type */}
-      <div>
-        <SectionHeader title="Wall Type" />
-        <div className="flex gap-2">
-          {[
-            {
-              key: 'CMU',
-              label: 'CMU Block',
-              count: cmuWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0).length,
-            },
-            {
-              key: 'PIP',
-              label: 'Poured In Place',
-              count: pipWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0).length,
-            },
-            {
-              key: 'Timber',
-              label: 'Timber / Lumber',
-              count: n(timberLF) > 0 || n(timberPosts) > 0 ? 1 : 0,
-            },
-          ].map(t => (
-            <button
-              key={t.key}
-              onClick={() => setWallType(t.key)}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                wallType === t.key
-                  ? 'bg-green-700 text-white border-green-700'
-                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {t.label}
-              {t.count > 0 ? ` (${t.count})` : ''}
-            </button>
-          ))}
-        </div>
-        {/* Reassurance line — explains the new behavior so users coming
-            from the old toggle don't worry about data loss. */}
-        <p className="text-[11px] text-gray-500 mt-1">
-          Switching tabs only changes what you see — every wall type's entries continue to
-          contribute to the totals.
-        </p>
-      </div>
 
       {/* ── CMU Block Walls ── */}
       {wallType === 'CMU' && (
