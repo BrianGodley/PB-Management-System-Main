@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import StatMiniGraphShared from '../components/StatMiniGraph'
 import {
   LineChart,
   Line,
@@ -231,27 +232,32 @@ function fmtShort(v) {
   return '$' + v.toFixed(0)
 }
 
+// Solvency trend — now rendered with the SHARED StatMiniGraph so it matches the
+// Statistics Group View config exactly (circle-handle scrubber, default_periods
+// window, angular line, click-to-expand). Loads the solvency auto_internal stat
+// + its saved values (de-duped per week) and hands them to the shared graph.
 function SolvencyMiniChart({ currentWeekEnding }) {
-  const [chartData, setChartData] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [stat, setStat] = useState(null)
+  const [values, setValues] = useState(null)
 
   useEffect(() => {
     let cancelled = false
     async function load() {
-      setLoading(true)
+      setValues(null)
       // 1. Find the solvency auto_internal stat(s)
       const { data: stats } = await supabase
         .from('statistics')
-        .select('id')
+        .select('*')
         .eq('stat_category', 'auto_internal')
         .ilike('data_source', '%finance_solvency%')
       if (cancelled) return
       if (!stats?.length) {
-        setLoading(false)
+        setStat(null)
+        setValues([])
         return
       }
-
       const ids = stats.map(s => s.id)
+      setStat(stats[0])
 
       // 2. Fetch all saved values, sorted oldest→newest
       const { data: rows } = await supabase
@@ -265,29 +271,15 @@ function SolvencyMiniChart({ currentWeekEnding }) {
       const byDate = {}
       for (const r of rows || []) {
         if (!byDate[r.period_date]) byDate[r.period_date] = []
-        byDate[r.period_date].push(r.value)
+        byDate[r.period_date].push(Number(r.value))
       }
-      // Trailing 6-month cutoff (≈26 weeks back from the current week or today)
-      const anchor = currentWeekEnding || new Date().toISOString().slice(0, 10)
-      const cutoff = new Date(anchor + 'T00:00:00')
-      cutoff.setMonth(cutoff.getMonth() - 6)
-      const cutoffStr = cutoff.toISOString().slice(0, 10)
-
-      const points = Object.entries(byDate)
+      const merged = Object.entries(byDate)
         .sort(([a], [b]) => a.localeCompare(b))
-        .filter(([date]) => date >= cutoffStr)
         .map(([date, vals]) => ({
-          date,
+          period_date: date,
           value: vals.reduce((s, v) => s + v, 0) / vals.length,
-          isCurrent: date === currentWeekEnding,
-          label: (() => {
-            const d = new Date(date + 'T00:00:00')
-            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-          })(),
         }))
-
-      setChartData(points)
-      setLoading(false)
+      setValues(merged)
     }
     load()
     return () => {
@@ -295,78 +287,16 @@ function SolvencyMiniChart({ currentWeekEnding }) {
     }
   }, [currentWeekEnding])
 
-  if (loading)
+  if (values === null)
     return (
       <div className="flex justify-center items-center h-32">
         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-700" />
       </div>
     )
-  if (!chartData.length)
+  if (!stat || !values.length)
     return <div className="text-center text-gray-400 text-xs py-6">No solvency history yet.</div>
 
-  const CustomDot = props => {
-    const { cx, cy, payload } = props
-    if (!payload.isCurrent) return null
-    return <circle cx={cx} cy={cy} r={5} fill={FG} stroke="#fff" strokeWidth={2} />
-  }
-
-  const TooltipContent = ({ active, payload }) => {
-    if (!active || !payload?.length) return null
-    const d = payload[0].payload
-    const v = payload[0].value
-    return (
-      <div className="bg-white border border-gray-200 rounded-lg shadow px-3 py-1.5 text-xs">
-        <p className="font-semibold text-gray-700">
-          {d.label}
-          {d.isCurrent ? ' ← current' : ''}
-        </p>
-        <p className={`font-bold ${v >= 0 ? 'text-green-700' : 'text-red-600'}`}>
-          {v >= 0 ? '' : '−'}$
-          {Math.abs(v).toLocaleString('en-US', {
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
-          })}
-        </p>
-      </div>
-    )
-  }
-
-  // Show every Nth label — 6-month window is ~26 weekly points; show every 3rd
-  const step = chartData.length > 20 ? 3 : chartData.length > 10 ? 2 : 1
-  const xTick = ({ x, y, payload, index }) => {
-    if (index % step !== 0) return null
-    return (
-      <text x={x} y={y + 10} textAnchor="middle" fontSize={9} fill="#9ca3af">
-        {payload.value}
-      </text>
-    )
-  }
-
-  return (
-    <ResponsiveContainer width="100%" height={221}>
-      <LineChart data={chartData} margin={{ top: 10, right: 12, left: 4, bottom: 16 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-        <XAxis dataKey="label" tick={xTick} axisLine={false} tickLine={false} interval={0} />
-        <YAxis
-          tickFormatter={fmtShort}
-          tick={{ fontSize: 9, fill: '#9ca3af' }}
-          axisLine={false}
-          tickLine={false}
-          width={42}
-        />
-        <Tooltip content={<TooltipContent />} />
-        <ReferenceLine y={0} stroke="#d1d5db" strokeDasharray="4 2" />
-        <Line
-          type="monotone"
-          dataKey="value"
-          stroke={FG}
-          strokeWidth={2}
-          dot={<CustomDot />}
-          activeDot={{ r: 4, fill: FG }}
-        />
-      </LineChart>
-    </ResponsiveContainer>
-  )
+  return <StatMiniGraphShared stat={stat} values={values} height={221} />
 }
 
 // ── Solvency backfill helper (module-level, no closure deps) ─────────────────

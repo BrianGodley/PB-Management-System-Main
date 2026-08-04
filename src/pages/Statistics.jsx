@@ -17,6 +17,7 @@ import {
   Customized,
 } from 'recharts'
 import StatSharesModal from '../components/StatSharesModal'
+import StatMiniGraph from '../components/StatMiniGraph'
 
 const FG = '#3A5038'
 const OVERLAY_COLORS = ['#3A5038', '#2563EB', '#DC2626'] // green, blue, red — one per stat slot
@@ -8845,170 +8846,7 @@ function ArchivedView({ onRestored }) {
   )
 }
 
-// ── StatMiniGraph ─────────────────────────────────────────────────────────────
-// Lightweight per-stat card used by the Group View grid. Computes a
-// {label, value} period series from this ONE stat's values (same period-matching
-// logic as the main chartData / EditValueHistoryModal), holds its own from/to
-// date window driven by the shared DateRangeScrubber, and renders a compact
-// recharts line chart with visible X + Y axes. No target lines, overlays,
-// upside-down, notes, or cursor — just the line + axes + slider.
-// Step `count-1` periods back from an anchor end date, returning the ISO start
-// date so the resulting [start, anchor] window spans exactly `count` periods of
-// the given tracking. Used by the mini cards to open on the stat's
-// default_periods count anchored to its most recent data (not "today", which
-// would collapse the window whenever the latest data is older than today).
-function periodsBackFrom(endDateStr, count, tracking, wed) {
-  const wday = wed ?? 5
-  const back = Math.max(0, (count || 1) - 1)
-  const base = new Date(endDateStr + 'T00:00:00')
-  if (tracking === 'daily') {
-    const d = new Date(base)
-    d.setDate(d.getDate() - back)
-    return isoDate(d)
-  } else if (tracking === 'weekly') {
-    const we = new Date(getWeekEndingDate(endDateStr, wday) + 'T00:00:00')
-    we.setDate(we.getDate() - back * 7)
-    return isoDate(we)
-  } else if (tracking === 'monthly') {
-    return isoDate(new Date(base.getFullYear(), base.getMonth() - back, 1))
-  } else if (tracking === 'quarterly') {
-    return isoDate(new Date(base.getFullYear(), base.getMonth() - back * 3, 1))
-  }
-  return `${base.getFullYear() - back}-01-01`
-}
-
-function StatMiniGraph({ stat, values, weekEndingDay, height = 285, onExpand }) {
-  const large = height > 300
-  // Full date extent of this stat's values. Fall back to a 90-day window so the
-  // scrubber always has a valid, non-zero span even when there's no data yet.
-  const dateExtent = useMemo(() => {
-    const dates = (values || []).map(v => v.period_date).filter(Boolean).sort()
-    if (!dates.length) return { min: daysAgo(90), max: today() }
-    return { min: dates[0], max: dates[dates.length - 1] }
-  }, [values])
-
-  // Default window = the stat's default_periods count, anchored to the most
-  // recent data point (dateExtent.max) and stepping back that many periods —
-  // so the card opens on exactly the number of periods set in the stat's
-  // new/edit modal. Falls back to the full extent when default_periods is unset.
-  const defWindow = useMemo(() => {
-    const min = dateExtent.min
-    const max = dateExtent.max
-    const count = stat?.default_periods
-    if (!count) return { from: min, to: max }
-    let f = periodsBackFrom(max, count, stat.tracking, weekEndingDay)
-    if (f < min) f = min
-    return { from: f, to: max }
-  }, [stat, weekEndingDay, dateExtent.min, dateExtent.max])
-
-  const [from, setFrom] = useState(defWindow.from)
-  const [to, setTo] = useState(defWindow.to)
-
-  // Reset this card's window to the default_periods span whenever the data or
-  // that default changes (group tab / tracking switch delivering a fresh slice).
-  useEffect(() => {
-    setFrom(defWindow.from)
-    setTo(defWindow.to)
-  }, [defWindow.from, defWindow.to])
-
-  // Period series for this card's window — walk every period in [from,to] for
-  // the stat's tracking and pull the value whose date matches that bucket.
-  const data = useMemo(() => {
-    const wed = weekEndingDay ?? 5
-    const periods = generatePeriods(from, to, stat.tracking, wed)
-    return periods.map(p => {
-      const match = (values || []).find(v => matchesPeriod(v.period_date, p, stat.tracking, wed))
-      return { label: periodLabel(p, stat.tracking), value: match ? Number(match.value) : null }
-    })
-  }, [values, from, to, stat.tracking, weekEndingDay])
-
-  const hasData = data.some(d => d.value != null)
-  // Clamp the scrubber props defensively so a stale from/to can never fall
-  // outside the current extent (which would break the handle math).
-  const fromClamped = from < dateExtent.min ? dateExtent.min : from > dateExtent.max ? dateExtent.max : from
-  const toClamped = to > dateExtent.max ? dateExtent.max : to < dateExtent.min ? dateExtent.min : to
-
-  return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col">
-      <div className="px-3 pt-2 pb-1 border-b border-gray-100 flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="text-xs font-semibold text-gray-800 truncate" title={stat.name}>
-            {stat.name}
-          </div>
-          <div className="text-[10px] text-gray-400 capitalize">{stat.tracking}</div>
-        </div>
-        {onExpand && (
-          <button
-            type="button"
-            onClick={onExpand}
-            title="Expand"
-            className="flex-shrink-0 -mt-0.5 -mr-1 p-1 rounded text-gray-400 hover:text-green-700 hover:bg-green-50 transition-colors"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 3 21 3 21 9" />
-              <polyline points="9 21 3 21 3 15" />
-              <line x1="21" y1="3" x2="14" y2="10" />
-              <line x1="3" y1="21" x2="10" y2="14" />
-            </svg>
-          </button>
-        )}
-      </div>
-      {/* Per-card date window slider — the same scrubber the main graph uses. */}
-      <DateRangeScrubber
-        compact
-        minDate={dateExtent.min}
-        maxDate={dateExtent.max}
-        fromDate={fromClamped}
-        toDate={toClamped}
-        onFromChange={setFrom}
-        onToChange={setTo}
-      />
-      <div
-        className={`px-1 pb-2 ${onExpand ? 'cursor-zoom-in' : ''}`}
-        style={{ height }}
-        onClick={onExpand}
-      >
-        {hasData ? (
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 6, right: 10, bottom: 4, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis
-                dataKey="label"
-                tick={{ fontSize: large ? 11 : 8, fill: '#9ca3af' }}
-                interval="preserveStartEnd"
-                minTickGap={large ? 24 : 12}
-                height={large ? 24 : 18}
-              />
-              <YAxis
-                tick={{ fontSize: large ? 11 : 8, fill: '#9ca3af' }}
-                width={large ? 52 : 40}
-                tickFormatter={v => fmtShort(v, stat.stat_type)}
-              />
-              <Tooltip
-                formatter={v => fmt(v, stat.stat_type)}
-                labelStyle={{ fontSize: 11 }}
-                contentStyle={{ fontSize: 11, padding: '4px 8px' }}
-              />
-              <Line
-                type="linear"
-                dataKey="value"
-                stroke={FG}
-                strokeWidth={2}
-                dot={large ? { r: 2 } : false}
-                connectNulls
-                isAnimationActive={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="h-full flex items-center justify-center text-[11px] text-gray-300">
-            No data
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
+// StatMiniGraph + periodsBackFrom now live in src/components/StatMiniGraph.jsx (shared).
 
 // ── Main Statistics Page ──────────────────────────────────────────────────────
 export default function Statistics() {
@@ -10951,6 +10789,7 @@ export default function Statistics() {
                 values={groupViewValuesByStat.get(expandedStat.id) || []}
                 weekEndingDay={weekEndingDay}
                 height={460}
+                expandable={false}
               />
             </div>
           </div>

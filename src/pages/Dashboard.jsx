@@ -17,6 +17,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useCachedData } from '../lib/useCachedData'
 import { resolveStatSeries } from '../lib/equationStat'
+import StatMiniGraphShared from '../components/StatMiniGraph'
 import AddEmployeeModal from '../components/AddEmployeeModal'
 import CoursePlayer from '../components/lms/CoursePlayer'
 import QuickEstimateModal from '../components/QuickEstimateModal'
@@ -334,87 +335,59 @@ function WeatherWidget({ location, onSaveLocation }) {
 // ═════════════════════════════════════════════════════════════════════════════
 // STAT MINI-GRAPH — a small trend line for one statistic from the stat system.
 // ═════════════════════════════════════════════════════════════════════════════
+// Dashboard stat card — loads the stat's series (stored or computed equation
+// stat) and renders the SHARED StatMiniGraph so it matches the Statistics Group
+// View config exactly (circle-handle scrubber, default_periods window, angular
+// line, click-to-expand). weekEndingDay is self-fetched by the shared component.
 function StatMiniGraph({ stat, allStats = [] }) {
-  const [points, setPoints] = useState(null)
+  const [values, setValues] = useState(null)
 
   useEffect(() => {
     if (!stat?.id) {
-      setPoints([])
+      setValues([])
       return
     }
     let alive = true
-    setPoints(null)
+    setValues(null)
     // resolveStatSeries handles stored stats AND computed equation stats.
     resolveStatSeries(stat, allStats)
       .then(series => {
         if (!alive) return
-        const rows = series
-          .slice(-26) // trailing ~6 months of weekly points
-          .map(r => ({
-            value: Number(r.value),
-            label: new Date(r.period_date + 'T00:00:00').toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-            }),
-          }))
-        setPoints(rows)
+        setValues(
+          (series || []).map(r => ({ period_date: r.period_date, value: Number(r.value) }))
+        )
       })
       .catch(() => {
-        if (alive) setPoints([])
+        if (alive) setValues([])
       })
     return () => {
       alive = false
     }
   }, [stat?.id, allStats])
 
-  return (
-    <div className="card">
-      <h3 className="text-sm font-bold text-gray-800 mb-1 truncate">
-        {stat ? stat.name : 'Stat'}
-      </h3>
-      {!stat ? (
-        <p className="text-xs text-gray-400 py-12 text-center">
+  if (!stat) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col">
+        <div className="px-3 pt-2 pb-1 border-b border-gray-100">
+          <div className="text-xs font-semibold text-gray-800">Stat</div>
+        </div>
+        <p className="text-xs text-gray-400 py-16 text-center">
           Pick a statistic in the Settings tab.
         </p>
-      ) : points === null ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-700" />
-        </div>
-      ) : points.length === 0 ? (
-        <p className="text-xs text-gray-400 py-12 text-center">No data recorded yet.</p>
-      ) : (
-        <>
-          <p className="text-2xl font-bold text-gray-900 mb-1">
-            {points[points.length - 1].value.toLocaleString()}
-          </p>
-          <ResponsiveContainer width="100%" height={120}>
-            <LineChart data={points} margin={{ top: 4, right: 6, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#eef0ee" vertical={false} />
-              <XAxis
-                dataKey="label"
-                tick={{ fontSize: 9, fill: '#9ca3af' }}
-                axisLine={false}
-                tickLine={false}
-                interval="preserveStartEnd"
-                minTickGap={24}
-              />
-              <YAxis
-                tick={{ fontSize: 9, fill: '#9ca3af' }}
-                axisLine={false}
-                tickLine={false}
-                width={36}
-              />
-              <Tooltip
-                contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e5e7eb' }}
-                labelStyle={{ color: '#6b7280' }}
-              />
-              <Line type="monotone" dataKey="value" stroke={FG} strokeWidth={2} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
-        </>
-      )}
-    </div>
-  )
+      </div>
+    )
+  }
+  if (values === null) {
+    return (
+      <div
+        className="bg-white border border-gray-200 rounded-xl flex items-center justify-center"
+        style={{ minHeight: 220 }}
+      >
+        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-700" />
+      </div>
+    )
+  }
+  return <StatMiniGraphShared stat={stat} values={values} />
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
