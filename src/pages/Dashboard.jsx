@@ -41,10 +41,30 @@ const FG = '#3A5038' // forest green
 // default) and, for stat features, a chosen statistic. The ordered list lives
 // per-user in dashboard_preferences.layout.features.
 const FEATURE_TYPES = [
-  { type: 'weather', label: '🌤️ Weather' },
-  { type: 'stat', label: '📈 Stat Graph' },
-  { type: 'inspirations', label: '✨ Inspiration' },
-  { type: 'appreciation', label: '🙏 Appreciation' },
+  {
+    type: 'weather',
+    label: 'Weather',
+    icon: '🌤️',
+    desc: 'Current conditions and a 5-day forecast for your location.',
+  },
+  {
+    type: 'stat',
+    label: 'Stat Graph',
+    icon: '📈',
+    desc: 'A mini trend graph for a statistic you choose. Add several.',
+  },
+  {
+    type: 'inspirations',
+    label: 'Inspiration',
+    icon: '✨',
+    desc: 'A fresh inspirational quote featured every day.',
+  },
+  {
+    type: 'appreciation',
+    label: 'Appreciation',
+    icon: '🙏',
+    desc: 'Note what you’re grateful for and send appreciation to a coworker.',
+  },
 ]
 
 function newFeatureId() {
@@ -858,6 +878,7 @@ function DashboardSettings({
 }) {
   // Draft copy of the feature list, edited here and committed on Save.
   const [draft, setDraft] = useState(initialFeatures || [])
+  const [subTab, setSubTab] = useState('selection') // 'selection' | 'customize'
   const [savingStats, setSavingStats] = useState(false)
   const [statsMsg, setStatsMsg] = useState('')
 
@@ -883,6 +904,9 @@ function DashboardSettings({
       },
     ])
   }
+  const removeAllOfType = type => setDraft(prev => prev.filter(f => f.type !== type))
+  const isTypePresent = type => draft.some(f => f.type === type)
+  const toggleType = type => (isTypePresent(type) ? removeAllOfType(type) : addFeature(type))
 
   async function saveStats() {
     if (!userId) return
@@ -921,103 +945,174 @@ function DashboardSettings({
     <div className="w-full space-y-5">
       {/* Dashboard Features */}
       <div className="card">
-        <h3 className="text-sm font-bold text-gray-800 mb-1">Dashboard Features</h3>
-        <p className="text-xs text-gray-500 mb-4">
-          Add, remove, and resize the cards on your dashboard. Drag cards on the dashboard itself
-          to reorder them.
-        </p>
+        <h3 className="text-sm font-bold text-gray-800 mb-3">Dashboard Features</h3>
 
-        <div className="space-y-3">
-          {draft.map((f, i) => {
-            const meta = FEATURE_TYPES.find(t => t.type === f.type)
-            const usedElsewhere = draft
-              .filter((x, idx) => idx !== i && x.type === 'stat')
-              .map(x => x.statId)
-            return (
-              <div key={f.id} className="rounded-xl border border-gray-200 p-3">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="text-sm font-semibold text-gray-800">
-                    {meta?.label || f.type}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => removeFeature(i)}
-                    title="Remove this feature"
-                    className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-colors"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                {f.type === 'stat' && (
-                  <select
-                    className="input w-full mb-2"
-                    value={f.statId ?? ''}
-                    onChange={e =>
-                      patchFeature(i, {
-                        statId: e.target.value ? Number(e.target.value) : undefined,
-                      })
-                    }
-                  >
-                    <option value="">— Choose a statistic —</option>
-                    {stats
-                      .filter(st => st.id === f.statId || !usedElsewhere.includes(st.id))
-                      .map(st => (
-                        <option key={st.id} value={st.id}>
-                          {st.name}
-                          {st.stat_category ? ` (${st.stat_category})` : ''}
-                        </option>
-                      ))}
-                  </select>
-                )}
-
-                {/* Per-feature size */}
-                <div className="space-y-2">
-                  {[
-                    { label: 'Width', key: 'w' },
-                    { label: 'Height', key: 'h' },
-                  ].map(({ label, key }) => (
-                    <div key={key} className="flex items-center gap-3">
-                      <span className="text-xs text-gray-500 w-12">{label}</span>
-                      <input
-                        type="range"
-                        min="50"
-                        max="200"
-                        step="5"
-                        value={f[key] || 100}
-                        onChange={e => patchFeature(i, { [key]: Number(e.target.value) })}
-                        className="flex-1 accent-green-700"
-                      />
-                      <span className="text-xs font-semibold text-gray-700 w-12 text-right tabular-nums">
-                        {f[key] || 100}%
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )
-          })}
-          {draft.length === 0 && (
-            <p className="text-xs text-gray-400">No features yet — add one below.</p>
-          )}
-        </div>
-
-        {/* Add a feature */}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-gray-500">Add:</span>
-          {FEATURE_TYPES.map(t => (
+        {/* Sub-tabs */}
+        <div className="flex gap-1 border-b border-gray-200 mb-4">
+          {[
+            { key: 'selection', label: 'Features Selection' },
+            { key: 'customize', label: 'Customize Features' },
+          ].map(t => (
             <button
-              key={t.type}
+              key={t.key}
               type="button"
-              onClick={() => addFeature(t.type)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-green-600 text-green-700 bg-green-50 hover:bg-green-100 transition-colors"
+              onClick={() => setSubTab(t.key)}
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                subTab === t.key
+                  ? 'border-green-700 text-green-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
             >
-              + {t.label}
+              {t.label}
             </button>
           ))}
         </div>
 
-        <div className="flex items-center gap-3 mt-4">
+        {/* ── Features Selection ── */}
+        {subTab === 'selection' && (
+          <div>
+            <p className="text-xs text-gray-500 mb-4">
+              Pick which features appear on your dashboard. Selected features are highlighted in
+              green.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {FEATURE_TYPES.map(t => {
+                const on = isTypePresent(t.type)
+                return (
+                  <div
+                    key={t.type}
+                    className={`rounded-xl border p-4 flex flex-col transition-colors ${
+                      on ? 'border-green-400 bg-green-50 ring-1 ring-green-200' : 'border-gray-200 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="text-3xl leading-none">{t.icon}</span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-gray-800">{t.label}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{t.desc}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleType(t.type)}
+                      className={`mt-3 self-start px-4 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                        on
+                          ? 'border-red-300 text-red-600 bg-white hover:bg-red-50'
+                          : 'border-green-600 text-green-700 bg-green-50 hover:bg-green-100'
+                      }`}
+                    >
+                      {on ? 'Remove' : 'Add'}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Customize Features ── */}
+        {subTab === 'customize' && (
+          <div>
+            <p className="text-xs text-gray-500 mb-4">
+              Configure each feature — choose the statistic for stat graphs and resize any card
+              (percent of default). Drag cards on the dashboard to reorder.
+            </p>
+            <div className="space-y-3">
+              {draft.map((f, i) => {
+                const meta = FEATURE_TYPES.find(t => t.type === f.type)
+                const usedElsewhere = draft
+                  .filter((x, idx) => idx !== i && x.type === 'stat')
+                  .map(x => x.statId)
+                return (
+                  <div key={f.id} className="rounded-xl border border-gray-200 p-3">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <span className="text-sm font-semibold text-gray-800">
+                        {meta ? `${meta.icon} ${meta.label}` : f.type}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeFeature(i)}
+                        title="Remove this feature"
+                        className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-colors"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {f.type === 'stat' && (
+                      <select
+                        className="input w-full mb-2"
+                        value={f.statId ?? ''}
+                        onChange={e =>
+                          patchFeature(i, {
+                            statId: e.target.value ? Number(e.target.value) : undefined,
+                          })
+                        }
+                      >
+                        <option value="">— Choose a statistic —</option>
+                        {stats
+                          .filter(st => st.id === f.statId || !usedElsewhere.includes(st.id))
+                          .map(st => (
+                            <option key={st.id} value={st.id}>
+                              {st.name}
+                              {st.stat_category ? ` (${st.stat_category})` : ''}
+                            </option>
+                          ))}
+                      </select>
+                    )}
+
+                    {/* Per-feature size */}
+                    <div className="space-y-2">
+                      {[
+                        { label: 'Width', key: 'w' },
+                        { label: 'Height', key: 'h' },
+                      ].map(({ label, key }) => (
+                        <div key={key} className="flex items-center gap-3">
+                          <span className="text-xs text-gray-500 w-12">{label}</span>
+                          <input
+                            type="range"
+                            min="50"
+                            max="200"
+                            step="5"
+                            value={f[key] || 100}
+                            onChange={e => patchFeature(i, { [key]: Number(e.target.value) })}
+                            className="flex-1 accent-green-700"
+                          />
+                          <span className="text-xs font-semibold text-gray-700 w-12 text-right tabular-nums">
+                            {f[key] || 100}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+              {draft.length === 0 && (
+                <p className="text-xs text-gray-400">
+                  No features yet — add some from the Features Selection tab.
+                </p>
+              )}
+            </div>
+
+            {/* Add another (e.g. a second stat graph) */}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-gray-500">Add another:</span>
+              {FEATURE_TYPES.map(t => (
+                <button
+                  key={t.type}
+                  type="button"
+                  onClick={() => addFeature(t.type)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-green-600 text-green-700 bg-green-50 hover:bg-green-100 transition-colors"
+                >
+                  + {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Shared Save */}
+        <div className="flex items-center gap-3 mt-5 pt-4 border-t border-gray-100">
           <button onClick={saveStats} disabled={savingStats} className="btn-primary text-sm">
             {savingStats ? 'Saving…' : 'Save Features'}
           </button>
