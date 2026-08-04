@@ -29,6 +29,9 @@ const GT_RATES = {
   metalEdgingLab: { dbName: 'Metal Edging - Labor Rate', fallback: 0.17 },
   soilPrepMat: { dbName: 'Soil Prep', fallback: 0.1558 },
   soilPrepLab: { dbName: 'Soil Prep - Labor Rate', fallback: 0.012 },
+  soilPrepHandAdd: { dbName: 'Soil Prep - Hand Add', fallback: 0.06 },
+  sodPrepMat: { dbName: 'Sod Soil Prep', fallback: 0.1558 },
+  sodPrepLab: { dbName: 'Sod Soil Prep - Labor Rate', fallback: 0.012 },
   sodMarathonMat: { dbName: 'Sod - Marathon', fallback: 1.2 },
   sodStAugMat: { dbName: 'Sod - St. Augustine', fallback: 1.97 },
   fertilizerSFPerBag: { dbName: 'Fertilizer - SF Per Bag', fallback: 4000 },
@@ -272,13 +275,27 @@ export default function GroundTreatmentsSummary({ module }) {
     return priceForType(subcat, type, houseArray, defaultVal)
   }
 
-  // ── Soil Prep ────────────────────────────────────────────────────────────────
+  // ── Preparation ──────────────────────────────────────────────────────────────
+  // Area = Planter → Soil Prep rates; Area = Sod → Sod Soil Prep rates. Method =
+  // Hand adds a per-SF labor coefficient (In-House). Money still comes from the
+  // saved calc; this line is the display breakdown.
+  const prepMethod = ih.prepMethod || 'Tiller'
+  const prepArea = ih.prepArea || 'Planter'
   let soilPrepLine = null
   if (n(soilPrepSF) > 0) {
-    const mat = n(soilPrepSF) * mp(GT_RATES.soilPrepMat.dbName, GT_RATES.soilPrepMat.fallback)
-    const hrs = n(soilPrepSF) * mp(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
+    const isSodArea = prepArea === 'Sod'
+    const matRate = isSodArea
+      ? mp(GT_RATES.sodPrepMat.dbName, GT_RATES.sodPrepMat.fallback)
+      : mp(GT_RATES.soilPrepMat.dbName, GT_RATES.soilPrepMat.fallback)
+    const baseLab = isSodArea
+      ? mp(GT_RATES.sodPrepLab.dbName, GT_RATES.sodPrepLab.fallback)
+      : mp(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
+    const handAdd =
+      prepMethod === 'Hand' ? mp(GT_RATES.soilPrepHandAdd.dbName, GT_RATES.soilPrepHandAdd.fallback) : 0
+    const mat = n(soilPrepSF) * matRate
+    const hrs = n(soilPrepSF) * (baseLab + handAdd)
     soilPrepLine = {
-      label: `Till and Amend — ${n(soilPrepSF).toLocaleString()} SF`,
+      label: `Till and Amend (${prepArea}${prepMethod === 'Hand' ? ', Hand' : ''}) — ${n(soilPrepSF).toLocaleString()} SF`,
       value: fmt2(mat),
       sub: `${hrs.toFixed(2)} hrs`,
     }
@@ -700,7 +717,7 @@ export default function GroundTreatmentsSummary({ module }) {
         <>
           {soilPrepLine && (
             <>
-              <SectionLabel title="Planting Bed Prep" />
+              <SectionLabel title="Preparation" />
               <LineRow
                 label={soilPrepLine.label}
                 value={soilPrepLine.value}

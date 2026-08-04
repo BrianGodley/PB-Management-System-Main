@@ -28,9 +28,12 @@ const GT_RATES = {
   metalEdgingMat: { dbName: 'Metal Edging', fallback: 4.0 }, // $/LF
   metalEdgingLab: { dbName: 'Metal Edging - Labor Rate', fallback: 0.17 }, // hrs/LF
 
-  // ── Soil Prep ──────────────────────────────────────────────────────────────
-  soilPrepMat: { dbName: 'Soil Prep', fallback: 0.1558 }, // $/SF
-  soilPrepLab: { dbName: 'Soil Prep - Labor Rate', fallback: 0.012 }, // hrs/SF
+  // ── Soil Prep / Preparation ──────────────────────────────────────────────────
+  soilPrepMat: { dbName: 'Soil Prep', fallback: 0.1558 }, // $/SF  (Area = Planter)
+  soilPrepLab: { dbName: 'Soil Prep - Labor Rate', fallback: 0.012 }, // hrs/SF (Area = Planter)
+  soilPrepHandAdd: { dbName: 'Soil Prep - Hand Add', fallback: 0.06 }, // hrs/SF — Method = Hand add (In-House only)
+  sodPrepMat: { dbName: 'Sod Soil Prep', fallback: 0.1558 }, // $/SF  (Area = Sod)
+  sodPrepLab: { dbName: 'Sod Soil Prep - Labor Rate', fallback: 0.012 }, // hrs/SF (Area = Sod)
 
   // ── Sod ────────────────────────────────────────────────────────────────────
   sodMarathonMat: { dbName: 'Sod - Marathon', fallback: 1.2 }, // $/SF
@@ -265,9 +268,8 @@ function calcGroundTreatments(
     plasticEdgingLF,
     metalEdgingLF,
     soilPrepSF,
-    sodSoilPrepSF,
-    sodSoilPrepVendor,
-    sodSoilPrepType,
+    prepMethod,
+    prepArea,
     sodSF,
     sodType,
     sodFertilizer,
@@ -340,18 +342,27 @@ function calcGroundTreatments(
   const metalMat =
     n(metalEdgingLF) * p(_metalEdgeOpt.dbName, _metalEdgeOpt.fallback)
 
-  // ── Soil Prep ──────────────────────────────────────────────────────────────
-  const soilLab = n(soilPrepSF) * p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
-  const soilMat = n(soilPrepSF) * p(GT_RATES.soilPrepMat.dbName, GT_RATES.soilPrepMat.fallback)
-  // Sod bed prep — same rates as Planting Bed Prep, entered in the Sod section.
-  const sodSoilLab =
-    n(sodSoilPrepSF) * p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
-  const sodSoilT = rowOpt(
-    'Soil Prep',
-    { vendor: sodSoilPrepVendor, type: sodSoilPrepType },
-    SOIL_PREP_TYPES
-  )
-  const sodSoilMat = n(sodSoilPrepSF) * p(sodSoilT.dbName, sodSoilT.fallback)
+  // ── Preparation (Planting Bed Prep) ─────────────────────────────────────────
+  // Area = Planter → existing Soil Prep rates; Area = Sod → independent Sod Soil
+  // Prep rates (same defaults). Method = Hand adds an editable per-SF labor
+  // coefficient — In-House ONLY (the Sub tab prices prep material the same way
+  // but never gets the Hand labor add). soilLab/soilMat keep their downstream
+  // wiring (base labor hours + total material).
+  const _prepIsSub = state.subType === 'Subcontractor'
+  const _prepBaseLab =
+    prepArea === 'Sod'
+      ? p(GT_RATES.sodPrepLab.dbName, GT_RATES.sodPrepLab.fallback)
+      : p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
+  const _prepBaseMat =
+    prepArea === 'Sod'
+      ? p(GT_RATES.sodPrepMat.dbName, GT_RATES.sodPrepMat.fallback)
+      : p(GT_RATES.soilPrepMat.dbName, GT_RATES.soilPrepMat.fallback)
+  const _prepHandAdd =
+    prepMethod === 'Hand' && !_prepIsSub
+      ? p(GT_RATES.soilPrepHandAdd.dbName, GT_RATES.soilPrepHandAdd.fallback)
+      : 0
+  const soilLab = n(soilPrepSF) * (_prepBaseLab + _prepHandAdd)
+  const soilMat = n(soilPrepSF) * _prepBaseMat
 
   // ── Sod ────────────────────────────────────────────────────────────────────
   const sodLab = n(sodSF) * p(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback)
@@ -463,14 +474,19 @@ function calcGroundTreatments(
     const handRate = p(GT_RATES.gravelHandLab.dbName, GT_RATES.gravelHandLab.fallback)
     const excavLab =
       r.method === 'Machine' ? ((CY * 1.62) / machineRate) * 8 : ((CY * 1.62) / handRate) * 8
-    const fabricLab =
-      n(r.sf) * p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
+    // Weed barrier — same fabric material + labor rate as DG's weed barrier.
+    // Legacy rows (no weedFabric field) default to Yes so prior estimates that
+    // always included fabric are unchanged.
+    const wantFabric = (r.weedFabric ?? 'Yes') === 'Yes'
+    const fabricLab = wantFabric
+      ? n(r.sf) * p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
+      : 0
     gravelLab += excavLab + fabricLab
     const gtype = rowOpt('Gravel', r, GRAVEL_TYPES)
     const costPerCY = p(gtype.dbName, gtype.fallback)
     gravelMat +=
       CY * costPerCY +
-      n(r.sf) * p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)
+      (wantFabric ? n(r.sf) * p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback) : 0)
   })
 
   // ── Pebble rows (same calc/labor as Gravel; PEBBLE_TYPES material) ──────────
@@ -483,14 +499,17 @@ function calcGroundTreatments(
     const handRate = p(GT_RATES.gravelHandLab.dbName, GT_RATES.gravelHandLab.fallback)
     const excavLab =
       r.method === 'Machine' ? ((CY * 1.62) / machineRate) * 8 : ((CY * 1.62) / handRate) * 8
-    const fabricLab =
-      n(r.sf) * p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
+    // Weed barrier — same fabric material + labor rate as DG's weed barrier.
+    const wantFabric = (r.weedFabric ?? 'Yes') === 'Yes'
+    const fabricLab = wantFabric
+      ? n(r.sf) * p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
+      : 0
     pebbleLab += excavLab + fabricLab
     const ptype = rowOpt('Pebble', r, PEBBLE_TYPES)
     const costPerCY = p(ptype.dbName, ptype.fallback)
     pebbleMat +=
       CY * costPerCY +
-      n(r.sf) * p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)
+      (wantFabric ? n(r.sf) * p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback) : 0)
   })
 
   // ── Cobbles & Boulders rows (same calc/labor as Gravel; COBBLE_TYPES) ───────
@@ -529,7 +548,6 @@ function calcGroundTreatments(
     plasticLab +
     metalLab +
     soilLab +
-    sodSoilLab +
     sodLab +
     stepLab +
     dgLab +
@@ -547,7 +565,6 @@ function calcGroundTreatments(
     plasticMat +
     metalMat +
     soilMat +
-    sodSoilMat +
     sodMat +
     fertMat +
     stepMat +
@@ -674,16 +691,16 @@ function VendorPicker({ vendors = [], value = 'House', onChange, label = 'Vendor
 }
 
 const DEFAULT_GRAVEL_ROWS = [
-  { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3', vendor: 'auto' },
-  { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3', vendor: 'auto' },
+  { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3', weedFabric: 'Yes', vendor: 'auto' },
+  { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3', weedFabric: 'Yes', vendor: 'auto' },
 ]
 const DEFAULT_SOILS_ROWS = [
   { type: 'Topsoil (Sandy Loam)', sf: '', depthIn: '2', vendor: 'auto' },
   { type: 'Topsoil (Sandy Loam)', sf: '', depthIn: '2', vendor: 'auto' },
 ]
 const DEFAULT_PEBBLE_ROWS = [
-  { sf: '', method: 'Hand', type: 'Arizona River Rock', depthIn: '3', vendor: 'auto' },
-  { sf: '', method: 'Hand', type: 'Arizona River Rock', depthIn: '3', vendor: 'auto' },
+  { sf: '', method: 'Hand', type: 'Arizona River Rock', depthIn: '3', weedFabric: 'Yes', vendor: 'auto' },
+  { sf: '', method: 'Hand', type: 'Arizona River Rock', depthIn: '3', weedFabric: 'Yes', vendor: 'auto' },
 ]
 const DEFAULT_COBBLE_ROWS = [
   { sf: '', method: 'Hand', type: 'Granite River Rock', depthIn: '3', vendor: 'auto' },
@@ -727,6 +744,10 @@ function makeTab(src = {}) {
     plasticEdgingLF: src.plasticEdgingLF ?? '',
     metalEdgingLF: src.metalEdgingLF ?? '',
     soilPrepSF: src.soilPrepSF ?? '',
+    // Preparation section — Method (Tiller default / Hand adds per-SF labor) and
+    // Area (Planter default → Soil Prep rates / Sod → Sod Soil Prep rates).
+    prepMethod: src.prepMethod ?? 'Tiller',
+    prepArea: src.prepArea ?? 'Planter',
     sodSoilPrepSF: src.sodSoilPrepSF ?? '',
     sodSoilPrepVendor: src.sodSoilPrepVendor ?? 'House',
     sodSoilPrepType: src.sodSoilPrepType ?? 'Soil Prep',
@@ -910,6 +931,10 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   const setMetalEdgingLF = setField('metalEdgingLF')
   const soilPrepSF = cur.soilPrepSF
   const setSoilPrepSF = setField('soilPrepSF')
+  const prepMethod = cur.prepMethod
+  const setPrepMethod = setField('prepMethod')
+  const prepArea = cur.prepArea
+  const setPrepArea = setField('prepArea')
   const sodSoilPrepSF = cur.sodSoilPrepSF
   const setSodSoilPrepSF = setField('sodSoilPrepSF')
   const sodSoilPrepVendor = cur.sodSoilPrepVendor
@@ -1207,45 +1232,88 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
         </>
       )}
 
-      {/* ── Planting Bed Prep ── */}
+      {/* ── Preparation ── */}
       <div>
-        <SectionHeader title="Planting Bed Prep" />
+        <SectionHeader title="Preparation" />
         <div className="space-y-0">
-          <LabeledRow
-            label="Till and Amend"
-            note={
-              n(soilPrepSF) > 0
-                ? `$${(n(soilPrepSF) * p(GT_RATES.soilPrepMat.dbName, 0.1558)).toFixed(2)} mat`
-                : null
-            }
-          >
-            <NumInput
-              value={soilPrepSF}
-              onChange={setSoilPrepSF}
-              placeholder="SF"
-              className="w-28"
-            />
-            <span className="text-xs text-gray-400 inline-flex items-center gap-1">
-              ${p(GT_RATES.soilPrepMat.dbName, 0.1558).toFixed(2)}/SF
-              <RateEditPopover
-                table="material_rates"
-                name={GT_RATES.soilPrepMat.dbName}
-                category="Ground Treatments"
-                unitLabel="SF"
-                currentValue={p(GT_RATES.soilPrepMat.dbName, GT_RATES.soilPrepMat.fallback)}
-                onSaved={refreshAllRates}
-              />
-              <RateEditPopover
-                table="labor_rates"
-                name={GT_RATES.soilPrepLab.dbName}
-                category="Ground Treatments"
-                mode="coefficient"
-                unitLabel="hrs/SF"
-                currentValue={p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)}
-                onSaved={refreshAllRates}
-              />
-            </span>
-          </LabeledRow>
+          {(() => {
+            const isSodArea = prepArea === 'Sod'
+            const matName = isSodArea ? GT_RATES.sodPrepMat.dbName : GT_RATES.soilPrepMat.dbName
+            const matVal = isSodArea
+              ? p(GT_RATES.sodPrepMat.dbName, GT_RATES.sodPrepMat.fallback)
+              : p(GT_RATES.soilPrepMat.dbName, GT_RATES.soilPrepMat.fallback)
+            const labName = isSodArea ? GT_RATES.sodPrepLab.dbName : GT_RATES.soilPrepLab.dbName
+            const labVal = isSodArea
+              ? p(GT_RATES.sodPrepLab.dbName, GT_RATES.sodPrepLab.fallback)
+              : p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
+            const handAdd = p(GT_RATES.soilPrepHandAdd.dbName, GT_RATES.soilPrepHandAdd.fallback)
+            const isSubTab = subType === 'Subcontractor'
+            return (
+              <LabeledRow
+                label="Till and Amend"
+                note={n(soilPrepSF) > 0 ? `$${(n(soilPrepSF) * matVal).toFixed(2)} mat` : null}
+              >
+                <select
+                  className="input text-sm py-1.5 w-28"
+                  value={prepMethod}
+                  onChange={e => setPrepMethod(e.target.value)}
+                  title="Method"
+                >
+                  <option value="Tiller">Tiller</option>
+                  <option value="Hand">Hand</option>
+                </select>
+                <select
+                  className="input text-sm py-1.5 w-28"
+                  value={prepArea}
+                  onChange={e => setPrepArea(e.target.value)}
+                  title="Area"
+                >
+                  <option value="Planter">Planter</option>
+                  <option value="Sod">Sod</option>
+                </select>
+                <NumInput
+                  value={soilPrepSF}
+                  onChange={setSoilPrepSF}
+                  placeholder="SF"
+                  className="w-28"
+                />
+                <span className="text-xs text-gray-400 inline-flex items-center gap-1 flex-wrap">
+                  ${matVal.toFixed(4)}/SF
+                  <RateEditPopover
+                    table="material_rates"
+                    name={matName}
+                    category="Ground Treatments"
+                    unitLabel="SF"
+                    currentValue={matVal}
+                    onSaved={refreshAllRates}
+                  />
+                  <RateEditPopover
+                    table="labor_rates"
+                    name={labName}
+                    category="Ground Treatments"
+                    mode="coefficient"
+                    unitLabel="hrs/SF"
+                    currentValue={labVal}
+                    onSaved={refreshAllRates}
+                  />
+                  {prepMethod === 'Hand' && (
+                    <>
+                      · Hand{isSubTab ? ' (In-House only)' : ` +${handAdd} hrs/SF`}
+                      <RateEditPopover
+                        table="labor_rates"
+                        name={GT_RATES.soilPrepHandAdd.dbName}
+                        category="Ground Treatments"
+                        mode="coefficient"
+                        unitLabel="hrs/SF"
+                        currentValue={handAdd}
+                        onSaved={refreshAllRates}
+                      />
+                    </>
+                  )}
+                </span>
+              </LabeledRow>
+            )
+          })()}
         </div>
       </div>
 
@@ -1364,81 +1432,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       <div>
         <SectionHeader title="Sod" />
         <div className="space-y-0">
-          <LabeledRow label="Soil Prep">
-            <select
-              className="input text-sm py-1.5 w-32"
-              value={sodSoilPrepVendor}
-              onChange={e => {
-                const v = e.target.value
-                setSodSoilPrepVendor(v)
-                const opts = sectionOptions('Soil Prep', v, SOIL_PREP_TYPES)
-                if (!opts.some(o => o.label === sodSoilPrepType))
-                  setSodSoilPrepType(opts[0]?.label)
-              }}
-              title="Vendor"
-            >
-              <option value="House">House</option>
-              {vendorsForCategory('Soil Prep').map(v => (
-                <option key={v.id} value={v.id}>
-                  {v.name}
-                </option>
-              ))}
-            </select>
-            <select
-              className="input text-sm py-1.5 flex-1"
-              value={sodSoilPrepType}
-              onChange={e => setSodSoilPrepType(e.target.value)}
-            >
-              {soilPrepOpts.map(t => (
-                <option key={t.label} value={t.label}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-            <NumInput
-              value={sodSoilPrepSF}
-              onChange={setSodSoilPrepSF}
-              placeholder="SF"
-              className="w-24"
-            />
-            <span className="text-xs text-gray-400 inline-flex items-center gap-1">
-              {(() => {
-                const st = resolveType(sodSoilPrepType, soilPrepOpts, SOIL_PREP_TYPES)
-                return (
-                  <>
-                    ${p(st.dbName, st.fallback).toFixed(4)}/SF
-                    <RateEditPopover
-                      table="material_rates"
-                      name={st.dbName}
-                      category="Ground Treatments"
-                      unitLabel="SF"
-                      currentValue={p(st.dbName, st.fallback)}
-                      onSaved={refreshAllRates}
-                    />
-                  </>
-                )
-              })()}
-              <RateEditPopover
-                table="labor_rates"
-                name={GT_RATES.soilPrepLab.dbName}
-                category="Ground Treatments"
-                mode="coefficient"
-                unitLabel="hrs/SF"
-                currentValue={p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)}
-                onSaved={refreshAllRates}
-              />
-            </span>
-            {n(sodSoilPrepSF) > 0 && (
-              <span className="text-xs text-gray-400">
-                $
-                {(() => {
-                  const st = resolveType(sodSoilPrepType, soilPrepOpts, SOIL_PREP_TYPES)
-                  return (n(sodSoilPrepSF) * p(st.dbName, st.fallback)).toFixed(2)
-                })()}{' '}
-                mat
-              </span>
-            )}
-          </LabeledRow>
           <LabeledRow label="Sod">
             <select
               className="input text-sm py-1.5 w-32"
@@ -1676,12 +1669,15 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 <th className="text-left pb-1 pr-1 font-medium">Type</th>
                 <th className="text-left pb-1 pr-1 font-medium">Area (SF)</th>
                 <th className="text-left pb-1 pr-1 font-medium">Depth (in)</th>
+                <th className="text-left pb-1 pr-1 font-medium">$/CY</th>
                 <th className="text-left pb-1 font-medium">Weed Fabric</th>
               </tr>
             </thead>
             <tbody>
               {mulchRows.map((row, i) => {
                 const rowOpts = sectionOptions('Mulch', row.vendor, MULCH_TYPES)
+                const mt = resolveType(row.type, rowOpts, MULCH_TYPES)
+                const typeCost = p(mt.dbName, mt.fallback)
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-1">
@@ -1726,6 +1722,19 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                           </option>
                         ))}
                       </select>
+                    </td>
+                    <td className="py-1 pr-1">
+                      <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
+                        ${typeCost.toFixed(2)}/CY
+                        <RateEditPopover
+                          table="material_rates"
+                          name={mt.dbName}
+                          category="Ground Treatments"
+                          unitLabel="CY"
+                          currentValue={typeCost}
+                          onSaved={refreshAllRates}
+                        />
+                      </span>
                     </td>
                     <td className="py-1">
                       <div className="flex items-center gap-1">
@@ -2055,6 +2064,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 <th className="text-left pb-1 pr-1 font-medium">SF</th>
                 <th className="text-left pb-1 pr-1 font-medium">Method</th>
                 <th className="text-left pb-1 pr-1 font-medium">$/CY</th>
+                <th className="text-left pb-1 pr-1 font-medium">Weed Barrier</th>
                 <th className="text-left pb-1 font-medium">Depth (in)</th>
               </tr>
             </thead>
@@ -2118,6 +2128,17 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         />
                       </span>
                     </td>
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.weedFabric ?? 'Yes'}
+                        onChange={e => updateGravel(i, 'weedFabric', e.target.value)}
+                        title="Weed Barrier fabric"
+                      >
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                      </select>
+                    </td>
                     <td className="py-1">
                       <div className="flex items-center gap-1">
                         <NumInput
@@ -2149,7 +2170,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             onClick={() =>
               setGravelRows(r => [
                 ...r,
-                { sf: '', method: 'Hand', type: GRAVEL_TYPES[0]?.label ?? 'Crushed Pea Gravel', depthIn: '3', vendor: defaultVendorFor('Gravel') },
+                { sf: '', method: 'Hand', type: GRAVEL_TYPES[0]?.label ?? 'Crushed Pea Gravel', depthIn: '3', weedFabric: 'Yes', vendor: defaultVendorFor('Gravel') },
               ])
             }
           >
@@ -2164,7 +2185,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 const gtype = resolveType(row.type, sectionOptions('Gravel', row.vendor, GRAVEL_TYPES), GRAVEL_TYPES)
                 const mat =
                   CY * p(gtype.dbName, gtype.fallback) +
-                  n(row.sf) * p(GT_RATES.gravelFabricMat.dbName, 0.1)
+                  ((row.weedFabric ?? 'Yes') === 'Yes' ? n(row.sf) * p(GT_RATES.gravelFabricMat.dbName, 0.1) : 0)
                 return (
                   <span key={i} className="text-xs text-gray-400">
                     #{i + 1}: {CY.toFixed(2)} CY · ${mat.toFixed(2)} mat
@@ -2237,6 +2258,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 <th className="text-left pb-1 pr-1 font-medium">SF</th>
                 <th className="text-left pb-1 pr-1 font-medium">Method</th>
                 <th className="text-left pb-1 pr-1 font-medium">$/CY</th>
+                <th className="text-left pb-1 pr-1 font-medium">Weed Barrier</th>
                 <th className="text-left pb-1 font-medium">Depth (in)</th>
               </tr>
             </thead>
@@ -2300,6 +2322,17 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         />
                       </span>
                     </td>
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.weedFabric ?? 'Yes'}
+                        onChange={e => updatePebble(i, 'weedFabric', e.target.value)}
+                        title="Weed Barrier fabric"
+                      >
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                      </select>
+                    </td>
                     <td className="py-1">
                       <NumInput
                         value={row.depthIn}
@@ -2319,7 +2352,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             onClick={() =>
               setPebbleRows(r => [
                 ...r,
-                { sf: '', method: 'Hand', type: PEBBLE_TYPES[0]?.label ?? 'Arizona River Rock', depthIn: '3', vendor: defaultVendorFor('Pebble') },
+                { sf: '', method: 'Hand', type: PEBBLE_TYPES[0]?.label ?? 'Arizona River Rock', depthIn: '3', weedFabric: 'Yes', vendor: defaultVendorFor('Pebble') },
               ])
             }
           >
@@ -2334,7 +2367,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 const ptype = resolveType(row.type, sectionOptions('Pebble', row.vendor, PEBBLE_TYPES), PEBBLE_TYPES)
                 const mat =
                   CY * p(ptype.dbName, ptype.fallback) +
-                  n(row.sf) * p(GT_RATES.gravelFabricMat.dbName, 0.1)
+                  ((row.weedFabric ?? 'Yes') === 'Yes' ? n(row.sf) * p(GT_RATES.gravelFabricMat.dbName, 0.1) : 0)
                 return (
                   <span key={i} className="text-xs text-gray-400">
                     #{i + 1}: {CY.toFixed(2)} CY · ${mat.toFixed(2)} mat
