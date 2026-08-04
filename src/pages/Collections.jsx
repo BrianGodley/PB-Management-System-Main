@@ -87,10 +87,21 @@ const PAY_CATS = [
 
 const FIN_SECTIONS = [
   { key: 'cash_on_hand', label: '1 — Cash On Hand', allowAdd: true },
-  { key: 'auto_alloc', label: '2 — Auto Allocations', allowAdd: true },
+  // Auto Allocations are now defined company-wide in Settings, so no per-week add.
+  { key: 'auto_alloc', label: '2 — Auto Allocations', allowAdd: false },
   { key: 'payroll', label: '3 — Payroll Allocations', allowAdd: true },
   { key: 'payables_alloc', label: '4 — Payables Allocations', allowAdd: true },
 ]
+
+// The "Value" a percentage allocation can be a percent OF.
+const ALLOC_TARGETS = [
+  { key: 'cash_on_hand', label: 'Cash on Hand' },
+  { key: 'receivables', label: 'Total Receivables' },
+  { key: 'payables', label: 'Total Payables' },
+  { key: 'payroll', label: 'Payroll Allocations' },
+  { key: 'available_cash', label: 'Available Cash' },
+]
+const allocTargetLabel = key => ALLOC_TARGETS.find(t => t.key === key)?.label || 'Cash on Hand'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtC(n) {
@@ -380,6 +391,10 @@ export default function Collections() {
   const [loading, setLoading] = useState(true)
   const [creatingWeek, setCreatingWeek] = useState(false)
   const [companyWeekEndDay, setCompanyWeekEndDay] = useState(6) // default Saturday
+  // Company-wide Auto Allocation definitions (percentage + fixed), stored in
+  // company_settings.auto_allocations. These drive Financial Planning section 2.
+  const [autoAllocations, setAutoAllocations] = useState([])
+  const [companySettingsId, setCompanySettingsId] = useState(null)
   const [newWeekModal, setNewWeekModal] = useState(null) // { lastDataWeek, nextDate }
   const [deleteWeekConfirm, setDeleteWeekConfirm] = useState(false)
   const [deletingWeek, setDeletingWeek] = useState(false)
@@ -424,7 +439,10 @@ export default function Collections() {
   useEffect(() => {
     Promise.all([
       supabase.from('collection_weeks').select('*').order('week_ending', { ascending: false }),
-      supabase.from('company_settings').select('company_week_ending_day').maybeSingle(),
+      supabase
+        .from('company_settings')
+        .select('id, company_week_ending_day, auto_allocations')
+        .maybeSingle(),
     ]).then(([weeksRes, settingsRes]) => {
       if (weeksRes.data) {
         setWeeks(weeksRes.data)
@@ -432,6 +450,12 @@ export default function Collections() {
       }
       if (settingsRes.data?.company_week_ending_day != null) {
         setCompanyWeekEndDay(settingsRes.data.company_week_ending_day)
+      }
+      if (settingsRes.data) {
+        setCompanySettingsId(settingsRes.data.id ?? null)
+        setAutoAllocations(
+          Array.isArray(settingsRes.data.auto_allocations) ? settingsRes.data.auto_allocations : []
+        )
       }
       setLoading(false)
     })
@@ -928,6 +952,22 @@ export default function Collections() {
     await supabase.from('collection_financial').delete().eq('id', id)
   }
 
+  // Persist the company-wide Auto Allocation definitions to company_settings.
+  async function saveAutoAllocations(next) {
+    setAutoAllocations(next)
+    const payload =
+      companySettingsId != null
+        ? { id: companySettingsId, auto_allocations: next }
+        : { auto_allocations: next }
+    const { data, error } = await supabase
+      .from('company_settings')
+      .upsert(payload, { onConflict: 'id' })
+      .select('id')
+      .maybeSingle()
+    if (error) throw error
+    if (data?.id && companySettingsId == null) setCompanySettingsId(data.id)
+  }
+
   // ── Summaries ───────────────────────────────────────────────────────────────
   function collSummary(section) {
     const sRows = rows.filter(r => r.section === section)
@@ -972,8 +1012,31 @@ export default function Collections() {
     return acc
   }, {})
   const cashOnHand = finTotal('cash_on_hand')
-  const autoAlloc = finTotal('auto_alloc', cashOnHand)
   const payrollAlloc = finTotal('payroll')
+  // Auto Allocations are computed from the company-wide definitions (percentage
+  // of a chosen target, or a fixed amount) rather than per-week rows.
+  const allocTargetValue = key =>
+    ({
+      cash_on_hand: cashOnHand,
+      receivables: totalReceivables,
+      payables: totalPayables,
+      payroll: payrollAlloc,
+      available_cash: cashOnHand - payrollAlloc,
+    })[key] ?? cashOnHand
+  const autoAllocComputed = (autoAllocations || []).map(a => ({
+    id: a.id,
+    name: a.name || (a.kind === 'percentage' ? 'Percentage' : 'Fixed'),
+    kind: a.kind,
+    detail:
+      a.kind === 'percentage'
+        ? `${parseFloat(a.rate) || 0}% of ${allocTargetLabel(a.target)}`
+        : null,
+    amount:
+      a.kind === 'percentage'
+        ? allocTargetValue(a.target) * ((parseFloat(a.rate) || 0) / 100)
+        : parseMoney(a.amount),
+  }))
+  const autoAlloc = autoAllocComputed.reduce((s, a) => s + a.amount, 0)
   const payablesAlloc = financial
     .filter(f => f.section === 'payables_alloc' && !f.is_formula && f.subsection)
     .reduce((s, f) => s + (parseFloat(f.amount) || 0), 0)
@@ -1364,20 +1427,29 @@ export default function Collections() {
               <div className="flex gap-4 pb-4 items-start">
                 {/* Left column: sections 1, 2, 3 */}
                 <div className="flex-1 flex flex-col gap-4">
-                  {FIN_SECTIONS.filter(s => s.key !== 'payables_alloc').map(sec => (
-                    <FinancialTable
-                      key={sec.key}
-                      sec={sec}
-                      rows={financial.filter(f => f.section === sec.key)}
-                      total={finTotal(sec.key, cashOnHand)}
-                      onUpdate={updateFinancial}
-                      onDelete={deleteFinancial}
-                      onAdd={() => addFinancial(sec.key)}
-                      canAdd={sec.allowAdd}
-                      cashOnHandTotal={cashOnHand}
-                      disabled={inputsLocked}
-                    />
-                  ))}
+                  {FIN_SECTIONS.filter(s => s.key !== 'payables_alloc').map(sec =>
+                    sec.key === 'auto_alloc' ? (
+                      <AutoAllocView
+                        key="auto_alloc"
+                        label={sec.label}
+                        items={autoAllocComputed}
+                        total={autoAlloc}
+                      />
+                    ) : (
+                      <FinancialTable
+                        key={sec.key}
+                        sec={sec}
+                        rows={financial.filter(f => f.section === sec.key)}
+                        total={finTotal(sec.key, cashOnHand)}
+                        onUpdate={updateFinancial}
+                        onDelete={deleteFinancial}
+                        onAdd={() => addFinancial(sec.key)}
+                        canAdd={sec.allowAdd}
+                        cashOnHandTotal={cashOnHand}
+                        disabled={inputsLocked}
+                      />
+                    )
+                  )}
                 </div>
 
                 {/* Middle column: section 4 — Payables Allocations */}
@@ -1547,7 +1619,10 @@ export default function Collections() {
           {mainTab === 'settings' && (
             <div className="-mb-6 mt-3 flex-1 flex flex-col">
               <div className="flex border border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0 rounded-xl mb-3">
-                {[{ key: 'general', label: '⚙️ General' }].map(t => (
+                {[
+                  { key: 'general', label: '⚙️ General' },
+                  { key: 'auto_alloc', label: '📐 Auto Allocations' },
+                ].map(t => (
                   <button
                     key={t.key}
                     onClick={() => setCollSettingsTab(t.key)}
@@ -1575,11 +1650,248 @@ export default function Collections() {
                     </div>
                   </div>
                 )}
+                {collSettingsTab === 'auto_alloc' && (
+                  <AutoAllocSettings value={autoAllocations} onSave={saveAutoAllocations} />
+                )}
               </div>
             </div>
           )}
         </>
       )}
+    </div>
+  )
+}
+
+// ── Auto Allocations (read-only) view for Financial Planning section 2 ────────
+function AutoAllocView({ label, items, total }) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+      <div className="bg-blue-800 text-white px-4 py-2.5 flex items-center justify-between flex-shrink-0">
+        <h3 className="text-sm font-bold">{label}</h3>
+        <span className="text-xs font-bold text-blue-100">{fmtC(total)}</span>
+      </div>
+      <table className="w-full text-xs">
+        <thead className="bg-gray-50 border-b border-gray-200">
+          <tr>
+            <th className="px-3 py-2 text-left font-semibold text-gray-500">Allocation</th>
+            <th className="px-3 py-2 text-right font-semibold text-gray-500 w-28">Amount</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {items.length === 0 && (
+            <tr>
+              <td colSpan={2} className="px-3 py-3 text-center text-gray-400 text-[11px]">
+                Set these up in Settings → Auto Allocations.
+              </td>
+            </tr>
+          )}
+          {items.map(a => (
+            <tr key={a.id} className={a.kind === 'percentage' ? 'bg-sky-50' : ''}>
+              <td className="px-3 py-1.5 text-[11px]">
+                <span className="font-semibold text-gray-800">{a.name}</span>
+                {a.detail && <span className="ml-1 font-normal text-sky-500">({a.detail})</span>}
+              </td>
+              <td className="px-3 py-1.5 text-right font-bold text-[11px] text-gray-800">
+                {fmtC(a.amount)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ── Auto Allocations settings — two tables (percentage + fixed) side by side ──
+function AutoAllocSettings({ value, onSave }) {
+  const [draft, setDraft] = useState(value || [])
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState('')
+  useEffect(() => setDraft(value || []), [value])
+
+  const newId = () => 'a' + Math.random().toString(36).slice(2, 9)
+  const add = kind =>
+    setDraft(prev => [
+      ...prev,
+      kind === 'percentage'
+        ? { id: newId(), kind: 'percentage', name: '', rate: '', target: 'cash_on_hand' }
+        : { id: newId(), kind: 'fixed', name: '', amount: '' },
+    ])
+  const patch = (id, p) => setDraft(prev => prev.map(a => (a.id === id ? { ...a, ...p } : a)))
+  const remove = id => setDraft(prev => prev.filter(a => a.id !== id))
+
+  const pct = draft.filter(a => a.kind === 'percentage')
+  const fixed = draft.filter(a => a.kind === 'fixed')
+
+  async function save() {
+    setSaving(true)
+    setMsg('')
+    try {
+      await onSave(draft)
+      setMsg('Saved.')
+      setTimeout(() => setMsg(''), 3000)
+    } catch (e) {
+      setMsg('Error: ' + (e?.message || 'save failed'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inputCls = 'input py-1 text-xs w-full'
+  return (
+    <div>
+      <p className="text-sm text-gray-500 mb-4">
+        These auto allocations apply to every week's Financial Planning. Percentage allocations
+        recalculate off the chosen value each week; fixed allocations use a set amount.
+      </p>
+      <div className="flex flex-col lg:flex-row gap-4">
+        {/* Percentage allocations */}
+        <div className="flex-1 bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="bg-blue-800 text-white px-4 py-2.5 text-sm font-bold">
+            Percentage Allocations
+          </div>
+          <table className="w-full text-xs">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-3 py-2 text-left font-semibold text-gray-500">Name</th>
+                <th className="px-2 py-2 text-left font-semibold text-gray-500 w-20">Rate %</th>
+                <th className="px-2 py-2 text-left font-semibold text-gray-500">Target Value</th>
+                <th className="w-8" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {pct.map(a => (
+                <tr key={a.id}>
+                  <td className="px-2 py-1">
+                    <input
+                      className={inputCls}
+                      value={a.name || ''}
+                      onChange={e => patch(a.id, { name: e.target.value })}
+                      placeholder="Name"
+                    />
+                  </td>
+                  <td className="px-2 py-1">
+                    <input
+                      className={inputCls}
+                      value={a.rate ?? ''}
+                      onChange={e => patch(a.id, { rate: e.target.value })}
+                      placeholder="0"
+                    />
+                  </td>
+                  <td className="px-2 py-1">
+                    <select
+                      className={inputCls}
+                      value={a.target || 'cash_on_hand'}
+                      onChange={e => patch(a.id, { target: e.target.value })}
+                    >
+                      {ALLOC_TARGETS.map(t => (
+                        <option key={t.key} value={t.key}>
+                          {t.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-1 text-center">
+                    <button
+                      onClick={() => remove(a.id)}
+                      className="text-red-300 hover:text-red-600"
+                    >
+                      ✕
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {pct.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-3 py-3 text-center text-gray-400 text-[11px]">
+                    No percentage allocations.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+          <div className="px-3 py-2 border-t border-gray-100 bg-gray-50">
+            <button
+              onClick={() => add('percentage')}
+              className="text-xs text-green-700 hover:text-green-900 font-medium"
+            >
+              + Add percentage
+            </button>
+          </div>
+        </div>
+
+        {/* Fixed allocations */}
+        <div className="flex-1 bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="bg-blue-800 text-white px-4 py-2.5 text-sm font-bold">
+            Fixed Allocations
+          </div>
+          <table className="w-full text-xs">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-3 py-2 text-left font-semibold text-gray-500">Name</th>
+                <th className="px-2 py-2 text-left font-semibold text-gray-500 w-32">Amount</th>
+                <th className="w-8" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {fixed.map(a => (
+                <tr key={a.id}>
+                  <td className="px-2 py-1">
+                    <input
+                      className={inputCls}
+                      value={a.name || ''}
+                      onChange={e => patch(a.id, { name: e.target.value })}
+                      placeholder="Name"
+                    />
+                  </td>
+                  <td className="px-2 py-1">
+                    <input
+                      className={inputCls}
+                      value={a.amount ?? ''}
+                      onChange={e => patch(a.id, { amount: e.target.value })}
+                      placeholder="0"
+                    />
+                  </td>
+                  <td className="px-1 text-center">
+                    <button
+                      onClick={() => remove(a.id)}
+                      className="text-red-300 hover:text-red-600"
+                    >
+                      ✕
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {fixed.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="px-3 py-3 text-center text-gray-400 text-[11px]">
+                    No fixed allocations.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+          <div className="px-3 py-2 border-t border-gray-100 bg-gray-50">
+            <button
+              onClick={() => add('fixed')}
+              className="text-xs text-green-700 hover:text-green-900 font-medium"
+            >
+              + Add fixed
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-center gap-3">
+        <button
+          onClick={save}
+          disabled={saving}
+          className="bg-green-700 text-white text-sm font-semibold px-6 py-2 rounded-lg hover:bg-green-800 disabled:opacity-50"
+        >
+          {saving ? 'Saving…' : 'Save Allocations'}
+        </button>
+        {msg && <span className="text-sm text-gray-600">{msg}</span>}
+      </div>
     </div>
   )
 }
