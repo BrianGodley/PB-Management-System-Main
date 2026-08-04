@@ -82,22 +82,32 @@ function newFeatureId() {
 // existing dashboards keep working.
 function buildFeatures(prefs) {
   const layout = prefs?.layout || {}
-  if (Array.isArray(layout.features) && layout.features.length) {
-    return layout.features.map(f => ({
+  const raw =
+    Array.isArray(layout.features) && layout.features.length
+      ? layout.features
+      : (() => {
+          const w = Number(layout.statW) || 100
+          const h = Number(layout.statH) || 100
+          const f = [{ type: 'weather', w, h }]
+          for (const id of prefs?.stat_ids || []) f.push({ type: 'stat', statId: Number(id), w, h })
+          f.push({ type: 'quickLinks', w: 100, h: 100 })
+          return f
+        })()
+  // Normalize each feature; assign a default grid position for any without x/y
+  // (features are free-positioned on an absolute canvas, like the Workflows graph).
+  return raw.map((f, i) => {
+    const col = i % 3
+    const row = Math.floor(i / 3)
+    return {
       id: f.id || newFeatureId(),
       type: f.type || 'stat',
       w: Number(f.w) || 100,
       h: Number(f.h) || 100,
+      x: Number.isFinite(f.x) ? f.x : col * 356,
+      y: Number.isFinite(f.y) ? f.y : row * 340,
       statId: f.statId != null ? Number(f.statId) : undefined,
-    }))
-  }
-  const w = Number(layout.statW) || 100
-  const h = Number(layout.statH) || 100
-  const feats = [{ id: newFeatureId(), type: 'weather', w, h }]
-  for (const id of prefs?.stat_ids || [])
-    feats.push({ id: newFeatureId(), type: 'stat', statId: Number(id), w, h })
-  feats.push({ id: newFeatureId(), type: 'quickLinks', w: 100, h: 100 })
-  return feats
+    }
+  })
 }
 
 // ── Quick-link buttons. Batch 1 wires each to its page; richer behaviour
@@ -636,25 +646,38 @@ export default function Dashboard() {
     )
   }
 
-  // Edit mode: when on, features can be dragged to reorder and resized by a
-  // corner handle (like resizing an image). Off = normal read-only dashboard.
+  // Edit mode: when on, features can be freely positioned (right-click hold to
+  // drag) and resized by a corner handle. Off = normal read-only dashboard.
   const [editMode, setEditMode] = useState(false)
   // Clicking a feature's expand control opens an enlarged modal (like stats).
   const [expanded, setExpanded] = useState(null)
 
-  // Drag-to-reorder (HTML5 DnD via each card's grip handle).
-  const dragIdx = useRef(null)
-  function onDropAt(toIdx) {
-    const from = dragIdx.current
-    dragIdx.current = null
-    if (from == null || from === toIdx) return
-    setFeatures(prev => {
-      const next = prev.slice()
-      const [moved] = next.splice(from, 1)
-      next.splice(toIdx, 0, moved)
-      persistFeatures(next)
-      return next
-    })
+  // Free-position drag — like the Workflows graph. Initiated by a RIGHT-click
+  // hold on a card; the card follows the cursor and drops on release. Absolute
+  // x/y are stored per feature.
+  function onMoveStart(e, i) {
+    e.preventDefault()
+    e.stopPropagation()
+    const startX = e.clientX
+    const startY = e.clientY
+    const f0 = features[i]
+    const ox = Number(f0.x) || 0
+    const oy = Number(f0.y) || 0
+    const move = ev => {
+      const nx = Math.max(0, ox + (ev.clientX - startX))
+      const ny = Math.max(0, oy + (ev.clientY - startY))
+      setFeatures(prev => prev.map((ff, idx) => (idx === i ? { ...ff, x: nx, y: ny } : ff)))
+    }
+    const up = () => {
+      window.removeEventListener('mousemove', move)
+      window.removeEventListener('mouseup', up)
+      setFeatures(prev => {
+        persistFeatures(prev)
+        return prev
+      })
+    }
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', up)
   }
 
   // Corner-handle resize. Percentages are relative to the base card size
@@ -688,12 +711,23 @@ export default function Dashboard() {
   }
 
   function featureDims(f) {
+    const pxWidth = Math.round(340 * ((Number(f.w) || 100) / 100))
+    const scaled = Math.round(285 * ((Number(f.h) || 100) / 100))
     return {
-      width: `min(100%, ${Math.round(340 * ((Number(f.w) || 100) / 100))}px)`,
-      statHeight: Math.round(285 * ((Number(f.h) || 100) / 100)),
-      minHeight: Math.round(285 * ((Number(f.h) || 100) / 100)),
+      pxWidth,
+      width: `${pxWidth}px`,
+      statHeight: scaled,
+      minHeight: scaled,
+      // Rough on-canvas block height (card chrome + body) for sizing the canvas.
+      blockHeight: (f.type === 'stat' ? scaled + 130 : scaled + 40),
     }
   }
+
+  // Total canvas height so absolutely-positioned features always fit.
+  const canvasHeight = Math.max(
+    420,
+    ...features.map(f => (Number(f.y) || 0) + featureDims(f).blockHeight + 24)
+  )
 
   // Sync the saved per-user background from the DB once prefs load (so the
   // choice follows the user across devices). Runs once; user changes after
@@ -760,35 +794,40 @@ export default function Dashboard() {
 
       {tab === 'dashboard' && (
         <>
-          <div className="flex flex-wrap gap-4 items-start">
+          {editMode && (
+            <p className="text-xs text-gray-500 mb-3">
+              <span className="font-semibold">Right-click and hold</span> a feature to drag it
+              anywhere, then release to drop. Drag the corner handle to resize.
+            </p>
+          )}
+          <div
+            className="relative"
+            style={{ minHeight: canvasHeight }}
+            onContextMenu={editMode ? e => e.preventDefault() : undefined}
+          >
             {features.map((f, i) => {
               const dims = featureDims(f)
               return (
                 <div
                   key={f.id}
-                  style={{ width: dims.width }}
-                  onDragOver={e => editMode && e.preventDefault()}
-                  onDrop={() => editMode && onDropAt(i)}
-                  className={`relative group ${
-                    editMode ? 'ring-2 ring-green-300 ring-offset-2 rounded-xl' : ''
+                  style={{
+                    position: 'absolute',
+                    left: Number(f.x) || 0,
+                    top: Number(f.y) || 0,
+                    width: dims.width,
+                  }}
+                  onMouseDown={
+                    editMode
+                      ? e => {
+                          if (e.button === 2) onMoveStart(e, i)
+                        }
+                      : undefined
+                  }
+                  onContextMenu={editMode ? e => e.preventDefault() : undefined}
+                  className={`group ${
+                    editMode ? 'ring-2 ring-green-300 rounded-xl select-none cursor-move' : ''
                   }`}
                 >
-                  {/* Drag handle — edit mode only. */}
-                  {editMode && (
-                    <div
-                      draggable
-                      onDragStart={() => {
-                        dragIdx.current = i
-                      }}
-                      onDragEnd={() => {
-                        dragIdx.current = null
-                      }}
-                      title="Drag to reorder"
-                      className="absolute -top-2 -left-2 z-30 w-6 h-6 flex items-center justify-center rounded-full bg-green-700 text-white shadow cursor-grab active:cursor-grabbing"
-                    >
-                      ⠿
-                    </div>
-                  )}
                   {/* Enlarge — view mode. Stat cards have their own built-in expand. */}
                   {!editMode && f.type !== 'stat' && (
                     <button
