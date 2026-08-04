@@ -8877,7 +8877,7 @@ function periodsBackFrom(endDateStr, count, tracking, wed) {
   return `${base.getFullYear() - back}-01-01`
 }
 
-function StatMiniGraph({ stat, values, weekEndingDay, height = 248, onExpand }) {
+function StatMiniGraph({ stat, values, weekEndingDay, height = 285, onExpand }) {
   const large = height > 300
   // Full date extent of this stat's values. Fall back to a 90-day window so the
   // scrubber always has a valid, non-zero span even when there's no data yet.
@@ -10830,7 +10830,7 @@ export default function Statistics() {
       )}
       {/* ── GROUP VIEW (grid of mini graphs) ─────────────────────────────── */}
       {viewMode === 'graphs' && showGroupView && (
-        <div className="flex-1 overflow-y-auto bg-gray-50">
+        <div className="flex-1 overflow-y-auto bg-gray-100">
           {/* Sticky (frozen) group tab bar — stays put while the grid scrolls. */}
           <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-3 py-2 flex items-center gap-2 flex-wrap">
             <button
