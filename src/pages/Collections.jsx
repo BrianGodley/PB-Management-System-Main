@@ -296,7 +296,7 @@ function SolvencyMiniChart({ currentWeekEnding }) {
   if (!stat || !values.length)
     return <div className="text-center text-gray-400 text-xs py-6">No solvency history yet.</div>
 
-  return <StatMiniGraphShared stat={stat} values={values} height={221} />
+  return <StatMiniGraphShared stat={stat} values={values} height={332} />
 }
 
 // ── Solvency backfill helper (module-level, no closure deps) ─────────────────

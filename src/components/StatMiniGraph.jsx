@@ -354,7 +354,7 @@ export default function StatMiniGraph({
   expandable = true,
 }) {
   const wed = useEffectiveWed(weekEndingDay)
-  const large = height > 300
+  const large = height > 400
   const [selfExpand, setSelfExpand] = useState(false)
   // External handler wins (Statistics group view drives a shared modal); else
   // the component opens its own modal when expandable.
@@ -385,11 +385,31 @@ export default function StatMiniGraph({
   }, [defWindow.from, defWindow.to])
 
   const data = useMemo(() => {
+    // Values that fall inside the current [from, to] window.
+    const inWin = (values || []).filter(
+      v => v.period_date && v.period_date >= from && v.period_date <= to
+    )
     const periods = generatePeriods(from, to, stat.tracking, wed)
-    return periods.map(p => {
-      const match = (values || []).find(v => matchesPeriod(v.period_date, p, stat.tracking, wed))
-      return { label: periodLabel(p, stat.tracking), value: match ? Number(match.value) : null }
-    })
+    if (periods.length) {
+      const mapped = periods.map(p => {
+        const match = inWin.find(v => matchesPeriod(v.period_date, p, stat.tracking, wed))
+        return { label: periodLabel(p, stat.tracking), value: match ? Number(match.value) : null }
+      })
+      // If the tracking-based buckets matched at least one value (the normal
+      // case), use them. Only fall back when buckets matched NOTHING despite
+      // real values existing — e.g. a stat with absent/looser tracking, or dates
+      // that don't land on generated period boundaries (which would otherwise
+      // render a blank "No data" card).
+      if (mapped.some(d => d.value != null) || inWin.length === 0) return mapped
+    }
+    // Fallback: plot the raw in-window values directly, by date.
+    return inWin
+      .slice()
+      .sort((a, b) => (a.period_date < b.period_date ? -1 : 1))
+      .map(v => ({
+        label: periodLabel(v.period_date, stat.tracking || 'daily'),
+        value: v.value == null ? null : Number(v.value),
+      }))
   }, [values, from, to, stat.tracking, wed])
 
   const hasData = data.some(d => d.value != null)
