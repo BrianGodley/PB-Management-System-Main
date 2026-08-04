@@ -1348,7 +1348,7 @@ export default function Collections() {
                   ))}
                 </div>
 
-                {/* Right column: section 4 + Totals */}
+                {/* Middle column: section 4 — Payables Allocations */}
                 <div className="flex-1 flex flex-col gap-4">
                   <PayablesAllocSection
                     rows={financial.filter(
@@ -1361,7 +1361,10 @@ export default function Collections() {
                     payablesByCategory={payablesByCategory}
                     disabled={inputsLocked}
                   />
+                </div>
 
+                {/* Right column: section 5 — Financial Planning summary */}
+                <div className="flex-1 flex flex-col gap-4">
                   {/* 5 — Financial Planning */}
                   <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
                     <div className="bg-cyan-600 text-white px-4 py-2.5">
