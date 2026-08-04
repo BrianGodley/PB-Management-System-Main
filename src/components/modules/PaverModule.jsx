@@ -973,9 +973,25 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   // ── Vendor catalog helpers (per-row Vendor/Type pickers) ─────────────────
   const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
 
-  // In-House engine — always reads the raw In-House fields (state.areaRows …).
+  // In-House engine — FORCE the In-House tab so it always reads the raw In-House
+  // fields (state.areaRows …) regardless of which tab is active. This is the
+  // in-house side of the module: paver material + install labor + in-house GP.
   const inHouse = calcPaver(
-    state,
+    { ...state, subType: 'In-House' },
+    laborRatePerHour,
+    laborRates,
+    materialRates,
+    paverPrices,
+    gpmd,
+    walkAccess,
+    laborBurdenPct,
+    materialRows
+  )
+  // Sub engine — FORCE the Sub tab so it reads the sub area rows (state.subAreaRows
+  // …). We take only its MATERIAL total (its labor/GP are ignored — install labor
+  // is always In-House). This paver material is a subcontractor cost.
+  const subEngine = calcPaver(
+    { ...state, subType: 'Subcontractor' },
     laborRatePerHour,
     laborRates,
     materialRates,
@@ -999,13 +1015,13 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
     n(state.subSleevesLF) * sleevesSubRate +
     (state.subManualRows || []).reduce((s, r) => s + n(r.subCost), 0)
 
-  // ── Combine In-House + Sub, apply the Sub GP markup ─────────────────────────
-  // On the Sub tab, the paver MATERIAL (inHouse.totalMat, computed from the sub
-  // area rows) is a SUBCONTRACTOR cost — route it into subCost and keep in-house
-  // materials at 0 so the two sides stay completely separate. On the In-House
-  // tab it stays an in-house material as before.
-  const subPaverMat = isSub ? inHouse.totalMat || 0 : 0
-  const ihTotalMat = isSub ? 0 : inHouse.totalMat
+  // ── Sum the two INDEPENDENT sides ───────────────────────────────────────────
+  // In-House side  = inHouse (labor + in-house paver material + in-house GP).
+  // Sub side       = sub paver material (from the sub area rows) + the sub install
+  //                  $/SF lines + manual sub costs, marked up by the Sub GP rate.
+  // Both are ALWAYS included so the module total = In-House subtotal + Sub subtotal,
+  // and each tab's inputs are fully independent.
+  const subPaverMat = subEngine.totalMat || 0
   const _subCost = inHouse.subCost + subSideCost + subPaverMat
   const _subGp = _subCost * subGpMarkupRate
   const _gp = inHouse.gp
@@ -1013,14 +1029,13 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   const _price =
     inHouse.laborCost +
     inHouse.burden +
-    ihTotalMat +
+    inHouse.totalMat +
     _gp +
     _subCost +
     _subGp +
     _commission
   const calcRaw = {
     ...inHouse,
-    totalMat: ihTotalMat,
     subCost: _subCost,
     subGp: _subGp,
     gp: _gp,
@@ -1096,7 +1111,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       {/* ── Sticky GPMD bar ── */}
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
         <GpmdBar
-          variant={isSub ? 'sub' : 'inhouse'}
+          variant="full"
           sticky
           totalMat={calc.totalMat}
           totalHrs={calc.totalHrs}
