@@ -8852,31 +8852,29 @@ function ArchivedView({ onRestored }) {
 // date window driven by the shared DateRangeScrubber, and renders a compact
 // recharts line chart with visible X + Y axes. No target lines, overlays,
 // upside-down, notes, or cursor — just the line + axes + slider.
-// Module-level twin of the main view's defaultRangeFor — computes the from/to
-// window for a stat's default_periods so mini cards open on the same number of
-// periods the big graph does. Returns null when the stat has no default_periods.
-function defaultRangeForStat(stat, wed) {
-  if (!stat?.default_periods) return null
-  const count = stat.default_periods
+// Step `count-1` periods back from an anchor end date, returning the ISO start
+// date so the resulting [start, anchor] window spans exactly `count` periods of
+// the given tracking. Used by the mini cards to open on the stat's
+// default_periods count anchored to its most recent data (not "today", which
+// would collapse the window whenever the latest data is older than today).
+function periodsBackFrom(endDateStr, count, tracking, wed) {
   const wday = wed ?? 5
-  const now = new Date()
-  let from
-  if (stat.tracking === 'daily') {
-    const d = new Date()
-    d.setDate(d.getDate() - (count - 1))
-    from = isoDate(d)
-  } else if (stat.tracking === 'weekly') {
-    const we = new Date(getWeekEndingDate(today(), wday) + 'T00:00:00')
-    we.setDate(we.getDate() - (count - 1) * 7)
-    from = isoDate(we)
-  } else if (stat.tracking === 'monthly') {
-    from = isoDate(new Date(now.getFullYear(), now.getMonth() - (count - 1), 1))
-  } else if (stat.tracking === 'quarterly') {
-    from = isoDate(new Date(now.getFullYear(), now.getMonth() - (count - 1) * 3, 1))
-  } else {
-    from = `${now.getFullYear() - (count - 1)}-01-01`
+  const back = Math.max(0, (count || 1) - 1)
+  const base = new Date(endDateStr + 'T00:00:00')
+  if (tracking === 'daily') {
+    const d = new Date(base)
+    d.setDate(d.getDate() - back)
+    return isoDate(d)
+  } else if (tracking === 'weekly') {
+    const we = new Date(getWeekEndingDate(endDateStr, wday) + 'T00:00:00')
+    we.setDate(we.getDate() - back * 7)
+    return isoDate(we)
+  } else if (tracking === 'monthly') {
+    return isoDate(new Date(base.getFullYear(), base.getMonth() - back, 1))
+  } else if (tracking === 'quarterly') {
+    return isoDate(new Date(base.getFullYear(), base.getMonth() - back * 3, 1))
   }
-  return { from, to: today() }
+  return `${base.getFullYear() - back}-01-01`
 }
 
 function StatMiniGraph({ stat, values, weekEndingDay }) {
@@ -8888,15 +8886,17 @@ function StatMiniGraph({ stat, values, weekEndingDay }) {
     return { min: dates[0], max: dates[dates.length - 1] }
   }, [values])
 
-  // Default window = the stat's default_periods span (same count the main graph
-  // opens on), clamped into the available data extent. Falls back to the full
-  // extent when the stat has no default_periods.
+  // Default window = the stat's default_periods count, anchored to the most
+  // recent data point (dateExtent.max) and stepping back that many periods —
+  // so the card opens on exactly the number of periods set in the stat's
+  // new/edit modal. Falls back to the full extent when default_periods is unset.
   const defWindow = useMemo(() => {
     const min = dateExtent.min
     const max = dateExtent.max
-    const dr = defaultRangeForStat(stat, weekEndingDay)
-    if (!dr) return { from: min, to: max }
-    const f = dr.from < min ? min : dr.from > max ? min : dr.from
+    const count = stat?.default_periods
+    if (!count) return { from: min, to: max }
+    let f = periodsBackFrom(max, count, stat.tracking, weekEndingDay)
+    if (f < min) f = min
     return { from: f, to: max }
   }, [stat, weekEndingDay, dateExtent.min, dateExtent.max])
 
