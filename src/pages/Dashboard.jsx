@@ -82,6 +82,23 @@ function newFeatureId() {
   return 'f' + Math.random().toString(36).slice(2, 9)
 }
 
+// Alignment snapping: given the moving feature's candidate edges on one axis and
+// the edges of every other feature, find the nearest match. Within SNAP px it's
+// "aligned" (snap + solid guide); within the wider NEAR band it shows a dotted
+// guide without snapping. Returns { delta, pos, aligned } or null.
+function snapAxis(draggedEdges, otherEdges, SNAP = 6, NEAR = 16) {
+  let best = null
+  for (const de of draggedEdges) {
+    for (const oe of otherEdges) {
+      const diff = oe - de
+      const ad = Math.abs(diff)
+      if (ad <= NEAR && (best == null || ad < best.ad)) best = { diff, pos: oe, ad }
+    }
+  }
+  if (!best) return null
+  return { delta: best.diff, pos: best.pos, aligned: best.ad <= SNAP }
+}
+
 // Build the feature list from saved prefs. Uses layout.features when present;
 // otherwise migrates the legacy shape (weather + one card per stat_id) so
 // existing dashboards keep working.
@@ -681,13 +698,24 @@ export default function Dashboard() {
   const [editMode, setEditMode] = useState(false)
   // Clicking a feature's expand control opens an enlarged modal (like stats).
   const [expanded, setExpanded] = useState(null)
+  // Alignment guide lines shown while dragging/resizing ([] when idle).
+  const [guides, setGuides] = useState([])
+
+  const clampPct = v => Math.max(40, Math.min(300, v))
+  const BASE_W = 340
+  const BASE_H = 285
+
+  // Canvas box (left/top/right/bottom in px) for a feature.
+  const boxOf = f => {
+    const d = featureDims(f)
+    const l = Number(f.x) || 0
+    const t = Number(f.y) || 0
+    return { l, t, r: l + d.pxWidth, b: t + d.blockHeight }
+  }
 
   // Free-position drag — like the Workflows graph. Click-and-hold a card, drag
-  // it anywhere, release to drop. Uses pointer events (works for mouse + touch)
-  // and window-level listeners so the drag continues past the card edge.
+  // it anywhere, release to drop. Shows green alignment guides vs other cards.
   function onMoveStart(e, i) {
-    // Ignore drags that begin on the resize handle (it stops propagation) or on
-    // form fields the user may want to interact with.
     e.preventDefault()
     e.stopPropagation()
     const startX = e.clientX
@@ -695,14 +723,33 @@ export default function Dashboard() {
     const f0 = features[i]
     const ox = Number(f0.x) || 0
     const oy = Number(f0.y) || 0
+    const dims = featureDims(f0)
+    const w = dims.pxWidth
+    const h = dims.blockHeight
+    const others = features.filter((_, idx) => idx !== i).map(boxOf)
+    const xEdges = others.flatMap(o => [o.l, o.r])
+    const yEdges = others.flatMap(o => [o.t, o.b])
     const move = ev => {
-      const nx = Math.max(0, ox + (ev.clientX - startX))
-      const ny = Math.max(0, oy + (ev.clientY - startY))
+      let nx = Math.max(0, ox + (ev.clientX - startX))
+      let ny = Math.max(0, oy + (ev.clientY - startY))
+      const gs = []
+      const sx = snapAxis([nx, nx + w], xEdges)
+      if (sx) {
+        if (sx.aligned) nx += sx.delta
+        gs.push({ o: 'v', pos: sx.pos, aligned: sx.aligned })
+      }
+      const sy = snapAxis([ny, ny + h], yEdges)
+      if (sy) {
+        if (sy.aligned) ny += sy.delta
+        gs.push({ o: 'h', pos: sy.pos, aligned: sy.aligned })
+      }
       setFeatures(prev => prev.map((ff, idx) => (idx === i ? { ...ff, x: nx, y: ny } : ff)))
+      setGuides(gs)
     }
     const up = () => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
+      setGuides([])
       setFeatures(prev => {
         persistFeatures(prev)
         return prev
@@ -712,9 +759,7 @@ export default function Dashboard() {
     window.addEventListener('pointerup', up)
   }
 
-  // Corner-handle resize. Percentages are relative to the base card size
-  // (340px wide × 285px tall). Live-updates while dragging, persists on release.
-  const clampPct = v => Math.max(40, Math.min(300, v))
+  // Corner-handle resize with the same alignment guides (right + bottom edges).
   function onResizeStart(e, i) {
     e.preventDefault()
     e.stopPropagation()
@@ -723,16 +768,44 @@ export default function Dashboard() {
     const f0 = features[i]
     const startW = Number(f0.w) || 100
     const startH = Number(f0.h) || 100
+    const left = Number(f0.x) || 0
+    const top = Number(f0.y) || 0
+    const count = f0.type === 'stat' ? Math.max(1, (f0.statIds || []).length) : 1
+    // Convert between the dragged "scaled" height and the on-canvas bottom edge.
+    const scaledToBottom = s => (f0.type === 'stat' ? top + (s + 130) * count + 16 : top + s + 40)
+    const bottomToScaled = b => (f0.type === 'stat' ? (b - top - 16) / count - 130 : b - top - 40)
+    const others = features.filter((_, idx) => idx !== i).map(boxOf)
+    const xEdges = others.flatMap(o => [o.l, o.r])
+    const yEdges = others.flatMap(o => [o.t, o.b])
     const move = ev => {
       const dx = ev.clientX - startX
       const dy = ev.clientY - startY
-      const newW = clampPct(Math.round(((340 * startW) / 100 + dx) / 340 * 100 / 5) * 5)
-      const newH = clampPct(Math.round(((285 * startH) / 100 + dy) / 285 * 100 / 5) * 5)
+      let wpx = (BASE_W * startW) / 100 + dx
+      let scaledH = (BASE_H * startH) / 100 + dy
+      const gs = []
+      const sx = snapAxis([left + wpx], xEdges)
+      if (sx) {
+        if (sx.aligned) wpx = sx.pos - left
+        gs.push({ o: 'v', pos: sx.pos, aligned: sx.aligned })
+      }
+      const sy = snapAxis([scaledToBottom(scaledH)], yEdges)
+      if (sy) {
+        if (sy.aligned) scaledH = bottomToScaled(sy.pos)
+        gs.push({ o: 'h', pos: sy.pos, aligned: sy.aligned })
+      }
+      const newW = sx?.aligned
+        ? clampPct(Math.round((wpx / BASE_W) * 100))
+        : clampPct(Math.round((wpx / BASE_W) * 100 / 5) * 5)
+      const newH = sy?.aligned
+        ? clampPct(Math.round((scaledH / BASE_H) * 100))
+        : clampPct(Math.round((scaledH / BASE_H) * 100 / 5) * 5)
       setFeatures(prev => prev.map((ff, idx) => (idx === i ? { ...ff, w: newW, h: newH } : ff)))
+      setGuides(gs)
     }
     const up = () => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
+      setGuides([])
       setFeatures(prev => {
         persistFeatures(prev)
         return prev
@@ -943,6 +1016,32 @@ export default function Dashboard() {
                 </div>
               )
             })}
+
+            {/* Alignment guides — dotted when near another card's edge, solid
+                green when aligned (and snapped). */}
+            {guides.map((g, gi) =>
+              g.o === 'v' ? (
+                <div
+                  key={`g${gi}`}
+                  className="pointer-events-none absolute top-0 bottom-0 z-40"
+                  style={{
+                    left: g.pos,
+                    width: 0,
+                    borderLeft: g.aligned ? '2px solid #16a34a' : '1px dashed #9ca3af',
+                  }}
+                />
+              ) : (
+                <div
+                  key={`g${gi}`}
+                  className="pointer-events-none absolute left-0 right-0 z-40"
+                  style={{
+                    top: g.pos,
+                    height: 0,
+                    borderTop: g.aligned ? '2px solid #16a34a' : '1px dashed #9ca3af',
+                  }}
+                />
+              )
+            )}
           </div>
 
           {/* Enlarged feature modal (click a card's ⤢ to open) */}
