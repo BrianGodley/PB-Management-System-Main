@@ -502,7 +502,7 @@ async function fetchDashboardData(userId) {
     supabase.from('company_settings').select('id, weather_location').maybeSingle(),
     supabase
       .from('statistics')
-      .select('id, name, stat_category, equation_parts')
+      .select('id, name, stat_category, equation_parts, tracking, stat_type, default_periods')
       .eq('archived', false)
       .order('name'),
     supabase.from('profiles').select('role').eq('id', userId).maybeSingle(),
