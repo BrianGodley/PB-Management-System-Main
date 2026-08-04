@@ -11,6 +11,8 @@ export default function AppreciationFeature({ userId, lineCount = 3, style, expa
   const n = Math.max(1, Number(lineCount) || 3)
   const [lines, setLines] = useState(() => Array.from({ length: n }, () => ''))
   const [showSend, setShowSend] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [savedMsg, setSavedMsg] = useState('')
 
   // Load today's entry from the DB, fit to the configured line count.
   useEffect(() => {
@@ -33,13 +35,21 @@ export default function AppreciationFeature({ userId, lineCount = 3, style, expa
   }, [userId, n])
 
   const setLine = (i, v) => setLines(prev => prev.map((l, idx) => (idx === i ? v : l)))
-  // Persist today's lines (called on blur so we don't write on every keystroke).
+  // Persist today's lines to the DB (used by the Save button and on blur).
   const commit = async () => {
     if (!userId) return
-    await supabase.from('dashboard_appreciations').upsert(
+    setSaving(true)
+    const { error } = await supabase.from('dashboard_appreciations').upsert(
       { user_id: userId, entry_date: todayStr(), lines, updated_at: new Date().toISOString() },
       { onConflict: 'user_id,entry_date' }
     )
+    setSaving(false)
+    if (!error) {
+      setSavedMsg('Saved ✓')
+      setTimeout(() => setSavedMsg(''), 2500)
+    } else {
+      setSavedMsg('Save failed')
+    }
   }
 
   return (
@@ -60,10 +70,21 @@ export default function AppreciationFeature({ userId, lineCount = 3, style, expa
           </div>
         ))}
       </div>
+      <div className="mt-4 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={commit}
+          disabled={saving || !userId}
+          className="flex-shrink-0 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-green-700 hover:bg-green-800 disabled:opacity-50 transition-colors"
+        >
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+        {savedMsg && <span className="text-xs font-medium text-green-700">{savedMsg}</span>}
+      </div>
       <button
         type="button"
         onClick={() => setShowSend(true)}
-        className="mt-4 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-white bg-green-700 hover:bg-green-800 transition-colors"
+        className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-white bg-green-700 hover:bg-green-800 transition-colors"
       >
         💌 Send Appreciation
       </button>
