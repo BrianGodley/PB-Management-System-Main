@@ -294,10 +294,15 @@ function SolvencyMiniChart({ currentWeekEnding }) {
         if (!byDate[r.period_date]) byDate[r.period_date] = []
         byDate[r.period_date].push(Number(r.value))
       }
+      // Only include weeks that are FULLY completed — i.e. whose week-ending
+      // date is strictly before today. This drops the in-progress current week
+      // and any future weeks, matching the Statistics module trend graphs.
+      const now = new Date()
+      const todayLocal = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
+        now.getDate()
+      ).padStart(2, '0')}`
       const merged = Object.entries(byDate)
-        // Never plot week-endings beyond the week being viewed — the current
-        // week's ending date is the last point (no future weeks).
-        .filter(([date]) => !currentWeekEnding || date <= currentWeekEnding)
+        .filter(([date]) => date < todayLocal)
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([date, vals]) => ({
           period_date: date,
