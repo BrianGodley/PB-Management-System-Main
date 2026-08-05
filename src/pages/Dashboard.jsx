@@ -104,18 +104,23 @@ function snapAxis(draggedEdges, otherEdges, SNAP = 6, NEAR = 16) {
 // Build the feature list from saved prefs. Uses layout.features when present;
 // otherwise migrates the legacy shape (weather + one card per stat_id) so
 // existing dashboards keep working.
-function buildFeatures(prefs) {
+function buildFeatures(prefs, opts = {}) {
   const layout = prefs?.layout || {}
   const rawList =
     Array.isArray(layout.features) && layout.features.length
       ? layout.features
       : (() => {
-          const w = Number(layout.statW) || 100
-          const h = Number(layout.statH) || 100
-          const f = [{ type: 'weather', w, h }]
-          const ids = (prefs?.stat_ids || []).map(Number)
-          if (ids.length) f.push({ type: 'stat', statIds: ids, w, h })
-          f.push({ type: 'quickLinks', w: 100, h: 100 })
+          // Company default for users who haven't customized: Weather,
+          // Inspiration, Appreciation, Quick Links — plus a Total Sales stat
+          // graph when that statistic exists.
+          const f = [
+            { type: 'weather', w: 100, h: 100 },
+            { type: 'inspirations', w: 100, h: 100 },
+            { type: 'appreciation', w: 100, h: 100, lines: 3 },
+            { type: 'quickLinks', w: 100, h: 100 },
+          ]
+          const salesId = opts.totalSalesStatId
+          if (salesId) f.push({ type: 'stat', statIds: [salesId], w: 100, h: 100 })
           return f
         })()
 
@@ -494,7 +499,7 @@ function StatMiniGraph({ stat, allStats = [], height }) {
           <div className="text-xs font-semibold text-gray-800">Stat</div>
         </div>
         <p className="text-xs text-gray-400 py-16 text-center">
-          Pick a statistic in the Settings tab.
+          Pick a statistic in the Customize tab.
         </p>
       </div>
     )
@@ -673,9 +678,17 @@ export default function Dashboard() {
   const positions = data?.positions || []
 
   // ── Dashboard Features (typed, resizable, drag-to-reorder) ─────────────────
+  // The Total Sales statistic (by name), used to seed the default dashboard.
+  const totalSalesStatId = useMemo(
+    () => stats.find(s => /total\s*sales/i.test(s.name || ''))?.id ?? null,
+    [stats]
+  )
   // Live feature list, seeded from saved prefs and re-synced whenever the
-  // dashboard data reloads (e.g. after saving in Settings).
-  const savedFeatures = useMemo(() => buildFeatures(prefs), [data])
+  // dashboard data reloads (e.g. after saving in Customize).
+  const savedFeatures = useMemo(
+    () => buildFeatures(prefs, { totalSalesStatId }),
+    [data, totalSalesStatId]
+  )
   const [features, setFeatures] = useState(savedFeatures)
   useEffect(() => {
     setFeatures(savedFeatures)
@@ -878,7 +891,7 @@ export default function Dashboard() {
         {[
           { key: 'dashboard', label: '🏠 Dashboard' },
           { key: 'appreciation', label: '🙏 Appreciation History' },
-          { key: 'settings', label: '⚙️ Settings' },
+          { key: 'customize', label: '🎨 Customize' },
         ].map(t => (
           <button
             key={t.key}
@@ -1208,7 +1221,7 @@ export default function Dashboard() {
 
       {tab === 'appreciation' && <AppreciationHistoryTable userId={user?.id} />}
 
-      {tab === 'settings' && (
+      {tab === 'customize' && (
         <DashboardSettings
           prefs={prefs}
           stats={stats}
