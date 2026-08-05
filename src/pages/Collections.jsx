@@ -295,6 +295,9 @@ function SolvencyMiniChart({ currentWeekEnding }) {
         byDate[r.period_date].push(Number(r.value))
       }
       const merged = Object.entries(byDate)
+        // Never plot week-endings beyond the week being viewed — the current
+        // week's ending date is the last point (no future weeks).
+        .filter(([date]) => !currentWeekEnding || date <= currentWeekEnding)
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([date, vals]) => ({
           period_date: date,
