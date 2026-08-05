@@ -134,6 +134,7 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
   const [instructions, setInstructions] = useState('')
   const [file, setFile] = useState(null)
   const [catalogYear, setCatalogYear] = useState(new Date().getFullYear())
+  const [catalogWarn, setCatalogWarn] = useState('')
   const savedCatalogRef = useRef(false)
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState('')
@@ -392,9 +393,18 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
             file_name: file.name,
           })
           savedCatalogRef.current = true
+          setCatalogWarn('')
+        } else {
+          // Don't block the product import — just tell the user the original
+          // PDF wasn't stored (usually because it exceeds the storage size limit).
+          setCatalogWarn(
+            `The original catalog file wasn't saved to the Catalogs tab (${cErr.message}). Product extraction still works. If it's a size limit, ask an admin to raise the sub-vendor-files bucket limit, then re-upload the PDF from the vendor's Catalogs tab.`
+          )
         }
-      } catch {
-        /* non-fatal — extraction still proceeds */
+      } catch (e) {
+        setCatalogWarn(
+          `The original catalog file couldn't be saved (${e?.message || 'unknown error'}). Product extraction still works.`
+        )
       }
     }
     try {
@@ -647,6 +657,20 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
 
         {error && (
           <div className="mx-5 mt-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</div>
+        )}
+
+        {catalogWarn && (
+          <div className="mx-5 mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2 flex items-start gap-2">
+            <span>⚠</span>
+            <span className="flex-1">{catalogWarn}</span>
+            <button
+              type="button"
+              onClick={() => setCatalogWarn('')}
+              className="text-amber-500 hover:text-amber-700"
+            >
+              ✕
+            </button>
+          </div>
         )}
 
         {/* shared datalists */}

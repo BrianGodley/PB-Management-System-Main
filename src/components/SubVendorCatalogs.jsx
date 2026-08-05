@@ -41,7 +41,16 @@ export default function SubVendorCatalogs({ partyId }) {
       .from('sub-vendor-files')
       .upload(path, file, { upsert: false, contentType: file.type })
     if (upErr) {
-      alert('Upload failed: ' + upErr.message)
+      const tooBig =
+        /size|large|exceed|payload|413/i.test(upErr.message || '') ||
+        file.size > 50 * 1024 * 1024
+      alert(
+        tooBig
+          ? `This catalog (${(file.size / 1024 / 1024).toFixed(1)} MB) is larger than the storage limit, so it wasn't saved.\n\n` +
+              `Ask an admin to raise the "sub-vendor-files" bucket file size limit in Supabase (Storage → Buckets → sub-vendor-files → Edit), then upload again.\n\n` +
+              `(Details: ${upErr.message})`
+          : 'Upload failed: ' + upErr.message
+      )
       setUploading(false)
       return
     }
