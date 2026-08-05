@@ -19,7 +19,9 @@ import { useCachedData } from '../lib/useCachedData'
 import { resolveStatSeries } from '../lib/equationStat'
 import StatMiniGraphShared from '../components/StatMiniGraph'
 import InspirationFeature from '../components/dashboard/InspirationFeature'
-import AppreciationFeature from '../components/dashboard/AppreciationFeature'
+import AppreciationFeature, {
+  AppreciationHistoryTable,
+} from '../components/dashboard/AppreciationFeature'
 import AddEmployeeModal from '../components/AddEmployeeModal'
 import CoursePlayer from '../components/lms/CoursePlayer'
 import QuickEstimateModal from '../components/QuickEstimateModal'
@@ -837,6 +839,12 @@ export default function Dashboard() {
     420,
     ...features.map(f => (Number(f.y) || 0) + featureDims(f).blockHeight + 24)
   )
+  // Canvas width so features pushed to the right stay reachable via horizontal
+  // scroll instead of being clipped off-screen.
+  const canvasWidth = Math.max(
+    800,
+    ...features.map(f => (Number(f.x) || 0) + featureDims(f).pxWidth + 24)
+  )
 
   // Sync the saved per-user background from the DB once prefs load (so the
   // choice follows the user across devices). Runs once; user changes after
@@ -869,6 +877,7 @@ export default function Dashboard() {
       <div className="relative bg-white border-b border-gray-200 flex justify-center gap-0 mb-5 rounded-xl">
         {[
           { key: 'dashboard', label: '🏠 Dashboard' },
+          { key: 'appreciation', label: '🙏 Appreciation History' },
           { key: 'settings', label: '⚙️ Settings' },
         ].map(t => (
           <button
@@ -909,7 +918,8 @@ export default function Dashboard() {
               then release to drop. Drag the corner handle to resize.
             </p>
           )}
-          <div className="relative" style={{ minHeight: canvasHeight }}>
+          <div className="overflow-x-auto pb-2">
+          <div className="relative" style={{ minHeight: canvasHeight, minWidth: canvasWidth }}>
             {features.map((f, i) => {
               const dims = featureDims(f)
               return (
@@ -1042,6 +1052,7 @@ export default function Dashboard() {
                 />
               )
             )}
+          </div>
           </div>
 
           {/* Enlarged feature modal (click a card's ⤢ to open) */}
@@ -1194,6 +1205,8 @@ export default function Dashboard() {
           )}
         </>
       )}
+
+      {tab === 'appreciation' && <AppreciationHistoryTable userId={user?.id} />}
 
       {tab === 'settings' && (
         <DashboardSettings

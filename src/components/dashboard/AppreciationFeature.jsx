@@ -2,17 +2,107 @@
 // each day, saved per-day to the dashboard_appreciations table so history is
 // searchable. Plus a button to send a note of appreciation to a coworker
 // (opens the user's own email/text app prefilled — no backend send).
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 
 const todayStr = () => new Date().toISOString().slice(0, 10)
+const fmtDate = d =>
+  new Date(d + 'T00:00:00').toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+
+// Full-page Appreciation History — one row per date (incl. blank days) with the
+// entries written that day. Used by the Dashboard "Appreciation History" tab.
+export function AppreciationHistoryTable({ userId }) {
+  const [rows, setRows] = useState(null) // null = loading
+
+  useEffect(() => {
+    if (!userId) return
+    let alive = true
+    supabase
+      .from('dashboard_appreciations')
+      .select('entry_date, lines')
+      .eq('user_id', userId)
+      .order('entry_date', { ascending: false })
+      .then(({ data }) => {
+        if (alive) setRows(data || [])
+      })
+    return () => {
+      alive = false
+    }
+  }, [userId])
+
+  // Build a continuous list of dates (today → earliest entry, min 30 days back).
+  const days = useMemo(() => {
+    const byDate = new Map((rows || []).map(r => [r.entry_date, (r.lines || []).filter(Boolean)]))
+    const today = new Date()
+    let earliest = new Date()
+    earliest.setDate(earliest.getDate() - 29)
+    if (rows && rows.length) {
+      const minD = new Date(rows[rows.length - 1].entry_date + 'T00:00:00')
+      if (minD < earliest) earliest = minD
+    }
+    const out = []
+    for (const d = new Date(today); d >= earliest; d.setDate(d.getDate() - 1)) {
+      const key = d.toISOString().slice(0, 10)
+      out.push({ date: key, entries: byDate.get(key) || [] })
+    }
+    return out
+  }, [rows])
+
+  return (
+    <div className="card">
+      <h3 className="text-sm font-bold text-gray-800 mb-3">🙏 Appreciation History</h3>
+      {rows === null ? (
+        <div className="flex justify-center py-10">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-700" />
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 text-left text-xs text-gray-500">
+                <th className="py-2 pr-4 w-44">Date</th>
+                <th className="py-2">Appreciations</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {days.map(d => (
+                <tr key={d.date}>
+                  <td className="py-2 pr-4 align-top font-medium text-gray-700 whitespace-nowrap">
+                    {fmtDate(d.date)}
+                  </td>
+                  <td className="py-2">
+                    {d.entries.length === 0 ? (
+                      <span className="text-gray-300">—</span>
+                    ) : (
+                      <ul className="space-y-1">
+                        {d.entries.map((l, i) => (
+                          <li key={i} className="flex gap-2 text-gray-700">
+                            <span className="text-green-600 leading-none">•</span>
+                            <span>{l}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function AppreciationFeature({ userId, lineCount = 3, style, expanded = false }) {
   const n = Math.max(1, Number(lineCount) || 3)
   const [lines, setLines] = useState(() => Array.from({ length: n }, () => ''))
   const [showSend, setShowSend] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [savedMsg, setSavedMsg] = useState('')
 
   // Load today's entry from the DB, fit to the configured line count.
   useEffect(() => {
@@ -35,21 +125,15 @@ export default function AppreciationFeature({ userId, lineCount = 3, style, expa
   }, [userId, n])
 
   const setLine = (i, v) => setLines(prev => prev.map((l, idx) => (idx === i ? v : l)))
-  // Persist today's lines to the DB (used by the Save button and on blur).
+  // Auto-save today's lines to the DB. Each day is its own row keyed by date, so
+  // when a new day starts today's row is fresh/blank and the previous day stays
+  // saved in its own row.
   const commit = async () => {
     if (!userId) return
-    setSaving(true)
-    const { error } = await supabase.from('dashboard_appreciations').upsert(
+    await supabase.from('dashboard_appreciations').upsert(
       { user_id: userId, entry_date: todayStr(), lines, updated_at: new Date().toISOString() },
       { onConflict: 'user_id,entry_date' }
     )
-    setSaving(false)
-    if (!error) {
-      setSavedMsg('Saved ✓')
-      setTimeout(() => setSavedMsg(''), 2500)
-    } else {
-      setSavedMsg('Save failed')
-    }
   }
 
   return (
@@ -70,21 +154,10 @@ export default function AppreciationFeature({ userId, lineCount = 3, style, expa
           </div>
         ))}
       </div>
-      <div className="mt-4 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={commit}
-          disabled={saving || !userId}
-          className="flex-shrink-0 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-green-700 hover:bg-green-800 disabled:opacity-50 transition-colors"
-        >
-          {saving ? 'Saving…' : 'Save'}
-        </button>
-        {savedMsg && <span className="text-xs font-medium text-green-700">{savedMsg}</span>}
-      </div>
       <button
         type="button"
         onClick={() => setShowSend(true)}
-        className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-white bg-green-700 hover:bg-green-800 transition-colors"
+        className="mt-4 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-white bg-green-700 hover:bg-green-800 transition-colors"
       >
         💌 Send Appreciation
       </button>
