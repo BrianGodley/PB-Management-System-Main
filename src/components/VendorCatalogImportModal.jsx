@@ -140,6 +140,7 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
   const [error, setError] = useState('')
   const [added, setAdded] = useState(0)
   const [skippedCount, setSkippedCount] = useState(0)
+  const [photolessCount, setPhotolessCount] = useState(0)
 
   // Per-page state. `pages` maps pageNum → { imageUrl, items, error }.
   // Rendered page canvases live in a ref Map so cropping + thumbnails reuse them
@@ -424,6 +425,7 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
       pagesRef.current = restoredPages
       setAdded(0)
       setSkippedCount(0)
+      setPhotolessCount(0)
       setPages(restoredPages)
       setSelectedIdx(null)
       setNumPages(np)
@@ -541,11 +543,22 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
         try {
           const blob = await cropBoxToBlob(canvas, it.box)
           if (blob) {
-            const path = `catalog/${vendorId}/${Date.now()}-${i}.jpg`
-            const { error: upErr } = await supabase.storage
-              .from('rate-photos')
-              .upload(path, blob, { contentType: 'image/jpeg', upsert: false })
-            if (!upErr) photoUrl = supabase.storage.from('rate-photos').getPublicUrl(path).data.publicUrl
+            // Unique path per attempt (random suffix) avoids same-ms collisions,
+            // and we retry a couple times so a transient storage hiccup on a
+            // large import doesn't silently drop the photo.
+            for (let attempt = 0; attempt < 3 && !photoUrl; attempt++) {
+              const path = `catalog/${vendorId}/${Date.now()}-${i}-${Math.random()
+                .toString(36)
+                .slice(2, 8)}.jpg`
+              const { error: upErr } = await supabase.storage
+                .from('rate-photos')
+                .upload(path, blob, { contentType: 'image/jpeg', upsert: false })
+              if (!upErr) {
+                photoUrl = supabase.storage.from('rate-photos').getPublicUrl(path).data.publicUrl
+                break
+              }
+              await new Promise(r => setTimeout(r, 300 * (attempt + 1)))
+            }
           }
         } catch {
           photoUrl = null
@@ -602,6 +615,8 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
         if (insErr) throw new Error(`Import failed: ${insErr.message}`)
 
         setAdded(a => a + payload.length)
+        // Items that imported without a photo (crop empty or upload failed).
+        setPhotolessCount(c => c + payload.filter(r => !r.photo_url).length)
       }
       setSkippedCount(s => s + skipped)
       onImported?.()
@@ -823,6 +838,7 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
                   </span>
                   <span className="ml-auto text-gray-700 font-medium">
                     {added} imported{skippedCount > 0 ? ` · ${skippedCount} skipped` : ''}
+                    {photolessCount > 0 ? ` · ${photolessCount} without photo` : ''}
                   </span>
                   {busy && <span className="w-full text-gray-500">{progress || 'Working…'}</span>}
                 </div>
@@ -967,7 +983,15 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
           <div className="p-8 text-center">
             <p className="text-sm text-gray-700 mb-1 font-semibold">Catalog imported</p>
             <p className="text-xs text-gray-500 mb-4">
-              {added} item(s) added to {vendorName}'s materials{skippedCount > 0 ? ` · ${skippedCount} skipped (already existed)` : ''}. You'll find them in the Catalog tab and in Master Rates.
+              {added} item(s) added to {vendorName}'s materials{skippedCount > 0 ? ` · ${skippedCount} skipped (already existed)` : ''}
+              {photolessCount > 0 ? ` · ${photolessCount} imported without a photo` : ''}. You'll
+              find them in the Catalog tab and in Master Rates.
+              {photolessCount > 0 && (
+                <span className="block mt-1 text-amber-600">
+                  Tip: {photolessCount} item(s) came in without a photo — usually because no photo
+                  box was marked on that item. You can add a photo later from Master Rates.
+                </span>
+              )}
             </p>
             <button onClick={onClose} className="text-sm bg-gray-800 text-white font-semibold rounded px-4 py-1.5">Done</button>
           </div>

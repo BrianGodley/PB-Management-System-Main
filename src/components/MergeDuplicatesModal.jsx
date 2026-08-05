@@ -200,6 +200,85 @@ function PairCard({ pair, onMerged, onSkip }) {
   )
 }
 
+// Searchable picker over material rows for the manual-merge panel.
+function RowPicker({ rows, value, onChange, excludeId, placeholder }) {
+  const [q, setQ] = useState('')
+  const [open, setOpen] = useState(false)
+  const selected = rows.find(r => r.id === value)
+  const matches = useMemo(() => {
+    const s = q.trim().toLowerCase()
+    if (!s) return []
+    return rows
+      .filter(
+        r =>
+          r.id !== excludeId &&
+          ((r.name || '').toLowerCase().includes(s) ||
+            (r.sub_category || '').toLowerCase().includes(s) ||
+            (r.category || '').toLowerCase().includes(s) ||
+            (r.sku || '').toLowerCase().includes(s))
+      )
+      .slice(0, 25)
+  }, [q, rows, excludeId])
+
+  const meta = r => [r.category, r.sub_category].filter(Boolean).join(' · ') || '—'
+
+  if (selected) {
+    return (
+      <div className="flex items-center justify-between gap-2 rounded-lg border border-green-400 bg-green-50 px-2 py-1.5">
+        <span className="text-xs text-gray-800 truncate">
+          <span className="font-semibold">{selected.name || '—'}</span>{' '}
+          <span className="text-gray-400">· {meta(selected)}</span>
+        </span>
+        <button
+          onClick={() => {
+            onChange(null)
+            setQ('')
+          }}
+          className="flex-shrink-0 text-gray-400 hover:text-red-600 text-xs"
+        >
+          ✕
+        </button>
+      </div>
+    )
+  }
+  return (
+    <div className="relative">
+      <input
+        value={q}
+        onChange={e => {
+          setQ(e.target.value)
+          setOpen(true)
+        }}
+        onFocus={() => setOpen(true)}
+        placeholder={placeholder}
+        className="input text-xs w-full py-1.5"
+      />
+      {open && matches.length > 0 && (
+        <div className="absolute z-10 mt-1 w-full max-h-56 overflow-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+          {matches.map(r => (
+            <button
+              key={r.id}
+              onClick={() => {
+                onChange(r.id)
+                setOpen(false)
+                setQ('')
+              }}
+              className="block w-full text-left px-2 py-1.5 hover:bg-gray-50 text-xs"
+            >
+              <span className="font-medium text-gray-800">{r.name || '—'}</span>
+              <span className="text-gray-400">
+                {' '}
+                · {meta(r)}
+                {r.sku ? ` · ${r.sku}` : ''}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function MergeDuplicatesModal({ onClose, onMerged }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
@@ -208,6 +287,34 @@ export default function MergeDuplicatesModal({ onClose, onMerged }) {
   const [scanError, setScanError] = useState('')
   const [scanned, setScanned] = useState(false)
   const [pairs, setPairs] = useState([])
+  // Manual merge (for pairs the scan misses — e.g. a name that equals another
+  // item's sub-category, or cross-category duplicates).
+  const [manualOpen, setManualOpen] = useState(false)
+  const [mKeep, setMKeep] = useState(null)
+  const [mDrop, setMDrop] = useState(null)
+  const [mBusy, setMBusy] = useState(false)
+  const [mErr, setMErr] = useState('')
+  const [mMsg, setMMsg] = useState('')
+
+  async function doManualMerge() {
+    if (!mKeep || !mDrop || mKeep === mDrop) return
+    setMBusy(true)
+    setMErr('')
+    setMMsg('')
+    const { error } = await supabase.rpc('merge_material_rates', { keep: mKeep, drop: mDrop })
+    setMBusy(false)
+    if (error) {
+      setMErr(error.message || 'Merge failed')
+      return
+    }
+    // Drop the merged-away row locally + any proposed pair referencing it.
+    setRows(prev => prev.filter(r => r.id !== mDrop))
+    setPairs(prev => prev.filter(p => p.rowA.id !== mDrop && p.rowB.id !== mDrop))
+    setMMsg('Merged.')
+    setMDrop(null)
+    onMerged?.()
+    setTimeout(() => setMMsg(''), 3000)
+  }
 
   useEffect(() => {
     let alive = true
@@ -272,6 +379,24 @@ export default function MergeDuplicatesModal({ onClose, onMerged }) {
           if (seen.has(k)) continue
           seen.add(k)
           out.push({ rowA: r, rowB: c, score: t.score })
+        }
+      }
+      // Same-material-different-label: one row's NAME equals another row's
+      // SUB_CATEGORY (or vice versa). The name-only fuzzy pass misses these.
+      for (const a of group) {
+        const an = normalizeName(a.name)
+        const asub = normalizeName(a.sub_category)
+        if (!an && !asub) continue
+        for (const b of group) {
+          if (b.id === a.id) continue
+          const bn = normalizeName(b.name)
+          const bsub = normalizeName(b.sub_category)
+          const match = (an && an === bsub) || (asub && asub === bn)
+          if (!match) continue
+          const k = pairKey(a.id, b.id)
+          if (seen.has(k)) continue
+          seen.add(k)
+          out.push({ rowA: a, rowB: b, score: 0.9 })
         }
       }
     }
@@ -410,6 +535,17 @@ export default function MergeDuplicatesModal({ onClose, onMerged }) {
           </div>
           <div className="ml-auto flex items-center gap-2">
             <button
+              onClick={() => setManualOpen(o => !o)}
+              disabled={loading || !!loadError}
+              className={`text-xs font-semibold px-3 py-1.5 rounded border disabled:opacity-50 ${
+                manualOpen
+                  ? 'bg-gray-800 text-white border-gray-800'
+                  : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              Manual merge
+            </button>
+            <button
               onClick={scan}
               disabled={scanning || loading || !!loadError}
               className="text-xs text-white font-semibold px-3 py-1.5 rounded hover:opacity-90 disabled:opacity-50"
@@ -429,6 +565,52 @@ export default function MergeDuplicatesModal({ onClose, onMerged }) {
 
         {/* Body */}
         <div className="flex-1 overflow-auto p-4 space-y-3">
+          {manualOpen && !loading && !loadError && (
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+              <p className="text-xs font-semibold text-gray-700 mb-2">
+                Manual merge — pick any two records to combine (for items the scan misses, e.g. a
+                name that matches another item's sub-category, or cross-category duplicates).
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] uppercase font-semibold text-gray-500">
+                    Keep this
+                  </label>
+                  <RowPicker
+                    rows={rows}
+                    value={mKeep}
+                    onChange={setMKeep}
+                    excludeId={mDrop}
+                    placeholder="Search the record to keep…"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase font-semibold text-gray-500">
+                    Merge in &amp; delete this
+                  </label>
+                  <RowPicker
+                    rows={rows}
+                    value={mDrop}
+                    onChange={setMDrop}
+                    excludeId={mKeep}
+                    placeholder="Search the record to merge in…"
+                  />
+                </div>
+              </div>
+              {mErr && <p className="text-[11px] text-red-600 mt-2">{mErr}</p>}
+              <div className="flex items-center justify-end gap-2 mt-2">
+                {mMsg && <span className="text-[11px] text-green-700 font-medium">{mMsg}</span>}
+                <button
+                  onClick={doManualMerge}
+                  disabled={!mKeep || !mDrop || mBusy}
+                  className="text-xs text-white font-semibold px-4 py-1.5 rounded disabled:opacity-50"
+                  style={{ backgroundColor: GREEN }}
+                >
+                  {mBusy ? 'Merging…' : 'Merge'}
+                </button>
+              </div>
+            </div>
+          )}
           {loading ? (
             <div className="text-center text-gray-400 text-sm py-10">Loading materials…</div>
           ) : loadError ? (
