@@ -450,7 +450,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
   // Vendor pickers: only vendors that supply the Columns category. 'House' first.
   const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
   const vendorOptions = [
-    { value: 'House', label: 'House' },
+    { value: 'House', label: 'Unspecified' },
     ...vendorsForCategory(COLUMNS_CATEGORY).map(v => ({ value: v.id, label: v.name })),
   ]
   // Vendor-resolved material price for display (calc uses colMatPrice internally).

@@ -310,7 +310,7 @@ function EpTable({
                           {v.name}
                         </option>
                       ))}
-                      <option value="House">House</option>
+                      <option value="House">Unspecified</option>
                     </select>
                   </td>
                   <td className="py-1 pr-2">

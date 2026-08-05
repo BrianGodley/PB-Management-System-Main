@@ -1457,7 +1457,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                         }
                       }}
                     >
-                      <option value="House">House</option>
+                      <option value="House">Unspecified</option>
                       {vendorsForCategory(PAVER_CAT.base).map(v => (
                         <option key={v.id} value={v.id}>
                           {v.name}

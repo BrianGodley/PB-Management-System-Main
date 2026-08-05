@@ -597,7 +597,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
   // ── Vendor / row helpers ──────────────────────────────────────────────────
   const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
   const vendorOptions = [
-    { value: 'House', label: 'House' },
+    { value: 'House', label: 'Unspecified' },
     ...vendorsForCategory(FINISHES_CATEGORY).map(v => ({ value: v.id, label: v.name })),
   ]
 

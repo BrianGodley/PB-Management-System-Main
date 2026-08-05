@@ -695,7 +695,7 @@ function MaterialStepSection({
                     value={row.vendor}
                     onChange={e => setRow(i, 'vendor', e.target.value)}
                   >
-                    <option value="House">House</option>
+                    <option value="House">Unspecified</option>
                     {vForCat.map(v => (
                       <option key={v.id} value={v.id}>
                         {v.name}
@@ -1127,7 +1127,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
                       value={row.vendor}
                       onChange={e => setConcRow(i, 'vendor', e.target.value)}
                     >
-                      <option value="House">House</option>
+                      <option value="House">Unspecified</option>
                       {vendorsForCategory(CONC_VENDOR_CAT).map(v => (
                         <option key={v.id} value={v.id}>
                           {v.name}

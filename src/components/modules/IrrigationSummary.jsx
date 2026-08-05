@@ -143,7 +143,7 @@ export default function IrrigationSummary({ module }) {
   const fmt2 = v =>
     `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   const fh = v => (v > 0 ? `${v.toFixed(2)} hrs` : null)
-  const vendorLabel = v => (!v || v === 'House' ? 'House' : vendorNames[v] || 'Vendor')
+  const vendorLabel = v => (!v || v === 'House' ? 'Unspecified' : vendorNames[v] || 'Vendor')
 
   // Zone lines
   const zoneLines = (zoneRows || [])

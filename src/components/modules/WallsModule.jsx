@@ -788,7 +788,7 @@ function CmuWallEntry({
             value={wall.vendor || 'House'}
             onChange={e => set('vendor')(e.target.value)}
           >
-            {(vendorOptions || [{ value: 'House', label: 'House' }]).map(o => (
+            {(vendorOptions || [{ value: 'House', label: 'Unspecified' }]).map(o => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
@@ -961,7 +961,7 @@ function PipWallEntry({ wall, idx, total, onChange, onRemove, detail, vendorOpti
             value={wall.vendor || 'House'}
             onChange={e => set('vendor')(e.target.value)}
           >
-            {(vendorOptions || [{ value: 'House', label: 'House' }]).map(o => (
+            {(vendorOptions || [{ value: 'House', label: 'Unspecified' }]).map(o => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
@@ -1243,7 +1243,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
   // ── Vendor helpers ──────────────────────────────────────────────────────────
   const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
   const vendorOptions = [
-    { value: 'House', label: 'House' },
+    { value: 'House', label: 'Unspecified' },
     ...vendorsForCategory('Walls').map(v => ({ value: v.id, label: v.name })),
   ]
 
