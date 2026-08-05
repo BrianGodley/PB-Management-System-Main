@@ -99,6 +99,34 @@ const newItem = cat => ({
   box: { ...DEFAULT_BOX },
 })
 
+// ── Lightweight draft persistence ────────────────────────────────────────────
+// Saves each page's extracted items + box edits to localStorage (NOT the page
+// images — those are re-rendered from the PDF). Lets a session survive an
+// accidental close/refresh and resume when the same catalog file is re-opened.
+const DRAFT_KEY = 'catalogImportDraft:v1'
+const sigOf = (vendorId, file) => (file ? `${vendorId}::${file.name}::${file.size}` : '')
+function readDraft() {
+  try {
+    return JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null')
+  } catch {
+    return null
+  }
+}
+function writeDraft(obj) {
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(obj))
+  } catch {
+    /* storage full / unavailable — non-fatal */
+  }
+}
+function clearDraft() {
+  try {
+    localStorage.removeItem(DRAFT_KEY)
+  } catch {
+    /* ignore */
+  }
+}
+
 export default function VendorCatalogImportModal({ vendors = [], onClose, onImported }) {
   const [step, setStep] = useState('form') // form | page | done
   const [vendorId, setVendorId] = useState('')
@@ -154,6 +182,34 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
       return
     onClose()
   }
+
+  // Persist a lightweight draft (items only) as the user works, so an accidental
+  // close/refresh can be resumed by re-opening the same catalog file.
+  useEffect(() => {
+    if (step !== 'page' || !vendorId || !file) return
+    const itemsByPage = {}
+    for (const [n, pg] of Object.entries(pages)) {
+      if (pg?.items?.length) itemsByPage[n] = pg.items
+    }
+    writeDraft({
+      sig: sigOf(vendorId, file),
+      vendorId,
+      fileName: file.name,
+      numPages,
+      currentPage,
+      defaultCategory,
+      instructions,
+      itemsByPage,
+      importedPages: [...importedPagesRef.current],
+      savedAt: Date.now(),
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pages, currentPage, step, vendorId, file, numPages, defaultCategory, instructions])
+
+  // Clear the draft once the import is finished.
+  useEffect(() => {
+    if (step === 'done') clearDraft()
+  }, [step])
 
   const isPdf = useMemo(
     () => !!file && (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)),
@@ -347,21 +403,36 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
         pdfRef.current = await pdfjs.getDocument({ data: buf }).promise
         np = pdfRef.current.numPages || 1
       }
-      // Reset any prior run.
+      // Restore a saved draft for this exact file, if present — otherwise fresh.
+      const draft = readDraft()
+      const restored = draft && draft.sig === sigOf(vendorId, file) ? draft : null
+
       canvasCache.current = new Map()
       extractedRef.current = new Set()
-      importedPagesRef.current = new Set()
-      pagesRef.current = {}
+      importedPagesRef.current = new Set(restored?.importedPages || [])
+      const restoredPages = {}
+      if (restored?.itemsByPage) {
+        for (const [n, items] of Object.entries(restored.itemsByPage)) {
+          if (Array.isArray(items) && items.length) {
+            restoredPages[n] = { items }
+            extractedRef.current.add(Number(n)) // don't re-extract restored pages
+          }
+        }
+        if (restored.defaultCategory) setDefaultCategory(restored.defaultCategory)
+        if (restored.instructions) setInstructions(restored.instructions)
+      }
+      pagesRef.current = restoredPages
       setAdded(0)
       setSkippedCount(0)
-      setPages({})
+      setPages(restoredPages)
       setSelectedIdx(null)
       setNumPages(np)
-      setCurrentPage(1)
+      const startPage = restored?.currentPage && restored.currentPage <= np ? restored.currentPage : 1
+      setCurrentPage(startPage)
       setStep('page')
       setBusy(false)
       setProgress('')
-      await preparePage(1)
+      await preparePage(startPage)
     } catch (e) {
       setError(String(e.message || e))
       setBusy(false)
@@ -623,6 +694,17 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
                 className="block w-full text-xs text-gray-900 file:mr-3 file:rounded-lg file:border-0 file:bg-green-600 file:px-4 file:py-2 file:text-white file:font-semibold file:cursor-pointer hover:file:bg-green-700"
               />
               <p className="text-[11px] text-gray-400 mt-1">You'll step through the catalog one page at a time. On each page Sam lists the products and marks each item's photo with an adjustable box you can drag, resize, delete, or add. Nothing is saved until you approve.</p>
+              {vendorId &&
+                file &&
+                (() => {
+                  const d = readDraft()
+                  return d && d.sig === sigOf(vendorId, file)
+                })() && (
+                  <p className="text-[11px] font-semibold text-green-700 mt-1">
+                    ↩ A saved draft for this catalog was found — Start will resume where you left
+                    off.
+                  </p>
+                )}
             </div>
             <div>
               <label className="block text-xs text-gray-900 mb-1">Instructions for Sam (optional)</label>
@@ -653,6 +735,7 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
                     )
                   )
                     return
+                  if (Object.keys(pages).length > 0) clearDraft()
                   start()
                 }}
                 disabled={busy}
