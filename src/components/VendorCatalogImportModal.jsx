@@ -132,6 +132,29 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
   // Which pages have already been imported (so we can mark/skip them).
   const importedPagesRef = useRef(new Set())
 
+  // A catalog session is "in progress" once pages have been read. Guard against
+  // accidental loss: warn before a browser unload, and confirm on close.
+  const inProgress = step === 'page' && Object.keys(pages).length > 0
+  useEffect(() => {
+    if (!inProgress) return
+    const h = e => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', h)
+    return () => window.removeEventListener('beforeunload', h)
+  }, [inProgress])
+  function requestClose() {
+    if (
+      inProgress &&
+      !window.confirm(
+        'Leave the catalog importer? Any pages you have worked on but not imported yet will be lost.'
+      )
+    )
+      return
+    onClose()
+  }
+
   const isPdf = useMemo(
     () => !!file && (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)),
     [file]
@@ -533,7 +556,7 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
       <div className="bg-white rounded-xl shadow-xl w-full max-w-[1500px] my-4">
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
           <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Import Vendor Catalog</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-lg leading-none">×</button>
+          <button onClick={requestClose} className="text-gray-400 hover:text-gray-700 text-lg leading-none">×</button>
         </div>
 
         {error && (
@@ -612,9 +635,34 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
               />
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <button onClick={onClose} className="text-sm text-gray-500 px-3 py-1.5">Cancel</button>
-              <button onClick={start} disabled={busy} className="text-sm bg-green-600 text-white font-semibold rounded px-4 py-1.5 disabled:opacity-50">
-                {busy ? (progress || 'Working…') : 'Start'}
+              <button onClick={requestClose} className="text-sm text-gray-500 px-3 py-1.5">Cancel</button>
+              {Object.keys(pages).length > 0 && (
+                <button
+                  onClick={() => setStep('page')}
+                  className="text-sm border border-green-600 text-green-700 font-semibold rounded px-4 py-1.5 hover:bg-green-50"
+                >
+                  ‹ Resume import
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  if (
+                    Object.keys(pages).length > 0 &&
+                    !window.confirm(
+                      'Start over? This clears the pages you have worked on here (items you already imported stay saved).'
+                    )
+                  )
+                    return
+                  start()
+                }}
+                disabled={busy}
+                className="text-sm bg-green-600 text-white font-semibold rounded px-4 py-1.5 disabled:opacity-50"
+              >
+                {busy
+                  ? progress || 'Working…'
+                  : Object.keys(pages).length > 0
+                    ? 'Start over'
+                    : 'Start'}
               </button>
             </div>
           </div>
@@ -792,7 +840,20 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
 
                 <div className="flex items-center justify-between gap-2 pt-3">
                   <div className="flex items-center gap-1">
-                    <button onClick={() => setStep('form')} className="text-xs text-gray-500 px-2 py-1.5">Back</button>
+                    <button
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            'Return to the setup screen? Your progress is kept — use “Resume import” to come back.'
+                          )
+                        )
+                          setStep('form')
+                      }}
+                      className="text-xs text-gray-500 px-2 py-1.5"
+                      title="Go back to the setup screen (your progress is kept)"
+                    >
+                      ‹ Setup
+                    </button>
                     {added > 0 && (
                       <button onClick={() => { setStep('done') }} className="text-xs text-gray-500 px-2 py-1.5">Finish now</button>
                     )}
