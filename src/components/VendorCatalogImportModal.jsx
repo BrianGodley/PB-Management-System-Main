@@ -105,6 +105,8 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
   const [defaultCategory, setDefaultCategory] = useState('')
   const [instructions, setInstructions] = useState('')
   const [file, setFile] = useState(null)
+  const [catalogYear, setCatalogYear] = useState(new Date().getFullYear())
+  const savedCatalogRef = useRef(false)
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState('')
   const [error, setError] = useState('')
@@ -290,6 +292,31 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
     if (!file) return setError('Choose a catalog file (PDF or image).')
     setBusy(true)
     setProgress('Opening file…')
+
+    // Save the ORIGINAL catalog file to this vendor's Catalogs tab (once per
+    // run), tagged with the chosen year. Non-fatal if it fails.
+    if (!savedCatalogRef.current) {
+      try {
+        const safe = file.name.replace(/[^\w.\-]+/g, '_')
+        const cpath = `catalogs/${vendorId}/${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 8)}-${safe}`
+        const { error: cErr } = await supabase.storage
+          .from('sub-vendor-files')
+          .upload(cpath, file, { upsert: false, contentType: file.type })
+        if (!cErr) {
+          await supabase.from('vendor_catalogs').insert({
+            vendor_id: vendorId,
+            year: Number(catalogYear),
+            file_path: cpath,
+            file_name: file.name,
+          })
+          savedCatalogRef.current = true
+        }
+      } catch {
+        /* non-fatal — extraction still proceeds */
+      }
+    }
     try {
       let np = 1
       if (isPdf) {
@@ -545,11 +572,31 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
               </div>
             </div>
             <div>
+              <label className="block text-xs text-gray-900 mb-1">Catalog Year</label>
+              <select
+                value={catalogYear}
+                onChange={e => setCatalogYear(e.target.value)}
+                className="input w-40 text-sm py-1.5"
+              >
+                {Array.from({ length: 12 }, (_, i) => new Date().getFullYear() + 1 - i).map(y => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-gray-400 mt-1">
+                The original file is saved to this vendor's Catalogs tab under this year.
+              </p>
+            </div>
+            <div>
               <label className="block text-xs text-gray-900 mb-1">Catalog file (PDF or image)</label>
               <input
                 type="file"
                 accept="application/pdf,image/*"
-                onChange={e => setFile(e.target.files?.[0] || null)}
+                onChange={e => {
+                  setFile(e.target.files?.[0] || null)
+                  savedCatalogRef.current = false
+                }}
                 className="block w-full text-xs text-gray-900 file:mr-3 file:rounded-lg file:border-0 file:bg-green-600 file:px-4 file:py-2 file:text-white file:font-semibold file:cursor-pointer hover:file:bg-green-700"
               />
               <p className="text-[11px] text-gray-400 mt-1">You'll step through the catalog one page at a time. On each page Sam lists the products and marks each item's photo with an adjustable box you can drag, resize, delete, or add. Nothing is saved until you approve.</p>

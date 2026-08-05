@@ -9,6 +9,7 @@ import SubVendorQuotes from '../components/SubVendorQuotes'
 import VendorInvoicing from '../components/VendorInvoicing'
 import MasterRates from './MasterRates'
 import PartyHistory from '../components/PartyHistory'
+import SubVendorCatalogs from '../components/SubVendorCatalogs'
 
 // ── Constants ────────────────────────────────────────────────
 const DIVISION_OPTIONS = [
@@ -1517,12 +1518,16 @@ function SubModal({
         { k: 'materials', l: 'Materials' },
         { k: 'pricing', l: 'Pricing' },
         { k: 'quotes', l: 'Quotes' },
+        { k: 'catalogs', l: 'Catalogs' },
       ]
-  ).filter(t => (t.k === 'quotes' || t.k === 'contracts' ? recordId : true))
+  ).filter(t =>
+    t.k === 'quotes' || t.k === 'contracts' || t.k === 'catalogs' ? recordId : true
+  )
   // Never leave the active tab on a kind that's hidden for this mode.
   useEffect(() => {
     if (stab === 'quotes' && mode !== 'vendor') setStab('details')
     if (stab === 'materials' && mode !== 'vendor') setStab('details')
+    if (stab === 'catalogs' && mode !== 'vendor') setStab('details')
     if (stab === 'contracts' && mode !== 'sub') setStab('details')
   }, [stab, mode])
   // Reset to view-mode (and the Details tab) whenever a different record opens.
@@ -1650,13 +1655,15 @@ function SubModal({
         {/* Body — form controls are disabled in view mode via the fieldset. */}
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-5">
           <fieldset
-            disabled={!editing && stab !== 'quotes' && stab !== 'contracts'}
+            disabled={!editing && stab !== 'quotes' && stab !== 'contracts' && stab !== 'catalogs'}
             className="space-y-4 border-0 p-0 m-0 min-w-0 disabled:opacity-90"
           >
           {stab === 'quotes' ? (
             <PartyHistory partyId={recordId} kind="quotes" />
           ) : stab === 'contracts' ? (
             <PartyHistory partyId={recordId} kind="contracts" />
+          ) : stab === 'catalogs' ? (
+            <SubVendorCatalogs partyId={recordId} />
           ) : stab === 'materials' ? (
           <>
           {/* Categories Supplied (vendors only) */}
@@ -2074,6 +2081,7 @@ function SubModal({
         <div className="px-5 py-4 flex gap-2 flex-shrink-0 border-t border-gray-100">
           {stab !== 'quotes' &&
             stab !== 'contracts' &&
+            stab !== 'catalogs' &&
             (editing ? (
               <button
                 onClick={onSave}
