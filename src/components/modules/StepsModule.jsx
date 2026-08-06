@@ -7,7 +7,14 @@ import GpmdBar from './GpmdBar'
 import ModuleNotesField from './ModuleNotesField'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { fetchPriceLedgerAsOf, ledgerPrice } from '../../lib/materialCatalog'
+import {
+  fetchPriceLedgerAsOf,
+  ledgerPrice,
+  catalogOptions,
+  catalogItemFor,
+} from '../../lib/materialCatalog'
+
+const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Steps Module
@@ -75,20 +82,12 @@ const MAT_SECTIONS = [
 ]
 
 // ── Vendor-catalog helpers (same as PaverModule) ─────────────────────────────
+// Vendor catalog options + row resolution from the shared library.
 function paverOptions(cat, vendorSel, materialRows) {
-  if (!vendorSel || vendorSel === 'House' || vendorSel === 'Custom') return []
-  const prefix = `${cat} - `
-  return (materialRows || [])
-    .filter(r => r.subcategory === cat && r.vendor_id === vendorSel)
-    .map(r => ({
-      label: r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name,
-      row: r,
-    }))
+  return catalogOptions(materialRows, cat, vendorSel, CATALOG_OPTS)
 }
 function paverItemFor(cat, vendorSel, typeLabel, materialRows) {
-  const opts = paverOptions(cat, vendorSel, materialRows)
-  if (!opts.length) return null
-  return (opts.find(o => o.label === typeLabel) || opts[0]).row
+  return catalogItemFor(materialRows, cat, vendorSel, typeLabel, CATALOG_OPTS)
 }
 
 // ── Per-row calculators ──────────────────────────────────────────────────────

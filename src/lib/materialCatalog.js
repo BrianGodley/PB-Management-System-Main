@@ -40,6 +40,49 @@ export function resolveMaterialPriceById(id, materialRows, fallback = 0) {
   return fallback
 }
 
+// ── Subcategory catalog resolution (shared by every vendor-catalog module) ────
+// Filters material_rows to a subcategory + vendor and resolves a stored key to
+// its row. Options tune the per-module behavior so this single implementation
+// reproduces paverOptions / lightingOptions / wfVendorPrice / resolveUtilRow /
+// drainMatCost / turfMatPrice / etc. exactly:
+//   houseRows : 'exclude'     → House/Custom vendor yields no catalog rows
+//                               (module prices House off its name-keyed map)
+//               'null-vendor' → House yields the vendor_id IS NULL rows
+//   stripPrefix: true         → label = name minus the '<subcategory> - ' prefix
+export function catalogOptions(
+  materialRows,
+  subcategory,
+  vendorSel,
+  { houseRows = 'exclude', stripPrefix = false } = {}
+) {
+  const isHouse = !vendorSel || vendorSel === 'House' || vendorSel === 'Custom'
+  if (isHouse && houseRows === 'exclude') return []
+  const prefix = `${subcategory} - `
+  return (materialRows || [])
+    .filter(r => r.subcategory === subcategory && (isHouse ? r.vendor_id == null : r.vendor_id === vendorSel))
+    .map(r => {
+      const label =
+        stripPrefix && r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name
+      return { id: r.id, value: r.id, label, stored: label, row: r }
+    })
+}
+
+// Resolve a stored selection key to its material_rates row: by id (new saves),
+// then by label/name (legacy saves). By default falls back to the first option;
+// pass fallbackFirst:false to return null when nothing matches (so a module can
+// keep its House default instead).
+export function catalogItemFor(materialRows, subcategory, vendorSel, key, opts = {}) {
+  const { fallbackFirst = true, ...rest } = opts
+  const options = catalogOptions(materialRows, subcategory, vendorSel, rest)
+  if (!options.length) return null
+  if (!key) return fallbackFirst ? options[0].row : null
+  const byId = options.find(o => o.id === key)
+  if (byId) return byId.row
+  const byLabel = options.find(o => o.stored === key || o.label === key)
+  if (byLabel) return byLabel.row
+  return fallbackFirst ? options[0].row : null
+}
+
 // ── Price ledger (Phase 4 — normalized multi-vendor pricing) ─────────────────
 // The current OPEN price per (material, vendor) lives in material_price_history
 // (effective_end IS NULL). fetchOpenPriceLedger returns a map keyed by material

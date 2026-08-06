@@ -6,7 +6,14 @@ import GpmdBar from './GpmdBar'
 import ModuleNotesField from './ModuleNotesField'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { fetchPriceLedgerAsOf, ledgerPrice } from '../../lib/materialCatalog'
+import {
+  fetchPriceLedgerAsOf,
+  ledgerPrice,
+  catalogOptions,
+  catalogItemFor,
+} from '../../lib/materialCatalog'
+
+const CATALOG_OPTS = { houseRows: 'null-vendor', stripPrefix: false }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Lighting Module — per-vendor catalog layout (mirrors PaverModule).
@@ -45,24 +52,13 @@ const n = v => parseFloat(v) || 0
 // otherwise → rows whose vendor_id === vendorSel. Each option carries the
 // material_rates row id (the STABLE, rename-proof key a selection is stored /
 // matched by) plus a clean label.
+// Vendor catalog options + row resolution from the shared library. House =
+// vendor_id IS NULL rows (Lighting prices House from the catalog, not a map).
 function lightingOptions(subcat, vendorSel, materialRows) {
-  const isHouse = !vendorSel || vendorSel === 'House'
-  return (materialRows || [])
-    .filter(r => r.subcategory === subcat && (isHouse ? r.vendor_id == null : r.vendor_id === vendorSel))
-    .map(r => ({ id: r.id, value: r.id, label: r.name, stored: r.name, row: r }))
+  return catalogOptions(materialRows, subcat, vendorSel, CATALOG_OPTS)
 }
-
-// Resolve a selection to its material_rates row. `key` is the row id (new
-// estimates store the id); fall back to matching the saved label/name (rows
-// saved before the id migration) and finally the vendor's first item.
 function lightingItemFor(subcat, vendorSel, key, materialRows) {
-  const opts = lightingOptions(subcat, vendorSel, materialRows)
-  if (!opts.length) return null
-  if (!key) return opts[0].row
-  const byId = opts.find(o => o.id === key)
-  if (byId) return byId.row
-  const byLabel = opts.find(o => o.stored === key || o.label === key)
-  return (byLabel || opts[0]).row
+  return catalogItemFor(materialRows, subcat, vendorSel, key, CATALOG_OPTS)
 }
 
 // Default sub $/each for a picked item: sub_price_ea, else unit_cost.

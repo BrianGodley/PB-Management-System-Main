@@ -1,4 +1,5 @@
 import FinancialSummaryList from './FinancialSummaryList'
+import { catalogItemFor } from '../../lib/materialCatalog'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LightingSummary — read-only detail view for a saved Lighting module.
@@ -13,15 +14,12 @@ const MATERIAL_MARKUP = 0.15
 
 const n = v => parseFloat(v) || 0
 
-// Resolve a saved row selection to its material_rates row (id → label → first).
+// Resolve a saved row selection to its material_rates row via the shared library.
 function lightingItemFor(subcat, vendorSel, key, materialRows) {
-  const isHouse = !vendorSel || vendorSel === 'House'
-  const opts = (materialRows || []).filter(
-    r => r.subcategory === subcat && (isHouse ? r.vendor_id == null : r.vendor_id === vendorSel)
-  )
-  if (!opts.length) return null
-  if (!key) return opts[0]
-  return opts.find(r => r.id === key) || opts.find(r => r.name === key) || opts[0]
+  return catalogItemFor(materialRows, subcat, vendorSel, key, {
+    houseRows: 'null-vendor',
+    stripPrefix: false,
+  })
 }
 
 function SectionLabel({ title }) {

@@ -1,5 +1,6 @@
 import FinancialSummaryList from './FinancialSummaryList'
 import { groutCyPerBlock } from '../../lib/cmuGrout'
+import { resolveMaterialPrice } from '../../lib/materialCatalog'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ColumnsSummary — read-only detail view for a saved Columns module
@@ -100,13 +101,7 @@ const n = v => parseFloat(v) || 0
 // material_rates row (name===dbName && vendor_id===vendorId) wins; otherwise fall
 // back to the House price (name-keyed materialPrices) then the hard fallback.
 // vendorId 'House'/empty returns exactly the pre-vendor value.
-function colMatPrice(dbName, vendorId, materialRows, mp, fallback) {
-  if (vendorId && vendorId !== 'House') {
-    const row = (materialRows || []).find(r => r.name === dbName && r.vendor_id === vendorId)
-    if (row && row.unit_cost != null && row.unit_cost !== '') return n(row.unit_cost)
-  }
-  return mp?.[dbName] != null ? mp[dbName] : fallback
-}
+const colMatPrice = resolveMaterialPrice
 
 function SectionLabel({ title }) {
   return (

@@ -18,6 +18,7 @@ import RateEditPopover from '../RateEditPopover'
 import { SubRateOverrideProvider } from '../SubRateOverrideContext.jsx'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
+import { catalogOptions } from '../../lib/materialCatalog'
 
 // ── Rate tables (method-indexed — not in DB) ──────────────────────────────────
 
@@ -166,14 +167,9 @@ function calcConcrete(
   const rowOpt = (cat, row, houseArray) => {
     const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : catDefaults[cat] || 'House'
     if (!vsel || vsel === 'House') return resolveType(row.type, houseArray, houseArray)
-    const prefix = `${cat} - `
-    const opts = (materialRows || [])
-      .filter(r => r.subcategory === cat && r.vendor_id === vsel)
-      .map(r => ({
-        label: r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name,
-        dbName: r.name,
-        fallback: n(r.unit_cost),
-      }))
+    const opts = catalogOptions(materialRows, cat, vsel, { houseRows: 'exclude', stripPrefix: true }).map(
+      o => ({ label: o.label, dbName: o.row.name, fallback: n(o.row.unit_cost) })
+    )
     return resolveType(row.type, opts, houseArray)
   }
   // Subcontractor rates: a one-off adjustment saved on THIS estimate
@@ -771,16 +767,9 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   function sectionOptions(subcat, vendorSel, houseArray) {
     const vsel = vendorSel && vendorSel !== 'auto' ? vendorSel : catDefaults[subcat] || 'House'
     if (!vsel || vsel === 'House') return houseArray
-    const rows = (materialRows || []).filter(
-      r => r.subcategory === subcat && r.vendor_id === vsel
-    )
-    if (!rows.length) return houseArray
-    const prefix = `${subcat} - `
-    return rows.map(r => ({
-      label: r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name,
-      dbName: r.name,
-      fallback: n(r.unit_cost),
-    }))
+    const opts = catalogOptions(materialRows, subcat, vsel, { houseRows: 'exclude', stripPrefix: true })
+    if (!opts.length) return houseArray
+    return opts.map(o => ({ label: o.label, dbName: o.row.name, fallback: n(o.row.unit_cost) }))
   }
   // Effective vendor for a stored value: 'auto'/unset/House → category default.
   const effVendor = (cat, v) => (v && v !== 'auto' && v !== 'House' ? v : catDefaults[cat])

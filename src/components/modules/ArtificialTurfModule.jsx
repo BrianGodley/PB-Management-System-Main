@@ -16,6 +16,9 @@ import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
+import { catalogItemFor } from '../../lib/materialCatalog'
+
+const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
 
 // ── Demo method rates (tons/hr) — DemoRatesTurf lookup table ────────────────
 const DEMO_METHODS = [
@@ -154,15 +157,11 @@ const BASE_MATERIALS = [
 ]
 function turfMatPrice(cat, vendorSel, typeLabel, houseName, houseFallback, materialRows, catDefaults, mp) {
   const vsel = vendorSel && vendorSel !== 'auto' ? vendorSel : catDefaults?.[cat] || 'House'
-  if (vsel && vsel !== 'House') {
-    const prefix = `${cat} - `
-    const vrow = (materialRows || []).find(r => {
-      if (r.subcategory !== cat || r.vendor_id !== vsel) return false
-      const label = r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name
-      return label === typeLabel
-    })
-    if (vrow) return { price: n(vrow.unit_cost), dbName: vrow.name }
-  }
+  const vrow = catalogItemFor(materialRows, cat, vsel, typeLabel, {
+    ...CATALOG_OPTS,
+    fallbackFirst: false,
+  })
+  if (vrow) return { price: n(vrow.unit_cost), dbName: vrow.name }
   return { price: n(mp[houseName]) || houseFallback, dbName: houseName }
 }
 

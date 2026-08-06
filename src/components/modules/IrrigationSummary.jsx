@@ -9,6 +9,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import FinancialSummaryList from './FinancialSummaryList'
+import { resolveMaterialPrice } from '../../lib/materialCatalog'
 
 const ZONE_TYPES = [
   {
@@ -78,13 +79,7 @@ const RATE_DEFAULTS = { handRate: 16, trenchRate: 12.5, timerHrs: 0.5, salesTax:
 
 const n = v => parseFloat(v) || 0
 
-function irrMatPrice(dbName, vendorId, materialRows, materialPrices, fallback) {
-  if (vendorId && vendorId !== 'House') {
-    const row = (materialRows || []).find(r => r.name === dbName && r.vendor_id === vendorId)
-    if (row && row.unit_cost != null && row.unit_cost !== '') return n(row.unit_cost)
-  }
-  return materialPrices?.[dbName] ?? fallback
-}
+const irrMatPrice = resolveMaterialPrice
 
 function SectionLabel({ title }) {
   return (

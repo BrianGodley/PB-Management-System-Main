@@ -7,6 +7,9 @@ import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
+import { catalogItemFor } from '../../lib/materialCatalog'
+
+const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drainage Module — fields and calculations from Excel estimator
@@ -117,17 +120,13 @@ function drainMatCost(cat, row, TYPES, materialRows, catDefaults, mp) {
   let dbName = t?.dbName
   let fallback = t?.costPerLF ?? t?.cost ?? 0
   const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : catDefaults[cat] || 'House'
-  if (vsel && vsel !== 'House') {
-    const prefix = `${cat} - `
-    const vrow = (materialRows || []).find(r => {
-      if (r.subcategory !== cat || r.vendor_id !== vsel) return false
-      const label = r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name
-      return label === row.type
-    })
-    if (vrow) {
-      dbName = vrow.name
-      fallback = n(vrow.unit_cost)
-    }
+  const vrow = catalogItemFor(materialRows, cat, vsel, row.type, {
+    ...CATALOG_OPTS,
+    fallbackFirst: false,
+  })
+  if (vrow) {
+    dbName = vrow.name
+    fallback = n(vrow.unit_cost)
   }
   return { dbName, cost: mp[dbName] ?? fallback }
 }

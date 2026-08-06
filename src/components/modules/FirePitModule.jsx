@@ -8,6 +8,9 @@ import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { groutCuFtPerBlock } from '../../lib/cmuGrout'
+import { catalogItemFor } from '../../lib/materialCatalog'
+
+const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Fire Pit Module — based on Fire Pit Module tab in Excel estimator
@@ -90,18 +93,8 @@ const GROUT_CF_PER_BLOCK = groutCuFtPerBlock(BLOCK_WIDTH_IN, BLOCK_HEIGHT_IN)
 const WF_CAT = 'Wall Finish'
 const CAP_CAT = 'Wall Cap'
 function wfVendorPrice(vendorSel, typeLabel, materialRows, cat = WF_CAT) {
-  if (!vendorSel || vendorSel === 'House' || vendorSel === 'auto') return null
-  const prefix = `${cat} - `
-  const rows = (materialRows || []).filter(
-    r => r.subcategory === cat && r.vendor_id === vendorSel
-  )
-  if (!rows.length) return null
-  const match =
-    rows.find(r => {
-      const label = r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name
-      return label === typeLabel
-    }) || rows[0]
-  return match ? n(match.unit_cost) : null
+  const row = catalogItemFor(materialRows, cat, vendorSel, typeLabel, CATALOG_OPTS)
+  return row ? n(row.unit_cost) : null
 }
 // Wall-finish master list. Each Type resolves a material unit price (FP_RATES
 // key, vendor-overridable) + a labor rate. `unit:'SF'` prices per SF (optional
@@ -162,17 +155,13 @@ function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
   let matDbName = builtIn?.dbName
   let matFallback = builtIn?.fallback ?? 0
   const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : 'House'
-  if (vsel && vsel !== 'House') {
-    const prefix = `${cat} - `
-    const vrow = (materialRows || []).find(r => {
-      if (r.subcategory !== cat || r.vendor_id !== vsel) return false
-      const label = r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name
-      return label === builtIn?.label
-    })
-    if (vrow) {
-      matDbName = vrow.name
-      matFallback = n(vrow.unit_cost)
-    }
+  const vrow = catalogItemFor(materialRows, cat, vsel, builtIn?.label, {
+    ...CATALOG_OPTS,
+    fallbackFirst: false,
+  })
+  if (vrow) {
+    matDbName = vrow.name
+    matFallback = n(vrow.unit_cost)
   }
   const matCost = mp[matDbName] ?? matFallback
   const matOpt = { label: builtIn?.label, dbName: matDbName, fallback: matFallback }

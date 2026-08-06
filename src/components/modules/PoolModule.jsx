@@ -8,6 +8,9 @@ import RateEditPopover from '../RateEditPopover'
 import { SubRateOverrideProvider } from '../SubRateOverrideContext.jsx'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
+import { catalogItemFor } from '../../lib/materialCatalog'
+
+const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pool Module
@@ -225,17 +228,13 @@ function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
   let matDbName = builtIn?.dbName
   let matFallback = builtIn?.fallback ?? 0
   const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : 'House'
-  if (vsel && vsel !== 'House') {
-    const prefix = `${cat} - `
-    const vrow = (materialRows || []).find(r => {
-      if (r.subcategory !== cat || r.vendor_id !== vsel) return false
-      const label = r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name
-      return label === builtIn?.label
-    })
-    if (vrow) {
-      matDbName = vrow.name
-      matFallback = n(vrow.unit_cost)
-    }
+  const vrow = catalogItemFor(materialRows, cat, vsel, builtIn?.label, {
+    ...CATALOG_OPTS,
+    fallbackFirst: false,
+  })
+  if (vrow) {
+    matDbName = vrow.name
+    matFallback = n(vrow.unit_cost)
   }
   const matCost = mp[matDbName] ?? matFallback
   const matOpt = { label: builtIn?.label, dbName: matDbName, fallback: matFallback }

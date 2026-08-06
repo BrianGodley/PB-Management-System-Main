@@ -41,7 +41,14 @@ import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { fetchPriceLedgerAsOf, ledgerPrice } from '../../lib/materialCatalog'
+import {
+  fetchPriceLedgerAsOf,
+  ledgerPrice,
+  catalogOptions,
+  catalogItemFor,
+} from '../../lib/materialCatalog'
+
+const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
 
 const n = v => parseFloat(v) || 0
 const sfToTons = (sf, depthIn) => (n(sf) / 200) * n(depthIn)
@@ -100,29 +107,13 @@ const PAVER_CAT = { paver: 'Paver Material', base: 'Base Material' }
 // rename-proof) plus a human label (name minus the '<subcategory> - ' prefix,
 // and minus the sub_category collection so it reads clean). Empty for
 // House/Custom/unset vendors.
+// Vendor catalog options + row resolution now come from the shared library
+// (src/lib/materialCatalog.js) so every module resolves identically.
 function paverOptions(cat, vendorSel, materialRows) {
-  if (!vendorSel || vendorSel === 'House' || vendorSel === 'Custom') return []
-  const prefix = `${cat} - `
-  return (materialRows || [])
-    .filter(r => r.subcategory === cat && r.vendor_id === vendorSel)
-    .map(r => {
-      // Human label = name minus the '<subcategory> - ' prefix.
-      const nm = r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name
-      // value = row id (the STABLE, rename-proof key a selection is matched by).
-      return { id: r.id, value: r.id, label: nm, stored: nm, row: r }
-    })
+  return catalogOptions(materialRows, cat, vendorSel, CATALOG_OPTS)
 }
-// Resolve a selection to its material_rates row. `key` is the row id (new
-// estimates store the id); we fall back to matching the old descriptive label
-// (estimates saved before the id migration) and finally the vendor's first item.
 function paverItemFor(cat, vendorSel, key, materialRows) {
-  const opts = paverOptions(cat, vendorSel, materialRows)
-  if (!opts.length) return null
-  if (!key) return opts[0].row
-  const byId = opts.find(o => o.id === key)
-  if (byId) return byId.row
-  const byLabel = opts.find(o => o.stored === key || o.label === key)
-  return (byLabel || opts[0]).row
+  return catalogItemFor(materialRows, cat, vendorSel, key, CATALOG_OPTS)
 }
 
 function calcPaver(

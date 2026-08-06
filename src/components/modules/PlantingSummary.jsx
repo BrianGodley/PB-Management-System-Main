@@ -10,6 +10,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import FinancialSummaryList from './FinancialSummaryList'
+import { resolveMaterialPrice } from '../../lib/materialCatalog'
 
 const SMALL_PLANT_DEFAULTS = {
   'Flats of Groundcover': { perDay: 25, price: 18.0 },
@@ -97,13 +98,7 @@ const LEGACY_ADDON_MAP = [
 const n = v => parseFloat(v) || 0
 const lr = (rates, key) => rates[key] ?? LABOR_DEFAULTS[key] ?? 0
 
-function plantMatPrice(dbName, vendorId, materialRows, materialPrices, fallback) {
-  if (vendorId && vendorId !== 'House') {
-    const row = (materialRows || []).find(r => r.name === dbName && r.vendor_id === vendorId)
-    if (row && row.unit_cost != null && row.unit_cost !== '') return n(row.unit_cost)
-  }
-  return materialPrices?.[dbName] ?? fallback
-}
+const plantMatPrice = resolveMaterialPrice
 
 function SectionLabel({ title }) {
   return (

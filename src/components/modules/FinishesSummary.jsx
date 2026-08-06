@@ -1,4 +1,5 @@
 import FinancialSummaryList from './FinancialSummaryList'
+import { resolveMaterialPrice } from '../../lib/materialCatalog'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FinishesSummary — read-only detail view for a saved Finishes module.
@@ -43,13 +44,7 @@ const FINISHES_RATES = {
   realStoneLab: { db: 'Real Stone - Finishes Labor Rate', fb: 0.8954 },
 }
 
-function finishMatPrice(dbName, vendorId, materialRows, mp, fallback) {
-  if (vendorId && vendorId !== 'House') {
-    const row = (materialRows || []).find(r => r.name === dbName && r.vendor_id === vendorId)
-    if (row && row.unit_cost != null && row.unit_cost !== '') return n(row.unit_cost)
-  }
-  return mp?.[dbName] ?? fallback
-}
+const finishMatPrice = resolveMaterialPrice
 
 function computeFlatRow(row, mp, materialRows) {
   const sf = n(row.sf)

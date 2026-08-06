@@ -7,6 +7,7 @@ import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
+import { catalogOptions } from '../../lib/materialCatalog'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Ground Treatments Module — based on Softscape Module tab in Excel estimator
@@ -251,13 +252,11 @@ function calcGroundTreatments(
     // default (first real vendor, else House); an explicit 'House'/id stays as-is.
     const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : (catDefaults[cat] || 'House')
     if (!vsel || vsel === 'House') return resolveType(row.type, houseArray, houseArray)
-    const rows = (materialRows || []).filter(
-      r => r.subcategory === cat && r.vendor_id === vsel
-    )
-    const opts = rows.map(r => ({
-      label: r.name.replace(new RegExp('^' + cat + ' - '), '').replace(/^.*? - /, ''),
-      dbName: r.name,
-      fallback: parseFloat(r.unit_cost) || 0,
+    // Shared row filtering (subcat + vendor); GT keeps its own label transform.
+    const opts = catalogOptions(materialRows, cat, vsel, { houseRows: 'exclude' }).map(o => ({
+      label: o.row.name.replace(new RegExp('^' + cat + ' - '), '').replace(/^.*? - /, ''),
+      dbName: o.row.name,
+      fallback: parseFloat(o.row.unit_cost) || 0,
     }))
     return resolveType(row.type, opts, houseArray)
   }
@@ -1005,16 +1004,9 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   // rows for the subcategory (so the dropdown is never empty).
   function sectionOptions(subcat, vendorSel, houseArray) {
     if (!vendorSel || vendorSel === 'House') return houseArray
-    const rows = (materialRows || []).filter(
-      r => r.subcategory === subcat && r.vendor_id === vendorSel
-    )
-    if (!rows.length) return houseArray
-    const prefix = `${subcat} - `
-    return rows.map(r => ({
-      label: (r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name) || r.name,
-      dbName: r.name,
-      fallback: n(r.unit_cost),
-    }))
+    const opts = catalogOptions(materialRows, subcat, vendorSel, { houseRows: 'exclude', stripPrefix: true })
+    if (!opts.length) return houseArray
+    return opts.map(o => ({ label: o.label || o.row.name, dbName: o.row.name, fallback: n(o.row.unit_cost) }))
   }
 
   // Vendors that supply a given material category — drives the per-row vendor
