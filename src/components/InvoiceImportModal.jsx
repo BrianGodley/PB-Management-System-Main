@@ -43,6 +43,7 @@ export default function InvoiceImportModal({ jobId: jobIdProp, jobName: jobNameP
   const [filePath, setFilePath] = useState('')
   const [header, setHeader] = useState({ invoice_no: '', invoice_date: today, subtotal: null, total: null, vendor_name: '' })
   const [rows, setRows] = useState([])
+  const [pricesUpdated, setPricesUpdated] = useState(0)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [selected, setSelected] = useState(() => new Set())
@@ -75,7 +76,7 @@ export default function InvoiceImportModal({ jobId: jobIdProp, jobName: jobNameP
   // Match each extracted line to a material for the chosen vendor + price-check.
   async function matchAndCheck(vId, extracted, invDate) {
     if (!vId) {
-      return extracted.map(r => ({ ...r, matchId: null, matchName: '', category: '', master: null, variance: null, include: true }))
+      return extracted.map(r => ({ ...r, matchId: null, matchName: '', category: '', master: null, variance: null, include: true, setPrice: false }))
     }
     const { data: mats } = await supabase
       .from('material_rates')
@@ -100,6 +101,7 @@ export default function InvoiceImportModal({ jobId: jobIdProp, jobName: jobNameP
         master,
         variance,
         include: true,
+        setPrice: false,
       })
     }
     return out
@@ -235,6 +237,21 @@ export default function InvoiceImportModal({ jobId: jobIdProp, jobName: jobNameP
         if (eErr) throw new Error(`Could not post expenses: ${eErr.message}`)
       }
 
+      // Optionally adopt invoice prices as the new master price (matched lines the
+      // user ticked "Set $"). Uses the canonical writer so unit_cost + price
+      // history stay in sync — dated at the invoice date, sourced 'invoice'.
+      const priceUpdates = rows.filter(r => r.setPrice && r.matchId && r.unit_price != null)
+      for (const r of priceUpdates) {
+        const { error: pErr } = await supabase.rpc('set_material_price_row', {
+          p_material_id: r.matchId,
+          p_unit_cost: Number(r.unit_price),
+          p_source: 'invoice',
+          p_date: header.invoice_date,
+        })
+        if (pErr) throw new Error(`Could not update price for "${r.description}": ${pErr.message}`)
+      }
+      setPricesUpdated(priceUpdates.length)
+
       setStep('done')
       onPosted?.()
     } catch (e) {
@@ -358,6 +375,10 @@ export default function InvoiceImportModal({ jobId: jobIdProp, jobName: jobNameP
                   <button onClick={() => applyToSelected({ include: true })} className="px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100">Include</button>
                   <button onClick={() => applyToSelected({ include: false })} className="px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100">Exclude</button>
                   <span className="mx-1 h-4 w-px bg-gray-300" />
+                  <span className="text-gray-600">Adopt invoice price?</span>
+                  <button onClick={() => applyToSelected({ setPrice: true })} className="px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100">Set price</button>
+                  <button onClick={() => applyToSelected({ setPrice: false })} className="px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100">Keep</button>
+                  <span className="mx-1 h-4 w-px bg-gray-300" />
                   <span className="text-gray-600">Set value</span>
                   <input value={bulkCat} onChange={e => setBulkCat(e.target.value)} placeholder="Category" className="border border-gray-300 rounded px-2 py-1 w-36" />
                   <button onClick={() => applyToSelected({ category: bulkCat })} className="px-2 py-1 bg-gray-800 text-white rounded hover:bg-gray-900">Apply →</button>
@@ -390,6 +411,7 @@ export default function InvoiceImportModal({ jobId: jobIdProp, jobName: jobNameP
                     <th className="px-2 py-2 font-semibold text-right">Inv $</th>
                     <th className="px-2 py-2 font-semibold text-right">Master $</th>
                     <th className="px-2 py-2 font-semibold text-right">Δ</th>
+                    <th className="px-2 py-2 font-semibold text-center">Set $</th>
                     <th className="px-2 py-2 font-semibold text-right">Amount</th>
                     <th className="px-2 py-2 font-semibold">Category</th>
                     <th className="px-2 py-2 font-semibold">Matched item</th>
@@ -425,6 +447,18 @@ export default function InvoiceImportModal({ jobId: jobIdProp, jobName: jobNameP
                         <td className={`px-2 py-1.5 text-right ${flagged ? 'font-semibold text-red-600' : r.variance < 0 ? 'text-green-600' : 'text-gray-500'}`}>
                           {r.variance == null ? '—' : `${r.variance > 0 ? '+' : ''}${r.variance.toFixed(0)}%`}
                         </td>
+                        <td className="px-2 py-1.5 text-center">
+                          {r.matchId && r.unit_price != null && r.master != null && Number(r.unit_price) !== Number(r.master) ? (
+                            <input
+                              type="checkbox"
+                              checked={!!r.setPrice}
+                              onChange={e => setRow(i, { setPrice: e.target.checked })}
+                              title="Adopt this invoice price as the new master price"
+                            />
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                        </td>
                         <td className="px-2 py-1.5 text-right font-semibold text-gray-800">{r.amount != null ? fmt(r.amount) : '—'}</td>
                         <td className="px-2 py-1.5">
                           <input value={r.category || ''} onChange={e => setRow(i, { category: e.target.value })} placeholder="—" className="border border-gray-200 rounded px-1.5 py-1 w-32" />
@@ -436,7 +470,7 @@ export default function InvoiceImportModal({ jobId: jobIdProp, jobName: jobNameP
                 </tbody>
               </table>
             </div>
-            <p className="text-[11px] text-gray-500 mt-2">Lines priced ≥{VARIANCE_FLAG}% off the master price are flagged in red. Untick <strong>Incl</strong> to leave a line off the job expenses.</p>
+            <p className="text-[11px] text-gray-500 mt-2">Lines priced ≥{VARIANCE_FLAG}% off the master price are flagged in red. Untick <strong>Incl</strong> to leave a line off the job expenses. Tick <strong>Set&nbsp;$</strong> on a matched line to adopt its invoice price as the new master price (effective the invoice date).</p>
             <div className="flex justify-end gap-2 pt-3">
               <button onClick={() => setStep('form')} className="text-sm text-gray-500 px-3 py-1.5">Back</button>
               <button onClick={post} disabled={busy} className="text-sm bg-green-600 text-white font-semibold rounded px-4 py-1.5 disabled:opacity-50">
@@ -451,6 +485,7 @@ export default function InvoiceImportModal({ jobId: jobIdProp, jobName: jobNameP
             <p className="text-sm text-gray-700 mb-1 font-semibold">Invoice posted</p>
             <p className="text-xs text-gray-500 mb-4">
               {totals.count} expense line(s) totalling {fmt(totals.sum)} posted to {jobName || 'the job'} and queued for QuickBooks sync.
+              {pricesUpdated > 0 && ` ${pricesUpdated} master price(s) updated from this invoice.`}
             </p>
             <button onClick={onClose} className="text-sm bg-gray-800 text-white font-semibold rounded px-4 py-1.5">Done</button>
           </div>
