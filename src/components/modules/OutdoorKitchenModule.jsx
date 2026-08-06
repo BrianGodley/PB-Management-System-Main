@@ -7,6 +7,7 @@ import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
+import { groutCuFtPerBlock } from '../../lib/cmuGrout'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Outdoor Kitchen (BBQ) Module — based on BBQ Module tab in Excel estimator
@@ -452,7 +453,9 @@ function calcOutdoorKitchen(
   const footingAreaSF = (n(footingWidthIn) * n(footingDepthIn)) / 144 // SF cross-section
   const footingCY = (totalLF * footingAreaSF) / 27
   const rebarLF = totalLF * 4
-  const fillCY = ((n(bbqHeightIn) / 12) * n(bbqLengthLF) * 0.25) / 27 / 2
+  // Grout fill = block count × cu-ft/block ÷ 27 (standardized CMU model, 8x8x16
+  // = 0.5 cu ft), priced at the concrete rate below.
+  const fillCY = (blockRaw * groutCuFtPerBlock(8, 8)) / 27
   const counterCY = (n(counterSF) * 0.33) / 27
 
   // ── BBQ Install Labor Hours (all rates from DB) ──────────────────────────────
@@ -526,7 +529,7 @@ function calcOutdoorKitchen(
   const blockMat = blockOrdered * p(OK_RATES.bbqBlock.dbName, OK_RATES.bbqBlock.fallback)
   const rebarMat = rebarLF * p(OK_RATES.bbqRebar.dbName, OK_RATES.bbqRebar.fallback)
   const footingMat = footingCY * p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)
-  const fillMat = fillCY * p(OK_RATES.bbqFillMat.dbName, OK_RATES.bbqFillMat.fallback)
+  const fillMat = fillCY * p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)
   const counterConcMat = counterCY * p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)
   const counterPolishMat = counterFinish === 'Polished Finish' ? n(counterSF) : 0 // $1/SF supply
   const applianceMat =
@@ -1059,13 +1062,14 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
               />
             </span>
             <span className="inline-flex items-center gap-1">
-              Fill ${p(OK_RATES.bbqFillMat.dbName, 60).toFixed(2)}/CY
+              Grout ${p(OK_RATES.bbqConcrete.dbName, 149.5).toFixed(2)}/CY ·{' '}
+              {groutCuFtPerBlock(8, 8)} cf/block
               <RateEditPopover
                 table="material_rates"
-                name={OK_RATES.bbqFillMat.dbName}
+                name={OK_RATES.bbqConcrete.dbName}
                 category="Outdoor Kitchen"
                 unitLabel="CY"
-                currentValue={p(OK_RATES.bbqFillMat.dbName, OK_RATES.bbqFillMat.fallback)}
+                currentValue={p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)}
                 onSaved={refreshAllRates}
               />
             </span>

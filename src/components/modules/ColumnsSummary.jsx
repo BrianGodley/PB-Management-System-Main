@@ -1,8 +1,12 @@
 import FinancialSummaryList from './FinancialSummaryList'
+import { groutCyPerBlock } from '../../lib/cmuGrout'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ColumnsSummary — read-only detail view for a saved Columns module
 // ─────────────────────────────────────────────────────────────────────────────
+
+// Grout fill is priced at the concrete ready-mix rate (shared Basic Materials).
+const GROUT_CONCRETE = { dbName: 'Concrete - Ready Mix (Truck)', fallback: 185 }
 
 const FINISH_TYPES = {
   'Sand Stucco': {
@@ -72,8 +76,7 @@ const FINISH_TYPES = {
 
 const BLOCK_RATES = {
   blockMatCost: { dbName: 'CMU Block', fallback: 2.5 },
-  rebarMatCost: { dbName: 'Rebar - Columns', fallback: 0.8 },
-  fillMatCost: { dbName: 'Fill Block / Grout', fallback: 0.75 },
+  rebarMatCost: { dbName: 'Rebar', fallback: 1.388 }, // shared Basic Materials rebar
   installLaborHrs: { dbName: 'CMU Install Labor', fallback: 0.083 },
   excavateLaborHrs: { dbName: 'Excavate Footing Labor', fallback: 0.5 },
   pourLaborHrs: { dbName: 'Pour Footing Labor', fallback: 0.25 },
@@ -174,11 +177,9 @@ export default function ColumnsSummary({ module }) {
       BLOCK_RATES.blockMatCost.fallback,
       installVendor
     )
-    const fillCost = matPrice(
-      BLOCK_RATES.fillMatCost.dbName,
-      BLOCK_RATES.fillMatCost.fallback,
-      installVendor
-    )
+    // Grout fill = block count × cu-ft/block ÷ 27 × concrete $/CY.
+    const groutCY = totalBlocks * groutCyPerBlock(8, 8)
+    const concreteCost = matPrice(GROUT_CONCRETE.dbName, GROUT_CONCRETE.fallback, installVendor)
     const rebarCost = matPrice(
       BLOCK_RATES.rebarMatCost.dbName,
       BLOCK_RATES.rebarMatCost.fallback,
@@ -195,7 +196,7 @@ export default function ColumnsSummary({ module }) {
     )
     const fillLab = price(BLOCK_RATES.fillLaborHrs.dbName, BLOCK_RATES.fillLaborHrs.fallback)
 
-    const matTotal = totalBlocks * blockCost + totalBlocks * fillCost + totalRebar * rebarCost
+    const matTotal = totalBlocks * blockCost + groutCY * concreteCost + totalRebar * rebarCost
     const hrsTotal =
       n(qty) * excavateLab + n(qty) * pourLab + totalBlocks * installLab + totalBlocks * fillLab
 

@@ -1,4 +1,5 @@
 import FinancialSummaryList from './FinancialSummaryList'
+import { groutCuFtPerBlock } from '../../lib/cmuGrout'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FirePitSummary — read-only detail view for a saved Fire Pit module
@@ -95,7 +96,7 @@ const GAS_LINE_FALLBACK = {
 const BLOCK_LENGTH_IN = 16
 const BLOCK_HEIGHT_IN = 8
 const BLOCK_WIDTH_IN = 8
-const GROUT_CF_PER_BLOCK = ((BLOCK_LENGTH_IN - 2) * BLOCK_HEIGHT_IN * (BLOCK_WIDTH_IN - 2)) / 1728
+const GROUT_CF_PER_BLOCK = groutCuFtPerBlock(BLOCK_WIDTH_IN, BLOCK_HEIGHT_IN) // shared CMU grout model
 
 const DEFAULTS = { laborRatePerHour: 35, laborBurdenPct: 0.29, gpmd: 425, commissionRate: 0.12 }
 

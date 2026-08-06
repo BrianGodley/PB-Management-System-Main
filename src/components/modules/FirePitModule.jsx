@@ -7,6 +7,7 @@ import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
+import { groutCuFtPerBlock } from '../../lib/cmuGrout'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Fire Pit Module — based on Fire Pit Module tab in Excel estimator
@@ -78,8 +79,9 @@ const n = v => parseFloat(v) || 0
 const BLOCK_LENGTH_IN = 16
 const BLOCK_HEIGHT_IN = 8
 const BLOCK_WIDTH_IN = 8
-// Interior void per block (CF) — (L-2) × H × (W-2) / 1728
-const GROUT_CF_PER_BLOCK = ((BLOCK_LENGTH_IN - 2) * BLOCK_HEIGHT_IN * (BLOCK_WIDTH_IN - 2)) / 1728
+// Grout fill per block — standardized cu-ft/block model shared across all CMU
+// modules (8x8x16 = 0.5 cu ft). Priced at the concrete rate (fpConcrete).
+const GROUT_CF_PER_BLOCK = groutCuFtPerBlock(BLOCK_WIDTH_IN, BLOCK_HEIGHT_IN)
 
 // ── Wall-finish vendor catalog (ported from Outdoor Kitchen) ──────────────────
 // A real vendor overrides ONLY the material unit price for a finish (matched by
