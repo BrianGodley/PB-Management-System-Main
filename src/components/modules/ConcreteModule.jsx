@@ -119,11 +119,15 @@ const R = {
 // Base Install material and the Concrete mix each map to one House product;
 // vendors tagged to the 'Concrete Base' / 'Concrete Mix' categories supply
 // additional priced types via material_rates (subcategory + vendor_id).
+// House defaults reference the SHARED Basic Materials rows (same rows Walls /
+// Columns / etc. use), so a price change on base or ready-mix propagates
+// everywhere. Vendor-supplied rows still come from the 'Concrete Base' /
+// 'Concrete Mix' subcategory catalog (category 'Concrete').
 const BASE_TYPES = [
-  { label: 'Import Base', dbName: 'Concrete - Import Base', fallback: R.costBase },
+  { label: 'Import Base', dbName: 'Base - Class II Roadbase', fallback: R.costBase, category: 'Basic Materials' },
 ]
 const MIX_TYPES = [
-  { label: 'Concrete Mix', dbName: 'Concrete - Per CY', fallback: R.concretePerCY },
+  { label: 'Concrete Mix', dbName: 'Concrete - Ready Mix (Truck)', fallback: R.concretePerCY, category: 'Basic Materials' },
 ]
 
 // Resolve a picked Type label against the vendor option list, then the House
@@ -168,7 +172,7 @@ function calcConcrete(
     const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : catDefaults[cat] || 'House'
     if (!vsel || vsel === 'House') return resolveType(row.type, houseArray, houseArray)
     const opts = catalogOptions(materialRows, cat, vsel, { houseRows: 'exclude', stripPrefix: true }).map(
-      o => ({ label: o.label, dbName: o.row.name, fallback: n(o.row.unit_cost) })
+      o => ({ label: o.label, dbName: o.row.name, fallback: n(o.row.unit_cost), category: 'Concrete' })
     )
     return resolveType(row.type, opts, houseArray)
   }
@@ -198,7 +202,7 @@ function calcConcrete(
   const seededAggSFPerHr = lr['Concrete - Seeded Aggregate SF/hr'] ?? 40
 
   // ── Material unit costs (material_rates) ─────────────────────────────────
-  const concretePerCY = mr['Concrete - Per CY'] ?? R.concretePerCY
+  const concretePerCY = mr['Concrete - Ready Mix (Truck)'] ?? R.concretePerCY // shared Basic Materials
   // Rebar $/LF (canonical, from the shared Basic Materials 'Rebar' row) and the
   // LF-per-SF conversion factor for the chosen on-center spacing.
   const rebarPerLF = mr['Rebar'] ?? REBAR_CANONICAL_FB
@@ -209,7 +213,7 @@ function calcConcrete(
   const sealerNatural5g = mr['Concrete - Sealer Natural 5gal'] ?? R.sealerNatural5g
   const sealerWet5g = mr['Concrete - Sealer Wet 5gal'] ?? R.sealerWet5g
   const vaporBarrierPerSF = mr['Concrete - Vapor Barrier SF'] ?? R.vaporBarrierPerSF
-  const costBase = mr['Concrete - Import Base'] ?? R.costBase
+  const costBase = mr['Base - Class II Roadbase'] ?? R.costBase // shared Basic Materials
 
   // ── Sub / equipment costs (subcontractor_rates) ──────────────────────────
   const pumpFeeFlat = sr['Concrete - Pump Flat Fee'] ?? R.pumpFeeFlat
@@ -769,7 +773,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     if (!vsel || vsel === 'House') return houseArray
     const opts = catalogOptions(materialRows, subcat, vsel, { houseRows: 'exclude', stripPrefix: true })
     if (!opts.length) return houseArray
-    return opts.map(o => ({ label: o.label, dbName: o.row.name, fallback: n(o.row.unit_cost) }))
+    return opts.map(o => ({ label: o.label, dbName: o.row.name, fallback: n(o.row.unit_cost), category: 'Concrete' }))
   }
   // Effective vendor for a stored value: 'auto'/unset/House → category default.
   const effVendor = (cat, v) => (v && v !== 'auto' && v !== 'House' ? v : catDefaults[cat])
@@ -1152,8 +1156,8 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           Base material ${calc.costBase}/ton
           <RateEditPopover
             table="material_rates"
-            name="Concrete - Import Base"
-            category="Concrete"
+            name="Base - Class II Roadbase"
+            category="Basic Materials"
             unitLabel="ton"
             currentValue={calc.costBase}
             onSaved={refreshAllRates}
@@ -1218,7 +1222,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                         <RateEditPopover
                           table="material_rates"
                           name={bt.dbName}
-                          category="Concrete"
+                          category={bt.category || 'Concrete'}
                           unitLabel="ton"
                           currentValue={baseRate}
                           onSaved={refreshAllRates}
@@ -1370,7 +1374,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                           <RateEditPopover
                             table="material_rates"
                             name={mt.dbName}
-                            category="Concrete"
+                            category={mt.category || 'Concrete'}
                             unitLabel="CY"
                             currentValue={mixRate}
                             onSaved={refreshAllRates}
