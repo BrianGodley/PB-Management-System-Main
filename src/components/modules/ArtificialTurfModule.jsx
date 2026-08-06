@@ -16,7 +16,7 @@ import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { catalogItemFor } from '../../lib/materialCatalog'
+import { catalogItemFor, catalogOptions } from '../../lib/materialCatalog'
 
 const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
 
@@ -165,6 +165,20 @@ function turfMatPrice(cat, vendorSel, typeLabel, houseName, houseFallback, mater
   return { price: n(mp[houseName]) || houseFallback, dbName: houseName }
 }
 
+// Turf brands = built-in TURF_BRANDS + any master-list rows tagged
+// sub_category='Turf Material' and left Unspecified. Add a brand in Master Rates
+// and it appears in the picker automatically, priced from its row. Turf install
+// labor is a shared rate, so brands need no paired labor row.
+function mergedTurfBrands(materialRows) {
+  const extra = catalogOptions(materialRows, TURF_CAT.turf, 'House', {
+    houseRows: 'null-vendor',
+    stripPrefix: true,
+  })
+    .filter(o => !TURF_BRANDS.some(b => b.label === o.label || b.key === o.label))
+    .map(o => ({ key: o.row.name, label: o.label, matKey: o.row.name, fallback: n(o.row.unit_cost), fromMaster: true }))
+  return extra.length ? [...TURF_BRANDS, ...extra] : TURF_BRANDS
+}
+
 function calcTurf(
   state,
   laborRatePerHour,
@@ -274,10 +288,11 @@ function calcTurf(
     totalEdgeLF = 0,
     subTurfCost = 0
 
+  const brands = mergedTurfBrands(materialRows)
   const rollCalc = state.rolls.map(roll => {
     const edgeLF = n(roll.edgeLF)
     const installSF = n(roll.installSF)
-    const brand = TURF_BRANDS.find(b => b.key === roll.brand) || TURF_BRANDS[0]
+    const brand = brands.find(b => b.key === roll.brand) || brands[0]
     const pricePerSF = turfMatPrice(
       TURF_CAT.turf,
       roll.vendor,
@@ -308,7 +323,7 @@ function calcTurf(
   // Material: brand $/SF × (LF × width ft)  — Excel S20=O20*Q20 (manual inputs)
   const stripsLF = n(state.strips?.lf)
   const stripsWidthIn = n(state.strips?.widthIn) || 12
-  const stripsBrand = TURF_BRANDS.find(b => b.key === state.strips?.brand) || TURF_BRANDS[0]
+  const stripsBrand = brands.find(b => b.key === state.strips?.brand) || brands[0]
   const stripsPrice = turfMatPrice(
     TURF_CAT.turf,
     state.strips?.vendor,
@@ -851,8 +866,9 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
   const num = 'py-1.5 pr-2 text-gray-600 tabular-nums text-xs align-top'
   const demoMethodKeys = DEMO_METHODS.map(m => m.key)
   const demoMethodLabels = DEMO_METHODS.map(m => m.label)
-  const brandKeys = TURF_BRANDS.map(b => b.key)
-  const brandLabels = TURF_BRANDS.map(b => b.label)
+  const brands = mergedTurfBrands(materialRows)
+  const brandKeys = brands.map(b => b.key)
+  const brandLabels = brands.map(b => b.label)
 
   function handleSave() {
     onSave({
@@ -1181,7 +1197,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           <tbody className="divide-y divide-gray-50">
             {T.rolls.map((roll, i) => {
               const cr = calc.rollCalc[i]
-              const brand = TURF_BRANDS.find(b => b.key === roll.brand) || TURF_BRANDS[0]
+              const brand = brands.find(b => b.key === roll.brand) || brands[0]
               return (
                 <tr key={i}>
                   <td className={td}>
@@ -1382,7 +1398,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                   </div>
                   {(() => {
                     const stripBrand =
-                      TURF_BRANDS.find(b => b.key === T.strips?.brand) || TURF_BRANDS[0]
+                      brands.find(b => b.key === T.strips?.brand) || brands[0]
                     return (
                       <>
                         <RateEditPopover
