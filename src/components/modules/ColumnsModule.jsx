@@ -7,6 +7,7 @@ import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
+import { useMaterialCatalog, resolveMaterialPrice } from '../../lib/materialCatalog'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Columns Module — fields and calculations from Excel estimator (Columns Module tab)
@@ -108,20 +109,10 @@ const n = v => parseFloat(v) || 0
 
 const COLUMNS_CATEGORY = 'Columns'
 
-// ── Vendor-catalog material price ─────────────────────────────────────────────
-// The ONLY thing the Vendor selection changes: the MATERIAL $ source.
-// If a real vendor is selected AND a material_rates row exists whose name===dbName
-// and vendor_id===vendorId, use that row's unit_cost. Otherwise fall back to the
-// House price (name-keyed materialPrices[dbName]) and finally the hard fallback.
-// With vendorId 'House' (or empty) this returns exactly (mp[dbName] ?? fallback),
-// i.e. the pre-vendor value — so In-House output is byte-for-byte unchanged.
-function colMatPrice(dbName, vendorId, materialRows, mp, fallback) {
-  if (vendorId && vendorId !== 'House') {
-    const row = (materialRows || []).find(r => r.name === dbName && r.vendor_id === vendorId)
-    if (row && row.unit_cost != null && row.unit_cost !== '') return n(row.unit_cost)
-  }
-  return mp?.[dbName] ?? fallback
-}
+// Vendor-resolved material price now comes from the shared resolver
+// (src/lib/materialCatalog.js) — same order (vendor row → House name key →
+// fallback), so Columns numbers are byte-for-byte unchanged.
+const colMatPrice = resolveMaterialPrice
 
 // ── Column geometry helpers ───────────────────────────────────────────────────
 // Standard CMU blocks are 8"×8"×16" (face) or 8"×8"×8" (corner/half)
@@ -312,46 +303,21 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
       paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
     }
   )
-  const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
-  // Full Columns material_rates catalog (id/name/vendor_id/unit/unit_cost) used to
-  // resolve a chosen vendor's material price, plus the vendor list for the pickers.
-  const [materialRows, setMaterialRows] = useState(initialData?.materialRows || [])
-  const [vendors, setVendors] = useState([])
-  const [pricesLoading, setPricesLoading] = useState(!initialData?.materialPrices)
-
-  // Re-fetch Columns merged labor+material map + vendor catalog. Used on mount
-  // and after edits.
-  const refreshAllRates = useCallback(async () => {
-    const [matRes, labRes, catRes, venRes] = await Promise.all([
-      supabase.from('material_rates').select('name, unit_cost').eq('category', COLUMNS_CATEGORY),
-      supabase.from('labor_rates').select('name, rate').eq('category', COLUMNS_CATEGORY),
-      supabase
-        .from('material_rates')
-        .select('id,name,vendor_id,unit,unit_cost')
-        .eq('category', COLUMNS_CATEGORY),
-      supabase
-        .from('subs_vendors')
-        .select('id, company_name, supplied_categories')
-        .eq('type', 'vendor')
-        .order('company_name'),
-    ])
-    const prices = {}
-    ;(matRes.data || []).forEach(r => {
-      prices[r.name] = parseFloat(r.unit_cost) || 0
-    })
-    ;(labRes.data || []).forEach(r => {
-      prices[r.name] = parseFloat(r.rate) || 0
-    })
-    setMaterialPrices(prices)
-    setMaterialRows(catRes.data || [])
-    setVendors(
-      (venRes.data || []).map(v => ({
-        id: v.id,
-        name: v.company_name,
-        categories: v.supplied_categories || [],
-      }))
-    )
-  }, [])
+  // Shared material catalog — fetches Columns material + labor rates, the
+  // material_rates rows, and vendors, and exposes the canonical resolver.
+  // (Replaces the old per-module fetch + colMatPrice copy.)
+  const {
+    priceMap: materialPrices,
+    materialRows,
+    vendors,
+    vendorNames,
+    loading: pricesLoading,
+    refresh: refreshAllRates,
+    vendorOptionsForCategory,
+  } = useMaterialCatalog(COLUMNS_CATEGORY, {
+    materialPrices: initialData?.materialPrices,
+    materialRows: initialData?.materialRows,
+  })
 
   useEffect(() => {
     if (!initialData?.laborRatePerHour) {
@@ -376,10 +342,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
           }
         })
     }
-    // Always refresh so the vendor catalog + material_rates rows load (matches the
-    // other vendor-catalog modules). House prices resolve identically either way.
-    refreshAllRates().then(() => setPricesLoading(false))
-  }, [refreshAllRates])
+  }, [initialData?.laborRatePerHour])
 
   const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
@@ -448,12 +411,8 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
   }, [])
 
   // Vendor pickers: only vendors that supply the Columns category. 'House' first.
-  const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
-  const vendorOptions = [
-    { value: 'House', label: 'Unspecified' },
-    ...vendorsForCategory(COLUMNS_CATEGORY).map(v => ({ value: v.id, label: v.name })),
-  ]
-  // Vendor-resolved material price for display (calc uses colMatPrice internally).
+  const vendorOptions = vendorOptionsForCategory(COLUMNS_CATEGORY)
+  // Vendor-resolved material price for display (calc uses the same resolver).
   const colMat = (dbName, vendorId, fallback) =>
     colMatPrice(dbName, vendorId, materialRows, materialPrices, fallback)
 
@@ -527,7 +486,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
         gpmd,
         materialPrices,
         materialRows,
-        vendorNames: Object.fromEntries(vendors.map(v => [v.id, v.name])),
+        vendorNames,
         ihData: ihTab,
         subData: subTab,
         calc,
