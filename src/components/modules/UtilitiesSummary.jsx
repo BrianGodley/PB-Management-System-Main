@@ -60,6 +60,18 @@ export default function UtilitiesSummary({ module }) {
         .map(r => ({ label: r.type, value: `× ${r.qty}` })),
     },
     {
+      title: 'Sewer Lines',
+      rows: (d.sewerLineRows || [])
+        .filter(r => n(r.lf) > 0)
+        .map(r => ({ label: r.type, value: `${n(r.lf)} LF` })),
+    },
+    {
+      title: 'Sewer Sinks',
+      rows: (d.sewerSinkRows || [])
+        .filter(r => n(r.qty) > 0)
+        .map(r => ({ label: r.type, value: `× ${r.qty}` })),
+    },
+    {
       title: 'Additional Items',
       rows: [
         ...addRows(d.additionalItems),
@@ -94,6 +106,18 @@ export default function UtilitiesSummary({ module }) {
     {
       title: 'Electrical Fixtures',
       rows: (d.subElecFixtureRows || [])
+        .filter(r => n(r.qty) > 0)
+        .map(r => ({ label: r.type, value: `× ${r.qty}` })),
+    },
+    {
+      title: 'Sewer Lines',
+      rows: (d.subSewerLineRows || [])
+        .filter(r => n(r.lf) > 0)
+        .map(r => ({ label: r.type, value: `${n(r.lf)} LF` })),
+    },
+    {
+      title: 'Sewer Sinks',
+      rows: (d.subSewerSinkRows || [])
         .filter(r => n(r.qty) > 0)
         .map(r => ({ label: r.type, value: `× ${r.qty}` })),
     },
