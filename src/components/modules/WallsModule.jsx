@@ -7,6 +7,7 @@ import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
+import { groutCyPerBlock as cmuGroutCyPerBlock } from '../../lib/cmuGrout'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Walls Module — CMU Block | Poured In Place | Timber/Lumber
@@ -52,8 +53,9 @@ function wallBlockRateName(name) {
   return `Wall Block ${name}`
 }
 function groutCyPerBlock(b) {
-  // Same formula as the Excel ((L-2) × H × (W-2)) in³ → yd³
-  return ((b.l - 2) * b.h * (b.w - 2)) / 1728 / 27
+  // Standardized grout fill: fixed cu-ft per block by size (0.5 for 8" wide,
+  // 0.4 for 6" wide), ÷ 27 → CY. Shared across all CMU modules via cmuGrout.js.
+  return cmuGroutCyPerBlock(b.w, b.h)
 }
 
 const WALL_RATES = {

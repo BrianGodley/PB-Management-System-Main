@@ -8,6 +8,7 @@ import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { useMaterialCatalog, resolveMaterialPrice } from '../../lib/materialCatalog'
+import { groutCyPerBlock } from '../../lib/cmuGrout'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Columns Module — fields and calculations from Excel estimator (Columns Module tab)
@@ -92,7 +93,9 @@ const BLOCK_RATES = {
   // $1.388/LF) so a vendor price change on rebar flows through here too.
   rebarMatCost: { dbName: 'Rebar', fallback: 1.388 }, // $/LF (Basic Materials)
   faceBlockMat: { dbName: 'Face Block', fallback: 3.0 }, // $/block (decorative)
-  fillMatCost: { dbName: 'Fill Block / Grout', fallback: 0.75 }, // $/block
+  // Grout fill is now priced at the concrete rate by volume (block count ×
+  // cu-ft/block ÷ 27 × concrete $/CY) via the shared Basic Materials concrete
+  // row — see cmuGrout.js. fillMatCost (flat $/block) is retired.
   // Labor rates
   installLaborHrs: { dbName: 'CMU Install Labor', fallback: 0.083 }, // hrs per block (~5 min)
   excavateLaborHrs: { dbName: 'Excavate Footing Labor', fallback: 0.5 }, // hrs per column
@@ -111,8 +114,11 @@ const n = v => parseFloat(v) || 0
 
 const COLUMNS_CATEGORY = 'Columns'
 // Shared cross-module catalog of basic materials (concrete, base, sand, rebar,
-// grout). Columns resolves its rebar from here so vendor prices propagate.
+// grout). Columns resolves its rebar + grout concrete from here so vendor
+// prices propagate.
 const BASIC_CATEGORY = 'Basic Materials'
+// Grout fill is priced at the concrete ready-mix rate (shared Basic Materials).
+const GROUT_CONCRETE = { dbName: 'Concrete - Ready Mix (Truck)', fallback: 185 } // $/CY
 
 // Vendor-resolved material price now comes from the shared resolver
 // (src/lib/materialCatalog.js) — same order (vendor row → House name key →
@@ -162,9 +168,13 @@ function calcColumns(
     const totalRebar = geo.rebarLF * n(qty)
 
     // Material costs — unit prices resolve through the section Vendor.
+    // Grout fill = block count × cu-ft/block ÷ 27 × concrete $/CY (columns are
+    // solid-grouted 8x8x16 → 0.5 cu ft/block). Concrete rate is the shared
+    // Basic Materials row, so vendor price changes propagate.
+    const groutCY = totalBlocks * groutCyPerBlock(8, 8)
     installMat +=
       totalBlocks * matP(BLOCK_RATES.blockMatCost.dbName, BLOCK_RATES.blockMatCost.fallback, installVendor) +
-      totalBlocks * matP(BLOCK_RATES.fillMatCost.dbName, BLOCK_RATES.fillMatCost.fallback, installVendor) +
+      groutCY * matP(GROUT_CONCRETE.dbName, GROUT_CONCRETE.fallback, installVendor) +
       totalRebar * matP(BLOCK_RATES.rebarMatCost.dbName, BLOCK_RATES.rebarMatCost.fallback, installVendor)
 
     // Labor hours
@@ -652,21 +662,15 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
               />
             </span>
             <span className="inline-flex items-center gap-1">
-              Fill $
-              {colMat(
-                BLOCK_RATES.fillMatCost.dbName,
-                installVendor,
-                BLOCK_RATES.fillMatCost.fallback
-              ).toFixed(2)}
-              /block
+              Grout (concrete) $
+              {colMat(GROUT_CONCRETE.dbName, installVendor, GROUT_CONCRETE.fallback).toFixed(2)}
+              /CY · {(groutCyPerBlock(8, 8) * 27).toFixed(2)} cf/block
               <RateEditPopover
                 table="material_rates"
-                name={BLOCK_RATES.fillMatCost.dbName}
-                category="Columns"
-                unitLabel="block"
-                currentValue={
-                  materialPrices[BLOCK_RATES.fillMatCost.dbName] ?? BLOCK_RATES.fillMatCost.fallback
-                }
+                name={GROUT_CONCRETE.dbName}
+                category={BASIC_CATEGORY}
+                unitLabel="CY"
+                currentValue={materialPrices[GROUT_CONCRETE.dbName] ?? GROUT_CONCRETE.fallback}
                 onSaved={refreshAllRates}
               />
             </span>
