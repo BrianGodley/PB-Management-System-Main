@@ -41,6 +41,7 @@ import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
+import { fetchOpenPriceLedger, ledgerPrice } from '../../lib/materialCatalog'
 
 const n = v => parseFloat(v) || 0
 const sfToTons = (sf, depthIn) => (n(sf) / 200) * n(depthIn)
@@ -133,7 +134,8 @@ function calcPaver(
   gpmd = 425,
   walkAccess = null,
   laborBurdenPct = 0.29,
-  materialRows = []
+  materialRows = [],
+  priceOf = item => n(item?.unit_cost)
 ) {
   const lr = laborRates || {}
   const mr = materialRates || {}
@@ -206,7 +208,7 @@ function calcPaver(
         row.baseId || row.baseType,
         materialRows
       )
-      baseTonRate = bItem ? n(bItem.unit_cost) : baseRockPerTon
+      baseTonRate = bItem ? priceOf(bItem) : baseRockPerTon
     } else {
       baseTonRate = mr['Base Material - Class II Roadbase'] ?? baseRockPerTon
     }
@@ -227,7 +229,7 @@ function calcPaver(
         materialRows
       )
       if (item) {
-        pricePerSF = n(item.unit_cost)
+        pricePerSF = priceOf(item)
         sfPerPallet = n(item.sf_per_pallet)
       }
     } else if (row.paverBrand) {
@@ -817,6 +819,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   // Vendor catalog (material_rates rows w/ subcategory + vendor_id + paver attrs)
   // and the vendor list, driving the per-row Vendor/Type pickers.
   const [materialRows, setMaterialRows] = useState(initialData?.materialRows || [])
+  const [ledger, setLedger] = useState({}) // Phase 4 per-vendor price ledger
   const [vendors, setVendors] = useState([])
 
   // ── Sales tax — applied to totalMat across every module so the bid
@@ -845,7 +848,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       supabase.from('material_rates').select('name,unit_cost').in('category', ['Paver', 'Basic Materials']),
       supabase
         .from('material_rates')
-        .select('name, unit_cost, subcategory, vendor_id, sf_per_pallet, price_per_lf_vert')
+        .select('id, name, unit_cost, subcategory, vendor_id, sf_per_pallet, price_per_lf_vert')
         .eq('category', 'Paver'),
       supabase
         .from('subs_vendors')
@@ -868,6 +871,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       setMaterialRates(m)
     }
     setMaterialRows(matRowsRes.data || [])
+    fetchOpenPriceLedger((matRowsRes.data || []).map(r => r.id)).then(setLedger)
     setVendors(
       (venRes.data || []).map(v => ({
         id: v.id,
@@ -974,6 +978,10 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   // ── Vendor catalog helpers (per-row Vendor/Type pickers) ─────────────────
   const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
 
+  // Resolve a catalog item's unit cost from the price ledger (per-vendor),
+  // falling back to the row's own unit_cost.
+  const priceOf = item => (item ? ledgerPrice(ledger, item.id, item.vendor_id, n(item.unit_cost)) : 0)
+
   // In-House engine — FORCE the In-House tab so it always reads the raw In-House
   // fields (state.areaRows …) regardless of which tab is active. This is the
   // in-house side of the module: paver material + install labor + in-house GP.
@@ -986,7 +994,8 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
     gpmd,
     walkAccess,
     laborBurdenPct,
-    materialRows
+    materialRows,
+    priceOf
   )
   // Sub engine — FORCE the Sub tab so it reads the sub area rows (state.subAreaRows
   // …). We take only its MATERIAL total (its labor/GP are ignored — install labor
@@ -1000,7 +1009,8 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
     gpmd,
     walkAccess,
     laborBurdenPct,
-    materialRows
+    materialRows,
+    priceOf
   )
 
   // ── Sub side — per-SF / per-LF unit pricing ─────────────────────────────────

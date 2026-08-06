@@ -7,6 +7,7 @@ import GpmdBar from './GpmdBar'
 import ModuleNotesField from './ModuleNotesField'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
+import { fetchOpenPriceLedger, ledgerPrice } from '../../lib/materialCatalog'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Steps Module
@@ -93,7 +94,7 @@ function paverItemFor(cat, vendorSel, typeLabel, materialRows) {
 // ── Per-row calculators ──────────────────────────────────────────────────────
 // Shared by every Vendor/Type step section (Paver/Brick/Tile/Flagstone); `cat`
 // selects which material catalog subcategory the Type options come from.
-function matStepRowCalc(r, laborRates, materialRows, cat = PAVER_STEP_CAT) {
+function matStepRowCalc(r, laborRates, materialRows, cat = PAVER_STEP_CAT, priceOf = item => n(item?.unit_cost)) {
   const sf = n(r.sf)
   const rate = n(laborRates[kPaverForm(r.form)] ?? PAVER_FORM_DEFAULT[r.form] ?? 0)
   const hrs = sf > 0 && rate > 0 ? sf / rate : 0
@@ -102,7 +103,7 @@ function matStepRowCalc(r, laborRates, materialRows, cat = PAVER_STEP_CAT) {
   if (r.vendor && r.vendor !== 'House' && r.vendor !== 'Custom') {
     const item = paverItemFor(cat, r.vendor, r.type, materialRows)
     if (item) {
-      price = n(item.unit_cost)
+      price = priceOf(item)
       sfPerPallet = n(item.sf_per_pallet)
     }
   }
@@ -155,7 +156,8 @@ function calcSteps(
   gpmd = DEFAULTS.gpmd,
   walkAccess = null,
   laborBurdenPct = DEFAULTS.laborBurdenPct,
-  subGpMarkupRate = 0.2
+  subGpMarkupRate = 0.2,
+  priceOf = item => n(item?.unit_cost)
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const lr = laborRates || {}
@@ -172,7 +174,7 @@ function calcSteps(
     let mat = 0
     let pallets = 0
     ;(state[sec.rowsKey] || []).forEach(r => {
-      const c = matStepRowCalc(r, lr, materialRows, sec.cat)
+      const c = matStepRowCalc(r, lr, materialRows, sec.cat, priceOf)
       labor += c.hrs
       mat += c.mat
       pallets += c.pallets
@@ -663,6 +665,7 @@ function MaterialStepSection({
   materialRates,
   laborRates,
   vendors,
+  priceOf = item => n(item?.unit_cost),
 }) {
   const vForCat = vendors.filter(v => (v.categories || []).includes(cat))
   const setRow = (i, field, val) =>
@@ -685,7 +688,7 @@ function MaterialStepSection({
         <tbody>
           {rows.map((row, i) => {
             const opts = paverOptions(cat, row.vendor, materialRows)
-            const c = matStepRowCalc(row, laborRates, materialRows, cat)
+            const c = matStepRowCalc(row, laborRates, materialRows, cat, priceOf)
             const sc = matStepSubRowCalc(row, materialRates, baseKey)
             return (
               <tr key={i} className="border-b border-gray-50">
@@ -809,6 +812,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
   const [laborRates, setLaborRates] = useState(initialData?.laborRates || {})
   const [materialRates, setMaterialRates] = useState(initialData?.materialRates || {})
   const [materialRows, setMaterialRows] = useState(initialData?.materialRows || [])
+  const [ledger, setLedger] = useState({}) // Phase 4 per-vendor price ledger
   const [vendors, setVendors] = useState([])
   const [loading, setLoading] = useState(true)
   const [ratesModalOpen, setRatesModalOpen] = useState(false)
@@ -819,7 +823,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
       supabase.from('material_rates').select('name, unit_cost').eq('category', 'Steps'),
       supabase
         .from('material_rates')
-        .select('name, unit_cost, subcategory, vendor_id, sf_per_pallet')
+        .select('id, name, unit_cost, subcategory, vendor_id, sf_per_pallet')
         .not('vendor_id', 'is', null),
       supabase
         .from('subs_vendors')
@@ -842,6 +846,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
       setMaterialRates(m)
     }
     setMaterialRows(matRowsRes.data || [])
+    fetchOpenPriceLedger((matRowsRes.data || []).map(r => r.id)).then(setLedger)
     setVendors(
       (venRes.data || []).map(v => ({
         id: v.id,
@@ -939,6 +944,10 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
     flag: { rows: isSub ? subFlagRows : flagRows, set: isSub ? setSubFlagRows : setFlagRows },
   }
 
+  // Resolve a catalog item's unit cost from the price ledger (per-vendor),
+  // falling back to the row's own unit_cost.
+  const priceOf = item => (item ? ledgerPrice(ledger, item.id, item.vendor_id, n(item.unit_cost)) : 0)
+
   const calcRaw = calcSteps(
     state,
     laborRatePerHour,
@@ -948,7 +957,8 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
     gpmd,
     walkAccess,
     laborBurdenPct,
-    subGpMarkupRate
+    subGpMarkupRate,
+    priceOf
   )
   const _salesTaxAmt = (calcRaw.totalMat || 0) * (salesTaxRate || 0)
   const calc =
@@ -1085,6 +1095,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           materialRates={materialRates}
           laborRates={laborRates}
           vendors={vendors}
+          priceOf={priceOf}
         />
       ))}
 
