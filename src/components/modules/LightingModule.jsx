@@ -6,7 +6,7 @@ import GpmdBar from './GpmdBar'
 import ModuleNotesField from './ModuleNotesField'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { fetchOpenPriceLedger, ledgerPrice } from '../../lib/materialCatalog'
+import { fetchPriceLedgerAsOf, ledgerPrice } from '../../lib/materialCatalog'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Lighting Module — per-vendor catalog layout (mirrors PaverModule).
@@ -241,8 +241,10 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
   const [materialRows, setMaterialRows] = useState(initialData?.materialRows || [])
   const [vendors, setVendors] = useState([])
   const [loading, setLoading] = useState(true)
-  // Phase 4 price ledger: current open price per (material, vendor).
+  // Phase 4 price ledger: price per (material, vendor), as of `asOfDate`
+  // (blank = current). Lets the estimate be priced at historical rates.
   const [ledger, setLedger] = useState({})
+  const [asOfDate, setAsOfDate] = useState('')
 
   // Re-fetch the lighting catalog + vendor list. Used on mount.
   const refreshCatalog = useCallback(async () => {
@@ -258,8 +260,6 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
         .order('company_name'),
     ])
     setMaterialRows(matRes.data || [])
-    // Load the current per-vendor price ledger for these materials.
-    fetchOpenPriceLedger((matRes.data || []).map(r => r.id)).then(setLedger)
     setVendors(
       (venRes.data || []).map(v => ({
         id: v.id,
@@ -344,6 +344,21 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
       alive = false
     }
   }, [])
+
+  // (Re)load the price ledger for the catalog whenever the rows or the as-of
+  // date change. Blank asOfDate → current price.
+  useEffect(() => {
+    let alive = true
+    fetchPriceLedgerAsOf(
+      materialRows.map(r => r.id),
+      asOfDate || null
+    ).then(m => {
+      if (alive) setLedger(m)
+    })
+    return () => {
+      alive = false
+    }
+  }, [materialRows, asOfDate])
 
   // Resolve an item's material cost from the price ledger (per-vendor), falling
   // back to the row's own unit_cost. Shared by the calc + the render display.
@@ -654,6 +669,28 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
           <option value="Paver">Paver</option>
           <option value="Specialty">Specialty</option>
         </select>
+      </div>
+
+      {/* Prices as of — leave blank for current prices, or pick a date to
+          re-price the catalog at the rates in effect on that date. */}
+      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
+        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Prices as of</label>
+        <input
+          type="date"
+          value={asOfDate}
+          onChange={e => setAsOfDate(e.target.value)}
+          className="input text-sm py-1 w-44"
+        />
+        {asOfDate && (
+          <button
+            type="button"
+            onClick={() => setAsOfDate('')}
+            className="text-xs text-green-700 hover:text-green-900 font-medium"
+          >
+            Use current
+          </button>
+        )}
+        <span className="text-[11px] text-gray-400">blank = today's prices</span>
       </div>
 
       {loading && (

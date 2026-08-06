@@ -49,21 +49,42 @@ export function resolveMaterialPriceById(id, materialRows, fallback = 0) {
 // so this is price-preserving; it becomes multi-vendor once writers populate
 // per-vendor ledger rows.
 const HOUSE_KEY = '__house__'
-export async function fetchOpenPriceLedger(materialIds) {
+
+// Price map for a set of materials AS OF a date. asOfDate null/'' → the current
+// open price (effective_end IS NULL). Otherwise → the period covering that date
+// (effective_start <= date AND (effective_end IS NULL OR effective_end >= date)),
+// so an estimate can be priced at its bid-date rates.
+export async function fetchPriceLedgerAsOf(materialIds, asOfDate = null) {
   const ids = [...new Set((materialIds || []).filter(Boolean))]
   if (!ids.length) return {}
-  const { data } = await supabase
+  let q = supabase
     .from('material_price_history')
-    .select('material_rate_id, vendor_id, unit_cost')
+    .select('material_rate_id, vendor_id, unit_cost, effective_start')
     .in('material_rate_id', ids)
-    .is('effective_end', null)
+  if (asOfDate) {
+    q = q.lte('effective_start', asOfDate).or(`effective_end.is.null,effective_end.gte.${asOfDate}`)
+  } else {
+    q = q.is('effective_end', null)
+  }
+  const { data } = await q
   const map = {}
+  const bestStart = {} // "materialId|vendorKey" → latest effective_start seen
   ;(data || []).forEach(r => {
-    const k = r.vendor_id ?? HOUSE_KEY
-    if (!map[r.material_rate_id]) map[r.material_rate_id] = {}
-    map[r.material_rate_id][k] = parseFloat(r.unit_cost)
+    const vk = r.vendor_id ?? HOUSE_KEY
+    const key = `${r.material_rate_id}|${vk}`
+    const start = r.effective_start || ''
+    if (bestStart[key] == null || start >= bestStart[key]) {
+      bestStart[key] = start
+      if (!map[r.material_rate_id]) map[r.material_rate_id] = {}
+      map[r.material_rate_id][vk] = parseFloat(r.unit_cost)
+    }
   })
   return map
+}
+
+// Current open price map (today). Thin wrapper over fetchPriceLedgerAsOf.
+export async function fetchOpenPriceLedger(materialIds) {
+  return fetchPriceLedgerAsOf(materialIds, null)
 }
 
 export function ledgerPrice(ledgerById, materialId, vendorId, fallback = 0) {
