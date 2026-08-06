@@ -8,7 +8,12 @@ import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { groutCyPerBlock as cmuGroutCyPerBlock } from '../../lib/cmuGrout'
-import { useMaterialCatalog, resolveMaterialPrice } from '../../lib/materialCatalog'
+import {
+  useMaterialCatalog,
+  resolveMaterialPrice,
+  catalogOptions,
+  catalogItemFor,
+} from '../../lib/materialCatalog'
 
 const WALLS_CATEGORY = 'Walls'
 // Shared cross-module basics (rebar, concrete, grout pump) live here so vendor
@@ -378,8 +383,35 @@ function computeWallWpTotals(wall, mp, materialRows) {
   )
 }
 
+// ── Modular master-list wall products ──────────────────────────────────────
+// Each module's material selector is driven by a sub_category "marker": rows in
+// material_rates (category='Walls') tagged sub_category='Modular Wall' show up in
+// the Modular tab's Wall Type picker automatically — populate the master list and
+// they appear here, no code change. Dimensions (block_w/h/l_in, inches) drive the
+// block-count math; unit_cost is the per-unit price.
+const MODULAR_SUBCAT = 'Modular Wall'
+const MODULAR_CAT_OPTS = { houseRows: 'null-vendor', stripPrefix: true }
+const MODULAR_FALLBACK = { name: 'Modular Block 8x8x16', w: 8, h: 8, l: 16, price: 3.5 }
+// Resolve the selected master-list wall product → { name, w, h, l, price }.
+// vendorSel picks the vendor's row (or the Unspecified/null-vendor row); a
+// missing/legacy key falls back to the first product under that marker.
+function resolveMasterBlock(wall, materialRows, subcat) {
+  const row = catalogItemFor(materialRows, subcat, wall.vendor, wall.blockType, {
+    ...MODULAR_CAT_OPTS,
+    fallbackFirst: true,
+  })
+  if (!row) return MODULAR_FALLBACK
+  return {
+    name: row.name,
+    w: n(row.block_w_in) || MODULAR_FALLBACK.w,
+    h: n(row.block_h_in) || MODULAR_FALLBACK.h,
+    l: n(row.block_l_in) || MODULAR_FALLBACK.l,
+    price: n(row.unit_cost),
+  }
+}
+
 // ── Per-wall calculators ──────────────────────────────────────────────────────
-function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = []) {
+function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [], blockOverride = null) {
   const {
     blockType,
     lf,
@@ -409,8 +441,10 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [])
   // vendor row, then a master_rates override (set via the Edit Rates popover),
   // and falls back to the catalog default. Falls back to the default 8x8x16
   // grey block if blockType is missing (legacy walls).
-  const b = blockByName(blockType)
-  const blockPrice = wallMatPrice(wallBlockRateName(b.name), v, materialRows, mp, b.price)
+  const b = blockOverride || blockByName(blockType)
+  const blockPrice = blockOverride
+    ? n(blockOverride.price)
+    : wallMatPrice(wallBlockRateName(b.name), v, materialRows, mp, b.price)
   const blocksPerCourse = Math.ceil((n(lf) * 12) / b.l)
   const totalCourses = Math.ceil(n(heightIn) / b.h)
   const bbCourses = Math.min(n(bondBeams), totalCourses)
@@ -476,9 +510,12 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [])
 // ── Modular block wall — reuses the CMU block + footing math with rebar,
 //    horizontal bars, bond beams and grouting all forced to zero (modular
 //    block isn't grouted/reinforced). Only the footing pump applies. ──────────
-function calcOneModular(wall, footingPump, r, mp = {}, materialRows = []) {
+// subcat present → resolve the wall product from the master list (Modular tab);
+// omitted → legacy CMU block catalog (Brick tab, unchanged).
+function calcOneModular(wall, footingPump, r, mp = {}, materialRows = [], subcat = null) {
   const modWall = { ...wall, rebarSpIn: '0', horizBars: '0', bondBeams: '0', pctGrouted: '0' }
-  return calcOneCMU(modWall, footingPump, 'No', r, mp, materialRows)
+  const override = subcat ? resolveMasterBlock(wall, materialRows, subcat) : null
+  return calcOneCMU(modWall, footingPump, 'No', r, mp, materialRows, override)
 }
 
 function calcOnePIP(wall, r, mp = {}, materialRows = []) {
@@ -573,7 +610,7 @@ function calcWalls(
     pipDetails.push({ ...res, lf: wall.lf, heightIn: wall.heightIn })
   })
   ;(state.modularWalls || []).forEach(wall => {
-    const res = calcOneModular(wall, state.modularFootingPump, r, mp, materialRows)
+    const res = calcOneModular(wall, state.modularFootingPump, r, mp, materialRows, MODULAR_SUBCAT)
     structuralHrs += res.hrs
     structuralMat += res.mat
     structuralSubMat += res.subMat
@@ -1347,6 +1384,9 @@ function ModularWallEntry({
   onWpUpdate,
   onWpAdd,
   onWpRemove,
+  // Modular tab passes { label:'Wall Type', subcat:'Modular Wall', master:true }
+  // to source options from the master list. Brick omits it → legacy CMU catalog.
+  typeSource = { label: 'Block Type', master: false },
 }) {
   const set = field => val => onChange(idx, field, val)
   return (
@@ -1380,44 +1420,98 @@ function ModularWallEntry({
           </select>
         </div>
         <div className="col-span-2">
-          <label className="block text-xs text-gray-500 mb-1">Block Type</label>
-          <select
-            className="input text-sm py-1.5 w-full"
-            value={wall.blockType || ''}
-            onChange={e => set('blockType')(e.target.value)}
-          >
-            {CMU_BLOCK_TYPES.map(b => (
-              <option key={b.name} value={b.name}>
-                {b.name} — {b.w}×{b.h}×{b.l}
-              </option>
-            ))}
-          </select>
-          {(() => {
-            const b = blockByName(wall.blockType)
-            const price = wallMatPrice(
-              wallBlockRateName(b.name),
-              wall.vendor,
-              materialRows,
-              materialPrices,
-              b.price
-            )
-            const housePrice = materialPrices?.[wallBlockRateName(b.name)] ?? b.price
-            return (
-              <div className="mt-1 flex items-center gap-1 text-[11px] text-gray-500">
-                <span>
-                  Price: <strong className="text-gray-800">${price.toFixed(2)}</strong>/ea
-                </span>
-                <RateEditPopover
-                  table="material_rates"
-                  name={wallBlockRateName(b.name)}
-                  category="Walls"
-                  unitLabel="ea"
-                  currentValue={housePrice}
-                  onSaved={refreshAllRates}
-                />
-              </div>
-            )
-          })()}
+          <label className="block text-xs text-gray-500 mb-1">{typeSource.label}</label>
+          {typeSource.master
+            ? (() => {
+                // Options + price come live from the master list (marker =
+                // sub_category). Add a product in Master Rates and it appears here.
+                const opts = catalogOptions(
+                  materialRows,
+                  typeSource.subcat,
+                  wall.vendor,
+                  MODULAR_CAT_OPTS
+                )
+                const selRow = catalogItemFor(materialRows, typeSource.subcat, wall.vendor, wall.blockType, {
+                  ...MODULAR_CAT_OPTS,
+                  fallbackFirst: true,
+                })
+                const price = n(selRow?.unit_cost)
+                return (
+                  <>
+                    <select
+                      className="input text-sm py-1.5 w-full"
+                      value={selRow?.id ?? ''}
+                      onChange={e => set('blockType')(e.target.value)}
+                    >
+                      {opts.length === 0 && (
+                        <option value="">No products — add one in Master Rates</option>
+                      )}
+                      {opts.map(o => (
+                        <option key={o.id} value={o.id}>
+                          {o.label}
+                          {n(o.row?.block_w_in)
+                            ? ` — ${n(o.row.block_w_in)}×${n(o.row.block_h_in)}×${n(o.row.block_l_in)}`
+                            : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {selRow && (
+                      <div className="mt-1 flex items-center gap-1 text-[11px] text-gray-500">
+                        <span>
+                          Price: <strong className="text-gray-800">${price.toFixed(2)}</strong>/ea
+                        </span>
+                        <RateEditPopover
+                          table="material_rates"
+                          name={selRow.name}
+                          category="Walls"
+                          unitLabel="ea"
+                          currentValue={price}
+                          onSaved={refreshAllRates}
+                        />
+                      </div>
+                    )}
+                  </>
+                )
+              })()
+            : (() => {
+                const b = blockByName(wall.blockType)
+                const price = wallMatPrice(
+                  wallBlockRateName(b.name),
+                  wall.vendor,
+                  materialRows,
+                  materialPrices,
+                  b.price
+                )
+                const housePrice = materialPrices?.[wallBlockRateName(b.name)] ?? b.price
+                return (
+                  <>
+                    <select
+                      className="input text-sm py-1.5 w-full"
+                      value={wall.blockType || ''}
+                      onChange={e => set('blockType')(e.target.value)}
+                    >
+                      {CMU_BLOCK_TYPES.map(bt => (
+                        <option key={bt.name} value={bt.name}>
+                          {bt.name} — {bt.w}×{bt.h}×{bt.l}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="mt-1 flex items-center gap-1 text-[11px] text-gray-500">
+                      <span>
+                        Price: <strong className="text-gray-800">${price.toFixed(2)}</strong>/ea
+                      </span>
+                      <RateEditPopover
+                        table="material_rates"
+                        name={wallBlockRateName(b.name)}
+                        category="Walls"
+                        unitLabel="ea"
+                        currentValue={housePrice}
+                        onSaved={refreshAllRates}
+                      />
+                    </div>
+                  </>
+                )
+              })()}
         </div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">Linear Feet</label>
@@ -2566,6 +2660,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
               vendorOptions={vendorOptions}
               isSub={isSub}
               refreshAllRates={refreshAllRates}
+              typeSource={{ label: 'Wall Type', subcat: MODULAR_SUBCAT, master: true }}
               {...makeWpHandlers(setModularWalls, idx)}
             />
           ))}
