@@ -16,7 +16,7 @@ import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { catalogItemFor, catalogOptions } from '../../lib/materialCatalog'
+import { catalogItemFor, catalogOptions, fetchModuleCatalog } from '../../lib/materialCatalog'
 
 const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
 
@@ -553,7 +553,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
 
   // Re-fetch Turf rate maps. Used on mount and after any RateEditPopover save.
   const refreshAllRates = useCallback(async () => {
-    const [matRes, labRes, subRes, matRowsRes, venRes] = await Promise.all([
+    const [matRes, labRes, subRes, catalogRows, venRes] = await Promise.all([
       supabase
         .from('material_rates')
         .select('name, unit_cost')
@@ -563,17 +563,16 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         .from('subcontractor_rates')
         .select('company_name, rate')
         .eq('category', 'Artificial Turf'),
-      supabase
-        .from('material_rates')
-        .select('name, unit_cost, sub_category, vendor_id')
-        .eq('category', 'Artificial Turf'),
+      // Repointed to the rebuilt catalog (material + material_price) via the
+      // shared adapter; same row shape, identical prices.
+      fetchModuleCatalog(['Artificial Turf']),
       supabase
         .from('subs_vendors')
         .select('id, company_name, supplied_categories')
         .eq('type', 'vendor')
         .order('company_name'),
     ])
-    setMaterialRows(matRowsRes.data || [])
+    setMaterialRows(catalogRows || [])
     setVendors(
       (venRes.data || []).map(v => ({
         id: v.id,
@@ -609,18 +608,15 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
   useEffect(() => {
     let alive = true
     Promise.all([
-      supabase
-        .from('material_rates')
-        .select('name, unit_cost, sub_category, vendor_id')
-        .eq('category', 'Artificial Turf'),
+      fetchModuleCatalog(['Artificial Turf']),
       supabase
         .from('subs_vendors')
         .select('id, company_name, supplied_categories')
         .eq('type', 'vendor')
         .order('company_name'),
-    ]).then(([matRowsRes, venRes]) => {
+    ]).then(([catalogRows, venRes]) => {
       if (!alive) return
-      setMaterialRows(matRowsRes.data || [])
+      setMaterialRows(catalogRows || [])
       setVendors(
         (venRes.data || []).map(v => ({
           id: v.id,

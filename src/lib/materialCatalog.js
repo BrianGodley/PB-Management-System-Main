@@ -140,6 +140,58 @@ export function ledgerPrice(ledgerById, materialId, vendorId, fallback = 0) {
   return num(fallback)
 }
 
+// ── New pricing model adapter (material + material_price) ────────────────────
+// Returns catalog rows in the SAME shape the modules already consume from
+// material_rates — {id,name,unit_cost,sub_category,vendor_id,calc_meta,collection}
+// — sourced from the rebuilt `material` product + `material_price` (one open
+// price per product×vendor). The Standard vendor is emitted as vendor_id:null so
+// houseRows:'null-vendor' / House resolution behaves exactly as before.
+//
+// `sub_category` is the taxonomy sub-category NAME (e.g. 'Turf Material'), which
+// equals the legacy marker for the converted modules. Repoints a module by
+// replacing its material_rates catalog fetch with this — prices are identical
+// to the migrated material_rates values, so estimate totals do not move.
+export async function fetchModuleCatalog(categories) {
+  const cats = Array.isArray(categories) ? categories : [categories]
+  const [{ data: catRows }, { data: vends }] = await Promise.all([
+    supabase.from('category').select('id, name').in('name', cats),
+    supabase.from('subs_vendors').select('id, company_name'),
+  ])
+  const catIds = (catRows || []).map(c => c.id)
+  const stdId =
+    (vends || []).find(v => ['standard', 'unspecified'].includes((v.company_name || '').trim().toLowerCase()))
+      ?.id || null
+  if (!catIds.length) return []
+  const { data } = await supabase
+    .from('material')
+    .select(
+      `id, description, unit, calc_meta, collection,
+       category:category_id ( name ),
+       subcategory:subcategory_id ( name ),
+       prices:material_price ( price, vendor_id, effective_end )`
+    )
+    .in('category_id', catIds)
+  const rows = []
+  ;(data || []).forEach(m => {
+    ;(m.prices || [])
+      .filter(p => p.effective_end == null)
+      .forEach(p => {
+        rows.push({
+          id: m.id,
+          name: m.description,
+          unit: m.unit || null,
+          unit_cost: p.price,
+          sub_category: m.subcategory?.name || null,
+          category: m.category?.name || null,
+          vendor_id: p.vendor_id === stdId ? null : p.vendor_id,
+          calc_meta: m.calc_meta || null,
+          collection: m.collection || null,
+        })
+      })
+  })
+  return rows
+}
+
 // Shared catalog hook. Fetches, for one or more `categories`:
 //   • priceMap  — name → unit_cost (materials) merged with name → rate (labor coefficients)
 //   • materialRows — {id,name,vendor_id,unit,unit_cost,category,sub_category,subcategory}
