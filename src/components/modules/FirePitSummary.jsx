@@ -1,5 +1,27 @@
 import FinancialSummaryList from './FinancialSummaryList'
 import { groutCuFtPerBlock } from '../../lib/cmuGrout'
+import { catalogItemFor } from '../../lib/materialCatalog'
+
+// Resolve a master-list finish/cap row (sub_category=cat, Unspecified) → meta with
+// its material unit + calc_meta params, mirroring the module so summary line items
+// include finishes/caps added via Master Rates.
+function masterFinishMeta(cat, typeLabel, materialRows) {
+  const r = catalogItemFor(materialRows, cat, 'House', typeLabel, {
+    houseRows: 'null-vendor',
+    stripPrefix: true,
+    fallbackFirst: false,
+  })
+  if (!r) return null
+  const m = r.calc_meta || {}
+  return {
+    ...m,
+    unit: m.unit || 'SF',
+    labMode: m.labMode || 'perSF',
+    matUnit: parseFloat(r.unit_cost) || 0,
+    laborCoeff: parseFloat(m.laborCoeff) || 0,
+    master: true,
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FirePitSummary — read-only detail view for a saved Fire Pit module
@@ -160,6 +182,7 @@ export default function FirePitSummary({ module }) {
     laborRatePerHour = DEFAULTS.laborRatePerHour,
     gpmd = DEFAULTS.gpmd,
     materialPrices = {},
+    materialRows = [],
   } = data
   // Reference the Sub record so it is available for future breakdown use.
   void sub
@@ -202,11 +225,15 @@ export default function FirePitSummary({ module }) {
   // ── Wall caps ($/LF material) ────────────────────────────────────────────────
   const capLines = (capRows || [])
     .map(r => {
-      const meta = CAP_META[r.type]
+      const meta = CAP_META[r.type] || masterFinishMeta('Wall Cap', r.type, materialRows)
       const lf = n(r.lf)
       if (!meta || lf <= 0) return null
-      const unit = mp(FP_RATES[meta.matKey].dbName, FP_RATES[meta.matKey].fallback)
-      const labCoef = mp(FP_RATES[meta.labKey].dbName, FP_RATES[meta.labKey].fallback)
+      const unit = meta.master
+        ? meta.matUnit
+        : mp(FP_RATES[meta.matKey].dbName, FP_RATES[meta.matKey].fallback)
+      const labCoef = meta.master
+        ? meta.laborCoeff
+        : mp(FP_RATES[meta.labKey].dbName, FP_RATES[meta.labKey].fallback)
       return { label: r.type, lf, mat: lf * unit, hrs: lf * labCoef }
     })
     .filter(Boolean)
@@ -216,10 +243,12 @@ export default function FirePitSummary({ module }) {
   // ── Wall finishes ────────────────────────────────────────────────────────────
   const finishLines = (wallFinishRows || [])
     .map(r => {
-      const meta = WF_META[r.type]
+      const meta = WF_META[r.type] || masterFinishMeta('Wall Finish', r.type, materialRows)
       const sf = n(r.sf)
       if (!meta || sf <= 0) return null
-      const unit = mp(FP_RATES[meta.key].dbName, FP_RATES[meta.key].fallback)
+      const unit = meta.master
+        ? meta.matUnit
+        : mp(FP_RATES[meta.key].dbName, FP_RATES[meta.key].fallback)
       let mat = 0
       if (meta.unit === 'ton') {
         const tons = sf / meta.tonPerSF
@@ -234,7 +263,9 @@ export default function FirePitSummary({ module }) {
           (meta.screwPer5 ? (sf / 5) * meta.screwPer5 : 0) +
           (meta.adhesivePerSF ? sf * meta.adhesivePerSF : 0)
       }
-      const labRate = mp(FP_RATES[meta.labKey].dbName, FP_RATES[meta.labKey].fallback)
+      const labRate = meta.master
+        ? meta.laborCoeff
+        : mp(FP_RATES[meta.labKey].dbName, FP_RATES[meta.labKey].fallback)
       const hrs = meta.labMode === 'perDay' ? (labRate > 0 ? (sf / labRate) * 8 : 0) : sf * labRate
       return { label: r.type, sf, mat, hrs }
     })
