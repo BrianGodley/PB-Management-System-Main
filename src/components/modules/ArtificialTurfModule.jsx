@@ -761,6 +761,15 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
 
   // ── Vendor catalog helpers (material-only per-line Vendor pickers) ────────
   const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
+  // A vendor belongs in a SECTION's dropdown only if they actually price a product
+  // under that section's marker (not just somewhere in the category). Standard is
+  // always offered via the <option value="House">Standard</option> in each select.
+  const vendorsSupplyingMarker = marker => {
+    const ids = new Set(
+      (materialRows || []).filter(r => r.sub_category === marker && r.vendor_id).map(r => r.vendor_id)
+    )
+    return vendors.filter(v => ids.has(v.id))
+  }
   const catDefaults = {} // Turf defaults to House; a real vendor is an explicit pick.
 
   // Feed the calc only the ACTIVE tab's inputs plus the shared top-level fields
@@ -964,7 +973,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                       onChange={e => setBaseRow(i, 'vendor', e.target.value)}
                       title="Vendor"
                     >
-                      {vendorsForCategory('Artificial Turf').map(v => (
+                      {vendorsSupplyingMarker(TURF_CAT.base).map(v => (
                         <option key={v.id} value={v.id}>
                           {v.name}
                         </option>
@@ -1141,7 +1150,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                       onChange={e => setRoll(i, 'vendor', e.target.value)}
                       title="Vendor"
                     >
-                      {vendorsForCategory('Artificial Turf').map(v => (
+                      {vendorsSupplyingMarker(TURF_CAT.turf).map(v => (
                         <option key={v.id} value={v.id}>
                           {v.name}
                         </option>
@@ -1312,7 +1321,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                   onChange={e => setStrips('vendor', e.target.value)}
                   title="Vendor"
                 >
-                  {vendorsForCategory('Artificial Turf').map(v => (
+                  {vendorsSupplyingMarker(TURF_CAT.turf).map(v => (
                     <option key={v.id} value={v.id}>
                       {v.name}
                     </option>
