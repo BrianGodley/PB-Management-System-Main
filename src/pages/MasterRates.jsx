@@ -195,6 +195,19 @@ async function uploadPhoto(file) {
   return supabase.storage.from('rate-photos').getPublicUrl(path).data.publicUrl
 }
 
+// Parse a calc-metadata form value (JSON string, object, or blank) into a
+// plain object or null for storage in the material_rates.calc_meta jsonb column.
+function parseCalcMeta(v) {
+  if (v == null || v === '') return null
+  if (typeof v === 'object') return v
+  try {
+    const o = JSON.parse(v)
+    return o && typeof o === 'object' ? o : null
+  } catch {
+    return null
+  }
+}
+
 function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loading, addLabel = 'Add Row', filters = null, count = null }) {
   const [editingId, setEditingId] = useState(null)
   const [adding, setAdding] = useState(false)
@@ -230,7 +243,12 @@ function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loadin
   }, [rows, sort, columns])
 
   function startEdit(row) {
-    setForm(row)
+    const f = { ...row }
+    // JSON columns (e.g. calc_meta) are stored as objects; edit them as text.
+    columns.forEach(c => {
+      if (c.json && f[c.key] && typeof f[c.key] === 'object') f[c.key] = JSON.stringify(f[c.key])
+    })
+    setForm(f)
     setEditingId(row.id)
     setAdding(false)
   }
@@ -549,6 +567,7 @@ export default function MasterRates({ only } = {}) {
         sub_category:
           form.sub_category?.trim() ||
           (form.category?.trim() === 'Paver' && form.vendor_id ? 'Paver Material' : null),
+        calc_meta: parseCalcMeta(form.calc_meta),
         photo_url: form.photo_url || null,
       })
       .select()
@@ -567,6 +586,7 @@ export default function MasterRates({ only } = {}) {
         sub_category:
           form.sub_category?.trim() ||
           (form.category?.trim() === 'Paver' && form.vendor_id ? 'Paver Material' : null),
+        calc_meta: parseCalcMeta(form.calc_meta),
         photo_url: form.photo_url || null,
       })
       .eq('id', form.id)
@@ -674,6 +694,13 @@ export default function MasterRates({ only } = {}) {
     { key: 'photo_url', label: 'Photo', photo: true },
     { key: 'unit', label: 'Unit', type: 'select', options: MATERIAL_UNIT_OPTIONS },
     { key: 'unit_cost', label: 'Price', type: 'number', step: '0.0001', prefix: '$' },
+    {
+      key: 'calc_meta',
+      label: 'Calc Meta (JSON)',
+      json: true,
+      placeholder: '{"laborPerLF":0.05}',
+      render: r => (r.calc_meta ? JSON.stringify(r.calc_meta) : '—'),
+    },
     {
       key: '__modules',
       label: 'Estimate Module',
@@ -840,6 +867,7 @@ export default function MasterRates({ only } = {}) {
               sub_category: '',
               unit: 'each',
               unit_cost: '',
+              calc_meta: '',
               photo_url: '',
             })}
             loading={loading}
