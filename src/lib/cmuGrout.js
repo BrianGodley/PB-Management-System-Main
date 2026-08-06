@@ -25,6 +25,7 @@ export const CU_FT_PER_YARD = 27
 export const GROUT_CF_OVERRIDES = {
   '8x8': 0.5,
   '6x8': 0.4,
+  '12x8': 0.8,
 }
 
 export function groutCuFtPerBlock(widthIn = 8, heightIn = 8) {
