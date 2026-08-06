@@ -8,6 +8,7 @@ import SubVendorContracts from '../components/SubVendorContracts'
 import SubVendorQuotes from '../components/SubVendorQuotes'
 import VendorInvoicing from '../components/VendorInvoicing'
 import MasterRates from './MasterRates'
+import MasterMaterialRates from './MasterMaterialRates'
 import PartyHistory from '../components/PartyHistory'
 import SubVendorCatalogs from '../components/SubVendorCatalogs'
 
@@ -703,10 +704,11 @@ export default function SubsVendors({ mode = 'sub' }) {
         <VendorInvoicing vendors={(subsData || []).filter(s => (s.type || 'sub') === 'vendor')} />
       )}
 
-      {/* ── Master Material Rates (vendors only) — includes catalog photos + Import Catalog ── */}
+      {/* ── Master Material Rates (vendors only) — two-view catalog on the new
+          material + material_price model (Standard / Vendor). ── */}
       {svTab === 'materialRates' && mode === 'vendor' && (
         <div className="mt-3 flex-1 overflow-y-auto">
-          <MasterRates only="materials" />
+          <MasterMaterialRates />
         </div>
       )}
 
