@@ -985,7 +985,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       supabase.from('subcontractor_rates').select('trade,rate').eq('category', 'Pool'),
       supabase
         .from('material_rates')
-        .select('name, unit_cost, subcategory, vendor_id')
+        .select('name, unit_cost, sub_category, vendor_id')
         .not('vendor_id', 'is', null),
       supabase
         .from('subs_vendors')

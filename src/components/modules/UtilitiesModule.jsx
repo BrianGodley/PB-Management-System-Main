@@ -456,7 +456,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   )
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
   const [pricesLoading, setPricesLoading] = useState(!initialData?.materialPrices)
-  // Vendor catalog (material_rates rows with subcategory + vendor_id) + vendor list.
+  // Vendor catalog (material_rates rows with sub_category + vendor_id) + vendor list.
   const [materialRows, setMaterialRows] = useState(initialData?.materialRows ?? [])
   const [vendors, setVendors] = useState([])
 
@@ -468,7 +468,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
       supabase.from('labor_rates').select('name, rate').eq('category', 'Utilities'),
       supabase
         .from('material_rates')
-        .select('name, unit_cost, subcategory, vendor_id')
+        .select('name, unit_cost, sub_category, vendor_id')
         .eq('category', 'Utilities'),
       supabase
         .from('subs_vendors')
@@ -501,7 +501,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
     Promise.all([
       supabase
         .from('material_rates')
-        .select('name, unit_cost, subcategory, vendor_id')
+        .select('name, unit_cost, sub_category, vendor_id')
         .eq('category', 'Utilities'),
       supabase
         .from('subs_vendors')

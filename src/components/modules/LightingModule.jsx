@@ -18,7 +18,7 @@ const CATALOG_OPTS = { houseRows: 'null-vendor', stripPrefix: false }
 // ─────────────────────────────────────────────────────────────────────────────
 // Lighting Module — per-vendor catalog layout (mirrors PaverModule).
 //
-// Items live in material_rates (category='Lighting') under a subcategory
+// Items live in material_rates (category='Lighting') under a sub_category
 // ('Light Fixture' | 'Transformer' | 'Wire'), optionally tagged to a vendor
 // (vendor_id NULL = House). Lighting-specific attribute columns:
 //   • watts / va        — per-each electrical load (fixtures only)
@@ -47,7 +47,7 @@ const DEFAULTS = {
 const n = v => parseFloat(v) || 0
 
 // ── Vendor catalog helpers (mirror PaverModule) ──────────────────────────────
-// Option list for a section = the catalog items for that subcategory + vendor.
+// Option list for a section = the catalog items for that sub_category + vendor.
 // House (vendorSel === 'House' or falsy) → rows with vendor_id == null;
 // otherwise → rows whose vendor_id === vendorSel. Each option carries the
 // material_rates row id (the STABLE, rename-proof key a selection is stored /
@@ -247,7 +247,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
     const [matRes, venRes] = await Promise.all([
       supabase
         .from('material_rates')
-        .select('id,name,subcategory,vendor_id,unit,unit_cost,watts,va,labor_hrs_ea,sub_price_ea')
+        .select('id,name,sub_category,vendor_id,unit,unit_cost,watts,va,labor_hrs_ea,sub_price_ea')
         .eq('category', LIGHTING_CATEGORY),
       supabase
         .from('subs_vendors')

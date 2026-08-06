@@ -118,11 +118,11 @@ const R = {
 // ── Vendor catalog: House type lists (single default each; vendors add more) ──
 // Base Install material and the Concrete mix each map to one House product;
 // vendors tagged to the 'Concrete Base' / 'Concrete Mix' categories supply
-// additional priced types via material_rates (subcategory + vendor_id).
+// additional priced types via material_rates (sub_category + vendor_id).
 // House defaults reference the SHARED Basic Materials rows (same rows Walls /
 // Columns / etc. use), so a price change on base or ready-mix propagates
 // everywhere. Vendor-supplied rows still come from the 'Concrete Base' /
-// 'Concrete Mix' subcategory catalog (category 'Concrete').
+// 'Concrete Mix' sub_category catalog (category 'Concrete').
 const BASE_TYPES = [
   { label: 'Import Base', dbName: 'Base - Class II Roadbase', fallback: R.costBase, category: 'Basic Materials' },
 ]
@@ -536,7 +536,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const [laborRates, setLaborRates] = useState(initialData?.laborRates ?? {})
   const [materialRates, setMaterialRates] = useState(initialData?.materialRates ?? {})
   const [subRates, setSubRates] = useState(initialData?.subRates ?? {})
-  // Vendor catalog: material_rates rows (with subcategory + vendor_id) and the
+  // Vendor catalog: material_rates rows (with sub_category + vendor_id) and the
   // vendor list, used to build the per-line Vendor/Type pickers.
   const [materialRows, setMaterialRows] = useState(initialData?.materialRows ?? [])
   const [vendors, setVendors] = useState([])
@@ -576,7 +576,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
       supabase.from('subcontractor_rates').select('company_name, rate').eq('category', 'Concrete'),
       supabase
         .from('material_rates')
-        .select('name, unit_cost, subcategory, vendor_id')
+        .select('name, unit_cost, sub_category, vendor_id')
         .eq('category', 'Concrete'),
       supabase
         .from('subs_vendors')
@@ -631,7 +631,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     Promise.all([
       supabase
         .from('material_rates')
-        .select('name, unit_cost, subcategory, vendor_id')
+        .select('name, unit_cost, sub_category, vendor_id')
         .eq('category', 'Concrete'),
       supabase
         .from('subs_vendors')
@@ -1306,7 +1306,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             ) : (
               <div className="space-y-1">
                 {/* Column labels */}
-                <div className="grid grid-cols-[6rem_7rem_minmax(0,1fr)_4.5rem_4.5rem_auto] items-center gap-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                <div className="grid grid-cols-[6rem_7rem_12rem_4.5rem_4.5rem_auto] items-center gap-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
                   <span />
                   <span>Vendor</span>
                   <span>Type</span>
@@ -1317,14 +1317,13 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 {INSTALL_TIERS.map(t => {
                   const rate = laborRates[t.rateName] ?? t.def
                   const is300plus = t.key !== 's100_300'
-                  const hasSF = n(installTiers[t.key]) > 0
                   const mixOpts = sectionOptions('Concrete Mix', installTierVendor[t.key], MIX_TYPES)
                   const mt = resolveType(installTierType[t.key], mixOpts, MIX_TYPES)
                   const mixRate = materialRates[mt.dbName] ?? mt.fallback
                   return (
                     <div
                       key={t.key}
-                      className="grid grid-cols-[6rem_7rem_minmax(0,1fr)_4.5rem_4.5rem_auto] items-center gap-2"
+                      className="grid grid-cols-[6rem_7rem_12rem_4.5rem_4.5rem_auto] items-center gap-2"
                     >
                       <span className="text-[11px] text-gray-500">{t.label}</span>
                       <select
@@ -1380,9 +1379,13 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                             onSaved={refreshAllRates}
                           />
                         </span>
-                        {is300plus && hasSF && (
-                          <span className="text-[10px] text-green-600">pump incl.</span>
-                        )}
+                        <span
+                          className={`text-[10px] whitespace-nowrap ${
+                            is300plus ? 'text-green-600' : 'text-gray-400'
+                          }`}
+                        >
+                          {is300plus ? 'pump' : 'pump not included'}
+                        </span>
                         <span className="text-[11px] text-gray-400 inline-flex items-center gap-1">
                           {rate} SF/hr
                           <RateEditPopover

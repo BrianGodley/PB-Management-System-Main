@@ -24,7 +24,7 @@ const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
 //
 //   Paver Steps — Vendor · Type · Form · SF · Grouted?
 //     Vendor + Type come from the shared Paver Material catalog (subs_vendors +
-//     material_rates, category='Paver', subcategory='Paver Material'), same as
+//     material_rates, category='Paver', sub_category='Paver Material'), same as
 //     the Paver module. Form (Straight/Curved) sets the labor LF/hr rate. SF
 //     drives BOTH labor (SF ÷ form rate) and material (SF × vendor $/SF).
 //
@@ -44,7 +44,7 @@ const DEFAULTS = { laborRatePerHour: 35, laborBurdenPct: 0.29, gpmd: 425, commis
 const n = v => parseFloat(v) || 0
 const fmt2 = v => `$${(n(v)).toFixed(2)}`
 
-const PAVER_STEP_CAT = 'Paver Material' // shared Paver catalog subcategory
+const PAVER_STEP_CAT = 'Paver Material' // shared Paver catalog sub_category
 const CONC_VENDOR_CAT = 'Concrete Mix' // supplied_categories tag for concrete vendors
 const STEP_FORMS = ['Straight', 'Curved']
 const CONC_TYPES = ['Standard', 'Standard Colored', 'Cantilevered', 'Cantilevered Colored']
@@ -72,7 +72,7 @@ const PAVER_FORM_DEFAULT = { Straight: 1.5, Curved: 1.0 } // LF/hr fallbacks
 const SUB_BASE_DEFAULT = 30 // $/LF starting base for every sub step section
 
 // Vendor/Type step sections. Each pulls Type options from its own material
-// catalog subcategory (subs_vendors + material_rates). Shape mirrors Paver
+// catalog sub_category (subs_vendors + material_rates). Shape mirrors Paver
 // Steps: Vendor · Type · Form · SF · Grouted?.
 const MAT_SECTIONS = [
   { key: 'paver', title: 'Paver Steps', cat: 'Paver Material', rowsKey: 'paverRows', subKey: 'subPaverRows', baseKey: kSubPaverBase },
@@ -92,7 +92,7 @@ function paverItemFor(cat, vendorSel, typeLabel, materialRows) {
 
 // ── Per-row calculators ──────────────────────────────────────────────────────
 // Shared by every Vendor/Type step section (Paver/Brick/Tile/Flagstone); `cat`
-// selects which material catalog subcategory the Type options come from.
+// selects which material catalog sub_category the Type options come from.
 function matStepRowCalc(r, laborRates, materialRows, cat = PAVER_STEP_CAT, priceOf = item => n(item?.unit_cost)) {
   const sf = n(r.sf)
   const rate = n(laborRates[kPaverForm(r.form)] ?? PAVER_FORM_DEFAULT[r.form] ?? 0)
@@ -652,7 +652,7 @@ const DEFAULT_PAVER_ROWS = () => [PAVER_ROW(), PAVER_ROW(), PAVER_ROW()]
 const DEFAULT_CONC_ROWS = [CONC_ROW(), CONC_ROW(), CONC_ROW()]
 
 // Reusable Vendor · Type · Form · SF · Grouted step section (Paver / Brick /
-// Tiled / Flagstone). Type options come from the given catalog subcategory.
+// Tiled / Flagstone). Type options come from the given catalog sub_category.
 function MaterialStepSection({
   title,
   cat,
@@ -823,7 +823,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
       supabase.from('material_rates').select('name, unit_cost').eq('category', 'Steps'),
       supabase
         .from('material_rates')
-        .select('id, name, unit_cost, subcategory, vendor_id, sf_per_pallet')
+        .select('id, name, unit_cost, sub_category, vendor_id, sf_per_pallet')
         .not('vendor_id', 'is', null),
       supabase
         .from('subs_vendors')

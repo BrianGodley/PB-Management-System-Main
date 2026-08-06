@@ -146,14 +146,14 @@ const DG_TYPES = [
 ]
 
 // Stepper stone types (material_rates, per TON). House defaults keep existing
-// estimates unchanged (Flagstone / Precast). Vendor rows filter to subcategory
+// estimates unchanged (Flagstone / Precast). Vendor rows filter to sub_category
 // 'Steppers'. Labor stays per-line (Soil vs Concrete SF/day), not from the type.
 const STEPPER_TYPES = [
   { label: 'Flagstone', dbName: 'Flagstone Steppers', fallback: 500 },
   { label: 'Precast',   dbName: 'Precast Steppers',   fallback: 200 },
 ]
 // Edging types (material_rates, per LF). House defaults keep existing estimates
-// unchanged (Plastic / Metal). Vendor rows filter to subcategory 'Edging'.
+// unchanged (Plastic / Metal). Vendor rows filter to sub_category 'Edging'.
 const EDGING_TYPES = [
   { label: 'Plastic', dbName: 'Plastic Edging', fallback: 1.2 },
   { label: 'Metal',   dbName: 'Metal Edging',   fallback: 4.0 },
@@ -810,7 +810,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   )
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
   const [pricesLoading, setPricesLoading] = useState(!initialData?.materialPrices)
-  // Full material_rates rows (name/unit_cost/subcategory/vendor_id) — used to build
+  // Full material_rates rows (name/unit_cost/sub_category/vendor_id) — used to build
   // vendor-filtered Type option lists. Vendors list (id/company_name) for pickers.
   const [materialRows, setMaterialRows] = useState([])
   const [vendors, setVendors] = useState([])
@@ -822,7 +822,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     const [matRowsRes, venRes] = await Promise.all([
       supabase
         .from('material_rates')
-        .select('name, unit_cost, subcategory, vendor_id')
+        .select('name, unit_cost, sub_category, vendor_id')
         .eq('category', 'Ground Treatments'),
       supabase.from('subs_vendors').select('id, company_name, supplied_categories').eq('type', 'vendor').order('company_name'),
     ])
@@ -845,7 +845,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       supabase.from('labor_rates').select('name, rate').eq('category', 'Ground Treatments'),
       supabase
         .from('material_rates')
-        .select('name, unit_cost, subcategory, vendor_id')
+        .select('name, unit_cost, sub_category, vendor_id')
         .eq('category', 'Ground Treatments'),
       supabase.from('subs_vendors').select('id, company_name, supplied_categories').eq('type', 'vendor').order('company_name'),
     ])
@@ -999,9 +999,9 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   const state = { crewType, subType, subGpMarkupRate, ...cur, materialRows }
 
   // Build a section's Type option list. 'House' → hardcoded array (unchanged).
-  // A vendor → that vendor's products for the section's subcategory, priced at
+  // A vendor → that vendor's products for the section's sub_category, priced at
   // the vendor's unit_cost. Falls back to the House array if the vendor has no
-  // rows for the subcategory (so the dropdown is never empty).
+  // rows for the sub_category (so the dropdown is never empty).
   function sectionOptions(subcat, vendorSel, houseArray) {
     if (!vendorSel || vendorSel === 'House') return houseArray
     const opts = catalogOptions(materialRows, subcat, vendorSel, { houseRows: 'exclude', stripPrefix: true })

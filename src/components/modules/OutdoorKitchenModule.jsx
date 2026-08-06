@@ -721,7 +721,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
         .in('category', ['Outdoor Kitchen', 'Utilities']),
       supabase
         .from('material_rates')
-        .select('name, unit_cost, subcategory, vendor_id')
+        .select('name, unit_cost, sub_category, vendor_id')
         .not('vendor_id', 'is', null),
       supabase
         .from('subs_vendors')

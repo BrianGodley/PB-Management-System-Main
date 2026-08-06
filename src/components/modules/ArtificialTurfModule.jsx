@@ -574,7 +574,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices || {})
   const [laborRates, setLaborRates] = useState(initialData?.laborRates || {})
   const [subRates, setSubRates] = useState(initialData?.subRates || {})
-  // Vendor catalog: material_rates rows (subcategory + vendor_id) + vendor list.
+  // Vendor catalog: material_rates rows (sub_category + vendor_id) + vendor list.
   const [materialRows, setMaterialRows] = useState(initialData?.materialRows || [])
   const [vendors, setVendors] = useState([])
   const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? 35)
@@ -616,7 +616,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         .eq('category', 'Artificial Turf'),
       supabase
         .from('material_rates')
-        .select('name, unit_cost, subcategory, vendor_id')
+        .select('name, unit_cost, sub_category, vendor_id')
         .eq('category', 'Artificial Turf'),
       supabase
         .from('subs_vendors')
@@ -662,7 +662,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
     Promise.all([
       supabase
         .from('material_rates')
-        .select('name, unit_cost, subcategory, vendor_id')
+        .select('name, unit_cost, sub_category, vendor_id')
         .eq('category', 'Artificial Turf'),
       supabase
         .from('subs_vendors')

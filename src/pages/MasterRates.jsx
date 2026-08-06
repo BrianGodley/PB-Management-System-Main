@@ -151,7 +151,7 @@ const SUB_UNIT_OPTIONS = [
 // generic category-word strip for rows without a subcategory prefix.
 function displayItem(row, v) {
   let out = v || ''
-  const pfx = row.subcategory ? `${row.subcategory} - ` : ''
+  const pfx = row.sub_category ? `${row.sub_category} - ` : ''
   if (pfx && out.startsWith(pfx)) out = out.slice(pfx.length)
   else out = stripCategory(out, row.category)
   // Drop the collection (sub_category) wherever it appears in the item —
@@ -546,10 +546,9 @@ export default function MasterRates({ only } = {}) {
         unit_cost: parseFloat(form.unit_cost) || 0,
         category: form.category?.trim(),
         vendor_id: form.vendor_id || null,
-        subcategory:
-          form.subcategory?.trim() ||
+        sub_category:
+          form.sub_category?.trim() ||
           (form.category?.trim() === 'Paver' && form.vendor_id ? 'Paver Material' : null),
-        sub_category: form.sub_category?.trim() || null,
         photo_url: form.photo_url || null,
       })
       .select()
@@ -565,10 +564,9 @@ export default function MasterRates({ only } = {}) {
         unit_cost: parseFloat(form.unit_cost) || 0,
         category: form.category?.trim(),
         vendor_id: form.vendor_id || null,
-        subcategory:
-          form.subcategory?.trim() ||
+        sub_category:
+          form.sub_category?.trim() ||
           (form.category?.trim() === 'Paver' && form.vendor_id ? 'Paver Material' : null),
-        sub_category: form.sub_category?.trim() || null,
         photo_url: form.photo_url || null,
       })
       .eq('id', form.id)
@@ -680,7 +678,7 @@ export default function MasterRates({ only } = {}) {
       key: '__modules',
       label: 'Estimate Module',
       editable: false,
-      render: r => <ModuleTags modules={estimateModules(r.category, r.subcategory)} />,
+      render: r => <ModuleTags modules={estimateModules(r.category, r.sub_category)} />,
     },
   ]
   const laborColumns = [
@@ -842,7 +840,6 @@ export default function MasterRates({ only } = {}) {
               sub_category: '',
               unit: 'each',
               unit_cost: '',
-              subcategory: '',
               photo_url: '',
             })}
             loading={loading}

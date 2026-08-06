@@ -88,7 +88,7 @@ const GROUT_CF_PER_BLOCK = groutCuFtPerBlock(BLOCK_WIDTH_IN, BLOCK_HEIGHT_IN)
 
 // ── Wall-finish vendor catalog (ported from Outdoor Kitchen) ──────────────────
 // A real vendor overrides ONLY the material unit price for a finish (matched by
-// its Type label in the vendor's catalog under the given subcategory); House
+// its Type label in the vendor's catalog under the given sub_category); House
 // keeps the built-in per-estimate / master-rate price. Labor is never affected.
 const WF_CAT = 'Wall Finish'
 const CAP_CAT = 'Wall Cap'
@@ -669,7 +669,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
         .in('category', ['Fire Pit', 'Utilities']),
       supabase
         .from('material_rates')
-        .select('name, unit_cost, subcategory, vendor_id')
+        .select('name, unit_cost, sub_category, vendor_id')
         .not('vendor_id', 'is', null),
       supabase
         .from('subs_vendors')

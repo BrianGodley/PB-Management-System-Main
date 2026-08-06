@@ -104,7 +104,7 @@ const PAVER_CAT = { paver: 'Paver Material', base: 'Base Material' }
 
 // Option list for a section = the vendor's catalog items. Each option carries
 // the material_rates row id (the STABLE key a selection is stored/matched by —
-// rename-proof) plus a human label (name minus the '<subcategory> - ' prefix,
+// rename-proof) plus a human label (name minus the '<sub_category> - ' prefix,
 // and minus the sub_category collection so it reads clean). Empty for
 // House/Custom/unset vendors.
 // Vendor catalog options + row resolution now come from the shared library
@@ -807,7 +807,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
     }
   )
   const [paverPrices, setPaverPrices] = useState(initialData?.paverPrices || [])
-  // Vendor catalog (material_rates rows w/ subcategory + vendor_id + paver attrs)
+  // Vendor catalog (material_rates rows w/ sub_category + vendor_id + paver attrs)
   // and the vendor list, driving the per-row Vendor/Type pickers.
   const [materialRows, setMaterialRows] = useState(initialData?.materialRows || [])
   const [ledger, setLedger] = useState({}) // Phase 4 per-vendor price ledger
@@ -840,7 +840,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       supabase.from('material_rates').select('name,unit_cost').in('category', ['Paver', 'Basic Materials']),
       supabase
         .from('material_rates')
-        .select('id, name, unit_cost, subcategory, vendor_id, sf_per_pallet, price_per_lf_vert')
+        .select('id, name, unit_cost, sub_category, vendor_id, sf_per_pallet, price_per_lf_vert')
         .eq('category', 'Paver'),
       supabase
         .from('subs_vendors')

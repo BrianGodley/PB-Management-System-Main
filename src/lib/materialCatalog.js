@@ -59,7 +59,7 @@ export function catalogOptions(
   if (isHouse && houseRows === 'exclude') return []
   const prefix = `${subcategory} - `
   return (materialRows || [])
-    .filter(r => r.subcategory === subcategory && (isHouse ? r.vendor_id == null : r.vendor_id === vendorSel))
+    .filter(r => r.sub_category === subcategory && (isHouse ? r.vendor_id == null : r.vendor_id === vendorSel))
     .map(r => {
       const label =
         stripPrefix && r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name
@@ -165,7 +165,7 @@ export function useMaterialCatalog(categories, initial = {}) {
       supabase.from('labor_rates').select('name, rate').in('category', catList),
       supabase
         .from('material_rates')
-        .select('id,name,vendor_id,unit,unit_cost,category,sub_category,subcategory')
+        .select('id,name,vendor_id,unit,unit_cost,category,sub_category')
         .in('category', catList),
       supabase
         .from('subs_vendors')
