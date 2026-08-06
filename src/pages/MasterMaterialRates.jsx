@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import MaterialDetailModal from '../components/MaterialDetailModal'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Master Material Rates — the two-view catalog on the NEW pricing model
@@ -33,6 +34,7 @@ export default function MasterMaterialRates() {
   const [q, setQ] = useState('')
   const [editing, setEditing] = useState(null) // { priceId|null, materialId, vendorId, value }
   const [saving, setSaving] = useState(false)
+  const [detail, setDetail] = useState(null) // row shown in the detail modal
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -240,8 +242,14 @@ export default function MasterMaterialRates() {
                   const isEd = editing && editing.key === r.key
                   return (
                     <tr key={r.key} className="hover:bg-gray-50 group">
-                      <td className="px-3 py-1.5 font-mono text-[11px] text-gray-500 whitespace-nowrap">
-                        {r.code}
+                      <td className="px-3 py-1.5 font-mono text-[11px] whitespace-nowrap">
+                        <button
+                          onClick={() => setDetail(r)}
+                          className="text-green-700 hover:text-green-900 hover:underline"
+                          title="View / edit product"
+                        >
+                          {r.code}
+                        </button>
                       </td>
                       {isVendorView && (
                         <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">{r.vName}</td>
@@ -323,6 +331,15 @@ export default function MasterMaterialRates() {
           </table>
         </div>
       </div>
+
+      {detail && (
+        <MaterialDetailModal
+          row={detail}
+          onClose={() => setDetail(null)}
+          onSaved={load}
+          onDeleted={load}
+        />
+      )}
     </div>
   )
 }

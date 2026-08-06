@@ -9,6 +9,7 @@ import SubVendorQuotes from '../components/SubVendorQuotes'
 import VendorInvoicing from '../components/VendorInvoicing'
 import MasterRates from './MasterRates'
 import MasterMaterialRates from './MasterMaterialRates'
+import TaxonomyManager from '../components/TaxonomyManager'
 import PartyHistory from '../components/PartyHistory'
 import SubVendorCatalogs from '../components/SubVendorCatalogs'
 
@@ -668,6 +669,8 @@ export default function SubsVendors({ mode = 'sub' }) {
             { key: 'directory', label: '📋 Directory' },
             ...(mode === 'vendor' ? [{ key: 'invoicing', label: '📥 Invoicing' }] : []),
             ...(mode === 'vendor' ? [{ key: 'materialRates', label: '📊 Master Material Rates' }] : []),
+            ...(mode === 'vendor' ? [{ key: 'categories', label: '🗂️ Categories' }] : []),
+            ...(mode === 'vendor' ? [{ key: 'subcategories', label: '🏷️ Sub-Categories' }] : []),
             ...(mode === 'sub' ? [{ key: 'contracts', label: '📑 Contracts' }] : []),
             ...(mode === 'sub' ? [{ key: 'subRates', label: '📊 Master Subcontractor Rates' }] : []),
             ...(mode === 'vendor' ? [{ key: 'quotes', label: '🧾 Quotes' }] : []),
@@ -709,6 +712,18 @@ export default function SubsVendors({ mode = 'sub' }) {
       {svTab === 'materialRates' && mode === 'vendor' && (
         <div className="mt-3 flex-1 overflow-y-auto">
           <MasterMaterialRates />
+        </div>
+      )}
+
+      {/* ── Categories / Sub-Categories (vendors only) ── */}
+      {svTab === 'categories' && mode === 'vendor' && (
+        <div className="mt-3 flex-1 overflow-y-auto">
+          <TaxonomyManager kind="category" />
+        </div>
+      )}
+      {svTab === 'subcategories' && mode === 'vendor' && (
+        <div className="mt-3 flex-1 overflow-y-auto">
+          <TaxonomyManager kind="subcategory" />
         </div>
       )}
 
