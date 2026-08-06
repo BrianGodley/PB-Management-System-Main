@@ -163,7 +163,7 @@ function calcPaver(
 
   // Material rates
   const baseRockPerTon = mr['Paver - Base Rock'] ?? MAT_DEFAULTS.baseRock
-  const beddingSandPerTon = mr['Paver - Bedding Sand'] ?? MAT_DEFAULTS.beddingSand
+  const beddingSandPerTon = mr['Bedding Sand'] ?? MAT_DEFAULTS.beddingSand // shared Basic Materials
   const jointSandPerSF = mr['Paver - Joint Sand'] ?? MAT_DEFAULTS.jointSand
   const polySandPerSF = mr['Paver - Poly Sand'] ?? MAT_DEFAULTS.polySandMat
   // Existing-paver poly sand rate falls back to 1.5× the new-paver rate so
@@ -841,7 +841,8 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   const refreshAllRates = useCallback(async () => {
     const [lrRes, mrRes, matRowsRes, venRes] = await Promise.all([
       supabase.from('labor_rates').select('name,rate').eq('category', 'Paver'),
-      supabase.from('material_rates').select('name,unit_cost').eq('category', 'Paver'),
+      // Include Basic Materials so shared basics (e.g. Bedding Sand) resolve here.
+      supabase.from('material_rates').select('name,unit_cost').in('category', ['Paver', 'Basic Materials']),
       supabase
         .from('material_rates')
         .select('name, unit_cost, subcategory, vendor_id, sf_per_pallet, price_per_lf_vert')
@@ -1403,8 +1404,8 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             · Bedding sand ${calc.beddingSandPerTon}/ton
             <RateEditPopover
               table="material_rates"
-              name="Paver - Bedding Sand"
-              category="Paver"
+              name="Bedding Sand"
+              category="Basic Materials"
               unitLabel="ton"
               currentValue={calc.beddingSandPerTon}
               onSaved={refreshAllRates}
