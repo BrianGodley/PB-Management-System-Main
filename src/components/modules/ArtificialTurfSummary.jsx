@@ -29,7 +29,9 @@ const BASE_LABELS = { Gravel: '2" Gravel Base', DG: '1" DG Base', Weed: 'Weed Ba
 const n = v => parseFloat(v) || 0
 const fmt2 = v =>
   `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-const brandLabel = b => TURF_BRANDS[b] || b || 'Turf'
+// Resolve a saved brand selection to a display name: by row id from the saved
+// materialRows snapshot (new estimates store the id), else the legacy key map.
+const brandLabel = (rows, b) => (rows || []).find(r => r.id === b)?.name || TURF_BRANDS[b] || b || 'Turf'
 
 export default function ArtificialTurfSummary({ module }) {
   const d = module?.data || {}
@@ -67,10 +69,10 @@ export default function ArtificialTurfSummary({ module }) {
   // ── Turf Installation ───────────────────────────────────────────────────────
   const rollInHouse = (ih.rolls || [])
     .filter(r => n(r.edgeLF) > 0)
-    .map(r => ({ label: brandLabel(r.brand), value: `${n(r.edgeLF).toLocaleString()} LF edge` }))
+    .map(r => ({ label: brandLabel(d.materialRows, r.brand), value: `${n(r.edgeLF).toLocaleString()} LF edge` }))
   const rollSub = (sub.rolls || [])
     .filter(r => n(r.installSF) > 0)
-    .map(r => ({ label: brandLabel(r.brand), value: `${n(r.installSF).toLocaleString()} SF` }))
+    .map(r => ({ label: brandLabel(d.materialRows, r.brand), value: `${n(r.installSF).toLocaleString()} SF` }))
 
   // ── Turf Strips ─────────────────────────────────────────────────────────────
   const stripRows =

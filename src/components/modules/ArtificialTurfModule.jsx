@@ -51,69 +51,9 @@ const DEMO_ROWS = [
   { key: 'lawn', label: 'Lawn', dumpKey: 'Dump Fee - Green Waste', dumpFallback: 72.19 },
 ]
 
-// ── Turf brands (ArtTurfPrices — Softscape Prices A2:F11) ────────────────────
-const TURF_BRANDS = [
-  {
-    key: 'Socal Blen Supreme 80',
-    label: 'Socal Blen Supreme - 80',
-    matKey: 'Turf - Socal Blen Supreme 80',
-    fallback: 2.39,
-  },
-  {
-    key: 'Bel Air SH 92/66',
-    label: 'Bel Air SH 92/66',
-    matKey: 'Turf - Bel Air SH 92/66',
-    fallback: 1.79,
-  },
-  {
-    key: 'Venice SH Light 50',
-    label: 'Venice SH Light - 50',
-    matKey: 'Turf - Venice SH Light 50',
-    fallback: 1.49,
-  },
-  {
-    key: 'Bel Air SH Light 50',
-    label: 'Bel Air SH Light - 50',
-    matKey: 'Turf - Bel Air SH Light 50',
-    fallback: 1.29,
-  },
-  {
-    key: 'Performance Play 63',
-    label: 'Performance Play - 63',
-    matKey: 'Turf - Performance Play 63',
-    fallback: 1.79,
-  },
-  {
-    key: 'Autumn Grass 75',
-    label: 'Autumn Grass - 75',
-    matKey: 'Turf - Autumn Grass 75',
-    fallback: 2.98,
-  },
-  {
-    key: 'Bel Air Supreme 90',
-    label: 'Bel Air Supreme - 90',
-    matKey: 'Turf - Bel Air Supreme 90',
-    fallback: 1.98,
-  },
-  {
-    key: 'Pet Turf Pro 85',
-    label: 'Pet Turf Pro - 85',
-    matKey: 'Turf - Pet Turf Pro 85',
-    fallback: 2.29,
-  },
-  {
-    key: 'Verdant Supreme 94',
-    label: 'Verdant Supreme - 94',
-    matKey: 'Turf - Verdant Supreme 94',
-    fallback: 2.39,
-  },
-  {
-    key: 'Golf Pro SH 47',
-    label: 'Golf Pro SH - 47',
-    matKey: 'Turf - Golf Pro SH 47',
-    fallback: 1.98,
-  },
-]
+// Turf brands are no longer a hardcoded list — they live in the catalog as
+// products (category 'Artificial Turf', sub_category 'Turf Material'). See
+// turfBrandOptions / turfBrandRow below.
 
 // ── Rate defaults (DB fallbacks) ──────────────────────────────────────────────
 const RATE_DEFAULTS = {
@@ -165,18 +105,31 @@ function turfMatPrice(cat, vendorSel, typeLabel, houseName, houseFallback, mater
   return { price: n(mp[houseName]) || houseFallback, dbName: houseName }
 }
 
-// Turf brands = built-in TURF_BRANDS + any master-list rows tagged
-// sub_category='Turf Material' and left Unspecified. Add a brand in Master Rates
-// and it appears in the picker automatically, priced from its row. Turf install
-// labor is a shared rate, so brands need no paired labor row.
-function mergedTurfBrands(materialRows) {
-  const extra = catalogOptions(materialRows, TURF_CAT.turf, 'House', {
+// Turf brands live entirely in the catalog now (category 'Artificial Turf',
+// sub_category 'Turf Material'). One product row per brand = one id; a vendor
+// that quotes differently is a price tag on that same id, never a new row.
+//   turfBrandOptions → the standard products for the picker ({id, label, row}).
+//   turfBrandRow     → resolve a saved selection (row id, or a legacy key/label)
+//                      to its row, preferring a vendor-specific row over standard.
+function turfBrandOptions(materialRows) {
+  return catalogOptions(materialRows, TURF_CAT.turf, 'House', {
     houseRows: 'null-vendor',
     stripPrefix: true,
   })
-    .filter(o => !TURF_BRANDS.some(b => b.label === o.label || b.key === o.label))
-    .map(o => ({ key: o.row.name, label: o.label, matKey: o.row.name, fallback: n(o.row.unit_cost), fromMaster: true }))
-  return extra.length ? [...TURF_BRANDS, ...extra] : TURF_BRANDS
+}
+function turfBrandRow(materialRows, vendorSel, key) {
+  return (
+    catalogItemFor(materialRows, TURF_CAT.turf, vendorSel, key, {
+      houseRows: 'null-vendor',
+      stripPrefix: true,
+      fallbackFirst: false,
+    }) ||
+    catalogItemFor(materialRows, TURF_CAT.turf, 'House', key, {
+      houseRows: 'null-vendor',
+      stripPrefix: true,
+      fallbackFirst: true,
+    })
+  )
 }
 
 function calcTurf(
@@ -288,21 +241,11 @@ function calcTurf(
     totalEdgeLF = 0,
     subTurfCost = 0
 
-  const brands = mergedTurfBrands(materialRows)
   const rollCalc = state.rolls.map(roll => {
     const edgeLF = n(roll.edgeLF)
     const installSF = n(roll.installSF)
-    const brand = brands.find(b => b.key === roll.brand) || brands[0]
-    const pricePerSF = turfMatPrice(
-      TURF_CAT.turf,
-      roll.vendor,
-      brand.label,
-      brand.matKey,
-      brand.fallback,
-      materialRows,
-      catDefaults,
-      mp
-    ).price
+    const brandRow = turfBrandRow(materialRows, roll.vendor, roll.brand)
+    const pricePerSF = n(brandRow?.unit_cost)
     // In-house derives SF from the 15' roll edge; the Sub tab uses the
     // installed SF the estimator enters directly.
     const sf = isSub ? installSF : edgeLF * 15
@@ -323,17 +266,8 @@ function calcTurf(
   // Material: brand $/SF × (LF × width ft)  — Excel S20=O20*Q20 (manual inputs)
   const stripsLF = n(state.strips?.lf)
   const stripsWidthIn = n(state.strips?.widthIn) || 12
-  const stripsBrand = brands.find(b => b.key === state.strips?.brand) || brands[0]
-  const stripsPrice = turfMatPrice(
-    TURF_CAT.turf,
-    state.strips?.vendor,
-    stripsBrand.label,
-    stripsBrand.matKey,
-    stripsBrand.fallback,
-    materialRows,
-    catDefaults,
-    mp
-  ).price
+  const stripsBrandRow = turfBrandRow(materialRows, state.strips?.vendor, state.strips?.brand)
+  const stripsPrice = n(stripsBrandRow?.unit_cost)
   const stripsSF = stripsLF * (stripsWidthIn / 12)
   // Labor rate is DB-editable (LF/hr). Legacy (LF/100)*8 == LF/12.5.
   const stripLFHr = n(lr['Turf - Strip Install LF/hr']) || RATE_DEFAULTS.stripLFHr
@@ -866,9 +800,9 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
   const num = 'py-1.5 pr-2 text-gray-600 tabular-nums text-xs align-top'
   const demoMethodKeys = DEMO_METHODS.map(m => m.key)
   const demoMethodLabels = DEMO_METHODS.map(m => m.label)
-  const brands = mergedTurfBrands(materialRows)
-  const brandKeys = brands.map(b => b.key)
-  const brandLabels = brands.map(b => b.label)
+  const brandOpts = turfBrandOptions(materialRows)
+  const brandKeys = brandOpts.map(o => o.id)
+  const brandLabels = brandOpts.map(o => o.label)
 
   function handleSave() {
     onSave({
@@ -1197,7 +1131,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           <tbody className="divide-y divide-gray-50">
             {T.rolls.map((roll, i) => {
               const cr = calc.rollCalc[i]
-              const brand = brands.find(b => b.key === roll.brand) || brands[0]
+              const brandRow = turfBrandRow(materialRows, roll.vendor, roll.brand)
               return (
                 <tr key={i}>
                   <td className={td}>
@@ -1219,7 +1153,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                     <div className="flex items-center gap-1">
                       <div className="flex-1 min-w-0">
                         <Sel
-                          value={roll.brand}
+                          value={brandRow?.id || roll.brand}
                           onChange={e => setRoll(i, 'brand', e.target.value)}
                           options={brandKeys}
                           optionLabels={brandLabels}
@@ -1227,7 +1161,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                       </div>
                       <RateEditPopover
                         table="material_rates"
-                        name={brand.matKey}
+                        name={brandRow?.name}
                         category="Artificial Turf"
                         unitLabel="SF"
                         currentValue={cr.pricePerSF}
@@ -1390,20 +1324,19 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                 <div className="flex items-center gap-1">
                   <div className="flex-1 min-w-0">
                     <Sel
-                      value={T.strips?.brand || brandKeys[0]}
+                      value={turfBrandRow(materialRows, T.strips?.vendor, T.strips?.brand)?.id || T.strips?.brand || brandKeys[0]}
                       onChange={e => setStrips('brand', e.target.value)}
                       options={brandKeys}
                       optionLabels={brandLabels}
                     />
                   </div>
                   {(() => {
-                    const stripBrand =
-                      brands.find(b => b.key === T.strips?.brand) || brands[0]
+                    const stripBrand = turfBrandRow(materialRows, T.strips?.vendor, T.strips?.brand)
                     return (
                       <>
                         <RateEditPopover
                           table="material_rates"
-                          name={stripBrand.matKey}
+                          name={stripBrand?.name}
                           category="Artificial Turf"
                           unitLabel="SF"
                           currentValue={calc.stripsPrice}
