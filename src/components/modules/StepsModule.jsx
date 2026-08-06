@@ -7,7 +7,7 @@ import GpmdBar from './GpmdBar'
 import ModuleNotesField from './ModuleNotesField'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { fetchOpenPriceLedger, ledgerPrice } from '../../lib/materialCatalog'
+import { fetchPriceLedgerAsOf, ledgerPrice } from '../../lib/materialCatalog'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Steps Module
@@ -813,6 +813,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
   const [materialRates, setMaterialRates] = useState(initialData?.materialRates || {})
   const [materialRows, setMaterialRows] = useState(initialData?.materialRows || [])
   const [ledger, setLedger] = useState({}) // Phase 4 per-vendor price ledger
+  const [asOfDate, setAsOfDate] = useState('') // blank = current prices
   const [vendors, setVendors] = useState([])
   const [loading, setLoading] = useState(true)
   const [ratesModalOpen, setRatesModalOpen] = useState(false)
@@ -846,7 +847,6 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
       setMaterialRates(m)
     }
     setMaterialRows(matRowsRes.data || [])
-    fetchOpenPriceLedger((matRowsRes.data || []).map(r => r.id)).then(setLedger)
     setVendors(
       (venRes.data || []).map(v => ({
         id: v.id,
@@ -878,6 +878,20 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
       gone = true
     }
   }, [refreshAllRates])
+
+  // (Re)load the price ledger whenever the catalog rows or the as-of date change.
+  useEffect(() => {
+    let alive = true
+    fetchPriceLedgerAsOf(
+      materialRows.map(r => r.id),
+      asOfDate || null
+    ).then(m => {
+      if (alive) setLedger(m)
+    })
+    return () => {
+      alive = false
+    }
+  }, [materialRows, asOfDate])
 
   const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
@@ -1032,6 +1046,27 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
       </div>
 
       <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} />
+
+      {/* Prices as of — blank = current; pick a date to re-price the catalog. */}
+      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
+        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Prices as of</label>
+        <input
+          type="date"
+          value={asOfDate}
+          onChange={e => setAsOfDate(e.target.value)}
+          className="input text-sm py-1 w-44"
+        />
+        {asOfDate && (
+          <button
+            type="button"
+            onClick={() => setAsOfDate('')}
+            className="text-xs text-green-700 hover:text-green-900 font-medium"
+          >
+            Use current
+          </button>
+        )}
+        <span className="text-[11px] text-gray-400">blank = today's prices</span>
+      </div>
 
       {/* Crew Type */}
       <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">

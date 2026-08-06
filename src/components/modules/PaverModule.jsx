@@ -41,7 +41,7 @@ import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { fetchOpenPriceLedger, ledgerPrice } from '../../lib/materialCatalog'
+import { fetchPriceLedgerAsOf, ledgerPrice } from '../../lib/materialCatalog'
 
 const n = v => parseFloat(v) || 0
 const sfToTons = (sf, depthIn) => (n(sf) / 200) * n(depthIn)
@@ -820,6 +820,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   // and the vendor list, driving the per-row Vendor/Type pickers.
   const [materialRows, setMaterialRows] = useState(initialData?.materialRows || [])
   const [ledger, setLedger] = useState({}) // Phase 4 per-vendor price ledger
+  const [asOfDate, setAsOfDate] = useState('') // blank = current prices
   const [vendors, setVendors] = useState([])
 
   // ── Sales tax — applied to totalMat across every module so the bid
@@ -871,7 +872,6 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       setMaterialRates(m)
     }
     setMaterialRows(matRowsRes.data || [])
-    fetchOpenPriceLedger((matRowsRes.data || []).map(r => r.id)).then(setLedger)
     setVendors(
       (venRes.data || []).map(v => ({
         id: v.id,
@@ -914,6 +914,20 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       gone = true
     }
   }, [refreshAllRates])
+
+  // (Re)load the price ledger whenever the catalog rows or the as-of date change.
+  useEffect(() => {
+    let alive = true
+    fetchPriceLedgerAsOf(
+      materialRows.map(r => r.id),
+      asOfDate || null
+    ).then(m => {
+      if (alive) setLedger(m)
+    })
+    return () => {
+      alive = false
+    }
+  }, [materialRows, asOfDate])
 
   const set = useCallback((f, v) => setState(p => ({ ...p, [f]: v })), [])
   const setRow = useCallback(
@@ -1173,6 +1187,27 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       </div>
 
       <WorkTypeChooser value={state.subType || 'In-House'} onChange={v => set('subType', v)} />
+
+      {/* Prices as of — blank = current; pick a date to re-price the catalog. */}
+      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
+        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Prices as of</label>
+        <input
+          type="date"
+          value={asOfDate}
+          onChange={e => setAsOfDate(e.target.value)}
+          className="input text-sm py-1 w-44"
+        />
+        {asOfDate && (
+          <button
+            type="button"
+            onClick={() => setAsOfDate('')}
+            className="text-xs text-green-700 hover:text-green-900 font-medium"
+          >
+            Use current
+          </button>
+        )}
+        <span className="text-[11px] text-gray-400">blank = today's prices</span>
+      </div>
 
       {/* Crew Type */}
       <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
