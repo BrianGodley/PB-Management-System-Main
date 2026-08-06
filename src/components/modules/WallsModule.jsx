@@ -8,6 +8,12 @@ import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { groutCyPerBlock as cmuGroutCyPerBlock } from '../../lib/cmuGrout'
+import { useMaterialCatalog, resolveMaterialPrice } from '../../lib/materialCatalog'
+
+const WALLS_CATEGORY = 'Walls'
+// Shared cross-module basics (rebar, concrete, grout pump) live here so vendor
+// price changes propagate into Walls too.
+const BASIC_CATEGORY = 'Basic Materials'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Walls Module — CMU Block | Poured In Place | Timber/Lumber
@@ -61,11 +67,13 @@ function groutCyPerBlock(b) {
 const WALL_RATES = {
   greyBlock: { db: 'Wall Grey Block', fb: 2.59 },
   bondbeamBlock: { db: 'Wall Bondbeam Block', fb: 2.59 },
-  rebar: { db: 'Wall Rebar', fb: 1.388 }, // canonical rebar $/LF (shared Basic Materials value)
-  concreteHand: { db: 'Wall Concrete Hand Mix', fb: 92.0 },
-  concreteTruck: { db: 'Wall Concrete Truck', fb: 185.0 },
-  groutPumpSetup: { db: 'Wall Grout Pump Setup', fb: 402.5 },
-  groutPumpPerYd: { db: 'Wall Grout Pump Per Yard', fb: 9.2 },
+  // Basics resolve from the shared "Basic Materials" catalog so vendor price
+  // changes propagate. Fallbacks equal the seeded values → price-preserving.
+  rebar: { db: 'Rebar', fb: 1.388 }, // $/LF (Basic Materials)
+  concreteHand: { db: 'Concrete - Hand Mix', fb: 92.0 }, // $/CY (Basic Materials)
+  concreteTruck: { db: 'Concrete - Ready Mix (Truck)', fb: 185.0 }, // $/CY (Basic Materials)
+  groutPumpSetup: { db: 'Grout Pump - Setup', fb: 402.5 }, // Basic Materials
+  groutPumpPerYd: { db: 'Grout Pump - Per CY', fb: 9.2 }, // Basic Materials
   digLab: { db: 'Wall Dig Footing Labor Rate', fb: 4.0 },
   rebarLab: { db: 'Wall Set Rebar Labor Rate', fb: 35.0 },
   blockLab: { db: 'Wall Set Block Labor Rate', fb: 10.4 },
@@ -211,13 +219,8 @@ const blankWpRow = () => ({ vendor: 'House', type: 'None', sf: '', subEach: '' }
 // vendor_id===vendorId) use that row's unit_cost; otherwise fall back to the
 // House price (name-keyed mp[dbName]) then the hard fallback. Vendor 'House'
 // resolves to exactly the original math, so In-House numbers never move.
-function wallMatPrice(dbName, vendorId, materialRows, mp, fallback) {
-  if (vendorId && vendorId !== 'House') {
-    const row = (materialRows || []).find(r => r.name === dbName && r.vendor_id === vendorId)
-    if (row && row.unit_cost != null && row.unit_cost !== '') return n(row.unit_cost)
-  }
-  return mp?.[dbName] ?? fallback
-}
+// Shared resolver (src/lib/materialCatalog.js) — same vendor→House→fallback order.
+const wallMatPrice = resolveMaterialPrice
 
 // ── Per-row Wall Finish calculator — identical formulas to the original
 //    calcWalls finish math; only the material price source is vendor-resolved.
@@ -1509,46 +1512,20 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
       paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
     }
   )
-  const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
-  // Full Walls material_rates catalog (id/name/vendor_id/unit/unit_cost) used to
-  // resolve a vendor's material price. Plus the vendor list for the pickers.
-  const [materialRows, setMaterialRows] = useState(initialData?.materialRows || [])
-  const [vendors, setVendors] = useState([])
-  const [pricesLoading, setPricesLoading] = useState(!initialData?.materialPrices)
-
-  // Re-fetch the merged labor+material rate map + vendor catalog. Called once on
-  // mount and again after any RateEditPopover save so the calc reflects edits.
-  const refreshAllRates = useCallback(async () => {
-    const [matRes, labRes, catRes, venRes] = await Promise.all([
-      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Walls'),
-      supabase.from('labor_rates').select('name, rate').eq('category', 'Walls'),
-      supabase
-        .from('material_rates')
-        .select('id,name,vendor_id,unit,unit_cost')
-        .eq('category', 'Walls'),
-      supabase
-        .from('subs_vendors')
-        .select('id, company_name, supplied_categories')
-        .eq('type', 'vendor')
-        .order('company_name'),
-    ])
-    const p = {}
-    ;(matRes.data || []).forEach(row => {
-      p[row.name] = parseFloat(row.unit_cost) || 0
-    })
-    ;(labRes.data || []).forEach(row => {
-      p[row.name] = parseFloat(row.rate) || 0
-    })
-    setMaterialPrices(p)
-    setMaterialRows(catRes.data || [])
-    setVendors(
-      (venRes.data || []).map(v => ({
-        id: v.id,
-        name: v.company_name,
-        categories: v.supplied_categories || [],
-      }))
-    )
-  }, [])
+  // Shared material catalog — Walls + Basic Materials rates, rows, vendors, and
+  // the canonical resolver. (Replaces the old per-module fetch + wallMatPrice.)
+  const {
+    priceMap: materialPrices,
+    materialRows,
+    vendors,
+    vendorNames,
+    loading: pricesLoading,
+    refresh: refreshAllRates,
+    vendorOptionsForCategory,
+  } = useMaterialCatalog([WALLS_CATEGORY, BASIC_CATEGORY], {
+    materialPrices: initialData?.materialPrices,
+    materialRows: initialData?.materialRows,
+  })
 
   useEffect(() => {
     if (!initialData?.laborRatePerHour) {
@@ -1572,10 +1549,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
           }
         })
     }
-    // Always refresh so the vendor list + material catalog load, even when
-    // editing a saved estimate (which already carries a materialPrices map).
-    refreshAllRates().then(() => setPricesLoading(false))
-  }, [refreshAllRates])
+  }, [initialData?.laborRatePerHour])
 
   const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
@@ -1753,11 +1727,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
   const r = key => materialPrices[WALL_RATES[key].db] ?? WALL_RATES[key].fb
 
   // ── Vendor helpers ──────────────────────────────────────────────────────────
-  const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
-  const vendorOptions = [
-    { value: 'House', label: 'Unspecified' },
-    ...vendorsForCategory('Walls').map(v => ({ value: v.id, label: v.name })),
-  ]
+  const vendorOptions = vendorOptionsForCategory(WALLS_CATEGORY)
 
   // The calc runs against the ACTIVE tab only — entering data on one tab never
   // affects the other. Shared selections (crew/sub type) are merged on top.
@@ -1804,7 +1774,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
         gpmd,
         materialPrices,
         materialRows,
-        vendorNames: Object.fromEntries(vendors.map(v => [v.id, v.name])),
+        vendorNames,
         walkAccess,
         calc,
       },
@@ -2320,7 +2290,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
                 <RateEditPopover
                   table="material_rates"
                   name={WALL_RATES.rebar.db}
-                  category="Walls"
+                  category="Basic Materials"
                   unitLabel="LF"
                   currentValue={r('rebar')}
                   onSaved={refreshAllRates}
@@ -2331,7 +2301,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
                 <RateEditPopover
                   table="material_rates"
                   name={WALL_RATES.concreteHand.db}
-                  category="Walls"
+                  category="Basic Materials"
                   unitLabel="CY"
                   currentValue={r('concreteHand')}
                   onSaved={refreshAllRates}
@@ -2342,7 +2312,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
                 <RateEditPopover
                   table="material_rates"
                   name={WALL_RATES.concreteTruck.db}
-                  category="Walls"
+                  category="Basic Materials"
                   unitLabel="CY"
                   currentValue={r('concreteTruck')}
                   onSaved={refreshAllRates}
@@ -2353,7 +2323,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
                 <RateEditPopover
                   table="material_rates"
                   name={WALL_RATES.groutPumpSetup.db}
-                  category="Walls"
+                  category="Basic Materials"
                   unitLabel="flat"
                   currentValue={r('groutPumpSetup')}
                   onSaved={refreshAllRates}
@@ -2364,7 +2334,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
                 <RateEditPopover
                   table="material_rates"
                   name={WALL_RATES.groutPumpPerYd.db}
-                  category="Walls"
+                  category="Basic Materials"
                   unitLabel="CY"
                   currentValue={r('groutPumpPerYd')}
                   onSaved={refreshAllRates}
@@ -2517,7 +2487,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
                 <RateEditPopover
                   table="material_rates"
                   name={WALL_RATES.concreteTruck.db}
-                  category="Walls"
+                  category="Basic Materials"
                   unitLabel="CY"
                   currentValue={r('concreteTruck')}
                   onSaved={refreshAllRates}

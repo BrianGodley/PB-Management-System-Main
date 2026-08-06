@@ -16,7 +16,7 @@ const fmt = v =>
 
 // Rate metadata mirrored from WallsModule (finish + cap + wp material/labor).
 const WALL_RATES = {
-  concreteTruck: { db: 'Wall Concrete Truck', fb: 185.0 },
+  concreteTruck: { db: 'Concrete - Ready Mix (Truck)', fb: 185.0 }, // shared Basic Materials
   sandStucco: { db: 'Sand Stucco - Wall', fb: 0.0 },
   smoothStucco: { db: 'Smooth Stucco - Wall', fb: 0.0 },
   ledgerstone: { db: 'Ledgerstone - Wall', fb: 10.0 },
@@ -225,7 +225,7 @@ const WALL_LABELS = {
 // any legacy tab-level wpRows, into one active list.
 function allWpRows(t = {}) {
   const fromWalls = []
-  ;['cmuWalls', 'pipWalls', 'modularWalls'].forEach(k => {
+  ;['cmuWalls', 'pipWalls', 'modularWalls', 'brickWalls'].forEach(k => {
     if (Array.isArray(t[k])) t[k].forEach(w => (w.wpRows || []).forEach(r => fromWalls.push(r)))
   })
   const legacy = Array.isArray(t.wpRows) ? t.wpRows : []
@@ -254,6 +254,7 @@ function tabHasData(t = {}) {
   const cmu = (t.cmuWalls || []).some(w => n(w.lf) > 0 || n(w.heightIn) > 0)
   const pip = (t.pipWalls || []).some(w => n(w.lf) > 0 || n(w.heightIn) > 0)
   const modular = (t.modularWalls || []).some(w => n(w.lf) > 0 || n(w.heightIn) > 0)
+  const brick = (t.brickWalls || []).some(w => n(w.lf) > 0 || n(w.heightIn) > 0)
   const timber = n(t.timberLF) > 0 || n(t.timberPosts) > 0
   const finishRows = Array.isArray(t.wallFinishRows)
     ? t.wallFinishRows.some(r => n(r.sf) > 0)
@@ -266,7 +267,7 @@ function tabHasData(t = {}) {
     m => n(m.hours) > 0 || n(m.materials) > 0 || n(m.subCost) > 0
   )
   const legacy = n(t.cmuLF) > 0 || n(t.pipLF) > 0
-  return cmu || pip || modular || timber || finishRows || caps || wp || manual || legacy
+  return cmu || pip || modular || brick || timber || finishRows || caps || wp || manual || legacy
 }
 
 // Quantity + material detail for a single tab record (In-House or Sub).
@@ -300,6 +301,9 @@ function WallQtyDetail({ t = {}, isSub, materialPrices, materialRows, vendorLabe
     : []
   const modularWalls = Array.isArray(t.modularWalls)
     ? t.modularWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0)
+    : []
+  const brickWalls = Array.isArray(t.brickWalls)
+    ? t.brickWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0)
     : []
   const wpRows = allWpRows(t)
   const finishRows = (
@@ -425,6 +429,33 @@ function WallQtyDetail({ t = {}, isSub, materialPrices, materialRows, vendorLabe
           </div>
         ))}
       {modularWalls.length > 0 && t.modularFootingPump === 'Yes' && (
+        <LineRow label="Footing Pump" value="Yes" />
+      )}
+
+      {/* Brick detail — same shape as Modular */}
+      {brickWalls.length > 0 &&
+        brickWalls.map((w, i) => (
+          <div key={i}>
+            <SectionLabel
+              title={brickWalls.length > 1 ? `Brick Wall ${i + 1}` : 'Brick Structure'}
+            />
+            {w.vendor && w.vendor !== 'House' && (
+              <LineRow label="Vendor" value={vendorLabel(w.vendor)} />
+            )}
+            {w.blockType && <LineRow label="Block Type" value={w.blockType} />}
+            <LineRow label="Linear Feet" value={`${n(w.lf)} LF`} />
+            <LineRow label="Wall Height" value={`${n(w.heightIn)} in`} />
+            <LineRow
+              label="Footing"
+              value={`${n(w.footingWIn) || 12}"W × ${n(w.footingDIn) || 12}"D`}
+            />
+            {n(w.pctCurved) > 0 && <LineRow label="% Curved" value={`${n(w.pctCurved)}%`} />}
+            {isSub && (n(w.subEach) > 0 || (w.subEach != null && w.subEach !== '')) && (
+              <LineRow label="Sub Flat" value={`${fmt(w.subEach)}/LF`} />
+            )}
+          </div>
+        ))}
+      {brickWalls.length > 0 && t.brickFootingPump === 'Yes' && (
         <LineRow label="Footing Pump" value="Yes" />
       )}
 
