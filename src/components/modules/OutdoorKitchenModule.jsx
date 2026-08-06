@@ -8,7 +8,7 @@ import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { groutCuFtPerBlock } from '../../lib/cmuGrout'
-import { catalogItemFor } from '../../lib/materialCatalog'
+import { catalogItemFor, catalogOptions } from '../../lib/materialCatalog'
 
 const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
 
@@ -169,8 +169,22 @@ const UTIL_CAT = { line: 'Utility Lines', gas: 'Gas Fixtures', elec: 'Electrical
 // Trenching for utility lines (machine trench, min/cf; from the Utilities schedule).
 const OK_TRENCH_RATE_NAME = 'Utilities Trench Excavation'
 const OK_TRENCH_FALLBACK_MIN_PER_CF = 10
+function mergedUtilTypes(cat, builtInArr, materialRows) {
+  const extra = catalogOptions(materialRows, cat, 'House', { houseRows: 'null-vendor', stripPrefix: true })
+    .filter(o => !builtInArr.some(b => b.label === o.label))
+    .map(o => ({
+      label: o.label,
+      dbName: o.row.name,
+      fallback: n(o.row.unit_cost),
+      laborDbName: `${o.label} - Labor Rate`,
+      laborFallback: 0,
+      fromMaster: true,
+    }))
+  return extra.length ? [...builtInArr, ...extra] : builtInArr
+}
 function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
-  const builtIn = houseArr.find(o => o.label === row.type) || houseArr[0]
+  const merged = mergedUtilTypes(cat, houseArr, materialRows)
+  const builtIn = merged.find(o => o.label === row.type) || merged[0]
   const laborVal = mp[builtIn?.laborDbName] ?? builtIn?.laborFallback ?? 0
   let matDbName = builtIn?.dbName
   let matFallback = builtIn?.fallback ?? 0
@@ -185,7 +199,7 @@ function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
   }
   const matCost = mp[matDbName] ?? matFallback
   const matOpt = { label: builtIn?.label, dbName: matDbName, fallback: matFallback }
-  return { opts: houseArr, matOpt, matCost, laborVal, laborBuiltIn: builtIn }
+  return { opts: merged, matOpt, matCost, laborVal, laborBuiltIn: builtIn }
 }
 const EP_LINE_ROW = () => ({ type: 'PVC Conduit with Electrical', lf: '', vendor: 'House' })
 const EP_GAS_ROW = () => ({ type: '12" Single Gas Ring', qty: '', vendor: 'House' })

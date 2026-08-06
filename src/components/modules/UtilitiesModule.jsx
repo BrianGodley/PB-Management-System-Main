@@ -7,7 +7,7 @@ import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { catalogItemFor } from '../../lib/materialCatalog'
+import { catalogItemFor, catalogOptions } from '../../lib/materialCatalog'
 
 const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
 
@@ -224,13 +224,32 @@ const UTIL_CAT = {
   elec: 'Electrical Fixtures',
 }
 
+// Merge the built-in Type list with any master-list rows tagged sub_category=cat
+// and left Unspecified (null vendor). Add a row in Master Rates under that marker
+// and it appears here automatically; its paired '<Label> - Labor Rate' row (looked
+// up by name) supplies labor. Built-ins always remain (deduped by label).
+function mergedUtilTypes(cat, builtInArr, materialRows) {
+  const extra = catalogOptions(materialRows, cat, 'House', { houseRows: 'null-vendor', stripPrefix: true })
+    .filter(o => !builtInArr.some(b => b.label === o.label))
+    .map(o => ({
+      label: o.label,
+      dbName: o.row.name,
+      fallback: n(o.row.unit_cost),
+      laborDbName: `${o.label} - Labor Rate`,
+      laborFallback: 0,
+      fromMaster: true,
+    }))
+  return extra.length ? [...builtInArr, ...extra] : builtInArr
+}
+
 // Resolve a row's material cost + per-unit labor.
-// The Type is ALWAYS a built-in item — it defines the labor and the House
-// material price. A vendor NEVER affects labor; it only overrides the MATERIAL
-// price for the selected item, matched by the item's name in the vendor's
-// catalog (material_rates for the category + vendor). No match → House price.
+// The Type is a built-in item OR a master-list addition (same shape). It defines
+// the labor and the House material price. A vendor NEVER affects labor; it only
+// overrides the MATERIAL price for the selected item, matched by the item's name
+// in the vendor's catalog (material_rates for the category + vendor).
 function resolveUtilRow(cat, row, houseArr, materialRows, catDefaults, mp) {
-  const builtIn = houseArr.find(o => o.label === row.type) || houseArr[0]
+  const merged = mergedUtilTypes(cat, houseArr, materialRows)
+  const builtIn = merged.find(o => o.label === row.type) || merged[0]
   const laborVal = mp[builtIn?.laborDbName] ?? builtIn?.laborFallback ?? 0
   let matDbName = builtIn?.dbName
   let matFallback = builtIn?.fallback ?? 0
@@ -246,7 +265,7 @@ function resolveUtilRow(cat, row, houseArr, materialRows, catDefaults, mp) {
   const matCost = mp[matDbName] ?? matFallback
   // matOpt drives the Type dropdown value + the material rate popover target.
   const matOpt = { label: builtIn?.label, dbName: matDbName, fallback: matFallback }
-  return { opts: houseArr, matOpt, matCost, laborVal, laborBuiltIn: builtIn }
+  return { opts: merged, matOpt, matCost, laborVal, laborBuiltIn: builtIn }
 }
 
 function calcUtilities(
