@@ -9,6 +9,17 @@ import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { catalogOptions } from '../../lib/materialCatalog'
 
+// Append master-list rows tagged sub_category=cat (Unspecified/null vendor) to a
+// section's built-in Type list. Built-ins keep their exact labels/prices; adding
+// a row in Master Rates under that marker makes it appear here automatically,
+// priced from its row. Deduped by label so built-ins always win.
+function mergedGtOpts(cat, houseArray, materialRows) {
+  const extra = catalogOptions(materialRows, cat, 'House', { houseRows: 'null-vendor', stripPrefix: true })
+    .filter(o => !(houseArray || []).some(h => h.label === o.label))
+    .map(o => ({ label: o.label, dbName: o.row.name, fallback: parseFloat(o.row.unit_cost) || 0 }))
+  return extra.length ? [...houseArray, ...extra] : houseArray
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Ground Treatments Module — based on Softscape Module tab in Excel estimator
 // Covers: Mulch, Edging, Soil Prep, Sod, Flagstone/Precast Steppers,
@@ -251,7 +262,10 @@ function calcGroundTreatments(
     // Resolve the effective vendor: a stored 'auto' (new default) → the category
     // default (first real vendor, else House); an explicit 'House'/id stays as-is.
     const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : (catDefaults[cat] || 'House')
-    if (!vsel || vsel === 'House') return resolveType(row.type, houseArray, houseArray)
+    if (!vsel || vsel === 'House') {
+      const merged = mergedGtOpts(cat, houseArray, materialRows)
+      return resolveType(row.type, merged, houseArray)
+    }
     // Shared row filtering (subcat + vendor); GT keeps its own label transform.
     const opts = catalogOptions(materialRows, cat, vsel, { houseRows: 'exclude' }).map(o => ({
       label: o.row.name.replace(new RegExp('^' + cat + ' - '), '').replace(/^.*? - /, ''),
@@ -1003,7 +1017,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   // the vendor's unit_cost. Falls back to the House array if the vendor has no
   // rows for the sub_category (so the dropdown is never empty).
   function sectionOptions(subcat, vendorSel, houseArray) {
-    if (!vendorSel || vendorSel === 'House') return houseArray
+    if (!vendorSel || vendorSel === 'House') return mergedGtOpts(subcat, houseArray, materialRows)
     const opts = catalogOptions(materialRows, subcat, vendorSel, { houseRows: 'exclude', stripPrefix: true })
     if (!opts.length) return houseArray
     return opts.map(o => ({ label: o.label || o.row.name, dbName: o.row.name, fallback: n(o.row.unit_cost) }))
