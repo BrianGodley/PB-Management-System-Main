@@ -503,14 +503,19 @@ export default function MasterRates({ only } = {}) {
   const [subCategory, setSubCategory] = useState('All')
   const [subCompany, setSubCompany] = useState('All')
 
+  // Unassigned material rates show as "Unspecified". The permanent Unspecified
+  // vendor record is filtered OUT of the explicit vendor list so the picker
+  // shows a single "Unspecified" choice (the value='' / unassigned option),
+  // never a duplicate.
+  const isUnspecifiedVendor = v => (v?.company_name || '').trim().toLowerCase() === 'unspecified'
   const vendorOptions = useMemo(
     () => [
-      { value: '', label: 'House (unassigned)' },
-      ...vendors.map(v => ({ value: v.id, label: v.company_name })),
+      { value: '', label: 'Unspecified' },
+      ...vendors.filter(v => !isUnspecifiedVendor(v)).map(v => ({ value: v.id, label: v.company_name })),
     ],
     [vendors]
   )
-  const vendorName = id => vendors.find(v => v.id === id)?.company_name || 'House'
+  const vendorName = id => vendors.find(v => v.id === id)?.company_name || 'Unspecified'
 
   useEffect(() => {
     fetchAll()
@@ -815,8 +820,8 @@ export default function MasterRates({ only } = {}) {
                   <label className="text-xs text-gray-500">Vendor</label>
                   <select value={matVendor} onChange={e => setMatVendor(e.target.value)} className={filterSelect}>
                     <option value="All">All vendors</option>
-                    <option value="__HOUSE__">House (unassigned)</option>
-                    {vendors.map(v => (
+                    <option value="__HOUSE__">Unspecified</option>
+                    {vendors.filter(v => !isUnspecifiedVendor(v)).map(v => (
                       <option key={v.id} value={v.id}>
                         {v.company_name}
                       </option>

@@ -216,7 +216,20 @@ function LineRow({ label, value, sub, highlight }) {
 const WALL_LABELS = {
   CMU: 'CMU Block Wall',
   PIP: 'Poured In Place Wall',
+  Modular: 'Modular Block Wall',
+  Brick: 'Brick Wall',
   Timber: 'Timber / Lumber Wall',
+}
+
+// Gather every wall entry's own waterproofing rows (CMU + PIP + Modular) plus
+// any legacy tab-level wpRows, into one active list.
+function allWpRows(t = {}) {
+  const fromWalls = []
+  ;['cmuWalls', 'pipWalls', 'modularWalls'].forEach(k => {
+    if (Array.isArray(t[k])) t[k].forEach(w => (w.wpRows || []).forEach(r => fromWalls.push(r)))
+  })
+  const legacy = Array.isArray(t.wpRows) ? t.wpRows : []
+  return [...fromWalls, ...legacy].filter(w => w && w.type && w.type !== 'None' && n(w.sf) > 0)
 }
 
 // Legacy flat finish fields → row shape (so old saves still list finishes).
@@ -240,6 +253,7 @@ function legacyFinishRows(t = {}) {
 function tabHasData(t = {}) {
   const cmu = (t.cmuWalls || []).some(w => n(w.lf) > 0 || n(w.heightIn) > 0)
   const pip = (t.pipWalls || []).some(w => n(w.lf) > 0 || n(w.heightIn) > 0)
+  const modular = (t.modularWalls || []).some(w => n(w.lf) > 0 || n(w.heightIn) > 0)
   const timber = n(t.timberLF) > 0 || n(t.timberPosts) > 0
   const finishRows = Array.isArray(t.wallFinishRows)
     ? t.wallFinishRows.some(r => n(r.sf) > 0)
@@ -247,12 +261,12 @@ function tabHasData(t = {}) {
   const caps = (t.capRows || []).some(
     c => c.type && c.type !== 'None' && (n(c.lf) > 0 || n(c.qty) > 0)
   )
-  const wp = (t.wpRows || []).some(w => w.type && w.type !== 'None' && n(w.sf) > 0)
+  const wp = allWpRows(t).length > 0
   const manual = (t.manualRows || []).some(
     m => n(m.hours) > 0 || n(m.materials) > 0 || n(m.subCost) > 0
   )
   const legacy = n(t.cmuLF) > 0 || n(t.pipLF) > 0
-  return cmu || pip || timber || finishRows || caps || wp || manual || legacy
+  return cmu || pip || modular || timber || finishRows || caps || wp || manual || legacy
 }
 
 // Quantity + material detail for a single tab record (In-House or Sub).
@@ -284,9 +298,10 @@ function WallQtyDetail({ t = {}, isSub, materialPrices, materialRows, vendorLabe
   const pipWalls = Array.isArray(t.pipWalls)
     ? t.pipWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0)
     : []
-  const wpRows = Array.isArray(t.wpRows)
-    ? t.wpRows.filter(w => w.type && w.type !== 'None' && n(w.sf) > 0)
+  const modularWalls = Array.isArray(t.modularWalls)
+    ? t.modularWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0)
     : []
+  const wpRows = allWpRows(t)
   const finishRows = (
     Array.isArray(t.wallFinishRows) ? t.wallFinishRows : legacyFinishRows(t)
   ).filter(r => n(r.sf) > 0)
@@ -384,6 +399,33 @@ function WallQtyDetail({ t = {}, isSub, materialPrices, materialRows, vendorLabe
           <LineRow label="Linear Feet" value={`${n(pipLF)} LF`} />
           <LineRow label="Wall Height" value={`${n(pipHeightIn)} in`} />
         </>
+      )}
+
+      {/* Modular detail — CMU-like minus rebar / grout / bond beam */}
+      {modularWalls.length > 0 &&
+        modularWalls.map((w, i) => (
+          <div key={i}>
+            <SectionLabel
+              title={modularWalls.length > 1 ? `Wall Installation ${i + 1}` : 'Modular Structure'}
+            />
+            {w.vendor && w.vendor !== 'House' && (
+              <LineRow label="Vendor" value={vendorLabel(w.vendor)} />
+            )}
+            {w.blockType && <LineRow label="Block Type" value={w.blockType} />}
+            <LineRow label="Linear Feet" value={`${n(w.lf)} LF`} />
+            <LineRow label="Wall Height" value={`${n(w.heightIn)} in`} />
+            <LineRow
+              label="Footing"
+              value={`${n(w.footingWIn) || 12}"W × ${n(w.footingDIn) || 12}"D`}
+            />
+            {n(w.pctCurved) > 0 && <LineRow label="% Curved" value={`${n(w.pctCurved)}%`} />}
+            {isSub && (n(w.subEach) > 0 || (w.subEach != null && w.subEach !== '')) && (
+              <LineRow label="Sub Flat" value={`${fmt(w.subEach)}/LF`} />
+            )}
+          </div>
+        ))}
+      {modularWalls.length > 0 && t.modularFootingPump === 'Yes' && (
+        <LineRow label="Footing Pump" value="Yes" />
       )}
 
       {/* Timber detail */}

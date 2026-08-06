@@ -97,7 +97,8 @@ const DEFAULTS = { laborRatePerHour: 35, laborBurdenPct: 0.29, gpmd: 425, commis
 const n = v => parseFloat(v) || 0
 const r2 = x => Math.round(((x || 0) + Number.EPSILON) * 100) / 100
 
-// Default entries
+// Default entries. Each structural wall entry carries its OWN waterproofing
+// rows (wpRows) — waterproofing is now specified per wall, not once per tab.
 const DEFAULT_CMU = () => ({
   blockType: DEFAULT_BLOCK_NAME,
   vendor: 'House',
@@ -111,6 +112,7 @@ const DEFAULT_CMU = () => ({
   pctGrouted: '100',
   pctCurved: '0',
   subEach: '',
+  wpRows: [blankWpRow()],
 })
 const DEFAULT_PIP = () => ({
   vendor: 'House',
@@ -120,6 +122,22 @@ const DEFAULT_PIP = () => ({
   footingDIn: '12',
   horizBars: '2',
   subEach: '',
+  wpRows: [blankWpRow()],
+})
+// Modular block wall — duplicates the CMU fields EXCEPT rebar spacing, horiz
+// bars, bond-beam courses and % grouted solid (modular block isn't grouted or
+// reinforced the same way). Prices out via calcOneModular, which reuses the
+// CMU block+footing math with those inputs forced to zero.
+const DEFAULT_MODULAR = () => ({
+  blockType: DEFAULT_BLOCK_NAME,
+  vendor: 'House',
+  lf: '',
+  heightIn: '',
+  footingWIn: '12',
+  footingDIn: '12',
+  pctCurved: '0',
+  subEach: '',
+  wpRows: [blankWpRow()],
 })
 
 // ── Fixed per-section type lists (the Item dropdown; NOT from the DB) ─────────
@@ -330,6 +348,18 @@ function computeWpRow(row, mp, materialRows) {
   return { mat, hrs, subUnit, subEach, subMat: sf * subEach, unit: 'SF', qty: sf }
 }
 
+// Sum a wall entry's own waterproofing rows into { wpHrs, wpMat, wpSubMat }.
+function computeWallWpTotals(wall, mp, materialRows) {
+  const rows = Array.isArray(wall?.wpRows) ? wall.wpRows : []
+  return rows.reduce(
+    (a, row) => {
+      const c = computeWpRow(row, mp, materialRows)
+      return { wpHrs: a.wpHrs + c.hrs, wpMat: a.wpMat + c.mat, wpSubMat: a.wpSubMat + c.subMat }
+    },
+    { wpHrs: 0, wpMat: 0, wpSubMat: 0 }
+  )
+}
+
 // ── Per-wall calculators ──────────────────────────────────────────────────────
 function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = []) {
   const {
@@ -344,7 +374,11 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [])
     pctGrouted,
     pctCurved,
   } = wall
-  if (!n(lf) || !n(heightIn)) return { hrs: 0, mat: 0, subUnit: 0, subEach: 0, subMat: 0, detail: null }
+  if (!n(lf) || !n(heightIn)) {
+    // Structural inputs blank — still bill any waterproofing entered on the wall.
+    const wp0 = computeWallWpTotals(wall, mp, materialRows)
+    return { hrs: 0, mat: 0, subUnit: 0, subEach: 0, subMat: 0, ...wp0, detail: null }
+  }
 
   // Vendor only swaps where each MATERIAL unit price comes from; labor rates
   // (r) and all geometry stay exactly as before. Vendor 'House' resolves to
@@ -408,19 +442,33 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [])
   const subEach = wall.subEach !== '' && wall.subEach != null ? n(wall.subEach) : subUnit
   const subMat = n(lf) * subEach
 
+  const wp = computeWallWpTotals(wall, mp, materialRows)
+
   return {
     hrs,
     mat,
     subUnit,
     subEach,
     subMat,
+    ...wp,
     detail: { orderGreyBlock, orderBBBlock, footingCY, groutCY, totalRebarLF, curveAdd, subUnit },
   }
 }
 
+// ── Modular block wall — reuses the CMU block + footing math with rebar,
+//    horizontal bars, bond beams and grouting all forced to zero (modular
+//    block isn't grouted/reinforced). Only the footing pump applies. ──────────
+function calcOneModular(wall, footingPump, r, mp = {}, materialRows = []) {
+  const modWall = { ...wall, rebarSpIn: '0', horizBars: '0', bondBeams: '0', pctGrouted: '0' }
+  return calcOneCMU(modWall, footingPump, 'No', r, mp, materialRows)
+}
+
 function calcOnePIP(wall, r, mp = {}, materialRows = []) {
   const { lf, heightIn, footingWIn, footingDIn, horizBars } = wall
-  if (!n(lf) || !n(heightIn)) return { hrs: 0, mat: 0, concCY: 0, subUnit: 0, subEach: 0, subMat: 0 }
+  if (!n(lf) || !n(heightIn)) {
+    const wp0 = computeWallWpTotals(wall, mp, materialRows)
+    return { hrs: 0, mat: 0, concCY: 0, subUnit: 0, subEach: 0, subMat: 0, ...wp0 }
+  }
   const v = wall.vendor
   const pm = key => wallMatPrice(WALL_RATES[key].db, v, materialRows, mp, WALL_RATES[key].fb)
   // Wall stem (existing formula)
@@ -451,7 +499,8 @@ function calcOnePIP(wall, r, mp = {}, materialRows = []) {
   const subUnit = n(lf) > 0 ? mat / n(lf) : 0
   const subEach = wall.subEach !== '' && wall.subEach != null ? n(wall.subEach) : subUnit
   const subMat = n(lf) * subEach
-  return { hrs, mat, concCY, footingCY, horizRebarLF, subUnit, subEach, subMat }
+  const wp = computeWallWpTotals(wall, mp, materialRows)
+  return { hrs, mat, concCY, footingCY, horizRebarLF, subUnit, subEach, subMat, ...wp }
 }
 
 // ── Main calc ─────────────────────────────────────────────────────────────────
@@ -471,7 +520,18 @@ function calcWalls(
     structuralMat = 0,
     structuralSubMat = 0
   let cmuDetails = [],
-    pipDetails = []
+    pipDetails = [],
+    modularDetails = []
+  // Waterproofing now lives per-wall; accumulate each wall's wp into the wp
+  // bucket (kept separate so the summary's Waterproofing line still works).
+  let wallWpHrs = 0,
+    wallWpMat = 0,
+    wallWpSubMat = 0
+  const addWp = res => {
+    wallWpHrs += res.wpHrs || 0
+    wallWpMat += res.wpMat || 0
+    wallWpSubMat += res.wpSubMat || 0
+  }
 
   // ALL wall types contribute simultaneously — switching the visible tab
   // no longer drops the other types from the calc. Each section is its
@@ -482,6 +542,7 @@ function calcWalls(
     structuralHrs += res.hrs
     structuralMat += res.mat
     structuralSubMat += res.subMat
+    addWp(res)
     cmuDetails.push(res.detail)
   })
   ;(state.pipWalls || []).forEach(wall => {
@@ -489,7 +550,16 @@ function calcWalls(
     structuralHrs += res.hrs
     structuralMat += res.mat
     structuralSubMat += res.subMat
+    addWp(res)
     pipDetails.push({ ...res, lf: wall.lf, heightIn: wall.heightIn })
+  })
+  ;(state.modularWalls || []).forEach(wall => {
+    const res = calcOneModular(wall, state.modularFootingPump, r, mp, materialRows)
+    structuralHrs += res.hrs
+    structuralMat += res.mat
+    structuralSubMat += res.subMat
+    addWp(res)
+    modularDetails.push(res.detail)
   })
 
   if (n(state.timberLF) > 0 || n(state.timberPosts) > 0) {
@@ -521,16 +591,12 @@ function calcWalls(
   const capMat = capResults.reduce((a, x) => a + (x.mat || 0), 0)
   const capSubMat = capResults.reduce((a, x) => a + (x.subMat || 0), 0)
 
-  // ── Waterproofing — per-row (Vendor + Item). Legacy single entry
-  //    (wpType / wpSF) is migrated into the array form by the component. ─────
-  const wpRowsSrc =
-    Array.isArray(state.wpRows) && state.wpRows.length
-      ? state.wpRows
-      : [{ type: state.wpType, sf: state.wpSF, vendor: 'House' }]
-  const wpResults = wpRowsSrc.map(row => computeWpRow(row, mp, materialRows))
-  const wpHrs = wpResults.reduce((a, x) => a + (x.hrs || 0), 0)
-  const wpMat = wpResults.reduce((a, x) => a + (x.mat || 0), 0)
-  const wpSubMat = wpResults.reduce((a, x) => a + (x.subMat || 0), 0)
+  // ── Waterproofing — now specified PER WALL. Each wall entry's wpRows were
+  //    summed above into wallWp*. (Legacy tab-level wpRows are migrated onto
+  //    the first CMU wall by makeTab, so totals stay consistent.) ────────────
+  const wpHrs = wallWpHrs
+  const wpMat = wallWpMat
+  const wpSubMat = wallWpSubMat
 
   // Manual
   let manHrs = 0,
@@ -615,9 +681,9 @@ function calcWalls(
     wpMat,
     cmuDetails,
     pipDetails,
+    modularDetails,
     finishRows,
     capResults,
-    wpResults,
   }
 }
 
@@ -665,8 +731,21 @@ const CAP_TYPES = ['None', 'Flagstone', 'Precast', 'PIP Concrete', 'Bullnose Bri
 // In-House and Sub each hold their own independent copy so the two tabs are
 // separate calculators. Backward-compat: legacy single-entry / flat fields are
 // migrated into the array forms below.
+// Ensure a wall entry has its own waterproofing rows (default one blank row).
+function initWallWp(w = {}) {
+  if (Array.isArray(w.wpRows) && w.wpRows.length)
+    return w.wpRows.map(r => ({ vendor: 'House', subEach: '', ...r }))
+  return [blankWpRow()]
+}
 function initCmuWalls(src = {}) {
-  if (src.cmuWalls) return src.cmuWalls.map(w => ({ blockType: DEFAULT_BLOCK_NAME, vendor: 'House', subEach: '', ...w }))
+  if (src.cmuWalls)
+    return src.cmuWalls.map(w => ({
+      blockType: DEFAULT_BLOCK_NAME,
+      vendor: 'House',
+      subEach: '',
+      ...w,
+      wpRows: initWallWp(w),
+    }))
   if (src.cmuLF !== undefined)
     return [
       {
@@ -682,15 +761,30 @@ function initCmuWalls(src = {}) {
         pctGrouted: src.cmuPctGrouted ?? '100',
         pctCurved: src.cmuPctCurved ?? '0',
         subEach: '',
+        wpRows: [blankWpRow()],
       },
     ]
   return [DEFAULT_CMU()]
 }
 function initPipWalls(src = {}) {
-  if (src.pipWalls) return src.pipWalls.map(w => ({ vendor: 'House', subEach: '', ...w }))
+  if (src.pipWalls)
+    return src.pipWalls.map(w => ({ vendor: 'House', subEach: '', ...w, wpRows: initWallWp(w) }))
   if (src.pipLF !== undefined)
-    return [{ vendor: 'House', lf: src.pipLF, heightIn: src.pipHeightIn, subEach: '' }]
+    return [
+      { vendor: 'House', lf: src.pipLF, heightIn: src.pipHeightIn, subEach: '', wpRows: [blankWpRow()] },
+    ]
   return [DEFAULT_PIP()]
+}
+function initModularWalls(src = {}) {
+  if (src.modularWalls)
+    return src.modularWalls.map(w => ({
+      blockType: DEFAULT_BLOCK_NAME,
+      vendor: 'House',
+      subEach: '',
+      ...w,
+      wpRows: initWallWp(w),
+    }))
+  return [DEFAULT_MODULAR()]
 }
 function initWpRows(src = {}) {
   if (Array.isArray(src.wpRows) && src.wpRows.length)
@@ -726,15 +820,30 @@ function initWallFinishRows(src = {}) {
   return rows.length ? rows : [blankWallFinishRow(), { ...blankWallFinishRow(), type: 'Ledgerstone' }]
 }
 function makeTab(src = {}) {
+  const cmuWalls = initCmuWalls(src)
+  // Legacy estimates stored a single tab-level waterproofing set (wpRows /
+  // wpType / wpSF) that rendered inside the CMU section. Waterproofing is now
+  // per wall, so fold any legacy tab-level entries onto the first CMU wall —
+  // this keeps old estimates' totals byte-for-byte identical.
+  if (!src.cmuWalls) {
+    const legacyWp = initWpRows(src).filter(w => w.type && w.type !== 'None')
+    if (legacyWp.length && cmuWalls[0]) {
+      const existing = (cmuWalls[0].wpRows || []).filter(w => w.type && w.type !== 'None')
+      const merged = [...existing, ...legacyWp]
+      cmuWalls[0].wpRows = merged.length ? merged : [blankWpRow()]
+    }
+  }
   return {
     difficulty: src.difficulty ?? '',
     hoursAdj: src.hoursAdj ?? '',
     wallType: src.wallType ?? 'CMU',
     distanceLF: src.distanceLF ?? '',
-    cmuWalls: initCmuWalls(src),
+    cmuWalls,
     cmuFootingPump: src.cmuFootingPump ?? 'No',
     cmuGroutPump: src.cmuGroutPump ?? 'No',
     pipWalls: initPipWalls(src),
+    modularWalls: initModularWalls(src),
+    modularFootingPump: src.modularFootingPump ?? 'No',
     timberLF: src.timberLF ?? '',
     timberHeightIn: src.timberHeightIn ?? '',
     timberType: src.timberType ?? 'Railroad Treated',
@@ -742,9 +851,116 @@ function makeTab(src = {}) {
     timberSubEach: src.timberSubEach ?? '',
     wallFinishRows: initWallFinishRows(src),
     capRows: src.capRows ? src.capRows.map(r => ({ vendor: 'House', subEach: '', ...r })) : DEFAULT_CAP_ROWS.map(r => ({ ...r })),
-    wpRows: initWpRows(src),
     manualRows: src.manualRows ?? DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
   }
+}
+
+// ── Per-wall Waterproofing sub-section ────────────────────────────────────────
+// Renders inside every wall entry (CMU / PIP / Modular). Edits the wall's own
+// wpRows via the supplied handlers. "None" rows contribute nothing.
+function WallWaterproofing({
+  wpRows,
+  vendorOptions,
+  materialPrices,
+  materialRows,
+  isSub,
+  refreshAllRates,
+  onWpUpdate,
+  onWpAdd,
+  onWpRemove,
+}) {
+  const rows = Array.isArray(wpRows) && wpRows.length ? wpRows : [blankWpRow()]
+  const rr = key => materialPrices?.[WALL_RATES[key].db] ?? WALL_RATES[key].fb
+  return (
+    <div className="mt-3 border-t border-gray-100 pt-2">
+      <label className="block text-xs text-gray-500 mb-1 font-medium">Waterproofing</label>
+      <div className="space-y-2">
+        {rows.map((row, i) => {
+          const wpKey = WP_KEY[row.type]
+          const wpc = computeWpRow(row, materialPrices, materialRows)
+          return (
+            <div key={i} className="flex items-center gap-2 flex-wrap">
+              <select
+                className="input text-sm py-1.5 w-40"
+                value={row.vendor || 'House'}
+                onChange={e => onWpUpdate(i, 'vendor', e.target.value)}
+              >
+                {vendorOptions.map(o => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="input text-sm py-1.5 flex-1 min-w-[10rem]"
+                value={row.type}
+                onChange={e => onWpUpdate(i, 'type', e.target.value)}
+              >
+                <option>None</option>
+                <option>Primer &amp; Membrane</option>
+                <option>3 Coats Roll On</option>
+                <option>Thoroseal &amp; Roll On</option>
+                <option>Dimple Membrane</option>
+              </select>
+              {row.type !== 'None' && (
+                <NumInput
+                  value={row.sf}
+                  onChange={v => onWpUpdate(i, 'sf', v)}
+                  placeholder="0"
+                  className="w-28"
+                />
+              )}
+              {row.type !== 'None' && <span className="text-xs text-gray-400 shrink-0">SF</span>}
+              {row.type !== 'None' && wpKey && (
+                <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+                  ${wallMatPrice(WALL_RATES[wpKey].db, row.vendor, materialRows, materialPrices, WALL_RATES[wpKey].fb).toFixed(2)}/SF
+                  <RateEditPopover
+                    table="material_rates"
+                    name={WALL_RATES[wpKey].db}
+                    category="Walls"
+                    unitLabel="SF"
+                    currentValue={rr(wpKey)}
+                    onSaved={refreshAllRates}
+                  />
+                </span>
+              )}
+              {isSub && row.type !== 'None' && (
+                <div className="relative w-24">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                    $
+                  </span>
+                  <input
+                    type="number"
+                    step="any"
+                    className="input text-sm py-1.5 pl-5 w-full"
+                    placeholder={r2(wpc.subUnit).toString()}
+                    value={row.subEach ?? ''}
+                    onChange={e => onWpUpdate(i, 'subEach', e.target.value)}
+                  />
+                </div>
+              )}
+              {rows.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => onWpRemove(i)}
+                  className="text-xs text-red-400 hover:text-red-600 px-2 py-0.5 rounded border border-red-100 hover:border-red-300"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          )
+        })}
+        <button
+          type="button"
+          onClick={onWpAdd}
+          className="w-full py-1.5 rounded-lg border border-dashed border-green-400 text-green-700 text-xs font-medium hover:bg-green-50 transition-colors"
+        >
+          + Add another waterproofing line
+        </button>
+      </div>
+    </div>
+  )
 }
 
 // ── CMU Wall Entry ────────────────────────────────────────────────────────────
@@ -760,6 +976,9 @@ function CmuWallEntry({
   vendorOptions,
   isSub,
   refreshAllRates,
+  onWpUpdate,
+  onWpAdd,
+  onWpRemove,
 }) {
   const set = field => val => onChange(idx, field, val)
   const hasData = n(wall.lf) > 0 && n(wall.heightIn) > 0
@@ -930,12 +1149,38 @@ function CmuWallEntry({
           </span>
         </div>
       )}
+      <WallWaterproofing
+        wpRows={wall.wpRows}
+        vendorOptions={vendorOptions}
+        materialPrices={materialPrices}
+        materialRows={materialRows}
+        isSub={isSub}
+        refreshAllRates={refreshAllRates}
+        onWpUpdate={onWpUpdate}
+        onWpAdd={onWpAdd}
+        onWpRemove={onWpRemove}
+      />
     </div>
   )
 }
 
 // ── PIP Wall Entry ────────────────────────────────────────────────────────────
-function PipWallEntry({ wall, idx, total, onChange, onRemove, detail, vendorOptions, isSub }) {
+function PipWallEntry({
+  wall,
+  idx,
+  total,
+  onChange,
+  onRemove,
+  detail,
+  vendorOptions,
+  isSub,
+  materialPrices,
+  materialRows,
+  refreshAllRates,
+  onWpUpdate,
+  onWpAdd,
+  onWpRemove,
+}) {
   const set = field => val => onChange(idx, field, val)
   const hasData = n(wall.lf) > 0 && n(wall.heightIn) > 0
   return (
@@ -1028,6 +1273,180 @@ function PipWallEntry({ wall, idx, total, onChange, onRemove, detail, vendorOpti
           </span>
         </div>
       )}
+      <WallWaterproofing
+        wpRows={wall.wpRows}
+        vendorOptions={vendorOptions}
+        materialPrices={materialPrices}
+        materialRows={materialRows}
+        isSub={isSub}
+        refreshAllRates={refreshAllRates}
+        onWpUpdate={onWpUpdate}
+        onWpAdd={onWpAdd}
+        onWpRemove={onWpRemove}
+      />
+    </div>
+  )
+}
+
+// ── Modular Wall Entry ────────────────────────────────────────────────────────
+// Same fields as a CMU wall MINUS rebar spacing, horiz bars, bond-beam courses
+// and % grouted solid. Titled "Wall Installation N".
+function ModularWallEntry({
+  wall,
+  idx,
+  total,
+  onChange,
+  onRemove,
+  detail,
+  materialPrices,
+  materialRows,
+  vendorOptions,
+  isSub,
+  refreshAllRates,
+  onWpUpdate,
+  onWpAdd,
+  onWpRemove,
+}) {
+  const set = field => val => onChange(idx, field, val)
+  return (
+    <div className="border border-gray-200 rounded-xl p-3 mb-3 bg-white">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+          Wall Installation {idx + 1}
+        </span>
+        {total > 1 && (
+          <button
+            onClick={() => onRemove(idx)}
+            className="text-xs text-red-400 hover:text-red-600 px-2 py-0.5 rounded border border-red-100 hover:border-red-300 transition-colors"
+          >
+            Remove
+          </button>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="col-span-2">
+          <label className="block text-xs text-gray-500 mb-1">Vendor</label>
+          <select
+            className="input text-sm py-1.5 w-full"
+            value={wall.vendor || 'House'}
+            onChange={e => set('vendor')(e.target.value)}
+          >
+            {(vendorOptions || [{ value: 'House', label: 'Unspecified' }]).map(o => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="col-span-2">
+          <label className="block text-xs text-gray-500 mb-1">Block Type</label>
+          <select
+            className="input text-sm py-1.5 w-full"
+            value={wall.blockType || ''}
+            onChange={e => set('blockType')(e.target.value)}
+          >
+            {CMU_BLOCK_TYPES.map(b => (
+              <option key={b.name} value={b.name}>
+                {b.name} — {b.w}×{b.h}×{b.l}
+              </option>
+            ))}
+          </select>
+          {(() => {
+            const b = blockByName(wall.blockType)
+            const price = wallMatPrice(
+              wallBlockRateName(b.name),
+              wall.vendor,
+              materialRows,
+              materialPrices,
+              b.price
+            )
+            const housePrice = materialPrices?.[wallBlockRateName(b.name)] ?? b.price
+            return (
+              <div className="mt-1 flex items-center gap-1 text-[11px] text-gray-500">
+                <span>
+                  Price: <strong className="text-gray-800">${price.toFixed(2)}</strong>/ea
+                </span>
+                <RateEditPopover
+                  table="material_rates"
+                  name={wallBlockRateName(b.name)}
+                  category="Walls"
+                  unitLabel="ea"
+                  currentValue={housePrice}
+                  onSaved={refreshAllRates}
+                />
+              </div>
+            )
+          })()}
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Linear Feet</label>
+          <NumInput value={wall.lf} onChange={set('lf')} placeholder="0" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Wall Height (in)</label>
+          <NumInput value={wall.heightIn} onChange={set('heightIn')} placeholder="48" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Footing Width (in)</label>
+          <NumInput value={wall.footingWIn} onChange={set('footingWIn')} placeholder="12" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Footing Depth (in)</label>
+          <NumInput value={wall.footingDIn} onChange={set('footingDIn')} placeholder="12" />
+        </div>
+        <div className="col-span-2 sm:col-span-1">
+          <label className="block text-xs text-gray-500 mb-1">% of Wall Curved</label>
+          <div className="relative">
+            <NumInput value={wall.pctCurved} onChange={set('pctCurved')} placeholder="0" />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+          </div>
+        </div>
+      </div>
+      {detail && (n(wall.lf) > 0 && n(wall.heightIn) > 0) && (
+        <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 text-xs text-gray-600 flex flex-wrap gap-3">
+          <span>
+            Block: <strong>{detail.orderGreyBlock}</strong>
+          </span>
+          <span>
+            Footing: <strong>{detail.footingCY.toFixed(3)} CY</strong>
+          </span>
+          {detail.curveAdd > 0 && (
+            <span>
+              Curve: <strong>+{detail.curveAdd.toFixed(2)} hrs</strong>
+            </span>
+          )}
+        </div>
+      )}
+      {isSub && (
+        <div className="mt-2 flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-gray-500">Sub flat $/LF</span>
+          <div className="relative w-28">
+            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+            <input
+              type="number"
+              step="any"
+              className="input text-sm py-1.5 pl-5 w-full"
+              placeholder={detail ? (detail.subUnit || 0).toFixed(2) : '0.00'}
+              value={wall.subEach ?? ''}
+              onChange={e => set('subEach')(e.target.value)}
+            />
+          </div>
+          <span className="text-[11px] text-gray-400">
+            default = material ÷ LF · no labor billed on Sub
+          </span>
+        </div>
+      )}
+      <WallWaterproofing
+        wpRows={wall.wpRows}
+        vendorOptions={vendorOptions}
+        materialPrices={materialPrices}
+        materialRows={materialRows}
+        isSub={isSub}
+        refreshAllRates={refreshAllRates}
+        onWpUpdate={onWpUpdate}
+        onWpAdd={onWpAdd}
+        onWpRemove={onWpRemove}
+      />
     </div>
   )
 }
@@ -1153,6 +1572,10 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
   const setCmuGroutPump = setField('cmuGroutPump')
   const pipWalls = cur.pipWalls
   const setPipWalls = setField('pipWalls')
+  const modularWalls = cur.modularWalls
+  const setModularWalls = setField('modularWalls')
+  const modularFootingPump = cur.modularFootingPump
+  const setModularFootingPump = setField('modularFootingPump')
   const timberLF = cur.timberLF
   const setTimberLF = setField('timberLF')
   const timberHeightIn = cur.timberHeightIn
@@ -1167,19 +1590,46 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
   const setWallFinishRows = setField('wallFinishRows')
   const capRows = cur.capRows
   const setCapRows = setField('capRows')
-  const wpRows = cur.wpRows
-  const setWpRows = setField('wpRows')
   const manualRows = cur.manualRows
   const setManualRows = setField('manualRows')
-  function updateWpRow(i, field, val) {
-    setWpRows(rs => rs.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
-  }
-  function addWpRow() {
-    setWpRows(rs => [...rs, blankWpRow()])
-  }
-  function removeWpRow(idx) {
-    setWpRows(rs => (rs.length > 1 ? rs.filter((_, i) => i !== idx) : rs))
-  }
+
+  // Per-wall waterproofing helpers. Given a wall-array setter and a wall index,
+  // they mutate that wall's own wpRows without touching sibling walls.
+  const makeWpHandlers = (setWalls, wallIdx) => ({
+    onWpUpdate: (wpIdx, field, val) =>
+      setWalls(ws =>
+        ws.map((w, i) =>
+          i === wallIdx
+            ? {
+                ...w,
+                wpRows: (w.wpRows || [blankWpRow()]).map((r, j) =>
+                  j === wpIdx ? { ...r, [field]: val } : r
+                ),
+              }
+            : w
+        )
+      ),
+    onWpAdd: () =>
+      setWalls(ws =>
+        ws.map((w, i) =>
+          i === wallIdx ? { ...w, wpRows: [...(w.wpRows || []), blankWpRow()] } : w
+        )
+      ),
+    onWpRemove: wpIdx =>
+      setWalls(ws =>
+        ws.map((w, i) =>
+          i === wallIdx
+            ? {
+                ...w,
+                wpRows:
+                  (w.wpRows || []).length > 1
+                    ? w.wpRows.filter((_, j) => j !== wpIdx)
+                    : w.wpRows,
+              }
+            : w
+        )
+      ),
+  })
 
   // ── Sales tax — applied to totalMat across every module so the bid
   //    reflects supplier-invoiced material cost. Sourced from
@@ -1215,6 +1665,16 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
   }
   function removePipWall(idx) {
     setPipWalls(ws => ws.filter((_, i) => i !== idx))
+  }
+
+  function updateModularWall(idx, field, val) {
+    setModularWalls(ws => ws.map((w, i) => (i === idx ? { ...w, [field]: val } : w)))
+  }
+  function addModularWall() {
+    setModularWalls(ws => [...ws, DEFAULT_MODULAR()])
+  }
+  function removeModularWall(idx) {
+    setModularWalls(ws => ws.filter((_, i) => i !== idx))
   }
 
   function updateManual(i, field, val) {
@@ -1698,7 +2158,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
             {
               key: 'Modular',
               label: 'Modular',
-              count: 0,
+              count: modularWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0).length,
             },
             {
               key: 'Brick',
@@ -1949,6 +2409,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
               vendorOptions={vendorOptions}
               isSub={isSub}
               refreshAllRates={refreshAllRates}
+              {...makeWpHandlers(setCmuWalls, idx)}
             />
           ))}
 
@@ -1985,97 +2446,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
               </select>
             </LabeledRow>
           </div>
-
-          {/* Waterproofing — multiple rows so different wall sections can
-              get different specs. "None" rows contribute nothing. */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1 font-medium">Waterproofing</label>
-            <div className="space-y-2">
-              {wpRows.map((row, i) => {
-                const wpKey = WP_KEY[row.type]
-                const wpc = computeWpRow(row, materialPrices, materialRows)
-                return (
-                  <div key={i} className="flex items-center gap-2 flex-wrap">
-                    <select
-                      className="input text-sm py-1.5 w-40"
-                      value={row.vendor || 'House'}
-                      onChange={e => updateWpRow(i, 'vendor', e.target.value)}
-                    >
-                      {vendorOptions.map(o => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      className="input text-sm py-1.5 flex-1"
-                      value={row.type}
-                      onChange={e => updateWpRow(i, 'type', e.target.value)}
-                    >
-                      <option>None</option>
-                      <option>Primer &amp; Membrane</option>
-                      <option>3 Coats Roll On</option>
-                      <option>Thoroseal &amp; Roll On</option>
-                      <option>Dimple Membrane</option>
-                    </select>
-                    {row.type !== 'None' && (
-                      <NumInput
-                        value={row.sf}
-                        onChange={v => updateWpRow(i, 'sf', v)}
-                        placeholder="0"
-                        className="w-28"
-                      />
-                    )}
-                    {row.type !== 'None' && (
-                      <span className="text-xs text-gray-400 shrink-0">SF</span>
-                    )}
-                    {row.type !== 'None' && wpKey && (
-                      <span className="inline-flex items-center gap-1 text-xs text-gray-400">
-                        ${wallMatPrice(WALL_RATES[wpKey].db, row.vendor, materialRows, materialPrices, WALL_RATES[wpKey].fb).toFixed(2)}/SF
-                        <RateEditPopover
-                          table="material_rates"
-                          name={WALL_RATES[wpKey].db}
-                          category="Walls"
-                          unitLabel="SF"
-                          currentValue={r(wpKey)}
-                          onSaved={refreshAllRates}
-                        />
-                      </span>
-                    )}
-                    {isSub && row.type !== 'None' && (
-                      <div className="relative w-24">
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                          $
-                        </span>
-                        <input
-                          type="number"
-                          step="any"
-                          className="input text-sm py-1.5 pl-5 w-full"
-                          placeholder={r2(wpc.subUnit).toString()}
-                          value={row.subEach ?? ''}
-                          onChange={e => updateWpRow(i, 'subEach', e.target.value)}
-                        />
-                      </div>
-                    )}
-                    {wpRows.length > 1 && (
-                      <button
-                        onClick={() => removeWpRow(i)}
-                        className="text-xs text-red-400 hover:text-red-600 px-2 py-0.5 rounded border border-red-100 hover:border-red-300"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                )
-              })}
-              <button
-                onClick={addWpRow}
-                className="w-full py-1.5 rounded-lg border border-dashed border-green-400 text-green-700 text-xs font-medium hover:bg-green-50 transition-colors"
-              >
-                + Add another waterproofing line
-              </button>
-            </div>
-          </div>
+          {/* Waterproofing is now specified per wall — see each Wall entry above. */}
         </div>
       )}
 
@@ -2138,6 +2509,10 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
               detail={calc.pipDetails[idx] || null}
               vendorOptions={vendorOptions}
               isSub={isSub}
+              materialPrices={materialPrices}
+              materialRows={materialRows}
+              refreshAllRates={refreshAllRates}
+              {...makeWpHandlers(setPipWalls, idx)}
             />
           ))}
 
@@ -2147,6 +2522,57 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
           >
             + Add Another PIP Wall
           </button>
+        </div>
+      )}
+
+      {/* ── Modular Block Walls ── */}
+      {wallType === 'Modular' && (
+        <div>
+          <SectionHeader title="Modular Block Walls" />
+
+          {modularWalls.map((wall, idx) => (
+            <ModularWallEntry
+              key={idx}
+              wall={wall}
+              idx={idx}
+              total={modularWalls.length}
+              onChange={updateModularWall}
+              onRemove={removeModularWall}
+              detail={calc.modularDetails[idx] || null}
+              materialPrices={materialPrices}
+              materialRows={materialRows}
+              vendorOptions={vendorOptions}
+              isSub={isSub}
+              refreshAllRates={refreshAllRates}
+              {...makeWpHandlers(setModularWalls, idx)}
+            />
+          ))}
+
+          <button
+            onClick={addModularWall}
+            className="w-full py-2 rounded-lg border border-dashed border-green-400 text-green-700 text-sm font-medium hover:bg-green-50 transition-colors mb-3"
+          >
+            + Add Another Modular Wall
+          </button>
+
+          {/* Module-level pump options — footing only (no grouting for modular). */}
+          <div className="border border-gray-200 rounded-xl p-3 bg-gray-50 space-y-0 mb-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              Pump Options (all walls)
+            </p>
+            <LabeledRow label="Pump for Pouring Footing?">
+              <select
+                className="input text-sm py-1.5 w-24"
+                value={modularFootingPump}
+                onChange={e => setModularFootingPump(e.target.value)}
+              >
+                <option>No</option>
+                <option>Yes</option>
+              </select>
+            </LabeledRow>
+          </div>
+          {/* Waterproofing + wall caps: waterproofing is per wall above; caps
+              are shown in the shared Wall Caps section below. */}
         </div>
       )}
 
@@ -2215,8 +2641,8 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
         </div>
       )}
 
-      {/* ── Wall Finishes ── */}
-      {renderWallFinishSection()}
+      {/* ── Wall Finishes ── (hidden on the Modular tab) */}
+      {wallType !== 'Modular' && renderWallFinishSection()}
 
       {/* ── Wall Caps ── */}
       {renderCapSection()}

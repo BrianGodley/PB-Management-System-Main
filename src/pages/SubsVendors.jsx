@@ -312,7 +312,15 @@ export default function SubsVendors({ mode = 'sub' }) {
     refresh()
   }
 
+  // The "Unspecified" vendor is a permanent system record (the House / no-vendor
+  // stand-in) and must never be deletable.
+  const isProtectedVendor = s => (s?.company_name || '').trim().toLowerCase() === 'unspecified'
+
   async function deleteSub(sub) {
+    if (isProtectedVendor(sub)) {
+      alert('"Unspecified" is a permanent system vendor and cannot be deleted.')
+      return
+    }
     if (!confirm(`Delete "${sub.company_name}"? This cannot be undone.`)) return
     await supabase.from('subs_vendors').delete().eq('id', sub.id)
     refresh()
@@ -1122,6 +1130,7 @@ export default function SubsVendors({ mode = 'sub' }) {
                                   />
                                 </svg>
                               </button>
+                              {!isProtectedVendor(sub) && (
                               <button
                                 onClick={() => deleteSub(sub)}
                                 className="p-1.5 rounded hover:bg-red-100 text-gray-400 hover:text-red-500"
@@ -1140,6 +1149,7 @@ export default function SubsVendors({ mode = 'sub' }) {
                                   />
                                 </svg>
                               </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1457,7 +1467,7 @@ export default function SubsVendors({ mode = 'sub' }) {
               onSave={saveSub}
               onClose={closeModal}
               onDelete={
-                editSub
+                editSub && !isProtectedVendor(editSub)
                   ? () => {
                       deleteSub(editSub)
                       closeModal()
