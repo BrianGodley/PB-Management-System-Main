@@ -125,6 +125,37 @@ const CAP_META = {
 const CAP_LIST = Object.keys(CAP_META)
 const CAP_ROW = () => ({ vendor: 'House', type: 'Flagstone', lf: '' })
 
+// ── Master-list finish/cap support ───────────────────────────────────────────
+// A material_rates row tagged sub_category=cat (Unspecified) becomes a selectable
+// finish/cap Type. Its material unit is the row's unit_cost; every other calc
+// parameter (unit mode, labMode, waste, tonPerSF, laborCoeff, …) comes from its
+// calc_meta JSON. Built-in types keep their exact WF_META/FP_RATES path unchanged.
+function masterWallMeta(cat, typeLabel, materialRows) {
+  const r = catalogItemFor(materialRows, cat, 'House', typeLabel, {
+    houseRows: 'null-vendor',
+    stripPrefix: true,
+    fallbackFirst: false,
+  })
+  if (!r) return null
+  const m = r.calc_meta || {}
+  return {
+    ...m,
+    unit: m.unit || 'SF',
+    labMode: m.labMode || 'perSF',
+    matUnit: n(r.unit_cost),
+    laborCoeff: n(m.laborCoeff),
+    dbName: r.name,
+    master: true,
+  }
+}
+// Section Type options = built-in labels + master-list additions (deduped).
+function masterWallOptions(cat, builtInList, materialRows) {
+  const extra = catalogOptions(materialRows, cat, 'House', { houseRows: 'null-vendor', stripPrefix: true })
+    .map(o => o.label)
+    .filter(l => !builtInList.includes(l))
+  return extra.length ? [...builtInList, ...extra] : builtInList
+}
+
 // ── Electrical & Plumbing catalog — GAS ONLY (ported from Utilities module) ────
 // Rates live in material_rates / labor_rates under category 'Utilities' so they
 // stay a single source of truth shared with the Utilities module. Fallbacks
@@ -364,10 +395,12 @@ function calcFirePit(
 
   // ── Wall finish per-row calc: material (vendor-overridable unit) + labor ──────
   const finishRowCalc = row => {
-    const meta = WF_META[row.type]
+    const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows)
     const sf = n(row.sf)
     if (!meta || sf <= 0) return { mat: 0, hrs: 0 }
-    const houseUnit = p(FP_RATES[meta.key].dbName, FP_RATES[meta.key].fallback)
+    const houseUnit = meta.master
+      ? meta.matUnit
+      : p(FP_RATES[meta.key].dbName, FP_RATES[meta.key].fallback)
     const unit = wfVendorPrice(row.vendor, row.type, materialRows, WF_CAT) ?? houseUnit
     let mat = 0
     if (meta.unit === 'ton') {
@@ -383,7 +416,9 @@ function calcFirePit(
         (meta.screwPer5 ? (sf / 5) * meta.screwPer5 : 0) +
         (meta.adhesivePerSF ? sf * meta.adhesivePerSF : 0)
     }
-    const labRate = p(FP_RATES[meta.labKey].dbName, FP_RATES[meta.labKey].fallback)
+    const labRate = meta.master
+      ? meta.laborCoeff
+      : p(FP_RATES[meta.labKey].dbName, FP_RATES[meta.labKey].fallback)
     const hrs = meta.labMode === 'perDay' ? (labRate > 0 ? (sf / labRate) * 8 : 0) : sf * labRate
     return { mat, hrs, unit }
   }
@@ -393,12 +428,16 @@ function calcFirePit(
 
   // ── Wall cap per-row calc: $/LF material (vendor-overridable) + hrs/LF labor ──
   const capRowCalc = row => {
-    const meta = CAP_META[row.type]
+    const meta = CAP_META[row.type] || masterWallMeta(CAP_CAT, row.type, materialRows)
     const lf = n(row.lf)
     if (!meta || lf <= 0) return { mat: 0, hrs: 0 }
-    const houseUnit = p(FP_RATES[meta.matKey].dbName, FP_RATES[meta.matKey].fallback)
+    const houseUnit = meta.master
+      ? meta.matUnit
+      : p(FP_RATES[meta.matKey].dbName, FP_RATES[meta.matKey].fallback)
     const unit = wfVendorPrice(row.vendor, row.type, materialRows, CAP_CAT) ?? houseUnit
-    const labCoef = p(FP_RATES[meta.labKey].dbName, FP_RATES[meta.labKey].fallback)
+    const labCoef = meta.master
+      ? meta.laborCoeff
+      : p(FP_RATES[meta.labKey].dbName, FP_RATES[meta.labKey].fallback)
     return { mat: lf * unit, hrs: lf * labCoef, unit }
   }
   const capCalc = (capRows || []).map(capRowCalc)
@@ -1213,7 +1252,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
             </thead>
             <tbody>
               {capRows.map((row, i) => {
-                const meta = CAP_META[row.type]
+                const meta = CAP_META[row.type] || masterWallMeta(CAP_CAT, row.type, materialRows)
                 const rc = calc.capCalc?.[i] || {}
                 return (
                   <tr key={i} className="border-b border-gray-100">
@@ -1239,13 +1278,13 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                           value={row.type}
                           onChange={e => setCapRow(i, 'type', e.target.value)}
                         >
-                          {CAP_LIST.map(t => (
+                          {masterWallOptions(CAP_CAT, CAP_LIST, materialRows).map(t => (
                             <option key={t} value={t}>
                               {t}
                             </option>
                           ))}
                         </select>
-                        {meta && (
+                        {meta && !meta.master && (
                           <RateEditPopover
                             table="material_rates"
                             name={FP_RATES[meta.matKey].dbName}
@@ -1255,7 +1294,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                             onSaved={refreshAllRates}
                           />
                         )}
-                        {meta && (
+                        {meta && !meta.master && (
                           <RateEditPopover
                             table="labor_rates"
                             name={FP_RATES[meta.labKey].dbName}
@@ -1368,7 +1407,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
             </thead>
             <tbody>
               {wallFinishRows.map((row, i) => {
-                const meta = WF_META[row.type]
+                const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows)
                 const rc = calc.wallFinishCalc?.[i] || {}
                 return (
                   <tr key={i} className="border-b border-gray-100">
@@ -1394,13 +1433,13 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                           value={row.type}
                           onChange={e => setWallFinishRow(i, 'type', e.target.value)}
                         >
-                          {WF_LIST.map(t => (
+                          {masterWallOptions(WF_CAT, WF_LIST, materialRows).map(t => (
                             <option key={t} value={t}>
                               {t}
                             </option>
                           ))}
                         </select>
-                        {meta && (
+                        {meta && !meta.master && (
                           <RateEditPopover
                             table="material_rates"
                             name={FP_RATES[meta.key].dbName}
@@ -1410,7 +1449,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                             onSaved={refreshAllRates}
                           />
                         )}
-                        {meta && (
+                        {meta && !meta.master && (
                           <RateEditPopover
                             table="labor_rates"
                             name={FP_RATES[meta.labKey].dbName}

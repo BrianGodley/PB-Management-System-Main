@@ -131,6 +131,35 @@ const WF_META = {
 const WF_LIST = Object.keys(WF_META)
 const WF_ROW = () => ({ vendor: 'House', type: 'Tile', sf: '' })
 
+// ── Master-list finish support ───────────────────────────────────────────────
+// A material_rates row tagged sub_category='Wall Finish' (Unspecified) becomes a
+// selectable finish Type: material unit = its unit_cost; unit mode / labMode /
+// waste / tonPerSF / laborCoeff come from its calc_meta. Built-ins are unchanged.
+function masterWallMeta(cat, typeLabel, materialRows) {
+  const r = catalogItemFor(materialRows, cat, 'House', typeLabel, {
+    houseRows: 'null-vendor',
+    stripPrefix: true,
+    fallbackFirst: false,
+  })
+  if (!r) return null
+  const m = r.calc_meta || {}
+  return {
+    ...m,
+    unit: m.unit || 'SF',
+    labMode: m.labMode || 'perSF',
+    matUnit: n(r.unit_cost),
+    laborCoeff: n(m.laborCoeff),
+    dbName: r.name,
+    master: true,
+  }
+}
+function masterWallOptions(cat, builtInList, materialRows) {
+  const extra = catalogOptions(materialRows, cat, 'House', { houseRows: 'null-vendor', stripPrefix: true })
+    .map(o => o.label)
+    .filter(l => !builtInList.includes(l))
+  return extra.length ? [...builtInList, ...extra] : builtInList
+}
+
 // ── Electrical & Plumbing catalog (ported from the Utilities module) ──────────
 // Rates live in material_rates / labor_rates under category 'Utilities' so they
 // stay a single source of truth shared with the Utilities module. Fallbacks
@@ -416,10 +445,12 @@ function calcOutdoorKitchen(
   const p = (dbName, fallback) => mp[dbName] ?? fallback
   // Wall finish per-row calc: material (vendor-overridable unit) + labor by type.
   const finishRowCalc = row => {
-    const meta = WF_META[row.type]
+    const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows)
     const sf = n(row.sf)
     if (!meta || sf <= 0) return { mat: 0, hrs: 0 }
-    const houseUnit = p(OK_RATES[meta.key].dbName, OK_RATES[meta.key].fallback)
+    const houseUnit = meta.master
+      ? meta.matUnit
+      : p(OK_RATES[meta.key].dbName, OK_RATES[meta.key].fallback)
     const unit = wfVendorPrice(row.vendor, row.type, materialRows) ?? houseUnit
     let mat = 0
     if (meta.unit === 'ton') {
@@ -435,7 +466,9 @@ function calcOutdoorKitchen(
         (meta.screwPer5 ? (sf / 5) * meta.screwPer5 : 0) +
         (meta.adhesivePerSF ? sf * meta.adhesivePerSF : 0)
     }
-    const labRate = p(OK_RATES[meta.labKey].dbName, OK_RATES[meta.labKey].fallback)
+    const labRate = meta.master
+      ? meta.laborCoeff
+      : p(OK_RATES[meta.labKey].dbName, OK_RATES[meta.labKey].fallback)
     const hrs = meta.labMode === 'perDay' ? (labRate > 0 ? (sf / labRate) * 8 : 0) : sf * labRate
     return { mat, hrs, unit }
   }
@@ -1536,7 +1569,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
             </thead>
             <tbody>
               {wallFinishRows.map((row, i) => {
-                const meta = WF_META[row.type]
+                const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows)
                 const rc = calc.wallFinishCalc?.[i] || {}
                 return (
                   <tr key={i} className="border-b border-gray-100">
@@ -1562,13 +1595,13 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                           value={row.type}
                           onChange={e => setWallFinishRow(i, 'type', e.target.value)}
                         >
-                          {WF_LIST.map(t => (
+                          {masterWallOptions(WF_CAT, WF_LIST, materialRows).map(t => (
                             <option key={t} value={t}>
                               {t}
                             </option>
                           ))}
                         </select>
-                        {meta && (
+                        {meta && !meta.master && (
                           <RateEditPopover
                             table="material_rates"
                             name={OK_RATES[meta.key].dbName}
@@ -1578,7 +1611,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                             onSaved={refreshAllRates}
                           />
                         )}
-                        {meta && (
+                        {meta && !meta.master && (
                           <RateEditPopover
                             table="labor_rates"
                             name={OK_RATES[meta.labKey].dbName}
