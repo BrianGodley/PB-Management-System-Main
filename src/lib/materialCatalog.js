@@ -40,6 +40,42 @@ export function resolveMaterialPriceById(id, materialRows, fallback = 0) {
   return fallback
 }
 
+// ── Price ledger (Phase 4 — normalized multi-vendor pricing) ─────────────────
+// The current OPEN price per (material, vendor) lives in material_price_history
+// (effective_end IS NULL). fetchOpenPriceLedger returns a map keyed by material
+// id → { [vendor_id | '__house__']: unit_cost }. ledgerPrice resolves a
+// material+vendor from that map, falling back to the supplied default (usually
+// the row's own unit_cost). Today the open price equals unit_cost (backfilled),
+// so this is price-preserving; it becomes multi-vendor once writers populate
+// per-vendor ledger rows.
+const HOUSE_KEY = '__house__'
+export async function fetchOpenPriceLedger(materialIds) {
+  const ids = [...new Set((materialIds || []).filter(Boolean))]
+  if (!ids.length) return {}
+  const { data } = await supabase
+    .from('material_price_history')
+    .select('material_rate_id, vendor_id, unit_cost')
+    .in('material_rate_id', ids)
+    .is('effective_end', null)
+  const map = {}
+  ;(data || []).forEach(r => {
+    const k = r.vendor_id ?? HOUSE_KEY
+    if (!map[r.material_rate_id]) map[r.material_rate_id] = {}
+    map[r.material_rate_id][k] = parseFloat(r.unit_cost)
+  })
+  return map
+}
+
+export function ledgerPrice(ledgerById, materialId, vendorId, fallback = 0) {
+  const led = ledgerById?.[materialId]
+  if (led) {
+    const vk = vendorId && vendorId !== 'House' ? vendorId : HOUSE_KEY
+    if (led[vk] != null) return led[vk]
+    if (led[HOUSE_KEY] != null) return led[HOUSE_KEY]
+  }
+  return num(fallback)
+}
+
 // Shared catalog hook. Fetches, for one or more `categories`:
 //   • priceMap  — name → unit_cost (materials) merged with name → rate (labor coefficients)
 //   • materialRows — {id,name,vendor_id,unit,unit_cost,category,sub_category,subcategory}

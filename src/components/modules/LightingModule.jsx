@@ -6,6 +6,7 @@ import GpmdBar from './GpmdBar'
 import ModuleNotesField from './ModuleNotesField'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
+import { fetchOpenPriceLedger, ledgerPrice } from '../../lib/materialCatalog'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Lighting Module — per-vendor catalog layout (mirrors PaverModule).
@@ -73,7 +74,10 @@ function defaultSubEach(item) {
 
 // ── Calculation ──────────────────────────────────────────────────────────────
 // Processes a section's rows → { hrs, mat, watts, va, sub }.
-function processSection(subcat, rows, materialRows) {
+// priceOf(item) resolves the item's current MATERIAL unit cost — from the price
+// ledger when available, else the row's own unit_cost. Defaults to unit_cost so
+// the calc still works when no ledger is supplied.
+function processSection(subcat, rows, materialRows, priceOf = item => n(item.unit_cost)) {
   let hrs = 0,
     mat = 0,
     watts = 0,
@@ -84,16 +88,17 @@ function processSection(subcat, rows, materialRows) {
     if (qty <= 0) return
     const item = lightingItemFor(subcat, r.vendor, r.itemId, materialRows)
     if (!item) return
+    const cost = priceOf(item)
     watts += qty * n(item.watts)
     va += qty * n(item.va)
     hrs += qty * n(item.labor_hrs_ea)
-    mat += qty * n(item.unit_cost)
+    mat += qty * cost
     const each =
       r.subEach !== '' && r.subEach != null
         ? n(r.subEach)
         : item.sub_price_ea != null
           ? n(item.sub_price_ea)
-          : n(item.unit_cost)
+          : cost
     sub += qty * each
   })
   return { hrs, mat, watts, va, sub }
@@ -105,16 +110,17 @@ function calcLighting(
   materialRows = [],
   gpmd = DEFAULTS.gpmd,
   walkAccess = null,
-  laborBurdenPct = DEFAULTS.laborBurdenPct
+  laborBurdenPct = DEFAULTS.laborBurdenPct,
+  priceOf = item => n(item.unit_cost)
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const { difficulty, hoursAdj, fixtureRows, transformerRows, wireRows, manualRows, distanceLF } =
     state
   const isSub = state.subType === 'Subcontractor'
 
-  const fx = processSection(LIGHT_CAT.fixture, fixtureRows, materialRows)
-  const xf = processSection(LIGHT_CAT.transformer, transformerRows, materialRows)
-  const wr = processSection(LIGHT_CAT.wire, wireRows, materialRows)
+  const fx = processSection(LIGHT_CAT.fixture, fixtureRows, materialRows, priceOf)
+  const xf = processSection(LIGHT_CAT.transformer, transformerRows, materialRows, priceOf)
+  const wr = processSection(LIGHT_CAT.wire, wireRows, materialRows, priceOf)
 
   // Electrical load (fixtures) is shown on both tabs for transformer sizing.
   const totalWatts = fx.watts + xf.watts + wr.watts
@@ -235,6 +241,8 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
   const [materialRows, setMaterialRows] = useState(initialData?.materialRows || [])
   const [vendors, setVendors] = useState([])
   const [loading, setLoading] = useState(true)
+  // Phase 4 price ledger: current open price per (material, vendor).
+  const [ledger, setLedger] = useState({})
 
   // Re-fetch the lighting catalog + vendor list. Used on mount.
   const refreshCatalog = useCallback(async () => {
@@ -250,6 +258,8 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
         .order('company_name'),
     ])
     setMaterialRows(matRes.data || [])
+    // Load the current per-vendor price ledger for these materials.
+    fetchOpenPriceLedger((matRes.data || []).map(r => r.id)).then(setLedger)
     setVendors(
       (venRes.data || []).map(v => ({
         id: v.id,
@@ -335,6 +345,10 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
     }
   }, [])
 
+  // Resolve an item's material cost from the price ledger (per-vendor), falling
+  // back to the row's own unit_cost. Shared by the calc + the render display.
+  const priceOf = item => (item ? ledgerPrice(ledger, item.id, item.vendor_id, n(item.unit_cost)) : 0)
+
   const calcRaw = calcLighting(
     {
       difficulty,
@@ -351,7 +365,8 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
     materialRows,
     gpmd,
     walkAccess,
-    laborBurdenPct
+    laborBurdenPct,
+    priceOf
   )
   const _salesTaxAmt = (calcRaw.totalMat || 0) * (salesTaxRate || 0)
   const calc =
@@ -480,15 +495,16 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
                 const qty = n(row.qty)
                 const watts = item ? qty * n(item.watts) : 0
                 const laborHrs = item ? qty * n(item.labor_hrs_ea) : 0
+                const itemCost = priceOf(item)
                 const eachSub =
                   row.subEach !== '' && row.subEach != null
                     ? n(row.subEach)
                     : item
                       ? item.sub_price_ea != null
                         ? n(item.sub_price_ea)
-                        : n(item.unit_cost)
+                        : itemCost
                       : 0
-                const material = isSub ? qty * eachSub : item ? qty * n(item.unit_cost) : 0
+                const material = isSub ? qty * eachSub : item ? qty * itemCost : 0
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1.5 pr-2">
