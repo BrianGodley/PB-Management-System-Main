@@ -59,7 +59,7 @@ function groutCyPerBlock(b) {
 const WALL_RATES = {
   greyBlock: { db: 'Wall Grey Block', fb: 2.59 },
   bondbeamBlock: { db: 'Wall Bondbeam Block', fb: 2.59 },
-  rebar: { db: 'Wall Rebar', fb: 1.399 },
+  rebar: { db: 'Wall Rebar', fb: 1.388 }, // canonical rebar $/LF (shared Basic Materials value)
   concreteHand: { db: 'Wall Concrete Hand Mix', fb: 92.0 },
   concreteTruck: { db: 'Wall Concrete Truck', fb: 185.0 },
   groutPumpSetup: { db: 'Wall Grout Pump Setup', fb: 402.5 },
@@ -129,6 +129,19 @@ const DEFAULT_PIP = () => ({
 // reinforced the same way). Prices out via calcOneModular, which reuses the
 // CMU block+footing math with those inputs forced to zero.
 const DEFAULT_MODULAR = () => ({
+  blockType: DEFAULT_BLOCK_NAME,
+  vendor: 'House',
+  lf: '',
+  heightIn: '',
+  footingWIn: '12',
+  footingDIn: '12',
+  pctCurved: '0',
+  subEach: '',
+  wpRows: [blankWpRow()],
+})
+// Brick wall — same structure/pricing model as Modular (block + footing, no
+// grout/rebar), just a different wall category.
+const DEFAULT_BRICK = () => ({
   blockType: DEFAULT_BLOCK_NAME,
   vendor: 'House',
   lf: '',
@@ -521,7 +534,8 @@ function calcWalls(
     structuralSubMat = 0
   let cmuDetails = [],
     pipDetails = [],
-    modularDetails = []
+    modularDetails = [],
+    brickDetails = []
   // Waterproofing now lives per-wall; accumulate each wall's wp into the wp
   // bucket (kept separate so the summary's Waterproofing line still works).
   let wallWpHrs = 0,
@@ -560,6 +574,14 @@ function calcWalls(
     structuralSubMat += res.subMat
     addWp(res)
     modularDetails.push(res.detail)
+  })
+  ;(state.brickWalls || []).forEach(wall => {
+    const res = calcOneModular(wall, state.brickFootingPump, r, mp, materialRows)
+    structuralHrs += res.hrs
+    structuralMat += res.mat
+    structuralSubMat += res.subMat
+    addWp(res)
+    brickDetails.push(res.detail)
   })
 
   if (n(state.timberLF) > 0 || n(state.timberPosts) > 0) {
@@ -682,6 +704,7 @@ function calcWalls(
     cmuDetails,
     pipDetails,
     modularDetails,
+    brickDetails,
     finishRows,
     capResults,
   }
@@ -786,6 +809,17 @@ function initModularWalls(src = {}) {
     }))
   return [DEFAULT_MODULAR()]
 }
+function initBrickWalls(src = {}) {
+  if (src.brickWalls)
+    return src.brickWalls.map(w => ({
+      blockType: DEFAULT_BLOCK_NAME,
+      vendor: 'House',
+      subEach: '',
+      ...w,
+      wpRows: initWallWp(w),
+    }))
+  return [DEFAULT_BRICK()]
+}
 function initWpRows(src = {}) {
   if (Array.isArray(src.wpRows) && src.wpRows.length)
     return src.wpRows.map(w => ({ vendor: 'House', subEach: '', ...w }))
@@ -844,6 +878,8 @@ function makeTab(src = {}) {
     pipWalls: initPipWalls(src),
     modularWalls: initModularWalls(src),
     modularFootingPump: src.modularFootingPump ?? 'No',
+    brickWalls: initBrickWalls(src),
+    brickFootingPump: src.brickFootingPump ?? 'No',
     timberLF: src.timberLF ?? '',
     timberHeightIn: src.timberHeightIn ?? '',
     timberType: src.timberType ?? 'Railroad Treated',
@@ -1576,6 +1612,10 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
   const setModularWalls = setField('modularWalls')
   const modularFootingPump = cur.modularFootingPump
   const setModularFootingPump = setField('modularFootingPump')
+  const brickWalls = cur.brickWalls
+  const setBrickWalls = setField('brickWalls')
+  const brickFootingPump = cur.brickFootingPump
+  const setBrickFootingPump = setField('brickFootingPump')
   const timberLF = cur.timberLF
   const setTimberLF = setField('timberLF')
   const timberHeightIn = cur.timberHeightIn
@@ -1675,6 +1715,16 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
   }
   function removeModularWall(idx) {
     setModularWalls(ws => ws.filter((_, i) => i !== idx))
+  }
+
+  function updateBrickWall(idx, field, val) {
+    setBrickWalls(ws => ws.map((w, i) => (i === idx ? { ...w, [field]: val } : w)))
+  }
+  function addBrickWall() {
+    setBrickWalls(ws => [...ws, DEFAULT_BRICK()])
+  }
+  function removeBrickWall(idx) {
+    setBrickWalls(ws => ws.filter((_, i) => i !== idx))
   }
 
   function updateManual(i, field, val) {
@@ -2163,7 +2213,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
             {
               key: 'Brick',
               label: 'Brick',
-              count: 0,
+              count: brickWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0).length,
             },
             {
               key: 'Timber',
@@ -2576,6 +2626,55 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
         </div>
       )}
 
+      {/* ── Brick Walls ── */}
+      {wallType === 'Brick' && (
+        <div>
+          <SectionHeader title="Brick Walls" />
+
+          {brickWalls.map((wall, idx) => (
+            <ModularWallEntry
+              key={idx}
+              wall={wall}
+              idx={idx}
+              total={brickWalls.length}
+              onChange={updateBrickWall}
+              onRemove={removeBrickWall}
+              detail={calc.brickDetails[idx] || null}
+              materialPrices={materialPrices}
+              materialRows={materialRows}
+              vendorOptions={vendorOptions}
+              isSub={isSub}
+              refreshAllRates={refreshAllRates}
+              {...makeWpHandlers(setBrickWalls, idx)}
+            />
+          ))}
+
+          <button
+            onClick={addBrickWall}
+            className="w-full py-2 rounded-lg border border-dashed border-green-400 text-green-700 text-sm font-medium hover:bg-green-50 transition-colors mb-3"
+          >
+            + Add Another Brick Wall
+          </button>
+
+          {/* Module-level pump options — footing only. */}
+          <div className="border border-gray-200 rounded-xl p-3 bg-gray-50 space-y-0 mb-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              Pump Options (all walls)
+            </p>
+            <LabeledRow label="Pump for Pouring Footing?">
+              <select
+                className="input text-sm py-1.5 w-24"
+                value={brickFootingPump}
+                onChange={e => setBrickFootingPump(e.target.value)}
+              >
+                <option>No</option>
+                <option>Yes</option>
+              </select>
+            </LabeledRow>
+          </div>
+        </div>
+      )}
+
       {/* ── Timber Wall (single) ── */}
       {wallType === 'Timber' && (
         <div>
@@ -2641,8 +2740,8 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
         </div>
       )}
 
-      {/* ── Wall Finishes ── (hidden on the Modular tab) */}
-      {wallType !== 'Modular' && renderWallFinishSection()}
+      {/* ── Wall Finishes ── (hidden on the Modular / Brick tabs) */}
+      {wallType !== 'Modular' && wallType !== 'Brick' && renderWallFinishSection()}
 
       {/* ── Wall Caps ── */}
       {renderCapSection()}

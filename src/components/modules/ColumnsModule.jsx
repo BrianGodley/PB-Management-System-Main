@@ -88,7 +88,9 @@ const FINISH_TYPES = {
 
 const BLOCK_RATES = {
   blockMatCost: { dbName: 'CMU Block', fallback: 2.5 }, // $/block
-  rebarMatCost: { dbName: 'Rebar - Columns', fallback: 0.8 }, // $/LF
+  // Rebar now references the shared Basic Materials 'Rebar' row (canonical
+  // $1.388/LF) so a vendor price change on rebar flows through here too.
+  rebarMatCost: { dbName: 'Rebar', fallback: 1.388 }, // $/LF (Basic Materials)
   faceBlockMat: { dbName: 'Face Block', fallback: 3.0 }, // $/block (decorative)
   fillMatCost: { dbName: 'Fill Block / Grout', fallback: 0.75 }, // $/block
   // Labor rates
@@ -108,6 +110,9 @@ const DEFAULTS = {
 const n = v => parseFloat(v) || 0
 
 const COLUMNS_CATEGORY = 'Columns'
+// Shared cross-module catalog of basic materials (concrete, base, sand, rebar,
+// grout). Columns resolves its rebar from here so vendor prices propagate.
+const BASIC_CATEGORY = 'Basic Materials'
 
 // Vendor-resolved material price now comes from the shared resolver
 // (src/lib/materialCatalog.js) — same order (vendor row → House name key →
@@ -314,7 +319,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
     loading: pricesLoading,
     refresh: refreshAllRates,
     vendorOptionsForCategory,
-  } = useMaterialCatalog(COLUMNS_CATEGORY, {
+  } = useMaterialCatalog([COLUMNS_CATEGORY, BASIC_CATEGORY], {
     materialPrices: initialData?.materialPrices,
     materialRows: initialData?.materialRows,
   })
@@ -637,7 +642,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
               <RateEditPopover
                 table="material_rates"
                 name={BLOCK_RATES.rebarMatCost.dbName}
-                category="Columns"
+                category={BASIC_CATEGORY}
                 unitLabel="LF"
                 currentValue={
                   materialPrices[BLOCK_RATES.rebarMatCost.dbName] ??

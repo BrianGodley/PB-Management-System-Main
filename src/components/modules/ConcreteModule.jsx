@@ -136,6 +136,14 @@ function resolveType(label, opts, houseArray) {
   )
 }
 
+// Rebar is priced by LINEAR FEET of bar, converted from the slab SF takeoff by
+// the on-center spacing, then multiplied by the canonical rebar $/LF (the
+// shared Basic Materials 'Rebar' row). Values set with Brian: 24" OC uses
+// 0.59 LF of rebar per SF; 12" OC uses 1.20 LF/SF.
+const REBAR_LF_PER_SF = { '24" OC': 0.59, '12" OC': 1.2 }
+const REBAR_CANONICAL_FB = 1.388 // $/LF fallback (matches Basic Materials seed)
+const REBAR_SPACINGS = ['24" OC', '12" OC']
+
 // ── Calculation engine ────────────────────────────────────────────────────────
 
 const n = v => parseFloat(v) || 0
@@ -195,7 +203,10 @@ function calcConcrete(
 
   // ── Material unit costs (material_rates) ─────────────────────────────────
   const concretePerCY = mr['Concrete - Per CY'] ?? R.concretePerCY
-  const rebarSFPrice = mr['Concrete - Rebar Price SF'] ?? R.rebarSFPrice
+  // Rebar $/LF (canonical, from the shared Basic Materials 'Rebar' row) and the
+  // LF-per-SF conversion factor for the chosen on-center spacing.
+  const rebarPerLF = mr['Rebar'] ?? REBAR_CANONICAL_FB
+  const rebarLfPerSf = REBAR_LF_PER_SF[state.rebarSpacing] ?? REBAR_LF_PER_SF['24" OC']
   const formMaterialPerLF = mr['Concrete - Form Lumber LF'] ?? R.formMaterialPerLF
   const sleevePer10LF = mr['Concrete - Sleeve Per 10LF'] ?? R.sleevePer10LF
   const colorCostPerCY = mr['Concrete - Color Per CY'] ?? R.colorCostPerCY
@@ -282,7 +293,7 @@ function calcConcrete(
   }, 0)
 
   const rebarHrs = rebarSF > 0 ? rebarSF / rebarSFPerHr : 0
-  const rebarMat = rebarSF * rebarSFPrice
+  const rebarMat = rebarSF * rebarLfPerSf * rebarPerLF
 
   const formHrs = formLF > 0 ? formLF / formLFPerHr : 0
   const formMat = formLF * formMaterialPerLF
@@ -432,7 +443,8 @@ function calcConcrete(
     sealerWetSFPerHr,
     vaporBarrierSFPerHr,
     concretePerCY,
-    rebarSFPrice,
+    rebarPerLF,
+    rebarLfPerSf,
     formMaterialPerLF,
     sleevePer10LF,
     colorCostPerCY,
@@ -557,7 +569,10 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const refreshAllRates = useCallback(async () => {
     const [lrRes, mrRes, srRes, matRowsRes, venRes] = await Promise.all([
       supabase.from('labor_rates').select('name, rate').eq('category', 'Concrete'),
-      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Concrete'),
+      supabase
+        .from('material_rates')
+        .select('name, unit_cost')
+        .in('category', ['Concrete', 'Basic Materials']),
       supabase.from('subcontractor_rates').select('company_name, rate').eq('category', 'Concrete'),
       supabase
         .from('material_rates')
@@ -658,6 +673,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const [installTierDepth, setInstallTierDepth] = useState(initialData?.installTierDepth ?? {})
   const [depthIn, setDepthIn] = useState(initialData?.depthIn ?? '4')
   const [rebarSF, setRebarSF] = useState(initialData?.rebarSF ?? '')
+  const [rebarSpacing, setRebarSpacing] = useState(initialData?.rebarSpacing ?? '24" OC')
   const [formLF, setFormLF] = useState(initialData?.formLF ?? '')
   const [sleeveLF, setSleeveLF] = useState(initialData?.sleeveLF ?? '')
 
@@ -681,6 +697,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const [subInstallSF, setSubInstallSF] = useState(initialData?.subInstallSF ?? '')
   const [subDepthIn, setSubDepthIn] = useState(initialData?.subDepthIn ?? '4')
   const [subRebarSF, setSubRebarSF] = useState(initialData?.subRebarSF ?? '')
+  const [subRebarSpacing, setSubRebarSpacing] = useState(initialData?.subRebarSpacing ?? '24" OC')
   const [subFormLF, setSubFormLF] = useState(initialData?.subFormLF ?? '')
   const [subSleeveLF, setSubSleeveLF] = useState(initialData?.subSleeveLF ?? '')
   const [subFinishType, setSubFinishType] = useState(initialData?.subFinishType ?? 'Broom Finish')
@@ -726,6 +743,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     installTierDepth,
     depthIn,
     rebarSF,
+    rebarSpacing,
     formLF,
     sleeveLF,
     finishType,
@@ -811,6 +829,8 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const setActiveDepthIn = isSub ? setSubDepthIn : setDepthIn
   const activeRebarSF = isSub ? subRebarSF : rebarSF
   const setActiveRebarSF = isSub ? setSubRebarSF : setRebarSF
+  const activeRebarSpacing = isSub ? subRebarSpacing : rebarSpacing
+  const setActiveRebarSpacing = isSub ? setSubRebarSpacing : setRebarSpacing
   const activeFormLF = isSub ? subFormLF : formLF
   const setActiveFormLF = isSub ? setSubFormLF : setFormLF
   const activeSleeveLF = isSub ? subSleeveLF : sleeveLF
@@ -881,7 +901,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   // Resolved add-on rates (identical on both tabs — sourced from rate maps).
   const {
     rebarSFPerHr,
-    rebarSFPrice,
+    rebarPerLF,
     formLFPerHr,
     formMaterialPerLF,
     sleeveLFPerHr,
@@ -905,9 +925,12 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   // No Base Install or Form Edging on the sub side (removed by request).
   subSideCost += n(subInstallSF) * subSlabRate
   subSideCost += n(subInstallSF) * (subFinishLaborPerSF + subFinishMatPerSF)
-  // Rebar
+  // Rebar — same LF-per-SF conversion × canonical $/LF, using the Sub tab's
+  // own on-center spacing.
   if (n(subRebarSF) > 0) {
-    subSideCost += n(subRebarSF) * rebarSFPrice + (n(subRebarSF) / rebarSFPerHr) * lrph
+    const subRebarLfPerSf = REBAR_LF_PER_SF[subRebarSpacing] ?? REBAR_LF_PER_SF['24" OC']
+    subSideCost +=
+      n(subRebarSF) * subRebarLfPerSf * rebarPerLF + (n(subRebarSF) / rebarSFPerHr) * lrph
   }
   // Sleeves
   if (n(subSleeveLF) > 0) {
@@ -986,6 +1009,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
         subInstallSF,
         subDepthIn,
         subRebarSF,
+        subRebarSpacing,
         subFormLF,
         subSleeveLF,
         subFinishType,
@@ -1412,10 +1436,12 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             </div>
           )}
           <div>
-            <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1">
-              Rebar 24" OC (Sq Ft)
+            <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap">
+              Rebar (Sq Ft)
               <span className="text-gray-400">
-                — {calc.rebarSFPerHr} SF/hr · ${calc.rebarSFPrice}/SF
+                — {calc.rebarSFPerHr} SF/hr · ${calc.rebarPerLF}/LF ·{' '}
+                {REBAR_LF_PER_SF[activeRebarSpacing] ?? REBAR_LF_PER_SF['24" OC']} LF/SF · $
+                {((REBAR_LF_PER_SF[activeRebarSpacing] ?? REBAR_LF_PER_SF['24" OC']) * calc.rebarPerLF).toFixed(3)}/SF
               </span>
               <RateEditPopover
                 table="labor_rates"
@@ -1426,16 +1452,31 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 currentValue={calc.rebarSFPerHr}
                 onSaved={refreshAllRates}
               />
+              {/* Edits the shared Basic Materials 'Rebar' $/LF (propagates everywhere). */}
               <RateEditPopover
                 table="material_rates"
-                name="Concrete - Rebar Price SF"
-                category="Concrete"
-                unitLabel="SF"
-                currentValue={calc.rebarSFPrice}
+                name="Rebar"
+                category="Basic Materials"
+                unitLabel="LF"
+                currentValue={calc.rebarPerLF}
                 onSaved={refreshAllRates}
               />
             </label>
-            <NumInput value={activeRebarSF} onChange={setActiveRebarSF} />
+            <div className="flex items-center gap-2">
+              <select
+                className="input text-sm py-1.5 w-28"
+                value={activeRebarSpacing}
+                onChange={e => setActiveRebarSpacing(e.target.value)}
+                title="Rebar on-center spacing"
+              >
+                {REBAR_SPACINGS.map(s => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+              <NumInput value={activeRebarSF} onChange={setActiveRebarSF} className="flex-1" />
+            </div>
           </div>
           {!isSub && (
           <div>
