@@ -7,6 +7,7 @@ import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
+import { useMaterialCatalog, resolveMaterialPrice } from '../../lib/materialCatalog'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Finishes Module — Flatwork, Wall Caps, Wall Finishes
@@ -132,13 +133,9 @@ const CAP_META = {
 // If a real vendor is selected AND a material_rates row exists whose name===dbName
 // and vendor_id===vendorId, use that row's unit_cost. Otherwise fall back to the
 // House price (name-keyed materialPrices[dbName]) and finally the hard fallback.
-function finishMatPrice(dbName, vendorId, materialRows, mp, fallback) {
-  if (vendorId && vendorId !== 'House') {
-    const row = (materialRows || []).find(r => r.name === dbName && r.vendor_id === vendorId)
-    if (row && row.unit_cost != null && row.unit_cost !== '') return n(row.unit_cost)
-  }
-  return mp?.[dbName] ?? fallback
-}
+// Uses the shared resolver (src/lib/materialCatalog.js) — same vendor→House→
+// fallback order, so Finishes numbers are byte-for-byte unchanged.
+const finishMatPrice = resolveMaterialPrice
 
 // ── Per-row calculators — identical formulas to the original calcFinishes, just
 //    fed the vendor-resolved material price. Each returns { mat, hrs, subUnit,
@@ -458,46 +455,20 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
     }
   )
 
-  // Name-keyed House material + labor rate map (House fallback + labor rates).
-  const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
-  // Full Finishes material_rates catalog (id/name/vendor_id/unit/unit_cost) used
-  // to resolve a vendor's material price. Plus the vendor list for the pickers.
-  const [materialRows, setMaterialRows] = useState(initialData?.materialRows || [])
-  const [vendors, setVendors] = useState([])
-  const [pricesLoading, setPricesLoading] = useState(true)
-
-  // Re-fetch the Finishes rate map + vendor catalog. Used on mount + after edits.
-  const refreshAllRates = useCallback(async () => {
-    const [matRes, labRes, catRes, venRes] = await Promise.all([
-      supabase.from('material_rates').select('name, unit_cost').eq('category', FINISHES_CATEGORY),
-      supabase.from('labor_rates').select('name, rate').eq('category', FINISHES_CATEGORY),
-      supabase
-        .from('material_rates')
-        .select('id,name,vendor_id,unit,unit_cost')
-        .eq('category', FINISHES_CATEGORY),
-      supabase
-        .from('subs_vendors')
-        .select('id, company_name, supplied_categories')
-        .eq('type', 'vendor')
-        .order('company_name'),
-    ])
-    const prices = {}
-    ;(matRes.data || []).forEach(r => {
-      prices[r.name] = parseFloat(r.unit_cost) || 0
-    })
-    ;(labRes.data || []).forEach(r => {
-      prices[r.name] = parseFloat(r.rate) || 0
-    })
-    setMaterialPrices(prices)
-    setMaterialRows(catRes.data || [])
-    setVendors(
-      (venRes.data || []).map(v => ({
-        id: v.id,
-        name: v.company_name,
-        categories: v.supplied_categories || [],
-      }))
-    )
-  }, [])
+  // Shared material catalog — Finishes material + labor rates, rows, vendors,
+  // and the canonical resolver. (Replaces the old per-module fetch + copy.)
+  const {
+    priceMap: materialPrices,
+    materialRows,
+    vendors,
+    vendorNames,
+    loading: pricesLoading,
+    refresh: refreshAllRates,
+    vendorOptionsForCategory,
+  } = useMaterialCatalog(FINISHES_CATEGORY, {
+    materialPrices: initialData?.materialPrices,
+    materialRows: initialData?.materialRows,
+  })
 
   useEffect(() => {
     if (!initialData?.laborRatePerHour) {
@@ -521,8 +492,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
           }
         })
     }
-    refreshAllRates().then(() => setPricesLoading(false))
-  }, [refreshAllRates])
+  }, [initialData?.laborRatePerHour])
 
   const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
@@ -595,11 +565,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
     finishMatPrice(FINISHES_RATES[matKey].db, vendor, materialRows, materialPrices, FINISHES_RATES[matKey].fb)
 
   // ── Vendor / row helpers ──────────────────────────────────────────────────
-  const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
-  const vendorOptions = [
-    { value: 'House', label: 'Unspecified' },
-    ...vendorsForCategory(FINISHES_CATEGORY).map(v => ({ value: v.id, label: v.name })),
-  ]
+  const vendorOptions = vendorOptionsForCategory(FINISHES_CATEGORY)
 
   function updateManual(i, field, val) {
     setManualRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
@@ -639,7 +605,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
         gpmd,
         materialPrices,
         materialRows,
-        vendorNames: Object.fromEntries(vendors.map(v => [v.id, v.name])),
+        vendorNames,
         calc,
       },
     })

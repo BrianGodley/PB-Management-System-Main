@@ -34,6 +34,7 @@ import GpmdBar from './GpmdBar'
 import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
+import { resolveMaterialPrice } from '../../lib/materialCatalog'
 
 const IRRIGATION_CATEGORY = 'Irrigation'
 
@@ -142,13 +143,10 @@ const r2 = x => Math.round(((x || 0) + Number.EPSILON) * 100) / 100
 // vendor_id===vendorId) use that row's unit_cost; otherwise fall back to the House
 // price (name-keyed materialPrices[dbName]) then the hard fallback. Vendor 'House'
 // resolves to exactly the original math, so In-House numbers never move.
-function irrMatPrice(dbName, vendorId, materialRows, materialPrices, fallback) {
-  if (vendorId && vendorId !== 'House') {
-    const row = (materialRows || []).find(r => r.name === dbName && r.vendor_id === vendorId)
-    if (row && row.unit_cost != null && row.unit_cost !== '') return n(row.unit_cost)
-  }
-  return materialPrices?.[dbName] ?? fallback
-}
+// Shared resolver (src/lib/materialCatalog.js) — same vendor→House→fallback
+// order. Irrigation keeps separate material/labor maps, so it doesn't use the
+// merged useMaterialCatalog hook.
+const irrMatPrice = resolveMaterialPrice
 
 // ── Per-row calculators ───────────────────────────────────────────────────────
 // Zone row: In-House labor + material identical to the original per-zone math —

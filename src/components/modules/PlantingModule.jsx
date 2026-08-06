@@ -7,6 +7,7 @@ import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
+import { resolveMaterialPrice } from '../../lib/materialCatalog'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Planting Module
@@ -196,13 +197,10 @@ function getLargePerDay(laborRates, type) {
 // vendor_id===vendorId) use that row's unit_cost; otherwise fall back to the
 // House price (name-keyed mp[dbName]) then the hard fallback. Vendor 'House'
 // resolves to exactly the original math, so In-House numbers never move.
-function plantMatPrice(dbName, vendorId, materialRows, materialPrices, fallback) {
-  if (vendorId && vendorId !== 'House') {
-    const row = (materialRows || []).find(r => r.name === dbName && r.vendor_id === vendorId)
-    if (row && row.unit_cost != null && row.unit_cost !== '') return n(row.unit_cost)
-  }
-  return materialPrices?.[dbName] ?? fallback
-}
+// Shared resolver (src/lib/materialCatalog.js) — same vendor→House→fallback
+// order. Planting keeps its own separate material/labor maps (plant names can
+// key both), so it doesn't use the merged useMaterialCatalog hook.
+const plantMatPrice = resolveMaterialPrice
 
 // ── Per-row calculators ───────────────────────────────────────────────────────
 // Plant row: In-House material = qty × the row's (editable, vendor-defaulted)
