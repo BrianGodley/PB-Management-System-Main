@@ -7,7 +7,7 @@ import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { catalogItemFor } from '../../lib/materialCatalog'
+import { catalogItemFor, catalogOptions } from '../../lib/materialCatalog'
 
 const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
 
@@ -131,6 +131,28 @@ function drainMatCost(cat, row, TYPES, materialRows, catDefaults, mp) {
   return { dbName, cost: mp[dbName] ?? fallback }
 }
 
+// Master-list additions for a drain section: rows tagged sub_category=cat
+// (Unspecified) become extra Type options. Material price = the row's unit_cost;
+// labor comes from calc_meta (laborPerLF for pipe, laborHrs for fixtures). Add a
+// row in Master Rates under that marker + set its calc_meta and it appears here.
+function masterDrainTypes(cat, builtIn, materialRows, laborField) {
+  const out = {}
+  ;(catalogOptions(materialRows, cat, 'House', { houseRows: 'null-vendor', stripPrefix: true }) || []).forEach(
+    o => {
+      if (builtIn[o.label]) return
+      const meta = o.row.calc_meta || {}
+      out[o.label] = {
+        dbName: o.row.name,
+        costPerLF: n(o.row.unit_cost),
+        cost: n(o.row.unit_cost),
+        [laborField]: n(meta[laborField]) || 0,
+        fromMaster: true,
+      }
+    }
+  )
+  return out
+}
+
 // materialPrices — { 'dbName': unit_cost, ... } fetched from material_rates
 function calcDrainage(
   state,
@@ -158,6 +180,8 @@ function calcDrainage(
     subAdditionalItems,
   } = state
   const isSub = state.subType === 'Subcontractor'
+  const PIPE_T = { ...PIPE_TYPES, ...masterDrainTypes(DRAIN_CAT.pipe, PIPE_TYPES, materialRows, 'laborPerLF') }
+  const FIX_T = { ...FIXTURE_TYPES, ...masterDrainTypes(DRAIN_CAT.fixture, FIXTURE_TYPES, materialRows, 'laborHrs') }
 
   let trenchHrs = 0,
     pipeHrs = 0,
@@ -180,9 +204,9 @@ function calcDrainage(
 
   pipeRows.forEach(r => {
     const lf = n(r.lf)
-    const rate = PIPE_TYPES[r.type]
+    const rate = PIPE_T[r.type]
     if (lf > 0 && rate) {
-      const { cost } = drainMatCost(DRAIN_CAT.pipe, r, PIPE_TYPES, materialRows, catDefaults, materialPrices)
+      const { cost } = drainMatCost(DRAIN_CAT.pipe, r, PIPE_T, materialRows, catDefaults, materialPrices)
       pipeMat += lf * cost
       pipeHrs += lf * rate.laborPerLF
     }
@@ -191,9 +215,9 @@ function calcDrainage(
   let totalFixQty = 0
   fixtureRows.forEach(r => {
     const qty = n(r.qty)
-    const rate = FIXTURE_TYPES[r.type]
+    const rate = FIX_T[r.type]
     if (qty > 0 && rate) {
-      const { cost } = drainMatCost(DRAIN_CAT.fixture, r, FIXTURE_TYPES, materialRows, catDefaults, materialPrices)
+      const { cost } = drainMatCost(DRAIN_CAT.fixture, r, FIX_T, materialRows, catDefaults, materialPrices)
       fixMat += qty * cost
       fixHrs += qty * rate.laborHrs
       totalFixQty += qty
@@ -555,6 +579,8 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
     materialRows,
     catDefaults
   )
+  const PIPE_T = { ...PIPE_TYPES, ...masterDrainTypes(DRAIN_CAT.pipe, PIPE_TYPES, materialRows, 'laborPerLF') }
+  const FIX_T = { ...FIXTURE_TYPES, ...masterDrainTypes(DRAIN_CAT.fixture, FIXTURE_TYPES, materialRows, 'laborHrs') }
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
@@ -781,7 +807,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                         onChange={e => updateSubFixture(i, 'type', e.target.value)}
                       >
                         <option value="">-- Select --</option>
-                        {Object.keys(FIXTURE_TYPES).map(t => (
+                        {Object.keys(FIX_T).map(t => (
                           <option key={t}>{t}</option>
                         ))}
                       </select>
@@ -999,11 +1025,11 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
             </thead>
             <tbody>
               {pipeRows.map((row, i) => {
-                const rate = PIPE_TYPES[row.type]
+                const rate = PIPE_T[row.type]
                 const { dbName, cost } = drainMatCost(
                   DRAIN_CAT.pipe,
                   row,
-                  PIPE_TYPES,
+                  PIPE_T,
                   materialRows,
                   catDefaults,
                   materialPrices
@@ -1033,7 +1059,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                           value={row.type}
                           onChange={e => updatePipe(i, 'type', e.target.value)}
                         >
-                          {Object.keys(PIPE_TYPES).map(t => (
+                          {Object.keys(PIPE_T).map(t => (
                             <option key={t}>{t}</option>
                           ))}
                         </select>
@@ -1103,11 +1129,11 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
             </thead>
             <tbody>
               {fixtureRows.map((row, i) => {
-                const rate = FIXTURE_TYPES[row.type]
+                const rate = FIX_T[row.type]
                 const { dbName, cost } = drainMatCost(
                   DRAIN_CAT.fixture,
                   row,
-                  FIXTURE_TYPES,
+                  FIX_T,
                   materialRows,
                   catDefaults,
                   materialPrices
@@ -1138,7 +1164,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                           onChange={e => updateFixture(i, 'type', e.target.value)}
                         >
                           <option value="">-- Select --</option>
-                          {Object.keys(FIXTURE_TYPES).map(t => (
+                          {Object.keys(FIX_T).map(t => (
                             <option key={t}>{t}</option>
                           ))}
                         </select>

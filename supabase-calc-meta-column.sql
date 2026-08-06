@@ -1,0 +1,21 @@
+-- ─────────────────────────────────────────────────────────────────────────────
+-- calc_meta — per-row calculation metadata for master-list-driven pickers.
+--
+-- Some module pickers need more than a price: the selected Type also drives calc
+-- behavior (labor coefficient, quantity unit, mode, waste/conversion factors).
+-- Storing that as a JSON blob on the material row lets a master-list addition
+-- carry everything its module's math needs — no new column per parameter.
+--
+-- Shapes by module (keys a module reads; extras are ignored):
+--   Drainage pipe    → { "laborPerLF": 0.05 }
+--   Drainage fixture → { "laborHrs": 0.5 }
+--   Turf base        → { "qtyUnit": "ton"|"roll", "laborCoeff": 0.25, "coverage": 1800 }
+--   FP/OK finish     → { "unit": "SF"|"ton", "labMode": "perDay"|"perSF",
+--                        "laborCoeff": 24, "tonPerSF": 80, "waste": 1.1, ... }
+--   FP/OK cap        → { "laborPerLF": 0.25 }
+--
+-- IMPORTANT: run this BEFORE deploying the new code — the shared catalog fetch
+-- now selects calc_meta, so the column must exist first. STAGING → confirm → PROD.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+ALTER TABLE material_rates ADD COLUMN IF NOT EXISTS calc_meta jsonb;

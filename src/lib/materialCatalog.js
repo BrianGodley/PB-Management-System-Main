@@ -165,7 +165,9 @@ export function useMaterialCatalog(categories, initial = {}) {
       supabase.from('labor_rates').select('name, rate').in('category', catList),
       supabase
         .from('material_rates')
-        .select('id,name,vendor_id,unit,unit_cost,category,sub_category,block_w_in,block_h_in,block_l_in')
+        .select(
+          'id,name,vendor_id,unit,unit_cost,category,sub_category,block_w_in,block_h_in,block_l_in,calc_meta'
+        )
         .in('category', catList),
       supabase
         .from('subs_vendors')
