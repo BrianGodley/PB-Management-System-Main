@@ -1306,7 +1306,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             ) : (
               <div className="space-y-1">
                 {/* Column labels */}
-                <div className="grid grid-cols-[6rem_7rem_12rem_4.5rem_4.5rem_auto] items-center gap-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                <div className="grid grid-cols-[6rem_9rem_minmax(0,1fr)_5rem_5rem_16rem] items-center gap-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
                   <span />
                   <span>Vendor</span>
                   <span>Type</span>
@@ -1323,7 +1323,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                   return (
                     <div
                       key={t.key}
-                      className="grid grid-cols-[6rem_7rem_12rem_4.5rem_4.5rem_auto] items-center gap-2"
+                      className="grid grid-cols-[6rem_9rem_minmax(0,1fr)_5rem_5rem_16rem] items-center gap-2"
                     >
                       <span className="text-[11px] text-gray-500">{t.label}</span>
                       <select
