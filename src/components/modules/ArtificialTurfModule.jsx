@@ -964,7 +964,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                       onChange={e => setBaseRow(i, 'vendor', e.target.value)}
                       title="Vendor"
                     >
-                      {vendorsForCategory(TURF_CAT.base).map(v => (
+                      {vendorsForCategory('Artificial Turf').map(v => (
                         <option key={v.id} value={v.id}>
                           {v.name}
                         </option>
@@ -1141,7 +1141,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                       onChange={e => setRoll(i, 'vendor', e.target.value)}
                       title="Vendor"
                     >
-                      {vendorsForCategory(TURF_CAT.turf).map(v => (
+                      {vendorsForCategory('Artificial Turf').map(v => (
                         <option key={v.id} value={v.id}>
                           {v.name}
                         </option>
@@ -1312,7 +1312,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                   onChange={e => setStrips('vendor', e.target.value)}
                   title="Vendor"
                 >
-                  {vendorsForCategory(TURF_CAT.turf).map(v => (
+                  {vendorsForCategory('Artificial Turf').map(v => (
                     <option key={v.id} value={v.id}>
                       {v.name}
                     </option>
