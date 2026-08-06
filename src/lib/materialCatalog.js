@@ -206,7 +206,7 @@ export function useMaterialCatalog(categories, initial = {}) {
 
   const vendorOptionsForCategory = useCallback(
     cat => [
-      { value: 'House', label: 'Unspecified' },
+      { value: 'House', label: 'Standard' },
       ...vendors
         .filter(v => (v.categories || []).includes(cat))
         .map(v => ({ value: v.id, label: v.name })),

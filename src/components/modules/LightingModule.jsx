@@ -393,7 +393,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
   // ── Vendor / row helpers ─────────────────────────────────────────────────────
   const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
   const vendorSelectOptions = () => [
-    { value: 'House', label: 'Unspecified' },
+    { value: 'House', label: 'Standard' },
     ...vendorsForCategory(LIGHTING_CATEGORY).map(v => ({ value: v.id, label: v.name })),
   ]
 

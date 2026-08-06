@@ -576,7 +576,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
   // ── Vendor helpers ──────────────────────────────────────────────────────────
   const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
   const vendorOptions = [
-    { value: 'House', label: 'Unspecified' },
+    { value: 'House', label: 'Standard' },
     ...vendorsForCategory(IRRIGATION_CATEGORY).map(v => ({ value: v.id, label: v.name })),
   ]
 

@@ -1085,7 +1085,7 @@ function CmuWallEntry({
             value={wall.vendor || 'House'}
             onChange={e => set('vendor')(e.target.value)}
           >
-            {(vendorOptions || [{ value: 'House', label: 'Unspecified' }]).map(o => (
+            {(vendorOptions || [{ value: 'House', label: 'Standard' }]).map(o => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
@@ -1284,7 +1284,7 @@ function PipWallEntry({
             value={wall.vendor || 'House'}
             onChange={e => set('vendor')(e.target.value)}
           >
-            {(vendorOptions || [{ value: 'House', label: 'Unspecified' }]).map(o => (
+            {(vendorOptions || [{ value: 'House', label: 'Standard' }]).map(o => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
@@ -1412,7 +1412,7 @@ function ModularWallEntry({
             value={wall.vendor || 'House'}
             onChange={e => set('vendor')(e.target.value)}
           >
-            {(vendorOptions || [{ value: 'House', label: 'Unspecified' }]).map(o => (
+            {(vendorOptions || [{ value: 'House', label: 'Standard' }]).map(o => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>

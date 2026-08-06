@@ -1049,7 +1049,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                             {v.name}
                           </option>
                         ))}
-                        <option value="House">Unspecified</option>
+                        <option value="House">Standard</option>
                       </select>
                     </td>
                     <td className="py-1 pr-2">
@@ -1153,7 +1153,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                             {v.name}
                           </option>
                         ))}
-                        <option value="House">Unspecified</option>
+                        <option value="House">Standard</option>
                       </select>
                     </td>
                     <td className="py-1 pr-2">

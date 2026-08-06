@@ -314,11 +314,12 @@ export default function SubsVendors({ mode = 'sub' }) {
 
   // The "Unspecified" vendor is a permanent system record (the House / no-vendor
   // stand-in) and must never be deletable.
-  const isProtectedVendor = s => (s?.company_name || '').trim().toLowerCase() === 'unspecified'
+  const isProtectedVendor = s =>
+    ['unspecified', 'standard'].includes((s?.company_name || '').trim().toLowerCase())
 
   async function deleteSub(sub) {
     if (isProtectedVendor(sub)) {
-      alert('"Unspecified" is a permanent system vendor and cannot be deleted.')
+      alert('"Standard" is a permanent system vendor and cannot be deleted.')
       return
     }
     if (!confirm(`Delete "${sub.company_name}"? This cannot be undone.`)) return

@@ -692,7 +692,7 @@ function VendorPicker({ vendors = [], value = 'House', onChange, label = 'Vendor
         value={value}
         onChange={e => onChange(e.target.value)}
       >
-        <option value="House">Unspecified</option>
+        <option value="House">Standard</option>
         {vendors.map(v => (
           <option key={v.id} value={v.id}>
             {v.name}
@@ -1354,7 +1354,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         value={row.vendor || 'House'}
                         onChange={e => changeRowVendor('Soils', SOIL_TYPES, updateSoils, i, e.target.value)}
                       >
-                        <option value="House">Unspecified</option>
+                        <option value="House">Standard</option>
                         {vendorsForCategory('Soils').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
@@ -1445,7 +1445,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               onChange={e => changeSodVendor(e.target.value)}
               title="Vendor"
             >
-              <option value="House">Unspecified</option>
+              <option value="House">Standard</option>
               {vendorsForCategory('Sod').map(v => (
                 <option key={v.id} value={v.id}>
                   {v.name}
@@ -1517,7 +1517,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               }}
               title="Vendor"
             >
-              <option value="House">Unspecified</option>
+              <option value="House">Standard</option>
               {vendorsForCategory('Fertilizer').map(v => (
                 <option key={v.id} value={v.id}>
                   {v.name}
@@ -1692,7 +1692,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         value={row.vendor || 'House'}
                         onChange={e => changeRowVendor('Mulch', MULCH_TYPES, updateMulch, i, e.target.value)}
                       >
-                        <option value="House">Unspecified</option>
+                        <option value="House">Standard</option>
                         {vendorsForCategory('Mulch').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
@@ -1895,7 +1895,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         value={row.vendor || 'House'}
                         onChange={e => changeRowVendor('DG', DG_TYPES, updateDg, i, e.target.value)}
                       >
-                        <option value="House">Unspecified</option>
+                        <option value="House">Standard</option>
                         {vendorsForCategory('DG').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
@@ -2087,7 +2087,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         value={row.vendor || 'House'}
                         onChange={e => changeRowVendor('Gravel', GRAVEL_TYPES, updateGravel, i, e.target.value)}
                       >
-                        <option value="House">Unspecified</option>
+                        <option value="House">Standard</option>
                         {vendorsForCategory('Gravel').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
@@ -2281,7 +2281,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         value={row.vendor || 'House'}
                         onChange={e => changeRowVendor('Pebble', PEBBLE_TYPES, updatePebble, i, e.target.value)}
                       >
-                        <option value="House">Unspecified</option>
+                        <option value="House">Standard</option>
                         {vendorsForCategory('Pebble').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
@@ -2462,7 +2462,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         value={row.vendor || 'House'}
                         onChange={e => changeRowVendor('Cobbles', COBBLE_TYPES, updateCobble, i, e.target.value)}
                       >
-                        <option value="House">Unspecified</option>
+                        <option value="House">Standard</option>
                         {vendorsForCategory('Cobbles').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
@@ -2582,7 +2582,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                   }}
                   title="Vendor"
                 >
-                  <option value="House">Unspecified</option>
+                  <option value="House">Standard</option>
                   {vendorsForCategory('Edging').map(v => (
                     <option key={v.id} value={v.id}>
                       {v.name}
@@ -2655,7 +2655,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                   }}
                   title="Vendor"
                 >
-                  <option value="House">Unspecified</option>
+                  <option value="House">Standard</option>
                   {vendorsForCategory('Edging').map(v => (
                     <option key={v.id} value={v.id}>
                       {v.name}
@@ -2784,7 +2784,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         }}
                         title="Vendor"
                       >
-                        <option value="House">Unspecified</option>
+                        <option value="House">Standard</option>
                         {vendorsForCategory('Steppers').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}

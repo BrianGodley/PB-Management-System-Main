@@ -299,7 +299,7 @@ function EpTable({
                           {v.name}
                         </option>
                       ))}
-                      <option value="House">Unspecified</option>
+                      <option value="House">Standard</option>
                     </select>
                   </td>
                   <td className="py-1 pr-2">
@@ -1391,7 +1391,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                           value={row.vendor || 'House'}
                           onChange={e => setRow('vendor', e.target.value)}
                         >
-                          <option value="House">Unspecified</option>
+                          <option value="House">Standard</option>
                           {vendorsForCategory('Appliance').map(v => (
                             <option key={v.id} value={v.id}>
                               {v.name}
@@ -1580,7 +1580,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                         onChange={e => setWallFinishRow(i, 'vendor', e.target.value)}
                         title="Vendor — overrides material price"
                       >
-                        <option value="House">Unspecified</option>
+                        <option value="House">Standard</option>
                         {vendorsForCategory(WF_CAT).map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}

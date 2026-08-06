@@ -280,7 +280,7 @@ function EpTable({
                           {v.name}
                         </option>
                       ))}
-                      <option value="House">Unspecified</option>
+                      <option value="House">Standard</option>
                     </select>
                   </td>
                   <td className="py-1 pr-2">
@@ -1263,7 +1263,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                         onChange={e => setCapRow(i, 'vendor', e.target.value)}
                         title="Vendor — overrides material price"
                       >
-                        <option value="House">Unspecified</option>
+                        <option value="House">Standard</option>
                         {vendorsForCategory(CAP_CAT).map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
@@ -1418,7 +1418,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                         onChange={e => setWallFinishRow(i, 'vendor', e.target.value)}
                         title="Vendor — overrides material price"
                       >
-                        <option value="House">Unspecified</option>
+                        <option value="House">Standard</option>
                         {vendorsForCategory(WF_CAT).map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}

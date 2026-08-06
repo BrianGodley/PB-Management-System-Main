@@ -506,7 +506,7 @@ export default function WallsSummary({ module }) {
   const materialRows = data.materialRows || []
   const vendorNames = data.vendorNames || {}
   const { difficulty = 0, hoursAdj = 0 } = ih
-  const vendorLabel = v => (!v || v === 'House' ? 'Unspecified' : vendorNames[v] || 'Vendor')
+  const vendorLabel = v => (!v || v === 'House' ? 'Standard' : vendorNames[v] || 'Vendor')
 
   const showSub = tabHasData(sub)
 

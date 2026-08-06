@@ -155,7 +155,7 @@ export default function ColumnsSummary({ module }) {
   // Material prices resolve through the saved Vendor selection.
   const matPrice = (dbName, fallback, vendorId) =>
     colMatPrice(dbName, vendorId, materialRows, materialPrices, fallback)
-  const vendorLabel = v => (!v || v === 'House' ? 'Unspecified' : vendorNames[v] || 'Vendor')
+  const vendorLabel = v => (!v || v === 'House' ? 'Standard' : vendorNames[v] || 'Vendor')
 
   const fmt2 = v =>
     `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`

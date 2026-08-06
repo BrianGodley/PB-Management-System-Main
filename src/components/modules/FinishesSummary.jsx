@@ -228,7 +228,7 @@ export default function FinishesSummary({ module }) {
     manualRows = [],
   } = tab
 
-  const vendorLabel = v => (!v || v === 'House' ? 'Unspecified' : vendorNames[v] || 'Vendor')
+  const vendorLabel = v => (!v || v === 'House' ? 'Standard' : vendorNames[v] || 'Vendor')
 
   // Build display lines for one section. `compute` returns qty/unit/mat/hrs/subMat.
   function sectionLines(rows, compute, isActiveFn) {

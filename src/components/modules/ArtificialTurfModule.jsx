@@ -969,7 +969,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                           {v.name}
                         </option>
                       ))}
-                      <option value="House">Unspecified</option>
+                      <option value="House">Standard</option>
                     </select>
                   </td>
                   <td className={td}>
@@ -1146,7 +1146,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                           {v.name}
                         </option>
                       ))}
-                      <option value="House">Unspecified</option>
+                      <option value="House">Standard</option>
                     </select>
                   </td>
                   <td className={td}>
@@ -1317,7 +1317,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                       {v.name}
                     </option>
                   ))}
-                  <option value="House">Unspecified</option>
+                  <option value="House">Standard</option>
                 </select>
               </td>
               <td className={td}>

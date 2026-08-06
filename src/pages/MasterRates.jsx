@@ -527,15 +527,16 @@ export default function MasterRates({ only } = {}) {
   // vendor record is filtered OUT of the explicit vendor list so the picker
   // shows a single "Unspecified" choice (the value='' / unassigned option),
   // never a duplicate.
-  const isUnspecifiedVendor = v => (v?.company_name || '').trim().toLowerCase() === 'unspecified'
+  const isUnspecifiedVendor = v =>
+    ['unspecified', 'standard'].includes((v?.company_name || '').trim().toLowerCase())
   const vendorOptions = useMemo(
     () => [
-      { value: '', label: 'Unspecified' },
+      { value: '', label: 'Standard' },
       ...vendors.filter(v => !isUnspecifiedVendor(v)).map(v => ({ value: v.id, label: v.company_name })),
     ],
     [vendors]
   )
-  const vendorName = id => vendors.find(v => v.id === id)?.company_name || 'Unspecified'
+  const vendorName = id => vendors.find(v => v.id === id)?.company_name || 'Standard'
 
   useEffect(() => {
     fetchAll()
@@ -861,7 +862,7 @@ export default function MasterRates({ only } = {}) {
                   <label className="text-xs text-gray-500">Vendor</label>
                   <select value={matVendor} onChange={e => setMatVendor(e.target.value)} className={filterSelect}>
                     <option value="All">All vendors</option>
-                    <option value="__HOUSE__">Unspecified</option>
+                    <option value="__HOUSE__">Standard</option>
                     {vendors.filter(v => !isUnspecifiedVendor(v)).map(v => (
                       <option key={v.id} value={v.id}>
                         {v.company_name}
