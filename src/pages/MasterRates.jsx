@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import PriceSheetImportModal from '../components/PriceSheetImportModal'
 import VendorCatalogImportModal from '../components/VendorCatalogImportModal'
 import MergeDuplicatesModal from '../components/MergeDuplicatesModal'
+import { fetchProductTypes, validateCalcMeta, indexProductTypes } from '../lib/productTypes'
 
 // ── Which estimate modules consume a given rate ──────────────────────────────
 // Most rates carry a `category` that IS the module; a few categories / vendor
@@ -511,6 +512,7 @@ export default function MasterRates({ only } = {}) {
   const [showMerge, setShowMerge] = useState(false)
   const [showCatalog, setShowCatalog] = useState(false)
   const [materials, setMaterials] = useState([])
+  const [productTypes, setProductTypes] = useState([])
   const [labor, setLabor] = useState([])
   const [subs, setSubs] = useState([])
   const [vendors, setVendors] = useState([])
@@ -551,6 +553,8 @@ export default function MasterRates({ only } = {}) {
     if (labRes.data) setLabor(labRes.data)
     if (subRes.data) setSubs(subRes.data)
     if (vendorRes.data) setVendors(vendorRes.data)
+    // Product types are reference data; tolerant of the table not existing yet.
+    setProductTypes(await fetchProductTypes())
     setLoading(false)
   }
 
@@ -680,6 +684,7 @@ export default function MasterRates({ only } = {}) {
   }
 
   // ── Column configs ──
+  const ptById = useMemo(() => indexProductTypes(productTypes).byId, [productTypes])
   const materialColumns = [
     { key: 'category', label: 'Category', placeholder: 'e.g. Hardscape' },
     {
@@ -695,11 +700,22 @@ export default function MasterRates({ only } = {}) {
     { key: 'unit', label: 'Unit', type: 'select', options: MATERIAL_UNIT_OPTIONS },
     { key: 'unit_cost', label: 'Price', type: 'number', step: '0.0001', prefix: '$' },
     {
+      key: '__ptype',
+      label: 'Type',
+      editable: false,
+      render: r => ptById[r.product_type_id]?.label || '—',
+    },
+    {
       key: 'calc_meta',
       label: 'Calc Meta (JSON)',
       json: true,
       placeholder: '{"laborPerLF":0.05}',
-      render: r => (r.calc_meta ? JSON.stringify(r.calc_meta) : '—'),
+      render: r => {
+        const t = ptById[r.product_type_id]
+        const v = t ? validateCalcMeta(t.attribute_schema, r.calc_meta) : null
+        if (v && v.missing.length) return `⚠ needs: ${v.missing.join(', ')}`
+        return r.calc_meta ? JSON.stringify(r.calc_meta) : '—'
+      },
     },
     {
       key: '__modules',
