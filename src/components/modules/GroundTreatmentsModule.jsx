@@ -1282,6 +1282,153 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
         </>
       )}
 
+      {/* ── Subcontractor Scope (Sub tab only) — flat unit rates ── */}
+      {isSub &&
+        (() => {
+          const _r = nm => n(materialPrices[nm]) || 0
+          const _money = v =>
+            v > 0 ? `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
+          const _pencil = (nm, unit) => (
+            <span className="text-[11px] text-gray-400 inline-flex items-center whitespace-nowrap">
+              ${_r(nm).toFixed(2)}/{unit}
+              <RateEditPopover
+                table="subcontractor_rates"
+                name={nm}
+                category="Ground Treatments"
+                unitLabel={unit}
+                currentValue={_r(nm)}
+                onSaved={refreshAllRates}
+              />
+            </span>
+          )
+          const _multi = (title, rows, setRows, subcat, nm) => {
+            const rt = _r(nm)
+            return (
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <h4 className="text-xs font-bold text-gray-600 uppercase flex-1">{title}</h4>
+                  {_pencil(nm, 'SF')}
+                </div>
+                {(rows || []).map((row, i) => {
+                  const opts = sectionOptions(subcat, row.vendor, [])
+                  const t = resolveType(row.type, opts, [])
+                  return (
+                    <div key={i} className="flex items-center gap-2 mb-1">
+                      <select
+                        className="input text-sm py-1 flex-1 min-w-0"
+                        value={t?.label || ''}
+                        onChange={e =>
+                          setRows(rs => rs.map((rr, idx) => (idx === i ? { ...rr, type: e.target.value } : rr)))
+                        }
+                      >
+                        {opts.map(o => (
+                          <option key={o.label} value={o.label}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                      <NumInput
+                        value={row.sf}
+                        onChange={v => setRows(rs => rs.map((rr, idx) => (idx === i ? { ...rr, sf: v } : rr)))}
+                        placeholder="SF"
+                        className="w-24"
+                      />
+                      <span className="text-xs text-gray-600 w-20 text-right">{_money(n(row.sf) * rt)}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          }
+          return (
+            <div className="border border-gray-200 rounded-xl p-4 bg-white">
+              <h3 className="text-sm font-bold text-gray-700 mb-3">Subcontractor Scope — flat rates</h3>
+
+              {/* Preparation */}
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-xs font-bold text-gray-600 uppercase flex-1">Preparation</span>
+                <NumInput value={soilPrepSF} onChange={setSoilPrepSF} placeholder="SF" className="w-24" />
+                {_pencil('Soil Prep Sub - $/SF', 'SF')}
+                <span className="text-xs text-gray-600 w-20 text-right">
+                  {_money(n(soilPrepSF) * _r('Soil Prep Sub - $/SF'))}
+                </span>
+              </div>
+
+              {/* Sod (material choice) */}
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-xs font-bold text-gray-600 uppercase">Sod</span>
+                <select
+                  className="input text-sm py-1 flex-1 min-w-0"
+                  value={resolveType(sodType, sectionOptions('Sod', sodVendor, []), [])?.label || ''}
+                  onChange={e => setSodType(e.target.value)}
+                >
+                  {sectionOptions('Sod', sodVendor, []).map(o => (
+                    <option key={o.label} value={o.label}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                <NumInput value={sodSF} onChange={setSodSF} placeholder="SF" className="w-24" />
+                {_pencil('Sod Sub - $/SF', 'SF')}
+                <span className="text-xs text-gray-600 w-20 text-right">
+                  {_money(n(sodSF) * _r('Sod Sub - $/SF'))}
+                </span>
+              </div>
+
+              {_multi('Mulch', mulchRows, setMulchRows, 'Mulch', 'Mulch Sub - $/SF')}
+              {_multi('D.G.', dgRows, setDgRows, 'DG', 'DG Sub - $/SF')}
+              {_multi('Gravel', gravelRows, setGravelRows, 'Gravel', 'Gravel Sub - $/SF')}
+              {_multi('Pebble', pebbleRows, setPebbleRows, 'Pebble', 'Pebble Sub - $/SF')}
+              {_multi('Cobbles & Boulders', cobbleRows, setCobbleRows, 'Cobbles', 'Cobbles Sub - $/SF')}
+
+              {/* Edging (per LF) */}
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <h4 className="text-xs font-bold text-gray-600 uppercase flex-1">Edging</h4>
+                  {_pencil('Edging Sub - $/LF', 'LF')}
+                </div>
+                {[
+                  ['Plastic (LF)', plasticEdgingLF, setPlasticEdgingLF],
+                  ['Metal (LF)', metalEdgingLF, setMetalEdgingLF],
+                ].map(([lbl, val, set]) => (
+                  <div key={lbl} className="flex items-center gap-2 mb-1">
+                    <span className="text-xs text-gray-500 flex-1">{lbl}</span>
+                    <NumInput value={val} onChange={set} placeholder="LF" className="w-24" />
+                    <span className="text-xs text-gray-600 w-20 text-right">
+                      {_money(n(val) * _r('Edging Sub - $/LF'))}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Steppers (per SF) */}
+              <div className="mb-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <h4 className="text-xs font-bold text-gray-600 uppercase flex-1">Steppers</h4>
+                  {_pencil('Steppers Sub - $/SF', 'SF')}
+                </div>
+                {[
+                  ['Flagstone — Soil Set', flagstoneSoilSF, setFlagstoneSoilSF],
+                  ['Flagstone — Concrete Set', flagstoneConcreteSF, setFlagstoneConcreteSF],
+                  ['Precast — Soil Set', precastSoilSF, setPrecastSoilSF],
+                  ['Precast — Concrete Set', precastConcreteSF, setPrecastConcreteSF],
+                ].map(([lbl, val, set]) => (
+                  <div key={lbl} className="flex items-center gap-2 mb-1">
+                    <span className="text-xs text-gray-500 flex-1">{lbl}</span>
+                    <NumInput value={val} onChange={set} placeholder="SF" className="w-24" />
+                    <span className="text-xs text-gray-600 w-20 text-right">
+                      {_money(n(val) * _r('Steppers Sub - $/SF'))}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
+
+      {/* In-House sections (hidden on the Sub tab) */}
+      {!isSub && (
+        <>
       {/* ── Preparation ── */}
       <div>
         <SectionHeader title="Preparation" />
@@ -2866,6 +3013,9 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           </table>
         </div>
       </div>
+
+        </>
+      )}
 
       {/* ── Manual Entry ── */}
       <div>
