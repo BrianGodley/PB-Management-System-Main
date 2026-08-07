@@ -24,10 +24,11 @@ async function fetchGtRows() {
 // priced from material_price. The built-in `houseArray` is only a fallback for a
 // sub-category that has no products yet, so nothing disappears mid-migration.
 function mergedGtOpts(cat, houseArray, materialRows) {
-  const db = catalogOptions(materialRows, cat, 'House', { houseRows: 'null-vendor', stripPrefix: true }).map(
+  // Purely table-driven: options come ONLY from the catalog for this sub-category.
+  // (houseArray is ignored — no hardcoded fallback list.)
+  return catalogOptions(materialRows, cat, 'House', { houseRows: 'null-vendor', stripPrefix: true }).map(
     o => ({ label: o.label, dbName: o.row.name, fallback: parseFloat(o.row.unit_cost) || 0, id: o.row.id })
   )
-  return db.length ? db : houseArray || []
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -243,7 +244,10 @@ function resolveType(label, options, houseArray) {
     (options || []).find(t => t.label === label) ||
     (houseArray || []).find(t => t.label === label) ||
     (options && options[0]) ||
-    (houseArray && houseArray[0])
+    (houseArray && houseArray[0]) ||
+    // Table-driven safe default when a sub-category/vendor has no products —
+    // keeps the calc + render from crashing on an empty list (price resolves 0).
+    { label: '', dbName: null, fallback: 0, id: null }
   )
 }
 
@@ -263,7 +267,7 @@ function calcGroundTreatments(
   // Sod stays single-choice, so its option list is still supplied via opts.
   // Default to the hardcoded House array so the calc works if opts is absent.
   const _opts = {
-    sod: opts.sod || SOD_TYPES,
+    sod: opts.sod || [],
   }
   // Per-ROW type option resolver (vendor-aware). 'House' (or missing vendor on
   // an old estimate) → hardcoded House array. A vendor id → that vendor's
@@ -274,7 +278,7 @@ function calcGroundTreatments(
     const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : (catDefaults[cat] || 'House')
     if (!vsel || vsel === 'House') {
       const merged = mergedGtOpts(cat, houseArray, materialRows)
-      return resolveType(row.type, merged, houseArray)
+      return resolveType(row.type, merged, [])
     }
     // Shared row filtering (subcat + vendor); GT keeps its own label transform.
     const opts = catalogOptions(materialRows, cat, vsel, { houseRows: 'exclude' }).map(o => ({
@@ -283,7 +287,7 @@ function calcGroundTreatments(
       fallback: parseFloat(o.row.unit_cost) || 0,
       id: o.row.id,
     }))
-    return resolveType(row.type, opts, houseArray)
+    return resolveType(row.type, opts, [])
   }
   const {
     difficulty,
@@ -329,7 +333,7 @@ function calcGroundTreatments(
       if (!(n(r.sf) > 0)) return
       anyMulch = true
       const CY = (n(r.sf) * (n(r.depth) / 12)) / 27
-      const mt = rowOpt('Mulch', r, MULCH_TYPES)
+      const mt = rowOpt('Mulch', r, [])
       mulchMat += CY * p(mt.dbName, mt.fallback)
       mulchLab += (CY / mulchCYPerDay) * 8 + (n(r.sf) / 3200) * 8
       if (r.weedFabric === 'Yes') {
@@ -351,18 +355,14 @@ function calcGroundTreatments(
     n(plasticEdgingLF) * p(GT_RATES.plasticEdgingLab.dbName, GT_RATES.plasticEdgingLab.fallback)
   const _plasticEdgeOpt = rowOpt(
     'Edging',
-    { vendor: (edgingVendor || {}).plastic, type: (edgingType || {}).plastic || 'Plastic' },
-    EDGING_TYPES
-  )
+    { vendor: (edgingVendor || {}).plastic, type: (edgingType || {}).plastic || 'Plastic' }, [])
   const plasticMat =
     n(plasticEdgingLF) * p(_plasticEdgeOpt.dbName, _plasticEdgeOpt.fallback)
   const metalLab =
     n(metalEdgingLF) * p(GT_RATES.metalEdgingLab.dbName, GT_RATES.metalEdgingLab.fallback)
   const _metalEdgeOpt = rowOpt(
     'Edging',
-    { vendor: (edgingVendor || {}).metal, type: (edgingType || {}).metal || 'Metal' },
-    EDGING_TYPES
-  )
+    { vendor: (edgingVendor || {}).metal, type: (edgingType || {}).metal || 'Metal' }, [])
   const metalMat =
     n(metalEdgingLF) * p(_metalEdgeOpt.dbName, _metalEdgeOpt.fallback)
 
@@ -390,7 +390,7 @@ function calcGroundTreatments(
 
   // ── Sod ────────────────────────────────────────────────────────────────────
   const sodLab = n(sodSF) * p(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback)
-  const sodT = resolveType(sodType, _opts.sod, SOD_TYPES)
+  const sodT = resolveType(sodType, _opts.sod, [])
   const sodMat = n(sodSF) * p(sodT.dbName, sodT.fallback)
 
   // Fertilizer — auto-figured bags from sod SF × coverage (SF/bag). Material only.
@@ -399,10 +399,7 @@ function calcGroundTreatments(
     sodFertilizerVendor && sodFertilizerVendor !== 'auto'
       ? sodFertilizerVendor
       : (catDefaults.Fertilizer || 'House')
-  const fertT =
-    _fertV && _fertV !== 'House'
-      ? rowOpt('Fertilizer', { vendor: _fertV, type: sodFertilizer }, FERTILIZER_TYPES)
-      : FERTILIZER_TYPES.find(t => t.label === sodFertilizer)
+  const fertT = rowOpt('Fertilizer', { vendor: _fertV, type: sodFertilizer }, [])
   const _fertSF = n(sodFertilizerSF) || n(sodSF)
   if (fertT && fertT.dbName && _fertSF > 0) {
     const sfPerBag = p(GT_RATES.fertilizerSFPerBag.dbName, GT_RATES.fertilizerSFPerBag.fallback)
@@ -415,7 +412,7 @@ function calcGroundTreatments(
   ;(soilsRows || []).forEach(r => {
     if (!n(r.sf)) return
     const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
-    const st = rowOpt('Soils', r, SOIL_TYPES)
+    const st = rowOpt('Soils', r, [])
     soilsMat += CY * p(st.dbName, st.fallback)
   })
 
@@ -442,7 +439,7 @@ function calcGroundTreatments(
     ]
     stepLines.forEach(ln => {
       if (!(n(ln.sf) > 0)) return
-      const opt = rowOpt('Steppers', { vendor: _sv[ln.key], type: _st[ln.key] || ln.defType }, STEPPER_TYPES)
+      const opt = rowOpt('Steppers', { vendor: _sv[ln.key], type: _st[ln.key] || ln.defType }, [])
       const perTon = p(opt.dbName, opt.fallback)
       const sfPerDay = p(ln.labRate.dbName, ln.labRate.fallback)
       const lab = sfPerDay > 0 ? (n(ln.sf) / sfPerDay) * 8 : 0
@@ -469,7 +466,7 @@ function calcGroundTreatments(
       if (!(n(r.sf) > 0)) return
       const tons = (n(r.sf) * n(r.depth)) / 200
       const cement = r.cement === 'Yes'
-      const dgt = rowOpt('DG', r, DG_TYPES)
+      const dgt = rowOpt('DG', r, [])
       const baseHrs =
         r.method === 'Hand'
           ? (tons * 1.62) / dgHandRate + (n(r.sf) / 1000) * 8 + tons
@@ -506,7 +503,7 @@ function calcGroundTreatments(
       ? n(r.sf) * p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
       : 0
     gravelLab += excavLab + fabricLab
-    const gtype = rowOpt('Gravel', r, GRAVEL_TYPES)
+    const gtype = rowOpt('Gravel', r, [])
     const costPerCY = p(gtype.dbName, gtype.fallback)
     gravelMat +=
       CY * costPerCY +
@@ -529,7 +526,7 @@ function calcGroundTreatments(
       ? n(r.sf) * p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
       : 0
     pebbleLab += excavLab + fabricLab
-    const ptype = rowOpt('Pebble', r, PEBBLE_TYPES)
+    const ptype = rowOpt('Pebble', r, [])
     const costPerCY = p(ptype.dbName, ptype.fallback)
     pebbleMat +=
       CY * costPerCY +
@@ -549,7 +546,7 @@ function calcGroundTreatments(
     const fabricLab =
       n(r.sf) * p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
     cobbleLab += excavLab + fabricLab
-    const ctype = rowOpt('Cobbles', r, COBBLE_TYPES)
+    const ctype = rowOpt('Cobbles', r, [])
     const costPerCY = p(ctype.dbName, ctype.fallback)
     cobbleMat +=
       CY * costPerCY +
@@ -1031,7 +1028,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   function sectionOptions(subcat, vendorSel, houseArray) {
     if (!vendorSel || vendorSel === 'House') return mergedGtOpts(subcat, houseArray, materialRows)
     const opts = catalogOptions(materialRows, subcat, vendorSel, { houseRows: 'exclude', stripPrefix: true })
-    if (!opts.length) return houseArray
+    // Table-driven: a vendor with no catalog rows for this sub-category shows an
+    // empty list (no hardcoded fallback).
     return opts.map(o => ({ label: o.label || o.row.name, dbName: o.row.name, fallback: n(o.row.unit_cost), id: o.row.id }))
   }
 
@@ -1097,7 +1095,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendors, initialData, vendorDefaultsApplied])
 
-  const sodOpts = sectionOptions('Sod', sodVendor, SOD_TYPES)
+  const sodOpts = sectionOptions('Sod', sodVendor, [])
   const soilPrepOpts = sectionOptions('Soil Prep', sodSoilPrepVendor, SOIL_PREP_TYPES)
 
   const calcRaw = calcGroundTreatments(
@@ -1158,7 +1156,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   }
   function changeSodVendor(v) {
     setSodVendor(v)
-    const first = sectionOptions('Sod', v, SOD_TYPES)[0]?.label
+    const first = sectionOptions('Sod', v, [])[0]?.label
     if (first) setSodType(first)
   }
 
@@ -1358,8 +1356,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             </thead>
             <tbody>
               {soilsRows.map((row, i) => {
-                const rowOpts = sectionOptions('Soils', row.vendor, SOIL_TYPES)
-                const st = resolveType(row.type, rowOpts, SOIL_TYPES)
+                const rowOpts = sectionOptions('Soils', row.vendor, [])
+                const st = resolveType(row.type, rowOpts, [])
                 const typeCost = p(st.dbName, st.fallback)
                 const CY = (n(row.sf) * (n(row.depthIn) / 12)) / 27
                 const mat = CY * typeCost
@@ -1482,7 +1480,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             <NumInput value={sodSF} onChange={setSodSF} placeholder="SF" className="w-24" />
             <span className="text-xs text-gray-400 inline-flex items-center gap-1">
               {(() => {
-                const st = resolveType(sodType, sodOpts, SOD_TYPES)
+                const st = resolveType(sodType, sodOpts, [])
                 return (
                   <>
                     ${p(st.dbName, st.fallback).toFixed(2)}/SF
@@ -1510,7 +1508,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               <span className="text-xs text-gray-400">
                 $
                 {(() => {
-                  const st = resolveType(sodType, sodOpts, SOD_TYPES)
+                  const st = resolveType(sodType, sodOpts, [])
                   return (n(sodSF) * p(st.dbName, st.fallback)).toFixed(2)
                 })()}{' '}
                 mat
@@ -1524,11 +1522,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               onChange={e => {
                 const v = e.target.value
                 setSodFertilizerVendor(v)
-                const opts =
-                  v === 'House'
-                    ? FERTILIZER_TYPES
-                    : [FERTILIZER_TYPES[0], ...sectionOptions('Fertilizer', v, [])]
-                if (!opts.some(o => o.label === sodFertilizer)) setSodFertilizer(opts[0].label)
+                const opts = sectionOptions('Fertilizer', v, [])
+                if (!opts.some(o => o.label === sodFertilizer)) setSodFertilizer(opts[0]?.label || '')
               }}
               title="Vendor"
             >
@@ -1544,10 +1539,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               value={sodFertilizer}
               onChange={e => setSodFertilizer(e.target.value)}
             >
-              {(sodFertilizerVendor === 'House'
-                ? FERTILIZER_TYPES
-                : [FERTILIZER_TYPES[0], ...sectionOptions('Fertilizer', sodFertilizerVendor, [])]
-              ).map(t => (
+              {sectionOptions('Fertilizer', sodFertilizerVendor, []).map(t => (
                 <option key={t.label} value={t.label}>
                   {t.label}
                 </option>
@@ -1560,14 +1552,11 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               className="w-24"
             />
             {(() => {
-              const ft =
-                sodFertilizerVendor === 'House'
-                  ? FERTILIZER_TYPES.find(t => t.label === sodFertilizer)
-                  : resolveType(
-                      sodFertilizer,
-                      [FERTILIZER_TYPES[0], ...sectionOptions('Fertilizer', sodFertilizerVendor, [])],
-                      FERTILIZER_TYPES
-                    )
+              const ft = resolveType(
+                sodFertilizer,
+                sectionOptions('Fertilizer', sodFertilizerVendor, []),
+                []
+              )
               if (!ft || !ft.dbName) return null
               const sfPerBag = p(
                 GT_RATES.fertilizerSFPerBag.dbName,
@@ -1615,9 +1604,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             {(() => {
               const mt = resolveType(
                 mulchRows[0]?.type,
-                sectionOptions('Mulch', mulchRows[0]?.vendor, MULCH_TYPES),
-                MULCH_TYPES
-              )
+                sectionOptions('Mulch', mulchRows[0]?.vendor, []), [])
               return (
                 <>
                   Type ${p(mt.dbName, mt.fallback).toFixed(2)}/CY
@@ -1693,8 +1680,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             </thead>
             <tbody>
               {mulchRows.map((row, i) => {
-                const rowOpts = sectionOptions('Mulch', row.vendor, MULCH_TYPES)
-                const mt = resolveType(row.type, rowOpts, MULCH_TYPES)
+                const rowOpts = sectionOptions('Mulch', row.vendor, [])
+                const mt = resolveType(row.type, rowOpts, [])
                 const typeCost = p(mt.dbName, mt.fallback)
                 return (
                   <tr key={i} className="border-b border-gray-100">
@@ -1803,9 +1790,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             {(() => {
               const dt = resolveType(
                 dgRows[0]?.type,
-                sectionOptions('DG', dgRows[0]?.vendor, DG_TYPES),
-                DG_TYPES
-              )
+                sectionOptions('DG', dgRows[0]?.vendor, []), [])
               return (
                 <>
                   Type ${p(dt.dbName, dt.fallback).toFixed(2)}/ton
@@ -1894,7 +1879,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             </thead>
             <tbody>
               {dgRows.map((row, i) => {
-                const rowOpts = sectionOptions('DG', row.vendor, DG_TYPES)
+                const rowOpts = sectionOptions('DG', row.vendor, [])
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-1">
@@ -2083,8 +2068,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             </thead>
             <tbody>
               {gravelRows.map((row, i) => {
-                const rowOpts = sectionOptions('Gravel', row.vendor, GRAVEL_TYPES)
-                const gtype = resolveType(row.type, rowOpts, GRAVEL_TYPES)
+                const rowOpts = sectionOptions('Gravel', row.vendor, [])
+                const gtype = resolveType(row.type, rowOpts, [])
                 const typeCost = p(gtype.dbName, gtype.fallback)
                 return (
                   <tr key={i} className="border-b border-gray-100">
@@ -2194,7 +2179,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               {gravelRows.map((row, i) => {
                 if (!n(row.sf)) return null
                 const CY = (n(row.sf) * (n(row.depthIn) / 12)) / 27
-                const gtype = resolveType(row.type, sectionOptions('Gravel', row.vendor, GRAVEL_TYPES), GRAVEL_TYPES)
+                const gtype = resolveType(row.type, sectionOptions('Gravel', row.vendor, []), [])
                 const mat =
                   CY * p(gtype.dbName, gtype.fallback) +
                   ((row.weedFabric ?? 'Yes') === 'Yes' ? n(row.sf) * p(GT_RATES.gravelFabricMat.dbName, 0.1) : 0)
@@ -2275,8 +2260,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             </thead>
             <tbody>
               {pebbleRows.map((row, i) => {
-                const rowOpts = sectionOptions('Pebble', row.vendor, PEBBLE_TYPES)
-                const ptype = resolveType(row.type, rowOpts, PEBBLE_TYPES)
+                const rowOpts = sectionOptions('Pebble', row.vendor, [])
+                const ptype = resolveType(row.type, rowOpts, [])
                 const typeCost = p(ptype.dbName, ptype.fallback)
                 return (
                   <tr key={i} className="border-b border-gray-100">
@@ -2374,7 +2359,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               {pebbleRows.map((row, i) => {
                 if (!n(row.sf)) return null
                 const CY = (n(row.sf) * (n(row.depthIn) / 12)) / 27
-                const ptype = resolveType(row.type, sectionOptions('Pebble', row.vendor, PEBBLE_TYPES), PEBBLE_TYPES)
+                const ptype = resolveType(row.type, sectionOptions('Pebble', row.vendor, []), [])
                 const mat =
                   CY * p(ptype.dbName, ptype.fallback) +
                   ((row.weedFabric ?? 'Yes') === 'Yes' ? n(row.sf) * p(GT_RATES.gravelFabricMat.dbName, 0.1) : 0)
@@ -2454,8 +2439,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             </thead>
             <tbody>
               {cobbleRows.map((row, i) => {
-                const rowOpts = sectionOptions('Cobbles', row.vendor, COBBLE_TYPES)
-                const ctype = resolveType(row.type, rowOpts, COBBLE_TYPES)
+                const rowOpts = sectionOptions('Cobbles', row.vendor, [])
+                const ctype = resolveType(row.type, rowOpts, [])
                 const typeCost = p(ctype.dbName, ctype.fallback)
                 return (
                   <tr key={i} className="border-b border-gray-100">
@@ -2542,7 +2527,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               {cobbleRows.map((row, i) => {
                 if (!n(row.sf)) return null
                 const CY = (n(row.sf) * (n(row.depthIn) / 12)) / 27
-                const ctype = resolveType(row.type, sectionOptions('Cobbles', row.vendor, COBBLE_TYPES), COBBLE_TYPES)
+                const ctype = resolveType(row.type, sectionOptions('Cobbles', row.vendor, []), [])
                 const mat =
                   CY * p(ctype.dbName, ctype.fallback) +
                   n(row.sf) * p(GT_RATES.gravelFabricMat.dbName, 0.1)
@@ -2563,8 +2548,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
         <div className="space-y-0">
           {/* Plastic Edging — Vendor + Type per line (material from picked type; labor per line) */}
           {(() => {
-            const opts = sectionOptions('Edging', edgingVendor.plastic, EDGING_TYPES)
-            const t = resolveType(edgingType.plastic, opts, EDGING_TYPES)
+            const opts = sectionOptions('Edging', edgingVendor.plastic, [])
+            const t = resolveType(edgingType.plastic, opts, [])
             const rate = p(t.dbName, t.fallback)
             return (
               <LabeledRow
@@ -2579,7 +2564,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                   onChange={e => {
                     const v = e.target.value
                     setEdgingVendor(ev => ({ ...ev, plastic: v }))
-                    const first = sectionOptions('Edging', v, EDGING_TYPES)[0]?.label
+                    const first = sectionOptions('Edging', v, [])[0]?.label
                     if (first) setEdgingType(et => ({ ...et, plastic: first }))
                   }}
                   title="Vendor"
@@ -2637,8 +2622,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
 
           {/* Metal Edging — Vendor + Type per line (material from picked type; labor per line) */}
           {(() => {
-            const opts = sectionOptions('Edging', edgingVendor.metal, EDGING_TYPES)
-            const t = resolveType(edgingType.metal, opts, EDGING_TYPES)
+            const opts = sectionOptions('Edging', edgingVendor.metal, [])
+            const t = resolveType(edgingType.metal, opts, [])
             const rate = p(t.dbName, t.fallback)
             return (
               <LabeledRow
@@ -2651,7 +2636,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                   onChange={e => {
                     const v = e.target.value
                     setEdgingVendor(ev => ({ ...ev, metal: v }))
-                    const first = sectionOptions('Edging', v, EDGING_TYPES)[0]?.label
+                    const first = sectionOptions('Edging', v, [])[0]?.label
                     if (first) setEdgingType(et => ({ ...et, metal: first }))
                   }}
                   title="Vendor"
@@ -2762,8 +2747,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                   labRate: GT_RATES.precastConcreteLab,
                 },
               ].map(row => {
-                const rowOpts = sectionOptions('Steppers', stepperVendor[row.key], STEPPER_TYPES)
-                const st = resolveType(stepperType[row.key], rowOpts, STEPPER_TYPES)
+                const rowOpts = sectionOptions('Steppers', stepperVendor[row.key], [])
+                const st = resolveType(stepperType[row.key], rowOpts, [])
                 const sfPerDay = p(row.labRate.dbName, row.labRate.fallback)
                 const perTon = p(st.dbName, st.fallback)
                 const sfN = n(row.sf)
@@ -2779,7 +2764,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         onChange={e => {
                           const v = e.target.value
                           setStepperVendor(sv => ({ ...sv, [row.key]: v }))
-                          const first = sectionOptions('Steppers', v, STEPPER_TYPES)[0]?.label
+                          const first = sectionOptions('Steppers', v, [])[0]?.label
                           if (first) setStepperType(st => ({ ...st, [row.key]: first }))
                         }}
                         title="Vendor"
