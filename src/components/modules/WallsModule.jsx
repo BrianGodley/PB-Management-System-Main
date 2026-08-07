@@ -472,8 +472,17 @@ function computeCapRow(row, mp, materialRows) {
       subQty = lf
       break
     }
-    default:
+    default: {
+      // Any catalog Wall Cap product (e.g. modular block caps like "Shelton
+      // Wall Cap"): priced per LF from its own material_price for the selected
+      // vendor, with the standard per-LF cap install labor coefficient.
+      const pr = capP(row.type, 0)
+      mat = lf * pr
+      hrs = lf * lab('capBullnoseLab')
+      subUnit = pr
+      subQty = lf
       break
+    }
   }
   const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : subUnit
   return { mat, hrs, subUnit, subEach, subMat: subQty * subEach, unit, qty: dispQty, widthIn }
