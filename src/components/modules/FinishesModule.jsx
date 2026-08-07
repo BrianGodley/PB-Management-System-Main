@@ -60,6 +60,16 @@ const FINISHES_RATES = {
   tileLab: { db: 'Tile - Finishes Labor Rate', fb: 0.2867 }, // hrs/SF
   flagstoneLab: { db: 'Real Flagstone - Finishes Labor Rate', fb: 0.4487 }, // hrs/SF
   realStoneLab: { db: 'Real Stone - Finishes Labor Rate', fb: 0.8954 }, // hrs/SF
+
+  // ── Cap labor coefficients (were hardcoded) ────────────────────────────────
+  capFlagstoneLab: { db: 'Finishes Cap Flagstone Labor Rate', fb: 0.25 }, // hrs/LF
+  capPrecastLab: { db: 'Finishes Cap Precast Labor Rate', fb: 0.2 }, // hrs/ea
+  capPipLab: { db: 'Finishes Cap PIP Concrete Labor Rate', fb: 0.15 }, // hrs/LF
+  capBullnoseLab: { db: 'Finishes Cap Bullnose Labor Rate', fb: 0.08 }, // hrs/LF
+
+  // ── Consumable material costs (were hardcoded) ─────────────────────────────
+  stoneScrews: { db: 'Finishes Stone Screws', fb: 0.4 }, // $/SF (was (sf/5)×$2)
+  tileAdhesive: { db: 'Finishes Tile Adhesive/Grout', fb: 1.0 }, // $/SF
 }
 
 const DEFAULTS = {
@@ -186,6 +196,7 @@ function computeCapRow(row, mp, materialRows) {
     qty = n(row.qty)
   const v = row.vendor
   const price = k => finishMatPrice(FINISHES_RATES[k].db, v, materialRows, mp, FINISHES_RATES[k].fb)
+  const lab = k => mp?.[FINISHES_RATES[k].db] ?? FINISHES_RATES[k].fb
   let mat = 0,
     hrs = 0,
     subUnit = 0,
@@ -194,26 +205,26 @@ function computeCapRow(row, mp, materialRows) {
   switch (row.type) {
     case 'Flagstone':
       mat = (((widthIn / 12) * lf * 0.0833 * 100) / 2000) * price('capFlagstone')
-      hrs = lf * 0.25
+      hrs = lf * lab('capFlagstoneLab')
       subUnit = (((widthIn / 12) * 0.0833 * 100) / 2000) * price('capFlagstone')
       subQty = lf
       break
     case 'Precast':
       mat = qty * price('capPrecast')
-      hrs = qty * 0.2
+      hrs = qty * lab('capPrecastLab')
       subUnit = price('capPrecast')
       subQty = qty
       unit = 'Qty'
       break
     case 'PIP Concrete':
       mat = ((lf * (widthIn / 12) * 0.333) / 27) * price('concreteTruck')
-      hrs = lf * 0.15
+      hrs = lf * lab('capPipLab')
       subUnit = (((widthIn / 12) * 0.333) / 27) * price('concreteTruck')
       subQty = lf
       break
     case 'Bullnose Brick':
       mat = lf * price('capBullnose')
-      hrs = lf * 0.08
+      hrs = lf * lab('capBullnoseLab')
       subUnit = price('capBullnose')
       subQty = lf
       break
@@ -246,18 +257,18 @@ function computeWallRow(row, mp, materialRows) {
       break
     case 'Ledgerstone':
       hrs = sf > 0 ? (sf / lab('ledgerstoneLab')) * 8 : 0
-      mat = sf > 0 ? sf * price('ledgerstone') * 1.1 + (sf / 5) * 2 : 0
-      subUnit = price('ledgerstone') * 1.1 + 0.4 // (sf/5)*2 per SF = 0.4
+      mat = sf > 0 ? sf * price('ledgerstone') * 1.1 + sf * lab('stoneScrews') : 0
+      subUnit = price('ledgerstone') * 1.1 + lab('stoneScrews') // screws $/SF
       break
     case 'Stacked Stone':
       hrs = sf > 0 ? (sf / lab('stackedStoneLab')) * 8 : 0
-      mat = sf > 0 ? sf * price('stackedStone') * 1.1 + (sf / 5) * 2 : 0
-      subUnit = price('stackedStone') * 1.1 + 0.4
+      mat = sf > 0 ? sf * price('stackedStone') * 1.1 + sf * lab('stoneScrews') : 0
+      subUnit = price('stackedStone') * 1.1 + lab('stoneScrews')
       break
     case 'Tile':
       hrs = sf > 0 ? sf * lab('tileLab') : 0
-      mat = sf > 0 ? sf * price('tile') + sf : 0 // +$1/SF adhesive/grout
-      subUnit = price('tile') + 1
+      mat = sf > 0 ? sf * price('tile') + sf * lab('tileAdhesive') : 0 // adhesive/grout $/SF
+      subUnit = price('tile') + lab('tileAdhesive')
       break
     case 'Real Flagstone': {
       const rate = n(row.rateIn) || price('realFlagstone')

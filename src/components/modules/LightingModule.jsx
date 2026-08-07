@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
+import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import {
@@ -33,8 +34,12 @@ const CATALOG_OPTS = { houseRows: 'null-vendor', stripPrefix: false }
 const LIGHTING_CATEGORY = 'Lighting'
 const LIGHT_CAT = { fixture: 'Light Fixture', transformer: 'Transformer', wire: 'Wire' }
 
-// 15% material markup applied to all fixture / transformer / wire materials
-const MATERIAL_MARKUP = 0.15
+// Material markup applied to all fixture / transformer / wire materials.
+// FALLBACK ONLY — the operative value comes from the price list
+// (misc_rates 'Lighting - Material Markup', category 'Lighting'), stored as a
+// fraction (0.15 = 15%). Used solely when the DB row is absent.
+const MATERIAL_MARKUP_FB = 0.15
+const MATERIAL_MARKUP_NAME = 'Lighting - Material Markup'
 
 const DEFAULTS = {
   laborRatePerHour: 35,
@@ -106,7 +111,8 @@ function calcLighting(
   gpmd = DEFAULTS.gpmd,
   walkAccess = null,
   laborBurdenPct = DEFAULTS.laborBurdenPct,
-  priceOf = item => n(item.unit_cost)
+  priceOf = item => n(item.unit_cost),
+  materialMarkup = MATERIAL_MARKUP_FB
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const { difficulty, hoursAdj, fixtureRows, transformerRows, wireRows, manualRows, distanceLF } =
@@ -121,8 +127,9 @@ function calcLighting(
   const totalWatts = fx.watts + xf.watts + wr.watts
   const totalVA = fx.va + xf.va + wr.va
 
+  const _markup = materialMarkup != null ? n(materialMarkup) : MATERIAL_MARKUP_FB
   const rawMat = fx.mat + xf.mat + wr.mat
-  const markedUpMat = rawMat * (1 + MATERIAL_MARKUP)
+  const markedUpMat = rawMat * (1 + _markup)
 
   let manHrs = 0,
     manMat = 0,
@@ -240,10 +247,13 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
   // (blank = current). Lets the estimate be priced at historical rates.
   const [ledger, setLedger] = useState({})
   const [asOfDate, setAsOfDate] = useState('')
+  // Material markup coefficient from the price list (fraction). Null → fallback.
+  const [materialMarkup, setMaterialMarkup] = useState(null)
 
-  // Re-fetch the lighting catalog + vendor list. Used on mount.
+  // Re-fetch the lighting catalog + vendor list + markup rate. Used on mount
+  // and after a markup RateEditPopover save.
   const refreshCatalog = useCallback(async () => {
-    const [matRes, venRes] = await Promise.all([
+    const [matRes, venRes, mkRes] = await Promise.all([
       supabase
         .from('material_rates')
         .select('id,name,sub_category,vendor_id,unit,unit_cost,watts,va,labor_hrs_ea,sub_price_ea')
@@ -253,7 +263,15 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
         .select('id, company_name')
         .eq('type', 'vendor')
         .order('company_name'),
+      supabase
+        .from('misc_rates')
+        .select('name, rate')
+        .eq('category', LIGHTING_CATEGORY)
+        .eq('name', MATERIAL_MARKUP_NAME)
+        .maybeSingle(),
     ])
+    const mk = mkRes.data ? parseFloat(mkRes.data.rate) : NaN
+    setMaterialMarkup(Number.isFinite(mk) ? mk : null)
     setMaterialRows(matRes.data || [])
     setVendors(
       (venRes.data || []).map(v => ({
@@ -375,7 +393,8 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
     gpmd,
     walkAccess,
     laborBurdenPct,
-    priceOf
+    priceOf,
+    materialMarkup
   )
   const _salesTaxAmt = (calcRaw.totalMat || 0) * (salesTaxRate || 0)
   const calc =
@@ -769,9 +788,20 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
       })}
 
       {!isSub && calc.rawMat > 0 && (
-        <p className="text-xs text-gray-400 -mt-2 px-1">
-          Raw materials {fmt2(calc.rawMat)} + 15% markup ={' '}
+        <p className="text-xs text-gray-400 -mt-2 px-1 flex items-center gap-1">
+          Raw materials {fmt2(calc.rawMat)} +{' '}
+          {(((materialMarkup != null ? materialMarkup : MATERIAL_MARKUP_FB) * 100)
+            .toFixed(0))}% markup ={' '}
           <span className="text-gray-600 font-medium">{fmt2(calc.markedUpMat)}</span>
+          <RateEditPopover
+            table="misc_rates"
+            name={MATERIAL_MARKUP_NAME}
+            category={LIGHTING_CATEGORY}
+            unitLabel="fraction"
+            mode="coefficient"
+            currentValue={materialMarkup != null ? materialMarkup : MATERIAL_MARKUP_FB}
+            onSaved={refreshCatalog}
+          />
         </p>
       )}
 

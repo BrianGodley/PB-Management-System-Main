@@ -188,7 +188,7 @@ export default function LightingSummary({ module }) {
 
           {!isSub && markedUpMat > 0 && rawMat > 0 && (
             <p className="text-xs text-gray-400 mt-1">
-              {fmt2(rawMat)} raw materials + 15% markup ={' '}
+              {fmt2(rawMat)} raw materials + {Math.round((markedUpMat / rawMat - 1) * 100)}% markup ={' '}
               <span className="text-gray-600 font-medium">{fmt2(markedUpMat)}</span>
             </p>
           )}

@@ -26,10 +26,23 @@ import RateEditPopover from '../RateEditPopover'
 const n = v => parseFloat(v) || 0
 const R = { laborRatePerHour: 35, laborBurdenPct: 0.29, gpmd: 425, commissionRate: 0.12 }
 
-const TRAVEL_HRS_PER_VISIT = 2
-const FLAT_HRS_PER_1K = 0.5
-const HILL_HRS_PER_1K = 1.0
-const MATERIAL_PER_1K = 2
+// In-House labor / material coefficients. These are FALLBACKS ONLY — the
+// operative values come from the price list: labor_rates for the hour
+// coefficients and material_rates for the per-1,000-SF material cost
+// (all category 'Weed Abatement'). The fallback is used solely when the DB
+// row is absent.
+const WEED_RATE_FB = {
+  travelHrsPerVisit: 2, // labor_rates 'Weed Abatement - Travel hr/visit'
+  flatHrsPer1k: 0.5, // labor_rates 'Weed Abatement - Flat hr/1k SF'
+  hillHrsPer1k: 1.0, // labor_rates 'Weed Abatement - Hillside hr/1k SF'
+  materialPer1k: 2, // material_rates 'Weed Abatement - Material $/1k SF'
+}
+const WEED_RATE_NAMES = {
+  travelHrsPerVisit: 'Weed Abatement - Travel hr/visit',
+  flatHrsPer1k: 'Weed Abatement - Flat hr/1k SF',
+  hillHrsPer1k: 'Weed Abatement - Hillside hr/1k SF',
+  materialPer1k: 'Weed Abatement - Material $/1k SF',
+}
 
 // Per-tab input factory — In-House and Sub each carry their OWN copy so the
 // two tabs never share inputs, only the module-level rates.
@@ -58,6 +71,14 @@ function calcWeed(
   const hillSF = mode === 'flat' ? 0 : n(state.hillSF)
   const subMarkup = n(state.subGpMarkupRate) || 0.2
 
+  // Price-list coefficients (labor hrs + material $/1k SF). state.rates carries
+  // the DB values; each falls back to WEED_RATE_FB only when the row is missing.
+  const rt = state.rates || {}
+  const travelPerVisit = rt.travelHrsPerVisit != null ? n(rt.travelHrsPerVisit) : WEED_RATE_FB.travelHrsPerVisit
+  const flatPer1k = rt.flatHrsPer1k != null ? n(rt.flatHrsPer1k) : WEED_RATE_FB.flatHrsPer1k
+  const hillPer1k = rt.hillHrsPer1k != null ? n(rt.hillHrsPer1k) : WEED_RATE_FB.hillHrsPer1k
+  const materialPer1k = rt.materialPer1k != null ? n(rt.materialPer1k) : WEED_RATE_FB.materialPer1k
+
   if (isSub) {
     // Sub tab: STRICT price per square foot — no labor hours. subCost is purely
     // $/SF × area × visits, plus an optional flat add.
@@ -76,14 +97,14 @@ function calcWeed(
     }
   }
 
-  const travelHrs = TRAVEL_HRS_PER_VISIT * visits
-  const flatHrs = (flatSF / 1000) * FLAT_HRS_PER_1K * visits
-  const hillHrs = (hillSF / 1000) * HILL_HRS_PER_1K * visits
+  const travelHrs = travelPerVisit * visits
+  const flatHrs = (flatSF / 1000) * flatPer1k * visits
+  const hillHrs = (hillSF / 1000) * hillPer1k * visits
   const laborHrs = flatHrs + hillHrs
   const totalHrs = travelHrs + laborHrs
   const manDays = totalHrs / 8
 
-  const totalMat = ((flatSF + hillSF) / 1000) * MATERIAL_PER_1K * visits
+  const totalMat = ((flatSF + hillSF) / 1000) * materialPer1k * visits
 
   const lrph = n(laborRatePerHour) || R.laborRatePerHour
   const laborCost = totalHrs * lrph
@@ -96,6 +117,7 @@ function calcWeed(
   return {
     isSub: false, mode, visits, flatSF, hillSF,
     travelHrs, flatHrs, hillHrs, laborHrs, totalHrs, manDays,
+    travelPerVisit, flatPer1k, hillPer1k, materialPer1k,
     totalMat, laborCost, burden, gp, commission, subCost, subGp: 0, price,
   }
 }
@@ -110,6 +132,10 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
   // Master-rate default for the Sub $/SF. Used only when the user leaves the
   // Subcontractor Rate field blank; a typed value always wins.
   const [subRateDefault, setSubRateDefault] = useState(null)
+
+  // In-House labor/material coefficients pulled from the price list. Null until
+  // loaded; calc falls back to WEED_RATE_FB for any coefficient still missing.
+  const [rateMap, setRateMap] = useState({})
 
   // Independent In-House / Sub tabs. Legacy flat saves load into In-House.
   const [ihTab, setIhTab] = useState(() => makeTab(initialData?.ihData || initialData))
@@ -129,13 +155,31 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
   // the user leaves the rate field blank. Re-fetched after a RateEditPopover
   // save so the hint + fallback reflect the edit immediately.
   const refreshRates = useCallback(async () => {
-    const { data } = await supabase
-      .from('material_rates')
-      .select('name, unit_cost')
-      .eq('category', 'Weed Abatement')
-    const row = (data || []).find(r => r.name === 'Weed Abatement - Sub $/SF')
-    const v = row ? parseFloat(row.unit_cost) : NaN
-    setSubRateDefault(Number.isFinite(v) ? v : null)
+    const [matRes, labRes] = await Promise.all([
+      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Weed Abatement'),
+      supabase.from('labor_rates').select('name, rate').eq('category', 'Weed Abatement'),
+    ])
+    const mat = matRes.data || []
+    const lab = labRes.data || []
+    // material_rates values live in unit_cost; labor_rates values live in rate.
+    const pickMat = name => {
+      const row = mat.find(r => r.name === name)
+      const v = row ? parseFloat(row.unit_cost) : NaN
+      return Number.isFinite(v) ? v : null
+    }
+    const pickLab = name => {
+      const row = lab.find(r => r.name === name)
+      const v = row ? parseFloat(row.rate) : NaN
+      return Number.isFinite(v) ? v : null
+    }
+    setSubRateDefault(pickMat('Weed Abatement - Sub $/SF'))
+    // In-House coefficients: labor hrs from labor_rates, material $ from material_rates.
+    setRateMap({
+      travelHrsPerVisit: pickLab(WEED_RATE_NAMES.travelHrsPerVisit),
+      flatHrsPer1k: pickLab(WEED_RATE_NAMES.flatHrsPer1k),
+      hillHrsPer1k: pickLab(WEED_RATE_NAMES.hillHrsPer1k),
+      materialPer1k: pickMat(WEED_RATE_NAMES.materialPer1k),
+    })
   }, [])
 
   useEffect(() => {
@@ -160,7 +204,7 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
   // only fall back to the master-rate default when the field is left blank.
   const effSubRatePerSF =
     cur.subRatePerSF === '' || cur.subRatePerSF == null ? (subRateDefault ?? '') : cur.subRatePerSF
-  const state = { subType, subGpMarkupRate, ...cur, subRatePerSF: effSubRatePerSF }
+  const state = { subType, subGpMarkupRate, ...cur, subRatePerSF: effSubRatePerSF, rates: rateMap }
   const calc = calcWeed(state, laborRatePerHour, gpmd, laborBurdenPct)
 
   function handleSave() {
@@ -183,6 +227,8 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
     })
   }
 
+  // Effective In-House coefficients for display + popover current values.
+  const effRate = k => (rateMap[k] != null ? rateMap[k] : WEED_RATE_FB[k])
   const fmt = v => `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
   const lbl = 'block text-sm font-medium text-gray-700 mb-1'
@@ -236,14 +282,40 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
           <div>
             <label className={lbl}>Flat Area (SF)</label>
             <input type="number" value={flatSF} onChange={e => setField('flatSF')(e.target.value)} placeholder="0" className={inp} />
-            {!isSub && <p className="text-[11px] text-gray-400 mt-1">0.5 hr / 1,000 SF</p>}
+            {!isSub && (
+              <p className="text-[11px] text-gray-400 mt-1 flex items-center gap-1">
+                {effRate('flatHrsPer1k')} hr / 1,000 SF
+                <RateEditPopover
+                  table="labor_rates"
+                  name={WEED_RATE_NAMES.flatHrsPer1k}
+                  category="Weed Abatement"
+                  unitLabel="hr/1k SF"
+                  mode="coefficient"
+                  currentValue={effRate('flatHrsPer1k')}
+                  onSaved={refreshRates}
+                />
+              </p>
+            )}
           </div>
         )}
         {mode !== 'flat' && (
           <div>
             <label className={lbl}>Hillside Area (SF)</label>
             <input type="number" value={hillSF} onChange={e => setField('hillSF')(e.target.value)} placeholder="0" className={inp} />
-            {!isSub && <p className="text-[11px] text-gray-400 mt-1">1 hr / 1,000 SF</p>}
+            {!isSub && (
+              <p className="text-[11px] text-gray-400 mt-1 flex items-center gap-1">
+                {effRate('hillHrsPer1k')} hr / 1,000 SF
+                <RateEditPopover
+                  table="labor_rates"
+                  name={WEED_RATE_NAMES.hillHrsPer1k}
+                  category="Weed Abatement"
+                  unitLabel="hr/1k SF"
+                  mode="coefficient"
+                  currentValue={effRate('hillHrsPer1k')}
+                  onSaved={refreshRates}
+                />
+              </p>
+            )}
           </div>
         )}
         <div>
@@ -308,7 +380,18 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
       ) : (
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm space-y-1.5">
           <div className="flex justify-between">
-            <span className="text-gray-500">Travel ({TRAVEL_HRS_PER_VISIT} hr × {calc.visits} visit{calc.visits === 1 ? '' : 's'})</span>
+            <span className="text-gray-500 flex items-center gap-1">
+              Travel ({effRate('travelHrsPerVisit')} hr × {calc.visits} visit{calc.visits === 1 ? '' : 's'})
+              <RateEditPopover
+                table="labor_rates"
+                name={WEED_RATE_NAMES.travelHrsPerVisit}
+                category="Weed Abatement"
+                unitLabel="hr/visit"
+                mode="coefficient"
+                currentValue={effRate('travelHrsPerVisit')}
+                onSaved={refreshRates}
+              />
+            </span>
             <span className="font-medium">{calc.travelHrs.toFixed(2)} hrs</span>
           </div>
           {mode !== 'hillside' && (
@@ -328,7 +411,17 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
             <span className="font-bold text-gray-900">{calc.totalHrs.toFixed(2)} hrs ({calc.manDays.toFixed(2)} MD)</span>
           </div>
           <div className="flex justify-between">
-            <span className="font-semibold text-gray-700">Material Cost</span>
+            <span className="font-semibold text-gray-700 flex items-center gap-1">
+              Material Cost ({fmt(effRate('materialPer1k'))} / 1,000 SF)
+              <RateEditPopover
+                table="material_rates"
+                name={WEED_RATE_NAMES.materialPer1k}
+                category="Weed Abatement"
+                unitLabel="1k SF"
+                currentValue={effRate('materialPer1k')}
+                onSaved={refreshRates}
+              />
+            </span>
             <span className="font-bold text-gray-900">{fmt(calc.totalMat)}</span>
           </div>
         </div>
