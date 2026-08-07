@@ -1,5 +1,6 @@
 import WorkTypeChooser from './WorkTypeChooser'
 import CrewTypeBar from './CrewTypeBar'
+import ModuleHeaderSlot from './ModuleHeaderSlot'
 import { useState, useEffect, useCallback, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
@@ -2545,7 +2546,9 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
             </div>
 
 
-      <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} />
+      <ModuleHeaderSlot>
+        <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} compact />
+      </ModuleHeaderSlot>
 
       <CrewTypeBar
         crewType={crewType}

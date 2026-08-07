@@ -2479,6 +2479,9 @@ export default function EstimateDetail() {
                     )}
                   </div>
                 </div>
+                {/* Slot for the module's In House / Subcontractor toggle,
+                    portalled up here (right of the module name) by the module. */}
+                <div id="pbs-module-worktype-slot" className="flex-shrink-0 self-center mr-3" />
                 <button
                   onClick={closeModuleFlow}
                   className="text-gray-400 hover:text-gray-600 text-base leading-none mt-0.5"
