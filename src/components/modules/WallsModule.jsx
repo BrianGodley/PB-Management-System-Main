@@ -1412,8 +1412,17 @@ function ModularWallEntry({
           <label className="block text-xs text-gray-500 mb-1">Vendor</label>
           <select
             className="input text-sm py-1.5 w-full"
-            value={wall.vendor || 'House'}
-            onChange={e => set('vendor')(e.target.value)}
+            value={wall.vendor || (typeSource.master ? vendorOptions?.[0]?.value : undefined) || 'House'}
+            onChange={e => {
+              const v = e.target.value
+              set('vendor')(v)
+              if (typeSource.master) {
+                const first = (materialRows || []).find(
+                  r => r.sub_category === typeSource.subcat && (v === 'House' ? r.vendor_id == null : r.vendor_id === v)
+                )
+                set('blockType')(first ? first.id : '')
+              }
+            }}
           >
             {(vendorOptions || [{ value: 'House', label: 'Standard' }]).map(o => (
               <option key={o.value} value={o.value}>
@@ -1428,12 +1437,16 @@ function ModularWallEntry({
             ? (() => {
                 // Options + price come live from the master list (marker =
                 // sub_category). Add a product in Master Rates and it appears here.
-                // Every Modular Wall product (any vendor) is selectable here.
+                // Vendor-first: the selected vendor's Modular Wall products.
+                const _vsel = wall.vendor && wall.vendor !== 'House' ? wall.vendor : vendorOptions?.[0]?.value
                 const opts = (materialRows || [])
-                  .filter(r => r.sub_category === typeSource.subcat)
+                  .filter(
+                    r =>
+                      r.sub_category === typeSource.subcat &&
+                      (_vsel === 'House' ? r.vendor_id == null : r.vendor_id === _vsel)
+                  )
                   .map(r => ({ id: r.id, label: r.name, row: r }))
-                const selRow =
-                  (materialRows || []).find(r => r.id === wall.blockType) || opts[0]?.row
+                const selRow = opts.find(o => o.row.id === wall.blockType)?.row || opts[0]?.row
                 const price = n(selRow?.unit_cost)
                 return (
                   <>
@@ -1821,6 +1834,16 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
 
   // ── Vendor helpers ──────────────────────────────────────────────────────────
   const vendorOptions = vendorOptionsForCategory(WALLS_CATEGORY)
+  // Modular Wall vendors — derived from the products themselves (reclassified
+  // items may not be tagged 'Walls' at the vendor level). Enables vendor-first
+  // picking: choose a vendor, then that vendor's Modular Wall types.
+  const modularVendorOptions = (() => {
+    const rows = (materialRows || []).filter(r => r.sub_category === MODULAR_SUBCAT)
+    const ids = [...new Set(rows.filter(r => r.vendor_id).map(r => r.vendor_id))]
+    const out = ids.map(id => ({ value: id, label: vendorNames[id] || 'Vendor' }))
+    if (rows.some(r => r.vendor_id == null)) out.unshift({ value: 'House', label: 'Standard' })
+    return out
+  })()
 
   // The calc runs against the ACTIVE tab only — entering data on one tab never
   // affects the other. Shared selections (crew/sub type) are merged on top.
@@ -2656,7 +2679,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
               detail={calc.modularDetails[idx] || null}
               materialPrices={materialPrices}
               materialRows={materialRows}
-              vendorOptions={vendorOptions}
+              vendorOptions={modularVendorOptions}
               isSub={isSub}
               refreshAllRates={refreshAllRates}
               typeSource={{ label: 'Wall Type', subcat: MODULAR_SUBCAT, master: true }}
