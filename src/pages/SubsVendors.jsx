@@ -1009,7 +1009,7 @@ export default function SubsVendors({ mode = 'sub' }) {
             <>
               {/* ── Desktop table ─────────────────────────────────── */}
               <div className="thin-scroll hidden lg:block overflow-x-hidden overflow-y-auto rounded-xl border border-gray-200 shadow-sm flex-1">
-                <table className="w-full text-sm table-fixed">
+                <table className="w-full text-xs table-fixed">
                   <colgroup>
                     <col style={{ width: '36px' }} /> {/* checkbox */}
                     <col style={{ width: '22%' }} /> {/* company name */}
@@ -1023,7 +1023,7 @@ export default function SubsVendors({ mode = 'sub' }) {
                   </colgroup>
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="px-3 py-3">
+                      <th className="px-3 py-2">
                         <input
                           type="checkbox"
                           checked={selected.size === filtered.length && filtered.length > 0}
@@ -1032,41 +1032,41 @@ export default function SubsVendors({ mode = 'sub' }) {
                         />
                       </th>
                       <th
-                        className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:text-gray-800 select-none"
+                        className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase cursor-pointer hover:text-gray-800 select-none"
                         onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))}
                       >
                         Company Name {sortDir === 'asc' ? '↑' : '↓'}
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">
                         Primary Contact
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">
                         {mode === 'sub' ? 'Trades' : 'Categories'}
                       </th>
                       {mode === 'sub' && (
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">
                           Services Pricing
                         </th>
                       )}
                       {mode === 'vendor' && (
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">
                           Price List
                         </th>
                       )}
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">
                         Cell
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">
                         Phone
                       </th>
-                      <th className="px-4 py-3" />
+                      <th className="px-4 py-2" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 bg-white">
                     {filtered.map(sub => {
                       return (
                         <tr key={sub.id} className="hover:bg-gray-50 transition-colors group">
-                          <td className="px-3 py-3">
+                          <td className="px-3 py-2">
                             <input
                               type="checkbox"
                               checked={selected.has(sub.id)}
@@ -1074,7 +1074,7 @@ export default function SubsVendors({ mode = 'sub' }) {
                               className="accent-green-700"
                             />
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-2">
                             <button
                               onClick={() => openEdit(sub)}
                               className="text-blue-600 hover:text-blue-800 font-medium text-left hover:underline truncate block w-full"
@@ -1082,25 +1082,25 @@ export default function SubsVendors({ mode = 'sub' }) {
                               {sub.company_name}
                             </button>
                           </td>
-                          <td className="px-4 py-3 text-gray-700 truncate">
+                          <td className="px-4 py-2 text-gray-700 truncate">
                             {sub.primary_contact || <span className="text-gray-300">—</span>}
                           </td>
-                          <td className="px-4 py-3 text-gray-600 truncate">
+                          <td className="px-4 py-2 text-gray-600 truncate">
                             {((mode === 'vendor' ? sub.supplied_categories : sub.divisions) || []).join(
                               ', '
                             ) || <span className="text-gray-300 italic">—</span>}
                           </td>
                           {mode === 'sub' && (
-                            <td className="px-4 py-3 text-gray-600 truncate">
+                            <td className="px-4 py-2 text-gray-600 truncate">
                               {sub.services_pricing || <span className="text-gray-300">—</span>}
                             </td>
                           )}
                           {mode === 'vendor' && (
-                            <td className="px-4 py-3 text-gray-600 truncate">
+                            <td className="px-4 py-2 text-gray-600 truncate">
                               {sub.price_list || <span className="text-gray-300">—</span>}
                             </td>
                           )}
-                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                          <td className="px-4 py-2 text-gray-600 whitespace-nowrap">
                             {sub.cell ? (
                               <a
                                 href={`tel:${String(sub.cell).replace(/[^\d+]/g, '')}`}
@@ -1114,7 +1114,7 @@ export default function SubsVendors({ mode = 'sub' }) {
                               <span className="text-gray-300">—</span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                          <td className="px-4 py-2 text-gray-600 whitespace-nowrap">
                             {sub.phone ? (
                               <a
                                 href={`tel:${String(sub.phone).replace(/[^\d+]/g, '')}`}
@@ -1128,7 +1128,7 @@ export default function SubsVendors({ mode = 'sub' }) {
                               <span className="text-gray-300">—</span>
                             )}
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-2">
                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button
                                 onClick={() => openEdit(sub)}
