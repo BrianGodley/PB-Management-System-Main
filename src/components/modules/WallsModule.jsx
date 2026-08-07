@@ -355,55 +355,49 @@ const wallMatPrice = resolveMaterialPrice
 function computeWallFinishRow(row, mp, materialRows) {
   const sf = n(row.sf)
   const v = row.vendor
-  const price = k => wallMatPrice(WALL_RATES[k].db, v, materialRows, mp, WALL_RATES[k].fb)
   const lab = k => mp?.[WALL_RATES[k].db] ?? WALL_RATES[k].fb
-  // Override-or-price helper. Empty / 0 / NaN override → the vendor/House price.
-  const ovr = (input, k) => {
-    const x = parseFloat(input)
-    return Number.isFinite(x) && x > 0 ? x : price(k)
-  }
+  // Material price comes from the selected Wall Finish catalog product (per
+  // vendor); a per-estimate $/unit override still wins if entered.
+  const meta = WALL_FINISH_META[row.type] || {}
+  const matFb = meta.matKey ? WALL_RATES[meta.matKey].fb : 0
+  const catP = catalogItemPrice(materialRows, WALL_FINISH_SUBCAT, row.type, v, matFb)
+  const rate = n(row.rateIn) > 0 ? n(row.rateIn) : catP
   let mat = 0,
     hrs = 0,
     subUnit = 0,
     tons = 0
   switch (row.type) {
     case 'Sand Stucco': {
-      const rate = ovr(row.rateIn, 'sandStucco')
       hrs = sf > 0 ? (sf / lab('sandStuccoLab')) * 8 : 0
       mat = sf * rate
       subUnit = rate
       break
     }
     case 'Smooth Stucco': {
-      const rate = ovr(row.rateIn, 'smoothStucco')
       hrs = sf > 0 ? (sf / lab('smoothStuccoLab')) * 8 : 0
       mat = sf * rate
       subUnit = rate
       break
     }
     case 'Ledgerstone': {
-      const rate = ovr(row.rateIn, 'ledgerstone')
       hrs = sf > 0 ? (sf / lab('ledgerstoneLab')) * 8 : 0
       mat = sf > 0 ? sf * rate * 1.1 + (sf / 5) * 2 : 0
       subUnit = rate * 1.1 + 0.4
       break
     }
     case 'Stacked Stone': {
-      const rate = ovr(row.rateIn, 'stackedStone')
       hrs = sf > 0 ? (sf / lab('stackedStoneLab')) * 8 : 0
       mat = sf > 0 ? sf * rate * 1.1 + (sf / 5) * 2 : 0
       subUnit = rate * 1.1 + 0.4
       break
     }
     case 'Tile': {
-      const rate = ovr(row.rateIn, 'tile')
       hrs = sf > 0 ? sf * lab('tileLab') : 0
       mat = sf > 0 ? sf * rate + sf : 0
       subUnit = rate + 1
       break
     }
     case 'Real Flagstone': {
-      const rate = n(row.rateIn) || price('flagstone')
       hrs = sf > 0 ? sf * lab('flagstoneLab') : 0
       mat = sf > 0 ? (sf / 80) * rate + sf * 1.5 : 0
       subUnit = rate / 80 + 1.5
@@ -411,7 +405,6 @@ function computeWallFinishRow(row, mp, materialRows) {
       break
     }
     case 'Real Stone': {
-      const rate = n(row.rateIn) || price('realStone')
       hrs = sf > 0 ? sf * lab('realStoneLab') : 0
       mat = sf > 0 ? (sf / 70) * rate + sf * 2 : 0
       subUnit = rate / 70 + 2
@@ -432,8 +425,10 @@ function computeCapRow(row, mp, materialRows) {
     widthIn = n(row.widthIn),
     qty = n(row.qty)
   const v = row.vendor
-  const price = k => wallMatPrice(WALL_RATES[k].db, v, materialRows, mp, WALL_RATES[k].fb)
   const lab = k => mp?.[WALL_RATES[k].db] ?? WALL_RATES[k].fb
+  // Cap material price from the Wall Cap catalog product (per vendor). PIP
+  // Concrete caps price off the concrete rate (a poured cap, not a cap product).
+  const capP = (name, fb) => catalogItemPrice(materialRows, WALL_CAP_SUBCAT, name, v, fb)
   let mat = 0,
     hrs = 0,
     subUnit = 0,
@@ -441,34 +436,41 @@ function computeCapRow(row, mp, materialRows) {
     unit = 'LF',
     dispQty = lf
   switch (row.type) {
-    case 'Flagstone':
-      mat = (((widthIn / 12) * lf * 0.0833 * 100) / 2000) * price('capFlagstone')
+    case 'Flagstone': {
+      const pr = capP('Flagstone', WALL_RATES.capFlagstone.fb)
+      mat = (((widthIn / 12) * lf * 0.0833 * 100) / 2000) * pr
       hrs = lf * lab('capFlagstoneLab')
-      subUnit = (((widthIn / 12) * 0.0833 * 100) / 2000) * price('capFlagstone')
+      subUnit = (((widthIn / 12) * 0.0833 * 100) / 2000) * pr
       subQty = lf
       break
+    }
     case 'Precast': {
+      const pr = capP('Precast', WALL_RATES.capPrecast.fb)
       const widthFactor = (widthIn || 8) / 8
-      mat = qty * price('capPrecast') * widthFactor
+      mat = qty * pr * widthFactor
       hrs = qty * lab('capPrecastLab')
-      subUnit = price('capPrecast') * widthFactor
+      subUnit = pr * widthFactor
       subQty = qty
       unit = 'ea'
       dispQty = qty
       break
     }
-    case 'PIP Concrete':
-      mat = ((lf * (widthIn / 12) * 0.333) / 27) * price('concreteTruck')
+    case 'PIP Concrete': {
+      const pr = wallMatPrice(WALL_RATES.concreteTruck.db, v, materialRows, mp, WALL_RATES.concreteTruck.fb)
+      mat = ((lf * (widthIn / 12) * 0.333) / 27) * pr
       hrs = lf * lab('capPipLab')
-      subUnit = (((widthIn / 12) * 0.333) / 27) * price('concreteTruck')
+      subUnit = (((widthIn / 12) * 0.333) / 27) * pr
       subQty = lf
       break
-    case 'Bullnose Brick':
-      mat = lf * price('capBullnose')
+    }
+    case 'Bullnose Brick': {
+      const pr = capP('Bullnose Brick', WALL_RATES.capBullnose.fb)
+      mat = lf * pr
       hrs = lf * lab('capBullnoseLab')
-      subUnit = price('capBullnose')
+      subUnit = pr
       subQty = lf
       break
+    }
     default:
       break
   }
@@ -485,7 +487,8 @@ function computeWpRow(row, mp, materialRows) {
     hrs = 0,
     subUnit = 0
   if (sf > 0 && k) {
-    const pr = wallMatPrice(WALL_RATES[k].db, row.vendor, materialRows, mp, WALL_RATES[k].fb)
+    // Price from the Waterproofing catalog product (per vendor), not a constant.
+    const pr = catalogItemPrice(materialRows, WALL_WP_SUBCAT, row.type, row.vendor, WALL_RATES[k].fb)
     const wpRate = n(mp?.[WALL_RATES.wpLabor.db]) || WALL_RATES.wpLabor.fb
     mat = sf * pr
     hrs = sf / wpRate
@@ -592,6 +595,16 @@ function wallCatalogTypes(materialRows, subcat, vendorSel) {
     }
   })
   return out
+}
+// Price of a catalog product by (sub-category, name) for the selected vendor —
+// vendor row → Standard row → fallback. This is how finish/cap/waterproofing
+// prices resolve now: from the DB product, not a hard-coded constant.
+function catalogItemPrice(materialRows, subcat, name, vendorSel, fallback) {
+  const rows = (materialRows || []).filter(r => r.sub_category === subcat && r.name === name)
+  if (!rows.length) return fallback
+  const vsel = vendorSel && vendorSel !== 'House' ? vendorSel : null
+  const row = rows.find(r => r.vendor_id === vsel) || rows.find(r => r.vendor_id == null) || rows[0]
+  return row && row.unit_cost != null && row.unit_cost !== '' ? n(row.unit_cost) : fallback
 }
 
 // ── Per-wall calculators ──────────────────────────────────────────────────────
