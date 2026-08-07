@@ -27,6 +27,8 @@ export default function CrewTypeBar({
   title = 'Module',
   rates = [],
   refreshAllRates,
+  // When false, hide the "In-Line Edit Rates" toggle (keep only View Rates).
+  showInlineToggle = true,
 }) {
   const { showRateIcons, toggleRateIcons, canAccessRates } = useRateIcons()
   const [showRates, setShowRates] = useState(false)
@@ -48,7 +50,7 @@ export default function CrewTypeBar({
       </select>
 
       <div className="flex items-center gap-3 ml-auto">
-        {canAccessRates && (
+        {canAccessRates && showInlineToggle && (
           <button
             type="button"
             onClick={toggleRateIcons}

@@ -916,7 +916,6 @@ function LabeledRow({ label, children }) {
 const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 1', hours: '', materials: '', subCost: '' },
   { label: 'Misc 2', hours: '', materials: '', subCost: '' },
-  { label: 'Misc 3', hours: '', materials: '', subCost: '' },
 ]
 const DEFAULT_CAP_ROWS = [blankCapRow(), blankCapRow()]
 const CAP_TYPES = ['None', 'Flagstone', 'Precast', 'PIP Concrete', 'Bullnose Brick']
@@ -2556,6 +2555,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
         title="Walls"
         rates={wallRateList}
         refreshAllRates={refreshAllRates}
+        showInlineToggle={false}
       />
 
       {/* Wall Type */}

@@ -2433,7 +2433,9 @@ export default function EstimateDetail() {
                       in the dark bar). Permission-gated and module-only. */}
                   <div className="flex items-center justify-between gap-3 mt-0.5">
                     <p className="text-sm text-gray-500">{selectedProject?.project_name}</p>
-                    {canAccessRates && !moduleReadOnly && (
+                    {/* Walls uses the in-module View Rates popup instead, so its
+                        header Edit Rates button is hidden. */}
+                    {canAccessRates && !moduleReadOnly && selectedType !== 'Walls' && (
                       <button
                         type="button"
                         onClick={toggleRateIcons}
