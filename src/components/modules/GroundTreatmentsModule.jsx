@@ -7,17 +7,27 @@ import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { catalogOptions } from '../../lib/materialCatalog'
+import { catalogOptions, fetchModuleCatalog } from '../../lib/materialCatalog'
 
-// Append master-list rows tagged sub_category=cat (Unspecified/null vendor) to a
-// section's built-in Type list. Built-ins keep their exact labels/prices; adding
-// a row in Master Rates under that marker makes it appear here automatically,
-// priced from its row. Deduped by label so built-ins always win.
+// Estimator repoint: Ground Treatments material pickers now read from the rebuilt
+// catalog (material + material_price), filtered by (Ground Treatments, sub-cat).
+// The taxonomy sub-category name equals each section's marker except D.G., whose
+// sub-category is named "Decomposed Granite" — remap it back to the "DG" marker.
+const GT_MARKER_REMAP = { 'Decomposed Granite': 'DG' }
+async function fetchGtRows() {
+  const rows = await fetchModuleCatalog(['Ground Treatments'])
+  return (rows || []).map(r => ({ ...r, sub_category: GT_MARKER_REMAP[r.sub_category] || r.sub_category }))
+}
+
+// Section Type options — DB-driven from the new catalog: every Standard
+// (null-vendor) product assigned to (Ground Treatments, cat) becomes an option,
+// priced from material_price. The built-in `houseArray` is only a fallback for a
+// sub-category that has no products yet, so nothing disappears mid-migration.
 function mergedGtOpts(cat, houseArray, materialRows) {
-  const extra = catalogOptions(materialRows, cat, 'House', { houseRows: 'null-vendor', stripPrefix: true })
-    .filter(o => !(houseArray || []).some(h => h.label === o.label))
-    .map(o => ({ label: o.label, dbName: o.row.name, fallback: parseFloat(o.row.unit_cost) || 0 }))
-  return extra.length ? [...houseArray, ...extra] : houseArray
+  const db = catalogOptions(materialRows, cat, 'House', { houseRows: 'null-vendor', stripPrefix: true }).map(
+    o => ({ label: o.label, dbName: o.row.name, fallback: parseFloat(o.row.unit_cost) || 0 })
+  )
+  return db.length ? db : houseArray || []
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -833,14 +843,11 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   // lists. Kept separate so it can run even when a saved estimate supplies a
   // materialPrices snapshot (so the vendor pickers still work on re-edit).
   const loadVendorData = useCallback(async () => {
-    const [matRowsRes, venRes] = await Promise.all([
-      supabase
-        .from('material_rates')
-        .select('name, unit_cost, sub_category, vendor_id')
-        .eq('category', 'Ground Treatments'),
+    const [gtRows, venRes] = await Promise.all([
+      fetchGtRows(),
       supabase.from('subs_vendors').select('id, company_name, supplied_categories').eq('type', 'vendor').order('company_name'),
     ])
-    setMaterialRows(matRowsRes.data || [])
+    setMaterialRows(gtRows || [])
     setVendors(
       (venRes.data || []).map(v => ({
         id: v.id,
@@ -854,24 +861,28 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   // RateEditPopover save so the calc reflects edits. Also refreshes the full
   // material rows + vendors that drive the vendor-filtered Type lists.
   const refreshAllRates = useCallback(async () => {
-    const [matRes, labRes, matRowsRes, venRes] = await Promise.all([
-      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Ground Treatments'),
+    // Fully off material_rates: mp is built from labor_rates (labor), misc_rates
+    // (fees), and the new catalog's Standard material prices (by clean name).
+    // Material option prices also come through the picker options from fetchGtRows.
+    const [labRes, feeRes, gtRows, venRes] = await Promise.all([
       supabase.from('labor_rates').select('name, rate').eq('category', 'Ground Treatments'),
-      supabase
-        .from('material_rates')
-        .select('name, unit_cost, sub_category, vendor_id')
-        .eq('category', 'Ground Treatments'),
+      supabase.from('misc_rates').select('name, rate').eq('category', 'Ground Treatments'),
+      fetchGtRows(),
       supabase.from('subs_vendors').select('id, company_name, supplied_categories').eq('type', 'vendor').order('company_name'),
     ])
     const prices = {}
-    ;(matRes.data || []).forEach(r => {
-      prices[r.name] = parseFloat(r.unit_cost) || 0
+    // Standard (null-vendor) material prices, keyed by clean description
+    ;(gtRows || []).forEach(r => {
+      if (r.vendor_id == null && r.name) prices[r.name] = parseFloat(r.unit_cost) || 0
     })
     ;(labRes.data || []).forEach(r => {
       prices[r.name] = parseFloat(r.rate) || 0
     })
+    ;(feeRes.data || []).forEach(r => {
+      prices[r.name] = parseFloat(r.rate) || 0
+    })
     setMaterialPrices(prices)
-    setMaterialRows(matRowsRes.data || [])
+    setMaterialRows(gtRows || [])
     setVendors(
       (venRes.data || []).map(v => ({
         id: v.id,

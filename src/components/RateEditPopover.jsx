@@ -32,12 +32,26 @@ const DEFAULT_VALUE_FIELD = {
   material_rates: 'unit_cost',
   labor_rates: 'rate',
   subcontractor_rates: 'rate',
+  material_price: 'price',
 }
 
 const SOURCE_LABEL = {
   material_rates: 'Master Rates → Materials',
   labor_rates: 'Master Rates → Labor',
   subcontractor_rates: 'Master Rates → Subcontractors',
+  material_price: 'Master Material Rates',
+}
+
+// Resolve the effective vendor for a material_price edit: an explicit vendorId,
+// else the tenant's Standard vendor (universal price).
+async function resolvePriceVendor(vendorId) {
+  if (vendorId && vendorId !== 'House') return vendorId
+  const { data } = await supabase
+    .from('subs_vendors')
+    .select('id')
+    .or('company_name.ilike.standard,company_name.ilike.unspecified')
+    .limit(1)
+  return data?.[0]?.id || null
 }
 
 const NAME_COLUMN = {
@@ -54,6 +68,10 @@ export default function RateEditPopover({
   unitLabel,
   currentValue, // optional fallback if DB has no row yet
   onSaved,
+  // material_price mode — product + vendor aware. materialId identifies the
+  // product; vendorId picks the price (omit → Standard/universal price).
+  materialId,
+  vendorId,
   // 'currency' (default) → shows '$' prefix on the input.
   // 'coefficient'        → no prefix, shows unitLabel as a suffix inside
   //                        the input. Use for labor coefficients like
@@ -87,6 +105,27 @@ export default function RateEditPopover({
     setLoaded(false)
     setError('')
     setSaveMsg('')
+    // material_price: fetch the open price for (materialId, resolved vendor).
+    if (table === 'material_price') {
+      ;(async () => {
+        const vid = await resolvePriceVendor(vendorId)
+        if (!vid || !materialId) {
+          setDraft(String(currentValue ?? ''))
+          setLoaded(true)
+          return
+        }
+        const { data } = await supabase
+          .from('material_price')
+          .select('price')
+          .eq('material_id', materialId)
+          .eq('vendor_id', vid)
+          .is('effective_end', null)
+          .limit(1)
+        setDraft(String(data?.[0]?.price ?? currentValue ?? ''))
+        setLoaded(true)
+      })()
+      return
+    }
     let q = supabase.from(table).select(`${field}, id`).eq(nameCol, name)
     // Filter by category on every table that has one (material_rates,
     // labor_rates, subcontractor_rates). The previous code only did this
@@ -134,6 +173,56 @@ export default function RateEditPopover({
     setSaving(true)
     setError('')
     setSaveMsg('')
+
+    // material_price: update the open price for (materialId, resolved vendor),
+    // or insert one if none exists. Product + vendor aware; no name matching.
+    if (table === 'material_price') {
+      try {
+        const vid = await resolvePriceVendor(vendorId)
+        if (!vid || !materialId) throw new Error('Missing product or vendor.')
+        const { data: existing, error: selErr } = await supabase
+          .from('material_price')
+          .select('id')
+          .eq('material_id', materialId)
+          .eq('vendor_id', vid)
+          .is('effective_end', null)
+          .limit(1)
+        if (selErr) throw new Error('Lookup failed: ' + selErr.message)
+        if (existing && existing.length > 0) {
+          const { data: up, error: upErr } = await supabase
+            .from('material_price')
+            .update({ price: v })
+            .eq('id', existing[0].id)
+            .select()
+          if (upErr) throw new Error('Save failed: ' + upErr.message)
+          if (!up || up.length === 0)
+            throw new Error('Save returned 0 rows — RLS likely blocked the write.')
+        } else {
+          const { data: ins, error: insErr } = await supabase
+            .from('material_price')
+            .insert({ material_id: materialId, vendor_id: vid, price: v, source: 'manual' })
+            .select()
+          if (insErr) throw new Error('Save failed: ' + insErr.message)
+          if (!ins || ins.length === 0)
+            throw new Error('Insert returned 0 rows — RLS likely blocked the write.')
+        }
+      } catch (e) {
+        setError(e?.message || 'Save failed.')
+        setSaving(false)
+        return
+      }
+      setSaving(false)
+      const disp = `$${v.toLocaleString(undefined, { maximumFractionDigits: 4 })}`
+      setSaveMsg(`Saved! New rate: ${disp}`)
+      if (onSaved) {
+        try {
+          await onSaved()
+        } catch {
+          /* non-fatal */
+        }
+      }
+      return
+    }
 
     // Three-step save that self-heals when a same-named row already lives
     // in a DIFFERENT category (a common leftover from earlier seeding).
