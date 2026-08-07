@@ -240,8 +240,8 @@ const DEFAULT_CMU = () => ({
   groutPump: 'No',
   subEach: '',
   wpRows: [blankWpRow()],
-  finishRows: [],
-  capRows: [],
+  finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
+  capRows: [blankCapRow()],
 })
 const DEFAULT_PIP = () => ({
   vendor: 'House',
@@ -253,8 +253,8 @@ const DEFAULT_PIP = () => ({
   footingPump: 'Yes',
   subEach: '',
   wpRows: [blankWpRow()],
-  finishRows: [],
-  capRows: [],
+  finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
+  capRows: [blankCapRow()],
 })
 // Modular block wall — duplicates the CMU fields EXCEPT rebar spacing, horiz
 // bars, bond-beam courses and % grouted solid (modular block isn't grouted or
@@ -271,8 +271,8 @@ const DEFAULT_MODULAR = () => ({
   footingPump: 'No',
   subEach: '',
   wpRows: [blankWpRow()],
-  finishRows: [],
-  capRows: [],
+  finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
+  capRows: [blankCapRow()],
 })
 // Brick wall — same structure/pricing model as Modular (block + footing, no
 // grout/rebar), just a different wall category.
@@ -287,8 +287,8 @@ const DEFAULT_BRICK = () => ({
   footingPump: 'No',
   subEach: '',
   wpRows: [blankWpRow()],
-  finishRows: [],
-  capRows: [],
+  finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
+  capRows: [blankCapRow()],
 })
 
 // ── Fixed per-section type lists (the Item dropdown; NOT from the DB) ─────────
@@ -1244,6 +1244,11 @@ function WallWaterproofing({
   const rr = key => materialPrices?.[WALL_RATES[key].db] ?? WALL_RATES[key].fb
   const wpKey = WP_KEY[row.type]
   const wpc = computeWpRow(row, materialPrices, materialRows)
+  // Live $/SF for the selected product (per vendor) — shown next to the SF field.
+  const wpUnit =
+    row.type && row.type !== 'None'
+      ? catalogItemPrice(materialRows, WALL_WP_SUBCAT, row.type, row.vendor, wpKey ? WALL_RATES[wpKey].fb : 0)
+      : 0
   // Vendor-catalog-driven type list (the selected vendor's Waterproofing products).
   const wpOpts = wallCatalogTypes(materialRows, WALL_WP_SUBCAT, row.vendor)
   const wpShown =
@@ -1251,15 +1256,15 @@ function WallWaterproofing({
   return (
     <div className="mt-3 border-t border-gray-100 pt-2">
       <label className="block text-xs text-gray-500 mb-1 font-medium">Waterproofing</label>
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-1.5 flex-wrap">
         <DropdownSelect
-          className="input text-sm py-1.5 w-40"
+          className="input text-sm py-1.5 flex-1 min-w-0"
           value={row.vendor || 'House'}
           onChange={v => onWpUpdate(0, 'vendor', v)}
           options={vendorOptions}
         />
         <DropdownSelect
-          className="input text-sm py-1.5 flex-1 min-w-[10rem]"
+          className="input text-sm py-1.5 flex-[1.5] min-w-0"
           value={row.type || 'None'}
           onChange={v => onWpUpdate(0, 'type', v)}
           options={[{ value: 'None', label: 'None' }, ...wpShown.map(t => ({ value: t, label: t }))]}
@@ -1269,20 +1274,28 @@ function WallWaterproofing({
             value={row.sf}
             onChange={v => onWpUpdate(0, 'sf', v)}
             placeholder="0"
-            className="w-28"
+            className="w-20 shrink-0"
           />
         )}
         {row.type !== 'None' && <span className="text-xs text-gray-400 shrink-0">SF</span>}
-        {row.type !== 'None' && wpKey && (
-          <span className="inline-flex items-center gap-1 text-xs text-gray-400">
-            <RateEditPopover
-              table="material_rates"
-              name={WALL_RATES[wpKey].db}
-              category="Walls"
-              unitLabel="SF"
-              currentValue={rr(wpKey)}
-              onSaved={refreshAllRates}
-            />
+        {row.type !== 'None' && (
+          <span className="inline-flex items-center gap-1 text-xs text-gray-400 shrink-0">
+            ${r2(wpUnit).toFixed(2)}/SF
+            {wpKey && (
+              <RateEditPopover
+                table="material_rates"
+                name={WALL_RATES[wpKey].db}
+                category="Walls"
+                unitLabel="SF"
+                currentValue={rr(wpKey)}
+                onSaved={refreshAllRates}
+              />
+            )}
+          </span>
+        )}
+        {row.type !== 'None' && n(row.sf) > 0 && (
+          <span className="text-xs text-gray-500 shrink-0">
+            = <strong>{r2(wpc.mat).toFixed(2)}</strong> mat · {r2(wpc.hrs).toFixed(2)} hrs
           </span>
         )}
         {isSub && row.type !== 'None' && (
@@ -1326,15 +1339,15 @@ function WallFinishesEditor({
               ? [row.type, ...opts]
               : opts
           return (
-            <div key={i} className="flex items-center gap-2">
+            <div key={i} className="flex items-center gap-1.5">
               <DropdownSelect
-                className="input text-sm py-1 w-44 shrink-0"
+                className="input text-sm py-1 flex-1 min-w-0"
                 value={row.vendor || 'House'}
                 onChange={v => onPatch(i, { vendor: v }, true)}
                 options={vendorOptions}
               />
               <DropdownSelect
-                className="input text-sm py-1 flex-1 min-w-0"
+                className="input text-sm py-1 flex-[1.5] min-w-0"
                 value={row.type || 'None'}
                 onChange={v => onPatch(i, { type: v }, true)}
                 options={[{ value: 'None', label: 'None' }, ...shown.map(t => ({ value: t, label: t }))]}
@@ -1343,7 +1356,7 @@ function WallFinishesEditor({
                 value={row.sf}
                 onChange={v => onPatch(i, { sf: v }, false)}
                 placeholder="0"
-                className="w-28 shrink-0"
+                className="w-20 shrink-0"
               />
               <span className="text-xs text-gray-400 shrink-0">SF</span>
               <button
@@ -1384,15 +1397,15 @@ function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, ma
               : opts
           const qtyLabel = row.type === 'Precast' ? 'Qty' : 'LF'
           return (
-            <div key={i} className="flex items-center gap-2">
+            <div key={i} className="flex items-center gap-1.5">
               <DropdownSelect
-                className="input text-sm py-1 w-44 shrink-0"
+                className="input text-sm py-1 flex-1 min-w-0"
                 value={row.vendor || 'House'}
                 onChange={v => onPatch(i, { vendor: v }, true)}
                 options={vendorOptions}
               />
               <DropdownSelect
-                className="input text-sm py-1 flex-1 min-w-0"
+                className="input text-sm py-1 flex-[1.5] min-w-0"
                 value={row.type || 'None'}
                 onChange={v => onPatch(i, { type: v }, true)}
                 options={[{ value: 'None', label: 'None' }, ...shown.map(t => ({ value: t, label: t }))]}
@@ -1401,7 +1414,7 @@ function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, ma
                 value={row.widthIn}
                 onChange={v => onPatch(i, { widthIn: v }, true)}
                 placeholder={row.type === 'Precast' ? '8' : '4'}
-                className="w-20 shrink-0"
+                className="w-16 shrink-0"
               />
               <span className="text-xs text-gray-400 shrink-0">W&quot;</span>
               <NumInput
@@ -1410,13 +1423,13 @@ function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, ma
                   onPatch(i, row.type === 'Precast' ? { qty: v } : { lf: v }, false)
                 }
                 placeholder="0"
-                className="w-24 shrink-0"
+                className="w-20 shrink-0"
               />
               <span className="text-xs text-gray-400 shrink-0">{qtyLabel}</span>
               <button
                 type="button"
                 onClick={() => onRemove(i)}
-                className="text-gray-300 hover:text-red-500 text-sm px-1 shrink-0 ml-auto"
+                className="text-gray-300 hover:text-red-500 text-sm px-1 shrink-0"
                 title="Remove row"
               >
                 ✕
