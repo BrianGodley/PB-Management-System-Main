@@ -25,7 +25,7 @@ async function fetchGtRows() {
 // sub-category that has no products yet, so nothing disappears mid-migration.
 function mergedGtOpts(cat, houseArray, materialRows) {
   const db = catalogOptions(materialRows, cat, 'House', { houseRows: 'null-vendor', stripPrefix: true }).map(
-    o => ({ label: o.label, dbName: o.row.name, fallback: parseFloat(o.row.unit_cost) || 0 })
+    o => ({ label: o.label, dbName: o.row.name, fallback: parseFloat(o.row.unit_cost) || 0, id: o.row.id })
   )
   return db.length ? db : houseArray || []
 }
@@ -281,6 +281,7 @@ function calcGroundTreatments(
       label: o.row.name.replace(new RegExp('^' + cat + ' - '), '').replace(/^.*? - /, ''),
       dbName: o.row.name,
       fallback: parseFloat(o.row.unit_cost) || 0,
+      id: o.row.id,
     }))
     return resolveType(row.type, opts, houseArray)
   }
@@ -1031,7 +1032,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     if (!vendorSel || vendorSel === 'House') return mergedGtOpts(subcat, houseArray, materialRows)
     const opts = catalogOptions(materialRows, subcat, vendorSel, { houseRows: 'exclude', stripPrefix: true })
     if (!opts.length) return houseArray
-    return opts.map(o => ({ label: o.label || o.row.name, dbName: o.row.name, fallback: n(o.row.unit_cost) }))
+    return opts.map(o => ({ label: o.label || o.row.name, dbName: o.row.name, fallback: n(o.row.unit_cost), id: o.row.id }))
   }
 
   // Vendors that supply a given material category — drives the per-row vendor
@@ -1039,6 +1040,12 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
   // First real vendor supplying a category (else 'House').
   const defaultVendorFor = cat => vendorsForCategory(cat)[0]?.id || 'House'
+
+  // Product ids for the two FIXED (non-picker) material rates, resolved from the
+  // new catalog so their inline pencils can edit material_price directly.
+  const gravelFabricId = (materialRows.find(r => r.vendor_id == null && r.name === 'Gravel Fabric') || {}).id
+  const dgCementId = (materialRows.find(r => r.vendor_id == null && r.sub_category === 'DG' && /cement/i.test(r.name || '')) || {}).id
+  const soilPrepId = (materialRows.find(r => r.vendor_id == null && r.sub_category === 'Soil Prep') || {}).id
 
   // On a NEW module, once vendor catalogs load, default each section's vendor to
   // the first real vendor that supplies its category (House then falls to the
@@ -1297,9 +1304,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 <span className="text-xs text-gray-400 inline-flex items-center gap-1 flex-wrap">
                   ${matVal.toFixed(4)}/SF
                   <RateEditPopover
-                    table="material_rates"
-                    name={matName}
-                    category="Ground Treatments"
+                    table="material_price"
+                    materialId={soilPrepId}
                     unitLabel="SF"
                     currentValue={matVal}
                     onSaved={refreshAllRates}
@@ -1401,9 +1407,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
                         ${typeCost.toFixed(2)}/CY
                         <RateEditPopover
-                          table="material_rates"
-                          name={st.dbName}
-                          category="Ground Treatments"
+                          table="material_price"
+                          materialId={st.id}
                           unitLabel="CY"
                           currentValue={typeCost}
                           onSaved={refreshAllRates}
@@ -1482,9 +1487,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                   <>
                     ${p(st.dbName, st.fallback).toFixed(2)}/SF
                     <RateEditPopover
-                      table="material_rates"
-                      name={st.dbName}
-                      category="Ground Treatments"
+                      table="material_price"
+                      materialId={st.id}
                       unitLabel="SF"
                       currentValue={p(st.dbName, st.fallback)}
                       onSaved={refreshAllRates}
@@ -1575,9 +1579,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 <span className="text-xs text-gray-400 inline-flex items-center gap-1 flex-wrap">
                   ${p(ft.dbName, ft.fallback).toFixed(2)}/bag
                   <RateEditPopover
-                    table="material_rates"
-                    name={ft.dbName}
-                    category="Ground Treatments"
+                    table="material_price"
+                    materialId={ft.id}
                     unitLabel="bag"
                     currentValue={p(ft.dbName, ft.fallback)}
                     onSaved={refreshAllRates}
@@ -1619,9 +1622,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 <>
                   Type ${p(mt.dbName, mt.fallback).toFixed(2)}/CY
                   <RateEditPopover
-                    table="material_rates"
-                    name={mt.dbName}
-                    category="Ground Treatments"
+                    table="material_price"
+                    materialId={mt.id}
                     unitLabel="CY"
                     currentValue={p(mt.dbName, mt.fallback)}
                     onSaved={refreshAllRates}
@@ -1634,7 +1636,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           <span className="inline-flex items-center gap-1">
             ${p(GT_RATES.mulchDelivery.dbName, 75).toFixed(2)} delivery
             <RateEditPopover
-              table="material_rates"
+              table="misc_rates"
               name={GT_RATES.mulchDelivery.dbName}
               category="Ground Treatments"
               unitLabel="flat"
@@ -1659,9 +1661,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           <span className="inline-flex items-center gap-1">
             Weed fabric ${p(GT_RATES.gravelFabricMat.dbName, 0.1).toFixed(2)}/SF
             <RateEditPopover
-              table="material_rates"
-              name={GT_RATES.gravelFabricMat.dbName}
-              category="Ground Treatments"
+              table="material_price"
+              materialId={gravelFabricId}
               unitLabel="SF"
               currentValue={p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)}
               onSaved={refreshAllRates}
@@ -1744,9 +1745,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
                         ${typeCost.toFixed(2)}/CY
                         <RateEditPopover
-                          table="material_rates"
-                          name={mt.dbName}
-                          category="Ground Treatments"
+                          table="material_price"
+                          materialId={mt.id}
                           unitLabel="CY"
                           currentValue={typeCost}
                           onSaved={refreshAllRates}
@@ -1810,9 +1810,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 <>
                   Type ${p(dt.dbName, dt.fallback).toFixed(2)}/ton
                   <RateEditPopover
-                    table="material_rates"
-                    name={dt.dbName}
-                    category="Ground Treatments"
+                    table="material_price"
+                    materialId={dt.id}
                     unitLabel="ton"
                     currentValue={p(dt.dbName, dt.fallback)}
                     onSaved={refreshAllRates}
@@ -1825,9 +1824,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           <span className="inline-flex items-center gap-1">
             Cement add ${p(GT_RATES.dgCementPerTon.dbName, 20).toFixed(2)}/ton
             <RateEditPopover
-              table="material_rates"
-              name={GT_RATES.dgCementPerTon.dbName}
-              category="Ground Treatments"
+              table="material_price"
+              materialId={dgCementId}
               unitLabel="ton"
               currentValue={p(GT_RATES.dgCementPerTon.dbName, GT_RATES.dgCementPerTon.fallback)}
               onSaved={refreshAllRates}
@@ -1863,9 +1861,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           <span className="inline-flex items-center gap-1">
             Weed fabric ${p(GT_RATES.gravelFabricMat.dbName, 0.1).toFixed(2)}/SF
             <RateEditPopover
-              table="material_rates"
-              name={GT_RATES.gravelFabricMat.dbName}
-              category="Ground Treatments"
+              table="material_price"
+              materialId={gravelFabricId}
               unitLabel="SF"
               currentValue={p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)}
               onSaved={refreshAllRates}
@@ -2027,9 +2024,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           <span className="inline-flex items-center gap-1">
             Fabric ${p(GT_RATES.gravelFabricMat.dbName, 0.1).toFixed(2)}/SF mat
             <RateEditPopover
-              table="material_rates"
-              name={GT_RATES.gravelFabricMat.dbName}
-              category="Ground Treatments"
+              table="material_price"
+              materialId={gravelFabricId}
               unitLabel="SF"
               currentValue={p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)}
               onSaved={refreshAllRates}
@@ -2136,9 +2132,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
                         ${typeCost.toFixed(2)}/CY
                         <RateEditPopover
-                          table="material_rates"
-                          name={gtype.dbName}
-                          category="Ground Treatments"
+                          table="material_price"
+                          materialId={gtype.id}
                           unitLabel="CY"
                           currentValue={typeCost}
                           onSaved={refreshAllRates}
@@ -2221,9 +2216,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           <span className="inline-flex items-center gap-1">
             Fabric ${p(GT_RATES.gravelFabricMat.dbName, 0.1).toFixed(2)}/SF mat
             <RateEditPopover
-              table="material_rates"
-              name={GT_RATES.gravelFabricMat.dbName}
-              category="Ground Treatments"
+              table="material_price"
+              materialId={gravelFabricId}
               unitLabel="SF"
               currentValue={p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)}
               onSaved={refreshAllRates}
@@ -2330,9 +2324,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
                         ${typeCost.toFixed(2)}/CY
                         <RateEditPopover
-                          table="material_rates"
-                          name={ptype.dbName}
-                          category="Ground Treatments"
+                          table="material_price"
+                          materialId={ptype.id}
                           unitLabel="CY"
                           currentValue={typeCost}
                           onSaved={refreshAllRates}
@@ -2403,9 +2396,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           <span className="inline-flex items-center gap-1">
             Fabric ${p(GT_RATES.gravelFabricMat.dbName, 0.1).toFixed(2)}/SF mat
             <RateEditPopover
-              table="material_rates"
-              name={GT_RATES.gravelFabricMat.dbName}
-              category="Ground Treatments"
+              table="material_price"
+              materialId={gravelFabricId}
               unitLabel="SF"
               currentValue={p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)}
               onSaved={refreshAllRates}
@@ -2511,9 +2503,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
                         ${typeCost.toFixed(2)}/CY
                         <RateEditPopover
-                          table="material_rates"
-                          name={ctype.dbName}
-                          category="Ground Treatments"
+                          table="material_price"
+                          materialId={ctype.id}
                           unitLabel="CY"
                           currentValue={typeCost}
                           onSaved={refreshAllRates}
@@ -2621,9 +2612,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 <span className="text-xs text-gray-400 inline-flex items-center gap-1">
                   ${rate.toFixed(2)}/LF
                   <RateEditPopover
-                    table="material_rates"
-                    name={t.dbName}
-                    category="Ground Treatments"
+                    table="material_price"
+                    materialId={t.id}
                     unitLabel="LF"
                     currentValue={rate}
                     onSaved={refreshAllRates}
@@ -2694,9 +2684,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 <span className="text-xs text-gray-400 inline-flex items-center gap-1">
                   ${rate.toFixed(2)}/LF
                   <RateEditPopover
-                    table="material_rates"
-                    name={t.dbName}
-                    category="Ground Treatments"
+                    table="material_price"
+                    materialId={t.id}
                     unitLabel="LF"
                     currentValue={rate}
                     onSaved={refreshAllRates}
@@ -2841,9 +2830,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
                         ${perTon.toFixed(2)}/ton
                         <RateEditPopover
-                          table="material_rates"
-                          name={st.dbName}
-                          category="Ground Treatments"
+                          table="material_price"
+                          materialId={st.id}
                           unitLabel="ton"
                           currentValue={perTon}
                           onSaved={refreshAllRates}

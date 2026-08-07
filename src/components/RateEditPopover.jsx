@@ -33,6 +33,7 @@ const DEFAULT_VALUE_FIELD = {
   labor_rates: 'rate',
   subcontractor_rates: 'rate',
   material_price: 'price',
+  misc_rates: 'rate',
 }
 
 const SOURCE_LABEL = {
@@ -40,6 +41,7 @@ const SOURCE_LABEL = {
   labor_rates: 'Master Rates → Labor',
   subcontractor_rates: 'Master Rates → Subcontractors',
   material_price: 'Master Material Rates',
+  misc_rates: 'Miscellaneous Rates',
 }
 
 // Resolve the effective vendor for a material_price edit: an explicit vendorId,
