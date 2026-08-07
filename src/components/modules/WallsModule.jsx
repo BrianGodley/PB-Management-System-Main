@@ -5,7 +5,6 @@ import { useState, useEffect, useCallback, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
-import RateEditPopover from '../RateEditPopover'
 import DropdownSelect from '../DropdownSelect'
 import MissingPriceModal from '../MissingPriceModal'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
@@ -1345,16 +1344,6 @@ function WallWaterproofing({
         {row.type !== 'None' && (
           <span className="inline-flex items-center gap-1 text-xs text-gray-400 shrink-0">
             ${r2(wpUnit).toFixed(2)}/SF
-            {wpKey && (
-              <RateEditPopover
-                table="material_rates"
-                name={WALL_RATES[wpKey].db}
-                category="Walls"
-                unitLabel="SF"
-                currentValue={rr(wpKey)}
-                onSaved={refreshAllRates}
-              />
-            )}
           </span>
         )}
         {row.type !== 'None' && n(row.sf) > 0 && (
@@ -1628,38 +1617,6 @@ function CmuWallEntry({
               }),
             ]}
           />
-          {(() => {
-            const cb = resolveCatalogBlock(wall, materialRows)
-            if (cb) {
-              return (
-                <div className="mt-1 flex items-center gap-1 text-[11px] text-gray-500">
-                  <RateEditPopover
-                    table="material_price"
-                    materialId={wall.blockType}
-                    vendorId={wall.vendor && wall.vendor !== 'House' ? wall.vendor : undefined}
-                    category="Walls"
-                    unitLabel="ea"
-                    currentValue={cb.price}
-                    onSaved={refreshAllRates}
-                  />
-                </div>
-              )
-            }
-            const b = blockByName(wall.blockType)
-            const housePrice = materialPrices?.[wallBlockRateName(b.name)] ?? b.price
-            return (
-              <div className="mt-1 flex items-center gap-1 text-[11px] text-gray-500">
-                <RateEditPopover
-                  table="material_rates"
-                  name={wallBlockRateName(b.name)}
-                  category="Walls"
-                  unitLabel="ea"
-                  currentValue={housePrice}
-                  onSaved={refreshAllRates}
-                />
-              </div>
-            )
-          })()}
         </div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">Linear Feet</label>
@@ -2040,55 +1997,20 @@ function ModularWallEntry({
                         }`,
                       }))}
                     />
-                    {selRow && (
-                      <div className="mt-1 flex items-center gap-1 text-[11px] text-gray-500">
-                        <RateEditPopover
-                          table="material_rates"
-                          name={selRow.name}
-                          category="Walls"
-                          unitLabel="ea"
-                          currentValue={price}
-                          onSaved={refreshAllRates}
-                        />
-                      </div>
-                    )}
                   </>
                 )
               })()
-            : (() => {
-                const b = blockByName(wall.blockType)
-                const price = wallMatPrice(
-                  wallBlockRateName(b.name),
-                  wall.vendor,
-                  materialRows,
-                  materialPrices,
-                  b.price
-                )
-                const housePrice = materialPrices?.[wallBlockRateName(b.name)] ?? b.price
-                return (
-                  <>
-                    <DropdownSelect
-                      className="input text-sm py-1.5 w-full"
-                      value={wall.blockType || ''}
-                      onChange={v => set('blockType')(v)}
-                      options={CMU_BLOCK_TYPES.map(bt => ({
-                        value: bt.name,
-                        label: `${bt.name} — ${bt.w}×${bt.h}×${bt.l}`,
-                      }))}
-                    />
-                    <div className="mt-1 flex items-center gap-1 text-[11px] text-gray-500">
-                      <RateEditPopover
-                        table="material_rates"
-                        name={wallBlockRateName(b.name)}
-                        category="Walls"
-                        unitLabel="ea"
-                        currentValue={housePrice}
-                        onSaved={refreshAllRates}
-                      />
-                    </div>
-                  </>
-                )
-              })()}
+            : (
+                <DropdownSelect
+                  className="input text-sm py-1.5 w-full"
+                  value={wall.blockType || ''}
+                  onChange={v => set('blockType')(v)}
+                  options={CMU_BLOCK_TYPES.map(bt => ({
+                    value: bt.name,
+                    label: `${bt.name} — ${bt.w}×${bt.h}×${bt.l}`,
+                  }))}
+                />
+              )}
         </div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">Linear Feet</label>

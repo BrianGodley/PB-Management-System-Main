@@ -303,6 +303,9 @@ export function useNewMaterialCatalog(categories, initial = {}) {
 
   const refresh = useCallback(async () => {
     const catList = catsKey.split('|')
+    // material_rates is being retired: the base price map is built from the new
+    // catalog's Standard prices (material + material_price) plus labor_rates and
+    // misc_rates. Any name not found falls back to the module's code constant.
     const [rows, labRes, feeRes, venRes] = await Promise.all([
       fetchModuleCatalog(catList),
       supabase.from('labor_rates').select('name, rate').in('category', catList),
@@ -314,6 +317,7 @@ export function useNewMaterialCatalog(categories, initial = {}) {
         .order('company_name'),
     ])
     const pm = {}
+    // Catalog Standard prices (by name), then labor + misc coefficients.
     ;(rows || []).forEach(r => {
       if (r.vendor_id == null && r.name) pm[r.name] = num(r.unit_cost)
     })
