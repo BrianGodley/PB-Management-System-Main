@@ -123,6 +123,14 @@ export default function FunnelsBoard() {
   const [textModal, setTextModal] = useState(null)   // { kind, title, label, initial, confirmLabel }
   const [addToStage, setAddToStage] = useState(null)  // stage id when picking an opportunity
 
+  // Per-user default funnel — the funnel this user lands on when opening Funnels.
+  // Stored in localStorage keyed by user id (same pattern as Statistics defaults).
+  const [userId, setUserId] = useState(null)
+  const [defaultFunnelId, setDefaultFunnelId] = useState(null)
+  const [defaultLoaded, setDefaultLoaded] = useState(false)
+  const [appliedDefault, setAppliedDefault] = useState(false)
+  const dkey = uid => `pb:funnels:defaultFunnel:${uid || 'anon'}`
+
   const loadFunnels = useCallback(async () => {
     const { data } = await supabase.from('funnels').select('*').order('sort_order').order('name')
     setFunnels(data || [])
@@ -144,6 +152,27 @@ export default function FunnelsBoard() {
 
   useEffect(() => { loadFunnels().finally(() => setLoading(false)) }, [loadFunnels])
   useEffect(() => { loadBoard(funnelId) }, [funnelId, loadBoard])
+
+  // Load this user's saved default funnel from localStorage.
+  useEffect(() => {
+    let alive = true
+    supabase.auth.getUser().then(({ data }) => {
+      if (!alive) return
+      const uid = data?.user?.id || null
+      setUserId(uid)
+      try { setDefaultFunnelId(localStorage.getItem(dkey(uid)) || null) } catch { /* ignore */ }
+      setDefaultLoaded(true)
+    })
+    return () => { alive = false }
+  }, [])
+
+  // Once funnels + the saved default are both loaded, land on the default funnel
+  // (if it still exists). Runs once so it never fights the user's manual pick.
+  useEffect(() => {
+    if (appliedDefault || !defaultLoaded || !funnels.length) return
+    if (defaultFunnelId && funnels.some(f => f.id === defaultFunnelId)) setFunnelId(defaultFunnelId)
+    setAppliedDefault(true)
+  }, [appliedDefault, defaultLoaded, funnels, defaultFunnelId])
 
   const funnel = funnels.find(f => f.id === funnelId)
 
@@ -253,6 +282,25 @@ export default function FunnelsBoard() {
         <select value={funnelId || ''} onChange={e => setFunnelId(e.target.value)} className="input text-sm w-auto min-w-[12rem]">
           {funnels.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
         </select>
+        <label
+          className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer whitespace-nowrap"
+          title="Make this the funnel you land on when opening Funnels"
+        >
+          <input
+            type="checkbox"
+            className="rounded"
+            checked={!!funnelId && funnelId === defaultFunnelId}
+            onChange={e => {
+              const v = e.target.checked ? funnelId : null
+              setDefaultFunnelId(v)
+              try {
+                if (v) localStorage.setItem(dkey(userId), v)
+                else localStorage.removeItem(dkey(userId))
+              } catch { /* ignore */ }
+            }}
+          />
+          Default
+        </label>
         <button onClick={() => setTextModal({ kind: 'new-funnel', title: 'New funnel', label: 'Funnel name', confirmLabel: 'Create funnel' })} className="text-sm px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">+ New funnel</button>
         <button onClick={() => setTextModal({ kind: 'rename-funnel', title: 'Rename funnel', label: 'Funnel name', initial: funnel?.name, confirmLabel: 'Rename' })} className="text-sm px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Rename</button>
         <button onClick={deleteFunnel} className="text-sm px-3 py-1.5 rounded-lg border border-red-100 text-red-500 hover:bg-red-50">Delete</button>
