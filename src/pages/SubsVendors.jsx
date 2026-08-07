@@ -1011,8 +1011,7 @@ export default function SubsVendors({ mode = 'sub' }) {
               <div className="thin-scroll hidden lg:block overflow-x-hidden overflow-y-auto rounded-xl border border-gray-200 shadow-sm flex-1">
                 <table className="w-full text-xs table-fixed">
                   <colgroup>
-                    <col style={{ width: '36px' }} /> {/* checkbox */}
-                    <col style={{ width: '22%' }} /> {/* company name */}
+                    <col style={{ width: '24%' }} /> {/* company name */}
                     <col style={{ width: '15%' }} /> {/* primary contact */}
                     <col style={{ width: '20%' }} /> {/* trades / materials */}
                     {mode === 'sub' && <col style={{ width: '150px' }} />}
