@@ -668,12 +668,12 @@ export default function SubsVendors({ mode = 'sub' }) {
           {[
             { key: 'directory', label: '📋 Directory' },
             ...(mode === 'vendor' ? [{ key: 'invoicing', label: '📥 Invoicing' }] : []),
+            ...(mode === 'vendor' ? [{ key: 'quotes', label: '🧾 Quotes' }] : []),
+            ...(mode === 'vendor' ? [{ key: 'categories', label: '🗂️ Material Categories' }] : []),
+            ...(mode === 'vendor' ? [{ key: 'subcategories', label: '🏷️ Material Sub-Categories' }] : []),
             ...(mode === 'vendor' ? [{ key: 'materialRates', label: '📊 Master Material Rates' }] : []),
-            ...(mode === 'vendor' ? [{ key: 'categories', label: '🗂️ Categories' }] : []),
-            ...(mode === 'vendor' ? [{ key: 'subcategories', label: '🏷️ Sub-Categories' }] : []),
             ...(mode === 'sub' ? [{ key: 'contracts', label: '📑 Contracts' }] : []),
             ...(mode === 'sub' ? [{ key: 'subRates', label: '📊 Master Subcontractor Rates' }] : []),
-            ...(mode === 'vendor' ? [{ key: 'quotes', label: '🧾 Quotes' }] : []),
             { key: 'settings', label: '⚙️ Settings', mobileHide: true },
           ].map(t => (
             <button

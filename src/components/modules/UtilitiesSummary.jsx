@@ -66,7 +66,7 @@ export default function UtilitiesSummary({ module }) {
         .map(r => ({ label: r.type, value: `${n(r.lf)} LF` })),
     },
     {
-      title: 'Sewer Sinks',
+      title: 'Sinks',
       rows: (d.sewerSinkRows || [])
         .filter(r => n(r.qty) > 0)
         .map(r => ({ label: r.type, value: `× ${r.qty}` })),
@@ -116,7 +116,7 @@ export default function UtilitiesSummary({ module }) {
         .map(r => ({ label: r.type, value: `${n(r.lf)} LF` })),
     },
     {
-      title: 'Sewer Sinks',
+      title: 'Sinks',
       rows: (d.subSewerSinkRows || [])
         .filter(r => n(r.qty) > 0)
         .map(r => ({ label: r.type, value: `× ${r.qty}` })),

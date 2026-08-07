@@ -1770,7 +1770,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
 
       {/* ── Sewer Sinks ── */}
       <div>
-        <SectionHeader title="Sewer Sinks" />
+        <SectionHeader title="Sinks" />
         <div className="overflow-x-auto">
           <table className="w-full text-sm table-fixed">
             <colgroup>
