@@ -18,6 +18,7 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
   const [subs, setSubs] = useState([])
   const [mode, setMode] = useState('view') // 'view' | 'edit'
   const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
   const [confirmDel, setConfirmDel] = useState(false)
   const [form, setForm] = useState({
     category_id: m.category_id,
@@ -45,8 +46,9 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
 
   const save = async () => {
     setBusy(true)
+    setErr('')
     // 1) product attributes
-    await supabase
+    const { error: mErr } = await supabase
       .from('material')
       .update({
         category_id: form.category_id,
@@ -55,6 +57,15 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
         unit: form.unit || null,
       })
       .eq('id', m.id)
+    if (mErr) {
+      setBusy(false)
+      setErr(
+        mErr.code === '23505' || /duplicate|unique/i.test(mErr.message)
+          ? 'A product with this name already exists in that category / sub-category. Rename this one, or delete the duplicate first.'
+          : mErr.message
+      )
+      return
+    }
     // 2) price for this row's vendor (update open period, or insert one)
     const price = form.price === '' ? null : parseFloat(form.price)
     if (row.priceId) {
@@ -183,6 +194,9 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
           )}
         </div>
 
+        {err && (
+          <div className="px-5 py-2 text-xs text-red-600 bg-red-50 border-t border-red-100">{err}</div>
+        )}
         <div className="px-5 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50">
           {mode === 'view' ? (
             <>

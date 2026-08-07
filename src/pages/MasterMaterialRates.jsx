@@ -358,7 +358,7 @@ export default function MasterMaterialRates() {
                             onClick={() => setEditing({ key: r.key, value: r.price ?? '' })}
                             className="text-gray-500 hover:text-gray-800 opacity-0 group-hover:opacity-100 transition-opacity"
                           >
-                            {r.price == null ? 'Set price' : 'Edit'}
+                            {r.price == null ? 'Set price' : 'Edit Price'}
                           </button>
                         )}
                       </td>
