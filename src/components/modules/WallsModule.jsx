@@ -1375,7 +1375,6 @@ function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, ma
             row.type && row.type !== 'None' && !opts.includes(row.type)
               ? [row.type, ...opts]
               : opts
-          const isActive = row.type && row.type !== 'None'
           const qtyLabel = row.type === 'Precast' ? 'Qty' : 'LF'
           return (
             <div key={i} className="flex items-center gap-2">
@@ -1402,26 +1401,22 @@ function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, ma
                   </option>
                 ))}
               </select>
-              {isActive && (
-                <>
-                  <NumInput
-                    value={row.widthIn}
-                    onChange={v => onPatch(i, { widthIn: v }, true)}
-                    placeholder={row.type === 'Precast' ? '8' : '4'}
-                    className="w-20 shrink-0"
-                  />
-                  <span className="text-xs text-gray-400 shrink-0">W&quot;</span>
-                  <NumInput
-                    value={row.type === 'Precast' ? row.qty : row.lf}
-                    onChange={v =>
-                      onPatch(i, row.type === 'Precast' ? { qty: v } : { lf: v }, false)
-                    }
-                    placeholder="0"
-                    className="w-24 shrink-0"
-                  />
-                  <span className="text-xs text-gray-400 shrink-0">{qtyLabel}</span>
-                </>
-              )}
+              <NumInput
+                value={row.widthIn}
+                onChange={v => onPatch(i, { widthIn: v }, true)}
+                placeholder={row.type === 'Precast' ? '8' : '4'}
+                className="w-20 shrink-0"
+              />
+              <span className="text-xs text-gray-400 shrink-0">W&quot;</span>
+              <NumInput
+                value={row.type === 'Precast' ? row.qty : row.lf}
+                onChange={v =>
+                  onPatch(i, row.type === 'Precast' ? { qty: v } : { lf: v }, false)
+                }
+                placeholder="0"
+                className="w-24 shrink-0"
+              />
+              <span className="text-xs text-gray-400 shrink-0">{qtyLabel}</span>
               <button
                 type="button"
                 onClick={() => onRemove(i)}
