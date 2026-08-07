@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useCachedData } from '../lib/useCachedData'
@@ -18,20 +19,45 @@ import SubVendorCatalogs from '../components/SubVendorCatalogs'
 // current svTab is one of its items. Closes on selection or outside click.
 function DropdownTab({ icon, label, items, current, onSelect }) {
   const [open, setOpen] = useState(false)
-  const ref = useRef(null)
+  const [pos, setPos] = useState(null)
+  const btnRef = useRef(null)
+  const menuRef = useRef(null)
   const active = items.some(i => i.key === current)
+
+  const place = () => {
+    const r = btnRef.current?.getBoundingClientRect()
+    if (r) setPos({ top: r.bottom + 2, left: r.left })
+  }
+  const toggle = () => {
+    if (!open) place()
+    setOpen(o => !o)
+  }
+  // The menu is portalled to <body> so the tab bar's overflow-x scroll can't
+  // clip it. Outside-click ignores both the button and the portalled menu;
+  // any scroll/resize closes it (its fixed position would otherwise drift).
   useEffect(() => {
     if (!open) return
     const onDoc = e => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+      if (btnRef.current?.contains(e.target)) return
+      if (menuRef.current?.contains(e.target)) return
+      setOpen(false)
     }
+    const onReflow = () => setOpen(false)
     document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
+    window.addEventListener('resize', onReflow)
+    window.addEventListener('scroll', onReflow, true)
+    return () => {
+      document.removeEventListener('mousedown', onDoc)
+      window.removeEventListener('resize', onReflow)
+      window.removeEventListener('scroll', onReflow, true)
+    }
   }, [open])
+
   return (
-    <div className="relative" ref={ref}>
+    <>
       <button
-        onClick={() => setOpen(o => !o)}
+        ref={btnRef}
+        onClick={toggle}
         className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
           active
             ? 'border-green-700 text-green-700'
@@ -41,27 +67,34 @@ function DropdownTab({ icon, label, items, current, onSelect }) {
         {icon} {label}
         <span className="text-[10px] text-gray-400">▼</span>
       </button>
-      {open && (
-        <div className="absolute left-0 top-full z-30 mt-0.5 min-w-[13rem] rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-          {items.map(i => (
-            <button
-              key={i.key}
-              onClick={() => {
-                onSelect(i.key)
-                setOpen(false)
-              }}
-              className={`block w-full text-left px-4 py-2 text-sm transition-colors ${
-                current === i.key
-                  ? 'bg-green-50 text-green-700 font-semibold'
-                  : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {i.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+      {open &&
+        pos &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 60 }}
+            className="min-w-[13rem] rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+          >
+            {items.map(i => (
+              <button
+                key={i.key}
+                onClick={() => {
+                  onSelect(i.key)
+                  setOpen(false)
+                }}
+                className={`block w-full text-left px-4 py-2 text-sm transition-colors ${
+                  current === i.key
+                    ? 'bg-green-50 text-green-700 font-semibold'
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {i.label}
+              </button>
+            ))}
+          </div>,
+          document.body
+        )}
+    </>
   )
 }
 
