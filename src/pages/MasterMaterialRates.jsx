@@ -26,7 +26,7 @@ const vendorCode = name =>
   isStandardName(name) ? 'STD' : (name || '').replace(/[^a-z0-9]/gi, '').slice(0, 4).toUpperCase() || 'VEN'
 
 export default function MasterMaterialRates() {
-  const [view, setView] = useState('standard') // 'standard' | 'vendor'
+  const [view, setView] = useState('vendor') // 'vendor' | 'standard'
   const [materials, setMaterials] = useState([])
   const [vendors, setVendors] = useState([])
   const [loading, setLoading] = useState(true)
@@ -192,9 +192,9 @@ export default function MasterMaterialRates() {
   const isVendorView = view === 'vendor'
 
   return (
-    <div className="mt-3">
-      {/* View toggle */}
-      <div className="mb-3">
+    <div className="mt-3 flex-1 min-h-0 flex flex-col">
+      {/* View toggle (frozen above the scrolling table) */}
+      <div className="mb-3 flex-shrink-0">
         <div className="flex justify-center items-center gap-2">
           {[
             { k: 'vendor', l: 'Vendor' },
@@ -203,7 +203,7 @@ export default function MasterMaterialRates() {
             <button
               key={t.k}
               onClick={() => setView(t.k)}
-              className={`px-8 py-2.5 text-sm font-semibold rounded-lg border transition-colors ${
+              className={`px-16 py-2.5 text-sm font-semibold rounded-lg border transition-colors ${
                 view === t.k
                   ? 'bg-green-700 text-white border-green-700'
                   : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
@@ -213,15 +213,10 @@ export default function MasterMaterialRates() {
             </button>
           ))}
         </div>
-        <p className="text-xs text-gray-400 text-center mt-1">
-          {view === 'standard'
-            ? 'One row per product, at the Standard price.'
-            : 'One row per vendor-specific price.'}
-        </p>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="flex flex-wrap items-center gap-3 px-3 py-2 bg-gray-50 border-b border-gray-200">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
+        <div className="flex flex-wrap items-center gap-3 px-3 py-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
           <select
             className="border border-gray-200 rounded-md px-2 py-1 text-xs bg-white"
             value={cat}
@@ -242,7 +237,7 @@ export default function MasterMaterialRates() {
           <span className="ml-auto text-xs text-gray-400">{rows.length} items</span>
         </div>
 
-        <div className="overflow-auto max-h-[calc(100vh-16rem)]">
+        <div className="overflow-auto flex-1 min-h-0">
           <table className="w-full text-xs min-w-[820px]">
             <thead className="sticky top-0 z-10">
               <tr className="bg-gray-50 border-b border-gray-200 text-left text-gray-600 uppercase">

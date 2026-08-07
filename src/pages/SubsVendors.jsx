@@ -942,7 +942,7 @@ export default function SubsVendors({ mode = 'sub' }) {
       {/* ── Master Material Rates (vendors only) — two-view catalog on the new
           material + material_price model (Standard / Vendor). ── */}
       {svTab === 'materialRates' && mode === 'vendor' && (
-        <div className="mt-3 flex-1 overflow-y-auto">
+        <div className="mt-3 flex-1 min-h-0 flex flex-col">
           <MasterMaterialRates />
         </div>
       )}
