@@ -1023,14 +1023,6 @@ export default function SubsVendors({ mode = 'sub' }) {
                   </colgroup>
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="px-3 py-2">
-                        <input
-                          type="checkbox"
-                          checked={selected.size === filtered.length && filtered.length > 0}
-                          onChange={toggleAll}
-                          className="accent-green-700"
-                        />
-                      </th>
                       <th
                         className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase cursor-pointer hover:text-gray-800 select-none"
                         onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))}
@@ -1066,14 +1058,6 @@ export default function SubsVendors({ mode = 'sub' }) {
                     {filtered.map(sub => {
                       return (
                         <tr key={sub.id} className="hover:bg-gray-50 transition-colors group">
-                          <td className="px-3 py-2">
-                            <input
-                              type="checkbox"
-                              checked={selected.has(sub.id)}
-                              onChange={() => toggleSelect(sub.id)}
-                              className="accent-green-700"
-                            />
-                          </td>
                           <td className="px-4 py-2">
                             <button
                               onClick={() => openEdit(sub)}
@@ -1247,9 +1231,6 @@ export default function SubsVendors({ mode = 'sub' }) {
           {filtered.length > 0 && (
             <div className="flex-shrink-0 pt-2 text-xs text-gray-400">
               Showing {filtered.length} of {subs.length} {subs.length === 1 ? 'entry' : 'entries'}
-              {selected.size > 0 && (
-                <span className="ml-2 text-green-700 font-medium">· {selected.size} selected</span>
-              )}
             </div>
           )}
 
