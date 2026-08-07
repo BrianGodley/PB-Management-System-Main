@@ -194,24 +194,26 @@ export default function MasterMaterialRates() {
   return (
     <div className="mt-3">
       {/* View toggle */}
-      <div className="flex items-center gap-2 mb-3">
-        {[
-          { k: 'standard', l: 'Standard' },
-          { k: 'vendor', l: 'Vendor' },
-        ].map(t => (
-          <button
-            key={t.k}
-            onClick={() => setView(t.k)}
-            className={`px-4 py-1.5 text-sm font-semibold rounded-lg border transition-colors ${
-              view === t.k
-                ? 'bg-green-700 text-white border-green-700'
-                : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-            }`}
-          >
-            {t.l}
-          </button>
-        ))}
-        <p className="text-xs text-gray-400 ml-2">
+      <div className="mb-3">
+        <div className="flex justify-center items-center gap-2">
+          {[
+            { k: 'vendor', l: 'Vendor' },
+            { k: 'standard', l: 'Standard' },
+          ].map(t => (
+            <button
+              key={t.k}
+              onClick={() => setView(t.k)}
+              className={`px-8 py-2.5 text-sm font-semibold rounded-lg border transition-colors ${
+                view === t.k
+                  ? 'bg-green-700 text-white border-green-700'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              {t.l}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-gray-400 text-center mt-1">
           {view === 'standard'
             ? 'One row per product, at the Standard price.'
             : 'One row per vendor-specific price.'}
