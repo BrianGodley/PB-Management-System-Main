@@ -385,13 +385,13 @@ function calcGroundTreatments(
     prepMethod === 'Hand' && !_prepIsSub
       ? p(GT_RATES.soilPrepHandAdd.dbName, GT_RATES.soilPrepHandAdd.fallback)
       : 0
-  const soilLab = n(soilPrepSF) * (_prepBaseLab + _prepHandAdd)
-  const soilMat = n(soilPrepSF) * _prepBaseMat
+  let soilLab = n(soilPrepSF) * (_prepBaseLab + _prepHandAdd)
+  let soilMat = n(soilPrepSF) * _prepBaseMat
 
   // ── Sod ────────────────────────────────────────────────────────────────────
-  const sodLab = n(sodSF) * p(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback)
+  let sodLab = n(sodSF) * p(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback)
   const sodT = resolveType(sodType, _opts.sod, [])
-  const sodMat = n(sodSF) * p(sodT.dbName, sodT.fallback)
+  let sodMat = n(sodSF) * p(sodT.dbName, sodT.fallback)
 
   // Fertilizer — auto-figured bags from sod SF × coverage (SF/bag). Material only.
   let fertMat = 0
@@ -418,6 +418,11 @@ function calcGroundTreatments(
     // Labor: 0.002 hr per SF per inch of depth (2" doubles it, 3" triples, …).
     soilsLab += n(r.sf) * n(r.depthIn) * p('Soils Install Labor', 0.002)
   })
+  // Sub tab: no Soils section — subcontractors supply their own soil.
+  if (state.subType === 'Subcontractor') {
+    soilsMat = 0
+    soilsLab = 0
+  }
 
   // ── Steppers (Flagstone + Precast, Soil Set + Concrete Set) ─────────────────
   // Each of the 4 lines now resolves its own material rate from a per-line
@@ -601,15 +606,28 @@ function calcGroundTreatments(
     manMat
   const laborCost = totalHrs * lrph
   const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
-  // On the Sub tab the itemized scope's cost IS the subcontractor cost — labor +
-  // burden + material + any manual sub — and profit is the markup (Sub GP). The
-  // in-house GP model applies only to the In-House tab.
   const isSubTab = state.subType === 'Subcontractor'
   const subMarkup = n(state.subGpMarkupRate) || 0.2
+  // On the Sub tab every section is a FLAT subcontractor unit rate sourced from
+  // subcontractor_rates (via mp) — $/SF (or $/LF for edging), not hours+material.
+  // (Soils is omitted — subcontractors bring their own soil.)
+  const _sfSum = rows => (rows || []).reduce((a, r) => a + n(r.sf), 0)
+  const _stepSubSF =
+    n(flagstoneSoilSF) + n(flagstoneConcreteSF) + n(precastSoilSF) + n(precastConcreteSF)
+  const sectionSubTotal =
+    n(soilPrepSF) * p('Soil Prep Sub - $/SF', 0) +
+    n(sodSF) * p('Sod Sub - $/SF', 0) +
+    _sfSum(mulchRows) * p('Mulch Sub - $/SF', 0) +
+    _sfSum(dgRows) * p('DG Sub - $/SF', 0) +
+    _sfSum(gravelRows) * p('Gravel Sub - $/SF', 0) +
+    _sfSum(pebbleRows) * p('Pebble Sub - $/SF', 0) +
+    _sfSum(cobbleRows) * p('Cobbles Sub - $/SF', 0) +
+    (n(plasticEdgingLF) + n(metalEdgingLF)) * p('Edging Sub - $/LF', 0) +
+    _stepSubSF * p('Steppers Sub - $/SF', 0)
   let gp, subCost, subGp, commission, price
   if (isSubTab) {
     gp = 0
-    subCost = totalMat + laborCost + burden + manSub
+    subCost = sectionSubTotal + manSub // flat subcontractor unit rates
     subGp = subCost * subMarkup
     commission = subGp * DEFAULTS.commissionRate
     price = subCost + subGp + commission
@@ -622,12 +640,14 @@ function calcGroundTreatments(
   }
 
   return {
-    walkHrs,
-    totalHrs,
-    manDays,
-    totalMat,
-    laborCost,
-    burden,
+    // On the Sub tab the bid is the flat subcontractor cost only — the itemized
+    // in-house hours/material/burden don't apply (and shouldn't be taxed).
+    walkHrs: isSubTab ? 0 : walkHrs,
+    totalHrs: isSubTab ? 0 : totalHrs,
+    manDays: isSubTab ? 0 : manDays,
+    totalMat: isSubTab ? 0 : totalMat,
+    laborCost: isSubTab ? 0 : laborCost,
+    burden: isSubTab ? 0 : burden,
     gp,
     subGp,
     commission,
@@ -866,9 +886,10 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     // Fully off material_rates: mp is built from labor_rates (labor), misc_rates
     // (fees), and the new catalog's Standard material prices (by clean name).
     // Material option prices also come through the picker options from fetchGtRows.
-    const [labRes, feeRes, gtRows, venRes] = await Promise.all([
+    const [labRes, feeRes, subRes, gtRows, venRes] = await Promise.all([
       supabase.from('labor_rates').select('name, rate').eq('category', 'Ground Treatments'),
       supabase.from('misc_rates').select('name, rate').eq('category', 'Ground Treatments'),
+      supabase.from('subcontractor_rates').select('company_name, rate').eq('category', 'Ground Treatments'),
       fetchGtRows(),
       supabase.from('subs_vendors').select('id, company_name, supplied_categories').eq('type', 'vendor').order('company_name'),
     ])
@@ -882,6 +903,9 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     })
     ;(feeRes.data || []).forEach(r => {
       prices[r.name] = parseFloat(r.rate) || 0
+    })
+    ;(subRes.data || []).forEach(r => {
+      prices[r.company_name] = parseFloat(r.rate) || 0
     })
     setMaterialPrices(prices)
     setMaterialRows(gtRows || [])
@@ -1342,7 +1366,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
         </div>
       </div>
 
-      {/* ── Soils ── */}
+      {/* ── Soils (In-House only — subcontractors bring their own soil) ── */}
+      {!isSub && (
       <div>
         <SectionHeader title="Soils" />
         <p className="text-xs text-gray-400 mb-2">Optional soil / amendment lines (material only). Vendor is per-row.</p>
@@ -1451,6 +1476,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           </button>
         </div>
       </div>
+      )}
 
       {/* ── Sod ── */}
       <div>
