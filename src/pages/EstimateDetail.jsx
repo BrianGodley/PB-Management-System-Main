@@ -2410,9 +2410,6 @@ export default function EstimateDetail() {
             >
               <div className="flex items-start justify-between px-6 pt-5 pb-3 border-b border-gray-200 flex-shrink-0">
                 <div className="flex-1">
-                  <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-0.5">
-                    {moduleReadOnly ? 'View Module' : editingModule ? 'Edit Module' : 'Add Module'}
-                  </p>
                   {editingModule ? (
                     <input
                       type="text"
