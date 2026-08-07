@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import TaxonomyDetailModal from './TaxonomyDetailModal'
 
@@ -67,6 +67,61 @@ export default function TaxonomyManager({ kind = 'category', scope = 'material' 
   const rows = isCat ? cats : subs
   const colCount = 2 + (isCat ? 1 : 1) + (cfg.hasMaterials ? 1 : 0) + (!isCat && cfg.hasVendor ? 1 : 0)
 
+  // ── Sorting ────────────────────────────────────────────────────────────────
+  const [sortKey, setSortKey] = useState('name')
+  const [sortDir, setSortDir] = useState('asc')
+  const sortValue = (row, key) => {
+    switch (key) {
+      case 'category':
+        return catName(row.category_id).toLowerCase()
+      case 'code':
+        return (row.code || '').toLowerCase()
+      case 'name':
+        return (row.name || '').toLowerCase()
+      case 'vendor':
+        return (row.default_vendor_id ? vendName(row.default_vendor_id) : 'Standard').toLowerCase()
+      case 'items':
+        return itemCount(row)
+      case 'subcats':
+        return subCount(row)
+      default:
+        return ''
+    }
+  }
+  const sortedRows = useMemo(() => {
+    const arr = [...rows]
+    arr.sort((a, b) => {
+      const av = sortValue(a, sortKey)
+      const bv = sortValue(b, sortKey)
+      let cmp
+      if (typeof av === 'number' && typeof bv === 'number') cmp = av - bv
+      else cmp = String(av).localeCompare(String(bv))
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+    return arr
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, sortKey, sortDir, cats, subs, materials, vendors])
+  const toggleSort = key =>
+    setSortKey(prev => {
+      if (prev === key) {
+        setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
+        return prev
+      }
+      setSortDir('asc')
+      return key
+    })
+  const arrow = key => (sortKey === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '')
+  const Th = ({ k, label, align = 'left' }) => (
+    <th
+      className={`px-3 py-2 font-semibold cursor-pointer select-none hover:text-gray-800 text-${align}`}
+      onClick={() => toggleSort(k)}
+      title="Sort"
+    >
+      {label}
+      {arrow(k)}
+    </th>
+  )
+
   return (
     <div className="mt-3">
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -85,12 +140,12 @@ export default function TaxonomyManager({ kind = 'category', scope = 'material' 
           <table className="w-full text-xs min-w-[560px]">
             <thead className="sticky top-0 z-10 bg-gray-50">
               <tr className="border-b border-gray-200 text-left text-gray-600 uppercase">
-                {!isCat && <th className="px-3 py-2 font-semibold">Category</th>}
-                <th className="px-3 py-2 font-semibold">Code</th>
-                <th className="px-3 py-2 font-semibold">Name</th>
-                {!isCat && cfg.hasVendor && <th className="px-3 py-2 font-semibold">Default Vendor</th>}
-                {cfg.hasMaterials && <th className="px-3 py-2 font-semibold text-right">Items</th>}
-                {isCat && <th className="px-3 py-2 font-semibold text-right">Sub-Cats</th>}
+                {!isCat && <Th k="category" label="Category" />}
+                <Th k="code" label="Code" />
+                <Th k="name" label="Name" />
+                {!isCat && cfg.hasVendor && <Th k="vendor" label="Default Vendor" />}
+                {cfg.hasMaterials && <Th k="items" label="Items" align="right" />}
+                {isCat && <Th k="subcats" label="Sub-Cats" align="right" />}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -101,7 +156,7 @@ export default function TaxonomyManager({ kind = 'category', scope = 'material' 
                   </td>
                 </tr>
               ) : (
-                rows.map(row => (
+                sortedRows.map(row => (
                   <tr key={row.id} className="hover:bg-gray-50">
                     {!isCat && <td className="px-3 py-1.5 text-gray-600">{catName(row.category_id)}</td>}
                     <td className="px-3 py-1.5 font-mono text-gray-500">{row.code}</td>
