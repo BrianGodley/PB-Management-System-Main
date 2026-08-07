@@ -2600,12 +2600,6 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
             </button>
           ))}
         </div>
-        {/* Reassurance line — explains the new behavior so users coming
-            from the old toggle don't worry about data loss. */}
-        <p className="text-[11px] text-gray-500 mt-1">
-          Switching tabs only changes what you see — every wall type's entries continue to
-          contribute to the totals.
-        </p>
       </div>
 
       {pricesLoading && (
