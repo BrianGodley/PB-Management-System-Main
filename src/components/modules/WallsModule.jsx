@@ -1405,12 +1405,19 @@ function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, ma
               {isActive && (
                 <>
                   <NumInput
+                    value={row.widthIn}
+                    onChange={v => onPatch(i, { widthIn: v }, true)}
+                    placeholder={row.type === 'Precast' ? '8' : '4'}
+                    className="w-20 shrink-0"
+                  />
+                  <span className="text-xs text-gray-400 shrink-0">W&quot;</span>
+                  <NumInput
                     value={row.type === 'Precast' ? row.qty : row.lf}
                     onChange={v =>
                       onPatch(i, row.type === 'Precast' ? { qty: v } : { lf: v }, false)
                     }
                     placeholder="0"
-                    className="w-28 shrink-0"
+                    className="w-24 shrink-0"
                   />
                   <span className="text-xs text-gray-400 shrink-0">{qtyLabel}</span>
                 </>
@@ -1887,7 +1894,7 @@ function ModularWallEntry({
     <div className="border border-gray-200 rounded-xl p-3 mb-3 bg-white">
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-          Wall Installation {idx + 1}
+          Wall {idx + 1}
         </span>
         {total > 1 && (
           <button
@@ -2455,39 +2462,41 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
   return (
     <SubTabContext.Provider value={isSub}>
     <div className="space-y-5">
-      {/* ── Sticky GPMD bar ── */}
-      <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
-        <GpmdBar
-          variant={subType === 'Subcontractor' ? 'sub' : 'inhouse'}
-          sticky
-          totalMat={calc.totalMat}
-          totalHrs={calc.totalHrs}
-          manDays={calc.manDays}
-          laborCost={calc.laborCost}
-          laborRatePerHour={laborRatePerHour}
-          burden={calc.burden}
-          gp={calc.gp}
-          commission={calc.commission}
-          subCost={calc.subCost}
-          gpmd={gpmd}
-          price={calc.price}
-          subMarkupRate={subGpMarkupRate}
-        />
-            </div>
-
+      {/* ── Frozen header: GPMD bar + Crew Type / View Rates bar ── */}
+      <div className="sticky top-0 z-20 -mx-6 bg-white shadow-md">
+        <div className="px-6 pt-1 pb-1 bg-gray-900">
+          <GpmdBar
+            variant={subType === 'Subcontractor' ? 'sub' : 'inhouse'}
+            sticky
+            totalMat={calc.totalMat}
+            totalHrs={calc.totalHrs}
+            manDays={calc.manDays}
+            laborCost={calc.laborCost}
+            laborRatePerHour={laborRatePerHour}
+            burden={calc.burden}
+            gp={calc.gp}
+            commission={calc.commission}
+            subCost={calc.subCost}
+            gpmd={gpmd}
+            price={calc.price}
+            subMarkupRate={subGpMarkupRate}
+          />
+        </div>
+        <div className="px-6 py-2">
+          <CrewTypeBar
+            crewType={crewType}
+            onCrewTypeChange={setCrewType}
+            title="Walls"
+            rates={wallRateList}
+            refreshAllRates={refreshAllRates}
+            showInlineToggle={false}
+          />
+        </div>
+      </div>
 
       <ModuleHeaderSlot>
         <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} compact />
       </ModuleHeaderSlot>
-
-      <CrewTypeBar
-        crewType={crewType}
-        onCrewTypeChange={setCrewType}
-        title="Walls"
-        rates={wallRateList}
-        refreshAllRates={refreshAllRates}
-        showInlineToggle={false}
-      />
 
       {/* Wall Type */}
       <div>
