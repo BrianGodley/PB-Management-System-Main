@@ -1273,15 +1273,15 @@ function WallWaterproofing({
           onChange={v => onWpUpdate(0, 'type', v)}
           options={[{ value: 'None', label: 'None' }, ...wpShown.map(t => ({ value: t, label: t }))]}
         />
-        {row.type !== 'None' && (
-          <NumInput
-            value={row.sf}
-            onChange={v => onWpUpdate(0, 'sf', v)}
-            placeholder="0"
-            className="w-20 shrink-0"
-          />
-        )}
-        {row.type !== 'None' && <span className="text-xs text-gray-400 shrink-0">SF</span>}
+        {/* SF is a PERMANENT field on the row — always shown, regardless of the
+            selected type (a "None" row simply doesn't bill it). */}
+        <NumInput
+          value={row.sf}
+          onChange={v => onWpUpdate(0, 'sf', v)}
+          placeholder="0"
+          className="w-20 shrink-0"
+        />
+        <span className="text-xs text-gray-400 shrink-0">SF</span>
         {row.type !== 'None' && (
           <span className="inline-flex items-center gap-1 text-xs text-gray-400 shrink-0">
             ${r2(wpUnit).toFixed(2)}/SF

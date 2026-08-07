@@ -72,7 +72,10 @@ export default function DropdownSelect({
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    // The caller's className (width / flex-1 / the `input` visual style) lives on
+    // the WRAPPER so the control grows to fill its flex row. The button is a
+    // transparent, full-width layer inside it.
+    <div ref={rootRef} className={`relative ${className}`}>
       <button
         type="button"
         disabled={disabled}
@@ -84,8 +87,8 @@ export default function DropdownSelect({
             setOpen(true)
           }
         }}
-        className={`${className} ${buttonClassName} flex items-center justify-between text-left ${
-          disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+        className={`w-full flex items-center justify-between text-left bg-transparent border-0 p-0 focus:outline-none ${buttonClassName} ${
+          disabled ? 'cursor-not-allowed' : 'cursor-pointer'
         }`}
       >
         <span className={`truncate ${selected ? '' : 'text-gray-400'}`}>{label}</span>
