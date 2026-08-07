@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import DropdownSelect from '../DropdownSelect'
+import MissingPriceModal from '../MissingPriceModal'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { groutCyPerBlock as cmuGroutCyPerBlock } from '../../lib/cmuGrout'
@@ -615,6 +616,48 @@ function catalogItemPrice(materialRows, subcat, name, vendorSel, fallback) {
   const vsel = vendorSel && vendorSel !== 'House' ? vendorSel : null
   const row = rows.find(r => r.vendor_id === vsel) || rows.find(r => r.vendor_id == null) || rows[0]
   return row && row.unit_cost != null && row.unit_cost !== '' ? n(row.unit_cost) : fallback
+}
+
+// Return the catalog product row for (sub-category, name, vendor) — used to
+// detect a selected material that has NO price so we can prompt the user.
+function wallCatalogRow(materialRows, subcat, name, vendorSel) {
+  const rows = (materialRows || []).filter(r => r.sub_category === subcat && r.name === name)
+  if (!rows.length) return null
+  const vsel = vendorSel && vendorSel !== 'House' ? vendorSel : null
+  return rows.find(r => r.vendor_id === vsel) || rows.find(r => r.vendor_id == null) || rows[0]
+}
+// True when a catalog row exists but carries no usable price.
+function isPricelessRow(row) {
+  return !!(row && row.id && (row.unit_cost == null || row.unit_cost === '' || n(row.unit_cost) === 0))
+}
+// Shared "missing price" prompt: when a selected catalog item has no price, open
+// a modal so the user can enter one (written to the catalog). Used by every
+// Walls picker (caps/finishes/waterproofing/blocks).
+function usePricePrompt() {
+  const [prompt, setPrompt] = useState(null)
+  // name-keyed catalog items (caps/finishes/waterproofing)
+  const check = (materialRows, subcat, name, vendor) => {
+    const row = wallCatalogRow(materialRows, subcat, name, vendor)
+    if (isPricelessRow(row)) {
+      setPrompt({ materialId: row.id, vendorId: vendor && vendor !== 'House' ? vendor : null, name })
+      return true
+    }
+    return false
+  }
+  // id-keyed catalog items (block pickers select the material id directly)
+  const checkById = (materialRows, id, vendor, name) => {
+    const row = (materialRows || []).find(r => r.id === id)
+    if (isPricelessRow(row)) {
+      setPrompt({
+        materialId: row.id,
+        vendorId: vendor && vendor !== 'House' ? vendor : null,
+        name: name || row.name,
+      })
+      return true
+    }
+    return false
+  }
+  return { prompt, check, checkById, close: () => setPrompt(null) }
 }
 
 // ── Per-wall calculators ──────────────────────────────────────────────────────
@@ -1253,6 +1296,7 @@ function WallWaterproofing({
   refreshAllRates,
   onWpUpdate,
 }) {
+  const pp = usePricePrompt()
   const row = (Array.isArray(wpRows) && wpRows[0]) || blankWpRow()
   const rr = key => materialPrices?.[WALL_RATES[key].db] ?? WALL_RATES[key].fb
   const wpKey = WP_KEY[row.type]
@@ -1274,13 +1318,19 @@ function WallWaterproofing({
         <DropdownSelect
           className="input text-sm py-1.5 flex-1 min-w-0"
           value={row.vendor || 'House'}
-          onChange={v => onWpUpdate(0, 'vendor', v)}
+          onChange={v => {
+            onWpUpdate(0, 'vendor', v)
+            pp.check(materialRows, WALL_WP_SUBCAT, row.type, v)
+          }}
           options={vendorOptions}
         />
         <DropdownSelect
           className="input text-sm py-1.5 flex-[1.5] min-w-0"
           value={row.type || 'None'}
-          onChange={v => onWpUpdate(0, 'type', v)}
+          onChange={v => {
+            onWpUpdate(0, 'type', v)
+            pp.check(materialRows, WALL_WP_SUBCAT, v, row.vendor)
+          }}
           options={[{ value: 'None', label: 'None' }, ...wpShown.map(t => ({ value: t, label: t }))]}
         />
         {/* SF is a PERMANENT field on the row — always shown, regardless of the
@@ -1326,6 +1376,9 @@ function WallWaterproofing({
           </div>
         )}
       </div>
+      {pp.prompt && (
+        <MissingPriceModal {...pp.prompt} onClose={pp.close} onSaved={refreshAllRates} />
+      )}
     </div>
   )
 }
@@ -1341,7 +1394,9 @@ function WallFinishesEditor({
   onRemove,
   vendorOptions,
   materialRows,
+  refreshAllRates,
 }) {
+  const pp = usePricePrompt()
   return (
     <div className="mt-3 border-t border-gray-100 pt-2">
       <label className="block text-xs text-gray-500 mb-1 font-medium">Finishes</label>
@@ -1357,13 +1412,19 @@ function WallFinishesEditor({
               <DropdownSelect
                 className="input text-sm py-1 flex-1 min-w-0"
                 value={row.vendor || 'House'}
-                onChange={v => onPatch(i, { vendor: v }, true)}
+                onChange={v => {
+                  onPatch(i, { vendor: v }, true)
+                  pp.check(materialRows, WALL_FINISH_SUBCAT, row.type, v)
+                }}
                 options={vendorOptions}
               />
               <DropdownSelect
                 className="input text-sm py-1 flex-[1.5] min-w-0"
                 value={row.type || 'None'}
-                onChange={v => onPatch(i, { type: v }, true)}
+                onChange={v => {
+                  onPatch(i, { type: v }, true)
+                  pp.check(materialRows, WALL_FINISH_SUBCAT, v, row.vendor)
+                }}
                 options={[{ value: 'None', label: 'None' }, ...shown.map(t => ({ value: t, label: t }))]}
               />
               <NumInput
@@ -1392,13 +1453,17 @@ function WallFinishesEditor({
           + Add finish
         </button>
       </div>
+      {pp.prompt && (
+        <MissingPriceModal {...pp.prompt} onClose={pp.close} onSaved={refreshAllRates} />
+      )}
     </div>
   )
 }
 
 // ── Per-wall Caps editor ──────────────────────────────────────────────────────
 // Add / edit / remove cap rows scoped to one wall. Identical cap math.
-function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, materialRows }) {
+function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, materialRows, refreshAllRates }) {
+  const pp = usePricePrompt()
   return (
     <div className="mt-3 border-t border-gray-100 pt-2">
       <label className="block text-xs text-gray-500 mb-1 font-medium">Caps</label>
@@ -1415,13 +1480,19 @@ function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, ma
               <DropdownSelect
                 className="input text-sm py-1 flex-1 min-w-0"
                 value={row.vendor || 'House'}
-                onChange={v => onPatch(i, { vendor: v }, true)}
+                onChange={v => {
+                  onPatch(i, { vendor: v }, true)
+                  pp.check(materialRows, WALL_CAP_SUBCAT, row.type, v)
+                }}
                 options={vendorOptions}
               />
               <DropdownSelect
                 className="input text-sm py-1 flex-[1.5] min-w-0"
                 value={row.type || 'None'}
-                onChange={v => onPatch(i, { type: v }, true)}
+                onChange={v => {
+                  onPatch(i, { type: v }, true)
+                  pp.check(materialRows, WALL_CAP_SUBCAT, v, row.vendor)
+                }}
                 options={[{ value: 'None', label: 'None' }, ...shown.map(t => ({ value: t, label: t }))]}
               />
               <NumInput
@@ -1459,6 +1530,9 @@ function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, ma
           + Add cap
         </button>
       </div>
+      {pp.prompt && (
+        <MissingPriceModal {...pp.prompt} onClose={pp.close} onSaved={refreshAllRates} />
+      )}
     </div>
   )
 }
@@ -1480,6 +1554,7 @@ function CmuWallEntry({
   finishHandlers,
   capHandlers,
 }) {
+  const pp = usePricePrompt()
   const set = field => val => onChange(idx, field, val)
   const hasData = n(wall.lf) > 0 && n(wall.heightIn) > 0
   // Catalog-driven Block Type: the selected vendor's "Wall Block" products.
@@ -1530,7 +1605,10 @@ function CmuWallEntry({
           <DropdownSelect
             className="input text-sm py-1.5 w-full"
             value={wall.blockType || ''}
-            onChange={v => set('blockType')(v)}
+            onChange={v => {
+              set('blockType')(v)
+              pp.checkById(materialRows, v, wall.vendor)
+            }}
             placeholder={blockOpts.length === 0 && !legacyBlock ? 'No block types for this vendor' : 'Select…'}
             options={[
               ...(legacyBlock
@@ -1718,6 +1796,9 @@ function CmuWallEntry({
         refreshAllRates={refreshAllRates}
         onWpUpdate={onWpUpdate}
       />
+      {pp.prompt && (
+        <MissingPriceModal {...pp.prompt} onClose={pp.close} onSaved={refreshAllRates} />
+      )}
     </div>
   )
 }
@@ -1889,6 +1970,7 @@ function ModularWallEntry({
   typeSource = { label: 'Block Type', master: false },
 }) {
   const set = field => val => onChange(idx, field, val)
+  const pp = usePricePrompt()
   return (
     <div className="border border-gray-200 rounded-xl p-3 mb-3 bg-white">
       <div className="flex items-center justify-between mb-2">
@@ -1944,7 +2026,10 @@ function ModularWallEntry({
                     <DropdownSelect
                       className="input text-sm py-1.5 w-full"
                       value={selRow?.id ?? ''}
-                      onChange={v => set('blockType')(v)}
+                      onChange={v => {
+                        set('blockType')(v)
+                        pp.checkById(materialRows, v, wall.vendor)
+                      }}
                       placeholder={opts.length === 0 ? 'No products — add one in Master Rates' : 'Select…'}
                       options={opts.map(o => ({
                         value: o.id,
@@ -2099,6 +2184,9 @@ function ModularWallEntry({
         refreshAllRates={refreshAllRates}
         onWpUpdate={onWpUpdate}
       />
+      {pp.prompt && (
+        <MissingPriceModal {...pp.prompt} onClose={pp.close} onSaved={refreshAllRates} />
+      )}
     </div>
   )
 }
