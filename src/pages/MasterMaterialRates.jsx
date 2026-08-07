@@ -163,22 +163,33 @@ export default function MasterMaterialRates() {
   }, [rows, sort])
 
   // ── Save a price (update the open row, or insert one for Standard) ─────────
+  // Updates local state in place so the new price shows instantly — no full
+  // table re-fetch / flicker.
   const savePrice = async r => {
     setSaving(true)
     const val = n(editing.value)
     if (r.priceId) {
       await supabase.from('material_price').update({ price: val }).eq('id', r.priceId)
+      setMaterials(ms =>
+        ms.map(m =>
+          m.id === r.m.id
+            ? { ...m, prices: (m.prices || []).map(p => (p.id === r.priceId ? { ...p, price: val } : p)) }
+            : m
+        )
+      )
     } else if (r.vendorId) {
-      await supabase.from('material_price').insert({
-        material_id: r.m.id,
-        vendor_id: r.vendorId,
-        price: val,
-        source: 'manual',
-      })
+      const { data } = await supabase
+        .from('material_price')
+        .insert({ material_id: r.m.id, vendor_id: r.vendorId, price: val, source: 'manual' })
+        .select('id, price, vendor_id, effective_end')
+        .single()
+      if (data)
+        setMaterials(ms =>
+          ms.map(m => (m.id === r.m.id ? { ...m, prices: [...(m.prices || []), data] } : m))
+        )
     }
     setEditing(null)
     setSaving(false)
-    load()
   }
 
   const setDefault = async m => {
