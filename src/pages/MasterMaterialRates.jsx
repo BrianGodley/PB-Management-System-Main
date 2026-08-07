@@ -35,6 +35,9 @@ export default function MasterMaterialRates() {
   const [editing, setEditing] = useState(null) // { priceId|null, materialId, vendorId, value }
   const [saving, setSaving] = useState(false)
   const [detail, setDetail] = useState(null) // row shown in the detail modal
+  const [sort, setSort] = useState({ key: 'description', dir: 'asc' })
+  const toggleSort = key =>
+    setSort(s => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }))
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -131,6 +134,33 @@ export default function MasterMaterialRates() {
     return out
   }, [materials, view, cat, q, standardVendorId, seqOf, vendorName])
 
+  // ── Sorting ────────────────────────────────────────────────────────────────
+  const sortVal = (r, key) => {
+    switch (key) {
+      case 'code': return r.code || ''
+      case 'vendor': return r.vName || ''
+      case 'category': return r.m.category?.name || ''
+      case 'subcat': return r.m.subcategory?.name || ''
+      case 'description': return r.m.description || ''
+      case 'unit': return r.m.unit || ''
+      case 'price': return r.price == null ? -Infinity : Number(r.price)
+      default: return ''
+    }
+  }
+  const sortedRows = useMemo(() => {
+    const arr = [...rows]
+    const { key, dir } = sort
+    arr.sort((a, b) => {
+      const av = sortVal(a, key)
+      const bv = sortVal(b, key)
+      let c
+      if (typeof av === 'number' && typeof bv === 'number') c = av - bv
+      else c = String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: 'base' })
+      return dir === 'asc' ? c : -c
+    })
+    return arr
+  }, [rows, sort])
+
   // ── Save a price (update the open row, or insert one for Standard) ─────────
   const savePrice = async r => {
     setSaving(true)
@@ -213,13 +243,13 @@ export default function MasterMaterialRates() {
           <table className="w-full text-xs min-w-[820px]">
             <thead className="sticky top-0 z-10">
               <tr className="bg-gray-50 border-b border-gray-200 text-left text-gray-600 uppercase">
-                <th className="px-3 py-2 font-semibold">Code</th>
-                {isVendorView && <th className="px-3 py-2 font-semibold">Vendor</th>}
-                <th className="px-3 py-2 font-semibold">Category</th>
-                <th className="px-3 py-2 font-semibold">Sub-Category</th>
-                <th className="px-3 py-2 font-semibold">Description</th>
-                <th className="px-3 py-2 font-semibold">Unit</th>
-                <th className="px-3 py-2 font-semibold text-right">Price</th>
+                <Th k="code" sort={sort} onSort={toggleSort}>Code</Th>
+                {isVendorView && <Th k="vendor" sort={sort} onSort={toggleSort}>Vendor</Th>}
+                <Th k="category" sort={sort} onSort={toggleSort}>Category</Th>
+                <Th k="subcat" sort={sort} onSort={toggleSort}>Sub-Category</Th>
+                <Th k="description" sort={sort} onSort={toggleSort}>Description</Th>
+                <Th k="unit" sort={sort} onSort={toggleSort}>Unit</Th>
+                <Th k="price" sort={sort} onSort={toggleSort} align="right">Price</Th>
                 {!isVendorView && <th className="px-3 py-2 font-semibold text-center">Default</th>}
                 <th className="px-3 py-2 w-20" />
               </tr>
@@ -238,7 +268,7 @@ export default function MasterMaterialRates() {
                   </td>
                 </tr>
               ) : (
-                rows.map(r => {
+                sortedRows.map(r => {
                   const isEd = editing && editing.key === r.key
                   return (
                     <tr key={r.key} className="hover:bg-gray-50 group">
@@ -341,5 +371,25 @@ export default function MasterMaterialRates() {
         />
       )}
     </div>
+  )
+}
+
+// Sortable header cell — click to sort, click again to flip direction.
+function Th({ k, sort, onSort, align = 'left', children }) {
+  const active = sort.key === k
+  return (
+    <th
+      onClick={() => onSort(k)}
+      className={`px-3 py-2 font-semibold cursor-pointer select-none hover:bg-gray-100 ${
+        align === 'right' ? 'text-right' : 'text-left'
+      }`}
+    >
+      <span className="inline-flex items-center gap-1">
+        {children}
+        <span className={active ? 'text-gray-700' : 'text-gray-300'}>
+          {active ? (sort.dir === 'asc' ? '▲' : '▼') : '↕'}
+        </span>
+      </span>
+    </th>
   )
 }
