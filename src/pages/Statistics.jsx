@@ -9104,16 +9104,21 @@ export default function Statistics() {
   const autoSelectedDefaultRef = useRef(false)
   useEffect(() => {
     if (autoSelectedDefaultRef.current) return
-    if (!defaultStatId) return
     if (selectedId) {
       autoSelectedDefaultRef.current = true
       return
     }
     if (!stats || stats.length === 0) return
-    const match = stats.find(s => String(s.id) === String(defaultStatId) && !s.archived)
-    if (match) {
+    // Prefer the user's starred default; otherwise always fall back to the
+    // first available graph so the module never opens with no graph in view.
+    // The user can star a different stat later (it persists in localStorage).
+    const starred = defaultStatId
+      ? stats.find(s => String(s.id) === String(defaultStatId) && !s.archived)
+      : null
+    const target = starred || stats.find(s => !s.archived)
+    if (target) {
       setOpenFolder('all')
-      setSelectedId(match.id)
+      setSelectedId(target.id)
     }
     autoSelectedDefaultRef.current = true
   }, [stats, defaultStatId, selectedId])
@@ -10626,10 +10631,8 @@ export default function Statistics() {
             )}
 
             {/* ── Desktop inline links ── */}
-            {/* Spacer pushes edit links flush with the left-panel / right-panel
-                divider on tablet+; on mobile we drop it so the buttons hug the
-                module title. */}
-            <div className="hidden md:block md:w-32 xl:w-40 flex-shrink-0" />
+            {/* Links sit flush-left with the same margin the "Add Statistic"
+                button has from the right edge (the bar's own px padding). */}
             {!['equation', 'overlay'].includes(selectedStat?.stat_category) && (
               <button
                 onClick={() => {
@@ -10685,13 +10688,13 @@ export default function Statistics() {
               key={m.id}
               onClick={() => setViewMode(m.id)}
               title={m.label}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold whitespace-nowrap flex-shrink-0 transition-colors ${
                 viewMode === m.id
                   ? 'bg-green-700 text-white'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
               }`}
             >
-              <span>{m.icon}</span>
+              <span className="text-base leading-none">{m.icon}</span>
               <span>{m.label}</span>
             </button>
           ))}
