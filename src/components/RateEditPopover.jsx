@@ -80,6 +80,9 @@ export default function RateEditPopover({
   //                        the input. Use for labor coefficients like
   //                        'min/cf' or 'hr/LF' where the value isn't dollars.
   mode = 'currency',
+  // When true, the edit control shows even if the global inline toggle is OFF.
+  // Used by the View Rates popup, which is always editable.
+  forceShow = false,
 }) {
   const field = valueField || DEFAULT_VALUE_FIELD[table] || 'unit_cost'
   const nameCol = NAME_COLUMN[table] || 'name'
@@ -320,9 +323,9 @@ export default function RateEditPopover({
     // the popover manually (Cancel button, X, Escape, or backdrop click).
   }
 
-  // Global toggle — when "Access/Edit Rates" is OFF, render nothing.
-  // The user flips it via the button in the GpmdBar at the top of each module.
-  if (!showRateIcons) return null
+  // Global toggle — when "Access/Edit Rates" is OFF, render nothing. The View
+  // Rates popup passes forceShow to stay editable regardless of the toggle.
+  if (!showRateIcons && !forceShow) return null
 
   return (
     <span ref={wrapRef} className="relative inline-flex items-center">

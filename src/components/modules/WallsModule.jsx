@@ -1,9 +1,9 @@
 import WorkTypeChooser from './WorkTypeChooser'
+import CrewTypeBar from './CrewTypeBar'
 import { useState, useEffect, useCallback, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
-import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
@@ -107,6 +107,75 @@ const WALL_RATES = {
   wpThoroseal: { db: 'Wall WP Thoroseal Roll On', fb: 1.5 },
   wpDimpleMembrane: { db: 'Wall WP Dimple Membrane', fb: 2.1 },
 }
+
+// Rate catalog for the "View Rates" popup. Each entry: [WALL_RATES key, label,
+// category, unit, mode]. mode 'coefficient' → labor_rates; else material_rates.
+const WALL_RATE_SPECS = [
+  {
+    group: 'Block & Structural',
+    items: [
+      ['greyBlock', 'Grey Block', 'Walls', 'ea', 'currency'],
+      ['bondbeamBlock', 'Bondbeam Block', 'Walls', 'ea', 'currency'],
+      ['rebar', 'Rebar', 'Basic Materials', 'LF', 'currency'],
+      ['concreteHand', 'Concrete — Hand Mix', 'Basic Materials', 'CY', 'currency'],
+      ['concreteTruck', 'Concrete — Ready Mix (Truck)', 'Basic Materials', 'CY', 'currency'],
+      ['groutPumpSetup', 'Grout Pump — Setup', 'Basic Materials', 'flat', 'currency'],
+      ['groutPumpPerYd', 'Grout Pump — Per CY', 'Basic Materials', 'CY', 'currency'],
+    ],
+  },
+  {
+    group: 'Labor',
+    items: [
+      ['digLab', 'Dig Footing', 'Walls', 'CF/hr', 'coefficient'],
+      ['rebarLab', 'Set Rebar', 'Walls', 'LF/hr', 'coefficient'],
+      ['blockLab', 'Set Block', 'Walls', 'blk/hr', 'coefficient'],
+      ['handGroutLab', 'Hand Grout', 'Walls', 'CF/hr', 'coefficient'],
+      ['pumpGroutLab', 'Pump Grout', 'Walls', 'CF/hr', 'coefficient'],
+      ['setupCleanLab', 'Setup / Clean', 'Walls', 'LF/hr', 'coefficient'],
+    ],
+  },
+  {
+    group: 'Finishes — Material',
+    items: [
+      ['sandStucco', 'Sand Stucco', 'Walls', 'SF', 'currency'],
+      ['smoothStucco', 'Smooth Stucco', 'Walls', 'SF', 'currency'],
+      ['ledgerstone', 'Ledgerstone', 'Walls', 'SF', 'currency'],
+      ['stackedStone', 'Stacked Stone', 'Walls', 'SF', 'currency'],
+      ['tile', 'Tile', 'Walls', 'SF', 'currency'],
+      ['flagstone', 'Real Flagstone', 'Walls', 'ton', 'currency'],
+      ['realStone', 'Real Stone', 'Walls', 'ton', 'currency'],
+    ],
+  },
+  {
+    group: 'Finishes — Labor',
+    items: [
+      ['sandStuccoLab', 'Sand Stucco Labor', 'Walls', 'SF/day', 'coefficient'],
+      ['smoothStuccoLab', 'Smooth Stucco Labor', 'Walls', 'SF/day', 'coefficient'],
+      ['ledgerstoneLab', 'Ledgerstone Labor', 'Walls', 'SF/day', 'coefficient'],
+      ['stackedStoneLab', 'Stacked Stone Labor', 'Walls', 'SF/day', 'coefficient'],
+      ['tileLab', 'Tile Labor', 'Walls', 'hrs/SF', 'coefficient'],
+      ['flagstoneLab', 'Real Flagstone Labor', 'Walls', 'hrs/SF', 'coefficient'],
+      ['realStoneLab', 'Real Stone Labor', 'Walls', 'hrs/SF', 'coefficient'],
+    ],
+  },
+  {
+    group: 'Caps',
+    items: [
+      ['capFlagstone', 'Cap — Flagstone', 'Walls', 'ton', 'currency'],
+      ['capPrecast', 'Cap — Precast', 'Walls', 'ea', 'currency'],
+      ['capBullnose', 'Cap — Bullnose Brick', 'Walls', 'LF', 'currency'],
+    ],
+  },
+  {
+    group: 'Waterproofing',
+    items: [
+      ['wpPrimerMembrane', 'Primer & Membrane', 'Walls', 'SF', 'currency'],
+      ['wp3CoatRollOn', '3 Coats Roll On', 'Walls', 'SF', 'currency'],
+      ['wpThoroseal', 'Thoroseal & Roll On', 'Walls', 'SF', 'currency'],
+      ['wpDimpleMembrane', 'Dimple Membrane', 'Walls', 'SF', 'currency'],
+    ],
+  },
+]
 
 const DEFAULTS = { laborRatePerHour: 35, laborBurdenPct: 0.29, gpmd: 425, commissionRate: 0.12 }
 const n = v => parseFloat(v) || 0
@@ -1054,7 +1123,6 @@ function WallWaterproofing({
         {row.type !== 'None' && <span className="text-xs text-gray-400 shrink-0">SF</span>}
         {row.type !== 'None' && wpKey && (
           <span className="inline-flex items-center gap-1 text-xs text-gray-400">
-            ${wallMatPrice(WALL_RATES[wpKey].db, row.vendor, materialRows, materialPrices, WALL_RATES[wpKey].fb).toFixed(2)}/SF
             <RateEditPopover
               table="material_rates"
               name={WALL_RATES[wpKey].db}
@@ -1358,7 +1426,6 @@ function WallCapsEditor({
                   <td className="py-1.5 pr-2">
                     {isActive && capMatKey ? (
                       <span className="inline-flex items-center gap-1 text-xs text-gray-400">
-                        ${wallMatPrice(WALL_RATES[capMatKey].db, row.vendor, materialRows, materialPrices, WALL_RATES[capMatKey].fb).toFixed(2)}/{capUnit}
                         <RateEditPopover
                           table="material_rates"
                           name={WALL_RATES[capMatKey].db}
@@ -1499,9 +1566,6 @@ function CmuWallEntry({
             const housePrice = materialPrices?.[wallBlockRateName(b.name)] ?? b.price
             return (
               <div className="mt-1 flex items-center gap-1 text-[11px] text-gray-500">
-                <span>
-                  Price: <strong className="text-gray-800">${price.toFixed(2)}</strong>/ea
-                </span>
                 <RateEditPopover
                   table="material_rates"
                   name={wallBlockRateName(b.name)}
@@ -1875,9 +1939,6 @@ function ModularWallEntry({
                     </select>
                     {selRow && (
                       <div className="mt-1 flex items-center gap-1 text-[11px] text-gray-500">
-                        <span>
-                          Price: <strong className="text-gray-800">${price.toFixed(2)}</strong>/ea
-                        </span>
                         <RateEditPopover
                           table="material_rates"
                           name={selRow.name}
@@ -1915,9 +1976,6 @@ function ModularWallEntry({
                       ))}
                     </select>
                     <div className="mt-1 flex items-center gap-1 text-[11px] text-gray-500">
-                      <span>
-                        Price: <strong className="text-gray-800">${price.toFixed(2)}</strong>/ea
-                      </span>
                       <RateEditPopover
                         table="material_rates"
                         name={wallBlockRateName(b.name)}
@@ -2265,6 +2323,34 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
 
   const r = key => materialPrices[WALL_RATES[key].db] ?? WALL_RATES[key].fb
 
+  // Full rate list for the "View Rates" popup (every field's rate, editable).
+  const wallRateList = [
+    {
+      group: 'Block Types',
+      items: CMU_BLOCK_TYPES.map(b => ({
+        label: `${b.name} (${b.w}×${b.h}×${b.l})`,
+        table: 'material_rates',
+        name: wallBlockRateName(b.name),
+        category: 'Walls',
+        unitLabel: 'ea',
+        mode: 'currency',
+        value: materialPrices[wallBlockRateName(b.name)] ?? b.price,
+      })),
+    },
+    ...WALL_RATE_SPECS.map(g => ({
+      group: g.group,
+      items: g.items.map(([key, label, category, unit, mode]) => ({
+        label,
+        table: mode === 'coefficient' ? 'labor_rates' : 'material_rates',
+        name: WALL_RATES[key].db,
+        category,
+        unitLabel: unit,
+        mode,
+        value: r(key),
+      })),
+    })),
+  ]
+
   // ── Vendor helpers ──────────────────────────────────────────────────────────
   const vendorOptions = vendorOptionsForCategory(WALLS_CATEGORY)
   // Modular Wall vendors — derived from the products themselves (reclassified
@@ -2358,29 +2444,16 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
         />
             </div>
 
-      {/* Notes — pinned in its own sticky container just below the
-          GPMD bar. Plain white textarea, no card chrome. */}
-      <div className="sticky top-[56px] z-10 -mx-6 px-6 pt-2 pb-2 mt-2 bg-transparent">
-        <ModuleNotesField value={notes} onChange={setNotes} />
-      </div>
 
       <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} />
 
-      {/* Crew Type */}
-      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select
-          value={crewType}
-          onChange={e => setCrewType(e.target.value)}
-          className="input text-sm py-1 w-36"
-        >
-          <option value="Demo">Demo</option>
-          <option value="Landscape">Landscape</option>
-          <option value="Masonry">Masonry</option>
-          <option value="Paver">Paver</option>
-          <option value="Specialty">Specialty</option>
-        </select>
-      </div>
+      <CrewTypeBar
+        crewType={crewType}
+        onCrewTypeChange={setCrewType}
+        title="Walls"
+        rates={wallRateList}
+        refreshAllRates={refreshAllRates}
+      />
 
       {/* Wall Type */}
       <div>

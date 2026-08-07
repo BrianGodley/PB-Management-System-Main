@@ -4,7 +4,6 @@ import { SubTabContext, subSectionTitle } from './subTabContext'
 import { createPortal } from 'react-dom'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
-import ModuleNotesField from './ModuleNotesField'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import {
@@ -1039,9 +1038,6 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         />
       </div>
 
-      <div className="sticky top-[56px] z-10 -mx-6 px-6 pt-2 pb-2 mt-2 bg-transparent">
-        <ModuleNotesField value={notes} onChange={setNotes} />
-      </div>
 
       <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} />
 

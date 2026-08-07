@@ -20,7 +20,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
-import ModuleNotesField from './ModuleNotesField'
 import WorkTypeChooser from './WorkTypeChooser'
 import RateEditPopover from '../RateEditPopover'
 
@@ -208,7 +207,6 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
         onGpmdSave={v => setGpmd(v)}
       />
 
-      <ModuleNotesField value={notes} onChange={setNotes} />
 
       {/* In-House vs Subcontractor */}
       <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} />

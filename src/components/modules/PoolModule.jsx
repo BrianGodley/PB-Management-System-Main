@@ -3,7 +3,6 @@ import { useState, useEffect, useCallback, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
-import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
 import { SubRateOverrideProvider } from '../SubRateOverrideContext.jsx'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
@@ -1217,11 +1216,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         />
             </div>
 
-      {/* Notes — pinned in its own sticky container just below the
-          GPMD bar. Plain white textarea, no card chrome. */}
-      <div className="sticky top-[56px] z-10 -mx-6 px-6 pt-2 pb-2 mt-2 bg-transparent">
-        <ModuleNotesField value={notes} onChange={setNotes} />
-      </div>
 
       <WorkTypeChooser value={state.subType || 'In-House'} onChange={v => updShared('subType', v)} />
 
