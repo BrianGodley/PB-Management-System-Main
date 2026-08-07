@@ -1253,10 +1253,11 @@ function WallWaterproofing({
     row.type && row.type !== 'None'
       ? catalogItemPrice(materialRows, WALL_WP_SUBCAT, row.type, row.vendor, wpKey ? WALL_RATES[wpKey].fb : 0)
       : 0
-  // Vendor-catalog-driven type list (the selected vendor's Waterproofing products).
-  const wpOpts = wallCatalogTypes(materialRows, WALL_WP_SUBCAT, row.vendor)
-  const wpShown =
-    row.type && row.type !== 'None' && !wpOpts.includes(row.type) ? [row.type, ...wpOpts] : wpOpts
+  // Built-in waterproofing types the calc supports + any real Waterproofing
+  // catalog products for the vendor; stale/phantom values are dropped.
+  const wpBase = WP_TYPES.filter(t => t !== 'None')
+  const wpCatalog = wallCatalogTypes(materialRows, WALL_WP_SUBCAT, row.vendor)
+  const wpShown = [...wpBase, ...wpCatalog.filter(t => !wpBase.includes(t))]
   return (
     <div className="mt-3 border-t border-gray-100 pt-2">
       <label className="block text-xs text-gray-500 mb-1 font-medium">Waterproofing</label>
@@ -1337,11 +1338,11 @@ function WallFinishesEditor({
       <label className="block text-xs text-gray-500 mb-1 font-medium">Finishes</label>
       <div className="space-y-1.5">
         {rows.map((row, i) => {
-          const opts = wallCatalogTypes(materialRows, WALL_FINISH_SUBCAT, row.vendor)
-          const shown =
-            row.type && row.type !== 'None' && !opts.includes(row.type)
-              ? [row.type, ...opts]
-              : opts
+          // Item list = the built-in finish types the calc supports, plus any
+          // real Wall Finish catalog products for the selected vendor. Stale
+          // saved values that are neither are dropped (not surfaced as phantoms).
+          const catalog = wallCatalogTypes(materialRows, WALL_FINISH_SUBCAT, row.vendor)
+          const shown = [...WALL_FINISH_TYPES, ...catalog.filter(t => !WALL_FINISH_TYPES.includes(t))]
           return (
             <div key={i} className="flex items-center gap-1.5">
               <DropdownSelect
@@ -1394,11 +1395,11 @@ function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, ma
       <label className="block text-xs text-gray-500 mb-1 font-medium">Caps</label>
       <div className="space-y-1.5">
         {rows.map((row, i) => {
-          const opts = wallCatalogTypes(materialRows, WALL_CAP_SUBCAT, row.vendor)
-          const shown =
-            row.type && row.type !== 'None' && !opts.includes(row.type)
-              ? [row.type, ...opts]
-              : opts
+          // Built-in cap types the calc supports + any real Wall Cap catalog
+          // products for the vendor; stale/phantom values are dropped.
+          const capBase = CAP_TYPES.filter(t => t !== 'None')
+          const catalog = wallCatalogTypes(materialRows, WALL_CAP_SUBCAT, row.vendor)
+          const shown = [...capBase, ...catalog.filter(t => !capBase.includes(t))]
           const qtyLabel = row.type === 'Precast' ? 'Qty' : 'LF'
           return (
             <div key={i} className="flex items-center gap-1.5">
