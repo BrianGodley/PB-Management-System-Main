@@ -195,6 +195,7 @@ const DEFAULT_CMU = () => ({
   bondBeams: '1',
   pctGrouted: '100',
   pctCurved: '0',
+  footingPump: 'No',
   subEach: '',
   wpRows: [blankWpRow()],
   finishRows: [],
@@ -207,6 +208,7 @@ const DEFAULT_PIP = () => ({
   footingWIn: '12',
   footingDIn: '12',
   horizBars: '2',
+  footingPump: 'Yes',
   subEach: '',
   wpRows: [blankWpRow()],
   finishRows: [],
@@ -224,6 +226,7 @@ const DEFAULT_MODULAR = () => ({
   footingWIn: '12',
   footingDIn: '12',
   pctCurved: '0',
+  footingPump: 'No',
   subEach: '',
   wpRows: [blankWpRow()],
   finishRows: [],
@@ -239,6 +242,7 @@ const DEFAULT_BRICK = () => ({
   footingWIn: '12',
   footingDIn: '12',
   pctCurved: '0',
+  footingPump: 'No',
   subEach: '',
   wpRows: [blankWpRow()],
   finishRows: [],
@@ -625,7 +629,10 @@ function calcOnePIP(wall, r, mp = {}, materialRows = []) {
     (footingCF > 0 ? footingCF / r('digLab') : 0) +
     (horizRebarLF > 0 ? horizRebarLF / r('rebarLab') : 0) +
     (footingCY > 0 ? footingCY / 0.2037 : 0)
-  const footingMat = footingCY * pm('concreteTruck') + horizRebarLF * pm('rebar')
+  // Per-wall footing pump: 'Yes' = ready-mix truck (default, unchanged), 'No' =
+  // hand mix. No separate pump-setup fee on PIP footings.
+  const footPrc = (wall.footingPump ?? 'Yes') === 'Yes' ? pm('concreteTruck') : pm('concreteHand')
+  const footingMat = footingCY * footPrc + horizRebarLF * pm('rebar')
 
   const hrs = wallHrs + footingHrs
   const concCY = wallConcCY + footingCY
@@ -674,7 +681,7 @@ function calcWalls(
   // own array and gets summed below. Vendor only changes the material $;
   // In-House labor / geometry is unchanged.
   ;(state.cmuWalls || []).forEach(wall => {
-    const res = calcOneCMU(wall, state.cmuFootingPump, state.cmuGroutPump, r, mp, materialRows)
+    const res = calcOneCMU(wall, wall.footingPump ?? 'No', state.cmuGroutPump, r, mp, materialRows)
     structuralHrs += res.hrs
     structuralMat += res.mat
     structuralSubMat += res.subMat
@@ -690,7 +697,7 @@ function calcWalls(
     pipDetails.push({ ...res, lf: wall.lf, heightIn: wall.heightIn })
   })
   ;(state.modularWalls || []).forEach(wall => {
-    const res = calcOneModular(wall, state.modularFootingPump, r, mp, materialRows, MODULAR_SUBCAT)
+    const res = calcOneModular(wall, wall.footingPump ?? 'No', r, mp, materialRows, MODULAR_SUBCAT)
     structuralHrs += res.hrs
     structuralMat += res.mat
     structuralSubMat += res.subMat
@@ -698,7 +705,7 @@ function calcWalls(
     modularDetails.push(res.detail)
   })
   ;(state.brickWalls || []).forEach(wall => {
-    const res = calcOneModular(wall, state.brickFootingPump, r, mp, materialRows)
+    const res = calcOneModular(wall, wall.footingPump ?? 'No', r, mp, materialRows)
     structuralHrs += res.hrs
     structuralMat += res.mat
     structuralSubMat += res.subMat
@@ -900,12 +907,16 @@ function initWallExtras(w = {}) {
   }
 }
 function initCmuWalls(src = {}) {
+  // Footing pump is now per-wall; legacy estimates carried one module-level
+  // value (cmuFootingPump) — inherit it onto each wall so totals don't move.
+  const legacyPump = src.cmuFootingPump ?? 'No'
   if (src.cmuWalls)
     return src.cmuWalls.map(w => ({
       blockType: DEFAULT_BLOCK_NAME,
       vendor: 'House',
       subEach: '',
       ...w,
+      footingPump: w.footingPump ?? legacyPump,
       wpRows: initWallWp(w),
       ...initWallExtras(w),
     }))
@@ -923,6 +934,7 @@ function initCmuWalls(src = {}) {
         bondBeams: src.cmuBondBeams ?? '1',
         pctGrouted: src.cmuPctGrouted ?? '100',
         pctCurved: src.cmuPctCurved ?? '0',
+        footingPump: legacyPump,
         subEach: '',
         wpRows: [blankWpRow()],
         finishRows: [],
@@ -932,11 +944,14 @@ function initCmuWalls(src = {}) {
   return [DEFAULT_CMU()]
 }
 function initPipWalls(src = {}) {
+  // PIP footing pumped by default ('Yes' = ready-mix truck, matching the prior
+  // always-truck behavior); the per-wall toggle can switch to hand mix.
   if (src.pipWalls)
     return src.pipWalls.map(w => ({
       vendor: 'House',
       subEach: '',
       ...w,
+      footingPump: w.footingPump ?? 'Yes',
       wpRows: initWallWp(w),
       ...initWallExtras(w),
     }))
@@ -946,6 +961,7 @@ function initPipWalls(src = {}) {
         vendor: 'House',
         lf: src.pipLF,
         heightIn: src.pipHeightIn,
+        footingPump: 'Yes',
         subEach: '',
         wpRows: [blankWpRow()],
         finishRows: [],
@@ -955,24 +971,28 @@ function initPipWalls(src = {}) {
   return [DEFAULT_PIP()]
 }
 function initModularWalls(src = {}) {
+  const legacyPump = src.modularFootingPump ?? 'No'
   if (src.modularWalls)
     return src.modularWalls.map(w => ({
       blockType: DEFAULT_BLOCK_NAME,
       vendor: 'House',
       subEach: '',
       ...w,
+      footingPump: w.footingPump ?? legacyPump,
       wpRows: initWallWp(w),
       ...initWallExtras(w),
     }))
   return [DEFAULT_MODULAR()]
 }
 function initBrickWalls(src = {}) {
+  const legacyPump = src.brickFootingPump ?? 'No'
   if (src.brickWalls)
     return src.brickWalls.map(w => ({
       blockType: DEFAULT_BLOCK_NAME,
       vendor: 'House',
       subEach: '',
       ...w,
+      footingPump: w.footingPump ?? legacyPump,
       wpRows: initWallWp(w),
       ...initWallExtras(w),
     }))
@@ -1624,6 +1644,17 @@ function CmuWallEntry({
             </span>
           </div>
         </div>
+        <div className="col-span-2 sm:col-span-1">
+          <label className="block text-xs text-gray-500 mb-1">Pump for Footing?</label>
+          <select
+            className="input text-sm py-1.5 w-full"
+            value={wall.footingPump || 'No'}
+            onChange={e => set('footingPump')(e.target.value)}
+          >
+            <option>No</option>
+            <option>Yes</option>
+          </select>
+        </div>
       </div>
       {hasData && detail && (
         <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 text-xs text-gray-600 flex flex-wrap gap-3">
@@ -1767,6 +1798,17 @@ function PipWallEntry({
         <div className="col-span-2 sm:col-span-1">
           <label className="block text-xs text-gray-500 mb-1">Horiz. Bars in Footing</label>
           <NumInput value={wall.horizBars} onChange={set('horizBars')} placeholder="2" />
+        </div>
+        <div className="col-span-2 sm:col-span-1">
+          <label className="block text-xs text-gray-500 mb-1">Pump for Footing?</label>
+          <select
+            className="input text-sm py-1.5 w-full"
+            value={wall.footingPump || 'Yes'}
+            onChange={e => set('footingPump')(e.target.value)}
+          >
+            <option>No</option>
+            <option>Yes</option>
+          </select>
         </div>
       </div>
       {hasData && detail && (
@@ -2011,6 +2053,17 @@ function ModularWallEntry({
             <NumInput value={wall.pctCurved} onChange={set('pctCurved')} placeholder="0" />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
           </div>
+        </div>
+        <div className="col-span-2 sm:col-span-1">
+          <label className="block text-xs text-gray-500 mb-1">Pump for Footing?</label>
+          <select
+            className="input text-sm py-1.5 w-full"
+            value={wall.footingPump || 'No'}
+            onChange={e => set('footingPump')(e.target.value)}
+          >
+            <option>No</option>
+            <option>Yes</option>
+          </select>
         </div>
       </div>
       {detail && (n(wall.lf) > 0 && n(wall.heightIn) > 0) && (
@@ -2577,22 +2630,10 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
             + Add Another CMU Wall
           </button>
 
-          {/* Module-level pump options */}
+          {/* Grout pump applies to grouting block for all walls. (Footing pump
+              is now set per wall in each Wall entry above.) */}
           <div className="border border-gray-200 rounded-xl p-3 bg-gray-50 space-y-0 mb-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              Pump Options (all walls)
-            </p>
-            <LabeledRow label="Pump for Pouring Footing?">
-              <select
-                className="input text-sm py-1.5 w-24"
-                value={cmuFootingPump}
-                onChange={e => setCmuFootingPump(e.target.value)}
-              >
-                <option>No</option>
-                <option>Yes</option>
-              </select>
-            </LabeledRow>
-            <LabeledRow label="Pump for Grouting Block?">
+            <LabeledRow label="Pump for Grouting Block? (all walls)">
               <select
                 className="input text-sm py-1.5 w-24"
                 value={cmuGroutPump}
@@ -2603,7 +2644,6 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
               </select>
             </LabeledRow>
           </div>
-          {/* Waterproofing is now specified per wall — see each Wall entry above. */}
         </div>
       )}
 
@@ -2674,24 +2714,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
             + Add Another Modular Wall
           </button>
 
-          {/* Module-level pump options — footing only (no grouting for modular). */}
-          <div className="border border-gray-200 rounded-xl p-3 bg-gray-50 space-y-0 mb-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              Pump Options (all walls)
-            </p>
-            <LabeledRow label="Pump for Pouring Footing?">
-              <select
-                className="input text-sm py-1.5 w-24"
-                value={modularFootingPump}
-                onChange={e => setModularFootingPump(e.target.value)}
-              >
-                <option>No</option>
-                <option>Yes</option>
-              </select>
-            </LabeledRow>
-          </div>
-          {/* Waterproofing + wall caps: waterproofing is per wall above; caps
-              are shown in the shared Wall Caps section below. */}
+          {/* Footing pump is now set per wall in each Wall entry above. */}
         </div>
       )}
 
@@ -2727,22 +2750,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
             + Add Another Brick Wall
           </button>
 
-          {/* Module-level pump options — footing only. */}
-          <div className="border border-gray-200 rounded-xl p-3 bg-gray-50 space-y-0 mb-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              Pump Options (all walls)
-            </p>
-            <LabeledRow label="Pump for Pouring Footing?">
-              <select
-                className="input text-sm py-1.5 w-24"
-                value={brickFootingPump}
-                onChange={e => setBrickFootingPump(e.target.value)}
-              >
-                <option>No</option>
-                <option>Yes</option>
-              </select>
-            </LabeledRow>
-          </div>
+          {/* Footing pump is now set per wall in each Wall entry above. */}
         </div>
       )}
 
