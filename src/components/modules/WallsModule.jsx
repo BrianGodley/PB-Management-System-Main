@@ -1033,12 +1033,16 @@ function initWallWp(w = {}) {
   const firstReal = rows.find(r => r.type && r.type !== 'None')
   return [firstReal || rows[0]]
 }
-// Per-wall Finishes / Caps — normalized copies (default empty).
+// Per-wall Finishes / Caps — normalized copies. Default to ONE neutral row so
+// every wall opens with an empty Finishes + Caps line the user can fill or leave.
 function initWallExtras(w = {}) {
-  return {
-    finishRows: Array.isArray(w.finishRows) ? w.finishRows.map(r => ({ ...r })) : [],
-    capRows: Array.isArray(w.capRows) ? w.capRows.map(r => ({ vendor: 'House', subEach: '', ...r })) : [],
-  }
+  const fin = Array.isArray(w.finishRows) && w.finishRows.length
+    ? w.finishRows.map(r => ({ ...r }))
+    : [{ ...blankWallFinishRow(), type: 'None' }]
+  const cap = Array.isArray(w.capRows) && w.capRows.length
+    ? w.capRows.map(r => ({ vendor: 'House', subEach: '', ...r }))
+    : [blankCapRow()]
+  return { finishRows: fin, capRows: cap }
 }
 function initCmuWalls(src = {}) {
   // Footing + grout pumps are now per-wall; legacy estimates carried module-level
@@ -1075,8 +1079,8 @@ function initCmuWalls(src = {}) {
         groutPump: legacyGrout,
         subEach: '',
         wpRows: [blankWpRow()],
-        finishRows: [],
-        capRows: [],
+        finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
+        capRows: [blankCapRow()],
       },
     ]
   return [DEFAULT_CMU()]
@@ -1102,8 +1106,8 @@ function initPipWalls(src = {}) {
         footingPump: 'Yes',
         subEach: '',
         wpRows: [blankWpRow()],
-        finishRows: [],
-        capRows: [],
+        finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
+        capRows: [blankCapRow()],
       },
     ]
   return [DEFAULT_PIP()]
