@@ -1561,6 +1561,23 @@ function CmuWallEntry({
 }) {
   const set = field => val => onChange(idx, field, val)
   const hasData = n(wall.lf) > 0 && n(wall.heightIn) > 0
+  // Block Type availability follows the selected vendor: a block is offered only
+  // when the catalog has a "Wall Block <name>" row for that vendor (Standard =
+  // the null-vendor rows). The currently-selected block stays visible so saved
+  // estimates never lose their choice.
+  const blocksForVendor = vsel =>
+    CMU_BLOCK_TYPES.filter(b => {
+      const nm = wallBlockRateName(b.name)
+      return !vsel || vsel === 'House'
+        ? (materialRows || []).some(r => r.name === nm && r.vendor_id == null)
+        : (materialRows || []).some(r => r.name === nm && r.vendor_id === vsel)
+    })
+  const availableBlocks = blocksForVendor(wall.vendor)
+  const currentBlock = CMU_BLOCK_TYPES.find(b => b.name === wall.blockType)
+  const blockOptions =
+    currentBlock && !availableBlocks.some(b => b.name === currentBlock.name)
+      ? [currentBlock, ...availableBlocks]
+      : availableBlocks
   return (
     <div className="border border-gray-200 rounded-xl p-3 mb-3 bg-white">
       <div className="flex items-center justify-between mb-2">
@@ -1584,7 +1601,14 @@ function CmuWallEntry({
           <select
             className="input text-sm py-1.5 w-full"
             value={wall.vendor || 'House'}
-            onChange={e => set('vendor')(e.target.value)}
+            onChange={e => {
+              const nv = e.target.value
+              set('vendor')(nv)
+              // Point Block Type at a block this vendor actually offers.
+              const opts = blocksForVendor(nv)
+              if (opts.length && !opts.some(b => b.name === wall.blockType))
+                set('blockType')(opts[0].name)
+            }}
           >
             {(vendorOptions || [{ value: 'House', label: 'Standard' }]).map(o => (
               <option key={o.value} value={o.value}>
@@ -1594,7 +1618,7 @@ function CmuWallEntry({
           </select>
         </div>
         {/* Block Type — drives dimensions (W/H/L) AND the per-block price.
-            Mirrors cell E8 of the legacy Estimator Master's Walls sheet. */}
+            Only shows blocks the selected vendor offers in the catalog. */}
         <div className="col-span-2">
           <label className="block text-xs text-gray-500 mb-1">Block Type</label>
           <select
@@ -1602,7 +1626,10 @@ function CmuWallEntry({
             value={wall.blockType || ''}
             onChange={e => set('blockType')(e.target.value)}
           >
-            {CMU_BLOCK_TYPES.map(b => (
+            {blockOptions.length === 0 && (
+              <option value="">No block types for this vendor</option>
+            )}
+            {blockOptions.map(b => (
               <option key={b.name} value={b.name}>
                 {b.name} — {b.w}×{b.h}×{b.l}
               </option>
