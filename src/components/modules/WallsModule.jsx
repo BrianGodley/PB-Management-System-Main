@@ -107,6 +107,13 @@ const WALL_RATES = {
   wp3CoatRollOn: { db: 'Wall WP 3 Coat Roll On', fb: 1.2 },
   wpThoroseal: { db: 'Wall WP Thoroseal Roll On', fb: 1.5 },
   wpDimpleMembrane: { db: 'Wall WP Dimple Membrane', fb: 2.1 },
+  // Cap + waterproofing install labor (editable; fallbacks = the original
+  // hard-coded coefficients so totals don't move until a rate is changed).
+  capFlagstoneLab: { db: 'Wall Cap Flagstone Labor', fb: 0.25 }, // hr/LF
+  capPrecastLab: { db: 'Wall Cap Precast Labor', fb: 0.2 }, // hr/ea
+  capPipLab: { db: 'Wall Cap PIP Concrete Labor', fb: 0.15 }, // hr/LF
+  capBullnoseLab: { db: 'Wall Cap Bullnose Labor', fb: 0.08 }, // hr/LF
+  wpLabor: { db: 'Wall WP Install Labor', fb: 200 }, // SF/hr
 }
 
 // Rate catalog for the "View Rates" popup, BROKEN DOWN BY WALL TYPE. Each item:
@@ -116,7 +123,7 @@ const WALL_RATES = {
 const WALL_RATE_SPECS = [
   {
     group: 'CMU Block',
-    blocks: true,
+    catalogSubcat: 'Wall Block',
     items: [
       ['greyBlock', 'Grey Block', 'Walls', 'ea', 'currency'],
       ['bondbeamBlock', 'Bondbeam Block', 'Walls', 'ea', 'currency'],
@@ -145,6 +152,7 @@ const WALL_RATE_SPECS = [
   },
   {
     group: 'Modular',
+    catalogSubcat: 'Modular Wall',
     items: [
       ['concreteHand', 'Footing Concrete — Hand Mix', 'Basic Materials', 'CY', 'currency'],
       ['concreteTruck', 'Footing Concrete — Ready Mix', 'Basic Materials', 'CY', 'currency'],
@@ -153,11 +161,10 @@ const WALL_RATE_SPECS = [
       ['blockLab', 'Set Block', 'Walls', 'blk/hr', 'coefficient'],
       ['setupCleanLab', 'Setup / Clean', 'Walls', 'LF/hr', 'coefficient'],
     ],
-    note: 'Modular Wall product prices come from the vendor catalog (edit via the Wall Type picker).',
   },
   {
     group: 'Brick',
-    blocks: true,
+    catalogSubcat: 'Wall Block',
     items: [
       ['concreteHand', 'Footing Concrete — Hand Mix', 'Basic Materials', 'CY', 'currency'],
       ['concreteTruck', 'Footing Concrete — Ready Mix', 'Basic Materials', 'CY', 'currency'],
@@ -168,7 +175,7 @@ const WALL_RATE_SPECS = [
     ],
   },
   {
-    group: 'Finishes — Material (all wall types)',
+    group: 'Finishes (all wall types)',
     items: [
       ['sandStucco', 'Sand Stucco', 'Walls', 'SF', 'currency'],
       ['smoothStucco', 'Smooth Stucco', 'Walls', 'SF', 'currency'],
@@ -177,11 +184,6 @@ const WALL_RATE_SPECS = [
       ['tile', 'Tile', 'Walls', 'SF', 'currency'],
       ['flagstone', 'Real Flagstone', 'Walls', 'ton', 'currency'],
       ['realStone', 'Real Stone', 'Walls', 'ton', 'currency'],
-    ],
-  },
-  {
-    group: 'Finishes — Labor (all wall types)',
-    items: [
       ['sandStuccoLab', 'Sand Stucco Labor', 'Walls', 'SF/day', 'coefficient'],
       ['smoothStuccoLab', 'Smooth Stucco Labor', 'Walls', 'SF/day', 'coefficient'],
       ['ledgerstoneLab', 'Ledgerstone Labor', 'Walls', 'SF/day', 'coefficient'],
@@ -197,6 +199,10 @@ const WALL_RATE_SPECS = [
       ['capFlagstone', 'Cap — Flagstone', 'Walls', 'ton', 'currency'],
       ['capPrecast', 'Cap — Precast', 'Walls', 'ea', 'currency'],
       ['capBullnose', 'Cap — Bullnose Brick', 'Walls', 'LF', 'currency'],
+      ['capFlagstoneLab', 'Flagstone Labor', 'Walls', 'hr/LF', 'coefficient'],
+      ['capPrecastLab', 'Precast Labor', 'Walls', 'hr/ea', 'coefficient'],
+      ['capPipLab', 'PIP Concrete Labor', 'Walls', 'hr/LF', 'coefficient'],
+      ['capBullnoseLab', 'Bullnose Labor', 'Walls', 'hr/LF', 'coefficient'],
     ],
   },
   {
@@ -206,6 +212,7 @@ const WALL_RATE_SPECS = [
       ['wp3CoatRollOn', '3 Coats Roll On', 'Walls', 'SF', 'currency'],
       ['wpThoroseal', 'Thoroseal & Roll On', 'Walls', 'SF', 'currency'],
       ['wpDimpleMembrane', 'Dimple Membrane', 'Walls', 'SF', 'currency'],
+      ['wpLabor', 'Install Labor', 'Walls', 'SF/hr', 'coefficient'],
     ],
   },
 ]
@@ -426,6 +433,7 @@ function computeCapRow(row, mp, materialRows) {
     qty = n(row.qty)
   const v = row.vendor
   const price = k => wallMatPrice(WALL_RATES[k].db, v, materialRows, mp, WALL_RATES[k].fb)
+  const lab = k => mp?.[WALL_RATES[k].db] ?? WALL_RATES[k].fb
   let mat = 0,
     hrs = 0,
     subUnit = 0,
@@ -435,14 +443,14 @@ function computeCapRow(row, mp, materialRows) {
   switch (row.type) {
     case 'Flagstone':
       mat = (((widthIn / 12) * lf * 0.0833 * 100) / 2000) * price('capFlagstone')
-      hrs = lf * 0.25
+      hrs = lf * lab('capFlagstoneLab')
       subUnit = (((widthIn / 12) * 0.0833 * 100) / 2000) * price('capFlagstone')
       subQty = lf
       break
     case 'Precast': {
       const widthFactor = (widthIn || 8) / 8
       mat = qty * price('capPrecast') * widthFactor
-      hrs = qty * 0.2
+      hrs = qty * lab('capPrecastLab')
       subUnit = price('capPrecast') * widthFactor
       subQty = qty
       unit = 'ea'
@@ -451,13 +459,13 @@ function computeCapRow(row, mp, materialRows) {
     }
     case 'PIP Concrete':
       mat = ((lf * (widthIn / 12) * 0.333) / 27) * price('concreteTruck')
-      hrs = lf * 0.15
+      hrs = lf * lab('capPipLab')
       subUnit = (((widthIn / 12) * 0.333) / 27) * price('concreteTruck')
       subQty = lf
       break
     case 'Bullnose Brick':
       mat = lf * price('capBullnose')
-      hrs = lf * 0.08
+      hrs = lf * lab('capBullnoseLab')
       subUnit = price('capBullnose')
       subQty = lf
       break
@@ -478,8 +486,9 @@ function computeWpRow(row, mp, materialRows) {
     subUnit = 0
   if (sf > 0 && k) {
     const pr = wallMatPrice(WALL_RATES[k].db, row.vendor, materialRows, mp, WALL_RATES[k].fb)
+    const wpRate = n(mp?.[WALL_RATES.wpLabor.db]) || WALL_RATES.wpLabor.fb
     mat = sf * pr
-    hrs = sf / 200
+    hrs = sf / wpRate
     subUnit = pr
   }
   const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : subUnit
@@ -2364,20 +2373,31 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
   const r = key => materialPrices[WALL_RATES[key].db] ?? WALL_RATES[key].fb
 
   // Full rate list for the "View Rates" popup, broken down by wall type. Groups
-  // flagged `blocks` prepend the CMU block-type price list.
-  const blockItems = CMU_BLOCK_TYPES.map(b => ({
-    label: `Block — ${b.name} (${b.w}×${b.h}×${b.l})`,
-    table: 'material_rates',
-    name: wallBlockRateName(b.name),
-    category: 'Walls',
-    unitLabel: 'ea',
-    mode: 'currency',
-    value: materialPrices[wallBlockRateName(b.name)] ?? b.price,
-  }))
+  // flagged with `catalogSubcat` prepend that sub-category's actual catalog block
+  // products (per vendor), editable via material_price — so the vendor and its
+  // real price show, not the retired built-in list.
+  const catalogBlockItems = subcat =>
+    (materialRows || [])
+      .filter(r0 => r0.sub_category === subcat)
+      .sort(
+        (a, b) =>
+          (a.name || '').localeCompare(b.name || '') ||
+          (vendorNames[a.vendor_id] || 'Standard').localeCompare(vendorNames[b.vendor_id] || 'Standard')
+      )
+      .map(r0 => ({
+        label: `${r0.name} — ${r0.vendor_id ? vendorNames[r0.vendor_id] || 'Vendor' : 'Standard'}`,
+        table: 'material_price',
+        materialId: r0.id,
+        vendorId: r0.vendor_id || undefined,
+        category: 'Walls',
+        unitLabel: r0.unit || 'ea',
+        mode: 'currency',
+        value: n(r0.unit_cost),
+      }))
   const wallRateList = WALL_RATE_SPECS.map(g => ({
     group: g.group,
     items: [
-      ...(g.blocks ? blockItems : []),
+      ...(g.catalogSubcat ? catalogBlockItems(g.catalogSubcat) : []),
       ...g.items.map(([key, label, category, unit, mode]) => ({
         label,
         table: mode === 'coefficient' ? 'labor_rates' : 'material_rates',
