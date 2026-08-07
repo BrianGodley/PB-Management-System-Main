@@ -140,9 +140,9 @@ export default function TaxonomyManager({ kind = 'category', scope = 'material' 
           <table className="w-full text-xs min-w-[560px]">
             <thead className="sticky top-0 z-10 bg-gray-50">
               <tr className="border-b border-gray-200 text-left text-gray-600 uppercase">
-                {!isCat && <Th k="category" label="Category" />}
+                <Th k="name" label={isCat ? 'Category' : 'Sub Category'} />
                 <Th k="code" label="Code" />
-                <Th k="name" label="Name" />
+                {!isCat && <Th k="category" label="Category" />}
                 {!isCat && cfg.hasVendor && <Th k="vendor" label="Default Vendor" />}
                 {cfg.hasMaterials && <Th k="items" label="Items" align="right" />}
                 {isCat && <Th k="subcats" label="Sub-Cats" align="right" />}
@@ -158,8 +158,6 @@ export default function TaxonomyManager({ kind = 'category', scope = 'material' 
               ) : (
                 sortedRows.map(row => (
                   <tr key={row.id} className="hover:bg-gray-50">
-                    {!isCat && <td className="px-3 py-1.5 text-gray-600">{catName(row.category_id)}</td>}
-                    <td className="px-3 py-1.5 font-mono text-gray-500">{row.code}</td>
                     <td className="px-3 py-1.5">
                       <button
                         onClick={() => setModal({ row })}
@@ -169,6 +167,8 @@ export default function TaxonomyManager({ kind = 'category', scope = 'material' 
                         {row.name}
                       </button>
                     </td>
+                    <td className="px-3 py-1.5 font-mono text-gray-500">{row.code}</td>
+                    {!isCat && <td className="px-3 py-1.5 text-gray-600">{catName(row.category_id)}</td>}
                     {!isCat && cfg.hasVendor && (
                       <td className="px-3 py-1.5 text-gray-600">
                         {row.default_vendor_id ? vendName(row.default_vendor_id) : 'Standard'}
