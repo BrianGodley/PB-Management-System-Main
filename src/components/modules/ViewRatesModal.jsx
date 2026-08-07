@@ -78,13 +78,25 @@ export default function ViewRatesModal({ title = 'Rates', rates = [], onClose, r
                   </p>
                 )}
                 <div className="rounded-xl border border-gray-200 divide-y divide-gray-100">
-                  {g.items.map((it, i) => {
-                    // Divider between material and labor within a group: labeled
-                    // separator before the first labor (coefficient) rate.
-                    const labelStart =
-                      it.mode === 'coefficient' && i > 0 && g.items[i - 1].mode !== 'coefficient'
-                    return (
+                  {(() => {
+                    const hasLabor = g.items.some(x => x.mode === 'coefficient')
+                    const hasMaterial = g.items.some(x => x.mode !== 'coefficient')
+                    const split = hasLabor && hasMaterial
+                    return g.items.map((it, i) => {
+                      // In a group that has both, label the Materials and Labor parts.
+                      const materialStart =
+                        split &&
+                        it.mode !== 'coefficient' &&
+                        (i === 0 || g.items[i - 1].mode === 'coefficient')
+                      const labelStart =
+                        it.mode === 'coefficient' && i > 0 && g.items[i - 1].mode !== 'coefficient'
+                      return (
                       <div key={i}>
+                        {materialStart && (
+                          <div className="px-3 py-1 bg-gray-100 text-[10px] font-semibold uppercase tracking-wide text-gray-500 border-t border-gray-300">
+                            Materials
+                          </div>
+                        )}
                         {labelStart && (
                           <div className="px-3 py-1 bg-gray-100 text-[10px] font-semibold uppercase tracking-wide text-gray-500 border-t border-gray-300">
                             Labor
@@ -110,8 +122,9 @@ export default function ViewRatesModal({ title = 'Rates', rates = [], onClose, r
                           />
                         </div>
                       </div>
-                    )
-                  })}
+                      )
+                    })
+                  })()}
                 </div>
               </div>
             ))
