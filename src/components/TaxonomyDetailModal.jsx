@@ -9,8 +9,19 @@ import { supabase } from '../lib/supabase'
 // item is orphaned.  kind = 'category' | 'subcategory'.  row = null → add mode.
 // ─────────────────────────────────────────────────────────────────────────────
 
+const SCOPE_TABLES = {
+  material: { catTable: 'category', subTable: 'subcategory', hasMaterials: true, hasVendor: true },
+  general: {
+    catTable: 'general_category',
+    subTable: 'general_subcategory',
+    hasMaterials: false,
+    hasVendor: false,
+  },
+}
+
 export default function TaxonomyDetailModal({
   kind = 'category',
+  scope = 'material',
   row = null,
   cats = [],
   subs = [],
@@ -19,6 +30,7 @@ export default function TaxonomyDetailModal({
   onClose,
   onChanged,
 }) {
+  const cfg = SCOPE_TABLES[scope] || SCOPE_TABLES.material
   const isCat = kind === 'category'
   const adding = !row
   const [mode, setMode] = useState(adding ? 'edit' : 'view')
@@ -45,14 +57,14 @@ export default function TaxonomyDetailModal({
 
   const save = async () => {
     setBusy(true)
-    const table = isCat ? 'category' : 'subcategory'
+    const table = isCat ? cfg.catTable : cfg.subTable
     const payload = isCat
       ? { code: form.code, name: form.name }
       : {
           category_id: form.category_id,
           code: form.code,
           name: form.name,
-          default_vendor_id: form.default_vendor_id || null,
+          ...(cfg.hasVendor ? { default_vendor_id: form.default_vendor_id || null } : {}),
         }
     if (row) await supabase.from(table).update(payload).eq('id', row.id)
     else await supabase.from(table).insert(payload)
@@ -65,19 +77,20 @@ export default function TaxonomyDetailModal({
     setBusy(true)
     if (isCat) {
       if (targetId) {
-        await supabase.from('subcategory').update({ category_id: targetId }).eq('category_id', row.id)
-        await supabase.from('material').update({ category_id: targetId }).eq('category_id', row.id)
+        await supabase.from(cfg.subTable).update({ category_id: targetId }).eq('category_id', row.id)
+        if (cfg.hasMaterials)
+          await supabase.from('material').update({ category_id: targetId }).eq('category_id', row.id)
       }
-      await supabase.from('category').delete().eq('id', row.id)
+      await supabase.from(cfg.catTable).delete().eq('id', row.id)
     } else {
       const t = subs.find(s => s.id === targetId)
-      if (t) {
+      if (t && cfg.hasMaterials) {
         await supabase
           .from('material')
           .update({ subcategory_id: t.id, category_id: t.category_id })
           .eq('subcategory_id', row.id)
       }
-      await supabase.from('subcategory').delete().eq('id', row.id)
+      await supabase.from(cfg.subTable).delete().eq('id', row.id)
     }
     setBusy(false)
     onChanged?.()
@@ -105,8 +118,8 @@ export default function TaxonomyDetailModal({
               {!isCat && <Field label="Category" value={catName(row.category_id)} />}
               <Field label="Code" value={row.code} />
               <Field label="Name" value={row.name} />
-              {!isCat && <Field label="Default Vendor" value={row.default_vendor_id ? vendName(row.default_vendor_id) : 'Standard'} />}
-              <Field label="Items" value={String(itemCount)} />
+              {!isCat && cfg.hasVendor && <Field label="Default Vendor" value={row.default_vendor_id ? vendName(row.default_vendor_id) : 'Standard'} />}
+              {cfg.hasMaterials && <Field label="Items" value={String(itemCount)} />}
               {isCat && <Field label="Sub-Categories" value={String(subCnt)} />}
             </>
           ) : (
@@ -146,7 +159,7 @@ export default function TaxonomyDetailModal({
                   />
                 </label>
               </div>
-              {!isCat && (
+              {!isCat && cfg.hasVendor && (
                 <label className="block">
                   <span className="text-xs text-gray-500">Default Vendor</span>
                   <select

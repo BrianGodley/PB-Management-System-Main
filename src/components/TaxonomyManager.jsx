@@ -6,9 +6,25 @@ import TaxonomyDetailModal from './TaxonomyDetailModal'
 // TaxonomyManager — Category or Sub-Category table (kind = 'category' |
 // 'subcategory'). Mirrors the material table: the name is a hyperlink that opens
 // a detail modal for editing / deleting (delete reassigns connected items).
+//
+// scope = 'material' (default) → category / subcategory tables, tied to the
+//   material catalog (item counts, per-subcat default vendor).
+// scope = 'general'  → general_category / general_subcategory: standalone lists
+//   with no material links or default vendor.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function TaxonomyManager({ kind = 'category' }) {
+const SCOPES = {
+  material: { catTable: 'category', subTable: 'subcategory', hasMaterials: true, hasVendor: true },
+  general: {
+    catTable: 'general_category',
+    subTable: 'general_subcategory',
+    hasMaterials: false,
+    hasVendor: false,
+  },
+}
+
+export default function TaxonomyManager({ kind = 'category', scope = 'material' }) {
+  const cfg = SCOPES[scope] || SCOPES.material
   const isCat = kind === 'category'
   const [cats, setCats] = useState([])
   const [subs, setSubs] = useState([])
@@ -19,18 +35,25 @@ export default function TaxonomyManager({ kind = 'category' }) {
 
   const load = useCallback(async () => {
     setLoading(true)
+    const subCols = cfg.hasVendor
+      ? 'id, code, name, category_id, default_vendor_id'
+      : 'id, code, name, category_id'
     const [c, s, m, v] = await Promise.all([
-      supabase.from('category').select('id, code, name').order('name'),
-      supabase.from('subcategory').select('id, code, name, category_id, default_vendor_id').order('name'),
-      supabase.from('material').select('id, category_id, subcategory_id'),
-      supabase.from('subs_vendors').select('id, company_name').order('company_name'),
+      supabase.from(cfg.catTable).select('id, code, name').order('name'),
+      supabase.from(cfg.subTable).select(subCols).order('name'),
+      cfg.hasMaterials
+        ? supabase.from('material').select('id, category_id, subcategory_id')
+        : Promise.resolve({ data: [] }),
+      cfg.hasVendor
+        ? supabase.from('subs_vendors').select('id, company_name').order('company_name')
+        : Promise.resolve({ data: [] }),
     ])
     setCats(c.data || [])
     setSubs(s.data || [])
     setMaterials(m.data || [])
     setVendors(v.data || [])
     setLoading(false)
-  }, [])
+  }, [cfg])
   useEffect(() => {
     load()
   }, [load])
@@ -42,6 +65,7 @@ export default function TaxonomyManager({ kind = 'category' }) {
   const subCount = row => (isCat ? subs.filter(s => s.category_id === row.id).length : 0)
 
   const rows = isCat ? cats : subs
+  const colCount = 2 + (isCat ? 1 : 1) + (cfg.hasMaterials ? 1 : 0) + (!isCat && cfg.hasVendor ? 1 : 0)
 
   return (
     <div className="mt-3">
@@ -64,15 +88,15 @@ export default function TaxonomyManager({ kind = 'category' }) {
                 {!isCat && <th className="px-3 py-2 font-semibold">Category</th>}
                 <th className="px-3 py-2 font-semibold">Code</th>
                 <th className="px-3 py-2 font-semibold">Name</th>
-                {!isCat && <th className="px-3 py-2 font-semibold">Default Vendor</th>}
-                <th className="px-3 py-2 font-semibold text-right">Items</th>
+                {!isCat && cfg.hasVendor && <th className="px-3 py-2 font-semibold">Default Vendor</th>}
+                {cfg.hasMaterials && <th className="px-3 py-2 font-semibold text-right">Items</th>}
                 {isCat && <th className="px-3 py-2 font-semibold text-right">Sub-Cats</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={colCount} className="px-4 py-8 text-center text-gray-400">
                     Loading…
                   </td>
                 </tr>
@@ -90,12 +114,14 @@ export default function TaxonomyManager({ kind = 'category' }) {
                         {row.name}
                       </button>
                     </td>
-                    {!isCat && (
+                    {!isCat && cfg.hasVendor && (
                       <td className="px-3 py-1.5 text-gray-600">
                         {row.default_vendor_id ? vendName(row.default_vendor_id) : 'Standard'}
                       </td>
                     )}
-                    <td className="px-3 py-1.5 text-right text-gray-500">{itemCount(row)}</td>
+                    {cfg.hasMaterials && (
+                      <td className="px-3 py-1.5 text-right text-gray-500">{itemCount(row)}</td>
+                    )}
                     {isCat && <td className="px-3 py-1.5 text-right text-gray-500">{subCount(row)}</td>}
                   </tr>
                 ))
@@ -108,6 +134,7 @@ export default function TaxonomyManager({ kind = 'category' }) {
       {modal && (
         <TaxonomyDetailModal
           kind={kind}
+          scope={scope}
           row={modal.row}
           cats={cats}
           subs={subs}

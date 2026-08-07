@@ -13,6 +13,58 @@ import TaxonomyManager from '../components/TaxonomyManager'
 import PartyHistory from '../components/PartyHistory'
 import SubVendorCatalogs from '../components/SubVendorCatalogs'
 
+// ── DropdownTab ──────────────────────────────────────────────
+// A tab-bar entry that opens a small menu of sub-tabs. Active (green) when the
+// current svTab is one of its items. Closes on selection or outside click.
+function DropdownTab({ icon, label, items, current, onSelect }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  const active = items.some(i => i.key === current)
+  useEffect(() => {
+    if (!open) return
+    const onDoc = e => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+          active
+            ? 'border-green-700 text-green-700'
+            : 'border-transparent text-gray-500 hover:text-gray-700'
+        }`}
+      >
+        {icon} {label}
+        <span className="text-[10px] text-gray-400">▼</span>
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-30 mt-0.5 min-w-[13rem] rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+          {items.map(i => (
+            <button
+              key={i.key}
+              onClick={() => {
+                onSelect(i.key)
+                setOpen(false)
+              }}
+              className={`block w-full text-left px-4 py-2 text-sm transition-colors ${
+                current === i.key
+                  ? 'bg-green-50 text-green-700 font-semibold'
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {i.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Constants ────────────────────────────────────────────────
 const DIVISION_OPTIONS = [
   'Carpentry',
@@ -669,9 +721,47 @@ export default function SubsVendors({ mode = 'sub' }) {
             { key: 'directory', label: '📋 Directory' },
             ...(mode === 'vendor' ? [{ key: 'invoicing', label: '📥 Invoicing' }] : []),
             ...(mode === 'vendor' ? [{ key: 'quotes', label: '🧾 Quotes' }] : []),
-            ...(mode === 'vendor' ? [{ key: 'categories', label: '🗂️ Material Categories' }] : []),
-            ...(mode === 'vendor' ? [{ key: 'subcategories', label: '🏷️ Material Sub-Categories' }] : []),
-            ...(mode === 'vendor' ? [{ key: 'materialRates', label: '📊 Master Material Rates' }] : []),
+          ].map(t => (
+            <button
+              key={t.key}
+              onClick={() => setSvTab(t.key)}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                svTab === t.key
+                  ? 'border-green-700 text-green-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+
+          {mode === 'vendor' && (
+            <DropdownTab
+              icon="📁"
+              label="General"
+              current={svTab}
+              onSelect={setSvTab}
+              items={[
+                { key: 'genCategories', label: 'General Categories' },
+                { key: 'genSubcategories', label: 'General Sub Categories' },
+              ]}
+            />
+          )}
+          {mode === 'vendor' && (
+            <DropdownTab
+              icon="🧱"
+              label="Materials"
+              current={svTab}
+              onSelect={setSvTab}
+              items={[
+                { key: 'categories', label: 'Material Categories' },
+                { key: 'subcategories', label: 'Material Sub-Categories' },
+                { key: 'materialRates', label: 'Master Material Rates' },
+              ]}
+            />
+          )}
+
+          {[
             ...(mode === 'sub' ? [{ key: 'contracts', label: '📑 Contracts' }] : []),
             ...(mode === 'sub' ? [{ key: 'subRates', label: '📊 Master Subcontractor Rates' }] : []),
             { key: 'settings', label: '⚙️ Settings', mobileHide: true },
@@ -679,7 +769,7 @@ export default function SubsVendors({ mode = 'sub' }) {
             <button
               key={t.key}
               onClick={() => setSvTab(t.key)}
-              className={`${t.mobileHide ? 'hidden lg:flex' : 'flex'} items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              className={`${t.mobileHide ? 'hidden lg:flex' : 'flex'} items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 svTab === t.key
                   ? 'border-green-700 text-green-700'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -715,15 +805,27 @@ export default function SubsVendors({ mode = 'sub' }) {
         </div>
       )}
 
-      {/* ── Categories / Sub-Categories (vendors only) ── */}
+      {/* ── Material Categories / Sub-Categories (vendors only) ── */}
       {svTab === 'categories' && mode === 'vendor' && (
         <div className="mt-3 flex-1 overflow-y-auto">
-          <TaxonomyManager kind="category" />
+          <TaxonomyManager kind="category" scope="material" />
         </div>
       )}
       {svTab === 'subcategories' && mode === 'vendor' && (
         <div className="mt-3 flex-1 overflow-y-auto">
-          <TaxonomyManager kind="subcategory" />
+          <TaxonomyManager kind="subcategory" scope="material" />
+        </div>
+      )}
+
+      {/* ── General Categories / Sub-Categories (vendors only) ── */}
+      {svTab === 'genCategories' && mode === 'vendor' && (
+        <div className="mt-3 flex-1 overflow-y-auto">
+          <TaxonomyManager kind="category" scope="general" />
+        </div>
+      )}
+      {svTab === 'genSubcategories' && mode === 'vendor' && (
+        <div className="mt-3 flex-1 overflow-y-auto">
+          <TaxonomyManager kind="subcategory" scope="general" />
         </div>
       )}
 
@@ -1032,7 +1134,7 @@ export default function SubsVendors({ mode = 'sub' }) {
                         Primary Contact
                       </th>
                       <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">
-                        {mode === 'sub' ? 'Trades' : 'Categories'}
+                        {mode === 'sub' ? 'Trades' : 'Offers'}
                       </th>
                       {mode === 'sub' && (
                         <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">
