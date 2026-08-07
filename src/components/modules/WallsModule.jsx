@@ -528,6 +528,42 @@ function resolveMasterBlock(wall, materialRows, subcat) {
   }
 }
 
+// CMU & Brick blocks are now catalog-driven from the Walls › "Wall Block"
+// sub-category (products carry dims in calc_meta + a per-vendor price). This
+// resolver returns the selected product's { name, w, h, l, price } ONLY when
+// blockType is a catalog product id; for legacy estimates (blockType = a built-in
+// size name) it returns null so the calc falls back to the built-in CMU catalog —
+// keeping old estimates byte-for-byte identical.
+const WALL_BLOCK_SUBCAT = 'Wall Block'
+function blockHasDims(r) {
+  const cm = r?.calc_meta || {}
+  return n(cm.block_w_in) || n(r?.block_w_in)
+}
+function resolveCatalogBlock(wall, materialRows) {
+  const row = (materialRows || []).find(
+    r => r.sub_category === WALL_BLOCK_SUBCAT && r.id === wall.blockType
+  )
+  if (!row) return null
+  const cm = row.calc_meta || {}
+  return {
+    name: row.name,
+    w: n(cm.block_w_in) || n(row.block_w_in) || 8,
+    h: n(cm.block_h_in) || n(row.block_h_in) || 8,
+    l: n(cm.block_l_in) || n(row.block_l_in) || 16,
+    price: n(row.unit_cost),
+  }
+}
+// The "Wall Block" products a vendor offers for the Block Type picker (only the
+// dimensioned ones — Grey/Bondbeam base blocks have no dims and aren't types).
+function wallBlockOptions(materialRows, vendorSel) {
+  return (materialRows || []).filter(
+    r =>
+      r.sub_category === WALL_BLOCK_SUBCAT &&
+      blockHasDims(r) &&
+      (!vendorSel || vendorSel === 'House' ? r.vendor_id == null : r.vendor_id === vendorSel)
+  )
+}
+
 // ── Per-wall calculators ──────────────────────────────────────────────────────
 function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [], blockOverride = null) {
   const {
@@ -630,10 +666,9 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
 //    block isn't grouted/reinforced). Only the footing pump applies. ──────────
 // subcat present → resolve the wall product from the master list (Modular tab);
 // omitted → legacy CMU block catalog (Brick tab, unchanged).
-function calcOneModular(wall, footingPump, r, mp = {}, materialRows = [], subcat = null) {
+function calcOneModular(wall, footingPump, r, mp = {}, materialRows = [], blockOverride = null) {
   const modWall = { ...wall, rebarSpIn: '0', horizBars: '0', bondBeams: '0', pctGrouted: '0' }
-  const override = subcat ? resolveMasterBlock(wall, materialRows, subcat) : null
-  return calcOneCMU(modWall, footingPump, 'No', r, mp, materialRows, override)
+  return calcOneCMU(modWall, footingPump, 'No', r, mp, materialRows, blockOverride)
 }
 
 function calcOnePIP(wall, r, mp = {}, materialRows = []) {
@@ -715,7 +750,15 @@ function calcWalls(
   // own array and gets summed below. Vendor only changes the material $;
   // In-House labor / geometry is unchanged.
   ;(state.cmuWalls || []).forEach(wall => {
-    const res = calcOneCMU(wall, wall.footingPump ?? 'No', wall.groutPump ?? 'No', r, mp, materialRows)
+    const res = calcOneCMU(
+      wall,
+      wall.footingPump ?? 'No',
+      wall.groutPump ?? 'No',
+      r,
+      mp,
+      materialRows,
+      resolveCatalogBlock(wall, materialRows)
+    )
     structuralHrs += res.hrs
     structuralMat += res.mat
     structuralSubMat += res.subMat
@@ -731,7 +774,14 @@ function calcWalls(
     pipDetails.push({ ...res, lf: wall.lf, heightIn: wall.heightIn })
   })
   ;(state.modularWalls || []).forEach(wall => {
-    const res = calcOneModular(wall, wall.footingPump ?? 'No', r, mp, materialRows, MODULAR_SUBCAT)
+    const res = calcOneModular(
+      wall,
+      wall.footingPump ?? 'No',
+      r,
+      mp,
+      materialRows,
+      resolveMasterBlock(wall, materialRows, MODULAR_SUBCAT)
+    )
     structuralHrs += res.hrs
     structuralMat += res.mat
     structuralSubMat += res.subMat
@@ -739,7 +789,14 @@ function calcWalls(
     modularDetails.push(res.detail)
   })
   ;(state.brickWalls || []).forEach(wall => {
-    const res = calcOneModular(wall, wall.footingPump ?? 'No', r, mp, materialRows)
+    const res = calcOneModular(
+      wall,
+      wall.footingPump ?? 'No',
+      r,
+      mp,
+      materialRows,
+      resolveCatalogBlock(wall, materialRows)
+    )
     structuralHrs += res.hrs
     structuralMat += res.mat
     structuralSubMat += res.subMat
@@ -1561,6 +1618,14 @@ function CmuWallEntry({
 }) {
   const set = field => val => onChange(idx, field, val)
   const hasData = n(wall.lf) > 0 && n(wall.heightIn) > 0
+  // Catalog-driven Block Type: the selected vendor's "Wall Block" products.
+  const blockOpts = wallBlockOptions(materialRows, wall.vendor)
+  // Legacy estimate: blockType is a built-in size name, not a catalog id — keep
+  // it selectable + priced off the built-in catalog so old bids don't move.
+  const legacyBlock =
+    wall.blockType && !blockOpts.some(o => o.id === wall.blockType)
+      ? CMU_BLOCK_TYPES.find(b => b.name === wall.blockType)
+      : null
   return (
     <div className="border border-gray-200 rounded-xl p-3 mb-3 bg-white">
       <div className="flex items-center justify-between mb-2">
@@ -1584,7 +1649,14 @@ function CmuWallEntry({
           <select
             className="input text-sm py-1.5 w-full"
             value={wall.vendor || 'House'}
-            onChange={e => set('vendor')(e.target.value)}
+            onChange={e => {
+              const nv = e.target.value
+              set('vendor')(nv)
+              // Point Block Type at a block this vendor actually offers.
+              const opts = wallBlockOptions(materialRows, nv)
+              if (opts.length && !opts.some(o => o.id === wall.blockType))
+                set('blockType')(opts[0].id)
+            }}
           >
             {(vendorOptions || [{ value: 'House', label: 'Standard' }]).map(o => (
               <option key={o.value} value={o.value}>
@@ -1593,8 +1665,8 @@ function CmuWallEntry({
             ))}
           </select>
         </div>
-        {/* Block Type — drives dimensions (W/H/L) AND the per-block price.
-            Mirrors cell E8 of the legacy Estimator Master's Walls sheet. */}
+        {/* Block Type — the selected vendor's "Wall Block" catalog products
+            (dims from calc_meta drive the block-count math). */}
         <div className="col-span-2">
           <label className="block text-xs text-gray-500 mb-1">Block Type</label>
           <select
@@ -1602,24 +1674,44 @@ function CmuWallEntry({
             value={wall.blockType || ''}
             onChange={e => set('blockType')(e.target.value)}
           >
-            {CMU_BLOCK_TYPES.map(b => (
-              <option key={b.name} value={b.name}>
-                {b.name} — {b.w}×{b.h}×{b.l}
+            {blockOpts.length === 0 && !legacyBlock && (
+              <option value="">No block types for this vendor</option>
+            )}
+            {legacyBlock && (
+              <option value={legacyBlock.name}>
+                {legacyBlock.name} — {legacyBlock.w}×{legacyBlock.h}×{legacyBlock.l}
               </option>
-            ))}
+            )}
+            {blockOpts.map(o => {
+              const cm = o.calc_meta || {}
+              const w = n(cm.block_w_in) || n(o.block_w_in) || 8
+              const h = n(cm.block_h_in) || n(o.block_h_in) || 8
+              const l = n(cm.block_l_in) || n(o.block_l_in) || 16
+              return (
+                <option key={o.id} value={o.id}>
+                  {o.name} — {w}×{h}×{l}
+                </option>
+              )
+            })}
           </select>
-          {/* Resolved block price + Edit Rates icon. Reflects the selected
-              vendor (House falls back to the master_rates override, then the
-              catalog default). The Edit Rates popover edits the House rate. */}
           {(() => {
+            const cb = resolveCatalogBlock(wall, materialRows)
+            if (cb) {
+              return (
+                <div className="mt-1 flex items-center gap-1 text-[11px] text-gray-500">
+                  <RateEditPopover
+                    table="material_price"
+                    materialId={wall.blockType}
+                    vendorId={wall.vendor && wall.vendor !== 'House' ? wall.vendor : undefined}
+                    category="Walls"
+                    unitLabel="ea"
+                    currentValue={cb.price}
+                    onSaved={refreshAllRates}
+                  />
+                </div>
+              )
+            }
             const b = blockByName(wall.blockType)
-            const price = wallMatPrice(
-              wallBlockRateName(b.name),
-              wall.vendor,
-              materialRows,
-              materialPrices,
-              b.price
-            )
             const housePrice = materialPrices?.[wallBlockRateName(b.name)] ?? b.price
             return (
               <div className="mt-1 flex items-center gap-1 text-[11px] text-gray-500">
@@ -2768,6 +2860,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
               vendorOptions={vendorOptions}
               isSub={isSub}
               refreshAllRates={refreshAllRates}
+              typeSource={{ label: 'Block Type', subcat: WALL_BLOCK_SUBCAT, master: true }}
               {...makeWpHandlers(setBrickWalls, idx)}
               finishHandlers={makeFinishHandlers(setBrickWalls, idx)}
               capHandlers={makeCapHandlers(setBrickWalls, idx)}

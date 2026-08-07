@@ -323,6 +323,10 @@ function WallQtyDetail({ t = {}, isSub, materialPrices, materialRows, vendorLabe
     c => c.type && c.type !== 'None' && (n(c.lf) > 0 || n(c.qty) > 0)
   )
 
+  // Block Type may be a catalog product id (new model) or a built-in size name
+  // (legacy). Resolve ids to the product name for display.
+  const blockLabel = id => (materialRows || []).find(r => r.id === id)?.name || id
+
   // Build a Vendor · Item line with recomputed material (+ hrs / flat $).
   const rowLine = (row, c, i) => {
     const material = isSub ? c.subMat : c.mat
@@ -355,7 +359,7 @@ function WallQtyDetail({ t = {}, isSub, materialPrices, materialRows, vendorLabe
             {w.vendor && w.vendor !== 'House' && (
               <LineRow label="Vendor" value={vendorLabel(w.vendor)} />
             )}
-            {w.blockType && <LineRow label="Block Type" value={w.blockType} />}
+            {w.blockType && <LineRow label="Block Type" value={blockLabel(w.blockType)} />}
             <LineRow label="Linear Feet" value={`${n(w.lf)} LF`} />
             <LineRow label="Wall Height" value={`${n(w.heightIn)} in`} />
             <LineRow
@@ -425,7 +429,7 @@ function WallQtyDetail({ t = {}, isSub, materialPrices, materialRows, vendorLabe
             {w.vendor && w.vendor !== 'House' && (
               <LineRow label="Vendor" value={vendorLabel(w.vendor)} />
             )}
-            {w.blockType && <LineRow label="Block Type" value={w.blockType} />}
+            {w.blockType && <LineRow label="Block Type" value={blockLabel(w.blockType)} />}
             <LineRow label="Linear Feet" value={`${n(w.lf)} LF`} />
             <LineRow label="Wall Height" value={`${n(w.heightIn)} in`} />
             <LineRow
@@ -452,7 +456,7 @@ function WallQtyDetail({ t = {}, isSub, materialPrices, materialRows, vendorLabe
             {w.vendor && w.vendor !== 'House' && (
               <LineRow label="Vendor" value={vendorLabel(w.vendor)} />
             )}
-            {w.blockType && <LineRow label="Block Type" value={w.blockType} />}
+            {w.blockType && <LineRow label="Block Type" value={blockLabel(w.blockType)} />}
             <LineRow label="Linear Feet" value={`${n(w.lf)} LF`} />
             <LineRow label="Wall Height" value={`${n(w.heightIn)} in`} />
             <LineRow
