@@ -409,11 +409,14 @@ function calcGroundTreatments(
 
   // ── Soils (optional amendment lines) ────────────────────────────────────────
   let soilsMat = 0
+  let soilsLab = 0
   ;(soilsRows || []).forEach(r => {
     if (!n(r.sf)) return
     const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
     const st = rowOpt('Soils', r, [])
     soilsMat += CY * p(st.dbName, st.fallback)
+    // Labor: 0.002 hr per SF per inch of depth (2" doubles it, 3" triples, …).
+    soilsLab += n(r.sf) * n(r.depthIn) * p('Soils Install Labor', 0.002)
   })
 
   // ── Steppers (Flagstone + Precast, Soil Set + Concrete Set) ─────────────────
@@ -569,6 +572,7 @@ function calcGroundTreatments(
     plasticLab +
     metalLab +
     soilLab +
+    soilsLab +
     sodLab +
     stepLab +
     dgLab +

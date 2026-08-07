@@ -27,6 +27,7 @@ import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { useSubRateOverrides } from './SubRateOverrideContext.jsx'
 import { useRateIcons } from '../contexts/RateIconsContext'
+import MaterialFieldRatesModal from './MaterialFieldRatesModal'
 
 const DEFAULT_VALUE_FIELD = {
   material_rates: 'unit_cost',
@@ -350,7 +351,17 @@ export default function RateEditPopover({
         </svg>
       </button>
 
-      {open &&
+      {/* Material pencil → full editable list of every material + price for this
+          field (Standard + vendors). Applies to every material_price pencil. */}
+      {open && table === 'material_price' && (
+        <MaterialFieldRatesModal
+          materialId={materialId}
+          onClose={() => setOpen(false)}
+          onSaved={onSaved}
+        />
+      )}
+
+      {open && table !== 'material_price' &&
         createPortal(
           <div
             className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
