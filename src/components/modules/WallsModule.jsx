@@ -564,6 +564,26 @@ function wallBlockOptions(materialRows, vendorSel) {
   )
 }
 
+// Caps & Finishes are also vendor-catalog-driven: the Item dropdown lists the
+// selected vendor's products in the 'Wall Cap' / 'Wall Finish' sub-category. The
+// product NAMES match the built-in type keys (Flagstone, Sand Stucco, …) so the
+// existing cap/finish calc is untouched — the vendor only controls availability.
+const WALL_CAP_SUBCAT = 'Wall Cap'
+const WALL_FINISH_SUBCAT = 'Wall Finish'
+function wallCatalogTypes(materialRows, subcat, vendorSel) {
+  const seen = new Set()
+  const out = []
+  ;(materialRows || []).forEach(r => {
+    if (r.sub_category !== subcat || !r.name) return
+    const ok = !vendorSel || vendorSel === 'House' ? r.vendor_id == null : r.vendor_id === vendorSel
+    if (ok && !seen.has(r.name)) {
+      seen.add(r.name)
+      out.push(r.name)
+    }
+  })
+  return out
+}
+
 // ── Per-wall calculators ──────────────────────────────────────────────────────
 function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [], blockOverride = null) {
   const {
@@ -1275,153 +1295,65 @@ function WallFinishesEditor({
   onAdd,
   onRemove,
   vendorOptions,
-  materialPrices,
   materialRows,
-  isSub,
-  refreshAllRates,
 }) {
-  const r = key => materialPrices?.[WALL_RATES[key].db] ?? WALL_RATES[key].fb
-  const p = db => materialPrices?.[db] ?? undefined
-  const fmt2 = v =>
-    `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   return (
     <div className="mt-3 border-t border-gray-100 pt-2">
       <label className="block text-xs text-gray-500 mb-1 font-medium">Finishes</label>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-xs text-gray-500 border-b border-gray-200">
-              <th className="text-left pb-1 pr-2 font-medium w-40">Vendor</th>
-              <th className="text-left pb-1 pr-2 font-medium w-36">Item</th>
-              <th className="text-left pb-1 pr-2 font-medium w-24">SF</th>
-              <th className="text-left pb-1 pr-2 font-medium">Rate</th>
-              <th className="text-right pb-1 pr-2 font-medium text-gray-400 w-24">
-                {isSub ? 'Flat $/unit' : 'Labor hrs'}
-              </th>
-              <th className="text-right pb-1 pr-2 font-medium text-gray-400 w-24">Material $</th>
-              <th className="w-6" />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => {
-              const c = computeWallFinishRow(row, materialPrices, materialRows)
-              const meta = WALL_FINISH_META[row.type] || {}
-              return (
-                <tr key={i} className="border-b border-gray-100">
-                  <td className="py-1.5 pr-2">
-                    <select
-                      className="input text-sm py-1 w-full"
-                      value={row.vendor || 'House'}
-                      onChange={e => onPatch(i, { vendor: e.target.value }, true)}
-                    >
-                      {vendorOptions.map(o => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="py-1.5 pr-2">
-                    <select
-                      className="input text-sm py-1 w-full"
-                      value={row.type}
-                      onChange={e => onPatch(i, { type: e.target.value }, true)}
-                    >
-                      {WALL_FINISH_TYPES.map(t => (
-                        <option key={t}>{t}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="py-1.5 pr-2">
-                    <NumInput
-                      value={row.sf}
-                      onChange={v => onPatch(i, { sf: v }, false)}
-                      className="w-24"
-                    />
-                  </td>
-                  <td className="py-1.5 pr-2">
-                    <div className="flex items-center gap-1">
-                      <div className="relative w-24">
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                          $
-                        </span>
-                        <input
-                          type="number"
-                          step="any"
-                          className="input text-sm py-1.5 pl-5 w-full"
-                          placeholder={meta.matKey ? r(meta.matKey).toFixed(2) : '0'}
-                          value={row.rateIn ?? ''}
-                          onChange={e => onPatch(i, { rateIn: e.target.value }, true)}
-                        />
-                      </div>
-                      {meta.matKey && (
-                        <RateEditPopover
-                          table="material_rates"
-                          name={WALL_RATES[meta.matKey].db}
-                          category="Walls"
-                          unitLabel={meta.matUnit}
-                          currentValue={p(WALL_RATES[meta.matKey].db) ?? WALL_RATES[meta.matKey].fb}
-                          onSaved={refreshAllRates}
-                        />
-                      )}
-                      {meta.labKey && (
-                        <RateEditPopover
-                          table="labor_rates"
-                          name={WALL_RATES[meta.labKey].db}
-                          category="Walls"
-                          mode="coefficient"
-                          unitLabel={meta.labUnit || 'rate'}
-                          currentValue={p(WALL_RATES[meta.labKey].db) ?? WALL_RATES[meta.labKey].fb}
-                          onSaved={refreshAllRates}
-                        />
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-1.5 text-right text-xs pr-2">
-                    {isSub ? (
-                      <input
-                        type="number"
-                        step="any"
-                        className="input text-sm py-1 w-24 text-right"
-                        placeholder={r2(c.subUnit).toString()}
-                        value={row.subEach ?? ''}
-                        onChange={e => onPatch(i, { subEach: e.target.value }, false)}
-                      />
-                    ) : (
-                      <span className="text-gray-400">{c.hrs > 0 ? c.hrs.toFixed(2) : '—'}</span>
-                    )}
-                  </td>
-                  <td className="py-1.5 text-right text-xs text-gray-600">
-                    {(isSub ? c.subMat : c.mat) > 0 ? (
-                      <div className="text-right">
-                        <div>{fmt2(isSub ? c.subMat : c.mat)}</div>
-                        {!isSub && c.tons > 0 && (
-                          <div className="text-gray-400">{c.tons.toFixed(2)} tons</div>
-                        )}
-                      </div>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td className="py-1.5 text-right">
-                    <button
-                      type="button"
-                      onClick={() => onRemove(i)}
-                      className="text-gray-300 hover:text-red-500 text-xs px-1"
-                      title="Remove row"
-                    >
-                      ✕
-                    </button>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+      <div className="space-y-1.5">
+        {rows.map((row, i) => {
+          const opts = wallCatalogTypes(materialRows, WALL_FINISH_SUBCAT, row.vendor)
+          const shown =
+            row.type && row.type !== 'None' && !opts.includes(row.type)
+              ? [row.type, ...opts]
+              : opts
+          return (
+            <div key={i} className="flex items-center gap-2">
+              <select
+                className="input text-sm py-1 w-44 shrink-0"
+                value={row.vendor || 'House'}
+                onChange={e => onPatch(i, { vendor: e.target.value }, true)}
+              >
+                {vendorOptions.map(o => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="input text-sm py-1 flex-1 min-w-0"
+                value={row.type || 'None'}
+                onChange={e => onPatch(i, { type: e.target.value }, true)}
+              >
+                <option value="None">None</option>
+                {shown.map(t => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+              <NumInput
+                value={row.sf}
+                onChange={v => onPatch(i, { sf: v }, false)}
+                placeholder="0"
+                className="w-28 shrink-0"
+              />
+              <span className="text-xs text-gray-400 shrink-0">SF</span>
+              <button
+                type="button"
+                onClick={() => onRemove(i)}
+                className="text-gray-300 hover:text-red-500 text-sm px-1 shrink-0"
+                title="Remove row"
+              >
+                ✕
+              </button>
+            </div>
+          )
+        })}
         <button
           type="button"
           onClick={onAdd}
-          className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+          className="mt-1 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
         >
           + Add finish
         </button>
@@ -1432,165 +1364,72 @@ function WallFinishesEditor({
 
 // ── Per-wall Caps editor ──────────────────────────────────────────────────────
 // Add / edit / remove cap rows scoped to one wall. Identical cap math.
-function WallCapsEditor({
-  rows = [],
-  onPatch,
-  onAdd,
-  onRemove,
-  vendorOptions,
-  materialPrices,
-  materialRows,
-  isSub,
-  refreshAllRates,
-}) {
-  const p = db => materialPrices?.[db] ?? undefined
-  const fmt2 = v =>
-    `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, materialRows }) {
   return (
     <div className="mt-3 border-t border-gray-100 pt-2">
       <label className="block text-xs text-gray-500 mb-1 font-medium">Caps</label>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-xs text-gray-500 border-b border-gray-200">
-              <th className="text-left pb-1 pr-2 font-medium w-40">Vendor</th>
-              <th className="text-left pb-1 pr-2 font-medium w-36">Item</th>
-              <th className="text-left pb-1 pr-2 font-medium w-20">Width (in)</th>
-              <th className="text-left pb-1 pr-2 font-medium w-24">LF / Qty</th>
-              <th className="text-left pb-1 pr-2 font-medium">Rate</th>
-              <th className="text-right pb-1 pr-2 font-medium text-gray-400 w-24">
-                {isSub ? 'Flat $/unit' : 'Labor hrs'}
-              </th>
-              <th className="text-right pb-1 pr-2 font-medium text-gray-400 w-24">Material $</th>
-              <th className="w-6" />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => {
-              const c = computeCapRow(row, materialPrices, materialRows)
-              const capMatKey = {
-                Flagstone: 'capFlagstone',
-                Precast: 'capPrecast',
-                'PIP Concrete': 'concreteTruck',
-                'Bullnose Brick': 'capBullnose',
-              }[row.type]
-              const capUnit = {
-                Flagstone: 'ton',
-                Precast: 'ea',
-                'PIP Concrete': 'CY',
-                'Bullnose Brick': 'LF',
-              }[row.type]
-              const isActive = row.type !== 'None'
-              return (
-                <tr key={i} className="border-b border-gray-100">
-                  <td className="py-1.5 pr-2">
-                    <select
-                      className="input text-sm py-1 w-full"
-                      value={row.vendor || 'House'}
-                      onChange={e => onPatch(i, { vendor: e.target.value }, true)}
-                    >
-                      {vendorOptions.map(o => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="py-1.5 pr-2">
-                    <select
-                      className="input text-sm py-1 w-full"
-                      value={row.type}
-                      onChange={e => onPatch(i, { type: e.target.value }, true)}
-                    >
-                      {CAP_TYPES.map(t => (
-                        <option key={t}>{t}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="py-1.5 pr-2">
-                    {isActive && row.type !== 'Precast' && (
-                      <NumInput
-                        value={row.widthIn}
-                        onChange={v => onPatch(i, { widthIn: v }, true)}
-                        className="w-20"
-                        placeholder="4"
-                      />
-                    )}
-                    {isActive && row.type === 'Precast' && (
-                      <NumInput
-                        value={row.widthIn}
-                        onChange={v => onPatch(i, { widthIn: v }, true)}
-                        className="w-20"
-                        placeholder="8"
-                      />
-                    )}
-                  </td>
-                  <td className="py-1.5 pr-2">
-                    {isActive && (
-                      <NumInput
-                        value={row.type === 'Precast' ? row.qty : row.lf}
-                        onChange={v =>
-                          onPatch(i, row.type === 'Precast' ? { qty: v } : { lf: v }, false)
-                        }
-                        className="w-20"
-                        placeholder="0"
-                      />
-                    )}
-                  </td>
-                  <td className="py-1.5 pr-2">
-                    {isActive && capMatKey ? (
-                      <span className="inline-flex items-center gap-1 text-xs text-gray-400">
-                        <RateEditPopover
-                          table="material_rates"
-                          name={WALL_RATES[capMatKey].db}
-                          category="Walls"
-                          unitLabel={capUnit}
-                          currentValue={p(WALL_RATES[capMatKey].db) ?? WALL_RATES[capMatKey].fb}
-                          onSaved={refreshAllRates}
-                        />
-                      </span>
-                    ) : (
-                      <span className="text-xs text-gray-300">—</span>
-                    )}
-                  </td>
-                  <td className="py-1.5 text-right text-xs pr-2">
-                    {!isActive ? (
-                      <span className="text-gray-300">—</span>
-                    ) : isSub ? (
-                      <input
-                        type="number"
-                        step="any"
-                        className="input text-sm py-1 w-24 text-right"
-                        placeholder={r2(c.subUnit).toString()}
-                        value={row.subEach ?? ''}
-                        onChange={e => onPatch(i, { subEach: e.target.value }, false)}
-                      />
-                    ) : (
-                      <span className="text-gray-400">{c.hrs > 0 ? c.hrs.toFixed(2) : '—'}</span>
-                    )}
-                  </td>
-                  <td className="py-1.5 text-right text-xs text-gray-600">
-                    {(isSub ? c.subMat : c.mat) > 0 ? fmt2(isSub ? c.subMat : c.mat) : '—'}
-                  </td>
-                  <td className="py-1.5 text-right">
-                    <button
-                      type="button"
-                      onClick={() => onRemove(i)}
-                      className="text-gray-300 hover:text-red-500 text-xs px-1"
-                      title="Remove row"
-                    >
-                      ✕
-                    </button>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+      <div className="space-y-1.5">
+        {rows.map((row, i) => {
+          const opts = wallCatalogTypes(materialRows, WALL_CAP_SUBCAT, row.vendor)
+          const shown =
+            row.type && row.type !== 'None' && !opts.includes(row.type)
+              ? [row.type, ...opts]
+              : opts
+          const isActive = row.type && row.type !== 'None'
+          const qtyLabel = row.type === 'Precast' ? 'Qty' : 'LF'
+          return (
+            <div key={i} className="flex items-center gap-2">
+              <select
+                className="input text-sm py-1 w-44 shrink-0"
+                value={row.vendor || 'House'}
+                onChange={e => onPatch(i, { vendor: e.target.value }, true)}
+              >
+                {vendorOptions.map(o => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="input text-sm py-1 flex-1 min-w-0"
+                value={row.type || 'None'}
+                onChange={e => onPatch(i, { type: e.target.value }, true)}
+              >
+                <option value="None">None</option>
+                {shown.map(t => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+              {isActive && (
+                <>
+                  <NumInput
+                    value={row.type === 'Precast' ? row.qty : row.lf}
+                    onChange={v =>
+                      onPatch(i, row.type === 'Precast' ? { qty: v } : { lf: v }, false)
+                    }
+                    placeholder="0"
+                    className="w-28 shrink-0"
+                  />
+                  <span className="text-xs text-gray-400 shrink-0">{qtyLabel}</span>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => onRemove(i)}
+                className="text-gray-300 hover:text-red-500 text-sm px-1 shrink-0 ml-auto"
+                title="Remove row"
+              >
+                ✕
+              </button>
+            </div>
+          )
+        })}
         <button
           type="button"
           onClick={onAdd}
-          className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+          className="mt-1 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
         >
           + Add cap
         </button>
@@ -1906,7 +1745,7 @@ function PipWallEntry({
       </div>
       <div className="grid grid-cols-2 gap-2">
         <div className="col-span-2">
-          <label className="block text-xs text-gray-500 mb-1">Vendor</label>
+          <label className="block text-xs text-gray-500 mb-1">Concrete Vendor</label>
           <select
             className="input text-sm py-1.5 w-full"
             value={wall.vendor || 'House'}
@@ -2807,7 +2646,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
       {/* ── Modular Block Walls ── */}
       {wallType === 'Modular' && (
         <div>
-          <SectionHeader title="Modular Block Walls" />
+          <SectionHeader title="Modular Walls" />
 
           {modularWalls.map((wall, idx) => (
             <ModularWallEntry
