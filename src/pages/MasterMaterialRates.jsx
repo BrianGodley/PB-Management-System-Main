@@ -107,12 +107,13 @@ export default function MasterMaterialRates() {
       const opens = openPrices(m)
       if (view === 'standard') {
         const sp = opens.find(p => p.vendor_id === standardVendorId)
+        if (!sp) return // only list products that actually have a Standard price
         out.push({
           key: m.id,
           m,
-          priceId: sp?.id || null,
+          priceId: sp.id,
           vendorId: standardVendorId,
-          price: sp?.price ?? null,
+          price: sp.price ?? null,
           code: codeFor(m, 'Standard'),
         })
       } else {
