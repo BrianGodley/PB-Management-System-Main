@@ -205,15 +205,13 @@ export function useMaterialCatalog(categories, initial = {}) {
 
   const refresh = useCallback(async () => {
     const catList = catsKey.split('|')
-    const [matRes, labRes, catRes, venRes] = await Promise.all([
-      supabase.from('material_rates').select('name, unit_cost').in('category', catList),
+    // material_rates retired: material options/prices come from material +
+    // material_price (fetchModuleCatalog); labor from labor_rates, fees from
+    // misc_rates. A name not found falls back to the module's code constant.
+    const [rows, labRes, feeRes, venRes] = await Promise.all([
+      fetchModuleCatalog(catList),
       supabase.from('labor_rates').select('name, rate').in('category', catList),
-      supabase
-        .from('material_rates')
-        .select(
-          'id,name,vendor_id,unit,unit_cost,category,sub_category,block_w_in,block_h_in,block_l_in,calc_meta'
-        )
-        .in('category', catList),
+      supabase.from('misc_rates').select('name, rate').in('category', catList),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
@@ -221,14 +219,17 @@ export function useMaterialCatalog(categories, initial = {}) {
         .order('company_name'),
     ])
     const pm = {}
-    ;(matRes.data || []).forEach(r => {
-      pm[r.name] = parseFloat(r.unit_cost) || 0
+    ;(rows || []).forEach(r => {
+      if (r.vendor_id == null && r.name) pm[r.name] = num(r.unit_cost)
     })
     ;(labRes.data || []).forEach(r => {
-      pm[r.name] = parseFloat(r.rate) || 0
+      pm[r.name] = num(r.rate)
+    })
+    ;(feeRes.data || []).forEach(r => {
+      pm[r.name] = num(r.rate)
     })
     setPriceMap(pm)
-    setMaterialRows(catRes.data || [])
+    setMaterialRows(rows || [])
     setVendors(
       (venRes.data || []).map(v => ({
         id: v.id,
