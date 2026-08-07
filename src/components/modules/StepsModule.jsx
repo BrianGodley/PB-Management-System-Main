@@ -45,7 +45,7 @@ const n = v => parseFloat(v) || 0
 const fmt2 = v => `$${(n(v)).toFixed(2)}`
 
 const PAVER_STEP_CAT = 'Paver Material' // shared Paver catalog sub_category
-const CONC_VENDOR_CAT = 'Concrete Mix' // supplied_categories tag for concrete vendors
+const CONC_VENDOR_CAT = 'Concrete Mix' // catalog sub_category for concrete vendors
 const STEP_FORMS = ['Straight', 'Curved']
 const CONC_TYPES = ['Standard', 'Standard Colored', 'Cantilevered', 'Cantilevered Colored']
 const CONC_FINISHES = ['Smooth', 'Broom', 'Sanded', 'Salted', 'Exposed Aggregate']
@@ -666,7 +666,7 @@ function MaterialStepSection({
   vendors,
   priceOf = item => n(item?.unit_cost),
 }) {
-  const vForCat = vendors.filter(v => (v.categories || []).includes(cat))
+  const vForCat = vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
   const setRow = (i, field, val) =>
     setRows(rs => rs.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   return (
@@ -827,7 +827,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         .not('vendor_id', 'is', null),
       supabase
         .from('subs_vendors')
-        .select('id, company_name, supplied_categories')
+        .select('id, company_name')
         .eq('type', 'vendor')
         .order('company_name'),
     ])
@@ -850,7 +850,6 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
       (venRes.data || []).map(v => ({
         id: v.id,
         name: v.company_name,
-        categories: v.supplied_categories || [],
       }))
     )
   }, [])
@@ -995,7 +994,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
   const setManual = (i, field, val) =>
     setCurManual(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
 
-  const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
+  const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
 
   function handleSave() {
     onSave({

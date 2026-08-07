@@ -223,7 +223,7 @@ export function useMaterialCatalog(categories, initial = {}) {
         .in('category', catList),
       supabase
         .from('subs_vendors')
-        .select('id, company_name, supplied_categories')
+        .select('id, company_name')
         .eq('type', 'vendor')
         .order('company_name'),
     ])
@@ -240,7 +240,6 @@ export function useMaterialCatalog(categories, initial = {}) {
       (venRes.data || []).map(v => ({
         id: v.id,
         name: v.company_name,
-        categories: v.supplied_categories || [],
       }))
     )
     setLoading(false)
@@ -256,14 +255,21 @@ export function useMaterialCatalog(categories, initial = {}) {
     [materialRows, priceMap]
   )
 
+  // Catalog-driven: a vendor appears in a section only when they have priced a
+  // product in that category / sub-category (material_rates row with their
+  // vendor_id). Replaces the retired supplied_categories gate.
   const vendorOptionsForCategory = useCallback(
     cat => [
       { value: 'House', label: 'Standard' },
       ...vendors
-        .filter(v => (v.categories || []).includes(cat))
+        .filter(v =>
+          materialRows.some(
+            r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)
+          )
+        )
         .map(v => ({ value: v.id, label: v.name })),
     ],
-    [vendors]
+    [vendors, materialRows]
   )
 
   const vendorNames = useMemo(() => Object.fromEntries(vendors.map(v => [v.id, v.name])), [vendors])
@@ -303,7 +309,7 @@ export function useNewMaterialCatalog(categories, initial = {}) {
       supabase.from('misc_rates').select('name, rate').in('category', catList),
       supabase
         .from('subs_vendors')
-        .select('id, company_name, supplied_categories')
+        .select('id, company_name')
         .eq('type', 'vendor')
         .order('company_name'),
     ])
@@ -323,7 +329,6 @@ export function useNewMaterialCatalog(categories, initial = {}) {
       (venRes.data || []).map(v => ({
         id: v.id,
         name: v.company_name,
-        categories: v.supplied_categories || [],
       }))
     )
     setLoading(false)
@@ -338,12 +343,20 @@ export function useNewMaterialCatalog(categories, initial = {}) {
       resolveMaterialPrice(name, vendorId, materialRows, priceMap, fallback),
     [materialRows, priceMap]
   )
+  // Catalog-driven vendor list (see useMaterialCatalog note): a vendor shows in a
+  // section only where they have priced a product in that category / sub-category.
   const vendorOptionsForCategory = useCallback(
     cat => [
       { value: 'House', label: 'Standard' },
-      ...vendors.filter(v => (v.categories || []).includes(cat)).map(v => ({ value: v.id, label: v.name })),
+      ...vendors
+        .filter(v =>
+          materialRows.some(
+            r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)
+          )
+        )
+        .map(v => ({ value: v.id, label: v.name })),
     ],
-    [vendors]
+    [vendors, materialRows]
   )
   const vendorNames = useMemo(() => Object.fromEntries(vendors.map(v => [v.id, v.name])), [vendors])
 

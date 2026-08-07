@@ -569,7 +569,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         .eq('category', 'Artificial Turf'),
       supabase
         .from('subs_vendors')
-        .select('id, company_name, supplied_categories')
+        .select('id, company_name')
         .eq('type', 'vendor')
         .order('company_name'),
     ])
@@ -578,7 +578,6 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       (venRes.data || []).map(v => ({
         id: v.id,
         name: v.company_name,
-        categories: v.supplied_categories || [],
       }))
     )
     if (matRes.data) {
@@ -615,7 +614,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         .eq('category', 'Artificial Turf'),
       supabase
         .from('subs_vendors')
-        .select('id, company_name, supplied_categories')
+        .select('id, company_name')
         .eq('type', 'vendor')
         .order('company_name'),
     ]).then(([matRowsRes, venRes]) => {
@@ -625,7 +624,6 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         (venRes.data || []).map(v => ({
           id: v.id,
           name: v.company_name,
-          categories: v.supplied_categories || [],
         }))
       )
     })
@@ -760,7 +758,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
   // ── Vendor catalog helpers (material-only per-line Vendor pickers) ────────
-  const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
+  const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
   // A vendor belongs in a SECTION's dropdown only if they actually price a product
   // under that section's marker (not just somewhere in the category). Standard is
   // always offered via the <option value="House">Standard</option> in each select.

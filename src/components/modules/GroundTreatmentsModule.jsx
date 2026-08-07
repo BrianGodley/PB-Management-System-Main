@@ -867,14 +867,13 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   const loadVendorData = useCallback(async () => {
     const [gtRows, venRes] = await Promise.all([
       fetchGtRows(),
-      supabase.from('subs_vendors').select('id, company_name, supplied_categories').eq('type', 'vendor').order('company_name'),
+      supabase.from('subs_vendors').select('id, company_name').eq('type', 'vendor').order('company_name'),
     ])
     setMaterialRows(gtRows || [])
     setVendors(
       (venRes.data || []).map(v => ({
         id: v.id,
         name: v.company_name,
-        categories: v.supplied_categories || [],
       }))
     )
   }, [])
@@ -891,7 +890,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       supabase.from('misc_rates').select('name, rate').eq('category', 'Ground Treatments'),
       supabase.from('subcontractor_rates').select('company_name, rate').eq('category', 'Ground Treatments'),
       fetchGtRows(),
-      supabase.from('subs_vendors').select('id, company_name, supplied_categories').eq('type', 'vendor').order('company_name'),
+      supabase.from('subs_vendors').select('id, company_name').eq('type', 'vendor').order('company_name'),
     ])
     const prices = {}
     // Standard (null-vendor) material prices, keyed by clean description
@@ -913,7 +912,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       (venRes.data || []).map(v => ({
         id: v.id,
         name: v.company_name,
-        categories: v.supplied_categories || [],
       }))
     )
   }, [])
@@ -1063,7 +1061,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
 
   // Vendors that supply a given material category — drives the per-row vendor
   // dropdowns so each row only offers vendors that carry that category.
-  const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
+  const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
   // First real vendor supplying a category (else 'House').
   const defaultVendorFor = cat => vendorsForCategory(cat)[0]?.id || 'House'
 

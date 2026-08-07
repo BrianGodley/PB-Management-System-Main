@@ -65,6 +65,97 @@ function DropdownTab({ icon, label, items, current, onSelect }) {
   )
 }
 
+// ── SuppliedList ─────────────────────────────────────────────
+// Editable list of names (add / edit / delete), seeded from a template list.
+// Read-only chips until `editing` is on. Template offers pick-from-list via a
+// datalist while still allowing free-typed custom entries.
+function SuppliedList({ title, help, value, onChange, editing, template = [] }) {
+  const items = Array.isArray(value) ? value : []
+  const [draft, setDraft] = useState('')
+  const listId = `tmpl-${title.replace(/\s+/g, '')}`
+  const add = raw => {
+    const v = (raw ?? draft).trim()
+    if (!v) return
+    if (!items.some(i => i.toLowerCase() === v.toLowerCase())) onChange([...items, v])
+    setDraft('')
+  }
+  const editAt = (i, v) => onChange(items.map((it, idx) => (idx === i ? v : it)))
+  const removeAt = i => onChange(items.filter((_, idx) => idx !== i))
+  const remaining = (template || [])
+    .map(t => t.name)
+    .filter(n => !items.some(i => i.toLowerCase() === n.toLowerCase()))
+  return (
+    <div>
+      <label className="block text-xs font-medium text-gray-600 mb-1">{title}</label>
+      {help && <p className="text-xs text-gray-400 mb-2">{help}</p>}
+      {!editing ? (
+        items.length === 0 ? (
+          <p className="text-xs text-gray-400">None listed.</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {items.map((it, i) => (
+              <span
+                key={i}
+                className="px-2 py-1 rounded-lg bg-gray-100 text-sm text-gray-700 border border-gray-200"
+              >
+                {it}
+              </span>
+            ))}
+          </div>
+        )
+      ) : (
+        <div className="space-y-1.5">
+          {items.map((it, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input
+                value={it}
+                onChange={e => editAt(i, e.target.value)}
+                className="input text-sm flex-1"
+              />
+              <button
+                type="button"
+                onClick={() => removeAt(i)}
+                className="p-1.5 rounded hover:bg-red-100 text-gray-400 hover:text-red-500"
+                title="Remove"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+          <div className="flex items-center gap-2 pt-1">
+            <input
+              list={listId}
+              value={draft}
+              onChange={e => setDraft(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  add()
+                }
+              }}
+              placeholder="Add — pick from the list or type your own"
+              className="input text-sm flex-1"
+            />
+            <datalist id={listId}>
+              {remaining.map(n => (
+                <option key={n} value={n} />
+              ))}
+            </datalist>
+            <button
+              type="button"
+              onClick={() => add()}
+              disabled={!draft.trim()}
+              className="px-3 py-2 text-sm rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 disabled:opacity-40 whitespace-nowrap"
+            >
+              + Add
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Constants ────────────────────────────────────────────────
 const DIVISION_OPTIONS = [
   'Carpentry',
@@ -149,6 +240,7 @@ const EMPTY_FORM = {
   price_list_files: [],
   services_pricing: '',
   supplied_categories: [],
+  general_categories: [],
 }
 
 // ── Data fetch ───────────────────────────────────────────────
@@ -206,8 +298,23 @@ export default function SubsVendors({ mode = 'sub' }) {
     setMaterialCategories(data || [])
   }
 
+  // General categories — non-job categories, template for the vendor General tab.
+  const [generalCategories, setGeneralCategories] = useState([])
+  async function loadGeneralCategories() {
+    const { data, error: gcErr } = await supabase
+      .from('general_category')
+      .select('id, name')
+      .order('name')
+    if (gcErr) {
+      console.error('general_category load failed:', gcErr)
+      return
+    }
+    setGeneralCategories(data || [])
+  }
+
   useEffect(() => {
     loadMaterialCategories()
+    loadGeneralCategories()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -302,6 +409,7 @@ export default function SubsVendors({ mode = 'sub' }) {
       price_list_files: Array.isArray(sub.price_list_files) ? sub.price_list_files : [],
       services_pricing: sub.services_pricing || '',
       supplied_categories: Array.isArray(sub.supplied_categories) ? sub.supplied_categories : [],
+      general_categories: Array.isArray(sub.general_categories) ? sub.general_categories : [],
     })
     setError('')
     setShowModal(true)
@@ -350,6 +458,7 @@ export default function SubsVendors({ mode = 'sub' }) {
       price_list_files: Array.isArray(form.price_list_files) ? form.price_list_files : [],
       services_pricing: form.services_pricing.trim() || null,
       supplied_categories: form.supplied_categories || [],
+      general_categories: form.general_categories || [],
       updated_at: new Date().toISOString(),
     }
     const { error } = editSub
@@ -1581,6 +1690,7 @@ export default function SubsVendors({ mode = 'sub' }) {
               recordId={editSub?.id}
               mode={mode}
               materialCategories={materialCategories}
+              generalCategories={generalCategories}
             />
           )}
         </>
@@ -1611,6 +1721,7 @@ function SubModal({
   recordId,
   mode = 'sub',
   materialCategories = [],
+  generalCategories = [],
 }) {
   const [customInput, setCustomInput] = useState('')
   const [stab, setStab] = useState('details') // 'details' | 'materials' | 'pricing' | 'quotes' | 'contracts'
@@ -1625,6 +1736,7 @@ function SubModal({
       ]
     : [
         { k: 'details', l: 'Details' },
+        { k: 'general', l: 'General' },
         { k: 'materials', l: 'Materials' },
         { k: 'pricing', l: 'Pricing' },
         { k: 'quotes', l: 'Quotes' },
@@ -1637,6 +1749,7 @@ function SubModal({
   useEffect(() => {
     if (stab === 'quotes' && mode !== 'vendor') setStab('details')
     if (stab === 'materials' && mode !== 'vendor') setStab('details')
+    if (stab === 'general' && mode !== 'vendor') setStab('details')
     if (stab === 'catalogs' && mode !== 'vendor') setStab('details')
     if (stab === 'contracts' && mode !== 'sub') setStab('details')
   }, [stab, mode])
@@ -1774,54 +1887,30 @@ function SubModal({
             <PartyHistory partyId={recordId} kind="contracts" />
           ) : stab === 'catalogs' ? (
             <SubVendorCatalogs partyId={recordId} />
+          ) : stab === 'general' ? (
+          <>
+          {/* General Categories (vendors only) — non-job categories for other
+              company vendors. Informational only; never used in the estimator. */}
+          <SuppliedList
+            title="General Categories"
+            help="Non-job categories for other company vendors. Not used in the estimator."
+            value={form.general_categories}
+            onChange={v => setForm(f => ({ ...f, general_categories: v }))}
+            editing={editing}
+            template={generalCategories}
+          />
+          {error && <p className="text-xs text-red-500">{error}</p>}
+          </>
           ) : stab === 'materials' ? (
           <>
-          {/* Categories Supplied (vendors only) */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-2">
-              Categories Supplied
-            </label>
-            <p className="text-xs text-gray-400 mb-2">
-              These drive which estimator sections list this vendor.
-            </p>
-            {materialCategories.length === 0 ? (
-              <p className="text-xs text-gray-400">
-                No material categories yet. Add them in Settings → Material Categories.
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                {materialCategories.map(cat => {
-                  const selected = (form.supplied_categories || []).includes(cat.name)
-                  return (
-                    <label
-                      key={cat.id}
-                      className="flex items-center gap-2 text-sm text-gray-700 px-2 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selected}
-                        onChange={() =>
-                          setForm(f => {
-                            const cur = Array.isArray(f.supplied_categories)
-                              ? f.supplied_categories
-                              : []
-                            return {
-                              ...f,
-                              supplied_categories: cur.includes(cat.name)
-                                ? cur.filter(n => n !== cat.name)
-                                : [...cur, cat.name],
-                            }
-                          })
-                        }
-                        className="accent-green-700 flex-shrink-0"
-                      />
-                      <span className="truncate">{cat.name}</span>
-                    </label>
-                  )
-                })}
-              </div>
-            )}
-          </div>
+          {/* Materials Supplied (vendors only) */}
+          <SuppliedList
+            title="Materials Supplied"
+            value={form.supplied_categories}
+            onChange={v => setForm(f => ({ ...f, supplied_categories: v }))}
+            editing={editing}
+            template={materialCategories}
+          />
           {error && <p className="text-xs text-red-500">{error}</p>}
           </>
           ) : stab === 'pricing' ? (

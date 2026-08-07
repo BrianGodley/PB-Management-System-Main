@@ -50,3 +50,8 @@ create policy general_subcategory_rw on public.general_subcategory for all to au
 
 grant select, insert, update, delete on public.general_category    to authenticated;
 grant select, insert, update, delete on public.general_subcategory to authenticated;
+
+-- 3) Vendor "General Categories" list (informational; never used in estimator).
+--    Mirrors supplied_categories (text[]) on the vendor record.
+alter table public.subs_vendors
+  add column if not exists general_categories text[] not null default '{}';

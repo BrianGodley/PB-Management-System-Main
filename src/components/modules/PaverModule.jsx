@@ -844,7 +844,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         .eq('category', 'Paver'),
       supabase
         .from('subs_vendors')
-        .select('id, company_name, supplied_categories')
+        .select('id, company_name')
         .eq('type', 'vendor')
         .order('company_name'),
     ])
@@ -867,7 +867,6 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       (venRes.data || []).map(v => ({
         id: v.id,
         name: v.company_name,
-        categories: v.supplied_categories || [],
       }))
     )
   }, [])
@@ -981,7 +980,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   const subInstall = state.subInstall || {}
 
   // ── Vendor catalog helpers (per-row Vendor/Type pickers) ─────────────────
-  const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
+  const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
 
   // Resolve a catalog item's unit cost from the price ledger (per-vendor),
   // falling back to the row's own unit_cost.

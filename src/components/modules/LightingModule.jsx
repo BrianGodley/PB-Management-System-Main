@@ -251,7 +251,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
         .eq('category', LIGHTING_CATEGORY),
       supabase
         .from('subs_vendors')
-        .select('id, company_name, supplied_categories')
+        .select('id, company_name')
         .eq('type', 'vendor')
         .order('company_name'),
     ])
@@ -260,7 +260,6 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
       (venRes.data || []).map(v => ({
         id: v.id,
         name: v.company_name,
-        categories: v.supplied_categories || [],
       }))
     )
   }, [])
@@ -391,7 +390,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
       : calcRaw
 
   // ── Vendor / row helpers ─────────────────────────────────────────────────────
-  const vendorsForCategory = cat => vendors.filter(v => (v.categories || []).includes(cat))
+  const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id))
   const vendorSelectOptions = () => [
     { value: 'House', label: 'Standard' },
     ...vendorsForCategory(LIGHTING_CATEGORY).map(v => ({ value: v.id, label: v.name })),
