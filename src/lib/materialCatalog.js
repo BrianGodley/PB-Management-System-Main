@@ -279,3 +279,73 @@ export function useMaterialCatalog(categories, initial = {}) {
     vendorOptionsForCategory,
   }
 }
+
+// New-model version of useMaterialCatalog — same return shape, but material
+// options/prices come from material + material_price (via fetchModuleCatalog),
+// labor from labor_rates, fees from misc_rates. materialRows carry calc_meta
+// (which includes migrated block dims for Modular Wall). Standard prices are
+// keyed by the (cleaned) description in priceMap. Use this to repoint a hook
+// module off material_rates without touching the legacy hook other modules use.
+export function useNewMaterialCatalog(categories, initial = {}) {
+  const cats = Array.isArray(categories) ? categories : [categories]
+  const catsKey = cats.join('|')
+
+  const [priceMap, setPriceMap] = useState(initial.materialPrices ?? {})
+  const [materialRows, setMaterialRows] = useState(initial.materialRows ?? [])
+  const [vendors, setVendors] = useState([])
+  const [loading, setLoading] = useState(!initial.materialPrices)
+
+  const refresh = useCallback(async () => {
+    const catList = catsKey.split('|')
+    const [rows, labRes, feeRes, venRes] = await Promise.all([
+      fetchModuleCatalog(catList),
+      supabase.from('labor_rates').select('name, rate').in('category', catList),
+      supabase.from('misc_rates').select('name, rate').in('category', catList),
+      supabase
+        .from('subs_vendors')
+        .select('id, company_name, supplied_categories')
+        .eq('type', 'vendor')
+        .order('company_name'),
+    ])
+    const pm = {}
+    ;(rows || []).forEach(r => {
+      if (r.vendor_id == null && r.name) pm[r.name] = num(r.unit_cost)
+    })
+    ;(labRes.data || []).forEach(r => {
+      pm[r.name] = num(r.rate)
+    })
+    ;(feeRes.data || []).forEach(r => {
+      pm[r.name] = num(r.rate)
+    })
+    setPriceMap(pm)
+    setMaterialRows(rows || [])
+    setVendors(
+      (venRes.data || []).map(v => ({
+        id: v.id,
+        name: v.company_name,
+        categories: v.supplied_categories || [],
+      }))
+    )
+    setLoading(false)
+  }, [catsKey])
+
+  useEffect(() => {
+    refresh()
+  }, [refresh])
+
+  const resolve = useCallback(
+    (name, vendorId, fallback = 0) =>
+      resolveMaterialPrice(name, vendorId, materialRows, priceMap, fallback),
+    [materialRows, priceMap]
+  )
+  const vendorOptionsForCategory = useCallback(
+    cat => [
+      { value: 'House', label: 'Standard' },
+      ...vendors.filter(v => (v.categories || []).includes(cat)).map(v => ({ value: v.id, label: v.name })),
+    ],
+    [vendors]
+  )
+  const vendorNames = useMemo(() => Object.fromEntries(vendors.map(v => [v.id, v.name])), [vendors])
+
+  return { priceMap, materialRows, vendors, vendorNames, loading, refresh, resolve, vendorOptionsForCategory }
+}

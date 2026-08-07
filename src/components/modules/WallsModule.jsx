@@ -9,7 +9,7 @@ import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { groutCyPerBlock as cmuGroutCyPerBlock } from '../../lib/cmuGrout'
 import {
-  useMaterialCatalog,
+  useNewMaterialCatalog,
   resolveMaterialPrice,
   catalogOptions,
   catalogItemFor,
@@ -401,11 +401,14 @@ function resolveMasterBlock(wall, materialRows, subcat) {
     fallbackFirst: true,
   })
   if (!row) return MODULAR_FALLBACK
+  // Block dims now live in the product's calc_meta (new model); fall back to the
+  // legacy columns for safety, then to the module defaults.
+  const cm = row.calc_meta || {}
   return {
     name: row.name,
-    w: n(row.block_w_in) || MODULAR_FALLBACK.w,
-    h: n(row.block_h_in) || MODULAR_FALLBACK.h,
-    l: n(row.block_l_in) || MODULAR_FALLBACK.l,
+    w: n(cm.block_w_in) || n(row.block_w_in) || MODULAR_FALLBACK.w,
+    h: n(cm.block_h_in) || n(row.block_h_in) || MODULAR_FALLBACK.h,
+    l: n(cm.block_l_in) || n(row.block_l_in) || MODULAR_FALLBACK.l,
     price: n(row.unit_cost),
   }
 }
@@ -1449,8 +1452,8 @@ function ModularWallEntry({
                       {opts.map(o => (
                         <option key={o.id} value={o.id}>
                           {o.label}
-                          {n(o.row?.block_w_in)
-                            ? ` — ${n(o.row.block_w_in)}×${n(o.row.block_h_in)}×${n(o.row.block_l_in)}`
+                          {n(o.row?.calc_meta?.block_w_in) || n(o.row?.block_w_in)
+                            ? ` — ${n(o.row.calc_meta?.block_w_in) || n(o.row.block_w_in)}×${n(o.row.calc_meta?.block_h_in) || n(o.row.block_h_in)}×${n(o.row.calc_meta?.block_l_in) || n(o.row.block_l_in)}`
                             : ''}
                         </option>
                       ))}
@@ -1616,7 +1619,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
     loading: pricesLoading,
     refresh: refreshAllRates,
     vendorOptionsForCategory,
-  } = useMaterialCatalog([WALLS_CATEGORY, BASIC_CATEGORY], {
+  } = useNewMaterialCatalog([WALLS_CATEGORY, BASIC_CATEGORY], {
     materialPrices: initialData?.materialPrices,
     materialRows: initialData?.materialRows,
   })
