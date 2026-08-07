@@ -128,6 +128,8 @@ const DEFAULT_CMU = () => ({
   pctCurved: '0',
   subEach: '',
   wpRows: [blankWpRow()],
+  finishRows: [],
+  capRows: [],
 })
 const DEFAULT_PIP = () => ({
   vendor: 'House',
@@ -138,6 +140,8 @@ const DEFAULT_PIP = () => ({
   horizBars: '2',
   subEach: '',
   wpRows: [blankWpRow()],
+  finishRows: [],
+  capRows: [],
 })
 // Modular block wall — duplicates the CMU fields EXCEPT rebar spacing, horiz
 // bars, bond-beam courses and % grouted solid (modular block isn't grouted or
@@ -153,6 +157,8 @@ const DEFAULT_MODULAR = () => ({
   pctCurved: '0',
   subEach: '',
   wpRows: [blankWpRow()],
+  finishRows: [],
+  capRows: [],
 })
 // Brick wall — same structure/pricing model as Modular (block + footing, no
 // grout/rebar), just a different wall category.
@@ -166,6 +172,8 @@ const DEFAULT_BRICK = () => ({
   pctCurved: '0',
   subEach: '',
   wpRows: [blankWpRow()],
+  finishRows: [],
+  capRows: [],
 })
 
 // ── Fixed per-section type lists (the Item dropdown; NOT from the DB) ─────────
@@ -643,17 +651,25 @@ function calcWalls(
     structuralSubMat += n(state.timberLF) > 0 ? n(state.timberLF) * tSubEach : timberMat
   }
 
-  // ── Wall Finishes — per-row (Vendor + Item). Formula per type is identical
-  //    to the original calc; the material price is vendor-resolved. ──────────
-  const finishRows = (state.wallFinishRows || []).map(row =>
-    computeWallFinishRow(row, mp, materialRows)
-  )
+  // ── Wall Finishes & Caps — now specified PER WALL. Gather each wall's own
+  //    finishRows / capRows across every wall type; per-row math is identical
+  //    to the original global sections, so totals are unchanged. ────────────
+  const allWalls = [
+    ...(state.cmuWalls || []),
+    ...(state.pipWalls || []),
+    ...(state.modularWalls || []),
+    ...(state.brickWalls || []),
+  ]
+  const finishRows = allWalls
+    .flatMap(w => w.finishRows || [])
+    .map(row => computeWallFinishRow(row, mp, materialRows))
   const finishHrs = finishRows.reduce((a, x) => a + (x.hrs || 0), 0)
   const finishMat = finishRows.reduce((a, x) => a + (x.mat || 0), 0)
   const finishSubMat = finishRows.reduce((a, x) => a + (x.subMat || 0), 0)
 
-  // ── Caps — per-row (Vendor + Item), identical math incl. Precast width. ────
-  const capResults = (state.capRows || []).map(row => computeCapRow(row, mp, materialRows))
+  const capResults = allWalls
+    .flatMap(w => w.capRows || [])
+    .map(row => computeCapRow(row, mp, materialRows))
   const capHrs = capResults.reduce((a, x) => a + (x.hrs || 0), 0)
   const capMat = capResults.reduce((a, x) => a + (x.mat || 0), 0)
   const capSubMat = capResults.reduce((a, x) => a + (x.subMat || 0), 0)
@@ -799,11 +815,20 @@ const CAP_TYPES = ['None', 'Flagstone', 'Precast', 'PIP Concrete', 'Bullnose Bri
 // In-House and Sub each hold their own independent copy so the two tabs are
 // separate calculators. Backward-compat: legacy single-entry / flat fields are
 // migrated into the array forms below.
-// Ensure a wall entry has its own waterproofing rows (default one blank row).
+// Waterproofing is now a SINGLE field per wall — collapse any legacy multi-row
+// wp to the first meaningful line (prefer the first non-None).
 function initWallWp(w = {}) {
-  if (Array.isArray(w.wpRows) && w.wpRows.length)
-    return w.wpRows.map(r => ({ vendor: 'House', subEach: '', ...r }))
-  return [blankWpRow()]
+  const rows = Array.isArray(w.wpRows) ? w.wpRows.map(r => ({ vendor: 'House', subEach: '', ...r })) : []
+  if (!rows.length) return [blankWpRow()]
+  const firstReal = rows.find(r => r.type && r.type !== 'None')
+  return [firstReal || rows[0]]
+}
+// Per-wall Finishes / Caps — normalized copies (default empty).
+function initWallExtras(w = {}) {
+  return {
+    finishRows: Array.isArray(w.finishRows) ? w.finishRows.map(r => ({ ...r })) : [],
+    capRows: Array.isArray(w.capRows) ? w.capRows.map(r => ({ vendor: 'House', subEach: '', ...r })) : [],
+  }
 }
 function initCmuWalls(src = {}) {
   if (src.cmuWalls)
@@ -813,6 +838,7 @@ function initCmuWalls(src = {}) {
       subEach: '',
       ...w,
       wpRows: initWallWp(w),
+      ...initWallExtras(w),
     }))
   if (src.cmuLF !== undefined)
     return [
@@ -830,16 +856,32 @@ function initCmuWalls(src = {}) {
         pctCurved: src.cmuPctCurved ?? '0',
         subEach: '',
         wpRows: [blankWpRow()],
+        finishRows: [],
+        capRows: [],
       },
     ]
   return [DEFAULT_CMU()]
 }
 function initPipWalls(src = {}) {
   if (src.pipWalls)
-    return src.pipWalls.map(w => ({ vendor: 'House', subEach: '', ...w, wpRows: initWallWp(w) }))
+    return src.pipWalls.map(w => ({
+      vendor: 'House',
+      subEach: '',
+      ...w,
+      wpRows: initWallWp(w),
+      ...initWallExtras(w),
+    }))
   if (src.pipLF !== undefined)
     return [
-      { vendor: 'House', lf: src.pipLF, heightIn: src.pipHeightIn, subEach: '', wpRows: [blankWpRow()] },
+      {
+        vendor: 'House',
+        lf: src.pipLF,
+        heightIn: src.pipHeightIn,
+        subEach: '',
+        wpRows: [blankWpRow()],
+        finishRows: [],
+        capRows: [],
+      },
     ]
   return [DEFAULT_PIP()]
 }
@@ -851,6 +893,7 @@ function initModularWalls(src = {}) {
       subEach: '',
       ...w,
       wpRows: initWallWp(w),
+      ...initWallExtras(w),
     }))
   return [DEFAULT_MODULAR()]
 }
@@ -862,6 +905,7 @@ function initBrickWalls(src = {}) {
       subEach: '',
       ...w,
       wpRows: initWallWp(w),
+      ...initWallExtras(w),
     }))
   return [DEFAULT_BRICK()]
 }
@@ -907,10 +951,32 @@ function makeTab(src = {}) {
   if (!src.cmuWalls) {
     const legacyWp = initWpRows(src).filter(w => w.type && w.type !== 'None')
     if (legacyWp.length && cmuWalls[0]) {
-      const existing = (cmuWalls[0].wpRows || []).filter(w => w.type && w.type !== 'None')
-      const merged = [...existing, ...legacyWp]
-      cmuWalls[0].wpRows = merged.length ? merged : [blankWpRow()]
+      // Single wp per wall now — keep the first legacy line if the wall has none.
+      const existing = (cmuWalls[0].wpRows || []).find(w => w.type && w.type !== 'None')
+      cmuWalls[0].wpRows = [existing || legacyWp[0]]
     }
+  }
+  // Finishes & Caps are per-wall now. Old estimates stored one global list
+  // (wallFinishRows / capRows) — fold the REAL (non-empty) rows onto the first
+  // CMU wall so totals stay byte-for-byte identical. New estimates already carry
+  // per-wall finishRows/capRows (detected below) and skip this.
+  const anyWall = [
+    ...(src.cmuWalls || []),
+    ...(src.pipWalls || []),
+    ...(src.modularWalls || []),
+    ...(src.brickWalls || []),
+  ]
+  const isNewFormat = anyWall.some(w => Array.isArray(w.finishRows) || Array.isArray(w.capRows))
+  if (!isNewFormat && cmuWalls[0]) {
+    const legacyFinish = initWallFinishRows(src).filter(
+      row => n(row.sf) > 0 || (row.rateIn != null && row.rateIn !== '')
+    )
+    const legacyCaps = (Array.isArray(src.capRows) ? src.capRows : [])
+      .map(row => ({ vendor: 'House', subEach: '', ...row }))
+      .filter(row => row.type && row.type !== 'None')
+    if (legacyFinish.length)
+      cmuWalls[0].finishRows = [...(cmuWalls[0].finishRows || []), ...legacyFinish]
+    if (legacyCaps.length) cmuWalls[0].capRows = [...(cmuWalls[0].capRows || []), ...legacyCaps]
   }
   return {
     difficulty: src.difficulty ?? '',
@@ -930,15 +996,14 @@ function makeTab(src = {}) {
     timberType: src.timberType ?? 'Railroad Treated',
     timberPosts: src.timberPosts ?? '',
     timberSubEach: src.timberSubEach ?? '',
-    wallFinishRows: initWallFinishRows(src),
-    capRows: src.capRows ? src.capRows.map(r => ({ vendor: 'House', subEach: '', ...r })) : DEFAULT_CAP_ROWS.map(r => ({ ...r })),
     manualRows: src.manualRows ?? DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
   }
 }
 
-// ── Per-wall Waterproofing sub-section ────────────────────────────────────────
-// Renders inside every wall entry (CMU / PIP / Modular). Edits the wall's own
-// wpRows via the supplied handlers. "None" rows contribute nothing.
+// ── Per-wall Waterproofing field ──────────────────────────────────────────────
+// A SINGLE waterproofing line that is a standard field on every wall entry (it
+// carries over with each wall the user adds). No add/remove — edits the wall's
+// own wpRows[0] via onWpUpdate. "None" contributes nothing.
 function WallWaterproofing({
   wpRows,
   vendorOptions,
@@ -947,97 +1012,406 @@ function WallWaterproofing({
   isSub,
   refreshAllRates,
   onWpUpdate,
-  onWpAdd,
-  onWpRemove,
 }) {
-  const rows = Array.isArray(wpRows) && wpRows.length ? wpRows : [blankWpRow()]
+  const row = (Array.isArray(wpRows) && wpRows[0]) || blankWpRow()
   const rr = key => materialPrices?.[WALL_RATES[key].db] ?? WALL_RATES[key].fb
+  const wpKey = WP_KEY[row.type]
+  const wpc = computeWpRow(row, materialPrices, materialRows)
   return (
     <div className="mt-3 border-t border-gray-100 pt-2">
       <label className="block text-xs text-gray-500 mb-1 font-medium">Waterproofing</label>
-      <div className="space-y-2">
-        {rows.map((row, i) => {
-          const wpKey = WP_KEY[row.type]
-          const wpc = computeWpRow(row, materialPrices, materialRows)
-          return (
-            <div key={i} className="flex items-center gap-2 flex-wrap">
-              <select
-                className="input text-sm py-1.5 w-40"
-                value={row.vendor || 'House'}
-                onChange={e => onWpUpdate(i, 'vendor', e.target.value)}
-              >
-                {vendorOptions.map(o => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="input text-sm py-1.5 flex-1 min-w-[10rem]"
-                value={row.type}
-                onChange={e => onWpUpdate(i, 'type', e.target.value)}
-              >
-                <option>None</option>
-                <option>Primer &amp; Membrane</option>
-                <option>3 Coats Roll On</option>
-                <option>Thoroseal &amp; Roll On</option>
-                <option>Dimple Membrane</option>
-              </select>
-              {row.type !== 'None' && (
-                <NumInput
-                  value={row.sf}
-                  onChange={v => onWpUpdate(i, 'sf', v)}
-                  placeholder="0"
-                  className="w-28"
-                />
-              )}
-              {row.type !== 'None' && <span className="text-xs text-gray-400 shrink-0">SF</span>}
-              {row.type !== 'None' && wpKey && (
-                <span className="inline-flex items-center gap-1 text-xs text-gray-400">
-                  ${wallMatPrice(WALL_RATES[wpKey].db, row.vendor, materialRows, materialPrices, WALL_RATES[wpKey].fb).toFixed(2)}/SF
-                  <RateEditPopover
-                    table="material_rates"
-                    name={WALL_RATES[wpKey].db}
-                    category="Walls"
-                    unitLabel="SF"
-                    currentValue={rr(wpKey)}
-                    onSaved={refreshAllRates}
-                  />
-                </span>
-              )}
-              {isSub && row.type !== 'None' && (
-                <div className="relative w-24">
-                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                    $
-                  </span>
-                  <input
-                    type="number"
-                    step="any"
-                    className="input text-sm py-1.5 pl-5 w-full"
-                    placeholder={r2(wpc.subUnit).toString()}
-                    value={row.subEach ?? ''}
-                    onChange={e => onWpUpdate(i, 'subEach', e.target.value)}
-                  />
-                </div>
-              )}
-              {rows.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => onWpRemove(i)}
-                  className="text-xs text-red-400 hover:text-red-600 px-2 py-0.5 rounded border border-red-100 hover:border-red-300"
-                >
-                  Remove
-                </button>
-              )}
-            </div>
-          )
-        })}
+      <div className="flex items-center gap-2 flex-wrap">
+        <select
+          className="input text-sm py-1.5 w-40"
+          value={row.vendor || 'House'}
+          onChange={e => onWpUpdate(0, 'vendor', e.target.value)}
+        >
+          {vendorOptions.map(o => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <select
+          className="input text-sm py-1.5 flex-1 min-w-[10rem]"
+          value={row.type}
+          onChange={e => onWpUpdate(0, 'type', e.target.value)}
+        >
+          <option>None</option>
+          <option>Primer &amp; Membrane</option>
+          <option>3 Coats Roll On</option>
+          <option>Thoroseal &amp; Roll On</option>
+          <option>Dimple Membrane</option>
+        </select>
+        {row.type !== 'None' && (
+          <NumInput
+            value={row.sf}
+            onChange={v => onWpUpdate(0, 'sf', v)}
+            placeholder="0"
+            className="w-28"
+          />
+        )}
+        {row.type !== 'None' && <span className="text-xs text-gray-400 shrink-0">SF</span>}
+        {row.type !== 'None' && wpKey && (
+          <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+            ${wallMatPrice(WALL_RATES[wpKey].db, row.vendor, materialRows, materialPrices, WALL_RATES[wpKey].fb).toFixed(2)}/SF
+            <RateEditPopover
+              table="material_rates"
+              name={WALL_RATES[wpKey].db}
+              category="Walls"
+              unitLabel="SF"
+              currentValue={rr(wpKey)}
+              onSaved={refreshAllRates}
+            />
+          </span>
+        )}
+        {isSub && row.type !== 'None' && (
+          <div className="relative w-24">
+            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+            <input
+              type="number"
+              step="any"
+              className="input text-sm py-1.5 pl-5 w-full"
+              placeholder={r2(wpc.subUnit).toString()}
+              value={row.subEach ?? ''}
+              onChange={e => onWpUpdate(0, 'subEach', e.target.value)}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Per-wall Finishes editor ──────────────────────────────────────────────────
+// Add / edit / remove finish rows scoped to one wall. Math is identical to the
+// original global section — only the row source is per-wall. Handlers:
+//   onPatch(i, patch, recompute) · onAdd() · onRemove(i)
+function WallFinishesEditor({
+  rows = [],
+  onPatch,
+  onAdd,
+  onRemove,
+  vendorOptions,
+  materialPrices,
+  materialRows,
+  isSub,
+  refreshAllRates,
+}) {
+  const r = key => materialPrices?.[WALL_RATES[key].db] ?? WALL_RATES[key].fb
+  const p = db => materialPrices?.[db] ?? undefined
+  const fmt2 = v =>
+    `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return (
+    <div className="mt-3 border-t border-gray-100 pt-2">
+      <label className="block text-xs text-gray-500 mb-1 font-medium">Finishes</label>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-xs text-gray-500 border-b border-gray-200">
+              <th className="text-left pb-1 pr-2 font-medium w-40">Vendor</th>
+              <th className="text-left pb-1 pr-2 font-medium w-36">Item</th>
+              <th className="text-left pb-1 pr-2 font-medium w-24">SF</th>
+              <th className="text-left pb-1 pr-2 font-medium">Rate</th>
+              <th className="text-right pb-1 pr-2 font-medium text-gray-400 w-24">
+                {isSub ? 'Flat $/unit' : 'Labor hrs'}
+              </th>
+              <th className="text-right pb-1 pr-2 font-medium text-gray-400 w-24">Material $</th>
+              <th className="w-6" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => {
+              const c = computeWallFinishRow(row, materialPrices, materialRows)
+              const meta = WALL_FINISH_META[row.type] || {}
+              return (
+                <tr key={i} className="border-b border-gray-100">
+                  <td className="py-1.5 pr-2">
+                    <select
+                      className="input text-sm py-1 w-full"
+                      value={row.vendor || 'House'}
+                      onChange={e => onPatch(i, { vendor: e.target.value }, true)}
+                    >
+                      {vendorOptions.map(o => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="py-1.5 pr-2">
+                    <select
+                      className="input text-sm py-1 w-full"
+                      value={row.type}
+                      onChange={e => onPatch(i, { type: e.target.value }, true)}
+                    >
+                      {WALL_FINISH_TYPES.map(t => (
+                        <option key={t}>{t}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="py-1.5 pr-2">
+                    <NumInput
+                      value={row.sf}
+                      onChange={v => onPatch(i, { sf: v }, false)}
+                      className="w-24"
+                    />
+                  </td>
+                  <td className="py-1.5 pr-2">
+                    <div className="flex items-center gap-1">
+                      <div className="relative w-24">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                          $
+                        </span>
+                        <input
+                          type="number"
+                          step="any"
+                          className="input text-sm py-1.5 pl-5 w-full"
+                          placeholder={meta.matKey ? r(meta.matKey).toFixed(2) : '0'}
+                          value={row.rateIn ?? ''}
+                          onChange={e => onPatch(i, { rateIn: e.target.value }, true)}
+                        />
+                      </div>
+                      {meta.matKey && (
+                        <RateEditPopover
+                          table="material_rates"
+                          name={WALL_RATES[meta.matKey].db}
+                          category="Walls"
+                          unitLabel={meta.matUnit}
+                          currentValue={p(WALL_RATES[meta.matKey].db) ?? WALL_RATES[meta.matKey].fb}
+                          onSaved={refreshAllRates}
+                        />
+                      )}
+                      {meta.labKey && (
+                        <RateEditPopover
+                          table="labor_rates"
+                          name={WALL_RATES[meta.labKey].db}
+                          category="Walls"
+                          mode="coefficient"
+                          unitLabel={meta.labUnit || 'rate'}
+                          currentValue={p(WALL_RATES[meta.labKey].db) ?? WALL_RATES[meta.labKey].fb}
+                          onSaved={refreshAllRates}
+                        />
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-1.5 text-right text-xs pr-2">
+                    {isSub ? (
+                      <input
+                        type="number"
+                        step="any"
+                        className="input text-sm py-1 w-24 text-right"
+                        placeholder={r2(c.subUnit).toString()}
+                        value={row.subEach ?? ''}
+                        onChange={e => onPatch(i, { subEach: e.target.value }, false)}
+                      />
+                    ) : (
+                      <span className="text-gray-400">{c.hrs > 0 ? c.hrs.toFixed(2) : '—'}</span>
+                    )}
+                  </td>
+                  <td className="py-1.5 text-right text-xs text-gray-600">
+                    {(isSub ? c.subMat : c.mat) > 0 ? (
+                      <div className="text-right">
+                        <div>{fmt2(isSub ? c.subMat : c.mat)}</div>
+                        {!isSub && c.tons > 0 && (
+                          <div className="text-gray-400">{c.tons.toFixed(2)} tons</div>
+                        )}
+                      </div>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                  <td className="py-1.5 text-right">
+                    <button
+                      type="button"
+                      onClick={() => onRemove(i)}
+                      className="text-gray-300 hover:text-red-500 text-xs px-1"
+                      title="Remove row"
+                    >
+                      ✕
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
         <button
           type="button"
-          onClick={onWpAdd}
-          className="w-full py-1.5 rounded-lg border border-dashed border-green-400 text-green-700 text-xs font-medium hover:bg-green-50 transition-colors"
+          onClick={onAdd}
+          className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
         >
-          + Add another waterproofing line
+          + Add finish
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Per-wall Caps editor ──────────────────────────────────────────────────────
+// Add / edit / remove cap rows scoped to one wall. Identical cap math.
+function WallCapsEditor({
+  rows = [],
+  onPatch,
+  onAdd,
+  onRemove,
+  vendorOptions,
+  materialPrices,
+  materialRows,
+  isSub,
+  refreshAllRates,
+}) {
+  const p = db => materialPrices?.[db] ?? undefined
+  const fmt2 = v =>
+    `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return (
+    <div className="mt-3 border-t border-gray-100 pt-2">
+      <label className="block text-xs text-gray-500 mb-1 font-medium">Caps</label>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-xs text-gray-500 border-b border-gray-200">
+              <th className="text-left pb-1 pr-2 font-medium w-40">Vendor</th>
+              <th className="text-left pb-1 pr-2 font-medium w-36">Item</th>
+              <th className="text-left pb-1 pr-2 font-medium w-20">Width (in)</th>
+              <th className="text-left pb-1 pr-2 font-medium w-24">LF / Qty</th>
+              <th className="text-left pb-1 pr-2 font-medium">Rate</th>
+              <th className="text-right pb-1 pr-2 font-medium text-gray-400 w-24">
+                {isSub ? 'Flat $/unit' : 'Labor hrs'}
+              </th>
+              <th className="text-right pb-1 pr-2 font-medium text-gray-400 w-24">Material $</th>
+              <th className="w-6" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => {
+              const c = computeCapRow(row, materialPrices, materialRows)
+              const capMatKey = {
+                Flagstone: 'capFlagstone',
+                Precast: 'capPrecast',
+                'PIP Concrete': 'concreteTruck',
+                'Bullnose Brick': 'capBullnose',
+              }[row.type]
+              const capUnit = {
+                Flagstone: 'ton',
+                Precast: 'ea',
+                'PIP Concrete': 'CY',
+                'Bullnose Brick': 'LF',
+              }[row.type]
+              const isActive = row.type !== 'None'
+              return (
+                <tr key={i} className="border-b border-gray-100">
+                  <td className="py-1.5 pr-2">
+                    <select
+                      className="input text-sm py-1 w-full"
+                      value={row.vendor || 'House'}
+                      onChange={e => onPatch(i, { vendor: e.target.value }, true)}
+                    >
+                      {vendorOptions.map(o => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="py-1.5 pr-2">
+                    <select
+                      className="input text-sm py-1 w-full"
+                      value={row.type}
+                      onChange={e => onPatch(i, { type: e.target.value }, true)}
+                    >
+                      {CAP_TYPES.map(t => (
+                        <option key={t}>{t}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="py-1.5 pr-2">
+                    {isActive && row.type !== 'Precast' && (
+                      <NumInput
+                        value={row.widthIn}
+                        onChange={v => onPatch(i, { widthIn: v }, true)}
+                        className="w-20"
+                        placeholder="4"
+                      />
+                    )}
+                    {isActive && row.type === 'Precast' && (
+                      <NumInput
+                        value={row.widthIn}
+                        onChange={v => onPatch(i, { widthIn: v }, true)}
+                        className="w-20"
+                        placeholder="8"
+                      />
+                    )}
+                  </td>
+                  <td className="py-1.5 pr-2">
+                    {isActive && (
+                      <NumInput
+                        value={row.type === 'Precast' ? row.qty : row.lf}
+                        onChange={v =>
+                          onPatch(i, row.type === 'Precast' ? { qty: v } : { lf: v }, false)
+                        }
+                        className="w-20"
+                        placeholder="0"
+                      />
+                    )}
+                  </td>
+                  <td className="py-1.5 pr-2">
+                    {isActive && capMatKey ? (
+                      <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+                        ${wallMatPrice(WALL_RATES[capMatKey].db, row.vendor, materialRows, materialPrices, WALL_RATES[capMatKey].fb).toFixed(2)}/{capUnit}
+                        <RateEditPopover
+                          table="material_rates"
+                          name={WALL_RATES[capMatKey].db}
+                          category="Walls"
+                          unitLabel={capUnit}
+                          currentValue={p(WALL_RATES[capMatKey].db) ?? WALL_RATES[capMatKey].fb}
+                          onSaved={refreshAllRates}
+                        />
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-300">—</span>
+                    )}
+                  </td>
+                  <td className="py-1.5 text-right text-xs pr-2">
+                    {!isActive ? (
+                      <span className="text-gray-300">—</span>
+                    ) : isSub ? (
+                      <input
+                        type="number"
+                        step="any"
+                        className="input text-sm py-1 w-24 text-right"
+                        placeholder={r2(c.subUnit).toString()}
+                        value={row.subEach ?? ''}
+                        onChange={e => onPatch(i, { subEach: e.target.value }, false)}
+                      />
+                    ) : (
+                      <span className="text-gray-400">{c.hrs > 0 ? c.hrs.toFixed(2) : '—'}</span>
+                    )}
+                  </td>
+                  <td className="py-1.5 text-right text-xs text-gray-600">
+                    {(isSub ? c.subMat : c.mat) > 0 ? fmt2(isSub ? c.subMat : c.mat) : '—'}
+                  </td>
+                  <td className="py-1.5 text-right">
+                    <button
+                      type="button"
+                      onClick={() => onRemove(i)}
+                      className="text-gray-300 hover:text-red-500 text-xs px-1"
+                      title="Remove row"
+                    >
+                      ✕
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        <button
+          type="button"
+          onClick={onAdd}
+          className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+        >
+          + Add cap
         </button>
       </div>
     </div>
@@ -1058,8 +1432,8 @@ function CmuWallEntry({
   isSub,
   refreshAllRates,
   onWpUpdate,
-  onWpAdd,
-  onWpRemove,
+  finishHandlers,
+  capHandlers,
 }) {
   const set = field => val => onChange(idx, field, val)
   const hasData = n(wall.lf) > 0 && n(wall.heightIn) > 0
@@ -1230,6 +1604,24 @@ function CmuWallEntry({
           </span>
         </div>
       )}
+      <WallCapsEditor
+        rows={wall.capRows || []}
+        vendorOptions={vendorOptions}
+        materialPrices={materialPrices}
+        materialRows={materialRows}
+        isSub={isSub}
+        refreshAllRates={refreshAllRates}
+        {...(capHandlers || {})}
+      />
+      <WallFinishesEditor
+        rows={wall.finishRows || []}
+        vendorOptions={vendorOptions}
+        materialPrices={materialPrices}
+        materialRows={materialRows}
+        isSub={isSub}
+        refreshAllRates={refreshAllRates}
+        {...(finishHandlers || {})}
+      />
       <WallWaterproofing
         wpRows={wall.wpRows}
         vendorOptions={vendorOptions}
@@ -1238,8 +1630,6 @@ function CmuWallEntry({
         isSub={isSub}
         refreshAllRates={refreshAllRates}
         onWpUpdate={onWpUpdate}
-        onWpAdd={onWpAdd}
-        onWpRemove={onWpRemove}
       />
     </div>
   )
@@ -1259,8 +1649,8 @@ function PipWallEntry({
   materialRows,
   refreshAllRates,
   onWpUpdate,
-  onWpAdd,
-  onWpRemove,
+  finishHandlers,
+  capHandlers,
 }) {
   const set = field => val => onChange(idx, field, val)
   const hasData = n(wall.lf) > 0 && n(wall.heightIn) > 0
@@ -1354,6 +1744,24 @@ function PipWallEntry({
           </span>
         </div>
       )}
+      <WallCapsEditor
+        rows={wall.capRows || []}
+        vendorOptions={vendorOptions}
+        materialPrices={materialPrices}
+        materialRows={materialRows}
+        isSub={isSub}
+        refreshAllRates={refreshAllRates}
+        {...(capHandlers || {})}
+      />
+      <WallFinishesEditor
+        rows={wall.finishRows || []}
+        vendorOptions={vendorOptions}
+        materialPrices={materialPrices}
+        materialRows={materialRows}
+        isSub={isSub}
+        refreshAllRates={refreshAllRates}
+        {...(finishHandlers || {})}
+      />
       <WallWaterproofing
         wpRows={wall.wpRows}
         vendorOptions={vendorOptions}
@@ -1362,8 +1770,6 @@ function PipWallEntry({
         isSub={isSub}
         refreshAllRates={refreshAllRates}
         onWpUpdate={onWpUpdate}
-        onWpAdd={onWpAdd}
-        onWpRemove={onWpRemove}
       />
     </div>
   )
@@ -1385,8 +1791,8 @@ function ModularWallEntry({
   isSub,
   refreshAllRates,
   onWpUpdate,
-  onWpAdd,
-  onWpRemove,
+  finishHandlers,
+  capHandlers,
   // Modular tab passes { label:'Wall Type', subcat:'Modular Wall', master:true }
   // to source options from the master list. Brick omits it → legacy CMU catalog.
   typeSource = { label: 'Block Type', master: false },
@@ -1583,6 +1989,24 @@ function ModularWallEntry({
           </span>
         </div>
       )}
+      <WallCapsEditor
+        rows={wall.capRows || []}
+        vendorOptions={vendorOptions}
+        materialPrices={materialPrices}
+        materialRows={materialRows}
+        isSub={isSub}
+        refreshAllRates={refreshAllRates}
+        {...(capHandlers || {})}
+      />
+      <WallFinishesEditor
+        rows={wall.finishRows || []}
+        vendorOptions={vendorOptions}
+        materialPrices={materialPrices}
+        materialRows={materialRows}
+        isSub={isSub}
+        refreshAllRates={refreshAllRates}
+        {...(finishHandlers || {})}
+      />
       <WallWaterproofing
         wpRows={wall.wpRows}
         vendorOptions={vendorOptions}
@@ -1591,8 +2015,6 @@ function ModularWallEntry({
         isSub={isSub}
         refreshAllRates={refreshAllRates}
         onWpUpdate={onWpUpdate}
-        onWpAdd={onWpAdd}
-        onWpRemove={onWpRemove}
       />
     </div>
   )
@@ -1708,15 +2130,10 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
   const setTimberPosts = setField('timberPosts')
   const timberSubEach = cur.timberSubEach
   const setTimberSubEach = setField('timberSubEach')
-  const wallFinishRows = cur.wallFinishRows
-  const setWallFinishRows = setField('wallFinishRows')
-  const capRows = cur.capRows
-  const setCapRows = setField('capRows')
   const manualRows = cur.manualRows
   const setManualRows = setField('manualRows')
 
-  // Per-wall waterproofing helpers. Given a wall-array setter and a wall index,
-  // they mutate that wall's own wpRows without touching sibling walls.
+  // Per-wall waterproofing: single line, edits the wall's own wpRows[0].
   const makeWpHandlers = (setWalls, wallIdx) => ({
     onWpUpdate: (wpIdx, field, val) =>
       setWalls(ws =>
@@ -1724,34 +2141,50 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
           i === wallIdx
             ? {
                 ...w,
-                wpRows: (w.wpRows || [blankWpRow()]).map((r, j) =>
+                wpRows: (w.wpRows && w.wpRows.length ? w.wpRows : [blankWpRow()]).map((r, j) =>
                   j === wpIdx ? { ...r, [field]: val } : r
                 ),
               }
             : w
         )
       ),
-    onWpAdd: () =>
-      setWalls(ws =>
-        ws.map((w, i) =>
-          i === wallIdx ? { ...w, wpRows: [...(w.wpRows || []), blankWpRow()] } : w
-        )
-      ),
-    onWpRemove: wpIdx =>
+  })
+
+  // Per-wall Finishes / Caps handlers. `field` is 'finishRows' | 'capRows';
+  // `compute` recomputes the Sub flat default when a driving input changes.
+  const makeRowHandlers = (setWalls, wallIdx, field, blank, compute) => ({
+    onPatch: (rowIdx, patch, recompute) =>
       setWalls(ws =>
         ws.map((w, i) =>
           i === wallIdx
             ? {
                 ...w,
-                wpRows:
-                  (w.wpRows || []).length > 1
-                    ? w.wpRows.filter((_, j) => j !== wpIdx)
-                    : w.wpRows,
+                [field]: (w[field] || []).map((row, j) => {
+                  if (j !== rowIdx) return row
+                  const next = { ...row, ...patch }
+                  if (recompute && isSub)
+                    next.subEach = String(r2(compute(next, materialPrices, materialRows).subUnit))
+                  return next
+                }),
               }
             : w
         )
       ),
+    onAdd: () =>
+      setWalls(ws =>
+        ws.map((w, i) => (i === wallIdx ? { ...w, [field]: [...(w[field] || []), blank()] } : w))
+      ),
+    onRemove: rowIdx =>
+      setWalls(ws =>
+        ws.map((w, i) =>
+          i === wallIdx ? { ...w, [field]: (w[field] || []).filter((_, j) => j !== rowIdx) } : w
+        )
+      ),
   })
+  const makeFinishHandlers = (setWalls, wallIdx) =>
+    makeRowHandlers(setWalls, wallIdx, 'finishRows', blankWallFinishRow, computeWallFinishRow)
+  const makeCapHandlers = (setWalls, wallIdx) =>
+    makeRowHandlers(setWalls, wallIdx, 'capRows', blankCapRow, computeCapRow)
 
   // ── Sales tax — applied to totalMat across every module so the bid
   //    reflects supplier-invoiced material cost. Sourced from
@@ -1901,335 +2334,6 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
     `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   const p = db => materialPrices[db] ?? undefined
 
-  // ── Wall Finishes — Vendor + Item add/remove ROW table. The Item drives the
-  //    formula (unchanged); the Vendor + $/unit override drive only the
-  //    material price. Sub tab shows a flat $/unit that routes into subCost. ──
-  function renderWallFinishSection() {
-    const rows = wallFinishRows
-    const setRows = setWallFinishRows
-    return (
-      <div>
-        <SectionHeader title="Wall Finishes" />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-left pb-1 pr-2 font-medium w-40">Vendor</th>
-                <th className="text-left pb-1 pr-2 font-medium w-36">Item</th>
-                <th className="text-left pb-1 pr-2 font-medium w-24">SF</th>
-                <th className="text-left pb-1 pr-2 font-medium">Rate</th>
-                <th className="text-right pb-1 pr-2 font-medium text-gray-400 w-24">
-                  {isSub ? 'Flat $/unit' : 'Labor hrs'}
-                </th>
-                <th className="text-right pb-1 pr-2 font-medium text-gray-400 w-24">Material $</th>
-                <th className="w-6" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, i) => {
-                const c = computeWallFinishRow(row, materialPrices, materialRows)
-                const meta = WALL_FINISH_META[row.type] || {}
-                return (
-                  <tr key={i} className="border-b border-gray-100">
-                    <td className="py-1.5 pr-2">
-                      <select
-                        className="input text-sm py-1 w-full"
-                        value={row.vendor || 'House'}
-                        onChange={e =>
-                          patchRow(setRows, i, { vendor: e.target.value }, computeWallFinishRow, true)
-                        }
-                      >
-                        {vendorOptions.map(o => (
-                          <option key={o.value} value={o.value}>
-                            {o.label}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="py-1.5 pr-2">
-                      <select
-                        className="input text-sm py-1 w-full"
-                        value={row.type}
-                        onChange={e =>
-                          patchRow(setRows, i, { type: e.target.value }, computeWallFinishRow, true)
-                        }
-                      >
-                        {WALL_FINISH_TYPES.map(t => (
-                          <option key={t}>{t}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="py-1.5 pr-2">
-                      <NumInput
-                        value={row.sf}
-                        onChange={v => patchRow(setRows, i, { sf: v }, computeWallFinishRow, false)}
-                        className="w-24"
-                      />
-                    </td>
-                    <td className="py-1.5 pr-2">
-                      {/* Per-estimate $/unit override (empty → vendor/House
-                          price). Plus Edit-Rates popovers for House master. */}
-                      <div className="flex items-center gap-1">
-                        <div className="relative w-24">
-                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                            $
-                          </span>
-                          <input
-                            type="number"
-                            step="any"
-                            className="input text-sm py-1.5 pl-5 w-full"
-                            placeholder={meta.matKey ? r(meta.matKey).toFixed(2) : '0'}
-                            value={row.rateIn ?? ''}
-                            onChange={e =>
-                              patchRow(setRows, i, { rateIn: e.target.value }, computeWallFinishRow, true)
-                            }
-                          />
-                        </div>
-                        {meta.matKey && (
-                          <RateEditPopover
-                            table="material_rates"
-                            name={WALL_RATES[meta.matKey].db}
-                            category="Walls"
-                            unitLabel={meta.matUnit}
-                            currentValue={p(WALL_RATES[meta.matKey].db) ?? WALL_RATES[meta.matKey].fb}
-                            onSaved={refreshAllRates}
-                          />
-                        )}
-                        {meta.labKey && (
-                          <RateEditPopover
-                            table="labor_rates"
-                            name={WALL_RATES[meta.labKey].db}
-                            category="Walls"
-                            mode="coefficient"
-                            unitLabel={meta.labUnit || 'rate'}
-                            currentValue={p(WALL_RATES[meta.labKey].db) ?? WALL_RATES[meta.labKey].fb}
-                            onSaved={refreshAllRates}
-                          />
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-1.5 text-right text-xs pr-2">
-                      {isSub ? (
-                        <input
-                          type="number"
-                          step="any"
-                          className="input text-sm py-1 w-24 text-right"
-                          placeholder={r2(c.subUnit).toString()}
-                          value={row.subEach ?? ''}
-                          onChange={e =>
-                            patchRow(setRows, i, { subEach: e.target.value }, computeWallFinishRow, false)
-                          }
-                        />
-                      ) : (
-                        <span className="text-gray-400">{c.hrs > 0 ? c.hrs.toFixed(2) : '—'}</span>
-                      )}
-                    </td>
-                    <td className="py-1.5 text-right text-xs text-gray-600">
-                      {(isSub ? c.subMat : c.mat) > 0 ? (
-                        <div className="text-right">
-                          <div>{fmt2(isSub ? c.subMat : c.mat)}</div>
-                          {!isSub && c.tons > 0 && (
-                            <div className="text-gray-400">{c.tons.toFixed(2)} tons</div>
-                          )}
-                        </div>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td className="py-1.5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => removeRow(setRows, i)}
-                        className="text-gray-300 hover:text-red-500 text-xs px-1"
-                        title="Remove row"
-                      >
-                        ✕
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-          <button
-            type="button"
-            onClick={() => addRow(setRows, blankWallFinishRow)}
-            className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
-          >
-            + Add row
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  // ── Wall Caps — Vendor + Item add/remove ROW table. ─────────────────────────
-  function renderCapSection() {
-    return (
-      <div>
-        <SectionHeader title="Wall Caps" />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-left pb-1 pr-2 font-medium w-40">Vendor</th>
-                <th className="text-left pb-1 pr-2 font-medium w-36">Item</th>
-                <th className="text-left pb-1 pr-2 font-medium w-20">Width (in)</th>
-                <th className="text-left pb-1 pr-2 font-medium w-24">LF / Qty</th>
-                <th className="text-left pb-1 pr-2 font-medium">Rate</th>
-                <th className="text-right pb-1 pr-2 font-medium text-gray-400 w-24">
-                  {isSub ? 'Flat $/unit' : 'Labor hrs'}
-                </th>
-                <th className="text-right pb-1 pr-2 font-medium text-gray-400 w-24">Material $</th>
-                <th className="w-6" />
-              </tr>
-            </thead>
-            <tbody>
-              {capRows.map((row, i) => {
-                const c = computeCapRow(row, materialPrices, materialRows)
-                const capMatKey = {
-                  Flagstone: 'capFlagstone',
-                  Precast: 'capPrecast',
-                  'PIP Concrete': 'concreteTruck',
-                  'Bullnose Brick': 'capBullnose',
-                }[row.type]
-                const capUnit = {
-                  Flagstone: 'ton',
-                  Precast: 'ea',
-                  'PIP Concrete': 'CY',
-                  'Bullnose Brick': 'LF',
-                }[row.type]
-                const isActive = row.type !== 'None'
-                return (
-                  <tr key={i} className="border-b border-gray-100">
-                    <td className="py-1.5 pr-2">
-                      <select
-                        className="input text-sm py-1 w-full"
-                        value={row.vendor || 'House'}
-                        onChange={e =>
-                          patchRow(setCapRows, i, { vendor: e.target.value }, computeCapRow, true)
-                        }
-                      >
-                        {vendorOptions.map(o => (
-                          <option key={o.value} value={o.value}>
-                            {o.label}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="py-1.5 pr-2">
-                      <select
-                        className="input text-sm py-1 w-full"
-                        value={row.type}
-                        onChange={e =>
-                          patchRow(setCapRows, i, { type: e.target.value }, computeCapRow, true)
-                        }
-                      >
-                        {CAP_TYPES.map(t => (
-                          <option key={t}>{t}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="py-1.5 pr-2">
-                      {isActive && row.type !== 'Precast' && (
-                        <NumInput
-                          value={row.widthIn}
-                          onChange={v => patchRow(setCapRows, i, { widthIn: v }, computeCapRow, true)}
-                          className="w-20"
-                          placeholder="4"
-                        />
-                      )}
-                      {isActive && row.type === 'Precast' && (
-                        <NumInput
-                          value={row.widthIn}
-                          onChange={v => patchRow(setCapRows, i, { widthIn: v }, computeCapRow, true)}
-                          className="w-20"
-                          placeholder="8"
-                        />
-                      )}
-                    </td>
-                    <td className="py-1.5 pr-2">
-                      {isActive && (
-                        <NumInput
-                          value={row.type === 'Precast' ? row.qty : row.lf}
-                          onChange={v =>
-                            patchRow(
-                              setCapRows,
-                              i,
-                              row.type === 'Precast' ? { qty: v } : { lf: v },
-                              computeCapRow,
-                              false
-                            )
-                          }
-                          className="w-20"
-                          placeholder="0"
-                        />
-                      )}
-                    </td>
-                    <td className="py-1.5 pr-2">
-                      {isActive && capMatKey ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-gray-400">
-                          ${wallMatPrice(WALL_RATES[capMatKey].db, row.vendor, materialRows, materialPrices, WALL_RATES[capMatKey].fb).toFixed(2)}/{capUnit}
-                          <RateEditPopover
-                            table="material_rates"
-                            name={WALL_RATES[capMatKey].db}
-                            category="Walls"
-                            unitLabel={capUnit}
-                            currentValue={p(WALL_RATES[capMatKey].db) ?? WALL_RATES[capMatKey].fb}
-                            onSaved={refreshAllRates}
-                          />
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-300">—</span>
-                      )}
-                    </td>
-                    <td className="py-1.5 text-right text-xs pr-2">
-                      {!isActive ? (
-                        <span className="text-gray-300">—</span>
-                      ) : isSub ? (
-                        <input
-                          type="number"
-                          step="any"
-                          className="input text-sm py-1 w-24 text-right"
-                          placeholder={r2(c.subUnit).toString()}
-                          value={row.subEach ?? ''}
-                          onChange={e =>
-                            patchRow(setCapRows, i, { subEach: e.target.value }, computeCapRow, false)
-                          }
-                        />
-                      ) : (
-                        <span className="text-gray-400">{c.hrs > 0 ? c.hrs.toFixed(2) : '—'}</span>
-                      )}
-                    </td>
-                    <td className="py-1.5 text-right text-xs text-gray-600">
-                      {(isSub ? c.subMat : c.mat) > 0 ? fmt2(isSub ? c.subMat : c.mat) : '—'}
-                    </td>
-                    <td className="py-1.5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => removeRow(setCapRows, i)}
-                        className="text-gray-300 hover:text-red-500 text-xs px-1"
-                        title="Remove row"
-                      >
-                        ✕
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-          <button
-            type="button"
-            onClick={() => addRow(setCapRows, blankCapRow)}
-            className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
-          >
-            + Add row
-          </button>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <SubTabContext.Provider value={isSub}>
@@ -2373,166 +2477,6 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
         <div>
           <SectionHeader title="CMU Block Walls" />
 
-          {/* Inline CMU rate reference — labor + material — all editable */}
-          <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-2 text-[11px] text-gray-500">
-            <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">
-              CMU Rates (click any to edit)
-            </p>
-            <div className="flex flex-wrap gap-x-3 gap-y-1">
-              <span className="inline-flex items-center gap-1">
-                Grey block ${r('greyBlock')}/ea
-                <RateEditPopover
-                  table="material_rates"
-                  name={WALL_RATES.greyBlock.db}
-                  category="Walls"
-                  unitLabel="ea"
-                  currentValue={r('greyBlock')}
-                  onSaved={refreshAllRates}
-                />
-              </span>
-              <span className="inline-flex items-center gap-1">
-                Bondbeam ${r('bondbeamBlock')}/ea
-                <RateEditPopover
-                  table="material_rates"
-                  name={WALL_RATES.bondbeamBlock.db}
-                  category="Walls"
-                  unitLabel="ea"
-                  currentValue={r('bondbeamBlock')}
-                  onSaved={refreshAllRates}
-                />
-              </span>
-              <span className="inline-flex items-center gap-1">
-                Rebar ${r('rebar')}/LF
-                <RateEditPopover
-                  table="material_rates"
-                  name={WALL_RATES.rebar.db}
-                  category="Basic Materials"
-                  unitLabel="LF"
-                  currentValue={r('rebar')}
-                  onSaved={refreshAllRates}
-                />
-              </span>
-              <span className="inline-flex items-center gap-1">
-                Conc hand ${r('concreteHand')}/CY
-                <RateEditPopover
-                  table="material_rates"
-                  name={WALL_RATES.concreteHand.db}
-                  category="Basic Materials"
-                  unitLabel="CY"
-                  currentValue={r('concreteHand')}
-                  onSaved={refreshAllRates}
-                />
-              </span>
-              <span className="inline-flex items-center gap-1">
-                Conc truck ${r('concreteTruck')}/CY
-                <RateEditPopover
-                  table="material_rates"
-                  name={WALL_RATES.concreteTruck.db}
-                  category="Basic Materials"
-                  unitLabel="CY"
-                  currentValue={r('concreteTruck')}
-                  onSaved={refreshAllRates}
-                />
-              </span>
-              <span className="inline-flex items-center gap-1">
-                Grout pump setup ${r('groutPumpSetup')}
-                <RateEditPopover
-                  table="material_rates"
-                  name={WALL_RATES.groutPumpSetup.db}
-                  category="Basic Materials"
-                  unitLabel="flat"
-                  currentValue={r('groutPumpSetup')}
-                  onSaved={refreshAllRates}
-                />
-              </span>
-              <span className="inline-flex items-center gap-1">
-                Grout pump ${r('groutPumpPerYd')}/CY
-                <RateEditPopover
-                  table="material_rates"
-                  name={WALL_RATES.groutPumpPerYd.db}
-                  category="Basic Materials"
-                  unitLabel="CY"
-                  currentValue={r('groutPumpPerYd')}
-                  onSaved={refreshAllRates}
-                />
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
-              <span className="inline-flex items-center gap-1">
-                Dig {r('digLab')} CF/hr
-                <RateEditPopover
-                  table="labor_rates"
-                  name={WALL_RATES.digLab.db}
-                  category="Walls"
-                  mode="coefficient"
-                  unitLabel="CF/hr"
-                  currentValue={r('digLab')}
-                  onSaved={refreshAllRates}
-                />
-              </span>
-              <span className="inline-flex items-center gap-1">
-                Rebar {r('rebarLab')} LF/hr
-                <RateEditPopover
-                  table="labor_rates"
-                  name={WALL_RATES.rebarLab.db}
-                  category="Walls"
-                  mode="coefficient"
-                  unitLabel="LF/hr"
-                  currentValue={r('rebarLab')}
-                  onSaved={refreshAllRates}
-                />
-              </span>
-              <span className="inline-flex items-center gap-1">
-                Block {r('blockLab')} blk/hr
-                <RateEditPopover
-                  table="labor_rates"
-                  name={WALL_RATES.blockLab.db}
-                  category="Walls"
-                  mode="coefficient"
-                  unitLabel="blk/hr"
-                  currentValue={r('blockLab')}
-                  onSaved={refreshAllRates}
-                />
-              </span>
-              <span className="inline-flex items-center gap-1">
-                Hand grout {r('handGroutLab')} CF/hr
-                <RateEditPopover
-                  table="labor_rates"
-                  name={WALL_RATES.handGroutLab.db}
-                  category="Walls"
-                  mode="coefficient"
-                  unitLabel="CF/hr"
-                  currentValue={r('handGroutLab')}
-                  onSaved={refreshAllRates}
-                />
-              </span>
-              <span className="inline-flex items-center gap-1">
-                Pump grout {r('pumpGroutLab')} CF/hr
-                <RateEditPopover
-                  table="labor_rates"
-                  name={WALL_RATES.pumpGroutLab.db}
-                  category="Walls"
-                  mode="coefficient"
-                  unitLabel="CF/hr"
-                  currentValue={r('pumpGroutLab')}
-                  onSaved={refreshAllRates}
-                />
-              </span>
-              <span className="inline-flex items-center gap-1">
-                Setup/clean {r('setupCleanLab')} LF/hr
-                <RateEditPopover
-                  table="labor_rates"
-                  name={WALL_RATES.setupCleanLab.db}
-                  category="Walls"
-                  mode="coefficient"
-                  unitLabel="LF/hr"
-                  currentValue={r('setupCleanLab')}
-                  onSaved={refreshAllRates}
-                />
-              </span>
-            </div>
-          </div>
-
           {cmuWalls.map((wall, idx) => (
             <CmuWallEntry
               key={idx}
@@ -2548,6 +2492,8 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
               isSub={isSub}
               refreshAllRates={refreshAllRates}
               {...makeWpHandlers(setCmuWalls, idx)}
+              finishHandlers={makeFinishHandlers(setCmuWalls, idx)}
+              capHandlers={makeCapHandlers(setCmuWalls, idx)}
             />
           ))}
 
@@ -2593,49 +2539,6 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
         <div>
           <SectionHeader title="Poured In Place Walls" />
 
-          <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-2 text-[11px] text-gray-500">
-            <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">
-              PIP Rates (click to edit)
-            </p>
-            <div className="flex flex-wrap gap-x-3 gap-y-1">
-              <span className="inline-flex items-center gap-1">
-                Concrete truck ${r('concreteTruck')}/CY
-                <RateEditPopover
-                  table="material_rates"
-                  name={WALL_RATES.concreteTruck.db}
-                  category="Basic Materials"
-                  unitLabel="CY"
-                  currentValue={r('concreteTruck')}
-                  onSaved={refreshAllRates}
-                />
-              </span>
-              <span className="inline-flex items-center gap-1">
-                Dig {r('digLab')} CF/hr
-                <RateEditPopover
-                  table="labor_rates"
-                  name={WALL_RATES.digLab.db}
-                  category="Walls"
-                  mode="coefficient"
-                  unitLabel="CF/hr"
-                  currentValue={r('digLab')}
-                  onSaved={refreshAllRates}
-                />
-              </span>
-              <span className="inline-flex items-center gap-1">
-                Rebar {r('rebarLab')} LF/hr
-                <RateEditPopover
-                  table="labor_rates"
-                  name={WALL_RATES.rebarLab.db}
-                  category="Walls"
-                  mode="coefficient"
-                  unitLabel="LF/hr"
-                  currentValue={r('rebarLab')}
-                  onSaved={refreshAllRates}
-                />
-              </span>
-            </div>
-          </div>
-
           {pipWalls.map((wall, idx) => (
             <PipWallEntry
               key={idx}
@@ -2651,6 +2554,8 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
               materialRows={materialRows}
               refreshAllRates={refreshAllRates}
               {...makeWpHandlers(setPipWalls, idx)}
+              finishHandlers={makeFinishHandlers(setPipWalls, idx)}
+              capHandlers={makeCapHandlers(setPipWalls, idx)}
             />
           ))}
 
@@ -2684,6 +2589,8 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
               refreshAllRates={refreshAllRates}
               typeSource={{ label: 'Wall Type', subcat: MODULAR_SUBCAT, master: true }}
               {...makeWpHandlers(setModularWalls, idx)}
+              finishHandlers={makeFinishHandlers(setModularWalls, idx)}
+              capHandlers={makeCapHandlers(setModularWalls, idx)}
             />
           ))}
 
@@ -2735,6 +2642,8 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
               isSub={isSub}
               refreshAllRates={refreshAllRates}
               {...makeWpHandlers(setBrickWalls, idx)}
+              finishHandlers={makeFinishHandlers(setBrickWalls, idx)}
+              capHandlers={makeCapHandlers(setBrickWalls, idx)}
             />
           ))}
 
@@ -2829,11 +2738,8 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
         </div>
       )}
 
-      {/* ── Wall Finishes ── (hidden on the Modular / Brick tabs) */}
-      {wallType !== 'Modular' && wallType !== 'Brick' && renderWallFinishSection()}
-
-      {/* ── Wall Caps ── */}
-      {renderCapSection()}
+      {/* Finishes, Caps & Waterproofing are now specified inside each wall entry
+          above (per wall) — no separate global sections. */}
 
       {/* ── Manual Entry ── */}
       <div>

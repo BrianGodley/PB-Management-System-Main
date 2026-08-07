@@ -227,6 +227,25 @@ function allWpRows(t = {}) {
   return [...fromWalls, ...legacy].filter(w => w && w.type && w.type !== 'None' && n(w.sf) > 0)
 }
 
+// Finishes & caps now live per-wall. Gather each wall's rows; fall back to the
+// legacy top-level list (older saves) so both formats render identically.
+function allFinishRows(t = {}) {
+  const fromWalls = []
+  ;['cmuWalls', 'pipWalls', 'modularWalls', 'brickWalls'].forEach(k => {
+    if (Array.isArray(t[k])) t[k].forEach(w => (w.finishRows || []).forEach(r => fromWalls.push(r)))
+  })
+  const topLevel = Array.isArray(t.wallFinishRows) ? t.wallFinishRows : legacyFinishRows(t)
+  return [...fromWalls, ...topLevel]
+}
+function allCapRows(t = {}) {
+  const fromWalls = []
+  ;['cmuWalls', 'pipWalls', 'modularWalls', 'brickWalls'].forEach(k => {
+    if (Array.isArray(t[k])) t[k].forEach(w => (w.capRows || []).forEach(r => fromWalls.push(r)))
+  })
+  const topLevel = Array.isArray(t.capRows) ? t.capRows : []
+  return [...fromWalls, ...topLevel]
+}
+
 // Legacy flat finish fields → row shape (so old saves still list finishes).
 function legacyFinishRows(t = {}) {
   const rows = []
@@ -251,10 +270,8 @@ function tabHasData(t = {}) {
   const modular = (t.modularWalls || []).some(w => n(w.lf) > 0 || n(w.heightIn) > 0)
   const brick = (t.brickWalls || []).some(w => n(w.lf) > 0 || n(w.heightIn) > 0)
   const timber = n(t.timberLF) > 0 || n(t.timberPosts) > 0
-  const finishRows = Array.isArray(t.wallFinishRows)
-    ? t.wallFinishRows.some(r => n(r.sf) > 0)
-    : legacyFinishRows(t).length > 0
-  const caps = (t.capRows || []).some(
+  const finishRows = allFinishRows(t).some(r => n(r.sf) > 0)
+  const caps = allCapRows(t).some(
     c => c.type && c.type !== 'None' && (n(c.lf) > 0 || n(c.qty) > 0)
   )
   const wp = allWpRows(t).length > 0
@@ -301,10 +318,8 @@ function WallQtyDetail({ t = {}, isSub, materialPrices, materialRows, vendorLabe
     ? t.brickWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0)
     : []
   const wpRows = allWpRows(t)
-  const finishRows = (
-    Array.isArray(t.wallFinishRows) ? t.wallFinishRows : legacyFinishRows(t)
-  ).filter(r => n(r.sf) > 0)
-  const activeCaps = (t.capRows || []).filter(
+  const finishRows = allFinishRows(t).filter(r => n(r.sf) > 0)
+  const activeCaps = allCapRows(t).filter(
     c => c.type && c.type !== 'None' && (n(c.lf) > 0 || n(c.qty) > 0)
   )
 
