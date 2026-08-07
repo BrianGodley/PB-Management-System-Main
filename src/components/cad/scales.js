@@ -54,13 +54,3 @@ export function scaleLabel(inPerFt) {
   return `${(Math.round(inPerFt * 1000) / 1000)}" = 1'`
 }
 
-// Nearest preset inPerFt to an arbitrary zoom — handy for snapping a wheel-zoom
-// back onto a named scale.
-export function nearestScale(inPerFt) {
-  let best = SCALE_PRESETS[0], bestD = Infinity
-  for (const p of SCALE_PRESETS) {
-    const d = Math.abs(Math.log(p.inPerFt) - Math.log(inPerFt || 1e-6))
-    if (d < bestD) { bestD = d; best = p }
-  }
-  return best
-}

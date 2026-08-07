@@ -335,38 +335,6 @@ export function readHeaderItems(map) {
   return { ...HEADER_ITEMS_DEFAULT, ...(map?.[HEADER_ITEMS_KEY] || {}) }
 }
 
-// Top header bar color options. The current default green is first; 'Clear'
-// makes the bar transparent (page background shows through). Header text
-// auto-contrasts to the chosen color (see headerNavColor).
-export const HEADER_COLORS = [
-  { id: 'default', label: 'Default (green)', value: HEADER_DEFAULT },
-  { id: 'clear', label: 'Clear', value: null },
-  { id: 'white', label: 'White', value: '#ffffff' },
-  { id: 'sand', label: 'Sand', value: '#f7f1e6' },
-  { id: 'blue', label: 'Blue', value: '#2563eb' },
-  { id: 'slate', label: 'Slate', value: '#334155' },
-  { id: 'graphite', label: 'Graphite', value: '#475569' },
-  { id: 'forest', label: 'Forest', value: '#3a5038' },
-  { id: 'navy', label: 'Navy', value: '#1e3a5f' },
-  { id: 'charcoal', label: 'Charcoal', value: '#1f2937' },
-]
-
-// Left menu bar color options. 'Clear' keeps the transparent look; the rest
-// span light → dark. Nav text auto-contrasts to the chosen color (see
-// sidebarNavColor below), so dark options stay readable.
-export const SIDEBAR_COLORS = [
-  { id: 'clear', label: 'Clear', value: null },
-  { id: 'white', label: 'White', value: '#ffffff' },
-  { id: 'slate', label: 'Slate', value: '#eef1f5' },
-  { id: 'blue', label: 'Blue', value: '#e6effb' },
-  { id: 'green', label: 'Green', value: '#e9f3e8' },
-  { id: 'sand', label: 'Sand', value: '#f7f1e6' },
-  { id: 'graphite', label: 'Graphite', value: '#475569' },
-  { id: 'charcoal', label: 'Charcoal', value: '#1f2937' },
-  { id: 'forest', label: 'Forest', value: '#3a5038' },
-  { id: 'navy', label: 'Navy', value: '#1e3a5f' },
-]
-
 // Relative luminance (0 = black, 1 = white) of a #rrggbb color.
 export function luminance(hex) {
   if (!hex || typeof hex !== 'string' || hex[0] !== '#' || hex.length < 7) return 1

@@ -26,11 +26,3 @@ export function useSubRateOverrides() {
   return useContext(SubRateOverrideContext)
 }
 
-// Resolve a subcontractor rate: this estimate's override wins over the master
-// rate, which wins over the code default. Used by module calc engines.
-export function resolveSubRate(overrides, subRates, name, fallback) {
-  const o = overrides ? overrides[name] : undefined
-  if (o !== undefined && o !== null && o !== '' && Number.isFinite(Number(o))) return Number(o)
-  const g = subRates ? subRates[name] : undefined
-  return g === undefined || g === null ? fallback : g
-}

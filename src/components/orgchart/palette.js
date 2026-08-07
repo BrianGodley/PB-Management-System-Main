@@ -28,7 +28,6 @@ export const CONTAINER_COLORS = PICKER_FAMILIES.map(fam => {
   }
 })
 
-export const FULL_LIBRARY = PICKER_FAMILIES
 export { getColor, getFamily }
 
 export function pickTextColor(bg) {

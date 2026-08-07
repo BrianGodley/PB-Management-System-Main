@@ -206,59 +206,6 @@ export async function sendWelcomeEmail({ to, fullName, username, password, login
 }
 
 /**
- * Notification email for job status changes.
- */
-export async function sendJobStatusEmail({ to, jobName, status, jobUrl }) {
-  const subject = `Job Update: ${jobName} is now ${status}`
-  const html = baseTemplate({
-    title: 'Job Status Update',
-    body: `
-      <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 12px;">
-        The status of <strong>${jobName}</strong> has been updated to:
-      </p>
-      <div style="display:inline-block;background:#f0fdf4;border:1px solid #bbf7d0;
-                  color:#166534;padding:8px 20px;border-radius:8px;font-weight:700;font-size:16px;margin-bottom:16px;">
-        ${status}
-      </div>`,
-    buttonText: 'View Job',
-    buttonUrl: jobUrl || '#',
-  })
-  return sendEmail({ to, subject, html })
-}
-
-/**
- * Notification email for bid status changes.
- */
-export async function sendBidStatusEmail({ to, clientName, bidAmount, status, bidUrl }) {
-  const subject = `Bid Update: ${clientName} bid is ${status}`
-  const html = baseTemplate({
-    title: 'Bid Status Update',
-    body: `
-      <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 12px;">
-        The bid for <strong>${clientName}</strong>
-        ${bidAmount ? `(${bidAmount})` : ''} has been marked as:
-      </p>
-      <div style="display:inline-block;background:#f0fdf4;border:1px solid #bbf7d0;
-                  color:#166534;padding:8px 20px;border-radius:8px;font-weight:700;font-size:16px;margin-bottom:16px;">
-        ${status}
-      </div>`,
-    buttonText: 'View Bid',
-    buttonUrl: bidUrl || '#',
-  })
-  return sendEmail({ to, subject, html })
-}
-
-/**
- * Generic SMS notification.
- */
-export async function sendJobSMS({ to, jobName, message }) {
-  return sendSMS({
-    to,
-    message: `[Job Tracker] ${jobName}: ${message}`,
-  })
-}
-
-/**
  * Feature/bug request status-change email.
  * Sent when an admin moves a ticket to "in_progress" or "done".
  * `notes` is the admin's triage note (rendered if present).

@@ -333,20 +333,3 @@ export function normalizeEdge(src, tgt) {
   return { src: tgt, tgt: src, direction: 'down' }
 }
 
-export function edgeAnchors(srcLayout, tgtLayout, direction) {
-  if (direction === 'down') {
-    return {
-      x1: srcLayout.x + srcLayout.width / 2,
-      y1: srcLayout.y + srcLayout.height,
-      x2: tgtLayout.x + tgtLayout.width / 2,
-      y2: tgtLayout.y,
-    }
-  }
-  const [a, b] = srcLayout.x <= tgtLayout.x ? [srcLayout, tgtLayout] : [tgtLayout, srcLayout]
-  return {
-    x1: a.x + a.width,
-    y1: a.y + a.height / 2,
-    x2: b.x,
-    y2: b.y + b.height / 2,
-  }
-}

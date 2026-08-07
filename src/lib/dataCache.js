@@ -47,8 +47,3 @@ export function invalidate(key) {
   }
 }
 
-// Wipe everything — useful on sign-out so the next user never sees stale data.
-export function clearAllCache() {
-  store.clear()
-  inflight.clear()
-}

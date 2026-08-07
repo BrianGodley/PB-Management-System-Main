@@ -33,13 +33,6 @@ export function resolveMaterialPrice(name, vendorId, materialRows, priceMap, fal
   return mp != null ? mp : fallback
 }
 
-// Id-keyed resolver (Pattern C catalog modules — Paver/Steps/Lighting). Rename-proof.
-export function resolveMaterialPriceById(id, materialRows, fallback = 0) {
-  const row = (materialRows || []).find(r => r.id === id)
-  if (row && row.unit_cost != null && row.unit_cost !== '') return num(row.unit_cost)
-  return fallback
-}
-
 // ── Subcategory catalog resolution (shared by every vendor-catalog module) ────
 // Filters material_rows to a subcategory + vendor and resolves a stored key to
 // its row. Options tune the per-module behavior so this single implementation

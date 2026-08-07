@@ -9,10 +9,6 @@
 //   twelve-week : most recent 13 periods, older half vs newer half (7/7)
 // All use the same classifier thresholds.
 //
-// The classifier never *outputs* 'power' (legacy only references it in the
-// invert map); it's selectable manually but not auto-derived.
-export const CONDITIONS = ['non_existence', 'danger', 'emergency', 'normal', 'affluence']
-
 const INVERT = {
   danger: 'affluence',
   emergency: 'normal',
@@ -126,8 +122,3 @@ export const CONDITION_META = {
   confusion: { label: 'Confusion', color: '#6b7280', bg: '#f3f4f6' },
 }
 
-export const TREND_LABELS = {
-  one_week: '1-week',
-  six_week: '6-week',
-  twelve_week: '12-week',
-}
