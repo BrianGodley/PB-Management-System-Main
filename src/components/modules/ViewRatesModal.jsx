@@ -78,27 +78,40 @@ export default function ViewRatesModal({ title = 'Rates', rates = [], onClose, r
                   </p>
                 )}
                 <div className="rounded-xl border border-gray-200 divide-y divide-gray-100">
-                  {g.items.map((it, i) => (
-                    <div key={i} className="flex items-center gap-3 px-3 py-2">
-                      <span className="text-sm text-gray-700 flex-1 min-w-0">{it.label}</span>
-                      <span className="text-sm font-medium text-gray-900 tabular-nums whitespace-nowrap">
-                        {fmtVal(it)}
-                      </span>
-                      <RateEditPopover
-                        forceShow
-                        table={it.table}
-                        name={it.name}
-                        category={it.category}
-                        valueField={it.valueField}
-                        unitLabel={it.unitLabel}
-                        mode={it.mode}
-                        currentValue={it.value}
-                        materialId={it.materialId}
-                        vendorId={it.vendorId}
-                        onSaved={refreshAllRates}
-                      />
-                    </div>
-                  ))}
+                  {g.items.map((it, i) => {
+                    // Divider between material and labor within a group: labeled
+                    // separator before the first labor (coefficient) rate.
+                    const labelStart =
+                      it.mode === 'coefficient' && i > 0 && g.items[i - 1].mode !== 'coefficient'
+                    return (
+                      <div key={i}>
+                        {labelStart && (
+                          <div className="px-3 py-1 bg-gray-100 text-[10px] font-semibold uppercase tracking-wide text-gray-500 border-t border-gray-300">
+                            Labor
+                          </div>
+                        )}
+                        <div className="flex items-center gap-3 px-3 py-2">
+                          <span className="text-sm text-gray-700 flex-1 min-w-0">{it.label}</span>
+                          <span className="text-sm font-medium text-gray-900 tabular-nums whitespace-nowrap">
+                            {fmtVal(it)}
+                          </span>
+                          <RateEditPopover
+                            forceShow
+                            table={it.table}
+                            name={it.name}
+                            category={it.category}
+                            valueField={it.valueField}
+                            unitLabel={it.unitLabel}
+                            mode={it.mode}
+                            currentValue={it.value}
+                            materialId={it.materialId}
+                            vendorId={it.vendorId}
+                            onSaved={refreshAllRates}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             ))
