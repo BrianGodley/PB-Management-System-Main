@@ -1561,23 +1561,6 @@ function CmuWallEntry({
 }) {
   const set = field => val => onChange(idx, field, val)
   const hasData = n(wall.lf) > 0 && n(wall.heightIn) > 0
-  // Block Type availability follows the selected vendor: a block is offered only
-  // when the catalog has a "Wall Block <name>" row for that vendor (Standard =
-  // the null-vendor rows). The currently-selected block stays visible so saved
-  // estimates never lose their choice.
-  const blocksForVendor = vsel =>
-    CMU_BLOCK_TYPES.filter(b => {
-      const nm = wallBlockRateName(b.name)
-      return !vsel || vsel === 'House'
-        ? (materialRows || []).some(r => r.name === nm && r.vendor_id == null)
-        : (materialRows || []).some(r => r.name === nm && r.vendor_id === vsel)
-    })
-  const availableBlocks = blocksForVendor(wall.vendor)
-  const currentBlock = CMU_BLOCK_TYPES.find(b => b.name === wall.blockType)
-  const blockOptions =
-    currentBlock && !availableBlocks.some(b => b.name === currentBlock.name)
-      ? [currentBlock, ...availableBlocks]
-      : availableBlocks
   return (
     <div className="border border-gray-200 rounded-xl p-3 mb-3 bg-white">
       <div className="flex items-center justify-between mb-2">
@@ -1601,14 +1584,7 @@ function CmuWallEntry({
           <select
             className="input text-sm py-1.5 w-full"
             value={wall.vendor || 'House'}
-            onChange={e => {
-              const nv = e.target.value
-              set('vendor')(nv)
-              // Point Block Type at a block this vendor actually offers.
-              const opts = blocksForVendor(nv)
-              if (opts.length && !opts.some(b => b.name === wall.blockType))
-                set('blockType')(opts[0].name)
-            }}
+            onChange={e => set('vendor')(e.target.value)}
           >
             {(vendorOptions || [{ value: 'House', label: 'Standard' }]).map(o => (
               <option key={o.value} value={o.value}>
@@ -1618,7 +1594,7 @@ function CmuWallEntry({
           </select>
         </div>
         {/* Block Type — drives dimensions (W/H/L) AND the per-block price.
-            Only shows blocks the selected vendor offers in the catalog. */}
+            Mirrors cell E8 of the legacy Estimator Master's Walls sheet. */}
         <div className="col-span-2">
           <label className="block text-xs text-gray-500 mb-1">Block Type</label>
           <select
@@ -1626,10 +1602,7 @@ function CmuWallEntry({
             value={wall.blockType || ''}
             onChange={e => set('blockType')(e.target.value)}
           >
-            {blockOptions.length === 0 && (
-              <option value="">No block types for this vendor</option>
-            )}
-            {blockOptions.map(b => (
+            {CMU_BLOCK_TYPES.map(b => (
               <option key={b.name} value={b.name}>
                 {b.name} — {b.w}×{b.h}×{b.l}
               </option>
@@ -1979,16 +1952,6 @@ function ModularWallEntry({
   typeSource = { label: 'Block Type', master: false },
 }) {
   const set = field => val => onChange(idx, field, val)
-  // Brick tab (legacy CMU block catalog): a block is offered only when the
-  // catalog has a "Wall Block <name>" row for the selected vendor (Standard =
-  // null-vendor rows). Not used on the master/Modular branch.
-  const legacyBlocksForVendor = vsel =>
-    CMU_BLOCK_TYPES.filter(b => {
-      const nm = wallBlockRateName(b.name)
-      return !vsel || vsel === 'House'
-        ? (materialRows || []).some(r => r.name === nm && r.vendor_id == null)
-        : (materialRows || []).some(r => r.name === nm && r.vendor_id === vsel)
-    })
   return (
     <div className="border border-gray-200 rounded-xl p-3 mb-3 bg-white">
       <div className="flex items-center justify-between mb-2">
@@ -2018,11 +1981,6 @@ function ModularWallEntry({
                   r => r.sub_category === typeSource.subcat && (v === 'House' ? r.vendor_id == null : r.vendor_id === v)
                 )
                 set('blockType')(first ? first.id : '')
-              } else {
-                // Brick: point Block Type at a block this vendor offers.
-                const opts = legacyBlocksForVendor(v)
-                if (opts.length && !opts.some(b => b.name === wall.blockType))
-                  set('blockType')(opts[0].name)
               }
             }}
           >
@@ -2094,10 +2052,6 @@ function ModularWallEntry({
                   b.price
                 )
                 const housePrice = materialPrices?.[wallBlockRateName(b.name)] ?? b.price
-                const avail = legacyBlocksForVendor(wall.vendor)
-                const curB = CMU_BLOCK_TYPES.find(bt => bt.name === wall.blockType)
-                const brickOptions =
-                  curB && !avail.some(x => x.name === curB.name) ? [curB, ...avail] : avail
                 return (
                   <>
                     <select
@@ -2105,10 +2059,7 @@ function ModularWallEntry({
                       value={wall.blockType || ''}
                       onChange={e => set('blockType')(e.target.value)}
                     >
-                      {brickOptions.length === 0 && (
-                        <option value="">No block types for this vendor</option>
-                      )}
-                      {brickOptions.map(bt => (
+                      {CMU_BLOCK_TYPES.map(bt => (
                         <option key={bt.name} value={bt.name}>
                           {bt.name} — {bt.w}×{bt.h}×{bt.l}
                         </option>
