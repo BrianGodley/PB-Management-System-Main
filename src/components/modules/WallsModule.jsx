@@ -6,6 +6,7 @@ import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
+import DropdownSelect from '../DropdownSelect'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { groutCyPerBlock as cmuGroutCyPerBlock } from '../../lib/cmuGrout'
@@ -1251,29 +1252,18 @@ function WallWaterproofing({
     <div className="mt-3 border-t border-gray-100 pt-2">
       <label className="block text-xs text-gray-500 mb-1 font-medium">Waterproofing</label>
       <div className="flex items-center gap-2 flex-wrap">
-        <select
+        <DropdownSelect
           className="input text-sm py-1.5 w-40"
           value={row.vendor || 'House'}
-          onChange={e => onWpUpdate(0, 'vendor', e.target.value)}
-        >
-          {vendorOptions.map(o => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-        <select
+          onChange={v => onWpUpdate(0, 'vendor', v)}
+          options={vendorOptions}
+        />
+        <DropdownSelect
           className="input text-sm py-1.5 flex-1 min-w-[10rem]"
           value={row.type || 'None'}
-          onChange={e => onWpUpdate(0, 'type', e.target.value)}
-        >
-          <option value="None">None</option>
-          {wpShown.map(t => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
+          onChange={v => onWpUpdate(0, 'type', v)}
+          options={[{ value: 'None', label: 'None' }, ...wpShown.map(t => ({ value: t, label: t }))]}
+        />
         {row.type !== 'None' && (
           <NumInput
             value={row.sf}
@@ -1337,29 +1327,18 @@ function WallFinishesEditor({
               : opts
           return (
             <div key={i} className="flex items-center gap-2">
-              <select
+              <DropdownSelect
                 className="input text-sm py-1 w-44 shrink-0"
                 value={row.vendor || 'House'}
-                onChange={e => onPatch(i, { vendor: e.target.value }, true)}
-              >
-                {vendorOptions.map(o => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-              <select
+                onChange={v => onPatch(i, { vendor: v }, true)}
+                options={vendorOptions}
+              />
+              <DropdownSelect
                 className="input text-sm py-1 flex-1 min-w-0"
                 value={row.type || 'None'}
-                onChange={e => onPatch(i, { type: e.target.value }, true)}
-              >
-                <option value="None">None</option>
-                {shown.map(t => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
+                onChange={v => onPatch(i, { type: v }, true)}
+                options={[{ value: 'None', label: 'None' }, ...shown.map(t => ({ value: t, label: t }))]}
+              />
               <NumInput
                 value={row.sf}
                 onChange={v => onPatch(i, { sf: v }, false)}
@@ -1406,29 +1385,18 @@ function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, ma
           const qtyLabel = row.type === 'Precast' ? 'Qty' : 'LF'
           return (
             <div key={i} className="flex items-center gap-2">
-              <select
+              <DropdownSelect
                 className="input text-sm py-1 w-44 shrink-0"
                 value={row.vendor || 'House'}
-                onChange={e => onPatch(i, { vendor: e.target.value }, true)}
-              >
-                {vendorOptions.map(o => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-              <select
+                onChange={v => onPatch(i, { vendor: v }, true)}
+                options={vendorOptions}
+              />
+              <DropdownSelect
                 className="input text-sm py-1 flex-1 min-w-0"
                 value={row.type || 'None'}
-                onChange={e => onPatch(i, { type: e.target.value }, true)}
-              >
-                <option value="None">None</option>
-                {shown.map(t => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
+                onChange={v => onPatch(i, { type: v }, true)}
+                options={[{ value: 'None', label: 'None' }, ...shown.map(t => ({ value: t, label: t }))]}
+              />
               <NumInput
                 value={row.widthIn}
                 onChange={v => onPatch(i, { widthIn: v }, true)}
@@ -1515,54 +1483,46 @@ function CmuWallEntry({
             from. "House" = the original master-rate / catalog pricing. */}
         <div className="col-span-2">
           <label className="block text-xs text-gray-500 mb-1">Vendor</label>
-          <select
+          <DropdownSelect
             className="input text-sm py-1.5 w-full"
             value={wall.vendor || 'House'}
-            onChange={e => {
-              const nv = e.target.value
+            onChange={nv => {
               set('vendor')(nv)
               // Point Block Type at a block this vendor actually offers.
               const opts = wallBlockOptions(materialRows, nv)
               if (opts.length && !opts.some(o => o.id === wall.blockType))
                 set('blockType')(opts[0].id)
             }}
-          >
-            {(vendorOptions || [{ value: 'House', label: 'Standard' }]).map(o => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+            options={vendorOptions || [{ value: 'House', label: 'Standard' }]}
+          />
         </div>
         {/* Block Type — the selected vendor's "Wall Block" catalog products
             (dims from calc_meta drive the block-count math). */}
         <div className="col-span-2">
           <label className="block text-xs text-gray-500 mb-1">Block Type</label>
-          <select
+          <DropdownSelect
             className="input text-sm py-1.5 w-full"
             value={wall.blockType || ''}
-            onChange={e => set('blockType')(e.target.value)}
-          >
-            {blockOpts.length === 0 && !legacyBlock && (
-              <option value="">No block types for this vendor</option>
-            )}
-            {legacyBlock && (
-              <option value={legacyBlock.name}>
-                {legacyBlock.name} — {legacyBlock.w}×{legacyBlock.h}×{legacyBlock.l}
-              </option>
-            )}
-            {blockOpts.map(o => {
-              const cm = o.calc_meta || {}
-              const w = n(cm.block_w_in) || n(o.block_w_in) || 8
-              const h = n(cm.block_h_in) || n(o.block_h_in) || 8
-              const l = n(cm.block_l_in) || n(o.block_l_in) || 16
-              return (
-                <option key={o.id} value={o.id}>
-                  {o.name} — {w}×{h}×{l}
-                </option>
-              )
-            })}
-          </select>
+            onChange={v => set('blockType')(v)}
+            placeholder={blockOpts.length === 0 && !legacyBlock ? 'No block types for this vendor' : 'Select…'}
+            options={[
+              ...(legacyBlock
+                ? [
+                    {
+                      value: legacyBlock.name,
+                      label: `${legacyBlock.name} — ${legacyBlock.w}×${legacyBlock.h}×${legacyBlock.l}`,
+                    },
+                  ]
+                : []),
+              ...blockOpts.map(o => {
+                const cm = o.calc_meta || {}
+                const w = n(cm.block_w_in) || n(o.block_w_in) || 8
+                const h = n(cm.block_h_in) || n(o.block_h_in) || 8
+                const l = n(cm.block_l_in) || n(o.block_l_in) || 16
+                return { value: o.id, label: `${o.name} — ${w}×${h}×${l}` }
+              }),
+            ]}
+          />
           {(() => {
             const cb = resolveCatalogBlock(wall, materialRows)
             if (cb) {
@@ -1644,25 +1604,21 @@ function CmuWallEntry({
         </div>
         <div className="col-span-2 sm:col-span-1">
           <label className="block text-xs text-gray-500 mb-1">Pump for Footing?</label>
-          <select
+          <DropdownSelect
             className="input text-sm py-1.5 w-full"
             value={wall.footingPump || 'No'}
-            onChange={e => set('footingPump')(e.target.value)}
-          >
-            <option>No</option>
-            <option>Yes</option>
-          </select>
+            onChange={v => set('footingPump')(v)}
+            options={[{ value: 'No', label: 'No' }, { value: 'Yes', label: 'Yes' }]}
+          />
         </div>
         <div className="col-span-2 sm:col-span-1">
           <label className="block text-xs text-gray-500 mb-1">Pump for Grouting?</label>
-          <select
+          <DropdownSelect
             className="input text-sm py-1.5 w-full"
             value={wall.groutPump || 'No'}
-            onChange={e => set('groutPump')(e.target.value)}
-          >
-            <option>No</option>
-            <option>Yes</option>
-          </select>
+            onChange={v => set('groutPump')(v)}
+            options={[{ value: 'No', label: 'No' }, { value: 'Yes', label: 'Yes' }]}
+          />
         </div>
       </div>
       {hasData && detail && (
@@ -1776,17 +1732,12 @@ function PipWallEntry({
       <div className="grid grid-cols-2 gap-2">
         <div className="col-span-2">
           <label className="block text-xs text-gray-500 mb-1">Concrete Vendor</label>
-          <select
+          <DropdownSelect
             className="input text-sm py-1.5 w-full"
             value={wall.vendor || 'House'}
-            onChange={e => set('vendor')(e.target.value)}
-          >
-            {(vendorOptions || [{ value: 'House', label: 'Standard' }]).map(o => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+            onChange={v => set('vendor')(v)}
+            options={vendorOptions || [{ value: 'House', label: 'Standard' }]}
+          />
         </div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">Linear Feet</label>
@@ -1810,14 +1761,12 @@ function PipWallEntry({
         </div>
         <div className="col-span-2 sm:col-span-1">
           <label className="block text-xs text-gray-500 mb-1">Pump for Footing?</label>
-          <select
+          <DropdownSelect
             className="input text-sm py-1.5 w-full"
             value={wall.footingPump || 'Yes'}
-            onChange={e => set('footingPump')(e.target.value)}
-          >
-            <option>No</option>
-            <option>Yes</option>
-          </select>
+            onChange={v => set('footingPump')(v)}
+            options={[{ value: 'No', label: 'No' }, { value: 'Yes', label: 'Yes' }]}
+          />
         </div>
       </div>
       {hasData && detail && (
@@ -1931,11 +1880,10 @@ function ModularWallEntry({
       <div className="grid grid-cols-2 gap-2">
         <div className="col-span-2">
           <label className="block text-xs text-gray-500 mb-1">Vendor</label>
-          <select
+          <DropdownSelect
             className="input text-sm py-1.5 w-full"
             value={wall.vendor || (typeSource.master ? vendorOptions?.[0]?.value : undefined) || 'House'}
-            onChange={e => {
-              const v = e.target.value
+            onChange={v => {
               set('vendor')(v)
               if (typeSource.master) {
                 const first = (materialRows || []).find(
@@ -1944,13 +1892,8 @@ function ModularWallEntry({
                 set('blockType')(first ? first.id : '')
               }
             }}
-          >
-            {(vendorOptions || [{ value: 'House', label: 'Standard' }]).map(o => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+            options={vendorOptions || [{ value: 'House', label: 'Standard' }]}
+          />
         </div>
         <div className="col-span-2">
           <label className="block text-xs text-gray-500 mb-1">{typeSource.label}</label>
@@ -1971,23 +1914,20 @@ function ModularWallEntry({
                 const price = n(selRow?.unit_cost)
                 return (
                   <>
-                    <select
+                    <DropdownSelect
                       className="input text-sm py-1.5 w-full"
                       value={selRow?.id ?? ''}
-                      onChange={e => set('blockType')(e.target.value)}
-                    >
-                      {opts.length === 0 && (
-                        <option value="">No products — add one in Master Rates</option>
-                      )}
-                      {opts.map(o => (
-                        <option key={o.id} value={o.id}>
-                          {o.label}
-                          {n(o.row?.calc_meta?.block_w_in) || n(o.row?.block_w_in)
+                      onChange={v => set('blockType')(v)}
+                      placeholder={opts.length === 0 ? 'No products — add one in Master Rates' : 'Select…'}
+                      options={opts.map(o => ({
+                        value: o.id,
+                        label: `${o.label}${
+                          n(o.row?.calc_meta?.block_w_in) || n(o.row?.block_w_in)
                             ? ` — ${n(o.row.calc_meta?.block_w_in) || n(o.row.block_w_in)}×${n(o.row.calc_meta?.block_h_in) || n(o.row.block_h_in)}×${n(o.row.calc_meta?.block_l_in) || n(o.row.block_l_in)}`
-                            : ''}
-                        </option>
-                      ))}
-                    </select>
+                            : ''
+                        }`,
+                      }))}
+                    />
                     {selRow && (
                       <div className="mt-1 flex items-center gap-1 text-[11px] text-gray-500">
                         <RateEditPopover
@@ -2015,17 +1955,15 @@ function ModularWallEntry({
                 const housePrice = materialPrices?.[wallBlockRateName(b.name)] ?? b.price
                 return (
                   <>
-                    <select
+                    <DropdownSelect
                       className="input text-sm py-1.5 w-full"
                       value={wall.blockType || ''}
-                      onChange={e => set('blockType')(e.target.value)}
-                    >
-                      {CMU_BLOCK_TYPES.map(bt => (
-                        <option key={bt.name} value={bt.name}>
-                          {bt.name} — {bt.w}×{bt.h}×{bt.l}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={v => set('blockType')(v)}
+                      options={CMU_BLOCK_TYPES.map(bt => ({
+                        value: bt.name,
+                        label: `${bt.name} — ${bt.w}×${bt.h}×${bt.l}`,
+                      }))}
+                    />
                     <div className="mt-1 flex items-center gap-1 text-[11px] text-gray-500">
                       <RateEditPopover
                         table="material_rates"
@@ -2065,14 +2003,12 @@ function ModularWallEntry({
         </div>
         <div className="col-span-2 sm:col-span-1">
           <label className="block text-xs text-gray-500 mb-1">Pump for Footing?</label>
-          <select
+          <DropdownSelect
             className="input text-sm py-1.5 w-full"
             value={wall.footingPump || 'No'}
-            onChange={e => set('footingPump')(e.target.value)}
-          >
-            <option>No</option>
-            <option>Yes</option>
-          </select>
+            onChange={v => set('footingPump')(v)}
+            options={[{ value: 'No', label: 'No' }, { value: 'Yes', label: 'Yes' }]}
+          />
         </div>
       </div>
       {detail && (n(wall.lf) > 0 && n(wall.heightIn) > 0) && (
@@ -2766,16 +2702,17 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
           <SectionHeader title="Timber / Lumber Wall" />
           <div className="mb-3">
             <label className="block text-xs text-gray-500 mb-1">Timber Type</label>
-            <select
+            <DropdownSelect
               className="input text-sm py-1.5 w-full"
               value={timberType}
-              onChange={e => setTimberType(e.target.value)}
-            >
-              <option>Railroad Treated</option>
-              <option>Douglas Fir 6×6</option>
-              <option>Cedar 6×6</option>
-              <option>Redwood 6×6</option>
-            </select>
+              onChange={v => setTimberType(v)}
+              options={[
+                { value: 'Railroad Treated', label: 'Railroad Treated' },
+                { value: 'Douglas Fir 6×6', label: 'Douglas Fir 6×6' },
+                { value: 'Cedar 6×6', label: 'Cedar 6×6' },
+                { value: 'Redwood 6×6', label: 'Redwood 6×6' },
+              ]}
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
