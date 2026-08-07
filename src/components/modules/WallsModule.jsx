@@ -570,6 +570,7 @@ function wallBlockOptions(materialRows, vendorSel) {
 // existing cap/finish calc is untouched — the vendor only controls availability.
 const WALL_CAP_SUBCAT = 'Wall Cap'
 const WALL_FINISH_SUBCAT = 'Wall Finish'
+const WALL_WP_SUBCAT = 'Waterproofing'
 function wallCatalogTypes(materialRows, subcat, vendorSel) {
   const seen = new Set()
   const out = []
@@ -1220,6 +1221,10 @@ function WallWaterproofing({
   const rr = key => materialPrices?.[WALL_RATES[key].db] ?? WALL_RATES[key].fb
   const wpKey = WP_KEY[row.type]
   const wpc = computeWpRow(row, materialPrices, materialRows)
+  // Vendor-catalog-driven type list (the selected vendor's Waterproofing products).
+  const wpOpts = wallCatalogTypes(materialRows, WALL_WP_SUBCAT, row.vendor)
+  const wpShown =
+    row.type && row.type !== 'None' && !wpOpts.includes(row.type) ? [row.type, ...wpOpts] : wpOpts
   return (
     <div className="mt-3 border-t border-gray-100 pt-2">
       <label className="block text-xs text-gray-500 mb-1 font-medium">Waterproofing</label>
@@ -1237,14 +1242,15 @@ function WallWaterproofing({
         </select>
         <select
           className="input text-sm py-1.5 flex-1 min-w-[10rem]"
-          value={row.type}
+          value={row.type || 'None'}
           onChange={e => onWpUpdate(0, 'type', e.target.value)}
         >
-          <option>None</option>
-          <option>Primer &amp; Membrane</option>
-          <option>3 Coats Roll On</option>
-          <option>Thoroseal &amp; Roll On</option>
-          <option>Dimple Membrane</option>
+          <option value="None">None</option>
+          {wpShown.map(t => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
         </select>
         {row.type !== 'None' && (
           <NumInput
