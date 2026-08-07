@@ -108,11 +108,14 @@ const WALL_RATES = {
   wpDimpleMembrane: { db: 'Wall WP Dimple Membrane', fb: 2.1 },
 }
 
-// Rate catalog for the "View Rates" popup. Each entry: [WALL_RATES key, label,
-// category, unit, mode]. mode 'coefficient' → labor_rates; else material_rates.
+// Rate catalog for the "View Rates" popup, BROKEN DOWN BY WALL TYPE. Each item:
+// [WALL_RATES key, label, category, unit, mode]. mode 'coefficient' → labor_rates;
+// else material_rates. `blocks:true` prepends the CMU block-type price list.
+// Finishes / Caps / Waterproofing are shown once (they apply to every wall type).
 const WALL_RATE_SPECS = [
   {
-    group: 'Block & Structural',
+    group: 'CMU Block',
+    blocks: true,
     items: [
       ['greyBlock', 'Grey Block', 'Walls', 'ea', 'currency'],
       ['bondbeamBlock', 'Bondbeam Block', 'Walls', 'ea', 'currency'],
@@ -121,11 +124,6 @@ const WALL_RATE_SPECS = [
       ['concreteTruck', 'Concrete — Ready Mix (Truck)', 'Basic Materials', 'CY', 'currency'],
       ['groutPumpSetup', 'Grout Pump — Setup', 'Basic Materials', 'flat', 'currency'],
       ['groutPumpPerYd', 'Grout Pump — Per CY', 'Basic Materials', 'CY', 'currency'],
-    ],
-  },
-  {
-    group: 'Labor',
-    items: [
       ['digLab', 'Dig Footing', 'Walls', 'CF/hr', 'coefficient'],
       ['rebarLab', 'Set Rebar', 'Walls', 'LF/hr', 'coefficient'],
       ['blockLab', 'Set Block', 'Walls', 'blk/hr', 'coefficient'],
@@ -135,7 +133,41 @@ const WALL_RATE_SPECS = [
     ],
   },
   {
-    group: 'Finishes — Material',
+    group: 'Poured In Place',
+    items: [
+      ['concreteTruck', 'Concrete — Ready Mix (Truck)', 'Basic Materials', 'CY', 'currency'],
+      ['concreteHand', 'Concrete — Hand Mix', 'Basic Materials', 'CY', 'currency'],
+      ['rebar', 'Rebar', 'Basic Materials', 'LF', 'currency'],
+      ['digLab', 'Dig Footing', 'Walls', 'CF/hr', 'coefficient'],
+      ['rebarLab', 'Set Rebar', 'Walls', 'LF/hr', 'coefficient'],
+    ],
+  },
+  {
+    group: 'Modular',
+    items: [
+      ['concreteHand', 'Footing Concrete — Hand Mix', 'Basic Materials', 'CY', 'currency'],
+      ['concreteTruck', 'Footing Concrete — Ready Mix', 'Basic Materials', 'CY', 'currency'],
+      ['groutPumpSetup', 'Footing Pump — Setup', 'Basic Materials', 'flat', 'currency'],
+      ['digLab', 'Dig Footing', 'Walls', 'CF/hr', 'coefficient'],
+      ['blockLab', 'Set Block', 'Walls', 'blk/hr', 'coefficient'],
+      ['setupCleanLab', 'Setup / Clean', 'Walls', 'LF/hr', 'coefficient'],
+    ],
+    note: 'Modular Wall product prices come from the vendor catalog (edit via the Wall Type picker).',
+  },
+  {
+    group: 'Brick',
+    blocks: true,
+    items: [
+      ['concreteHand', 'Footing Concrete — Hand Mix', 'Basic Materials', 'CY', 'currency'],
+      ['concreteTruck', 'Footing Concrete — Ready Mix', 'Basic Materials', 'CY', 'currency'],
+      ['groutPumpSetup', 'Footing Pump — Setup', 'Basic Materials', 'flat', 'currency'],
+      ['digLab', 'Dig Footing', 'Walls', 'CF/hr', 'coefficient'],
+      ['blockLab', 'Set Block', 'Walls', 'blk/hr', 'coefficient'],
+      ['setupCleanLab', 'Setup / Clean', 'Walls', 'LF/hr', 'coefficient'],
+    ],
+  },
+  {
+    group: 'Finishes — Material (all wall types)',
     items: [
       ['sandStucco', 'Sand Stucco', 'Walls', 'SF', 'currency'],
       ['smoothStucco', 'Smooth Stucco', 'Walls', 'SF', 'currency'],
@@ -147,7 +179,7 @@ const WALL_RATE_SPECS = [
     ],
   },
   {
-    group: 'Finishes — Labor',
+    group: 'Finishes — Labor (all wall types)',
     items: [
       ['sandStuccoLab', 'Sand Stucco Labor', 'Walls', 'SF/day', 'coefficient'],
       ['smoothStuccoLab', 'Smooth Stucco Labor', 'Walls', 'SF/day', 'coefficient'],
@@ -159,7 +191,7 @@ const WALL_RATE_SPECS = [
     ],
   },
   {
-    group: 'Caps',
+    group: 'Caps (all wall types)',
     items: [
       ['capFlagstone', 'Cap — Flagstone', 'Walls', 'ton', 'currency'],
       ['capPrecast', 'Cap — Precast', 'Walls', 'ea', 'currency'],
@@ -167,7 +199,7 @@ const WALL_RATE_SPECS = [
     ],
   },
   {
-    group: 'Waterproofing',
+    group: 'Waterproofing (all wall types)',
     items: [
       ['wpPrimerMembrane', 'Primer & Membrane', 'Walls', 'SF', 'currency'],
       ['wp3CoatRollOn', '3 Coats Roll On', 'Walls', 'SF', 'currency'],
@@ -196,6 +228,7 @@ const DEFAULT_CMU = () => ({
   pctGrouted: '100',
   pctCurved: '0',
   footingPump: 'No',
+  groutPump: 'No',
   subEach: '',
   wpRows: [blankWpRow()],
   finishRows: [],
@@ -681,7 +714,7 @@ function calcWalls(
   // own array and gets summed below. Vendor only changes the material $;
   // In-House labor / geometry is unchanged.
   ;(state.cmuWalls || []).forEach(wall => {
-    const res = calcOneCMU(wall, wall.footingPump ?? 'No', state.cmuGroutPump, r, mp, materialRows)
+    const res = calcOneCMU(wall, wall.footingPump ?? 'No', wall.groutPump ?? 'No', r, mp, materialRows)
     structuralHrs += res.hrs
     structuralMat += res.mat
     structuralSubMat += res.subMat
@@ -907,9 +940,11 @@ function initWallExtras(w = {}) {
   }
 }
 function initCmuWalls(src = {}) {
-  // Footing pump is now per-wall; legacy estimates carried one module-level
-  // value (cmuFootingPump) — inherit it onto each wall so totals don't move.
+  // Footing + grout pumps are now per-wall; legacy estimates carried module-level
+  // values (cmuFootingPump / cmuGroutPump) — inherit them onto each wall so
+  // totals don't move.
   const legacyPump = src.cmuFootingPump ?? 'No'
+  const legacyGrout = src.cmuGroutPump ?? 'No'
   if (src.cmuWalls)
     return src.cmuWalls.map(w => ({
       blockType: DEFAULT_BLOCK_NAME,
@@ -917,6 +952,7 @@ function initCmuWalls(src = {}) {
       subEach: '',
       ...w,
       footingPump: w.footingPump ?? legacyPump,
+      groutPump: w.groutPump ?? legacyGrout,
       wpRows: initWallWp(w),
       ...initWallExtras(w),
     }))
@@ -935,6 +971,7 @@ function initCmuWalls(src = {}) {
         pctGrouted: src.cmuPctGrouted ?? '100',
         pctCurved: src.cmuPctCurved ?? '0',
         footingPump: legacyPump,
+        groutPump: legacyGrout,
         subEach: '',
         wpRows: [blankWpRow()],
         finishRows: [],
@@ -1650,6 +1687,17 @@ function CmuWallEntry({
             className="input text-sm py-1.5 w-full"
             value={wall.footingPump || 'No'}
             onChange={e => set('footingPump')(e.target.value)}
+          >
+            <option>No</option>
+            <option>Yes</option>
+          </select>
+        </div>
+        <div className="col-span-2 sm:col-span-1">
+          <label className="block text-xs text-gray-500 mb-1">Pump for Grouting?</label>
+          <select
+            className="input text-sm py-1.5 w-full"
+            value={wall.groutPump || 'No'}
+            onChange={e => set('groutPump')(e.target.value)}
           >
             <option>No</option>
             <option>Yes</option>
@@ -2376,23 +2424,22 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
 
   const r = key => materialPrices[WALL_RATES[key].db] ?? WALL_RATES[key].fb
 
-  // Full rate list for the "View Rates" popup (every field's rate, editable).
-  const wallRateList = [
-    {
-      group: 'Block Types',
-      items: CMU_BLOCK_TYPES.map(b => ({
-        label: `${b.name} (${b.w}×${b.h}×${b.l})`,
-        table: 'material_rates',
-        name: wallBlockRateName(b.name),
-        category: 'Walls',
-        unitLabel: 'ea',
-        mode: 'currency',
-        value: materialPrices[wallBlockRateName(b.name)] ?? b.price,
-      })),
-    },
-    ...WALL_RATE_SPECS.map(g => ({
-      group: g.group,
-      items: g.items.map(([key, label, category, unit, mode]) => ({
+  // Full rate list for the "View Rates" popup, broken down by wall type. Groups
+  // flagged `blocks` prepend the CMU block-type price list.
+  const blockItems = CMU_BLOCK_TYPES.map(b => ({
+    label: `Block — ${b.name} (${b.w}×${b.h}×${b.l})`,
+    table: 'material_rates',
+    name: wallBlockRateName(b.name),
+    category: 'Walls',
+    unitLabel: 'ea',
+    mode: 'currency',
+    value: materialPrices[wallBlockRateName(b.name)] ?? b.price,
+  }))
+  const wallRateList = WALL_RATE_SPECS.map(g => ({
+    group: g.group,
+    items: [
+      ...(g.blocks ? blockItems : []),
+      ...g.items.map(([key, label, category, unit, mode]) => ({
         label,
         table: mode === 'coefficient' ? 'labor_rates' : 'material_rates',
         name: WALL_RATES[key].db,
@@ -2401,8 +2448,8 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
         mode,
         value: r(key),
       })),
-    })),
-  ]
+    ],
+  }))
 
   // ── Vendor helpers ──────────────────────────────────────────────────────────
   const vendorOptions = vendorOptionsForCategory(WALLS_CATEGORY)
@@ -2630,20 +2677,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
             + Add Another CMU Wall
           </button>
 
-          {/* Grout pump applies to grouting block for all walls. (Footing pump
-              is now set per wall in each Wall entry above.) */}
-          <div className="border border-gray-200 rounded-xl p-3 bg-gray-50 space-y-0 mb-2">
-            <LabeledRow label="Pump for Grouting Block? (all walls)">
-              <select
-                className="input text-sm py-1.5 w-24"
-                value={cmuGroutPump}
-                onChange={e => setCmuGroutPump(e.target.value)}
-              >
-                <option>No</option>
-                <option>Yes</option>
-              </select>
-            </LabeledRow>
-          </div>
+          {/* Footing + grout pumps are now set per wall in each Wall entry above. */}
         </div>
       )}
 
