@@ -396,10 +396,10 @@ const MODULAR_FALLBACK = { name: 'Modular Block 8x8x16', w: 8, h: 8, l: 16, pric
 // vendorSel picks the vendor's row (or the Unspecified/null-vendor row); a
 // missing/legacy key falls back to the first product under that marker.
 function resolveMasterBlock(wall, materialRows, subcat) {
-  const row = catalogItemFor(materialRows, subcat, wall.vendor, wall.blockType, {
-    ...MODULAR_CAT_OPTS,
-    fallbackFirst: true,
-  })
+  // Show every product assigned to this sub-category regardless of vendor
+  // (Modular Wall items are vendor-priced, so a Standard-only filter is empty).
+  const inSub = (materialRows || []).filter(r => r.sub_category === subcat)
+  const row = inSub.find(r => r.id === wall.blockType) || inSub[0]
   if (!row) return MODULAR_FALLBACK
   // Block dims now live in the product's calc_meta (new model); fall back to the
   // legacy columns for safety, then to the module defaults.
@@ -1428,16 +1428,12 @@ function ModularWallEntry({
             ? (() => {
                 // Options + price come live from the master list (marker =
                 // sub_category). Add a product in Master Rates and it appears here.
-                const opts = catalogOptions(
-                  materialRows,
-                  typeSource.subcat,
-                  wall.vendor,
-                  MODULAR_CAT_OPTS
-                )
-                const selRow = catalogItemFor(materialRows, typeSource.subcat, wall.vendor, wall.blockType, {
-                  ...MODULAR_CAT_OPTS,
-                  fallbackFirst: true,
-                })
+                // Every Modular Wall product (any vendor) is selectable here.
+                const opts = (materialRows || [])
+                  .filter(r => r.sub_category === typeSource.subcat)
+                  .map(r => ({ id: r.id, label: r.name, row: r }))
+                const selRow =
+                  (materialRows || []).find(r => r.id === wall.blockType) || opts[0]?.row
                 const price = n(selRow?.unit_cost)
                 return (
                   <>
