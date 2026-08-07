@@ -430,7 +430,7 @@ function makeTurfTab(src = {}) {
 function SecHdr({ title }) {
   const isSub = useContext(SubTabContext)
   return (
-    <div className="bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200 mb-2">
+    <div className="bg-gray-100 rounded-lg px-4 py-2.5 border border-gray-200 mb-2">
       <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wider">{subSectionTitle(title, isSub)}</h3>
     </div>
   )
