@@ -19,6 +19,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
+import { fetchStandardRateMap } from '../../lib/materialCatalog'
 import GpmdBar from './GpmdBar'
 import WorkTypeChooser from './WorkTypeChooser'
 import RateEditPopover from '../RateEditPopover'
@@ -155,16 +156,15 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
   // the user leaves the rate field blank. Re-fetched after a RateEditPopover
   // save so the hint + fallback reflect the edit immediately.
   const refreshRates = useCallback(async () => {
-    const [matRes, labRes] = await Promise.all([
-      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Weed Abatement'),
+    // material_rates retired: material $ from the new model (fetchStandardRateMap
+    // = material Standard + misc), labor coefficients from labor_rates.
+    const [matMap, labRes] = await Promise.all([
+      fetchStandardRateMap(['Weed Abatement']),
       supabase.from('labor_rates').select('name, rate').eq('category', 'Weed Abatement'),
     ])
-    const mat = matRes.data || []
     const lab = labRes.data || []
-    // material_rates values live in unit_cost; labor_rates values live in rate.
     const pickMat = name => {
-      const row = mat.find(r => r.name === name)
-      const v = row ? parseFloat(row.unit_cost) : NaN
+      const v = matMap[name]
       return Number.isFinite(v) ? v : null
     }
     const pickLab = name => {
