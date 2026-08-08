@@ -13,6 +13,7 @@ import {
   catalogItemFor,
   fetchModuleCatalog,
   fetchStandardRateMap,
+  saveStandardNamedRate,
 } from '../../lib/materialCatalog'
 
 const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
@@ -349,26 +350,26 @@ function StepsRatesModal({ open, onClose, onSaved, isSub = false }) {
     })
     CONC_TYPES.forEach(t => {
       jobs.push(upsertRate('labor_rates', kConcTypeHrs(t), 'rate', draft.typeHrs[t]))
-      jobs.push(upsertRate('material_rates', kConcTypeMat(t), 'unit_cost', draft.typeMat[t]))
+      jobs.push(saveStandardNamedRate(kConcTypeMat(t), draft.typeMat[t], 'Steps'))
     })
     CONC_FINISHES.forEach(f => {
       jobs.push(upsertRate('labor_rates', kFinishHrs(f), 'rate', draft.finHrs[f]))
-      jobs.push(upsertRate('material_rates', kFinishMat(f), 'unit_cost', draft.finMat[f]))
+      jobs.push(saveStandardNamedRate(kFinishMat(f), draft.finMat[f], 'Steps'))
     })
-    // Subcontractor per-LF rates (stored in material_rates).
+    // Subcontractor per-LF rates → material Standard price on the new model.
     MAT_SECTIONS.forEach(sec => {
-      jobs.push(upsertRate('material_rates', sec.baseKey, 'unit_cost', draft.subBase[sec.key]))
+      jobs.push(saveStandardNamedRate(sec.baseKey, draft.subBase[sec.key], 'Steps'))
     })
-    jobs.push(upsertRate('material_rates', kSubConcBase, 'unit_cost', draft.subBase.conc))
-    jobs.push(upsertRate('material_rates', kSubGrouted, 'unit_cost', draft.subGrouted))
+    jobs.push(saveStandardNamedRate(kSubConcBase, draft.subBase.conc, 'Steps'))
+    jobs.push(saveStandardNamedRate(kSubGrouted, draft.subGrouted, 'Steps'))
     STEP_FORMS.forEach(f => {
-      jobs.push(upsertRate('material_rates', kSubForm(f), 'unit_cost', draft.subForm[f]))
+      jobs.push(saveStandardNamedRate(kSubForm(f), draft.subForm[f], 'Steps'))
     })
     CONC_TYPES.forEach(t => {
-      jobs.push(upsertRate('material_rates', kSubType(t), 'unit_cost', draft.subType[t]))
+      jobs.push(saveStandardNamedRate(kSubType(t), draft.subType[t], 'Steps'))
     })
     CONC_FINISHES.forEach(f => {
-      jobs.push(upsertRate('material_rates', kSubFinish(f), 'unit_cost', draft.subFinish[f]))
+      jobs.push(saveStandardNamedRate(kSubFinish(f), draft.subFinish[f], 'Steps'))
     })
     await Promise.all(jobs)
     setSaving(false)

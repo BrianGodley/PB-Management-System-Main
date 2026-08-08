@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { supersedeMaterialPrice } from '../lib/materialCatalog'
 import VendorCombo from './VendorCombo'
 import QuickAddVendorModal from './QuickAddVendorModal'
 
@@ -78,19 +79,25 @@ export default function InvoiceImportModal({ jobId: jobIdProp, jobName: jobNameP
     if (!vId) {
       return extracted.map(r => ({ ...r, matchId: null, matchName: '', category: '', master: null, variance: null, include: true, setPrice: false }))
     }
-    const { data: mats } = await supabase
-      .from('material_rates')
-      .select('id, name, category, unit_cost')
+    const { data: priced } = await supabase
+      .from('material_price')
+      .select('price, material:material_id ( id, description, category:category_id ( name ) )')
       .eq('vendor_id', vId)
-    const byNorm = new Map((mats || []).map(m => [norm(m.name), m]))
+      .is('effective_end', null)
+    const byNorm = new Map(
+      (priced || [])
+        .filter(p => p.material?.id)
+        .map(p => [
+          norm(p.material.description),
+          { id: p.material.id, name: p.material.description, category: p.material.category?.name || '', unit_cost: p.price },
+        ])
+    )
     const out = []
     for (const r of extracted) {
       const hit = byNorm.get(norm(r.description)) || null
-      let master = null
-      if (hit) {
-        const { data: pa } = await supabase.rpc('price_as_of', { p_rate_id: hit.id, p_date: invDate })
-        master = pa != null ? Number(pa) : Number(hit.unit_cost)
-      }
+      // "master" = the vendor's current open price for this product. (Date-based
+      // "as of" lookups are the deferred ledger path; current price is the fallback.)
+      const master = hit && hit.unit_cost != null ? Number(hit.unit_cost) : null
       const unit_price = r.unit_price != null ? Number(r.unit_price) : null
       const variance = master && master !== 0 && unit_price != null ? ((unit_price - master) / master) * 100 : null
       out.push({
@@ -242,13 +249,14 @@ export default function InvoiceImportModal({ jobId: jobIdProp, jobName: jobNameP
       // history stay in sync — dated at the invoice date, sourced 'invoice'.
       const priceUpdates = rows.filter(r => r.setPrice && r.matchId && r.unit_price != null)
       for (const r of priceUpdates) {
-        const { error: pErr } = await supabase.rpc('set_material_price_row', {
-          p_material_id: r.matchId,
-          p_unit_cost: Number(r.unit_price),
-          p_source: 'invoice',
-          p_date: header.invoice_date,
-        })
-        if (pErr) throw new Error(`Could not update price for "${r.description}": ${pErr.message}`)
+        try {
+          await supersedeMaterialPrice(r.matchId, vendorId, Number(r.unit_price), {
+            effectiveStart: header.invoice_date,
+            source: 'invoice',
+          })
+        } catch (e) {
+          throw new Error(`Could not update price for "${r.description}": ${e?.message || e}`)
+        }
       }
       setPricesUpdated(priceUpdates.length)
 

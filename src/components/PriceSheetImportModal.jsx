@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { supersedeMaterialPrice, resolveTaxonomyIds } from '../lib/materialCatalog'
 import { topCandidates } from '../lib/matchScore'
 import VendorCombo from './VendorCombo'
 import QuickAddVendorModal from './QuickAddVendorModal'
@@ -85,18 +86,13 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
   const [catOptions, setCatOptions] = useState([])
   const [subOptions, setSubOptions] = useState([])
   useEffect(() => {
-    supabase
-      .from('material_rates')
-      .select('category, sub_category')
-      .then(({ data }) => {
-        const cats = new Set(), subs = new Set()
-        for (const r of data || []) {
-          if (r.category) cats.add(r.category)
-          if (r.sub_category) subs.add(r.sub_category)
-        }
-        setCatOptions([...cats].sort())
-        setSubOptions([...subs].sort())
-      })
+    Promise.all([
+      supabase.from('category').select('name'),
+      supabase.from('subcategory').select('name'),
+    ]).then(([{ data: cats }, { data: subs }]) => {
+      setCatOptions([...new Set((cats || []).map(c => c.name).filter(Boolean))].sort())
+      setSubOptions([...new Set((subs || []).map(s => s.name).filter(Boolean))].sort())
+    })
   }, [])
 
   async function extract() {
@@ -118,21 +114,48 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
       const extracted = data?.rows || []
       if (!extracted.length) throw new Error('No priced line items were found on that sheet.')
 
-      // Current materials for this vendor → match by normalized name.
-      const { data: existing } = await supabase
-        .from('material_rates')
-        .select('id, name, category, sub_category, unit, unit_cost')
+      // Products this vendor already has an OPEN price for → match by name.
+      const { data: priced } = await supabase
+        .from('material_price')
+        .select(
+          'price, material:material_id ( id, description, unit, category:category_id ( name ), subcategory:subcategory_id ( name ) )'
+        )
         .eq('vendor_id', vendorId)
-      const byNorm = new Map((existing || []).map(m => [norm(m.name), m]))
+        .is('effective_end', null)
+      const existing = (priced || [])
+        .map(p => ({
+          id: p.material?.id,
+          name: p.material?.description,
+          category: p.material?.category?.name || '',
+          sub_category: p.material?.subcategory?.name || '',
+          unit: p.material?.unit,
+          unit_cost: p.price,
+        }))
+        .filter(m => m.id)
+      const byNorm = new Map(existing.map(m => [norm(m.name), m]))
 
-      // Broad candidate pool across ALL vendors — used to propose fuzzy
+      // Broad candidate pool across ALL products — used to propose fuzzy
       // "same product" matches (e.g. a catalog item that has a photo but no
       // price yet) so we can merge price in instead of creating a duplicate.
-      const { data: pool } = await supabase
-        .from('material_rates')
-        .select('id, name, sku, category, sub_category, unit_cost, photo_url')
+      const { data: poolRows } = await supabase
+        .from('material')
+        .select(
+          'id, description, sku, photo_url, category:category_id ( name ), subcategory:subcategory_id ( name ), prices:material_price ( price, effective_end )'
+        )
         .limit(5000)
-      setAllMaterials(pool || [])
+      const pool = (poolRows || []).map(m => {
+        const open = (m.prices || []).filter(p => p.effective_end == null)
+        return {
+          id: m.id,
+          name: m.description,
+          sku: m.sku,
+          category: m.category?.name || '',
+          sub_category: m.subcategory?.name || '',
+          unit_cost: open.length ? open[0].price : null,
+          photo_url: m.photo_url,
+        }
+      })
+      setAllMaterials(pool)
 
       const merged = extracted.map(r => {
         const key = norm(`${r.item} ${r.notes || ''}`)
@@ -373,61 +396,30 @@ export default function PriceSheetImportModal({ vendors = [], onClose, onApplied
         if (r.action !== 'update' && r.action !== 'add') { unchanged++; continue }
 
         if (r.action === 'update' && r.matchId) {
-          // Only write history/price when the price actually changed.
+          // Only write a new price when it actually changed.
           if (r.current != null && Number(r.current) === Number(r.unit_price)) { updated++; continue }
-          const { data: openRows } = await supabase
-            .from('material_price_history')
-            .select('id')
-            .eq('material_rate_id', r.matchId)
-            .is('effective_end', null)
-          if (openRows && openRows.length) {
-            await supabase
-              .from('material_price_history')
-              .update({ effective_end: priorEnd })
-              .eq('material_rate_id', r.matchId)
-              .is('effective_end', null)
-          } else if (r.current != null) {
-            // Seed the prior price so the timeline is complete for "as of" lookups.
-            await supabase.from('material_price_history').insert({
-              material_rate_id: r.matchId,
-              vendor_id: vendorId,
-              unit_cost: r.current,
-              effective_start: '2000-01-01',
-              effective_end: priorEnd,
-              source: 'manual',
-            })
-          }
-          await supabase.from('material_price_history').insert({
-            material_rate_id: r.matchId,
-            vendor_id: vendorId,
-            unit_cost: r.unit_price,
-            effective_start: startDate,
+          // Effective-dated price write on the new model (material_price ledger).
+          await supersedeMaterialPrice(r.matchId, vendorId, r.unit_price, {
+            effectiveStart: startDate,
             source: 'price_sheet',
-            import_id: importId,
           })
-          await supabase.from('material_rates').update({ unit_cost: r.unit_price, unit: r.unit }).eq('id', r.matchId)
+          if (r.unit) await supabase.from('material').update({ unit: r.unit }).eq('id', r.matchId)
           updated++
         } else if (r.action === 'add') {
+          const { category_id, subcategory_id, error: taxErr } = await resolveTaxonomyIds(
+            r.category,
+            r.sub_category
+          )
+          if (taxErr) throw new Error(`Add failed for "${r.item}": ${taxErr}`)
           const { data: nm, error: addErr } = await supabase
-            .from('material_rates')
-            .insert({
-              name: r.item,
-              category: r.category.trim(),
-              sub_category: r.sub_category?.trim() || null,
-              vendor_id: vendorId,
-              unit: r.unit,
-              unit_cost: r.unit_price,
-            })
-            .select()
+            .from('material')
+            .insert({ description: r.item, category_id, subcategory_id, unit: r.unit })
+            .select('id')
             .single()
           if (addErr) throw new Error(`Add failed for "${r.item}": ${addErr.message}`)
-          await supabase.from('material_price_history').insert({
-            material_rate_id: nm.id,
-            vendor_id: vendorId,
-            unit_cost: r.unit_price,
-            effective_start: startDate,
+          await supersedeMaterialPrice(nm.id, vendorId, r.unit_price, {
+            effectiveStart: startDate,
             source: 'price_sheet',
-            import_id: importId,
           })
           added++
         }

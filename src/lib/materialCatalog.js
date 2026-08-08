@@ -267,6 +267,128 @@ export async function setMaterialPrice(materialId, vendorId, price, source = 'ma
   return ins[0]
 }
 
+// Effective-dated price write for imports (price sheets / invoices). Closes the
+// current open material_price row for (material, vendor) by stamping its
+// effective_end the day before `effectiveStart`, then inserts a new open row.
+// This preserves a price timeline inside material_price itself (the new model's
+// ledger), replacing the legacy material_rate_id-keyed material_price_history.
+export async function supersedeMaterialPrice(materialId, vendorId, price, opts = {}) {
+  const v = typeof price === 'number' ? price : parseFloat(price)
+  if (!Number.isFinite(v) || v < 0) throw new Error('Invalid price.')
+  const vid = await resolvePriceVendor(vendorId)
+  if (!vid || !materialId) throw new Error('Missing product or vendor.')
+  const start = opts.effectiveStart || new Date().toISOString().slice(0, 10)
+  const source = opts.source || 'manual'
+  // day before start → effective_end for the row we're closing
+  const priorEnd = new Date(new Date(start).getTime() - 86400000).toISOString().slice(0, 10)
+  const { data: open } = await supabase
+    .from('material_price')
+    .select('id, effective_start')
+    .eq('material_id', materialId)
+    .eq('vendor_id', vid)
+    .is('effective_end', null)
+  for (const row of open || []) {
+    // Don't create a zero/negative-length period if an open row already starts
+    // on/after the new start — just overwrite it in place instead.
+    if (row.effective_start && row.effective_start >= start) {
+      await supabase.from('material_price').update({ price: v, source }).eq('id', row.id)
+      return { superseded: false, updatedId: row.id }
+    }
+    await supabase.from('material_price').update({ effective_end: priorEnd }).eq('id', row.id)
+  }
+  const { data: ins, error: insErr } = await supabase
+    .from('material_price')
+    .insert({ material_id: materialId, vendor_id: vid, price: v, effective_start: start, source })
+    .select('id')
+  if (insErr) throw new Error('Price insert failed: ' + insErr.message)
+  return { superseded: true, newId: ins?.[0]?.id || null }
+}
+
+// Save a named "Standard" rate onto the new model. Mirrors how fetchStandardRateMap
+// READS a name (material Standard price, else misc_rates). If a material exists with
+// this description, its Standard (universal) price is set; otherwise the name is
+// treated as a misc_rate. Used by module rate-editors that historically wrote
+// material_rates.unit_cost by name (Steps, Walls). Labor coefficients keep using
+// labor_rates directly — this is only for the material-price side.
+export async function saveStandardNamedRate(name, price, category = null) {
+  const val = typeof price === 'number' ? price : parseFloat(price)
+  const { data: mat } = await supabase.from('material').select('id').eq('description', name).limit(1)
+  if (mat && mat.length) {
+    await setMaterialPrice(mat[0].id, null, Number.isFinite(val) ? val : 0)
+    return
+  }
+  const { data: ex } = await supabase.from('misc_rates').select('id').eq('name', name).limit(1)
+  if (ex && ex.length) {
+    await supabase.from('misc_rates').update({ rate: Number.isFinite(val) ? val : 0 }).eq('id', ex[0].id)
+  } else {
+    const row = { name, rate: Number.isFinite(val) ? val : 0 }
+    if (category) row.category = category
+    await supabase.from('misc_rates').insert(row)
+  }
+}
+
+// All materials mapped to the legacy material_rates row shape (for admin list
+// views): one row per material with its Standard (universal) open price. Sorted
+// by name. Used by the old Master Rates page's Materials tab.
+export async function fetchAllMaterialsAdmin() {
+  const [{ data: vends }, { data }] = await Promise.all([
+    supabase.from('subs_vendors').select('id, company_name'),
+    supabase
+      .from('material')
+      .select(
+        `id, description, unit, calc_meta, photo_url, sku, show_in_selections,
+         category:category_id ( name ),
+         subcategory:subcategory_id ( name ),
+         prices:material_price ( price, vendor_id, effective_end )`
+      ),
+  ])
+  const stdId =
+    (vends || []).find(v => ['standard', 'unspecified'].includes((v.company_name || '').trim().toLowerCase()))
+      ?.id || null
+  return (data || [])
+    .map(m => {
+      const open = (m.prices || []).filter(p => p.effective_end == null)
+      const std = open.find(p => p.vendor_id === stdId)
+      return {
+        id: m.id,
+        name: m.description,
+        unit: m.unit || null,
+        unit_cost: std ? num(std.price) : open.length ? num(open[0].price) : null,
+        category: m.category?.name || null,
+        sub_category: m.subcategory?.name || null,
+        vendor_id: null, // new model: materials are shared; price is per-vendor
+        calc_meta: m.calc_meta || null,
+        photo_url: m.photo_url || null,
+        sku: m.sku || null,
+        show_in_selections: !!m.show_in_selections,
+      }
+    })
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+}
+
+// Read a named "Standard" rate from the new model — the inverse of
+// saveStandardNamedRate. Returns the material's Standard open price if a material
+// with this description exists, else the misc_rates value, else null.
+export async function getStandardNamedRate(name) {
+  const { data: mat } = await supabase.from('material').select('id').eq('description', name).limit(1)
+  if (mat && mat.length) {
+    const vid = await resolvePriceVendor(null)
+    if (vid) {
+      const { data: p } = await supabase
+        .from('material_price')
+        .select('price')
+        .eq('material_id', mat[0].id)
+        .eq('vendor_id', vid)
+        .is('effective_end', null)
+        .limit(1)
+      if (p?.[0]?.price != null) return num(p[0].price)
+    }
+    return null
+  }
+  const { data: mr } = await supabase.from('misc_rates').select('rate').eq('name', name).limit(1)
+  return mr?.[0]?.rate != null ? num(mr[0].rate) : null
+}
+
 // Materials flagged show_in_selections, normalized to the old material_rates
 // "selections row" shape the CAD palette + SelectionsBrowser expect:
 //   { id, category, sub_category, name, photo_url, unit, price, collection }

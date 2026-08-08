@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
+import { fetchAllMaterialsAdmin } from '../lib/materialCatalog'
 import { topCandidates, normalizeName } from '../lib/matchScore'
 
 // ── Find & Merge Duplicate Materials ─────────────────────────────────────────
@@ -113,9 +114,9 @@ function PairCard({ pair, onMerged, onSkip }) {
     setBusy(true)
     setError('')
     try {
-      const { error: rpcErr } = await supabase.rpc('merge_material_rates', {
-        keep: keepRow.id,
-        drop: dropRow.id,
+      const { error: rpcErr } = await supabase.rpc('merge_material', {
+        p_keep: keepRow.id,
+        p_drop: dropRow.id,
       })
       if (rpcErr) {
         setError(rpcErr.message || 'Merge failed')
@@ -301,7 +302,7 @@ export default function MergeDuplicatesModal({ onClose, onMerged }) {
     setMBusy(true)
     setMErr('')
     setMMsg('')
-    const { error } = await supabase.rpc('merge_material_rates', { keep: mKeep, drop: mDrop })
+    const { error } = await supabase.rpc('merge_material', { p_keep: mKeep, p_drop: mDrop })
     setMBusy(false)
     if (error) {
       setMErr(error.message || 'Merge failed')
@@ -322,19 +323,9 @@ export default function MergeDuplicatesModal({ onClose, onMerged }) {
       setLoading(true)
       setLoadError('')
       try {
-        const { data, error } = await supabase
-          .from('material_rates')
-          .select(
-            'id, name, sku, category, sub_category, unit, unit_cost, photo_url, vendor_id, show_in_selections'
-          )
-          .limit(8000)
+        const data = await fetchAllMaterialsAdmin()
         if (!alive) return
-        if (error) {
-          setLoadError(error.message || 'Failed to load materials')
-          setRows([])
-        } else {
-          setRows(Array.isArray(data) ? data : [])
-        }
+        setRows(Array.isArray(data) ? data : [])
       } catch (e) {
         if (alive) setLoadError((e && e.message) || 'Failed to load materials')
       } finally {

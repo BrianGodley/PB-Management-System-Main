@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
+import { fetchAllMaterialsAdmin, resolveTaxonomyIds, setMaterialPrice } from '../lib/materialCatalog'
 import PriceSheetImportModal from '../components/PriceSheetImportModal'
 import VendorCatalogImportModal from '../components/VendorCatalogImportModal'
 import MergeDuplicatesModal from '../components/MergeDuplicatesModal'
@@ -544,13 +545,13 @@ export default function MasterRates({ only } = {}) {
 
   async function fetchAll() {
     setLoading(true)
-    const [matRes, labRes, subRes, vendorRes] = await Promise.all([
-      supabase.from('material_rates').select('*').order('name'),
+    const [mats, labRes, subRes, vendorRes] = await Promise.all([
+      fetchAllMaterialsAdmin(),
       supabase.from('labor_rates').select('*').order('name'),
       supabase.from('subcontractor_rates').select('*').order('company_name'),
       supabase.from('subs_vendors').select('id, company_name, type').order('company_name'),
     ])
-    if (matRes.data) setMaterials(matRes.data)
+    if (mats) setMaterials(mats)
     if (labRes.data) setLabor(labRes.data)
     if (subRes.data) setSubs(subRes.data)
     if (vendorRes.data) setVendors(vendorRes.data)
@@ -559,49 +560,57 @@ export default function MasterRates({ only } = {}) {
     setLoading(false)
   }
 
-  // ── Materials CRUD ──
+  // ── Materials CRUD (new model: material + material_price) ──
   async function addMaterial(form) {
-    const { data } = await supabase
-      .from('material_rates')
+    const subCat =
+      form.sub_category?.trim() ||
+      (form.category?.trim() === 'Paver' && form.vendor_id ? 'Paver Material' : null)
+    const { category_id, subcategory_id, error: taxErr } = await resolveTaxonomyIds(form.category, subCat)
+    if (taxErr) { alert(taxErr); return }
+    const { data, error } = await supabase
+      .from('material')
       .insert({
-        name: form.name?.trim(),
+        description: form.name?.trim(),
         unit: form.unit,
-        unit_cost: parseFloat(form.unit_cost) || 0,
-        category: form.category?.trim(),
-        vendor_id: form.vendor_id || null,
-        sub_category:
-          form.sub_category?.trim() ||
-          (form.category?.trim() === 'Paver' && form.vendor_id ? 'Paver Material' : null),
+        category_id,
+        subcategory_id,
         calc_meta: parseCalcMeta(form.calc_meta),
         photo_url: form.photo_url || null,
       })
-      .select()
+      .select('id')
       .single()
-    if (data) setMaterials(p => [...p, data].sort((a, b) => a.name.localeCompare(b.name)))
+    if (error) { alert('Add failed: ' + error.message); return }
+    if (form.unit_cost !== '' && form.unit_cost != null) {
+      await setMaterialPrice(data.id, form.vendor_id || null, parseFloat(form.unit_cost) || 0)
+    }
+    await fetchAll()
   }
   async function saveMaterial(form) {
-    const { data } = await supabase
-      .from('material_rates')
+    const subCat =
+      form.sub_category?.trim() ||
+      (form.category?.trim() === 'Paver' && form.vendor_id ? 'Paver Material' : null)
+    const { category_id, subcategory_id, error: taxErr } = await resolveTaxonomyIds(form.category, subCat)
+    if (taxErr) { alert(taxErr); return }
+    const { error } = await supabase
+      .from('material')
       .update({
-        name: form.name?.trim(),
+        description: form.name?.trim(),
         unit: form.unit,
-        unit_cost: parseFloat(form.unit_cost) || 0,
-        category: form.category?.trim(),
-        vendor_id: form.vendor_id || null,
-        sub_category:
-          form.sub_category?.trim() ||
-          (form.category?.trim() === 'Paver' && form.vendor_id ? 'Paver Material' : null),
+        category_id,
+        subcategory_id,
         calc_meta: parseCalcMeta(form.calc_meta),
         photo_url: form.photo_url || null,
       })
       .eq('id', form.id)
-      .select()
-      .single()
-    if (data) setMaterials(p => p.map(r => (r.id === data.id ? data : r)))
+    if (error) { alert('Save failed: ' + error.message); return }
+    if (form.unit_cost !== '' && form.unit_cost != null) {
+      await setMaterialPrice(form.id, form.vendor_id || null, parseFloat(form.unit_cost) || 0)
+    }
+    await fetchAll()
   }
   async function deleteMaterial(id) {
-    if (!confirm('Delete this material rate?')) return
-    await supabase.from('material_rates').delete().eq('id', id)
+    if (!confirm('Delete this material? Its prices are removed too.')) return
+    await supabase.from('material').delete().eq('id', id) // cascades material_price
     setMaterials(p => p.filter(r => r.id !== id))
   }
 

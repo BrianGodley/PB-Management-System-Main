@@ -25,6 +25,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
+import { getStandardNamedRate, saveStandardNamedRate } from '../lib/materialCatalog'
 import { useSubRateOverrides } from './SubRateOverrideContext.jsx'
 import { useRateIcons } from '../contexts/RateIconsContext'
 import MaterialFieldRatesModal from './MaterialFieldRatesModal'
@@ -38,7 +39,7 @@ const DEFAULT_VALUE_FIELD = {
 }
 
 const SOURCE_LABEL = {
-  material_rates: 'Master Rates → Materials',
+  material_rates: 'Master Material Rates',
   labor_rates: 'Master Rates → Labor',
   subcontractor_rates: 'Master Rates → Subcontractors',
   material_price: 'Master Material Rates',
@@ -132,6 +133,16 @@ export default function RateEditPopover({
       })()
       return
     }
+    // material_rates is retired: named material rates now live on the new model
+    // (a material's Standard price, or a misc_rate). Read via the shared helper.
+    if (table === 'material_rates') {
+      ;(async () => {
+        const val = await getStandardNamedRate(name)
+        setDraft(String(val ?? currentValue ?? ''))
+        setLoaded(true)
+      })()
+      return
+    }
     let q = supabase.from(table).select(`${field}, id`).eq(nameCol, name)
     // Filter by category on every table that has one (material_rates,
     // labor_rates, subcontractor_rates). The previous code only did this
@@ -212,6 +223,29 @@ export default function RateEditPopover({
           if (!ins || ins.length === 0)
             throw new Error('Insert returned 0 rows — RLS likely blocked the write.')
         }
+      } catch (e) {
+        setError(e?.message || 'Save failed.')
+        setSaving(false)
+        return
+      }
+      setSaving(false)
+      const disp = `$${v.toLocaleString(undefined, { maximumFractionDigits: 4 })}`
+      setSaveMsg(`Saved! New rate: ${disp}`)
+      if (onSaved) {
+        try {
+          await onSaved()
+        } catch {
+          /* non-fatal */
+        }
+      }
+      return
+    }
+
+    // material_rates retired → save the named rate onto the new model (a
+    // material's Standard price, or a misc_rate). Keeps the same name-keyed UX.
+    if (table === 'material_rates') {
+      try {
+        await saveStandardNamedRate(name, v, category)
       } catch (e) {
         setError(e?.message || 'Save failed.')
         setSaving(false)
