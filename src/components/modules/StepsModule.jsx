@@ -11,6 +11,8 @@ import {
   ledgerPrice,
   catalogOptions,
   catalogItemFor,
+  fetchModuleCatalog,
+  fetchStandardRateMap,
 } from '../../lib/materialCatalog'
 
 const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
@@ -286,16 +288,12 @@ function StepsRatesModal({ open, onClose, onSaved, isSub = false }) {
     setLoading(true)
     Promise.all([
       supabase.from('labor_rates').select('name, rate').eq('category', 'Steps'),
-      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Steps'),
-    ]).then(([lrRes, mrRes]) => {
+      fetchStandardRateMap(['Steps']),
+    ]).then(([lrRes, mr]) => {
       if (gone) return
       const lr = {}
       ;(lrRes.data || []).forEach(r => {
         lr[r.name] = parseFloat(r.rate)
-      })
-      const mr = {}
-      ;(mrRes.data || []).forEach(r => {
-        mr[r.name] = parseFloat(r.unit_cost)
       })
       const d = {
         paverForm: {},
@@ -817,13 +815,13 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
   const [ratesModalOpen, setRatesModalOpen] = useState(false)
 
   const refreshAllRates = useCallback(async () => {
-    const [lrRes, mrRes, matRowsRes, venRes] = await Promise.all([
+    // material_rates retired: base map (category 'Steps') from the new model;
+    // catalog from the shared Paver + Concrete categories (Steps' pickers filter
+    // on 'Paver Material' / 'Concrete Mix', both unchanged names).
+    const [lrRes, matMap, rows, venRes] = await Promise.all([
       supabase.from('labor_rates').select('name, rate').eq('category', 'Steps'),
-      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Steps'),
-      supabase
-        .from('material_rates')
-        .select('id, name, unit_cost, sub_category, vendor_id, sf_per_pallet')
-        .not('vendor_id', 'is', null),
+      fetchStandardRateMap(['Steps']),
+      fetchModuleCatalog(['Paver', 'Concrete']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
@@ -837,14 +835,8 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
       })
       setLaborRates(m)
     }
-    if (mrRes.data) {
-      const m = {}
-      mrRes.data.forEach(r => {
-        m[r.name] = parseFloat(r.unit_cost)
-      })
-      setMaterialRates(m)
-    }
-    setMaterialRows(matRowsRes.data || [])
+    setMaterialRates(matMap)
+    setMaterialRows(rows || [])
     setVendors(
       (venRes.data || []).map(v => ({
         id: v.id,
