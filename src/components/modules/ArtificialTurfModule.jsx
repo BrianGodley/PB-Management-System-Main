@@ -15,7 +15,7 @@ import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { catalogItemFor, catalogOptions } from '../../lib/materialCatalog'
+import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 
 const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
 
@@ -552,40 +552,31 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
 
   // Re-fetch Turf rate maps. Used on mount and after any RateEditPopover save.
   const refreshAllRates = useCallback(async () => {
-    const [matRes, labRes, subRes, matRowsRes, venRes] = await Promise.all([
-      supabase
-        .from('material_rates')
-        .select('name, unit_cost')
-        .in('category', ['Artificial Turf', 'Demo']),
+    // material_rates retired: base map (incl. shared Demo fees) from the new
+    // model; Turf catalog from material + material_price. Markers
+    // ('Turf Material'/'Turf Base') are unchanged, so no remap.
+    const [matMap, labRes, subRes, rows, venRes] = await Promise.all([
+      fetchStandardRateMap(['Artificial Turf', 'Demo']),
       supabase.from('labor_rates').select('name, rate').eq('category', 'Artificial Turf'),
       supabase
         .from('subcontractor_rates')
         .select('company_name, rate')
         .eq('category', 'Artificial Turf'),
-      supabase
-        .from('material_rates')
-        .select('name, unit_cost, sub_category, vendor_id')
-        .eq('category', 'Artificial Turf'),
+      fetchModuleCatalog(['Artificial Turf']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
         .eq('type', 'vendor')
         .order('company_name'),
     ])
-    setMaterialRows(matRowsRes.data || [])
+    setMaterialRows(rows || [])
     setVendors(
       (venRes.data || []).map(v => ({
         id: v.id,
         name: v.company_name,
       }))
     )
-    if (matRes.data) {
-      const m = {}
-      matRes.data.forEach(r => {
-        m[r.name] = parseFloat(r.unit_cost)
-      })
-      setMaterialPrices(m)
-    }
+    setMaterialPrices(matMap)
     if (labRes.data) {
       const m = {}
       labRes.data.forEach(r => {
@@ -607,18 +598,15 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
   useEffect(() => {
     let alive = true
     Promise.all([
-      supabase
-        .from('material_rates')
-        .select('name, unit_cost, sub_category, vendor_id')
-        .eq('category', 'Artificial Turf'),
+      fetchModuleCatalog(['Artificial Turf']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
         .eq('type', 'vendor')
         .order('company_name'),
-    ]).then(([matRowsRes, venRes]) => {
+    ]).then(([rows, venRes]) => {
       if (!alive) return
-      setMaterialRows(matRowsRes.data || [])
+      setMaterialRows(rows || [])
       setVendors(
         (venRes.data || []).map(v => ({
           id: v.id,
