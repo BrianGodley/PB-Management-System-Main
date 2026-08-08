@@ -6,7 +6,7 @@ import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { catalogItemFor, catalogOptions } from '../../lib/materialCatalog'
+import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 
 const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
 
@@ -397,18 +397,15 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   useEffect(() => {
     let alive = true
     Promise.all([
-      supabase
-        .from('material_rates')
-        .select('name, unit_cost, sub_category, vendor_id')
-        .eq('category', 'Drainage'),
+      fetchModuleCatalog(['Drainage']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
         .eq('type', 'vendor')
         .order('company_name'),
-    ]).then(([matRowsRes, venRes]) => {
+    ]).then(([rows, venRes]) => {
       if (!alive) return
-      setMaterialRows(matRowsRes.data || [])
+      setMaterialRows(rows || [])
       setVendors(
         (venRes.data || []).map(v => ({
           id: v.id,
@@ -425,17 +422,14 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   // master-rate value — picks up the change without a page refresh. Fetches
   // both the Drainage material rates and the Drainage subcontractor rates.
   async function refreshMaterialPrices() {
-    const [matRes, subRes] = await Promise.all([
-      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Drainage'),
+    // material_rates retired: base map (fees like 'Drain Fitting Fee' from
+    // misc_rates) via the new model; catalog subcategories ('Drain Pipe' /
+    // 'Drain Fixtures') already match the module's markers.
+    const [matMap, subRes] = await Promise.all([
+      fetchStandardRateMap(['Drainage']),
       supabase.from('subcontractor_rates').select('company_name, rate').eq('category', 'Drainage'),
     ])
-    if (matRes.data) {
-      const prices = {}
-      matRes.data.forEach(r => {
-        prices[r.name] = parseFloat(r.unit_cost) || 0
-      })
-      setMaterialPrices(prices)
-    }
+    setMaterialPrices(matMap)
     if (subRes.data) {
       const sr = {}
       subRes.data.forEach(r => {
