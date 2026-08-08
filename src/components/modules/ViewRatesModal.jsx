@@ -73,7 +73,7 @@ export default function ViewRatesModal({ title = 'Rates', rates = [], onClose, r
             filtered.map((g, gi) => (
               <div key={gi} className="mb-3">
                 {g.group && (
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-900 mb-1">
                     {g.group}
                   </p>
                 )}
