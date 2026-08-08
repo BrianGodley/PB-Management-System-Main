@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { supabase } from '../lib/supabase'
+import { setMaterialPrice } from '../lib/materialCatalog'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MissingPriceModal — pops when a user selects a catalog material that has no
@@ -17,18 +17,6 @@ import { supabase } from '../lib/supabase'
 //   onSaved    — async () => void  (host re-fetches its catalog so the new price shows)
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Resolve the vendor to price against: an explicit vendor, else the tenant's
-// Standard vendor (universal price). Mirrors RateEditPopover.
-async function resolvePriceVendor(vendorId) {
-  if (vendorId && vendorId !== 'House') return vendorId
-  const { data } = await supabase
-    .from('subs_vendors')
-    .select('id')
-    .or('company_name.ilike.standard,company_name.ilike.unspecified')
-    .limit(1)
-  return data?.[0]?.id || null
-}
-
 export default function MissingPriceModal({ name, materialId, vendorId, vendorLabel, onClose, onSaved }) {
   const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
@@ -43,35 +31,7 @@ export default function MissingPriceModal({ name, materialId, vendorId, vendorLa
     setSaving(true)
     setError('')
     try {
-      const vid = await resolvePriceVendor(vendorId)
-      if (!vid || !materialId) throw new Error('Missing product or vendor.')
-      // Update the open price if one exists, else insert one.
-      const { data: existing, error: selErr } = await supabase
-        .from('material_price')
-        .select('id')
-        .eq('material_id', materialId)
-        .eq('vendor_id', vid)
-        .is('effective_end', null)
-        .limit(1)
-      if (selErr) throw new Error('Lookup failed: ' + selErr.message)
-      if (existing && existing.length > 0) {
-        const { data: up, error: upErr } = await supabase
-          .from('material_price')
-          .update({ price: v })
-          .eq('id', existing[0].id)
-          .select()
-        if (upErr) throw new Error('Save failed: ' + upErr.message)
-        if (!up || up.length === 0)
-          throw new Error('Save returned 0 rows — RLS likely blocked the write.')
-      } else {
-        const { data: ins, error: insErr } = await supabase
-          .from('material_price')
-          .insert({ material_id: materialId, vendor_id: vid, price: v, source: 'manual' })
-          .select()
-        if (insErr) throw new Error('Save failed: ' + insErr.message)
-        if (!ins || ins.length === 0)
-          throw new Error('Insert returned 0 rows — RLS likely blocked the write.')
-      }
+      await setMaterialPrice(materialId, vendorId, v)
     } catch (e) {
       setError(e?.message || 'Save failed.')
       setSaving(false)

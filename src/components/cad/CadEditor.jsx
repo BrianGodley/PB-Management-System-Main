@@ -22,6 +22,7 @@
  */
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
+import { fetchSelections } from '../../lib/materialCatalog';
 import { entitiesToDxf, parseDxf } from './dxf';
 import CadSheets from './CadSheets';
 import SendToEstimateModal from './SendToEstimateModal';
@@ -200,27 +201,15 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
   }, []);
 
   // -------- load selections library (once) --------------------------------
-  // Selections are now the design/spec lens of material_rates (rows flagged
-  // show_in_selections). Normalize to the palette's expected shape so the rest
-  // of the palette/placeBlock code is unchanged: price=unit_cost, and the row's
-  // own id IS the material_rate id.
+  // Selections are the design/spec lens of the catalog (material rows flagged
+  // show_in_selections) on the NEW pricing model. fetchSelections normalizes to
+  // the palette's expected shape: price=Standard open price, id=material id.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const { data, error } = await supabase
-          .from('material_rates')
-          .select('id, category, sub_category, name, photo_url, unit_cost, unit')
-          .eq('show_in_selections', true)
-          .order('category')
-          .order('name');
+        const data = await fetchSelections();
         if (cancelled) return;
-        if (error) {
-          // eslint-disable-next-line no-console
-          console.error('CAD selections load failed', error);
-          setSelections([]);
-          return;
-        }
         const norm = (Array.isArray(data) ? data : []).map((r) => ({
           id: r.id,
           category: r.category,
@@ -228,7 +217,7 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
           name: r.name,
           photo_url: r.photo_url,
           unit: r.unit,
-          price: r.unit_cost,
+          price: r.price,
           material_rate_id: r.id,
         }));
         setSelections(norm);

@@ -219,6 +219,96 @@ export async function fetchStandardRateMap(categories) {
   return map
 }
 
+// Resolve the vendor to price against: an explicit vendor, else the tenant's
+// Standard/Unspecified vendor (the universal price).
+export async function resolvePriceVendor(vendorId) {
+  if (vendorId && vendorId !== 'House') return vendorId
+  const { data } = await supabase
+    .from('subs_vendors')
+    .select('id')
+    .or('company_name.ilike.standard,company_name.ilike.unspecified')
+    .limit(1)
+  return data?.[0]?.id || null
+}
+
+// Write a price into the NEW model. Updates the OPEN material_price row for
+// (material_id, resolved vendor) in place if one exists, else inserts one —
+// matching the app's existing convention (MissingPriceModal / MasterMaterialRates).
+// vendorId null/'House' → the Standard (universal) price. Throws on RLS/errors.
+export async function setMaterialPrice(materialId, vendorId, price, source = 'manual') {
+  const v = typeof price === 'number' ? price : parseFloat(price)
+  if (!Number.isFinite(v) || v < 0) throw new Error('Invalid price.')
+  const vid = await resolvePriceVendor(vendorId)
+  if (!vid || !materialId) throw new Error('Missing product or vendor.')
+  const { data: existing, error: selErr } = await supabase
+    .from('material_price')
+    .select('id')
+    .eq('material_id', materialId)
+    .eq('vendor_id', vid)
+    .is('effective_end', null)
+    .limit(1)
+  if (selErr) throw new Error('Lookup failed: ' + selErr.message)
+  if (existing && existing.length > 0) {
+    const { data: up, error: upErr } = await supabase
+      .from('material_price')
+      .update({ price: v })
+      .eq('id', existing[0].id)
+      .select()
+    if (upErr) throw new Error('Save failed: ' + upErr.message)
+    if (!up || up.length === 0) throw new Error('Save returned 0 rows — RLS likely blocked the write.')
+    return up[0]
+  }
+  const { data: ins, error: insErr } = await supabase
+    .from('material_price')
+    .insert({ material_id: materialId, vendor_id: vid, price: v, source })
+    .select()
+  if (insErr) throw new Error('Save failed: ' + insErr.message)
+  if (!ins || ins.length === 0) throw new Error('Insert returned 0 rows — RLS likely blocked the write.')
+  return ins[0]
+}
+
+// Materials flagged show_in_selections, normalized to the old material_rates
+// "selections row" shape the CAD palette + SelectionsBrowser expect:
+//   { id, category, sub_category, name, photo_url, unit, price, collection }
+// price = the Standard (universal) open price, else the lowest open vendor price.
+export async function fetchSelections() {
+  const [{ data: vends }, { data }] = await Promise.all([
+    supabase.from('subs_vendors').select('id, company_name'),
+    supabase
+      .from('material')
+      .select(
+        `id, description, photo_url, unit, collection,
+         category:category_id ( name ),
+         subcategory:subcategory_id ( name ),
+         prices:material_price ( price, vendor_id, effective_end )`
+      )
+      .eq('show_in_selections', true),
+  ])
+  const stdId =
+    (vends || []).find(v => ['standard', 'unspecified'].includes((v.company_name || '').trim().toLowerCase()))
+      ?.id || null
+  return (data || [])
+    .map(m => {
+      const open = (m.prices || []).filter(p => p.effective_end == null)
+      const std = open.find(p => p.vendor_id === stdId)
+      const price = std ? num(std.price) : open.length ? Math.min(...open.map(p => num(p.price))) : null
+      return {
+        id: m.id,
+        category: m.category?.name || null,
+        sub_category: m.subcategory?.name || null,
+        name: m.description,
+        photo_url: m.photo_url || null,
+        unit: m.unit || null,
+        price,
+        collection: m.collection || null,
+      }
+    })
+    .sort(
+      (a, b) =>
+        (a.category || '').localeCompare(b.category || '') || (a.name || '').localeCompare(b.name || '')
+    )
+}
+
 // Shared catalog hook. Fetches, for one or more `categories`:
 //   • priceMap  — name → unit_cost (materials) merged with name → rate (labor coefficients)
 //   • materialRows — {id,name,vendor_id,unit,unit_cost,category,sub_category,subcategory}
