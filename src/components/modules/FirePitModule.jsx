@@ -7,7 +7,7 @@ import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { groutCuFtPerBlock } from '../../lib/cmuGrout'
-import { catalogItemFor, catalogOptions } from '../../lib/materialCatalog'
+import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 
 const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
 
@@ -710,34 +710,28 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
   // mount and after edit. The 'Utilities' category rates (shared with the
   // Utilities module) merge into the same price map the gas sections read.
   const refreshAllRates = useCallback(async () => {
-    const [matRes, labRes, matRowsRes, venRes] = await Promise.all([
-      supabase
-        .from('material_rates')
-        .select('name, unit_cost')
-        .in('category', ['Fire Pit', 'Utilities']),
+    // material_rates retired: base map from the new model; wall-finish + cap
+    // catalog comes from the shared Fire Pit / Outdoor Kitchen / Walls
+    // categories ('Wall Finish' and 'Wall Cap' subcategories, unchanged names).
+    const [matMap, labRes, rows, venRes] = await Promise.all([
+      fetchStandardRateMap(['Fire Pit', 'Utilities']),
       supabase
         .from('labor_rates')
         .select('name, rate')
         .in('category', ['Fire Pit', 'Utilities']),
-      supabase
-        .from('material_rates')
-        .select('name, unit_cost, sub_category, vendor_id')
-        .not('vendor_id', 'is', null),
+      fetchModuleCatalog(['Fire Pit', 'Outdoor Kitchen', 'Walls']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
         .eq('type', 'vendor')
         .order('company_name'),
     ])
-    const prices = {}
-    ;(matRes.data || []).forEach(r => {
-      prices[r.name] = parseFloat(r.unit_cost) || 0
-    })
+    const prices = { ...matMap }
     ;(labRes.data || []).forEach(r => {
       prices[r.name] = parseFloat(r.rate) || 0
     })
     setMaterialPrices(prices)
-    setMaterialRows(matRowsRes.data || [])
+    setMaterialRows(rows || [])
     setVendors(
       (venRes.data || []).map(v => ({
         id: v.id,
