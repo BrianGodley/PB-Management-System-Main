@@ -6,7 +6,7 @@ import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { resolveMaterialPrice } from '../../lib/materialCatalog'
+import { resolveMaterialPrice, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Planting Module
@@ -566,26 +566,20 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
   // Re-fetch Planting master-rate maps + vendor catalog. Called once on mount and
   // again after any RateEditPopover save so the calc reflects edits immediately.
   const refreshAllRates = useCallback(async () => {
-    const [matRes, labRes, catRes, venRes] = await Promise.all([
-      supabase.from('material_rates').select('name, unit_cost').eq('category', PLANTING_CATEGORY),
+    // material_rates retired: House/base prices from the new model
+    // (fetchStandardRateMap, name-keyed); vendor catalog rows from
+    // material + material_price. Planting resolves by name, not subcategory.
+    const [matMap, labRes, rows, venRes] = await Promise.all([
+      fetchStandardRateMap([PLANTING_CATEGORY]),
       supabase.from('labor_rates').select('name, rate').eq('category', PLANTING_CATEGORY),
-      supabase
-        .from('material_rates')
-        .select('id,name,vendor_id,unit,unit_cost')
-        .eq('category', PLANTING_CATEGORY),
+      fetchModuleCatalog([PLANTING_CATEGORY]),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
         .eq('type', 'vendor')
         .order('company_name'),
     ])
-    if (matRes.data) {
-      const p = {}
-      matRes.data.forEach(r => {
-        p[r.name] = parseFloat(r.unit_cost) || 0
-      })
-      setMaterialPrices(p)
-    }
+    setMaterialPrices(matMap)
     if (labRes.data) {
       const l = {}
       labRes.data.forEach(r => {
