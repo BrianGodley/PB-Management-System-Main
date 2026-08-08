@@ -208,7 +208,7 @@ export default function InvoiceImportModal({ jobId: jobIdProp, jobName: jobNameP
 
       const lineRows = rows.map(r => ({
         invoice_id: invoiceId,
-        material_rate_id: r.matchId || null,
+        material_id: r.matchId || null, // new model: matchId is a material.id
         description: r.description,
         qty: r.qty,
         unit: r.unit,
