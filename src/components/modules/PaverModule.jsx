@@ -45,6 +45,8 @@ import {
   ledgerPrice,
   catalogOptions,
   catalogItemFor,
+  fetchModuleCatalog,
+  fetchStandardRateMap,
 } from '../../lib/materialCatalog'
 
 const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
@@ -833,14 +835,14 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   // Re-fetch all Paver rate maps. Called once on mount and again whenever the
   // user saves an edit from a RateEditPopover so the calc picks up the change.
   const refreshAllRates = useCallback(async () => {
-    const [lrRes, mrRes, matRowsRes, venRes] = await Promise.all([
+    // material_rates retired: base map (incl. shared Basic Materials) from the
+    // new model; Paver catalog (with pallet / vertical-LF specs) from
+    // material + material_price. Subcategories ('Paver Material'/'Base Material')
+    // are unchanged, so no remap needed.
+    const [lrRes, matMap, rows, venRes] = await Promise.all([
       supabase.from('labor_rates').select('name,rate').eq('category', 'Paver'),
-      // Include Basic Materials so shared basics (e.g. Bedding Sand) resolve here.
-      supabase.from('material_rates').select('name,unit_cost').in('category', ['Paver', 'Basic Materials']),
-      supabase
-        .from('material_rates')
-        .select('id, name, unit_cost, sub_category, vendor_id, sf_per_pallet, price_per_lf_vert')
-        .eq('category', 'Paver'),
+      fetchStandardRateMap(['Paver', 'Basic Materials']),
+      fetchModuleCatalog(['Paver']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
@@ -854,14 +856,8 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       })
       setLaborRates(m)
     }
-    if (mrRes.data) {
-      const m = {}
-      mrRes.data.forEach(r => {
-        m[r.name] = parseFloat(r.unit_cost)
-      })
-      setMaterialRates(m)
-    }
-    setMaterialRows(matRowsRes.data || [])
+    setMaterialRates(matMap)
+    setMaterialRows(rows || [])
     setVendors(
       (venRes.data || []).map(v => ({
         id: v.id,
