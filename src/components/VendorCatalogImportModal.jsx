@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { pdfjs } from 'react-pdf'
 import { supabase } from '../lib/supabase'
+import { supersedeMaterialPrice, resolveTaxonomyIds } from '../lib/materialCatalog'
 import VendorCombo from './VendorCombo'
 import QuickAddVendorModal from './QuickAddVendorModal'
 
@@ -233,12 +234,10 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
   const [catOptions, setCatOptions] = useState([])
   useEffect(() => {
     supabase
-      .from('material_rates')
-      .select('category')
+      .from('category')
+      .select('name')
       .then(({ data }) => {
-        const cats = new Set()
-        for (const r of data || []) if (r.category) cats.add(r.category)
-        setCatOptions([...cats].sort())
+        setCatOptions([...new Set((data || []).map(c => c.name).filter(Boolean))].sort())
       })
   }, [])
 
@@ -598,35 +597,56 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
         seen.add(k)
         uniq.push(r)
       }
-      const { data: existingRows } = await supabase.from('material_rates').select('name, category')
+      const { data: existingRows } = await supabase
+        .from('material')
+        .select('description, category:category_id ( name )')
       const exists = new Set(
-        (existingRows || []).map(e => `${(e.category || '').toLowerCase()}::${(e.name || '').toLowerCase()}`)
+        (existingRows || []).map(
+          e => `${(e.category?.name || '').toLowerCase()}::${(e.description || '').toLowerCase()}`
+        )
       )
       const toInsert = uniq.filter(r => !exists.has(key(r)))
       const skipped = included.length - toInsert.length
 
       if (toInsert.length) {
-        // One product record per item. show_in_selections=true so imported
-        // catalog items appear in Design → Selections (the design/spec lens of
-        // the same material_rates table). No separate selections write.
-        const payload = toInsert.map(r => ({
-          name: r.name.trim(),
-          category: r.category.trim() || null,
-          sub_category: r.sub_category.trim() || null,
-          vendor_id: vendorId,
-          unit: r.unit.trim() || null,
-          unit_cost: r.price === '' ? null : Number(r.price),
-          photo_url: r.photoUrl || null,
-          description: r.description?.trim() || null,
-          sku: r.sku?.trim() || null,
-          show_in_selections: true,
-        }))
-        const { error: insErr } = await supabase.from('material_rates').insert(payload)
-        if (insErr) throw new Error(`Import failed: ${insErr.message}`)
-
-        setAdded(a => a + payload.length)
+        // One `material` record per item + a vendor price. show_in_selections=true
+        // so imported catalog items appear in Design → Selections. The new model
+        // keeps the product name in `description`; the long spec blurb (if any)
+        // lives under attributes.description.
+        let insertedCount = 0
+        let photoless = 0
+        for (const r of toInsert) {
+          const { category_id, subcategory_id, error: taxErr } = await resolveTaxonomyIds(
+            r.category,
+            r.sub_category
+          )
+          if (taxErr) throw new Error(`Import failed for "${r.name}": ${taxErr}`)
+          const attributes = {}
+          if (r.description?.trim()) attributes.description = r.description.trim()
+          const { data: mIns, error: insErr } = await supabase
+            .from('material')
+            .insert({
+              description: r.name.trim(),
+              category_id,
+              subcategory_id,
+              unit: r.unit.trim() || null,
+              photo_url: r.photoUrl || null,
+              sku: r.sku?.trim() || null,
+              attributes,
+              show_in_selections: true,
+            })
+            .select('id')
+            .single()
+          if (insErr) throw new Error(`Import failed for "${r.name}": ${insErr.message}`)
+          if (r.price !== '' && r.price != null) {
+            await supersedeMaterialPrice(mIns.id, vendorId, Number(r.price), { source: 'vendor_catalog' })
+          }
+          insertedCount++
+          if (!r.photoUrl) photoless++
+        }
+        setAdded(a => a + insertedCount)
         // Items that imported without a photo (crop empty or upload failed).
-        setPhotolessCount(c => c + payload.filter(r => !r.photo_url).length)
+        setPhotolessCount(c => c + photoless)
       }
       setSkippedCount(s => s + skipped)
       onImported?.()
