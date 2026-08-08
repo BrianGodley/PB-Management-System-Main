@@ -12,6 +12,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
+import { fetchSelections, resolveTaxonomyIds, setMaterialPrice } from '../lib/materialCatalog'
 import VendorCombo from './VendorCombo'
 
 const FG = '#3A5038'
@@ -95,8 +96,8 @@ export default function SelectionsBrowser() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [{ data: sel }, { data: vs }] = await Promise.all([
-      supabase.from('material_rates').select('*').eq('show_in_selections', true).order('name'),
+    const [sel, { data: vs }] = await Promise.all([
+      fetchSelections(),
       supabase.from('subs_vendors').select('id, company_name, type').order('company_name'),
     ])
     setItems(sel || [])
@@ -149,7 +150,7 @@ export default function SelectionsBrowser() {
 
   async function handleDelete(row) {
     if (!confirm(`Remove "${row.name}" from Selections? The material/price record itself is kept.`)) return
-    const { error } = await supabase.from('material_rates').update({ show_in_selections: false }).eq('id', row.id)
+    const { error } = await supabase.from('material').update({ show_in_selections: false }).eq('id', row.id)
     if (error) { alert('Remove from Selections failed: ' + error.message); return }
     setDetail(null)
     load()
@@ -473,36 +474,52 @@ function SelectionForm({ row, vendors, categories, onClose, onSaved }) {
     if (!name.trim()) { setErr('Name is required.'); return }
     setSaving(true)
 
-    // Assemble attributes jsonb from non-empty keys.
+    // Assemble attributes jsonb from non-empty keys. The new `material` table has
+    // no separate long-text column, so the spec "Description" field is kept under
+    // attributes.description.
     const attributes = {}
     for (const r of attrRows) {
       const k = r.key.trim()
       if (k) attributes[k] = r.value
     }
+    if (description.trim()) attributes.description = description.trim()
+
+    // Resolve category/sub-category names → taxonomy ids (new model).
+    const { category_id, subcategory_id, error: taxErr } = await resolveTaxonomyIds(category, subCategory)
+    if (taxErr) { setSaving(false); setErr(taxErr); return }
 
     const payload = {
-      name: name.trim(),
-      category: category.trim() || null,
-      sub_category: subCategory.trim() || null,
-      vendor_id: vendorId || null,
+      description: name.trim(), // product name lives in material.description
+      category_id,
+      subcategory_id,
       unit: unit.trim() || null,
-      unit_cost: price === '' ? null : Number(price),
       sku: sku.trim() || null,
-      description: description.trim() || null,
       photo_url: photoUrl || null,
       attributes: Object.keys(attributes).length ? attributes : {},
       show_in_selections: true,
     }
 
+    let materialId = isEdit ? row.id : null
     let error
     if (isEdit) {
-      ({ error } = await supabase.from('material_rates').update(payload).eq('id', row.id))
+      ({ error } = await supabase.from('material').update(payload).eq('id', row.id))
     } else {
       // never send tenant_id (set by trigger).
-      ({ error } = await supabase.from('material_rates').insert(payload))
+      const { data: ins, error: insErr } = await supabase.from('material').insert(payload).select('id')
+      error = insErr
+      materialId = ins?.[0]?.id || null
+    }
+    if (error) { setSaving(false); setErr(error.message); return }
+
+    // Price → material_price (Standard vendor unless one is picked). Skipped when blank.
+    if (materialId && price !== '' && price != null) {
+      try {
+        await setMaterialPrice(materialId, vendorId || null, Number(price))
+      } catch (e) {
+        setSaving(false); setErr(e?.message || 'Price save failed.'); return
+      }
     }
     setSaving(false)
-    if (error) { setErr(error.message); return }
     onSaved()
   }
 

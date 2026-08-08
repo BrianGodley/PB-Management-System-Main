@@ -277,7 +277,7 @@ export async function fetchSelections() {
     supabase
       .from('material')
       .select(
-        `id, description, photo_url, unit, collection,
+        `id, description, photo_url, unit, collection, sku, attributes,
          category:category_id ( name ),
          subcategory:subcategory_id ( name ),
          prices:material_price ( price, vendor_id, effective_end )`
@@ -292,6 +292,7 @@ export async function fetchSelections() {
       const open = (m.prices || []).filter(p => p.effective_end == null)
       const std = open.find(p => p.vendor_id === stdId)
       const price = std ? num(std.price) : open.length ? Math.min(...open.map(p => num(p.price))) : null
+      const attrs = m.attributes && typeof m.attributes === 'object' ? m.attributes : {}
       return {
         id: m.id,
         category: m.category?.name || null,
@@ -300,6 +301,12 @@ export async function fetchSelections() {
         photo_url: m.photo_url || null,
         unit: m.unit || null,
         price,
+        unit_cost: price, // alias for edit-form prefill
+        sku: m.sku || null,
+        // the new model keeps the product name in `description`; the old long-text
+        // "description" (spec blurb) lives under attributes.description.
+        description: attrs.description || null,
+        attributes: attrs,
         collection: m.collection || null,
       }
     })
@@ -307,6 +314,36 @@ export async function fetchSelections() {
       (a, b) =>
         (a.category || '').localeCompare(b.category || '') || (a.name || '').localeCompare(b.name || '')
     )
+}
+
+// Resolve a category name + sub-category name to their ids in the taxonomy
+// tables. Returns { category_id, subcategory_id, error }. subcategory is matched
+// within the resolved category. Missing rows → error (callers surface it; we do
+// NOT auto-create taxonomy here — that's TaxonomyManager's job).
+export async function resolveTaxonomyIds(categoryName, subCategoryName) {
+  const cName = (categoryName || '').trim()
+  const sName = (subCategoryName || '').trim()
+  if (!cName) return { error: 'Category is required.' }
+  const { data: cat } = await supabase
+    .from('category')
+    .select('id, name')
+    .ilike('name', cName)
+    .limit(1)
+  const category_id = cat?.[0]?.id
+  if (!category_id) return { error: `Category "${cName}" not found. Add it in Taxonomy first.` }
+  let subcategory_id = null
+  if (sName) {
+    const { data: sub } = await supabase
+      .from('subcategory')
+      .select('id, name')
+      .eq('category_id', category_id)
+      .ilike('name', sName)
+      .limit(1)
+    subcategory_id = sub?.[0]?.id || null
+    if (!subcategory_id)
+      return { error: `Sub-category "${sName}" not found under "${cName}". Add it in Taxonomy first.` }
+  }
+  return { category_id, subcategory_id }
 }
 
 // Shared catalog hook. Fetches, for one or more `categories`:
