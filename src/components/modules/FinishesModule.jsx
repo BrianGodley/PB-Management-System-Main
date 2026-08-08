@@ -647,16 +647,6 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
             ${finishMat(meta.matKey, row.vendor).toFixed(2)}/{meta.matUnit}
           </span>
         )}
-        {isHouse && (
-          <RateEditPopover
-            table="material_rates"
-            name={FINISHES_RATES[meta.matKey].db}
-            category="Finishes"
-            unitLabel={meta.matUnit}
-            currentValue={p(FINISHES_RATES[meta.matKey].db) ?? FINISHES_RATES[meta.matKey].fb}
-            onSaved={refreshAllRates}
-          />
-        )}
         {isHouse && meta.labKey && (
           <RateEditPopover
             table="labor_rates"

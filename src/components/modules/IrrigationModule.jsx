@@ -33,7 +33,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { resolveMaterialPrice } from '../../lib/materialCatalog'
+import { resolveMaterialPrice, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 
 const IRRIGATION_CATEGORY = 'Irrigation'
 
@@ -481,26 +481,21 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
   // Re-fetch Irrigation master-rate maps + vendor catalog. Called on mount and
   // after any RateEditPopover save so the calc reflects edits immediately.
   const refreshAllRates = useCallback(async () => {
-    const [mrRes, lrRes, catRes, venRes] = await Promise.all([
-      supabase.from('material_rates').select('name, unit_cost').eq('category', IRRIGATION_CATEGORY),
+    // material_rates retired: House/base prices from the new model
+    // (fetchStandardRateMap = Standard + labor + misc, name-keyed); vendor
+    // catalog rows from material + material_price. Irrigation resolves by name,
+    // never by subcategory, so no remap is needed.
+    const [matMap, lrRes, rows, venRes] = await Promise.all([
+      fetchStandardRateMap([IRRIGATION_CATEGORY]),
       supabase.from('labor_rates').select('name, rate').eq('category', IRRIGATION_CATEGORY),
-      supabase
-        .from('material_rates')
-        .select('id,name,vendor_id,unit,unit_cost')
-        .eq('category', IRRIGATION_CATEGORY),
+      fetchModuleCatalog([IRRIGATION_CATEGORY]),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
         .eq('type', 'vendor')
         .order('company_name'),
     ])
-    if (mrRes.data) {
-      const m = {}
-      mrRes.data.forEach(r => {
-        m[r.name] = parseFloat(r.unit_cost)
-      })
-      setMaterialPrices(m)
-    }
+    setMaterialPrices(matMap)
     if (lrRes.data) {
       const m = {}
       lrRes.data.forEach(r => {
@@ -508,7 +503,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
       })
       setLaborRates(m)
     }
-    setMaterialRows(catRes.data || [])
+    setMaterialRows(rows || [])
     setVendors(
       (venRes.data || []).map(v => ({
         id: v.id,
@@ -810,16 +805,6 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
                           options={ZONE_OPTIONS}
                         />
                       </div>
-                      {isHouse && (
-                        <RateEditPopover
-                          table="material_rates"
-                          name={z.matKey}
-                          category="Irrigation"
-                          unitLabel="zone"
-                          currentValue={masterMat}
-                          onSaved={refreshAllRates}
-                        />
-                      )}
                     </div>
                   </td>
                   <td className={td}>
@@ -922,16 +907,6 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
                           options={TIMER_OPTIONS}
                         />
                       </div>
-                      {isHouse && (
-                        <RateEditPopover
-                          table="material_rates"
-                          name={t.matKey}
-                          category="Irrigation"
-                          unitLabel="ea"
-                          currentValue={masterMat}
-                          onSaved={refreshAllRates}
-                        />
-                      )}
                     </div>
                   </td>
                   <td className={td}>

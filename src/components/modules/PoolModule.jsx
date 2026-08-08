@@ -7,7 +7,7 @@ import RateEditPopover from '../RateEditPopover'
 import { SubRateOverrideProvider } from '../SubRateOverrideContext.jsx'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { catalogItemFor, catalogOptions } from '../../lib/materialCatalog'
+import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 
 const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
 
@@ -357,16 +357,6 @@ function EpTable({
                   <td className="py-1 text-right text-gray-400 text-xs pr-2">
                     <span className="inline-flex items-center justify-end gap-1">
                       ${matCost.toFixed(2)}
-                      {matOpt?.dbName && (
-                        <RateEditPopover
-                          table="material_rates"
-                          name={matOpt.dbName}
-                          category="Utilities"
-                          unitLabel={unitLabel}
-                          currentValue={matCost}
-                          onSaved={refreshAllRates}
-                        />
-                      )}
                     </span>
                   </td>
                   <td className="py-1 text-right text-gray-600 text-xs">
@@ -989,27 +979,17 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
 
   // Re-fetch all three Pool rate tables. Called on mount and after edits.
   const refreshAllRates = useCallback(async () => {
-    const [matRes, labRes, subRes, matRowsRes, venRes] = await Promise.all([
-      supabase
-        .from('material_rates')
-        .select('name,unit_cost')
-        .in('category', ['Pool', 'Utilities']),
+    const [mp, labRes, subRes, catRows, venRes] = await Promise.all([
+      fetchStandardRateMap(['Pool', 'Utilities']),
       supabase.from('labor_rates').select('name,rate').in('category', ['Pool', 'Utilities']),
       supabase.from('subcontractor_rates').select('trade,rate').eq('category', 'Pool'),
-      supabase
-        .from('material_rates')
-        .select('name, unit_cost, sub_category, vendor_id')
-        .not('vendor_id', 'is', null),
+      fetchModuleCatalog(['Utilities']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
         .eq('type', 'vendor')
         .order('company_name'),
     ])
-    const mp = {}
-    ;(matRes.data || []).forEach(r => {
-      mp[r.name] = parseFloat(r.unit_cost)
-    })
     const lr = {}
     ;(labRes.data || []).forEach(r => {
       lr[r.name] = parseFloat(r.rate)
@@ -1021,7 +1001,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
     setMaterialPrices(mp)
     setLaborRates(lr)
     setSubRates(sr)
-    setMaterialRows(matRowsRes.data || [])
+    setMaterialRows(catRows || [])
     setVendors(
       (venRes.data || []).map(v => ({
         id: v.id,
@@ -1591,16 +1571,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                     ))}
                   </select>
                   <span className="text-[10px] text-gray-400 ml-1">mat</span>
-                  <RateEditPopover
-                    table="material_rates"
-                    name={`Spillway ${sw.type}`}
-                    category="Pool"
-                    unitLabel="LF"
-                    currentValue={
-                      materialPrices[`Spillway ${sw.type}`] ?? SPILLWAY_DEFAULTS[sw.type]?.mat
-                    }
-                    onSaved={refreshAllRates}
-                  />
                   <span className="text-[10px] text-gray-400">lab</span>
                   <RateEditPopover
                     table="labor_rates"
@@ -1673,16 +1643,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                     ))}
                   </select>
                   <span className="text-[10px] text-gray-400 ml-1">mat</span>
-                  <RateEditPopover
-                    table="material_rates"
-                    name={`Coping - ${cr.type}`}
-                    category="Pool"
-                    unitLabel="LF"
-                    currentValue={
-                      materialPrices[`Coping - ${cr.type}`] ?? COPING_DEFAULTS[cr.type]?.mat
-                    }
-                    onSaved={refreshAllRates}
-                  />
                   <span className="text-[10px] text-gray-400">lab</span>
                   <RateEditPopover
                     table="labor_rates"
@@ -1750,17 +1710,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                     ))}
                   </select>
                   <span className="text-[10px] text-gray-400 ml-1">mat</span>
-                  <RateEditPopover
-                    table="material_rates"
-                    name={`Raised - ${rs.matType}`}
-                    category="Pool"
-                    unitLabel="SF"
-                    currentValue={
-                      materialPrices[`Raised - ${rs.matType}`] ??
-                      RAISED_SURFACE_DEFAULTS[rs.matType]?.mat
-                    }
-                    onSaved={refreshAllRates}
-                  />
                   <span className="text-[10px] text-gray-400">lab</span>
                   <RateEditPopover
                     table="labor_rates"
@@ -1934,14 +1883,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                       ))}
                     </select>
                     <span className="text-[10px] text-gray-400 ml-1">mat</span>
-                    <RateEditPopover
-                      table="material_rates"
-                      name={eq.model}
-                      category="Pool"
-                      unitLabel="ea"
-                      currentValue={matRate}
-                      onSaved={refreshAllRates}
-                    />
                     <span className="text-[10px] text-gray-400">lab</span>
                     <RateEditPopover
                       table="labor_rates"
@@ -2291,14 +2232,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                     className="pl-6"
                   />
                 </div>
-                <RateEditPopover
-                  table="material_rates"
-                  name="Pool Plumbing - Materials"
-                  category="Pool"
-                  unitLabel="ea"
-                  currentValue={materialPrices['Pool Plumbing - Materials'] ?? 350}
-                  onSaved={refreshAllRates}
-                />
               </div>
               {(T.plumbingIH?.materials ?? '') === '' && (
                 <p className="text-[10px] text-gray-400 mt-0.5">

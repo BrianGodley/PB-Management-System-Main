@@ -623,17 +623,6 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
                 BLOCK_RATES.blockMatCost.fallback
               ).toFixed(2)}
               /ea
-              <RateEditPopover
-                table="material_rates"
-                name={BLOCK_RATES.blockMatCost.dbName}
-                category="Columns"
-                unitLabel="ea"
-                currentValue={
-                  materialPrices[BLOCK_RATES.blockMatCost.dbName] ??
-                  BLOCK_RATES.blockMatCost.fallback
-                }
-                onSaved={refreshAllRates}
-              />
             </span>
             <span className="inline-flex items-center gap-1">
               Rebar $
@@ -643,30 +632,11 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
                 BLOCK_RATES.rebarMatCost.fallback
               ).toFixed(2)}
               /LF
-              <RateEditPopover
-                table="material_rates"
-                name={BLOCK_RATES.rebarMatCost.dbName}
-                category={BASIC_CATEGORY}
-                unitLabel="LF"
-                currentValue={
-                  materialPrices[BLOCK_RATES.rebarMatCost.dbName] ??
-                  BLOCK_RATES.rebarMatCost.fallback
-                }
-                onSaved={refreshAllRates}
-              />
             </span>
             <span className="inline-flex items-center gap-1">
               Grout (concrete) $
               {colMat(GROUT_CONCRETE.dbName, installVendor, GROUT_CONCRETE.fallback).toFixed(2)}
               /CY · {(groutCyPerBlock(8, 8) * 27).toFixed(2)} cf/block
-              <RateEditPopover
-                table="material_rates"
-                name={GROUT_CONCRETE.dbName}
-                category={BASIC_CATEGORY}
-                unitLabel="CY"
-                currentValue={materialPrices[GROUT_CONCRETE.dbName] ?? GROUT_CONCRETE.fallback}
-                onSaved={refreshAllRates}
-              />
             </span>
           </div>
           <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
@@ -859,21 +829,6 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
                       <span className="inline-flex items-center justify-end gap-1">
                         ${cost.toFixed(2)}
-                        {/* House rate edit — only when House vendor (edits the
-                            name-keyed House material_rates row, not a vendor's). */}
-                        {rate && (!row.vendor || row.vendor === 'House') && (
-                          <RateEditPopover
-                            table="material_rates"
-                            name={isSub ? rate.subDbName : rate.dbName}
-                            category="Columns"
-                            unitLabel={unitLabel}
-                            currentValue={
-                              materialPrices[isSub ? rate.subDbName : rate.dbName] ??
-                              (isSub ? rate.subFallback ?? 0 : defCost ?? 0)
-                            }
-                            onSaved={refreshAllRates}
-                          />
-                        )}
                       </span>
                     </td>
                     <td className="py-1 text-right text-gray-600 text-xs">

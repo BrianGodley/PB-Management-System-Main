@@ -314,16 +314,6 @@ function EpTable({
                   <td className="py-1 text-right text-gray-400 text-xs pr-2">
                     <span className="inline-flex items-center justify-end gap-1">
                       ${matCost.toFixed(2)}
-                      {matOpt?.dbName && (
-                        <RateEditPopover
-                          table="material_rates"
-                          name={matOpt.dbName}
-                          category="Utilities"
-                          unitLabel={unitLabel}
-                          currentValue={matCost}
-                          onSaved={refreshAllRates}
-                        />
-                      )}
                     </span>
                   </td>
                   <td className="py-1 text-right text-gray-600 text-xs">
@@ -982,25 +972,9 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
             <div className="flex flex-wrap gap-x-3 gap-y-1">
               <span className="inline-flex items-center gap-1">
                 Structure ${p(FP_RATES.fpSubStructLF.dbName, 0).toFixed(2)}/LF
-                <RateEditPopover
-                  table="material_rates"
-                  name={FP_RATES.fpSubStructLF.dbName}
-                  category="Fire Pit"
-                  unitLabel="LF"
-                  currentValue={p(FP_RATES.fpSubStructLF.dbName, FP_RATES.fpSubStructLF.fallback)}
-                  onSaved={refreshAllRates}
-                />
               </span>
               <span className="inline-flex items-center gap-1">
                 Wall Face ${p(FP_RATES.fpSubStructHtSF.dbName, 0).toFixed(2)}/SF
-                <RateEditPopover
-                  table="material_rates"
-                  name={FP_RATES.fpSubStructHtSF.dbName}
-                  category="Fire Pit"
-                  unitLabel="SF"
-                  currentValue={p(FP_RATES.fpSubStructHtSF.dbName, FP_RATES.fpSubStructHtSF.fallback)}
-                  onSaved={refreshAllRates}
-                />
               </span>
             </div>
             <p className="text-[10px] text-gray-400 mt-1 italic">
@@ -1015,47 +989,15 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
           <div className="flex flex-wrap gap-x-3 gap-y-1">
             <span className="inline-flex items-center gap-1">
               Block ${p(FP_RATES.fpBlock.dbName, 2.5).toFixed(2)}/ea
-              <RateEditPopover
-                table="material_rates"
-                name={FP_RATES.fpBlock.dbName}
-                category="Fire Pit"
-                unitLabel="ea"
-                currentValue={p(FP_RATES.fpBlock.dbName, FP_RATES.fpBlock.fallback)}
-                onSaved={refreshAllRates}
-              />
             </span>
             <span className="inline-flex items-center gap-1">
               Rebar ${p(FP_RATES.fpRebar.dbName, 0.5).toFixed(2)}/LF
-              <RateEditPopover
-                table="material_rates"
-                name={FP_RATES.fpRebar.dbName}
-                category="Fire Pit"
-                unitLabel="LF"
-                currentValue={p(FP_RATES.fpRebar.dbName, FP_RATES.fpRebar.fallback)}
-                onSaved={refreshAllRates}
-              />
             </span>
             <span className="inline-flex items-center gap-1">
               Concrete ${p(FP_RATES.fpConcrete.dbName, 149.5).toFixed(2)}/CY
-              <RateEditPopover
-                table="material_rates"
-                name={FP_RATES.fpConcrete.dbName}
-                category="Fire Pit"
-                unitLabel="CY"
-                currentValue={p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)}
-                onSaved={refreshAllRates}
-              />
             </span>
             <span className="inline-flex items-center gap-1">
               Grout pump ${p(FP_RATES.fpGroutPump.dbName, 150).toFixed(2)}
-              <RateEditPopover
-                table="material_rates"
-                name={FP_RATES.fpGroutPump.dbName}
-                category="Fire Pit"
-                unitLabel="flat"
-                currentValue={p(FP_RATES.fpGroutPump.dbName, FP_RATES.fpGroutPump.fallback)}
-                onSaved={refreshAllRates}
-              />
             </span>
           </div>
           <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
@@ -1273,16 +1215,6 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                         </select>
                         {meta && !meta.master && (
                           <RateEditPopover
-                            table="material_rates"
-                            name={FP_RATES[meta.matKey].dbName}
-                            category="Fire Pit"
-                            unitLabel="LF"
-                            currentValue={p(FP_RATES[meta.matKey].dbName, FP_RATES[meta.matKey].fallback)}
-                            onSaved={refreshAllRates}
-                          />
-                        )}
-                        {meta && !meta.master && (
-                          <RateEditPopover
                             table="labor_rates"
                             name={FP_RATES[meta.labKey].dbName}
                             category="Fire Pit"
@@ -1426,16 +1358,6 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                             </option>
                           ))}
                         </select>
-                        {meta && !meta.master && (
-                          <RateEditPopover
-                            table="material_rates"
-                            name={FP_RATES[meta.key].dbName}
-                            category="Fire Pit"
-                            unitLabel={meta.unit === 'ton' ? 'ton' : 'SF'}
-                            currentValue={p(FP_RATES[meta.key].dbName, FP_RATES[meta.key].fallback)}
-                            onSaved={refreshAllRates}
-                          />
-                        )}
                         {meta && !meta.master && (
                           <RateEditPopover
                             table="labor_rates"

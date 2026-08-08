@@ -1162,34 +1162,8 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           ) : (
             <>
               <span className="font-normal normal-case">· Container ${calc.containerPrice}</span>
-              <RateEditPopover
-                table="material_rates"
-                name="Demo - Skid Container (Low-Boy)"
-                category="Demo"
-                unitLabel="container"
-                currentValue={calc.containerPrice}
-                onSaved={refreshAllRates}
-              />
               <span className="font-normal normal-case">/ {calc.containerCy} cy</span>
-              <RateEditPopover
-                table="material_rates"
-                name="Demo - Skid Container Capacity (CY)"
-                category="Demo"
-                mode="coefficient"
-                unitLabel="cy"
-                currentValue={calc.containerCy}
-                onSaved={refreshAllRates}
-              />
               <span className="font-normal normal-case">· ×{calc.swellFactor} swell</span>
-              <RateEditPopover
-                table="material_rates"
-                name="Demo - Skid Removal Swell"
-                category="Demo"
-                mode="coefficient"
-                unitLabel="×"
-                currentValue={calc.swellFactor}
-                onSaved={refreshAllRates}
-              />
             </>
           )}
           {isDemoSub && (
@@ -1275,16 +1249,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 rateName: 'Demo - Skid - Grass SF',
                 rateNote: `${calc.laborGrass} hr/100sf·in`,
                 rateUnit: 'hr/100sf·in',
-                extraIcon: (
-                  <RateEditPopover
-                    table="material_rates"
-                    name="Demo - Skid Dump - Green Waste"
-                    category="Demo"
-                    unitLabel="ton"
-                    currentValue={dumpGreen}
-                    onSaved={refreshAllRates}
-                  />
-                ),
+                extraIcon: null,
               },
             ].map(({ label, sfK, dK, dep, row, rate, rateName, rateNote, rateUnit, extraIcon }) => (
               <tr key={label}>
@@ -1957,14 +1922,6 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           {isSelf && (
             <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
               · Green waste
-              <RateEditPopover
-                table="material_rates"
-                name="Demo - Skid Dump - Green Waste"
-                category="Demo"
-                unitLabel="ton"
-                currentValue={dumpGreen}
-                onSaved={refreshAllRates}
-              />
             </span>
           )}
         </div>

@@ -7,7 +7,7 @@ import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { groutCuFtPerBlock } from '../../lib/cmuGrout'
-import { catalogItemFor, catalogOptions } from '../../lib/materialCatalog'
+import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 
 const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
 
@@ -333,16 +333,6 @@ function EpTable({
                   <td className="py-1 text-right text-gray-400 text-xs pr-2">
                     <span className="inline-flex items-center justify-end gap-1">
                       ${matCost.toFixed(2)}
-                      {matOpt?.dbName && (
-                        <RateEditPopover
-                          table="material_rates"
-                          name={matOpt.dbName}
-                          category="Utilities"
-                          unitLabel={unitLabel}
-                          currentValue={matCost}
-                          onSaved={refreshAllRates}
-                        />
-                      )}
                     </span>
                   </td>
                   <td className="py-1 text-right text-gray-600 text-xs">
@@ -756,34 +746,28 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
 
   // Re-fetch Outdoor Kitchen merged labor+material map. Used on mount and after save.
   const refreshAllRates = useCallback(async () => {
-    const [matRes, labRes, matRowsRes, venRes] = await Promise.all([
-      supabase
-        .from('material_rates')
-        .select('name, unit_cost')
-        .in('category', ['Outdoor Kitchen', 'Utilities']),
+    // material_rates retired: base map from the new model; catalog (Wall Finish +
+    // Utility Lines/Gas/Electrical Fixtures, all unchanged names) from the shared
+    // Outdoor Kitchen / Utilities / Fire Pit / Walls categories.
+    const [matMap, labRes, rows, venRes] = await Promise.all([
+      fetchStandardRateMap(['Outdoor Kitchen', 'Utilities']),
       supabase
         .from('labor_rates')
         .select('name, rate')
         .in('category', ['Outdoor Kitchen', 'Utilities']),
-      supabase
-        .from('material_rates')
-        .select('name, unit_cost, sub_category, vendor_id')
-        .not('vendor_id', 'is', null),
+      fetchModuleCatalog(['Outdoor Kitchen', 'Utilities', 'Fire Pit', 'Walls']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
         .eq('type', 'vendor')
         .order('company_name'),
     ])
-    const prices = {}
-    ;(matRes.data || []).forEach(r => {
-      prices[r.name] = parseFloat(r.unit_cost) || 0
-    })
+    const prices = { ...matMap }
     ;(labRes.data || []).forEach(r => {
       prices[r.name] = parseFloat(r.rate) || 0
     })
     setMaterialPrices(prices)
-    setMaterialRows(matRowsRes.data || [])
+    setMaterialRows(rows || [])
     setVendors(
       (venRes.data || []).map(v => ({
         id: v.id,
@@ -1029,25 +1013,9 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
             <div className="flex flex-wrap gap-x-3 gap-y-1">
               <span className="inline-flex items-center gap-1">
                 BBQ Wall ${p(OK_RATES.bbqSubWallLF.dbName, 150).toFixed(2)}/LF
-                <RateEditPopover
-                  table="material_rates"
-                  name={OK_RATES.bbqSubWallLF.dbName}
-                  category="Outdoor Kitchen"
-                  unitLabel="LF"
-                  currentValue={p(OK_RATES.bbqSubWallLF.dbName, OK_RATES.bbqSubWallLF.fallback)}
-                  onSaved={refreshAllRates}
-                />
               </span>
               <span className="inline-flex items-center gap-1">
                 Backsplash ${p(OK_RATES.bbqSubBackLF.dbName, 100).toFixed(2)}/LF
-                <RateEditPopover
-                  table="material_rates"
-                  name={OK_RATES.bbqSubBackLF.dbName}
-                  category="Outdoor Kitchen"
-                  unitLabel="LF"
-                  currentValue={p(OK_RATES.bbqSubBackLF.dbName, OK_RATES.bbqSubBackLF.fallback)}
-                  onSaved={refreshAllRates}
-                />
               </span>
             </div>
           </div>
@@ -1059,48 +1027,16 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
           <div className="flex flex-wrap gap-x-3 gap-y-1">
             <span className="inline-flex items-center gap-1">
               Block ${p(OK_RATES.bbqBlock.dbName, 2.5).toFixed(2)}/ea
-              <RateEditPopover
-                table="material_rates"
-                name={OK_RATES.bbqBlock.dbName}
-                category="Outdoor Kitchen"
-                unitLabel="ea"
-                currentValue={p(OK_RATES.bbqBlock.dbName, OK_RATES.bbqBlock.fallback)}
-                onSaved={refreshAllRates}
-              />
             </span>
             <span className="inline-flex items-center gap-1">
               Rebar ${p(OK_RATES.bbqRebar.dbName, 0.4).toFixed(2)}/LF
-              <RateEditPopover
-                table="material_rates"
-                name={OK_RATES.bbqRebar.dbName}
-                category="Outdoor Kitchen"
-                unitLabel="LF"
-                currentValue={p(OK_RATES.bbqRebar.dbName, OK_RATES.bbqRebar.fallback)}
-                onSaved={refreshAllRates}
-              />
             </span>
             <span className="inline-flex items-center gap-1">
               Concrete ${p(OK_RATES.bbqConcrete.dbName, 149.5).toFixed(2)}/CY
-              <RateEditPopover
-                table="material_rates"
-                name={OK_RATES.bbqConcrete.dbName}
-                category="Outdoor Kitchen"
-                unitLabel="CY"
-                currentValue={p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)}
-                onSaved={refreshAllRates}
-              />
             </span>
             <span className="inline-flex items-center gap-1">
               Grout ${p(OK_RATES.bbqConcrete.dbName, 149.5).toFixed(2)}/CY ·{' '}
               {groutCuFtPerBlock(8, 8)} cf/block
-              <RateEditPopover
-                table="material_rates"
-                name={OK_RATES.bbqConcrete.dbName}
-                category="Outdoor Kitchen"
-                unitLabel="CY"
-                currentValue={p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)}
-                onSaved={refreshAllRates}
-              />
             </span>
           </div>
           <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
@@ -1227,14 +1163,6 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
           <div className="flex flex-wrap gap-x-3 gap-y-1">
             <span className="inline-flex items-center gap-1">
               Concrete ${p(OK_RATES.bbqConcrete.dbName, 149.5).toFixed(2)}/CY
-              <RateEditPopover
-                table="material_rates"
-                name={OK_RATES.bbqConcrete.dbName}
-                category="Outdoor Kitchen"
-                unitLabel="CY"
-                currentValue={p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)}
-                onSaved={refreshAllRates}
-              />
             </span>
             <span className="inline-flex items-center gap-1">
               Form {p(OK_RATES.counterFormLab.dbName, 20)} LF/hr
@@ -1405,14 +1333,6 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                               </option>
                             ))}
                           </select>
-                          <RateEditPopover
-                            table="material_rates"
-                            name={applianceRateName(row.type)}
-                            category="Outdoor Kitchen"
-                            unitLabel="ea"
-                            currentValue={p(applianceRateName(row.type), 0)}
-                            onSaved={refreshAllRates}
-                          />
                         </span>
                       </td>
                       <td className="py-1 pr-2">
@@ -1594,16 +1514,6 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                             </option>
                           ))}
                         </select>
-                        {meta && !meta.master && (
-                          <RateEditPopover
-                            table="material_rates"
-                            name={OK_RATES[meta.key].dbName}
-                            category="Outdoor Kitchen"
-                            unitLabel={meta.unit === 'ton' ? 'ton' : 'SF'}
-                            currentValue={p(OK_RATES[meta.key].dbName, OK_RATES[meta.key].fallback)}
-                            onSaved={refreshAllRates}
-                          />
-                        )}
                         {meta && !meta.master && (
                           <RateEditPopover
                             table="labor_rates"

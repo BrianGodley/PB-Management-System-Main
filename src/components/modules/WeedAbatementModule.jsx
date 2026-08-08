@@ -331,14 +331,6 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
           <div>
             <div className="flex items-center mb-1">
               <label className={`${lbl} mb-0`}>Subcontractor Rate ($ / SF)</label>
-              <RateEditPopover
-                table="material_rates"
-                name="Weed Abatement - Sub $/SF"
-                category="Weed Abatement"
-                unitLabel="SF"
-                currentValue={subRateDefault ?? ''}
-                onSaved={refreshRates}
-              />
             </div>
             <input type="number" step="0.001" value={cur.subRatePerSF} onChange={e => setField('subRatePerSF')(e.target.value)} placeholder={subRateDefault != null ? String(subRateDefault) : '0.00'} className={inp} />
             <p className="text-[11px] text-gray-400 mt-1">
@@ -413,14 +405,6 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
           <div className="flex justify-between">
             <span className="font-semibold text-gray-700 flex items-center gap-1">
               Material Cost ({fmt(effRate('materialPer1k'))} / 1,000 SF)
-              <RateEditPopover
-                table="material_rates"
-                name={WEED_RATE_NAMES.materialPer1k}
-                category="Weed Abatement"
-                unitLabel="1k SF"
-                currentValue={effRate('materialPer1k')}
-                onSaved={refreshRates}
-              />
             </span>
             <span className="font-bold text-gray-900">{fmt(calc.totalMat)}</span>
           </div>

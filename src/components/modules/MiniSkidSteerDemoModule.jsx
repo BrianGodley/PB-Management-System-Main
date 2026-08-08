@@ -1123,34 +1123,8 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           {isSelf ? (
             <>
               <span className="font-normal normal-case">· Container ${calc.containerPrice}</span>
-              <RateEditPopover
-                table="material_rates"
-                name="Demo - Mini Container (Low-Boy)"
-                category="Demo"
-                unitLabel="container"
-                currentValue={calc.containerPrice}
-                onSaved={refreshAllRates}
-              />
               <span className="font-normal normal-case">/ {calc.containerCy} cy</span>
-              <RateEditPopover
-                table="material_rates"
-                name="Demo - Mini Container Capacity (CY)"
-                category="Demo"
-                mode="coefficient"
-                unitLabel="cy"
-                currentValue={calc.containerCy}
-                onSaved={refreshAllRates}
-              />
               <span className="font-normal normal-case">· ×{calc.swellFactor} swell</span>
-              <RateEditPopover
-                table="material_rates"
-                name="Demo - Mini Removal Swell"
-                category="Demo"
-                mode="coefficient"
-                unitLabel="×"
-                currentValue={calc.swellFactor}
-                onSaved={refreshAllRates}
-              />
             </>
           ) : (
             <>
@@ -1222,16 +1196,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 rateName: 'Demo - Mini - Import Base SF',
                 rateNote: `½ × ${calc.laborBase} hr/100sf·in`,
                 rateUnit: 'hr/100sf·in',
-                extraIcon: (
-                  <RateEditPopover
-                    table="material_rates"
-                    name="Demo - Mini Dump - Import Base"
-                    category="Demo"
-                    unitLabel="ton"
-                    currentValue={dumpBase}
-                    onSaved={refreshAllRates}
-                  />
-                ),
+                extraIcon: null,
               },
               {
                 label: 'Grass/Sod',
@@ -1244,16 +1209,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 rateName: 'Demo - Mini - Grass SF',
                 rateNote: `${calc.laborGrass} hr/100sf·in`,
                 rateUnit: 'hr/100sf·in',
-                extraIcon: (
-                  <RateEditPopover
-                    table="material_rates"
-                    name="Demo - Mini Dump - Green Waste"
-                    category="Demo"
-                    unitLabel="ton"
-                    currentValue={dumpGreen}
-                    onSaved={refreshAllRates}
-                  />
-                ),
+                extraIcon: null,
               },
             ].map(({ label, sfK, dK, dep, row, rate, rateName, rateNote, rateUnit, extraIcon }) => (
               <tr key={label}>
@@ -1352,14 +1308,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           {isSelf && (
             <>
               <span className="font-normal normal-case">· ${dumpConc}/ton dump fee</span>
-              <RateEditPopover
-                table="material_rates"
-                name="Demo - Mini Dump - Concrete"
-                category="Demo"
-                unitLabel="ton"
-                currentValue={dumpConc}
-                onSaved={refreshAllRates}
-              />
             </>
           )}
           {isSub && (
@@ -1446,14 +1394,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           {isSelf && (
             <>
               <span className="font-normal normal-case">· ${dumpConc}/ton dump fee</span>
-              <RateEditPopover
-                table="material_rates"
-                name="Demo - Mini Dump - Concrete"
-                category="Demo"
-                unitLabel="ton"
-                currentValue={dumpConc}
-                onSaved={refreshAllRates}
-              />
             </>
           )}
         </div>
@@ -1526,14 +1466,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           {isSelf && (
             <>
               <span className="font-normal normal-case">· ${dumpConc}/ton dump fee</span>
-              <RateEditPopover
-                table="material_rates"
-                name="Demo - Mini Dump - Concrete"
-                category="Demo"
-                unitLabel="ton"
-                currentValue={dumpConc}
-                onSaved={refreshAllRates}
-              />
             </>
           )}
         </div>
@@ -1967,14 +1899,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           {isSelf && (
             <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
               · ${dumpTreeStump}/ton tree/stump dump
-              <RateEditPopover
-                table="material_rates"
-                name="Demo - Mini Dump - Tree/Stump"
-                category="Demo"
-                unitLabel="ton"
-                currentValue={dumpTreeStump}
-                onSaved={refreshAllRates}
-              />
             </span>
           )}
           {isSub && (

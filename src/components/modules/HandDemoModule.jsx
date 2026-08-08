@@ -1047,13 +1047,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           <span>{subSectionTitle('Demolition', isSub)}</span>
           {isSelf && (
             <>
-              <span className="font-normal normal-case">Container ${calc.containerPrice}</span>
-              <RateEditPopover table="material_rates" name="Demo - Hand Container (Low-Boy)" category="Demo" unitLabel="container" currentValue={calc.containerPrice} onSaved={refreshAllRates} />
-              <span className="font-normal normal-case">/ {calc.containerCy} cy</span>
-              <RateEditPopover table="material_rates" name="Demo - Hand Container Capacity (CY)" category="Demo" mode="coefficient" unitLabel="cy" currentValue={calc.containerCy} onSaved={refreshAllRates} />
-              <span className="font-normal normal-case">· ×{calc.swellFactor} swell</span>
-              <RateEditPopover table="material_rates" name="Demo - Hand Removal Swell" category="Demo" mode="coefficient" unitLabel="×" currentValue={calc.swellFactor} onSaved={refreshAllRates} />
-            </>
+              <span className="font-normal normal-case">Container ${calc.containerPrice}</span>              <span className="font-normal normal-case">/ {calc.containerCy} cy</span>              <span className="font-normal normal-case">· ×{calc.swellFactor} swell</span>            </>
           )}
           {isSub && (
             <>
@@ -1217,13 +1211,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
               <span className="font-normal normal-case">Hand labor {calc.laborMiscFlat} hr/100sf·in</span>
               <RateEditPopover table="labor_rates" name="Demo - Hand - Misc Flat SF" category="Demo" mode="coefficient" unitLabel="hr/100sf·in" currentValue={calc.laborMiscFlat} onSaved={refreshAllRates} />
               <span className="text-gray-400 font-normal">·</span>
-              <span className="font-normal normal-case">Container ${calc.containerPrice}</span>
-              <RateEditPopover table="material_rates" name="Demo - Hand Container (Low-Boy)" category="Demo" unitLabel="container" currentValue={calc.containerPrice} onSaved={refreshAllRates} />
-              <span className="font-normal normal-case">/ {calc.containerCy} cy</span>
-              <RateEditPopover table="material_rates" name="Demo - Hand Container Capacity (CY)" category="Demo" mode="coefficient" unitLabel="cy" currentValue={calc.containerCy} onSaved={refreshAllRates} />
-              <span className="font-normal normal-case">· ×{calc.swellFactor} swell</span>
-              <RateEditPopover table="material_rates" name="Demo - Hand Removal Swell" category="Demo" mode="coefficient" unitLabel="×" currentValue={calc.swellFactor} onSaved={refreshAllRates} />
-            </>
+              <span className="font-normal normal-case">Container ${calc.containerPrice}</span>              <span className="font-normal normal-case">/ {calc.containerCy} cy</span>              <span className="font-normal normal-case">· ×{calc.swellFactor} swell</span>            </>
           )}
           {isSub && (
             <>
@@ -1862,17 +1850,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           {isSelf && (
             <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
               · Tree dump
-              <RateEditPopover
-                table="material_rates"
-                name="Demo - Hand Dump - Tree/Stump"
-                category="Demo"
-                unitLabel="ton"
-                currentValue={
-                  materialPrices['Demo - Hand Dump - Tree/Stump'] ??
-                  DUMP_FEE_DEFAULTS['Demo - Hand Dump - Tree/Stump']
-                }
-                onSaved={refreshAllRates}
-              />
             </span>
           )}
         </div>

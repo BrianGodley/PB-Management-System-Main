@@ -1134,14 +1134,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
         <SectionHeader title="Base Install" />
         <p className="text-xs text-gray-400 mb-1 inline-flex items-center gap-1">
           Base material ${calc.costBase}/ton
-          <RateEditPopover
-            table="material_rates"
-            name="Base - Class II Roadbase"
-            category="Basic Materials"
-            unitLabel="ton"
-            currentValue={calc.costBase}
-            onSaved={refreshAllRates}
-          />
         </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -1199,14 +1191,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                             </option>
                           ))}
                         </select>
-                        <RateEditPopover
-                          table="material_rates"
-                          name={bt.dbName}
-                          category={bt.category || 'Concrete'}
-                          unitLabel="ton"
-                          currentValue={baseRate}
-                          onSaved={refreshAllRates}
-                        />
                       </div>
                     </td>
                     <td className="py-1 pr-2">
@@ -1350,14 +1334,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                       <div className="flex items-center justify-end gap-2 whitespace-nowrap">
                         <span className="text-[11px] text-gray-400 inline-flex items-center gap-1">
                           ${Number(mixRate).toFixed(0)}/CY
-                          <RateEditPopover
-                            table="material_rates"
-                            name={mt.dbName}
-                            category={mt.category || 'Concrete'}
-                            unitLabel="CY"
-                            currentValue={mixRate}
-                            onSaved={refreshAllRates}
-                          />
                         </span>
                         <span
                           className={`text-[10px] whitespace-nowrap ${
@@ -1428,15 +1404,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 currentValue={calc.rebarSFPerHr}
                 onSaved={refreshAllRates}
               />
-              {/* Edits the shared Basic Materials 'Rebar' $/LF (propagates everywhere). */}
-              <RateEditPopover
-                table="material_rates"
-                name="Rebar"
-                category="Basic Materials"
-                unitLabel="LF"
-                currentValue={calc.rebarPerLF}
-                onSaved={refreshAllRates}
-              />
             </label>
             <div className="flex items-center gap-2">
               <select
@@ -1470,14 +1437,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 currentValue={calc.formLFPerHr}
                 onSaved={refreshAllRates}
               />
-              <RateEditPopover
-                table="material_rates"
-                name="Concrete - Form Lumber LF"
-                category="Concrete"
-                unitLabel="LF"
-                currentValue={calc.formMaterialPerLF}
-                onSaved={refreshAllRates}
-              />
             </label>
             <NumInput value={activeFormLF} onChange={setActiveFormLF} />
           </div>
@@ -1495,14 +1454,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 mode="coefficient"
                 unitLabel="LF/hr"
                 currentValue={calc.sleeveLFPerHr}
-                onSaved={refreshAllRates}
-              />
-              <RateEditPopover
-                table="material_rates"
-                name="Concrete - Sleeve Per 10LF"
-                category="Concrete"
-                unitLabel="10LF"
-                currentValue={calc.sleevePer10LF}
                 onSaved={refreshAllRates}
               />
             </label>
@@ -1665,14 +1616,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 className="accent-green-600"
               />
               <span className="text-gray-700">Color Hardener (${calc.colorCostPerCY}/CY)</span>
-              <RateEditPopover
-                table="material_rates"
-                name="Concrete - Color Per CY"
-                category="Concrete"
-                unitLabel="CY"
-                currentValue={calc.colorCostPerCY}
-                onSaved={refreshAllRates}
-              />
             </label>
           </div>
           <div>
@@ -1702,14 +1645,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                     mode="coefficient"
                     unitLabel="SF/hr"
                     currentValue={calc.vaporBarrierSFPerHr}
-                    onSaved={refreshAllRates}
-                  />
-                  <RateEditPopover
-                    table="material_rates"
-                    name="Concrete - Vapor Barrier SF"
-                    category="Concrete"
-                    unitLabel="SF"
-                    currentValue={calc.vaporBarrierPerSF}
                     onSaved={refreshAllRates}
                   />
                 </>
@@ -1744,14 +1679,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                     currentValue={calc.sealerNaturalSFPerHr}
                     onSaved={refreshAllRates}
                   />
-                  <RateEditPopover
-                    table="material_rates"
-                    name="Concrete - Sealer Natural 5gal"
-                    category="Concrete"
-                    unitLabel="5gal"
-                    currentValue={calc.sealerNatural5g}
-                    onSaved={refreshAllRates}
-                  />
                 </span>
               ) : (
                 <span className="text-gray-400 inline-flex items-center gap-1">
@@ -1763,14 +1690,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                     mode="coefficient"
                     unitLabel="SF/hr"
                     currentValue={calc.sealerWetSFPerHr}
-                    onSaved={refreshAllRates}
-                  />
-                  <RateEditPopover
-                    table="material_rates"
-                    name="Concrete - Sealer Wet 5gal"
-                    category="Concrete"
-                    unitLabel="5gal"
-                    currentValue={calc.sealerWet5g}
                     onSaved={refreshAllRates}
                   />
                 </span>

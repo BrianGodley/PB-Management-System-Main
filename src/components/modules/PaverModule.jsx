@@ -1313,23 +1313,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           )}
           <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
             · Joint sand ${calc.jointSandPerSF}/SF
-            <RateEditPopover
-              table="material_rates"
-              name="Paver - Joint Sand"
-              category="Paver"
-              unitLabel="SF"
-              currentValue={calc.jointSandPerSF}
-              onSaved={refreshAllRates}
-            />
             · Pallet ${calc.palletCharge}
-            <RateEditPopover
-              table="material_rates"
-              name="Paver - Pallet Charge"
-              category="Paver"
-              unitLabel="pallet"
-              currentValue={calc.palletCharge}
-              onSaved={refreshAllRates}
-            />
           </span>
         </div>
         <table className="w-full text-xs">
@@ -1418,23 +1402,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           )}
           <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
             · Base rock ${calc.baseRockPerTon}/ton
-            <RateEditPopover
-              table="material_rates"
-              name="Paver - Base Rock"
-              category="Paver"
-              unitLabel="ton"
-              currentValue={calc.baseRockPerTon}
-              onSaved={refreshAllRates}
-            />
             · Bedding sand ${calc.beddingSandPerTon}/ton
-            <RateEditPopover
-              table="material_rates"
-              name="Bedding Sand"
-              category="Basic Materials"
-              unitLabel="ton"
-              currentValue={calc.beddingSandPerTon}
-              onSaved={refreshAllRates}
-            />
           </span>
         </div>
         <table className="w-full text-xs">
@@ -1686,14 +1654,6 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                         <span className="text-gray-400 font-normal">
                           · ${matRate}/{matUnit} mat
                         </span>
-                        <RateEditPopover
-                          table="material_rates"
-                          name={matName}
-                          category="Paver"
-                          unitLabel={matUnit}
-                          currentValue={matRate}
-                          onSaved={refreshAllRates}
-                        />
                       </>
                     )}
                   </span>
@@ -1788,14 +1748,6 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                     <span className="text-gray-400 font-normal">
                       · ${calc.polySandPerSF}/SF mat
                     </span>
-                    <RateEditPopover
-                      table="material_rates"
-                      name="Paver - Poly Sand"
-                      category="Paver"
-                      unitLabel="SF"
-                      currentValue={calc.polySandPerSF}
-                      onSaved={refreshAllRates}
-                    />
                   </span>
                 </td>
                 <td className={`${num} text-gray-500`}>
@@ -1817,14 +1769,6 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                     <span className="text-gray-400 font-normal">
                       · ${calc.polySandExistingPerSF}/SF mat
                     </span>
-                    <RateEditPopover
-                      table="material_rates"
-                      name="Paver - Poly Sand Existing"
-                      category="Paver"
-                      unitLabel="SF"
-                      currentValue={calc.polySandExistingPerSF}
-                      onSaved={refreshAllRates}
-                    />
                   </span>
                 </td>
                 <td className={`${num} text-gray-500`}>
@@ -1849,14 +1793,6 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                     onSaved={refreshAllRates}
                   />
                   <span className="text-gray-400 font-normal">· ${calc.sealerMatPerSF}/SF mat</span>
-                  <RateEditPopover
-                    table="material_rates"
-                    name="Paver - Sealer"
-                    category="Paver"
-                    unitLabel="SF"
-                    currentValue={calc.sealerMatPerSF}
-                    onSaved={refreshAllRates}
-                  />
                 </span>
               </td>
               <td className={td}>
@@ -2059,14 +1995,6 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         <div>
           <div className="flex items-center gap-1 mb-0.5">
             <p className="text-xs text-gray-500">Delivery</p>
-            <RateEditPopover
-              table="material_rates"
-              name="Paver - Delivery"
-              category="Paver"
-              unitLabel="per 900 SF"
-              currentValue={calc.deliveryFlat}
-              onSaved={refreshAllRates}
-            />
           </div>
           {calc.deliveryIncrements > 0 ? (
             <>

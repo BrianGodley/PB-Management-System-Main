@@ -1068,14 +1068,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
                       <span className="inline-flex items-center justify-end">
                         ${cost.toFixed(2)}
-                        <RateEditPopover
-                          table="material_rates"
-                          name={dbName || row.type}
-                          category="Drainage"
-                          unitLabel="LF"
-                          currentValue={cost}
-                          onSaved={refreshMaterialPrices}
-                        />
                       </span>
                     </td>
                     <td className="py-1 text-right text-gray-600 text-xs">
@@ -1173,14 +1165,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
                       <span className="inline-flex items-center justify-end">
                         {rate ? `$${cost.toFixed(2)}` : '—'}
-                        <RateEditPopover
-                          table="material_rates"
-                          name={dbName || row.type}
-                          category="Drainage"
-                          unitLabel="ea"
-                          currentValue={cost}
-                          onSaved={refreshMaterialPrices}
-                        />
                       </span>
                     </td>
                     <td className="py-1 text-right text-gray-600 text-xs">
@@ -1248,14 +1232,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                     <td className="py-1.5 text-right text-gray-600 text-xs">
                       <span className="inline-flex items-center justify-end">
                         {qty > 0 ? `$${(qty * matCost).toLocaleString()}` : `$${matCost} / ea`}
-                        <RateEditPopover
-                          table="material_rates"
-                          name={rate.dbName}
-                          category="Drainage"
-                          unitLabel="ea"
-                          currentValue={matCost}
-                          onSaved={refreshMaterialPrices}
-                        />
                       </span>
                     </td>
                   </tr>

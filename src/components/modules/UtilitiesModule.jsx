@@ -6,7 +6,7 @@ import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { catalogItemFor, catalogOptions } from '../../lib/materialCatalog'
+import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 
 const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
 
@@ -579,28 +579,17 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   // Re-fetch Utilities labor+material rate map (merged into one for lookup).
   // Called once on mount and again after any RateEditPopover save.
   const refreshAllRates = useCallback(async () => {
-    const [matRes, labRes, matRowsRes, venRes] = await Promise.all([
-      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Utilities'),
-      supabase.from('labor_rates').select('name, rate').eq('category', 'Utilities'),
-      supabase
-        .from('material_rates')
-        .select('name, unit_cost, sub_category, vendor_id')
-        .eq('category', 'Utilities'),
+    const [prices, catRows, venRes] = await Promise.all([
+      fetchStandardRateMap(['Utilities']),
+      fetchModuleCatalog(['Utilities']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
         .eq('type', 'vendor')
         .order('company_name'),
     ])
-    const prices = {}
-    ;(matRes.data || []).forEach(r => {
-      prices[r.name] = parseFloat(r.unit_cost) || 0
-    })
-    ;(labRes.data || []).forEach(r => {
-      prices[r.name] = parseFloat(r.rate) || 0
-    })
     setMaterialPrices(prices)
-    setMaterialRows(matRowsRes.data || [])
+    setMaterialRows(catRows || [])
     setVendors(
       (venRes.data || []).map(v => ({
         id: v.id,
@@ -614,18 +603,15 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   useEffect(() => {
     let alive = true
     Promise.all([
-      supabase
-        .from('material_rates')
-        .select('name, unit_cost, sub_category, vendor_id')
-        .eq('category', 'Utilities'),
+      fetchModuleCatalog(['Utilities']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
         .eq('type', 'vendor')
         .order('company_name'),
-    ]).then(([matRowsRes, venRes]) => {
+    ]).then(([catRows, venRes]) => {
       if (!alive) return
-      setMaterialRows(matRowsRes.data || [])
+      setMaterialRows(catRows || [])
       setVendors(
         (venRes.data || []).map(v => ({
           id: v.id,
@@ -1196,14 +1182,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
             </button>
             <span className="inline-flex items-center gap-1 text-xs text-gray-400">
               ${subTrenchRate.toFixed(2)}/LF
-              <RateEditPopover
-                table="material_rates"
-                name="Utilities Sub Trench - Per LF"
-                category="Utilities"
-                unitLabel="LF"
-                currentValue={subTrenchRate}
-                onSaved={refreshAllRates}
-              />
             </span>
           </div>
         </div>
@@ -1230,14 +1208,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                     mode="coefficient"
                     unitLabel="hr/ea"
                     currentValue={laborHrs}
-                    onSaved={refreshAllRates}
-                  />
-                  <RateEditPopover
-                    table="material_rates"
-                    name={rate.dbName}
-                    category="Utilities"
-                    unitLabel="ea"
-                    currentValue={matCost}
                     onSaved={refreshAllRates}
                   />
                 </span>
@@ -1354,16 +1324,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
                       <span className="inline-flex items-center justify-end gap-1">
                         ${matCost.toFixed(2)}
-                        {matOpt?.dbName && (
-                          <RateEditPopover
-                            table="material_rates"
-                            name={matOpt.dbName}
-                            category="Utilities"
-                            unitLabel="LF"
-                            currentValue={matCost}
-                            onSaved={refreshAllRates}
-                          />
-                        )}
                       </span>
                     </td>
                     <td className="py-1 text-right text-gray-600 text-xs">
@@ -1475,16 +1435,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
                       <span className="inline-flex items-center justify-end gap-1">
                         ${matCost.toFixed(2)}
-                        {matOpt?.dbName && (
-                          <RateEditPopover
-                            table="material_rates"
-                            name={matOpt.dbName}
-                            category="Utilities"
-                            unitLabel="ea"
-                            currentValue={matCost}
-                            onSaved={refreshAllRates}
-                          />
-                        )}
                       </span>
                     </td>
                     <td className="py-1 text-right text-gray-600 text-xs">
@@ -1596,16 +1546,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
                       <span className="inline-flex items-center justify-end gap-1">
                         ${matCost.toFixed(2)}
-                        {matOpt?.dbName && (
-                          <RateEditPopover
-                            table="material_rates"
-                            name={matOpt.dbName}
-                            category="Utilities"
-                            unitLabel="ea"
-                            currentValue={matCost}
-                            onSaved={refreshAllRates}
-                          />
-                        )}
                       </span>
                     </td>
                     <td className="py-1 text-right text-gray-600 text-xs">
@@ -1725,16 +1665,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
                       <span className="inline-flex items-center justify-end gap-1">
                         ${matCost.toFixed(2)}
-                        {matOpt?.dbName && (
-                          <RateEditPopover
-                            table="material_rates"
-                            name={matOpt.dbName}
-                            category="Utilities"
-                            unitLabel="LF"
-                            currentValue={matCost}
-                            onSaved={refreshAllRates}
-                          />
-                        )}
                       </span>
                     </td>
                     <td className="py-1 text-right text-gray-600 text-xs">
@@ -1849,16 +1779,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
                       <span className="inline-flex items-center justify-end gap-1">
                         ${matCost.toFixed(2)}
-                        {matOpt?.dbName && (
-                          <RateEditPopover
-                            table="material_rates"
-                            name={matOpt.dbName}
-                            category="Utilities"
-                            unitLabel="ea"
-                            currentValue={matCost}
-                            onSaved={refreshAllRates}
-                          />
-                        )}
                       </span>
                     </td>
                     <td className="py-1 text-right text-gray-600 text-xs">

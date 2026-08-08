@@ -978,14 +978,6 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                       <span className="text-gray-400 whitespace-nowrap">
                         ${rate.toFixed(2)}/{unitLabel}
                       </span>
-                      <RateEditPopover
-                        table="material_rates"
-                        name={def.matKey}
-                        category="Artificial Turf"
-                        unitLabel={unitLabel}
-                        currentValue={rate}
-                        onSaved={refreshAllRates}
-                      />
                     </div>
                   </td>
                   <td className={td}>
@@ -1044,16 +1036,6 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                   2
                 )}
                 /bag
-                <RateEditPopover
-                  table="material_rates"
-                  name="Turf - Infill ZeoFill"
-                  category="Artificial Turf"
-                  unitLabel="bag"
-                  currentValue={n(
-                    materialPrices['Turf - Infill ZeoFill'] || RATE_DEFAULTS.infillZeoFill
-                  )}
-                  onSaved={refreshAllRates}
-                />
               </>
             ) : (
               <>
@@ -1062,16 +1044,6 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                   materialPrices['Turf - Infill Durafill'] || RATE_DEFAULTS.infillDurafill
                 ).toFixed(2)}
                 /SF
-                <RateEditPopover
-                  table="material_rates"
-                  name="Turf - Infill Durafill"
-                  category="Artificial Turf"
-                  unitLabel="SF"
-                  currentValue={n(
-                    materialPrices['Turf - Infill Durafill'] || RATE_DEFAULTS.infillDurafill
-                  )}
-                  onSaved={refreshAllRates}
-                />
               </>
             )}
           </span>
@@ -1148,14 +1120,6 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                           optionLabels={brandLabels}
                         />
                       </div>
-                      <RateEditPopover
-                        table="material_rates"
-                        name={brandRow?.name}
-                        category="Artificial Turf"
-                        unitLabel="SF"
-                        currentValue={cr.pricePerSF}
-                        onSaved={refreshAllRates}
-                      />
                       {calc.isSub ? (
                         <RateEditPopover
                           table="subcontractor_rates"
@@ -1219,16 +1183,6 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
             <span className="text-gray-600 font-medium inline-flex items-center gap-1">
               Cut, Staple &amp; Seam
               <span className="text-gray-400 font-normal ml-1">({calc.totalEdgeLF} LF total)</span>
-              <RateEditPopover
-                table="material_rates"
-                name="Turf - Install Materials"
-                category="Artificial Turf"
-                unitLabel="LF"
-                currentValue={n(
-                  materialPrices['Turf - Install Materials'] || RATE_DEFAULTS.installMaterials
-                )}
-                onSaved={refreshAllRates}
-              />
             </span>
             <div className="flex gap-4">
               {!calc.isSub && <span className="text-gray-700">{fh(calc.cutHrs)} hrs</span>}
@@ -1323,14 +1277,6 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                     const stripBrand = turfBrandRow(materialRows, T.strips?.vendor, T.strips?.brand)
                     return (
                       <>
-                        <RateEditPopover
-                          table="material_rates"
-                          name={stripBrand?.name}
-                          category="Artificial Turf"
-                          unitLabel="SF"
-                          currentValue={calc.stripsPrice}
-                          onSaved={refreshAllRates}
-                        />
                         {calc.isSub ? (
                           <RateEditPopover
                             table="subcontractor_rates"

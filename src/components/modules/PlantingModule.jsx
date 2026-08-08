@@ -859,16 +859,6 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
                               onChange={e => plantUpdate(setRows, defaultsMap, i, 'price', e.target.value)}
                             />
                           </div>
-                          {isHouse && (
-                            <RateEditPopover
-                              table="material_rates"
-                              name={row.type}
-                              category="Planting"
-                              unitLabel="ea"
-                              currentValue={masterPrice}
-                              onSaved={refreshAllRates}
-                            />
-                          )}
                         </div>
                       </td>
                     )}
@@ -1000,16 +990,6 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
                           <span>
                             ${c.unitPrice.toFixed(2)}/{meta.unit}
                           </span>
-                          {isHouse && (
-                            <RateEditPopover
-                              table="material_rates"
-                              name={meta.matKey}
-                              category="Planting"
-                              unitLabel={meta.unit}
-                              currentValue={houseMat}
-                              onSaved={refreshAllRates}
-                            />
-                          )}
                           {isHouse && meta.labKey && (
                             <RateEditPopover
                               table="labor_rates"
