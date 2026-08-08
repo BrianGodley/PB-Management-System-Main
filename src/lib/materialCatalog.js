@@ -159,6 +159,7 @@ export async function fetchModuleCatalog(categories) {
     .from('material')
     .select(
       `id, description, unit, calc_meta, collection,
+       watts, va, labor_hrs_ea, sub_price_ea, sf_per_pallet, price_per_lf_vert,
        category:category_id ( name ),
        subcategory:subcategory_id ( name ),
        prices:material_price ( price, vendor_id, effective_end )`
@@ -179,6 +180,14 @@ export async function fetchModuleCatalog(categories) {
           vendor_id: p.vendor_id === stdId ? null : p.vendor_id,
           calc_meta: m.calc_meta || null,
           collection: m.collection || null,
+          // Module-specific product specs (Lighting watts/va/labor/sub-price,
+          // Paver/Steps pallet, etc.) — null when the product doesn't carry them.
+          watts: m.watts ?? null,
+          va: m.va ?? null,
+          labor_hrs_ea: m.labor_hrs_ea ?? null,
+          sub_price_ea: m.sub_price_ea ?? null,
+          sf_per_pallet: m.sf_per_pallet ?? null,
+          price_per_lf_vert: m.price_per_lf_vert ?? null,
         })
       })
   })

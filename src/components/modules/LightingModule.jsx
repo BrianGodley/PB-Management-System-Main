@@ -11,6 +11,7 @@ import {
   ledgerPrice,
   catalogOptions,
   catalogItemFor,
+  fetchModuleCatalog,
 } from '../../lib/materialCatalog'
 
 const CATALOG_OPTS = { houseRows: 'null-vendor', stripPrefix: false }
@@ -253,11 +254,11 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
   // Re-fetch the lighting catalog + vendor list + markup rate. Used on mount
   // and after a markup RateEditPopover save.
   const refreshCatalog = useCallback(async () => {
-    const [matRes, venRes, mkRes] = await Promise.all([
-      supabase
-        .from('material_rates')
-        .select('id,name,sub_category,vendor_id,unit,unit_cost,watts,va,labor_hrs_ea,sub_price_ea')
-        .eq('category', LIGHTING_CATEGORY),
+    // material_rates retired: catalog (with watts/va/labor/sub-price specs) from
+    // material + material_price. Subcategories (Light Fixture/Transformer/Wire)
+    // are unchanged, so no remap needed.
+    const [rows, venRes, mkRes] = await Promise.all([
+      fetchModuleCatalog([LIGHTING_CATEGORY]),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
@@ -272,7 +273,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
     ])
     const mk = mkRes.data ? parseFloat(mkRes.data.rate) : NaN
     setMaterialMarkup(Number.isFinite(mk) ? mk : null)
-    setMaterialRows(matRes.data || [])
+    setMaterialRows(rows || [])
     setVendors(
       (venRes.data || []).map(v => ({
         id: v.id,
