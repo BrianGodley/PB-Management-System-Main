@@ -76,14 +76,15 @@ export function catalogItemFor(materialRows, subcategory, vendorSel, key, opts =
   return fallbackFirst ? options[0].row : null
 }
 
-// ── Price ledger (Phase 4 — normalized multi-vendor pricing) ─────────────────
-// The current OPEN price per (material, vendor) lives in material_price_history
-// (effective_end IS NULL). fetchOpenPriceLedger returns a map keyed by material
-// id → { [vendor_id | '__house__']: unit_cost }. ledgerPrice resolves a
-// material+vendor from that map, falling back to the supplied default (usually
-// the row's own unit_cost). Today the open price equals unit_cost (backfilled),
-// so this is price-preserving; it becomes multi-vendor once writers populate
-// per-vendor ledger rows.
+// ── Price ledger (new model — effective-dated material_price) ────────────────
+// Price history lives in material_price itself: each (material, vendor) has one
+// or more periods (effective_start .. effective_end; effective_end IS NULL = the
+// open/current period). fetchOpenPriceLedger returns a map keyed by material id →
+// { [vendor_id | '__house__']: price }. ledgerPrice resolves a material+vendor
+// from that map, falling back to the supplied default. The Standard/Unspecified
+// vendor is folded into '__house__' so callers passing vendor_id null resolve to
+// the universal price. Importers write new effective-dated rows (see
+// supersedeMaterialPrice), so history accrues going forward.
 const HOUSE_KEY = '__house__'
 
 // Price map for a set of materials AS OF a date. asOfDate null/'' → the current
@@ -93,26 +94,34 @@ const HOUSE_KEY = '__house__'
 export async function fetchPriceLedgerAsOf(materialIds, asOfDate = null) {
   const ids = [...new Set((materialIds || []).filter(Boolean))]
   if (!ids.length) return {}
-  let q = supabase
-    .from('material_price_history')
-    .select('material_rate_id, vendor_id, unit_cost, effective_start')
-    .in('material_rate_id', ids)
-  if (asOfDate) {
-    q = q.lte('effective_start', asOfDate).or(`effective_end.is.null,effective_end.gte.${asOfDate}`)
-  } else {
-    q = q.is('effective_end', null)
-  }
-  const { data } = await q
+  const [{ data: vends }, ledRes] = await Promise.all([
+    supabase.from('subs_vendors').select('id, company_name'),
+    (() => {
+      let q = supabase
+        .from('material_price')
+        .select('material_id, vendor_id, price, effective_start')
+        .in('material_id', ids)
+      if (asOfDate) {
+        q = q.lte('effective_start', asOfDate).or(`effective_end.is.null,effective_end.gte.${asOfDate}`)
+      } else {
+        q = q.is('effective_end', null)
+      }
+      return q
+    })(),
+  ])
+  const stdId =
+    (vends || []).find(v => ['standard', 'unspecified'].includes((v.company_name || '').trim().toLowerCase()))
+      ?.id || null
   const map = {}
   const bestStart = {} // "materialId|vendorKey" → latest effective_start seen
-  ;(data || []).forEach(r => {
-    const vk = r.vendor_id ?? HOUSE_KEY
-    const key = `${r.material_rate_id}|${vk}`
+  ;(ledRes.data || []).forEach(r => {
+    const vk = r.vendor_id == null || r.vendor_id === stdId ? HOUSE_KEY : r.vendor_id
+    const key = `${r.material_id}|${vk}`
     const start = r.effective_start || ''
     if (bestStart[key] == null || start >= bestStart[key]) {
       bestStart[key] = start
-      if (!map[r.material_rate_id]) map[r.material_rate_id] = {}
-      map[r.material_rate_id][vk] = parseFloat(r.unit_cost)
+      if (!map[r.material_id]) map[r.material_id] = {}
+      map[r.material_id][vk] = num(r.price)
     }
   })
   return map
