@@ -17,7 +17,7 @@ import RateEditPopover from '../RateEditPopover'
 import { SubRateOverrideProvider } from '../SubRateOverrideContext.jsx'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { catalogOptions } from '../../lib/materialCatalog'
+import { catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 
 // ── Rate tables (method-indexed — not in DB) ──────────────────────────────────
 
@@ -566,24 +566,21 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   // the user saves an edit from a RateEditPopover so the calc picks up the
   // change without a page reload.
   const refreshAllRates = useCallback(async () => {
-    const [lrRes, mrRes, srRes, matRowsRes, venRes] = await Promise.all([
+    // material_rates retired: base map (incl. shared Basic Materials) from the
+    // new model; vendor catalog from material + material_price. Concrete's
+    // markers ('Concrete Mix'/'Concrete Base') are unchanged, so no remap.
+    const [lrRes, matMap, srRes, rows, venRes] = await Promise.all([
       supabase.from('labor_rates').select('name, rate').eq('category', 'Concrete'),
-      supabase
-        .from('material_rates')
-        .select('name, unit_cost')
-        .in('category', ['Concrete', 'Basic Materials']),
+      fetchStandardRateMap(['Concrete', 'Basic Materials']),
       supabase.from('subcontractor_rates').select('company_name, rate').eq('category', 'Concrete'),
-      supabase
-        .from('material_rates')
-        .select('name, unit_cost, sub_category, vendor_id')
-        .eq('category', 'Concrete'),
+      fetchModuleCatalog(['Concrete']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
         .eq('type', 'vendor')
         .order('company_name'),
     ])
-    setMaterialRows(matRowsRes.data || [])
+    setMaterialRows(rows || [])
     setVendors(
       (venRes.data || []).map(v => ({
         id: v.id,
@@ -597,13 +594,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
       })
       setLaborRates(m)
     }
-    if (mrRes.data) {
-      const m = {}
-      mrRes.data.forEach(r => {
-        m[r.name] = r.unit_cost
-      })
-      setMaterialRates(m)
-    }
+    setMaterialRates(matMap)
     if (srRes.data) {
       const m = {}
       srRes.data.forEach(r => {
@@ -627,18 +618,15 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   useEffect(() => {
     let alive = true
     Promise.all([
-      supabase
-        .from('material_rates')
-        .select('name, unit_cost, sub_category, vendor_id')
-        .eq('category', 'Concrete'),
+      fetchModuleCatalog(['Concrete']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
         .eq('type', 'vendor')
         .order('company_name'),
-    ]).then(([matRowsRes, venRes]) => {
+    ]).then(([rows, venRes]) => {
       if (!alive) return
-      setMaterialRows(matRowsRes.data || [])
+      setMaterialRows(rows || [])
       setVendors(
         (venRes.data || []).map(v => ({
           id: v.id,
