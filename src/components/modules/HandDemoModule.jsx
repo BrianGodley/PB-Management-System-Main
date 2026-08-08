@@ -14,6 +14,7 @@ import WorkTypeChooser from './WorkTypeChooser'
 import { useState, useEffect, useCallback, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
+import { fetchStandardRateMap } from '../../lib/materialCatalog'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { SubRateOverrideProvider } from '../SubRateOverrideContext.jsx'
@@ -700,18 +701,14 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
   // Re-fetch all master-rate maps. Called once on mount and again whenever the
   // user saves an edit from a RateEditPopover so the calc picks up the change.
   const refreshAllRates = useCallback(async () => {
-    const [matRes, lrRes, srRes] = await Promise.all([
-      supabase.from('material_rates').select('name,unit_cost').eq('category', 'Demo'),
+    const [matMap, lrRes, srRes] = await Promise.all([
+      // material_rates retired: Demo materials from material+material_price,
+      // fees from misc_rates, labor from labor_rates — all by name.
+      fetchStandardRateMap(['Demo']),
       supabase.from('labor_rates').select('name,rate,rate_per_day'),
       supabase.from('subcontractor_rates').select('company_name,rate'),
     ])
-    if (matRes.data) {
-      const m = {}
-      matRes.data.forEach(r => {
-        m[r.name] = parseFloat(r.unit_cost)
-      })
-      setMaterialPrices(m)
-    }
+    setMaterialPrices(matMap)
     if (lrRes.data) {
       const m = {}
       lrRes.data.forEach(r => {

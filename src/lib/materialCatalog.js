@@ -185,6 +185,31 @@ export async function fetchModuleCatalog(categories) {
   return rows
 }
 
+// name → price for the given categories from the NEW model: material Standard
+// prices (material + open material_price for the Standard vendor) + labor_rates
+// + misc_rates. Drop-in replacement for the legacy
+//   material_rates.select('name, unit_cost').in('category', cats)
+// map. Names not present fall back to the caller's code constant.
+export async function fetchStandardRateMap(categories) {
+  const cats = Array.isArray(categories) ? categories : [categories]
+  const [rows, labRes, feeRes] = await Promise.all([
+    fetchModuleCatalog(cats),
+    supabase.from('labor_rates').select('name, rate').in('category', cats),
+    supabase.from('misc_rates').select('name, rate').in('category', cats),
+  ])
+  const map = {}
+  ;(rows || []).forEach(r => {
+    if (r.vendor_id == null && r.name) map[r.name] = num(r.unit_cost)
+  })
+  ;(labRes.data || []).forEach(r => {
+    if (r.name) map[r.name] = num(r.rate)
+  })
+  ;(feeRes.data || []).forEach(r => {
+    if (r.name) map[r.name] = num(r.rate)
+  })
+  return map
+}
+
 // Shared catalog hook. Fetches, for one or more `categories`:
 //   • priceMap  — name → unit_cost (materials) merged with name → rate (labor coefficients)
 //   • materialRows — {id,name,vendor_id,unit,unit_cost,category,sub_category,subcategory}
