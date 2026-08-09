@@ -630,6 +630,10 @@ function resolveBrick(wall, materialRows) {
 // Concrete category's 'Concrete Mix' sub-category (loaded into the Walls catalog).
 const CONCRETE_CATEGORY = 'Concrete'
 const CONC_MIX_SUBCAT = 'Concrete Mix'
+// Timber / Lumber walls: wood types live in the 'Wood' sub-category, Standard-
+// priced. Price drives the timber material calc (was a flat $50).
+const WOOD_SUBCAT = 'Wood'
+const TIMBER_TYPES = ['Railroad Treated', 'Douglas Fir 6×6', 'Cedar 6×6', 'Redwood 6×6']
 function wallCatalogTypes(materialRows, subcat, vendorSel) {
   const seen = new Set()
   const out = []
@@ -986,7 +990,10 @@ function calcWalls(
     const addlCourses = Math.max(0, Math.ceil((n(state.timberHeightIn) - 8) / 8))
     const postQty = n(state.timberPosts)
     structuralHrs += n(state.timberLF) * (0.4417 + addlCourses * 0.8) + postQty * 0.4667
-    const timberMat = n(state.timberLF) * (0.2917 + addlCourses * 0.55) * 50 + postQty * 100
+    // Wood price ($/unit) from the selected type's Walls › Wood catalog entry for
+    // the chosen vendor; legacy default $50 keeps existing estimates unchanged.
+    const woodPrice = catalogItemPrice(materialRows, WOOD_SUBCAT, state.timberType, state.timberVendor, 50)
+    const timberMat = n(state.timberLF) * (0.2917 + addlCourses * 0.55) * woodPrice + postQty * 100
     structuralMat += timberMat
     // Sub flat: default $/LF = In-House timber material ÷ LF (folding posts in);
     // overridable via timberSubEach. Posts-only (no LF) bills the material flat.
@@ -1359,6 +1366,7 @@ function makeTab(src = {}) {
     timberLF: src.timberLF ?? '',
     timberHeightIn: src.timberHeightIn ?? '',
     timberType: src.timberType ?? 'Railroad Treated',
+    timberVendor: src.timberVendor ?? 'House',
     timberPosts: src.timberPosts ?? '',
     timberSubEach: src.timberSubEach ?? '',
     manualRows: src.manualRows ?? DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
@@ -2346,6 +2354,8 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
   const setTimberHeightIn = setField('timberHeightIn')
   const timberType = cur.timberType
   const setTimberType = setField('timberType')
+  const timberVendor = cur.timberVendor
+  const setTimberVendor = setField('timberVendor')
   const timberPosts = cur.timberPosts
   const setTimberPosts = setField('timberPosts')
   const timberSubEach = cur.timberSubEach
@@ -2868,19 +2878,32 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
       {wallType === 'Timber' && (
         <div>
           <SectionHeader title="Timber / Lumber Wall" />
-          <div className="mb-3">
-            <label className="block text-xs text-gray-500 mb-1">Timber Type</label>
-            <DropdownSelect
-              className="input text-sm py-1.5 w-full"
-              value={timberType}
-              onChange={v => setTimberType(v)}
-              options={[
-                { value: 'Railroad Treated', label: 'Railroad Treated' },
-                { value: 'Douglas Fir 6×6', label: 'Douglas Fir 6×6' },
-                { value: 'Cedar 6×6', label: 'Cedar 6×6' },
-                { value: 'Redwood 6×6', label: 'Redwood 6×6' },
-              ]}
-            />
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Vendor</label>
+              <DropdownSelect
+                className="input text-sm py-1.5 w-full"
+                value={timberVendor || 'House'}
+                onChange={v => setTimberVendor(v)}
+                options={vendorOptsForSub(vendorOptions, materialRows, WOOD_SUBCAT)}
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Timber Type</label>
+              <DropdownSelect
+                className="input text-sm py-1.5 w-full"
+                value={timberType}
+                onChange={v => setTimberType(v)}
+                options={(() => {
+                  const catalog = wallCatalogTypes(materialRows, WOOD_SUBCAT, timberVendor)
+                  const isHouse = !timberVendor || timberVendor === 'House'
+                  const shown = isHouse
+                    ? [...TIMBER_TYPES, ...catalog.filter(t => !TIMBER_TYPES.includes(t))]
+                    : catalog
+                  return shown.map(t => ({ value: t, label: t }))
+                })()}
+              />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
