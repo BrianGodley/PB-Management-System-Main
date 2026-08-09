@@ -210,6 +210,7 @@ export default function MasterMaterialRates() {
           {[
             { k: 'vendor', l: 'Vendor' },
             { k: 'standard', l: 'Standard' },
+            { k: 'misc', l: 'Misc' },
           ].map(t => (
             <button
               key={t.k}
@@ -226,6 +227,9 @@ export default function MasterMaterialRates() {
         </div>
       </div>
 
+      {view === 'misc' ? (
+        <MiscRatesPanel />
+      ) : (
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
         <div className="flex flex-wrap items-center gap-3 px-3 py-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
           <select
@@ -370,6 +374,7 @@ export default function MasterMaterialRates() {
           </table>
         </div>
       </div>
+      )}
 
       {detail && (
         <MaterialDetailModal
@@ -379,6 +384,222 @@ export default function MasterMaterialRates() {
           onDeleted={load}
         />
       )}
+    </div>
+  )
+}
+
+// ── Misc rates tab ────────────────────────────────────────────────────────────
+// Simple CRUD over the misc_rates table (name · rate · category). Misc values can
+// be flat fees OR coefficients/markups, so the rate is shown as a plain number
+// (no $) to avoid implying dollars.
+const num4 = v => (v == null || v === '' ? '—' : Number(v).toLocaleString(undefined, { maximumFractionDigits: 4 }))
+
+function MiscRatesPanel() {
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [q, setQ] = useState('')
+  const [editing, setEditing] = useState(null) // { id, value }
+  const [saving, setSaving] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const [draft, setDraft] = useState({ category: '', name: '', rate: '' })
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase
+      .from('misc_rates')
+      .select('id, name, rate, category')
+      .order('category')
+      .order('name')
+    setRows(data || [])
+    setLoading(false)
+  }, [])
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const filtered = useMemo(() => {
+    const s = q.trim().toLowerCase()
+    if (!s) return rows
+    return rows.filter(r => [r.name, r.category].filter(Boolean).some(x => x.toLowerCase().includes(s)))
+  }, [rows, q])
+
+  const sortRows = arr =>
+    [...arr].sort(
+      (a, b) => (a.category || '').localeCompare(b.category || '') || (a.name || '').localeCompare(b.name || '')
+    )
+
+  const saveRate = async id => {
+    setSaving(true)
+    const val = n(editing.value)
+    await supabase.from('misc_rates').update({ rate: val }).eq('id', id)
+    setRows(rs => rs.map(r => (r.id === id ? { ...r, rate: val } : r)))
+    setEditing(null)
+    setSaving(false)
+  }
+
+  const addRow = async () => {
+    if (!draft.name.trim()) return
+    const payload = { name: draft.name.trim(), rate: n(draft.rate) ?? 0 }
+    if (draft.category.trim()) payload.category = draft.category.trim()
+    const { data, error } = await supabase
+      .from('misc_rates')
+      .insert(payload)
+      .select('id, name, rate, category')
+      .single()
+    if (error) {
+      alert('Add failed: ' + error.message)
+      return
+    }
+    if (data) setRows(rs => sortRows([...rs, data]))
+    setDraft({ category: '', name: '', rate: '' })
+    setAdding(false)
+  }
+
+  const delRow = async id => {
+    if (!confirm('Delete this misc rate?')) return
+    await supabase.from('misc_rates').delete().eq('id', id)
+    setRows(rs => rs.filter(r => r.id !== id))
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
+      <div className="flex flex-wrap items-center gap-3 px-3 py-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
+        <input
+          className="border border-gray-200 rounded-md px-2 py-1 text-xs w-56"
+          placeholder="Search name / category…"
+          value={q}
+          onChange={e => setQ(e.target.value)}
+        />
+        <button
+          onClick={() => setAdding(a => !a)}
+          className="text-xs px-2 py-1 rounded bg-green-700 text-white hover:bg-green-800"
+        >
+          {adding ? 'Cancel' : '+ Add Misc Rate'}
+        </button>
+        <span className="ml-auto text-xs text-gray-400">{filtered.length} items</span>
+      </div>
+
+      <div className="overflow-auto flex-1 min-h-0">
+        <table className="w-full text-xs min-w-[560px]">
+          <thead className="sticky top-0 z-10">
+            <tr className="bg-gray-50 border-b border-gray-200 text-left text-gray-600 uppercase">
+              <th className="px-3 py-2 font-semibold">Category</th>
+              <th className="px-3 py-2 font-semibold">Name</th>
+              <th className="px-3 py-2 font-semibold text-right">Rate</th>
+              <th className="px-3 py-2 w-24" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {adding && (
+              <tr className="bg-green-50/40">
+                <td className="px-3 py-1.5">
+                  <input
+                    className="w-28 border border-gray-300 rounded px-2 py-1 text-xs"
+                    placeholder="Category"
+                    value={draft.category}
+                    onChange={e => setDraft({ ...draft, category: e.target.value })}
+                  />
+                </td>
+                <td className="px-3 py-1.5">
+                  <input
+                    className="w-56 border border-gray-300 rounded px-2 py-1 text-xs"
+                    placeholder="Name"
+                    value={draft.name}
+                    onChange={e => setDraft({ ...draft, name: e.target.value })}
+                  />
+                </td>
+                <td className="px-3 py-1.5 text-right">
+                  <input
+                    type="number"
+                    step="0.0001"
+                    className="w-24 border border-gray-300 rounded px-2 py-1 text-xs text-right"
+                    placeholder="0"
+                    value={draft.rate}
+                    onChange={e => setDraft({ ...draft, rate: e.target.value })}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') addRow()
+                    }}
+                  />
+                </td>
+                <td className="px-3 py-1.5 text-right">
+                  <button onClick={addRow} className="text-green-700 font-semibold">
+                    Save
+                  </button>
+                </td>
+              </tr>
+            )}
+            {loading ? (
+              <tr>
+                <td colSpan={4} className="px-4 py-8 text-center text-gray-400">
+                  Loading…
+                </td>
+              </tr>
+            ) : filtered.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-4 py-8 text-center text-gray-400">
+                  No misc rates.
+                </td>
+              </tr>
+            ) : (
+              filtered.map(r => {
+                const isEd = editing && editing.id === r.id
+                return (
+                  <tr key={r.id} className="hover:bg-gray-50 group">
+                    <td className="px-3 py-1.5 text-gray-600 whitespace-nowrap">{r.category || '—'}</td>
+                    <td className="px-3 py-1.5 text-gray-900 font-medium">{r.name}</td>
+                    <td className="px-3 py-1.5 text-right whitespace-nowrap">
+                      {isEd ? (
+                        <input
+                          autoFocus
+                          type="number"
+                          step="0.0001"
+                          className="w-24 border border-green-300 rounded-md px-2 py-1 text-xs text-right"
+                          value={editing.value}
+                          onChange={e => setEditing({ ...editing, value: e.target.value })}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') saveRate(r.id)
+                            if (e.key === 'Escape') setEditing(null)
+                          }}
+                        />
+                      ) : (
+                        <span className="text-gray-800 font-semibold">{num4(r.rate)}</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-1.5 text-right whitespace-nowrap">
+                      {isEd ? (
+                        <>
+                          <button
+                            onClick={() => saveRate(r.id)}
+                            disabled={saving}
+                            className="text-green-700 font-semibold mr-2"
+                          >
+                            Save
+                          </button>
+                          <button onClick={() => setEditing(null)} className="text-gray-400">
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => setEditing({ id: r.id, value: r.rate ?? '' })}
+                            className="text-gray-500 hover:text-gray-800 mr-2"
+                          >
+                            Edit
+                          </button>
+                          <button onClick={() => delRow(r.id)} className="text-red-400 hover:text-red-600">
+                            Delete
+                          </button>
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
