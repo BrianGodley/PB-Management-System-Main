@@ -72,8 +72,6 @@ function groutCyPerBlock(b) {
 }
 
 const WALL_RATES = {
-  greyBlock: { db: 'Wall Grey Block', fb: 2.59 },
-  bondbeamBlock: { db: 'Wall Bondbeam Block', fb: 2.59 },
   // Basics resolve from the shared "Basic Materials" catalog so vendor price
   // changes propagate. Fallbacks equal the seeded values → price-preserving.
   rebar: { db: 'Rebar', fb: 1.388 }, // $/LF (Basic Materials)
@@ -158,8 +156,6 @@ const WALL_RATE_SPECS = [
     group: 'CMU Block',
     catalogSubcat: 'Wall Block',
     items: [
-      ['greyBlock', 'Grey Block', 'Walls', 'ea', 'currency'],
-      ['bondbeamBlock', 'Bondbeam Block', 'Walls', 'ea', 'currency'],
       ['rebar', 'Rebar', 'Basic Materials', 'LF', 'currency'],
       ['concreteHand', 'Concrete — Hand Mix', 'Basic Materials', 'CY', 'currency'],
       ['concreteTruck', 'Concrete — Ready Mix (Truck)', 'Basic Materials', 'CY', 'currency'],
@@ -266,6 +262,8 @@ const DEFAULT_CMU = () => ({
   rebarSpIn: '16',
   horizBars: '2',
   bondBeams: '1',
+  bbVendor: 'House',
+  bbBlockType: '',
   pctGrouted: '100',
   pctCurved: '0',
   footingPump: 'No',
@@ -665,6 +663,27 @@ const CONC_MIX_SUBCAT = 'Concrete Mix'
 // priced. Price drives the timber material calc (was a flat $50).
 const WOOD_SUBCAT = 'Wood'
 const TIMBER_TYPES = ['Railroad Treated', 'Douglas Fir 6×6', 'Cedar 6×6', 'Redwood 6×6']
+// Bond-beam block: catalog products in the 'Bond Beam Block' sub-category, priced
+// per block. Selected per CMU wall via its own vendor + type picker (NO flat rate).
+const BOND_BEAM_SUBCAT = 'Bond Beam Block'
+function bondBeamOptions(materialRows, vendorSel) {
+  return (materialRows || []).filter(
+    r =>
+      r.sub_category === BOND_BEAM_SUBCAT &&
+      (!vendorSel || vendorSel === 'House' ? r.vendor_id == null : r.vendor_id === vendorSel)
+  )
+}
+function resolveBondBeam(wall, materialRows) {
+  const inSub = (materialRows || []).filter(r => r.sub_category === BOND_BEAM_SUBCAT)
+  const vsel = wall.bbVendor
+  const forV = r => (!vsel || vsel === 'House' ? r.vendor_id == null : r.vendor_id === vsel)
+  const row =
+    inSub.find(r => r.id === wall.bbBlockType && forV(r)) ||
+    inSub.find(r => r.id === wall.bbBlockType) ||
+    inSub.find(forV) ||
+    inSub[0]
+  return { name: row?.name || null, price: n(row?.unit_cost) || 0 }
+}
 function wallCatalogTypes(materialRows, subcat, vendorSel) {
   const seen = new Set()
   const out = []
@@ -797,12 +816,13 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
 
   const footConcrPrc = footingPump === 'Yes' ? pm('concreteTruck') : pm('concreteHand')
   const groutConcrPrc = groutPump === 'Yes' ? pm('concreteTruck') : pm('concreteHand')
-  // Grey block price comes from the selected block type's catalog entry
-  // (mirroring the Excel VLOOKUP into the CmuBlockPrices table). Bond-beam
-  // block stays on the flat master rate — there's only one BB SKU.
+  // Grey block price comes from the selected block type's catalog entry.
+  // Bond-beam block price comes from its own catalog pick (Bond Beam Block
+  // sub-category) per this wall's bond-beam vendor/type — no flat rate.
+  const bbPrice = resolveBondBeam(wall, materialRows).price
   const mat =
     orderGreyBlock * blockPrice +
-    orderBBBlock * pm('bondbeamBlock') +
+    orderBBBlock * bbPrice +
     totalRebarLF * pm('rebar') +
     footingCY * footConcrPrc +
     (footingPump === 'Yes' ? pm('groutPumpSetup') : 0) +
@@ -1250,6 +1270,8 @@ function initCmuWalls(src = {}) {
         rebarSpIn: src.cmuRebarSpIn ?? '16',
         horizBars: src.cmuHorizBars ?? '2',
         bondBeams: src.cmuBondBeams ?? '1',
+        bbVendor: src.cmuBbVendor ?? 'House',
+        bbBlockType: src.cmuBbBlockType ?? '',
         pctGrouted: src.cmuPctGrouted ?? '100',
         pctCurved: src.cmuPctCurved ?? '0',
         footingPump: legacyPump,
@@ -1802,6 +1824,40 @@ function CmuWallEntry({
           <label className="block text-xs text-gray-500 mb-1">Bond Beam Courses</label>
           <NumInput value={wall.bondBeams} onChange={set('bondBeams')} placeholder="1" />
         </div>
+        {n(wall.bondBeams) > 0 && (
+          <>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Bond Beam Vendor</label>
+              <DropdownSelect
+                className="input text-sm py-1.5 w-full"
+                value={wall.bbVendor || 'House'}
+                onChange={nv => {
+                  set('bbVendor')(nv)
+                  const opts = bondBeamOptions(materialRows, nv)
+                  if (opts.length && !opts.some(o => o.id === wall.bbBlockType))
+                    set('bbBlockType')(opts[0].id)
+                }}
+                options={vendorOptsForSub(vendorOptions, materialRows, BOND_BEAM_SUBCAT)}
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Bond Beam Block</label>
+              <DropdownSelect
+                className="input text-sm py-1.5 w-full"
+                value={wall.bbBlockType || ''}
+                onChange={v => {
+                  set('bbBlockType')(v)
+                  pp.checkById(materialRows, v, wall.bbVendor)
+                }}
+                placeholder="Select…"
+                options={bondBeamOptions(materialRows, wall.bbVendor).map(o => ({
+                  value: o.id,
+                  label: o.name,
+                }))}
+              />
+            </div>
+          </>
+        )}
         <div>
           <label className="block text-xs text-gray-500 mb-1">% Grouted Solid</label>
           <div className="relative">
