@@ -1323,7 +1323,12 @@ function WallWaterproofing({
   // catalog products for the vendor; stale/phantom values are dropped.
   const wpBase = WP_TYPES.filter(t => t !== 'None')
   const wpCatalog = wallCatalogTypes(materialRows, WALL_WP_SUBCAT, row.vendor)
-  const wpShown = [...wpBase, ...wpCatalog.filter(t => !wpBase.includes(t))]
+  // Standard/House → built-in types (+ Standard catalog). A specific vendor →
+  // ONLY that vendor's catalog products.
+  const wpIsHouse = !row.vendor || row.vendor === 'House'
+  const wpShown = wpIsHouse
+    ? [...wpBase, ...wpCatalog.filter(t => !wpBase.includes(t))]
+    : wpCatalog
   return (
     <div className="mt-3 border-t border-gray-100 pt-2">
       <label className="block text-xs text-gray-500 mb-1 font-medium">Waterproofing</label>
@@ -1409,7 +1414,12 @@ function WallFinishesEditor({
           // real Wall Finish catalog products for the selected vendor. Stale
           // saved values that are neither are dropped (not surfaced as phantoms).
           const catalog = wallCatalogTypes(materialRows, WALL_FINISH_SUBCAT, row.vendor)
-          const shown = [...WALL_FINISH_TYPES, ...catalog.filter(t => !WALL_FINISH_TYPES.includes(t))]
+          // Standard/House → built-in finishes (+ Standard catalog). A specific
+          // vendor → ONLY that vendor's catalog products.
+          const finIsHouse = !row.vendor || row.vendor === 'House'
+          const shown = finIsHouse
+            ? [...WALL_FINISH_TYPES, ...catalog.filter(t => !WALL_FINISH_TYPES.includes(t))]
+            : catalog
           return (
             <div key={i} className="flex items-center gap-1.5">
               <DropdownSelect
@@ -1476,7 +1486,12 @@ function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, ma
           // products for the vendor; stale/phantom values are dropped.
           const capBase = CAP_TYPES.filter(t => t !== 'None')
           const catalog = wallCatalogTypes(materialRows, WALL_CAP_SUBCAT, row.vendor)
-          const shown = [...capBase, ...catalog.filter(t => !capBase.includes(t))]
+          // Standard/House → built-in types (+ any Standard catalog). A specific
+          // vendor → ONLY that vendor's catalog products (don't append built-ins).
+          const capIsHouse = !row.vendor || row.vendor === 'House'
+          const shown = capIsHouse
+            ? [...capBase, ...catalog.filter(t => !capBase.includes(t))]
+            : catalog
           const qtyLabel = row.type === 'Precast' ? 'Qty' : 'LF'
           return (
             <div key={i} className="flex items-center gap-1.5">
