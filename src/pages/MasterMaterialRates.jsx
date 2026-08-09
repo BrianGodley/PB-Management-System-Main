@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { setMaterialPrice } from '../lib/materialCatalog'
 import MaterialDetailModal from '../components/MaterialDetailModal'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -35,6 +36,7 @@ export default function MasterMaterialRates() {
   const [editing, setEditing] = useState(null) // { priceId|null, materialId, vendorId, value }
   const [saving, setSaving] = useState(false)
   const [detail, setDetail] = useState(null) // row shown in the detail modal
+  const [adding, setAdding] = useState(null) // 'standard' | 'vendor' → AddMaterialModal
   const [sort, setSort] = useState({ key: 'description', dir: 'asc' })
   const toggleSort = key =>
     setSort(s => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }))
@@ -249,7 +251,21 @@ export default function MasterMaterialRates() {
             value={q}
             onChange={e => setQ(e.target.value)}
           />
-          <span className="ml-auto text-xs text-gray-400">{rows.length} items</span>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => setAdding('standard')}
+              className="text-xs px-2 py-1 rounded bg-green-700 text-white hover:bg-green-800"
+            >
+              + Add Standard Material
+            </button>
+            <button
+              onClick={() => setAdding('vendor')}
+              className="text-xs px-2 py-1 rounded bg-green-700 text-white hover:bg-green-800"
+            >
+              + Add Vendor Material
+            </button>
+            <span className="text-xs text-gray-400">{rows.length} items</span>
+          </div>
         </div>
 
         <div className="overflow-auto flex-1 min-h-0">
@@ -384,6 +400,181 @@ export default function MasterMaterialRates() {
           onDeleted={load}
         />
       )}
+
+      {adding && (
+        <AddMaterialModal
+          mode={adding}
+          vendors={vendors}
+          onClose={() => setAdding(null)}
+          onSaved={() => {
+            setAdding(null)
+            load()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Add Material modal ────────────────────────────────────────────────────────
+// Creates a new `material` (category/sub-category/description/unit) plus an
+// initial price. mode 'standard' → price on the Standard vendor; mode 'vendor'
+// → price on a chosen vendor.
+function AddMaterialModal({ mode, vendors, onClose, onSaved }) {
+  const isVendor = mode === 'vendor'
+  const [cats, setCats] = useState([])
+  const [subs, setSubs] = useState([])
+  const [catId, setCatId] = useState('')
+  const [subId, setSubId] = useState('')
+  const [description, setDescription] = useState('')
+  const [unit, setUnit] = useState('')
+  const [vendorId, setVendorId] = useState('')
+  const [price, setPrice] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from('category').select('id, name').order('name'),
+      supabase.from('subcategory').select('id, name, category_id').order('name'),
+    ]).then(([c, s]) => {
+      setCats(c.data || [])
+      setSubs(s.data || [])
+    })
+  }, [])
+
+  const subOpts = subs.filter(s => s.category_id === catId)
+  // Real vendors only (exclude Standard/Unspecified — that's the Standard button).
+  const vendorOpts = (vendors || []).filter(v => !isStandardName(v.company_name))
+
+  async function save() {
+    setErr('')
+    if (!description.trim()) return setErr('Description is required.')
+    if (!catId) return setErr('Category is required.')
+    if (!subId) return setErr('Sub-category is required.')
+    if (isVendor && !vendorId) return setErr('Pick a vendor.')
+    setSaving(true)
+    const { data, error } = await supabase
+      .from('material')
+      .insert({
+        description: description.trim(),
+        category_id: catId,
+        subcategory_id: subId,
+        unit: unit.trim() || null,
+      })
+      .select('id')
+      .single()
+    if (error) {
+      setErr(error.message)
+      setSaving(false)
+      return
+    }
+    if (price !== '' && price != null) {
+      try {
+        await setMaterialPrice(data.id, isVendor ? vendorId : null, Number(price))
+      } catch (e) {
+        setErr(e?.message || 'Price save failed.')
+        setSaving(false)
+        return
+      }
+    }
+    setSaving(false)
+    onSaved()
+  }
+
+  const inputCls =
+    'w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-700/30 focus:border-green-700'
+
+  return (
+    <div className="fixed inset-0 z-[9998] bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+          <h2 className="text-base font-bold text-gray-800">
+            {isVendor ? 'Add Vendor Material' : 'Add Standard Material'}
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg">
+            ✕
+          </button>
+        </div>
+        <div className="p-5 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Category *</label>
+              <select
+                value={catId}
+                onChange={e => {
+                  setCatId(e.target.value)
+                  setSubId('')
+                }}
+                className={inputCls}
+              >
+                <option value="">Select…</option>
+                {cats.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Sub-Category *</label>
+              <select value={subId} onChange={e => setSubId(e.target.value)} className={inputCls} disabled={!catId}>
+                <option value="">Select…</option>
+                {subOpts.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 mb-1">Description *</label>
+            <input value={description} onChange={e => setDescription(e.target.value)} className={inputCls} placeholder="Product name" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Unit</label>
+              <input value={unit} onChange={e => setUnit(e.target.value)} className={inputCls} placeholder="ea / SF / LF…" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">
+                Price{isVendor ? '' : ' (Standard)'}
+              </label>
+              <input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className={inputCls} placeholder="0.00" />
+            </div>
+          </div>
+          {isVendor && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Vendor *</label>
+              <select value={vendorId} onChange={e => setVendorId(e.target.value)} className={inputCls}>
+                <option value="">Select vendor…</option>
+                {vendorOpts.map(v => (
+                  <option key={v.id} value={v.id}>
+                    {v.company_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {err && <p className="text-xs text-red-600">{err}</p>}
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">
+              Cancel
+            </button>
+            <button
+              onClick={save}
+              disabled={saving}
+              className="flex-1 py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
+            >
+              {saving ? 'Saving…' : 'Add Material'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -474,7 +665,7 @@ function MiscRatesPanel() {
           onClick={() => setAdding(a => !a)}
           className="text-xs px-2 py-1 rounded bg-green-700 text-white hover:bg-green-800"
         >
-          {adding ? 'Cancel' : '+ Add Misc Rate'}
+          {adding ? 'Cancel' : '+ Add Misc Material'}
         </button>
         <span className="ml-auto text-xs text-gray-400">{filtered.length} items</span>
       </div>
