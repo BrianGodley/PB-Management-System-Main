@@ -115,6 +115,7 @@ const WALL_RATES = {
   capPipLab: { db: 'Wall Cap PIP Concrete Labor', fb: 0.15 }, // hr/LF
   capBullnoseLab: { db: 'Wall Cap Bullnose Labor', fb: 0.08 }, // hr/LF
   wpLabor: { db: 'Wall WP Install Labor', fb: 200 }, // SF/hr
+  brickLayLab: { db: 'Wall Brick Lay Labor', fb: 1.75 }, // hr/SF of brick wall face
 }
 
 // Rate catalog for the "View Rates" popup, BROKEN DOWN BY WALL TYPE. Each item:
@@ -473,13 +474,25 @@ function computeCapRow(row, mp, materialRows) {
       break
     }
     default: {
-      // Any catalog Wall Cap product (e.g. modular block caps like "Shelton
-      // Wall Cap"): priced per LF from its own material_price for the selected
-      // vendor, with the standard per-LF cap install labor coefficient.
+      // Any catalog Wall Cap product. Priced per LF from its own material_price
+      // for the selected vendor. calc_meta may carry a per-LF count coefficient
+      // (per_lf — e.g. 3 bricks/LF) and its own labor (labor_hr_per_lf), so each
+      // cap type supports its own price AND labor. Defaults keep prior behavior:
+      // per_lf = 1 (price is already per LF) and the standard bullnose labor.
       const pr = capP(row.type, 0)
-      mat = lf * pr
-      hrs = lf * lab('capBullnoseLab')
-      subUnit = pr
+      const capRow =
+        (materialRows || []).find(
+          rr =>
+            rr.sub_category === WALL_CAP_SUBCAT &&
+            rr.name === row.type &&
+            (v && v !== 'House' ? rr.vendor_id === v : rr.vendor_id == null)
+        ) || (materialRows || []).find(rr => rr.sub_category === WALL_CAP_SUBCAT && rr.name === row.type)
+      const cm = capRow?.calc_meta || {}
+      const perLf = n(cm.per_lf) || 1
+      const laborPerLf = n(cm.labor_hr_per_lf)
+      mat = lf * perLf * pr
+      hrs = lf * (laborPerLf || lab('capBullnoseLab'))
+      subUnit = perLf * pr
       subQty = lf
       break
     }
@@ -593,6 +606,25 @@ function wallBlockOptions(materialRows, vendorSel) {
 const WALL_CAP_SUBCAT = 'Wall Cap'
 const WALL_FINISH_SUBCAT = 'Wall Finish'
 const WALL_WP_SUBCAT = 'Waterproofing'
+// Brick walls: products live in the 'Brick' sub-category, priced per brick, with
+// a bricks-per-sqft coefficient in calc_meta (per_sqft, default 7).
+const BRICK_SUBCAT = 'Brick'
+
+// Resolve the selected brick product for a wall: matches by product id + the
+// chosen vendor's price row, returns { name, price ($/brick), perSqft }.
+function resolveBrick(wall, materialRows) {
+  const inSub = (materialRows || []).filter(r => r.sub_category === BRICK_SUBCAT)
+  const vsel = wall.vendor
+  const forVendor = r =>
+    !vsel || vsel === 'House' ? r.vendor_id == null : r.vendor_id === vsel
+  const row =
+    inSub.find(r => r.id === wall.blockType && forVendor(r)) ||
+    inSub.find(r => r.id === wall.blockType) ||
+    inSub.find(forVendor) ||
+    inSub[0]
+  const cm = row?.calc_meta || {}
+  return { name: row?.name || 'Brick', price: n(row?.unit_cost) || 0, perSqft: n(cm.per_sqft) || 7 }
+}
 // PIP walls pour concrete — the "Concrete Vendor" picker is scoped to the
 // Concrete category's 'Concrete Mix' sub-category (loaded into the Walls catalog).
 const CONCRETE_CATEGORY = 'Concrete'
@@ -770,6 +802,38 @@ function calcOneModular(wall, footingPump, r, mp = {}, materialRows = [], blockO
   return calcOneCMU(modWall, footingPump, 'No', r, mp, materialRows, blockOverride)
 }
 
+// ── Brick wall — priced per brick, NOT by block dimensions. Material =
+//    face sqft × bricks/sqft (calc_meta.per_sqft, default 7) × $/brick.
+//    Labor = face sqft × brickLayLab (hr/SF, default 1.75). ────────────────────
+function calcOneBrick(wall, r, mp = {}, materialRows = []) {
+  const lf = n(wall.lf)
+  const heightIn = n(wall.heightIn)
+  if (!lf || !heightIn) {
+    const wp0 = computeWallWpTotals(wall, mp, materialRows)
+    return { hrs: 0, mat: 0, subUnit: 0, subEach: 0, subMat: 0, ...wp0, detail: null }
+  }
+  const sqft = (heightIn / 12) * lf
+  const brick = resolveBrick(wall, materialRows)
+  const bricks = sqft * brick.perSqft
+  const mat = bricks * brick.price
+  const hrs = sqft * r('brickLayLab')
+
+  const subUnit = lf > 0 ? mat / lf : 0
+  const subEach = wall.subEach !== '' && wall.subEach != null ? n(wall.subEach) : subUnit
+  const subMat = lf * subEach
+
+  const wp = computeWallWpTotals(wall, mp, materialRows)
+  return {
+    hrs,
+    mat,
+    subUnit,
+    subEach,
+    subMat,
+    ...wp,
+    detail: { sqft, bricks, brick: brick.name, subUnit },
+  }
+}
+
 function calcOnePIP(wall, r, mp = {}, materialRows = []) {
   const { lf, heightIn, footingWIn, footingDIn, horizBars } = wall
   if (!n(lf) || !n(heightIn)) {
@@ -888,14 +952,7 @@ function calcWalls(
     modularDetails.push(res.detail)
   })
   ;(state.brickWalls || []).forEach(wall => {
-    const res = calcOneModular(
-      wall,
-      wall.footingPump ?? 'No',
-      r,
-      mp,
-      materialRows,
-      resolveCatalogBlock(wall, materialRows)
-    )
+    const res = calcOneBrick(wall, r, mp, materialRows)
     structuralHrs += res.hrs
     structuralMat += res.mat
     structuralSubMat += res.subMat
@@ -2753,7 +2810,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
               vendorOptions={vendorOptions}
               isSub={isSub}
               refreshAllRates={refreshAllRates}
-              typeSource={{ label: 'Block Type', subcat: WALL_BLOCK_SUBCAT, master: true }}
+              typeSource={{ label: 'Brick Type', subcat: BRICK_SUBCAT, master: true }}
               {...makeWpHandlers(setBrickWalls, idx)}
               finishHandlers={makeFinishHandlers(setBrickWalls, idx)}
               capHandlers={makeCapHandlers(setBrickWalls, idx)}
