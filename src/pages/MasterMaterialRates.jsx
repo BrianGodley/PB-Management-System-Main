@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { setMaterialPrice } from '../lib/materialCatalog'
 import MaterialDetailModal from '../components/MaterialDetailModal'
@@ -479,7 +480,7 @@ function AddMaterialModal({ mode, vendors, onClose, onSaved }) {
   const inputCls =
     'w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-700/30 focus:border-green-700'
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[9998] bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
       <div
         className="bg-white rounded-2xl shadow-2xl w-full max-w-md"
@@ -569,7 +570,8 @@ function AddMaterialModal({ mode, vendors, onClose, onSaved }) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
