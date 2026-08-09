@@ -2613,19 +2613,44 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
         mode: 'currency',
         value: n(r0.unit_cost),
       }))
+  // A currency WALL_RATES item → catalog rows (Standard + each vendor price) when
+  // a matching `material` exists (Rebar, Concrete…), vendor-first; otherwise a
+  // single 'Standard — name' row at the current rate (e.g. Grout Pump misc fees).
+  const materialRateRows = (dbName, unit, value) => {
+    const rows = (materialRows || []).filter(r0 => r0.name === dbName)
+    if (rows.length) {
+      return rows
+        .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
+        .sort((a, b) => {
+          const va = a.vendor_id == null ? '' : vendorNames[a.vendor_id] || '~'
+          const vb = b.vendor_id == null ? '' : vendorNames[b.vendor_id] || '~'
+          return va.localeCompare(vb)
+        })
+        .map(r0 => ({
+          label: `${r0.vendor_id ? vendorNames[r0.vendor_id] || 'Vendor' : 'Standard'} — ${r0.name}`,
+          table: 'material_price',
+          materialId: r0.id,
+          vendorId: r0.vendor_id || undefined,
+          category: 'Walls',
+          unitLabel: r0.unit || unit,
+          mode: 'currency',
+          value: n(r0.unit_cost),
+        }))
+    }
+    return [
+      { label: `Standard — ${dbName}`, table: 'material_rates', name: dbName, category: 'Walls', unitLabel: unit, mode: 'currency', value },
+    ]
+  }
+
   const wallRateList = WALL_RATE_SPECS.map(g => ({
     group: g.group,
     items: [
       ...(g.catalogSubcat ? catalogBlockItems(g.catalogSubcat) : []),
-      ...g.items.map(([key, label, category, unit, mode]) => ({
-        label,
-        table: mode === 'coefficient' ? 'labor_rates' : 'material_rates',
-        name: WALL_RATES[key].db,
-        category,
-        unitLabel: unit,
-        mode,
-        value: r(key),
-      })),
+      ...g.items.flatMap(([key, label, category, unit, mode]) =>
+        mode === 'coefficient'
+          ? [{ label, table: 'labor_rates', name: WALL_RATES[key].db, category, unitLabel: unit, mode, value: r(key) }]
+          : materialRateRows(WALL_RATES[key].db, unit, r(key))
+      ),
     ],
   }))
 
