@@ -253,16 +253,10 @@ export default function MasterMaterialRates() {
           />
           <div className="ml-auto flex items-center gap-2">
             <button
-              onClick={() => setAdding('standard')}
+              onClick={() => setAdding(isVendorView ? 'vendor' : 'standard')}
               className="text-xs px-2 py-1 rounded bg-green-700 text-white hover:bg-green-800"
             >
-              + Add Standard Material
-            </button>
-            <button
-              onClick={() => setAdding('vendor')}
-              className="text-xs px-2 py-1 rounded bg-green-700 text-white hover:bg-green-800"
-            >
-              + Add Vendor Material
+              {isVendorView ? '+ Add Vendor Material' : '+ Add Standard Material'}
             </button>
             <span className="text-xs text-gray-400">{rows.length} items</span>
           </div>
@@ -661,13 +655,15 @@ function MiscRatesPanel() {
           value={q}
           onChange={e => setQ(e.target.value)}
         />
-        <button
-          onClick={() => setAdding(a => !a)}
-          className="text-xs px-2 py-1 rounded bg-green-700 text-white hover:bg-green-800"
-        >
-          {adding ? 'Cancel' : '+ Add Misc Material'}
-        </button>
-        <span className="ml-auto text-xs text-gray-400">{filtered.length} items</span>
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={() => setAdding(a => !a)}
+            className="text-xs px-2 py-1 rounded bg-green-700 text-white hover:bg-green-800"
+          >
+            {adding ? 'Cancel' : '+ Add Misc Material'}
+          </button>
+          <span className="text-xs text-gray-400">{filtered.length} items</span>
+        </div>
       </div>
 
       <div className="overflow-auto flex-1 min-h-0">
