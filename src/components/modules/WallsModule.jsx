@@ -197,7 +197,7 @@ const WALL_RATE_SPECS = [
   },
   {
     group: 'Brick',
-    catalogSubcat: 'Wall Block',
+    catalogSubcat: 'Brick',
     items: [
       ['concreteHand', 'Footing Concrete — Hand Mix', 'Basic Materials', 'CY', 'currency'],
       ['concreteTruck', 'Footing Concrete — Ready Mix', 'Basic Materials', 'CY', 'currency'],
@@ -2538,13 +2538,17 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
   const catalogBlockItems = subcat =>
     (materialRows || [])
       .filter(r0 => r0.sub_category === subcat)
-      .sort(
-        (a, b) =>
-          (a.name || '').localeCompare(b.name || '') ||
-          (vendorNames[a.vendor_id] || 'Standard').localeCompare(vendorNames[b.vendor_id] || 'Standard')
-      )
+      // Only rows attributable to Standard (null vendor) or a KNOWN vendor —
+      // drop orphaned rows whose vendor can't be resolved.
+      .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
+      // Vendor FIRST, then product name. Standard (null vendor) sorts to the top.
+      .sort((a, b) => {
+        const va = a.vendor_id == null ? '' : vendorNames[a.vendor_id] || '~'
+        const vb = b.vendor_id == null ? '' : vendorNames[b.vendor_id] || '~'
+        return va.localeCompare(vb) || (a.name || '').localeCompare(b.name || '')
+      })
       .map(r0 => ({
-        label: `${r0.name} — ${r0.vendor_id ? vendorNames[r0.vendor_id] || 'Vendor' : 'Standard'}`,
+        label: `${r0.vendor_id ? vendorNames[r0.vendor_id] || 'Vendor' : 'Standard'} — ${r0.name}`,
         table: 'material_price',
         materialId: r0.id,
         vendorId: r0.vendor_id || undefined,
