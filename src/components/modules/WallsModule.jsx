@@ -116,6 +116,13 @@ const WALL_RATES = {
   capBullnoseLab: { db: 'Wall Cap Bullnose Labor', fb: 0.08 }, // hr/LF
   wpLabor: { db: 'Wall WP Install Labor', fb: 200 }, // SF/hr
   brickLayLab: { db: 'Wall Brick Lay Labor', fb: 1.75 }, // hr/SF of brick wall face
+  // Timber / Lumber wall — every coefficient is table-driven (fb = legacy value).
+  timberBdftBase: { db: 'Wall Timber Qty per LF', fb: 0.2917 }, // wood units / LF (base)
+  timberBdftCourse: { db: 'Wall Timber Qty per Added Course', fb: 0.55 }, // wood units / LF / course
+  timberLfLab: { db: 'Wall Timber LF Labor', fb: 0.4417 }, // hr / LF (base)
+  timberCourseLab: { db: 'Wall Timber Added Course Labor', fb: 0.8 }, // hr / LF / course
+  timberPostMat: { db: 'Wall Timber Steel Post', fb: 100 }, // $ / post
+  timberPostLab: { db: 'Wall Timber Steel Post Labor', fb: 0.4667 }, // hr / post
 }
 
 // Rate catalog for the "View Rates" popup, BROKEN DOWN BY WALL TYPE. Each item:
@@ -989,11 +996,16 @@ function calcWalls(
   if (n(state.timberLF) > 0 || n(state.timberPosts) > 0) {
     const addlCourses = Math.max(0, Math.ceil((n(state.timberHeightIn) - 8) / 8))
     const postQty = n(state.timberPosts)
-    structuralHrs += n(state.timberLF) * (0.4417 + addlCourses * 0.8) + postQty * 0.4667
+    // Labor + post rates are table-driven (WALL_RATES → labor_rates/misc_rates).
+    structuralHrs +=
+      n(state.timberLF) * (r('timberLfLab') + addlCourses * r('timberCourseLab')) +
+      postQty * r('timberPostLab')
     // Wood price ($/unit) from the selected type's Walls › Wood catalog entry for
     // the chosen vendor; legacy default $50 keeps existing estimates unchanged.
     const woodPrice = catalogItemPrice(materialRows, WOOD_SUBCAT, state.timberType, state.timberVendor, 50)
-    const timberMat = n(state.timberLF) * (0.2917 + addlCourses * 0.55) * woodPrice + postQty * 100
+    const timberMat =
+      n(state.timberLF) * (r('timberBdftBase') + addlCourses * r('timberBdftCourse')) * woodPrice +
+      postQty * r('timberPostMat')
     structuralMat += timberMat
     // Sub flat: default $/LF = In-House timber material ÷ LF (folding posts in);
     // overridable via timberSubEach. Posts-only (no LF) bills the material flat.
@@ -2926,7 +2938,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
                 placeholder="0"
                 className="w-28"
               />
-              <span className="text-xs text-gray-400">$100 mat + 0.47 hr each</span>
+              <span className="text-xs text-gray-400">material + labor per post (from rates)</span>
             </div>
           </div>
           {isSub && (
