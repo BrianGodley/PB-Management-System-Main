@@ -284,6 +284,7 @@ const DEFAULT_BRICK = () => ({
   heightIn: '',
   footingWIn: '12',
   footingDIn: '12',
+  horizBars: '2',
   pctCurved: '0',
   footingPump: 'No',
   subEach: '',
@@ -812,11 +813,32 @@ function calcOneBrick(wall, r, mp = {}, materialRows = []) {
     const wp0 = computeWallWpTotals(wall, mp, materialRows)
     return { hrs: 0, mat: 0, subUnit: 0, subEach: 0, subMat: 0, ...wp0, detail: null }
   }
+  const v = wall.vendor
+  const pm = key => wallMatPrice(WALL_RATES[key].db, v, materialRows, mp, WALL_RATES[key].fb)
+
+  // Brick material + laying labor.
   const sqft = (heightIn / 12) * lf
   const brick = resolveBrick(wall, materialRows)
   const bricks = sqft * brick.perSqft
-  const mat = bricks * brick.price
-  const hrs = sqft * r('brickLayLab')
+  const brickMat = bricks * brick.price
+  const brickHrs = sqft * r('brickLayLab')
+
+  // Footing — identical dig + horizontal footing rebar + pour math to CMU / PIP.
+  const fW = n(wall.footingWIn)
+  const fD = n(wall.footingDIn)
+  const hb = n(wall.horizBars)
+  const footingCF = fW > 0 && fD > 0 ? lf * (fW / 12) * (fD / 12) : 0
+  const footingCY = footingCF / 27
+  const horizRebarLF = hb * lf
+  const footingHrs =
+    (footingCF > 0 ? footingCF / r('digLab') : 0) +
+    (horizRebarLF > 0 ? horizRebarLF / r('rebarLab') : 0) +
+    (footingCY > 0 ? footingCY / 0.2037 : 0)
+  const footPrc = (wall.footingPump ?? 'No') === 'Yes' ? pm('concreteTruck') : pm('concreteHand')
+  const footingMat = footingCY * footPrc + horizRebarLF * pm('rebar')
+
+  const mat = brickMat + footingMat
+  const hrs = brickHrs + footingHrs
 
   const subUnit = lf > 0 ? mat / lf : 0
   const subEach = wall.subEach !== '' && wall.subEach != null ? n(wall.subEach) : subUnit
@@ -830,7 +852,7 @@ function calcOneBrick(wall, r, mp = {}, materialRows = []) {
     subEach,
     subMat,
     ...wp,
-    detail: { sqft, bricks, brick: brick.name, subUnit },
+    detail: { sqft, bricks, brick: brick.name, footingCY, horizRebarLF, subUnit },
   }
 }
 
@@ -2119,6 +2141,12 @@ function ModularWallEntry({
           <label className="block text-xs text-gray-500 mb-1">Footing Depth (in)</label>
           <NumInput value={wall.footingDIn} onChange={set('footingDIn')} placeholder="12" />
         </div>
+        {typeSource?.subcat === BRICK_SUBCAT && (
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Horiz. Bars in Footing</label>
+            <NumInput value={wall.horizBars} onChange={set('horizBars')} placeholder="2" />
+          </div>
+        )}
         <div className="col-span-2 sm:col-span-1">
           <label className="block text-xs text-gray-500 mb-1">% of Wall Curved</label>
           <div className="relative">
@@ -2138,12 +2166,20 @@ function ModularWallEntry({
       </div>
       {detail && (n(wall.lf) > 0 && n(wall.heightIn) > 0) && (
         <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 text-xs text-gray-600 flex flex-wrap gap-3">
-          <span>
-            Block: <strong>{detail.orderGreyBlock}</strong>
-          </span>
-          <span>
-            Footing: <strong>{detail.footingCY.toFixed(3)} CY</strong>
-          </span>
+          {typeSource?.subcat === BRICK_SUBCAT ? (
+            <span>
+              Bricks: <strong>{Math.ceil(detail.bricks || 0)}</strong>
+            </span>
+          ) : (
+            <span>
+              Block: <strong>{detail.orderGreyBlock ?? 0}</strong>
+            </span>
+          )}
+          {detail.footingCY != null && (
+            <span>
+              Footing: <strong>{detail.footingCY.toFixed(3)} CY</strong>
+            </span>
+          )}
           {detail.curveAdd > 0 && (
             <span>
               Curve: <strong>+{detail.curveAdd.toFixed(2)} hrs</strong>
