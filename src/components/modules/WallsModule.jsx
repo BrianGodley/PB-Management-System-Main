@@ -1282,6 +1282,20 @@ function makeTab(src = {}) {
   }
 }
 
+// Vendors from `vendorOptions` that actually have a priced product in `subcat`
+// (the Standard/House option is always kept). Prevents a vendor that only supplies
+// one wall sub-type (e.g. Modular Wall) from appearing in another sub-type's picker
+// (e.g. CMU Wall Block) just because both share the 'Walls' category.
+function vendorOptsForSub(vendorOptions, materialRows, subcat) {
+  if (!subcat) return vendorOptions || [{ value: 'House', label: 'Standard' }]
+  const allowed = new Set(
+    (materialRows || []).filter(r => r.sub_category === subcat && r.vendor_id).map(r => r.vendor_id)
+  )
+  return (vendorOptions || [{ value: 'House', label: 'Standard' }]).filter(
+    o => o.value === 'House' || allowed.has(o.value)
+  )
+}
+
 // ── Per-wall Waterproofing field ──────────────────────────────────────────────
 // A SINGLE waterproofing line that is a standard field on every wall entry (it
 // carries over with each wall the user adds). No add/remove — edits the wall's
@@ -1321,7 +1335,7 @@ function WallWaterproofing({
             onWpUpdate(0, 'vendor', v)
             pp.check(materialRows, WALL_WP_SUBCAT, row.type, v)
           }}
-          options={vendorOptions}
+          options={vendorOptsForSub(vendorOptions, materialRows, WALL_WP_SUBCAT)}
         />
         <DropdownSelect
           className="input text-sm py-1.5 flex-[1.5] min-w-0"
@@ -1405,7 +1419,7 @@ function WallFinishesEditor({
                   onPatch(i, { vendor: v }, true)
                   pp.check(materialRows, WALL_FINISH_SUBCAT, row.type, v)
                 }}
-                options={vendorOptions}
+                options={vendorOptsForSub(vendorOptions, materialRows, WALL_FINISH_SUBCAT)}
               />
               <DropdownSelect
                 className="input text-sm py-1 flex-[1.5] min-w-0"
@@ -1473,7 +1487,7 @@ function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, ma
                   onPatch(i, { vendor: v }, true)
                   pp.check(materialRows, WALL_CAP_SUBCAT, row.type, v)
                 }}
-                options={vendorOptions}
+                options={vendorOptsForSub(vendorOptions, materialRows, WALL_CAP_SUBCAT)}
               />
               <DropdownSelect
                 className="input text-sm py-1 flex-[1.5] min-w-0"
@@ -1584,7 +1598,7 @@ function CmuWallEntry({
               if (opts.length && !opts.some(o => o.id === wall.blockType))
                 set('blockType')(opts[0].id)
             }}
-            options={vendorOptions || [{ value: 'House', label: 'Standard' }]}
+            options={vendorOptsForSub(vendorOptions, materialRows, WALL_BLOCK_SUBCAT)}
           />
         </div>
         {/* Block Type — the selected vendor's "Wall Block" catalog products
@@ -1958,7 +1972,7 @@ function ModularWallEntry({
                 set('blockType')(first ? first.id : '')
               }
             }}
-            options={vendorOptions || [{ value: 'House', label: 'Standard' }]}
+            options={vendorOptsForSub(vendorOptions, materialRows, typeSource?.subcat || WALL_BLOCK_SUBCAT)}
           />
         </div>
         <div className="col-span-2">
