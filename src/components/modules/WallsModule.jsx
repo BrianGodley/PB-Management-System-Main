@@ -21,6 +21,12 @@ const WALLS_CATEGORY = 'Walls'
 // Shared cross-module basics (rebar, concrete, grout pump) live here so vendor
 // price changes propagate into Walls too.
 const BASIC_CATEGORY = 'Basic Materials'
+// Loaded so the per-wall Demo calc reads the SAME Demo labor_rates + misc_rates
+// (Dirt SF labor, container price/capacity, swell) as the standalone Demo
+// modules — single source of truth. Only affects the merged rate map `mp`; the
+// wall vendor/type pickers filter by wall sub-categories, so Demo materials
+// never appear in them.
+const DEMO_CATEGORY = 'Demo'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Walls Module — CMU Block | Poured In Place | Timber/Lumber
@@ -145,6 +151,90 @@ const WALL_RATES = {
   flagstoneExtraPerSf: { db: 'Wall Real Flagstone Extra per SF', fb: 1.5 }, // $ / SF (setting)
   realStoneSfPerTon: { db: 'Wall Real Stone SF per Ton', fb: 70 }, // SF coverage per ton
   realStoneExtraPerSf: { db: 'Wall Real Stone Extra per SF', fb: 2 }, // $ / SF (setting)
+  // ── Per-wall Demo (Slope Removal + Footing Demo). Hours, tons and dump fees
+  // reuse the referenced Demo modules' DIRT calc EXACTLY. Every coefficient is
+  // table-driven (fb = the value copied from the referenced Demo module) and is
+  // read through the merged rate map — category 'Demo' is loaded into `mp` so a
+  // Demo rate edited in Master Rates flows straight here. NO hard-coded numbers.
+  //   hours = (sf/100) × thickIn × <dirt SF labor rate for method>  (ALL methods)
+  //   tons  = (sf / denom) × thickIn
+  //   dump  = ceil(removalYards / containerCy) × containerPrice, where
+  //           removalYards = (sf × (thickIn/12) / 27) × swell
+  // Excavator shares Mini Skid's rates; Footing Demo offers Hand + Excavator.
+  demoHandDirt: { db: 'Demo - Hand - Dirt SF', fb: 1 }, // hr per 100 SF·in (HandDemoModule sfLaborHrs)
+  demoMiniDirt: { db: 'Demo - Mini - Dirt SF', fb: 1 }, // hr per 100 SF·in (MiniSkidSteerDemoModule; Excavator shares)
+  demoSkidDirt: { db: 'Demo - Skid - Dirt SF', fb: 1 }, // hr per 100 SF·in (SkidSteerDemoModule)
+  demoSfToTonsDenom: { db: 'Demo SF to Tons Denom', fb: 200 }, // sfToTons: (sf / 200) × depthIn (all Demo modules)
+  // Container removal (dump) — per method (misc_rates, category Demo).
+  demoHandContainer: { db: 'Demo - Hand Container (Low-Boy)', fb: 770 }, // $ per container
+  demoHandContainerCy: { db: 'Demo - Hand Container Capacity (CY)', fb: 10 }, // CY per container
+  demoHandSwell: { db: 'Demo - Hand Removal Swell', fb: 1.2 }, // broken-material swell factor
+  demoMiniContainer: { db: 'Demo - Mini Container (Low-Boy)', fb: 770 }, // $ per container (Excavator shares)
+  demoMiniContainerCy: { db: 'Demo - Mini Container Capacity (CY)', fb: 10 }, // CY per container
+  demoMiniSwell: { db: 'Demo - Mini Removal Swell', fb: 1.2 }, // swell factor
+  demoSkidContainer: { db: 'Demo - Skid Container (Low-Boy)', fb: 770 }, // $ per container
+  demoSkidContainerCy: { db: 'Demo - Skid Container Capacity (CY)', fb: 10 }, // CY per container
+  demoSkidSwell: { db: 'Demo - Skid Removal Swell', fb: 1.2 }, // swell factor
+}
+
+// Method pickers for the per-wall Demo section (Slope Removal has 4 options,
+// Footing Demo has 2). Kept module-level so the entry components share them.
+const DEMO_SLOPE_METHODS = ['Hand', 'Mini Skid', 'Skid Steer', 'Excavator']
+const DEMO_FOOT_METHODS = ['Hand', 'Excavator']
+
+// Blank per-wall Demo fields. Added to every wall's DEFAULT_* and hydrated onto
+// loaded walls so old estimates open with an empty (0-hour) Demo section.
+const DEMO_DEFAULTS = () => ({
+  demoSlopeMethod: 'Hand',
+  demoSlopeLf: '',
+  demoSlopeH: '',
+  demoSlopeD: '',
+  demoFootMethod: 'Hand',
+  demoFootLen: '',
+  demoFootW: '',
+  demoFootD: '',
+})
+
+// Demo hours + tons + dump fee for ONE wall's Demo section — reuses the Demo
+// modules' DIRT math EXACTLY, table-driven via `r`. Each part converts to (area
+// SF, thickness in) then applies, for EVERY method:
+//   • hours = (sf/100) × thickIn × <dirt SF labor rate for method>  (sfLaborHrs)
+//   • tons  = (sf / denom) × thickIn                                 (sfToTons)
+//   • dump  = ceil(removalYards / containerCy) × containerPrice, where
+//             removalYards = (sf × (thickIn/12) / 27) × swell
+// Method → the Demo module rate keys it reuses (Excavator shares Mini Skid's).
+const DEMO_METHOD_KEYS = {
+  Hand: { dirt: 'demoHandDirt', cont: 'demoHandContainer', cy: 'demoHandContainerCy', swell: 'demoHandSwell' },
+  'Mini Skid': { dirt: 'demoMiniDirt', cont: 'demoMiniContainer', cy: 'demoMiniContainerCy', swell: 'demoMiniSwell' },
+  'Skid Steer': { dirt: 'demoSkidDirt', cont: 'demoSkidContainer', cy: 'demoSkidContainerCy', swell: 'demoSkidSwell' },
+  Excavator: { dirt: 'demoMiniDirt', cont: 'demoMiniContainer', cy: 'demoMiniContainerCy', swell: 'demoMiniSwell' },
+}
+function wallDemo(wall = {}, r) {
+  const denom = r('demoSfToTonsDenom') || 200
+  const part = (sf, thickIn, method) => {
+    const s = n(sf)
+    const t = n(thickIn)
+    if (s <= 0 || t <= 0) return { hrs: 0, tons: 0, dump: 0 }
+    const keys = DEMO_METHOD_KEYS[method] || DEMO_METHOD_KEYS.Hand
+    const hrs = (s / 100) * t * r(keys.dirt)
+    const tons = (s / denom) * t
+    const containerCy = r(keys.cy) || 1
+    const removalYards = ((s * (t / 12)) / 27) * r(keys.swell)
+    const containers = Math.ceil(removalYards / containerCy)
+    const dump = containers * r(keys.cont)
+    return { hrs, tons, dump }
+  }
+  // Slope Removal: sf = LF × (aveHeight/12); thickness = aveDepth (in).
+  const slopeSf = n(wall.demoSlopeLf) * (n(wall.demoSlopeH) / 12)
+  const slope = part(slopeSf, wall.demoSlopeD, wall.demoSlopeMethod || 'Hand')
+  // Footing Demo: sf = Length × (width/12); thickness = depth (in).
+  const footSf = n(wall.demoFootLen) * (n(wall.demoFootW) / 12)
+  const foot = part(footSf, wall.demoFootD, wall.demoFootMethod || 'Hand')
+  return {
+    hrs: slope.hrs + foot.hrs,
+    tons: slope.tons + foot.tons,
+    dump: slope.dump + foot.dump,
+  }
 }
 
 // Rate catalog for the "View Rates" popup, BROKEN DOWN BY WALL TYPE. Each item:
@@ -270,6 +360,7 @@ const DEFAULT_CMU = () => ({
   groutPump: 'No',
   subEach: '',
   wpRows: [blankWpRow()],
+  ...DEMO_DEFAULTS(),
   finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
   capRows: [blankCapRow()],
 })
@@ -283,6 +374,7 @@ const DEFAULT_PIP = () => ({
   footingPump: 'Yes',
   subEach: '',
   wpRows: [blankWpRow()],
+  ...DEMO_DEFAULTS(),
   finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
   capRows: [blankCapRow()],
 })
@@ -301,6 +393,7 @@ const DEFAULT_MODULAR = () => ({
   footingPump: 'No',
   subEach: '',
   wpRows: [blankWpRow()],
+  ...DEMO_DEFAULTS(),
   finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
   capRows: [blankCapRow()],
 })
@@ -318,6 +411,7 @@ const DEFAULT_BRICK = () => ({
   footingPump: 'No',
   subEach: '',
   wpRows: [blankWpRow()],
+  ...DEMO_DEFAULTS(),
   finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
   capRows: [blankCapRow()],
 })
@@ -970,6 +1064,9 @@ function calcWalls(
   let structuralHrs = 0,
     structuralMat = 0,
     structuralSubMat = 0
+  // Timber labor is split OUT of the main structural bucket so it can be shown
+  // (and crewed) separately. Its material/sub still flow into structuralMat.
+  let timberHrs = 0
   let cmuDetails = [],
     pipDetails = [],
     modularDetails = [],
@@ -1041,7 +1138,9 @@ function calcWalls(
     const addlCourses = Math.max(0, Math.ceil((n(state.timberHeightIn) - 8) / 8))
     const postQty = n(state.timberPosts)
     // Labor + post rates are table-driven (WALL_RATES → labor_rates/misc_rates).
-    structuralHrs +=
+    // Timber labor now lands in its OWN bucket (was structuralHrs) so the summary
+    // can show / crew it independently; the aggregate total is unchanged.
+    timberHrs +=
       n(state.timberLF) * (r('timberLfLab') + addlCourses * r('timberCourseLab')) +
       postQty * r('timberPostLab')
     // Wood price ($/unit) from the selected type's Walls › Wood catalog entry for
@@ -1099,13 +1198,44 @@ function calcWalls(
     manSub += n(row.subCost)
   })
 
-  // ── In-House totals (unchanged formulas) ─────────────────────────────────
-  const baseHrs = structuralHrs + finishHrs + capHrs + wpHrs + manHrs
+  // ── Per-wall Demo — sum every wall's Demo section (all 5 wall types),
+  //    reusing the Demo modules' DIRT math via wallDemo (table-driven). Yields
+  //    labor hours, removal tons and container dump fees. With no demo inputs
+  //    entered all three are 0, so the aggregate totals are unchanged. ──
+  let demoHrs = 0,
+    demoTons = 0,
+    demoDump = 0
+  const addDemo = w => {
+    const d = wallDemo(w, r)
+    demoHrs += d.hrs
+    demoTons += d.tons
+    demoDump += d.dump
+  }
+  ;(state.cmuWalls || []).forEach(addDemo)
+  ;(state.pipWalls || []).forEach(addDemo)
+  ;(state.modularWalls || []).forEach(addDemo)
+  ;(state.brickWalls || []).forEach(addDemo)
+  addDemo(state.timberDemo || {})
+
+  // ── Three labor buckets for the summary (raw hours, pre-difficulty/walk):
+  //   • mainInstallHrs = structural(minus timber) + finish + cap + wp + man
+  //   • demoHrs        = the per-wall Demo total (above)
+  //   • timberHrs      = the Timber tab's labor only
+  const mainInstallHrs = structuralHrs + finishHrs + capHrs + wpHrs + manHrs
+
+  // ── In-House totals ──────────────────────────────────────────────────────
+  // baseHrs still carries timber (it was folded into structuralHrs before) and
+  // now ALSO the demo hours; with demo = 0 this equals the pre-change baseHrs
+  // exactly, so totals / manDays / laborCost are byte-identical without demo.
+  const baseHrs = mainInstallHrs + timberHrs + demoHrs
   const diffMod = 1 + n(state.difficulty) / 100
   const _adjHrs = baseHrs * diffMod + n(state.hoursAdj)
   const walkHrsIH = calcWalkAccessLabor(_adjHrs, state.distanceLF, { paceLfPerMin: _pace })
   const totalHrsIH = _adjHrs + walkHrsIH
-  const totalMatIH = structuralMat + finishMat + capMat + wpMat + manMat
+  // Demo dump fees are a removal (material) cost, matching how the Demo modules
+  // treat container disposal — added to the in-house material total (0 with no
+  // demo, so the totals stay byte-identical without demo inputs).
+  const totalMatIH = structuralMat + finishMat + capMat + wpMat + manMat + demoDump
   const totalSubMat = structuralSubMat + finishSubMat + capSubMat + wpSubMat
 
   const isSubTab = state.subType === 'Subcontractor'
@@ -1166,6 +1296,12 @@ function calcWalls(
     finishHrs,
     capHrs,
     wpHrs,
+    // Three labor buckets for the summary's split lines (raw hours).
+    mainInstallHrs,
+    demoHrs,
+    demoTons,
+    demoDump,
+    timberHrs,
     structuralMat,
     finishMat,
     capMat,
@@ -1252,6 +1388,7 @@ function initCmuWalls(src = {}) {
       blockType: DEFAULT_BLOCK_NAME,
       vendor: 'House',
       subEach: '',
+      ...DEMO_DEFAULTS(),
       ...w,
       footingPump: w.footingPump ?? legacyPump,
       groutPump: w.groutPump ?? legacyGrout,
@@ -1291,6 +1428,7 @@ function initPipWalls(src = {}) {
     return src.pipWalls.map(w => ({
       vendor: 'House',
       subEach: '',
+      ...DEMO_DEFAULTS(),
       ...w,
       footingPump: w.footingPump ?? 'Yes',
       wpRows: initWallWp(w),
@@ -1318,6 +1456,7 @@ function initModularWalls(src = {}) {
       blockType: DEFAULT_BLOCK_NAME,
       vendor: 'House',
       subEach: '',
+      ...DEMO_DEFAULTS(),
       ...w,
       footingPump: w.footingPump ?? legacyPump,
       wpRows: initWallWp(w),
@@ -1332,6 +1471,7 @@ function initBrickWalls(src = {}) {
       blockType: DEFAULT_BLOCK_NAME,
       vendor: 'House',
       subEach: '',
+      ...DEMO_DEFAULTS(),
       ...w,
       footingPump: w.footingPump ?? legacyPump,
       wpRows: initWallWp(w),
@@ -1427,6 +1567,9 @@ function makeTab(src = {}) {
     timberVendor: src.timberVendor ?? 'House',
     timberPosts: src.timberPosts ?? '',
     timberSubEach: src.timberSubEach ?? '',
+    // Timber wall's own Demo section (inline block, not a wall array) — a nested
+    // object carrying the same demo* fields as each wall entry.
+    timberDemo: { ...DEMO_DEFAULTS(), ...(src.timberDemo || {}) },
     manualRows: src.manualRows ?? DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
   }
 }
@@ -1704,6 +1847,74 @@ function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, ma
   )
 }
 
+// ── Per-wall Demo section ─────────────────────────────────────────────────────
+// Shared across every wall entry (CMU / PIP / Modular / Brick) and the inline
+// Timber block. `onChange` is the entry's `set` curry: onChange('field')(val).
+// The header + "Installation" label match the Caps/Finishes sub-header style.
+function WallDemoSection({ wall = {}, onChange }) {
+  const set = onChange
+  const methodOpts = list => list.map(m => ({ value: m, label: m }))
+  return (
+    <div className="mb-3">
+      <label className="block text-xs text-gray-500 mb-1 font-medium">Demo</label>
+      {/* Slope Removal */}
+      <div className="mb-2">
+        <p className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">Slope Removal</p>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Method</label>
+            <DropdownSelect
+              className="input text-sm py-1.5 w-full"
+              value={wall.demoSlopeMethod || 'Hand'}
+              onChange={set('demoSlopeMethod')}
+              options={methodOpts(DEMO_SLOPE_METHODS)}
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Linear Feet</label>
+            <NumInput value={wall.demoSlopeLf} onChange={set('demoSlopeLf')} />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Ave Height (in)</label>
+            <NumInput value={wall.demoSlopeH} onChange={set('demoSlopeH')} />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Ave Depth (in)</label>
+            <NumInput value={wall.demoSlopeD} onChange={set('demoSlopeD')} />
+          </div>
+        </div>
+      </div>
+      {/* Footing Demo */}
+      <div>
+        <p className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">Footing Demo</p>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Method</label>
+            <DropdownSelect
+              className="input text-sm py-1.5 w-full"
+              value={wall.demoFootMethod || 'Hand'}
+              onChange={set('demoFootMethod')}
+              options={methodOpts(DEMO_FOOT_METHODS)}
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Length</label>
+            <NumInput value={wall.demoFootLen} onChange={set('demoFootLen')} />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Width (in)</label>
+            <NumInput value={wall.demoFootW} onChange={set('demoFootW')} />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Depth (in)</label>
+            <NumInput value={wall.demoFootD} onChange={set('demoFootD')} />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── CMU Wall Entry ────────────────────────────────────────────────────────────
 function CmuWallEntry({
   wall,
@@ -1747,6 +1958,8 @@ function CmuWallEntry({
           </button>
         )}
       </div>
+      <WallDemoSection wall={wall} onChange={set} />
+      <label className="block text-xs text-gray-500 mb-1 font-medium">Installation</label>
       <div className="grid grid-cols-2 gap-2">
         {/* Vendor — the ONLY thing that changes where the material $ comes
             from. "House" = the original master-rate / catalog pricing. */}
@@ -2007,6 +2220,8 @@ function PipWallEntry({
           </button>
         )}
       </div>
+      <WallDemoSection wall={wall} onChange={set} />
+      <label className="block text-xs text-gray-500 mb-1 font-medium">Installation</label>
       <div className="grid grid-cols-2 gap-2">
         <div className="col-span-2">
           <label className="block text-xs text-gray-500 mb-1">Concrete Vendor</label>
@@ -2156,6 +2371,8 @@ function ModularWallEntry({
           </button>
         )}
       </div>
+      <WallDemoSection wall={wall} onChange={set} />
+      <label className="block text-xs text-gray-500 mb-1 font-medium">Installation</label>
       <div className="grid grid-cols-2 gap-2">
         <div className="col-span-2">
           <label className="block text-xs text-gray-500 mb-1">Vendor</label>
@@ -2370,7 +2587,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
     loading: pricesLoading,
     refresh: refreshAllRates,
     vendorOptionsForCategory,
-  } = useNewMaterialCatalog([WALLS_CATEGORY, BASIC_CATEGORY, CONCRETE_CATEGORY], {
+  } = useNewMaterialCatalog([WALLS_CATEGORY, BASIC_CATEGORY, CONCRETE_CATEGORY, DEMO_CATEGORY], {
     materialPrices: initialData?.materialPrices,
     materialRows: initialData?.materialRows,
   })
@@ -3006,6 +3223,15 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
       {wallType === 'Timber' && (
         <div>
           <SectionHeader title="Timber / Lumber Wall" />
+          {/* Per-wall Demo section (timber's own inline block; state lives on
+              cur.timberDemo). Reuses the shared WallDemoSection component. */}
+          <WallDemoSection
+            wall={cur.timberDemo || {}}
+            onChange={f => val =>
+              setField('timberDemo')(prev => ({ ...(prev || {}), [f]: val }))
+            }
+          />
+          <label className="block text-xs text-gray-500 mb-1 font-medium">Installation</label>
           <div className="grid grid-cols-2 gap-3 mb-3">
             <div>
               <label className="block text-xs text-gray-500 mb-1">Vendor</label>

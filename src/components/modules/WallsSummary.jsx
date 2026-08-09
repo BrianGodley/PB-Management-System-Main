@@ -526,6 +526,18 @@ export default function WallsSummary({ module }) {
   const vendorNames = data.vendorNames || {}
   const { difficulty = 0, hoursAdj = 0 } = ih
   const vendorLabel = v => (!v || v === 'House' ? 'Standard' : vendorNames[v] || 'Vendor')
+  // Labor rate + assigned crews for the three labor-bucket lines. Crew names are
+  // saved at the top level of `data` (spread from the module's state).
+  const lrph = n(data.laborRatePerHour) || 35
+  const mainCrew = data.crewType || ''
+  const demoCrew = data.demoCrewType || ''
+  const timberCrew = data.timberCrewType || ''
+  // Main Wall Install hours: new saves carry calc.mainInstallHrs; legacy saves
+  // fall back to the old structural+finish+cap+wp sum (which folded timber in).
+  const mainInstallHrs =
+    calc.mainInstallHrs != null
+      ? n(calc.mainInstallHrs)
+      : n(calc.structuralHrs) + n(calc.finishHrs) + n(calc.capHrs) + n(calc.wpHrs)
 
   const showSub = tabHasData(sub)
 
@@ -574,13 +586,32 @@ export default function WallsSummary({ module }) {
         </>
       )}
 
-      {/* Hour breakdown — from the saved calc snapshot (active tab) */}
+      {/* Labor breakdown — three crew-split buckets. Each shows hours, the $
+          value (hours × labor rate) and the assigned crew. */}
       <SectionLabel title="Labor Breakdown" />
-      <LineRow label="Structural Hours" value={`${n(calc.structuralHrs).toFixed(2)} hrs`} />
-      {n(calc.finishHrs) > 0 && (
-        <LineRow label="Finish Hours" value={`${n(calc.finishHrs).toFixed(2)} hrs`} />
+      <LineRow
+        label={`Main Wall Install${mainCrew ? ` · ${mainCrew}` : ''}`}
+        value={`${mainInstallHrs.toFixed(2)} hrs`}
+        sub={fmt(mainInstallHrs * lrph)}
+      />
+      {n(calc.demoHrs) > 0 && (
+        <LineRow
+          label={`Demo${demoCrew ? ` · ${demoCrew}` : ''}`}
+          value={`${n(calc.demoHrs).toFixed(2)} hrs`}
+          sub={
+            `${fmt(n(calc.demoHrs) * lrph)}` +
+            (n(calc.demoTons) > 0 ? ` · ${n(calc.demoTons).toFixed(2)} t` : '') +
+            (n(calc.demoDump) > 0 ? ` · ${fmt(n(calc.demoDump))} dump` : '')
+          }
+        />
       )}
-      {n(calc.capHrs) > 0 && <LineRow label="Cap Hours" value={`${n(calc.capHrs).toFixed(2)} hrs`} />}
+      {n(calc.timberHrs) > 0 && (
+        <LineRow
+          label={`Timber${timberCrew ? ` · ${timberCrew}` : ''}`}
+          value={`${n(calc.timberHrs).toFixed(2)} hrs`}
+          sub={fmt(n(calc.timberHrs) * lrph)}
+        />
+      )}
       {n(calc.finishMat) > 0 && <LineRow label="Finish Material Total" value={fmt(calc.finishMat)} />}
       {n(difficulty) > 0 && <LineRow label="Difficulty Add" value={`${n(difficulty)}%`} />}
       {n(hoursAdj) !== 0 && (
