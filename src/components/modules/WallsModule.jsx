@@ -123,6 +123,30 @@ const WALL_RATES = {
   timberCourseLab: { db: 'Wall Timber Added Course Labor', fb: 0.8 }, // hr / LF / course
   timberPostMat: { db: 'Wall Timber Steel Post', fb: 100 }, // $ / post
   timberPostLab: { db: 'Wall Timber Steel Post Labor', fb: 0.4667 }, // hr / post
+  // ── Structural coefficients (were hard-coded in the calc functions; fb =
+  // legacy value so totals are unchanged until a rate is seeded/edited). ──────
+  blockOrderWaste: { db: 'Wall Block Order Waste', fb: 1.1 }, // order multiplier (grey + BB)
+  footingPourLab: { db: 'Wall Footing Pour Labor Rate', fb: 0.2037 }, // CY / hr (pour productivity)
+  curveLab: { db: 'Wall Curve Labor Factor', fb: 0.5 }, // factor on struct hrs per % curved
+  // Poured-In-Place stem coefficients.
+  pipStemLfLab: { db: 'Wall PIP Stem LF Labor', fb: 1.0833 }, // hr / LF (base course)
+  pipStemCourseLab: { db: 'Wall PIP Stem Added Course Labor', fb: 1.6167 }, // hr / LF / added course
+  pipStemCyPerLf: { db: 'Wall PIP Stem CY per LF', fb: 0.2833 }, // CY / LF (base course)
+  pipStemCyPerLfCourse: { db: 'Wall PIP Stem CY per LF per Course', fb: 0.3667 }, // CY / LF / added course
+  // Wall-finish material coefficients (waste / setting-bed / coverage / extras).
+  ledgerWaste: { db: 'Wall Ledgerstone Waste', fb: 1.1 }, // material order multiplier
+  ledgerSetSfPerUnit: { db: 'Wall Ledgerstone Setting SF per Unit', fb: 5 }, // SF per setting unit
+  ledgerSetUnitCost: { db: 'Wall Ledgerstone Setting Unit Cost', fb: 2 }, // $ per setting unit
+  ledgerSubExtraPerSf: { db: 'Wall Ledgerstone Sub Extra per SF', fb: 0.4 }, // $ / SF (sub flat)
+  stackedWaste: { db: 'Wall Stacked Stone Waste', fb: 1.1 }, // material order multiplier
+  stackedSetSfPerUnit: { db: 'Wall Stacked Stone Setting SF per Unit', fb: 5 }, // SF per setting unit
+  stackedSetUnitCost: { db: 'Wall Stacked Stone Setting Unit Cost', fb: 2 }, // $ per setting unit
+  stackedSubExtraPerSf: { db: 'Wall Stacked Stone Sub Extra per SF', fb: 0.4 }, // $ / SF (sub flat)
+  tileExtraPerSf: { db: 'Wall Tile Extra per SF', fb: 1 }, // $ / SF (thinset/grout)
+  flagstoneSfPerTon: { db: 'Wall Real Flagstone SF per Ton', fb: 80 }, // SF coverage per ton
+  flagstoneExtraPerSf: { db: 'Wall Real Flagstone Extra per SF', fb: 1.5 }, // $ / SF (setting)
+  realStoneSfPerTon: { db: 'Wall Real Stone SF per Ton', fb: 70 }, // SF coverage per ton
+  realStoneExtraPerSf: { db: 'Wall Real Stone Extra per SF', fb: 2 }, // $ / SF (setting)
 }
 
 // Rate catalog for the "View Rates" popup, BROKEN DOWN BY WALL TYPE. Each item:
@@ -391,34 +415,34 @@ function computeWallFinishRow(row, mp, materialRows) {
     }
     case 'Ledgerstone': {
       hrs = sf > 0 ? (sf / lab('ledgerstoneLab')) * 8 : 0
-      mat = sf > 0 ? sf * rate * 1.1 + (sf / 5) * 2 : 0
-      subUnit = rate * 1.1 + 0.4
+      mat = sf > 0 ? sf * rate * lab('ledgerWaste') + (sf / lab('ledgerSetSfPerUnit')) * lab('ledgerSetUnitCost') : 0
+      subUnit = rate * lab('ledgerWaste') + lab('ledgerSubExtraPerSf')
       break
     }
     case 'Stacked Stone': {
       hrs = sf > 0 ? (sf / lab('stackedStoneLab')) * 8 : 0
-      mat = sf > 0 ? sf * rate * 1.1 + (sf / 5) * 2 : 0
-      subUnit = rate * 1.1 + 0.4
+      mat = sf > 0 ? sf * rate * lab('stackedWaste') + (sf / lab('stackedSetSfPerUnit')) * lab('stackedSetUnitCost') : 0
+      subUnit = rate * lab('stackedWaste') + lab('stackedSubExtraPerSf')
       break
     }
     case 'Tile': {
       hrs = sf > 0 ? sf * lab('tileLab') : 0
-      mat = sf > 0 ? sf * rate + sf : 0
-      subUnit = rate + 1
+      mat = sf > 0 ? sf * rate + sf * lab('tileExtraPerSf') : 0
+      subUnit = rate + lab('tileExtraPerSf')
       break
     }
     case 'Real Flagstone': {
       hrs = sf > 0 ? sf * lab('flagstoneLab') : 0
-      mat = sf > 0 ? (sf / 80) * rate + sf * 1.5 : 0
-      subUnit = rate / 80 + 1.5
-      tons = sf / 80
+      mat = sf > 0 ? (sf / lab('flagstoneSfPerTon')) * rate + sf * lab('flagstoneExtraPerSf') : 0
+      subUnit = rate / lab('flagstoneSfPerTon') + lab('flagstoneExtraPerSf')
+      tons = sf / lab('flagstoneSfPerTon')
       break
     }
     case 'Real Stone': {
       hrs = sf > 0 ? sf * lab('realStoneLab') : 0
-      mat = sf > 0 ? (sf / 70) * rate + sf * 2 : 0
-      subUnit = rate / 70 + 2
-      tons = sf / 70
+      mat = sf > 0 ? (sf / lab('realStoneSfPerTon')) * rate + sf * lab('realStoneExtraPerSf') : 0
+      subUnit = rate / lab('realStoneSfPerTon') + lab('realStoneExtraPerSf')
+      tons = sf / lab('realStoneSfPerTon')
       break
     }
     default:
@@ -747,8 +771,8 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
   const bbCourses = Math.min(n(bondBeams), totalCourses)
   const regCourses = Math.max(0, totalCourses - bbCourses)
   const rawBlocks = blocksPerCourse * totalCourses
-  const orderGreyBlock = Math.ceil(blocksPerCourse * regCourses * 1.1)
-  const orderBBBlock = Math.ceil(blocksPerCourse * bbCourses * 1.1)
+  const orderGreyBlock = Math.ceil(blocksPerCourse * regCourses * r('blockOrderWaste'))
+  const orderBBBlock = Math.ceil(blocksPerCourse * bbCourses * r('blockOrderWaste'))
 
   const footingCF = (n(footingWIn) / 12) * (n(footingDIn) / 12) * n(lf)
   const footingCY = footingCF / 27
@@ -764,11 +788,11 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
   const structBase =
     (footingCF > 0 ? footingCF / r('digLab') : 0) +
     (totalRebarLF > 0 ? totalRebarLF / r('rebarLab') : 0) +
-    (footingCY > 0 ? footingCY / 0.2037 : 0) +
+    (footingCY > 0 ? footingCY / r('footingPourLab') : 0) +
     (rawBlocks > 0 ? rawBlocks / r('blockLab') : 0) +
     (groutCF > 0 ? groutCF / groutRate : 0) +
     n(lf) / r('setupCleanLab')
-  const curveAdd = structBase * (n(pctCurved) / 100) * 0.5
+  const curveAdd = structBase * (n(pctCurved) / 100) * r('curveLab')
   const hrs = structBase + curveAdd
 
   const footConcrPrc = footingPump === 'Yes' ? pm('concreteTruck') : pm('concreteHand')
@@ -844,7 +868,7 @@ function calcOneBrick(wall, r, mp = {}, materialRows = []) {
   const footingHrs =
     (footingCF > 0 ? footingCF / r('digLab') : 0) +
     (horizRebarLF > 0 ? horizRebarLF / r('rebarLab') : 0) +
-    (footingCY > 0 ? footingCY / 0.2037 : 0)
+    (footingCY > 0 ? footingCY / r('footingPourLab') : 0)
   const footPrc = (wall.footingPump ?? 'No') === 'Yes' ? pm('concreteTruck') : pm('concreteHand')
   const footingMat = footingCY * footPrc + horizRebarLF * pm('rebar')
 
@@ -877,8 +901,8 @@ function calcOnePIP(wall, r, mp = {}, materialRows = []) {
   const pm = key => wallMatPrice(WALL_RATES[key].db, v, materialRows, mp, WALL_RATES[key].fb)
   // Wall stem (existing formula)
   const addlCourses = Math.max(0, Math.ceil((n(heightIn) - 6) / 6))
-  const wallHrs = n(lf) * (1.0833 + addlCourses * 1.6167)
-  const wallConcCY = n(lf) * (0.2833 + addlCourses * 0.3667)
+  const wallHrs = n(lf) * (r('pipStemLfLab') + addlCourses * r('pipStemCourseLab'))
+  const wallConcCY = n(lf) * (r('pipStemCyPerLf') + addlCourses * r('pipStemCyPerLfCourse'))
 
   // Footing — same dig + rebar + pour coefficients as the CMU calc so PIP
   // footings price out consistently. Optional: if the user leaves footing
@@ -893,7 +917,7 @@ function calcOnePIP(wall, r, mp = {}, materialRows = []) {
   const footingHrs =
     (footingCF > 0 ? footingCF / r('digLab') : 0) +
     (horizRebarLF > 0 ? horizRebarLF / r('rebarLab') : 0) +
-    (footingCY > 0 ? footingCY / 0.2037 : 0)
+    (footingCY > 0 ? footingCY / r('footingPourLab') : 0)
   // Per-wall footing pump: 'Yes' = ready-mix truck (default, unchanged), 'No' =
   // hand mix. No separate pump-setup fee on PIP footings.
   const footPrc = (wall.footingPump ?? 'Yes') === 'Yes' ? pm('concreteTruck') : pm('concreteHand')
