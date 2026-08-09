@@ -593,6 +593,10 @@ function wallBlockOptions(materialRows, vendorSel) {
 const WALL_CAP_SUBCAT = 'Wall Cap'
 const WALL_FINISH_SUBCAT = 'Wall Finish'
 const WALL_WP_SUBCAT = 'Waterproofing'
+// PIP walls pour concrete — the "Concrete Vendor" picker is scoped to the
+// Concrete category's 'Concrete Mix' sub-category (loaded into the Walls catalog).
+const CONCRETE_CATEGORY = 'Concrete'
+const CONC_MIX_SUBCAT = 'Concrete Mix'
 function wallCatalogTypes(materialRows, subcat, vendorSel) {
   const seen = new Set()
   const out = []
@@ -1798,6 +1802,7 @@ function PipWallEntry({
   onRemove,
   detail,
   vendorOptions,
+  concreteVendorOptions,
   isSub,
   materialPrices,
   materialRows,
@@ -1830,7 +1835,7 @@ function PipWallEntry({
             className="input text-sm py-1.5 w-full"
             value={wall.vendor || 'House'}
             onChange={v => set('vendor')(v)}
-            options={vendorOptions || [{ value: 'House', label: 'Standard' }]}
+            options={concreteVendorOptions || [{ value: 'House', label: 'Standard' }]}
           />
         </div>
         <div>
@@ -2172,7 +2177,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
     loading: pricesLoading,
     refresh: refreshAllRates,
     vendorOptionsForCategory,
-  } = useNewMaterialCatalog([WALLS_CATEGORY, BASIC_CATEGORY], {
+  } = useNewMaterialCatalog([WALLS_CATEGORY, BASIC_CATEGORY, CONCRETE_CATEGORY], {
     materialPrices: initialData?.materialPrices,
     materialRows: initialData?.materialRows,
   })
@@ -2427,6 +2432,9 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
 
   // ── Vendor helpers ──────────────────────────────────────────────────────────
   const vendorOptions = vendorOptionsForCategory(WALLS_CATEGORY)
+  // PIP "Concrete Vendor" list — only vendors that supply the Concrete Mix
+  // sub-category (Standard always first).
+  const concreteVendorOptions = vendorOptionsForCategory(CONC_MIX_SUBCAT)
   // Modular Wall vendors — derived from the products themselves (reclassified
   // items may not be tagged 'Walls' at the vendor level). Enables vendor-first
   // picking: choose a vendor, then that vendor's Modular Wall types.
@@ -2669,6 +2677,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
               onRemove={removePipWall}
               detail={calc.pipDetails[idx] || null}
               vendorOptions={vendorOptions}
+              concreteVendorOptions={concreteVendorOptions}
               isSub={isSub}
               materialPrices={materialPrices}
               materialRows={materialRows}
