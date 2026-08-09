@@ -29,6 +29,12 @@ export default function CrewTypeBar({
   refreshAllRates,
   // When false, hide the "In-Line Edit Rates" toggle (keep only View Rates).
   showInlineToggle = true,
+  // Label for the primary crew select (e.g. Walls uses "Main Wall Installation
+  // Crew Type"). Defaults to the shared "Crew Type".
+  crewLabel = 'Crew Type',
+  // Additional crew selectors rendered after the primary one (Walls only):
+  //   [{ label, value, onChange }] — each uses the same crewOptions.
+  extraCrews = [],
 }) {
   const { showRateIcons, toggleRateIcons, canAccessRates } = useRateIcons()
   const [showRates, setShowRates] = useState(false)
@@ -36,7 +42,7 @@ export default function CrewTypeBar({
 
   return (
     <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200 flex-wrap">
-      <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
+      <label className="text-sm font-medium text-gray-700 whitespace-nowrap">{crewLabel}</label>
       <select
         value={crewType}
         onChange={e => onCrewTypeChange(e.target.value)}
@@ -48,6 +54,23 @@ export default function CrewTypeBar({
           </option>
         ))}
       </select>
+
+      {extraCrews.map((c, i) => (
+        <span key={i} className="flex items-center gap-2">
+          <label className="text-sm font-medium text-gray-700 whitespace-nowrap">{c.label}</label>
+          <select
+            value={c.value}
+            onChange={e => c.onChange(e.target.value)}
+            className="input text-sm py-1 w-36"
+          >
+            {crewOptions.map(o => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </select>
+        </span>
+      ))}
 
       <div className="flex items-center gap-3 ml-auto">
         {canAccessRates && showInlineToggle && (

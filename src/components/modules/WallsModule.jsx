@@ -2404,6 +2404,8 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
 
   // ── Shared (not per-tab) selections ─────────────────────────────────────────
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Masonry')
+  const [demoCrewType, setDemoCrewType] = useState(initialData?.demoCrewType ?? 'Demo')
+  const [timberCrewType, setTimberCrewType] = useState(initialData?.timberCrewType ?? 'Masonry')
   const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
 
   // Independent In-House vs Sub input records — each tab is its own calculator.
@@ -2672,7 +2674,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
 
   // The calc runs against the ACTIVE tab only — entering data on one tab never
   // affects the other. Shared selections (crew/sub type) are merged on top.
-  const state = { crewType, subType, subGpMarkupRate, ...cur }
+  const state = { crewType, demoCrewType, timberCrewType, subType, subGpMarkupRate, ...cur }
   const calcRaw = calcWalls(
     state,
     laborRatePerHour,
@@ -2754,6 +2756,11 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
           <CrewTypeBar
             crewType={crewType}
             onCrewTypeChange={setCrewType}
+            crewLabel="Main Wall Installation Crew Type"
+            extraCrews={[
+              { label: 'Demo Crew Type', value: demoCrewType, onChange: setDemoCrewType },
+              { label: 'Timber Wall Crew Type', value: timberCrewType, onChange: setTimberCrewType },
+            ]}
             title="Walls"
             rates={wallRateList}
             refreshAllRates={refreshAllRates}
