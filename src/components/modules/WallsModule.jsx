@@ -139,6 +139,15 @@ const WALL_RATES = {
   // Modular wall install labor — split OUT of CMU's blockLab so the two are
   // independent. fb equals blockLab's so totals are unchanged until edited.
   modularInstallLab: { db: 'Wall Modular Install Labor Rate', fb: 10.4 }, // blk / hr
+  // Footing EXCAVATION is no longer part of the wall build (footing input fields
+  // only drive install + material). All footing digging is priced in the per-wall
+  // "Dig and Haul Footing Soil" section: a flat CF/hr dig rate + a soil-haul
+  // (container) material cost. Every value is table-driven.
+  footingDigHaulLab: { db: 'Wall Footing Dig+Haul Labor Rate', fb: 8 }, // CF / hr (dig + load)
+  footingSoilSwell: { db: 'Wall Footing Soil Swell', fb: 1.2 }, // loose/broken swell factor
+  footingSoilContainerCy: { db: 'Wall Footing Soil Container CY', fb: 10 }, // CY per haul container
+  footingSoilContainerPrice: { db: 'Wall Footing Soil Container Price', fb: 770 }, // $ per container
+  footingSoilTonsPerCy: { db: 'Wall Footing Soil Tons per CY', fb: 1.5 }, // tons per loose CY (display)
   curveLab: { db: 'Wall Curve Labor Factor', fb: 0.5 }, // factor on struct hrs per % curved
   // Poured-In-Place stem coefficients.
   pipStemLfLab: { db: 'Wall PIP Stem LF Labor', fb: 1.0833 }, // hr / LF (base course)
@@ -235,9 +244,21 @@ function wallDemo(wall = {}, r) {
   // Slope Removal: sf = LF × (aveHeight/12); thickness = aveDepth (in).
   const slopeSf = n(wall.demoSlopeLf) * (n(wall.demoSlopeH) / 12)
   const slope = part(slopeSf, wall.demoSlopeD, wall.demoSlopeMethod || 'Hand')
-  // Footing Demo: sf = Length × (width/12); thickness = depth (in).
-  const footSf = n(wall.demoFootLen) * (n(wall.demoFootW) / 12)
-  const foot = part(footSf, wall.demoFootD, wall.demoFootMethod || 'Hand')
+  // ── Dig and Haul Footing Soil ── excavation of NEW footing trenches. Volume in
+  // cubic feet (Length LF × Width/12 × Depth/12); labor is a flat CF/hr dig+load
+  // rate and the removed soil is hauled off by the container-load (a MATERIAL
+  // cost). Every coefficient is table-driven.
+  const footCF = n(wall.demoFootLen) * (n(wall.demoFootW) / 12) * (n(wall.demoFootD) / 12)
+  const footYards = (footCF / 27) * (r('footingSoilSwell') || 1.2)
+  const footContCy = r('footingSoilContainerCy') || 1
+  const foot =
+    footCF > 0
+      ? {
+          hrs: footCF / (r('footingDigHaulLab') || 8),
+          tons: (footCF / 27) * r('footingSoilTonsPerCy'),
+          dump: Math.ceil(footYards / footContCy) * r('footingSoilContainerPrice'),
+        }
+      : { hrs: 0, tons: 0, dump: 0 }
   return {
     hrs: slope.hrs + foot.hrs,
     tons: slope.tons + foot.tons,
@@ -259,7 +280,6 @@ const WALL_RATE_SPECS = [
       ['concreteTruck', 'Concrete — Ready Mix (Truck)', 'Basic Materials', 'CY', 'currency'],
       ['groutPumpSetup', 'Grout Pump — Setup', 'Basic Materials', 'flat', 'currency'],
       ['groutPumpPerYd', 'Grout Pump — Per CY', 'Basic Materials', 'CY', 'currency'],
-      ['digLab', 'Dig Footing', 'Walls', 'CF/hr', 'coefficient'],
       ['rebarLab', 'Set Rebar', 'Walls', 'LF/hr', 'coefficient'],
       ['footingPourHandLab', 'Hand Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
       ['footingPourPumpLab', 'Pump Footing', 'Walls', 'CY/hr', 'coefficient'],
@@ -277,7 +297,6 @@ const WALL_RATE_SPECS = [
       ['rebar', 'Rebar', 'Basic Materials', 'LF', 'currency'],
       ['pipStemLfLab', 'Poured In Place Install', 'Walls', 'hr/LF', 'coefficient'],
       ['pipStemCourseLab', 'PIP Added Course', 'Walls', 'hr/LF', 'coefficient'],
-      ['digLab', 'Dig Footing', 'Walls', 'CF/hr', 'coefficient'],
       ['rebarLab', 'Set Rebar', 'Walls', 'LF/hr', 'coefficient'],
       ['footingPourHandLab', 'Hand Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
       ['footingPourPumpLab', 'Pump Footing', 'Walls', 'CY/hr', 'coefficient'],
@@ -290,7 +309,6 @@ const WALL_RATE_SPECS = [
       ['concreteHand', 'Footing Concrete — Hand Mix', 'Basic Materials', 'CY', 'currency'],
       ['concreteTruck', 'Footing Concrete — Ready Mix', 'Basic Materials', 'CY', 'currency'],
       ['groutPumpSetup', 'Footing Pump — Setup', 'Basic Materials', 'flat', 'currency'],
-      ['digLab', 'Dig Footing', 'Walls', 'CF/hr', 'coefficient'],
       ['footingPourHandLab', 'Hand Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
       ['footingPourPumpLab', 'Pump Footing', 'Walls', 'CY/hr', 'coefficient'],
       ['modularInstallLab', 'Modular Wall Installation', 'Walls', 'blk/hr', 'coefficient'],
@@ -305,7 +323,6 @@ const WALL_RATE_SPECS = [
       ['concreteTruck', 'Footing Concrete — Ready Mix', 'Basic Materials', 'CY', 'currency'],
       ['rebar', 'Rebar', 'Basic Materials', 'LF', 'currency'],
       ['brickLayLab', 'Brick Installation', 'Walls', 'hr/SF', 'coefficient'],
-      ['digLab', 'Dig Footing', 'Walls', 'CF/hr', 'coefficient'],
       ['rebarLab', 'Set Rebar', 'Walls', 'LF/hr', 'coefficient'],
       ['footingPourHandLab', 'Hand Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
       ['footingPourPumpLab', 'Pump Footing', 'Walls', 'CY/hr', 'coefficient'],
@@ -319,13 +336,22 @@ const WALL_RATE_SPECS = [
       ['concreteHand', 'Concrete — Hand Mix', 'Basic Materials', 'CY', 'currency'],
       ['concreteTruck', 'Concrete — Ready Mix (Truck)', 'Basic Materials', 'CY', 'currency'],
       ['timberPostMat', 'Steel Post', 'Walls', 'ea', 'currency'],
-      ['digLab', 'Dig Footing', 'Walls', 'CF/hr', 'coefficient'],
       ['rebarLab', 'Set Rebar', 'Walls', 'LF/hr', 'coefficient'],
       ['footingPourHandLab', 'Hand Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
       ['footingPourPumpLab', 'Pump Footing', 'Walls', 'CY/hr', 'coefficient'],
       ['timberLfLab', 'Timber Wall Installation', 'Walls', 'hr/LF', 'coefficient'],
       ['timberCourseLab', 'Timber Added Course', 'Walls', 'hr/LF', 'coefficient'],
       ['timberPostLab', 'Steel Post Installation', 'Walls', 'hr/ea', 'coefficient'],
+    ],
+  },
+  {
+    group: 'Dig & Haul Footing Soil (all wall types)',
+    items: [
+      ['footingDigHaulLab', 'Dig & Haul Footing Soil', 'Walls', 'CF/hr', 'coefficient'],
+      ['footingSoilContainerPrice', 'Soil Haul — Container', 'Walls', 'ea', 'currency'],
+      ['footingSoilContainerCy', 'Soil Haul — Container CY', 'Walls', 'CY', 'coefficient'],
+      ['footingSoilSwell', 'Soil Swell Factor', 'Walls', '×', 'coefficient'],
+      ['footingSoilTonsPerCy', 'Soil Tons per CY', 'Walls', 'ton/CY', 'coefficient'],
     ],
   },
   {
@@ -933,8 +959,9 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
   const totalRebarLF = vertRebarLF + horizRebarLF
 
   const groutRate = groutPump === 'Yes' ? r('pumpGroutLab') : r('handGroutLab')
+  // Footing EXCAVATION is priced separately in the "Dig and Haul Footing Soil"
+  // section — the footing fields here only drive install (rebar + pour) + material.
   const structBase =
-    (footingCF > 0 ? footingCF / r('digLab') : 0) +
     (totalRebarLF > 0 ? totalRebarLF / r('rebarLab') : 0) +
     (footingCY > 0 ? footingCY / r(footingPump === 'Yes' ? 'footingPourPumpLab' : 'footingPourHandLab') : 0) +
     (rawBlocks > 0 ? rawBlocks / r(installKey) : 0) +
@@ -1014,8 +1041,9 @@ function calcOneBrick(wall, r, mp = {}, materialRows = []) {
   const footingCF = fW > 0 && fD > 0 ? lf * (fW / 12) * (fD / 12) : 0
   const footingCY = footingCF / 27
   const horizRebarLF = hb * lf
+  // Footing excavation moved to the Dig and Haul Footing Soil section — install
+  // (rebar + pour) + material only here.
   const footingHrs =
-    (footingCF > 0 ? footingCF / r('digLab') : 0) +
     (horizRebarLF > 0 ? horizRebarLF / r('rebarLab') : 0) +
     (footingCY > 0
       ? footingCY / r((wall.footingPump ?? 'No') === 'Yes' ? 'footingPourPumpLab' : 'footingPourHandLab')
@@ -1065,8 +1093,9 @@ function calcOnePIP(wall, r, mp = {}, materialRows = []) {
   const footingCF = fW > 0 && fD > 0 ? n(lf) * (fW / 12) * (fD / 12) : 0
   const footingCY = footingCF / 27
   const horizRebarLF = hb * n(lf)
+  // Footing excavation moved to the Dig and Haul Footing Soil section — install
+  // (rebar + pour) + material only here.
   const footingHrs =
-    (footingCF > 0 ? footingCF / r('digLab') : 0) +
     (horizRebarLF > 0 ? horizRebarLF / r('rebarLab') : 0) +
     (footingCY > 0
       ? footingCY / r((wall.footingPump ?? 'Yes') === 'Yes' ? 'footingPourPumpLab' : 'footingPourHandLab')
@@ -1202,8 +1231,9 @@ function calcWalls(
     const tHorizRebarLF = tHb * tLF
     const tFootPump = (state.timberFootingPump ?? 'No') === 'Yes'
     const tpm = key => wallMatPrice(WALL_RATES[key].db, 'House', materialRows, mp, WALL_RATES[key].fb)
+    // Footing excavation is priced in the Dig and Haul Footing Soil section —
+    // install (rebar + pour) + material only here.
     const tFootingHrs =
-      (tFootingCF > 0 ? tFootingCF / r('digLab') : 0) +
       (tHorizRebarLF > 0 ? tHorizRebarLF / r('rebarLab') : 0) +
       (tFootingCY > 0 ? tFootingCY / r(tFootPump ? 'footingPourPumpLab' : 'footingPourHandLab') : 0)
     const tFootConcPrc = tFootPump ? tpm('concreteTruck') : tpm('concreteHand')
@@ -1952,21 +1982,12 @@ function WallDemoSection({ wall = {}, onChange }) {
           </div>
         </div>
       </div>
-      {/* Footing Demo */}
+      {/* Dig and Haul Footing Soil — flat CF/hr dig + soil-haul material. */}
       <div>
-        <p className="text-[11px] text-gray-700 uppercase tracking-wide mb-1">Dig Footings</p>
-        <div className="grid grid-cols-2 gap-2">
+        <p className="text-[11px] text-gray-700 uppercase tracking-wide mb-1">Dig and Haul Footing Soil</p>
+        <div className="grid grid-cols-3 gap-2">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Method</label>
-            <DropdownSelect
-              className="input text-sm py-1.5 w-full"
-              value={wall.demoFootMethod || 'Hand'}
-              onChange={set('demoFootMethod')}
-              options={methodOpts(DEMO_FOOT_METHODS)}
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Length</label>
+            <label className="block text-xs text-gray-500 mb-1">Length (LF)</label>
             <NumInput value={wall.demoFootLen} onChange={set('demoFootLen')} />
           </div>
           <div>
