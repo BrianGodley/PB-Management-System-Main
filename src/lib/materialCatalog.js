@@ -164,17 +164,17 @@ export async function fetchModuleCatalog(categories) {
     (vends || []).find(v => ['standard', 'unspecified'].includes((v.company_name || '').trim().toLowerCase()))
       ?.id || null
   if (!catIds.length) return []
-  const { data } = await supabase
-    .from('material')
-    .select(
-      `id, description, unit, calc_meta, collection,
+  const sel = `id, description, unit, calc_meta, collection,
        watts, va, labor_hrs_ea, sub_price_ea, sf_per_pallet, price_per_lf_vert,
        category:category_id ( name ),
        subcategory:subcategory_id ( name ),
        prices:material_price ( price, vendor_id, effective_end )`
-    )
-    .in('category_id', catIds)
-    .is('archived_at', null)
+  // Prefer to hide archived materials, but fall back gracefully if the
+  // archived_at column hasn't been migrated yet — otherwise the filter errors
+  // and the estimator loses every catalog block/material.
+  let matRes = await supabase.from('material').select(sel).in('category_id', catIds).is('archived_at', null)
+  if (matRes.error) matRes = await supabase.from('material').select(sel).in('category_id', catIds)
+  const data = matRes.data
   const rows = []
   ;(data || []).forEach(m => {
     ;(m.prices || [])
@@ -351,7 +351,20 @@ export async function fetchAllMaterialsAdmin() {
          subcategory:subcategory_id ( name ),
          prices:material_price ( price, vendor_id, effective_end )`
       ),
-  ])
+  ]).then(async ([v, m]) => {
+    // Fall back without archived_at if the column hasn't been migrated yet.
+    if (m.error) {
+      m = await supabase
+        .from('material')
+        .select(
+          `id, description, unit, calc_meta, photo_url, sku, show_in_selections,
+           category:category_id ( name ),
+           subcategory:subcategory_id ( name ),
+           prices:material_price ( price, vendor_id, effective_end )`
+        )
+    }
+    return [v, m]
+  })
   const stdId =
     (vends || []).find(v => ['standard', 'unspecified'].includes((v.company_name || '').trim().toLowerCase()))
       ?.id || null
@@ -404,19 +417,20 @@ export async function getStandardNamedRate(name) {
 //   { id, category, sub_category, name, photo_url, unit, price, collection }
 // price = the Standard (universal) open price, else the lowest open vendor price.
 export async function fetchSelections() {
-  const [{ data: vends }, { data }] = await Promise.all([
-    supabase.from('subs_vendors').select('id, company_name'),
-    supabase
-      .from('material')
-      .select(
-        `id, description, photo_url, unit, collection, sku, attributes,
+  const selSel = `id, description, photo_url, unit, collection, sku, attributes,
          category:category_id ( name ),
          subcategory:subcategory_id ( name ),
          prices:material_price ( price, vendor_id, effective_end )`
-      )
-      .eq('show_in_selections', true)
-      .is('archived_at', null),
+  const [{ data: vends }, matRes] = await Promise.all([
+    supabase.from('subs_vendors').select('id, company_name'),
+    supabase.from('material').select(selSel).eq('show_in_selections', true).is('archived_at', null),
   ])
+  // Fall back if archived_at hasn't been migrated yet (see fetchModuleCatalog).
+  let data = matRes.data
+  if (matRes.error) {
+    const retry = await supabase.from('material').select(selSel).eq('show_in_selections', true)
+    data = retry.data
+  }
   const stdId =
     (vends || []).find(v => ['standard', 'unspecified'].includes((v.company_name || '').trim().toLowerCase()))
       ?.id || null
