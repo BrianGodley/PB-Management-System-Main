@@ -390,18 +390,19 @@ const WALL_RATE_SPECS = [
   {
     group: 'CMU Block',
     catalogSubcat: 'Wall Block',
+    manualOrder: true, // keep the Labor order below as-is (don't auto-alphabetize)
     items: [
       ['rebar', 'Rebar', 'Basic Materials', 'LF', 'currency'],
       ['concreteHand', 'Concrete — Hand Mix', 'Basic Materials', 'CY', 'currency'],
       ['concreteTruck', 'Concrete — Ready Mix (Truck)', 'Basic Materials', 'CY', 'currency'],
       ['groutPumpSetup', 'Grout Pump — Setup', 'Basic Materials', 'flat', 'currency'],
       ['groutPumpPerYd', 'Grout Pump — Per CY', 'Basic Materials', 'CY', 'currency'],
-      ['rebarLab', 'Set Rebar', 'Walls', 'LF/hr', 'coefficient'],
+      ['footingPourPumpLab', 'Pump Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
       ['footingPourHandLab', 'Hand Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
-      ['footingPourPumpLab', 'Pump Footing', 'Walls', 'CY/hr', 'coefficient'],
+      ['pumpGroutLab', 'Pump Fill Grout', 'Walls', 'CF/hr', 'coefficient'],
+      ['handGroutLab', 'Hand Fill Grout', 'Walls', 'CF/hr', 'coefficient'],
+      ['rebarLab', 'Set Rebar', 'Walls', 'LF/hr', 'coefficient'],
       ['blockLab', 'CMU Block Install', 'Walls', 'blk/hr', 'coefficient'],
-      ['handGroutLab', 'Hand Grout', 'Walls', 'CF/hr', 'coefficient'],
-      ['pumpGroutLab', 'Pump Grout', 'Walls', 'CF/hr', 'coefficient'],
       ['setupCleanLab', 'Setup / Clean', 'Walls', 'LF/hr', 'coefficient'],
     ],
   },
@@ -414,7 +415,7 @@ const WALL_RATE_SPECS = [
       ['pipStemCourseLab', 'Pour in Place Install (per 6" Height)', 'Walls', 'hr/LF', 'coefficient'],
       ['rebarLab', 'Set Rebar', 'Walls', 'LF/hr', 'coefficient'],
       ['footingPourHandLab', 'Hand Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
-      ['footingPourPumpLab', 'Pump Footing', 'Walls', 'CY/hr', 'coefficient'],
+      ['footingPourPumpLab', 'Pump Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
     ],
   },
   {
@@ -425,7 +426,7 @@ const WALL_RATE_SPECS = [
       ['concreteTruck', 'Footing Concrete — Ready Mix', 'Basic Materials', 'CY', 'currency'],
       ['groutPumpSetup', 'Footing Pump — Setup', 'Basic Materials', 'flat', 'currency'],
       ['footingPourHandLab', 'Hand Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
-      ['footingPourPumpLab', 'Pump Footing', 'Walls', 'CY/hr', 'coefficient'],
+      ['footingPourPumpLab', 'Pump Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
       ['modularInstallLab', 'Modular Wall Installation', 'Walls', 'blk/hr', 'coefficient'],
       ['setupCleanLab', 'Setup / Clean', 'Walls', 'LF/hr', 'coefficient'],
     ],
@@ -440,7 +441,7 @@ const WALL_RATE_SPECS = [
       ['brickLayLab', 'Brick Installation', 'Walls', 'hr/SF', 'coefficient'],
       ['rebarLab', 'Set Rebar', 'Walls', 'LF/hr', 'coefficient'],
       ['footingPourHandLab', 'Hand Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
-      ['footingPourPumpLab', 'Pump Footing', 'Walls', 'CY/hr', 'coefficient'],
+      ['footingPourPumpLab', 'Pump Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
     ],
   },
   {
@@ -453,7 +454,7 @@ const WALL_RATE_SPECS = [
       ['timberPostMat', 'Steel Post', 'Walls', 'ea', 'currency'],
       ['rebarLab', 'Set Rebar', 'Walls', 'LF/hr', 'coefficient'],
       ['footingPourHandLab', 'Hand Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
-      ['footingPourPumpLab', 'Pump Footing', 'Walls', 'CY/hr', 'coefficient'],
+      ['footingPourPumpLab', 'Pump Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
       ['timberLfLab', 'Timber Wall Installation', 'Walls', 'hr/LF', 'coefficient'],
       ['timberCourseLab', 'Timber Added Course', 'Walls', 'hr/LF', 'coefficient'],
       ['timberPostLab', 'Steel Post Installation', 'Walls', 'hr/ea', 'coefficient'],
@@ -3258,7 +3259,9 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
             : materialRateRows(WALL_RATES[key].db, unit, r(key))
       ),
     ].sort((a, b) =>
-      (a.label || '').localeCompare(b.label || '', undefined, { sensitivity: 'base' })
+      // Groups flagged manualOrder keep their spec order (stable sort; return 0);
+      // everything else is alphabetized within its Materials / Labor block.
+      g.manualOrder ? 0 : (a.label || '').localeCompare(b.label || '', undefined, { sensitivity: 'base' })
     ),
   }))
 
