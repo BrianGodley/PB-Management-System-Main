@@ -86,7 +86,14 @@ function groutCyPerBlock(b) {
 const WALL_RATES = {
   // Basics resolve from the shared "Basic Materials" catalog so vendor price
   // changes propagate. Fallbacks equal the seeded values → price-preserving.
-  rebar: { db: 'Rebar', fb: 1.388 }, // $/LF (Basic Materials)
+  rebar: { db: 'Rebar', fb: 1.388 }, // $/LF (Basic Materials) — Brick/Timber only
+  // Sized rebar material prices (per LF, Standard). CMU + PIP pick a size per
+  // wall/footing; labor for ALL rebar stays the shared rebarLab ('Set Rebar').
+  rebar3Mat: { db: 'Rebar #3', fb: 1.2 },
+  rebar4Mat: { db: 'Rebar #4', fb: 1.5 },
+  rebar5Mat: { db: 'Rebar #5', fb: 1.75 },
+  rebar6Mat: { db: 'Rebar #6', fb: 2.0 },
+  rebar8Mat: { db: 'Rebar #8', fb: 2.5 },
   concreteHand: { db: 'Concrete - Hand Mix', fb: 92.0 }, // $/CY (Basic Materials)
   concreteTruck: { db: 'Concrete - Ready Mix (Truck)', fb: 185.0 }, // $/CY (Basic Materials)
   groutPumpSetup: { db: 'Grout Pump - Setup', fb: 402.5 }, // Basic Materials
@@ -222,6 +229,13 @@ const WALL_RATES = {
   drainGravel24Mat: { db: 'Drainage Gravel Bed 24in Material', fb: 8 }, // $/LF
   drainGravel24Lab: { db: 'Drainage Gravel Bed 24in Labor', fb: 3 }, // $/LF
 }
+
+// Rebar sizes offered per wall/footing (CMU + PIP). Each maps to its own material
+// price key in WALL_RATES; labor stays the shared rebarLab. rebarPrice resolves the
+// $/LF for a size through `r` (defaulting to #4 if a legacy value is missing).
+const REBAR_SIZES = ['#3', '#4', '#5', '#6', '#8']
+const REBAR_SIZE_KEY = { '#3': 'rebar3Mat', '#4': 'rebar4Mat', '#5': 'rebar5Mat', '#6': 'rebar6Mat', '#8': 'rebar8Mat' }
+const rebarPrice = (size, r) => r(REBAR_SIZE_KEY[size] || 'rebar4Mat')
 
 // Per-wall Drainage (French Drain) option lists + blank fields. Spread into every
 // wall's DEFAULT_* and hydrated onto loaded walls so old estimates open with an
@@ -407,6 +421,16 @@ const WALL_RATE_SPECS = [
     ],
   },
   {
+    group: 'Rebar — Standard (per LF, by size)',
+    items: [
+      ['rebar3Mat', 'Rebar #3', 'Basic Materials', 'LF', 'currency'],
+      ['rebar4Mat', 'Rebar #4', 'Basic Materials', 'LF', 'currency'],
+      ['rebar5Mat', 'Rebar #5', 'Basic Materials', 'LF', 'currency'],
+      ['rebar6Mat', 'Rebar #6', 'Basic Materials', 'LF', 'currency'],
+      ['rebar8Mat', 'Rebar #8', 'Basic Materials', 'LF', 'currency'],
+    ],
+  },
+  {
     group: 'Poured In Place',
     items: [
       ['concreteTruck', 'Concrete — Ready Mix (Truck)', 'Basic Materials', 'CY', 'currency'],
@@ -567,10 +591,11 @@ const DEFAULT_CMU = () => ({
   footingWIn: '12',
   footingDIn: '12',
   rebarSpIn: '16',
+  wallRebarSize: '#4',
+  wallHorizBars: '',
+  wallHorizRebarSize: '#4',
+  footingRebarSize: '#4',
   horizBars: '2',
-  bondBeams: '1',
-  bbVendor: 'House',
-  bbBlockType: '',
   pctGrouted: '100',
   pctCurved: '0',
   footingPump: 'No',
@@ -590,6 +615,11 @@ const DEFAULT_PIP = () => ({
   footingWIn: '12',
   footingDIn: '12',
   horizBars: '2',
+  pipFootingRebarSize: '#4',
+  pipWallHorizBars: '',
+  pipWallHorizSize: '#4',
+  pipWallVertBars: '',
+  pipVertSize: '#4',
   footingPump: 'Yes',
   subEach: '',
   wpRows: [blankWpRow()],
@@ -1079,7 +1109,6 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
     footingDIn,
     rebarSpIn,
     horizBars,
-    bondBeams,
     pctGrouted,
     pctCurved,
   } = wall
@@ -1106,27 +1135,35 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
     : wallMatPrice(wallBlockRateName(b.name), v, materialRows, mp, b.price)
   const blocksPerCourse = Math.ceil((n(lf) * 12) / b.l)
   const totalCourses = Math.ceil(n(heightIn) / b.h)
-  const bbCourses = Math.min(n(bondBeams), totalCourses)
-  const regCourses = Math.max(0, totalCourses - bbCourses)
+  const regCourses = totalCourses // every course is regular grey block (bond beam removed)
   const rawBlocks = blocksPerCourse * totalCourses
-  const orderGreyBlock = Math.ceil(blocksPerCourse * regCourses * r('blockOrderWaste'))
-  const orderBBBlock = Math.ceil(blocksPerCourse * bbCourses * r('blockOrderWaste'))
+  const orderGreyBlock = Math.ceil(blocksPerCourse * totalCourses * r('blockOrderWaste'))
 
   const footingCF = (n(footingWIn) / 12) * (n(footingDIn) / 12) * n(lf)
   const footingCY = footingCF / 27
   const groutCY = rawBlocks * groutCyPerBlock(b) * (n(pctGrouted) / 100)
   const groutCF = groutCY * 27
 
-  const vertRebars = n(rebarSpIn) > 0 ? Math.ceil((n(lf) * 12) / n(rebarSpIn)) : 0
-  const vertRebarLF = (vertRebars * (n(heightIn) + n(footingDIn))) / 12
-  const horizRebarLF = (n(horizBars) + bbCourses) * n(lf)
-  const totalRebarLF = vertRebarLF + horizRebarLF
+  // Rebar split by size: three explicit contributions, each with its own size.
+  //  - Wall verticals: spacing-based count × wall height (Wall Rebar Size)
+  //  - Wall horizontals: a count × wall length (Wall Horiz Rebar Size)
+  //  - Footing horizontals: count × length +10% wraps (Footing Rebar Size)
+  // Labor for ALL rebar stays the shared rebarLab ('Set Rebar').
+  const bars = n(rebarSpIn) > 0 ? Math.ceil((n(lf) * 12) / n(rebarSpIn)) : 0
+  const wallVertLF = bars * (n(heightIn) / 12)
+  const wallHorizLF = n(wall.wallHorizBars) * n(lf)
+  const footingRebarLF = n(lf) * n(horizBars) * 1.1 // +10% for wraps
+  const rebarHrs = (wallVertLF + wallHorizLF + footingRebarLF) / r('rebarLab')
+  const rebarMat =
+    wallVertLF * rebarPrice(wall.wallRebarSize, r) +
+    wallHorizLF * rebarPrice(wall.wallHorizRebarSize, r) +
+    footingRebarLF * rebarPrice(wall.footingRebarSize, r)
 
   const groutRate = groutPump === 'Yes' ? r('pumpGroutLab') : r('handGroutLab')
   // Footing EXCAVATION is priced separately in the "Dig and Haul Footing Soil"
   // section — the footing fields here only drive install (rebar + pour) + material.
   const structBase =
-    (totalRebarLF > 0 ? totalRebarLF / r('rebarLab') : 0) +
+    rebarHrs +
     (footingCY > 0 ? footingCY / r(footingPump === 'Yes' ? 'footingPourPumpLab' : 'footingPourHandLab') : 0) +
     (rawBlocks > 0 ? rawBlocks / r(installKey) : 0) +
     (groutCF > 0 ? groutCF / groutRate : 0) +
@@ -1137,13 +1174,9 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
   const footConcrPrc = footingPump === 'Yes' ? pm('concreteTruck') : pm('concreteHand')
   const groutConcrPrc = groutPump === 'Yes' ? pm('concreteTruck') : pm('concreteHand')
   // Grey block price comes from the selected block type's catalog entry.
-  // Bond-beam block price comes from its own catalog pick (Bond Beam Block
-  // sub-category) per this wall's bond-beam vendor/type — no flat rate.
-  const bbPrice = resolveBondBeam(wall, materialRows).price
   const mat =
     orderGreyBlock * blockPrice +
-    orderBBBlock * bbPrice +
-    totalRebarLF * pm('rebar') +
+    rebarMat +
     footingCY * footConcrPrc +
     (footingPump === 'Yes' ? pm('groutPumpSetup') : 0) +
     groutCY * groutConcrPrc +
@@ -1164,7 +1197,14 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
     subEach,
     subMat,
     ...wp,
-    detail: { orderGreyBlock, orderBBBlock, footingCY, groutCY, totalRebarLF, curveAdd, subUnit },
+    detail: {
+      orderGreyBlock,
+      footingCY,
+      groutCY,
+      totalRebarLF: wallVertLF + wallHorizLF + footingRebarLF,
+      curveAdd,
+      subUnit,
+    },
   }
 }
 
@@ -1258,28 +1298,48 @@ function calcOnePIP(wall, r, mp = {}, materialRows = []) {
     hb = n(horizBars)
   const footingCF = fW > 0 && fD > 0 ? n(lf) * (fW / 12) * (fD / 12) : 0
   const footingCY = footingCF / 27
-  const horizRebarLF = hb * n(lf)
-  // Footing excavation moved to the Dig and Haul Footing Soil section — install
-  // (rebar + pour) + material only here.
+  // Rebar split by size: footing horizontals (+10% wraps ONLY on the footing),
+  // wall horizontals (# × wall length) and wall verticals (# × wall height) —
+  // both wall counts as plain counts, no +10%. Labor for ALL rebar stays the
+  // shared rebarLab ('Set Rebar').
+  const footingRebarLF = n(lf) * n(horizBars) * 1.1 // +10% ONLY on footing
+  const wallHorizLF = n(wall.pipWallHorizBars) * n(lf) // # horizontals × wall length, NO +10%
+  const wallVertLF = n(wall.pipWallVertBars) * (n(heightIn) / 12) // # verticals × wall height, NO +10%
+  const rebarHrs = (footingRebarLF + wallHorizLF + wallVertLF) / r('rebarLab')
+  const rebarMat =
+    footingRebarLF * rebarPrice(wall.pipFootingRebarSize, r) +
+    wallHorizLF * rebarPrice(wall.pipWallHorizSize, r) +
+    wallVertLF * rebarPrice(wall.pipVertSize, r)
+  // Footing POUR only (concrete). Excavation is priced in the Dig and Haul
+  // Footing Soil section; rebar is billed separately above.
   const footingHrs =
-    (horizRebarLF > 0 ? horizRebarLF / r('rebarLab') : 0) +
-    (footingCY > 0
+    footingCY > 0
       ? footingCY / r((wall.footingPump ?? 'Yes') === 'Yes' ? 'footingPourPumpLab' : 'footingPourHandLab')
-      : 0)
+      : 0
   // Per-wall footing pump: 'Yes' = ready-mix truck (default, unchanged), 'No' =
   // hand mix. No separate pump-setup fee on PIP footings.
   const footPrc = (wall.footingPump ?? 'Yes') === 'Yes' ? pm('concreteTruck') : pm('concreteHand')
-  const footingMat = footingCY * footPrc + horizRebarLF * pm('rebar')
+  const footingMat = footingCY * footPrc
 
-  const hrs = wallHrs + footingHrs
+  const hrs = wallHrs + footingHrs + rebarHrs
   const concCY = wallConcCY + footingCY
-  const mat = wallConcCY * pm('concreteTruck') + footingMat
+  const mat = wallConcCY * pm('concreteTruck') + footingMat + rebarMat
   // Sub-tab flat pricing: default $/LF = In-House material ÷ LF; overridable.
   const subUnit = n(lf) > 0 ? mat / n(lf) : 0
   const subEach = wall.subEach !== '' && wall.subEach != null ? n(wall.subEach) : subUnit
   const subMat = n(lf) * subEach
   const wp = computeWallWpTotals(wall, mp, materialRows)
-  return { hrs, mat, concCY, footingCY, horizRebarLF, subUnit, subEach, subMat, ...wp }
+  return {
+    hrs,
+    mat,
+    concCY,
+    footingCY,
+    horizRebarLF: footingRebarLF + wallHorizLF + wallVertLF,
+    subUnit,
+    subEach,
+    subMat,
+    ...wp,
+  }
 }
 
 // ── Main calc ─────────────────────────────────────────────────────────────────
@@ -1673,6 +1733,10 @@ function initCmuWalls(src = {}) {
       blockType: DEFAULT_BLOCK_NAME,
       vendor: 'House',
       subEach: '',
+      wallRebarSize: '#4',
+      wallHorizBars: '',
+      wallHorizRebarSize: '#4',
+      footingRebarSize: '#4',
       ...DEMO_DEFAULTS(),
       ...DRAIN_DEFAULTS(),
   ...BACKFILL_DEFAULTS(),
@@ -1715,6 +1779,11 @@ function initPipWalls(src = {}) {
     return src.pipWalls.map(w => ({
       vendor: 'House',
       subEach: '',
+      pipFootingRebarSize: '#4',
+      pipWallHorizBars: '',
+      pipWallHorizSize: '#4',
+      pipWallVertBars: '',
+      pipVertSize: '#4',
       ...DEMO_DEFAULTS(),
       ...DRAIN_DEFAULTS(),
   ...BACKFILL_DEFAULTS(),
@@ -2428,43 +2497,36 @@ function CmuWallEntry({
           <NumInput value={wall.horizBars} onChange={set('horizBars')} placeholder="2" />
         </div>
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Bond Beam Courses</label>
-          <NumInput value={wall.bondBeams} onChange={set('bondBeams')} placeholder="1" />
+          <label className="block text-xs text-gray-500 mb-1">Wall Rebar Size</label>
+          <DropdownSelect
+            className="input text-sm py-1.5 w-full"
+            value={wall.wallRebarSize || '#4'}
+            onChange={v => set('wallRebarSize')(v)}
+            options={REBAR_SIZES.map(s => ({ value: s, label: s }))}
+          />
         </div>
-        {n(wall.bondBeams) > 0 && (
-          <>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Bond Beam Vendor</label>
-              <DropdownSelect
-                className="input text-sm py-1.5 w-full"
-                value={wall.bbVendor || 'House'}
-                onChange={nv => {
-                  set('bbVendor')(nv)
-                  const opts = bondBeamOptions(materialRows, nv)
-                  if (opts.length && !opts.some(o => o.id === wall.bbBlockType))
-                    set('bbBlockType')(opts[0].id)
-                }}
-                options={vendorOptsForSub(vendorOptions, materialRows, BOND_BEAM_SUBCAT)}
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Bond Beam Block</label>
-              <DropdownSelect
-                className="input text-sm py-1.5 w-full"
-                value={wall.bbBlockType || ''}
-                onChange={v => {
-                  set('bbBlockType')(v)
-                  pp.checkById(materialRows, v, wall.bbVendor)
-                }}
-                placeholder="Select…"
-                options={bondBeamOptions(materialRows, wall.bbVendor).map(o => ({
-                  value: o.id,
-                  label: o.name,
-                }))}
-              />
-            </div>
-          </>
-        )}
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Footing Rebar Size</label>
+          <DropdownSelect
+            className="input text-sm py-1.5 w-full"
+            value={wall.footingRebarSize || '#4'}
+            onChange={v => set('footingRebarSize')(v)}
+            options={REBAR_SIZES.map(s => ({ value: s, label: s }))}
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Wall Horizontal Bars</label>
+          <NumInput value={wall.wallHorizBars} onChange={set('wallHorizBars')} placeholder="0" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Wall Horiz Rebar Size</label>
+          <DropdownSelect
+            className="input text-sm py-1.5 w-full"
+            value={wall.wallHorizRebarSize || '#4'}
+            onChange={v => set('wallHorizRebarSize')(v)}
+            options={REBAR_SIZES.map(s => ({ value: s, label: s }))}
+          />
+        </div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">% Grouted Solid</label>
           <div className="relative">
@@ -2623,6 +2685,41 @@ function PipWallEntry({
         <div className="col-span-2 sm:col-span-1">
           <label className="block text-xs text-gray-500 mb-1">Horiz. Bars in Footing</label>
           <NumInput value={wall.horizBars} onChange={set('horizBars')} placeholder="2" />
+        </div>
+        <div className="col-span-2 sm:col-span-1">
+          <label className="block text-xs text-gray-500 mb-1">Footing Rebar Size</label>
+          <DropdownSelect
+            className="input text-sm py-1.5 w-full"
+            value={wall.pipFootingRebarSize || '#4'}
+            onChange={v => set('pipFootingRebarSize')(v)}
+            options={REBAR_SIZES.map(s => ({ value: s, label: s }))}
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Wall Horizontal Bars</label>
+          <NumInput value={wall.pipWallHorizBars} onChange={set('pipWallHorizBars')} placeholder="0" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Wall Horiz Rebar Size</label>
+          <DropdownSelect
+            className="input text-sm py-1.5 w-full"
+            value={wall.pipWallHorizSize || '#4'}
+            onChange={v => set('pipWallHorizSize')(v)}
+            options={REBAR_SIZES.map(s => ({ value: s, label: s }))}
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Wall Vertical Bars</label>
+          <NumInput value={wall.pipWallVertBars} onChange={set('pipWallVertBars')} placeholder="0" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Wall Vertical Rebar Size</label>
+          <DropdownSelect
+            className="input text-sm py-1.5 w-full"
+            value={wall.pipVertSize || '#4'}
+            onChange={v => set('pipVertSize')(v)}
+            options={REBAR_SIZES.map(s => ({ value: s, label: s }))}
+          />
         </div>
         <div className="col-span-2 sm:col-span-1">
           <label className="block text-xs text-gray-500 mb-1">Pump for Footing?</label>
