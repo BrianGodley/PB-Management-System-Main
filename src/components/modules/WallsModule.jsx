@@ -1623,7 +1623,7 @@ function WallWaterproofing({
     : wpCatalog
   return (
     <div className="mt-3 border-t border-gray-100 pt-2">
-      <label className="block text-xs text-gray-500 mb-1 font-medium">Waterproofing</label>
+      <label className="block text-xs text-gray-800 mb-1 font-medium">Waterproofing</label>
       <div className="flex items-center gap-1.5 flex-wrap">
         <DropdownSelect
           className="input text-sm py-1.5 flex-1 min-w-0"
@@ -1699,7 +1699,7 @@ function WallFinishesEditor({
   const pp = usePricePrompt()
   return (
     <div className="mt-3 border-t border-gray-100 pt-2">
-      <label className="block text-xs text-gray-500 mb-1 font-medium">Finishes</label>
+      <label className="block text-xs text-gray-800 mb-1 font-medium">Finishes</label>
       <div className="space-y-1.5">
         {rows.map((row, i) => {
           // Item list = the built-in finish types the calc supports, plus any
@@ -1771,7 +1771,7 @@ function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, ma
   const pp = usePricePrompt()
   return (
     <div className="mt-3 border-t border-gray-100 pt-2">
-      <label className="block text-xs text-gray-500 mb-1 font-medium">Caps</label>
+      <label className="block text-xs text-gray-800 mb-1 font-medium">Caps</label>
       <div className="space-y-1.5">
         {rows.map((row, i) => {
           // Built-in cap types the calc supports + any real Wall Cap catalog
@@ -1856,10 +1856,10 @@ function WallDemoSection({ wall = {}, onChange }) {
   const methodOpts = list => list.map(m => ({ value: m, label: m }))
   return (
     <div className="mb-3">
-      <label className="block text-xs text-gray-500 mb-1 font-medium">Demo</label>
+      <label className="block text-xs text-gray-800 mb-1 font-medium">Demo</label>
       {/* Slope Removal */}
       <div className="mb-2">
-        <p className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">Slope Removal</p>
+        <p className="text-[11px] text-gray-700 uppercase tracking-wide mb-1">Slope Removal</p>
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="block text-xs text-gray-500 mb-1">Method</label>
@@ -1886,7 +1886,7 @@ function WallDemoSection({ wall = {}, onChange }) {
       </div>
       {/* Footing Demo */}
       <div>
-        <p className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">Footing Demo</p>
+        <p className="text-[11px] text-gray-700 uppercase tracking-wide mb-1">Footing Demo</p>
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="block text-xs text-gray-500 mb-1">Method</label>
@@ -1946,7 +1946,7 @@ function CmuWallEntry({
   return (
     <div className="border border-gray-200 rounded-xl p-3 mb-3 bg-white">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+        <span className="text-xs font-semibold text-black uppercase tracking-wide">
           Wall {idx + 1}
         </span>
         {total > 1 && (
@@ -1959,7 +1959,7 @@ function CmuWallEntry({
         )}
       </div>
       <WallDemoSection wall={wall} onChange={set} />
-      <label className="block text-xs text-gray-500 mb-1 font-medium">Installation</label>
+      <label className="block text-xs text-gray-800 mb-1 font-medium">Installation</label>
       <div className="grid grid-cols-2 gap-2">
         {/* Vendor — the ONLY thing that changes where the material $ comes
             from. "House" = the original master-rate / catalog pricing. */}
@@ -2208,7 +2208,7 @@ function PipWallEntry({
   return (
     <div className="border border-gray-200 rounded-xl p-3 mb-3 bg-white">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+        <span className="text-xs font-semibold text-black uppercase tracking-wide">
           Wall {idx + 1}
         </span>
         {total > 1 && (
@@ -2221,7 +2221,7 @@ function PipWallEntry({
         )}
       </div>
       <WallDemoSection wall={wall} onChange={set} />
-      <label className="block text-xs text-gray-500 mb-1 font-medium">Installation</label>
+      <label className="block text-xs text-gray-800 mb-1 font-medium">Installation</label>
       <div className="grid grid-cols-2 gap-2">
         <div className="col-span-2">
           <label className="block text-xs text-gray-500 mb-1">Concrete Vendor</label>
@@ -2359,7 +2359,7 @@ function ModularWallEntry({
   return (
     <div className="border border-gray-200 rounded-xl p-3 mb-3 bg-white">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+        <span className="text-xs font-semibold text-black uppercase tracking-wide">
           Wall {idx + 1}
         </span>
         {total > 1 && (
@@ -2372,7 +2372,7 @@ function ModularWallEntry({
         )}
       </div>
       <WallDemoSection wall={wall} onChange={set} />
-      <label className="block text-xs text-gray-500 mb-1 font-medium">Installation</label>
+      <label className="block text-xs text-gray-800 mb-1 font-medium">Installation</label>
       <div className="grid grid-cols-2 gap-2">
         <div className="col-span-2">
           <label className="block text-xs text-gray-500 mb-1">Vendor</label>
@@ -3231,7 +3231,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
               setField('timberDemo')(prev => ({ ...(prev || {}), [f]: val }))
             }
           />
-          <label className="block text-xs text-gray-500 mb-1 font-medium">Installation</label>
+          <label className="block text-xs text-gray-800 mb-1 font-medium">Installation</label>
           <div className="grid grid-cols-2 gap-3 mb-3">
             <div>
               <label className="block text-xs text-gray-500 mb-1">Vendor</label>
