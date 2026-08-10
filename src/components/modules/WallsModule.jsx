@@ -2225,7 +2225,7 @@ function WallDrainageSection({ wall = {}, onChange }) {
   const set = onChange
   const methodOpts = list => list.map(m => ({ value: m, label: m }))
   return (
-    <div className="mb-3">
+    <div className="mt-3 mb-3">
       <label className="block text-xs text-gray-800 mb-1 font-medium">Drainage — French Drain</label>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <div>
