@@ -2984,58 +2984,36 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
             showInlineToggle={false}
           />
         </div>
+        <div className="px-6 pb-2">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Wall Type</p>
+          <div className="flex gap-2">
+            {[
+              { key: 'CMU', label: 'CMU Block', count: cmuWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0).length },
+              { key: 'PIP', label: 'Poured In Place', count: pipWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0).length },
+              { key: 'Modular', label: 'Modular', count: modularWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0).length },
+              { key: 'Brick', label: 'Brick', count: brickWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0).length },
+              { key: 'Timber', label: 'Timber / Lumber', count: n(timberLF) > 0 || n(timberPosts) > 0 ? 1 : 0 },
+            ].map(t => (
+              <button
+                key={t.key}
+                onClick={() => setWallType(t.key)}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                  wallType === t.key
+                    ? 'bg-green-700 text-white border-green-700'
+                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {t.label}
+                {t.count > 0 ? ` (${t.count})` : ''}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <ModuleHeaderSlot>
         <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} compact />
       </ModuleHeaderSlot>
-
-      {/* Wall Type */}
-      <div>
-        <SectionHeader title="Wall Type" />
-        <div className="flex gap-2">
-          {[
-            {
-              key: 'CMU',
-              label: 'CMU Block',
-              count: cmuWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0).length,
-            },
-            {
-              key: 'PIP',
-              label: 'Poured In Place',
-              count: pipWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0).length,
-            },
-            {
-              key: 'Modular',
-              label: 'Modular',
-              count: modularWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0).length,
-            },
-            {
-              key: 'Brick',
-              label: 'Brick',
-              count: brickWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0).length,
-            },
-            {
-              key: 'Timber',
-              label: 'Timber / Lumber',
-              count: n(timberLF) > 0 || n(timberPosts) > 0 ? 1 : 0,
-            },
-          ].map(t => (
-            <button
-              key={t.key}
-              onClick={() => setWallType(t.key)}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                wallType === t.key
-                  ? 'bg-green-700 text-white border-green-700'
-                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {t.label}
-              {t.count > 0 ? ` (${t.count})` : ''}
-            </button>
-          ))}
-        </div>
-      </div>
 
       {pricesLoading && (
         <div className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
