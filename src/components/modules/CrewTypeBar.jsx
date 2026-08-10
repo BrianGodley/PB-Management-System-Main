@@ -41,12 +41,12 @@ export default function CrewTypeBar({
   const hasRates = Array.isArray(rates) && rates.length > 0
 
   return (
-    <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200 flex-wrap">
+    <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200 flex-nowrap overflow-x-auto">
       <label className="text-sm font-medium text-gray-700 whitespace-nowrap">{crewLabel}</label>
       <select
         value={crewType}
         onChange={e => onCrewTypeChange(e.target.value)}
-        className="input text-sm py-1 w-36"
+        className="input text-sm py-1 w-32 flex-shrink-0"
       >
         {crewOptions.map(o => (
           <option key={o} value={o}>
@@ -56,12 +56,12 @@ export default function CrewTypeBar({
       </select>
 
       {extraCrews.map((c, i) => (
-        <span key={i} className="flex items-center gap-2">
+        <span key={i} className="flex items-center gap-2 flex-shrink-0">
           <label className="text-sm font-medium text-gray-700 whitespace-nowrap">{c.label}</label>
           <select
             value={c.value}
             onChange={e => c.onChange(e.target.value)}
-            className="input text-sm py-1 w-36"
+            className="input text-sm py-1 w-32 flex-shrink-0"
           >
             {crewOptions.map(o => (
               <option key={o} value={o}>
@@ -72,7 +72,7 @@ export default function CrewTypeBar({
         </span>
       ))}
 
-      <div className="flex items-center gap-3 ml-auto">
+      <div className="flex items-center gap-3 ml-auto flex-shrink-0">
         {canAccessRates && showInlineToggle && (
           <button
             type="button"

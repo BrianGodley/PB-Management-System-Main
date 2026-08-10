@@ -2973,7 +2973,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
           <CrewTypeBar
             crewType={crewType}
             onCrewTypeChange={setCrewType}
-            crewLabel="Main Wall Installation Crew Type"
+            crewLabel="Main Wall Crew Type"
             extraCrews={[
               { label: 'Demo Crew Type', value: demoCrewType, onChange: setDemoCrewType },
               { label: 'Timber Wall Crew Type', value: timberCrewType, onChange: setTimberCrewType },
