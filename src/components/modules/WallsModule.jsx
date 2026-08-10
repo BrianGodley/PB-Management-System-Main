@@ -143,7 +143,8 @@ const WALL_RATES = {
   // only drive install + material). All footing digging is priced in the per-wall
   // "Dig and Haul Footing Soil" section: a flat CF/hr dig rate + a soil-haul
   // (container) material cost. Every value is table-driven.
-  footingDigHaulLab: { db: 'Wall Footing Dig+Haul Labor Rate', fb: 8 }, // CF / hr (dig + load)
+  footingDigHaulLab: { db: 'Wall Footing Dig+Haul Labor Rate', fb: 8 }, // CF / hr (dig + load — Hand)
+  footingDigHaulExcavLab: { db: 'Wall Footing Dig+Haul Excavator Labor Rate', fb: 25 }, // CF / hr (Excavator)
   footingSoilSwell: { db: 'Wall Footing Soil Swell', fb: 1.2 }, // loose/broken swell factor
   footingSoilContainerCy: { db: 'Wall Footing Soil Container CY', fb: 10 }, // CY per haul container
   footingSoilContainerPrice: { db: 'Wall Footing Soil Container Price', fb: 770 }, // $ per container
@@ -251,10 +252,15 @@ function wallDemo(wall = {}, r) {
   const footCF = n(wall.demoFootLen) * (n(wall.demoFootW) / 12) * (n(wall.demoFootD) / 12)
   const footYards = (footCF / 27) * (r('footingSoilSwell') || 1.2)
   const footContCy = r('footingSoilContainerCy') || 1
+  // Dig rate depends on method (Hand vs Excavator); haul cost is the same either way.
+  const footDigRate =
+    (wall.demoFootMethod || 'Hand') === 'Excavator'
+      ? r('footingDigHaulExcavLab') || 25
+      : r('footingDigHaulLab') || 8
   const foot =
     footCF > 0
       ? {
-          hrs: footCF / (r('footingDigHaulLab') || 8),
+          hrs: footCF / footDigRate,
           tons: (footCF / 27) * r('footingSoilTonsPerCy'),
           dump: Math.ceil(footYards / footContCy) * r('footingSoilContainerPrice'),
         }
@@ -357,7 +363,8 @@ const WALL_RATE_SPECS = [
   {
     group: 'Dig & Haul Footing Soil (all wall types)',
     items: [
-      ['footingDigHaulLab', 'Dig & Haul Footing Soil', 'Walls', 'CF/hr', 'coefficient'],
+      ['footingDigHaulLab', 'Hand — Dig & Haul Footing Soil', 'Walls', 'CF/hr', 'coefficient'],
+      ['footingDigHaulExcavLab', 'Excavator — Dig & Haul Footing Soil', 'Walls', 'CF/hr', 'coefficient'],
       ['footingSoilContainerPrice', 'Soil Haul — Container', 'Walls', 'ea', 'currency'],
       ['footingSoilContainerCy', 'Soil Haul — Container CY', 'Walls', 'CY', 'coefficient'],
       ['footingSoilSwell', 'Soil Swell Factor', 'Walls', '×', 'coefficient'],
@@ -1995,7 +2002,16 @@ function WallDemoSection({ wall = {}, onChange }) {
       {/* Dig and Haul Footing Soil — flat CF/hr dig + soil-haul material. */}
       <div>
         <p className="text-[11px] text-gray-700 uppercase tracking-wide mb-1">Dig and Haul Footing Soil</p>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Method</label>
+            <DropdownSelect
+              className="input text-sm py-1.5 w-full"
+              value={wall.demoFootMethod || 'Hand'}
+              onChange={set('demoFootMethod')}
+              options={methodOpts(DEMO_FOOT_METHODS)}
+            />
+          </div>
           <div>
             <label className="block text-xs text-gray-500 mb-1">Length (LF)</label>
             <NumInput value={wall.demoFootLen} onChange={set('demoFootLen')} />
