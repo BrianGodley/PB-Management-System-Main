@@ -411,8 +411,7 @@ const WALL_RATE_SPECS = [
       ['concreteTruck', 'Concrete — Ready Mix (Truck)', 'Basic Materials', 'CY', 'currency'],
       ['concreteHand', 'Concrete — Hand Mix', 'Basic Materials', 'CY', 'currency'],
       ['rebar', 'Rebar', 'Basic Materials', 'LF', 'currency'],
-      ['pipStemLfLab', 'Poured In Place Install', 'Walls', 'hr/LF', 'coefficient'],
-      ['pipStemCourseLab', 'PIP Added Course', 'Walls', 'hr/LF', 'coefficient'],
+      ['pipStemCourseLab', 'Pour in Place Install (per 6" Height)', 'Walls', 'hr/LF', 'coefficient'],
       ['rebarLab', 'Set Rebar', 'Walls', 'LF/hr', 'coefficient'],
       ['footingPourHandLab', 'Hand Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
       ['footingPourPumpLab', 'Pump Footing', 'Walls', 'CY/hr', 'coefficient'],
@@ -1242,9 +1241,11 @@ function calcOnePIP(wall, r, mp = {}, materialRows = []) {
   }
   const v = wall.vendor
   const pm = key => wallMatPrice(WALL_RATES[key].db, v, materialRows, mp, WALL_RATES[key].fb)
-  // Wall stem (existing formula)
-  const addlCourses = Math.max(0, Math.ceil((n(heightIn) - 6) / 6))
-  const wallHrs = n(lf) * (r('pipStemLfLab') + addlCourses * r('pipStemCourseLab'))
+  // Wall stem — the WHOLE wall is priced in 6" courses at one install rate (no
+  // separate base-course premium). courses = ceil(height / 6).
+  const courses = Math.max(0, Math.ceil(n(heightIn) / 6))
+  const addlCourses = Math.max(0, Math.ceil((n(heightIn) - 6) / 6)) // concrete volume still base + added
+  const wallHrs = n(lf) * courses * r('pipStemCourseLab')
   const wallConcCY = n(lf) * (r('pipStemCyPerLf') + addlCourses * r('pipStemCyPerLfCourse'))
 
   // Footing — same dig + rebar + pour coefficients as the CMU calc so PIP
