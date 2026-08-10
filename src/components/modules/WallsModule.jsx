@@ -1954,7 +1954,7 @@ function WallDemoSection({ wall = {}, onChange }) {
       </div>
       {/* Footing Demo */}
       <div>
-        <p className="text-[11px] text-gray-700 uppercase tracking-wide mb-1">Footing Demo</p>
+        <p className="text-[11px] text-gray-700 uppercase tracking-wide mb-1">Dig Footings</p>
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="block text-xs text-gray-500 mb-1">Method</label>
