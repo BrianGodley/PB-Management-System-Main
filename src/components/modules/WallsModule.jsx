@@ -406,7 +406,6 @@ const WALL_RATE_SPECS = [
     catalogSubcat: 'Wall Block',
     manualOrder: true, // keep the Labor order below as-is (don't auto-alphabetize)
     items: [
-      ['rebar', 'Rebar', 'Basic Materials', 'LF', 'currency'],
       ['concreteHand', 'Concrete — Hand Mix', 'Basic Materials', 'CY', 'currency'],
       ['concreteTruck', 'Concrete — Ready Mix (Truck)', 'Basic Materials', 'CY', 'currency'],
       ['groutPumpSetup', 'Grout Pump — Setup', 'Basic Materials', 'flat', 'currency'],
@@ -435,7 +434,6 @@ const WALL_RATE_SPECS = [
     items: [
       ['concreteTruck', 'Concrete — Ready Mix (Truck)', 'Basic Materials', 'CY', 'currency'],
       ['concreteHand', 'Concrete — Hand Mix', 'Basic Materials', 'CY', 'currency'],
-      ['rebar', 'Rebar', 'Basic Materials', 'LF', 'currency'],
       ['pipStemCourseLab', 'Pour in Place Install (per 6" Height)', 'Walls', 'hr/LF', 'coefficient'],
       ['rebarLab', 'Set Rebar', 'Walls', 'LF/hr', 'coefficient'],
       ['footingPourHandLab', 'Hand Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
@@ -461,7 +459,6 @@ const WALL_RATE_SPECS = [
     items: [
       ['concreteHand', 'Footing Concrete — Hand Mix', 'Basic Materials', 'CY', 'currency'],
       ['concreteTruck', 'Footing Concrete — Ready Mix', 'Basic Materials', 'CY', 'currency'],
-      ['rebar', 'Rebar', 'Basic Materials', 'LF', 'currency'],
       ['brickLayLab', 'Brick Installation', 'Walls', 'hr/SF', 'coefficient'],
       ['rebarLab', 'Set Rebar', 'Walls', 'LF/hr', 'coefficient'],
       ['footingPourHandLab', 'Hand Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
@@ -472,7 +469,6 @@ const WALL_RATE_SPECS = [
     group: 'Timber / Lumber',
     catalogSubcat: 'Wood',
     items: [
-      ['rebar', 'Rebar', 'Basic Materials', 'LF', 'currency'],
       ['concreteHand', 'Concrete — Hand Mix', 'Basic Materials', 'CY', 'currency'],
       ['concreteTruck', 'Concrete — Ready Mix (Truck)', 'Basic Materials', 'CY', 'currency'],
       ['timberPostMat', 'Steel Post', 'Walls', 'ea', 'currency'],
@@ -660,6 +656,7 @@ const DEFAULT_BRICK = () => ({
   footingWIn: '12',
   footingDIn: '12',
   horizBars: '2',
+  brickFootingRebarSize: '#4',
   pctCurved: '0',
   footingPump: 'No',
   subEach: '',
@@ -1253,7 +1250,7 @@ function calcOneBrick(wall, r, mp = {}, materialRows = []) {
       ? footingCY / r((wall.footingPump ?? 'No') === 'Yes' ? 'footingPourPumpLab' : 'footingPourHandLab')
       : 0)
   const footPrc = (wall.footingPump ?? 'No') === 'Yes' ? pm('concreteTruck') : pm('concreteHand')
-  const footingMat = footingCY * footPrc + horizRebarLF * pm('rebar')
+  const footingMat = footingCY * footPrc + horizRebarLF * rebarPrice(wall.brickFootingRebarSize, r)
 
   const mat = brickMat + footingMat
   const hrs = brickHrs + footingHrs
@@ -1463,7 +1460,7 @@ function calcWalls(
       (tHorizRebarLF > 0 ? tHorizRebarLF / r('rebarLab') : 0) +
       (tFootingCY > 0 ? tFootingCY / r(tFootPump ? 'footingPourPumpLab' : 'footingPourHandLab') : 0)
     const tFootConcPrc = tFootPump ? tpm('concreteTruck') : tpm('concreteHand')
-    const tFootingMat = tFootingCY * tFootConcPrc + tHorizRebarLF * tpm('rebar')
+    const tFootingMat = tFootingCY * tFootConcPrc + tHorizRebarLF * rebarPrice(state.timberFootingRebarSize, r)
     timberHrs += tFootingHrs
 
     const timberMat = woodMat + tFootingMat
@@ -1836,6 +1833,7 @@ function initBrickWalls(src = {}) {
   ...BACKFILL_DEFAULTS(),
       ...w,
       footingPump: w.footingPump ?? legacyPump,
+      brickFootingRebarSize: w.brickFootingRebarSize ?? '#4',
       wpRows: initWallWp(w),
       ...initWallExtras(w),
     }))
@@ -1934,6 +1932,7 @@ function makeTab(src = {}) {
     timberFootingWIn: src.timberFootingWIn ?? '',
     timberFootingDIn: src.timberFootingDIn ?? '',
     timberHorizBars: src.timberHorizBars ?? '2',
+    timberFootingRebarSize: src.timberFootingRebarSize ?? '#4',
     timberFootingPump: src.timberFootingPump ?? 'No',
     // Timber wall's own Demo section (inline block, not a wall array) — a nested
     // object carrying the same demo* fields as each wall entry.
@@ -2935,6 +2934,17 @@ function ModularWallEntry({
             <NumInput value={wall.horizBars} onChange={set('horizBars')} placeholder="2" />
           </div>
         )}
+        {typeSource?.subcat === BRICK_SUBCAT && (
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Footing Rebar Size</label>
+            <DropdownSelect
+              className="input text-sm py-1.5 w-full"
+              value={wall.brickFootingRebarSize || '#4'}
+              onChange={v => set('brickFootingRebarSize')(v)}
+              options={REBAR_SIZES.map(s => ({ value: s, label: s }))}
+            />
+          </div>
+        )}
         <div className="col-span-2 sm:col-span-1">
           <label className="block text-xs text-gray-500 mb-1">% of Wall Curved</label>
           <div className="relative">
@@ -3149,6 +3159,8 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
   const setTimberFootingDIn = setField('timberFootingDIn')
   const timberHorizBars = cur.timberHorizBars
   const setTimberHorizBars = setField('timberHorizBars')
+  const timberFootingRebarSize = cur.timberFootingRebarSize
+  const setTimberFootingRebarSize = setField('timberFootingRebarSize')
   const timberFootingPump = cur.timberFootingPump
   const setTimberFootingPump = setField('timberFootingPump')
   const manualRows = cur.manualRows
@@ -3775,6 +3787,15 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
             <div>
               <label className="block text-xs text-gray-500 mb-1">Horizontal Rebar (qty)</label>
               <NumInput value={timberHorizBars} onChange={setTimberHorizBars} placeholder="0" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Footing Rebar Size</label>
+              <DropdownSelect
+                className="input text-sm py-1.5 w-full"
+                value={timberFootingRebarSize || '#4'}
+                onChange={v => setTimberFootingRebarSize(v)}
+                options={REBAR_SIZES.map(s => ({ value: s, label: s }))}
+              />
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">Footing Pump</label>
