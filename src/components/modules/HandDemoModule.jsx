@@ -2037,7 +2037,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           onClick={handleSave}
           className="flex-1 bg-gray-900 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-700 transition-colors"
         >
-          Save Module
+          Save
         </button>
         <button
           onClick={onCancel}

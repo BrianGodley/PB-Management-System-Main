@@ -2314,7 +2314,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           disabled={saving}
           className="btn-primary flex-1 text-sm"
         >
-          {saving ? 'Saving…' : 'Save Pool Module'}
+          {saving ? 'Saving…' : 'Save'}
         </button>
       </div>
     </div>

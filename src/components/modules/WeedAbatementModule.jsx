@@ -415,7 +415,7 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
       <div className="flex gap-3 pt-2">
         <button onClick={onBack} className="btn-secondary flex-1">← Back</button>
         <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
-          {saving ? 'Saving...' : 'Add Module'}
+          {saving ? 'Saving...' : 'Save'}
         </button>
       </div>
     </div>

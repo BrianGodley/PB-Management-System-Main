@@ -17,12 +17,17 @@ const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
 // ─────────────────────────────────────────────────────────────────────────────
 
 // dbName must match the name column in material_rates exactly
+// Solid Drain Pipe types (perforated types live in FRENCH_PIPE_TYPES below).
 const PIPE_TYPES = {
   '4" SDR 35': { laborPerLF: 0.0495, costPerLF: 2.26, dbName: '4" SDR 35 Pipe' },
   '3" SDR 35': { laborPerLF: 0.045, costPerLF: 1.48, dbName: '3" SDR 35 Pipe' },
   '6" SDR 35': { laborPerLF: 0.06, costPerLF: 3.72, dbName: '6" SDR 35 Pipe' },
   '4" Triple Wall': { laborPerLF: 0.05, costPerLF: 1.03, dbName: '4" Triple Wall Pipe' },
   '3" Triple Wall': { laborPerLF: 0.045, costPerLF: 0.86, dbName: '3" Triple Wall Pipe' },
+}
+
+// French Drain pipe types — perforated pipe, same shape as PIPE_TYPES.
+const FRENCH_PIPE_TYPES = {
   '4" Perforated': { laborPerLF: 0.05, costPerLF: 2.26, dbName: '4" Perforated Pipe' },
   '3" Perforated': { laborPerLF: 0.045, costPerLF: 1.48, dbName: '3" Perforated Pipe' },
 }
@@ -58,6 +63,8 @@ const PIPE_LABOR_RATE_NAME = {
   '6" SDR 35': 'Drainage 6" SDR 35 Pipe Labor',
   '4" Triple Wall': 'Drainage 4" Triple Wall Pipe Labor',
   '3" Triple Wall': 'Drainage 3" Triple Wall Pipe Labor',
+}
+const FRENCH_PIPE_LABOR_RATE_NAME = {
   '4" Perforated': 'Drainage 4" Perforated Pipe Labor',
   '3" Perforated': 'Drainage 3" Perforated Pipe Labor',
 }
@@ -98,6 +105,29 @@ const ADD_ITEM_LABOR_RATE_NAME = {
 
 // Default fitting fee per drain unit — overridden by 'Drain Fitting Fee' in material_rates
 const DRAIN_FITTING_FEE = 10
+
+// French-drain fabric + gravel-bed rates ($/ft), stored in misc_rates
+// (category 'Drainage'). Read as materialPrices[name] ?? fb; the code number
+// here is only a last-resort fallback. Applied to TOTAL French-drain LF.
+const FRENCH_SOCK_MAT_NAME = 'Drainage Drain Sock Material'
+const FRENCH_SOCK_LABOR_NAME = 'Drainage Drain Sock Labor'
+const FRENCH_BURRITO_MAT_NAME = 'Drainage Burrito Wrap Material'
+const FRENCH_BURRITO_LABOR_NAME = 'Drainage Burrito Wrap Labor'
+const FRENCH_GRAVEL12_MAT_NAME = 'Drainage Gravel Bed 12in Material'
+const FRENCH_GRAVEL12_LABOR_NAME = 'Drainage Gravel Bed 12in Labor'
+const FRENCH_GRAVEL24_MAT_NAME = 'Drainage Gravel Bed 24in Material'
+const FRENCH_GRAVEL24_LABOR_NAME = 'Drainage Gravel Bed 24in Labor'
+const FRENCH_RATE_FB = {
+  [FRENCH_SOCK_MAT_NAME]: 1,
+  [FRENCH_SOCK_LABOR_NAME]: 1,
+  [FRENCH_BURRITO_MAT_NAME]: 1,
+  [FRENCH_BURRITO_LABOR_NAME]: 1.75,
+  [FRENCH_GRAVEL12_MAT_NAME]: 2,
+  [FRENCH_GRAVEL12_LABOR_NAME]: 1,
+  [FRENCH_GRAVEL24_MAT_NAME]: 8,
+  [FRENCH_GRAVEL24_LABOR_NAME]: 3,
+}
+const frenchRate = (mp, name) => mp[name] ?? FRENCH_RATE_FB[name] ?? 0
 
 const DEFAULTS = {
   laborRatePerHour: 35,
@@ -177,6 +207,9 @@ function calcDrainage(
     subTrenchRows,
     subFixtureRows,
     subAdditionalItems,
+    frenchRows = [],
+    frenchFabric = 'None',
+    frenchGravel = 'None',
   } = state
   const isSub = state.subType === 'Subcontractor'
   const PIPE_T = { ...PIPE_TYPES, ...masterDrainTypes(DRAIN_CAT.pipe, PIPE_TYPES, materialRows, 'laborPerLF') }
@@ -210,6 +243,59 @@ function calcDrainage(
       pipeHrs += lf * rate.laborPerLF
     }
   })
+
+  // ── French Drains ────────────────────────────────────────────────────────
+  // Perforated pipe (same math as solid pipe) + section-level fabric wrap and
+  // gravel bed priced $/ft on the TOTAL French-drain linear feet. Labor $/ft is
+  // converted to hours via laborRatePerHour so it flows through man-days/GPMD.
+  let frenchMat = 0,
+    frenchHrs = 0
+  ;(frenchRows || []).forEach(r => {
+    const lf = n(r.lf)
+    const rate = FRENCH_PIPE_TYPES[r.type]
+    if (lf > 0 && rate) {
+      const { cost } = drainMatCost(
+        DRAIN_CAT.pipe,
+        r,
+        FRENCH_PIPE_TYPES,
+        materialRows,
+        catDefaults,
+        materialPrices
+      )
+      frenchMat += lf * cost
+      frenchHrs += lf * rate.laborPerLF
+    }
+  })
+  const totalFrenchLF = (frenchRows || []).reduce((s, r) => s + n(r.lf), 0)
+
+  const fabricMatPerFt =
+    frenchFabric === 'Drain Sock'
+      ? frenchRate(materialPrices, FRENCH_SOCK_MAT_NAME)
+      : frenchFabric === 'Burrito Wrap'
+        ? frenchRate(materialPrices, FRENCH_BURRITO_MAT_NAME)
+        : 0
+  const fabricLaborPerFt =
+    frenchFabric === 'Drain Sock'
+      ? frenchRate(materialPrices, FRENCH_SOCK_LABOR_NAME)
+      : frenchFabric === 'Burrito Wrap'
+        ? frenchRate(materialPrices, FRENCH_BURRITO_LABOR_NAME)
+        : 0
+  const gravelMatPerFt =
+    frenchGravel === '12"'
+      ? frenchRate(materialPrices, FRENCH_GRAVEL12_MAT_NAME)
+      : frenchGravel === '24"'
+        ? frenchRate(materialPrices, FRENCH_GRAVEL24_MAT_NAME)
+        : 0
+  const gravelLaborPerFt =
+    frenchGravel === '12"'
+      ? frenchRate(materialPrices, FRENCH_GRAVEL12_LABOR_NAME)
+      : frenchGravel === '24"'
+        ? frenchRate(materialPrices, FRENCH_GRAVEL24_LABOR_NAME)
+        : 0
+
+  frenchMat += totalFrenchLF * fabricMatPerFt + totalFrenchLF * gravelMatPerFt
+  frenchHrs += (fabricLaborPerFt * totalFrenchLF) / laborRatePerHour
+  frenchHrs += (gravelLaborPerFt * totalFrenchLF) / laborRatePerHour
 
   let totalFixQty = 0
   fixtureRows.forEach(r => {
@@ -268,13 +354,13 @@ function calcDrainage(
     n(sa.curbCoreQty) * subCurbCoreRate +
     n(sa.hydrocutLF) * subHydrocutRate
 
-  const baseHrs = (isSub ? 0 : trenchHrs + pipeHrs + fixHrs + addHrs) + manHrs
+  const baseHrs = (isSub ? 0 : trenchHrs + pipeHrs + fixHrs + addHrs + frenchHrs) + manHrs
   const diffMod = 1 + n(difficulty) / 100
   const _preWalkHrs = baseHrs * diffMod + (parseFloat(hoursAdj) || 0)
   const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
   const totalHrs = _preWalkHrs + walkHrs
   const manDays = totalHrs / 8
-  const totalMat = (isSub ? 0 : pipeMat + fixMat + drainFittingFee + addMat) + manMat
+  const totalMat = (isSub ? 0 : pipeMat + fixMat + drainFittingFee + addMat + frenchMat) + manMat
   const laborCost = totalHrs * laborRatePerHour
   const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
   const subCost = manSub + subDrainCost + (isSub ? subFixtureCost + subAdditionalCost : 0)
@@ -312,6 +398,9 @@ function calcDrainage(
     fittingFeeEa,
     addHrs,
     addMat,
+    frenchMat,
+    frenchHrs,
+    totalFrenchLF,
   }
 }
 
@@ -339,20 +428,12 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
 }
 
 // ── Default blank rows ─────────────────────────────────────────────────────────
-const DEFAULT_TRENCH_ROWS = [
-  { equipment: 'Hand', lf: '', width: '', depth: '' },
-  { equipment: 'Hand', lf: '', width: '', depth: '' },
-  { equipment: 'Hand', lf: '', width: '', depth: '' },
-]
-const DEFAULT_PIPE_ROWS = [
-  { type: '3" SDR 35', lf: '', vendor: 'auto' },
-  { type: '3" SDR 35', lf: '', vendor: 'auto' },
-  { type: '3" SDR 35', lf: '', vendor: 'auto' },
-]
-const DEFAULT_FIXTURE_ROWS = [
-  { type: '3" Area Drain', qty: '', vendor: 'auto' },
-  { type: '3" Area Drain', qty: '', vendor: 'auto' },
-  { type: '3" Area Drain', qty: '', vendor: 'auto' },
+const DEFAULT_TRENCH_ROWS = [{ equipment: 'Hand', lf: '', width: '', depth: '' }]
+const DEFAULT_PIPE_ROWS = [{ type: '3" SDR 35', lf: '', vendor: 'auto' }]
+const DEFAULT_FIXTURE_ROWS = [{ type: '3" Area Drain', qty: '', vendor: 'auto' }]
+const DEFAULT_FRENCH_ROWS = [
+  { type: '4" Perforated', lf: '', vendor: 'auto' },
+  { type: '4" Perforated', lf: '', vendor: 'auto' },
 ]
 const DEFAULT_ADDITIONAL = {
   pumpVaultQty: '',
@@ -485,6 +566,10 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
     initialData?.subTrenchRows ?? [{ lf: '' }, { lf: '' }]
   )
   const [pipeRows, setPipeRows] = useState(initialData?.pipeRows ?? DEFAULT_PIPE_ROWS)
+  // French Drains — In-House perforated pipe + section-level fabric wrap + gravel bed.
+  const [frenchRows, setFrenchRows] = useState(initialData?.frenchRows ?? DEFAULT_FRENCH_ROWS)
+  const [frenchFabric, setFrenchFabric] = useState(initialData?.frenchFabric ?? 'None')
+  const [frenchGravel, setFrenchGravel] = useState(initialData?.frenchGravel ?? 'None')
   const [fixtureRows, setFixtureRows] = useState(initialData?.fixtureRows ?? DEFAULT_FIXTURE_ROWS)
   const [additionalItems, setAdditionalItems] = useState(
     initialData?.additionalItems ?? DEFAULT_ADDITIONAL
@@ -538,6 +623,9 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
     setPipeRows(rows =>
       (rows || []).map(r => (needs(r.vendor) ? { ...r, vendor: defaultVendorFor(DRAIN_CAT.pipe) } : r))
     )
+    setFrenchRows(rows =>
+      (rows || []).map(r => (needs(r.vendor) ? { ...r, vendor: defaultVendorFor(DRAIN_CAT.pipe) } : r))
+    )
     setFixtureRows(rows =>
       (rows || []).map(r =>
         needs(r.vendor) ? { ...r, vendor: defaultVendorFor(DRAIN_CAT.fixture) } : r
@@ -553,6 +641,9 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
       trenchRows,
       pipeRows,
       fixtureRows,
+      frenchRows,
+      frenchFabric,
+      frenchGravel,
       additionalItems,
       manualRows,
       subTrenchRows,
@@ -594,6 +685,9 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   function updatePipe(i, field, val) {
     setPipeRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
+  function updateFrench(i, field, val) {
+    setFrenchRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  }
   function updateFixture(i, field, val) {
     setFixtureRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
@@ -615,6 +709,9 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         subTrenchRows,
         pipeRows,
         fixtureRows,
+        frenchRows,
+        frenchFabric,
+        frenchGravel,
         additionalItems,
         subFixtureRows,
         subAdditionalItems,
@@ -986,12 +1083,21 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
               })}
             </tbody>
           </table>
+          <button
+            type="button"
+            onClick={() =>
+              setTrenchRows(rows => [...rows, { equipment: 'Hand', lf: '', width: '', depth: '' }])
+            }
+            className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+          >
+            + Add Row
+          </button>
         </div>
       </div>
 
-      {/* ── Drain Pipe ── */}
+      {/* ── Solid Drain Pipe ── */}
       <div>
-        <SectionHeader title="Drain Pipe" />
+        <SectionHeader title="Solid Drain Pipe" />
         <div className="overflow-x-auto">
           <table className="w-full text-sm table-fixed">
             <colgroup>
@@ -1078,6 +1184,227 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
               })}
             </tbody>
           </table>
+          <button
+            type="button"
+            onClick={() =>
+              setPipeRows(rows => [...rows, { type: '3" SDR 35', lf: '', vendor: 'auto' }])
+            }
+            className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+          >
+            + Add Row
+          </button>
+        </div>
+      </div>
+
+      {/* ── French Drains ── */}
+      <div>
+        <SectionHeader title="French Drains" />
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              <col className="w-[128px]" />
+              <col />
+              <col className="w-[84px]" />
+              <col className="w-[96px]" />
+              <col className="w-[96px]" />
+            </colgroup>
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
+                <th className="text-left pb-1 pr-2 font-medium">Pipe Type</th>
+                <th className="text-left pb-1 pr-2 font-medium">Linear Feet</th>
+                <th className="text-right pb-1 pr-2 font-medium text-gray-400">$/LF</th>
+                <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
+              </tr>
+            </thead>
+            <tbody>
+              {frenchRows.map((row, i) => {
+                const rate = FRENCH_PIPE_TYPES[row.type]
+                const { cost } = drainMatCost(
+                  DRAIN_CAT.pipe,
+                  row,
+                  FRENCH_PIPE_TYPES,
+                  materialRows,
+                  catDefaults,
+                  materialPrices
+                )
+                const mat = n(row.lf) * cost
+                return (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-2">
+                      <select
+                        className="input text-sm py-1 w-full"
+                        value={effVendor(DRAIN_CAT.pipe, row.vendor)}
+                        onChange={e => updateFrench(i, 'vendor', e.target.value)}
+                        title="Vendor"
+                      >
+                        {vendorsForCategory(DRAIN_CAT.pipe).map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                        <option value="House">Standard</option>
+                      </select>
+                    </td>
+                    <td className="py-1 pr-2">
+                      <div className="flex items-center gap-1">
+                        <select
+                          className="input text-sm py-1 flex-1 min-w-0"
+                          value={row.type}
+                          onChange={e => updateFrench(i, 'type', e.target.value)}
+                        >
+                          {Object.keys(FRENCH_PIPE_TYPES).map(t => (
+                            <option key={t}>{t}</option>
+                          ))}
+                        </select>
+                        {FRENCH_PIPE_LABOR_RATE_NAME[row.type] && (
+                          <RateEditPopover
+                            table="labor_rates"
+                            name={FRENCH_PIPE_LABOR_RATE_NAME[row.type]}
+                            category="Drainage"
+                            mode="coefficient"
+                            unitLabel="hr/LF"
+                            currentValue={rate?.laborPerLF}
+                          />
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-1 pr-2">
+                      <NumInput value={row.lf} onChange={v => updateFrench(i, 'lf', v)} className="w-full" />
+                    </td>
+                    <td className="py-1 text-right text-gray-400 text-xs pr-2">
+                      <span className="inline-flex items-center justify-end">
+                        ${cost.toFixed(2)}
+                      </span>
+                    </td>
+                    <td className="py-1 text-right text-gray-600 text-xs">
+                      {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <button
+            type="button"
+            onClick={() =>
+              setFrenchRows(rows => [...rows, { type: '4" Perforated', lf: '', vendor: 'auto' }])
+            }
+            className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+          >
+            + Add Row
+          </button>
+        </div>
+        {/* Fabric + Gravel Bed — applied to the TOTAL French-drain linear feet */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+          <div>
+            <p className="text-xs text-gray-500 mb-0.5 inline-flex items-center gap-1">
+              Fabric
+              {frenchFabric === 'Drain Sock' && (
+                <>
+                  <RateEditPopover
+                    table="misc_rates"
+                    name={FRENCH_SOCK_MAT_NAME}
+                    category="Drainage"
+                    unitLabel="/LF"
+                    currentValue={frenchRate(materialPrices, FRENCH_SOCK_MAT_NAME)}
+                    onSaved={refreshMaterialPrices}
+                  />
+                  <RateEditPopover
+                    table="misc_rates"
+                    name={FRENCH_SOCK_LABOR_NAME}
+                    category="Drainage"
+                    unitLabel="/LF"
+                    currentValue={frenchRate(materialPrices, FRENCH_SOCK_LABOR_NAME)}
+                    onSaved={refreshMaterialPrices}
+                  />
+                </>
+              )}
+              {frenchFabric === 'Burrito Wrap' && (
+                <>
+                  <RateEditPopover
+                    table="misc_rates"
+                    name={FRENCH_BURRITO_MAT_NAME}
+                    category="Drainage"
+                    unitLabel="/LF"
+                    currentValue={frenchRate(materialPrices, FRENCH_BURRITO_MAT_NAME)}
+                    onSaved={refreshMaterialPrices}
+                  />
+                  <RateEditPopover
+                    table="misc_rates"
+                    name={FRENCH_BURRITO_LABOR_NAME}
+                    category="Drainage"
+                    unitLabel="/LF"
+                    currentValue={frenchRate(materialPrices, FRENCH_BURRITO_LABOR_NAME)}
+                    onSaved={refreshMaterialPrices}
+                  />
+                </>
+              )}
+            </p>
+            <select
+              className="input text-sm py-1.5 w-full"
+              value={frenchFabric}
+              onChange={e => setFrenchFabric(e.target.value)}
+            >
+              <option value="None">None</option>
+              <option value="Drain Sock">Drain Sock</option>
+              <option value="Burrito Wrap">Burrito Wrap</option>
+            </select>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 mb-0.5 inline-flex items-center gap-1">
+              Gravel Bed
+              {frenchGravel === '12"' && (
+                <>
+                  <RateEditPopover
+                    table="misc_rates"
+                    name={FRENCH_GRAVEL12_MAT_NAME}
+                    category="Drainage"
+                    unitLabel="/LF"
+                    currentValue={frenchRate(materialPrices, FRENCH_GRAVEL12_MAT_NAME)}
+                    onSaved={refreshMaterialPrices}
+                  />
+                  <RateEditPopover
+                    table="misc_rates"
+                    name={FRENCH_GRAVEL12_LABOR_NAME}
+                    category="Drainage"
+                    unitLabel="/LF"
+                    currentValue={frenchRate(materialPrices, FRENCH_GRAVEL12_LABOR_NAME)}
+                    onSaved={refreshMaterialPrices}
+                  />
+                </>
+              )}
+              {frenchGravel === '24"' && (
+                <>
+                  <RateEditPopover
+                    table="misc_rates"
+                    name={FRENCH_GRAVEL24_MAT_NAME}
+                    category="Drainage"
+                    unitLabel="/LF"
+                    currentValue={frenchRate(materialPrices, FRENCH_GRAVEL24_MAT_NAME)}
+                    onSaved={refreshMaterialPrices}
+                  />
+                  <RateEditPopover
+                    table="misc_rates"
+                    name={FRENCH_GRAVEL24_LABOR_NAME}
+                    category="Drainage"
+                    unitLabel="/LF"
+                    currentValue={frenchRate(materialPrices, FRENCH_GRAVEL24_LABOR_NAME)}
+                    onSaved={refreshMaterialPrices}
+                  />
+                </>
+              )}
+            </p>
+            <select
+              className="input text-sm py-1.5 w-full"
+              value={frenchGravel}
+              onChange={e => setFrenchGravel(e.target.value)}
+            >
+              <option value="None">None</option>
+              <option value='12"'>12"</option>
+              <option value='24"'>24"</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -1175,6 +1502,15 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
               })}
             </tbody>
           </table>
+          <button
+            type="button"
+            onClick={() =>
+              setFixtureRows(rows => [...rows, { type: '3" Area Drain', qty: '', vendor: 'auto' }])
+            }
+            className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+          >
+            + Add Row
+          </button>
         </div>
       </div>
 
@@ -1310,7 +1646,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           ← Back
         </button>
         <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
-          {saving ? 'Saving...' : 'Add Module'}
+          {saving ? 'Saving...' : 'Save'}
         </button>
       </div>
     </div>

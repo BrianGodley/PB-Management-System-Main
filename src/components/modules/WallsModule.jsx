@@ -27,6 +27,12 @@ const BASIC_CATEGORY = 'Basic Materials'
 // wall vendor/type pickers filter by wall sub-categories, so Demo materials
 // never appear in them.
 const DEMO_CATEGORY = 'Demo'
+// Loaded so the per-wall Drainage (French Drain) calc reads the SAME Drainage
+// rate rows (perforated pipe material/labor, fabric, gravel bed) as the standalone
+// Drainage module — one shared source of truth. Only affects the merged rate map
+// `mp`; the wall vendor/type pickers filter by wall sub-categories, so Drainage
+// materials never appear in them.
+const DRAINAGE_CATEGORY = 'Drainage'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Walls Module — CMU Block | Poured In Place | Timber/Lumber
@@ -193,6 +199,73 @@ const WALL_RATES = {
   demoSkidContainer: { db: 'Demo - Skid Container (Low-Boy)', fb: 770 }, // $ per container
   demoSkidContainerCy: { db: 'Demo - Skid Container Capacity (CY)', fb: 10 }, // CY per container
   demoSkidSwell: { db: 'Demo - Skid Removal Swell', fb: 1.2 }, // swell factor
+  // ── Per-wall Drainage (French Drain). Shares the Drainage module's rate rows
+  // (category 'Drainage') so a rate edited in either place changes the one shared
+  // row. fb = the Drainage module's Standard values. Read through the merged rate
+  // map (category 'Drainage' is loaded into `mp`). NO hard-coded numbers.
+  drainPerf4Mat: { db: '4" Perforated Pipe', fb: 2.26 }, // $/LF material
+  drainPerf3Mat: { db: '3" Perforated Pipe', fb: 1.48 }, // $/LF material
+  drainPerf4Lab: { db: 'Drainage 4" Perforated Pipe Labor', fb: 0.05 }, // hr/LF
+  drainPerf3Lab: { db: 'Drainage 3" Perforated Pipe Labor', fb: 0.045 }, // hr/LF
+  drainSockMat: { db: 'Drainage Drain Sock Material', fb: 1 }, // $/LF
+  drainSockLab: { db: 'Drainage Drain Sock Labor', fb: 1 }, // $/LF (converted to hrs)
+  drainBurritoMat: { db: 'Drainage Burrito Wrap Material', fb: 1 }, // $/LF
+  drainBurritoLab: { db: 'Drainage Burrito Wrap Labor', fb: 1.75 }, // $/LF
+  drainGravel12Mat: { db: 'Drainage Gravel Bed 12in Material', fb: 2 }, // $/LF
+  drainGravel12Lab: { db: 'Drainage Gravel Bed 12in Labor', fb: 1 }, // $/LF
+  drainGravel24Mat: { db: 'Drainage Gravel Bed 24in Material', fb: 8 }, // $/LF
+  drainGravel24Lab: { db: 'Drainage Gravel Bed 24in Labor', fb: 3 }, // $/LF
+}
+
+// Per-wall Drainage (French Drain) option lists + blank fields. Spread into every
+// wall's DEFAULT_* and hydrated onto loaded walls so old estimates open with an
+// empty (0-cost) Drainage section.
+const DRAIN_PIPE_TYPES = ['4" Perforated', '3" Perforated']
+const DRAIN_FABRIC_OPTS = ['None', 'Drain Sock', 'Burrito Wrap']
+const DRAIN_GRAVEL_OPTS = ['None', '12"', '24"']
+const DRAIN_DEFAULTS = () => ({
+  drainType: '4" Perforated',
+  drainLf: '',
+  drainFabric: 'None',
+  drainGravel: 'None',
+})
+
+// Drainage hours + material for ONE wall's French-drain section — table-driven
+// via `r`. One perforated pipe run (+ optional fabric + gravel bed) per wall.
+// Fabric/gravel labor is quoted $/ft; divide by lrph so it lands in the hours
+// bucket (GPMD applies uniformly). In-House only. Returns { hrs, mat }.
+function wallDrain(wall = {}, r, lrph) {
+  const dLf = n(wall.drainLf)
+  if (dLf <= 0) return { hrs: 0, mat: 0 }
+  const pipeCost = wall.drainType === '3" Perforated' ? r('drainPerf3Mat') : r('drainPerf4Mat')
+  const pipeLab = wall.drainType === '3" Perforated' ? r('drainPerf3Lab') : r('drainPerf4Lab')
+  const fabMat =
+    wall.drainFabric === 'Drain Sock'
+      ? r('drainSockMat')
+      : wall.drainFabric === 'Burrito Wrap'
+        ? r('drainBurritoMat')
+        : 0
+  const fabLab =
+    wall.drainFabric === 'Drain Sock'
+      ? r('drainSockLab')
+      : wall.drainFabric === 'Burrito Wrap'
+        ? r('drainBurritoLab')
+        : 0
+  const grvMat =
+    wall.drainGravel === '12"'
+      ? r('drainGravel12Mat')
+      : wall.drainGravel === '24"'
+        ? r('drainGravel24Mat')
+        : 0
+  const grvLab =
+    wall.drainGravel === '12"'
+      ? r('drainGravel12Lab')
+      : wall.drainGravel === '24"'
+        ? r('drainGravel24Lab')
+        : 0
+  const mat = dLf * pipeCost + dLf * (fabMat + grvMat)
+  const hrs = dLf * pipeLab + ((fabLab + grvLab) * dLf) / (lrph || 35) // $/ft labor → hours so GPMD applies
+  return { hrs, mat }
 }
 
 // Method pickers for the per-wall Demo section (Slope Removal has 4 options,
@@ -361,6 +434,24 @@ const WALL_RATE_SPECS = [
     ],
   },
   {
+    // Shares the Drainage module's French-drain rates — editing here or in
+    // Drainage changes the one shared rate. Category 'Drainage' + explicit table
+    // so the RateEditPopover writes the SHARED Drainage rows.
+    group: 'Drainage — French Drain (Shared with Drainage Module)',
+    items: [
+      ['drainPerf4Lab', '4" Perforated Pipe Labor', 'Drainage', 'hr/LF', 'coefficient', 'labor_rates'],
+      ['drainPerf3Lab', '3" Perforated Pipe Labor', 'Drainage', 'hr/LF', 'coefficient', 'labor_rates'],
+      ['drainSockMat', 'Drain Sock Material', 'Drainage', 'LF', 'currency', 'misc_rates'],
+      ['drainSockLab', 'Drain Sock Labor', 'Drainage', 'LF', 'currency', 'misc_rates'],
+      ['drainBurritoMat', 'Burrito Wrap Geotextile', 'Drainage', 'LF', 'currency', 'misc_rates'],
+      ['drainBurritoLab', 'Burrito Wrap Labor', 'Drainage', 'LF', 'currency', 'misc_rates'],
+      ['drainGravel12Mat', 'Gravel Bed 12" Material', 'Drainage', 'LF', 'currency', 'misc_rates'],
+      ['drainGravel12Lab', 'Gravel Bed 12" Labor', 'Drainage', 'LF', 'currency', 'misc_rates'],
+      ['drainGravel24Mat', 'Gravel Bed 24" Material', 'Drainage', 'LF', 'currency', 'misc_rates'],
+      ['drainGravel24Lab', 'Gravel Bed 24" Labor', 'Drainage', 'LF', 'currency', 'misc_rates'],
+    ],
+  },
+  {
     group: 'Dig & Haul Footing Soil (all wall types)',
     items: [
       ['footingDigHaulLab', 'Hand — Dig & Haul Footing Soil', 'Walls', 'CF/hr', 'coefficient'],
@@ -439,6 +530,7 @@ const DEFAULT_CMU = () => ({
   subEach: '',
   wpRows: [blankWpRow()],
   ...DEMO_DEFAULTS(),
+  ...DRAIN_DEFAULTS(),
   finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
   capRows: [blankCapRow()],
 })
@@ -453,6 +545,7 @@ const DEFAULT_PIP = () => ({
   subEach: '',
   wpRows: [blankWpRow()],
   ...DEMO_DEFAULTS(),
+  ...DRAIN_DEFAULTS(),
   finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
   capRows: [blankCapRow()],
 })
@@ -472,6 +565,7 @@ const DEFAULT_MODULAR = () => ({
   subEach: '',
   wpRows: [blankWpRow()],
   ...DEMO_DEFAULTS(),
+  ...DRAIN_DEFAULTS(),
   finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
   capRows: [blankCapRow()],
 })
@@ -490,6 +584,7 @@ const DEFAULT_BRICK = () => ({
   subEach: '',
   wpRows: [blankWpRow()],
   ...DEMO_DEFAULTS(),
+  ...DRAIN_DEFAULTS(),
   finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
   capRows: [blankCapRow()],
 })
@@ -1326,6 +1421,22 @@ function calcWalls(
   ;(state.brickWalls || []).forEach(addDemo)
   addDemo(state.timberDemo || {})
 
+  // ── Per-wall Drainage (French Drain) — one perforated pipe run (+ optional
+  //    fabric + gravel bed) per wall, table-driven via the shared Drainage rows.
+  //    Feeds the In-House structural hours/material buckets (In-House only — Sub
+  //    totals untouched). Empty (0 LF) sections contribute 0, so totals are
+  //    unchanged without drainage inputs. ──
+  const addDrain = w => {
+    const d = wallDrain(w, r, lrph)
+    structuralHrs += d.hrs
+    structuralMat += d.mat
+  }
+  ;(state.cmuWalls || []).forEach(addDrain)
+  ;(state.pipWalls || []).forEach(addDrain)
+  ;(state.modularWalls || []).forEach(addDrain)
+  ;(state.brickWalls || []).forEach(addDrain)
+  addDrain(state.timberDrain || {})
+
   // ── Three labor buckets for the summary (raw hours, pre-difficulty/walk):
   //   • mainInstallHrs = structural(minus timber) + finish + cap + wp + man
   //   • demoHrs        = the per-wall Demo total (above)
@@ -1498,6 +1609,7 @@ function initCmuWalls(src = {}) {
       vendor: 'House',
       subEach: '',
       ...DEMO_DEFAULTS(),
+      ...DRAIN_DEFAULTS(),
       ...w,
       footingPump: w.footingPump ?? legacyPump,
       groutPump: w.groutPump ?? legacyGrout,
@@ -1538,6 +1650,7 @@ function initPipWalls(src = {}) {
       vendor: 'House',
       subEach: '',
       ...DEMO_DEFAULTS(),
+      ...DRAIN_DEFAULTS(),
       ...w,
       footingPump: w.footingPump ?? 'Yes',
       wpRows: initWallWp(w),
@@ -1566,6 +1679,7 @@ function initModularWalls(src = {}) {
       vendor: 'House',
       subEach: '',
       ...DEMO_DEFAULTS(),
+      ...DRAIN_DEFAULTS(),
       ...w,
       footingPump: w.footingPump ?? legacyPump,
       wpRows: initWallWp(w),
@@ -1581,6 +1695,7 @@ function initBrickWalls(src = {}) {
       vendor: 'House',
       subEach: '',
       ...DEMO_DEFAULTS(),
+      ...DRAIN_DEFAULTS(),
       ...w,
       footingPump: w.footingPump ?? legacyPump,
       wpRows: initWallWp(w),
@@ -1685,6 +1800,9 @@ function makeTab(src = {}) {
     // Timber wall's own Demo section (inline block, not a wall array) — a nested
     // object carrying the same demo* fields as each wall entry.
     timberDemo: { ...DEMO_DEFAULTS(), ...(src.timberDemo || {}) },
+    // Timber wall's own Drainage (French Drain) section — a nested object carrying
+    // the same drain* fields as each wall entry.
+    timberDrain: { ...DRAIN_DEFAULTS(), ...(src.timberDrain || {}) },
     manualRows: src.manualRows ?? DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
   }
 }
@@ -2030,6 +2148,54 @@ function WallDemoSection({ wall = {}, onChange }) {
   )
 }
 
+// ── Per-wall Drainage (French Drain) section ─────────────────────────────────
+// Shared across every wall entry (CMU / PIP / Modular / Brick) and the inline
+// Timber block. One perforated pipe run (+ optional fabric + gravel bed) per
+// wall. Rates come from the Drainage module's shared rows. `onChange` is the
+// entry's `set` curry: onChange('field')(val).
+function WallDrainageSection({ wall = {}, onChange }) {
+  const set = onChange
+  const methodOpts = list => list.map(m => ({ value: m, label: m }))
+  return (
+    <div className="mb-3">
+      <label className="block text-xs text-gray-800 mb-1 font-medium">Drainage — French Drain</label>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Pipe Type</label>
+          <DropdownSelect
+            className="input text-sm py-1.5 w-full"
+            value={wall.drainType || '4" Perforated'}
+            onChange={set('drainType')}
+            options={methodOpts(DRAIN_PIPE_TYPES)}
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Linear Feet</label>
+          <NumInput value={wall.drainLf} onChange={set('drainLf')} />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Fabric</label>
+          <DropdownSelect
+            className="input text-sm py-1.5 w-full"
+            value={wall.drainFabric || 'None'}
+            onChange={set('drainFabric')}
+            options={methodOpts(DRAIN_FABRIC_OPTS)}
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Gravel Bed</label>
+          <DropdownSelect
+            className="input text-sm py-1.5 w-full"
+            value={wall.drainGravel || 'None'}
+            onChange={set('drainGravel')}
+            options={methodOpts(DRAIN_GRAVEL_OPTS)}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── CMU Wall Entry ────────────────────────────────────────────────────────────
 function CmuWallEntry({
   wall,
@@ -2074,6 +2240,7 @@ function CmuWallEntry({
         )}
       </div>
       <WallDemoSection wall={wall} onChange={set} />
+      <WallDrainageSection wall={wall} onChange={set} />
       <label className="block text-xs text-gray-800 mb-1 font-medium">Installation</label>
       <div className="grid grid-cols-2 gap-2">
         {/* Vendor — the ONLY thing that changes where the material $ comes
@@ -2336,6 +2503,7 @@ function PipWallEntry({
         )}
       </div>
       <WallDemoSection wall={wall} onChange={set} />
+      <WallDrainageSection wall={wall} onChange={set} />
       <label className="block text-xs text-gray-800 mb-1 font-medium">Installation</label>
       <div className="grid grid-cols-2 gap-2">
         <div className="col-span-2">
@@ -2487,6 +2655,7 @@ function ModularWallEntry({
         )}
       </div>
       <WallDemoSection wall={wall} onChange={set} />
+      <WallDrainageSection wall={wall} onChange={set} />
       <label className="block text-xs text-gray-800 mb-1 font-medium">Installation</label>
       <div className="grid grid-cols-2 gap-2">
         <div className="col-span-2">
@@ -2702,7 +2871,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
     loading: pricesLoading,
     refresh: refreshAllRates,
     vendorOptionsForCategory,
-  } = useNewMaterialCatalog([WALLS_CATEGORY, BASIC_CATEGORY, CONCRETE_CATEGORY, DEMO_CATEGORY], {
+  } = useNewMaterialCatalog([WALLS_CATEGORY, BASIC_CATEGORY, CONCRETE_CATEGORY, DEMO_CATEGORY, DRAINAGE_CATEGORY], {
     materialPrices: initialData?.materialPrices,
     materialRows: initialData?.materialRows,
   })
@@ -2988,10 +3157,15 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
     group: g.group,
     items: [
       ...(g.catalogSubcat ? catalogBlockItems(g.catalogSubcat) : []),
-      ...g.items.flatMap(([key, label, category, unit, mode]) =>
-        mode === 'coefficient'
-          ? [{ label, table: 'labor_rates', name: WALL_RATES[key].db, category, unitLabel: unit, mode, value: r(key) }]
-          : materialRateRows(WALL_RATES[key].db, unit, r(key))
+      ...g.items.flatMap(([key, label, category, unit, mode, tableOverride]) =>
+        tableOverride
+          ? // Explicit table (6th tuple element) — a single shared row written
+            // straight to that table (e.g. the Drainage French-drain rows share
+            // the Drainage module's misc_rates / labor_rates rows).
+            [{ label, table: tableOverride, name: WALL_RATES[key].db, category, unitLabel: unit, mode, value: r(key) }]
+          : mode === 'coefficient'
+            ? [{ label, table: 'labor_rates', name: WALL_RATES[key].db, category, unitLabel: unit, mode, value: r(key) }]
+            : materialRateRows(WALL_RATES[key].db, unit, r(key))
       ),
     ].sort((a, b) =>
       (a.label || '').localeCompare(b.label || '', undefined, { sensitivity: 'base' })
@@ -3334,6 +3508,12 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
               setField('timberDemo')(prev => ({ ...(prev || {}), [f]: val }))
             }
           />
+          <WallDrainageSection
+            wall={cur.timberDrain || {}}
+            onChange={f => val =>
+              setField('timberDrain')(prev => ({ ...(prev || {}), [f]: val }))
+            }
+          />
           <label className="block text-xs text-gray-800 mb-1 font-medium">Installation</label>
           <div className="grid grid-cols-2 gap-3 mb-3">
             <div>
@@ -3493,7 +3673,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
           ← Back
         </button>
         <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
-          {saving ? 'Saving...' : 'Add Module'}
+          {saving ? 'Saving...' : 'Save'}
         </button>
       </div>
     </div>

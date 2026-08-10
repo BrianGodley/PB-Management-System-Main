@@ -1870,7 +1870,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
           ← Back
         </button>
         <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
-          {saving ? 'Saving...' : 'Add Module'}
+          {saving ? 'Saving...' : 'Save'}
         </button>
       </div>
     </div>
