@@ -174,6 +174,7 @@ export async function fetchModuleCatalog(categories) {
        prices:material_price ( price, vendor_id, effective_end )`
     )
     .in('category_id', catIds)
+    .is('archived_at', null)
   const rows = []
   ;(data || []).forEach(m => {
     ;(m.prices || [])
@@ -345,7 +346,7 @@ export async function fetchAllMaterialsAdmin() {
     supabase
       .from('material')
       .select(
-        `id, description, unit, calc_meta, photo_url, sku, show_in_selections,
+        `id, description, unit, calc_meta, photo_url, sku, show_in_selections, archived_at,
          category:category_id ( name ),
          subcategory:subcategory_id ( name ),
          prices:material_price ( price, vendor_id, effective_end )`
@@ -413,7 +414,8 @@ export async function fetchSelections() {
          subcategory:subcategory_id ( name ),
          prices:material_price ( price, vendor_id, effective_end )`
       )
-      .eq('show_in_selections', true),
+      .eq('show_in_selections', true)
+      .is('archived_at', null),
   ])
   const stdId =
     (vends || []).find(v => ['standard', 'unspecified'].includes((v.company_name || '').trim().toLowerCase()))
@@ -445,6 +447,43 @@ export async function fetchSelections() {
       (a, b) =>
         (a.category || '').localeCompare(b.category || '') || (a.name || '').localeCompare(b.name || '')
     )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Delete-guard helpers. Selections in saved estimates reference materials by
+// NAME (not FK), and material_price holds the price ledger — so a hard delete
+// silently orphans live selections and erases history. These let the UI check
+// usage first and prefer a reversible archive.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// How much would be lost / broken if this material were hard-deleted:
+//   priceCount — material_price rows (the price ledger, incl. history)
+//   refCount   — saved estimate_modules whose JSON mentions this product name
+export async function materialUsage(materialId, name) {
+  const [{ count: priceCount }, refRes] = await Promise.all([
+    supabase
+      .from('material_price')
+      .select('id', { count: 'exact', head: true })
+      .eq('material_id', materialId),
+    name
+      ? supabase.rpc('material_reference_count', { p_name: name })
+      : Promise.resolve({ data: 0 }),
+  ])
+  return {
+    priceCount: priceCount || 0,
+    refCount: Number(refRes?.data ?? 0) || 0,
+  }
+}
+
+// Reversible soft-delete: hide from every module picker / selection browser but
+// keep the product row + its whole price ledger intact.
+export async function archiveMaterial(id) {
+  return supabase.from('material').update({ archived_at: new Date().toISOString() }).eq('id', id)
+}
+
+// Undo an archive — the product reappears in pickers.
+export async function restoreMaterial(id) {
+  return supabase.from('material').update({ archived_at: null }).eq('id', id)
 }
 
 // Resolve a category name + sub-category name to their ids in the taxonomy

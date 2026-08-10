@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
+import { materialUsage, archiveMaterial, restoreMaterial } from '../lib/materialCatalog'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MaterialDetailModal — opened from the code hyperlink in Master Material Rates.
@@ -20,6 +21,8 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [confirmDel, setConfirmDel] = useState(false)
+  const [usage, setUsage] = useState(null) // { priceCount, refCount } once loaded
+  const [archived, setArchived] = useState(!!m.archived_at)
   const [form, setForm] = useState({
     category_id: m.category_id,
     subcategory_id: m.subcategory_id,
@@ -80,11 +83,42 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
     onClose?.()
   }
 
+  // When the delete confirm opens, check what depends on this product so we can
+  // block a destructive delete and steer to Archive instead.
+  const openConfirm = async () => {
+    setConfirmDel(true)
+    setUsage(null)
+    const u = await materialUsage(m.id, m.description)
+    setUsage(u)
+  }
+
+  const protectedItem = usage && (usage.priceCount > 0 || usage.refCount > 0)
+
   const del = async () => {
     setBusy(true)
     await supabase.from('material').delete().eq('id', m.id) // cascades material_price
     setBusy(false)
+    setConfirmDel(false)
     onDeleted?.()
+    onClose?.()
+  }
+
+  const archive = async () => {
+    setBusy(true)
+    await archiveMaterial(m.id)
+    setBusy(false)
+    setConfirmDel(false)
+    setArchived(true)
+    onDeleted?.() // refresh the list; archived items drop out of pickers
+    onClose?.()
+  }
+
+  const restore = async () => {
+    setBusy(true)
+    await restoreMaterial(m.id)
+    setBusy(false)
+    setArchived(false)
+    onSaved?.()
     onClose?.()
   }
 
@@ -111,6 +145,12 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
         </div>
 
         <div className="px-5 py-4 space-y-3 text-sm">
+          {archived && (
+            <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+              This product is <b>archived</b> — hidden from all pickers and selection lists. Its price
+              history is preserved. Use Restore to bring it back.
+            </div>
+          )}
           {mode === 'view' ? (
             <>
               <Field label="Category" value={catName(m.category_id)} />
@@ -200,12 +240,22 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
         <div className="px-5 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50">
           {mode === 'view' ? (
             <>
-              <button
-                onClick={() => setConfirmDel(true)}
-                className="text-sm text-red-600 hover:text-red-800 font-medium"
-              >
-                Delete
-              </button>
+              {archived ? (
+                <button
+                  onClick={restore}
+                  disabled={busy}
+                  className="text-sm text-green-700 hover:text-green-900 font-medium disabled:opacity-50"
+                >
+                  {busy ? 'Restoring…' : '↩ Restore'}
+                </button>
+              ) : (
+                <button
+                  onClick={openConfirm}
+                  className="text-sm text-red-600 hover:text-red-800 font-medium"
+                >
+                  Delete
+                </button>
+              )}
               <div className="flex gap-2">
                 <button onClick={onClose} className="text-sm text-gray-500 px-3 py-1.5">
                   Close
@@ -245,23 +295,80 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
               className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-5"
               onClick={e => e.stopPropagation()}
             >
-              <h4 className="font-bold text-gray-900 mb-1">Delete this product?</h4>
-              <p className="text-sm text-gray-600 mb-4">
-                “{m.description}” and all of its vendor prices will be permanently removed. This
-                can’t be undone.
-              </p>
-              <div className="flex justify-end gap-2">
-                <button onClick={() => setConfirmDel(false)} className="text-sm text-gray-500 px-3 py-1.5">
-                  Cancel
-                </button>
-                <button
-                  onClick={del}
-                  disabled={busy}
-                  className="text-sm bg-red-600 text-white px-4 py-1.5 rounded-lg font-semibold disabled:opacity-50"
-                >
-                  {busy ? 'Deleting…' : 'Delete'}
-                </button>
-              </div>
+              {usage == null ? (
+                <p className="text-sm text-gray-500 py-4 text-center">Checking where this product is used…</p>
+              ) : protectedItem ? (
+                <>
+                  <h4 className="font-bold text-gray-900 mb-1">Archive this product?</h4>
+                  <p className="text-sm text-gray-600 mb-3">
+                    “{m.description}” can’t be permanently deleted because doing so would break live
+                    selections and erase its price history:
+                  </p>
+                  <ul className="text-sm text-gray-700 mb-3 space-y-1">
+                    {usage.refCount > 0 && (
+                      <li>
+                        • Used in <b>{usage.refCount}</b> saved estimate
+                        {usage.refCount === 1 ? '' : 's'} — deleting would orphan those selections.
+                      </li>
+                    )}
+                    {usage.priceCount > 0 && (
+                      <li>
+                        • Has <b>{usage.priceCount}</b> price record{usage.priceCount === 1 ? '' : 's'}{' '}
+                        (vendor prices + history) that would be lost.
+                      </li>
+                    )}
+                  </ul>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Archiving hides it from all pickers and selection lists but keeps the product and
+                    its full price ledger intact. You can restore it anytime.
+                  </p>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => setConfirmDel(false)}
+                      className="text-sm text-gray-500 px-3 py-1.5"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={archive}
+                      disabled={busy}
+                      className="text-sm bg-amber-600 text-white px-4 py-1.5 rounded-lg font-semibold disabled:opacity-50"
+                    >
+                      {busy ? 'Archiving…' : 'Archive'}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h4 className="font-bold text-gray-900 mb-1">Delete this product?</h4>
+                  <p className="text-sm text-gray-600 mb-4">
+                    “{m.description}” isn’t used in any saved estimate and has no price history, so it
+                    can be permanently removed. This can’t be undone.
+                  </p>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => setConfirmDel(false)}
+                      className="text-sm text-gray-500 px-3 py-1.5"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={archive}
+                      disabled={busy}
+                      className="text-sm border border-amber-500 text-amber-700 px-3 py-1.5 rounded-lg font-semibold disabled:opacity-50"
+                    >
+                      Archive
+                    </button>
+                    <button
+                      onClick={del}
+                      disabled={busy}
+                      className="text-sm bg-red-600 text-white px-4 py-1.5 rounded-lg font-semibold disabled:opacity-50"
+                    >
+                      {busy ? 'Deleting…' : 'Delete'}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>,
           document.body
