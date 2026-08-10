@@ -130,7 +130,15 @@ const WALL_RATES = {
   // ── Structural coefficients (were hard-coded in the calc functions; fb =
   // legacy value so totals are unchanged until a rate is seeded/edited). ──────
   blockOrderWaste: { db: 'Wall Block Order Waste', fb: 1.1 }, // order multiplier (grey + BB)
-  footingPourLab: { db: 'Wall Footing Pour Labor Rate', fb: 0.2037 }, // CY / hr (pour productivity)
+  footingPourLab: { db: 'Wall Footing Pour Labor Rate', fb: 0.2037 }, // CY / hr (pour productivity) — legacy, kept for back-compat
+  // Footing pour labor split by method. The wall's Footing Pump toggle selects
+  // which one drives the calc. Both seeded to the legacy footingPourLab value so
+  // existing estimates don't move until a rate is edited.
+  footingPourHandLab: { db: 'Wall Hand Pour Footing Labor Rate', fb: 0.2037 }, // CY / hr (hand pour)
+  footingPourPumpLab: { db: 'Wall Pump Footing Labor Rate', fb: 0.2037 }, // CY / hr (pump pour)
+  // Modular wall install labor — split OUT of CMU's blockLab so the two are
+  // independent. fb equals blockLab's so totals are unchanged until edited.
+  modularInstallLab: { db: 'Wall Modular Install Labor Rate', fb: 10.4 }, // blk / hr
   curveLab: { db: 'Wall Curve Labor Factor', fb: 0.5 }, // factor on struct hrs per % curved
   // Poured-In-Place stem coefficients.
   pipStemLfLab: { db: 'Wall PIP Stem LF Labor', fb: 1.0833 }, // hr / LF (base course)
@@ -253,7 +261,9 @@ const WALL_RATE_SPECS = [
       ['groutPumpPerYd', 'Grout Pump — Per CY', 'Basic Materials', 'CY', 'currency'],
       ['digLab', 'Dig Footing', 'Walls', 'CF/hr', 'coefficient'],
       ['rebarLab', 'Set Rebar', 'Walls', 'LF/hr', 'coefficient'],
-      ['blockLab', 'Set Block', 'Walls', 'blk/hr', 'coefficient'],
+      ['footingPourHandLab', 'Hand Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
+      ['footingPourPumpLab', 'Pump Footing', 'Walls', 'CY/hr', 'coefficient'],
+      ['blockLab', 'CMU Block Install', 'Walls', 'blk/hr', 'coefficient'],
       ['handGroutLab', 'Hand Grout', 'Walls', 'CF/hr', 'coefficient'],
       ['pumpGroutLab', 'Pump Grout', 'Walls', 'CF/hr', 'coefficient'],
       ['setupCleanLab', 'Setup / Clean', 'Walls', 'LF/hr', 'coefficient'],
@@ -265,8 +275,12 @@ const WALL_RATE_SPECS = [
       ['concreteTruck', 'Concrete — Ready Mix (Truck)', 'Basic Materials', 'CY', 'currency'],
       ['concreteHand', 'Concrete — Hand Mix', 'Basic Materials', 'CY', 'currency'],
       ['rebar', 'Rebar', 'Basic Materials', 'LF', 'currency'],
+      ['pipStemLfLab', 'Poured In Place Install', 'Walls', 'hr/LF', 'coefficient'],
+      ['pipStemCourseLab', 'PIP Added Course', 'Walls', 'hr/LF', 'coefficient'],
       ['digLab', 'Dig Footing', 'Walls', 'CF/hr', 'coefficient'],
       ['rebarLab', 'Set Rebar', 'Walls', 'LF/hr', 'coefficient'],
+      ['footingPourHandLab', 'Hand Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
+      ['footingPourPumpLab', 'Pump Footing', 'Walls', 'CY/hr', 'coefficient'],
     ],
   },
   {
@@ -277,7 +291,9 @@ const WALL_RATE_SPECS = [
       ['concreteTruck', 'Footing Concrete — Ready Mix', 'Basic Materials', 'CY', 'currency'],
       ['groutPumpSetup', 'Footing Pump — Setup', 'Basic Materials', 'flat', 'currency'],
       ['digLab', 'Dig Footing', 'Walls', 'CF/hr', 'coefficient'],
-      ['blockLab', 'Set Block', 'Walls', 'blk/hr', 'coefficient'],
+      ['footingPourHandLab', 'Hand Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
+      ['footingPourPumpLab', 'Pump Footing', 'Walls', 'CY/hr', 'coefficient'],
+      ['modularInstallLab', 'Modular Wall Installation', 'Walls', 'blk/hr', 'coefficient'],
       ['setupCleanLab', 'Setup / Clean', 'Walls', 'LF/hr', 'coefficient'],
     ],
   },
@@ -287,10 +303,29 @@ const WALL_RATE_SPECS = [
     items: [
       ['concreteHand', 'Footing Concrete — Hand Mix', 'Basic Materials', 'CY', 'currency'],
       ['concreteTruck', 'Footing Concrete — Ready Mix', 'Basic Materials', 'CY', 'currency'],
-      ['groutPumpSetup', 'Footing Pump — Setup', 'Basic Materials', 'flat', 'currency'],
+      ['rebar', 'Rebar', 'Basic Materials', 'LF', 'currency'],
+      ['brickLayLab', 'Brick Installation', 'Walls', 'hr/SF', 'coefficient'],
       ['digLab', 'Dig Footing', 'Walls', 'CF/hr', 'coefficient'],
-      ['blockLab', 'Set Block', 'Walls', 'blk/hr', 'coefficient'],
-      ['setupCleanLab', 'Setup / Clean', 'Walls', 'LF/hr', 'coefficient'],
+      ['rebarLab', 'Set Rebar', 'Walls', 'LF/hr', 'coefficient'],
+      ['footingPourHandLab', 'Hand Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
+      ['footingPourPumpLab', 'Pump Footing', 'Walls', 'CY/hr', 'coefficient'],
+    ],
+  },
+  {
+    group: 'Timber / Lumber',
+    catalogSubcat: 'Wood',
+    items: [
+      ['rebar', 'Rebar', 'Basic Materials', 'LF', 'currency'],
+      ['concreteHand', 'Concrete — Hand Mix', 'Basic Materials', 'CY', 'currency'],
+      ['concreteTruck', 'Concrete — Ready Mix (Truck)', 'Basic Materials', 'CY', 'currency'],
+      ['timberPostMat', 'Steel Post', 'Walls', 'ea', 'currency'],
+      ['digLab', 'Dig Footing', 'Walls', 'CF/hr', 'coefficient'],
+      ['rebarLab', 'Set Rebar', 'Walls', 'LF/hr', 'coefficient'],
+      ['footingPourHandLab', 'Hand Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
+      ['footingPourPumpLab', 'Pump Footing', 'Walls', 'CY/hr', 'coefficient'],
+      ['timberLfLab', 'Timber Wall Installation', 'Walls', 'hr/LF', 'coefficient'],
+      ['timberCourseLab', 'Timber Added Course', 'Walls', 'hr/LF', 'coefficient'],
+      ['timberPostLab', 'Steel Post Installation', 'Walls', 'hr/ea', 'coefficient'],
     ],
   },
   {
@@ -845,7 +880,7 @@ function usePricePrompt() {
 }
 
 // ── Per-wall calculators ──────────────────────────────────────────────────────
-function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [], blockOverride = null) {
+function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [], blockOverride = null, installKey = 'blockLab') {
   const {
     blockType,
     lf,
@@ -901,8 +936,8 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
   const structBase =
     (footingCF > 0 ? footingCF / r('digLab') : 0) +
     (totalRebarLF > 0 ? totalRebarLF / r('rebarLab') : 0) +
-    (footingCY > 0 ? footingCY / r('footingPourLab') : 0) +
-    (rawBlocks > 0 ? rawBlocks / r('blockLab') : 0) +
+    (footingCY > 0 ? footingCY / r(footingPump === 'Yes' ? 'footingPourPumpLab' : 'footingPourHandLab') : 0) +
+    (rawBlocks > 0 ? rawBlocks / r(installKey) : 0) +
     (groutCF > 0 ? groutCF / groutRate : 0) +
     n(lf) / r('setupCleanLab')
   const curveAdd = structBase * (n(pctCurved) / 100) * r('curveLab')
@@ -949,7 +984,7 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
 // omitted → legacy CMU block catalog (Brick tab, unchanged).
 function calcOneModular(wall, footingPump, r, mp = {}, materialRows = [], blockOverride = null) {
   const modWall = { ...wall, rebarSpIn: '0', horizBars: '0', bondBeams: '0', pctGrouted: '0' }
-  return calcOneCMU(modWall, footingPump, 'No', r, mp, materialRows, blockOverride)
+  return calcOneCMU(modWall, footingPump, 'No', r, mp, materialRows, blockOverride, 'modularInstallLab')
 }
 
 // ── Brick wall — priced per brick, NOT by block dimensions. Material =
@@ -982,7 +1017,9 @@ function calcOneBrick(wall, r, mp = {}, materialRows = []) {
   const footingHrs =
     (footingCF > 0 ? footingCF / r('digLab') : 0) +
     (horizRebarLF > 0 ? horizRebarLF / r('rebarLab') : 0) +
-    (footingCY > 0 ? footingCY / r('footingPourLab') : 0)
+    (footingCY > 0
+      ? footingCY / r((wall.footingPump ?? 'No') === 'Yes' ? 'footingPourPumpLab' : 'footingPourHandLab')
+      : 0)
   const footPrc = (wall.footingPump ?? 'No') === 'Yes' ? pm('concreteTruck') : pm('concreteHand')
   const footingMat = footingCY * footPrc + horizRebarLF * pm('rebar')
 
@@ -1031,7 +1068,9 @@ function calcOnePIP(wall, r, mp = {}, materialRows = []) {
   const footingHrs =
     (footingCF > 0 ? footingCF / r('digLab') : 0) +
     (horizRebarLF > 0 ? horizRebarLF / r('rebarLab') : 0) +
-    (footingCY > 0 ? footingCY / r('footingPourLab') : 0)
+    (footingCY > 0
+      ? footingCY / r((wall.footingPump ?? 'Yes') === 'Yes' ? 'footingPourPumpLab' : 'footingPourHandLab')
+      : 0)
   // Per-wall footing pump: 'Yes' = ready-mix truck (default, unchanged), 'No' =
   // hand mix. No separate pump-setup fee on PIP footings.
   const footPrc = (wall.footingPump ?? 'Yes') === 'Yes' ? pm('concreteTruck') : pm('concreteHand')
@@ -1146,16 +1185,39 @@ function calcWalls(
     // Wood price ($/unit) from the selected type's Walls › Wood catalog entry for
     // the chosen vendor; legacy default $50 keeps existing estimates unchanged.
     const woodPrice = catalogItemPrice(materialRows, WOOD_SUBCAT, state.timberType, state.timberVendor, 50)
-    const timberMat =
+    const woodMat =
       n(state.timberLF) * (r('timberBdftBase') + addlCourses * r('timberBdftCourse')) * woodPrice +
       postQty * r('timberPostMat')
+
+    // Timber footing — dig + horizontal rebar + pour + concrete, identical math
+    // to brick / PIP. Footing concrete + rebar resolve at Standard (House) prices
+    // (timber's vendor picker is wood-only). Footing labor lands in the timber
+    // bucket so it's crewed with the timber wall. Blank width/depth ⇒ 0 footing.
+    const tLF = n(state.timberLF)
+    const tfW = n(state.timberFootingWIn)
+    const tfD = n(state.timberFootingDIn)
+    const tHb = n(state.timberHorizBars)
+    const tFootingCF = tfW > 0 && tfD > 0 ? tLF * (tfW / 12) * (tfD / 12) : 0
+    const tFootingCY = tFootingCF / 27
+    const tHorizRebarLF = tHb * tLF
+    const tFootPump = (state.timberFootingPump ?? 'No') === 'Yes'
+    const tpm = key => wallMatPrice(WALL_RATES[key].db, 'House', materialRows, mp, WALL_RATES[key].fb)
+    const tFootingHrs =
+      (tFootingCF > 0 ? tFootingCF / r('digLab') : 0) +
+      (tHorizRebarLF > 0 ? tHorizRebarLF / r('rebarLab') : 0) +
+      (tFootingCY > 0 ? tFootingCY / r(tFootPump ? 'footingPourPumpLab' : 'footingPourHandLab') : 0)
+    const tFootConcPrc = tFootPump ? tpm('concreteTruck') : tpm('concreteHand')
+    const tFootingMat = tFootingCY * tFootConcPrc + tHorizRebarLF * tpm('rebar')
+    timberHrs += tFootingHrs
+
+    const timberMat = woodMat + tFootingMat
     structuralMat += timberMat
-    // Sub flat: default $/LF = In-House timber material ÷ LF (folding posts in);
-    // overridable via timberSubEach. Posts-only (no LF) bills the material flat.
-    const tSubUnit = n(state.timberLF) > 0 ? timberMat / n(state.timberLF) : 0
+    // Sub flat: default $/LF = In-House timber material ÷ LF (wood + footing +
+    // posts folded in); overridable via timberSubEach. Posts-only bills flat.
+    const tSubUnit = tLF > 0 ? timberMat / tLF : 0
     const tSubEach =
       state.timberSubEach !== '' && state.timberSubEach != null ? n(state.timberSubEach) : tSubUnit
-    structuralSubMat += n(state.timberLF) > 0 ? n(state.timberLF) * tSubEach : timberMat
+    structuralSubMat += tLF > 0 ? tLF * tSubEach : timberMat
   }
 
   // ── Wall Finishes & Caps — now specified PER WALL. Gather each wall's own
@@ -1567,6 +1629,12 @@ function makeTab(src = {}) {
     timberVendor: src.timberVendor ?? 'House',
     timberPosts: src.timberPosts ?? '',
     timberSubEach: src.timberSubEach ?? '',
+    // Timber footing (dig + rebar + pour + concrete, same math as brick/PIP).
+    // Default blank so existing timber estimates open with a 0-footing (no change).
+    timberFootingWIn: src.timberFootingWIn ?? '',
+    timberFootingDIn: src.timberFootingDIn ?? '',
+    timberHorizBars: src.timberHorizBars ?? '2',
+    timberFootingPump: src.timberFootingPump ?? 'No',
     // Timber wall's own Demo section (inline block, not a wall array) — a nested
     // object carrying the same demo* fields as each wall entry.
     timberDemo: { ...DEMO_DEFAULTS(), ...(src.timberDemo || {}) },
@@ -2671,6 +2739,14 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
   const setTimberPosts = setField('timberPosts')
   const timberSubEach = cur.timberSubEach
   const setTimberSubEach = setField('timberSubEach')
+  const timberFootingWIn = cur.timberFootingWIn
+  const setTimberFootingWIn = setField('timberFootingWIn')
+  const timberFootingDIn = cur.timberFootingDIn
+  const setTimberFootingDIn = setField('timberFootingDIn')
+  const timberHorizBars = cur.timberHorizBars
+  const setTimberHorizBars = setField('timberHorizBars')
+  const timberFootingPump = cur.timberFootingPump
+  const setTimberFootingPump = setField('timberFootingPump')
   const manualRows = cur.manualRows
   const setManualRows = setField('manualRows')
 
@@ -3263,6 +3339,36 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
               <span className="text-xs text-gray-400">material + labor per post (from rates)</span>
             </div>
           </div>
+          <label className="block text-xs text-gray-800 mt-3 mb-1 font-medium">Footing</label>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Footing Width (in)</label>
+              <NumInput value={timberFootingWIn} onChange={setTimberFootingWIn} placeholder="0" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Footing Depth (in)</label>
+              <NumInput value={timberFootingDIn} onChange={setTimberFootingDIn} placeholder="0" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Horizontal Rebar (qty)</label>
+              <NumInput value={timberHorizBars} onChange={setTimberHorizBars} placeholder="0" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Footing Pump</label>
+              <DropdownSelect
+                className="input text-sm py-1.5 w-full"
+                value={timberFootingPump || 'No'}
+                onChange={v => setTimberFootingPump(v)}
+                options={[
+                  { value: 'No', label: 'No (hand)' },
+                  { value: 'Yes', label: 'Yes (pump)' },
+                ]}
+              />
+            </div>
+          </div>
+          <p className="text-[11px] text-gray-400 mt-1">
+            Leave width/depth blank for no footing.
+          </p>
           {isSub && (
             <div className="mt-3 flex items-center gap-2 flex-wrap">
               <span className="text-xs text-gray-500">Sub flat $/LF</span>
