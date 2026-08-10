@@ -38,6 +38,20 @@ export default function MasterMaterialRates() {
   const [saving, setSaving] = useState(false)
   const [detail, setDetail] = useState(null) // row shown in the detail modal
   const [adding, setAdding] = useState(null) // 'standard' | 'vendor' → AddMaterialModal
+  const [moveCopy, setMoveCopy] = useState(null) // source → MoveCopyMaterialModal
+  const sourceFromRow = r => ({
+    kind: 'material',
+    materialId: r.m.id,
+    priceId: r.priceId,
+    description: r.m.description,
+    unit: r.m.unit,
+    categoryId: r.m.category_id,
+    subcategoryId: r.m.subcategory_id,
+    categoryName: r.m.category?.name,
+    price: r.price,
+    vendorId: r.vendorId,
+    vendorName: r.vName || 'Standard',
+  })
   const [sort, setSort] = useState({ key: 'description', dir: 'asc' })
   const toggleSort = key =>
     setSort(s => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }))
@@ -275,7 +289,7 @@ export default function MasterMaterialRates() {
                 <Th k="unit" sort={sort} onSort={toggleSort}>Unit</Th>
                 <Th k="price" sort={sort} onSort={toggleSort} align="right">Price</Th>
                 {!isVendorView && <th className="px-3 py-2 font-semibold text-center">Default</th>}
-                <th className="px-3 py-2 w-20" />
+                <th className="px-3 py-2 w-36" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -369,12 +383,20 @@ export default function MasterMaterialRates() {
                             </button>
                           </>
                         ) : (
-                          <button
-                            onClick={() => setEditing({ key: r.key, value: r.price ?? '' })}
-                            className="text-gray-500 hover:text-gray-800 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            {r.price == null ? 'Set price' : 'Edit Price'}
-                          </button>
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                            <button
+                              onClick={() => setEditing({ key: r.key, value: r.price ?? '' })}
+                              className="text-gray-500 hover:text-gray-800 mr-2"
+                            >
+                              {r.price == null ? 'Set price' : 'Edit Price'}
+                            </button>
+                            <button
+                              onClick={() => setMoveCopy(sourceFromRow(r))}
+                              className="text-blue-600 hover:text-blue-800"
+                            >
+                              Move/Copy
+                            </button>
+                          </span>
                         )}
                       </td>
                     </tr>
@@ -403,6 +425,17 @@ export default function MasterMaterialRates() {
           onClose={() => setAdding(null)}
           onSaved={() => {
             setAdding(null)
+            load()
+          }}
+        />
+      )}
+
+      {moveCopy && (
+        <MoveCopyMaterialModal
+          source={moveCopy}
+          onClose={() => setMoveCopy(null)}
+          onDone={() => {
+            setMoveCopy(null)
             load()
           }}
         />
@@ -575,6 +608,217 @@ function AddMaterialModal({ mode, vendors, onClose, onSaved }) {
   )
 }
 
+// ── Move / Copy modal ─────────────────────────────────────────────────────────
+// Copy (or move) an item between the three tables: Standard, Vendor (both the
+// material + material_price model) and Misc (misc_rates). `source` describes the
+// row being acted on:
+//   { kind:'material', materialId, priceId, description, unit, categoryId,
+//     subcategoryId, categoryName, price, vendorId }
+//   { kind:'misc', miscId, name, rate, category }
+function MoveCopyMaterialModal({ source, onClose, onDone }) {
+  const fromMaterial = source.kind === 'material'
+  const [mode, setMode] = useState('copy') // 'copy' | 'move'
+  // Default destination: from a material → Misc; from a misc → Standard.
+  const [dest, setDest] = useState(fromMaterial ? 'misc' : 'standard')
+  const [vendors, setVendors] = useState([])
+  const [cats, setCats] = useState([])
+  const [subs, setSubs] = useState([])
+  const [destVendorId, setDestVendorId] = useState('')
+  const [miscCategory, setMiscCategory] = useState(source.categoryName || '')
+  // Fields needed when creating a material FROM a misc rate.
+  const [description, setDescription] = useState(source.name || source.description || '')
+  const [unit, setUnit] = useState(source.unit || '')
+  const [catId, setCatId] = useState('')
+  const [subId, setSubId] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from('subs_vendors').select('id, company_name'),
+      supabase.from('category').select('id, name').order('name'),
+      supabase.from('subcategory').select('id, name, category_id').order('name'),
+    ]).then(([v, c, s]) => {
+      setVendors(v.data || [])
+      setCats(c.data || [])
+      setSubs(s.data || [])
+    })
+  }, [])
+
+  const stdId = useMemo(
+    () => vendors.find(v => isStandardName(v.company_name))?.id || null,
+    [vendors]
+  )
+  const vendorOpts = (vendors || []).filter(v => !isStandardName(v.company_name))
+  const subOpts = subs.filter(s => s.category_id === catId)
+  const amount = fromMaterial ? source.price : source.rate
+
+  async function submit() {
+    setErr('')
+    setSaving(true)
+    try {
+      if (fromMaterial) {
+        if (dest === 'misc') {
+          await supabase.from('misc_rates').insert({
+            name: source.description,
+            rate: amount ?? 0,
+            category: miscCategory.trim() || source.categoryName || null,
+          })
+          if (mode === 'move' && source.priceId)
+            await supabase.from('material_price').delete().eq('id', source.priceId)
+        } else {
+          if (dest === 'vendor' && !destVendorId) throw new Error('Pick a vendor.')
+          const destVendor = dest === 'standard' ? null : destVendorId
+          const destVendorResolved = dest === 'standard' ? stdId : destVendorId
+          await setMaterialPrice(source.materialId, destVendor, Number(amount ?? 0))
+          // Move = remove the source price, unless it IS the destination row.
+          if (mode === 'move' && source.priceId && destVendorResolved !== source.vendorId)
+            await supabase.from('material_price').delete().eq('id', source.priceId)
+        }
+      } else {
+        // Misc → material (Standard or Vendor): create the product + its price.
+        if (!description.trim()) throw new Error('Description is required.')
+        if (!catId) throw new Error('Category is required.')
+        if (!subId) throw new Error('Sub-category is required.')
+        if (dest === 'vendor' && !destVendorId) throw new Error('Pick a vendor.')
+        const { data: mat, error } = await supabase
+          .from('material')
+          .insert({ description: description.trim(), category_id: catId, subcategory_id: subId, unit: unit.trim() || null })
+          .select('id')
+          .single()
+        if (error) throw new Error(error.message)
+        await setMaterialPrice(mat.id, dest === 'standard' ? null : destVendorId, Number(amount ?? 0))
+        if (mode === 'move' && source.miscId)
+          await supabase.from('misc_rates').delete().eq('id', source.miscId)
+      }
+      setSaving(false)
+      onDone()
+    } catch (e) {
+      setErr(e?.message || 'Failed.')
+      setSaving(false)
+    }
+  }
+
+  const inputCls =
+    'w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-700/30 focus:border-green-700'
+  const srcLabel = fromMaterial
+    ? `${source.vendorName || 'Standard'} — ${source.description}`
+    : `Misc — ${source.name}`
+  const destOpts = fromMaterial
+    ? [{ k: 'standard', l: 'Standard' }, { k: 'vendor', l: 'Vendor' }, { k: 'misc', l: 'Misc' }]
+    : [{ k: 'standard', l: 'Standard' }, { k: 'vendor', l: 'Vendor' }]
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9998] bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+          <h2 className="text-base font-bold text-gray-800">Move / Copy Material</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+        </div>
+        <div className="p-5 space-y-3">
+          <div className="text-xs text-gray-500">
+            Source: <span className="font-medium text-gray-800">{srcLabel}</span>
+            {amount != null && <> · <span className="font-mono">{num4(amount)}</span></>}
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 mb-1">Action</label>
+            <div className="flex gap-2">
+              {[{ k: 'copy', l: 'Copy' }, { k: 'move', l: 'Move' }].map(o => (
+                <button
+                  key={o.k}
+                  onClick={() => setMode(o.k)}
+                  className={`flex-1 py-1.5 rounded-lg border text-sm font-medium ${
+                    mode === o.k ? 'bg-green-700 text-white border-green-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {o.l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 mb-1">Destination table</label>
+            <div className="flex gap-2">
+              {destOpts.map(o => (
+                <button
+                  key={o.k}
+                  onClick={() => setDest(o.k)}
+                  className={`flex-1 py-1.5 rounded-lg border text-sm font-medium ${
+                    dest === o.k ? 'bg-gray-800 text-white border-gray-800' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {o.l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {dest === 'vendor' && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Vendor *</label>
+              <select value={destVendorId} onChange={e => setDestVendorId(e.target.value)} className={inputCls}>
+                <option value="">Select vendor…</option>
+                {vendorOpts.map(v => (
+                  <option key={v.id} value={v.id}>{v.company_name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {fromMaterial && dest === 'misc' && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Misc Category</label>
+              <input value={miscCategory} onChange={e => setMiscCategory(e.target.value)} className={inputCls} placeholder="e.g. Walls" />
+            </div>
+          )}
+
+          {!fromMaterial && (dest === 'standard' || dest === 'vendor') && (
+            <>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Description *</label>
+                <input value={description} onChange={e => setDescription(e.target.value)} className={inputCls} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Category *</label>
+                  <select value={catId} onChange={e => { setCatId(e.target.value); setSubId('') }} className={inputCls}>
+                    <option value="">Select…</option>
+                    {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Sub-Category *</label>
+                  <select value={subId} onChange={e => setSubId(e.target.value)} className={inputCls} disabled={!catId}>
+                    <option value="">Select…</option>
+                    {subOpts.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Unit</label>
+                <input value={unit} onChange={e => setUnit(e.target.value)} className={inputCls} placeholder="ea / SF / LF…" />
+              </div>
+            </>
+          )}
+
+          {err && <p className="text-xs text-red-600">{err}</p>}
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">
+              Cancel
+            </button>
+            <button onClick={submit} disabled={saving} className="flex-1 py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 disabled:opacity-50">
+              {saving ? 'Working…' : mode === 'move' ? 'Move' : 'Copy'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 // ── Misc rates tab ────────────────────────────────────────────────────────────
 // Simple CRUD over the misc_rates table (name · rate · category). Misc values can
 // be flat fees OR coefficients/markups, so the rate is shown as a plain number
@@ -589,6 +833,7 @@ function MiscRatesPanel() {
   const [saving, setSaving] = useState(false)
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState({ category: '', name: '', rate: '' })
+  const [moveCopy, setMoveCopy] = useState(null) // misc source → MoveCopyMaterialModal
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -600,6 +845,26 @@ function MiscRatesPanel() {
     setRows(data || [])
     setLoading(false)
   }, [])
+
+  // Identity code per misc rate: MISC-<CAT>-NNNN, where NNNN is the row's stable
+  // index within its category (sorted by name) — mirrors the Vendor/Standard code.
+  const miscSeq = useMemo(() => {
+    const byCat = {}
+    const map = {}
+    ;[...rows]
+      .sort(
+        (a, b) =>
+          (a.category || '').localeCompare(b.category || '') || (a.name || '').localeCompare(b.name || '')
+      )
+      .forEach(r => {
+        const k = r.category || 'GEN'
+        byCat[k] = (byCat[k] || 0) + 1
+        map[r.id] = String(byCat[k]).padStart(4, '0')
+      })
+    return map
+  }, [rows])
+  const miscCatCode = c => ((c || 'GEN').replace(/[^a-z0-9]/gi, '').slice(0, 4).toUpperCase() || 'GEN')
+  const miscCodeFor = r => `MISC-${miscCatCode(r.category)}-${miscSeq[r.id] || '0000'}`
   useEffect(() => {
     load()
   }, [load])
@@ -672,15 +937,17 @@ function MiscRatesPanel() {
         <table className="w-full text-xs min-w-[560px]">
           <thead className="sticky top-0 z-10">
             <tr className="bg-gray-50 border-b border-gray-200 text-left text-gray-600 uppercase">
+              <th className="px-3 py-2 font-semibold">Code</th>
               <th className="px-3 py-2 font-semibold">Category</th>
               <th className="px-3 py-2 font-semibold">Name</th>
               <th className="px-3 py-2 font-semibold text-right">Rate</th>
-              <th className="px-3 py-2 w-24" />
+              <th className="px-3 py-2 w-36" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {adding && (
               <tr className="bg-green-50/40">
+                <td className="px-3 py-1.5 text-gray-300 font-mono text-[11px]">—</td>
                 <td className="px-3 py-1.5">
                   <input
                     className="w-28 border border-gray-300 rounded px-2 py-1 text-xs"
@@ -719,13 +986,13 @@ function MiscRatesPanel() {
             )}
             {loading ? (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
                   Loading…
                 </td>
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
                   No misc rates.
                 </td>
               </tr>
@@ -734,6 +1001,9 @@ function MiscRatesPanel() {
                 const isEd = editing && editing.id === r.id
                 return (
                   <tr key={r.id} className="hover:bg-gray-50 group">
+                    <td className="px-3 py-1.5 font-mono text-[11px] text-gray-600 whitespace-nowrap">
+                      {miscCodeFor(r)}
+                    </td>
                     <td className="px-3 py-1.5 text-gray-600 whitespace-nowrap">{r.category || '—'}</td>
                     <td className="px-3 py-1.5 text-gray-900 font-medium">{r.name}</td>
                     <td className="px-3 py-1.5 text-right whitespace-nowrap">
@@ -769,12 +1039,20 @@ function MiscRatesPanel() {
                           </button>
                         </>
                       ) : (
-                        <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                           <button
                             onClick={() => setEditing({ id: r.id, value: r.rate ?? '' })}
                             className="text-gray-500 hover:text-gray-800 mr-2"
                           >
                             Edit
+                          </button>
+                          <button
+                            onClick={() =>
+                              setMoveCopy({ kind: 'misc', miscId: r.id, name: r.name, rate: r.rate, category: r.category })
+                            }
+                            className="text-blue-600 hover:text-blue-800 mr-2"
+                          >
+                            Move/Copy
                           </button>
                           <button onClick={() => delRow(r.id)} className="text-red-400 hover:text-red-600">
                             Delete
@@ -789,6 +1067,17 @@ function MiscRatesPanel() {
           </tbody>
         </table>
       </div>
+
+      {moveCopy && (
+        <MoveCopyMaterialModal
+          source={moveCopy}
+          onClose={() => setMoveCopy(null)}
+          onDone={() => {
+            setMoveCopy(null)
+            load()
+          }}
+        />
+      )}
     </div>
   )
 }
