@@ -345,6 +345,16 @@ const WALL_RATE_SPECS = [
     ],
   },
   {
+    // These are the SAME rows the Demo module uses — editing here or in Demo
+    // changes the one shared rate. Excavator shares the Mini Skid rate.
+    group: 'Slope Removal (Shared Demo Module Rate)',
+    items: [
+      ['demoHandDirt', 'Hand — Dirt Removal', 'Demo', 'hr/100 SF·in', 'coefficient'],
+      ['demoMiniDirt', 'Mini Skid / Excavator — Dirt Removal', 'Demo', 'hr/100 SF·in', 'coefficient'],
+      ['demoSkidDirt', 'Skid Steer — Dirt Removal', 'Demo', 'hr/100 SF·in', 'coefficient'],
+    ],
+  },
+  {
     group: 'Dig & Haul Footing Soil (all wall types)',
     items: [
       ['footingDigHaulLab', 'Dig & Haul Footing Soil', 'Walls', 'CF/hr', 'coefficient'],

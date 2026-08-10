@@ -79,30 +79,26 @@ export default function ViewRatesModal({ title = 'Rates', rates = [], onClose, r
                 )}
                 <div className="rounded-xl border border-gray-200 divide-y divide-gray-100">
                   {(() => {
-                    const hasLabor = g.items.some(x => x.mode === 'coefficient')
-                    const hasMaterial = g.items.some(x => x.mode !== 'coefficient')
-                    const split = hasLabor && hasMaterial
-                    return g.items.map((it, i) => {
-                      // In a group that has both, label the Materials and Labor parts.
-                      const materialStart =
-                        split &&
-                        it.mode !== 'coefficient' &&
-                        (i === 0 || g.items[i - 1].mode === 'coefficient')
-                      const labelStart =
-                        it.mode === 'coefficient' && i > 0 && g.items[i - 1].mode !== 'coefficient'
-                      return (
-                      <div key={i}>
-                        {materialStart && (
-                          <div className="px-3 py-1 bg-gray-100 text-[10px] font-semibold uppercase tracking-wide text-gray-500 border-t border-gray-300">
-                            Materials
-                          </div>
-                        )}
-                        {labelStart && (
-                          <div className="px-3 py-1 bg-gray-100 text-[10px] font-semibold uppercase tracking-wide text-gray-500 border-t border-gray-300">
-                            Labor
-                          </div>
-                        )}
-                        <div className="flex items-center gap-3 px-3 py-2">
+                    // Always split a group into ONE Materials block then ONE Labor
+                    // block, each with its own header. Items keep the order the
+                    // caller gave them (Walls alphabetizes), so each block is sorted
+                    // on its own instead of materials/labor interleaving.
+                    const materials = g.items.filter(x => x.mode !== 'coefficient')
+                    const labor = g.items.filter(x => x.mode === 'coefficient')
+                    const rows = [
+                      ...(materials.length ? [{ _header: 'Materials' }, ...materials] : []),
+                      ...(labor.length ? [{ _header: 'Labor' }, ...labor] : []),
+                    ]
+                    return rows.map((it, i) =>
+                      it._header ? (
+                        <div
+                          key={`h-${i}`}
+                          className="px-3 py-1 bg-gray-100 text-[10px] font-semibold uppercase tracking-wide text-gray-500"
+                        >
+                          {it._header}
+                        </div>
+                      ) : (
+                        <div key={i} className="flex items-center gap-3 px-3 py-2">
                           <span className="text-sm text-gray-700 flex-1 min-w-0">{it.label}</span>
                           <span className="text-sm font-medium text-gray-900 tabular-nums whitespace-nowrap">
                             {fmtVal(it)}
@@ -121,9 +117,8 @@ export default function ViewRatesModal({ title = 'Rates', rates = [], onClose, r
                             onSaved={refreshAllRates}
                           />
                         </div>
-                      </div>
                       )
-                    })
+                    )
                   })()}
                 </div>
               </div>
