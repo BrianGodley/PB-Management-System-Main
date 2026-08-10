@@ -188,6 +188,12 @@ const WALL_RATES = {
   demoHandDirt: { db: 'Demo - Hand - Dirt SF', fb: 1 }, // hr per 100 SF·in (HandDemoModule sfLaborHrs)
   demoMiniDirt: { db: 'Demo - Mini - Dirt SF', fb: 1 }, // hr per 100 SF·in (MiniSkidSteerDemoModule; Excavator shares)
   demoSkidDirt: { db: 'Demo - Skid - Dirt SF', fb: 1 }, // hr per 100 SF·in (SkidSteerDemoModule)
+  // Backfilling & Compaction — SHARED with the Demo module's Grade Fill rates
+  // (per equipment; Excavator uses Mini) and Jumping Jack rate. hr per 100 SF·in.
+  backfillHandGF: { db: 'Demo - Hand - Grade Fill SF', fb: 1 },
+  backfillMiniGF: { db: 'Demo - Mini - Grade Fill SF', fb: 1 },
+  backfillSkidGF: { db: 'Demo - Skid - Grade Fill SF', fb: 1 },
+  compJJ: { db: 'Demo - Hand - JJ SF', fb: 1 }, // Jumping Jack; Hand compaction = 3× this
   demoSfToTonsDenom: { db: 'Demo SF to Tons Denom', fb: 200 }, // sfToTons: (sf / 200) × depthIn (all Demo modules)
   // Container removal (dump) — per method (misc_rates, category Demo).
   demoHandContainer: { db: 'Demo - Hand Container (Low-Boy)', fb: 770 }, // $ per container
@@ -266,6 +272,37 @@ function wallDrain(wall = {}, r, lrph) {
   const mat = dLf * pipeCost + dLf * (fabMat + grvMat)
   const hrs = dLf * pipeLab + ((fabLab + grvLab) * dLf) / (lrph || 35) // $/ft labor → hours so GPMD applies
   return { hrs, mat }
+}
+
+// ── Backfilling & Compaction ── shares the Hand Demo module's Grade Fill rate
+// (per equipment; Excavator = Mini Skid) and its Jumping Jack rate. All SF-based
+// like the Demo module: hours = (sf/100) × depthIn × rate, where sf = Length ×
+// (Width/12). Hand compaction = 3× the Jumping Jack rate. In-House only.
+const BACKFILL_METHODS = ['Hand', 'Mini Skid', 'Skid Steer', 'Excavator']
+const COMPACTION_METHODS = ['Hand', 'Jumping Jack']
+const BACKFILL_DEFAULTS = () => ({
+  bkLen: '',
+  bkWidth: '',
+  bkDepth: '',
+  bkMethod: 'Hand',
+  bkCompMethod: 'Jumping Jack',
+})
+const BACKFILL_GF_KEY = {
+  Hand: 'backfillHandGF',
+  'Mini Skid': 'backfillMiniGF',
+  'Skid Steer': 'backfillSkidGF',
+  Excavator: 'backfillMiniGF', // Excavator shares the Mini Skid Grade Fill rate
+}
+function wallBackfill(wall = {}, r) {
+  const sf = n(wall.bkLen) * (n(wall.bkWidth) / 12)
+  const depthIn = n(wall.bkDepth)
+  if (sf <= 0 || depthIn <= 0) return { hrs: 0 }
+  const gfRate = r(BACKFILL_GF_KEY[wall.bkMethod] || 'backfillHandGF')
+  const jjRate = r('compJJ')
+  const compRate = (wall.bkCompMethod || 'Jumping Jack') === 'Hand' ? 3 * jjRate : jjRate
+  const backfillHrs = (sf / 100) * depthIn * gfRate
+  const compHrs = (sf / 100) * depthIn * compRate
+  return { hrs: backfillHrs + compHrs }
 }
 
 // Method pickers for the per-wall Demo section (Slope Removal has 4 options,
@@ -434,6 +471,17 @@ const WALL_RATE_SPECS = [
     ],
   },
   {
+    // Shared with the Demo module's Grade Fill + Jumping Jack rates. Excavator
+    // uses the Mini Skid rate; Hand compaction = 3× the Jumping Jack rate.
+    group: 'Backfilling & Compaction (Shared Demo Module Rate)',
+    items: [
+      ['backfillHandGF', 'Hand — Grade Fill', 'Demo', 'hr/100 SF·in', 'coefficient'],
+      ['backfillMiniGF', 'Mini Skid / Excavator — Grade Fill', 'Demo', 'hr/100 SF·in', 'coefficient'],
+      ['backfillSkidGF', 'Skid Steer — Grade Fill', 'Demo', 'hr/100 SF·in', 'coefficient'],
+      ['compJJ', 'Jumping Jack Compaction (Hand = 3×)', 'Demo', 'hr/100 SF·in', 'coefficient'],
+    ],
+  },
+  {
     // Shares the Drainage module's French-drain rates — editing here or in
     // Drainage changes the one shared rate. Category 'Drainage' + explicit table
     // so the RateEditPopover writes the SHARED Drainage rows.
@@ -531,6 +579,7 @@ const DEFAULT_CMU = () => ({
   wpRows: [blankWpRow()],
   ...DEMO_DEFAULTS(),
   ...DRAIN_DEFAULTS(),
+  ...BACKFILL_DEFAULTS(),
   finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
   capRows: [blankCapRow()],
 })
@@ -546,6 +595,7 @@ const DEFAULT_PIP = () => ({
   wpRows: [blankWpRow()],
   ...DEMO_DEFAULTS(),
   ...DRAIN_DEFAULTS(),
+  ...BACKFILL_DEFAULTS(),
   finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
   capRows: [blankCapRow()],
 })
@@ -566,6 +616,7 @@ const DEFAULT_MODULAR = () => ({
   wpRows: [blankWpRow()],
   ...DEMO_DEFAULTS(),
   ...DRAIN_DEFAULTS(),
+  ...BACKFILL_DEFAULTS(),
   finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
   capRows: [blankCapRow()],
 })
@@ -585,6 +636,7 @@ const DEFAULT_BRICK = () => ({
   wpRows: [blankWpRow()],
   ...DEMO_DEFAULTS(),
   ...DRAIN_DEFAULTS(),
+  ...BACKFILL_DEFAULTS(),
   finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
   capRows: [blankCapRow()],
 })
@@ -1437,6 +1489,17 @@ function calcWalls(
   ;(state.brickWalls || []).forEach(addDrain)
   addDrain(state.timberDrain || {})
 
+  // ── Per-wall Backfilling & Compaction — grade-fill (per equipment) + compaction
+  //    hours, sharing the Demo module's rates. In-House structural hours only.
+  const addBackfill = w => {
+    structuralHrs += wallBackfill(w, r).hrs
+  }
+  ;(state.cmuWalls || []).forEach(addBackfill)
+  ;(state.pipWalls || []).forEach(addBackfill)
+  ;(state.modularWalls || []).forEach(addBackfill)
+  ;(state.brickWalls || []).forEach(addBackfill)
+  addBackfill(state.timberBackfill || {})
+
   // ── Three labor buckets for the summary (raw hours, pre-difficulty/walk):
   //   • mainInstallHrs = structural(minus timber) + finish + cap + wp + man
   //   • demoHrs        = the per-wall Demo total (above)
@@ -1610,6 +1673,7 @@ function initCmuWalls(src = {}) {
       subEach: '',
       ...DEMO_DEFAULTS(),
       ...DRAIN_DEFAULTS(),
+  ...BACKFILL_DEFAULTS(),
       ...w,
       footingPump: w.footingPump ?? legacyPump,
       groutPump: w.groutPump ?? legacyGrout,
@@ -1651,6 +1715,7 @@ function initPipWalls(src = {}) {
       subEach: '',
       ...DEMO_DEFAULTS(),
       ...DRAIN_DEFAULTS(),
+  ...BACKFILL_DEFAULTS(),
       ...w,
       footingPump: w.footingPump ?? 'Yes',
       wpRows: initWallWp(w),
@@ -1680,6 +1745,7 @@ function initModularWalls(src = {}) {
       subEach: '',
       ...DEMO_DEFAULTS(),
       ...DRAIN_DEFAULTS(),
+  ...BACKFILL_DEFAULTS(),
       ...w,
       footingPump: w.footingPump ?? legacyPump,
       wpRows: initWallWp(w),
@@ -1696,6 +1762,7 @@ function initBrickWalls(src = {}) {
       subEach: '',
       ...DEMO_DEFAULTS(),
       ...DRAIN_DEFAULTS(),
+  ...BACKFILL_DEFAULTS(),
       ...w,
       footingPump: w.footingPump ?? legacyPump,
       wpRows: initWallWp(w),
@@ -1803,6 +1870,7 @@ function makeTab(src = {}) {
     // Timber wall's own Drainage (French Drain) section — a nested object carrying
     // the same drain* fields as each wall entry.
     timberDrain: { ...DRAIN_DEFAULTS(), ...(src.timberDrain || {}) },
+    timberBackfill: { ...BACKFILL_DEFAULTS(), ...(src.timberBackfill || {}) },
     manualRows: src.manualRows ?? DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
   }
 }
@@ -2196,6 +2264,48 @@ function WallDrainageSection({ wall = {}, onChange }) {
   )
 }
 
+function WallBackfillSection({ wall = {}, onChange }) {
+  const set = onChange
+  const methodOpts = list => list.map(m => ({ value: m, label: m }))
+  return (
+    <div className="mb-3">
+      <label className="block text-xs text-gray-800 mb-1 font-medium">Backfilling and Compaction</label>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Length (LF)</label>
+          <NumInput value={wall.bkLen} onChange={set('bkLen')} />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Width (in)</label>
+          <NumInput value={wall.bkWidth} onChange={set('bkWidth')} />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Depth (in)</label>
+          <NumInput value={wall.bkDepth} onChange={set('bkDepth')} />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Backfill Method</label>
+          <DropdownSelect
+            className="input text-sm py-1.5 w-full"
+            value={wall.bkMethod || 'Hand'}
+            onChange={set('bkMethod')}
+            options={methodOpts(BACKFILL_METHODS)}
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Compaction</label>
+          <DropdownSelect
+            className="input text-sm py-1.5 w-full"
+            value={wall.bkCompMethod || 'Jumping Jack'}
+            onChange={set('bkCompMethod')}
+            options={methodOpts(COMPACTION_METHODS)}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── CMU Wall Entry ────────────────────────────────────────────────────────────
 function CmuWallEntry({
   wall,
@@ -2240,6 +2350,7 @@ function CmuWallEntry({
         )}
       </div>
       <WallDemoSection wall={wall} onChange={set} />
+      <WallBackfillSection wall={wall} onChange={set} />
       <label className="block text-xs text-gray-800 mb-1 font-medium">Installation</label>
       <div className="grid grid-cols-2 gap-2">
         {/* Vendor — the ONLY thing that changes where the material $ comes
@@ -2479,6 +2590,7 @@ function PipWallEntry({
         )}
       </div>
       <WallDemoSection wall={wall} onChange={set} />
+      <WallBackfillSection wall={wall} onChange={set} />
       <label className="block text-xs text-gray-800 mb-1 font-medium">Installation</label>
       <div className="grid grid-cols-2 gap-2">
         <div className="col-span-2">
@@ -2631,6 +2743,7 @@ function ModularWallEntry({
         )}
       </div>
       <WallDemoSection wall={wall} onChange={set} />
+      <WallBackfillSection wall={wall} onChange={set} />
       <label className="block text-xs text-gray-800 mb-1 font-medium">Installation</label>
       <div className="grid grid-cols-2 gap-2">
         <div className="col-span-2">
@@ -3482,6 +3595,12 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
             wall={cur.timberDemo || {}}
             onChange={f => val =>
               setField('timberDemo')(prev => ({ ...(prev || {}), [f]: val }))
+            }
+          />
+          <WallBackfillSection
+            wall={cur.timberBackfill || {}}
+            onChange={f => val =>
+              setField('timberBackfill')(prev => ({ ...(prev || {}), [f]: val }))
             }
           />
           <WallDrainageSection
