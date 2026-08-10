@@ -2870,7 +2870,9 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
           ? [{ label, table: 'labor_rates', name: WALL_RATES[key].db, category, unitLabel: unit, mode, value: r(key) }]
           : materialRateRows(WALL_RATES[key].db, unit, r(key))
       ),
-    ],
+    ].sort((a, b) =>
+      (a.label || '').localeCompare(b.label || '', undefined, { sensitivity: 'base' })
+    ),
   }))
 
   // ── Vendor helpers ──────────────────────────────────────────────────────────
