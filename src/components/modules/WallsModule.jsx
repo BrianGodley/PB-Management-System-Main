@@ -2240,7 +2240,6 @@ function CmuWallEntry({
         )}
       </div>
       <WallDemoSection wall={wall} onChange={set} />
-      <WallDrainageSection wall={wall} onChange={set} />
       <label className="block text-xs text-gray-800 mb-1 font-medium">Installation</label>
       <div className="grid grid-cols-2 gap-2">
         {/* Vendor — the ONLY thing that changes where the material $ comes
@@ -2390,30 +2389,6 @@ function CmuWallEntry({
           />
         </div>
       </div>
-      {hasData && detail && (
-        <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 text-xs text-gray-600 flex flex-wrap gap-3">
-          <span>
-            Grey: <strong>{detail.orderGreyBlock}</strong>
-          </span>
-          <span>
-            BB: <strong>{detail.orderBBBlock}</strong>
-          </span>
-          <span>
-            Footing: <strong>{detail.footingCY.toFixed(3)} CY</strong>
-          </span>
-          <span>
-            Grout: <strong>{detail.groutCY.toFixed(3)} CY</strong>
-          </span>
-          <span>
-            Rebar: <strong>{Math.round(detail.totalRebarLF)} LF</strong>
-          </span>
-          {detail.curveAdd > 0 && (
-            <span>
-              Curve: <strong>+{detail.curveAdd.toFixed(2)} hrs</strong>
-            </span>
-          )}
-        </div>
-      )}
       {isSub && (
         <div className="mt-2 flex items-center gap-2 flex-wrap">
           <span className="text-xs text-gray-500">Sub flat $/LF</span>
@@ -2433,6 +2408,7 @@ function CmuWallEntry({
           </span>
         </div>
       )}
+      <WallDrainageSection wall={wall} onChange={set} />
       <WallCapsEditor
         rows={wall.capRows || []}
         vendorOptions={vendorOptions}
@@ -2503,7 +2479,6 @@ function PipWallEntry({
         )}
       </div>
       <WallDemoSection wall={wall} onChange={set} />
-      <WallDrainageSection wall={wall} onChange={set} />
       <label className="block text-xs text-gray-800 mb-1 font-medium">Installation</label>
       <div className="grid grid-cols-2 gap-2">
         <div className="col-span-2">
@@ -2584,6 +2559,7 @@ function PipWallEntry({
           </span>
         </div>
       )}
+      <WallDrainageSection wall={wall} onChange={set} />
       <WallCapsEditor
         rows={wall.capRows || []}
         vendorOptions={vendorOptions}
@@ -2655,7 +2631,6 @@ function ModularWallEntry({
         )}
       </div>
       <WallDemoSection wall={wall} onChange={set} />
-      <WallDrainageSection wall={wall} onChange={set} />
       <label className="block text-xs text-gray-800 mb-1 font-medium">Installation</label>
       <div className="grid grid-cols-2 gap-2">
         <div className="col-span-2">
@@ -2807,6 +2782,7 @@ function ModularWallEntry({
           </span>
         </div>
       )}
+      <WallDrainageSection wall={wall} onChange={set} />
       <WallCapsEditor
         rows={wall.capRows || []}
         vendorOptions={vendorOptions}
