@@ -456,6 +456,9 @@ export default function EstimateDetail() {
   // estimate_modules.module_name (a new column). Falls back to module_type
   // for legacy rows / when left blank.
   const [moduleNameInput, setModuleNameInput] = useState('')
+  // Inline module-name rename: the name shows as text with a pencil; clicking the
+  // pencil turns it into an input. Reset whenever a module opens/closes.
+  const [renamingModule, setRenamingModule] = useState(false)
   // pickerStep: 1 = pick type, 2 = name the module. Auto-advances when the
   // user picks a type from step 1.
   const [pickerStep, setPickerStep] = useState(1)
@@ -737,6 +740,7 @@ export default function EstimateDetail() {
     setShowModulePicker(false)
     setSelectedType(null)
     setModuleNameInput('')
+    setRenamingModule(false)
     setPickerStep(1)
     setSwitchDemoData(null)
     setModuleForm({ man_days: '', material_cost: '', notes: '' })
@@ -750,6 +754,7 @@ export default function EstimateDetail() {
     setSelectedType(mod.module_type)
     setPickerStep(3) // skip the two add-flow steps when editing
     setModuleNameInput(mod.module_name || mod.module_type)
+    setRenamingModule(false)
     // Pre-fill generic form in case it's a non-specific module type
     setModuleForm({
       man_days: mod.man_days || '',
@@ -2408,82 +2413,65 @@ export default function EstimateDetail() {
               className={`relative bg-white rounded-2xl shadow-xl w-full mx-4 flex flex-col ${selectedType === 'Pavers' || selectedType === 'Pool' ? 'max-w-6xl' : 'max-w-5xl'}`}
               style={{ maxHeight: '90dvh' }}
             >
-              <div className="flex items-start justify-between px-6 pt-5 pb-3 border-b border-gray-200 flex-shrink-0">
-                <div className="flex-1">
-                  {editingModule ? (
+              <div className="flex items-center justify-between gap-3 px-6 pt-5 pb-3 border-b border-gray-200 flex-shrink-0">
+                {/* Breadcrumb: Project › Module (folder-tree style). In edit
+                    mode a pencil next to the module name opens an inline rename. */}
+                <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                  <span className="text-sm text-gray-500 truncate">
+                    {selectedProject?.project_name}
+                  </span>
+                  <span className="text-gray-300 text-sm flex-shrink-0">›</span>
+                  {editingModule && !moduleReadOnly && renamingModule ? (
                     <input
                       type="text"
+                      autoFocus
                       value={moduleNameInput}
                       onChange={e => setModuleNameInput(e.target.value)}
-                      disabled={moduleReadOnly}
+                      onBlur={() => setRenamingModule(false)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === 'Escape') setRenamingModule(false)
+                      }}
                       placeholder={editingModule.module_type || selectedType}
                       title="Edit the module name — saved when you click Update Module"
-                      className="w-full max-w-md rounded-md border border-dashed border-gray-300 bg-white px-2 py-1 text-xl font-bold text-gray-900 focus:border-green-500 focus:outline-none disabled:bg-gray-50 disabled:text-gray-700"
+                      className="min-w-0 flex-1 max-w-md rounded-md border border-dashed border-gray-300 bg-white px-2 py-0.5 text-lg font-bold text-gray-900 focus:border-green-500 focus:outline-none"
                     />
                   ) : (
-                    <h2 className="text-xl font-bold text-gray-900">
-                      {(moduleNameInput && moduleNameInput.trim()) ||
-                        editingModule?.module_name ||
-                        selectedType}
-                    </h2>
+                    <>
+                      <span className="text-lg font-bold text-gray-900 truncate">
+                        {(moduleNameInput && moduleNameInput.trim()) ||
+                          editingModule?.module_name ||
+                          selectedType}
+                      </span>
+                      {editingModule && !moduleReadOnly && (
+                        <button
+                          type="button"
+                          onClick={() => setRenamingModule(true)}
+                          title="Rename this module"
+                          className="text-gray-400 hover:text-green-600 flex-shrink-0"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M12 20h9" />
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                          </svg>
+                        </button>
+                      )}
+                    </>
                   )}
-                  {/* Project-name row: project name on the left, Edit Rates
-                      toggle on the right so it sits directly above the
-                      "Total Price" cell of the GPMD bar (which is right-most
-                      in the dark bar). Permission-gated and module-only. */}
-                  <div className="flex items-center justify-between gap-3 mt-0.5">
-                    <p className="text-sm text-gray-500">{selectedProject?.project_name}</p>
-                    {/* Walls uses the in-module View Rates popup instead, so its
-                        header Edit Rates button is hidden. */}
-                    {canAccessRates && !moduleReadOnly && selectedType !== 'Walls' && (
-                      <button
-                        type="button"
-                        onClick={toggleRateIcons}
-                        title={
-                          showRateIcons
-                            ? 'Hide the inline rate-edit calculator icons'
-                            : 'Show calculator icons next to every rate so you can adjust master rates inline'
-                        }
-                        className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md border transition-colors ${
-                          showRateIcons
-                            ? 'bg-green-600 border-green-500 text-white hover:bg-green-700'
-                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
-                        }`}
-                      >
-                        <svg
-                          className="w-3 h-3"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.5"
-                        >
-                          <rect x="4" y="3" width="16" height="18" rx="2" />
-                          <line x1="8" y1="7" x2="16" y2="7" />
-                          <line x1="8" y1="11" x2="10" y2="11" />
-                          <line x1="13" y1="11" x2="16" y2="11" />
-                          <line x1="8" y1="15" x2="10" y2="15" />
-                          <line x1="13" y1="15" x2="16" y2="15" />
-                          <line x1="8" y1="19" x2="10" y2="19" />
-                          <line x1="13" y1="19" x2="16" y2="19" />
-                        </svg>
-                        Edit Rates
-                        <span
-                          className={`text-[10px] uppercase tracking-wide ml-0.5 ${
-                            showRateIcons ? 'text-green-100' : 'text-gray-500'
-                          }`}
-                        >
-                          {showRateIcons ? 'on' : 'off'}
-                        </span>
-                      </button>
-                    )}
-                  </div>
                 </div>
-                {/* Slot for the module's In House / Subcontractor toggle,
-                    portalled up here (right of the module name) by the module. */}
-                <div id="pbs-module-worktype-slot" className="flex-shrink-0 self-center mr-3" />
+                {/* Right side: the module's In House / Subcontractor toggle
+                    (portalled in here), sitting just left of the close ✕. */}
+                <div id="pbs-module-worktype-slot" className="flex-shrink-0 self-center" />
                 <button
                   onClick={closeModuleFlow}
-                  className="text-gray-400 hover:text-gray-600 text-base leading-none mt-0.5"
+                  className="text-gray-400 hover:text-gray-600 text-base leading-none flex-shrink-0"
                   aria-label="Close"
                 >
                   ✕
