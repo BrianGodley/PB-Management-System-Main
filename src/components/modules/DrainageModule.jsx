@@ -45,6 +45,7 @@ const FIXTURE_TYPES = {
   '4" Paver Top Inlet': { laborHrs: 0.75, cost: 23.63, dbName: '4" Paver Top Inlet' },
   '9" x 9" Catch Basin': { laborHrs: 0.495, cost: 16.9, dbName: '9" x 9" Catch Basin' },
   '12" x 12" Catch Basin': { laborHrs: 0.495, cost: 21.6, dbName: '12" x 12" Catch Basin' },
+  '24" x 24" Catch Basin': { laborHrs: 0.495, cost: 225, dbName: '24" x 24" Catch Basin' },
 }
 
 // minutes per cubic foot by equipment type
@@ -81,11 +82,11 @@ const FIXTURE_LABOR_RATE_NAME = {
   '4" Paver Top Inlet': 'Drainage 4" Paver Top Inlet Labor',
   '9" x 9" Catch Basin': 'Drainage 9" x 9" Catch Basin Labor',
   '12" x 12" Catch Basin': 'Drainage 12" x 12" Catch Basin Labor',
+  '24" x 24" Catch Basin': 'Drainage 24" x 24" Catch Basin Labor',
 }
 
 // Additional item rates — qty drives both labor hours AND material cost
 const ADD_ITEM_RATES = {
-  pumpVault: { laborHrs: 5, matCost: 275, label: 'Pump Vault', dbName: 'Pump Vault' },
   sumpPump: { laborHrs: 3, matCost: 650, label: 'Sump Pump', dbName: 'Sump Pump' },
   curbCore: { laborHrs: 2, matCost: 250, label: 'Curb Core *', dbName: 'Curb Core' },
   hydrocut: {
@@ -99,7 +100,6 @@ const ADD_ITEM_RATES = {
 // Labor-coefficient lookup for Additional Items — matches names seeded in
 // supabase-drainage-labor-coefficients.sql so the popover edits the right row.
 const ADD_ITEM_LABOR_RATE_NAME = {
-  pumpVault: 'Drainage Pump Vault Labor',
   sumpPump: 'Drainage Sump Pump Labor',
   curbCore: 'Drainage Curb Core Labor',
   hydrocut: 'Drainage Hydrocut Under Hardscape Labor',
@@ -343,7 +343,6 @@ function calcDrainage(
   // Sub tab's own flat-priced Drain Fixtures + Additional Items — independent
   // of the In-House hourly sections. Each rate is a fixed sub cost.
   const subFixtureFlat = subRates['Drainage Sub - Fixture Flat'] ?? 20
-  const subPumpVaultRate = subRates['Drainage Sub - Pump Vault'] ?? 250
   const subSumpPumpRate = subRates['Drainage Sub - Sump Pump'] ?? 300
   const subCurbCoreRate = subRates['Drainage Sub - Curb Core'] ?? 250
   const subHydrocutRate = subRates['Drainage Sub - Hydrocut Per LF'] ?? 10
@@ -351,7 +350,6 @@ function calcDrainage(
   const subFixtureCost = subFixQty * subFixtureFlat
   const sa = subAdditionalItems || {}
   const subAdditionalCost =
-    n(sa.pumpVaultQty) * subPumpVaultRate +
     n(sa.sumpPumpQty) * subSumpPumpRate +
     n(sa.curbCoreQty) * subCurbCoreRate +
     n(sa.hydrocutLF) * subHydrocutRate
@@ -382,7 +380,6 @@ function calcDrainage(
     subFixtureFlat,
     subFixtureCost,
     subFixQty,
-    subPumpVaultRate,
     subSumpPumpRate,
     subCurbCoreRate,
     subHydrocutRate,
@@ -435,10 +432,8 @@ const DEFAULT_PIPE_ROWS = [{ type: '3" SDR 35', lf: '', vendor: 'auto' }]
 const DEFAULT_FIXTURE_ROWS = [{ type: '3" Area Drain', qty: '', vendor: 'auto' }]
 const DEFAULT_FRENCH_ROWS = [
   { type: '4" Perforated', lf: '', vendor: 'auto' },
-  { type: '4" Perforated', lf: '', vendor: 'auto' },
 ]
 const DEFAULT_ADDITIONAL = {
-  pumpVaultQty: '',
   sumpPumpQty: '',
   curbCoreQty: '',
   hydrocutQty: '',
@@ -446,8 +441,6 @@ const DEFAULT_ADDITIONAL = {
 }
 const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 1', hours: '', materials: '', subCost: '' },
-  { label: 'Misc 2', hours: '', materials: '', subCost: '' },
-  { label: 'Misc 3', hours: '', materials: '', subCost: '' },
 ]
 
 // ── Main Component ─────────────────────────────────────────────────────────────
@@ -583,7 +576,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   )
   const [subAdditionalItems, setSubAdditionalItems] = useState(
     initialData?.subAdditionalItems ?? {
-      pumpVaultQty: '',
       sumpPumpQty: '',
       curbCoreQty: '',
       hydrocutLF: '',
@@ -949,15 +941,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           value: subRates['Drainage Sub - Fixture Flat'] ?? 20,
         },
         {
-          label: 'Drainage Sub - Pump Vault',
-          table: 'subcontractor_rates',
-          name: 'Drainage Sub - Pump Vault',
-          category: 'Drainage',
-          mode: 'currency',
-          unitLabel: 'ea',
-          value: subRates['Drainage Sub - Pump Vault'] ?? 250,
-        },
-        {
           label: 'Drainage Sub - Sump Pump',
           table: 'subcontractor_rates',
           name: 'Drainage Sub - Sump Pump',
@@ -1183,13 +1166,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
               </thead>
               <tbody>
                 {[
-                  {
-                    key: 'pumpVaultQty',
-                    label: 'Pump Vault',
-                    rate: calc.subPumpVaultRate,
-                    rateName: 'Drainage Sub - Pump Vault',
-                    unit: 'ea',
-                  },
                   {
                     key: 'sumpPumpQty',
                     label: 'Sump Pump',

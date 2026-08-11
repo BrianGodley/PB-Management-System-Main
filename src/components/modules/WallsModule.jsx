@@ -675,6 +675,26 @@ const DEFAULT_BRICK = () => ({
   finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
   capRows: [blankCapRow()],
 })
+// Timber / Lumber wall — now a multi-wall array entry (mirrors CMU/PIP/etc.).
+// Each entry carries its OWN install inputs (wood type/vendor, LF, height, posts,
+// footing) PLUS its own Demo / Drainage / Backfilling sub-sections (flattened
+// fields, same as every other wall type). All pricing/labor is table-driven.
+const DEFAULT_TIMBER = () => ({
+  vendor: 'House',
+  timberType: 'Railroad Treated',
+  lf: '',
+  heightIn: '',
+  posts: '',
+  subEach: '',
+  footingWIn: '',
+  footingDIn: '',
+  horizBars: '2',
+  footingRebarSize: '#4',
+  footingPump: 'No',
+  ...DEMO_DEFAULTS(),
+  ...DRAIN_DEFAULTS(),
+  ...BACKFILL_DEFAULTS(),
+})
 
 // ── Fixed per-section type lists (the Item dropdown; NOT from the DB) ─────────
 // Only the Vendor changes the material price; the Item (type) drives the
@@ -1457,34 +1477,39 @@ function calcWalls(
     brickDetails.push(res.detail)
   })
 
-  if (n(state.timberLF) > 0 || n(state.timberPosts) > 0) {
-    const addlCourses = Math.max(0, Math.ceil((n(state.timberHeightIn) - 8) / 8))
-    const postQty = n(state.timberPosts)
+  // Timber / Lumber — now a multi-wall array. Each wall runs the SAME install math
+  // (wood + course + steel posts + footing rebar/pour) and accumulates into the
+  // timberHrs (Timber crew) bucket; material/sub flow into structuralMat/Sub. The
+  // per-wall Demo (slope + dig-haul) is added below via addDemo → demoHrs (Demo
+  // crew), NOT here — install stays in the Timber bucket.
+  ;(state.timberWalls || []).forEach(wall => {
+    if (!(n(wall.lf) > 0 || n(wall.posts) > 0)) return
+    const addlCourses = Math.max(0, Math.ceil((n(wall.heightIn) - 8) / 8))
+    const postQty = n(wall.posts)
     // Labor + post rates are table-driven (WALL_RATES → labor_rates/misc_rates).
-    // Timber labor now lands in its OWN bucket (was structuralHrs) so the summary
-    // can show / crew it independently; the aggregate total is unchanged.
+    // Timber labor lands in its OWN bucket so the summary can crew it independently.
     timberHrs +=
-      n(state.timberLF) * (r('timberLfLab') + addlCourses * r('timberCourseLab')) +
+      n(wall.lf) * (r('timberLfLab') + addlCourses * r('timberCourseLab')) +
       postQty * r('timberPostLab')
     // Wood price ($/unit) from the selected type's Walls › Wood catalog entry for
     // the chosen vendor; legacy default $50 keeps existing estimates unchanged.
-    const woodPrice = catalogItemPrice(materialRows, WOOD_SUBCAT, state.timberType, state.timberVendor, 50)
+    const woodPrice = catalogItemPrice(materialRows, WOOD_SUBCAT, wall.timberType, wall.vendor, 50)
     const woodMat =
-      n(state.timberLF) * (r('timberBdftBase') + addlCourses * r('timberBdftCourse')) * woodPrice +
+      n(wall.lf) * (r('timberBdftBase') + addlCourses * r('timberBdftCourse')) * woodPrice +
       postQty * r('timberPostMat')
 
     // Timber footing — dig + horizontal rebar + pour + concrete, identical math
     // to brick / PIP. Footing concrete + rebar resolve at Standard (House) prices
-    // (timber's vendor picker is wood-only). Footing labor lands in the timber
+    // (timber's vendor picker is wood-only). Footing POUR labor lands in the timber
     // bucket so it's crewed with the timber wall. Blank width/depth ⇒ 0 footing.
-    const tLF = n(state.timberLF)
-    const tfW = n(state.timberFootingWIn)
-    const tfD = n(state.timberFootingDIn)
-    const tHb = n(state.timberHorizBars)
+    const tLF = n(wall.lf)
+    const tfW = n(wall.footingWIn)
+    const tfD = n(wall.footingDIn)
+    const tHb = n(wall.horizBars)
     const tFootingCF = tfW > 0 && tfD > 0 ? tLF * (tfW / 12) * (tfD / 12) : 0
     const tFootingCY = tFootingCF / 27
     const tHorizRebarLF = tHb * tLF
-    const tFootPump = (state.timberFootingPump ?? 'No') === 'Yes'
+    const tFootPump = (wall.footingPump ?? 'No') === 'Yes'
     const tpm = key => wallMatPrice(WALL_RATES[key].db, 'House', materialRows, mp, WALL_RATES[key].fb)
     // Footing excavation is priced in the Dig and Haul Footing Soil section —
     // install (rebar + pour) + material only here.
@@ -1492,18 +1517,17 @@ function calcWalls(
       (tHorizRebarLF > 0 ? tHorizRebarLF / r('rebarLab') : 0) +
       (tFootingCY > 0 ? tFootingCY / r(tFootPump ? 'footingPourPumpLab' : 'footingPourHandLab') : 0)
     const tFootConcPrc = tFootPump ? tpm('concreteTruck') : tpm('concreteHand')
-    const tFootingMat = tFootingCY * tFootConcPrc + tHorizRebarLF * rebarPrice(state.timberFootingRebarSize, r)
+    const tFootingMat = tFootingCY * tFootConcPrc + tHorizRebarLF * rebarPrice(wall.footingRebarSize, r)
     timberHrs += tFootingHrs
 
     const timberMat = woodMat + tFootingMat
     structuralMat += timberMat
     // Sub flat: default $/LF = In-House timber material ÷ LF (wood + footing +
-    // posts folded in); overridable via timberSubEach. Posts-only bills flat.
+    // posts folded in); overridable via the wall's subEach. Posts-only bills flat.
     const tSubUnit = tLF > 0 ? timberMat / tLF : 0
-    const tSubEach =
-      state.timberSubEach !== '' && state.timberSubEach != null ? n(state.timberSubEach) : tSubUnit
+    const tSubEach = wall.subEach !== '' && wall.subEach != null ? n(wall.subEach) : tSubUnit
     structuralSubMat += tLF > 0 ? tLF * tSubEach : timberMat
-  }
+  })
 
   // ── Wall Finishes & Caps — now specified PER WALL. Gather each wall's own
   //    finishRows / capRows across every wall type; per-row math is identical
@@ -1562,7 +1586,8 @@ function calcWalls(
   ;(state.pipWalls || []).forEach(addDemo)
   ;(state.modularWalls || []).forEach(addDemo)
   ;(state.brickWalls || []).forEach(addDemo)
-  addDemo(state.timberDemo || {})
+  // Each timber wall's Demo (slope + dig-haul footing soil) → demoHrs (Demo crew).
+  ;(state.timberWalls || []).forEach(addDemo)
 
   // ── Per-wall Drainage (French Drain) — one perforated pipe run (+ optional
   //    fabric + gravel bed) per wall, table-driven via the shared Drainage rows.
@@ -1578,7 +1603,7 @@ function calcWalls(
   ;(state.pipWalls || []).forEach(addDrain)
   ;(state.modularWalls || []).forEach(addDrain)
   ;(state.brickWalls || []).forEach(addDrain)
-  addDrain(state.timberDrain || {})
+  ;(state.timberWalls || []).forEach(addDrain)
 
   // ── Per-wall Backfilling & Compaction — grade-fill (per equipment) + compaction
   //    hours, sharing the Demo module's rates. In-House structural hours only.
@@ -1589,7 +1614,7 @@ function calcWalls(
   ;(state.pipWalls || []).forEach(addBackfill)
   ;(state.modularWalls || []).forEach(addBackfill)
   ;(state.brickWalls || []).forEach(addBackfill)
-  addBackfill(state.timberBackfill || {})
+  ;(state.timberWalls || []).forEach(addBackfill)
 
   // ── Three labor buckets for the summary (raw hours, pre-difficulty/walk):
   //   • mainInstallHrs = structural(minus timber) + finish + cap + wp + man
@@ -1871,6 +1896,56 @@ function initBrickWalls(src = {}) {
     }))
   return [DEFAULT_BRICK()]
 }
+// Timber walls hydrate exactly like the other wall arrays: map each saved entry,
+// folding in its OWN Demo / Drainage / Backfill defaults + install defaults, then
+// overlaying the saved fields. LEGACY: a pre-array estimate stored ONE flat timber
+// wall (timberLF/timberType/… + nested timberDemo/timberDrain/timberBackfill) —
+// migrate it into a single array entry so old bids open byte-for-byte unchanged.
+function initTimberWalls(src = {}) {
+  if (src.timberWalls)
+    return src.timberWalls.map(w => ({
+      vendor: 'House',
+      timberType: 'Railroad Treated',
+      subEach: '',
+      horizBars: '2',
+      footingRebarSize: '#4',
+      footingPump: 'No',
+      ...DEMO_DEFAULTS(),
+      ...DRAIN_DEFAULTS(),
+      ...BACKFILL_DEFAULTS(),
+      ...w,
+    }))
+  const hasLegacyTimber =
+    src.timberLF !== undefined ||
+    src.timberType !== undefined ||
+    src.timberPosts !== undefined ||
+    src.timberDemo != null ||
+    src.timberDrain != null ||
+    src.timberBackfill != null
+  if (hasLegacyTimber)
+    return [
+      {
+        vendor: src.timberVendor ?? 'House',
+        timberType: src.timberType ?? 'Railroad Treated',
+        lf: src.timberLF ?? '',
+        heightIn: src.timberHeightIn ?? '',
+        posts: src.timberPosts ?? '',
+        subEach: src.timberSubEach ?? '',
+        footingWIn: src.timberFootingWIn ?? '',
+        footingDIn: src.timberFootingDIn ?? '',
+        horizBars: src.timberHorizBars ?? '2',
+        footingRebarSize: src.timberFootingRebarSize ?? '#4',
+        footingPump: src.timberFootingPump ?? 'No',
+        ...DEMO_DEFAULTS(),
+        ...DRAIN_DEFAULTS(),
+        ...BACKFILL_DEFAULTS(),
+        ...(src.timberDemo || {}),
+        ...(src.timberDrain || {}),
+        ...(src.timberBackfill || {}),
+      },
+    ]
+  return [DEFAULT_TIMBER()]
+}
 function initWpRows(src = {}) {
   if (Array.isArray(src.wpRows) && src.wpRows.length)
     return src.wpRows.map(w => ({ vendor: 'House', subEach: '', ...w }))
@@ -1953,26 +2028,10 @@ function makeTab(src = {}) {
     modularFootingPump: src.modularFootingPump ?? 'No',
     brickWalls: initBrickWalls(src),
     brickFootingPump: src.brickFootingPump ?? 'No',
-    timberLF: src.timberLF ?? '',
-    timberHeightIn: src.timberHeightIn ?? '',
-    timberType: src.timberType ?? 'Railroad Treated',
-    timberVendor: src.timberVendor ?? 'House',
-    timberPosts: src.timberPosts ?? '',
-    timberSubEach: src.timberSubEach ?? '',
-    // Timber footing (dig + rebar + pour + concrete, same math as brick/PIP).
-    // Default blank so existing timber estimates open with a 0-footing (no change).
-    timberFootingWIn: src.timberFootingWIn ?? '',
-    timberFootingDIn: src.timberFootingDIn ?? '',
-    timberHorizBars: src.timberHorizBars ?? '2',
-    timberFootingRebarSize: src.timberFootingRebarSize ?? '#4',
-    timberFootingPump: src.timberFootingPump ?? 'No',
-    // Timber wall's own Demo section (inline block, not a wall array) — a nested
-    // object carrying the same demo* fields as each wall entry.
-    timberDemo: { ...DEMO_DEFAULTS(), ...(src.timberDemo || {}) },
-    // Timber wall's own Drainage (French Drain) section — a nested object carrying
-    // the same drain* fields as each wall entry.
-    timberDrain: { ...DRAIN_DEFAULTS(), ...(src.timberDrain || {}) },
-    timberBackfill: { ...BACKFILL_DEFAULTS(), ...(src.timberBackfill || {}) },
+    // Timber / Lumber is now a multi-wall array (mirrors CMU/PIP/etc.). Each entry
+    // carries its own install inputs + Demo/Drainage/Backfill. Legacy flat timber
+    // estimates migrate into a single array entry inside initTimberWalls.
+    timberWalls: initTimberWalls(src),
     manualRows: src.manualRows ?? DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
   }
 }
@@ -3071,6 +3130,146 @@ function ModularWallEntry({
   )
 }
 
+// ── Timber / Lumber Wall Entry ────────────────────────────────────────────────
+// One timber wall in the timberWalls array. Mirrors CmuWallEntry: a header with
+// "Timber Wall N" + Remove, the shared Demo / Backfilling / Drainage sub-sections
+// (flattened fields), then the timber-specific Installation + Footing inputs and
+// the Sub flat $/LF field. All pricing/labor is table-driven in the calc.
+function TimberWallEntry({
+  wall,
+  idx,
+  total,
+  onChange,
+  onRemove,
+  materialRows,
+  vendorOptions,
+  isSub,
+}) {
+  const set = field => val => onChange(idx, field, val)
+  return (
+    <div className="border border-gray-200 rounded-xl p-3 mb-3 bg-white">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-semibold text-black uppercase tracking-wide">
+          Timber Wall {idx + 1}
+        </span>
+        {total > 1 && (
+          <button
+            onClick={() => onRemove(idx)}
+            className="text-xs text-red-400 hover:text-red-600 px-2 py-0.5 rounded border border-red-100 hover:border-red-300 transition-colors"
+          >
+            Remove
+          </button>
+        )}
+      </div>
+      {/* Per-wall Demo (slope + dig-haul → Demo crew) and Backfilling. */}
+      <WallDemoSection wall={wall} onChange={set} />
+      <WallBackfillSection wall={wall} onChange={set} />
+      <WallDrainageSection wall={wall} onChange={set} />
+      <label className="block text-xs text-gray-800 mb-1 font-medium">Installation</label>
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Vendor</label>
+          <DropdownSelect
+            className="input text-sm py-1.5 w-full"
+            value={wall.vendor || 'House'}
+            onChange={v => set('vendor')(v)}
+            options={vendorOptsForSub(vendorOptions, materialRows, WOOD_SUBCAT)}
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Timber Type</label>
+          <DropdownSelect
+            className="input text-sm py-1.5 w-full"
+            value={wall.timberType || 'Railroad Treated'}
+            onChange={v => set('timberType')(v)}
+            options={(() => {
+              const catalog = wallCatalogTypes(materialRows, WOOD_SUBCAT, wall.vendor)
+              const isHouse = !wall.vendor || wall.vendor === 'House'
+              const shown = isHouse
+                ? [...TIMBER_TYPES, ...catalog.filter(t => !TIMBER_TYPES.includes(t))]
+                : catalog
+              return shown.map(t => ({ value: t, label: t }))
+            })()}
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Linear Feet of Wall</label>
+          <NumInput value={wall.lf} onChange={set('lf')} placeholder="0" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Wall Finish Height (in)</label>
+          <NumInput value={wall.heightIn} onChange={set('heightIn')} placeholder="24" />
+        </div>
+      </div>
+      <div className="mt-2">
+        <label className="block text-xs text-gray-500 mb-1">Pile-Driven Steel Posts (qty)</label>
+        <div className="flex items-center gap-2">
+          <NumInput value={wall.posts} onChange={set('posts')} placeholder="0" className="w-28" />
+          <span className="text-xs text-gray-400">material + labor per post (from rates)</span>
+        </div>
+      </div>
+      <label className="block text-xs text-gray-800 mt-3 mb-1 font-medium">Footing</label>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Footing Width (in)</label>
+          <NumInput value={wall.footingWIn} onChange={set('footingWIn')} placeholder="0" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Footing Depth (in)</label>
+          <NumInput value={wall.footingDIn} onChange={set('footingDIn')} placeholder="0" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Horizontal Rebar (qty)</label>
+          <NumInput value={wall.horizBars} onChange={set('horizBars')} placeholder="0" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Footing Rebar Size</label>
+          <DropdownSelect
+            className="input text-sm py-1.5 w-full"
+            value={wall.footingRebarSize || '#4'}
+            onChange={v => set('footingRebarSize')(v)}
+            options={REBAR_SIZES.map(s => ({ value: s, label: s }))}
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Footing Pump</label>
+          <DropdownSelect
+            className="input text-sm py-1.5 w-full"
+            value={wall.footingPump || 'No'}
+            onChange={v => set('footingPump')(v)}
+            options={[
+              { value: 'No', label: 'No (hand)' },
+              { value: 'Yes', label: 'Yes (pump)' },
+            ]}
+          />
+        </div>
+      </div>
+      <p className="text-[11px] text-gray-400 mt-1">Leave width/depth blank for no footing.</p>
+      {isSub && (
+        <div className="mt-3 flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-gray-500">Sub flat $/LF</span>
+          <div className="relative w-28">
+            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+            <input
+              type="number"
+              step="any"
+              className="input text-sm py-1.5 pl-5 w-full"
+              placeholder="0.00"
+              value={wall.subEach ?? ''}
+              onChange={e => set('subEach')(e.target.value)}
+            />
+          </div>
+          <span className="text-[11px] text-gray-400">
+            default = material ÷ LF · no labor billed on Sub
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Main component
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3173,28 +3372,8 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
   const setBrickWalls = setField('brickWalls')
   const brickFootingPump = cur.brickFootingPump
   const setBrickFootingPump = setField('brickFootingPump')
-  const timberLF = cur.timberLF
-  const setTimberLF = setField('timberLF')
-  const timberHeightIn = cur.timberHeightIn
-  const setTimberHeightIn = setField('timberHeightIn')
-  const timberType = cur.timberType
-  const setTimberType = setField('timberType')
-  const timberVendor = cur.timberVendor
-  const setTimberVendor = setField('timberVendor')
-  const timberPosts = cur.timberPosts
-  const setTimberPosts = setField('timberPosts')
-  const timberSubEach = cur.timberSubEach
-  const setTimberSubEach = setField('timberSubEach')
-  const timberFootingWIn = cur.timberFootingWIn
-  const setTimberFootingWIn = setField('timberFootingWIn')
-  const timberFootingDIn = cur.timberFootingDIn
-  const setTimberFootingDIn = setField('timberFootingDIn')
-  const timberHorizBars = cur.timberHorizBars
-  const setTimberHorizBars = setField('timberHorizBars')
-  const timberFootingRebarSize = cur.timberFootingRebarSize
-  const setTimberFootingRebarSize = setField('timberFootingRebarSize')
-  const timberFootingPump = cur.timberFootingPump
-  const setTimberFootingPump = setField('timberFootingPump')
+  const timberWalls = cur.timberWalls
+  const setTimberWalls = setField('timberWalls')
   const manualRows = cur.manualRows
   const setManualRows = setField('manualRows')
 
@@ -3305,6 +3484,16 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
   }
   function removeBrickWall(idx) {
     setBrickWalls(ws => ws.filter((_, i) => i !== idx))
+  }
+
+  function updateTimberWall(idx, field, val) {
+    setTimberWalls(ws => ws.map((w, i) => (i === idx ? { ...w, [field]: val } : w)))
+  }
+  function addTimberWall() {
+    setTimberWalls(ws => [...ws, DEFAULT_TIMBER()])
+  }
+  function removeTimberWall(idx) {
+    setTimberWalls(ws => ws.filter((_, i) => i !== idx))
   }
 
   function updateManual(i, field, val) {
@@ -3528,7 +3717,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
               { key: 'PIP', label: 'Poured In Place', count: pipWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0).length },
               { key: 'Modular', label: 'Modular', count: modularWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0).length },
               { key: 'Brick', label: 'Brick', count: brickWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0).length },
-              { key: 'Timber', label: 'Timber / Lumber', count: n(timberLF) > 0 || n(timberPosts) > 0 ? 1 : 0 },
+              { key: 'Timber', label: 'Timber / Lumber', count: timberWalls.filter(w => n(w.lf) > 0 || n(w.posts) > 0).length },
             ].map(t => (
               <button
                 key={t.key}
@@ -3733,142 +3922,31 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
         </div>
       )}
 
-      {/* ── Timber Wall (single) ── */}
+      {/* ── Timber / Lumber Walls (multi-wall array) ── */}
       {wallType === 'Timber' && (
         <div>
-          <SectionHeader title="Timber / Lumber Wall" />
-          {/* Per-wall Demo section (timber's own inline block; state lives on
-              cur.timberDemo). Reuses the shared WallDemoSection component. */}
-          <WallDemoSection
-            wall={cur.timberDemo || {}}
-            onChange={f => val =>
-              setField('timberDemo')(prev => ({ ...(prev || {}), [f]: val }))
-            }
-          />
-          <WallBackfillSection
-            wall={cur.timberBackfill || {}}
-            onChange={f => val =>
-              setField('timberBackfill')(prev => ({ ...(prev || {}), [f]: val }))
-            }
-          />
-          <WallDrainageSection
-            wall={cur.timberDrain || {}}
-            onChange={f => val =>
-              setField('timberDrain')(prev => ({ ...(prev || {}), [f]: val }))
-            }
-          />
-          <label className="block text-xs text-gray-800 mb-1 font-medium">Installation</label>
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Vendor</label>
-              <DropdownSelect
-                className="input text-sm py-1.5 w-full"
-                value={timberVendor || 'House'}
-                onChange={v => setTimberVendor(v)}
-                options={vendorOptsForSub(vendorOptions, materialRows, WOOD_SUBCAT)}
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Timber Type</label>
-              <DropdownSelect
-                className="input text-sm py-1.5 w-full"
-                value={timberType}
-                onChange={v => setTimberType(v)}
-                options={(() => {
-                  const catalog = wallCatalogTypes(materialRows, WOOD_SUBCAT, timberVendor)
-                  const isHouse = !timberVendor || timberVendor === 'House'
-                  const shown = isHouse
-                    ? [...TIMBER_TYPES, ...catalog.filter(t => !TIMBER_TYPES.includes(t))]
-                    : catalog
-                  return shown.map(t => ({ value: t, label: t }))
-                })()}
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Linear Feet of Wall</label>
-              <NumInput value={timberLF} onChange={setTimberLF} placeholder="0" />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Wall Finish Height (in)</label>
-              <NumInput value={timberHeightIn} onChange={setTimberHeightIn} placeholder="24" />
-            </div>
-          </div>
-          <div className="mt-2">
-            <label className="block text-xs text-gray-500 mb-1">
-              Pile-Driven Steel Posts (qty)
-            </label>
-            <div className="flex items-center gap-2">
-              <NumInput
-                value={timberPosts}
-                onChange={setTimberPosts}
-                placeholder="0"
-                className="w-28"
-              />
-              <span className="text-xs text-gray-400">material + labor per post (from rates)</span>
-            </div>
-          </div>
-          <label className="block text-xs text-gray-800 mt-3 mb-1 font-medium">Footing</label>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Footing Width (in)</label>
-              <NumInput value={timberFootingWIn} onChange={setTimberFootingWIn} placeholder="0" />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Footing Depth (in)</label>
-              <NumInput value={timberFootingDIn} onChange={setTimberFootingDIn} placeholder="0" />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Horizontal Rebar (qty)</label>
-              <NumInput value={timberHorizBars} onChange={setTimberHorizBars} placeholder="0" />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Footing Rebar Size</label>
-              <DropdownSelect
-                className="input text-sm py-1.5 w-full"
-                value={timberFootingRebarSize || '#4'}
-                onChange={v => setTimberFootingRebarSize(v)}
-                options={REBAR_SIZES.map(s => ({ value: s, label: s }))}
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Footing Pump</label>
-              <DropdownSelect
-                className="input text-sm py-1.5 w-full"
-                value={timberFootingPump || 'No'}
-                onChange={v => setTimberFootingPump(v)}
-                options={[
-                  { value: 'No', label: 'No (hand)' },
-                  { value: 'Yes', label: 'Yes (pump)' },
-                ]}
-              />
-            </div>
-          </div>
-          <p className="text-[11px] text-gray-400 mt-1">
-            Leave width/depth blank for no footing.
-          </p>
-          {isSub && (
-            <div className="mt-3 flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-gray-500">Sub flat $/LF</span>
-              <div className="relative w-28">
-                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                  $
-                </span>
-                <input
-                  type="number"
-                  step="any"
-                  className="input text-sm py-1.5 pl-5 w-full"
-                  placeholder="0.00"
-                  value={timberSubEach ?? ''}
-                  onChange={e => setTimberSubEach(e.target.value)}
-                />
-              </div>
-              <span className="text-[11px] text-gray-400">
-                default = material ÷ LF · no labor billed on Sub
-              </span>
-            </div>
-          )}
+          <SectionHeader title="Timber / Lumber Walls" />
+
+          {timberWalls.map((wall, idx) => (
+            <TimberWallEntry
+              key={idx}
+              wall={wall}
+              idx={idx}
+              total={timberWalls.length}
+              onChange={updateTimberWall}
+              onRemove={removeTimberWall}
+              materialRows={materialRows}
+              vendorOptions={vendorOptions}
+              isSub={isSub}
+            />
+          ))}
+
+          <button
+            onClick={addTimberWall}
+            className="w-full py-2 rounded-lg border border-dashed border-green-400 text-green-700 text-sm font-medium hover:bg-green-50 transition-colors mb-3"
+          >
+            + Add Another Timber Wall
+          </button>
         </div>
       )}
 
