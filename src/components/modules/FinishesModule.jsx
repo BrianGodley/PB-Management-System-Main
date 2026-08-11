@@ -918,6 +918,45 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
     unitLabel,
     value: _rv(k),
   })
+  // Material rows for a FINISHES_RATES key (matched by NAME, same as the
+  // estimator's finishMatPrice resolver). One row per vendor (Standard first),
+  // each editable straight to material_price — mirrors Walls / Utilities. When no
+  // catalog product carries the name yet, a single name-keyed Standard row is
+  // shown (still material_price, so material_rates stays out of it).
+  const _matRows = (k, unit) => {
+    const dbName = FINISHES_RATES[k].db
+    const rows = (materialRows || []).filter(r0 => r0.name === dbName)
+    if (rows.length) {
+      return rows
+        .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
+        .sort((a, b) => {
+          const va = a.vendor_id == null ? '' : vendorNames[a.vendor_id] || '~'
+          const vb = b.vendor_id == null ? '' : vendorNames[b.vendor_id] || '~'
+          return va.localeCompare(vb)
+        })
+        .map(r0 => ({
+          label: `${r0.vendor_id ? vendorNames[r0.vendor_id] || 'Vendor' : 'Standard'} — ${r0.name}`,
+          table: 'material_price',
+          materialId: r0.id,
+          vendorId: r0.vendor_id || undefined,
+          category: FINISHES_CATEGORY,
+          unitLabel: r0.unit || unit,
+          mode: 'currency',
+          value: n(r0.unit_cost),
+        }))
+    }
+    return [
+      {
+        label: `Standard — ${dbName}`,
+        table: 'material_price',
+        name: dbName,
+        category: FINISHES_CATEGORY,
+        unitLabel: unit,
+        mode: 'currency',
+        value: materialPrices[dbName] ?? FINISHES_RATES[k].fb,
+      },
+    ]
+  }
   const finishesRateList = [
     {
       group: 'Flatwork Finish',
@@ -926,6 +965,10 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
         _laborItem('flatBrickLab', 'hrs/SF'),
         _laborItem('flatFlagstoneLab', 'hrs/SF'),
         _laborItem('flatPorcelainLab', 'hrs/SF'),
+        ..._matRows('flatTile', 'SF'),
+        ..._matRows('flatBrick', 'brick'),
+        ..._matRows('flatFlagstone', 'ton'),
+        ..._matRows('flatPorcelain', 'SF'),
       ],
     },
     {
@@ -935,6 +978,10 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
         _laborItem('capPrecastLab', 'hrs/ea'),
         _laborItem('capPipLab', 'hrs/LF'),
         _laborItem('capBullnoseLab', 'hrs/LF'),
+        ..._matRows('capFlagstone', 'ton'),
+        ..._matRows('capPrecast', 'ea'),
+        ..._matRows('concreteTruck', 'CY'),
+        ..._matRows('capBullnose', 'LF'),
       ],
     },
     {
@@ -947,6 +994,16 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
         _laborItem('tileLab', 'hrs/SF'),
         _laborItem('flagstoneLab', 'hrs/SF'),
         _laborItem('realStoneLab', 'hrs/SF'),
+        ..._matRows('sandStucco', 'SF'),
+        ..._matRows('smoothStucco', 'SF'),
+        ..._matRows('ledgerstone', 'SF'),
+        ..._matRows('stackedStone', 'SF'),
+        ..._matRows('tile', 'SF'),
+        ..._matRows('realFlagstone', 'ton'),
+        ..._matRows('realStone', 'ton'),
+        // Consumables folded into wall-finish material cost (per-SF).
+        ..._matRows('stoneScrews', 'SF'),
+        ..._matRows('tileAdhesive', 'SF'),
       ],
     },
   ]

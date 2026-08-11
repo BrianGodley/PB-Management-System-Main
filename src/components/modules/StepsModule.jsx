@@ -1012,22 +1012,57 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
 
   // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Mirrors every
   //    rate the module (and its Edit-Rates modal) uses: Paver/Concrete labor +
-  //    material modifiers, plus the flat per-LF Subcontractor pricing. Labor
-  //    coefficients → labor_rates; every $/SF or $/LF value → material_rates
-  //    (named Standard rate on the new model).
+  //    material modifiers, plus the flat per-LF Subcontractor pricing. Each
+  //    section lists its LABOR rates first, then every MATERIAL rate (one row
+  //    per vendor, Standard first) from the module's catalog — mirrors the Walls
+  //    / Utilities View Rates. material_rates is retired: labor coefficients →
+  //    labor_rates; per-vendor catalog products → material_price; the remaining
+  //    named $/SF or $/LF modifiers live as misc_rates on the new model.
+  const vendorNames = Object.fromEntries((vendors || []).map(v => [v.id, v.name]))
+  // Catalog material rows for a sub_category: one currency row per vendor
+  // (Standard/null-vendor first), each editable straight to material_price.
+  const catalogBlockItems = subcat =>
+    (materialRows || [])
+      .filter(r0 => r0.sub_category === subcat)
+      .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
+      .sort((a, b) => {
+        const va = a.vendor_id == null ? '' : vendorNames[a.vendor_id] || '~'
+        const vb = b.vendor_id == null ? '' : vendorNames[b.vendor_id] || '~'
+        return va.localeCompare(vb) || (a.name || '').localeCompare(b.name || '')
+      })
+      .map(r0 => ({
+        label: `${r0.vendor_id ? vendorNames[r0.vendor_id] || 'Vendor' : 'Standard'} — ${r0.name}`,
+        table: 'material_price',
+        materialId: r0.id,
+        vendorId: r0.vendor_id || undefined,
+        category: 'Steps',
+        unitLabel: r0.unit || 'ea',
+        mode: 'currency',
+        value: n(r0.unit_cost),
+      }))
   const stepsRateList = [
     {
       group: 'Paver Steps',
-      items: STEP_FORMS.map(f => ({
-        label: `Form ${f}`,
-        table: 'labor_rates',
-        name: kPaverForm(f),
-        category: 'Steps',
-        mode: 'coefficient',
-        unitLabel: 'LF/hr',
-        value: laborRates[kPaverForm(f)] ?? PAVER_FORM_DEFAULT[f],
-      })),
+      items: [
+        ...STEP_FORMS.map(f => ({
+          label: `Form ${f}`,
+          table: 'labor_rates',
+          name: kPaverForm(f),
+          category: 'Steps',
+          mode: 'coefficient',
+          unitLabel: 'LF/hr',
+          value: laborRates[kPaverForm(f)] ?? PAVER_FORM_DEFAULT[f],
+        })),
+        ...catalogBlockItems(PAVER_STEP_CAT),
+      ],
     },
+    // Remaining material-catalog step sections (Brick / Tile / Flagstone) — the
+    // form labor above is shared across every paver-type section, so these list
+    // only their per-vendor catalog materials.
+    ...MAT_SECTIONS.filter(sec => sec.cat !== PAVER_STEP_CAT).map(sec => ({
+      group: sec.title,
+      items: catalogBlockItems(sec.cat),
+    })),
     {
       group: 'Concrete Steps',
       items: [
@@ -1058,9 +1093,12 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           unitLabel: 'hr/SF',
           value: laborRates[kFinishHrs(f)] ?? 0,
         })),
+        // Per-vendor concrete-mix catalog products.
+        ...catalogBlockItems(CONC_VENDOR_CAT),
+        // Named $/SF material modifiers (no catalog product) — misc_rates.
         ...CONC_TYPES.map(t => ({
           label: `${t} Material`,
-          table: 'material_rates',
+          table: 'misc_rates',
           name: kConcTypeMat(t),
           category: 'Steps',
           mode: 'currency',
@@ -1069,7 +1107,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         })),
         ...CONC_FINISHES.map(f => ({
           label: `Finish ${f} Material`,
-          table: 'material_rates',
+          table: 'misc_rates',
           name: kFinishMat(f),
           category: 'Steps',
           mode: 'currency',
@@ -1083,7 +1121,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
       items: [
         ...MAT_SECTIONS.map(sec => ({
           label: `${sec.title.replace(' Steps', '')} Base`,
-          table: 'material_rates',
+          table: 'misc_rates',
           name: sec.baseKey,
           category: 'Steps',
           mode: 'currency',
@@ -1092,7 +1130,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         })),
         {
           label: 'Concrete Base',
-          table: 'material_rates',
+          table: 'misc_rates',
           name: kSubConcBase,
           category: 'Steps',
           mode: 'currency',
@@ -1101,7 +1139,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         },
         ...STEP_FORMS.map(f => ({
           label: `Form ${f}`,
-          table: 'material_rates',
+          table: 'misc_rates',
           name: kSubForm(f),
           category: 'Steps',
           mode: 'currency',
@@ -1110,7 +1148,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         })),
         {
           label: 'Grouted (paver)',
-          table: 'material_rates',
+          table: 'misc_rates',
           name: kSubGrouted,
           category: 'Steps',
           mode: 'currency',
@@ -1119,7 +1157,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         },
         ...CONC_TYPES.map(t => ({
           label: `Type ${t}`,
-          table: 'material_rates',
+          table: 'misc_rates',
           name: kSubType(t),
           category: 'Steps',
           mode: 'currency',
@@ -1128,7 +1166,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         })),
         ...CONC_FINISHES.map(f => ({
           label: `Finish ${f}`,
-          table: 'material_rates',
+          table: 'misc_rates',
           name: kSubFinish(f),
           category: 'Steps',
           mode: 'currency',

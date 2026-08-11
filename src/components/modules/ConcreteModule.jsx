@@ -1015,6 +1015,42 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const fmt2 = v =>
     `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
+  // ── Catalog material rows for View Rates ────────────────────────────────────
+  // Mirrors Walls/Utilities: surface the module's material catalog prices (one
+  // row per vendor, Standard first) so each section lists its MATERIAL rates
+  // after its labor rates. Sourced from the SAME `materialRows`/`vendors` state
+  // the estimator's pickers use — no extra fetch.
+  const vendorNames = Object.fromEntries((vendors || []).map(v => [v.id, v.name]))
+  const catalogRowToItem = r0 => ({
+    label: `${r0.vendor_id ? vendorNames[r0.vendor_id] || 'Vendor' : 'Standard'} — ${r0.name}`,
+    table: 'material_price',
+    materialId: r0.id,
+    vendorId: r0.vendor_id || undefined,
+    category: 'Concrete',
+    unitLabel: r0.unit || 'ea',
+    mode: 'currency',
+    value: n(r0.unit_cost),
+  })
+  const catalogSort = (a, b) => {
+    const va = a.vendor_id == null ? '' : vendorNames[a.vendor_id] || '~'
+    const vb = b.vendor_id == null ? '' : vendorNames[b.vendor_id] || '~'
+    return va.localeCompare(vb) || (a.name || '').localeCompare(b.name || '')
+  }
+  // Sub-category–picked sections (Base / Mix): every catalog row in that subcat.
+  const catalogBlockItems = subcat =>
+    (materialRows || [])
+      .filter(r0 => r0.sub_category === subcat)
+      .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
+      .sort(catalogSort)
+      .map(catalogRowToItem)
+  // Named materials (Rebar, Form Lumber, …): matched by exact catalog name.
+  const materialRateRows = dbName =>
+    (materialRows || [])
+      .filter(r0 => r0.name === dbName)
+      .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
+      .sort(catalogSort)
+      .map(catalogRowToItem)
+
   // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
   //    that used to have an inline RateEditPopover in this module now lives here.
   const concreteRateList = [
@@ -1034,15 +1070,19 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     },
     {
       group: 'Base Install',
-      items: METHODS.map(m => ({
-        label: BASE_METHOD_LABOR_NAME[m],
-        table: 'labor_rates',
-        name: BASE_METHOD_LABOR_NAME[m],
-        category: 'Concrete',
-        mode: 'coefficient',
-        unitLabel: 't/hr',
-        value: laborRates[BASE_METHOD_LABOR_NAME[m]] ?? BASE_RATES[m],
-      })),
+      items: [
+        ...METHODS.map(m => ({
+          label: BASE_METHOD_LABOR_NAME[m],
+          table: 'labor_rates',
+          name: BASE_METHOD_LABOR_NAME[m],
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: 't/hr',
+          value: laborRates[BASE_METHOD_LABOR_NAME[m]] ?? BASE_RATES[m],
+        })),
+        // Base material catalog (vendor-supplied 'Concrete Base' products).
+        ...catalogBlockItems('Concrete Base'),
+      ],
     },
     {
       group: 'Concrete Install',
@@ -1101,6 +1141,13 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           unitLabel: 'CY',
           value: calc.pumpFeePerCY,
         },
+        // Concrete mix catalog (vendor-supplied 'Concrete Mix' products) + the
+        // named install materials (rebar, form lumber, sleeves, color).
+        ...catalogBlockItems('Concrete Mix'),
+        ...materialRateRows('Rebar'),
+        ...materialRateRows('Concrete - Form Lumber LF'),
+        ...materialRateRows('Concrete - Sleeve Per 10LF'),
+        ...materialRateRows('Concrete - Color Per CY'),
       ],
     },
     {
@@ -1196,6 +1243,10 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           unitLabel: 'CY',
           value: calc.stampSubPerCY,
         },
+        // Finish material catalog (sealers, vapor barrier).
+        ...materialRateRows('Concrete - Sealer Natural 5gal'),
+        ...materialRateRows('Concrete - Sealer Wet 5gal'),
+        ...materialRateRows('Concrete - Vapor Barrier SF'),
       ],
     },
     {

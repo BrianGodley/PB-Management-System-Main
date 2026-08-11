@@ -833,6 +833,42 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
     })
   }
 
+  // ── Catalog material rows for View Rates ────────────────────────────────────
+  // Mirrors Walls/Utilities: surface the module's material catalog prices (one
+  // row per vendor, Standard first) so each section lists its MATERIAL rates
+  // after its labor rates. Sourced from the SAME `materialRows`/`vendors` state
+  // the estimator's pickers use — no extra fetch.
+  const vendorNames = Object.fromEntries((vendors || []).map(v => [v.id, v.name]))
+  const catalogRowToItem = r0 => ({
+    label: `${r0.vendor_id ? vendorNames[r0.vendor_id] || 'Vendor' : 'Standard'} — ${r0.name}`,
+    table: 'material_price',
+    materialId: r0.id,
+    vendorId: r0.vendor_id || undefined,
+    category: 'Artificial Turf',
+    unitLabel: r0.unit || 'ea',
+    mode: 'currency',
+    value: n(r0.unit_cost),
+  })
+  const catalogSort = (a, b) => {
+    const va = a.vendor_id == null ? '' : vendorNames[a.vendor_id] || '~'
+    const vb = b.vendor_id == null ? '' : vendorNames[b.vendor_id] || '~'
+    return va.localeCompare(vb) || (a.name || '').localeCompare(b.name || '')
+  }
+  // Sub-category–picked sections (Turf Base / Turf Material): all catalog rows.
+  const catalogBlockItems = subcat =>
+    (materialRows || [])
+      .filter(r0 => r0.sub_category === subcat)
+      .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
+      .sort(catalogSort)
+      .map(catalogRowToItem)
+  // Named materials (base fabrics, infill, install materials): by exact name.
+  const materialRateRows = dbName =>
+    (materialRows || [])
+      .filter(r0 => r0.name === dbName)
+      .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
+      .sort(catalogSort)
+      .map(catalogRowToItem)
+
   // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
   //    that used to have an inline RateEditPopover in this module now lives here.
   const turfRateList = [
@@ -848,6 +884,18 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           unitLabel: 'SF/hr',
           value: calc.turfSFHr,
         },
+        // Base material catalog ('Turf Base' vendor products + named base fabrics),
+        // turf material catalog ('Turf Material' brands) and the named consumables
+        // (install materials, infill). The Turf Strips section reuses this same
+        // 'Turf Material' catalog, so its materials are surfaced here.
+        ...catalogBlockItems(TURF_CAT.base),
+        ...materialRateRows('Turf - Gravel Base'),
+        ...materialRateRows('Turf - DG Base'),
+        ...materialRateRows('Turf - Weed Barrier Fabric'),
+        ...catalogBlockItems(TURF_CAT.turf),
+        ...materialRateRows('Turf - Install Materials'),
+        ...materialRateRows('Turf - Infill ZeoFill'),
+        ...materialRateRows('Turf - Infill Durafill'),
       ],
     },
     {

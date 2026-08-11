@@ -1157,6 +1157,37 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
 
   // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
   //    that used to have an inline RateEditPopover in this module now lives here.
+  // Material rows for a catalog item (matched by name) from the shared Utilities
+  // catalog. One row per vendor (Standard first), each editable straight to
+  // material_price — same helper shape Walls/Utilities use. The Electrical &
+  // Plumbing section resolves its line/gas/electrical MATERIAL prices from this
+  // catalog, so surface every vendor price alongside the labor rates.
+  const vendorNames = Object.fromEntries((vendors || []).map(v => [v.id, v.name]))
+  const matRows = (dbName, unit, fallback) => {
+    const rows = (materialRows || []).filter(r0 => r0.name === dbName)
+    if (rows.length) {
+      return rows
+        .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
+        .sort((a, b) => {
+          const va = a.vendor_id == null ? '' : vendorNames[a.vendor_id] || '~'
+          const vb = b.vendor_id == null ? '' : vendorNames[b.vendor_id] || '~'
+          return va.localeCompare(vb)
+        })
+        .map(r0 => ({
+          label: `${r0.vendor_id ? vendorNames[r0.vendor_id] || 'Vendor' : 'Standard'} — ${r0.name}`,
+          table: 'material_price',
+          materialId: r0.id,
+          vendorId: r0.vendor_id || undefined,
+          category: 'Utilities',
+          unitLabel: r0.unit || unit,
+          mode: 'currency',
+          value: n(r0.unit_cost),
+        }))
+    }
+    return [
+      { label: `Standard — ${dbName}`, table: 'material_price', name: dbName, category: 'Utilities', unitLabel: unit, mode: 'currency', value: materialPrices[dbName] ?? fallback },
+    ]
+  }
   const poolRateList = [
     {
       group: 'Excavation',
@@ -1381,6 +1412,11 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           unitLabel: 'hrs/ea',
           value: materialPrices[t.laborDbName] ?? t.laborFallback,
         })),
+        // Material prices (per vendor, Standard first) for each line/fixture,
+        // sourced from the shared Utilities catalog.
+        ...LINE_TYPE_ARR.flatMap(t => matRows(t.dbName, 'LF', t.fallback)),
+        ...GAS_TYPE_ARR.flatMap(t => matRows(t.dbName, 'ea', t.fallback)),
+        ...ELEC_TYPE_ARR.flatMap(t => matRows(t.dbName, 'ea', t.fallback)),
       ],
     },
     {

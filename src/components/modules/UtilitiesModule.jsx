@@ -980,101 +980,101 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
 
   // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
   //    that used to have an inline RateEditPopover in this module now lives here.
+  //    Each section lists its LABOR rates first, then every MATERIAL rate
+  //    (per vendor from the catalog) — mirrors the Walls module View Rates.
+  const vendorNames = Object.fromEntries((vendors || []).map(v => [v.id, v.name]))
+  // Material rows for a catalog item (matched by name). One row per vendor
+  // (Standard first), each editable straight to material_price — same helper
+  // shape Walls uses.
+  const matRows = (dbName, unit, fallback) => {
+    const rows = (materialRows || []).filter(r0 => r0.name === dbName)
+    if (rows.length) {
+      return rows
+        .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
+        .sort((a, b) => {
+          const va = a.vendor_id == null ? '' : vendorNames[a.vendor_id] || '~'
+          const vb = b.vendor_id == null ? '' : vendorNames[b.vendor_id] || '~'
+          return va.localeCompare(vb)
+        })
+        .map(r0 => ({
+          label: `${r0.vendor_id ? vendorNames[r0.vendor_id] || 'Vendor' : 'Standard'} — ${r0.name}`,
+          table: 'material_price',
+          materialId: r0.id,
+          vendorId: r0.vendor_id || undefined,
+          category: 'Utilities',
+          unitLabel: r0.unit || unit,
+          mode: 'currency',
+          value: n(r0.unit_cost),
+        }))
+    }
+    return [
+      { label: `Standard — ${dbName}`, table: 'material_price', name: dbName, category: 'Utilities', unitLabel: unit, mode: 'currency', value: fallback },
+    ]
+  }
+  const laborRow = (name, unit, value) => ({
+    label: name, table: 'labor_rates', name, category: 'Utilities', mode: 'coefficient', unitLabel: unit, value,
+  })
   const utilitiesRateList = [
     {
       group: 'Trenching',
       items: [
-        {
-          label: TRENCH_LABOR_RATE_NAME.Trench,
-          table: 'labor_rates',
-          name: TRENCH_LABOR_RATE_NAME.Trench,
-          category: 'Utilities',
-          mode: 'coefficient',
-          unitLabel: 'min/cf',
-          value: materialPrices[TRENCH_LABOR_RATE_NAME.Trench] ?? TRENCH_MINS_PER_CF.Trench,
-        },
-        {
-          label: TRENCH_LABOR_RATE_NAME.Hand,
-          table: 'labor_rates',
-          name: TRENCH_LABOR_RATE_NAME.Hand,
-          category: 'Utilities',
-          mode: 'coefficient',
-          unitLabel: 'min/cf',
-          value: materialPrices[TRENCH_LABOR_RATE_NAME.Hand] ?? TRENCH_MINS_PER_CF.Hand,
-        },
+        laborRow(TRENCH_LABOR_RATE_NAME.Trench, 'min/cf', materialPrices[TRENCH_LABOR_RATE_NAME.Trench] ?? TRENCH_MINS_PER_CF.Trench),
+        laborRow(TRENCH_LABOR_RATE_NAME.Hand, 'min/cf', materialPrices[TRENCH_LABOR_RATE_NAME.Hand] ?? TRENCH_MINS_PER_CF.Hand),
       ],
     },
     {
       group: 'Utility Lines',
-      items: Object.values(UTILITY_LINE_TYPES).map(t => ({
-        label: t.laborDbName,
-        table: 'labor_rates',
-        name: t.laborDbName,
-        category: 'Utilities',
-        mode: 'coefficient',
-        unitLabel: 'hr/LF',
-        value: materialPrices[t.laborDbName] ?? t.laborPerLF,
-      })),
+      items: [
+        ...Object.values(UTILITY_LINE_TYPES).map(t =>
+          laborRow(t.laborDbName, 'hr/LF', materialPrices[t.laborDbName] ?? t.laborPerLF)
+        ),
+        ...Object.values(UTILITY_LINE_TYPES).flatMap(t => matRows(t.dbName, 'LF', t.costPerLF)),
+      ],
     },
     {
       group: 'Gas Fixtures',
-      items: Object.values(GAS_FIXTURE_TYPES).map(t => ({
-        label: t.laborDbName,
-        table: 'labor_rates',
-        name: t.laborDbName,
-        category: 'Utilities',
-        mode: 'coefficient',
-        unitLabel: 'hr/ea',
-        value: materialPrices[t.laborDbName] ?? t.laborHrs,
-      })),
+      items: [
+        ...Object.values(GAS_FIXTURE_TYPES).map(t =>
+          laborRow(t.laborDbName, 'hr/ea', materialPrices[t.laborDbName] ?? t.laborHrs)
+        ),
+        ...Object.values(GAS_FIXTURE_TYPES).flatMap(t => matRows(t.dbName, 'ea', t.cost)),
+      ],
     },
     {
       group: 'Electrical Fixtures',
-      items: Object.values(ELECTRICAL_FIXTURE_TYPES).map(t => ({
-        label: t.laborDbName,
-        table: 'labor_rates',
-        name: t.laborDbName,
-        category: 'Utilities',
-        mode: 'coefficient',
-        unitLabel: 'hr/ea',
-        value: materialPrices[t.laborDbName] ?? t.laborHrs,
-      })),
+      items: [
+        ...Object.values(ELECTRICAL_FIXTURE_TYPES).map(t =>
+          laborRow(t.laborDbName, 'hr/ea', materialPrices[t.laborDbName] ?? t.laborHrs)
+        ),
+        ...Object.values(ELECTRICAL_FIXTURE_TYPES).flatMap(t => matRows(t.dbName, 'ea', t.cost)),
+      ],
     },
     {
       group: 'Sewer Lines',
-      items: Object.values(SEWER_LINE_TYPES).map(t => ({
-        label: t.laborDbName,
-        table: 'labor_rates',
-        name: t.laborDbName,
-        category: 'Utilities',
-        mode: 'coefficient',
-        unitLabel: 'hr/LF',
-        value: materialPrices[t.laborDbName] ?? t.laborPerLF,
-      })),
+      items: [
+        ...Object.values(SEWER_LINE_TYPES).map(t =>
+          laborRow(t.laborDbName, 'hr/LF', materialPrices[t.laborDbName] ?? t.laborPerLF)
+        ),
+        ...Object.values(SEWER_LINE_TYPES).flatMap(t => matRows(t.dbName, 'LF', t.costPerLF)),
+      ],
     },
     {
       group: 'Sewer Sinks',
-      items: Object.values(SEWER_SINK_TYPES).map(t => ({
-        label: t.laborDbName,
-        table: 'labor_rates',
-        name: t.laborDbName,
-        category: 'Utilities',
-        mode: 'coefficient',
-        unitLabel: 'hr/ea',
-        value: materialPrices[t.laborDbName] ?? t.laborHrs,
-      })),
+      items: [
+        ...Object.values(SEWER_SINK_TYPES).map(t =>
+          laborRow(t.laborDbName, 'hr/ea', materialPrices[t.laborDbName] ?? t.laborHrs)
+        ),
+        ...Object.values(SEWER_SINK_TYPES).flatMap(t => matRows(t.dbName, 'ea', t.cost)),
+      ],
     },
     {
       group: 'Additional Subgrade Work',
-      items: Object.values(ADD_ITEM_RATES).map(rate => ({
-        label: rate.laborDbName,
-        table: 'labor_rates',
-        name: rate.laborDbName,
-        category: 'Utilities',
-        mode: 'coefficient',
-        unitLabel: 'hr/ea',
-        value: materialPrices[rate.laborDbName] ?? rate.laborHrs,
-      })),
+      items: [
+        ...Object.values(ADD_ITEM_RATES).map(rate =>
+          laborRow(rate.laborDbName, 'hr/ea', materialPrices[rate.laborDbName] ?? rate.laborHrs)
+        ),
+        ...Object.values(ADD_ITEM_RATES).flatMap(rate => matRows(rate.dbName, 'ea', rate.matCost)),
+      ],
     },
   ]
 

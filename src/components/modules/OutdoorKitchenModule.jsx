@@ -913,8 +913,9 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
   const setWallFinishRow = (i, field, val) =>
     setWallFinishRows(rs => rs.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
 
-  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
-  //    that used to have an inline RateEditPopover in this module now lives here.
+  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Each section
+  //    lists its LABOR rates first, then every MATERIAL rate (per vendor from the
+  //    module catalog, Standard first) — mirrors the Walls / Utilities View Rates.
   const okLaborItem = (rateKey, unitLabel) => ({
     label: OK_RATES[rateKey].dbName,
     table: 'labor_rates',
@@ -924,6 +925,56 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
     unitLabel,
     value: p(OK_RATES[rateKey].dbName, OK_RATES[rateKey].fallback),
   })
+  const vendorNames = Object.fromEntries((vendors || []).map(v => [v.id, v.name]))
+  // Material rows for a catalog item (matched by name). One row per vendor
+  // (Standard first), each editable straight to material_price; falls back to a
+  // single Standard row at the current rate when no catalog row exists.
+  const matRows = (dbName, unit, fallback) => {
+    const rows = (materialRows || []).filter(r0 => r0.name === dbName)
+    if (rows.length) {
+      return rows
+        .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
+        .sort((a, b) => {
+          const va = a.vendor_id == null ? '' : vendorNames[a.vendor_id] || '~'
+          const vb = b.vendor_id == null ? '' : vendorNames[b.vendor_id] || '~'
+          return va.localeCompare(vb)
+        })
+        .map(r0 => ({
+          label: `${r0.vendor_id ? vendorNames[r0.vendor_id] || 'Vendor' : 'Standard'} — ${r0.name}`,
+          table: 'material_price',
+          materialId: r0.id,
+          vendorId: r0.vendor_id || undefined,
+          category: 'Outdoor Kitchen',
+          unitLabel: r0.unit || unit,
+          mode: 'currency',
+          value: n(r0.unit_cost),
+        }))
+    }
+    return [
+      { label: `Standard — ${dbName}`, table: 'material_price', name: dbName, category: 'Outdoor Kitchen', unitLabel: unit, mode: 'currency', value: fallback },
+    ]
+  }
+  // Every catalog product tagged with a sub-category (Wall Finish / Appliance),
+  // one row per vendor (Standard first) — vendor-overridable material prices.
+  const catalogBlockItems = (subcat, unit) =>
+    (materialRows || [])
+      .filter(r0 => r0.sub_category === subcat)
+      .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
+      .sort((a, b) => {
+        const va = a.vendor_id == null ? '' : vendorNames[a.vendor_id] || '~'
+        const vb = b.vendor_id == null ? '' : vendorNames[b.vendor_id] || '~'
+        return va.localeCompare(vb) || (a.name || '').localeCompare(b.name || '')
+      })
+      .map(r0 => ({
+        label: `${r0.vendor_id ? vendorNames[r0.vendor_id] || 'Vendor' : 'Standard'} — ${r0.name}`,
+        table: 'material_price',
+        materialId: r0.id,
+        vendorId: r0.vendor_id || undefined,
+        category: 'Outdoor Kitchen',
+        unitLabel: r0.unit || unit || 'ea',
+        mode: 'currency',
+        value: n(r0.unit_cost),
+      }))
   const outdoorKitchenRateList = [
     {
       group: 'BBQ Structure',
@@ -933,6 +984,10 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
         okLaborItem('pourFootingLab', 'hrs/CY'),
         okLaborItem('installBlockLab', 'blk/day'),
         okLaborItem('fillBlockLab', 'blk/day'),
+        ...matRows(OK_RATES.bbqBlock.dbName, 'block', p(OK_RATES.bbqBlock.dbName, OK_RATES.bbqBlock.fallback)),
+        ...matRows(OK_RATES.bbqRebar.dbName, 'LF', p(OK_RATES.bbqRebar.dbName, OK_RATES.bbqRebar.fallback)),
+        ...matRows(OK_RATES.bbqConcrete.dbName, 'CY', p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)),
+        ...matRows(OK_RATES.bbqFillMat.dbName, 'CY', p(OK_RATES.bbqFillMat.dbName, OK_RATES.bbqFillMat.fallback)),
       ],
     },
     {
@@ -942,26 +997,46 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
         okLaborItem('counterPourLab', 'SF/day'),
         okLaborItem('counterBroomLab', 'SF/day'),
         okLaborItem('counterPolishLab', 'SF/day'),
+        // Countertop is poured from the same concrete master rate as the footing.
+        ...matRows(OK_RATES.bbqConcrete.dbName, 'CY', p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)),
       ],
     },
     {
       group: 'Appliances',
-      items: [okLaborItem('applianceInstallHrs', 'hrs/ea')],
+      items: [
+        okLaborItem('applianceInstallHrs', 'hrs/ea'),
+        // Vendor catalog appliance products + each built-in equipment master
+        // rate + shared install hardware.
+        ...catalogBlockItems('Appliance', 'ea'),
+        ...APPLIANCE_TYPES.flatMap(type =>
+          matRows(applianceRateName(type), 'ea', p(applianceRateName(type), 0))
+        ),
+        ...matRows(OK_RATES.applianceHardware.dbName, 'ea', p(OK_RATES.applianceHardware.dbName, OK_RATES.applianceHardware.fallback)),
+      ],
     },
     {
       group: 'Wall Finishes',
-      items: WF_LIST.map(type => {
-        const meta = WF_META[type]
-        return {
-          label: OK_RATES[meta.labKey].dbName,
-          table: 'labor_rates',
-          name: OK_RATES[meta.labKey].dbName,
-          category: 'Outdoor Kitchen',
-          mode: 'coefficient',
-          unitLabel: meta.labMode === 'perDay' ? 'SF/day' : 'hrs/SF',
-          value: p(OK_RATES[meta.labKey].dbName, OK_RATES[meta.labKey].fallback),
-        }
-      }),
+      items: [
+        ...WF_LIST.map(type => {
+          const meta = WF_META[type]
+          return {
+            label: OK_RATES[meta.labKey].dbName,
+            table: 'labor_rates',
+            name: OK_RATES[meta.labKey].dbName,
+            category: 'Outdoor Kitchen',
+            mode: 'coefficient',
+            unitLabel: meta.labMode === 'perDay' ? 'SF/day' : 'hrs/SF',
+            value: p(OK_RATES[meta.labKey].dbName, OK_RATES[meta.labKey].fallback),
+          }
+        }),
+        // Vendor catalog finish products (Wall Finish sub-category) + each
+        // built-in House finish material rate.
+        ...catalogBlockItems(WF_CAT, 'SF'),
+        ...WF_LIST.flatMap(type => {
+          const meta = WF_META[type]
+          return matRows(OK_RATES[meta.key].dbName, meta.unit === 'ton' ? 'ton' : 'SF', p(OK_RATES[meta.key].dbName, OK_RATES[meta.key].fallback))
+        }),
+      ],
     },
     {
       group: 'Electrical & Plumbing',
@@ -993,6 +1068,14 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
           unitLabel: 'hrs/ea',
           value: p(t.laborDbName, t.laborFallback),
         })),
+        // Built-in BBQ service materials + the shared utility-line / fixture
+        // catalog materials (per vendor, matched by name).
+        ...matRows(OK_RATES.gficOutlet.dbName, 'ea', p(OK_RATES.gficOutlet.dbName, OK_RATES.gficOutlet.fallback)),
+        ...matRows(OK_RATES.sinkPlumbing.dbName, 'flat', p(OK_RATES.sinkPlumbing.dbName, OK_RATES.sinkPlumbing.fallback)),
+        ...matRows(OK_RATES.gasPipe.dbName, 'LF', p(OK_RATES.gasPipe.dbName, OK_RATES.gasPipe.fallback)),
+        ...LINE_TYPE_ARR.flatMap(t => matRows(t.dbName, 'LF', p(t.dbName, t.fallback))),
+        ...GAS_TYPE_ARR.flatMap(t => matRows(t.dbName, 'ea', p(t.dbName, t.fallback))),
+        ...ELEC_TYPE_ARR.flatMap(t => matRows(t.dbName, 'ea', p(t.dbName, t.fallback))),
       ],
     },
   ]

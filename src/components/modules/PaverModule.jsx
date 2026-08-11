@@ -1144,6 +1144,42 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   // The financial calc still sums both sides.
   const matBd = isSub ? subEngine : inHouse
 
+  // ── Catalog material rows for View Rates ────────────────────────────────────
+  // Mirrors Walls/Utilities: surface the module's material catalog prices (one
+  // row per vendor, Standard first) so each section lists its MATERIAL rates
+  // after its labor rates. Sourced from the SAME `materialRows`/`vendors` state
+  // the estimator's pickers use — no extra fetch.
+  const vendorNames = Object.fromEntries((vendors || []).map(v => [v.id, v.name]))
+  const catalogRowToItem = r0 => ({
+    label: `${r0.vendor_id ? vendorNames[r0.vendor_id] || 'Vendor' : 'Standard'} — ${r0.name}`,
+    table: 'material_price',
+    materialId: r0.id,
+    vendorId: r0.vendor_id || undefined,
+    category: 'Paver',
+    unitLabel: r0.unit || 'ea',
+    mode: 'currency',
+    value: n(r0.unit_cost),
+  })
+  const catalogSort = (a, b) => {
+    const va = a.vendor_id == null ? '' : vendorNames[a.vendor_id] || '~'
+    const vb = b.vendor_id == null ? '' : vendorNames[b.vendor_id] || '~'
+    return va.localeCompare(vb) || (a.name || '').localeCompare(b.name || '')
+  }
+  // Sub-category–picked sections (Paver / Base): every catalog row in that subcat.
+  const catalogBlockItems = subcat =>
+    (materialRows || [])
+      .filter(r0 => r0.sub_category === subcat)
+      .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
+      .sort(catalogSort)
+      .map(catalogRowToItem)
+  // Named materials (base rock, sands, sealer, …): matched by exact catalog name.
+  const materialRateRows = dbName =>
+    (materialRows || [])
+      .filter(r0 => r0.name === dbName)
+      .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
+      .sort(catalogSort)
+      .map(catalogRowToItem)
+
   // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
   //    that used to have an inline RateEditPopover in this module now lives here.
   const paverRateList = [
@@ -1163,22 +1199,29 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
     },
     {
       group: 'Base Install',
-      items: BASE_METHODS.map(m => ({
-        label: BASE_METHOD_LABOR_NAME[m],
-        table: 'labor_rates',
-        name: BASE_METHOD_LABOR_NAME[m],
-        category: 'Paver',
-        mode: 'coefficient',
-        unitLabel: 't/hr',
-        value:
-          m === 'Skid Good'
-            ? calc.baseBobcatGood
-            : m === 'Skid OK'
-              ? calc.baseBobcatOK
-              : m === 'Mini Skid'
-                ? calc.baseMiniBobcat
-                : calc.baseHand,
-      })),
+      items: [
+        ...BASE_METHODS.map(m => ({
+          label: BASE_METHOD_LABOR_NAME[m],
+          table: 'labor_rates',
+          name: BASE_METHOD_LABOR_NAME[m],
+          category: 'Paver',
+          mode: 'coefficient',
+          unitLabel: 't/hr',
+          value:
+            m === 'Skid Good'
+              ? calc.baseBobcatGood
+              : m === 'Skid OK'
+                ? calc.baseBobcatOK
+                : m === 'Mini Skid'
+                  ? calc.baseMiniBobcat
+                  : calc.baseHand,
+        })),
+        // Base material catalog (vendor-supplied 'Base Material' products) + the
+        // named base/setting materials (base rock, bedding sand).
+        ...catalogBlockItems(PAVER_CAT.base),
+        ...materialRateRows('Paver - Base Rock'),
+        ...materialRateRows('Bedding Sand'),
+      ],
     },
     {
       group: 'Paver Labor',
@@ -1282,6 +1325,17 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           unitLabel: 'LF/hr',
           value: calc.vertSoldierRate,
         },
+        // Paver material catalog (vendor-supplied 'Paver Material' products) + the
+        // named consumables (sands, sealer, restraint, sleeves, pallet/delivery).
+        ...catalogBlockItems(PAVER_CAT.paver),
+        ...materialRateRows('Paver - Joint Sand'),
+        ...materialRateRows('Paver - Poly Sand'),
+        ...materialRateRows('Paver - Poly Sand Existing'),
+        ...materialRateRows('Paver - Sealer'),
+        ...materialRateRows('Paver - Restraint Concrete'),
+        ...materialRateRows('Paver - Sleeves'),
+        ...materialRateRows('Paver - Pallet Charge'),
+        ...materialRateRows('Paver - Delivery'),
       ],
     },
     {

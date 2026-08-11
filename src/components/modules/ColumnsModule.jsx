@@ -512,6 +512,45 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
 
   // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
   //    that used to have an inline RateEditPopover in this module now lives here.
+  //    Each section lists its LABOR rates first, then every MATERIAL rate (per
+  //    vendor from the catalog, Standard first) — mirrors the Walls module.
+  // Material rows for a catalog item (matched by NAME, same as colMatPrice). One
+  // row per vendor (Standard first), each editable straight to material_price.
+  // When no catalog product carries the name yet, a single name-keyed Standard
+  // row is shown (still material_price — material_rates is retired).
+  const _colMatRows = (dbName, unit, fallback, category = COLUMNS_CATEGORY) => {
+    const rows = (materialRows || []).filter(r0 => r0.name === dbName)
+    if (rows.length) {
+      return rows
+        .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
+        .sort((a, b) => {
+          const va = a.vendor_id == null ? '' : vendorNames[a.vendor_id] || '~'
+          const vb = b.vendor_id == null ? '' : vendorNames[b.vendor_id] || '~'
+          return va.localeCompare(vb)
+        })
+        .map(r0 => ({
+          label: `${r0.vendor_id ? vendorNames[r0.vendor_id] || 'Vendor' : 'Standard'} — ${r0.name}`,
+          table: 'material_price',
+          materialId: r0.id,
+          vendorId: r0.vendor_id || undefined,
+          category: r0.category || category,
+          unitLabel: r0.unit || unit,
+          mode: 'currency',
+          value: n(r0.unit_cost),
+        }))
+    }
+    return [
+      {
+        label: `Standard — ${dbName}`,
+        table: 'material_price',
+        name: dbName,
+        category,
+        unitLabel: unit,
+        mode: 'currency',
+        value: materialPrices[dbName] ?? fallback,
+      },
+    ]
+  }
   const columnsRateList = [
     {
       group: 'Column Install',
@@ -552,22 +591,37 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
           unitLabel: 'hrs/blk',
           value: materialPrices[BLOCK_RATES.fillLaborHrs.dbName] ?? BLOCK_RATES.fillLaborHrs.fallback,
         },
+        // Column Install materials (block, grouted-fill concrete, rebar). Rebar
+        // + concrete are shared Basic Materials rows.
+        ..._colMatRows(BLOCK_RATES.blockMatCost.dbName, 'block', BLOCK_RATES.blockMatCost.fallback),
+        ..._colMatRows(GROUT_CONCRETE.dbName, 'CY', GROUT_CONCRETE.fallback, BASIC_CATEGORY),
+        ..._colMatRows(BLOCK_RATES.rebarMatCost.dbName, 'LF', BLOCK_RATES.rebarMatCost.fallback, BASIC_CATEGORY),
       ],
     },
     {
       group: 'Finishes',
-      items: Object.values(FINISH_TYPES).map(rate => {
-        const defLab = rate.unit === 'ton' ? rate.laborHrsPer : rate.laborHrsPerSF
-        return {
-          label: rate.laborDbName,
-          table: 'labor_rates',
-          name: rate.laborDbName,
-          category: COLUMNS_CATEGORY,
-          mode: 'coefficient',
-          unitLabel: `hrs/${rate.unit}`,
-          value: materialPrices[rate.laborDbName] ?? defLab ?? 0,
-        }
-      }),
+      items: [
+        ...Object.values(FINISH_TYPES).map(rate => {
+          const defLab = rate.unit === 'ton' ? rate.laborHrsPer : rate.laborHrsPerSF
+          return {
+            label: rate.laborDbName,
+            table: 'labor_rates',
+            name: rate.laborDbName,
+            category: COLUMNS_CATEGORY,
+            mode: 'coefficient',
+            unitLabel: `hrs/${rate.unit}`,
+            value: materialPrices[rate.laborDbName] ?? defLab ?? 0,
+          }
+        }),
+        // Finish materials — one block per finish type (per vendor, Standard first).
+        ...Object.values(FINISH_TYPES).flatMap(rate =>
+          _colMatRows(
+            rate.dbName,
+            rate.unit,
+            rate.unit === 'ton' ? rate.costPerTon : rate.costPerSF
+          )
+        ),
+      ],
     },
   ]
 

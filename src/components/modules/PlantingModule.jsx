@@ -1086,10 +1086,38 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
     )
   }
 
-  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
-  //    that used to have an inline RateEditPopover in this module now lives here.
-  //    All Planting rates are labor coefficients (labor_rates); material prices
-  //    are per-row catalog values edited in Master Material Rates.
+  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Each section
+  //    lists its LABOR rates first, then every MATERIAL rate (one row per vendor,
+  //    Standard first) sourced from the module's material catalog — mirrors the
+  //    Walls / Utilities View Rates. Planting resolves materials by name.
+  const vendorNames = Object.fromEntries((vendors || []).map(v => [v.id, v.name]))
+  // Material rows for a catalog item (matched by name). One row per vendor
+  // (Standard first), each editable straight to material_price.
+  const matRows = (dbName, unit, fallback) => {
+    const rows = (materialRows || []).filter(r0 => r0.name === dbName)
+    if (rows.length) {
+      return rows
+        .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
+        .sort((a, b) => {
+          const va = a.vendor_id == null ? '' : vendorNames[a.vendor_id] || '~'
+          const vb = b.vendor_id == null ? '' : vendorNames[b.vendor_id] || '~'
+          return va.localeCompare(vb)
+        })
+        .map(r0 => ({
+          label: `${r0.vendor_id ? vendorNames[r0.vendor_id] || 'Vendor' : 'Standard'} — ${r0.name}`,
+          table: 'material_price',
+          materialId: r0.id,
+          vendorId: r0.vendor_id || undefined,
+          category: 'Planting',
+          unitLabel: r0.unit || unit,
+          mode: 'currency',
+          value: n(r0.unit_cost),
+        }))
+    }
+    return [
+      { label: `Standard — ${dbName}`, table: 'material_price', name: dbName, category: 'Planting', unitLabel: unit, mode: 'currency', value: fallback },
+    ]
+  }
   const plantingRateList = [
     {
       group: 'Till & Amend Soil',
@@ -1125,45 +1153,65 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
     },
     {
       group: 'Small Plants',
-      items: Object.keys(SMALL_PLANT_DEFAULTS).map(type => ({
-        label: type,
-        table: 'labor_rates',
-        name: type,
-        category: 'Planting',
-        mode: 'coefficient',
-        unitLabel: 'per day',
-        value: getSmallPerDay(laborRates, type),
-      })),
+      items: [
+        ...Object.keys(SMALL_PLANT_DEFAULTS).map(type => ({
+          label: type,
+          table: 'labor_rates',
+          name: type,
+          category: 'Planting',
+          mode: 'coefficient',
+          unitLabel: 'per day',
+          value: getSmallPerDay(laborRates, type),
+        })),
+        ...Object.keys(SMALL_PLANT_DEFAULTS).flatMap(type =>
+          matRows(type, 'ea', materialPrices[type] ?? SMALL_PLANT_DEFAULTS[type].price)
+        ),
+      ],
     },
     {
       group: 'Large Plants / Trees',
-      items: Object.keys(LARGE_PLANT_DEFAULTS).map(type => ({
-        label: type,
-        table: 'labor_rates',
-        name: type,
-        category: 'Planting',
-        mode: 'coefficient',
-        unitLabel: 'per day',
-        value: getLargePerDay(laborRates, type),
-      })),
+      items: [
+        ...Object.keys(LARGE_PLANT_DEFAULTS).map(type => ({
+          label: type,
+          table: 'labor_rates',
+          name: type,
+          category: 'Planting',
+          mode: 'coefficient',
+          unitLabel: 'per day',
+          value: getLargePerDay(laborRates, type),
+        })),
+        ...Object.keys(LARGE_PLANT_DEFAULTS).flatMap(type =>
+          matRows(type, 'ea', materialPrices[type] ?? LARGE_PLANT_DEFAULTS[type].price)
+        ),
+      ],
     },
     {
       group: 'Planting Add-Ons',
       items: [
-        { key: 'Tree Stakes - Install Rate', unit: 'stakes/day' },
-        { key: 'Root Barrier - Install Rate', unit: 'min/LF' },
-        { key: 'Gopher Basket - Install Rate', unit: 'min/basket' },
-        { key: 'Mesh Flat - Install Rate', unit: 'min/SF' },
-        { key: 'Jute Fabric - Install Rate', unit: 'min/SF' },
-      ].map(({ key, unit }) => ({
-        label: key,
-        table: 'labor_rates',
-        name: key,
-        category: 'Planting',
-        mode: 'coefficient',
-        unitLabel: unit,
-        value: lr(laborRates, key),
-      })),
+        ...[
+          { key: 'Tree Stakes - Install Rate', unit: 'stakes/day' },
+          { key: 'Root Barrier - Install Rate', unit: 'min/LF' },
+          { key: 'Gopher Basket - Install Rate', unit: 'min/basket' },
+          { key: 'Mesh Flat - Install Rate', unit: 'min/SF' },
+          { key: 'Jute Fabric - Install Rate', unit: 'min/SF' },
+        ].map(({ key, unit }) => ({
+          label: key,
+          table: 'labor_rates',
+          name: key,
+          category: 'Planting',
+          mode: 'coefficient',
+          unitLabel: unit,
+          value: lr(laborRates, key),
+        })),
+        ...ADDON_TYPES.flatMap(t => {
+          const meta = ADDON_META[t] || {}
+          return matRows(
+            meta.matKey,
+            meta.unit || 'ea',
+            materialPrices[meta.matKey] ?? ADDON_MAT_DEFAULTS[meta.matKey] ?? 0
+          )
+        }),
+      ],
     },
   ]
 

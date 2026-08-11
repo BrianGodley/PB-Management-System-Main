@@ -732,6 +732,31 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
 
   // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
   //    that used to have an inline RateEditPopover in this module now lives here.
+  //    Each section lists its LABOR rates first, then every MATERIAL rate (one
+  //    row per vendor, Standard first) resolved from the module's catalog —
+  //    mirrors the Walls / Utilities View Rates.
+  const vendorNames = Object.fromEntries((vendors || []).map(v => [v.id, v.name]))
+  // Catalog material rows for a sub_category: one currency row per vendor
+  // (Standard/null-vendor first), each editable straight to material_price.
+  const catalogBlockItems = subcat =>
+    (materialRows || [])
+      .filter(r0 => r0.sub_category === subcat)
+      .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
+      .sort((a, b) => {
+        const va = a.vendor_id == null ? '' : vendorNames[a.vendor_id] || '~'
+        const vb = b.vendor_id == null ? '' : vendorNames[b.vendor_id] || '~'
+        return va.localeCompare(vb) || (a.name || '').localeCompare(b.name || '')
+      })
+      .map(r0 => ({
+        label: `${r0.vendor_id ? vendorNames[r0.vendor_id] || 'Vendor' : 'Standard'} — ${r0.name}`,
+        table: 'material_price',
+        materialId: r0.id,
+        vendorId: r0.vendor_id || undefined,
+        category: 'Drainage',
+        unitLabel: r0.unit || 'ea',
+        mode: 'currency',
+        value: n(r0.unit_cost),
+      }))
   const drainageRateList = [
     {
       group: 'Trenching',
@@ -758,15 +783,18 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
     },
     {
       group: 'Drain Pipe',
-      items: Object.entries(PIPE_LABOR_RATE_NAME).map(([type, name]) => ({
-        label: name,
-        table: 'labor_rates',
-        name,
-        category: 'Drainage',
-        mode: 'coefficient',
-        unitLabel: 'hr/LF',
-        value: PIPE_TYPES[type]?.laborPerLF,
-      })),
+      items: [
+        ...Object.entries(PIPE_LABOR_RATE_NAME).map(([type, name]) => ({
+          label: name,
+          table: 'labor_rates',
+          name,
+          category: 'Drainage',
+          mode: 'coefficient',
+          unitLabel: 'hr/LF',
+          value: PIPE_TYPES[type]?.laborPerLF,
+        })),
+        ...catalogBlockItems(DRAIN_CAT.pipe),
+      ],
     },
     {
       group: 'French Drains',
@@ -860,15 +888,18 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
     },
     {
       group: 'Drains & Fixtures',
-      items: Object.entries(FIXTURE_LABOR_RATE_NAME).map(([type, name]) => ({
-        label: name,
-        table: 'labor_rates',
-        name,
-        category: 'Drainage',
-        mode: 'coefficient',
-        unitLabel: 'hr/ea',
-        value: FIXTURE_TYPES[type]?.laborHrs,
-      })),
+      items: [
+        ...Object.entries(FIXTURE_LABOR_RATE_NAME).map(([type, name]) => ({
+          label: name,
+          table: 'labor_rates',
+          name,
+          category: 'Drainage',
+          mode: 'coefficient',
+          unitLabel: 'hr/ea',
+          value: FIXTURE_TYPES[type]?.laborHrs,
+        })),
+        ...catalogBlockItems(DRAIN_CAT.fixture),
+      ],
     },
     {
       group: 'Additional Items',

@@ -661,8 +661,38 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
     })
   }
 
-  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
-  //    that used to have an inline RateEditPopover in this module now lives here.
+  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Each section
+  //    lists its LABOR rates first, then every MATERIAL rate (one row per vendor,
+  //    Standard first) sourced from the module's material catalog — mirrors the
+  //    Walls / Utilities View Rates. Irrigation resolves materials by name.
+  const vendorNames = Object.fromEntries((vendors || []).map(v => [v.id, v.name]))
+  // Material rows for a catalog item (matched by name). One row per vendor
+  // (Standard first), each editable straight to material_price.
+  const matRows = (dbName, unit, fallback) => {
+    const rows = (materialRows || []).filter(r0 => r0.name === dbName)
+    if (rows.length) {
+      return rows
+        .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
+        .sort((a, b) => {
+          const va = a.vendor_id == null ? '' : vendorNames[a.vendor_id] || '~'
+          const vb = b.vendor_id == null ? '' : vendorNames[b.vendor_id] || '~'
+          return va.localeCompare(vb)
+        })
+        .map(r0 => ({
+          label: `${r0.vendor_id ? vendorNames[r0.vendor_id] || 'Vendor' : 'Standard'} — ${r0.name}`,
+          table: 'material_price',
+          materialId: r0.id,
+          vendorId: r0.vendor_id || undefined,
+          category: 'Irrigation',
+          unitLabel: r0.unit || unit,
+          mode: 'currency',
+          value: n(r0.unit_cost),
+        }))
+    }
+    return [
+      { label: `Standard — ${dbName}`, table: 'material_price', name: dbName, category: 'Irrigation', unitLabel: unit, mode: 'currency', value: fallback },
+    ]
+  }
   const irrigationRateList = [
     {
       group: 'Irrigation Zones',
@@ -685,6 +715,9 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
           unitLabel: 'hrs/zone',
           value: calc.trenchRate,
         },
+        ...ZONE_TYPES.flatMap(z =>
+          matRows(z.matKey, 'ea', materialPrices[z.matKey] ?? z.matFallback)
+        ),
       ],
     },
     {
@@ -699,6 +732,9 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
           unitLabel: 'hrs/ea',
           value: calc.timerHrs,
         },
+        ...TIMER_TYPES.flatMap(t =>
+          matRows(t.matKey, 'ea', materialPrices[t.matKey] ?? t.matFallback)
+        ),
       ],
     },
   ]

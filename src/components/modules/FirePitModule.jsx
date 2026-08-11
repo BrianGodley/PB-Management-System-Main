@@ -871,10 +871,59 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
     })
   }
 
-  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
-  //    that used to have an inline RateEditPopover in this module now lives here.
-  //    All are labor coefficients (labor_rates); material prices are edited in
-  //    Master Material Rates, not inline.
+  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Each section
+  //    lists its LABOR rates first, then every MATERIAL rate (per vendor from the
+  //    module catalog, Standard first) — mirrors the Walls / Utilities View Rates.
+  const vendorNames = Object.fromEntries((vendors || []).map(v => [v.id, v.name]))
+  // Material rows for a catalog item (matched by name). One row per vendor
+  // (Standard first), each editable straight to material_price; falls back to a
+  // single Standard row at the current rate when no catalog row exists.
+  const matRows = (dbName, unit, fallback) => {
+    const rows = (materialRows || []).filter(r0 => r0.name === dbName)
+    if (rows.length) {
+      return rows
+        .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
+        .sort((a, b) => {
+          const va = a.vendor_id == null ? '' : vendorNames[a.vendor_id] || '~'
+          const vb = b.vendor_id == null ? '' : vendorNames[b.vendor_id] || '~'
+          return va.localeCompare(vb)
+        })
+        .map(r0 => ({
+          label: `${r0.vendor_id ? vendorNames[r0.vendor_id] || 'Vendor' : 'Standard'} — ${r0.name}`,
+          table: 'material_price',
+          materialId: r0.id,
+          vendorId: r0.vendor_id || undefined,
+          category: 'Fire Pit',
+          unitLabel: r0.unit || unit,
+          mode: 'currency',
+          value: n(r0.unit_cost),
+        }))
+    }
+    return [
+      { label: `Standard — ${dbName}`, table: 'material_price', name: dbName, category: 'Fire Pit', unitLabel: unit, mode: 'currency', value: fallback },
+    ]
+  }
+  // Every catalog product tagged with a sub-category (Wall Cap / Wall Finish),
+  // one row per vendor (Standard first) — vendor-overridable material prices.
+  const catalogBlockItems = (subcat, unit) =>
+    (materialRows || [])
+      .filter(r0 => r0.sub_category === subcat)
+      .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
+      .sort((a, b) => {
+        const va = a.vendor_id == null ? '' : vendorNames[a.vendor_id] || '~'
+        const vb = b.vendor_id == null ? '' : vendorNames[b.vendor_id] || '~'
+        return va.localeCompare(vb) || (a.name || '').localeCompare(b.name || '')
+      })
+      .map(r0 => ({
+        label: `${r0.vendor_id ? vendorNames[r0.vendor_id] || 'Vendor' : 'Standard'} — ${r0.name}`,
+        table: 'material_price',
+        materialId: r0.id,
+        vendorId: r0.vendor_id || undefined,
+        category: 'Fire Pit',
+        unitLabel: r0.unit || unit || 'ea',
+        mode: 'currency',
+        value: n(r0.unit_cost),
+      }))
   const firePitRateList = [
     {
       group: 'Structure Labor',
@@ -924,62 +973,90 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
           unitLabel: 'CF/hr',
           value: p(FP_RATES.pumpGroutLab.dbName, FP_RATES.pumpGroutLab.fallback),
         },
+        ...matRows(FP_RATES.fpBlock.dbName, 'block', p(FP_RATES.fpBlock.dbName, FP_RATES.fpBlock.fallback)),
+        ...matRows(FP_RATES.fpRebar.dbName, 'LF', p(FP_RATES.fpRebar.dbName, FP_RATES.fpRebar.fallback)),
+        ...matRows(FP_RATES.fpConcrete.dbName, 'CY', p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)),
+        ...matRows(FP_RATES.fpGroutPump.dbName, 'flat', p(FP_RATES.fpGroutPump.dbName, FP_RATES.fpGroutPump.fallback)),
       ],
     },
     {
       group: 'Wall Caps',
-      items: CAP_LIST.map(type => {
-        const labKey = CAP_META[type].labKey
-        return {
-          label: FP_RATES[labKey].dbName,
-          table: 'labor_rates',
-          name: FP_RATES[labKey].dbName,
-          category: 'Fire Pit',
-          mode: 'coefficient',
-          unitLabel: 'hrs/LF',
-          value: p(FP_RATES[labKey].dbName, FP_RATES[labKey].fallback),
-        }
-      }),
+      items: [
+        ...CAP_LIST.map(type => {
+          const labKey = CAP_META[type].labKey
+          return {
+            label: FP_RATES[labKey].dbName,
+            table: 'labor_rates',
+            name: FP_RATES[labKey].dbName,
+            category: 'Fire Pit',
+            mode: 'coefficient',
+            unitLabel: 'hrs/LF',
+            value: p(FP_RATES[labKey].dbName, FP_RATES[labKey].fallback),
+          }
+        }),
+        // Vendor catalog cap products (Wall Cap sub-category) + each built-in
+        // House cap $/LF rate.
+        ...catalogBlockItems(CAP_CAT, 'LF'),
+        ...CAP_LIST.flatMap(type => {
+          const matKey = CAP_META[type].matKey
+          return matRows(FP_RATES[matKey].dbName, 'LF', p(FP_RATES[matKey].dbName, FP_RATES[matKey].fallback))
+        }),
+      ],
     },
     {
       group: 'Wall Finishes',
-      items: WF_LIST.map(type => {
-        const meta = WF_META[type]
-        const labKey = meta.labKey
-        return {
-          label: FP_RATES[labKey].dbName,
-          table: 'labor_rates',
-          name: FP_RATES[labKey].dbName,
-          category: 'Fire Pit',
-          mode: 'coefficient',
-          unitLabel: meta.labMode === 'perDay' ? 'SF/day' : 'hrs/SF',
-          value: p(FP_RATES[labKey].dbName, FP_RATES[labKey].fallback),
-        }
-      }),
+      items: [
+        ...WF_LIST.map(type => {
+          const meta = WF_META[type]
+          const labKey = meta.labKey
+          return {
+            label: FP_RATES[labKey].dbName,
+            table: 'labor_rates',
+            name: FP_RATES[labKey].dbName,
+            category: 'Fire Pit',
+            mode: 'coefficient',
+            unitLabel: meta.labMode === 'perDay' ? 'SF/day' : 'hrs/SF',
+            value: p(FP_RATES[labKey].dbName, FP_RATES[labKey].fallback),
+          }
+        }),
+        // Vendor catalog finish products (Wall Finish sub-category) + each
+        // built-in House finish material rate.
+        ...catalogBlockItems(WF_CAT, 'SF'),
+        ...WF_LIST.flatMap(type => {
+          const meta = WF_META[type]
+          return matRows(FP_RATES[meta.key].dbName, meta.unit === 'ton' ? 'ton' : 'SF', p(FP_RATES[meta.key].dbName, FP_RATES[meta.key].fallback))
+        }),
+      ],
     },
     {
       group: 'Gas Line',
-      items: LINE_TYPE_ARR.map(t => ({
-        label: t.laborDbName,
-        table: 'labor_rates',
-        name: t.laborDbName,
-        category: 'Utilities',
-        mode: 'coefficient',
-        unitLabel: 'hrs/LF',
-        value: materialPrices[t.laborDbName] ?? t.laborFallback,
-      })),
+      items: [
+        ...LINE_TYPE_ARR.map(t => ({
+          label: t.laborDbName,
+          table: 'labor_rates',
+          name: t.laborDbName,
+          category: 'Utilities',
+          mode: 'coefficient',
+          unitLabel: 'hrs/LF',
+          value: materialPrices[t.laborDbName] ?? t.laborFallback,
+        })),
+        ...LINE_TYPE_ARR.flatMap(t => matRows(t.dbName, 'LF', materialPrices[t.dbName] ?? t.fallback)),
+      ],
     },
     {
       group: 'Gas Fixtures',
-      items: GAS_TYPE_ARR.map(t => ({
-        label: t.laborDbName,
-        table: 'labor_rates',
-        name: t.laborDbName,
-        category: 'Utilities',
-        mode: 'coefficient',
-        unitLabel: 'hrs/ea',
-        value: materialPrices[t.laborDbName] ?? t.laborFallback,
-      })),
+      items: [
+        ...GAS_TYPE_ARR.map(t => ({
+          label: t.laborDbName,
+          table: 'labor_rates',
+          name: t.laborDbName,
+          category: 'Utilities',
+          mode: 'coefficient',
+          unitLabel: 'hrs/ea',
+          value: materialPrices[t.laborDbName] ?? t.laborFallback,
+        })),
+        ...GAS_TYPE_ARR.flatMap(t => matRows(t.dbName, 'ea', materialPrices[t.dbName] ?? t.fallback)),
+      ],
     },
   ]
 

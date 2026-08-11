@@ -3381,7 +3381,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
         }))
     }
     return [
-      { label: `Standard — ${label || dbName}`, table: 'material_rates', name: dbName, category: 'Walls', unitLabel: unit, mode: 'currency', value },
+      { label: `Standard — ${label || dbName}`, table: 'material_price', name: dbName, category: 'Walls', unitLabel: unit, mode: 'currency', value },
     ]
   }
 

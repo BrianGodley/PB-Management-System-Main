@@ -643,8 +643,36 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
 
   // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
   //    that used to have an inline RateEditPopover in this module now lives here.
-  //    Lighting's only inline rate was the material markup (a fraction).
+  //    Each section lists its catalog MATERIAL rates (one row per vendor,
+  //    Standard first) sourced from the module's material catalog — mirrors the
+  //    Walls module View Rates. Lighting labor lives per-item (labor_hrs_ea) so
+  //    the only standalone rate is the material markup.
+  const vendorNames = Object.fromEntries((vendors || []).map(v => [v.id, v.name]))
+  // Catalog material rows for a sub_category → one row per vendor (Standard
+  // first), each editable straight to material_price (same helper Walls uses).
+  const catalogBlockItems = subcat =>
+    (materialRows || [])
+      .filter(r0 => r0.sub_category === subcat)
+      .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
+      .sort((a, b) => {
+        const va = a.vendor_id == null ? '' : vendorNames[a.vendor_id] || '~'
+        const vb = b.vendor_id == null ? '' : vendorNames[b.vendor_id] || '~'
+        return va.localeCompare(vb) || (a.name || '').localeCompare(b.name || '')
+      })
+      .map(r0 => ({
+        label: `${r0.vendor_id ? vendorNames[r0.vendor_id] || 'Vendor' : 'Standard'} — ${r0.name}`,
+        table: 'material_price',
+        materialId: r0.id,
+        vendorId: r0.vendor_id || undefined,
+        category: LIGHTING_CATEGORY,
+        unitLabel: r0.unit || 'ea',
+        mode: 'currency',
+        value: n(r0.unit_cost),
+      }))
   const lightingRateList = [
+    { group: 'Fixtures', items: catalogBlockItems(LIGHT_CAT.fixture) },
+    { group: 'Transformers', items: catalogBlockItems(LIGHT_CAT.transformer) },
+    { group: 'Wire', items: catalogBlockItems(LIGHT_CAT.wire) },
     {
       group: 'Materials',
       items: [
