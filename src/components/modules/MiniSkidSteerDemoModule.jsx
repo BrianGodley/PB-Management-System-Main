@@ -901,30 +901,39 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       ],
     },
     {
-      group: 'Demolition (In-House)',
+      group: 'Main Demo',
       items: [
-        { label: 'Demo - Mini - Concrete SF', table: 'labor_rates', name: 'Demo - Mini - Concrete SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100sf·in', value: calc.laborConc },
-        { label: 'Demo - Mini - Dirt SF', table: 'labor_rates', name: 'Demo - Mini - Dirt SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100sf·in', value: calc.laborDirt },
-        { label: 'Demo - Mini - Import Base SF', table: 'labor_rates', name: 'Demo - Mini - Import Base SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100sf·in', value: calc.laborBase },
-        { label: 'Demo - Mini - Grass SF', table: 'labor_rates', name: 'Demo - Mini - Grass SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100sf·in', value: calc.laborGrass },
+        { label: 'Demo - Mini - Concrete SF', table: 'labor_rates', name: 'Demo - Mini - Concrete SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100 SF per in deep', value: calc.laborConc },
+        { label: 'Demo - Mini - Dirt SF', table: 'labor_rates', name: 'Demo - Mini - Dirt SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100 SF per in deep', value: calc.laborDirt },
+        { label: 'Demo - Mini - Grass SF', table: 'labor_rates', name: 'Demo - Mini - Grass SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100 SF per in deep', value: calc.laborGrass },
+        { label: 'Demo - Mini - Grade Cut SF', table: 'labor_rates', name: 'Demo - Mini - Grade Cut SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100 SF per in deep', value: calc.laborGradeCut },
+      ],
+    },
+    {
+      group: 'Import',
+      items: [
+        { label: 'Demo - Mini - Import Base SF', table: 'labor_rates', name: 'Demo - Mini - Import Base SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100 SF per in deep', value: calc.laborBase },
+        { label: 'Demo - Mini - Grade Fill SF', table: 'labor_rates', name: 'Demo - Mini - Grade Fill SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100 SF per in deep', value: calc.laborGradeFill },
+      ],
+    },
+    {
+      group: 'Vertical Demo',
+      items: [
+        { label: 'Demo - Mini - Misc Vert SF', table: 'labor_rates', name: 'Demo - Mini - Misc Vert SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100 SF per in deep', value: calc.laborMiscVert },
         { label: 'Demo - Mini Rebar', table: 'labor_rates', name: 'Demo - Mini Rebar', category: 'Demo', mode: 'coefficient', unitLabel: 'min/SF', value: calc.rebarMinPerSF },
       ],
     },
     {
-      group: 'Misc Flat / Vertical / Footing',
+      group: 'Footing',
       items: [
-        { label: 'Demo - Mini - Misc Flat SF', table: 'labor_rates', name: 'Demo - Mini - Misc Flat SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100sf·in', value: calc.laborMiscFlat },
-        { label: 'Demo - Mini - Misc Vert SF', table: 'labor_rates', name: 'Demo - Mini - Misc Vert SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100sf·in', value: calc.laborMiscVert },
-        { label: 'Demo - Mini - Footing SF', table: 'labor_rates', name: 'Demo - Mini - Footing SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100sf·in', value: calc.laborFooting },
+        { label: 'Demo - Mini - Footing SF', table: 'labor_rates', name: 'Demo - Mini - Footing SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100 SF per in deep', value: calc.laborFooting },
       ],
     },
     {
-      group: 'Grading (In-House)',
+      group: 'Compaction',
       items: [
-        { label: 'Demo - Mini - Grade Cut SF', table: 'labor_rates', name: 'Demo - Mini - Grade Cut SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100sf·in', value: calc.laborGradeCut },
-        { label: 'Demo - Mini - Grade Fill SF', table: 'labor_rates', name: 'Demo - Mini - Grade Fill SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100sf·in', value: calc.laborGradeFill },
-        { label: 'Demo - Mini - JJ SF', table: 'labor_rates', name: 'Demo - Mini - JJ SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100sf·in', value: calc.laborJJ },
-        { label: 'Demo - Mini - SS Compact SF', table: 'labor_rates', name: 'Demo - Mini - SS Compact SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100sf·in', value: calc.laborSS },
+        { label: 'Demo - Mini - JJ SF', table: 'labor_rates', name: 'Demo - Mini - JJ SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100 SF per in deep', value: calc.laborJJ },
+        { label: 'Demo - Mini - SS Compact SF', table: 'labor_rates', name: 'Demo - Mini - SS Compact SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100 SF per in deep', value: calc.laborSS },
       ],
     },
     {
@@ -1208,8 +1217,8 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 fee: dumpConc,
                 rate: calc.laborConc,
                 rateName: 'Demo - Mini - Concrete SF',
-                rateNote: `${calc.laborConc} hr/100sf·in`,
-                rateUnit: 'hr/100sf·in',
+                rateNote: `${calc.laborConc} hr/100 SF per in deep`,
+                rateUnit: 'hr/100 SF per in deep',
               },
               {
                 label: 'Dirt/Rock',
@@ -1220,8 +1229,8 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 fee: dumpDirt,
                 rate: calc.laborDirt,
                 rateName: 'Demo - Mini - Dirt SF',
-                rateNote: `${calc.laborDirt} hr/100sf·in`,
-                rateUnit: 'hr/100sf·in',
+                rateNote: `${calc.laborDirt} hr/100 SF per in deep`,
+                rateUnit: 'hr/100 SF per in deep',
               },
               {
                 label: 'Grass/Sod',
@@ -1232,8 +1241,8 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 fee: dumpGreen,
                 rate: calc.laborGrass,
                 rateName: 'Demo - Mini - Grass SF',
-                rateNote: `${calc.laborGrass} hr/100sf·in`,
-                rateUnit: 'hr/100sf·in',
+                rateNote: `${calc.laborGrass} hr/100 SF per in deep`,
+                rateUnit: 'hr/100 SF per in deep',
                 extraIcon: null,
               },
               {
@@ -1245,8 +1254,8 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 fee: dumpDirt,
                 rate: calc.laborGradeCut,
                 rateName: 'Demo - Mini - Grade Cut SF',
-                rateNote: `${calc.laborGradeCut} hr/100sf·in`,
-                rateUnit: 'hr/100sf·in',
+                rateNote: `${calc.laborGradeCut} hr/100 SF per in deep`,
+                rateUnit: 'hr/100 SF per in deep',
                 extraIcon: null,
               },
             ].map(({ label, sfK, dK, dep, row, rate, rateName, rateNote, rateUnit, extraIcon }) => (
@@ -1332,7 +1341,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 dK: 'baseDepth',
                 dep: 4,
                 row: calc.base,
-                rateNote: `½ × ${calc.laborBase} hr/100sf·in`,
+                rateNote: `½ × ${calc.laborBase} hr/100 SF per in deep`,
               },
               {
                 label: 'Grade Fill',
@@ -1340,7 +1349,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 dK: 'gradeFillDepth',
                 dep: 4,
                 row: calc.gradeFill,
-                rateNote: `${calc.laborGradeFill} hr/100sf·in`,
+                rateNote: `${calc.laborGradeFill} hr/100 SF per in deep`,
               },
             ].map(({ label, sfK, dK, dep, row, rateNote }) => (
               <tr key={label}>
@@ -1376,7 +1385,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           <span>{subSectionTitle('VERTICAL DEMO', isSub)}</span>
           {isSelf && (
             <>
-              <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborMiscVert} hr/100sf·in equiv</span>
+              <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborMiscVert} hr/100 SF per in deep equiv</span>
               <span className="font-normal normal-case text-gray-500">· container disposal</span>
             </>
           )}
@@ -1454,7 +1463,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           <span>{subSectionTitle('Footing Demo', isSub)}</span>
           {isSelf && (
             <>
-              <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborFooting} hr/100sf·in equiv</span>
+              <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborFooting} hr/100 SF per in deep equiv</span>
               <span className="font-normal normal-case text-gray-500">· container disposal</span>
             </>
           )}
@@ -1584,10 +1593,10 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 dep: 4,
                 tons: calc.jjTons,
                 hrs: calc.jjHrs,
-                note: `${calc.laborJJ} hr/100sf·in`,
+                note: `${calc.laborJJ} hr/100 SF per in deep`,
                 rate: calc.laborJJ,
                 rateName: 'Demo - Mini - JJ SF',
-                rateUnit: 'hr/100sf·in',
+                rateUnit: 'hr/100 SF per in deep',
               },
               {
                 label: 'Mini SS Compact (4" Max)',
@@ -1596,10 +1605,10 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 dep: 4,
                 tons: calc.ssCmpTons,
                 hrs: calc.ssCmpHrs,
-                note: `${calc.laborSS} hr/100sf·in`,
+                note: `${calc.laborSS} hr/100 SF per in deep`,
                 rate: calc.laborSS,
                 rateName: 'Demo - Mini - SS Compact SF',
-                rateUnit: 'hr/100sf·in',
+                rateUnit: 'hr/100 SF per in deep',
               },
             ].map(({ label, sfK, dK, dep, tons, hrs, note, rate, rateName, rateUnit }) => (
               <tr key={label}>

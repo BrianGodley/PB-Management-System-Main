@@ -962,7 +962,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
       ],
     },
     {
-      group: 'Demolition',
+      group: 'Main Demo',
       items: [
         {
           label: 'Concrete',
@@ -970,7 +970,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           name: 'Demo - Skid - Concrete SF',
           category: 'Demo',
           mode: 'coefficient',
-          unitLabel: 'hr/100sf·in',
+          unitLabel: 'hr/100 SF per in deep',
           value: calc.laborConc,
         },
         {
@@ -979,17 +979,8 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           name: 'Demo - Skid - Dirt SF',
           category: 'Demo',
           mode: 'coefficient',
-          unitLabel: 'hr/100sf·in',
+          unitLabel: 'hr/100 SF per in deep',
           value: calc.laborDirt,
-        },
-        {
-          label: 'Import Base',
-          table: 'labor_rates',
-          name: 'Demo - Skid - Import Base SF',
-          category: 'Demo',
-          mode: 'coefficient',
-          unitLabel: 'hr/100sf·in',
-          value: calc.laborBase,
         },
         {
           label: 'Grass/Sod',
@@ -997,8 +988,54 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           name: 'Demo - Skid - Grass SF',
           category: 'Demo',
           mode: 'coefficient',
-          unitLabel: 'hr/100sf·in',
+          unitLabel: 'hr/100 SF per in deep',
           value: calc.laborGrass,
+        },
+        {
+          label: 'Grade Cut',
+          table: 'labor_rates',
+          name: 'Demo - Skid - Grade Cut SF',
+          category: 'Demo',
+          mode: 'coefficient',
+          unitLabel: 'hr/100 SF per in deep',
+          value: calc.laborGradeCut,
+        },
+      ],
+    },
+    {
+      group: 'Import',
+      items: [
+        {
+          label: 'Import Base',
+          table: 'labor_rates',
+          name: 'Demo - Skid - Import Base SF',
+          category: 'Demo',
+          mode: 'coefficient',
+          unitLabel: 'hr/100 SF per in deep',
+          value: calc.laborBase,
+        },
+        {
+          label: 'Grade Fill',
+          table: 'labor_rates',
+          name: 'Demo - Skid - Grade Fill SF',
+          category: 'Demo',
+          mode: 'coefficient',
+          unitLabel: 'hr/100 SF per in deep',
+          value: calc.laborGradeFill,
+        },
+      ],
+    },
+    {
+      group: 'Vertical Demo',
+      items: [
+        {
+          label: 'Misc Vertical',
+          table: 'labor_rates',
+          name: 'Demo - Skid - Misc Vert SF',
+          category: 'Demo',
+          mode: 'coefficient',
+          unitLabel: 'hr/100 SF per in deep',
+          value: calc.laborMiscVert,
         },
         {
           label: 'Rebar',
@@ -1012,34 +1049,6 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
       ],
     },
     {
-      group: 'Misc Flat',
-      items: [
-        {
-          label: 'Misc Flat',
-          table: 'labor_rates',
-          name: 'Demo - Skid - Misc Flat SF',
-          category: 'Demo',
-          mode: 'coefficient',
-          unitLabel: 'hr/100sf·in',
-          value: calc.laborMiscFlat,
-        },
-      ],
-    },
-    {
-      group: 'Misc Vertical',
-      items: [
-        {
-          label: 'Misc Vertical',
-          table: 'labor_rates',
-          name: 'Demo - Skid - Misc Vert SF',
-          category: 'Demo',
-          mode: 'coefficient',
-          unitLabel: 'hr/100sf·in',
-          value: calc.laborMiscVert,
-        },
-      ],
-    },
-    {
       group: 'Footing',
       items: [
         {
@@ -1048,39 +1057,21 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           name: 'Demo - Skid - Footing SF',
           category: 'Demo',
           mode: 'coefficient',
-          unitLabel: 'hr/100sf·in',
+          unitLabel: 'hr/100 SF per in deep',
           value: calc.laborFooting,
         },
       ],
     },
     {
-      group: 'Grading',
+      group: 'Compaction',
       items: [
-        {
-          label: 'Grade Cut',
-          table: 'labor_rates',
-          name: 'Demo - Skid - Grade Cut SF',
-          category: 'Demo',
-          mode: 'coefficient',
-          unitLabel: 'hr/100sf·in',
-          value: calc.laborGradeCut,
-        },
-        {
-          label: 'Grade Fill',
-          table: 'labor_rates',
-          name: 'Demo - Skid - Grade Fill SF',
-          category: 'Demo',
-          mode: 'coefficient',
-          unitLabel: 'hr/100sf·in',
-          value: calc.laborGradeFill,
-        },
         {
           label: 'Jumping Jack',
           table: 'labor_rates',
           name: 'Demo - Skid - JJ SF',
           category: 'Demo',
           mode: 'coefficient',
-          unitLabel: 'hr/100sf·in',
+          unitLabel: 'hr/100 SF per in deep',
           value: calc.laborJJ,
         },
         {
@@ -1089,7 +1080,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           name: 'Demo - Skid - SS Compact SF',
           category: 'Demo',
           mode: 'coefficient',
-          unitLabel: 'hr/100sf·in',
+          unitLabel: 'hr/100 SF per in deep',
           value: calc.laborSS,
         },
       ],
@@ -1626,8 +1617,8 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 fee: dumpConc,
                 rate: calc.laborConc,
                 rateName: 'Demo - Skid - Concrete SF',
-                rateNote: `${calc.laborConc} hr/100sf·in`,
-                rateUnit: 'hr/100sf·in',
+                rateNote: `${calc.laborConc} hr/100 SF per in deep`,
+                rateUnit: 'hr/100 SF per in deep',
               },
               {
                 label: 'Dirt/Rock',
@@ -1638,8 +1629,8 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 fee: dumpDirt,
                 rate: calc.laborDirt,
                 rateName: 'Demo - Skid - Dirt SF',
-                rateNote: `${calc.laborDirt} hr/100sf·in`,
-                rateUnit: 'hr/100sf·in',
+                rateNote: `${calc.laborDirt} hr/100 SF per in deep`,
+                rateUnit: 'hr/100 SF per in deep',
               },
               {
                 label: 'Grass/Sod',
@@ -1650,8 +1641,8 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 fee: dumpGreen,
                 rate: calc.laborGrass,
                 rateName: 'Demo - Skid - Grass SF',
-                rateNote: `${calc.laborGrass} hr/100sf·in`,
-                rateUnit: 'hr/100sf·in',
+                rateNote: `${calc.laborGrass} hr/100 SF per in deep`,
+                rateUnit: 'hr/100 SF per in deep',
                 extraIcon: null,
               },
               {
@@ -1663,8 +1654,8 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 fee: dumpDirt,
                 rate: calc.laborGradeCut,
                 rateName: 'Demo - Skid - Grade Cut SF',
-                rateNote: `${calc.laborGradeCut} hr/100sf·in`,
-                rateUnit: 'hr/100sf·in',
+                rateNote: `${calc.laborGradeCut} hr/100 SF per in deep`,
+                rateUnit: 'hr/100 SF per in deep',
                 extraIcon: null,
               },
             ].map(({ label, sfK, dK, dep, row, rate, rateName, rateNote, rateUnit, extraIcon }) => (
@@ -1752,7 +1743,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 dep: 4,
                 tons: calc.base.tons,
                 hrs: calc.base.hours,
-                note: `½ × ${calc.laborBase} hr/100sf·in`,
+                note: `½ × ${calc.laborBase} hr/100 SF per in deep`,
               },
               {
                 label: 'Grade Fill',
@@ -1761,7 +1752,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 dep: 4,
                 tons: calc.gradeFill.tons,
                 hrs: calc.gradeFill.hours,
-                note: `${calc.laborGradeFill} hr/100sf·in`,
+                note: `${calc.laborGradeFill} hr/100 SF per in deep`,
               },
             ].map(({ label, sfK, dK, dep, tons, hrs, note }) => (
               <tr key={label}>
@@ -1796,7 +1787,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           <span>{subSectionTitle('VERTICAL DEMO', isDemoSub)}</span>
           {isSelf && (
             <>
-              <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborMiscVert} hr/100sf·in equiv</span>
+              <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborMiscVert} hr/100 SF per in deep equiv</span>
               <span className="font-normal normal-case text-gray-500">· container disposal</span>
             </>
           )}
@@ -1867,7 +1858,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           <span>{subSectionTitle('Footing Demo', isDemoSub)}</span>
           {isSelf && (
             <>
-              <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborFooting} hr/100sf·in equiv</span>
+              <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborFooting} hr/100 SF per in deep equiv</span>
               <span className="font-normal normal-case text-gray-500">· container disposal</span>
             </>
           )}
@@ -1990,10 +1981,10 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 dep: 4,
                 tons: calc.jjTons,
                 hrs: calc.jjHrs,
-                note: `${calc.laborJJ} hr/100sf·in`,
+                note: `${calc.laborJJ} hr/100 SF per in deep`,
                 rate: calc.laborJJ,
                 rateName: 'Demo - Skid - JJ SF',
-                rateUnit: 'hr/100sf·in',
+                rateUnit: 'hr/100 SF per in deep',
               },
               {
                 label: 'SS Compact',
@@ -2002,10 +1993,10 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 dep: 4,
                 tons: calc.ssCmpTons,
                 hrs: calc.ssCmpHrs,
-                note: `${calc.laborSS} hr/100sf·in`,
+                note: `${calc.laborSS} hr/100 SF per in deep`,
                 rate: calc.laborSS,
                 rateName: 'Demo - Skid - SS Compact SF',
-                rateUnit: 'hr/100sf·in',
+                rateUnit: 'hr/100 SF per in deep',
               },
             ].map(({ label, sfK, dK, dep, tons, hrs, note, rate, rateName, rateUnit }) => (
               <tr key={label}>

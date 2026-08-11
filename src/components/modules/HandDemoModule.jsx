@@ -852,7 +852,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
 
   // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
   //    that used to have an inline RateEditPopover in this module now lives here.
-  const coefRate = (label, name, value, unitLabel = 'hr/100sf·in') => ({
+  const coefRate = (label, name, value, unitLabel = 'hr/100 SF per in deep') => ({
     label, table: 'labor_rates', name, category: 'Demo', mode: 'coefficient', unitLabel, value,
   })
   const subcRate = (label, name, value, unitLabel = 'ea') => ({
@@ -868,28 +868,37 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       ],
     },
     {
-      group: 'Demolition Labor',
+      group: 'Main Demo',
       items: [
         coefRate('Concrete', 'Demo - Hand - Concrete SF', calc.laborConc),
         coefRate('Dirt/Rock', 'Demo - Hand - Dirt SF', calc.laborDirt),
-        coefRate('Import Base', 'Demo - Hand - Import Base SF', calc.laborBase),
         coefRate('Grass/Sod', 'Demo - Hand - Grass SF', calc.laborGrass),
+        coefRate('Grade Cut', 'Demo - Hand - Grade Cut SF', calc.laborGradeCut),
+      ],
+    },
+    {
+      group: 'Import',
+      items: [
+        coefRate('Import Base', 'Demo - Hand - Import Base SF', calc.laborBase),
+        coefRate('Grade Fill', 'Demo - Hand - Grade Fill SF', calc.laborGradeFill),
+      ],
+    },
+    {
+      group: 'Vertical Demo',
+      items: [
+        coefRate('Misc Vertical', 'Demo - Hand - Misc Vert SF', calc.laborMiscVert),
         coefRate('Rebar', 'Demo - Hand Rebar SF/hr', calc.rebarSfPerHr, 'SF/hr'),
       ],
     },
     {
-      group: 'Misc & Structural Labor',
+      group: 'Footing',
       items: [
-        coefRate('Misc Flat', 'Demo - Hand - Misc Flat SF', calc.laborMiscFlat),
-        coefRate('Misc Vertical', 'Demo - Hand - Misc Vert SF', calc.laborMiscVert),
         coefRate('Footing', 'Demo - Hand - Footing SF', calc.laborFooting),
       ],
     },
     {
-      group: 'Grading Labor',
+      group: 'Compaction',
       items: [
-        coefRate('Grade Cut', 'Demo - Hand - Grade Cut SF', calc.laborGradeCut),
-        coefRate('Grade Fill', 'Demo - Hand - Grade Fill SF', calc.laborGradeFill),
         coefRate('Jumping Jack', 'Demo - Hand - JJ SF', calc.laborJJ),
       ],
     },
@@ -1152,8 +1161,8 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 fee: dumpConc,
                 rate: calc.laborConc,
                 rateName: 'Demo - Hand - Concrete SF',
-                rateNote: `${calc.laborConc} hr/100sf·in`,
-                rateUnit: 'hr/100sf·in',
+                rateNote: `${calc.laborConc} hr/100 SF per in deep`,
+                rateUnit: 'hr/100 SF per in deep',
               },
               {
                 label: 'Dirt/Rock',
@@ -1164,8 +1173,8 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 fee: dumpDirt,
                 rate: calc.laborDirt,
                 rateName: 'Demo - Hand - Dirt SF',
-                rateNote: `${calc.laborDirt} hr/100sf·in`,
-                rateUnit: 'hr/100sf·in',
+                rateNote: `${calc.laborDirt} hr/100 SF per in deep`,
+                rateUnit: 'hr/100 SF per in deep',
               },
               {
                 label: 'Grass/Sod',
@@ -1176,8 +1185,8 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 fee: dumpGreen,
                 rate: calc.laborGrass,
                 rateName: 'Demo - Hand - Grass SF',
-                rateNote: `${calc.laborGrass} hr/100sf·in`,
-                rateUnit: 'hr/100sf·in',
+                rateNote: `${calc.laborGrass} hr/100 SF per in deep`,
+                rateUnit: 'hr/100 SF per in deep',
               },
               {
                 label: 'Grade Cut',
@@ -1188,8 +1197,8 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 fee: 0,
                 rate: calc.laborGradeCut,
                 rateName: 'Demo - Hand - Grade Cut SF',
-                rateNote: `${calc.laborGradeCut} hr/100sf·in`,
-                rateUnit: 'hr/100sf·in',
+                rateNote: `${calc.laborGradeCut} hr/100 SF per in deep`,
+                rateUnit: 'hr/100 SF per in deep',
               },
             ].map(({ label, sfK, dK, dep, row, rate, rateName, rateNote, rateUnit, extraIcon }) => (
               <tr key={label}>
@@ -1280,7 +1289,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 4,
                 tons: calc.base.tons,
                 hrs: calc.base.hours,
-                note: `½ × ${calc.laborBase} hr/100sf·in`,
+                note: `½ × ${calc.laborBase} hr/100 SF per in deep`,
               },
               {
                 label: 'Grade Fill',
@@ -1289,7 +1298,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 4,
                 tons: calc.gradeFill.tons,
                 hrs: calc.gradeFill.hours,
-                note: `${calc.laborGradeFill} hr/100sf·in`,
+                note: `${calc.laborGradeFill} hr/100 SF per in deep`,
               },
             ].map(({ label, sfK, dK, dep, tons, hrs, note }) => (
               <tr key={label}>
@@ -1324,7 +1333,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           <span>{subSectionTitle('VERTICAL DEMO', isSub)}</span>
           {isSelf && (
             <>
-              <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborMiscVert} hr/100sf·in equiv</span>
+              <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborMiscVert} hr/100 SF per in deep equiv</span>
               <span className="font-normal normal-case text-gray-500">· container disposal</span>
             </>
           )}
@@ -1395,7 +1404,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           <span>{subSectionTitle('Footing Demo', isSub)}</span>
           {isSelf && (
             <>
-              <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborFooting} hr/100sf·in equiv</span>
+              <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborFooting} hr/100 SF per in deep equiv</span>
               <span className="font-normal normal-case text-gray-500">· container disposal</span>
             </>
           )}
@@ -1466,7 +1475,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           <span>{subSectionTitle('Hand Bucket Areas', isSub)}</span>
           {isSelf && (
             <>
-              <span className="font-normal normal-case text-gray-500">· tight/confined access · 2 × concrete rate = {calc.laborBucket} hr/100sf·in</span>
+              <span className="font-normal normal-case text-gray-500">· tight/confined access · 2 × concrete rate = {calc.laborBucket} hr/100 SF per in deep</span>
               <span className="font-normal normal-case text-gray-500">· container disposal</span>
             </>
           )}
@@ -1584,10 +1593,10 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 4,
                 tons: 0,
                 hrs: calc.jjHrs,
-                note: `${calc.laborJJ} hr/100sf·in`,
+                note: `${calc.laborJJ} hr/100 SF per in deep`,
                 rate: calc.laborJJ,
                 rateName: 'Demo - Hand - JJ SF',
-                rateUnit: 'hr/100sf·in',
+                rateUnit: 'hr/100 SF per in deep',
               },
             ].map(({ label, sfK, dK, dep, tons, hrs, note, rate, rateName, rateUnit }) => (
               <tr key={label}>
