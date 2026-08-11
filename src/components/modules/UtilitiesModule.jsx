@@ -519,25 +519,18 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
 // ── Default blank rows ────────────────────────────────────────────────────────
 const DEFAULT_TRENCH_ROWS = [
   { equipment: 'Trench', lf: '', width: '', depth: '' },
-  { equipment: 'Trench', lf: '', width: '', depth: '' },
-  { equipment: 'Hand', lf: '', width: '', depth: '' },
 ]
 const DEFAULT_LINE_ROWS = [
   { type: 'PVC Conduit with Electrical', laborType: 'PVC Conduit with Electrical', lf: '', vendor: 'auto' },
-  { type: '1" Black Iron Gas Pipe', laborType: '1" Black Iron Gas Pipe', lf: '', vendor: 'auto' },
-  { type: '1-1/2" Black Iron Gas Pipe', laborType: '1-1/2" Black Iron Gas Pipe', lf: '', vendor: 'auto' },
 ]
 const DEFAULT_FIXTURE_ROWS = [
-  { type: '12" Single Gas Ring', laborType: '12" Single Gas Ring', qty: '', vendor: 'auto' },
   { type: '12" Single Gas Ring', laborType: '12" Single Gas Ring', qty: '', vendor: 'auto' },
 ]
 const DEFAULT_ELEC_FIXTURE_ROWS = [
   { type: 'GFCI Protected Receptacles', laborType: 'GFCI Protected Receptacles', qty: '', vendor: 'auto' },
-  { type: 'GFCI Protected Receptacles', laborType: 'GFCI Protected Receptacles', qty: '', vendor: 'auto' },
 ]
 const DEFAULT_SEWER_LINE_ROWS = [
   { type: '4" ABS', laborType: '4" ABS', lf: '', vendor: 'auto' },
-  { type: '3" ABS', laborType: '3" ABS', lf: '', vendor: 'auto' },
 ]
 const DEFAULT_SEWER_SINK_ROWS = [
   { type: 'Turbo 2" x 14" Sink w/fittings', laborType: 'Turbo 2" x 14" Sink w/fittings', qty: '', vendor: 'auto' },
@@ -547,11 +540,7 @@ const DEFAULT_ADDITIONAL = {
   hydrocutQty: '',
   permitRequired: false,
 }
-const DEFAULT_MANUAL_ROWS = [
-  { label: 'Misc 1', hours: '', materials: '', subCost: '' },
-  { label: 'Misc 2', hours: '', materials: '', subCost: '' },
-  { label: 'Misc 3', hours: '', materials: '', subCost: '' },
-]
+const DEFAULT_MANUAL_ROWS = []
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function UtilitiesModule({ onSave, onBack, saving, initialData }) {
@@ -685,7 +674,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   // Each field defaults to the same blank rows as its in-house counterpart,
   // except sub trench which is LF-only (no equipment/width/depth).
   const [subTrenchRows, setSubTrenchRows] = useState(
-    initialData?.subTrenchRows ?? [{ lf: '' }, { lf: '' }]
+    initialData?.subTrenchRows ?? [{ lf: '' }]
   )
   const [subLineRows, setSubLineRows] = useState(initialData?.subLineRows ?? DEFAULT_LINE_ROWS)
   const [subFixtureRows, setSubFixtureRows] = useState(
