@@ -132,6 +132,10 @@ const WALL_RATES = {
   capPipLab: { db: 'Wall Cap PIP Concrete Labor', fb: 0.15 }, // hr/LF
   capBullnoseLab: { db: 'Wall Cap Bullnose Labor', fb: 0.08 }, // hr/LF
   wpLabor: { db: 'Wall WP Install Labor', fb: 200 }, // SF/hr
+  wpLabPrimerMembrane: { db: 'Wall WP Primer + Membrane Labor', fb: 100 }, // SF/hr
+  wpLab2Coat: { db: 'Wall WP 2 Coats Roll On Labor', fb: 125 }, // SF/hr
+  wpLabThoroseal: { db: 'Wall WP Thoroseal Labor', fb: 75 }, // SF/hr
+  wpLabDimple: { db: 'Wall WP Dimple Labor', fb: 50 }, // SF/hr
   brickLayLab: { db: 'Wall Brick Lay Labor', fb: 1.75 }, // hr/SF of brick wall face
   // Timber / Lumber wall — every coefficient is table-driven (fb = legacy value).
   timberBdftBase: { db: 'Wall Timber Qty per LF', fb: 0.2917 }, // wood units / LF (base)
@@ -420,16 +424,6 @@ const WALL_RATE_SPECS = [
     ],
   },
   {
-    group: 'Rebar — Standard (per LF, by size)',
-    items: [
-      ['rebar3Mat', 'Rebar #3', 'Basic Materials', 'LF', 'currency'],
-      ['rebar4Mat', 'Rebar #4', 'Basic Materials', 'LF', 'currency'],
-      ['rebar5Mat', 'Rebar #5', 'Basic Materials', 'LF', 'currency'],
-      ['rebar6Mat', 'Rebar #6', 'Basic Materials', 'LF', 'currency'],
-      ['rebar8Mat', 'Rebar #8', 'Basic Materials', 'LF', 'currency'],
-    ],
-  },
-  {
     group: 'Poured In Place',
     items: [
       ['concreteTruck', 'Concrete — Ready Mix (Truck)', 'Basic Materials', 'CY', 'currency'],
@@ -502,6 +496,16 @@ const WALL_RATE_SPECS = [
     ],
   },
   {
+    group: 'Rebar — Standard (per LF, by size)',
+    items: [
+      ['rebar3Mat', 'Rebar #3', 'Basic Materials', 'LF', 'currency'],
+      ['rebar4Mat', 'Rebar #4', 'Basic Materials', 'LF', 'currency'],
+      ['rebar5Mat', 'Rebar #5', 'Basic Materials', 'LF', 'currency'],
+      ['rebar6Mat', 'Rebar #6', 'Basic Materials', 'LF', 'currency'],
+      ['rebar8Mat', 'Rebar #8', 'Basic Materials', 'LF', 'currency'],
+    ],
+  },
+  {
     // Shares the Drainage module's French-drain rates — editing here or in
     // Drainage changes the one shared rate. Category 'Drainage' + explicit table
     // so the RateEditPopover writes the SHARED Drainage rows.
@@ -510,13 +514,13 @@ const WALL_RATE_SPECS = [
       ['drainPerf4Lab', '4" Perforated Pipe Labor', 'Drainage', 'hr/LF', 'coefficient', 'labor_rates'],
       ['drainPerf3Lab', '3" Perforated Pipe Labor', 'Drainage', 'hr/LF', 'coefficient', 'labor_rates'],
       ['drainSockMat', 'Drain Sock Material', 'Drainage', 'LF', 'currency', 'misc_rates'],
-      ['drainSockLab', 'Drain Sock Labor', 'Drainage', 'LF', 'currency', 'misc_rates'],
+      ['drainSockLab', 'Drain Sock Labor', 'Drainage', 'LF', 'currency', 'misc_rates', 'labor'],
       ['drainBurritoMat', 'Burrito Wrap Geotextile', 'Drainage', 'LF', 'currency', 'misc_rates'],
-      ['drainBurritoLab', 'Burrito Wrap Labor', 'Drainage', 'LF', 'currency', 'misc_rates'],
+      ['drainBurritoLab', 'Burrito Wrap Labor', 'Drainage', 'LF', 'currency', 'misc_rates', 'labor'],
       ['drainGravel12Mat', 'Gravel Bed 12" Material', 'Drainage', 'LF', 'currency', 'misc_rates'],
-      ['drainGravel12Lab', 'Gravel Bed 12" Labor', 'Drainage', 'LF', 'currency', 'misc_rates'],
+      ['drainGravel12Lab', 'Gravel Bed 12" Labor', 'Drainage', 'LF', 'currency', 'misc_rates', 'labor'],
       ['drainGravel24Mat', 'Gravel Bed 24" Material', 'Drainage', 'LF', 'currency', 'misc_rates'],
-      ['drainGravel24Lab', 'Gravel Bed 24" Labor', 'Drainage', 'LF', 'currency', 'misc_rates'],
+      ['drainGravel24Lab', 'Gravel Bed 24" Labor', 'Drainage', 'LF', 'currency', 'misc_rates', 'labor'],
     ],
   },
   {
@@ -555,6 +559,7 @@ const WALL_RATE_SPECS = [
       ['capFlagstone', 'Cap — Flagstone', 'Walls', 'ton', 'currency'],
       ['capPrecast', 'Cap — Precast', 'Walls', 'ea', 'currency'],
       ['capBullnose', 'Cap — Bullnose Brick', 'Walls', 'LF', 'currency'],
+      ['concreteTruck', 'PIP Concrete Cap — Ready Mix', 'Basic Materials', 'CY', 'currency'],
       ['capFlagstoneLab', 'Flagstone Labor', 'Walls', 'hr/LF', 'coefficient'],
       ['capPrecastLab', 'Precast Labor', 'Walls', 'hr/ea', 'coefficient'],
       ['capPipLab', 'PIP Concrete Labor', 'Walls', 'hr/LF', 'coefficient'],
@@ -564,11 +569,14 @@ const WALL_RATE_SPECS = [
   {
     group: 'Waterproofing (all wall types)',
     items: [
-      ['wpPrimerMembrane', 'Primer & Membrane', 'Walls', 'SF', 'currency'],
-      ['wp3CoatRollOn', '3 Coats Roll On', 'Walls', 'SF', 'currency'],
-      ['wpThoroseal', 'Thoroseal & Roll On', 'Walls', 'SF', 'currency'],
-      ['wpDimpleMembrane', 'Dimple Membrane', 'Walls', 'SF', 'currency'],
-      ['wpLabor', 'Install Labor', 'Walls', 'SF/hr', 'coefficient'],
+      ['wpPrimerMembrane', 'Primer + Membrane', 'Walls', 'SF', 'currency'],
+      ['wp3CoatRollOn', '2 Coats Roll On', 'Walls', 'SF', 'currency'],
+      ['wpThoroseal', 'Thoroseal 2 Coats', 'Walls', 'SF', 'currency'],
+      ['wpDimpleMembrane', 'Primer, Membrane + Dimple', 'Walls', 'SF', 'currency'],
+      ['wpLabPrimerMembrane', 'Primer + Membrane Labor', 'Walls', 'SF/hr', 'coefficient'],
+      ['wpLab2Coat', '2 Coats Roll On Labor', 'Walls', 'SF/hr', 'coefficient'],
+      ['wpLabThoroseal', 'Thoroseal Labor', 'Walls', 'SF/hr', 'coefficient'],
+      ['wpLabDimple', 'Primer, Membrane + Dimple Labor', 'Walls', 'SF/hr', 'coefficient'],
     ],
   },
 ]
@@ -702,16 +710,35 @@ const WALL_FINISH_META = {
 
 const WP_TYPES = [
   'None',
-  'Primer & Membrane',
-  '3 Coats Roll On',
-  'Thoroseal & Roll On',
-  'Dimple Membrane',
+  'Primer + Membrane',
+  '2 Coats Roll On',
+  'Thoroseal 2 Coats',
+  'Primer, Membrane + Dimple',
 ]
+// Both current names AND legacy names map to the same rate key, so walls saved
+// under the old labels keep pricing after the rename.
 const WP_KEY = {
+  'Primer + Membrane': 'wpPrimerMembrane',
+  '2 Coats Roll On': 'wp3CoatRollOn',
+  'Thoroseal 2 Coats': 'wpThoroseal',
+  'Primer, Membrane + Dimple': 'wpDimpleMembrane',
+  // legacy aliases
   'Primer & Membrane': 'wpPrimerMembrane',
   '3 Coats Roll On': 'wp3CoatRollOn',
   'Thoroseal & Roll On': 'wpThoroseal',
   'Dimple Membrane': 'wpDimpleMembrane',
+}
+// Per-type install-labor rate keys — current + legacy names, same as WP_KEY.
+const WP_LABOR_KEY = {
+  'Primer + Membrane': 'wpLabPrimerMembrane',
+  '2 Coats Roll On': 'wpLab2Coat',
+  'Thoroseal 2 Coats': 'wpLabThoroseal',
+  'Primer, Membrane + Dimple': 'wpLabDimple',
+  // legacy aliases
+  'Primer & Membrane': 'wpLabPrimerMembrane',
+  '3 Coats Roll On': 'wpLab2Coat',
+  'Thoroseal & Roll On': 'wpLabThoroseal',
+  'Dimple Membrane': 'wpLabDimple',
 }
 
 const blankWallFinishRow = () => ({ vendor: 'House', type: 'Sand Stucco', sf: '', rateIn: '', subEach: '' })
@@ -888,7 +915,12 @@ function computeWpRow(row, mp, materialRows) {
   if (sf > 0 && k) {
     // Price from the Waterproofing catalog product (per vendor), not a constant.
     const pr = catalogItemPrice(materialRows, WALL_WP_SUBCAT, row.type, row.vendor, WALL_RATES[k].fb)
-    const wpRate = n(mp?.[WALL_RATES.wpLabor.db]) || WALL_RATES.wpLabor.fb
+    // Per-type install labor (SF/hr). Internal type strings are kept for
+    // backward-compat; WP_LABOR_KEY maps them to the per-type labor rate keys.
+    const labKey = WP_LABOR_KEY[row.type]
+    const wpRate = labKey
+      ? n(mp?.[WALL_RATES[labKey].db]) || WALL_RATES[labKey].fb
+      : n(mp?.[WALL_RATES.wpLabor.db]) || WALL_RATES.wpLabor.fb
     mat = sf * pr
     hrs = sf / wpRate
     subUnit = pr
@@ -3327,7 +3359,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
   // A currency WALL_RATES item → catalog rows (Standard + each vendor price) when
   // a matching `material` exists (Rebar, Concrete…), vendor-first; otherwise a
   // single 'Standard — name' row at the current rate (e.g. Grout Pump misc fees).
-  const materialRateRows = (dbName, unit, value) => {
+  const materialRateRows = (dbName, unit, value, label) => {
     const rows = (materialRows || []).filter(r0 => r0.name === dbName)
     if (rows.length) {
       return rows
@@ -3349,7 +3381,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
         }))
     }
     return [
-      { label: `Standard — ${dbName}`, table: 'material_rates', name: dbName, category: 'Walls', unitLabel: unit, mode: 'currency', value },
+      { label: `Standard — ${label || dbName}`, table: 'material_rates', name: dbName, category: 'Walls', unitLabel: unit, mode: 'currency', value },
     ]
   }
 
@@ -3357,16 +3389,19 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
     group: g.group,
     items: [
       ...(g.catalogSubcat ? catalogBlockItems(g.catalogSubcat) : []),
-      ...g.items.flatMap(([key, label, category, unit, mode, tableOverride]) =>
-        tableOverride
+      ...g.items.flatMap(([key, label, category, unit, mode, tableOverride, sectionOverride]) => {
+        // 7th tuple element optionally forces the Materials/Labor section;
+        // default = coefficient → labor, currency → material.
+        const section = sectionOverride || (mode === 'coefficient' ? 'labor' : 'material')
+        return tableOverride
           ? // Explicit table (6th tuple element) — a single shared row written
             // straight to that table (e.g. the Drainage French-drain rows share
             // the Drainage module's misc_rates / labor_rates rows).
-            [{ label, table: tableOverride, name: WALL_RATES[key].db, category, unitLabel: unit, mode, value: r(key) }]
+            [{ label, table: tableOverride, name: WALL_RATES[key].db, category, unitLabel: unit, mode, value: r(key), section }]
           : mode === 'coefficient'
-            ? [{ label, table: 'labor_rates', name: WALL_RATES[key].db, category, unitLabel: unit, mode, value: r(key) }]
-            : materialRateRows(WALL_RATES[key].db, unit, r(key))
-      ),
+            ? [{ label, table: 'labor_rates', name: WALL_RATES[key].db, category, unitLabel: unit, mode, value: r(key), section }]
+            : materialRateRows(WALL_RATES[key].db, unit, r(key), label).map(row => ({ ...row, section }))
+      }),
     ].sort((a, b) =>
       // Groups flagged manualOrder keep their spec order (stable sort; return 0);
       // everything else is alphabetized within its Materials / Labor block.
