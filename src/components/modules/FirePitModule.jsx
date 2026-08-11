@@ -1,9 +1,10 @@
 import WorkTypeChooser from './WorkTypeChooser'
+import CrewTypeBar from './CrewTypeBar'
+import ModuleHeaderSlot from './ModuleHeaderSlot'
 import { useState, useEffect, useCallback, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
-import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { groutCuFtPerBlock } from '../../lib/cmuGrout'
@@ -295,17 +296,6 @@ function EpTable({
                           </option>
                         ))}
                       </select>
-                      {laborBuiltIn && (
-                        <RateEditPopover
-                          table="labor_rates"
-                          name={laborBuiltIn.laborDbName}
-                          category="Utilities"
-                          mode="coefficient"
-                          unitLabel={`hrs/${unitLabel}`}
-                          currentValue={laborVal}
-                          onSaved={refreshAllRates}
-                        />
-                      )}
                     </div>
                   </td>
                   <td className="py-1 pr-2">
@@ -881,48 +871,156 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
     })
   }
 
+  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
+  //    that used to have an inline RateEditPopover in this module now lives here.
+  //    All are labor coefficients (labor_rates); material prices are edited in
+  //    Master Material Rates, not inline.
+  const firePitRateList = [
+    {
+      group: 'Structure Labor',
+      items: [
+        {
+          label: FP_RATES.digLab.dbName,
+          table: 'labor_rates',
+          name: FP_RATES.digLab.dbName,
+          category: 'Fire Pit',
+          mode: 'coefficient',
+          unitLabel: 'CF/hr',
+          value: p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback),
+        },
+        {
+          label: FP_RATES.rebarLab.dbName,
+          table: 'labor_rates',
+          name: FP_RATES.rebarLab.dbName,
+          category: 'Fire Pit',
+          mode: 'coefficient',
+          unitLabel: 'LF/hr',
+          value: p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback),
+        },
+        {
+          label: FP_RATES.blockLab.dbName,
+          table: 'labor_rates',
+          name: FP_RATES.blockLab.dbName,
+          category: 'Fire Pit',
+          mode: 'coefficient',
+          unitLabel: 'blk/hr',
+          value: p(FP_RATES.blockLab.dbName, FP_RATES.blockLab.fallback),
+        },
+        {
+          label: FP_RATES.handGroutLab.dbName,
+          table: 'labor_rates',
+          name: FP_RATES.handGroutLab.dbName,
+          category: 'Fire Pit',
+          mode: 'coefficient',
+          unitLabel: 'CF/hr',
+          value: p(FP_RATES.handGroutLab.dbName, FP_RATES.handGroutLab.fallback),
+        },
+        {
+          label: FP_RATES.pumpGroutLab.dbName,
+          table: 'labor_rates',
+          name: FP_RATES.pumpGroutLab.dbName,
+          category: 'Fire Pit',
+          mode: 'coefficient',
+          unitLabel: 'CF/hr',
+          value: p(FP_RATES.pumpGroutLab.dbName, FP_RATES.pumpGroutLab.fallback),
+        },
+      ],
+    },
+    {
+      group: 'Wall Caps',
+      items: CAP_LIST.map(type => {
+        const labKey = CAP_META[type].labKey
+        return {
+          label: FP_RATES[labKey].dbName,
+          table: 'labor_rates',
+          name: FP_RATES[labKey].dbName,
+          category: 'Fire Pit',
+          mode: 'coefficient',
+          unitLabel: 'hrs/LF',
+          value: p(FP_RATES[labKey].dbName, FP_RATES[labKey].fallback),
+        }
+      }),
+    },
+    {
+      group: 'Wall Finishes',
+      items: WF_LIST.map(type => {
+        const meta = WF_META[type]
+        const labKey = meta.labKey
+        return {
+          label: FP_RATES[labKey].dbName,
+          table: 'labor_rates',
+          name: FP_RATES[labKey].dbName,
+          category: 'Fire Pit',
+          mode: 'coefficient',
+          unitLabel: meta.labMode === 'perDay' ? 'SF/day' : 'hrs/SF',
+          value: p(FP_RATES[labKey].dbName, FP_RATES[labKey].fallback),
+        }
+      }),
+    },
+    {
+      group: 'Gas Line',
+      items: LINE_TYPE_ARR.map(t => ({
+        label: t.laborDbName,
+        table: 'labor_rates',
+        name: t.laborDbName,
+        category: 'Utilities',
+        mode: 'coefficient',
+        unitLabel: 'hrs/LF',
+        value: materialPrices[t.laborDbName] ?? t.laborFallback,
+      })),
+    },
+    {
+      group: 'Gas Fixtures',
+      items: GAS_TYPE_ARR.map(t => ({
+        label: t.laborDbName,
+        table: 'labor_rates',
+        name: t.laborDbName,
+        category: 'Utilities',
+        mode: 'coefficient',
+        unitLabel: 'hrs/ea',
+        value: materialPrices[t.laborDbName] ?? t.laborFallback,
+      })),
+    },
+  ]
+
   return (
     <SubTabContext.Provider value={isSub}>
     <div className="space-y-5">
-      {/* ── Sticky GPMD bar ── */}
-      <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
-        {/* GPMD summary bar */}
-        <GpmdBar
-          variant={subType === 'Subcontractor' ? 'sub' : 'inhouse'}
-          sticky
-          totalMat={calc.totalMat}
-          totalHrs={calc.totalHrs}
-          manDays={calc.manDays}
-          laborCost={calc.laborCost}
-          laborRatePerHour={laborRatePerHour}
-          burden={calc.burden}
-          gp={calc.gp}
-          commission={calc.commission}
-          subCost={calc.subCost}
-          gpmd={gpmd}
-          price={calc.price}
-          subMarkupRate={subGpMarkupRate}
-        />
-            </div>
-
-
-      <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} />
-
-      {/* Crew Type */}
-      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select
-          value={crewType}
-          onChange={e => setCrewType(e.target.value)}
-          className="input text-sm py-1 w-36"
-        >
-          <option value="Demo">Demo</option>
-          <option value="Landscape">Landscape</option>
-          <option value="Masonry">Masonry</option>
-          <option value="Paver">Paver</option>
-          <option value="Specialty">Specialty</option>
-        </select>
+      {/* ── Frozen header: GPMD bar + Crew Type / View Rates bar ── */}
+      <div className="sticky top-0 z-20 -mx-6 bg-white shadow-md">
+        <div className="px-6 pt-1 pb-1 bg-gray-900">
+          <GpmdBar
+            variant={subType === 'Subcontractor' ? 'sub' : 'inhouse'}
+            sticky
+            totalMat={calc.totalMat}
+            totalHrs={calc.totalHrs}
+            manDays={calc.manDays}
+            laborCost={calc.laborCost}
+            laborRatePerHour={laborRatePerHour}
+            burden={calc.burden}
+            gp={calc.gp}
+            commission={calc.commission}
+            subCost={calc.subCost}
+            gpmd={gpmd}
+            price={calc.price}
+            subMarkupRate={subGpMarkupRate}
+          />
+        </div>
+        <div className="px-6 py-2">
+          <CrewTypeBar
+            crewType={crewType}
+            onCrewTypeChange={setCrewType}
+            title="Fire Pit"
+            rates={firePitRateList}
+            refreshAllRates={refreshAllRates}
+            showInlineToggle={false}
+          />
+        </div>
       </div>
+
+      <ModuleHeaderSlot>
+        <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} compact />
+      </ModuleHeaderSlot>
 
       {pricesLoading && (
         <div className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
@@ -1003,63 +1101,18 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
           <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
             <span className="inline-flex items-center gap-1">
               Dig {p(FP_RATES.digLab.dbName, 4)} CF/hr
-              <RateEditPopover
-                table="labor_rates"
-                name={FP_RATES.digLab.dbName}
-                category="Fire Pit"
-                mode="coefficient"
-                unitLabel="CF/hr"
-                currentValue={p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback)}
-                onSaved={refreshAllRates}
-              />
             </span>
             <span className="inline-flex items-center gap-1">
               Rebar {p(FP_RATES.rebarLab.dbName, 35)} LF/hr
-              <RateEditPopover
-                table="labor_rates"
-                name={FP_RATES.rebarLab.dbName}
-                category="Fire Pit"
-                mode="coefficient"
-                unitLabel="LF/hr"
-                currentValue={p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback)}
-                onSaved={refreshAllRates}
-              />
             </span>
             <span className="inline-flex items-center gap-1">
               Block {p(FP_RATES.blockLab.dbName, 10.4)} blk/hr
-              <RateEditPopover
-                table="labor_rates"
-                name={FP_RATES.blockLab.dbName}
-                category="Fire Pit"
-                mode="coefficient"
-                unitLabel="blk/hr"
-                currentValue={p(FP_RATES.blockLab.dbName, FP_RATES.blockLab.fallback)}
-                onSaved={refreshAllRates}
-              />
             </span>
             <span className="inline-flex items-center gap-1">
               Hand grout {p(FP_RATES.handGroutLab.dbName, 5.5)} CF/hr
-              <RateEditPopover
-                table="labor_rates"
-                name={FP_RATES.handGroutLab.dbName}
-                category="Fire Pit"
-                mode="coefficient"
-                unitLabel="CF/hr"
-                currentValue={p(FP_RATES.handGroutLab.dbName, FP_RATES.handGroutLab.fallback)}
-                onSaved={refreshAllRates}
-              />
             </span>
             <span className="inline-flex items-center gap-1">
               Pump grout {p(FP_RATES.pumpGroutLab.dbName, 81)} CF/hr
-              <RateEditPopover
-                table="labor_rates"
-                name={FP_RATES.pumpGroutLab.dbName}
-                category="Fire Pit"
-                mode="coefficient"
-                unitLabel="CF/hr"
-                currentValue={p(FP_RATES.pumpGroutLab.dbName, FP_RATES.pumpGroutLab.fallback)}
-                onSaved={refreshAllRates}
-              />
             </span>
           </div>
         </div>
@@ -1213,17 +1266,6 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                             </option>
                           ))}
                         </select>
-                        {meta && !meta.master && (
-                          <RateEditPopover
-                            table="labor_rates"
-                            name={FP_RATES[meta.labKey].dbName}
-                            category="Fire Pit"
-                            mode="coefficient"
-                            unitLabel="hrs/LF"
-                            currentValue={p(FP_RATES[meta.labKey].dbName, FP_RATES[meta.labKey].fallback)}
-                            onSaved={refreshAllRates}
-                          />
-                        )}
                       </span>
                     </td>
                     <td className="py-1 pr-2">
@@ -1358,17 +1400,6 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                             </option>
                           ))}
                         </select>
-                        {meta && !meta.master && (
-                          <RateEditPopover
-                            table="labor_rates"
-                            name={FP_RATES[meta.labKey].dbName}
-                            category="Fire Pit"
-                            mode="coefficient"
-                            unitLabel={meta.labMode === 'perDay' ? 'SF/day' : 'hrs/SF'}
-                            currentValue={p(FP_RATES[meta.labKey].dbName, FP_RATES[meta.labKey].fallback)}
-                            onSaved={refreshAllRates}
-                          />
-                        )}
                       </span>
                     </td>
                     <td className="py-1 pr-2">

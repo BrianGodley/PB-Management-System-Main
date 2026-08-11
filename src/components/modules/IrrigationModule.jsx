@@ -1,4 +1,6 @@
 import WorkTypeChooser from './WorkTypeChooser'
+import CrewTypeBar from './CrewTypeBar'
+import ModuleHeaderSlot from './ModuleHeaderSlot'
 // ─────────────────────────────────────────────────────────────────────────────
 // IrrigationModule — Irrigation system estimator
 // Rates from Excel "Irrigation Module" sheet and Master Rates.
@@ -31,7 +33,6 @@ import { useState, useEffect, useCallback, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
-import RateEditPopover from '../RateEditPopover'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { resolveMaterialPrice, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 
@@ -660,48 +661,87 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
     })
   }
 
+  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
+  //    that used to have an inline RateEditPopover in this module now lives here.
+  const irrigationRateList = [
+    {
+      group: 'Irrigation Zones',
+      items: [
+        {
+          label: 'Irrigation - Hand Zone',
+          table: 'labor_rates',
+          name: 'Irrigation - Hand Zone',
+          category: 'Irrigation',
+          mode: 'coefficient',
+          unitLabel: 'hrs/zone',
+          value: calc.handRate,
+        },
+        {
+          label: 'Irrigation - Trench Zone',
+          table: 'labor_rates',
+          name: 'Irrigation - Trench Zone',
+          category: 'Irrigation',
+          mode: 'coefficient',
+          unitLabel: 'hrs/zone',
+          value: calc.trenchRate,
+        },
+      ],
+    },
+    {
+      group: 'Controllers / Timers',
+      items: [
+        {
+          label: 'Irrigation - Timer Install',
+          table: 'labor_rates',
+          name: 'Irrigation - Timer Install',
+          category: 'Irrigation',
+          mode: 'coefficient',
+          unitLabel: 'hrs/ea',
+          value: calc.timerHrs,
+        },
+      ],
+    },
+  ]
+
   return (
     <SubTabContext.Provider value={isSub}>
     <div className="space-y-4">
-      {/* ── Sticky GPMD bar ── */}
-      <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
-        {/* GPMD summary bar */}
-        <GpmdBar
-          variant={isSub ? 'sub' : 'inhouse'}
-          sticky
-          totalMat={calc.totalMat}
-          totalHrs={calc.totalHrs}
-          manDays={calc.manDays}
-          laborCost={calc.laborCost}
-          laborRatePerHour={laborRatePerHour}
-          burden={calc.burden}
-          gp={calc.gp}
-          commission={calc.commission}
-          subCost={calc.subCost}
-          gpmd={gpmd}
-          price={calc.price}
-          subMarkupRate={subGpMarkupRate}
-        />
+      {/* ── Frozen header: GPMD bar + Crew Type / View Rates bar ── */}
+      <div className="sticky top-0 z-20 -mx-6 bg-white shadow-md">
+        <div className="px-6 pt-1 pb-1 bg-gray-900">
+          <GpmdBar
+            variant={isSub ? 'sub' : 'inhouse'}
+            sticky
+            totalMat={calc.totalMat}
+            totalHrs={calc.totalHrs}
+            manDays={calc.manDays}
+            laborCost={calc.laborCost}
+            laborRatePerHour={laborRatePerHour}
+            burden={calc.burden}
+            gp={calc.gp}
+            commission={calc.commission}
+            subCost={calc.subCost}
+            gpmd={gpmd}
+            price={calc.price}
+            subMarkupRate={subGpMarkupRate}
+          />
+        </div>
+        <div className="px-6 py-2">
+          <CrewTypeBar
+            crewType={crewType}
+            onCrewTypeChange={setCrewType}
+            title="Irrigation"
+            rates={irrigationRateList}
+            refreshAllRates={refreshAllRates}
+            showInlineToggle={false}
+          />
+        </div>
       </div>
 
+      <ModuleHeaderSlot>
+        <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} compact />
+      </ModuleHeaderSlot>
 
-      <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} />
-
-      {/* Crew Type */}
-      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select
-          value={crewType}
-          onChange={e => setCrewType(e.target.value)}
-          className="input text-sm py-1 w-36"
-        >
-          <option value="Demo">Demo</option>
-          <option value="Landscape">Landscape</option>
-          <option value="Masonry">Masonry</option>
-          <option value="Paver">Paver</option>
-          <option value="Specialty">Specialty</option>
-        </select>
-      </div>
       {pricesLoading && (
         <div className="text-xs text-amber-700 bg-amber-50 rounded px-3 py-2">
           Loading current rates…
@@ -745,28 +785,10 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
           <span>{subSectionTitle('Irrigation Zones', isSub)} —</span>
           <span className="inline-flex items-center gap-1">
             Hand: {calc.handRate} hrs/zone
-            <RateEditPopover
-              table="labor_rates"
-              name="Irrigation - Hand Zone"
-              category="Irrigation"
-              mode="coefficient"
-              unitLabel="hrs/zone"
-              currentValue={calc.handRate}
-              onSaved={refreshAllRates}
-            />
           </span>
           ·
           <span className="inline-flex items-center gap-1">
             Trench: {calc.trenchRate} hrs/zone
-            <RateEditPopover
-              table="labor_rates"
-              name="Irrigation - Trench Zone"
-              category="Irrigation"
-              mode="coefficient"
-              unitLabel="hrs/zone"
-              currentValue={calc.trenchRate}
-              onSaved={refreshAllRates}
-            />
           </span>
         </div>
         <table className="w-full text-xs">
@@ -862,15 +884,6 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
       <div>
         <div className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-5 mb-2 flex items-center gap-2">
           <span>{subSectionTitle('Controllers / Timers', isSub)} — {calc.timerHrs} hrs install each</span>
-          <RateEditPopover
-            table="labor_rates"
-            name="Irrigation - Timer Install"
-            category="Irrigation"
-            mode="coefficient"
-            unitLabel="hrs/ea"
-            currentValue={calc.timerHrs}
-            onSaved={refreshAllRates}
-          />
         </div>
         <table className="w-full text-xs">
           <TH

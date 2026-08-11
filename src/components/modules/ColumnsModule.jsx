@@ -1,4 +1,6 @@
 import WorkTypeChooser from './WorkTypeChooser'
+import CrewTypeBar from './CrewTypeBar'
+import ModuleHeaderSlot from './ModuleHeaderSlot'
 import { useState, useEffect, useCallback, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
@@ -508,48 +510,105 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
     })
   }
 
+  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
+  //    that used to have an inline RateEditPopover in this module now lives here.
+  const columnsRateList = [
+    {
+      group: 'Column Install',
+      items: [
+        {
+          label: BLOCK_RATES.installLaborHrs.dbName,
+          table: 'labor_rates',
+          name: BLOCK_RATES.installLaborHrs.dbName,
+          category: COLUMNS_CATEGORY,
+          mode: 'coefficient',
+          unitLabel: 'hrs/blk',
+          value: materialPrices[BLOCK_RATES.installLaborHrs.dbName] ?? BLOCK_RATES.installLaborHrs.fallback,
+        },
+        {
+          label: BLOCK_RATES.excavateLaborHrs.dbName,
+          table: 'labor_rates',
+          name: BLOCK_RATES.excavateLaborHrs.dbName,
+          category: COLUMNS_CATEGORY,
+          mode: 'coefficient',
+          unitLabel: 'hrs/col',
+          value: materialPrices[BLOCK_RATES.excavateLaborHrs.dbName] ?? BLOCK_RATES.excavateLaborHrs.fallback,
+        },
+        {
+          label: BLOCK_RATES.pourLaborHrs.dbName,
+          table: 'labor_rates',
+          name: BLOCK_RATES.pourLaborHrs.dbName,
+          category: COLUMNS_CATEGORY,
+          mode: 'coefficient',
+          unitLabel: 'hrs/col',
+          value: materialPrices[BLOCK_RATES.pourLaborHrs.dbName] ?? BLOCK_RATES.pourLaborHrs.fallback,
+        },
+        {
+          label: BLOCK_RATES.fillLaborHrs.dbName,
+          table: 'labor_rates',
+          name: BLOCK_RATES.fillLaborHrs.dbName,
+          category: COLUMNS_CATEGORY,
+          mode: 'coefficient',
+          unitLabel: 'hrs/blk',
+          value: materialPrices[BLOCK_RATES.fillLaborHrs.dbName] ?? BLOCK_RATES.fillLaborHrs.fallback,
+        },
+      ],
+    },
+    {
+      group: 'Finishes',
+      items: Object.values(FINISH_TYPES).map(rate => {
+        const defLab = rate.unit === 'ton' ? rate.laborHrsPer : rate.laborHrsPerSF
+        return {
+          label: rate.laborDbName,
+          table: 'labor_rates',
+          name: rate.laborDbName,
+          category: COLUMNS_CATEGORY,
+          mode: 'coefficient',
+          unitLabel: `hrs/${rate.unit}`,
+          value: materialPrices[rate.laborDbName] ?? defLab ?? 0,
+        }
+      }),
+    },
+  ]
+
   return (
     <SubTabContext.Provider value={isSub}>
     <div className="space-y-5">
-      {/* ── Sticky GPMD bar ── */}
-      <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
-        {/* GPMD summary bar */}
-        <GpmdBar
-          variant={subType === 'Subcontractor' ? 'sub' : 'inhouse'}
-          sticky
-          totalMat={calc.totalMat}
-          totalHrs={calc.totalHrs}
-          manDays={calc.manDays}
-          laborCost={calc.laborCost}
-          laborRatePerHour={laborRatePerHour}
-          burden={calc.burden}
-          gp={calc.gp}
-          commission={calc.commission}
-          subCost={calc.subCost}
-          gpmd={gpmd}
-          price={calc.price}
-          subMarkupRate={subGpMarkupRate}
-        />
-            </div>
-
-
-      <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} />
-
-      {/* Crew Type */}
-      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select
-          value={crewType}
-          onChange={e => setCrewType(e.target.value)}
-          className="input text-sm py-1 w-36"
-        >
-          <option value="Demo">Demo</option>
-          <option value="Landscape">Landscape</option>
-          <option value="Masonry">Masonry</option>
-          <option value="Paver">Paver</option>
-          <option value="Specialty">Specialty</option>
-        </select>
+      {/* ── Frozen header: GPMD bar + Crew Type / View Rates bar ── */}
+      <div className="sticky top-0 z-20 -mx-6 bg-white shadow-md">
+        <div className="px-6 pt-1 pb-1 bg-gray-900">
+          <GpmdBar
+            variant={subType === 'Subcontractor' ? 'sub' : 'inhouse'}
+            sticky
+            totalMat={calc.totalMat}
+            totalHrs={calc.totalHrs}
+            manDays={calc.manDays}
+            laborCost={calc.laborCost}
+            laborRatePerHour={laborRatePerHour}
+            burden={calc.burden}
+            gp={calc.gp}
+            commission={calc.commission}
+            subCost={calc.subCost}
+            gpmd={gpmd}
+            price={calc.price}
+            subMarkupRate={subGpMarkupRate}
+          />
+        </div>
+        <div className="px-6 py-2">
+          <CrewTypeBar
+            crewType={crewType}
+            onCrewTypeChange={setCrewType}
+            title="Columns"
+            rates={columnsRateList}
+            refreshAllRates={refreshAllRates}
+            showInlineToggle={false}
+          />
+        </div>
       </div>
+
+      <ModuleHeaderSlot>
+        <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} compact />
+      </ModuleHeaderSlot>
 
       {pricesLoading && (
         <div className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
@@ -612,7 +671,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
         {!isSub && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3 text-[11px] text-gray-500">
           <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">
-            Column Install Rates (click any to edit)
+            Column Install Rates
           </p>
           <div className="flex flex-wrap gap-x-3 gap-y-1">
             <span className="inline-flex items-center gap-1">
@@ -645,70 +704,22 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
               {materialPrices[BLOCK_RATES.installLaborHrs.dbName] ??
                 BLOCK_RATES.installLaborHrs.fallback}{' '}
               hrs/blk
-              <RateEditPopover
-                table="labor_rates"
-                name={BLOCK_RATES.installLaborHrs.dbName}
-                category="Columns"
-                mode="coefficient"
-                unitLabel="hrs/blk"
-                currentValue={
-                  materialPrices[BLOCK_RATES.installLaborHrs.dbName] ??
-                  BLOCK_RATES.installLaborHrs.fallback
-                }
-                onSaved={refreshAllRates}
-              />
             </span>
             <span className="inline-flex items-center gap-1">
               Excavate{' '}
               {materialPrices[BLOCK_RATES.excavateLaborHrs.dbName] ??
                 BLOCK_RATES.excavateLaborHrs.fallback}{' '}
               hrs/col
-              <RateEditPopover
-                table="labor_rates"
-                name={BLOCK_RATES.excavateLaborHrs.dbName}
-                category="Columns"
-                mode="coefficient"
-                unitLabel="hrs/col"
-                currentValue={
-                  materialPrices[BLOCK_RATES.excavateLaborHrs.dbName] ??
-                  BLOCK_RATES.excavateLaborHrs.fallback
-                }
-                onSaved={refreshAllRates}
-              />
             </span>
             <span className="inline-flex items-center gap-1">
               Pour{' '}
               {materialPrices[BLOCK_RATES.pourLaborHrs.dbName] ?? BLOCK_RATES.pourLaborHrs.fallback}{' '}
               hrs/col
-              <RateEditPopover
-                table="labor_rates"
-                name={BLOCK_RATES.pourLaborHrs.dbName}
-                category="Columns"
-                mode="coefficient"
-                unitLabel="hrs/col"
-                currentValue={
-                  materialPrices[BLOCK_RATES.pourLaborHrs.dbName] ??
-                  BLOCK_RATES.pourLaborHrs.fallback
-                }
-                onSaved={refreshAllRates}
-              />
             </span>
             <span className="inline-flex items-center gap-1">
               Fill{' '}
               {materialPrices[BLOCK_RATES.fillLaborHrs.dbName] ?? BLOCK_RATES.fillLaborHrs.fallback}{' '}
               hrs/blk
-              <RateEditPopover
-                table="labor_rates"
-                name={BLOCK_RATES.fillLaborHrs.dbName}
-                category="Columns"
-                mode="coefficient"
-                unitLabel="hrs/blk"
-                currentValue={
-                  materialPrices[BLOCK_RATES.fillLaborHrs.dbName] ??
-                  BLOCK_RATES.fillLaborHrs.fallback
-                }
-                onSaved={refreshAllRates}
-              />
             </span>
           </div>
         </div>
@@ -808,18 +819,6 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
                             <option key={t}>{t}</option>
                           ))}
                         </select>
-                        {/* In-House only: labor coefficient edit */}
-                        {rate && !isSub && (
-                          <RateEditPopover
-                            table="labor_rates"
-                            name={rate.laborDbName}
-                            category="Columns"
-                            mode="coefficient"
-                            unitLabel={`hrs/${rate.unit}`}
-                            currentValue={labRate}
-                            onSaved={refreshAllRates}
-                          />
-                        )}
                       </div>
                     </td>
                     <td className="py-1 pr-2">

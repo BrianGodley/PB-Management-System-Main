@@ -1,4 +1,6 @@
 import WorkTypeChooser from './WorkTypeChooser'
+import CrewTypeBar from './CrewTypeBar'
+import ModuleHeaderSlot from './ModuleHeaderSlot'
 import { useState, useEffect, useCallback, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
@@ -639,47 +641,65 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
     )
   }
 
+  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
+  //    that used to have an inline RateEditPopover in this module now lives here.
+  //    Lighting's only inline rate was the material markup (a fraction).
+  const lightingRateList = [
+    {
+      group: 'Materials',
+      items: [
+        {
+          label: MATERIAL_MARKUP_NAME,
+          table: 'misc_rates',
+          name: MATERIAL_MARKUP_NAME,
+          category: LIGHTING_CATEGORY,
+          mode: 'coefficient',
+          unitLabel: 'fraction',
+          value: materialMarkup != null ? materialMarkup : MATERIAL_MARKUP_FB,
+          section: 'material',
+        },
+      ],
+    },
+  ]
+
   return (
     <SubTabContext.Provider value={isSub}>
     <div className="space-y-5">
-      {/* ── Sticky GPMD bar ── */}
-      <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
-        <GpmdBar
-          variant={isSub ? 'sub' : 'inhouse'}
-          sticky
-          totalMat={calc.totalMat}
-          totalHrs={calc.totalHrs}
-          manDays={calc.manDays}
-          laborCost={calc.laborCost}
-          laborRatePerHour={laborRatePerHour}
-          burden={calc.burden}
-          gp={calc.gp}
-          commission={calc.commission}
-          subCost={calc.subCost}
-          gpmd={gpmd}
-          price={calc.price}
-          subMarkupRate={subGpMarkupRate}
-        />
+      {/* ── Frozen header: GPMD bar + Crew Type / View Rates bar ── */}
+      <div className="sticky top-0 z-20 -mx-6 bg-white shadow-md">
+        <div className="px-6 pt-1 pb-1 bg-gray-900">
+          <GpmdBar
+            variant={isSub ? 'sub' : 'inhouse'}
+            sticky
+            totalMat={calc.totalMat}
+            totalHrs={calc.totalHrs}
+            manDays={calc.manDays}
+            laborCost={calc.laborCost}
+            laborRatePerHour={laborRatePerHour}
+            burden={calc.burden}
+            gp={calc.gp}
+            commission={calc.commission}
+            subCost={calc.subCost}
+            gpmd={gpmd}
+            price={calc.price}
+            subMarkupRate={subGpMarkupRate}
+          />
+        </div>
+        <div className="px-6 py-2">
+          <CrewTypeBar
+            crewType={crewType}
+            onCrewTypeChange={setCrewType}
+            title="Lighting"
+            rates={lightingRateList}
+            refreshAllRates={refreshCatalog}
+            showInlineToggle={false}
+          />
+        </div>
       </div>
 
-
-      <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} />
-
-      {/* Crew Type */}
-      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select
-          value={crewType}
-          onChange={e => setCrewType(e.target.value)}
-          className="input text-sm py-1 w-36"
-        >
-          <option value="Demo">Demo</option>
-          <option value="Landscape">Landscape</option>
-          <option value="Masonry">Masonry</option>
-          <option value="Paver">Paver</option>
-          <option value="Specialty">Specialty</option>
-        </select>
-      </div>
+      <ModuleHeaderSlot>
+        <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} compact />
+      </ModuleHeaderSlot>
 
       {/* Prices as of — leave blank for current prices, or pick a date to
           re-price the catalog at the rates in effect on that date. */}
@@ -794,15 +814,6 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
           {(((materialMarkup != null ? materialMarkup : MATERIAL_MARKUP_FB) * 100)
             .toFixed(0))}% markup ={' '}
           <span className="text-gray-600 font-medium">{fmt2(calc.markedUpMat)}</span>
-          <RateEditPopover
-            table="misc_rates"
-            name={MATERIAL_MARKUP_NAME}
-            category={LIGHTING_CATEGORY}
-            unitLabel="fraction"
-            mode="coefficient"
-            currentValue={materialMarkup != null ? materialMarkup : MATERIAL_MARKUP_FB}
-            onSaved={refreshCatalog}
-          />
         </p>
       )}
 

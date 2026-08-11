@@ -1,4 +1,6 @@
 import WorkTypeChooser from './WorkTypeChooser'
+import CrewTypeBar from './CrewTypeBar'
+import ModuleHeaderSlot from './ModuleHeaderSlot'
 import { useState, useEffect, useCallback, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
@@ -866,15 +868,6 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
                       <td className="py-1.5 text-right text-gray-400 text-xs">
                         <span className="inline-flex items-center justify-end gap-1">
                           {perDay < 1 ? perDay.toFixed(2) : perDay.toLocaleString()}
-                          <RateEditPopover
-                            table="labor_rates"
-                            name={row.type}
-                            category="Planting"
-                            mode="coefficient"
-                            unitLabel="per day"
-                            currentValue={perDay}
-                            onSaved={refreshAllRates}
-                          />
                         </span>
                       </td>
                     )}
@@ -990,17 +983,6 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
                           <span>
                             ${c.unitPrice.toFixed(2)}/{meta.unit}
                           </span>
-                          {isHouse && meta.labKey && (
-                            <RateEditPopover
-                              table="labor_rates"
-                              name={meta.labKey}
-                              category="Planting"
-                              mode="coefficient"
-                              unitLabel={meta.labUnit || 'rate'}
-                              currentValue={lr(laborRates, meta.labKey)}
-                              onSaved={refreshAllRates}
-                            />
-                          )}
                         </div>
                       </td>
                     )}
@@ -1104,48 +1086,125 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
     )
   }
 
+  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
+  //    that used to have an inline RateEditPopover in this module now lives here.
+  //    All Planting rates are labor coefficients (labor_rates); material prices
+  //    are per-row catalog values edited in Master Material Rates.
+  const plantingRateList = [
+    {
+      group: 'Till & Amend Soil',
+      items: [
+        {
+          label: 'Till - Soil Move Rate',
+          table: 'labor_rates',
+          name: 'Till - Soil Move Rate',
+          category: 'Planting',
+          mode: 'coefficient',
+          unitLabel: 'CY/day',
+          value: lr(laborRates, 'Till - Soil Move Rate'),
+        },
+        {
+          label: 'Till - Tilling Rate',
+          table: 'labor_rates',
+          name: 'Till - Tilling Rate',
+          category: 'Planting',
+          mode: 'coefficient',
+          unitLabel: 'SF/day',
+          value: lr(laborRates, 'Till - Tilling Rate'),
+        },
+        {
+          label: 'Till - Amend Rate',
+          table: 'labor_rates',
+          name: 'Till - Amend Rate',
+          category: 'Planting',
+          mode: 'coefficient',
+          unitLabel: 'SF/day',
+          value: lr(laborRates, 'Till - Amend Rate'),
+        },
+      ],
+    },
+    {
+      group: 'Small Plants',
+      items: Object.keys(SMALL_PLANT_DEFAULTS).map(type => ({
+        label: type,
+        table: 'labor_rates',
+        name: type,
+        category: 'Planting',
+        mode: 'coefficient',
+        unitLabel: 'per day',
+        value: getSmallPerDay(laborRates, type),
+      })),
+    },
+    {
+      group: 'Large Plants / Trees',
+      items: Object.keys(LARGE_PLANT_DEFAULTS).map(type => ({
+        label: type,
+        table: 'labor_rates',
+        name: type,
+        category: 'Planting',
+        mode: 'coefficient',
+        unitLabel: 'per day',
+        value: getLargePerDay(laborRates, type),
+      })),
+    },
+    {
+      group: 'Planting Add-Ons',
+      items: [
+        { key: 'Tree Stakes - Install Rate', unit: 'stakes/day' },
+        { key: 'Root Barrier - Install Rate', unit: 'min/LF' },
+        { key: 'Gopher Basket - Install Rate', unit: 'min/basket' },
+        { key: 'Mesh Flat - Install Rate', unit: 'min/SF' },
+        { key: 'Jute Fabric - Install Rate', unit: 'min/SF' },
+      ].map(({ key, unit }) => ({
+        label: key,
+        table: 'labor_rates',
+        name: key,
+        category: 'Planting',
+        mode: 'coefficient',
+        unitLabel: unit,
+        value: lr(laborRates, key),
+      })),
+    },
+  ]
+
   return (
     <SubTabContext.Provider value={isSub}>
     <div className="space-y-5">
-      {/* ── Sticky GPMD bar ── */}
-      <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
-        {/* GPMD summary bar */}
-        <GpmdBar
-          variant={isSub ? 'sub' : 'inhouse'}
-          sticky
-          totalMat={calc.totalMat}
-          totalHrs={calc.totalHrs}
-          manDays={calc.manDays}
-          laborCost={calc.laborCost}
-          laborRatePerHour={laborRatePerHour}
-          burden={calc.burden}
-          gp={calc.gp}
-          commission={calc.commission}
-          subCost={calc.subCost}
-          gpmd={gpmd}
-          price={calc.price}
-          subMarkupRate={subGpMarkupRate}
-        />
+      {/* ── Frozen header: GPMD bar + Crew Type / View Rates bar ── */}
+      <div className="sticky top-0 z-20 -mx-6 bg-white shadow-md">
+        <div className="px-6 pt-1 pb-1 bg-gray-900">
+          <GpmdBar
+            variant={isSub ? 'sub' : 'inhouse'}
+            sticky
+            totalMat={calc.totalMat}
+            totalHrs={calc.totalHrs}
+            manDays={calc.manDays}
+            laborCost={calc.laborCost}
+            laborRatePerHour={laborRatePerHour}
+            burden={calc.burden}
+            gp={calc.gp}
+            commission={calc.commission}
+            subCost={calc.subCost}
+            gpmd={gpmd}
+            price={calc.price}
+            subMarkupRate={subGpMarkupRate}
+          />
+        </div>
+        <div className="px-6 py-2">
+          <CrewTypeBar
+            crewType={crewType}
+            onCrewTypeChange={setCrewType}
+            title="Planting"
+            rates={plantingRateList}
+            refreshAllRates={refreshAllRates}
+            showInlineToggle={false}
+          />
+        </div>
       </div>
 
-
-      <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} />
-
-      {/* Crew Type */}
-      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select
-          value={crewType}
-          onChange={e => setCrewType(e.target.value)}
-          className="input text-sm py-1 w-36"
-        >
-          <option value="Demo">Demo</option>
-          <option value="Landscape">Landscape</option>
-          <option value="Masonry">Masonry</option>
-          <option value="Paver">Paver</option>
-          <option value="Specialty">Specialty</option>
-        </select>
-      </div>
+      <ModuleHeaderSlot>
+        <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} compact />
+      </ModuleHeaderSlot>
 
       {pricesLoading && (
         <div className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
@@ -1191,35 +1250,8 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
           <div>
             <div className="flex items-center flex-wrap gap-2 text-xs text-gray-400 mb-1">
               <span>{lr(laborRates, 'Till - Soil Move Rate')} CY/d</span>
-              <RateEditPopover
-                table="labor_rates"
-                name="Till - Soil Move Rate"
-                category="Planting"
-                mode="coefficient"
-                unitLabel="CY/day"
-                currentValue={lr(laborRates, 'Till - Soil Move Rate')}
-                onSaved={refreshAllRates}
-              />
               <span>· {lr(laborRates, 'Till - Tilling Rate')} SF/d</span>
-              <RateEditPopover
-                table="labor_rates"
-                name="Till - Tilling Rate"
-                category="Planting"
-                mode="coefficient"
-                unitLabel="SF/day"
-                currentValue={lr(laborRates, 'Till - Tilling Rate')}
-                onSaved={refreshAllRates}
-              />
               <span>· {lr(laborRates, 'Till - Amend Rate')} SF/d</span>
-              <RateEditPopover
-                table="labor_rates"
-                name="Till - Amend Rate"
-                category="Planting"
-                mode="coefficient"
-                unitLabel="SF/day"
-                currentValue={lr(laborRates, 'Till - Amend Rate')}
-                onSaved={refreshAllRates}
-              />
             </div>
             <p className="text-xs text-gray-500 mb-0.5">Sqft</p>
             <NumInput value={tillSqft} onChange={setTillSqft} placeholder="0" />

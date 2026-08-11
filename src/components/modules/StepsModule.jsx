@@ -1,4 +1,6 @@
 import WorkTypeChooser from './WorkTypeChooser'
+import CrewTypeBar from './CrewTypeBar'
+import ModuleHeaderSlot from './ModuleHeaderSlot'
 import { useState, useEffect, useCallback, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { createPortal } from 'react-dom'
@@ -1008,31 +1010,173 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
     })
   }
 
+  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Mirrors every
+  //    rate the module (and its Edit-Rates modal) uses: Paver/Concrete labor +
+  //    material modifiers, plus the flat per-LF Subcontractor pricing. Labor
+  //    coefficients → labor_rates; every $/SF or $/LF value → material_rates
+  //    (named Standard rate on the new model).
+  const stepsRateList = [
+    {
+      group: 'Paver Steps',
+      items: STEP_FORMS.map(f => ({
+        label: `Form ${f}`,
+        table: 'labor_rates',
+        name: kPaverForm(f),
+        category: 'Steps',
+        mode: 'coefficient',
+        unitLabel: 'LF/hr',
+        value: laborRates[kPaverForm(f)] ?? PAVER_FORM_DEFAULT[f],
+      })),
+    },
+    {
+      group: 'Concrete Steps',
+      items: [
+        ...CONC_TYPES.map(t => ({
+          label: `${t} Labor`,
+          table: 'labor_rates',
+          name: kConcTypeHrs(t),
+          category: 'Steps',
+          mode: 'coefficient',
+          unitLabel: 'hr/SF',
+          value: laborRates[kConcTypeHrs(t)] ?? 0,
+        })),
+        ...STEP_FORMS.map(f => ({
+          label: `Form ${f} Multiplier`,
+          table: 'labor_rates',
+          name: kConcForm(f),
+          category: 'Steps',
+          mode: 'coefficient',
+          unitLabel: '×',
+          value: laborRates[kConcForm(f)] ?? 1,
+        })),
+        ...CONC_FINISHES.map(f => ({
+          label: `Finish ${f} Labor`,
+          table: 'labor_rates',
+          name: kFinishHrs(f),
+          category: 'Steps',
+          mode: 'coefficient',
+          unitLabel: 'hr/SF',
+          value: laborRates[kFinishHrs(f)] ?? 0,
+        })),
+        ...CONC_TYPES.map(t => ({
+          label: `${t} Material`,
+          table: 'material_rates',
+          name: kConcTypeMat(t),
+          category: 'Steps',
+          mode: 'currency',
+          unitLabel: 'SF',
+          value: materialRates[kConcTypeMat(t)] ?? 0,
+        })),
+        ...CONC_FINISHES.map(f => ({
+          label: `Finish ${f} Material`,
+          table: 'material_rates',
+          name: kFinishMat(f),
+          category: 'Steps',
+          mode: 'currency',
+          unitLabel: 'SF',
+          value: materialRates[kFinishMat(f)] ?? 0,
+        })),
+      ],
+    },
+    {
+      group: 'Subcontractor ($/LF)',
+      items: [
+        ...MAT_SECTIONS.map(sec => ({
+          label: `${sec.title.replace(' Steps', '')} Base`,
+          table: 'material_rates',
+          name: sec.baseKey,
+          category: 'Steps',
+          mode: 'currency',
+          unitLabel: 'LF',
+          value: materialRates[sec.baseKey] ?? SUB_BASE_DEFAULT,
+        })),
+        {
+          label: 'Concrete Base',
+          table: 'material_rates',
+          name: kSubConcBase,
+          category: 'Steps',
+          mode: 'currency',
+          unitLabel: 'LF',
+          value: materialRates[kSubConcBase] ?? SUB_BASE_DEFAULT,
+        },
+        ...STEP_FORMS.map(f => ({
+          label: `Form ${f}`,
+          table: 'material_rates',
+          name: kSubForm(f),
+          category: 'Steps',
+          mode: 'currency',
+          unitLabel: 'LF',
+          value: materialRates[kSubForm(f)] ?? 0,
+        })),
+        {
+          label: 'Grouted (paver)',
+          table: 'material_rates',
+          name: kSubGrouted,
+          category: 'Steps',
+          mode: 'currency',
+          unitLabel: 'LF',
+          value: materialRates[kSubGrouted] ?? 0,
+        },
+        ...CONC_TYPES.map(t => ({
+          label: `Type ${t}`,
+          table: 'material_rates',
+          name: kSubType(t),
+          category: 'Steps',
+          mode: 'currency',
+          unitLabel: 'LF',
+          value: materialRates[kSubType(t)] ?? 0,
+        })),
+        ...CONC_FINISHES.map(f => ({
+          label: `Finish ${f}`,
+          table: 'material_rates',
+          name: kSubFinish(f),
+          category: 'Steps',
+          mode: 'currency',
+          unitLabel: 'LF',
+          value: materialRates[kSubFinish(f)] ?? 0,
+        })),
+      ],
+    },
+  ]
+
   return (
     <SubTabContext.Provider value={isSub}>
     <div className="space-y-5">
-      {/* ── Sticky GPMD bar ── */}
-      <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
-        <GpmdBar
-          variant={isSub ? 'sub' : 'inhouse'}
-          sticky
-          totalMat={calc.totalMat}
-          totalHrs={calc.totalHrs}
-          manDays={calc.manDays}
-          laborCost={calc.laborCost}
-          laborRatePerHour={laborRatePerHour}
-          burden={calc.burden}
-          gp={calc.gp}
-          commission={calc.commission}
-          subCost={calc.subCost}
-          gpmd={gpmd}
-          price={calc.price}
-          subMarkupRate={subGpMarkupRate}
-        />
+      {/* ── Frozen header: GPMD bar + Crew Type / View Rates bar ── */}
+      <div className="sticky top-0 z-20 -mx-6 bg-white shadow-md">
+        <div className="px-6 pt-1 pb-1 bg-gray-900">
+          <GpmdBar
+            variant={isSub ? 'sub' : 'inhouse'}
+            sticky
+            totalMat={calc.totalMat}
+            totalHrs={calc.totalHrs}
+            manDays={calc.manDays}
+            laborCost={calc.laborCost}
+            laborRatePerHour={laborRatePerHour}
+            burden={calc.burden}
+            gp={calc.gp}
+            commission={calc.commission}
+            subCost={calc.subCost}
+            gpmd={gpmd}
+            price={calc.price}
+            subMarkupRate={subGpMarkupRate}
+          />
+        </div>
+        <div className="px-6 py-2">
+          <CrewTypeBar
+            crewType={crewType}
+            onCrewTypeChange={setCrewType}
+            title="Steps"
+            rates={stepsRateList}
+            refreshAllRates={refreshAllRates}
+            showInlineToggle={false}
+          />
+        </div>
       </div>
 
-
-      <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} />
+      <ModuleHeaderSlot>
+        <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} compact />
+      </ModuleHeaderSlot>
 
       {/* Prices as of — blank = current; pick a date to re-price the catalog. */}
       <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
@@ -1053,22 +1197,6 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           </button>
         )}
         <span className="text-[11px] text-gray-400">blank = today's prices</span>
-      </div>
-
-      {/* Crew Type */}
-      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select
-          value={crewType}
-          onChange={e => setCrewType(e.target.value)}
-          className="input text-sm py-1 w-36"
-        >
-          <option value="Demo">Demo</option>
-          <option value="Landscape">Landscape</option>
-          <option value="Masonry">Masonry</option>
-          <option value="Paver">Paver</option>
-          <option value="Specialty">Specialty</option>
-        </select>
       </div>
 
       {loading && (

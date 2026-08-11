@@ -1,4 +1,6 @@
 import WorkTypeChooser from './WorkTypeChooser'
+import CrewTypeBar from './CrewTypeBar'
+import ModuleHeaderSlot from './ModuleHeaderSlot'
 // ─────────────────────────────────────────────────────────────────────────────
 // ArtificialTurfModule — Artificial Turf system estimator
 // Rates pulled from DB:
@@ -12,7 +14,6 @@ import { useState, useEffect, useCallback, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
-import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
@@ -832,48 +833,101 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
     })
   }
 
+  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
+  //    that used to have an inline RateEditPopover in this module now lives here.
+  const turfRateList = [
+    {
+      group: 'Turf Installation',
+      items: [
+        {
+          label: 'Turf Install',
+          table: 'labor_rates',
+          name: 'Turf - Turf Install SF/hr',
+          category: 'Artificial Turf',
+          mode: 'coefficient',
+          unitLabel: 'SF/hr',
+          value: calc.turfSFHr,
+        },
+      ],
+    },
+    {
+      group: 'Turf Strips',
+      items: [
+        {
+          label: 'Turf Strip Install',
+          table: 'labor_rates',
+          name: 'Turf - Strip Install LF/hr',
+          category: 'Artificial Turf',
+          mode: 'coefficient',
+          unitLabel: 'LF/hr',
+          value: calc.stripLFHr,
+        },
+      ],
+    },
+    {
+      group: 'Subcontractor',
+      items: [
+        {
+          label: 'Turf Sub - Install Per SF',
+          table: 'subcontractor_rates',
+          name: 'Turf Sub - Install Per SF',
+          category: 'Artificial Turf',
+          mode: 'currency',
+          unitLabel: 'SF',
+          value: calc.subInstallPerSF,
+        },
+        {
+          label: 'Turf Sub - Strip Per LF',
+          table: 'subcontractor_rates',
+          name: 'Turf Sub - Strip Per LF',
+          category: 'Artificial Turf',
+          mode: 'currency',
+          unitLabel: 'LF',
+          value: calc.subStripPerLF,
+        },
+      ],
+    },
+  ]
+
   return (
     <SubTabContext.Provider value={isSub}>
     <div className="space-y-4">
-      {/* ── Sticky GPMD bar ── */}
-      <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
-        {/* GPMD summary bar */}
-        <GpmdBar
-          variant={state.subType === 'Subcontractor' ? 'sub' : 'inhouse'}
-          sticky
-          totalMat={calc.totalMat}
-          totalHrs={calc.totalHrs}
-          manDays={calc.manDays}
-          laborCost={calc.laborCost}
-          laborRatePerHour={laborRatePerHour}
-          burden={calc.burden}
-          gp={calc.gp}
-          commission={calc.commission}
-          subCost={calc.subCost}
-          gpmd={gpmd}
-          price={calc.price}
-          subMarkupRate={subGpMarkupRate}
-        />
-            </div>
-
-
-      <WorkTypeChooser value={state.subType || 'In-House'} onChange={v => set('subType', v)} />
-
-      {/* Crew Type */}
-      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select
-          value={state.crewType}
-          onChange={e => set('crewType', e.target.value)}
-          className="input text-sm py-1 w-36"
-        >
-          <option value="Demo">Demo</option>
-          <option value="Landscape">Landscape</option>
-          <option value="Masonry">Masonry</option>
-          <option value="Paver">Paver</option>
-          <option value="Specialty">Specialty</option>
-        </select>
+      {/* ── Frozen header: GPMD bar + Crew Type / View Rates bar ── */}
+      <div className="sticky top-0 z-20 -mx-6 bg-white shadow-md">
+        <div className="px-6 pt-1 pb-1 bg-gray-900">
+          <GpmdBar
+            variant={state.subType === 'Subcontractor' ? 'sub' : 'inhouse'}
+            sticky
+            totalMat={calc.totalMat}
+            totalHrs={calc.totalHrs}
+            manDays={calc.manDays}
+            laborCost={calc.laborCost}
+            laborRatePerHour={laborRatePerHour}
+            burden={calc.burden}
+            gp={calc.gp}
+            commission={calc.commission}
+            subCost={calc.subCost}
+            gpmd={gpmd}
+            price={calc.price}
+            subMarkupRate={subGpMarkupRate}
+          />
+        </div>
+        <div className="px-6 py-2">
+          <CrewTypeBar
+            crewType={state.crewType}
+            onCrewTypeChange={v => set('crewType', v)}
+            title="Artificial Turf"
+            rates={turfRateList}
+            refreshAllRates={refreshAllRates}
+            showInlineToggle={false}
+          />
+        </div>
       </div>
+
+      <ModuleHeaderSlot>
+        <WorkTypeChooser value={state.subType || 'In-House'} onChange={v => set('subType', v)} compact />
+      </ModuleHeaderSlot>
+
       {pricesLoading && (
         <div className="text-xs text-amber-700 bg-amber-50 rounded px-3 py-2">
           Loading current rates…
@@ -1111,36 +1165,12 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                     </select>
                   </td>
                   <td className={td}>
-                    <div className="flex items-center gap-1">
-                      <div className="flex-1 min-w-0">
-                        <Sel
-                          value={brandRow?.id || roll.brand}
-                          onChange={e => setRoll(i, 'brand', e.target.value)}
-                          options={brandKeys}
-                          optionLabels={brandLabels}
-                        />
-                      </div>
-                      {calc.isSub ? (
-                        <RateEditPopover
-                          table="subcontractor_rates"
-                          name="Turf Sub - Install Per SF"
-                          category="Artificial Turf"
-                          unitLabel="/SF"
-                          currentValue={calc.subInstallPerSF}
-                          onSaved={refreshAllRates}
-                        />
-                      ) : (
-                        <RateEditPopover
-                          table="labor_rates"
-                          name="Turf - Turf Install SF/hr"
-                          category="Artificial Turf"
-                          mode="coefficient"
-                          unitLabel="SF/hr"
-                          currentValue={calc.turfSFHr}
-                          onSaved={refreshAllRates}
-                        />
-                      )}
-                    </div>
+                    <Sel
+                      value={brandRow?.id || roll.brand}
+                      onChange={e => setRoll(i, 'brand', e.target.value)}
+                      options={brandKeys}
+                      optionLabels={brandLabels}
+                    />
                   </td>
                   {calc.isSub ? (
                     <>
@@ -1264,43 +1294,12 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                 </select>
               </td>
               <td className={td}>
-                <div className="flex items-center gap-1">
-                  <div className="flex-1 min-w-0">
-                    <Sel
-                      value={turfBrandRow(materialRows, T.strips?.vendor, T.strips?.brand)?.id || T.strips?.brand || brandKeys[0]}
-                      onChange={e => setStrips('brand', e.target.value)}
-                      options={brandKeys}
-                      optionLabels={brandLabels}
-                    />
-                  </div>
-                  {(() => {
-                    const stripBrand = turfBrandRow(materialRows, T.strips?.vendor, T.strips?.brand)
-                    return (
-                      <>
-                        {calc.isSub ? (
-                          <RateEditPopover
-                            table="subcontractor_rates"
-                            name="Turf Sub - Strip Per LF"
-                            category="Artificial Turf"
-                            unitLabel="/LF"
-                            currentValue={calc.subStripPerLF}
-                            onSaved={refreshAllRates}
-                          />
-                        ) : (
-                          <RateEditPopover
-                            table="labor_rates"
-                            name="Turf - Strip Install LF/hr"
-                            category="Artificial Turf"
-                            mode="coefficient"
-                            unitLabel="LF/hr"
-                            currentValue={calc.stripLFHr}
-                            onSaved={refreshAllRates}
-                          />
-                        )}
-                      </>
-                    )
-                  })()}
-                </div>
+                <Sel
+                  value={turfBrandRow(materialRows, T.strips?.vendor, T.strips?.brand)?.id || T.strips?.brand || brandKeys[0]}
+                  onChange={e => setStrips('brand', e.target.value)}
+                  options={brandKeys}
+                  optionLabels={brandLabels}
+                />
               </td>
               <td className={td}>
                 <Inp

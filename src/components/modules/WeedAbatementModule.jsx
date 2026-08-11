@@ -22,7 +22,8 @@ import { supabase } from '../../lib/supabase'
 import { fetchStandardRateMap } from '../../lib/materialCatalog'
 import GpmdBar from './GpmdBar'
 import WorkTypeChooser from './WorkTypeChooser'
-import RateEditPopover from '../RateEditPopover'
+import CrewTypeBar from './CrewTypeBar'
+import ModuleHeaderSlot from './ModuleHeaderSlot'
 
 const n = v => parseFloat(v) || 0
 const R = { laborRatePerHour: 35, laborBurdenPct: 0.29, gpmd: 425, commissionRate: 0.12 }
@@ -142,6 +143,7 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
   const [ihTab, setIhTab] = useState(() => makeTab(initialData?.ihData || initialData))
   const [subTab, setSubTab] = useState(() => makeTab(initialData?.subData || {}))
   const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
+  const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Landscape')
   const isSub = subType === 'Subcontractor'
   const cur = isSub ? subTab : ihTab
   const setCur = isSub ? setSubTab : setIhTab
@@ -218,6 +220,7 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
         ihData: ihTab,
         subData: subTab,
         subType,
+        crewType,
         subGpMarkupRate,
         laborRatePerHour,
         laborBurdenPct,
@@ -233,29 +236,111 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
   const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
   const lbl = 'block text-sm font-medium text-gray-700 mb-1'
 
+  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
+  //    that used to have an inline RateEditPopover in this module now lives here,
+  //    plus the material $ and Sub $/SF rates the calc reads from the price list.
+  const weedAbatementRateList = [
+    {
+      group: 'Labor',
+      items: [
+        {
+          label: WEED_RATE_NAMES.travelHrsPerVisit,
+          table: 'labor_rates',
+          name: WEED_RATE_NAMES.travelHrsPerVisit,
+          category: 'Weed Abatement',
+          mode: 'coefficient',
+          unitLabel: 'hr/visit',
+          value: effRate('travelHrsPerVisit'),
+        },
+        {
+          label: WEED_RATE_NAMES.flatHrsPer1k,
+          table: 'labor_rates',
+          name: WEED_RATE_NAMES.flatHrsPer1k,
+          category: 'Weed Abatement',
+          mode: 'coefficient',
+          unitLabel: 'hr/1k SF',
+          value: effRate('flatHrsPer1k'),
+        },
+        {
+          label: WEED_RATE_NAMES.hillHrsPer1k,
+          table: 'labor_rates',
+          name: WEED_RATE_NAMES.hillHrsPer1k,
+          category: 'Weed Abatement',
+          mode: 'coefficient',
+          unitLabel: 'hr/1k SF',
+          value: effRate('hillHrsPer1k'),
+        },
+      ],
+    },
+    {
+      group: 'Materials',
+      items: [
+        {
+          label: WEED_RATE_NAMES.materialPer1k,
+          table: 'misc_rates',
+          name: WEED_RATE_NAMES.materialPer1k,
+          category: 'Weed Abatement',
+          mode: 'currency',
+          unitLabel: '1k SF',
+          value: effRate('materialPer1k'),
+        },
+      ],
+    },
+    {
+      group: 'Subcontractor',
+      items: [
+        {
+          label: 'Weed Abatement - Sub $/SF',
+          table: 'misc_rates',
+          name: 'Weed Abatement - Sub $/SF',
+          category: 'Weed Abatement',
+          mode: 'currency',
+          unitLabel: 'SF',
+          value: subRateDefault,
+        },
+      ],
+    },
+  ]
+
   return (
     <div className="space-y-5">
-      {/* GPMD summary bar — switches to the Sub variant on the Sub tab */}
-      <GpmdBar
-        variant={isSub ? 'sub' : 'inhouse'}
-        totalMat={calc.totalMat}
-        totalHrs={calc.totalHrs}
-        manDays={calc.manDays}
-        laborCost={calc.laborCost}
-        laborRatePerHour={laborRatePerHour}
-        burden={calc.burden}
-        gp={calc.gp}
-        commission={calc.commission}
-        subCost={calc.subCost}
-        gpmd={gpmd}
-        price={calc.price}
-        subMarkupRate={subGpMarkupRate}
-        onGpmdSave={v => setGpmd(v)}
-      />
-
+      {/* ── Frozen header: GPMD bar + Crew Type / View Rates bar ── */}
+      <div className="sticky top-0 z-20 -mx-6 bg-white shadow-md">
+        <div className="px-6 pt-1 pb-1 bg-gray-900">
+          <GpmdBar
+            sticky
+            variant={isSub ? 'sub' : 'inhouse'}
+            totalMat={calc.totalMat}
+            totalHrs={calc.totalHrs}
+            manDays={calc.manDays}
+            laborCost={calc.laborCost}
+            laborRatePerHour={laborRatePerHour}
+            burden={calc.burden}
+            gp={calc.gp}
+            commission={calc.commission}
+            subCost={calc.subCost}
+            gpmd={gpmd}
+            price={calc.price}
+            subMarkupRate={subGpMarkupRate}
+            onGpmdSave={v => setGpmd(v)}
+          />
+        </div>
+        <div className="px-6 py-2">
+          <CrewTypeBar
+            crewType={crewType}
+            onCrewTypeChange={setCrewType}
+            title="Weed Abatement"
+            rates={weedAbatementRateList}
+            refreshAllRates={refreshRates}
+            showInlineToggle={false}
+          />
+        </div>
+      </div>
 
       {/* In-House vs Subcontractor */}
-      <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} />
+      <ModuleHeaderSlot>
+        <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} compact />
+      </ModuleHeaderSlot>
 
       {/* Area type */}
       <div>
@@ -283,17 +368,8 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
             <label className={lbl}>Flat Area (SF)</label>
             <input type="number" value={flatSF} onChange={e => setField('flatSF')(e.target.value)} placeholder="0" className={inp} />
             {!isSub && (
-              <p className="text-[11px] text-gray-400 mt-1 flex items-center gap-1">
+              <p className="text-[11px] text-gray-400 mt-1">
                 {effRate('flatHrsPer1k')} hr / 1,000 SF
-                <RateEditPopover
-                  table="labor_rates"
-                  name={WEED_RATE_NAMES.flatHrsPer1k}
-                  category="Weed Abatement"
-                  unitLabel="hr/1k SF"
-                  mode="coefficient"
-                  currentValue={effRate('flatHrsPer1k')}
-                  onSaved={refreshRates}
-                />
               </p>
             )}
           </div>
@@ -303,17 +379,8 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
             <label className={lbl}>Hillside Area (SF)</label>
             <input type="number" value={hillSF} onChange={e => setField('hillSF')(e.target.value)} placeholder="0" className={inp} />
             {!isSub && (
-              <p className="text-[11px] text-gray-400 mt-1 flex items-center gap-1">
+              <p className="text-[11px] text-gray-400 mt-1">
                 {effRate('hillHrsPer1k')} hr / 1,000 SF
-                <RateEditPopover
-                  table="labor_rates"
-                  name={WEED_RATE_NAMES.hillHrsPer1k}
-                  category="Weed Abatement"
-                  unitLabel="hr/1k SF"
-                  mode="coefficient"
-                  currentValue={effRate('hillHrsPer1k')}
-                  onSaved={refreshRates}
-                />
               </p>
             )}
           </div>
@@ -372,17 +439,8 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
       ) : (
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm space-y-1.5">
           <div className="flex justify-between">
-            <span className="text-gray-500 flex items-center gap-1">
+            <span className="text-gray-500">
               Travel ({effRate('travelHrsPerVisit')} hr × {calc.visits} visit{calc.visits === 1 ? '' : 's'})
-              <RateEditPopover
-                table="labor_rates"
-                name={WEED_RATE_NAMES.travelHrsPerVisit}
-                category="Weed Abatement"
-                unitLabel="hr/visit"
-                mode="coefficient"
-                currentValue={effRate('travelHrsPerVisit')}
-                onSaved={refreshRates}
-              />
             </span>
             <span className="font-medium">{calc.travelHrs.toFixed(2)} hrs</span>
           </div>

@@ -1,4 +1,6 @@
 import WorkTypeChooser from './WorkTypeChooser'
+import CrewTypeBar from './CrewTypeBar'
+import ModuleHeaderSlot from './ModuleHeaderSlot'
 import { useState, useEffect, useCallback, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
@@ -987,48 +989,144 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
     })
   }
 
+  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
+  //    that used to have an inline RateEditPopover in this module now lives here.
+  const utilitiesRateList = [
+    {
+      group: 'Trenching',
+      items: [
+        {
+          label: TRENCH_LABOR_RATE_NAME.Trench,
+          table: 'labor_rates',
+          name: TRENCH_LABOR_RATE_NAME.Trench,
+          category: 'Utilities',
+          mode: 'coefficient',
+          unitLabel: 'min/cf',
+          value: materialPrices[TRENCH_LABOR_RATE_NAME.Trench] ?? TRENCH_MINS_PER_CF.Trench,
+        },
+        {
+          label: TRENCH_LABOR_RATE_NAME.Hand,
+          table: 'labor_rates',
+          name: TRENCH_LABOR_RATE_NAME.Hand,
+          category: 'Utilities',
+          mode: 'coefficient',
+          unitLabel: 'min/cf',
+          value: materialPrices[TRENCH_LABOR_RATE_NAME.Hand] ?? TRENCH_MINS_PER_CF.Hand,
+        },
+      ],
+    },
+    {
+      group: 'Utility Lines',
+      items: Object.values(UTILITY_LINE_TYPES).map(t => ({
+        label: t.laborDbName,
+        table: 'labor_rates',
+        name: t.laborDbName,
+        category: 'Utilities',
+        mode: 'coefficient',
+        unitLabel: 'hr/LF',
+        value: materialPrices[t.laborDbName] ?? t.laborPerLF,
+      })),
+    },
+    {
+      group: 'Gas Fixtures',
+      items: Object.values(GAS_FIXTURE_TYPES).map(t => ({
+        label: t.laborDbName,
+        table: 'labor_rates',
+        name: t.laborDbName,
+        category: 'Utilities',
+        mode: 'coefficient',
+        unitLabel: 'hr/ea',
+        value: materialPrices[t.laborDbName] ?? t.laborHrs,
+      })),
+    },
+    {
+      group: 'Electrical Fixtures',
+      items: Object.values(ELECTRICAL_FIXTURE_TYPES).map(t => ({
+        label: t.laborDbName,
+        table: 'labor_rates',
+        name: t.laborDbName,
+        category: 'Utilities',
+        mode: 'coefficient',
+        unitLabel: 'hr/ea',
+        value: materialPrices[t.laborDbName] ?? t.laborHrs,
+      })),
+    },
+    {
+      group: 'Sewer Lines',
+      items: Object.values(SEWER_LINE_TYPES).map(t => ({
+        label: t.laborDbName,
+        table: 'labor_rates',
+        name: t.laborDbName,
+        category: 'Utilities',
+        mode: 'coefficient',
+        unitLabel: 'hr/LF',
+        value: materialPrices[t.laborDbName] ?? t.laborPerLF,
+      })),
+    },
+    {
+      group: 'Sewer Sinks',
+      items: Object.values(SEWER_SINK_TYPES).map(t => ({
+        label: t.laborDbName,
+        table: 'labor_rates',
+        name: t.laborDbName,
+        category: 'Utilities',
+        mode: 'coefficient',
+        unitLabel: 'hr/ea',
+        value: materialPrices[t.laborDbName] ?? t.laborHrs,
+      })),
+    },
+    {
+      group: 'Additional Subgrade Work',
+      items: Object.values(ADD_ITEM_RATES).map(rate => ({
+        label: rate.laborDbName,
+        table: 'labor_rates',
+        name: rate.laborDbName,
+        category: 'Utilities',
+        mode: 'coefficient',
+        unitLabel: 'hr/ea',
+        value: materialPrices[rate.laborDbName] ?? rate.laborHrs,
+      })),
+    },
+  ]
+
   return (
     <SubTabContext.Provider value={isSub}>
     <div className="space-y-5">
-      {/* ── Sticky GPMD bar ── */}
-      <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
-        {/* GPMD summary bar */}
-        <GpmdBar
-          variant={isSub ? 'sub' : 'inhouse'}
-          sticky
-          totalMat={calc.totalMat}
-          totalHrs={calc.totalHrs}
-          manDays={calc.manDays}
-          laborCost={calc.laborCost}
-          laborRatePerHour={laborRatePerHour}
-          burden={calc.burden}
-          gp={calc.gp}
-          commission={calc.commission}
-          subCost={calc.subCost}
-          gpmd={gpmd}
-          price={calc.price}
-          subMarkupRate={subGpMarkupRate}
-        />
-            </div>
-
-
-      <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} />
-
-      {/* Crew Type */}
-      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select
-          value={crewType}
-          onChange={e => setCrewType(e.target.value)}
-          className="input text-sm py-1 w-36"
-        >
-          <option value="Demo">Demo</option>
-          <option value="Landscape">Landscape</option>
-          <option value="Masonry">Masonry</option>
-          <option value="Paver">Paver</option>
-          <option value="Specialty">Specialty</option>
-        </select>
+      {/* ── Frozen header: GPMD bar + Crew Type / View Rates bar ── */}
+      <div className="sticky top-0 z-20 -mx-6 bg-white shadow-md">
+        <div className="px-6 pt-1 pb-1 bg-gray-900">
+          <GpmdBar
+            variant={isSub ? 'sub' : 'inhouse'}
+            sticky
+            totalMat={calc.totalMat}
+            totalHrs={calc.totalHrs}
+            manDays={calc.manDays}
+            laborCost={calc.laborCost}
+            laborRatePerHour={laborRatePerHour}
+            burden={calc.burden}
+            gp={calc.gp}
+            commission={calc.commission}
+            subCost={calc.subCost}
+            gpmd={gpmd}
+            price={calc.price}
+            subMarkupRate={subGpMarkupRate}
+          />
+        </div>
+        <div className="px-6 py-2">
+          <CrewTypeBar
+            crewType={crewType}
+            onCrewTypeChange={setCrewType}
+            title="Utilities"
+            rates={utilitiesRateList}
+            refreshAllRates={refreshAllRates}
+            showInlineToggle={false}
+          />
+        </div>
       </div>
+
+      <ModuleHeaderSlot>
+        <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} compact />
+      </ModuleHeaderSlot>
 
       {pricesLoading && (
         <div className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
@@ -1106,17 +1204,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                           <option>Trench</option>
                           <option>Hand</option>
                         </select>
-                        {laborName && (
-                          <RateEditPopover
-                            table="labor_rates"
-                            name={laborName}
-                            category="Utilities"
-                            mode="coefficient"
-                            unitLabel="min/cf"
-                            currentValue={minsPerCF}
-                            onSaved={refreshAllRates}
-                          />
-                        )}
                       </div>
                     </td>
                     <td className="py-1 pr-2">
@@ -1201,15 +1288,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
               <div key={key} className="flex items-center gap-3 py-1.5 border-b border-gray-100">
                 <span className="text-xs text-gray-700 flex-1 inline-flex items-center gap-1">
                   {rate.label}
-                  <RateEditPopover
-                    table="labor_rates"
-                    name={rate.laborDbName}
-                    category="Utilities"
-                    mode="coefficient"
-                    unitLabel="hr/ea"
-                    currentValue={laborHrs}
-                    onSaved={refreshAllRates}
-                  />
                 </span>
                 <input
                   type="number"
@@ -1305,17 +1383,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                             </option>
                           ))}
                         </select>
-                        {laborBuiltIn && (
-                          <RateEditPopover
-                            table="labor_rates"
-                            name={laborBuiltIn.laborDbName}
-                            category="Utilities"
-                            mode="coefficient"
-                            unitLabel="hrs/LF"
-                            currentValue={laborVal}
-                            onSaved={refreshAllRates}
-                          />
-                        )}
                       </div>
                     </td>
                     <td className="py-1 pr-2">
@@ -1416,17 +1483,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                             </option>
                           ))}
                         </select>
-                        {laborBuiltIn && (
-                          <RateEditPopover
-                            table="labor_rates"
-                            name={laborBuiltIn.laborDbName}
-                            category="Utilities"
-                            mode="coefficient"
-                            unitLabel="hrs/ea"
-                            currentValue={laborVal}
-                            onSaved={refreshAllRates}
-                          />
-                        )}
                       </div>
                     </td>
                     <td className="py-1 pr-2">
@@ -1527,17 +1583,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                             </option>
                           ))}
                         </select>
-                        {laborBuiltIn && (
-                          <RateEditPopover
-                            table="labor_rates"
-                            name={laborBuiltIn.laborDbName}
-                            category="Utilities"
-                            mode="coefficient"
-                            unitLabel="hrs/ea"
-                            currentValue={laborVal}
-                            onSaved={refreshAllRates}
-                          />
-                        )}
                       </div>
                     </td>
                     <td className="py-1 pr-2">
@@ -1638,17 +1683,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                             </option>
                           ))}
                         </select>
-                        {laborBuiltIn && (
-                          <RateEditPopover
-                            table="labor_rates"
-                            name={laborBuiltIn.laborDbName}
-                            category="Utilities"
-                            mode="coefficient"
-                            unitLabel="hrs/LF"
-                            currentValue={laborVal}
-                            onSaved={refreshAllRates}
-                          />
-                        )}
                       </div>
                     </td>
                     <td className="py-1 pr-2">
@@ -1752,17 +1786,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                             </option>
                           ))}
                         </select>
-                        {laborBuiltIn && (
-                          <RateEditPopover
-                            table="labor_rates"
-                            name={laborBuiltIn.laborDbName}
-                            category="Utilities"
-                            mode="coefficient"
-                            unitLabel="hrs/ea"
-                            currentValue={laborVal}
-                            onSaved={refreshAllRates}
-                          />
-                        )}
                       </div>
                     </td>
                     <td className="py-1 pr-2">

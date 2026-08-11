@@ -1,9 +1,10 @@
 import WorkTypeChooser from './WorkTypeChooser'
+import CrewTypeBar from './CrewTypeBar'
+import ModuleHeaderSlot from './ModuleHeaderSlot'
 import { useState, useEffect, useCallback, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
-import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { catalogOptions, fetchModuleCatalog } from '../../lib/materialCatalog'
@@ -1194,48 +1195,339 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     })
   }
 
+  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every labor
+  //    coefficient + misc/subcontractor rate that used to have an inline
+  //    RateEditPopover in this module now lives here. Per-type material prices
+  //    are catalog products (material_price) — edit those in Master Material Rates.
+  const groundTreatmentsRateList = [
+    {
+      group: 'Preparation',
+      items: [
+        {
+          label: 'Soil Prep - Labor Rate',
+          table: 'labor_rates',
+          name: GT_RATES.soilPrepLab.dbName,
+          category: 'Ground Treatments',
+          mode: 'coefficient',
+          unitLabel: 'hrs/SF',
+          value: p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback),
+        },
+        {
+          label: 'Sod Soil Prep - Labor Rate',
+          table: 'labor_rates',
+          name: GT_RATES.sodPrepLab.dbName,
+          category: 'Ground Treatments',
+          mode: 'coefficient',
+          unitLabel: 'hrs/SF',
+          value: p(GT_RATES.sodPrepLab.dbName, GT_RATES.sodPrepLab.fallback),
+        },
+        {
+          label: 'Soil Prep - Hand Add',
+          table: 'labor_rates',
+          name: GT_RATES.soilPrepHandAdd.dbName,
+          category: 'Ground Treatments',
+          mode: 'coefficient',
+          unitLabel: 'hrs/SF',
+          value: p(GT_RATES.soilPrepHandAdd.dbName, GT_RATES.soilPrepHandAdd.fallback),
+        },
+      ],
+    },
+    {
+      group: 'Sod',
+      items: [
+        {
+          label: 'Sod - Labor Rate',
+          table: 'labor_rates',
+          name: GT_RATES.sodLab.dbName,
+          category: 'Ground Treatments',
+          mode: 'coefficient',
+          unitLabel: 'hrs/SF',
+          value: p(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback),
+        },
+        {
+          label: 'Fertilizer - SF Per Bag',
+          table: 'labor_rates',
+          name: GT_RATES.fertilizerSFPerBag.dbName,
+          category: 'Ground Treatments',
+          mode: 'coefficient',
+          unitLabel: 'SF/bag',
+          value: p(GT_RATES.fertilizerSFPerBag.dbName, GT_RATES.fertilizerSFPerBag.fallback),
+        },
+      ],
+    },
+    {
+      group: 'Mulch',
+      items: [
+        {
+          label: 'Mulch - Labor Rate',
+          table: 'labor_rates',
+          name: GT_RATES.mulchLab.dbName,
+          category: 'Ground Treatments',
+          mode: 'coefficient',
+          unitLabel: 'CY/day',
+          value: p(GT_RATES.mulchLab.dbName, GT_RATES.mulchLab.fallback),
+        },
+        {
+          label: 'Mulch Delivery Fee',
+          table: 'misc_rates',
+          name: GT_RATES.mulchDelivery.dbName,
+          category: 'Ground Treatments',
+          mode: 'currency',
+          unitLabel: 'flat',
+          value: p(GT_RATES.mulchDelivery.dbName, GT_RATES.mulchDelivery.fallback),
+        },
+      ],
+    },
+    {
+      group: 'Weed Fabric',
+      items: [
+        {
+          label: 'Gravel Fabric - Labor Rate',
+          table: 'labor_rates',
+          name: GT_RATES.gravelFabricLab.dbName,
+          category: 'Ground Treatments',
+          mode: 'coefficient',
+          unitLabel: 'hrs/SF',
+          value: p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback),
+        },
+      ],
+    },
+    {
+      group: 'Decomposed Granite',
+      items: [
+        {
+          label: 'DG - Hand Labor Rate',
+          table: 'labor_rates',
+          name: GT_RATES.dgHandLab.dbName,
+          category: 'Ground Treatments',
+          mode: 'coefficient',
+          unitLabel: 'CY/hr',
+          value: p(GT_RATES.dgHandLab.dbName, GT_RATES.dgHandLab.fallback),
+        },
+        {
+          label: 'DG - Machine Labor Rate',
+          table: 'labor_rates',
+          name: GT_RATES.dgMachineLab.dbName,
+          category: 'Ground Treatments',
+          mode: 'coefficient',
+          unitLabel: 'CY/day',
+          value: p(GT_RATES.dgMachineLab.dbName, GT_RATES.dgMachineLab.fallback),
+        },
+      ],
+    },
+    {
+      group: 'Gravel / Pebble / Cobbles',
+      items: [
+        {
+          label: 'Gravel - Machine Labor Rate',
+          table: 'labor_rates',
+          name: GT_RATES.gravelMachineLab.dbName,
+          category: 'Ground Treatments',
+          mode: 'coefficient',
+          unitLabel: 'CY/day',
+          value: p(GT_RATES.gravelMachineLab.dbName, GT_RATES.gravelMachineLab.fallback),
+        },
+        {
+          label: 'Gravel - Hand Labor Rate',
+          table: 'labor_rates',
+          name: GT_RATES.gravelHandLab.dbName,
+          category: 'Ground Treatments',
+          mode: 'coefficient',
+          unitLabel: 'CY/day',
+          value: p(GT_RATES.gravelHandLab.dbName, GT_RATES.gravelHandLab.fallback),
+        },
+      ],
+    },
+    {
+      group: 'Edging',
+      items: [
+        {
+          label: 'Plastic Edging - Labor Rate',
+          table: 'labor_rates',
+          name: GT_RATES.plasticEdgingLab.dbName,
+          category: 'Ground Treatments',
+          mode: 'coefficient',
+          unitLabel: 'hrs/LF',
+          value: p(GT_RATES.plasticEdgingLab.dbName, GT_RATES.plasticEdgingLab.fallback),
+        },
+        {
+          label: 'Metal Edging - Labor Rate',
+          table: 'labor_rates',
+          name: GT_RATES.metalEdgingLab.dbName,
+          category: 'Ground Treatments',
+          mode: 'coefficient',
+          unitLabel: 'hrs/LF',
+          value: p(GT_RATES.metalEdgingLab.dbName, GT_RATES.metalEdgingLab.fallback),
+        },
+      ],
+    },
+    {
+      group: 'Steppers',
+      items: [
+        {
+          label: 'Flagstone Steppers - Soil Labor',
+          table: 'labor_rates',
+          name: GT_RATES.flagstoneSoilLab.dbName,
+          category: 'Ground Treatments',
+          mode: 'coefficient',
+          unitLabel: 'SF/day',
+          value: p(GT_RATES.flagstoneSoilLab.dbName, GT_RATES.flagstoneSoilLab.fallback),
+        },
+        {
+          label: 'Flagstone Steppers - Concrete Labor',
+          table: 'labor_rates',
+          name: GT_RATES.flagstoneConcreteLab.dbName,
+          category: 'Ground Treatments',
+          mode: 'coefficient',
+          unitLabel: 'SF/day',
+          value: p(GT_RATES.flagstoneConcreteLab.dbName, GT_RATES.flagstoneConcreteLab.fallback),
+        },
+        {
+          label: 'Precast Steppers - Soil Labor',
+          table: 'labor_rates',
+          name: GT_RATES.precastSoilLab.dbName,
+          category: 'Ground Treatments',
+          mode: 'coefficient',
+          unitLabel: 'SF/day',
+          value: p(GT_RATES.precastSoilLab.dbName, GT_RATES.precastSoilLab.fallback),
+        },
+        {
+          label: 'Precast Steppers - Concrete Labor',
+          table: 'labor_rates',
+          name: GT_RATES.precastConcreteLab.dbName,
+          category: 'Ground Treatments',
+          mode: 'coefficient',
+          unitLabel: 'SF/day',
+          value: p(GT_RATES.precastConcreteLab.dbName, GT_RATES.precastConcreteLab.fallback),
+        },
+      ],
+    },
+    {
+      group: 'Subcontractor',
+      items: [
+        {
+          label: 'Soil Prep Sub - $/SF',
+          table: 'subcontractor_rates',
+          name: 'Soil Prep Sub - $/SF',
+          category: 'Ground Treatments',
+          mode: 'currency',
+          unitLabel: 'SF',
+          value: p('Soil Prep Sub - $/SF', 0),
+        },
+        {
+          label: 'Sod Sub - $/SF',
+          table: 'subcontractor_rates',
+          name: 'Sod Sub - $/SF',
+          category: 'Ground Treatments',
+          mode: 'currency',
+          unitLabel: 'SF',
+          value: p('Sod Sub - $/SF', 0),
+        },
+        {
+          label: 'Mulch Sub - $/SF',
+          table: 'subcontractor_rates',
+          name: 'Mulch Sub - $/SF',
+          category: 'Ground Treatments',
+          mode: 'currency',
+          unitLabel: 'SF',
+          value: p('Mulch Sub - $/SF', 0),
+        },
+        {
+          label: 'DG Sub - $/SF',
+          table: 'subcontractor_rates',
+          name: 'DG Sub - $/SF',
+          category: 'Ground Treatments',
+          mode: 'currency',
+          unitLabel: 'SF',
+          value: p('DG Sub - $/SF', 0),
+        },
+        {
+          label: 'Gravel Sub - $/SF',
+          table: 'subcontractor_rates',
+          name: 'Gravel Sub - $/SF',
+          category: 'Ground Treatments',
+          mode: 'currency',
+          unitLabel: 'SF',
+          value: p('Gravel Sub - $/SF', 0),
+        },
+        {
+          label: 'Pebble Sub - $/SF',
+          table: 'subcontractor_rates',
+          name: 'Pebble Sub - $/SF',
+          category: 'Ground Treatments',
+          mode: 'currency',
+          unitLabel: 'SF',
+          value: p('Pebble Sub - $/SF', 0),
+        },
+        {
+          label: 'Cobbles Sub - $/SF',
+          table: 'subcontractor_rates',
+          name: 'Cobbles Sub - $/SF',
+          category: 'Ground Treatments',
+          mode: 'currency',
+          unitLabel: 'SF',
+          value: p('Cobbles Sub - $/SF', 0),
+        },
+        {
+          label: 'Edging Sub - $/LF',
+          table: 'subcontractor_rates',
+          name: 'Edging Sub - $/LF',
+          category: 'Ground Treatments',
+          mode: 'currency',
+          unitLabel: 'LF',
+          value: p('Edging Sub - $/LF', 0),
+        },
+        {
+          label: 'Steppers Sub - $/SF',
+          table: 'subcontractor_rates',
+          name: 'Steppers Sub - $/SF',
+          category: 'Ground Treatments',
+          mode: 'currency',
+          unitLabel: 'SF',
+          value: p('Steppers Sub - $/SF', 0),
+        },
+      ],
+    },
+  ]
+
   return (
     <SubTabContext.Provider value={isSub}>
     <div className="space-y-5">
-      {/* ── Sticky GPMD bar ── */}
-      <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
-        {/* GPMD summary bar */}
-        <GpmdBar
-          variant={subType === 'Subcontractor' ? 'sub' : 'inhouse'}
-          sticky
-          totalMat={calc.totalMat}
-          totalHrs={calc.totalHrs}
-          manDays={calc.manDays}
-          laborCost={calc.laborCost}
-          laborRatePerHour={laborRatePerHour}
-          burden={calc.burden}
-          gp={calc.gp}
-          commission={calc.commission}
-          subCost={calc.subCost}
-          gpmd={gpmd}
-          price={calc.price}
-          subMarkupRate={subGpMarkupRate}
-        />
-            </div>
-
-
-      <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} />
-
-      {/* Crew Type */}
-      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select
-          value={crewType}
-          onChange={e => setCrewType(e.target.value)}
-          className="input text-sm py-1 w-36"
-        >
-          <option value="Demo">Demo</option>
-          <option value="Landscape">Landscape</option>
-          <option value="Masonry">Masonry</option>
-          <option value="Paver">Paver</option>
-          <option value="Specialty">Specialty</option>
-        </select>
+      {/* ── Frozen header: GPMD bar + Crew Type / View Rates bar ── */}
+      <div className="sticky top-0 z-20 -mx-6 bg-white shadow-md">
+        <div className="px-6 pt-1 pb-1 bg-gray-900">
+          <GpmdBar
+            sticky
+            totalMat={calc.totalMat}
+            totalHrs={calc.totalHrs}
+            manDays={calc.manDays}
+            laborCost={calc.laborCost}
+            laborRatePerHour={laborRatePerHour}
+            burden={calc.burden}
+            gp={calc.gp}
+            commission={calc.commission}
+            subCost={calc.subCost}
+            gpmd={gpmd}
+            price={calc.price}
+            subMarkupRate={subGpMarkupRate}
+            variant={isSub ? 'sub' : 'inhouse'}
+          />
+        </div>
+        <div className="px-6 py-2">
+          <CrewTypeBar
+            crewType={crewType}
+            onCrewTypeChange={setCrewType}
+            title="Ground Treatments"
+            rates={groundTreatmentsRateList}
+            refreshAllRates={refreshAllRates}
+            showInlineToggle={false}
+          />
+        </div>
       </div>
+
+      <ModuleHeaderSlot>
+        <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} compact />
+      </ModuleHeaderSlot>
 
       {pricesLoading && (
         <div className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
@@ -1283,14 +1575,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           const _pencil = (nm, unit) => (
             <span className="text-[11px] text-gray-400 inline-flex items-center whitespace-nowrap">
               ${_r(nm).toFixed(2)}/{unit}
-              <RateEditPopover
-                table="subcontractor_rates"
-                name={nm}
-                category="Ground Treatments"
-                unitLabel={unit}
-                currentValue={_r(nm)}
-                onSaved={refreshAllRates}
-              />
             </span>
           )
           const _multi = (title, rows, setRows, subcat, nm) => {
@@ -1468,34 +1752,9 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 />
                 <span className="text-xs text-gray-400 inline-flex items-center gap-1 flex-wrap">
                   ${matVal.toFixed(4)}/SF
-                  <RateEditPopover
-                    table="material_price"
-                    materialId={soilPrepId}
-                    unitLabel="SF"
-                    currentValue={matVal}
-                    onSaved={refreshAllRates}
-                  />
-                  <RateEditPopover
-                    table="labor_rates"
-                    name={labName}
-                    category="Ground Treatments"
-                    mode="coefficient"
-                    unitLabel="hrs/SF"
-                    currentValue={labVal}
-                    onSaved={refreshAllRates}
-                  />
                   {prepMethod === 'Hand' && (
                     <>
                       · Hand{isSubTab ? ' (In-House only)' : ` +${handAdd} hrs/SF`}
-                      <RateEditPopover
-                        table="labor_rates"
-                        name={GT_RATES.soilPrepHandAdd.dbName}
-                        category="Ground Treatments"
-                        mode="coefficient"
-                        unitLabel="hrs/SF"
-                        currentValue={handAdd}
-                        onSaved={refreshAllRates}
-                      />
                     </>
                   )}
                 </span>
@@ -1572,13 +1831,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
                         ${typeCost.toFixed(2)}/CY
-                        <RateEditPopover
-                          table="material_price"
-                          materialId={st.id}
-                          unitLabel="CY"
-                          currentValue={typeCost}
-                          onSaved={refreshAllRates}
-                        />
                       </span>
                     </td>
                     <td className="py-1 text-right text-xs text-gray-600">
@@ -1653,25 +1905,9 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 return (
                   <>
                     ${p(st.dbName, st.fallback).toFixed(2)}/SF
-                    <RateEditPopover
-                      table="material_price"
-                      materialId={st.id}
-                      unitLabel="SF"
-                      currentValue={p(st.dbName, st.fallback)}
-                      onSaved={refreshAllRates}
-                    />
                   </>
                 )
               })()}
-              <RateEditPopover
-                table="labor_rates"
-                name={GT_RATES.sodLab.dbName}
-                category="Ground Treatments"
-                mode="coefficient"
-                unitLabel="hrs/SF"
-                currentValue={p(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback)}
-                onSaved={refreshAllRates}
-              />
             </span>
             {n(sodSF) > 0 && (
               <span className="text-xs text-gray-400">
@@ -1736,23 +1972,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               return (
                 <span className="text-xs text-gray-400 inline-flex items-center gap-1 flex-wrap">
                   ${p(ft.dbName, ft.fallback).toFixed(2)}/bag
-                  <RateEditPopover
-                    table="material_price"
-                    materialId={ft.id}
-                    unitLabel="bag"
-                    currentValue={p(ft.dbName, ft.fallback)}
-                    onSaved={refreshAllRates}
-                  />
                   · 1 bag / {sfPerBag} SF
-                  <RateEditPopover
-                    table="labor_rates"
-                    name={GT_RATES.fertilizerSFPerBag.dbName}
-                    category="Ground Treatments"
-                    mode="coefficient"
-                    unitLabel="SF/bag"
-                    currentValue={sfPerBag}
-                    onSaved={refreshAllRates}
-                  />
                   {bags > 0 && (
                     <span className="text-gray-500">
                       = {bags} bag{bags > 1 ? 's' : ''} · ${(bags * p(ft.dbName, ft.fallback)).toFixed(2)}
@@ -1777,13 +1997,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               return (
                 <>
                   Type ${p(mt.dbName, mt.fallback).toFixed(2)}/CY
-                  <RateEditPopover
-                    table="material_price"
-                    materialId={mt.id}
-                    unitLabel="CY"
-                    currentValue={p(mt.dbName, mt.fallback)}
-                    onSaved={refreshAllRates}
-                  />
                 </>
               )
             })()}
@@ -1791,48 +2004,15 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           ·
           <span className="inline-flex items-center gap-1">
             ${p(GT_RATES.mulchDelivery.dbName, 75).toFixed(2)} delivery
-            <RateEditPopover
-              table="misc_rates"
-              name={GT_RATES.mulchDelivery.dbName}
-              category="Ground Treatments"
-              unitLabel="flat"
-              currentValue={p(GT_RATES.mulchDelivery.dbName, GT_RATES.mulchDelivery.fallback)}
-              onSaved={refreshAllRates}
-            />
           </span>
           ·
           <span className="inline-flex items-center gap-1">
             {p(GT_RATES.mulchLab.dbName, 15)} CY/day labor
-            <RateEditPopover
-              table="labor_rates"
-              name={GT_RATES.mulchLab.dbName}
-              category="Ground Treatments"
-              mode="coefficient"
-              unitLabel="CY/day"
-              currentValue={p(GT_RATES.mulchLab.dbName, GT_RATES.mulchLab.fallback)}
-              onSaved={refreshAllRates}
-            />
           </span>
           ·
           <span className="inline-flex items-center gap-1">
             Weed fabric ${p(GT_RATES.gravelFabricMat.dbName, 0.1).toFixed(2)}/SF
-            <RateEditPopover
-              table="material_price"
-              materialId={gravelFabricId}
-              unitLabel="SF"
-              currentValue={p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)}
-              onSaved={refreshAllRates}
-            />
             · {p(GT_RATES.gravelFabricLab.dbName, 0.024)} hrs/SF
-            <RateEditPopover
-              table="labor_rates"
-              name={GT_RATES.gravelFabricLab.dbName}
-              category="Ground Treatments"
-              mode="coefficient"
-              unitLabel="hrs/SF"
-              currentValue={p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)}
-              onSaved={refreshAllRates}
-            />
           </span>
         </p>
         <div className="overflow-x-auto">
@@ -1900,13 +2080,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
                         ${typeCost.toFixed(2)}/CY
-                        <RateEditPopover
-                          table="material_price"
-                          materialId={mt.id}
-                          unitLabel="CY"
-                          currentValue={typeCost}
-                          onSaved={refreshAllRates}
-                        />
                       </span>
                     </td>
                     <td className="py-1">
@@ -1963,13 +2136,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               return (
                 <>
                   Type ${p(dt.dbName, dt.fallback).toFixed(2)}/ton
-                  <RateEditPopover
-                    table="material_price"
-                    materialId={dt.id}
-                    unitLabel="ton"
-                    currentValue={p(dt.dbName, dt.fallback)}
-                    onSaved={refreshAllRates}
-                  />
                 </>
               )
             })()}
@@ -1977,60 +2143,19 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           ·
           <span className="inline-flex items-center gap-1">
             Cement add ${p(GT_RATES.dgCementPerTon.dbName, 20).toFixed(2)}/ton
-            <RateEditPopover
-              table="material_price"
-              materialId={dgCementId}
-              unitLabel="ton"
-              currentValue={p(GT_RATES.dgCementPerTon.dbName, GT_RATES.dgCementPerTon.fallback)}
-              onSaved={refreshAllRates}
-            />
           </span>
           ·
           <span className="inline-flex items-center gap-1">
             Hand {p(GT_RATES.dgHandLab.dbName, 0.5)} CY/hr labor
-            <RateEditPopover
-              table="labor_rates"
-              name={GT_RATES.dgHandLab.dbName}
-              category="Ground Treatments"
-              mode="coefficient"
-              unitLabel="CY/hr"
-              currentValue={p(GT_RATES.dgHandLab.dbName, GT_RATES.dgHandLab.fallback)}
-              onSaved={refreshAllRates}
-            />
           </span>
           ·
           <span className="inline-flex items-center gap-1">
             Machine {p(GT_RATES.dgMachineLab.dbName, 12)} CY/day labor
-            <RateEditPopover
-              table="labor_rates"
-              name={GT_RATES.dgMachineLab.dbName}
-              category="Ground Treatments"
-              mode="coefficient"
-              unitLabel="CY/day"
-              currentValue={p(GT_RATES.dgMachineLab.dbName, GT_RATES.dgMachineLab.fallback)}
-              onSaved={refreshAllRates}
-            />
           </span>
           ·
           <span className="inline-flex items-center gap-1">
             Weed fabric ${p(GT_RATES.gravelFabricMat.dbName, 0.1).toFixed(2)}/SF
-            <RateEditPopover
-              table="material_price"
-              materialId={gravelFabricId}
-              unitLabel="SF"
-              currentValue={p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)}
-              onSaved={refreshAllRates}
-            />
             · {p(GT_RATES.gravelFabricLab.dbName, 0.024)} hrs/SF
-            <RateEditPopover
-              table="labor_rates"
-              name={GT_RATES.gravelFabricLab.dbName}
-              category="Ground Treatments"
-              mode="coefficient"
-              unitLabel="hrs/SF"
-              currentValue={p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)}
-              onSaved={refreshAllRates}
-            />
           </span>
         </p>
         <div className="overflow-x-auto">
@@ -2177,49 +2302,15 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
         <p className="text-xs text-gray-400 mb-2 inline-flex items-center flex-wrap gap-x-2">
           <span className="inline-flex items-center gap-1">
             Fabric ${p(GT_RATES.gravelFabricMat.dbName, 0.1).toFixed(2)}/SF mat
-            <RateEditPopover
-              table="material_price"
-              materialId={gravelFabricId}
-              unitLabel="SF"
-              currentValue={p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)}
-              onSaved={refreshAllRates}
-            />
             · {p(GT_RATES.gravelFabricLab.dbName, 0.024)} hrs/SF labor
-            <RateEditPopover
-              table="labor_rates"
-              name={GT_RATES.gravelFabricLab.dbName}
-              category="Ground Treatments"
-              mode="coefficient"
-              unitLabel="hrs/SF"
-              currentValue={p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)}
-              onSaved={refreshAllRates}
-            />
           </span>
           ·
           <span className="inline-flex items-center gap-1">
             Machine excav {p(GT_RATES.gravelMachineLab.dbName, 12)} CY/day
-            <RateEditPopover
-              table="labor_rates"
-              name={GT_RATES.gravelMachineLab.dbName}
-              category="Ground Treatments"
-              mode="coefficient"
-              unitLabel="CY/day"
-              currentValue={p(GT_RATES.gravelMachineLab.dbName, GT_RATES.gravelMachineLab.fallback)}
-              onSaved={refreshAllRates}
-            />
           </span>
           ·
           <span className="inline-flex items-center gap-1">
             Hand excav {p(GT_RATES.gravelHandLab.dbName, 4)} CY/day
-            <RateEditPopover
-              table="labor_rates"
-              name={GT_RATES.gravelHandLab.dbName}
-              category="Ground Treatments"
-              mode="coefficient"
-              unitLabel="CY/day"
-              currentValue={p(GT_RATES.gravelHandLab.dbName, GT_RATES.gravelHandLab.fallback)}
-              onSaved={refreshAllRates}
-            />
           </span>
         </p>
         <div className="overflow-x-auto">
@@ -2285,13 +2376,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
                         ${typeCost.toFixed(2)}/CY
-                        <RateEditPopover
-                          table="material_price"
-                          materialId={gtype.id}
-                          unitLabel="CY"
-                          currentValue={typeCost}
-                          onSaved={refreshAllRates}
-                        />
                       </span>
                     </td>
                     <td className="py-1 pr-1">
@@ -2369,49 +2453,15 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
         <p className="text-xs text-gray-400 mb-2 inline-flex items-center flex-wrap gap-x-2">
           <span className="inline-flex items-center gap-1">
             Fabric ${p(GT_RATES.gravelFabricMat.dbName, 0.1).toFixed(2)}/SF mat
-            <RateEditPopover
-              table="material_price"
-              materialId={gravelFabricId}
-              unitLabel="SF"
-              currentValue={p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)}
-              onSaved={refreshAllRates}
-            />
             · {p(GT_RATES.gravelFabricLab.dbName, 0.024)} hrs/SF labor
-            <RateEditPopover
-              table="labor_rates"
-              name={GT_RATES.gravelFabricLab.dbName}
-              category="Ground Treatments"
-              mode="coefficient"
-              unitLabel="hrs/SF"
-              currentValue={p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)}
-              onSaved={refreshAllRates}
-            />
           </span>
           ·
           <span className="inline-flex items-center gap-1">
             Machine excav {p(GT_RATES.gravelMachineLab.dbName, 12)} CY/day
-            <RateEditPopover
-              table="labor_rates"
-              name={GT_RATES.gravelMachineLab.dbName}
-              category="Ground Treatments"
-              mode="coefficient"
-              unitLabel="CY/day"
-              currentValue={p(GT_RATES.gravelMachineLab.dbName, GT_RATES.gravelMachineLab.fallback)}
-              onSaved={refreshAllRates}
-            />
           </span>
           ·
           <span className="inline-flex items-center gap-1">
             Hand excav {p(GT_RATES.gravelHandLab.dbName, 4)} CY/day
-            <RateEditPopover
-              table="labor_rates"
-              name={GT_RATES.gravelHandLab.dbName}
-              category="Ground Treatments"
-              mode="coefficient"
-              unitLabel="CY/day"
-              currentValue={p(GT_RATES.gravelHandLab.dbName, GT_RATES.gravelHandLab.fallback)}
-              onSaved={refreshAllRates}
-            />
           </span>
         </p>
         <div className="overflow-x-auto">
@@ -2477,13 +2527,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
                         ${typeCost.toFixed(2)}/CY
-                        <RateEditPopover
-                          table="material_price"
-                          materialId={ptype.id}
-                          unitLabel="CY"
-                          currentValue={typeCost}
-                          onSaved={refreshAllRates}
-                        />
                       </span>
                     </td>
                     <td className="py-1 pr-1">
@@ -2549,49 +2592,15 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
         <p className="text-xs text-gray-400 mb-2 inline-flex items-center flex-wrap gap-x-2">
           <span className="inline-flex items-center gap-1">
             Fabric ${p(GT_RATES.gravelFabricMat.dbName, 0.1).toFixed(2)}/SF mat
-            <RateEditPopover
-              table="material_price"
-              materialId={gravelFabricId}
-              unitLabel="SF"
-              currentValue={p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)}
-              onSaved={refreshAllRates}
-            />
             · {p(GT_RATES.gravelFabricLab.dbName, 0.024)} hrs/SF labor
-            <RateEditPopover
-              table="labor_rates"
-              name={GT_RATES.gravelFabricLab.dbName}
-              category="Ground Treatments"
-              mode="coefficient"
-              unitLabel="hrs/SF"
-              currentValue={p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)}
-              onSaved={refreshAllRates}
-            />
           </span>
           ·
           <span className="inline-flex items-center gap-1">
             Machine excav {p(GT_RATES.gravelMachineLab.dbName, 12)} CY/day
-            <RateEditPopover
-              table="labor_rates"
-              name={GT_RATES.gravelMachineLab.dbName}
-              category="Ground Treatments"
-              mode="coefficient"
-              unitLabel="CY/day"
-              currentValue={p(GT_RATES.gravelMachineLab.dbName, GT_RATES.gravelMachineLab.fallback)}
-              onSaved={refreshAllRates}
-            />
           </span>
           ·
           <span className="inline-flex items-center gap-1">
             Hand excav {p(GT_RATES.gravelHandLab.dbName, 4)} CY/day
-            <RateEditPopover
-              table="labor_rates"
-              name={GT_RATES.gravelHandLab.dbName}
-              category="Ground Treatments"
-              mode="coefficient"
-              unitLabel="CY/day"
-              currentValue={p(GT_RATES.gravelHandLab.dbName, GT_RATES.gravelHandLab.fallback)}
-              onSaved={refreshAllRates}
-            />
           </span>
         </p>
         <div className="overflow-x-auto">
@@ -2656,13 +2665,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
                         ${typeCost.toFixed(2)}/CY
-                        <RateEditPopover
-                          table="material_price"
-                          materialId={ctype.id}
-                          unitLabel="CY"
-                          currentValue={typeCost}
-                          onSaved={refreshAllRates}
-                        />
                       </span>
                     </td>
                     <td className="py-1">
@@ -2765,25 +2767,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 />
                 <span className="text-xs text-gray-400 inline-flex items-center gap-1">
                   ${rate.toFixed(2)}/LF
-                  <RateEditPopover
-                    table="material_price"
-                    materialId={t.id}
-                    unitLabel="LF"
-                    currentValue={rate}
-                    onSaved={refreshAllRates}
-                  />
-                  <RateEditPopover
-                    table="labor_rates"
-                    name={GT_RATES.plasticEdgingLab.dbName}
-                    category="Ground Treatments"
-                    mode="coefficient"
-                    unitLabel="hrs/LF"
-                    currentValue={p(
-                      GT_RATES.plasticEdgingLab.dbName,
-                      GT_RATES.plasticEdgingLab.fallback
-                    )}
-                    onSaved={refreshAllRates}
-                  />
                 </span>
               </LabeledRow>
             )
@@ -2837,25 +2820,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 />
                 <span className="text-xs text-gray-400 inline-flex items-center gap-1">
                   ${rate.toFixed(2)}/LF
-                  <RateEditPopover
-                    table="material_price"
-                    materialId={t.id}
-                    unitLabel="LF"
-                    currentValue={rate}
-                    onSaved={refreshAllRates}
-                  />
-                  <RateEditPopover
-                    table="labor_rates"
-                    name={GT_RATES.metalEdgingLab.dbName}
-                    category="Ground Treatments"
-                    mode="coefficient"
-                    unitLabel="hrs/LF"
-                    currentValue={p(
-                      GT_RATES.metalEdgingLab.dbName,
-                      GT_RATES.metalEdgingLab.fallback
-                    )}
-                    onSaved={refreshAllRates}
-                  />
                 </span>
               </LabeledRow>
             )
@@ -2969,27 +2933,11 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-2">
                       <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
                         {sfPerDay} SF/day
-                        <RateEditPopover
-                          table="labor_rates"
-                          name={row.labRate.dbName}
-                          category="Ground Treatments"
-                          mode="coefficient"
-                          unitLabel="SF/day"
-                          currentValue={sfPerDay}
-                          onSaved={refreshAllRates}
-                        />
                       </span>
                     </td>
                     <td className="py-1 pr-2">
                       <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
                         ${perTon.toFixed(2)}/ton
-                        <RateEditPopover
-                          table="material_price"
-                          materialId={st.id}
-                          unitLabel="ton"
-                          currentValue={perTon}
-                          onSaved={refreshAllRates}
-                        />
                       </span>
                     </td>
                     <td className="py-1 text-right text-xs text-gray-400 pr-2">

@@ -1,4 +1,6 @@
 import WorkTypeChooser from './WorkTypeChooser'
+import CrewTypeBar from './CrewTypeBar'
+import ModuleHeaderSlot from './ModuleHeaderSlot'
 // ─────────────────────────────────────────────────────────────────────────────
 // HandDemoModule — Hand (Non-Skid-Steer) Demo estimator
 //
@@ -16,7 +18,6 @@ import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import { fetchStandardRateMap } from '../../lib/materialCatalog'
 import GpmdBar from './GpmdBar'
-import RateEditPopover from '../RateEditPopover'
 import { SubRateOverrideProvider } from '../SubRateOverrideContext.jsx'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
@@ -853,53 +854,150 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
     })
   }
 
+  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
+  //    that used to have an inline RateEditPopover in this module now lives here.
+  const coefRate = (label, name, value, unitLabel = 'hr/100sf·in') => ({
+    label, table: 'labor_rates', name, category: 'Demo', mode: 'coefficient', unitLabel, value,
+  })
+  const subcRate = (label, name, value, unitLabel = 'ea') => ({
+    label, table: 'subcontractor_rates', name, category: 'Demo', mode: 'currency', unitLabel, value,
+  })
+  const handDemoRateList = [
+    {
+      group: 'Job Site & Hauling',
+      items: [
+        coefRate('Difficulty Ratio', 'Demo - Hand Difficulty Ratio', calc.difficultyRatio, '% per 1%'),
+        coefRate('Haul Sec/Ft', 'Demo - Hand Haul Sec/Ft', calc.haulSecPerFt, 'sec/ft'),
+        coefRate('Haul Load (CY)', 'Demo - Hand Load (CY)', calc.haulLoadCy, 'cy'),
+      ],
+    },
+    {
+      group: 'Demolition Labor',
+      items: [
+        coefRate('Concrete', 'Demo - Hand - Concrete SF', calc.laborConc),
+        coefRate('Dirt/Rock', 'Demo - Hand - Dirt SF', calc.laborDirt),
+        coefRate('Import Base', 'Demo - Hand - Import Base SF', calc.laborBase),
+        coefRate('Grass/Sod', 'Demo - Hand - Grass SF', calc.laborGrass),
+        coefRate('Rebar', 'Demo - Hand Rebar SF/hr', calc.rebarSfPerHr, 'SF/hr'),
+      ],
+    },
+    {
+      group: 'Misc & Structural Labor',
+      items: [
+        coefRate('Misc Flat', 'Demo - Hand - Misc Flat SF', calc.laborMiscFlat),
+        coefRate('Misc Vertical', 'Demo - Hand - Misc Vert SF', calc.laborMiscVert),
+        coefRate('Footing', 'Demo - Hand - Footing SF', calc.laborFooting),
+      ],
+    },
+    {
+      group: 'Grading Labor',
+      items: [
+        coefRate('Grade Cut', 'Demo - Hand - Grade Cut SF', calc.laborGradeCut),
+        coefRate('Grade Fill', 'Demo - Hand - Grade Fill SF', calc.laborGradeFill),
+        coefRate('Jumping Jack', 'Demo - Hand - JJ SF', calc.laborJJ),
+      ],
+    },
+    {
+      group: 'Vegetation Labor',
+      items: [
+        coefRate('Shrub', 'Demo - Hand Shrub', calc.shrubRate, 'hrs/ea'),
+        coefRate('Stump Small', 'Demo - Hand Stump Small', calc.stumpSmallRate, 'hrs/ea'),
+        coefRate('Stump Medium', 'Demo - Hand Stump Medium', calc.stumpMedRate, 'hrs/ea'),
+        coefRate('Stump Large', 'Demo - Hand Stump Large', calc.stumpLargeRate, 'hrs/ea'),
+        coefRate('Stump XL', 'Demo - Hand Stump XL', calc.stumpXLRate, 'hrs/ea'),
+        coefRate('Tree Small', 'Demo - Hand Tree Small', calc.treeSmall, 'hrs/ft'),
+        coefRate('Tree Medium', 'Demo - Hand Tree Medium', calc.treeMed, 'hrs/ft'),
+        coefRate('Tree Large', 'Demo - Hand Tree Large', calc.treeLarge, 'hrs/ft'),
+      ],
+    },
+    {
+      group: 'Subcontractor — Demolition',
+      items: [
+        subcRate('Concrete/Dirt/Rock/Paver', 'Sub Demo - Hand SF', calc.handSubRate, 'sf'),
+      ],
+    },
+    {
+      group: 'Subcontractor — Hauling',
+      items: [
+        subcRate('Trash (12yd load)', 'Demo - Hand Sub Haul - Trash 12yd', calc.haulTrashRate, 'load'),
+        subcRate('Concrete (12yd load)', 'Demo - Hand Sub Haul - Concrete 12yd', calc.haulConcreteRate, 'load'),
+        subcRate('Soil (12yd load)', 'Demo - Hand Sub Haul - Soil 12yd', calc.haulSoilRate, 'load'),
+        subcRate('Import Base (12yd load)', 'Demo - Hand Sub Haul - Import Base 12yd', calc.haulBaseRate, 'load'),
+      ],
+    },
+    {
+      group: 'Subcontractor — Grading',
+      items: [
+        subcRate('Grade Cut', 'Sub Grade - Hand Cut SF', calc.sgCut, 'sf'),
+        subcRate('Grade Fill', 'Sub Grade - Hand Fill SF', calc.sgFill, 'sf'),
+        subcRate('Jumping Jack', 'Sub Grade - Hand JJ SF', calc.sgJJ, 'sf'),
+        subcRate('Sheepsfoot Compactor', 'Sub Grade - Hand Sheepsfoot SF', calc.sgSheep, 'sf'),
+        subcRate('Roll Compactor', 'Sub Grade - Hand Roll SF', calc.sgRoll, 'sf'),
+      ],
+    },
+    {
+      group: 'Subcontractor — Stump',
+      items: [
+        subcRate('Stump Small', 'Sub Stump - Hand Small', calc.ssSmall, 'ea'),
+        subcRate('Stump Medium', 'Sub Stump - Hand Medium', calc.ssMed, 'ea'),
+        subcRate('Stump Large', 'Sub Stump - Hand Large', calc.ssLarge, 'ea'),
+        subcRate('Stump XL', 'Sub Stump - Hand XL', calc.ssXL, 'ea'),
+      ],
+    },
+    {
+      group: 'Subcontractor — Tree',
+      items: [
+        subcRate('Tree 6-12"', 'Sub Tree - Hand 6-12', calc.stSmall, 'ea'),
+        subcRate('Tree 12-18"', 'Sub Tree - Hand 12-18', calc.stMed, 'ea'),
+        subcRate('Tree 18-24"', 'Sub Tree - Hand 18-24', calc.stLarge, 'ea'),
+      ],
+    },
+  ]
+
   return (
     <SubTabContext.Provider value={isSub}>
     <SubRateOverrideProvider overrides={state.rateOverrides} setOverride={setOverride}>
     <div className="space-y-4">
-      {/* ── Sticky GPMD bar ── */}
-      <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
-        {/* GPMD summary bar */}
-        <GpmdBar
-          variant={isSub ? 'sub' : 'inhouse'}
-          sticky
-          totalMat={calc.totalMat}
-          totalHrs={calc.totalHrs}
-          manDays={calc.manDays}
-          laborCost={calc.laborCost}
-          laborRatePerHour={laborRatePerHour}
-          burden={calc.burden}
-          gp={calc.gp}
-          commission={calc.commission}
-          subCost={calc.subCost}
-          gpmd={gpmd}
-          price={calc.price}
-          subMarkupRate={subGpMarkupRate}
-        />
-            </div>
+      {/* ── Frozen header: GPMD bar + Crew Type / View Rates bar ── */}
+      <div className="sticky top-0 z-20 -mx-6 bg-white shadow-md">
+        <div className="px-6 pt-1 pb-1 bg-gray-900">
+          <GpmdBar
+            variant={isSub ? 'sub' : 'inhouse'}
+            sticky
+            totalMat={calc.totalMat}
+            totalHrs={calc.totalHrs}
+            manDays={calc.manDays}
+            laborCost={calc.laborCost}
+            laborRatePerHour={laborRatePerHour}
+            burden={calc.burden}
+            gp={calc.gp}
+            commission={calc.commission}
+            subCost={calc.subCost}
+            gpmd={gpmd}
+            price={calc.price}
+            subMarkupRate={subGpMarkupRate}
+          />
+        </div>
+        <div className="px-6 py-2">
+          <CrewTypeBar
+            crewType={state.crewType}
+            onCrewTypeChange={v => set('crewType', v)}
+            title="Hand Demo"
+            rates={handDemoRateList}
+            refreshAllRates={refreshAllRates}
+            showInlineToggle={false}
+          />
+        </div>
+      </div>
 
+      <ModuleHeaderSlot>
+        <WorkTypeChooser value={state.dumpType || 'In-House'} onChange={v => set('dumpType', v)} compact />
+      </ModuleHeaderSlot>
 
-      {/* In House / Subcontractor chooser — drives the Sub calculations (isSub) */}
-      <WorkTypeChooser value={state.dumpType} onChange={v => set('dumpType', v)} />
-
-      {/* Crew Type + Change Demo Module switcher */}
-      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select
-          value={state.crewType}
-          onChange={e => set('crewType', e.target.value)}
-          className="input text-sm py-1 w-36"
-        >
-          <option value="Demo">Demo</option>
-          <option value="Landscape">Landscape</option>
-          <option value="Masonry">Masonry</option>
-          <option value="Paver">Paver</option>
-          <option value="Specialty">Specialty</option>
-        </select>
-        {/* Change Demo Module — bundle current values and switch to
-            another demo type (Hand / Skid Steer / Mini Skid Steer).
-            Shared fields populate automatically in the target. */}
-        {onSwitchType && (
+      {/* Change Demo Module — bundle current values and switch to another demo
+          type (Skid Steer / Mini Skid Steer). Shared fields populate in target. */}
+      {onSwitchType && (
+        <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
           <div className="relative">
             <button
               type="button"
@@ -961,8 +1059,8 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
               </div>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
       {pricesLoading && (
         <div className="text-xs text-amber-700 bg-amber-50 rounded px-3 py-2">
           Loading current rates…
@@ -983,15 +1081,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           />
           <p className="text-[10px] text-gray-500 mt-0.5 inline-flex items-center gap-1">
             {calc.difficultyRatio}% labor per 1%
-            <RateEditPopover
-              table="labor_rates"
-              name="Demo - Hand Difficulty Ratio"
-              category="Demo"
-              mode="coefficient"
-              unitLabel="% per 1%"
-              currentValue={calc.difficultyRatio}
-              onSaved={refreshAllRates}
-            />
           </p>
         </div>
         <div className={isSub ? 'hidden' : undefined}>
@@ -1008,25 +1097,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           />
           <p className="text-[10px] text-gray-500 mt-0.5 inline-flex items-center gap-1 flex-wrap">
             {calc.haulSecPerFt} sec/ft
-            <RateEditPopover
-              table="labor_rates"
-              name="Demo - Hand Haul Sec/Ft"
-              category="Demo"
-              mode="coefficient"
-              unitLabel="sec/ft"
-              currentValue={calc.haulSecPerFt}
-              onSaved={refreshAllRates}
-            />
             · {calc.haulLoadCy} cy/load
-            <RateEditPopover
-              table="labor_rates"
-              name="Demo - Hand Load (CY)"
-              category="Demo"
-              mode="coefficient"
-              unitLabel="cy"
-              currentValue={calc.haulLoadCy}
-              onSaved={refreshAllRates}
-            />
             {calc.walkHrs > 0 && <span>· +{calc.walkHrs.toFixed(2)} hrs haul</span>}
           </p>
         </div>
@@ -1053,7 +1124,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             <>
               <span className="text-gray-400 font-normal">·</span>
               <span className="font-normal normal-case">Concrete / Dirt / Rock / Paver — ${calc.handSubRate}/sf</span>
-              <RateEditPopover table="subcontractor_rates" name="Sub Demo - Hand SF" unitLabel="/sf" currentValue={calc.handSubRate} onSaved={refreshAllRates} />
             </>
           )}
         </div>
@@ -1135,7 +1205,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                     {isSelf && (
                       <>
                         <span className="text-gray-400 font-normal text-[10px]">({rateNote})</span>
-                        <RateEditPopover table="labor_rates" name={rateName} category="Demo" mode="coefficient" unitLabel={rateUnit || 't/hr'} currentValue={rate} onSaved={refreshAllRates} />
                         {extraIcon}
                       </>
                     )}
@@ -1178,15 +1247,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
               <span className="text-gray-400 font-normal">
                 (1 hr per {calc.rebarSfPerHr} SF)
               </span>
-              <RateEditPopover
-                table="labor_rates"
-                name="Demo - Hand Rebar SF/hr"
-                category="Demo"
-                mode="coefficient"
-                unitLabel="SF/hr"
-                currentValue={calc.rebarSfPerHr}
-                onSaved={refreshAllRates}
-              />
             </p>
             <Inp
               value={state.rebarSF}
@@ -1209,7 +1269,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             <>
               <span className="text-gray-400 font-normal">·</span>
               <span className="font-normal normal-case">Hand labor {calc.laborMiscFlat} hr/100sf·in</span>
-              <RateEditPopover table="labor_rates" name="Demo - Hand - Misc Flat SF" category="Demo" mode="coefficient" unitLabel="hr/100sf·in" currentValue={calc.laborMiscFlat} onSaved={refreshAllRates} />
               <span className="text-gray-400 font-normal">·</span>
               <span className="font-normal normal-case">Container ${calc.containerPrice}</span>              <span className="font-normal normal-case">/ {calc.containerCy} cy</span>              <span className="font-normal normal-case">· ×{calc.swellFactor} swell</span>            </>
           )}
@@ -1217,7 +1276,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             <>
               <span className="text-gray-400 font-normal">·</span>
               <span className="font-normal normal-case">${calc.handSubRate}/sf</span>
-              <RateEditPopover table="subcontractor_rates" name="Sub Demo - Hand SF" unitLabel="/sf" currentValue={calc.handSubRate} onSaved={refreshAllRates} />
             </>
           )}
         </div>
@@ -1291,7 +1349,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           {isSelf && (
             <>
               <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborMiscVert} hr/100sf·in equiv</span>
-              <RateEditPopover table="labor_rates" name="Demo - Hand - Misc Vert SF" category="Demo" mode="coefficient" unitLabel="hr/100sf·in" currentValue={calc.laborMiscVert} onSaved={refreshAllRates} />
               <span className="font-normal normal-case text-gray-500">· container disposal</span>
             </>
           )}
@@ -1356,7 +1413,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           {isSelf && (
             <>
               <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborFooting} hr/100sf·in equiv</span>
-              <RateEditPopover table="labor_rates" name="Demo - Hand - Footing SF" category="Demo" mode="coefficient" unitLabel="hr/100sf·in" currentValue={calc.laborFooting} onSaved={refreshAllRates} />
               <span className="font-normal normal-case text-gray-500">· container disposal</span>
             </>
           )}
@@ -1421,7 +1477,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           {isSelf && (
             <>
               <span className="font-normal normal-case text-gray-500">· tight/confined access · 2 × concrete rate = {calc.laborBucket} hr/100sf·in</span>
-              <RateEditPopover table="labor_rates" name="Demo - Hand - Concrete SF" category="Demo" mode="coefficient" unitLabel="hr/100sf·in" currentValue={calc.laborConc} onSaved={refreshAllRates} />
               <span className="font-normal normal-case text-gray-500">· container disposal</span>
             </>
           )}
@@ -1493,13 +1548,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                       <span className="inline-flex items-center gap-1">
                         {label}
                         <span className="text-gray-400 font-normal">(${rate}/load)</span>
-                        <RateEditPopover
-                          table="subcontractor_rates"
-                          name={rateName}
-                          unitLabel="/load"
-                          currentValue={rate}
-                          onSaved={refreshAllRates}
-                        />
                       </span>
                     </td>
                     <td className={td}>
@@ -1576,7 +1624,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                     {isSelf && (
                       <>
                         <span className="text-gray-400 font-normal">({note})</span>
-                        <RateEditPopover table="labor_rates" name={rateName} category="Demo" mode="coefficient" unitLabel={rateUnit || 't/hr'} currentValue={rate} onSaved={refreshAllRates} />
                       </>
                     )}
                   </span>
@@ -1621,13 +1668,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                     <span className="inline-flex items-center gap-1">
                       {label}
                       <span className="text-gray-400 font-normal">(${rate}/sf)</span>
-                      <RateEditPopover
-                        table="subcontractor_rates"
-                        name={rateName}
-                        unitLabel="/sf"
-                        currentValue={rate}
-                        onSaved={refreshAllRates}
-                      />
                     </span>
                   </td>
                   <td className={td}>
@@ -1697,15 +1737,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
         {isSelf && (
           <p className="text-xs text-gray-400 mt-1 inline-flex items-center gap-1">
             {calc.shrubRate} hrs/ea × shrub-height modifier
-            <RateEditPopover
-              table="labor_rates"
-              name="Demo - Hand Shrub"
-              category="Demo"
-              mode="coefficient"
-              unitLabel="hrs/ea"
-              currentValue={calc.shrubRate}
-              onSaved={refreshAllRates}
-            />
           </p>
         )}
       </div>
@@ -1758,25 +1789,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           <div key={key}>
             <p className="text-xs text-gray-500 mb-0.5 inline-flex items-center gap-1">
               {label}
-              {isSub ? (
-                <RateEditPopover
-                  table="subcontractor_rates"
-                  name={subRateName}
-                  unitLabel="/ea"
-                  currentValue={subRate}
-                  onSaved={refreshAllRates}
-                />
-              ) : (
-                <RateEditPopover
-                  table="labor_rates"
-                  name={rateName}
-                  category="Demo"
-                  mode="coefficient"
-                  unitLabel="hrs/ea"
-                  currentValue={rate}
-                  onSaved={refreshAllRates}
-                />
-              )}
             </p>
             <Inp value={state[key]} onChange={e => set(key, e.target.value)} />
             <p className="text-xs text-gray-400 mt-0.5">
@@ -1804,35 +1816,8 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           <span className="font-normal normal-case text-gray-500">· qty × height × size multiplier</span>
           <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
             (S:{calc.treeSmall}
-            <RateEditPopover
-              table="labor_rates"
-              name="Demo - Hand Tree Small"
-              category="Demo"
-              mode="coefficient"
-              unitLabel="hrs/ft"
-              currentValue={calc.treeSmall}
-              onSaved={refreshAllRates}
-            />
             · M:{calc.treeMed}
-            <RateEditPopover
-              table="labor_rates"
-              name="Demo - Hand Tree Medium"
-              category="Demo"
-              mode="coefficient"
-              unitLabel="hrs/ft"
-              currentValue={calc.treeMed}
-              onSaved={refreshAllRates}
-            />
             · L:{calc.treeLarge}
-            <RateEditPopover
-              table="labor_rates"
-              name="Demo - Hand Tree Large"
-              category="Demo"
-              mode="coefficient"
-              unitLabel="hrs/ft"
-              currentValue={calc.treeLarge}
-              onSaved={refreshAllRates}
-            />
             hrs/ft)
           </span>
             </>
@@ -1840,11 +1825,8 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           {isSub && (
             <span className="font-normal normal-case text-gray-500 inline-flex items-center gap-1">
               · per tree: 6-12" ${calc.stSmall}
-              <RateEditPopover table="subcontractor_rates" name="Sub Tree - Hand 6-12" unitLabel="/ea" currentValue={calc.stSmall} onSaved={refreshAllRates} />
               · 12-18" ${calc.stMed}
-              <RateEditPopover table="subcontractor_rates" name="Sub Tree - Hand 12-18" unitLabel="/ea" currentValue={calc.stMed} onSaved={refreshAllRates} />
               · 18-24" ${calc.stLarge}
-              <RateEditPopover table="subcontractor_rates" name="Sub Tree - Hand 18-24" unitLabel="/ea" currentValue={calc.stLarge} onSaved={refreshAllRates} />
             </span>
           )}
           {isSelf && (

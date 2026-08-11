@@ -79,15 +79,19 @@ export default function ViewRatesModal({ title = 'Rates', rates = [], onClose, r
                 )}
                 <div className="rounded-xl border border-gray-200 divide-y divide-gray-100">
                   {(() => {
-                    // Always split a group into ONE Materials block then ONE Labor
+                    // Always split a group into ONE Labor block then ONE Materials
                     // block, each with its own header. Items keep the order the
                     // caller gave them (Walls alphabetizes), so each block is sorted
-                    // on its own instead of materials/labor interleaving.
-                    const materials = g.items.filter(x => x.mode !== 'coefficient')
-                    const labor = g.items.filter(x => x.mode === 'coefficient')
+                    // on its own instead of materials/labor interleaving. An item may
+                    // force its block via an explicit `section` ('labor'/'material');
+                    // otherwise coefficient→labor, currency→material.
+                    const isLabor = x =>
+                      (x.section || (x.mode === 'coefficient' ? 'labor' : 'material')) === 'labor'
+                    const labor = g.items.filter(isLabor)
+                    const materials = g.items.filter(x => !isLabor(x))
                     const rows = [
-                      ...(materials.length ? [{ _header: 'Materials' }, ...materials] : []),
                       ...(labor.length ? [{ _header: 'Labor' }, ...labor] : []),
+                      ...(materials.length ? [{ _header: 'Materials' }, ...materials] : []),
                     ]
                     return rows.map((it, i) =>
                       it._header ? (

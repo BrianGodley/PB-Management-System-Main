@@ -1,4 +1,6 @@
 import WorkTypeChooser from './WorkTypeChooser'
+import CrewTypeBar from './CrewTypeBar'
+import ModuleHeaderSlot from './ModuleHeaderSlot'
 import { useState, useEffect, useCallback, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
@@ -314,17 +316,6 @@ function EpTable({
                           </option>
                         ))}
                       </select>
-                      {laborBuiltIn && (
-                        <RateEditPopover
-                          table="labor_rates"
-                          name={laborBuiltIn.laborDbName}
-                          category="Utilities"
-                          mode="coefficient"
-                          unitLabel={`hrs/${unitLabel}`}
-                          currentValue={laborVal}
-                          onSaved={refreshAllRates}
-                        />
-                      )}
                     </div>
                   </td>
                   <td className="py-1 pr-2">
@@ -922,48 +913,128 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
   const setWallFinishRow = (i, field, val) =>
     setWallFinishRows(rs => rs.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
 
+  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
+  //    that used to have an inline RateEditPopover in this module now lives here.
+  const okLaborItem = (rateKey, unitLabel) => ({
+    label: OK_RATES[rateKey].dbName,
+    table: 'labor_rates',
+    name: OK_RATES[rateKey].dbName,
+    category: 'Outdoor Kitchen',
+    mode: 'coefficient',
+    unitLabel,
+    value: p(OK_RATES[rateKey].dbName, OK_RATES[rateKey].fallback),
+  })
+  const outdoorKitchenRateList = [
+    {
+      group: 'BBQ Structure',
+      items: [
+        okLaborItem('excavateLab', 'CF/hr'),
+        okLaborItem('rebarLab', 'LF/day'),
+        okLaborItem('pourFootingLab', 'hrs/CY'),
+        okLaborItem('installBlockLab', 'blk/day'),
+        okLaborItem('fillBlockLab', 'blk/day'),
+      ],
+    },
+    {
+      group: 'Concrete Countertop',
+      items: [
+        okLaborItem('counterFormLab', 'LF/hr'),
+        okLaborItem('counterPourLab', 'SF/day'),
+        okLaborItem('counterBroomLab', 'SF/day'),
+        okLaborItem('counterPolishLab', 'SF/day'),
+      ],
+    },
+    {
+      group: 'Appliances',
+      items: [okLaborItem('applianceInstallHrs', 'hrs/ea')],
+    },
+    {
+      group: 'Wall Finishes',
+      items: WF_LIST.map(type => {
+        const meta = WF_META[type]
+        return {
+          label: OK_RATES[meta.labKey].dbName,
+          table: 'labor_rates',
+          name: OK_RATES[meta.labKey].dbName,
+          category: 'Outdoor Kitchen',
+          mode: 'coefficient',
+          unitLabel: meta.labMode === 'perDay' ? 'SF/day' : 'hrs/SF',
+          value: p(OK_RATES[meta.labKey].dbName, OK_RATES[meta.labKey].fallback),
+        }
+      }),
+    },
+    {
+      group: 'Electrical & Plumbing',
+      items: [
+        ...LINE_TYPE_ARR.map(t => ({
+          label: t.laborDbName,
+          table: 'labor_rates',
+          name: t.laborDbName,
+          category: 'Utilities',
+          mode: 'coefficient',
+          unitLabel: 'hrs/LF',
+          value: p(t.laborDbName, t.laborFallback),
+        })),
+        ...GAS_TYPE_ARR.map(t => ({
+          label: t.laborDbName,
+          table: 'labor_rates',
+          name: t.laborDbName,
+          category: 'Utilities',
+          mode: 'coefficient',
+          unitLabel: 'hrs/ea',
+          value: p(t.laborDbName, t.laborFallback),
+        })),
+        ...ELEC_TYPE_ARR.map(t => ({
+          label: t.laborDbName,
+          table: 'labor_rates',
+          name: t.laborDbName,
+          category: 'Utilities',
+          mode: 'coefficient',
+          unitLabel: 'hrs/ea',
+          value: p(t.laborDbName, t.laborFallback),
+        })),
+      ],
+    },
+  ]
+
   return (
     <SubTabContext.Provider value={isSub}>
     <div className="space-y-5">
-      {/* ── Sticky GPMD bar ── */}
-      <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
-        {/* GPMD summary bar */}
-        <GpmdBar
-          variant={subType === 'Subcontractor' ? 'sub' : 'inhouse'}
-          sticky
-          totalMat={calc.totalMat}
-          totalHrs={calc.totalHrs}
-          manDays={calc.manDays}
-          laborCost={calc.laborCost}
-          laborRatePerHour={laborRatePerHour}
-          burden={calc.burden}
-          gp={calc.gp}
-          commission={calc.commission}
-          subCost={calc.subCost}
-          gpmd={gpmd}
-          price={calc.price}
-          subMarkupRate={subGpMarkupRate}
-        />
-            </div>
-
-
-      <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} />
-
-      {/* Crew Type */}
-      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select
-          value={crewType}
-          onChange={e => setCrewType(e.target.value)}
-          className="input text-sm py-1 w-36"
-        >
-          <option value="Demo">Demo</option>
-          <option value="Landscape">Landscape</option>
-          <option value="Masonry">Masonry</option>
-          <option value="Paver">Paver</option>
-          <option value="Specialty">Specialty</option>
-        </select>
+      {/* ── Frozen header: GPMD bar + Crew Type / View Rates bar ── */}
+      <div className="sticky top-0 z-20 -mx-6 bg-white shadow-md">
+        <div className="px-6 pt-1 pb-1 bg-gray-900">
+          <GpmdBar
+            variant={subType === 'Subcontractor' ? 'sub' : 'inhouse'}
+            sticky
+            totalMat={calc.totalMat}
+            totalHrs={calc.totalHrs}
+            manDays={calc.manDays}
+            laborCost={calc.laborCost}
+            laborRatePerHour={laborRatePerHour}
+            burden={calc.burden}
+            gp={calc.gp}
+            commission={calc.commission}
+            subCost={calc.subCost}
+            gpmd={gpmd}
+            price={calc.price}
+            subMarkupRate={subGpMarkupRate}
+          />
+        </div>
+        <div className="px-6 py-2">
+          <CrewTypeBar
+            crewType={crewType}
+            onCrewTypeChange={setCrewType}
+            title="Outdoor Kitchen"
+            rates={outdoorKitchenRateList}
+            refreshAllRates={refreshAllRates}
+            showInlineToggle={false}
+          />
+        </div>
       </div>
+
+      <ModuleHeaderSlot>
+        <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} compact />
+      </ModuleHeaderSlot>
 
       {pricesLoading && (
         <div className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
@@ -1022,7 +1093,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
         ) : (
         <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3 text-[11px] text-gray-500">
           <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">
-            BBQ Structural Rates (click any to edit)
+            BBQ Structural Rates
           </p>
           <div className="flex flex-wrap gap-x-3 gap-y-1">
             <span className="inline-flex items-center gap-1">
@@ -1042,63 +1113,18 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
           <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
             <span className="inline-flex items-center gap-1">
               Excavate {p(OK_RATES.excavateLab.dbName, 5)} CF/hr
-              <RateEditPopover
-                table="labor_rates"
-                name={OK_RATES.excavateLab.dbName}
-                category="Outdoor Kitchen"
-                mode="coefficient"
-                unitLabel="CF/hr"
-                currentValue={p(OK_RATES.excavateLab.dbName, OK_RATES.excavateLab.fallback)}
-                onSaved={refreshAllRates}
-              />
             </span>
             <span className="inline-flex items-center gap-1">
               Rebar {p(OK_RATES.rebarLab.dbName, 146)} LF/day
-              <RateEditPopover
-                table="labor_rates"
-                name={OK_RATES.rebarLab.dbName}
-                category="Outdoor Kitchen"
-                mode="coefficient"
-                unitLabel="LF/day"
-                currentValue={p(OK_RATES.rebarLab.dbName, OK_RATES.rebarLab.fallback)}
-                onSaved={refreshAllRates}
-              />
             </span>
             <span className="inline-flex items-center gap-1">
               Pour {p(OK_RATES.pourFootingLab.dbName, 4)} hrs/CY
-              <RateEditPopover
-                table="labor_rates"
-                name={OK_RATES.pourFootingLab.dbName}
-                category="Outdoor Kitchen"
-                mode="coefficient"
-                unitLabel="hrs/CY"
-                currentValue={p(OK_RATES.pourFootingLab.dbName, OK_RATES.pourFootingLab.fallback)}
-                onSaved={refreshAllRates}
-              />
             </span>
             <span className="inline-flex items-center gap-1">
               Block {p(OK_RATES.installBlockLab.dbName, 60)} blk/day
-              <RateEditPopover
-                table="labor_rates"
-                name={OK_RATES.installBlockLab.dbName}
-                category="Outdoor Kitchen"
-                mode="coefficient"
-                unitLabel="blk/day"
-                currentValue={p(OK_RATES.installBlockLab.dbName, OK_RATES.installBlockLab.fallback)}
-                onSaved={refreshAllRates}
-              />
             </span>
             <span className="inline-flex items-center gap-1">
               Fill {p(OK_RATES.fillBlockLab.dbName, 146)} blk/day
-              <RateEditPopover
-                table="labor_rates"
-                name={OK_RATES.fillBlockLab.dbName}
-                category="Outdoor Kitchen"
-                mode="coefficient"
-                unitLabel="blk/day"
-                currentValue={p(OK_RATES.fillBlockLab.dbName, OK_RATES.fillBlockLab.fallback)}
-                onSaved={refreshAllRates}
-              />
             </span>
           </div>
         </div>
@@ -1158,7 +1184,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
         <SectionHeader title="Concrete Countertop" />
         <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-2 text-[11px] text-gray-500">
           <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">
-            Countertop Rates (click any to edit)
+            Countertop Rates
           </p>
           <div className="flex flex-wrap gap-x-3 gap-y-1">
             <span className="inline-flex items-center gap-1">
@@ -1166,54 +1192,15 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
             </span>
             <span className="inline-flex items-center gap-1">
               Form {p(OK_RATES.counterFormLab.dbName, 20)} LF/hr
-              <RateEditPopover
-                table="labor_rates"
-                name={OK_RATES.counterFormLab.dbName}
-                category="Outdoor Kitchen"
-                mode="coefficient"
-                unitLabel="LF/hr"
-                currentValue={p(OK_RATES.counterFormLab.dbName, OK_RATES.counterFormLab.fallback)}
-                onSaved={refreshAllRates}
-              />
             </span>
             <span className="inline-flex items-center gap-1">
               Pour {p(OK_RATES.counterPourLab.dbName, 50)} SF/day
-              <RateEditPopover
-                table="labor_rates"
-                name={OK_RATES.counterPourLab.dbName}
-                category="Outdoor Kitchen"
-                mode="coefficient"
-                unitLabel="SF/day"
-                currentValue={p(OK_RATES.counterPourLab.dbName, OK_RATES.counterPourLab.fallback)}
-                onSaved={refreshAllRates}
-              />
             </span>
             <span className="inline-flex items-center gap-1">
               Broom {p(OK_RATES.counterBroomLab.dbName, 60)} SF/day
-              <RateEditPopover
-                table="labor_rates"
-                name={OK_RATES.counterBroomLab.dbName}
-                category="Outdoor Kitchen"
-                mode="coefficient"
-                unitLabel="SF/day"
-                currentValue={p(OK_RATES.counterBroomLab.dbName, OK_RATES.counterBroomLab.fallback)}
-                onSaved={refreshAllRates}
-              />
             </span>
             <span className="inline-flex items-center gap-1">
               Polish {p(OK_RATES.counterPolishLab.dbName, 18)} SF/day
-              <RateEditPopover
-                table="labor_rates"
-                name={OK_RATES.counterPolishLab.dbName}
-                category="Outdoor Kitchen"
-                mode="coefficient"
-                unitLabel="SF/day"
-                currentValue={p(
-                  OK_RATES.counterPolishLab.dbName,
-                  OK_RATES.counterPolishLab.fallback
-                )}
-                onSaved={refreshAllRates}
-              />
             </span>
           </div>
         </div>
@@ -1271,23 +1258,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                   <th className="text-left pb-1 pr-2 font-medium">Qty</th>
                   <th className="text-left pb-1 pr-2 font-medium">$/ea</th>
                   <th className="text-left pb-1 pr-2 font-medium">Client Provided</th>
-                  <th className="text-left pb-1 pr-2 font-medium">
-                    <span className="inline-flex items-center gap-1">
-                      Labor (hrs/ea)
-                      <RateEditPopover
-                        table="labor_rates"
-                        name={OK_RATES.applianceInstallHrs.dbName}
-                        category="Outdoor Kitchen"
-                        mode="coefficient"
-                        unitLabel="hrs/ea"
-                        currentValue={p(
-                          OK_RATES.applianceInstallHrs.dbName,
-                          OK_RATES.applianceInstallHrs.fallback
-                        )}
-                        onSaved={refreshAllRates}
-                      />
-                    </span>
-                  </th>
+                  <th className="text-left pb-1 pr-2 font-medium">Labor (hrs/ea)</th>
                   <th className="text-right pb-1 pr-2 font-medium text-gray-400">Material $</th>
                   <th></th>
                 </tr>
@@ -1514,17 +1485,6 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                             </option>
                           ))}
                         </select>
-                        {meta && !meta.master && (
-                          <RateEditPopover
-                            table="labor_rates"
-                            name={OK_RATES[meta.labKey].dbName}
-                            category="Outdoor Kitchen"
-                            mode="coefficient"
-                            unitLabel={meta.labMode === 'perDay' ? 'SF/day' : 'hrs/SF'}
-                            currentValue={p(OK_RATES[meta.labKey].dbName, OK_RATES[meta.labKey].fallback)}
-                            onSaved={refreshAllRates}
-                          />
-                        )}
                       </span>
                     </td>
                     <td className="py-1 pr-2">

@@ -1,9 +1,10 @@
 import WorkTypeChooser from './WorkTypeChooser'
+import CrewTypeBar from './CrewTypeBar'
+import ModuleHeaderSlot from './ModuleHeaderSlot'
 import { useState, useEffect, useCallback, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
-import RateEditPopover from '../RateEditPopover'
 import { SubRateOverrideProvider } from '../SubRateOverrideContext.jsx'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
@@ -300,7 +301,7 @@ function EpTable({
           </thead>
           <tbody>
             {rows.map((row, i) => {
-              const { opts, matOpt, matCost, laborVal, laborBuiltIn } = resolveUtilRow(
+              const { opts, matOpt, matCost } = resolveUtilRow(
                 cat,
                 row,
                 arr,
@@ -338,17 +339,6 @@ function EpTable({
                           </option>
                         ))}
                       </select>
-                      {laborBuiltIn && (
-                        <RateEditPopover
-                          table="labor_rates"
-                          name={laborBuiltIn.laborDbName}
-                          category="Utilities"
-                          mode="coefficient"
-                          unitLabel={`hrs/${unitLabel}`}
-                          currentValue={laborVal}
-                          onSaved={refreshAllRates}
-                        />
-                      )}
                     </div>
                   </td>
                   <td className="py-1 pr-2">
@@ -1165,6 +1155,250 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
     .filter(([, s, always]) => always || s.enabled)
     .map(([k]) => k)
 
+  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
+  //    that used to have an inline RateEditPopover in this module now lives here.
+  const poolRateList = [
+    {
+      group: 'Excavation',
+      items: EXCAVATION_TYPES.filter(t => EXCAVATION_LABOR_NAME[t]).map(t => ({
+        label: EXCAVATION_LABOR_NAME[t],
+        table: 'labor_rates',
+        name: EXCAVATION_LABOR_NAME[t],
+        category: 'Pool',
+        mode: 'coefficient',
+        unitLabel: 'CY/hr',
+        value: laborRates[EXCAVATION_LABOR_NAME[t]] ?? EXCAVATION_RATES[t],
+      })),
+    },
+    {
+      group: 'Shotcrete (Sub)',
+      items: [
+        {
+          label: 'Shotcrete Material',
+          table: 'subcontractor_rates',
+          name: 'Shotcrete Material',
+          category: 'Pool',
+          mode: 'currency',
+          unitLabel: 'CY',
+          value: subRates['Shotcrete Material'] ?? SHOTCRETE_MAT_PER_CY,
+        },
+        {
+          label: 'Shotcrete Labor',
+          table: 'subcontractor_rates',
+          name: 'Shotcrete Labor',
+          category: 'Pool',
+          mode: 'currency',
+          unitLabel: 'CY',
+          value: subRates['Shotcrete Labor'] ?? SHOTCRETE_LABOR_PER_CY,
+          section: 'labor',
+        },
+        {
+          label: 'Shotcrete Minimum Labor',
+          table: 'subcontractor_rates',
+          name: 'Shotcrete Minimum Labor',
+          category: 'Pool',
+          mode: 'currency',
+          unitLabel: 'flat',
+          value: subRates['Shotcrete Minimum Labor'] ?? SHOTCRETE_LABOR_MIN,
+          section: 'labor',
+        },
+      ],
+    },
+    {
+      group: 'Waterline Tile',
+      items: TILE_INSTALL_TYPES.map(t => ({
+        label: `Tile - ${t}`,
+        table: 'labor_rates',
+        name: `Tile - ${t}`,
+        category: 'Pool',
+        mode: 'coefficient',
+        unitLabel: 'hrs/LF',
+        value: laborRates[`Tile - ${t}`] ?? TILE_INSTALL_DEFAULTS[t],
+      })),
+    },
+    {
+      group: 'Spillways',
+      items: SPILLWAY_TYPES.map(t => ({
+        label: `Spillway - ${t}`,
+        table: 'labor_rates',
+        name: `Spillway - ${t}`,
+        category: 'Pool',
+        mode: 'coefficient',
+        unitLabel: 'hrs/LF',
+        value: laborRates[`Spillway - ${t}`] ?? SPILLWAY_DEFAULTS[t]?.hrs,
+      })),
+    },
+    {
+      group: 'Coping',
+      items: COPING_TYPES.map(t => ({
+        label: `Coping - ${t}`,
+        table: 'labor_rates',
+        name: `Coping - ${t}`,
+        category: 'Pool',
+        mode: 'coefficient',
+        unitLabel: 'hrs/LF',
+        value: laborRates[`Coping - ${t}`] ?? COPING_DEFAULTS[t]?.hrs,
+      })),
+    },
+    {
+      group: 'Raised Surfaces',
+      items: RAISED_SURFACE_TYPES.map(t => ({
+        label: `Raised - ${t}`,
+        table: 'labor_rates',
+        name: `Raised - ${t}`,
+        category: 'Pool',
+        mode: 'coefficient',
+        unitLabel: 'hrs/SF',
+        value: laborRates[`Raised - ${t}`] ?? RAISED_SURFACE_DEFAULTS[t]?.hrs,
+      })),
+    },
+    {
+      group: 'Interior Finish (Sub)',
+      items: INTERIOR_TYPES.map(t => ({
+        label: `Interior Finish - ${t}`,
+        table: 'subcontractor_rates',
+        name: `Interior Finish - ${t}`,
+        category: 'Pool',
+        mode: 'currency',
+        unitLabel: 'SF',
+        value: subRates[`Interior Finish - ${t}`] ?? INTERIOR_DEFAULTS[t],
+      })),
+    },
+    {
+      group: 'Pool Equipment',
+      items: Array.from(
+        new Set(Object.values(EQUIPMENT_CATALOG).flat().map(m => m.model))
+      ).map(model => ({
+        label: `Equip Labor - ${model}`,
+        table: 'labor_rates',
+        name: `Equip Labor - ${model}`,
+        category: 'Pool',
+        mode: 'coefficient',
+        unitLabel: 'hrs/ea',
+        value: laborRates[`Equip Labor - ${model}`] ?? 0,
+      })),
+    },
+    {
+      group: 'Plumbing (Sub)',
+      items: [
+        ...Object.keys(PLUMBING_BASES).map(k => ({
+          label: `Plumbing ${k}`,
+          table: 'subcontractor_rates',
+          name: `Plumbing ${k}`,
+          category: 'Pool',
+          mode: 'currency',
+          unitLabel: 'flat',
+          value: subRates[`Plumbing ${k}`] ?? PLUMBING_BASES[k],
+        })),
+        {
+          label: 'Plumbing Extra Light',
+          table: 'subcontractor_rates',
+          name: 'Plumbing Extra Light',
+          category: 'Pool',
+          mode: 'currency',
+          unitLabel: 'ea',
+          value: subRates['Plumbing Extra Light'] ?? 150,
+        },
+        {
+          label: 'Plumbing Sheer Descent',
+          table: 'subcontractor_rates',
+          name: 'Plumbing Sheer Descent',
+          category: 'Pool',
+          mode: 'currency',
+          unitLabel: 'ea',
+          value: subRates['Plumbing Sheer Descent'] ?? 450,
+        },
+        {
+          label: 'Plumbing Over 20ft Add',
+          table: 'subcontractor_rates',
+          name: 'Plumbing Over 20ft Add',
+          category: 'Pool',
+          mode: 'currency',
+          unitLabel: 'flat',
+          value: subRates['Plumbing Over 20ft Add'] ?? 300,
+        },
+        {
+          label: 'Plumbing Remodel Add',
+          table: 'subcontractor_rates',
+          name: 'Plumbing Remodel Add',
+          category: 'Pool',
+          mode: 'currency',
+          unitLabel: 'flat',
+          value: subRates['Plumbing Remodel Add'] ?? 200,
+        },
+      ],
+    },
+    {
+      group: 'Steel (Sub)',
+      items: [
+        {
+          label: 'Steel Per LF',
+          table: 'subcontractor_rates',
+          name: 'Steel Per LF',
+          category: 'Pool',
+          mode: 'currency',
+          unitLabel: 'LF',
+          value: subRates['Steel Per LF'] ?? 8,
+        },
+        {
+          label: 'Steel Spa Bonus',
+          table: 'subcontractor_rates',
+          name: 'Steel Spa Bonus',
+          category: 'Pool',
+          mode: 'currency',
+          unitLabel: 'flat',
+          value: subRates['Steel Spa Bonus'] ?? 200,
+        },
+      ],
+    },
+    {
+      group: 'Electrical & Plumbing',
+      items: [
+        ...LINE_TYPE_ARR.map(t => ({
+          label: t.laborDbName,
+          table: 'labor_rates',
+          name: t.laborDbName,
+          category: 'Utilities',
+          mode: 'coefficient',
+          unitLabel: 'hrs/LF',
+          value: materialPrices[t.laborDbName] ?? t.laborFallback,
+        })),
+        ...GAS_TYPE_ARR.map(t => ({
+          label: t.laborDbName,
+          table: 'labor_rates',
+          name: t.laborDbName,
+          category: 'Utilities',
+          mode: 'coefficient',
+          unitLabel: 'hrs/ea',
+          value: materialPrices[t.laborDbName] ?? t.laborFallback,
+        })),
+        ...ELEC_TYPE_ARR.map(t => ({
+          label: t.laborDbName,
+          table: 'labor_rates',
+          name: t.laborDbName,
+          category: 'Utilities',
+          mode: 'coefficient',
+          unitLabel: 'hrs/ea',
+          value: materialPrices[t.laborDbName] ?? t.laborFallback,
+        })),
+      ],
+    },
+    {
+      group: 'In-House Plumbing',
+      items: [
+        {
+          label: 'Pool Plumbing - Base Hours',
+          table: 'labor_rates',
+          name: 'Pool Plumbing - Base Hours',
+          category: 'Pool',
+          mode: 'coefficient',
+          unitLabel: 'hrs',
+          value: laborRates['Pool Plumbing - Base Hours'] ?? 16,
+        },
+      ],
+    },
+  ]
+
   if (loadingRates)
     return (
       <div className="flex items-center justify-center py-12">
@@ -1176,44 +1410,41 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
     <SubTabContext.Provider value={isSub}>
     <SubRateOverrideProvider overrides={state.rateOverrides} setOverride={setOverride}>
     <div className="space-y-6 pb-6">
-      {/* ── Sticky GPMD bar ── */}
-      <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
-        <GpmdBar
-          variant={subType === 'Subcontractor' ? 'sub' : 'inhouse'}
-          sticky
-          totalMat={calc.totalMat}
-          totalHrs={calc.totalHrs}
-          manDays={calc.manDays}
-          laborCost={calc.laborCost}
-          lrph={n(state.laborRatePerHour)}
-          burden={calc.burden}
-          subCost={calc.subCost}
-          gp={calc.gp}
-          commission={calc.commission}
-          price={calc.price}
-          gpmd={n(state.gpmd)}
-          subMarkupRate={subGpMarkupRate}
-        />
-            </div>
-
-
-      <WorkTypeChooser value={state.subType || 'In-House'} onChange={v => updShared('subType', v)} />
-
-      {/* Crew Type */}
-      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select
-          value={state.crewType}
-          onChange={e => updShared('crewType', e.target.value)}
-          className="input text-sm py-1 w-36"
-        >
-          <option value="Demo">Demo</option>
-          <option value="Landscape">Landscape</option>
-          <option value="Masonry">Masonry</option>
-          <option value="Paver">Paver</option>
-          <option value="Specialty">Specialty</option>
-        </select>
+      {/* ── Frozen header: GPMD bar + Crew Type / View Rates bar ── */}
+      <div className="sticky top-0 z-20 -mx-6 bg-white shadow-md">
+        <div className="px-6 pt-1 pb-1 bg-gray-900">
+          <GpmdBar
+            variant={subType === 'Subcontractor' ? 'sub' : 'inhouse'}
+            sticky
+            totalMat={calc.totalMat}
+            totalHrs={calc.totalHrs}
+            manDays={calc.manDays}
+            laborCost={calc.laborCost}
+            lrph={n(state.laborRatePerHour)}
+            burden={calc.burden}
+            subCost={calc.subCost}
+            gp={calc.gp}
+            commission={calc.commission}
+            price={calc.price}
+            gpmd={n(state.gpmd)}
+            subMarkupRate={subGpMarkupRate}
+          />
+        </div>
+        <div className="px-6 py-2">
+          <CrewTypeBar
+            crewType={state.crewType}
+            onCrewTypeChange={v => updShared('crewType', v)}
+            title="Pool"
+            rates={poolRateList}
+            refreshAllRates={refreshAllRates}
+            showInlineToggle={false}
+          />
+        </div>
       </div>
+
+      <ModuleHeaderSlot>
+        <WorkTypeChooser value={subType || 'In-House'} onChange={v => updShared('subType', v)} compact />
+      </ModuleHeaderSlot>
 
       {/* Settings — In-House tab only */}
       {subType !== 'Subcontractor' && (
@@ -1324,17 +1555,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                   <option key={t}>{t}</option>
                 ))}
               </select>
-              {EXCAVATION_LABOR_NAME[T.excavation.equipment] && (
-                <RateEditPopover
-                  table="labor_rates"
-                  name={EXCAVATION_LABOR_NAME[T.excavation.equipment]}
-                  category="Pool"
-                  mode="coefficient"
-                  unitLabel="CY/hr"
-                  currentValue={calc.equipRate}
-                  onSaved={refreshAllRates}
-                />
-              )}
             </div>
           </div>
           <div>
@@ -1407,33 +1627,9 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           <div className="flex items-end pb-1">
             <p className="text-xs text-gray-400 inline-flex items-center flex-wrap gap-x-1">
               {calc.totalShotCY.toFixed(1)} CY × $
-              {subRates['Shotcrete Material'] ?? SHOTCRETE_MAT_PER_CY}/CY mat
-              <RateEditPopover
-                table="subcontractor_rates"
-                name="Shotcrete Material"
-                category="Pool"
-                unitLabel="CY"
-                currentValue={subRates['Shotcrete Material'] ?? SHOTCRETE_MAT_PER_CY}
-                onSaved={refreshAllRates}
-              />
-              + max(${(subRates['Shotcrete Minimum Labor'] ?? SHOTCRETE_LABOR_MIN).toLocaleString()}
-              <RateEditPopover
-                table="subcontractor_rates"
-                name="Shotcrete Minimum Labor"
-                category="Pool"
-                unitLabel="flat"
-                currentValue={subRates['Shotcrete Minimum Labor'] ?? SHOTCRETE_LABOR_MIN}
-                onSaved={refreshAllRates}
-              />
-              , CY × ${subRates['Shotcrete Labor'] ?? SHOTCRETE_LABOR_PER_CY}/CY lab)
-              <RateEditPopover
-                table="subcontractor_rates"
-                name="Shotcrete Labor"
-                category="Pool"
-                unitLabel="CY"
-                currentValue={subRates['Shotcrete Labor'] ?? SHOTCRETE_LABOR_PER_CY}
-                onSaved={refreshAllRates}
-              />
+              {subRates['Shotcrete Material'] ?? SHOTCRETE_MAT_PER_CY}/CY mat + max($
+              {(subRates['Shotcrete Minimum Labor'] ?? SHOTCRETE_LABOR_MIN).toLocaleString()}, CY × $
+              {subRates['Shotcrete Labor'] ?? SHOTCRETE_LABOR_PER_CY}/CY lab)
             </p>
           </div>
         </div>
@@ -1480,18 +1676,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                             <option key={tp}>{tp}</option>
                           ))}
                         </select>
-                        <RateEditPopover
-                          table="labor_rates"
-                          name={`Tile - ${t.installType}`}
-                          category="Pool"
-                          mode="coefficient"
-                          unitLabel="hrs/LF"
-                          currentValue={
-                            laborRates[`Tile - ${t.installType}`] ??
-                            TILE_INSTALL_DEFAULTS[t.installType]
-                          }
-                          onSaved={refreshAllRates}
-                        />
                       </div>
                     </div>
                     <div>
@@ -1570,19 +1754,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                       <option key={t}>{t}</option>
                     ))}
                   </select>
-                  <span className="text-[10px] text-gray-400 ml-1">mat</span>
-                  <span className="text-[10px] text-gray-400">lab</span>
-                  <RateEditPopover
-                    table="labor_rates"
-                    name={`Spillway - ${sw.type}`}
-                    category="Pool"
-                    mode="coefficient"
-                    unitLabel="hrs/LF"
-                    currentValue={
-                      laborRates[`Spillway - ${sw.type}`] ?? SPILLWAY_DEFAULTS[sw.type]?.hrs
-                    }
-                    onSaved={refreshAllRates}
-                  />
                 </div>
               </div>
               <div>
@@ -1642,19 +1813,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                       <option key={t}>{t}</option>
                     ))}
                   </select>
-                  <span className="text-[10px] text-gray-400 ml-1">mat</span>
-                  <span className="text-[10px] text-gray-400">lab</span>
-                  <RateEditPopover
-                    table="labor_rates"
-                    name={`Coping - ${cr.type}`}
-                    category="Pool"
-                    mode="coefficient"
-                    unitLabel="hrs/LF"
-                    currentValue={
-                      laborRates[`Coping - ${cr.type}`] ?? COPING_DEFAULTS[cr.type]?.hrs
-                    }
-                    onSaved={refreshAllRates}
-                  />
                 </div>
               </div>
               <div>
@@ -1709,20 +1867,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                       <option key={t}>{t}</option>
                     ))}
                   </select>
-                  <span className="text-[10px] text-gray-400 ml-1">mat</span>
-                  <span className="text-[10px] text-gray-400">lab</span>
-                  <RateEditPopover
-                    table="labor_rates"
-                    name={`Raised - ${rs.matType}`}
-                    category="Pool"
-                    mode="coefficient"
-                    unitLabel="hrs/SF"
-                    currentValue={
-                      laborRates[`Raised - ${rs.matType}`] ??
-                      RAISED_SURFACE_DEFAULTS[rs.matType]?.hrs
-                    }
-                    onSaved={refreshAllRates}
-                  />
                 </div>
               </div>
               <div>
@@ -1802,14 +1946,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                             <option key={t}>{t}</option>
                           ))}
                         </select>
-                        <RateEditPopover
-                          table="subcontractor_rates"
-                          name={`Interior Finish - ${fin.type}`}
-                          category="Pool"
-                          unitLabel="SF"
-                          currentValue={priceSF}
-                          onSaved={refreshAllRates}
-                        />
                       </div>
                     </div>
                     <div>
@@ -1882,17 +2018,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                         </option>
                       ))}
                     </select>
-                    <span className="text-[10px] text-gray-400 ml-1">mat</span>
-                    <span className="text-[10px] text-gray-400">lab</span>
-                    <RateEditPopover
-                      table="labor_rates"
-                      name={`Equip Labor - ${eq.model}`}
-                      category="Pool"
-                      mode="coefficient"
-                      unitLabel="hrs/ea"
-                      currentValue={labRate}
-                      onSaved={refreshAllRates}
-                    />
                   </div>
                 </div>
                 <div>
@@ -1951,17 +2076,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                   <option key={k}>{k}</option>
                 ))}
               </select>
-              <RateEditPopover
-                table="subcontractor_rates"
-                name={`Plumbing ${T.plumbing.baseType}`}
-                category="Pool"
-                unitLabel="flat"
-                currentValue={
-                  subRates[`Plumbing ${T.plumbing.baseType}`] ??
-                  PLUMBING_BASES[T.plumbing.baseType]
-                }
-                onSaved={refreshAllRates}
-              />
             </div>
           </div>
           <div>
@@ -1971,14 +2085,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                 value={T.plumbing.extraLights}
                 onChange={v => upd('plumbing', { ...T.plumbing, extraLights: v })}
               />
-              <RateEditPopover
-                table="subcontractor_rates"
-                name="Plumbing Extra Light"
-                category="Pool"
-                unitLabel="ea"
-                currentValue={subRates['Plumbing Extra Light'] ?? 150}
-                onSaved={refreshAllRates}
-              />
             </div>
           </div>
           <div>
@@ -1987,14 +2093,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
               <NumInput
                 value={T.plumbing.sheerDescents}
                 onChange={v => upd('plumbing', { ...T.plumbing, sheerDescents: v })}
-              />
-              <RateEditPopover
-                table="subcontractor_rates"
-                name="Plumbing Sheer Descent"
-                category="Pool"
-                unitLabel="ea"
-                currentValue={subRates['Plumbing Sheer Descent'] ?? 450}
-                onSaved={refreshAllRates}
               />
             </div>
           </div>
@@ -2009,14 +2107,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
               <span className="text-xs text-gray-600">
                 &gt;20ft from equipment (+${subRates['Plumbing Over 20ft Add'] ?? 300})
               </span>
-              <RateEditPopover
-                table="subcontractor_rates"
-                name="Plumbing Over 20ft Add"
-                category="Pool"
-                unitLabel="flat"
-                currentValue={subRates['Plumbing Over 20ft Add'] ?? 300}
-                onSaved={refreshAllRates}
-              />
             </label>
             <label className="flex items-center gap-1.5 cursor-pointer">
               <input
@@ -2028,14 +2118,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
               <span className="text-xs text-gray-600">
                 Remodel (+${subRates['Plumbing Remodel Add'] ?? 200})
               </span>
-              <RateEditPopover
-                table="subcontractor_rates"
-                name="Plumbing Remodel Add"
-                category="Pool"
-                unitLabel="flat"
-                currentValue={subRates['Plumbing Remodel Add'] ?? 200}
-                onSaved={refreshAllRates}
-              />
             </label>
           </div>
           <div>
@@ -2062,17 +2144,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                 PLUMBING_BASES[T.plumbing.baseType] ??
                 4500
               ).toLocaleString()}
-              <RateEditPopover
-                table="subcontractor_rates"
-                name={`Plumbing ${T.plumbing.baseType}`}
-                category="Pool"
-                unitLabel="flat"
-                currentValue={
-                  subRates[`Plumbing ${T.plumbing.baseType}`] ??
-                  PLUMBING_BASES[T.plumbing.baseType]
-                }
-                onSaved={refreshAllRates}
-              />
             </p>
           </div>
         </div>
@@ -2106,27 +2177,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           <div className="flex items-end pb-1">
             <p className="text-xs text-gray-400 inline-flex items-center flex-wrap gap-1">
               Auto: pool perimeter × ${subRates['Steel Per LF'] ?? 8}/LF
-              <RateEditPopover
-                table="subcontractor_rates"
-                name="Steel Per LF"
-                category="Pool"
-                unitLabel="LF"
-                currentValue={subRates['Steel Per LF'] ?? 8}
-                onSaved={refreshAllRates}
-              />
-              {T.spa.enabled && (
-                <>
-                  + ${subRates['Steel Spa Bonus'] ?? 200} spa
-                  <RateEditPopover
-                    table="subcontractor_rates"
-                    name="Steel Spa Bonus"
-                    category="Pool"
-                    unitLabel="flat"
-                    currentValue={subRates['Steel Spa Bonus'] ?? 200}
-                    onSaved={refreshAllRates}
-                  />
-                </>
-              )}
+              {T.spa.enabled && <> + ${subRates['Steel Spa Bonus'] ?? 200} spa</>}
             </p>
           </div>
         </div>
@@ -2201,15 +2252,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                   onChange={v => upd('plumbingIH', { ...(T.plumbingIH || {}), hours: v })}
                   placeholder={`default ${laborRates['Pool Plumbing - Base Hours'] ?? 16}`}
                   className="flex-1 min-w-0"
-                />
-                <RateEditPopover
-                  table="labor_rates"
-                  name="Pool Plumbing - Base Hours"
-                  category="Pool"
-                  mode="coefficient"
-                  unitLabel="hrs"
-                  currentValue={laborRates['Pool Plumbing - Base Hours'] ?? 16}
-                  onSaved={refreshAllRates}
                 />
               </div>
               {(T.plumbingIH?.hours ?? '') === '' && (

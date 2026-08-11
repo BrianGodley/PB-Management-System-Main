@@ -1,4 +1,6 @@
 import WorkTypeChooser from './WorkTypeChooser'
+import CrewTypeBar from './CrewTypeBar'
+import ModuleHeaderSlot from './ModuleHeaderSlot'
 // ─────────────────────────────────────────────────────────────────────────────
 // ConcreteModule — Concrete paving estimator
 //
@@ -1013,49 +1015,287 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const fmt2 = v =>
     `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
+  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
+  //    that used to have an inline RateEditPopover in this module now lives here.
+  const concreteRateList = [
+    {
+      group: 'Job Site Conditions',
+      items: [
+        {
+          label: 'Concrete - Forming Complexity % Per Unit',
+          table: 'labor_rates',
+          name: 'Concrete - Forming Complexity % Per Unit',
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: '%/pt',
+          value: calc.complexityPctPerUnit,
+        },
+      ],
+    },
+    {
+      group: 'Base Install',
+      items: METHODS.map(m => ({
+        label: BASE_METHOD_LABOR_NAME[m],
+        table: 'labor_rates',
+        name: BASE_METHOD_LABOR_NAME[m],
+        category: 'Concrete',
+        mode: 'coefficient',
+        unitLabel: 't/hr',
+        value: laborRates[BASE_METHOD_LABOR_NAME[m]] ?? BASE_RATES[m],
+      })),
+    },
+    {
+      group: 'Concrete Install',
+      items: [
+        ...INSTALL_TIERS.map(t => ({
+          label: t.rateName,
+          table: 'labor_rates',
+          name: t.rateName,
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: 'SF/hr',
+          value: laborRates[t.rateName] ?? t.def,
+        })),
+        {
+          label: 'Concrete - Rebar 24" OC',
+          table: 'labor_rates',
+          name: 'Concrete - Rebar 24" OC',
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: 'SF/hr',
+          value: calc.rebarSFPerHr,
+        },
+        {
+          label: 'Concrete - Form Setting',
+          table: 'labor_rates',
+          name: 'Concrete - Form Setting',
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: 'LF/hr',
+          value: calc.formLFPerHr,
+        },
+        {
+          label: 'Concrete - Sleeves',
+          table: 'labor_rates',
+          name: 'Concrete - Sleeves',
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: 'LF/hr',
+          value: calc.sleeveLFPerHr,
+        },
+        {
+          label: 'Concrete - Pump Flat Fee',
+          table: 'subcontractor_rates',
+          name: 'Concrete - Pump Flat Fee',
+          category: 'Concrete',
+          mode: 'currency',
+          unitLabel: 'flat',
+          value: calc.pumpFeeFlat,
+        },
+        {
+          label: 'Concrete - Pump Per CY',
+          table: 'subcontractor_rates',
+          name: 'Concrete - Pump Per CY',
+          category: 'Concrete',
+          mode: 'currency',
+          unitLabel: 'CY',
+          value: calc.pumpFeePerCY,
+        },
+      ],
+    },
+    {
+      group: 'Finish Options',
+      items: [
+        {
+          label: 'Concrete - Sand Finish SF/hr',
+          table: 'labor_rates',
+          name: 'Concrete - Sand Finish SF/hr',
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: 'SF/hr',
+          value: calc.sandFinishSFPerHr,
+        },
+        {
+          label: 'Concrete - Salt Finish SF/hr',
+          table: 'labor_rates',
+          name: 'Concrete - Salt Finish SF/hr',
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: 'SF/hr',
+          value: calc.saltFinishSFPerHr,
+        },
+        {
+          label: 'Concrete - Exposed Aggregate SF/hr',
+          table: 'labor_rates',
+          name: 'Concrete - Exposed Aggregate SF/hr',
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: 'SF/hr',
+          value: calc.exposedAggSFPerHr,
+        },
+        {
+          label: 'Concrete - Seeded Aggregate SF/hr',
+          table: 'labor_rates',
+          name: 'Concrete - Seeded Aggregate SF/hr',
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: 'SF/hr',
+          value: calc.seededAggSFPerHr,
+        },
+        {
+          label: 'Concrete - Vapor Barrier',
+          table: 'labor_rates',
+          name: 'Concrete - Vapor Barrier',
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: 'SF/hr',
+          value: calc.vaporBarrierSFPerHr,
+        },
+        {
+          label: 'Concrete - Sealer Natural',
+          table: 'labor_rates',
+          name: 'Concrete - Sealer Natural',
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: 'SF/hr',
+          value: calc.sealerNaturalSFPerHr,
+        },
+        {
+          label: 'Concrete - Sealer Wet-Look',
+          table: 'labor_rates',
+          name: 'Concrete - Sealer Wet-Look',
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: 'SF/hr',
+          value: calc.sealerWetSFPerHr,
+        },
+        {
+          label: 'Concrete - Sand Finish 400SF',
+          table: 'subcontractor_rates',
+          name: 'Concrete - Sand Finish 400SF',
+          category: 'Concrete',
+          mode: 'currency',
+          unitLabel: '400SF',
+          value: calc.sandFinishPer400SF,
+        },
+        {
+          label: 'Concrete - Stamp Sub Flat',
+          table: 'subcontractor_rates',
+          name: 'Concrete - Stamp Sub Flat',
+          category: 'Concrete',
+          mode: 'currency',
+          unitLabel: 'flat',
+          value: calc.stampSubFlat,
+        },
+        {
+          label: 'Concrete - Stamp Sub Per CY',
+          table: 'subcontractor_rates',
+          name: 'Concrete - Stamp Sub Per CY',
+          category: 'Concrete',
+          mode: 'currency',
+          unitLabel: 'CY',
+          value: calc.stampSubPerCY,
+        },
+      ],
+    },
+    {
+      group: 'Subcontractor',
+      items: [
+        {
+          label: 'Concrete Sub - Per SF',
+          table: 'subcontractor_rates',
+          name: 'Concrete Sub - Per SF',
+          category: 'Concrete',
+          mode: 'currency',
+          unitLabel: 'SF',
+          value: subSlabRate,
+        },
+        ...Object.entries(SUB_FINISH_RATES).flatMap(([, cfg]) => {
+          const rows = [
+            {
+              label: cfg.labor.name,
+              table: 'subcontractor_rates',
+              name: cfg.labor.name,
+              category: 'Concrete',
+              mode: 'currency',
+              unitLabel: 'SF',
+              value: subRates[cfg.labor.name] ?? cfg.labor.def,
+            },
+          ]
+          if (cfg.mat) {
+            rows.push({
+              label: cfg.mat.name,
+              table: 'subcontractor_rates',
+              name: cfg.mat.name,
+              category: 'Concrete',
+              mode: 'currency',
+              unitLabel: 'SF',
+              value: subRates[cfg.mat.name] ?? cfg.mat.def,
+            })
+          }
+          return rows
+        }),
+        {
+          label: 'Concrete Sub - Vapor Barrier Per SF',
+          table: 'subcontractor_rates',
+          name: 'Concrete Sub - Vapor Barrier Per SF',
+          category: 'Concrete',
+          mode: 'currency',
+          unitLabel: 'SF',
+          value: subVaporBarrierRate,
+        },
+        {
+          label: 'Concrete Sub - Sealer Per SF',
+          table: 'subcontractor_rates',
+          name: 'Concrete Sub - Sealer Per SF',
+          category: 'Concrete',
+          mode: 'currency',
+          unitLabel: 'SF',
+          value: subSealerRate,
+        },
+      ],
+    },
+  ]
+
   return (
     <SubTabContext.Provider value={isSub}>
     <SubRateOverrideProvider overrides={rateOverrides} setOverride={setOverride}>
     <div className="space-y-5">
-      {/* ── Sticky GPMD bar ── */}
-      <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
-        {/* GPMD summary bar */}
-        <GpmdBar
-          variant={isSub ? 'sub' : 'inhouse'}
-          sticky
-          totalMat={calc.totalMat}
-          totalHrs={calc.totalHrs}
-          manDays={calc.manDays}
-          laborCost={calc.laborCost}
-          laborRatePerHour={laborRatePerHour}
-          burden={calc.burden}
-          gp={calc.gp}
-          commission={calc.commission}
-          subCost={calc.subCost}
-          gpmd={gpmd}
-          price={calc.price}
-          subMarkupRate={subGpMarkupRate}
-        />
-            </div>
-
-
-      <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} />
-
-      {/* Crew Type */}
-      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select
-          value={crewType}
-          onChange={e => setCrewType(e.target.value)}
-          className="input text-sm py-1 w-36"
-        >
-          <option value="Demo">Demo</option>
-          <option value="Landscape">Landscape</option>
-          <option value="Masonry">Masonry</option>
-          <option value="Paver">Paver</option>
-          <option value="Specialty">Specialty</option>
-        </select>
+      {/* ── Frozen header: GPMD bar + Crew Type / View Rates bar ── */}
+      <div className="sticky top-0 z-20 -mx-6 bg-white shadow-md">
+        <div className="px-6 pt-1 pb-1 bg-gray-900">
+          <GpmdBar
+            variant={isSub ? 'sub' : 'inhouse'}
+            sticky
+            totalMat={calc.totalMat}
+            totalHrs={calc.totalHrs}
+            manDays={calc.manDays}
+            laborCost={calc.laborCost}
+            laborRatePerHour={laborRatePerHour}
+            burden={calc.burden}
+            gp={calc.gp}
+            commission={calc.commission}
+            subCost={calc.subCost}
+            gpmd={gpmd}
+            price={calc.price}
+            subMarkupRate={subGpMarkupRate}
+          />
+        </div>
+        <div className="px-6 py-2">
+          <CrewTypeBar
+            crewType={crewType}
+            onCrewTypeChange={setCrewType}
+            title="Concrete"
+            rates={concreteRateList}
+            refreshAllRates={refreshAllRates}
+            showInlineToggle={false}
+          />
+        </div>
       </div>
+
+      <ModuleHeaderSlot>
+        <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} compact />
+      </ModuleHeaderSlot>
 
       {/* ── Global Settings — In-House tab only (Sub tab has no modifiers) ── */}
       {!isSub && (
@@ -1092,15 +1332,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap">
               Forming Complexity (0–100)
               <span className="text-gray-400">— +{calc.complexityPctPerUnit}% labor / point</span>
-              <RateEditPopover
-                table="labor_rates"
-                name="Concrete - Forming Complexity % Per Unit"
-                category="Concrete"
-                mode="coefficient"
-                unitLabel="%/pt"
-                currentValue={calc.complexityPctPerUnit}
-                onSaved={refreshAllRates}
-              />
             </label>
             <NumInput
               value={formingComplexity}
@@ -1204,15 +1435,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                             <option key={m}>{m}</option>
                           ))}
                         </select>
-                        <RateEditPopover
-                          table="labor_rates"
-                          name={BASE_METHOD_LABOR_NAME[row.method]}
-                          category="Concrete"
-                          mode="coefficient"
-                          unitLabel="t/hr"
-                          currentValue={methodRate}
-                          onSaved={refreshAllRates}
-                        />
                       </div>
                     </td>
                     <td className="py-1 pr-2">
@@ -1248,14 +1470,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 Installation (Sq Ft)
                 <span className="text-gray-400 inline-flex items-center gap-1">
                   — ${subSlabRate}/SF all-in
-                  <RateEditPopover
-                    table="subcontractor_rates"
-                    name="Concrete Sub - Per SF"
-                    category="Concrete"
-                    unitLabel="/SF"
-                    currentValue={subSlabRate}
-                    onSaved={refreshAllRates}
-                  />
                 </span>
               </label>
             )}
@@ -1344,15 +1558,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                         </span>
                         <span className="text-[11px] text-gray-400 inline-flex items-center gap-1">
                           {rate} SF/hr
-                          <RateEditPopover
-                            table="labor_rates"
-                            name={t.rateName}
-                            category="Concrete"
-                            mode="coefficient"
-                            unitLabel="SF/hr"
-                            currentValue={rate}
-                            onSaved={refreshAllRates}
-                          />
                         </span>
                       </div>
                     </div>
@@ -1360,23 +1565,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 })}
                 <div className="pt-1 text-[11px] text-gray-400 inline-flex items-center gap-1 flex-wrap">
                   Pump (auto 300+): ${calc.pumpFeeFlat} flat
-                  <RateEditPopover
-                    table="subcontractor_rates"
-                    name="Concrete - Pump Flat Fee"
-                    category="Concrete"
-                    unitLabel="flat"
-                    currentValue={calc.pumpFeeFlat}
-                    onSaved={refreshAllRates}
-                  />
                   + ${calc.pumpFeePerCY}/CY
-                  <RateEditPopover
-                    table="subcontractor_rates"
-                    name="Concrete - Pump Per CY"
-                    category="Concrete"
-                    unitLabel="CY"
-                    currentValue={calc.pumpFeePerCY}
-                    onSaved={refreshAllRates}
-                  />
                 </div>
               </div>
             )}
@@ -1395,15 +1584,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 {REBAR_LF_PER_SF[activeRebarSpacing] ?? REBAR_LF_PER_SF['24" OC']} LF/SF · $
                 {((REBAR_LF_PER_SF[activeRebarSpacing] ?? REBAR_LF_PER_SF['24" OC']) * calc.rebarPerLF).toFixed(3)}/SF
               </span>
-              <RateEditPopover
-                table="labor_rates"
-                name='Concrete - Rebar 24" OC'
-                category="Concrete"
-                mode="coefficient"
-                unitLabel="SF/hr"
-                currentValue={calc.rebarSFPerHr}
-                onSaved={refreshAllRates}
-              />
             </label>
             <div className="flex items-center gap-2">
               <select
@@ -1428,15 +1608,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               <span className="text-gray-400">
                 — {calc.formLFPerHr} LF/hr · ${calc.formMaterialPerLF}/LF
               </span>
-              <RateEditPopover
-                table="labor_rates"
-                name="Concrete - Form Setting"
-                category="Concrete"
-                mode="coefficient"
-                unitLabel="LF/hr"
-                currentValue={calc.formLFPerHr}
-                onSaved={refreshAllRates}
-              />
             </label>
             <NumInput value={activeFormLF} onChange={setActiveFormLF} />
           </div>
@@ -1447,15 +1618,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               <span className="text-gray-400">
                 — {calc.sleeveLFPerHr} LF/hr · ${calc.sleevePer10LF}/10LF
               </span>
-              <RateEditPopover
-                table="labor_rates"
-                name="Concrete - Sleeves"
-                category="Concrete"
-                mode="coefficient"
-                unitLabel="LF/hr"
-                currentValue={calc.sleeveLFPerHr}
-                onSaved={refreshAllRates}
-              />
             </label>
             <NumInput value={activeSleeveLF} onChange={setActiveSleeveLF} />
           </div>
@@ -1484,25 +1646,9 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 (subFinishCfg ? (
                   <span className="text-gray-400 inline-flex items-center gap-1 flex-wrap">
                     — ${subFinishLaborPerSF}/SF
-                    <RateEditPopover
-                      table="subcontractor_rates"
-                      name={subFinishCfg.labor.name}
-                      category="Concrete"
-                      unitLabel="/SF"
-                      currentValue={subFinishLaborPerSF}
-                      onSaved={refreshAllRates}
-                    />
                     {subFinishCfg.mat && (
                       <>
                         · ${subFinishMatPerSF}/SF mat
-                        <RateEditPopover
-                          table="subcontractor_rates"
-                          name={subFinishCfg.mat.name}
-                          category="Concrete"
-                          unitLabel="/SF"
-                          currentValue={subFinishMatPerSF}
-                          onSaved={refreshAllRates}
-                        />
                       </>
                     )}
                   </span>
@@ -1512,88 +1658,28 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               {!isSub && activeFinishType === 'Sand Finish' && (
                 <span className="text-gray-400 inline-flex items-center gap-1 flex-wrap">
                   — {calc.sandFinishSFPerHr} SF/hr
-                  <RateEditPopover
-                    table="labor_rates"
-                    name="Concrete - Sand Finish SF/hr"
-                    category="Concrete"
-                    mode="coefficient"
-                    unitLabel="SF/hr"
-                    currentValue={calc.sandFinishSFPerHr}
-                    onSaved={refreshAllRates}
-                  />
                   · sand sub ${calc.sandFinishPer400SF}/400SF
-                  <RateEditPopover
-                    table="subcontractor_rates"
-                    name="Concrete - Sand Finish 400SF"
-                    category="Concrete"
-                    unitLabel="400SF"
-                    currentValue={calc.sandFinishPer400SF}
-                    onSaved={refreshAllRates}
-                  />
                 </span>
               )}
               {!isSub && activeFinishType === 'Salt Finish' && (
                 <span className="text-gray-400 inline-flex items-center gap-1">
                   — {calc.saltFinishSFPerHr} SF/hr
-                  <RateEditPopover
-                    table="labor_rates"
-                    name="Concrete - Salt Finish SF/hr"
-                    category="Concrete"
-                    mode="coefficient"
-                    unitLabel="SF/hr"
-                    currentValue={calc.saltFinishSFPerHr}
-                    onSaved={refreshAllRates}
-                  />
                 </span>
               )}
               {!isSub && activeFinishType === 'Exposed Aggregate' && (
                 <span className="text-gray-400 inline-flex items-center gap-1">
                   — {calc.exposedAggSFPerHr} SF/hr
-                  <RateEditPopover
-                    table="labor_rates"
-                    name="Concrete - Exposed Aggregate SF/hr"
-                    category="Concrete"
-                    mode="coefficient"
-                    unitLabel="SF/hr"
-                    currentValue={calc.exposedAggSFPerHr}
-                    onSaved={refreshAllRates}
-                  />
                 </span>
               )}
               {!isSub && activeFinishType === 'Seeded Aggregate' && (
                 <span className="text-gray-400 inline-flex items-center gap-1">
                   — {calc.seededAggSFPerHr} SF/hr
-                  <RateEditPopover
-                    table="labor_rates"
-                    name="Concrete - Seeded Aggregate SF/hr"
-                    category="Concrete"
-                    mode="coefficient"
-                    unitLabel="SF/hr"
-                    currentValue={calc.seededAggSFPerHr}
-                    onSaved={refreshAllRates}
-                  />
                 </span>
               )}
               {!isSub && activeFinishType === 'Stamped' && (
                 <span className="text-gray-400 inline-flex items-center gap-1 flex-wrap">
                   — stamp sub ${calc.stampSubFlat} flat
-                  <RateEditPopover
-                    table="subcontractor_rates"
-                    name="Concrete - Stamp Sub Flat"
-                    category="Concrete"
-                    unitLabel="flat"
-                    currentValue={calc.stampSubFlat}
-                    onSaved={refreshAllRates}
-                  />
                   · ${calc.stampSubPerCY}/CY
-                  <RateEditPopover
-                    table="subcontractor_rates"
-                    name="Concrete - Stamp Sub Per CY"
-                    category="Concrete"
-                    unitLabel="CY"
-                    currentValue={calc.stampSubPerCY}
-                    onSaved={refreshAllRates}
-                  />
                 </span>
               )}
             </label>
@@ -1624,29 +1710,12 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               {isSub ? (
                 <span className="text-gray-400 inline-flex items-center gap-1">
                   — ${subVaporBarrierRate}/SF
-                  <RateEditPopover
-                    table="subcontractor_rates"
-                    name="Concrete Sub - Vapor Barrier Per SF"
-                    category="Concrete"
-                    unitLabel="/SF"
-                    currentValue={subVaporBarrierRate}
-                    onSaved={refreshAllRates}
-                  />
                 </span>
               ) : (
                 <>
                   <span className="text-gray-400">
                     — {calc.vaporBarrierSFPerHr} SF/hr · ${calc.vaporBarrierPerSF}/SF
                   </span>
-                  <RateEditPopover
-                    table="labor_rates"
-                    name="Concrete - Vapor Barrier"
-                    category="Concrete"
-                    mode="coefficient"
-                    unitLabel="SF/hr"
-                    currentValue={calc.vaporBarrierSFPerHr}
-                    onSaved={refreshAllRates}
-                  />
                 </>
               )}
             </label>
@@ -1658,40 +1727,14 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               {isSub ? (
                 <span className="text-gray-400 inline-flex items-center gap-1">
                   — ${subSealerRate}/SF
-                  <RateEditPopover
-                    table="subcontractor_rates"
-                    name="Concrete Sub - Sealer Per SF"
-                    category="Concrete"
-                    unitLabel="/SF"
-                    currentValue={subSealerRate}
-                    onSaved={refreshAllRates}
-                  />
                 </span>
               ) : activeSealerType === 'Natural' ? (
                 <span className="text-gray-400 inline-flex items-center gap-1">
                   — {calc.sealerNaturalSFPerHr} SF/hr · ${calc.sealerNatural5g}/5gal
-                  <RateEditPopover
-                    table="labor_rates"
-                    name="Concrete - Sealer Natural"
-                    category="Concrete"
-                    mode="coefficient"
-                    unitLabel="SF/hr"
-                    currentValue={calc.sealerNaturalSFPerHr}
-                    onSaved={refreshAllRates}
-                  />
                 </span>
               ) : (
                 <span className="text-gray-400 inline-flex items-center gap-1">
                   — {calc.sealerWetSFPerHr} SF/hr · ${calc.sealerWet5g}/5gal
-                  <RateEditPopover
-                    table="labor_rates"
-                    name="Concrete - Sealer Wet-Look"
-                    category="Concrete"
-                    mode="coefficient"
-                    unitLabel="SF/hr"
-                    currentValue={calc.sealerWetSFPerHr}
-                    onSaved={refreshAllRates}
-                  />
                 </span>
               )}
             </label>

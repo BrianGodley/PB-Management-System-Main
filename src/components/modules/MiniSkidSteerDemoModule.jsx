@@ -1,4 +1,6 @@
 import WorkTypeChooser from './WorkTypeChooser'
+import CrewTypeBar from './CrewTypeBar'
+import ModuleHeaderSlot from './ModuleHeaderSlot'
 // ─────────────────────────────────────────────────────────────────────────────
 // MiniSkidSteerDemoModule — Mini Skid Steer Demo estimator
 //
@@ -22,7 +24,6 @@ import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import { fetchStandardRateMap } from '../../lib/materialCatalog'
 import GpmdBar from './GpmdBar'
-import RateEditPopover from '../RateEditPopover'
 import { SubRateOverrideProvider } from '../SubRateOverrideContext.jsx'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import {
@@ -892,52 +893,148 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
     })
   }
 
+  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
+  //    that used to have an inline RateEditPopover in this module now lives here.
+  const miniDemoRateList = [
+    {
+      group: 'Settings',
+      items: [
+        { label: 'Demo - Mini Difficulty Ratio', table: 'labor_rates', name: 'Demo - Mini Difficulty Ratio', category: 'Demo', mode: 'coefficient', unitLabel: '% per 1%', value: calc.difficultyRatio },
+        { label: 'Demo - Mini Haul Sec/Ft', table: 'labor_rates', name: 'Demo - Mini Haul Sec/Ft', category: 'Demo', mode: 'coefficient', unitLabel: 'sec/ft', value: calc.haulSecPerFt },
+        { label: 'Demo - Mini Load (CY)', table: 'labor_rates', name: 'Demo - Mini Load (CY)', category: 'Demo', mode: 'coefficient', unitLabel: 'cy', value: calc.haulLoadCy },
+      ],
+    },
+    {
+      group: 'Demolition (In-House)',
+      items: [
+        { label: 'Demo - Mini - Concrete SF', table: 'labor_rates', name: 'Demo - Mini - Concrete SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100sf·in', value: calc.laborConc },
+        { label: 'Demo - Mini - Dirt SF', table: 'labor_rates', name: 'Demo - Mini - Dirt SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100sf·in', value: calc.laborDirt },
+        { label: 'Demo - Mini - Import Base SF', table: 'labor_rates', name: 'Demo - Mini - Import Base SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100sf·in', value: calc.laborBase },
+        { label: 'Demo - Mini - Grass SF', table: 'labor_rates', name: 'Demo - Mini - Grass SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100sf·in', value: calc.laborGrass },
+        { label: 'Demo - Mini Rebar', table: 'labor_rates', name: 'Demo - Mini Rebar', category: 'Demo', mode: 'coefficient', unitLabel: 'min/SF', value: calc.rebarMinPerSF },
+      ],
+    },
+    {
+      group: 'Misc Flat / Vertical / Footing',
+      items: [
+        { label: 'Demo - Mini - Misc Flat SF', table: 'labor_rates', name: 'Demo - Mini - Misc Flat SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100sf·in', value: calc.laborMiscFlat },
+        { label: 'Demo - Mini - Misc Vert SF', table: 'labor_rates', name: 'Demo - Mini - Misc Vert SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100sf·in', value: calc.laborMiscVert },
+        { label: 'Demo - Mini - Footing SF', table: 'labor_rates', name: 'Demo - Mini - Footing SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100sf·in', value: calc.laborFooting },
+      ],
+    },
+    {
+      group: 'Grading (In-House)',
+      items: [
+        { label: 'Demo - Mini - Grade Cut SF', table: 'labor_rates', name: 'Demo - Mini - Grade Cut SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100sf·in', value: calc.laborGradeCut },
+        { label: 'Demo - Mini - Grade Fill SF', table: 'labor_rates', name: 'Demo - Mini - Grade Fill SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100sf·in', value: calc.laborGradeFill },
+        { label: 'Demo - Mini - JJ SF', table: 'labor_rates', name: 'Demo - Mini - JJ SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100sf·in', value: calc.laborJJ },
+        { label: 'Demo - Mini - SS Compact SF', table: 'labor_rates', name: 'Demo - Mini - SS Compact SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100sf·in', value: calc.laborSS },
+      ],
+    },
+    {
+      group: 'Vegetation (In-House)',
+      items: [
+        { label: 'Demo - Mini Shrub', table: 'labor_rates', name: 'Demo - Mini Shrub', category: 'Demo', mode: 'coefficient', unitLabel: 'hrs/ea', value: calc.shrubRate },
+        { label: 'Demo - Mini Stump Small', table: 'labor_rates', name: 'Demo - Mini Stump Small', category: 'Demo', mode: 'coefficient', unitLabel: 'hrs/ea', value: calc.stumpSmallRate },
+        { label: 'Demo - Mini Stump Medium', table: 'labor_rates', name: 'Demo - Mini Stump Medium', category: 'Demo', mode: 'coefficient', unitLabel: 'hrs/ea', value: calc.stumpMedRate },
+        { label: 'Demo - Mini Stump Large', table: 'labor_rates', name: 'Demo - Mini Stump Large', category: 'Demo', mode: 'coefficient', unitLabel: 'hrs/ea', value: calc.stumpLargeRate },
+        { label: 'Demo - Mini Stump XL', table: 'labor_rates', name: 'Demo - Mini Stump XL', category: 'Demo', mode: 'coefficient', unitLabel: 'hrs/ea', value: calc.stumpXLRate },
+        { label: 'Demo - Mini Tree Small', table: 'labor_rates', name: 'Demo - Mini Tree Small', category: 'Demo', mode: 'coefficient', unitLabel: 'hrs/ft', value: calc.treeSmall },
+        { label: 'Demo - Mini Tree Medium', table: 'labor_rates', name: 'Demo - Mini Tree Medium', category: 'Demo', mode: 'coefficient', unitLabel: 'hrs/ft', value: calc.treeMed },
+        { label: 'Demo - Mini Tree Large', table: 'labor_rates', name: 'Demo - Mini Tree Large', category: 'Demo', mode: 'coefficient', unitLabel: 'hrs/ft', value: calc.treeLarge },
+      ],
+    },
+    {
+      group: 'Subcontractor — Demo',
+      items: [
+        { label: 'Sub Demo - Mini 5-7in', table: 'subcontractor_rates', name: 'Sub Demo - Mini 5-7in', mode: 'currency', unitLabel: 'sf', value: calc.miniRateDeep },
+        { label: 'Sub Demo - Mini 2-4in', table: 'subcontractor_rates', name: 'Sub Demo - Mini 2-4in', mode: 'currency', unitLabel: 'sf', value: calc.miniRateMid },
+        { label: 'Sub Demo - Mini 1-2in', table: 'subcontractor_rates', name: 'Sub Demo - Mini 1-2in', mode: 'currency', unitLabel: 'sf', value: calc.miniRateShallow },
+        { label: 'Sub Demo - Mini Misc Flat', table: 'subcontractor_rates', name: 'Sub Demo - Mini Misc Flat', mode: 'currency', unitLabel: 'sf', value: calc.miniMiscFlatSubRate },
+      ],
+    },
+    {
+      group: 'Subcontractor — Grading',
+      items: [
+        { label: 'Sub Grade - Mini Cut SF', table: 'subcontractor_rates', name: 'Sub Grade - Mini Cut SF', mode: 'currency', unitLabel: 'sf', value: calc.sgCut },
+        { label: 'Sub Grade - Mini Fill SF', table: 'subcontractor_rates', name: 'Sub Grade - Mini Fill SF', mode: 'currency', unitLabel: 'sf', value: calc.sgFill },
+        { label: 'Sub Grade - Mini JJ SF', table: 'subcontractor_rates', name: 'Sub Grade - Mini JJ SF', mode: 'currency', unitLabel: 'sf', value: calc.sgJJ },
+        { label: 'Sub Grade - Mini Sheepsfoot SF', table: 'subcontractor_rates', name: 'Sub Grade - Mini Sheepsfoot SF', mode: 'currency', unitLabel: 'sf', value: calc.sgSheep },
+        { label: 'Sub Grade - Mini Roll SF', table: 'subcontractor_rates', name: 'Sub Grade - Mini Roll SF', mode: 'currency', unitLabel: 'sf', value: calc.sgRoll },
+        { label: 'Sub Grade - Mini SS Compact SF', table: 'subcontractor_rates', name: 'Sub Grade - Mini SS Compact SF', mode: 'currency', unitLabel: 'sf', value: calc.sgSS },
+      ],
+    },
+    {
+      group: 'Subcontractor — Stump & Tree',
+      items: [
+        { label: 'Sub Stump - Mini Small', table: 'subcontractor_rates', name: 'Sub Stump - Mini Small', mode: 'currency', unitLabel: 'ea', value: calc.ssSmall },
+        { label: 'Sub Stump - Mini Medium', table: 'subcontractor_rates', name: 'Sub Stump - Mini Medium', mode: 'currency', unitLabel: 'ea', value: calc.ssMed },
+        { label: 'Sub Stump - Mini Large', table: 'subcontractor_rates', name: 'Sub Stump - Mini Large', mode: 'currency', unitLabel: 'ea', value: calc.ssLarge },
+        { label: 'Sub Stump - Mini XL', table: 'subcontractor_rates', name: 'Sub Stump - Mini XL', mode: 'currency', unitLabel: 'ea', value: calc.ssXL },
+        { label: 'Sub Tree - Mini Small', table: 'subcontractor_rates', name: 'Sub Tree - Mini Small', mode: 'currency', unitLabel: 'ea', value: calc.stSmall },
+        { label: 'Sub Tree - Mini Medium', table: 'subcontractor_rates', name: 'Sub Tree - Mini Medium', mode: 'currency', unitLabel: 'ea', value: calc.stMed },
+        { label: 'Sub Tree - Mini Large', table: 'subcontractor_rates', name: 'Sub Tree - Mini Large', mode: 'currency', unitLabel: 'ea', value: calc.stLarge },
+      ],
+    },
+    {
+      group: 'Subcontractor — Sub Haul',
+      items: [
+        { label: 'Demo - Mini Sub Haul - Concrete', table: 'subcontractor_rates', name: 'Demo - Mini Sub Haul - Concrete', mode: 'currency', unitLabel: '1.5T', value: calc.shConc },
+        { label: 'Demo - Mini Sub Haul - Dirt', table: 'subcontractor_rates', name: 'Demo - Mini Sub Haul - Dirt', mode: 'currency', unitLabel: '1.5T', value: calc.shDirt },
+        { label: 'Demo - Mini Sub Haul - Grass', table: 'subcontractor_rates', name: 'Demo - Mini Sub Haul - Grass', mode: 'currency', unitLabel: '1.5T', value: calc.shGrass },
+        { label: 'Demo - Mini Sub Haul - Trash 12yd', table: 'subcontractor_rates', name: 'Demo - Mini Sub Haul - Trash 12yd', mode: 'currency', unitLabel: 'load', value: calc.haulTrashRate },
+        { label: 'Demo - Mini Sub Haul - Concrete 12yd', table: 'subcontractor_rates', name: 'Demo - Mini Sub Haul - Concrete 12yd', mode: 'currency', unitLabel: 'load', value: calc.haulConcreteRate },
+        { label: 'Demo - Mini Sub Haul - Soil 12yd', table: 'subcontractor_rates', name: 'Demo - Mini Sub Haul - Soil 12yd', mode: 'currency', unitLabel: 'load', value: calc.haulSoilRate },
+        { label: 'Demo - Mini Sub Haul - Import Base 12yd', table: 'subcontractor_rates', name: 'Demo - Mini Sub Haul - Import Base 12yd', mode: 'currency', unitLabel: 'load', value: calc.haulBaseRate },
+      ],
+    },
+  ]
+
   return (
     <SubTabContext.Provider value={isSub}>
     <SubRateOverrideProvider overrides={state.rateOverrides} setOverride={setOverride}>
     <div className="space-y-4">
-      {/* ── Sticky GPMD bar ── */}
-      <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
-        {/* GPMD summary bar */}
-        <GpmdBar
-          variant={isSub ? 'sub' : 'inhouse'}
-          sticky
-          totalMat={calc.totalMat}
-          totalHrs={calc.totalHrs}
-          manDays={calc.manDays}
-          laborCost={calc.laborCost}
-          laborRatePerHour={laborRatePerHour}
-          burden={calc.burden}
-          gp={calc.gp}
-          commission={calc.commission}
-          subCost={calc.subCost}
-          gpmd={gpmd}
-          price={calc.price}
-          subMarkupRate={subGpMarkupRate}
-        />
-            </div>
+      {/* ── Frozen header: GPMD bar + Crew Type / View Rates bar ── */}
+      <div className="sticky top-0 z-20 -mx-6 bg-white shadow-md">
+        <div className="px-6 pt-1 pb-1 bg-gray-900">
+          <GpmdBar
+            variant={isSub ? 'sub' : 'inhouse'}
+            sticky
+            totalMat={calc.totalMat}
+            totalHrs={calc.totalHrs}
+            manDays={calc.manDays}
+            laborCost={calc.laborCost}
+            laborRatePerHour={laborRatePerHour}
+            burden={calc.burden}
+            gp={calc.gp}
+            commission={calc.commission}
+            subCost={calc.subCost}
+            gpmd={gpmd}
+            price={calc.price}
+            subMarkupRate={subGpMarkupRate}
+          />
+        </div>
+        <div className="px-6 py-2">
+          <CrewTypeBar
+            crewType={state.crewType}
+            onCrewTypeChange={v => set('crewType', v)}
+            title="Mini Skid Steer Demo"
+            rates={miniDemoRateList}
+            refreshAllRates={refreshAllRates}
+            showInlineToggle={false}
+          />
+        </div>
+      </div>
 
 
-      <WorkTypeChooser value={state.dumpType} onChange={v => set('dumpType', v)} />
+      <ModuleHeaderSlot>
+        <WorkTypeChooser value={state.dumpType} onChange={v => set('dumpType', v)} compact />
+      </ModuleHeaderSlot>
 
-      {/* Crew Type + Change Demo Module switcher */}
+      {/* Change Demo Module switcher */}
+      {onSwitchType && (
       <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select
-          value={state.crewType}
-          onChange={e => set('crewType', e.target.value)}
-          className="input text-sm py-1 w-36"
-        >
-          <option value="Demo">Demo</option>
-          <option value="Landscape">Landscape</option>
-          <option value="Masonry">Masonry</option>
-          <option value="Paver">Paver</option>
-          <option value="Specialty">Specialty</option>
-        </select>
-        {/* Change Demo Module — bundle current values and switch to
-            another demo type (Hand / Skid Steer / Mini Skid Steer).
-            Shared fields populate automatically in the target. */}
-        {onSwitchType && (
+        <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Demo Module</span>
           <div className="relative">
             <button
               type="button"
@@ -999,8 +1096,8 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
               </div>
             )}
           </div>
-        )}
       </div>
+      )}
       {pricesLoading && (
         <div className="text-xs text-amber-700 bg-amber-50 rounded px-3 py-2">
           Loading current rates…
@@ -1021,15 +1118,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           />
           <p className="text-[10px] text-gray-500 mt-0.5 inline-flex items-center gap-1">
             {calc.difficultyRatio}% labor per 1%
-            <RateEditPopover
-              table="labor_rates"
-              name="Demo - Mini Difficulty Ratio"
-              category="Demo"
-              mode="coefficient"
-              unitLabel="% per 1%"
-              currentValue={calc.difficultyRatio}
-              onSaved={refreshAllRates}
-            />
           </p>
         </div>
         <div className={isSub ? 'hidden' : undefined}>
@@ -1046,25 +1134,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           />
           <p className="text-[10px] text-gray-500 mt-0.5 inline-flex items-center gap-1 flex-wrap">
             {calc.haulSecPerFt} sec/ft
-            <RateEditPopover
-              table="labor_rates"
-              name="Demo - Mini Haul Sec/Ft"
-              category="Demo"
-              mode="coefficient"
-              unitLabel="sec/ft"
-              currentValue={calc.haulSecPerFt}
-              onSaved={refreshAllRates}
-            />
             · {calc.haulLoadCy} cy/load
-            <RateEditPopover
-              table="labor_rates"
-              name="Demo - Mini Load (CY)"
-              category="Demo"
-              mode="coefficient"
-              unitLabel="cy"
-              currentValue={calc.haulLoadCy}
-              onSaved={refreshAllRates}
-            />
             {calc.walkHrs > 0 && <span>· +{calc.walkHrs.toFixed(2)} hrs haul</span>}
           </p>
         </div>
@@ -1080,35 +1150,14 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
               Sub haul:
               <span className="inline-flex items-center gap-0.5">
                 ${calc.shConc}/1.5T conc
-                <RateEditPopover
-                  table="subcontractor_rates"
-                  name="Demo - Mini Sub Haul - Concrete"
-                  unitLabel="/1.5T"
-                  currentValue={calc.shConc}
-                  onSaved={refreshAllRates}
-                />
               </span>
               ·
               <span className="inline-flex items-center gap-0.5">
                 ${calc.shDirt}/1.5T dirt
-                <RateEditPopover
-                  table="subcontractor_rates"
-                  name="Demo - Mini Sub Haul - Dirt"
-                  unitLabel="/1.5T"
-                  currentValue={calc.shDirt}
-                  onSaved={refreshAllRates}
-                />
               </span>
               ·
               <span className="inline-flex items-center gap-0.5">
                 ${calc.shGrass}/1.5T grass
-                <RateEditPopover
-                  table="subcontractor_rates"
-                  name="Demo - Mini Sub Haul - Grass"
-                  unitLabel="/1.5T"
-                  currentValue={calc.shGrass}
-                  onSaved={refreshAllRates}
-                />
               </span>
             </p>
           )}
@@ -1130,11 +1179,8 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             <>
               <span className="font-normal normal-case">· Concrete / Dirt / Rock / Paver</span>
               <span className="font-normal normal-case text-gray-500">${calc.miniRateDeep} (5-7")</span>
-              <RateEditPopover table="subcontractor_rates" name="Sub Demo - Mini 5-7in" unitLabel="/sf" currentValue={calc.miniRateDeep} onSaved={refreshAllRates} />
               <span className="font-normal normal-case text-gray-500">/ ${calc.miniRateMid} (2-4")</span>
-              <RateEditPopover table="subcontractor_rates" name="Sub Demo - Mini 2-4in" unitLabel="/sf" currentValue={calc.miniRateMid} onSaved={refreshAllRates} />
               <span className="font-normal normal-case text-gray-500">/ ${calc.miniRateShallow} (1-2")</span>
-              <RateEditPopover table="subcontractor_rates" name="Sub Demo - Mini 1-2in" unitLabel="/sf" currentValue={calc.miniRateShallow} onSaved={refreshAllRates} />
               <span className="font-normal normal-case text-gray-500">/sf</span>
             </>
           )}
@@ -1217,15 +1263,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                   <span className="inline-flex items-center gap-1">
                     {label}
                     <span className="text-gray-400 font-normal text-[10px]">({rateNote})</span>
-                    <RateEditPopover
-                      table="labor_rates"
-                      name={rateName}
-                      category="Demo"
-                      mode="coefficient"
-                      unitLabel={rateUnit || 't/hr'}
-                      currentValue={rate}
-                      onSaved={refreshAllRates}
-                    />
                     {extraIcon}
                   </span>
                 </td>
@@ -1264,15 +1301,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             <p className="text-xs text-gray-500 mb-0.5 inline-flex items-center gap-1">
               Rebar SF
               <span className="text-gray-400 font-normal">({calc.rebarMinPerSF} min/SF)</span>
-              <RateEditPopover
-                table="labor_rates"
-                name="Demo - Mini Rebar"
-                category="Demo"
-                mode="coefficient"
-                unitLabel="min/SF"
-                currentValue={calc.rebarMinPerSF}
-                onSaved={refreshAllRates}
-              />
             </p>
             <Inp
               value={state.rebarSF}
@@ -1293,15 +1321,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           <span>{subSectionTitle('Misc Flat Demo', isSub)}{isSelf ? ` — ${calc.laborMiscFlat} hr/100sf·in` : ''}</span>
           {isSelf && (
             <>
-              <RateEditPopover
-                table="labor_rates"
-                name="Demo - Mini - Misc Flat SF"
-                category="Demo"
-                mode="coefficient"
-                unitLabel="hr/100sf·in"
-                currentValue={calc.laborMiscFlat}
-                onSaved={refreshAllRates}
-              />
               <span className="font-normal normal-case text-gray-500">· container disposal</span>
             </>
           )}
@@ -1313,7 +1332,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           {isSub && (
             <>
               <span className="font-normal normal-case text-gray-500">${calc.miniMiscFlatSubRate}/sf</span>
-              <RateEditPopover table="subcontractor_rates" name="Sub Demo - Mini Misc Flat" unitLabel="/sf" currentValue={calc.miniMiscFlatSubRate} onSaved={refreshAllRates} />
             </>
           )}
         </div>
@@ -1387,7 +1405,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           {isSelf && (
             <>
               <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborMiscVert} hr/100sf·in equiv</span>
-              <RateEditPopover table="labor_rates" name="Demo - Mini - Misc Vert SF" category="Demo" mode="coefficient" unitLabel="hr/100sf·in" currentValue={calc.laborMiscVert} onSaved={refreshAllRates} />
               <span className="font-normal normal-case text-gray-500">· container disposal</span>
             </>
           )}
@@ -1459,7 +1476,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           {isSelf && (
             <>
               <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborFooting} hr/100sf·in equiv</span>
-              <RateEditPopover table="labor_rates" name="Demo - Mini - Footing SF" category="Demo" mode="coefficient" unitLabel="hr/100sf·in" currentValue={calc.laborFooting} onSaved={refreshAllRates} />
               <span className="font-normal normal-case text-gray-500">· container disposal</span>
             </>
           )}
@@ -1543,13 +1559,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                       <span className="inline-flex items-center gap-1">
                         {label}
                         <span className="text-gray-400 font-normal">(${rate}/load)</span>
-                        <RateEditPopover
-                          table="subcontractor_rates"
-                          name={rateName}
-                          unitLabel="/load"
-                          currentValue={rate}
-                          onSaved={refreshAllRates}
-                        />
                       </span>
                     </td>
                     <td className={td}>
@@ -1636,15 +1645,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                   <span className="inline-flex items-center gap-1">
                     {label}
                     <span className="text-gray-400 font-normal">({note})</span>
-                    <RateEditPopover
-                      table="labor_rates"
-                      name={rateName}
-                      category="Demo"
-                      mode="coefficient"
-                      unitLabel={rateUnit || 't/hr'}
-                      currentValue={rate}
-                      onSaved={refreshAllRates}
-                    />
                   </span>
                 </td>
                 <td className={td}>
@@ -1687,13 +1687,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                     <span className="inline-flex items-center gap-1">
                       {label}
                       <span className="text-gray-400 font-normal">(${rate}/sf)</span>
-                      <RateEditPopover
-                        table="subcontractor_rates"
-                        name={rateName}
-                        unitLabel="/sf"
-                        currentValue={rate}
-                        onSaved={refreshAllRates}
-                      />
                     </span>
                   </td>
                   <td className={td}>
@@ -1759,15 +1752,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
         {isSelf && (
           <p className="text-xs text-gray-400 mt-1 inline-flex items-center gap-1">
             {calc.shrubRate} hrs/ea × shrub-height modifier
-            <RateEditPopover
-              table="labor_rates"
-              name="Demo - Mini Shrub"
-              category="Demo"
-              mode="coefficient"
-              unitLabel="hrs/ea"
-              currentValue={calc.shrubRate}
-              onSaved={refreshAllRates}
-            />
           </p>
         )}
       </div>
@@ -1820,25 +1804,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           <div key={key}>
             <p className="text-xs text-gray-500 mb-0.5 inline-flex items-center gap-1">
               {label}
-              {isSub ? (
-                <RateEditPopover
-                  table="subcontractor_rates"
-                  name={subRateName}
-                  unitLabel="/ea"
-                  currentValue={subRate}
-                  onSaved={refreshAllRates}
-                />
-              ) : (
-                <RateEditPopover
-                  table="labor_rates"
-                  name={rateName}
-                  category="Demo"
-                  mode="coefficient"
-                  unitLabel="hrs/ea"
-                  currentValue={rate}
-                  onSaved={refreshAllRates}
-                />
-              )}
             </p>
             <Inp value={state[key]} onChange={e => set(key, e.target.value)} />
             <p className="text-xs text-gray-400 mt-0.5">
@@ -1864,35 +1829,8 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           {isSelf && (
           <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
             (S:{calc.treeSmall}
-            <RateEditPopover
-              table="labor_rates"
-              name="Demo - Mini Tree Small"
-              category="Demo"
-              mode="coefficient"
-              unitLabel="hrs/ft"
-              currentValue={calc.treeSmall}
-              onSaved={refreshAllRates}
-            />
             · M:{calc.treeMed}
-            <RateEditPopover
-              table="labor_rates"
-              name="Demo - Mini Tree Medium"
-              category="Demo"
-              mode="coefficient"
-              unitLabel="hrs/ft"
-              currentValue={calc.treeMed}
-              onSaved={refreshAllRates}
-            />
             · L:{calc.treeLarge}
-            <RateEditPopover
-              table="labor_rates"
-              name="Demo - Mini Tree Large"
-              category="Demo"
-              mode="coefficient"
-              unitLabel="hrs/ft"
-              currentValue={calc.treeLarge}
-              onSaved={refreshAllRates}
-            />
             hrs/ft)
           </span>
           )}
@@ -1904,11 +1842,8 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           {isSub && (
             <span className="font-normal normal-case text-gray-500 inline-flex items-center gap-1">
               · per tree: S ${calc.stSmall}
-              <RateEditPopover table="subcontractor_rates" name="Sub Tree - Mini Small" unitLabel="/ea" currentValue={calc.stSmall} onSaved={refreshAllRates} />
               · M ${calc.stMed}
-              <RateEditPopover table="subcontractor_rates" name="Sub Tree - Mini Medium" unitLabel="/ea" currentValue={calc.stMed} onSaved={refreshAllRates} />
               · L ${calc.stLarge}
-              <RateEditPopover table="subcontractor_rates" name="Sub Tree - Mini Large" unitLabel="/ea" currentValue={calc.stLarge} onSaved={refreshAllRates} />
             </span>
           )}
         </div>

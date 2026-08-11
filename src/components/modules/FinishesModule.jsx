@@ -1,9 +1,10 @@
 import WorkTypeChooser from './WorkTypeChooser'
+import CrewTypeBar from './CrewTypeBar'
+import ModuleHeaderSlot from './ModuleHeaderSlot'
 import { useState, useEffect, useCallback, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
-import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { useMaterialCatalog, resolveMaterialPrice } from '../../lib/materialCatalog'
@@ -627,7 +628,6 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
   // ── Rate cell (material price + edit popovers + optional $/ton override) ────
   function rateCell(row, meta, setRows, i, compute) {
     if (!meta || !meta.matKey) return <span className="text-xs text-gray-300">—</span>
-    const isHouse = !row.vendor || row.vendor === 'House'
     return (
       <div className="flex items-center gap-1 flex-wrap">
         {meta.override ? (
@@ -646,17 +646,6 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
           <span className="text-xs text-gray-400">
             ${finishMat(meta.matKey, row.vendor).toFixed(2)}/{meta.matUnit}
           </span>
-        )}
-        {isHouse && meta.labKey && (
-          <RateEditPopover
-            table="labor_rates"
-            name={FINISHES_RATES[meta.labKey].db}
-            category="Finishes"
-            mode="coefficient"
-            unitLabel={meta.labUnit || 'rate'}
-            currentValue={p(FINISHES_RATES[meta.labKey].db) ?? FINISHES_RATES[meta.labKey].fb}
-            onSaved={refreshAllRates}
-          />
         )}
       </div>
     )
@@ -916,47 +905,90 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
     )
   }
 
+  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every labor
+  //    coefficient that used to have an inline RateEditPopover in this module now
+  //    lives here (material prices are edited in Master Material Rates).
+  const _rv = k => p(FINISHES_RATES[k].db) ?? FINISHES_RATES[k].fb
+  const _laborItem = (k, unitLabel) => ({
+    label: FINISHES_RATES[k].db,
+    table: 'labor_rates',
+    name: FINISHES_RATES[k].db,
+    category: FINISHES_CATEGORY,
+    mode: 'coefficient',
+    unitLabel,
+    value: _rv(k),
+  })
+  const finishesRateList = [
+    {
+      group: 'Flatwork Finish',
+      items: [
+        _laborItem('flatTileLab', 'hrs/SF'),
+        _laborItem('flatBrickLab', 'hrs/SF'),
+        _laborItem('flatFlagstoneLab', 'hrs/SF'),
+        _laborItem('flatPorcelainLab', 'hrs/SF'),
+      ],
+    },
+    {
+      group: 'Wall Caps',
+      items: [
+        _laborItem('capFlagstoneLab', 'hrs/LF'),
+        _laborItem('capPrecastLab', 'hrs/ea'),
+        _laborItem('capPipLab', 'hrs/LF'),
+        _laborItem('capBullnoseLab', 'hrs/LF'),
+      ],
+    },
+    {
+      group: 'Wall Finishes',
+      items: [
+        _laborItem('sandStuccoLab', 'SF/day'),
+        _laborItem('smoothStuccoLab', 'SF/day'),
+        _laborItem('ledgerstoneLab', 'SF/day'),
+        _laborItem('stackedStoneLab', 'SF/day'),
+        _laborItem('tileLab', 'hrs/SF'),
+        _laborItem('flagstoneLab', 'hrs/SF'),
+        _laborItem('realStoneLab', 'hrs/SF'),
+      ],
+    },
+  ]
+
   return (
     <SubTabContext.Provider value={isSub}>
     <div className="space-y-5">
-      {/* ── Sticky GPMD bar ── */}
-      <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
-        <GpmdBar
-          variant={isSub ? 'sub' : 'inhouse'}
-          sticky
-          totalMat={calc.totalMat}
-          totalHrs={calc.totalHrs}
-          manDays={calc.manDays}
-          laborCost={calc.laborCost}
-          laborRatePerHour={laborRatePerHour}
-          burden={calc.burden}
-          gp={calc.gp}
-          commission={calc.commission}
-          subCost={calc.subCost}
-          gpmd={gpmd}
-          price={calc.price}
-          subMarkupRate={subGpMarkupRate}
-        />
+      {/* ── Frozen header: GPMD bar + Crew Type / View Rates bar ── */}
+      <div className="sticky top-0 z-20 -mx-6 bg-white shadow-md">
+        <div className="px-6 pt-1 pb-1 bg-gray-900">
+          <GpmdBar
+            variant={isSub ? 'sub' : 'inhouse'}
+            sticky
+            totalMat={calc.totalMat}
+            totalHrs={calc.totalHrs}
+            manDays={calc.manDays}
+            laborCost={calc.laborCost}
+            laborRatePerHour={laborRatePerHour}
+            burden={calc.burden}
+            gp={calc.gp}
+            commission={calc.commission}
+            subCost={calc.subCost}
+            gpmd={gpmd}
+            price={calc.price}
+            subMarkupRate={subGpMarkupRate}
+          />
+        </div>
+        <div className="px-6 py-2">
+          <CrewTypeBar
+            crewType={crewType}
+            onCrewTypeChange={setCrewType}
+            title="Finishes"
+            rates={finishesRateList}
+            refreshAllRates={refreshAllRates}
+            showInlineToggle={false}
+          />
+        </div>
       </div>
 
-
-      <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} />
-
-      {/* Crew Type */}
-      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select
-          value={crewType}
-          onChange={e => setCrewType(e.target.value)}
-          className="input text-sm py-1 w-36"
-        >
-          <option value="Demo">Demo</option>
-          <option value="Landscape">Landscape</option>
-          <option value="Masonry">Masonry</option>
-          <option value="Paver">Paver</option>
-          <option value="Specialty">Specialty</option>
-        </select>
-      </div>
+      <ModuleHeaderSlot>
+        <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} compact />
+      </ModuleHeaderSlot>
 
       {pricesLoading && (
         <div className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
