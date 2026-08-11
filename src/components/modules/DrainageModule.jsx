@@ -1,4 +1,6 @@
 import WorkTypeChooser from './WorkTypeChooser'
+import CrewTypeBar from './CrewTypeBar'
+import ModuleHeaderSlot from './ModuleHeaderSlot'
 import { useState, useEffect, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
@@ -728,48 +730,271 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
     })
   }
 
+  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
+  //    that used to have an inline RateEditPopover in this module now lives here.
+  const drainageRateList = [
+    {
+      group: 'Trenching',
+      items: [
+        {
+          label: 'Drainage Trench Excavation',
+          table: 'labor_rates',
+          name: TRENCH_LABOR_RATE_NAME.Trench,
+          category: 'Drainage',
+          mode: 'coefficient',
+          unitLabel: 'min/cf',
+          value: TRENCH_MINS_PER_CF.Trench,
+        },
+        {
+          label: 'Drainage Hand Excavation',
+          table: 'labor_rates',
+          name: TRENCH_LABOR_RATE_NAME.Hand,
+          category: 'Drainage',
+          mode: 'coefficient',
+          unitLabel: 'min/cf',
+          value: TRENCH_MINS_PER_CF.Hand,
+        },
+      ],
+    },
+    {
+      group: 'Drain Pipe',
+      items: Object.entries(PIPE_LABOR_RATE_NAME).map(([type, name]) => ({
+        label: name,
+        table: 'labor_rates',
+        name,
+        category: 'Drainage',
+        mode: 'coefficient',
+        unitLabel: 'hr/LF',
+        value: PIPE_TYPES[type]?.laborPerLF,
+      })),
+    },
+    {
+      group: 'French Drains',
+      items: [
+        ...Object.entries(FRENCH_PIPE_LABOR_RATE_NAME).map(([type, name]) => ({
+          label: name,
+          table: 'labor_rates',
+          name,
+          category: 'Drainage',
+          mode: 'coefficient',
+          unitLabel: 'hr/LF',
+          value: FRENCH_PIPE_TYPES[type]?.laborPerLF,
+        })),
+        {
+          label: FRENCH_SOCK_MAT_NAME,
+          table: 'misc_rates',
+          name: FRENCH_SOCK_MAT_NAME,
+          category: 'Drainage',
+          mode: 'currency',
+          unitLabel: 'LF',
+          value: frenchRate(materialPrices, FRENCH_SOCK_MAT_NAME),
+        },
+        {
+          label: FRENCH_SOCK_LABOR_NAME,
+          table: 'misc_rates',
+          name: FRENCH_SOCK_LABOR_NAME,
+          category: 'Drainage',
+          mode: 'currency',
+          unitLabel: 'LF',
+          value: frenchRate(materialPrices, FRENCH_SOCK_LABOR_NAME),
+          section: 'labor',
+        },
+        {
+          label: FRENCH_BURRITO_MAT_NAME,
+          table: 'misc_rates',
+          name: FRENCH_BURRITO_MAT_NAME,
+          category: 'Drainage',
+          mode: 'currency',
+          unitLabel: 'LF',
+          value: frenchRate(materialPrices, FRENCH_BURRITO_MAT_NAME),
+        },
+        {
+          label: FRENCH_BURRITO_LABOR_NAME,
+          table: 'misc_rates',
+          name: FRENCH_BURRITO_LABOR_NAME,
+          category: 'Drainage',
+          mode: 'currency',
+          unitLabel: 'LF',
+          value: frenchRate(materialPrices, FRENCH_BURRITO_LABOR_NAME),
+          section: 'labor',
+        },
+        {
+          label: FRENCH_GRAVEL12_MAT_NAME,
+          table: 'misc_rates',
+          name: FRENCH_GRAVEL12_MAT_NAME,
+          category: 'Drainage',
+          mode: 'currency',
+          unitLabel: 'LF',
+          value: frenchRate(materialPrices, FRENCH_GRAVEL12_MAT_NAME),
+        },
+        {
+          label: FRENCH_GRAVEL12_LABOR_NAME,
+          table: 'misc_rates',
+          name: FRENCH_GRAVEL12_LABOR_NAME,
+          category: 'Drainage',
+          mode: 'currency',
+          unitLabel: 'LF',
+          value: frenchRate(materialPrices, FRENCH_GRAVEL12_LABOR_NAME),
+          section: 'labor',
+        },
+        {
+          label: FRENCH_GRAVEL24_MAT_NAME,
+          table: 'misc_rates',
+          name: FRENCH_GRAVEL24_MAT_NAME,
+          category: 'Drainage',
+          mode: 'currency',
+          unitLabel: 'LF',
+          value: frenchRate(materialPrices, FRENCH_GRAVEL24_MAT_NAME),
+        },
+        {
+          label: FRENCH_GRAVEL24_LABOR_NAME,
+          table: 'misc_rates',
+          name: FRENCH_GRAVEL24_LABOR_NAME,
+          category: 'Drainage',
+          mode: 'currency',
+          unitLabel: 'LF',
+          value: frenchRate(materialPrices, FRENCH_GRAVEL24_LABOR_NAME),
+          section: 'labor',
+        },
+      ],
+    },
+    {
+      group: 'Drains & Fixtures',
+      items: Object.entries(FIXTURE_LABOR_RATE_NAME).map(([type, name]) => ({
+        label: name,
+        table: 'labor_rates',
+        name,
+        category: 'Drainage',
+        mode: 'coefficient',
+        unitLabel: 'hr/ea',
+        value: FIXTURE_TYPES[type]?.laborHrs,
+      })),
+    },
+    {
+      group: 'Additional Items',
+      items: Object.entries(ADD_ITEM_LABOR_RATE_NAME).map(([key, name]) => ({
+        label: name,
+        table: 'labor_rates',
+        name,
+        category: 'Drainage',
+        mode: 'coefficient',
+        unitLabel: 'hr/ea',
+        value: ADD_ITEM_RATES[key]?.laborHrs,
+      })),
+    },
+    {
+      group: 'Fees',
+      items: [
+        {
+          label: 'Drain Fitting Fee',
+          table: 'misc_rates',
+          name: 'Drain Fitting Fee',
+          category: 'Drainage',
+          mode: 'currency',
+          unitLabel: 'ea',
+          value: materialPrices['Drain Fitting Fee'] ?? DRAIN_FITTING_FEE,
+        },
+      ],
+    },
+    {
+      group: 'Subcontractor',
+      items: [
+        {
+          label: 'Drainage Sub - Per LF',
+          table: 'subcontractor_rates',
+          name: 'Drainage Sub - Per LF',
+          category: 'Drainage',
+          mode: 'currency',
+          unitLabel: 'LF',
+          value: subRates['Drainage Sub - Per LF'] ?? 16,
+        },
+        {
+          label: 'Drainage Sub - Fixture Flat',
+          table: 'subcontractor_rates',
+          name: 'Drainage Sub - Fixture Flat',
+          category: 'Drainage',
+          mode: 'currency',
+          unitLabel: 'fixture',
+          value: subRates['Drainage Sub - Fixture Flat'] ?? 20,
+        },
+        {
+          label: 'Drainage Sub - Pump Vault',
+          table: 'subcontractor_rates',
+          name: 'Drainage Sub - Pump Vault',
+          category: 'Drainage',
+          mode: 'currency',
+          unitLabel: 'ea',
+          value: subRates['Drainage Sub - Pump Vault'] ?? 250,
+        },
+        {
+          label: 'Drainage Sub - Sump Pump',
+          table: 'subcontractor_rates',
+          name: 'Drainage Sub - Sump Pump',
+          category: 'Drainage',
+          mode: 'currency',
+          unitLabel: 'ea',
+          value: subRates['Drainage Sub - Sump Pump'] ?? 300,
+        },
+        {
+          label: 'Drainage Sub - Curb Core',
+          table: 'subcontractor_rates',
+          name: 'Drainage Sub - Curb Core',
+          category: 'Drainage',
+          mode: 'currency',
+          unitLabel: 'ea',
+          value: subRates['Drainage Sub - Curb Core'] ?? 250,
+        },
+        {
+          label: 'Drainage Sub - Hydrocut Per LF',
+          table: 'subcontractor_rates',
+          name: 'Drainage Sub - Hydrocut Per LF',
+          category: 'Drainage',
+          mode: 'currency',
+          unitLabel: 'LF',
+          value: subRates['Drainage Sub - Hydrocut Per LF'] ?? 10,
+        },
+      ],
+    },
+  ]
+
   return (
     <SubTabContext.Provider value={isSub}>
     <div className="space-y-5">
-      {/* ── Sticky GPMD bar ── */}
-      <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-1 bg-gray-900 shadow-lg">
-        {/* GPMD summary bar */}
-        <GpmdBar
-          sticky
-          totalMat={calc.totalMat}
-          totalHrs={calc.totalHrs}
-          manDays={calc.manDays}
-          laborCost={calc.laborCost}
-          laborRatePerHour={laborRatePerHour}
-          burden={calc.burden}
-          gp={calc.gp}
-          commission={calc.commission}
-          subCost={calc.subCost}
-          gpmd={gpmd}
-          price={calc.price}
-          subMarkupRate={subGpMarkupRate}
-          variant={isSub ? 'sub' : 'inhouse'}
-        />
-            </div>
-
-
-      <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} />
-
-      {/* Crew Type */}
-      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select
-          value={crewType}
-          onChange={e => setCrewType(e.target.value)}
-          className="input text-sm py-1 w-36"
-        >
-          <option value="Demo">Demo</option>
-          <option value="Landscape">Landscape</option>
-          <option value="Masonry">Masonry</option>
-          <option value="Paver">Paver</option>
-          <option value="Specialty">Specialty</option>
-        </select>
+      {/* ── Frozen header: GPMD bar + Crew Type / View Rates bar ── */}
+      <div className="sticky top-0 z-20 -mx-6 bg-white shadow-md">
+        <div className="px-6 pt-1 pb-1 bg-gray-900">
+          <GpmdBar
+            sticky
+            totalMat={calc.totalMat}
+            totalHrs={calc.totalHrs}
+            manDays={calc.manDays}
+            laborCost={calc.laborCost}
+            laborRatePerHour={laborRatePerHour}
+            burden={calc.burden}
+            gp={calc.gp}
+            commission={calc.commission}
+            subCost={calc.subCost}
+            gpmd={gpmd}
+            price={calc.price}
+            subMarkupRate={subGpMarkupRate}
+            variant={isSub ? 'sub' : 'inhouse'}
+          />
+        </div>
+        <div className="px-6 py-2">
+          <CrewTypeBar
+            crewType={crewType}
+            onCrewTypeChange={setCrewType}
+            title="Drainage"
+            rates={drainageRateList}
+            refreshAllRates={refreshMaterialPrices}
+            showInlineToggle={false}
+          />
+        </div>
       </div>
+
+      <ModuleHeaderSlot>
+        <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} compact />
+      </ModuleHeaderSlot>
 
       {/* Prices loading notice */}
       {pricesLoading && (
@@ -858,14 +1083,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           </div>
           <p className="text-xs text-gray-400 mt-2 inline-flex items-center gap-1">
             ${calc.subRatePerLF}/LF × {calc.subLf} LF = ${calc.subDrainCost.toFixed(2)}
-            <RateEditPopover
-              table="subcontractor_rates"
-              name="Drainage Sub - Per LF"
-              category="Drainage"
-              unitLabel="/LF"
-              currentValue={calc.subRatePerLF}
-              onSaved={refreshMaterialPrices}
-            />
           </p>
         </div>
 
@@ -918,14 +1135,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           </div>
           <p className="text-xs text-gray-400 mt-2 inline-flex items-center gap-1">
             ${calc.subFixtureFlat}/fixture × {calc.subFixQty} = ${calc.subFixtureCost.toFixed(2)}
-            <RateEditPopover
-              table="subcontractor_rates"
-              name="Drainage Sub - Fixture Flat"
-              category="Drainage"
-              unitLabel="/fixture"
-              currentValue={calc.subFixtureFlat}
-              onSaved={refreshMaterialPrices}
-            />
           </p>
         </div>
 
@@ -999,14 +1208,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                           {qty > 0
                             ? `$${(qty * item.rate).toFixed(2)}`
                             : `$${item.rate} / ${item.unit}`}
-                          <RateEditPopover
-                            table="subcontractor_rates"
-                            name={item.rateName}
-                            category="Drainage"
-                            unitLabel={`/${item.unit}`}
-                            currentValue={item.rate}
-                            onSaved={refreshMaterialPrices}
-                          />
                         </span>
                       </td>
                     </tr>
@@ -1053,16 +1254,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                           <option>Trench</option>
                           <option>Hand</option>
                         </select>
-                        {laborName && (
-                          <RateEditPopover
-                            table="labor_rates"
-                            name={laborName}
-                            category="Drainage"
-                            mode="coefficient"
-                            unitLabel="min/cf"
-                            currentValue={TRENCH_MINS_PER_CF[row.equipment]}
-                          />
-                        )}
                       </div>
                     </td>
                     <td className="py-1 pr-2">
@@ -1156,16 +1347,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                             <option key={t}>{t}</option>
                           ))}
                         </select>
-                        {PIPE_LABOR_RATE_NAME[row.type] && (
-                          <RateEditPopover
-                            table="labor_rates"
-                            name={PIPE_LABOR_RATE_NAME[row.type]}
-                            category="Drainage"
-                            mode="coefficient"
-                            unitLabel="hr/LF"
-                            currentValue={rate?.laborPerLF}
-                          />
-                        )}
                       </div>
                     </td>
                     <td className="py-1 pr-2">
@@ -1257,16 +1438,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                             <option key={t}>{t}</option>
                           ))}
                         </select>
-                        {FRENCH_PIPE_LABOR_RATE_NAME[row.type] && (
-                          <RateEditPopover
-                            table="labor_rates"
-                            name={FRENCH_PIPE_LABOR_RATE_NAME[row.type]}
-                            category="Drainage"
-                            mode="coefficient"
-                            unitLabel="hr/LF"
-                            currentValue={rate?.laborPerLF}
-                          />
-                        )}
                       </div>
                     </td>
                     <td className="py-1 pr-2">
@@ -1298,49 +1469,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         {/* Fabric + Gravel Bed — applied to the TOTAL French-drain linear feet */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
           <div>
-            <p className="text-xs text-gray-500 mb-0.5 inline-flex items-center gap-1">
-              Fabric
-              {frenchFabric === 'Drain Sock' && (
-                <>
-                  <RateEditPopover
-                    table="misc_rates"
-                    name={FRENCH_SOCK_MAT_NAME}
-                    category="Drainage"
-                    unitLabel="/LF"
-                    currentValue={frenchRate(materialPrices, FRENCH_SOCK_MAT_NAME)}
-                    onSaved={refreshMaterialPrices}
-                  />
-                  <RateEditPopover
-                    table="misc_rates"
-                    name={FRENCH_SOCK_LABOR_NAME}
-                    category="Drainage"
-                    unitLabel="/LF"
-                    currentValue={frenchRate(materialPrices, FRENCH_SOCK_LABOR_NAME)}
-                    onSaved={refreshMaterialPrices}
-                  />
-                </>
-              )}
-              {frenchFabric === 'Burrito Wrap' && (
-                <>
-                  <RateEditPopover
-                    table="misc_rates"
-                    name={FRENCH_BURRITO_MAT_NAME}
-                    category="Drainage"
-                    unitLabel="/LF"
-                    currentValue={frenchRate(materialPrices, FRENCH_BURRITO_MAT_NAME)}
-                    onSaved={refreshMaterialPrices}
-                  />
-                  <RateEditPopover
-                    table="misc_rates"
-                    name={FRENCH_BURRITO_LABOR_NAME}
-                    category="Drainage"
-                    unitLabel="/LF"
-                    currentValue={frenchRate(materialPrices, FRENCH_BURRITO_LABOR_NAME)}
-                    onSaved={refreshMaterialPrices}
-                  />
-                </>
-              )}
-            </p>
+            <p className="text-xs text-gray-500 mb-0.5">Fabric</p>
             <select
               className="input text-sm py-1.5 w-full"
               value={frenchFabric}
@@ -1352,49 +1481,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
             </select>
           </div>
           <div>
-            <p className="text-xs text-gray-500 mb-0.5 inline-flex items-center gap-1">
-              Gravel Bed
-              {frenchGravel === '12"' && (
-                <>
-                  <RateEditPopover
-                    table="misc_rates"
-                    name={FRENCH_GRAVEL12_MAT_NAME}
-                    category="Drainage"
-                    unitLabel="/LF"
-                    currentValue={frenchRate(materialPrices, FRENCH_GRAVEL12_MAT_NAME)}
-                    onSaved={refreshMaterialPrices}
-                  />
-                  <RateEditPopover
-                    table="misc_rates"
-                    name={FRENCH_GRAVEL12_LABOR_NAME}
-                    category="Drainage"
-                    unitLabel="/LF"
-                    currentValue={frenchRate(materialPrices, FRENCH_GRAVEL12_LABOR_NAME)}
-                    onSaved={refreshMaterialPrices}
-                  />
-                </>
-              )}
-              {frenchGravel === '24"' && (
-                <>
-                  <RateEditPopover
-                    table="misc_rates"
-                    name={FRENCH_GRAVEL24_MAT_NAME}
-                    category="Drainage"
-                    unitLabel="/LF"
-                    currentValue={frenchRate(materialPrices, FRENCH_GRAVEL24_MAT_NAME)}
-                    onSaved={refreshMaterialPrices}
-                  />
-                  <RateEditPopover
-                    table="misc_rates"
-                    name={FRENCH_GRAVEL24_LABOR_NAME}
-                    category="Drainage"
-                    unitLabel="/LF"
-                    currentValue={frenchRate(materialPrices, FRENCH_GRAVEL24_LABOR_NAME)}
-                    onSaved={refreshMaterialPrices}
-                  />
-                </>
-              )}
-            </p>
+            <p className="text-xs text-gray-500 mb-0.5">Gravel Bed</p>
             <select
               className="input text-sm py-1.5 w-full"
               value={frenchGravel}
@@ -1474,16 +1561,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                             <option key={t}>{t}</option>
                           ))}
                         </select>
-                        {FIXTURE_LABOR_RATE_NAME[row.type] && (
-                          <RateEditPopover
-                            table="labor_rates"
-                            name={FIXTURE_LABOR_RATE_NAME[row.type]}
-                            category="Drainage"
-                            mode="coefficient"
-                            unitLabel="hr/ea"
-                            currentValue={rate?.laborHrs}
-                          />
-                        )}
                       </div>
                     </td>
                     <td className="py-1 pr-2">
@@ -1553,16 +1630,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                     <td className="py-1.5 text-right text-gray-400 text-xs pr-2">
                       <span className="inline-flex items-center justify-end">
                         {qty > 0 ? (qty * rate.laborHrs).toFixed(1) : `${rate.laborHrs} / ea`}
-                        {laborName && (
-                          <RateEditPopover
-                            table="labor_rates"
-                            name={laborName}
-                            category="Drainage"
-                            mode="coefficient"
-                            unitLabel="hr/ea"
-                            currentValue={rate.laborHrs}
-                          />
-                        )}
                       </span>
                     </td>
                     <td className="py-1.5 text-right text-gray-600 text-xs">
