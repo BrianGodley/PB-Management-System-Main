@@ -223,7 +223,7 @@ const GAS_TYPE_ARR = Object.entries(GAS_FIXTURE_TYPES).map(([label, t]) => ({ la
 const ELEC_TYPE_ARR = Object.entries(ELECTRICAL_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, fallback: t.cost, laborDbName: t.laborDbName, laborFallback: t.laborHrs }))
 const UTIL_CAT = { line: 'Utility Lines', gas: 'Gas Fixtures', elec: 'Electrical Fixtures' }
 function mergedUtilTypes(cat, builtInArr, materialRows) {
-  const extra = catalogOptions(materialRows, cat, 'House', { houseRows: 'null-vendor', stripPrefix: true })
+  const extra = catalogOptions(materialRows, cat, 'Standard', { houseRows: 'null-vendor', stripPrefix: true })
     .filter(o => !builtInArr.some(b => b.label === o.label))
     .map(o => ({
       label: o.label,
@@ -241,7 +241,7 @@ function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
   const laborVal = mp[builtIn?.laborDbName] ?? builtIn?.laborFallback ?? 0
   let matDbName = builtIn?.dbName
   let matFallback = builtIn?.fallback ?? 0
-  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : 'House'
+  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : 'Standard'
   const vrow = catalogItemFor(materialRows, cat, vsel, builtIn?.label, {
     ...CATALOG_OPTS,
     fallbackFirst: false,
@@ -254,9 +254,9 @@ function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
   const matOpt = { label: builtIn?.label, dbName: matDbName, fallback: matFallback }
   return { opts: merged, matOpt, matCost, laborVal, laborBuiltIn: builtIn }
 }
-const EP_LINE_ROW = () => ({ type: 'PVC Conduit with Electrical', lf: '', vendor: 'House' })
-const EP_GAS_ROW = () => ({ type: '12" Single Gas Ring', qty: '', vendor: 'House' })
-const EP_ELEC_ROW = () => ({ type: 'GFCI Protected Receptacles', qty: '', vendor: 'House' })
+const EP_LINE_ROW = () => ({ type: 'PVC Conduit with Electrical', lf: '', vendor: 'Standard' })
+const EP_GAS_ROW = () => ({ type: '12" Single Gas Ring', qty: '', vendor: 'Standard' })
+const EP_ELEC_ROW = () => ({ type: 'GFCI Protected Receptacles', qty: '', vendor: 'Standard' })
 
 // Reusable Electrical & Plumbing table (Utility Lines / Gas / Electrical).
 function EpTable({
@@ -314,7 +314,7 @@ function EpTable({
                   <td className="py-1 pr-2">
                     <select
                       className="input text-sm py-1 w-full"
-                      value={row.vendor || 'House'}
+                      value={row.vendor || 'Standard'}
                       onChange={e => upd(i, 'vendor', e.target.value)}
                       title="Vendor"
                     >
@@ -323,7 +323,7 @@ function EpTable({
                           {v.name}
                         </option>
                       ))}
-                      <option value="House">Standard</option>
+                      <option value="Standard">Standard</option>
                     </select>
                   </td>
                   <td className="py-1 pr-2">

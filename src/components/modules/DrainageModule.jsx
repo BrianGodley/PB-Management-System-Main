@@ -148,7 +148,7 @@ function drainMatCost(cat, row, TYPES, materialRows, catDefaults, mp) {
   const t = TYPES[row.type]
   let dbName = t?.dbName
   let fallback = t?.costPerLF ?? t?.cost ?? 0
-  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : catDefaults[cat] || 'House'
+  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : catDefaults[cat] || 'Standard'
   const vrow = catalogItemFor(materialRows, cat, vsel, row.type, {
     ...CATALOG_OPTS,
     fallbackFirst: false,
@@ -166,7 +166,7 @@ function drainMatCost(cat, row, TYPES, materialRows, catDefaults, mp) {
 // row in Master Rates under that marker + set its calc_meta and it appears here.
 function masterDrainTypes(cat, builtIn, materialRows, laborField) {
   const out = {}
-  ;(catalogOptions(materialRows, cat, 'House', { houseRows: 'null-vendor', stripPrefix: true }) || []).forEach(
+  ;(catalogOptions(materialRows, cat, 'Standard', { houseRows: 'null-vendor', stripPrefix: true }) || []).forEach(
     o => {
       if (builtIn[o.label]) return
       const meta = o.row.calc_meta || {}
@@ -597,8 +597,8 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
 
   // ── Vendor catalog helpers (material-only, per-row Vendor picker) ────────
   const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
-  const defaultVendorFor = cat => vendorsForCategory(cat)[0]?.id || 'House'
-  const effVendor = (cat, v) => (v && v !== 'auto' && v !== 'House' ? v : defaultVendorFor(cat))
+  const defaultVendorFor = cat => vendorsForCategory(cat)[0]?.id || 'Standard'
+  const effVendor = (cat, v) => (v && v !== 'auto' && v !== 'Standard' ? v : defaultVendorFor(cat))
   const catDefaults = {
     [DRAIN_CAT.pipe]: defaultVendorFor(DRAIN_CAT.pipe),
     [DRAIN_CAT.fixture]: defaultVendorFor(DRAIN_CAT.fixture),
@@ -610,7 +610,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
     const isSaved = initialData?.materialPrices && Object.keys(initialData.materialPrices).length > 0
     if (vendorDefaultsApplied || isSaved || !vendors.length) return
     setVendorDefaultsApplied(true)
-    const needs = v => !v || v === 'House' || v === 'auto'
+    const needs = v => !v || v === 'Standard' || v === 'auto'
     setPipeRows(rows =>
       (rows || []).map(r => (needs(r.vendor) ? { ...r, vendor: defaultVendorFor(DRAIN_CAT.pipe) } : r))
     )
@@ -1323,7 +1323,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                             {v.name}
                           </option>
                         ))}
-                        <option value="House">Standard</option>
+                        <option value="Standard">Standard</option>
                       </select>
                     </td>
                     <td className="py-1 pr-2">
@@ -1414,7 +1414,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                             {v.name}
                           </option>
                         ))}
-                        <option value="House">Standard</option>
+                        <option value="Standard">Standard</option>
                       </select>
                     </td>
                     <td className="py-1 pr-2">
@@ -1536,7 +1536,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                             {v.name}
                           </option>
                         ))}
-                        <option value="House">Standard</option>
+                        <option value="Standard">Standard</option>
                       </select>
                     </td>
                     <td className="py-1 pr-2">

@@ -267,7 +267,7 @@ export default function GroundTreatmentsSummary({ module }) {
   const priceForRow = (subcat, row, houseArray, defaultVal) => {
     const type = row?.type
     const vendor = row?.vendor
-    if (vendor && vendor !== 'House') {
+    if (vendor && vendor !== 'Standard') {
       if (type != null && materialPrices[`${subcat} - ${type}`] != null)
         return materialPrices[`${subcat} - ${type}`]
       if (type != null && materialPrices[type] != null) return materialPrices[type]

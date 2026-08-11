@@ -416,9 +416,9 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
 }
 
 // ── Default rows / factories ──────────────────────────────────────────────────
-const blankFlatRow = () => ({ vendor: 'House', type: 'Tile', sf: '', rateIn: '', subEach: '' })
-const blankCapRow = () => ({ vendor: 'House', type: 'None', widthIn: '', lf: '', qty: '', subEach: '' })
-const blankWallRow = () => ({ vendor: 'House', type: 'Sand Stucco', sf: '', rateIn: '', subEach: '' })
+const blankFlatRow = () => ({ vendor: 'Standard', type: 'Tile', sf: '', rateIn: '', subEach: '' })
+const blankCapRow = () => ({ vendor: 'Standard', type: 'None', widthIn: '', lf: '', qty: '', subEach: '' })
+const blankWallRow = () => ({ vendor: 'Standard', type: 'Sand Stucco', sf: '', rateIn: '', subEach: '' })
 
 const DEFAULT_FLAT_ROWS = () => [blankFlatRow(), { ...blankFlatRow(), type: 'Flagstone' }]
 const DEFAULT_CAP_ROWS = () => [blankCapRow(), blankCapRow()]
@@ -680,7 +680,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
                     <td className="py-1.5 pr-2">
                       <select
                         className="input text-sm py-1 w-full"
-                        value={row.vendor || 'House'}
+                        value={row.vendor || 'Standard'}
                         onChange={e =>
                           patchRow(setRows, i, { vendor: e.target.value }, compute, true)
                         }
@@ -799,7 +799,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
                     <td className="py-1.5 pr-2">
                       <select
                         className="input text-sm py-1 w-full"
-                        value={row.vendor || 'House'}
+                        value={row.vendor || 'Standard'}
                         onChange={e =>
                           patchRow(setCapRows, i, { vendor: e.target.value }, computeCapRow, true)
                         }

@@ -49,7 +49,7 @@ const SOURCE_LABEL = {
 // Resolve the effective vendor for a material_price edit: an explicit vendorId,
 // else the tenant's Standard vendor (universal price).
 async function resolvePriceVendor(vendorId) {
-  if (vendorId && vendorId !== 'House') return vendorId
+  if (vendorId && vendorId !== 'Standard') return vendorId
   const { data } = await supabase
     .from('subs_vendors')
     .select('id')

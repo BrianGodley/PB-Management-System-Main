@@ -599,7 +599,7 @@ const r2 = x => Math.round(((x || 0) + Number.EPSILON) * 100) / 100
 // rows (wpRows) — waterproofing is now specified per wall, not once per tab.
 const DEFAULT_CMU = () => ({
   blockType: DEFAULT_BLOCK_NAME,
-  vendor: 'House',
+  vendor: 'Standard',
   lf: '',
   heightIn: '',
   footingWIn: '12',
@@ -623,7 +623,7 @@ const DEFAULT_CMU = () => ({
   capRows: [blankCapRow()],
 })
 const DEFAULT_PIP = () => ({
-  vendor: 'House',
+  vendor: 'Standard',
   lf: '',
   heightIn: '',
   footingWIn: '12',
@@ -649,7 +649,7 @@ const DEFAULT_PIP = () => ({
 // CMU block+footing math with those inputs forced to zero.
 const DEFAULT_MODULAR = () => ({
   blockType: DEFAULT_BLOCK_NAME,
-  vendor: 'House',
+  vendor: 'Standard',
   lf: '',
   heightIn: '',
   footingWIn: '12',
@@ -668,7 +668,7 @@ const DEFAULT_MODULAR = () => ({
 // grout/rebar), just a different wall category.
 const DEFAULT_BRICK = () => ({
   blockType: DEFAULT_BLOCK_NAME,
-  vendor: 'House',
+  vendor: 'Standard',
   lf: '',
   heightIn: '',
   footingWIn: '12',
@@ -690,7 +690,7 @@ const DEFAULT_BRICK = () => ({
 // footing) PLUS its own Demo / Drainage / Backfilling sub-sections (flattened
 // fields, same as every other wall type). All pricing/labor is table-driven.
 const DEFAULT_TIMBER = () => ({
-  vendor: 'House',
+  vendor: 'Standard',
   timberType: 'Railroad Treated',
   lf: '',
   heightIn: '',
@@ -771,15 +771,15 @@ const WP_LABOR_KEY = {
   'Dimple Membrane': 'wpLabDimple',
 }
 
-const blankWallFinishRow = () => ({ vendor: 'House', type: 'Sand Stucco', sf: '', rateIn: '', subEach: '' })
-const blankCapRow = () => ({ vendor: 'House', type: 'None', widthIn: '', lf: '', qty: '', subEach: '' })
-const blankWpRow = () => ({ vendor: 'House', type: 'None', sf: '', subEach: '' })
+const blankWallFinishRow = () => ({ vendor: 'Standard', type: 'Sand Stucco', sf: '', rateIn: '', subEach: '' })
+const blankCapRow = () => ({ vendor: 'Standard', type: 'None', widthIn: '', lf: '', qty: '', subEach: '' })
+const blankWpRow = () => ({ vendor: 'Standard', type: 'None', sf: '', subEach: '' })
 
 // ── Vendor-catalog material price ─────────────────────────────────────────────
 // The ONLY thing the Vendor selection changes: the material $ source. When a
 // real vendor is selected AND a material_rates row exists (name===dbName &&
 // vendor_id===vendorId) use that row's unit_cost; otherwise fall back to the
-// House price (name-keyed mp[dbName]) then the hard fallback. Vendor 'House'
+// House price (name-keyed mp[dbName]) then the hard fallback. Vendor 'Standard'
 // resolves to exactly the original math, so In-House numbers never move.
 // Shared resolver (src/lib/materialCatalog.js) — same vendor→House→fallback order.
 const wallMatPrice = resolveMaterialPrice
@@ -918,7 +918,7 @@ function computeCapRow(row, mp, materialRows) {
           rr =>
             rr.sub_category === WALL_CAP_SUBCAT &&
             rr.name === row.type &&
-            (v && v !== 'House' ? rr.vendor_id === v : rr.vendor_id == null)
+            (v && v !== 'Standard' ? rr.vendor_id === v : rr.vendor_id == null)
         ) || (materialRows || []).find(rr => rr.sub_category === WALL_CAP_SUBCAT && rr.name === row.type)
       const cm = capRow?.calc_meta || {}
       const perLf = n(cm.per_lf) || 1
@@ -1033,7 +1033,7 @@ function wallBlockOptions(materialRows, vendorSel) {
     r =>
       r.sub_category === WALL_BLOCK_SUBCAT &&
       blockHasDims(r) &&
-      (!vendorSel || vendorSel === 'House' ? r.vendor_id == null : r.vendor_id === vendorSel)
+      (!vendorSel || vendorSel === 'Standard' ? r.vendor_id == null : r.vendor_id === vendorSel)
   )
 }
 
@@ -1054,7 +1054,7 @@ function resolveBrick(wall, materialRows) {
   const inSub = (materialRows || []).filter(r => r.sub_category === BRICK_SUBCAT)
   const vsel = wall.vendor
   const forVendor = r =>
-    !vsel || vsel === 'House' ? r.vendor_id == null : r.vendor_id === vsel
+    !vsel || vsel === 'Standard' ? r.vendor_id == null : r.vendor_id === vsel
   const row =
     inSub.find(r => r.id === wall.blockType && forVendor(r)) ||
     inSub.find(r => r.id === wall.blockType) ||
@@ -1078,13 +1078,13 @@ function bondBeamOptions(materialRows, vendorSel) {
   return (materialRows || []).filter(
     r =>
       r.sub_category === BOND_BEAM_SUBCAT &&
-      (!vendorSel || vendorSel === 'House' ? r.vendor_id == null : r.vendor_id === vendorSel)
+      (!vendorSel || vendorSel === 'Standard' ? r.vendor_id == null : r.vendor_id === vendorSel)
   )
 }
 function resolveBondBeam(wall, materialRows) {
   const inSub = (materialRows || []).filter(r => r.sub_category === BOND_BEAM_SUBCAT)
   const vsel = wall.bbVendor
-  const forV = r => (!vsel || vsel === 'House' ? r.vendor_id == null : r.vendor_id === vsel)
+  const forV = r => (!vsel || vsel === 'Standard' ? r.vendor_id == null : r.vendor_id === vsel)
   const row =
     inSub.find(r => r.id === wall.bbBlockType && forV(r)) ||
     inSub.find(r => r.id === wall.bbBlockType) ||
@@ -1097,7 +1097,7 @@ function wallCatalogTypes(materialRows, subcat, vendorSel) {
   const out = []
   ;(materialRows || []).forEach(r => {
     if (r.sub_category !== subcat || !r.name) return
-    const ok = !vendorSel || vendorSel === 'House' ? r.vendor_id == null : r.vendor_id === vendorSel
+    const ok = !vendorSel || vendorSel === 'Standard' ? r.vendor_id == null : r.vendor_id === vendorSel
     if (ok && !seen.has(r.name)) {
       seen.add(r.name)
       out.push(r.name)
@@ -1111,7 +1111,7 @@ function wallCatalogTypes(materialRows, subcat, vendorSel) {
 function catalogItemPrice(materialRows, subcat, name, vendorSel, fallback) {
   const rows = (materialRows || []).filter(r => r.sub_category === subcat && r.name === name)
   if (!rows.length) return fallback
-  const vsel = vendorSel && vendorSel !== 'House' ? vendorSel : null
+  const vsel = vendorSel && vendorSel !== 'Standard' ? vendorSel : null
   const row = rows.find(r => r.vendor_id === vsel) || rows.find(r => r.vendor_id == null) || rows[0]
   return row && row.unit_cost != null && row.unit_cost !== '' ? n(row.unit_cost) : fallback
 }
@@ -1121,7 +1121,7 @@ function catalogItemPrice(materialRows, subcat, name, vendorSel, fallback) {
 function wallCatalogRow(materialRows, subcat, name, vendorSel) {
   const rows = (materialRows || []).filter(r => r.sub_category === subcat && r.name === name)
   if (!rows.length) return null
-  const vsel = vendorSel && vendorSel !== 'House' ? vendorSel : null
+  const vsel = vendorSel && vendorSel !== 'Standard' ? vendorSel : null
   return rows.find(r => r.vendor_id === vsel) || rows.find(r => r.vendor_id == null) || rows[0]
 }
 // True when a catalog row exists but carries no usable price.
@@ -1137,7 +1137,7 @@ function usePricePrompt() {
   const check = (materialRows, subcat, name, vendor) => {
     const row = wallCatalogRow(materialRows, subcat, name, vendor)
     if (isPricelessRow(row)) {
-      setPrompt({ materialId: row.id, vendorId: vendor && vendor !== 'House' ? vendor : null, name })
+      setPrompt({ materialId: row.id, vendorId: vendor && vendor !== 'Standard' ? vendor : null, name })
       return true
     }
     return false
@@ -1148,7 +1148,7 @@ function usePricePrompt() {
     if (isPricelessRow(row)) {
       setPrompt({
         materialId: row.id,
-        vendorId: vendor && vendor !== 'House' ? vendor : null,
+        vendorId: vendor && vendor !== 'Standard' ? vendor : null,
         name: name || row.name,
       })
       return true
@@ -1178,7 +1178,7 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
   }
 
   // Vendor only swaps where each MATERIAL unit price comes from; labor rates
-  // (r) and all geometry stay exactly as before. Vendor 'House' resolves to
+  // (r) and all geometry stay exactly as before. Vendor 'Standard' resolves to
   // the original master-rate / catalog prices, so In-House math is unchanged.
   const v = wall.vendor
   const pm = key => wallMatPrice(WALL_RATES[key].db, v, materialRows, mp, WALL_RATES[key].fb)
@@ -1520,7 +1520,7 @@ function calcWalls(
     const tFootingCY = tFootingCF / 27
     const tHorizRebarLF = tHb * tLF
     const tFootPump = (wall.footingPump ?? 'No') === 'Yes'
-    const tpm = key => wallMatPrice(WALL_RATES[key].db, 'House', materialRows, mp, WALL_RATES[key].fb)
+    const tpm = key => wallMatPrice(WALL_RATES[key].db, 'Standard', materialRows, mp, WALL_RATES[key].fb)
     // Footing excavation is priced in the Dig and Haul Footing Soil section —
     // install (rebar + pour) + material only here.
     const tFootingHrs =
@@ -1770,7 +1770,7 @@ const CAP_TYPES = ['None', 'Flagstone', 'Precast', 'PIP Concrete', 'Bullnose Bri
 // Waterproofing is now a SINGLE field per wall — collapse any legacy multi-row
 // wp to the first meaningful line (prefer the first non-None).
 function initWallWp(w = {}) {
-  const rows = Array.isArray(w.wpRows) ? w.wpRows.map(r => ({ vendor: 'House', subEach: '', ...r })) : []
+  const rows = Array.isArray(w.wpRows) ? w.wpRows.map(r => ({ vendor: 'Standard', subEach: '', ...r })) : []
   if (!rows.length) return [blankWpRow()]
   const firstReal = rows.find(r => r.type && r.type !== 'None')
   return [firstReal || rows[0]]
@@ -1782,7 +1782,7 @@ function initWallExtras(w = {}) {
     ? w.finishRows.map(r => ({ ...r }))
     : [{ ...blankWallFinishRow(), type: 'None' }]
   const cap = Array.isArray(w.capRows) && w.capRows.length
-    ? w.capRows.map(r => ({ vendor: 'House', subEach: '', ...r }))
+    ? w.capRows.map(r => ({ vendor: 'Standard', subEach: '', ...r }))
     : [blankCapRow()]
   return { finishRows: fin, capRows: cap }
 }
@@ -1795,7 +1795,7 @@ function initCmuWalls(src = {}) {
   if (src.cmuWalls)
     return src.cmuWalls.map(w => ({
       blockType: DEFAULT_BLOCK_NAME,
-      vendor: 'House',
+      vendor: 'Standard',
       subEach: '',
       wallRebarSize: '#4',
       wallHorizBars: '',
@@ -1814,7 +1814,7 @@ function initCmuWalls(src = {}) {
     return [
       {
         blockType: DEFAULT_BLOCK_NAME,
-        vendor: 'House',
+        vendor: 'Standard',
         lf: src.cmuLF,
         heightIn: src.cmuHeightIn,
         footingWIn: src.cmuFootingWIn ?? '12',
@@ -1822,7 +1822,7 @@ function initCmuWalls(src = {}) {
         rebarSpIn: src.cmuRebarSpIn ?? '16',
         horizBars: src.cmuHorizBars ?? '2',
         bondBeams: src.cmuBondBeams ?? '1',
-        bbVendor: src.cmuBbVendor ?? 'House',
+        bbVendor: src.cmuBbVendor ?? 'Standard',
         bbBlockType: src.cmuBbBlockType ?? '',
         pctGrouted: src.cmuPctGrouted ?? '100',
         pctCurved: src.cmuPctCurved ?? '0',
@@ -1841,7 +1841,7 @@ function initPipWalls(src = {}) {
   // always-truck behavior); the per-wall toggle can switch to hand mix.
   if (src.pipWalls)
     return src.pipWalls.map(w => ({
-      vendor: 'House',
+      vendor: 'Standard',
       subEach: '',
       pipFootingRebarSize: '#4',
       pipWallHorizBars: '',
@@ -1859,7 +1859,7 @@ function initPipWalls(src = {}) {
   if (src.pipLF !== undefined)
     return [
       {
-        vendor: 'House',
+        vendor: 'Standard',
         lf: src.pipLF,
         heightIn: src.pipHeightIn,
         footingPump: 'Yes',
@@ -1876,7 +1876,7 @@ function initModularWalls(src = {}) {
   if (src.modularWalls)
     return src.modularWalls.map(w => ({
       blockType: DEFAULT_BLOCK_NAME,
-      vendor: 'House',
+      vendor: 'Standard',
       subEach: '',
       ...DEMO_DEFAULTS(),
       ...DRAIN_DEFAULTS(),
@@ -1893,7 +1893,7 @@ function initBrickWalls(src = {}) {
   if (src.brickWalls)
     return src.brickWalls.map(w => ({
       blockType: DEFAULT_BLOCK_NAME,
-      vendor: 'House',
+      vendor: 'Standard',
       subEach: '',
       ...DEMO_DEFAULTS(),
       ...DRAIN_DEFAULTS(),
@@ -1914,7 +1914,7 @@ function initBrickWalls(src = {}) {
 function initTimberWalls(src = {}) {
   if (src.timberWalls)
     return src.timberWalls.map(w => ({
-      vendor: 'House',
+      vendor: 'Standard',
       timberType: 'Railroad Treated',
       subEach: '',
       horizBars: '2',
@@ -1935,7 +1935,7 @@ function initTimberWalls(src = {}) {
   if (hasLegacyTimber)
     return [
       {
-        vendor: src.timberVendor ?? 'House',
+        vendor: src.timberVendor ?? 'Standard',
         timberType: src.timberType ?? 'Railroad Treated',
         lf: src.timberLF ?? '',
         heightIn: src.timberHeightIn ?? '',
@@ -1958,9 +1958,9 @@ function initTimberWalls(src = {}) {
 }
 function initWpRows(src = {}) {
   if (Array.isArray(src.wpRows) && src.wpRows.length)
-    return src.wpRows.map(w => ({ vendor: 'House', subEach: '', ...w }))
+    return src.wpRows.map(w => ({ vendor: 'Standard', subEach: '', ...w }))
   if (src.wpType || src.wpSF)
-    return [{ vendor: 'House', type: src.wpType || 'None', sf: src.wpSF || '', subEach: '' }]
+    return [{ vendor: 'Standard', type: src.wpType || 'None', sf: src.wpSF || '', subEach: '' }]
   return [blankWpRow()]
 }
 // Migrate the legacy fixed finish fields (sandStuccoSF / …RateIn) into the new
@@ -1973,7 +1973,7 @@ function initWallFinishRows(src = {}) {
   const push = (type, sfKey, rateKey) => {
     if (n(src[sfKey]) > 0 || (src[rateKey] != null && src[rateKey] !== ''))
       rows.push({
-        vendor: 'House',
+        vendor: 'Standard',
         type,
         sf: src[sfKey] ?? '',
         rateIn: src[rateKey] ?? '',
@@ -2019,7 +2019,7 @@ function makeTab(src = {}) {
       row => n(row.sf) > 0 || (row.rateIn != null && row.rateIn !== '')
     )
     const legacyCaps = (Array.isArray(src.capRows) ? src.capRows : [])
-      .map(row => ({ vendor: 'House', subEach: '', ...row }))
+      .map(row => ({ vendor: 'Standard', subEach: '', ...row }))
       .filter(row => row.type && row.type !== 'None')
     if (legacyFinish.length)
       cmuWalls[0].finishRows = [...(cmuWalls[0].finishRows || []), ...legacyFinish]
@@ -2051,12 +2051,12 @@ function makeTab(src = {}) {
 // one wall sub-type (e.g. Modular Wall) from appearing in another sub-type's picker
 // (e.g. CMU Wall Block) just because both share the 'Walls' category.
 function vendorOptsForSub(vendorOptions, materialRows, subcat) {
-  if (!subcat) return vendorOptions || [{ value: 'House', label: 'Standard' }]
+  if (!subcat) return vendorOptions || [{ value: 'Standard', label: 'Standard' }]
   const allowed = new Set(
     (materialRows || []).filter(r => r.sub_category === subcat && r.vendor_id).map(r => r.vendor_id)
   )
-  return (vendorOptions || [{ value: 'House', label: 'Standard' }]).filter(
-    o => o.value === 'House' || allowed.has(o.value)
+  return (vendorOptions || [{ value: 'Standard', label: 'Standard' }]).filter(
+    o => o.value === 'Standard' || allowed.has(o.value)
   )
 }
 
@@ -2089,7 +2089,7 @@ function WallWaterproofing({
   const wpCatalog = wallCatalogTypes(materialRows, WALL_WP_SUBCAT, row.vendor)
   // Standard/House → built-in types (+ Standard catalog). A specific vendor →
   // ONLY that vendor's catalog products.
-  const wpIsHouse = !row.vendor || row.vendor === 'House'
+  const wpIsHouse = !row.vendor || row.vendor === 'Standard'
   const wpShown = wpIsHouse
     ? [...wpBase, ...wpCatalog.filter(t => !wpBase.includes(t))]
     : wpCatalog
@@ -2099,7 +2099,7 @@ function WallWaterproofing({
       <div className="flex items-center gap-1.5 flex-wrap">
         <DropdownSelect
           className="input text-sm py-1.5 flex-1 min-w-0"
-          value={row.vendor || 'House'}
+          value={row.vendor || 'Standard'}
           onChange={v => {
             onWpUpdate(0, 'vendor', v)
             pp.check(materialRows, WALL_WP_SUBCAT, row.type, v)
@@ -2180,7 +2180,7 @@ function WallFinishesEditor({
           const catalog = wallCatalogTypes(materialRows, WALL_FINISH_SUBCAT, row.vendor)
           // Standard/House → built-in finishes (+ Standard catalog). A specific
           // vendor → ONLY that vendor's catalog products.
-          const finIsHouse = !row.vendor || row.vendor === 'House'
+          const finIsHouse = !row.vendor || row.vendor === 'Standard'
           const shown = finIsHouse
             ? [...WALL_FINISH_TYPES, ...catalog.filter(t => !WALL_FINISH_TYPES.includes(t))]
             : catalog
@@ -2188,7 +2188,7 @@ function WallFinishesEditor({
             <div key={i} className="flex items-center gap-1.5">
               <DropdownSelect
                 className="input text-sm py-1 flex-1 min-w-0"
-                value={row.vendor || 'House'}
+                value={row.vendor || 'Standard'}
                 onChange={v => {
                   onPatch(i, { vendor: v }, true)
                   pp.check(materialRows, WALL_FINISH_SUBCAT, row.type, v)
@@ -2252,7 +2252,7 @@ function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, ma
           const catalog = wallCatalogTypes(materialRows, WALL_CAP_SUBCAT, row.vendor)
           // Standard/House → built-in types (+ any Standard catalog). A specific
           // vendor → ONLY that vendor's catalog products (don't append built-ins).
-          const capIsHouse = !row.vendor || row.vendor === 'House'
+          const capIsHouse = !row.vendor || row.vendor === 'Standard'
           const shown = capIsHouse
             ? [...capBase, ...catalog.filter(t => !capBase.includes(t))]
             : catalog
@@ -2261,7 +2261,7 @@ function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, ma
             <div key={i} className="flex items-center gap-1.5">
               <DropdownSelect
                 className="input text-sm py-1 flex-1 min-w-0"
-                value={row.vendor || 'House'}
+                value={row.vendor || 'Standard'}
                 onChange={v => {
                   onPatch(i, { vendor: v }, true)
                   pp.check(materialRows, WALL_CAP_SUBCAT, row.type, v)
@@ -2525,12 +2525,12 @@ function CmuWallEntry({
       <label className="block text-xs text-gray-800 mb-1 font-medium">Installation</label>
       <div className="grid grid-cols-2 gap-2">
         {/* Vendor — the ONLY thing that changes where the material $ comes
-            from. "House" = the original master-rate / catalog pricing. */}
+            from. "Standard" = the original master-rate / catalog pricing. */}
         <div className="col-span-2">
           <label className="block text-xs text-gray-500 mb-1">Vendor</label>
           <DropdownSelect
             className="input text-sm py-1.5 w-full"
-            value={wall.vendor || 'House'}
+            value={wall.vendor || 'Standard'}
             onChange={nv => {
               set('vendor')(nv)
               // Point Block Type at a block this vendor actually offers.
@@ -2761,9 +2761,9 @@ function PipWallEntry({
           <label className="block text-xs text-gray-500 mb-1">Concrete Vendor</label>
           <DropdownSelect
             className="input text-sm py-1.5 w-full"
-            value={wall.vendor || 'House'}
+            value={wall.vendor || 'Standard'}
             onChange={v => set('vendor')(v)}
-            options={concreteVendorOptions || [{ value: 'House', label: 'Standard' }]}
+            options={concreteVendorOptions || [{ value: 'Standard', label: 'Standard' }]}
           />
         </div>
         <div>
@@ -2949,12 +2949,12 @@ function ModularWallEntry({
           <label className="block text-xs text-gray-500 mb-1">Vendor</label>
           <DropdownSelect
             className="input text-sm py-1.5 w-full"
-            value={wall.vendor || (typeSource.master ? vendorOptions?.[0]?.value : undefined) || 'House'}
+            value={wall.vendor || (typeSource.master ? vendorOptions?.[0]?.value : undefined) || 'Standard'}
             onChange={v => {
               set('vendor')(v)
               if (typeSource.master) {
                 const first = (materialRows || []).find(
-                  r => r.sub_category === typeSource.subcat && (v === 'House' ? r.vendor_id == null : r.vendor_id === v)
+                  r => r.sub_category === typeSource.subcat && (v === 'Standard' ? r.vendor_id == null : r.vendor_id === v)
                 )
                 set('blockType')(first ? first.id : '')
               }
@@ -2969,12 +2969,12 @@ function ModularWallEntry({
                 // Options + price come live from the master list (marker =
                 // sub_category). Add a product in Master Rates and it appears here.
                 // Vendor-first: the selected vendor's Modular Wall products.
-                const _vsel = wall.vendor && wall.vendor !== 'House' ? wall.vendor : vendorOptions?.[0]?.value
+                const _vsel = wall.vendor && wall.vendor !== 'Standard' ? wall.vendor : vendorOptions?.[0]?.value
                 const opts = (materialRows || [])
                   .filter(
                     r =>
                       r.sub_category === typeSource.subcat &&
-                      (_vsel === 'House' ? r.vendor_id == null : r.vendor_id === _vsel)
+                      (_vsel === 'Standard' ? r.vendor_id == null : r.vendor_id === _vsel)
                   )
                   .map(r => ({ id: r.id, label: r.name, row: r }))
                 const selRow = opts.find(o => o.row.id === wall.blockType)?.row || opts[0]?.row
@@ -3181,7 +3181,7 @@ function TimberWallEntry({
           <label className="block text-xs text-gray-500 mb-1">Vendor</label>
           <DropdownSelect
             className="input text-sm py-1.5 w-full"
-            value={wall.vendor || 'House'}
+            value={wall.vendor || 'Standard'}
             onChange={v => set('vendor')(v)}
             options={vendorOptsForSub(vendorOptions, materialRows, WOOD_SUBCAT)}
           />
@@ -3194,7 +3194,7 @@ function TimberWallEntry({
             onChange={v => set('timberType')(v)}
             options={(() => {
               const catalog = wallCatalogTypes(materialRows, WOOD_SUBCAT, wall.vendor)
-              const isHouse = !wall.vendor || wall.vendor === 'House'
+              const isHouse = !wall.vendor || wall.vendor === 'Standard'
               const shown = isHouse
                 ? [...TIMBER_TYPES, ...catalog.filter(t => !TIMBER_TYPES.includes(t))]
                 : catalog
@@ -3620,7 +3620,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
     const rows = (materialRows || []).filter(r => r.sub_category === MODULAR_SUBCAT)
     const ids = [...new Set(rows.filter(r => r.vendor_id).map(r => r.vendor_id))]
     const out = ids.map(id => ({ value: id, label: vendorNames[id] || 'Vendor' }))
-    if (rows.some(r => r.vendor_id == null)) out.unshift({ value: 'House', label: 'Standard' })
+    if (rows.some(r => r.vendor_id == null)) out.unshift({ value: 'Standard', label: 'Standard' })
     return out
   })()
 

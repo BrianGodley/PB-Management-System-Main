@@ -29,7 +29,7 @@ import { resolveMaterialPrice, fetchModuleCatalog, fetchStandardRateMap } from '
 //   add/remove ROW table with a Vendor column + an Item column. The Item drives
 //   the pricing/labor FORMULA (per-plant/day, per-size, install rate) exactly as
 //   before; the Vendor ONLY changes where the MATERIAL unit price comes from
-//   (House named-rate fallback vs. a vendor's material_rates row). Vendor 'House'
+//   (House named-rate fallback vs. a vendor's material_rates row). Vendor 'Standard'
 //   resolves to the original math, so In-House numbers never move.
 //
 //   In-House and Subcontractor are independent calculators (makeTab / ihTab /
@@ -196,7 +196,7 @@ function getLargePerDay(laborRates, type) {
 // The ONLY thing the Vendor selection changes: the material $ source. When a
 // real vendor is selected AND a material_rates row exists (name===dbName &&
 // vendor_id===vendorId) use that row's unit_cost; otherwise fall back to the
-// House price (name-keyed mp[dbName]) then the hard fallback. Vendor 'House'
+// House price (name-keyed mp[dbName]) then the hard fallback. Vendor 'Standard'
 // resolves to exactly the original math, so In-House numbers never move.
 // Shared resolver (src/lib/materialCatalog.js) — same vendor→House→fallback
 // order. Planting keeps its own separate material/labor maps (plant names can
@@ -444,17 +444,17 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
 // ── Default rows / factories ──────────────────────────────────────────────────
 function newSmallRow(type = 'Flats of Groundcover', materialPrices = {}, materialRows = []) {
   const fb = SMALL_PLANT_DEFAULTS[type]?.price ?? 0
-  return { vendor: 'House', type, qty: '', price: plantMatPrice(type, 'House', materialRows, materialPrices, fb), subEach: '' }
+  return { vendor: 'Standard', type, qty: '', price: plantMatPrice(type, 'Standard', materialRows, materialPrices, fb), subEach: '' }
 }
 function newLargeRow(type = '15 gallon standard', materialPrices = {}, materialRows = []) {
   const fb = LARGE_PLANT_DEFAULTS[type]?.price ?? 0
-  return { vendor: 'House', type, qty: '', price: plantMatPrice(type, 'House', materialRows, materialPrices, fb), subEach: '' }
+  return { vendor: 'Standard', type, qty: '', price: plantMatPrice(type, 'Standard', materialRows, materialPrices, fb), subEach: '' }
 }
-const blankAddonRow = () => ({ vendor: 'House', type: 'Tree Stake', qty: '', subEach: '' })
+const blankAddonRow = () => ({ vendor: 'Standard', type: 'Tree Stake', qty: '', subEach: '' })
 
 const DEFAULT_SMALL_ROWS = () =>
   Array.from({ length: 4 }, () => ({
-    vendor: 'House',
+    vendor: 'Standard',
     type: 'Flats of Groundcover',
     qty: '',
     price: SMALL_PLANT_DEFAULTS['Flats of Groundcover'].price,
@@ -462,7 +462,7 @@ const DEFAULT_SMALL_ROWS = () =>
   }))
 const DEFAULT_LARGE_ROWS = () =>
   Array.from({ length: 4 }, () => ({
-    vendor: 'House',
+    vendor: 'Standard',
     type: '15 gallon standard',
     qty: '',
     price: LARGE_PLANT_DEFAULTS['15 gallon standard'].price,
@@ -490,7 +490,7 @@ const DEFAULT_MANUAL_ROWS = [
 function migrateAddonRows(a = {}) {
   const rows = []
   const push = (type, field) => {
-    if (n(a[field]) > 0) rows.push({ vendor: 'House', type, qty: a[field], subEach: '' })
+    if (n(a[field]) > 0) rows.push({ vendor: 'Standard', type, qty: a[field], subEach: '' })
   }
   push('Tree Stake', 'treeStakes')
   push('Root Barrier 12"', 'rootBarrier12')
@@ -514,13 +514,13 @@ function makeTab(src = {}) {
     hoursAdj: src.hoursAdj ?? '',
     distanceLF: src.distanceLF ?? '',
     smallPlantRows: src.smallPlantRows
-      ? src.smallPlantRows.map(r => ({ vendor: 'House', subEach: '', ...r }))
+      ? src.smallPlantRows.map(r => ({ vendor: 'Standard', subEach: '', ...r }))
       : DEFAULT_SMALL_ROWS(),
     largePlantRows: src.largePlantRows
-      ? src.largePlantRows.map(r => ({ vendor: 'House', subEach: '', ...r }))
+      ? src.largePlantRows.map(r => ({ vendor: 'Standard', subEach: '', ...r }))
       : DEFAULT_LARGE_ROWS(),
     addonRows: src.addonRows
-      ? src.addonRows.map(r => ({ vendor: 'House', subEach: '', ...r }))
+      ? src.addonRows.map(r => ({ vendor: 'Standard', subEach: '', ...r }))
       : migrateAddonRows(legacyAddons),
     otherAddons: src.otherAddons
       ? { ...OTHER_ADDON_DEFAULTS, ...src.otherAddons }
@@ -710,7 +710,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
   // ── Vendor helpers ──────────────────────────────────────────────────────────
   const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id))
   const vendorOptions = [
-    { value: 'House', label: 'Standard' },
+    { value: 'Standard', label: 'Standard' },
     ...vendorsForCategory(PLANTING_CATEGORY).map(v => ({ value: v.id, label: v.name })),
   ]
 
@@ -813,13 +813,13 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
                 const c = computePlantRow(row, perDay)
                 const masterPrice =
                   materialPrices[row.type] ?? defaultsMap[row.type]?.price ?? 0
-                const isHouse = !row.vendor || row.vendor === 'House'
+                const isHouse = !row.vendor || row.vendor === 'Standard'
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1.5 pr-2">
                       <select
                         className="input text-sm py-1 w-full"
-                        value={row.vendor || 'House'}
+                        value={row.vendor || 'Standard'}
                         onChange={e => plantUpdate(setRows, defaultsMap, i, 'vendor', e.target.value)}
                       >
                         {vendorOptions.map(o => (
@@ -946,14 +946,14 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
               {addonRows.map((row, i) => {
                 const meta = ADDON_META[row.type] || {}
                 const c = computeAddonRow(row, laborRates, materialPrices, materialRows)
-                const isHouse = !row.vendor || row.vendor === 'House'
+                const isHouse = !row.vendor || row.vendor === 'Standard'
                 const houseMat = mp(materialPrices, meta.matKey)
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1.5 pr-2">
                       <select
                         className="input text-sm py-1 w-full"
-                        value={row.vendor || 'House'}
+                        value={row.vendor || 'Standard'}
                         onChange={e => addonUpdate(i, 'vendor', e.target.value)}
                       >
                         {vendorOptions.map(o => (

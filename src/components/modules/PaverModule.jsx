@@ -200,7 +200,7 @@ function calcPaver(
     // catalog item; House ('Class II Roadbase') uses the seeded rate, falling
     // back to the legacy single base-rock rate.
     let baseTonRate
-    if (row.baseVendor && row.baseVendor !== 'House' && row.baseVendor !== 'auto') {
+    if (row.baseVendor && row.baseVendor !== 'Standard' && row.baseVendor !== 'auto') {
       const bItem = paverItemFor(
         PAVER_CAT.base,
         row.baseVendor,
@@ -499,9 +499,9 @@ const DEFAULT_STATE = {
   crewType: 'Paver',
   hoursAdj: 0,
   areaRows: [
-    { label: 'Area 1', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: 'House', baseType: 'Class II Roadbase' },
-    { label: 'Area 2', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: 'House', baseType: 'Class II Roadbase' },
-    { label: 'Area 3', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: 'House', baseType: 'Class II Roadbase' },
+    { label: 'Area 1', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: 'Standard', baseType: 'Class II Roadbase' },
+    { label: 'Area 2', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: 'Standard', baseType: 'Class II Roadbase' },
+    { label: 'Area 3', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: 'Standard', baseType: 'Class II Roadbase' },
   ],
   straightCutLF: '',
   curvedCutLF: '',
@@ -535,9 +535,9 @@ const DEFAULT_STATE = {
   //    are NOT mirrored. Sub cost itself uses an install-only whole-job rate
   //    (see calc below); the other mirrored fields are captured for scope.
   subAreaRows: [
-    { label: 'Area 1', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: 'House', baseType: 'Class II Roadbase', installType: 'Hand Demo', largeFormat: false, under500: false },
-    { label: 'Area 2', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: 'House', baseType: 'Class II Roadbase', installType: 'Hand Demo', largeFormat: false, under500: false },
-    { label: 'Area 3', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: 'House', baseType: 'Class II Roadbase', installType: 'Hand Demo', largeFormat: false, under500: false },
+    { label: 'Area 1', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: 'Standard', baseType: 'Class II Roadbase', installType: 'Hand Demo', largeFormat: false, under500: false },
+    { label: 'Area 2', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: 'Standard', baseType: 'Class II Roadbase', installType: 'Hand Demo', largeFormat: false, under500: false },
+    { label: 'Area 3', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: 'Standard', baseType: 'Class II Roadbase', installType: 'Hand Demo', largeFormat: false, under500: false },
   ],
   // Sub install line items — SF per install type + two surcharge lines.
   subInstall: {
@@ -1657,7 +1657,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           <tbody className="divide-y divide-gray-50">
             {state[kArea].map((row, i) => {
               const a = (isSub ? calc.subAreas : calc.areas)[i] || {}
-              const isRealBase = row.baseVendor && row.baseVendor !== 'House'
+              const isRealBase = row.baseVendor && row.baseVendor !== 'Standard'
               const bOpts = isRealBase
                 ? paverOptions(PAVER_CAT.base, row.baseVendor, materialRows)
                 : ['Class II Roadbase']
@@ -1666,11 +1666,11 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                   <td className={td}>
                     <select
                       className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
-                      value={row.baseVendor || 'House'}
+                      value={row.baseVendor || 'Standard'}
                       onChange={e => {
                         const v = e.target.value
                         setRow(kArea, i, 'baseVendor', v)
-                        if (v === 'House') {
+                        if (v === 'Standard') {
                           setRow(kArea, i, 'baseId', '')
                           setRow(kArea, i, 'baseType', 'Class II Roadbase')
                         } else {
@@ -1680,7 +1680,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                         }
                       }}
                     >
-                      <option value="House">Standard</option>
+                      <option value="Standard">Standard</option>
                       {vendorsForCategory(PAVER_CAT.base).map(v => (
                         <option key={v.id} value={v.id}>
                           {v.name}

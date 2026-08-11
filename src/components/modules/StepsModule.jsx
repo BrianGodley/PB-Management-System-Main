@@ -103,7 +103,7 @@ function matStepRowCalc(r, laborRates, materialRows, cat = PAVER_STEP_CAT, price
   const hrs = sf > 0 && rate > 0 ? sf / rate : 0
   let price = 0
   let sfPerPallet = 0
-  if (r.vendor && r.vendor !== 'House' && r.vendor !== 'Custom') {
+  if (r.vendor && r.vendor !== 'Standard' && r.vendor !== 'Custom') {
     const item = paverItemFor(cat, r.vendor, r.type, materialRows)
     if (item) {
       price = priceOf(item)
@@ -644,8 +644,8 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
 const cellSel =
   'w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400'
 
-const PAVER_ROW = () => ({ vendor: 'House', type: '', form: 'Straight', sf: '', grouted: false })
-const CONC_ROW = () => ({ vendor: 'House', type: 'Standard', form: 'Straight', sf: '', finish: 'Smooth' })
+const PAVER_ROW = () => ({ vendor: 'Standard', type: '', form: 'Straight', sf: '', grouted: false })
+const CONC_ROW = () => ({ vendor: 'Standard', type: 'Standard', form: 'Straight', sf: '', finish: 'Smooth' })
 const MANUAL_ROW = () => ({ label: '', hours: '', materials: '', subCost: '' })
 
 const DEFAULT_PAVER_ROWS = () => [PAVER_ROW(), PAVER_ROW(), PAVER_ROW()]
@@ -697,7 +697,7 @@ function MaterialStepSection({
                     value={row.vendor}
                     onChange={e => setRow(i, 'vendor', e.target.value)}
                   >
-                    <option value="House">Standard</option>
+                    <option value="Standard">Standard</option>
                     {vForCat.map(v => (
                       <option key={v.id} value={v.id}>
                         {v.name}
@@ -1326,7 +1326,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
                       value={row.vendor}
                       onChange={e => setConcRow(i, 'vendor', e.target.value)}
                     >
-                      <option value="House">Standard</option>
+                      <option value="Standard">Standard</option>
                       {vendorsForCategory(CONC_VENDOR_CAT).map(v => (
                         <option key={v.id} value={v.id}>
                           {v.name}

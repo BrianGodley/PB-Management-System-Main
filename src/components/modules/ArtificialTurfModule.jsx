@@ -96,7 +96,7 @@ const BASE_MATERIALS = [
   { key: 'Weed', label: 'Weed Barrier Fabric', matKey: 'Turf - Weed Barrier Fabric', fallbackKey: 'weedFabric', qtyUnit: 'roll' },
 ]
 function turfMatPrice(cat, vendorSel, typeLabel, houseName, houseFallback, materialRows, catDefaults, mp) {
-  const vsel = vendorSel && vendorSel !== 'auto' ? vendorSel : catDefaults?.[cat] || 'House'
+  const vsel = vendorSel && vendorSel !== 'auto' ? vendorSel : catDefaults?.[cat] || 'Standard'
   const vrow = catalogItemFor(materialRows, cat, vsel, typeLabel, {
     ...CATALOG_OPTS,
     fallbackFirst: false,
@@ -112,7 +112,7 @@ function turfMatPrice(cat, vendorSel, typeLabel, houseName, houseFallback, mater
 //   turfBrandRow     → resolve a saved selection (row id, or a legacy key/label)
 //                      to its row, preferring a vendor-specific row over standard.
 function turfBrandOptions(materialRows) {
-  return catalogOptions(materialRows, TURF_CAT.turf, 'House', {
+  return catalogOptions(materialRows, TURF_CAT.turf, 'Standard', {
     houseRows: 'null-vendor',
     stripPrefix: true,
   })
@@ -124,7 +124,7 @@ function turfBrandRow(materialRows, vendorSel, key) {
       stripPrefix: true,
       fallbackFirst: false,
     }) ||
-    catalogItemFor(materialRows, TURF_CAT.turf, 'House', key, {
+    catalogItemFor(materialRows, TURF_CAT.turf, 'Standard', key, {
       houseRows: 'null-vendor',
       stripPrefix: true,
       fallbackFirst: true,
@@ -409,17 +409,17 @@ const DEFAULT_STATE = {
     lawn: { sf: '', inches: '4', method: 'Skid Steer Good' },
   },
   baseRows: [
-    { material: 'Gravel', sf: '', vendor: 'House' },
-    { material: 'DG', sf: '', vendor: 'House' },
-    { material: 'Weed', sf: '', vendor: 'House' },
+    { material: 'Gravel', sf: '', vendor: 'Standard' },
+    { material: 'DG', sf: '', vendor: 'Standard' },
+    { material: 'Weed', sf: '', vendor: 'Standard' },
   ],
   useZeoFill: false,
   rolls: [
-    { brand: 'Socal Blen Supreme 80', edgeLF: '', vendor: 'House' },
-    { brand: 'Socal Blen Supreme 80', edgeLF: '', vendor: 'House' },
-    { brand: 'Socal Blen Supreme 80', edgeLF: '', vendor: 'House' },
+    { brand: 'Socal Blen Supreme 80', edgeLF: '', vendor: 'Standard' },
+    { brand: 'Socal Blen Supreme 80', edgeLF: '', vendor: 'Standard' },
+    { brand: 'Socal Blen Supreme 80', edgeLF: '', vendor: 'Standard' },
   ],
-  strips: { lf: '', widthIn: '12', brand: 'Socal Blen Supreme 80', vendor: 'House' },
+  strips: { lf: '', widthIn: '12', brand: 'Socal Blen Supreme 80', vendor: 'Standard' },
   manualRows: [
     { label: '', hours: '', materials: '', subCost: '' },
     { label: '', hours: '', materials: '', subCost: '' },
@@ -524,9 +524,9 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
     if (initialData && !initialData.baseRows && initialData.base) {
       const b = initialData.base
       const rows = [
-        b.useGravel !== false && { material: 'Gravel', sf: b.gravelSF || '', vendor: b.gravelVendor || 'House' },
-        b.useDG !== false && { material: 'DG', sf: b.dgSF || '', vendor: b.dgVendor || 'House' },
-        b.useWeedFabric !== false && { material: 'Weed', sf: b.weedSF || '', vendor: b.weedVendor || 'House' },
+        b.useGravel !== false && { material: 'Gravel', sf: b.gravelSF || '', vendor: b.gravelVendor || 'Standard' },
+        b.useDG !== false && { material: 'DG', sf: b.dgSF || '', vendor: b.dgVendor || 'Standard' },
+        b.useWeedFabric !== false && { material: 'Weed', sf: b.weedSF || '', vendor: b.weedVendor || 'Standard' },
       ].filter(Boolean)
       legacy.baseRows = rows.length ? rows : DEFAULT_STATE.baseRows.map(r => ({ ...r }))
     }
@@ -718,7 +718,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           ...p,
           [k]: {
             ...cur,
-            baseRows: [...(cur.baseRows || []), { material: 'Gravel', sf: '', vendor: 'House' }],
+            baseRows: [...(cur.baseRows || []), { material: 'Gravel', sf: '', vendor: 'Standard' }],
           },
         }
       }),
@@ -772,7 +772,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
   const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
   // A vendor belongs in a SECTION's dropdown only if they actually price a product
   // under that section's marker (not just somewhere in the category). Standard is
-  // always offered via the <option value="House">Standard</option> in each select.
+  // always offered via the <option value="Standard">Standard</option> in each select.
   const vendorsSupplyingMarker = marker => {
     const ids = new Set(
       (materialRows || []).filter(r => r.sub_category === marker && r.vendor_id).map(r => r.vendor_id)
@@ -1185,7 +1185,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                   <td className={td}>
                     <select
                       className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
-                      value={row.vendor || 'House'}
+                      value={row.vendor || 'Standard'}
                       onChange={e => setBaseRow(i, 'vendor', e.target.value)}
                       title="Vendor"
                     >
@@ -1194,7 +1194,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                           {v.name}
                         </option>
                       ))}
-                      <option value="House">Standard</option>
+                      <option value="Standard">Standard</option>
                     </select>
                   </td>
                   <td className={td}>
@@ -1334,7 +1334,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                   <td className={td}>
                     <select
                       className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
-                      value={roll.vendor || 'House'}
+                      value={roll.vendor || 'Standard'}
                       onChange={e => setRoll(i, 'vendor', e.target.value)}
                       title="Vendor"
                     >
@@ -1343,7 +1343,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                           {v.name}
                         </option>
                       ))}
-                      <option value="House">Standard</option>
+                      <option value="Standard">Standard</option>
                     </select>
                   </td>
                   <td className={td}>
@@ -1463,7 +1463,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
               <td className={td}>
                 <select
                   className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
-                  value={T.strips?.vendor || 'House'}
+                  value={T.strips?.vendor || 'Standard'}
                   onChange={e => setStrips('vendor', e.target.value)}
                   title="Vendor"
                 >
@@ -1472,7 +1472,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                       {v.name}
                     </option>
                   ))}
-                  <option value="House">Standard</option>
+                  <option value="Standard">Standard</option>
                 </select>
               </td>
               <td className={td}>

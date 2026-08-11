@@ -55,7 +55,7 @@ const n = v => parseFloat(v) || 0
 
 // ── Vendor catalog helpers (mirror PaverModule) ──────────────────────────────
 // Option list for a section = the catalog items for that sub_category + vendor.
-// House (vendorSel === 'House' or falsy) → rows with vendor_id == null;
+// House (vendorSel === 'Standard' or falsy) → rows with vendor_id == null;
 // otherwise → rows whose vendor_id === vendorSel. Each option carries the
 // material_rates row id (the STABLE, rename-proof key a selection is stored /
 // matched by) plus a clean label.
@@ -194,7 +194,7 @@ function calcLighting(
 }
 
 // ── Default blank state ───────────────────────────────────────────────────────
-const blankRow = () => ({ vendor: 'House', itemId: '', qty: '', subEach: '' })
+const blankRow = () => ({ vendor: 'Standard', itemId: '', qty: '', subEach: '' })
 const blankRows = () => [blankRow(), blankRow(), blankRow()]
 const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 1', hours: '', materials: '', subCost: '' },
@@ -413,7 +413,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
   // ── Vendor / row helpers ─────────────────────────────────────────────────────
   const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id))
   const vendorSelectOptions = () => [
-    { value: 'House', label: 'Standard' },
+    { value: 'Standard', label: 'Standard' },
     ...vendorsForCategory(LIGHTING_CATEGORY).map(v => ({ value: v.id, label: v.name })),
   ]
 
@@ -541,7 +541,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
                     <td className="py-1.5 pr-2">
                       <select
                         className="input text-sm py-1 w-full"
-                        value={row.vendor || 'House'}
+                        value={row.vendor || 'Standard'}
                         onChange={e =>
                           onVendorChange(subcat, rows, setRows, i, e.target.value)
                         }

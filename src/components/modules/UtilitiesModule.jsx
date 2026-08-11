@@ -228,7 +228,7 @@ const DEFAULTS = {
 const n = v => parseFloat(v) || 0
 
 // ── Vendor catalog: built-in Type lists as {label, dbName, fallback, labor…} ──
-// The section's built-in items become the "House" option list; vendors tagged to
+// The section's built-in items become the "Standard" option list; vendors tagged to
 // the matching material category supply additional priced items (material only —
 // labor is kept from the matching/last built-in item).
 const LINE_TYPE_ARR = Object.entries(UTILITY_LINE_TYPES).map(([label, t]) => ({
@@ -275,31 +275,22 @@ const UTIL_CAT = {
   sewerSink: 'Sewer Sinks',
 }
 
-// Type list source of truth = the Master Rates catalog (Standard / null-vendor
-// rows tagged sub_category=cat). Whatever is in the catalog for this category IS
-// the dropdown — so renaming, adding, or deleting an item in Master Rates flows
-// straight through with no duplicates. Built-ins are NO LONGER a second source of
-// options; they only supply a labor-rate name + price/labor fallback for any
-// catalog row that was seeded from a built-in (matched by name).
-// Only when a category has NO catalog rows at all do we fall back to the built-in
-// list (so an un-seeded category still shows something).
+// Merge the built-in Type list with any master-list rows tagged sub_category=cat
+// and left Unspecified (null vendor). Add a row in Master Rates under that marker
+// and it appears here automatically; its paired '<Label> - Labor Rate' row (looked
+// up by name) supplies labor. Built-ins always remain (deduped by label).
 function mergedUtilTypes(cat, builtInArr, materialRows) {
-  const catRows = catalogOptions(materialRows, cat, 'House', {
-    houseRows: 'null-vendor',
-    stripPrefix: true,
-  })
-  if (!catRows.length) return builtInArr
-  return catRows.map(o => {
-    const bi = builtInArr.find(b => b.dbName === o.row.name || b.label === o.label)
-    return {
+  const extra = catalogOptions(materialRows, cat, 'Standard', { houseRows: 'null-vendor', stripPrefix: true })
+    .filter(o => !builtInArr.some(b => b.label === o.label))
+    .map(o => ({
       label: o.label,
       dbName: o.row.name,
       fallback: n(o.row.unit_cost),
-      laborDbName: bi?.laborDbName ?? `${o.label} - Labor Rate`,
-      laborFallback: bi?.laborFallback ?? 0,
-      fromMaster: !bi,
-    }
-  })
+      laborDbName: `${o.label} - Labor Rate`,
+      laborFallback: 0,
+      fromMaster: true,
+    }))
+  return extra.length ? [...builtInArr, ...extra] : builtInArr
 }
 
 // Resolve a row's material cost + per-unit labor.
@@ -313,7 +304,7 @@ function resolveUtilRow(cat, row, houseArr, materialRows, catDefaults, mp) {
   const laborVal = mp[builtIn?.laborDbName] ?? builtIn?.laborFallback ?? 0
   let matDbName = builtIn?.dbName
   let matFallback = builtIn?.fallback ?? 0
-  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : catDefaults[cat] || 'House'
+  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : catDefaults[cat] || 'Standard'
   const vrow = catalogItemFor(materialRows, cat, vsel, builtIn?.label, {
     ...CATALOG_OPTS,
     fallbackFirst: false,
@@ -741,8 +732,8 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
 
   // ── Vendor catalog helpers (per-row Vendor/Type pickers) ─────────────────
   const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
-  const defaultVendorFor = cat => vendorsForCategory(cat)[0]?.id || 'House'
-  const effVendor = (cat, v) => (v && v !== 'auto' && v !== 'House' ? v : defaultVendorFor(cat))
+  const defaultVendorFor = cat => vendorsForCategory(cat)[0]?.id || 'Standard'
+  const effVendor = (cat, v) => (v && v !== 'auto' && v !== 'Standard' ? v : defaultVendorFor(cat))
   const catDefaults = {
     [UTIL_CAT.line]: defaultVendorFor(UTIL_CAT.line),
     [UTIL_CAT.gas]: defaultVendorFor(UTIL_CAT.gas),
@@ -759,7 +750,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
     const isSaved = initialData?.materialPrices && Object.keys(initialData.materialPrices).length > 0
     if (vendorDefaultsApplied || isSaved || !vendors.length) return
     setVendorDefaultsApplied(true)
-    const needsDefault = v => !v || v === 'House' || v === 'auto'
+    const needsDefault = v => !v || v === 'Standard' || v === 'auto'
     const migLine = rows =>
       (rows || []).map(r => (needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor(UTIL_CAT.line) } : r))
     const migGas = rows =>
@@ -1380,7 +1371,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                             {v.name}
                           </option>
                         ))}
-                        <option value="House">Standard</option>
+                        <option value="Standard">Standard</option>
                       </select>
                     </td>
                     <td className="py-1 pr-2">
@@ -1480,7 +1471,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                             {v.name}
                           </option>
                         ))}
-                        <option value="House">Standard</option>
+                        <option value="Standard">Standard</option>
                       </select>
                     </td>
                     <td className="py-1 pr-2">
@@ -1580,7 +1571,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                             {v.name}
                           </option>
                         ))}
-                        <option value="House">Standard</option>
+                        <option value="Standard">Standard</option>
                       </select>
                     </td>
                     <td className="py-1 pr-2">
@@ -1680,7 +1671,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                             {v.name}
                           </option>
                         ))}
-                        <option value="House">Standard</option>
+                        <option value="Standard">Standard</option>
                       </select>
                     </td>
                     <td className="py-1 pr-2">
@@ -1783,7 +1774,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                             {v.name}
                           </option>
                         ))}
-                        <option value="House">Standard</option>
+                        <option value="Standard">Standard</option>
                       </select>
                     </td>
                     <td className="py-1 pr-2">

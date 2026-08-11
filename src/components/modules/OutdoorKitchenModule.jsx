@@ -92,7 +92,7 @@ const APPLIANCE_TYPES = [
   'Other',
 ]
 const applianceRateName = type => `BBQ Equip - ${type}`
-const EQUIP_ROW = () => ({ vendor: 'House', type: 'BBQ Grill', qty: '0', unitCost: '', clientProvided: false, hours: '' })
+const EQUIP_ROW = () => ({ vendor: 'Standard', type: 'BBQ Grill', qty: '0', unitCost: '', clientProvided: false, hours: '' })
 
 const n = v => parseFloat(v) || 0
 
@@ -129,14 +129,14 @@ const WF_META = {
   'Real Stone': { key: 'realStone', labKey: 'realStoneLab', unit: 'ton', tonPerSF: 70, labMode: 'perSF', delivPerTon: 180, addPerSF: 1 },
 }
 const WF_LIST = Object.keys(WF_META)
-const WF_ROW = () => ({ vendor: 'House', type: 'Tile', sf: '' })
+const WF_ROW = () => ({ vendor: 'Standard', type: 'Tile', sf: '' })
 
 // ── Master-list finish support ───────────────────────────────────────────────
 // A material_rates row tagged sub_category='Wall Finish' (Unspecified) becomes a
 // selectable finish Type: material unit = its unit_cost; unit mode / labMode /
 // waste / tonPerSF / laborCoeff come from its calc_meta. Built-ins are unchanged.
 function masterWallMeta(cat, typeLabel, materialRows, category = null) {
-  const r = catalogItemFor(materialRows, cat, 'House', typeLabel, {
+  const r = catalogItemFor(materialRows, cat, 'Standard', typeLabel, {
     houseRows: 'null-vendor',
     stripPrefix: true,
     fallbackFirst: false,
@@ -155,7 +155,7 @@ function masterWallMeta(cat, typeLabel, materialRows, category = null) {
   }
 }
 function masterWallOptions(cat, builtInList, materialRows, category = null) {
-  const extra = catalogOptions(materialRows, cat, 'House', { houseRows: 'null-vendor', stripPrefix: true, category })
+  const extra = catalogOptions(materialRows, cat, 'Standard', { houseRows: 'null-vendor', stripPrefix: true, category })
     .map(o => o.label)
     .filter(l => !builtInList.includes(l))
   return extra.length ? [...builtInList, ...extra] : builtInList
@@ -200,7 +200,7 @@ const UTIL_CAT = { line: 'Utility Lines', gas: 'Gas Fixtures', elec: 'Electrical
 const OK_TRENCH_RATE_NAME = 'Utilities Trench Excavation'
 const OK_TRENCH_FALLBACK_MIN_PER_CF = 10
 function mergedUtilTypes(cat, builtInArr, materialRows) {
-  const extra = catalogOptions(materialRows, cat, 'House', { houseRows: 'null-vendor', stripPrefix: true })
+  const extra = catalogOptions(materialRows, cat, 'Standard', { houseRows: 'null-vendor', stripPrefix: true })
     .filter(o => !builtInArr.some(b => b.label === o.label))
     .map(o => ({
       label: o.label,
@@ -218,7 +218,7 @@ function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
   const laborVal = mp[builtIn?.laborDbName] ?? builtIn?.laborFallback ?? 0
   let matDbName = builtIn?.dbName
   let matFallback = builtIn?.fallback ?? 0
-  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : 'House'
+  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : 'Standard'
   const vrow = catalogItemFor(materialRows, cat, vsel, builtIn?.label, {
     ...CATALOG_OPTS,
     fallbackFirst: false,
@@ -231,9 +231,9 @@ function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
   const matOpt = { label: builtIn?.label, dbName: matDbName, fallback: matFallback }
   return { opts: merged, matOpt, matCost, laborVal, laborBuiltIn: builtIn }
 }
-const EP_LINE_ROW = () => ({ type: 'PVC Conduit with Electrical', lf: '', vendor: 'House' })
-const EP_GAS_ROW = () => ({ type: '12" Single Gas Ring', qty: '', vendor: 'House' })
-const EP_ELEC_ROW = () => ({ type: 'GFCI Protected Receptacles', qty: '', vendor: 'House' })
+const EP_LINE_ROW = () => ({ type: 'PVC Conduit with Electrical', lf: '', vendor: 'Standard' })
+const EP_GAS_ROW = () => ({ type: '12" Single Gas Ring', qty: '', vendor: 'Standard' })
+const EP_ELEC_ROW = () => ({ type: 'GFCI Protected Receptacles', qty: '', vendor: 'Standard' })
 
 // Reusable Electrical & Plumbing table (Utility Lines / Gas / Electrical).
 function EpTable({
@@ -291,7 +291,7 @@ function EpTable({
                   <td className="py-1 pr-2">
                     <select
                       className="input text-sm py-1 w-full"
-                      value={row.vendor || 'House'}
+                      value={row.vendor || 'Standard'}
                       onChange={e => upd(i, 'vendor', e.target.value)}
                       title="Vendor"
                     >
@@ -300,7 +300,7 @@ function EpTable({
                           {v.name}
                         </option>
                       ))}
-                      <option value="House">Standard</option>
+                      <option value="Standard">Standard</option>
                     </select>
                   </td>
                   <td className="py-1 pr-2">
@@ -1365,10 +1365,10 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                       <td className="py-1 pr-2">
                         <select
                           className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white w-full"
-                          value={row.vendor || 'House'}
+                          value={row.vendor || 'Standard'}
                           onChange={e => setRow('vendor', e.target.value)}
                         >
-                          <option value="House">Standard</option>
+                          <option value="Standard">Standard</option>
                           {vendorsForCategory('Appliance').map(v => (
                             <option key={v.id} value={v.id}>
                               {v.name}
@@ -1545,11 +1545,11 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                     <td className="py-1 pr-2">
                       <select
                         className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white w-full"
-                        value={row.vendor || 'House'}
+                        value={row.vendor || 'Standard'}
                         onChange={e => setWallFinishRow(i, 'vendor', e.target.value)}
                         title="Vendor — overrides material price"
                       >
-                        <option value="House">Standard</option>
+                        <option value="Standard">Standard</option>
                         {vendorsForFinish().map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}

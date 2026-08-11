@@ -154,7 +154,7 @@ function calcColumns(
   const installVendor = state.installVendor // section-level Vendor for Column Install materials
 
   // mp() = name-keyed House lookup (labor coefficients + House material fallback).
-  // matP() = vendor-resolved MATERIAL price; with vendor 'House'/empty it returns
+  // matP() = vendor-resolved MATERIAL price; with vendor 'Standard'/empty it returns
   // exactly (materialPrices[dbName] ?? fallback) == the pre-vendor mp() value.
   const mp = (dbName, fallback) => materialPrices[dbName] ?? fallback
   const matP = (dbName, fallback, vendorId) =>
@@ -290,10 +290,10 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
 const DEFAULT_FINISH_ROWS = [
-  { type: 'Sand Stucco', qty: '', vendor: 'House' },
-  { type: 'Sand Stucco', qty: '', vendor: 'House' },
-  { type: 'Ledgerstone Veneer Panels', qty: '', vendor: 'House' },
-  { type: 'Tile', qty: '', vendor: 'House' },
+  { type: 'Sand Stucco', qty: '', vendor: 'Standard' },
+  { type: 'Sand Stucco', qty: '', vendor: 'Standard' },
+  { type: 'Ledgerstone Veneer Panels', qty: '', vendor: 'Standard' },
+  { type: 'Tile', qty: '', vendor: 'Standard' },
 ]
 const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 1', hours: '', materials: '', subCost: '' },
@@ -378,10 +378,10 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
     heightIn: src.heightIn ?? '',
     widthIn: src.widthIn ?? '',
     distanceLF: src.distanceLF ?? '',
-    // Section-level Vendor for the Column Install materials. 'House' = current price.
-    installVendor: src.installVendor ?? 'House',
+    // Section-level Vendor for the Column Install materials. 'Standard' = current price.
+    installVendor: src.installVendor ?? 'Standard',
     finishRows: src.finishRows
-      ? src.finishRows.map(r => ({ vendor: 'House', ...r }))
+      ? src.finishRows.map(r => ({ vendor: 'Standard', ...r }))
       : DEFAULT_FINISH_ROWS.map(r => ({ ...r })),
     manualRows: src.manualRows ? src.manualRows.map(r => ({ ...r })) : DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
   })
@@ -404,7 +404,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
   const setWidthIn = setField('widthIn')
   const distanceLF = cur.distanceLF
   const setDistanceLF = setField('distanceLF')
-  const installVendor = cur.installVendor ?? 'House'
+  const installVendor = cur.installVendor ?? 'Standard'
   const setInstallVendor = setField('installVendor')
   const finishRows = cur.finishRows
   const setFinishRows = setField('finishRows')
@@ -426,7 +426,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
     }
   }, [])
 
-  // Vendor pickers: only vendors that supply the Columns category. 'House' first.
+  // Vendor pickers: only vendors that supply the Columns category. 'Standard' first.
   const vendorOptions = vendorOptionsForCategory(COLUMNS_CATEGORY)
   // Vendor-resolved material price for display (calc uses the same resolver).
   const colMat = (dbName, vendorId, fallback) =>
@@ -705,11 +705,11 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
       <div>
         <SectionHeader title="Column Install" />
         {/* Section Vendor — overrides ONLY the material unit prices (CMU Block,
-            Fill/Grout, Rebar) used by the geometry calc. 'House' = current price. */}
+            Fill/Grout, Rebar) used by the geometry calc. 'Standard' = current price. */}
         <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200 mb-3">
           <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Vendor</label>
           <select
-            value={installVendor || 'House'}
+            value={installVendor || 'Standard'}
             onChange={e => setInstallVendor(e.target.value)}
             className="input text-sm py-1 w-48"
           >
@@ -852,7 +852,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
                     <td className="py-1 pr-2">
                       <select
                         className="input text-sm py-1 w-full"
-                        value={row.vendor || 'House'}
+                        value={row.vendor || 'Standard'}
                         onChange={e => updateFinish(i, 'vendor', e.target.value)}
                       >
                         {vendorOptions.map(o => (
@@ -895,7 +895,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
           <button
             type="button"
             className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
-            onClick={() => setFinishRows(r => [...r, { type: 'Sand Stucco', qty: '', vendor: 'House' }])}
+            onClick={() => setFinishRows(r => [...r, { type: 'Sand Stucco', qty: '', vendor: 'Standard' }])}
           >
             + Add row
           </button>

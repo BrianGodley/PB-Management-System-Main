@@ -165,12 +165,12 @@ function calcConcrete(
   materialRows = [],
   catDefaults = {}
 ) {
-  // Per-row/line vendor-aware price resolver. 'House' (or a missing/'auto'
+  // Per-row/line vendor-aware price resolver. 'Standard' (or a missing/'auto'
   // vendor → the category default) uses the House array; a real vendor id →
   // that vendor's products for the category, priced from material_rates.
   const rowOpt = (cat, row, houseArray) => {
-    const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : catDefaults[cat] || 'House'
-    if (!vsel || vsel === 'House') return resolveType(row.type, houseArray, houseArray)
+    const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : catDefaults[cat] || 'Standard'
+    if (!vsel || vsel === 'Standard') return resolveType(row.type, houseArray, houseArray)
     const opts = catalogOptions(materialRows, cat, vsel, { houseRows: 'exclude', stripPrefix: true }).map(
       o => ({ label: o.label, dbName: o.row.name, fallback: n(o.row.unit_cost), category: 'Concrete' })
     )
@@ -762,23 +762,23 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
 
   // ── Vendor catalog helpers (per-line Vendor/Type pickers) ────────────────
   const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
-  const defaultVendorFor = cat => vendorsForCategory(cat)[0]?.id || 'House'
+  const defaultVendorFor = cat => vendorsForCategory(cat)[0]?.id || 'Standard'
   const catDefaults = {
     'Concrete Base': defaultVendorFor('Concrete Base'),
     'Concrete Mix': defaultVendorFor('Concrete Mix'),
   }
-  // Build a section's Type option list for a given vendor selection. 'House'
+  // Build a section's Type option list for a given vendor selection. 'Standard'
   // (or a vendor with no catalog rows) → the House array; a vendor id → that
   // vendor's products for the category (priced from material_rates).
   function sectionOptions(subcat, vendorSel, houseArray) {
-    const vsel = vendorSel && vendorSel !== 'auto' ? vendorSel : catDefaults[subcat] || 'House'
-    if (!vsel || vsel === 'House') return houseArray
+    const vsel = vendorSel && vendorSel !== 'auto' ? vendorSel : catDefaults[subcat] || 'Standard'
+    if (!vsel || vsel === 'Standard') return houseArray
     const opts = catalogOptions(materialRows, subcat, vsel, { houseRows: 'exclude', stripPrefix: true })
     if (!opts.length) return houseArray
     return opts.map(o => ({ label: o.label, dbName: o.row.name, fallback: n(o.row.unit_cost), category: 'Concrete' }))
   }
   // Effective vendor for a stored value: 'auto'/unset/House → category default.
-  const effVendor = (cat, v) => (v && v !== 'auto' && v !== 'House' ? v : catDefaults[cat])
+  const effVendor = (cat, v) => (v && v !== 'auto' && v !== 'Standard' ? v : catDefaults[cat])
 
   // On a NEW estimate, once vendor catalogs load, default the Base rows and each
   // install tier to the first real vendor for their category. Never overrides a
@@ -789,7 +789,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
       initialData?.materialRates && Object.keys(initialData.materialRates).length > 0
     if (vendorDefaultsApplied || isSaved || !vendors.length) return
     setVendorDefaultsApplied(true)
-    const needsDefault = v => !v || v === 'House' || v === 'auto'
+    const needsDefault = v => !v || v === 'Standard' || v === 'auto'
     setBaseRows(rows =>
       (rows || []).map(r =>
         needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor('Concrete Base') } : r
@@ -1519,7 +1519,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                             {v.name}
                           </option>
                         ))}
-                        <option value="House">Standard</option>
+                        <option value="Standard">Standard</option>
                       </select>
                     </td>
                     <td className="py-1 pr-2">
@@ -1630,7 +1630,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                             {v.name}
                           </option>
                         ))}
-                        <option value="House">Standard</option>
+                        <option value="Standard">Standard</option>
                       </select>
                       <select
                         className="input text-xs py-1 w-full"

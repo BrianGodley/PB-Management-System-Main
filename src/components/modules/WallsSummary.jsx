@@ -251,7 +251,7 @@ function legacyFinishRows(t = {}) {
   const rows = []
   const push = (type, sfKey, rateKey) => {
     if (n(t[sfKey]) > 0)
-      rows.push({ vendor: 'House', type, sf: t[sfKey], rateIn: t[rateKey] ?? '', subEach: '' })
+      rows.push({ vendor: 'Standard', type, sf: t[sfKey], rateIn: t[rateKey] ?? '', subEach: '' })
   }
   push('Sand Stucco', 'sandStuccoSF', 'sandStuccoRateIn')
   push('Smooth Stucco', 'smoothStuccoSF', 'smoothStuccoRateIn')
@@ -356,7 +356,7 @@ function WallQtyDetail({ t = {}, isSub, materialPrices, materialRows, vendorLabe
         cmuWalls.map((w, i) => (
           <div key={i}>
             <SectionLabel title={cmuWalls.length > 1 ? `CMU Wall ${i + 1}` : 'CMU Structure'} />
-            {w.vendor && w.vendor !== 'House' && (
+            {w.vendor && w.vendor !== 'Standard' && (
               <LineRow label="Vendor" value={vendorLabel(w.vendor)} />
             )}
             {w.blockType && <LineRow label="Block Type" value={blockLabel(w.blockType)} />}
@@ -401,7 +401,7 @@ function WallQtyDetail({ t = {}, isSub, materialPrices, materialRows, vendorLabe
             <SectionLabel
               title={pipWalls.length > 1 ? `Poured In Place ${i + 1}` : 'Poured In Place'}
             />
-            {w.vendor && w.vendor !== 'House' && (
+            {w.vendor && w.vendor !== 'Standard' && (
               <LineRow label="Vendor" value={vendorLabel(w.vendor)} />
             )}
             <LineRow label="Linear Feet" value={`${n(w.lf)} LF`} />
@@ -426,7 +426,7 @@ function WallQtyDetail({ t = {}, isSub, materialPrices, materialRows, vendorLabe
             <SectionLabel
               title={modularWalls.length > 1 ? `Wall Installation ${i + 1}` : 'Modular Structure'}
             />
-            {w.vendor && w.vendor !== 'House' && (
+            {w.vendor && w.vendor !== 'Standard' && (
               <LineRow label="Vendor" value={vendorLabel(w.vendor)} />
             )}
             {w.blockType && <LineRow label="Block Type" value={blockLabel(w.blockType)} />}
@@ -453,7 +453,7 @@ function WallQtyDetail({ t = {}, isSub, materialPrices, materialRows, vendorLabe
             <SectionLabel
               title={brickWalls.length > 1 ? `Brick Wall ${i + 1}` : 'Brick Structure'}
             />
-            {w.vendor && w.vendor !== 'House' && (
+            {w.vendor && w.vendor !== 'Standard' && (
               <LineRow label="Vendor" value={vendorLabel(w.vendor)} />
             )}
             {w.blockType && <LineRow label="Block Type" value={blockLabel(w.blockType)} />}
@@ -525,7 +525,7 @@ export default function WallsSummary({ module }) {
   const materialRows = data.materialRows || []
   const vendorNames = data.vendorNames || {}
   const { difficulty = 0, hoursAdj = 0 } = ih
-  const vendorLabel = v => (!v || v === 'House' ? 'Standard' : vendorNames[v] || 'Vendor')
+  const vendorLabel = v => (!v || v === 'Standard' ? 'Standard' : vendorNames[v] || 'Vendor')
   // Labor rate + assigned crews for the three labor-bucket lines. Crew names are
   // saved at the top level of `data` (spread from the module's state).
   const lrph = n(data.laborRatePerHour) || 35

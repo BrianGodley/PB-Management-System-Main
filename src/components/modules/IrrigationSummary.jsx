@@ -110,11 +110,11 @@ function LineRow({ label, value, sub, highlight }) {
 function legacyZoneRows(src) {
   const q = src.zoneQtys || {}
   const m = src.zoneModes || {}
-  return ZONE_TYPES.map(z => ({ vendor: 'House', type: z.key, qty: q[z.key] ?? '', mode: m[z.key] || z.defaultMode }))
+  return ZONE_TYPES.map(z => ({ vendor: 'Standard', type: z.key, qty: q[z.key] ?? '', mode: m[z.key] || z.defaultMode }))
 }
 function legacyTimerRows(src) {
   const q = src.timerQtys || {}
-  return TIMER_TYPES.map(t => ({ vendor: 'House', type: t.key, qty: q[t.key] ?? '' }))
+  return TIMER_TYPES.map(t => ({ vendor: 'Standard', type: t.key, qty: q[t.key] ?? '' }))
 }
 
 export default function IrrigationSummary({ module }) {
@@ -138,7 +138,7 @@ export default function IrrigationSummary({ module }) {
   const fmt2 = v =>
     `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   const fh = v => (v > 0 ? `${v.toFixed(2)} hrs` : null)
-  const vendorLabel = v => (!v || v === 'House' ? 'Standard' : vendorNames[v] || 'Vendor')
+  const vendorLabel = v => (!v || v === 'Standard' ? 'Standard' : vendorNames[v] || 'Vendor')
 
   // Zone lines
   const zoneLines = (zoneRows || [])

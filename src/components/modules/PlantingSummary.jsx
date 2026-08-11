@@ -139,7 +139,7 @@ export default function PlantingSummary({ module }) {
   const addonRows =
     tab.addonRows ||
     LEGACY_ADDON_MAP.filter(([, field]) => n(legacyAddons[field]) > 0).map(([type, field]) => ({
-      vendor: 'House',
+      vendor: 'Standard',
       type,
       qty: legacyAddons[field],
     }))
@@ -160,7 +160,7 @@ export default function PlantingSummary({ module }) {
 
   const fmt2 = v =>
     `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-  const vendorLabel = v => (!v || v === 'House' ? 'Standard' : vendorNames[v] || 'Vendor')
+  const vendorLabel = v => (!v || v === 'Standard' ? 'Standard' : vendorNames[v] || 'Vendor')
 
   // Plant lines
   function plantLines(rows, defaultsMap) {

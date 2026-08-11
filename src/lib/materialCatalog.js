@@ -13,7 +13,7 @@
 //   1. Selected vendor's row:  materialRows.find(name === n && vendor_id === v).unit_cost
 //   2. House / Unspecified price: name-keyed priceMap[n]  (vendor-agnostic master rate)
 //   3. Hardcoded fallback:     fb
-// Vendor 'House' / '' / null resolves straight to step 2 → 3.
+// Vendor 'Standard' / '' / null resolves straight to step 2 → 3.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from './supabase'
@@ -23,9 +23,16 @@ const num = v => {
   return Number.isFinite(x) ? x : 0
 }
 
-// Name-keyed resolver (Pattern A/B modules). `vendorId` of 'House'/''/null → House price.
+// Vendor sentinel for the Standard/Unspecified (universal) price.
+// LEGACY ALIAS: the sentinel was renamed 'House' → 'Standard'. Estimates saved
+// before the rename still store 'House', so both — plus '' / null — mean "use the
+// Standard price". This is the ONE place 'House' survives in code; remove it only
+// after migrating saved estimate data (UPDATE estimate JSON 'House' → 'Standard').
+const isStandardSel = v => !v || v === 'Standard' || v === 'House'
+
+// Name-keyed resolver (Pattern A/B modules). `vendorId` of 'Standard'/''/null → House price.
 export function resolveMaterialPrice(name, vendorId, materialRows, priceMap, fallback = 0) {
-  if (vendorId && vendorId !== 'House') {
+  if (vendorId && !isStandardSel(vendorId)) {
     const row = (materialRows || []).find(r => r.name === name && r.vendor_id === vendorId)
     if (row && row.unit_cost != null && row.unit_cost !== '') return num(row.unit_cost)
   }
@@ -48,7 +55,7 @@ export function catalogOptions(
   vendorSel,
   { houseRows = 'exclude', stripPrefix = false, category = null } = {}
 ) {
-  const isHouse = !vendorSel || vendorSel === 'House' || vendorSel === 'Custom'
+  const isHouse = isStandardSel(vendorSel) || vendorSel === 'Custom'
   if (isHouse && houseRows === 'exclude') return []
   const prefix = `${subcategory} - `
   return (materialRows || [])
@@ -139,7 +146,7 @@ export async function fetchOpenPriceLedger(materialIds) {
 export function ledgerPrice(ledgerById, materialId, vendorId, fallback = 0) {
   const led = ledgerById?.[materialId]
   if (led) {
-    const vk = vendorId && vendorId !== 'House' ? vendorId : HOUSE_KEY
+    const vk = vendorId && !isStandardSel(vendorId) ? vendorId : HOUSE_KEY
     if (led[vk] != null) return led[vk]
     if (led[HOUSE_KEY] != null) return led[HOUSE_KEY]
   }
@@ -236,7 +243,7 @@ export async function fetchStandardRateMap(categories) {
 // Resolve the vendor to price against: an explicit vendor, else the tenant's
 // Standard/Unspecified vendor (the universal price).
 export async function resolvePriceVendor(vendorId) {
-  if (vendorId && vendorId !== 'House') return vendorId
+  if (vendorId && !isStandardSel(vendorId)) return vendorId
   const { data } = await supabase
     .from('subs_vendors')
     .select('id')
@@ -248,7 +255,7 @@ export async function resolvePriceVendor(vendorId) {
 // Write a price into the NEW model. Updates the OPEN material_price row for
 // (material_id, resolved vendor) in place if one exists, else inserts one —
 // matching the app's existing convention (MissingPriceModal / MasterMaterialRates).
-// vendorId null/'House' → the Standard (universal) price. Throws on RLS/errors.
+// vendorId null/'Standard' → the Standard (universal) price. Throws on RLS/errors.
 export async function setMaterialPrice(materialId, vendorId, price, source = 'manual') {
   const v = typeof price === 'number' ? price : parseFloat(price)
   if (!Number.isFinite(v) || v < 0) throw new Error('Invalid price.')
@@ -603,7 +610,7 @@ export function useMaterialCatalog(categories, initial = {}) {
   // vendor_id). Replaces the retired supplied_categories gate.
   const vendorOptionsForCategory = useCallback(
     cat => [
-      { value: 'House', label: 'Standard' },
+      { value: 'Standard', label: 'Standard' },
       ...vendors
         .filter(v =>
           materialRows.some(
@@ -694,7 +701,7 @@ export function useNewMaterialCatalog(categories, initial = {}) {
   // section only where they have priced a product in that category / sub-category.
   const vendorOptionsForCategory = useCallback(
     cat => [
-      { value: 'House', label: 'Standard' },
+      { value: 'Standard', label: 'Standard' },
       ...vendors
         .filter(v =>
           materialRows.some(

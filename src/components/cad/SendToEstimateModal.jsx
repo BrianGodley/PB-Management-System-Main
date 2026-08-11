@@ -146,13 +146,13 @@ export default function SendToEstimateModal({ takeoff, unit = 'ft', drawingName 
             sf: Math.round(a.area),
             depth: 6,
             paverVendor: '', paverType: '', customPricePerSF: '',
-            baseVendor: 'House', baseType: 'Class II Roadbase',
+            baseVendor: 'Standard', baseType: 'Class II Roadbase',
           })),
         }
       } else if (type === 'Walls' && g.linear.length) {
         data = {
           ihData: {
-            cmuWalls: g.linear.map(l => ({ vendor: 'House', lf: Math.round(l.length), heightIn: 36 })),
+            cmuWalls: g.linear.map(l => ({ vendor: 'Standard', lf: Math.round(l.length), heightIn: 36 })),
           },
         }
       }

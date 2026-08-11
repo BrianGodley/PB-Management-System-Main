@@ -22,7 +22,7 @@ import ModuleHeaderSlot from './ModuleHeaderSlot'
 //   Vendor column + an Item column. The Item (zone type / timer type) drives the
 //   labor + per-zone / per-timer FORMULA exactly as before; the Vendor ONLY
 //   changes where the MATERIAL unit price comes from (House named-rate fallback
-//   vs. a vendor's material_rates row). Vendor 'House' resolves to the original
+//   vs. a vendor's material_rates row). Vendor 'Standard' resolves to the original
 //   math, so In-House numbers never move.
 //
 //   In-House and Subcontractor are independent calculators (makeTab / ihTab /
@@ -141,7 +141,7 @@ const r2 = x => Math.round(((x || 0) + Number.EPSILON) * 100) / 100
 // The ONLY thing the Vendor selection changes: the material $ source. When a real
 // vendor is selected AND a material_rates row exists (name===dbName &&
 // vendor_id===vendorId) use that row's unit_cost; otherwise fall back to the House
-// price (name-keyed materialPrices[dbName]) then the hard fallback. Vendor 'House'
+// price (name-keyed materialPrices[dbName]) then the hard fallback. Vendor 'Standard'
 // resolves to exactly the original math, so In-House numbers never move.
 // Shared resolver (src/lib/materialCatalog.js) — same vendor→House→fallback
 // order. Irrigation keeps separate material/labor maps, so it doesn't use the
@@ -323,9 +323,9 @@ function calcIrrigation(
 
 // ── Default rows / factories ──────────────────────────────────────────────────
 const defaultZoneRows = () =>
-  ZONE_TYPES.map(z => ({ vendor: 'House', type: z.key, qty: '', mode: z.defaultMode, subEach: '' }))
+  ZONE_TYPES.map(z => ({ vendor: 'Standard', type: z.key, qty: '', mode: z.defaultMode, subEach: '' }))
 const defaultTimerRows = () =>
-  TIMER_TYPES.map(t => ({ vendor: 'House', type: t.key, qty: '', subEach: '' }))
+  TIMER_TYPES.map(t => ({ vendor: 'Standard', type: t.key, qty: '', subEach: '' }))
 const DEFAULT_MANUAL_ROWS = () => [
   { label: '', hours: '', materials: '', subCost: '' },
   { label: '', hours: '', materials: '', subCost: '' },
@@ -337,7 +337,7 @@ const DEFAULT_MANUAL_ROWS = () => [
 // totals stay byte-for-byte identical while the UI keeps showing all zones.
 function migrateZoneRows(src) {
   return ZONE_TYPES.map(z => ({
-    vendor: 'House',
+    vendor: 'Standard',
     type: z.key,
     qty: src.zoneQtys?.[z.key] ?? '',
     mode: src.zoneModes?.[z.key] || z.defaultMode,
@@ -346,7 +346,7 @@ function migrateZoneRows(src) {
 }
 function migrateTimerRows(src) {
   return TIMER_TYPES.map(t => ({
-    vendor: 'House',
+    vendor: 'Standard',
     type: t.key,
     qty: src.timerQtys?.[t.key] ?? '',
     subEach: '',
@@ -362,12 +362,12 @@ function makeTab(src = {}) {
     hoursAdj: src.hoursAdj ?? 0,
     distanceLF: src.distanceLF ?? '',
     zoneRows: src.zoneRows
-      ? src.zoneRows.map(r => ({ vendor: 'House', subEach: '', ...r }))
+      ? src.zoneRows.map(r => ({ vendor: 'Standard', subEach: '', ...r }))
       : src.zoneQtys
         ? migrateZoneRows(src)
         : defaultZoneRows(),
     timerRows: src.timerRows
-      ? src.timerRows.map(r => ({ vendor: 'House', subEach: '', ...r }))
+      ? src.timerRows.map(r => ({ vendor: 'Standard', subEach: '', ...r }))
       : src.timerQtys
         ? migrateTimerRows(src)
         : defaultTimerRows(),
@@ -570,7 +570,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
   // ── Vendor helpers ──────────────────────────────────────────────────────────
   const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id))
   const vendorOptions = [
-    { value: 'House', label: 'Standard' },
+    { value: 'Standard', label: 'Standard' },
     ...vendorsForCategory(IRRIGATION_CATEGORY).map(v => ({ value: v.id, label: v.name })),
   ]
 
@@ -843,13 +843,13 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
             {zoneRows.map((row, i) => {
               const c = calc.zoneCalc[i] || computeZoneRow(row, calc.handRate, calc.trenchRate, materialPrices, materialRows)
               const z = zoneMeta(row.type)
-              const isHouse = !row.vendor || row.vendor === 'House'
+              const isHouse = !row.vendor || row.vendor === 'Standard'
               const masterMat = materialPrices[z.matKey] ?? z.matFallback
               return (
                 <tr key={i}>
                   <td className={td}>
                     <Sel
-                      value={row.vendor || 'House'}
+                      value={row.vendor || 'Standard'}
                       onChange={e => zoneUpdate(i, 'vendor', e.target.value)}
                       options={vendorOptions}
                     />
@@ -909,7 +909,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
         </table>
         <button
           type="button"
-          onClick={() => setZoneRows(rows => [...rows, { vendor: 'House', type: 'planterSpray', qty: '', mode: 'Hand', subEach: '' }])}
+          onClick={() => setZoneRows(rows => [...rows, { vendor: 'Standard', type: 'planterSpray', qty: '', mode: 'Hand', subEach: '' }])}
           className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
         >
           + Add zone
@@ -936,13 +936,13 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
             {timerRows.map((row, i) => {
               const c = calc.timerCalc[i] || computeTimerRow(row, calc.timerHrs, materialPrices, materialRows)
               const t = timerMeta(row.type)
-              const isHouse = !row.vendor || row.vendor === 'House'
+              const isHouse = !row.vendor || row.vendor === 'Standard'
               const masterMat = materialPrices[t.matKey] ?? t.matFallback
               return (
                 <tr key={i}>
                   <td className={td}>
                     <Sel
-                      value={row.vendor || 'House'}
+                      value={row.vendor || 'Standard'}
                       onChange={e => timerUpdate(i, 'vendor', e.target.value)}
                       options={vendorOptions}
                     />
@@ -995,7 +995,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
         </table>
         <button
           type="button"
-          onClick={() => setTimerRows(rows => [...rows, { vendor: 'House', type: 'timer4', qty: '', subEach: '' }])}
+          onClick={() => setTimerRows(rows => [...rows, { vendor: 'Standard', type: 'timer4', qty: '', subEach: '' }])}
           className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
         >
           + Add timer

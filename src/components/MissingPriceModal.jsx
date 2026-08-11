@@ -11,7 +11,7 @@ import { setMaterialPrice } from '../lib/materialCatalog'
 // Props:
 //   name       — the material's display name
 //   materialId — the `material` row id (required to save)
-//   vendorId   — vendor id, or null/'House' → the Standard (universal) price
+//   vendorId   — vendor id, or null/'Standard' → the Standard (universal) price
 //   vendorLabel— optional label shown in the message (e.g. 'Angelus')
 //   onClose    — () => void
 //   onSaved    — async () => void  (host re-fetches its catalog so the new price shows)

@@ -26,7 +26,7 @@ async function fetchGtRows() {
 function mergedGtOpts(cat, houseArray, materialRows) {
   // Purely table-driven: options come ONLY from the catalog for this sub-category.
   // (houseArray is ignored — no hardcoded fallback list.)
-  return catalogOptions(materialRows, cat, 'House', { houseRows: 'null-vendor', stripPrefix: true }).map(
+  return catalogOptions(materialRows, cat, 'Standard', { houseRows: 'null-vendor', stripPrefix: true }).map(
     o => ({ label: o.label, dbName: o.row.name, fallback: parseFloat(o.row.unit_cost) || 0, id: o.row.id })
   )
 }
@@ -269,14 +269,14 @@ function calcGroundTreatments(
   const _opts = {
     sod: opts.sod || [],
   }
-  // Per-ROW type option resolver (vendor-aware). 'House' (or missing vendor on
+  // Per-ROW type option resolver (vendor-aware). 'Standard' (or missing vendor on
   // an old estimate) → hardcoded House array. A vendor id → that vendor's
   // products for the row's material category, priced at the vendor's unit_cost.
   const rowOpt = (cat, row, houseArray) => {
     // Resolve the effective vendor: a stored 'auto' (new default) → the category
-    // default (first real vendor, else House); an explicit 'House'/id stays as-is.
-    const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : (catDefaults[cat] || 'House')
-    if (!vsel || vsel === 'House') {
+    // default (first real vendor, else House); an explicit 'Standard'/id stays as-is.
+    const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : (catDefaults[cat] || 'Standard')
+    if (!vsel || vsel === 'Standard') {
       const merged = mergedGtOpts(cat, houseArray, materialRows)
       return resolveType(row.type, merged, [])
     }
@@ -411,7 +411,7 @@ function calcGroundTreatments(
   const _fertV =
     sodFertilizerVendor && sodFertilizerVendor !== 'auto'
       ? sodFertilizerVendor
-      : (catDefaults.Fertilizer || 'House')
+      : (catDefaults.Fertilizer || 'Standard')
   const fertT = rowOpt('Fertilizer', { vendor: _fertV, type: sodFertilizer }, [])
   const _fertSF = n(sodFertilizerSF) || n(sodSF)
   if (fertT && fertT.dbName && _fertSF > 0) {
@@ -725,10 +725,10 @@ function LabeledRow({ label, children, note }) {
   )
 }
 
-// Per-section Vendor picker. "House" (default) keeps the hardcoded type list;
+// Per-section Vendor picker. "Standard" (default) keeps the hardcoded type list;
 // selecting a vendor filters that section's Type dropdown to the vendor's
 // products at the vendor's price (from material_rates).
-function VendorPicker({ vendors = [], value = 'House', onChange, label = 'Vendor' }) {
+function VendorPicker({ vendors = [], value = 'Standard', onChange, label = 'Vendor' }) {
   return (
     <span className="inline-flex items-center gap-1">
       <span className="text-xs text-gray-500">{label}:</span>
@@ -737,7 +737,7 @@ function VendorPicker({ vendors = [], value = 'House', onChange, label = 'Vendor
         value={value}
         onChange={e => onChange(e.target.value)}
       >
-        <option value="House">Standard</option>
+        <option value="Standard">Standard</option>
         {vendors.map(v => (
           <option key={v.id} value={v.id}>
             {v.name}
@@ -807,7 +807,7 @@ function makeTab(src = {}) {
     prepMethod: src.prepMethod ?? 'Tiller',
     prepArea: src.prepArea ?? 'Planter',
     sodSoilPrepSF: src.sodSoilPrepSF ?? '',
-    sodSoilPrepVendor: src.sodSoilPrepVendor ?? 'House',
+    sodSoilPrepVendor: src.sodSoilPrepVendor ?? 'Standard',
     sodSoilPrepType: src.sodSoilPrepType ?? 'Soil Prep',
     sodFertilizerSF: src.sodFertilizerSF ?? '',
     sodSF: src.sodSF ?? '',
@@ -818,10 +818,10 @@ function makeTab(src = {}) {
     precastSoilSF: src.precastSoilSF ?? '',
     precastConcreteSF: src.precastConcreteSF ?? '',
     stepperVendor:
-      src.stepperVendor ?? { flagSoil: 'House', flagConc: 'House', precSoil: 'House', precConc: 'House' },
+      src.stepperVendor ?? { flagSoil: 'Standard', flagConc: 'Standard', precSoil: 'Standard', precConc: 'Standard' },
     stepperType:
       src.stepperType ?? { flagSoil: 'Flagstone', flagConc: 'Flagstone', precSoil: 'Precast', precConc: 'Precast' },
-    edgingVendor: src.edgingVendor ?? { plastic: 'House', metal: 'House' },
+    edgingVendor: src.edgingVendor ?? { plastic: 'Standard', metal: 'Standard' },
     edgingType: src.edgingType ?? { plastic: 'Plastic', metal: 'Metal' },
     // D.G. multi-row. Backward-compat: migrate a legacy single DG entry.
     dgRows:
@@ -844,8 +844,8 @@ function makeTab(src = {}) {
     pebbleRows: src.pebbleRows ?? DEFAULT_PEBBLE_ROWS.map(r => ({ ...r })),
     cobbleRows: src.cobbleRows ?? DEFAULT_COBBLE_ROWS.map(r => ({ ...r })),
     manualRows: src.manualRows ?? DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
-    sodVendor: src.sodVendor ?? 'House',
-    sodFertilizerVendor: src.sodFertilizerVendor ?? 'House',
+    sodVendor: src.sodVendor ?? 'Standard',
+    sodFertilizerVendor: src.sodFertilizerVendor ?? 'Standard',
   }
 }
 
@@ -1060,12 +1060,12 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
 
   const state = { crewType, subType, subGpMarkupRate, ...cur, materialRows }
 
-  // Build a section's Type option list. 'House' → hardcoded array (unchanged).
+  // Build a section's Type option list. 'Standard' → hardcoded array (unchanged).
   // A vendor → that vendor's products for the section's sub_category, priced at
   // the vendor's unit_cost. Falls back to the House array if the vendor has no
   // rows for the sub_category (so the dropdown is never empty).
   function sectionOptions(subcat, vendorSel, houseArray) {
-    if (!vendorSel || vendorSel === 'House') return mergedGtOpts(subcat, houseArray, materialRows)
+    if (!vendorSel || vendorSel === 'Standard') return mergedGtOpts(subcat, houseArray, materialRows)
     const opts = catalogOptions(materialRows, subcat, vendorSel, { houseRows: 'exclude', stripPrefix: true })
     // Table-driven: a vendor with no catalog rows for this sub-category shows an
     // empty list (no hardcoded fallback).
@@ -1075,8 +1075,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   // Vendors that supply a given material category — drives the per-row vendor
   // dropdowns so each row only offers vendors that carry that category.
   const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
-  // First real vendor supplying a category (else 'House').
-  const defaultVendorFor = cat => vendorsForCategory(cat)[0]?.id || 'House'
+  // First real vendor supplying a category (else 'Standard').
+  const defaultVendorFor = cat => vendorsForCategory(cat)[0]?.id || 'Standard'
 
   // Product ids for the two FIXED (non-picker) material rates, resolved from the
   // new catalog so their inline pencils can edit material_price directly.
@@ -1096,9 +1096,9 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     if (vendorDefaultsApplied || initialData?.materialPrices || !vendors.length) return
     setVendorDefaultsApplied(true)
     // A field/row that hasn't been explicitly set yet — the 'auto' sentinel that
-    // default rows ship with, a leftover 'House', or an empty value. Only these
+    // default rows ship with, a leftover 'Standard', or an empty value. Only these
     // get pushed to the category's first real vendor; an explicit user pick stays.
-    const needsDefault = v => !v || v === 'House' || v === 'auto'
+    const needsDefault = v => !v || v === 'Standard' || v === 'auto'
     const migRows = (cat, rows) =>
       (rows || []).map(r => (needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor(cat) } : r))
     const migMap = (obj, cat) => {
@@ -1892,10 +1892,10 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.vendor || 'House'}
+                        value={row.vendor || 'Standard'}
                         onChange={e => changeRowVendor('Soils', SOIL_TYPES, updateSoils, i, e.target.value)}
                       >
-                        <option value="House">Standard</option>
+                        <option value="Standard">Standard</option>
                         {vendorsForCategory('Soils').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
@@ -1979,7 +1979,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               onChange={e => changeSodVendor(e.target.value)}
               title="Vendor"
             >
-              <option value="House">Standard</option>
+              <option value="Standard">Standard</option>
               {vendorsForCategory('Sod').map(v => (
                 <option key={v.id} value={v.id}>
                   {v.name}
@@ -2031,7 +2031,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               }}
               title="Vendor"
             >
-              <option value="House">Standard</option>
+              <option value="Standard">Standard</option>
               {vendorsForCategory('Fertilizer').map(v => (
                 <option key={v.id} value={v.id}>
                   {v.name}
@@ -2136,10 +2136,10 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.vendor || 'House'}
+                        value={row.vendor || 'Standard'}
                         onChange={e => changeRowVendor('Mulch', MULCH_TYPES, updateMulch, i, e.target.value)}
                       >
-                        <option value="House">Standard</option>
+                        <option value="Standard">Standard</option>
                         {vendorsForCategory('Mulch').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
@@ -2278,10 +2278,10 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.vendor || 'House'}
+                        value={row.vendor || 'Standard'}
                         onChange={e => changeRowVendor('DG', DG_TYPES, updateDg, i, e.target.value)}
                       >
-                        <option value="House">Standard</option>
+                        <option value="Standard">Standard</option>
                         {vendorsForCategory('DG').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
@@ -2435,10 +2435,10 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.vendor || 'House'}
+                        value={row.vendor || 'Standard'}
                         onChange={e => changeRowVendor('Gravel', GRAVEL_TYPES, updateGravel, i, e.target.value)}
                       >
-                        <option value="House">Standard</option>
+                        <option value="Standard">Standard</option>
                         {vendorsForCategory('Gravel').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
@@ -2586,10 +2586,10 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.vendor || 'House'}
+                        value={row.vendor || 'Standard'}
                         onChange={e => changeRowVendor('Pebble', PEBBLE_TYPES, updatePebble, i, e.target.value)}
                       >
-                        <option value="House">Standard</option>
+                        <option value="Standard">Standard</option>
                         {vendorsForCategory('Pebble').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
@@ -2724,10 +2724,10 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.vendor || 'House'}
+                        value={row.vendor || 'Standard'}
                         onChange={e => changeRowVendor('Cobbles', COBBLE_TYPES, updateCobble, i, e.target.value)}
                       >
-                        <option value="House">Standard</option>
+                        <option value="Standard">Standard</option>
                         {vendorsForCategory('Cobbles').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
@@ -2830,7 +2830,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               >
                 <select
                   className="input text-sm py-1.5 w-32"
-                  value={edgingVendor.plastic || 'House'}
+                  value={edgingVendor.plastic || 'Standard'}
                   onChange={e => {
                     const v = e.target.value
                     setEdgingVendor(ev => ({ ...ev, plastic: v }))
@@ -2839,7 +2839,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                   }}
                   title="Vendor"
                 >
-                  <option value="House">Standard</option>
+                  <option value="Standard">Standard</option>
                   {vendorsForCategory('Edging').map(v => (
                     <option key={v.id} value={v.id}>
                       {v.name}
@@ -2883,7 +2883,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               >
                 <select
                   className="input text-sm py-1.5 w-32"
-                  value={edgingVendor.metal || 'House'}
+                  value={edgingVendor.metal || 'Standard'}
                   onChange={e => {
                     const v = e.target.value
                     setEdgingVendor(ev => ({ ...ev, metal: v }))
@@ -2892,7 +2892,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                   }}
                   title="Vendor"
                 >
-                  <option value="House">Standard</option>
+                  <option value="Standard">Standard</option>
                   {vendorsForCategory('Edging').map(v => (
                     <option key={v.id} value={v.id}>
                       {v.name}
@@ -2992,7 +2992,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-2">
                       <select
                         className="input text-sm py-1.5"
-                        value={stepperVendor[row.key] || 'House'}
+                        value={stepperVendor[row.key] || 'Standard'}
                         onChange={e => {
                           const v = e.target.value
                           setStepperVendor(sv => ({ ...sv, [row.key]: v }))
@@ -3001,7 +3001,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         }}
                         title="Vendor"
                       >
-                        <option value="House">Standard</option>
+                        <option value="Standard">Standard</option>
                         {vendorsForCategory('Steppers').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}

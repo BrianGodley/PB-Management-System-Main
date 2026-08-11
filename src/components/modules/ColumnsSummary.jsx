@@ -100,7 +100,7 @@ const n = v => parseFloat(v) || 0
 // Vendor-catalog material price. Mirrors ColumnsModule.colMatPrice: a real vendor's
 // material_rates row (name===dbName && vendor_id===vendorId) wins; otherwise fall
 // back to the House price (name-keyed materialPrices) then the hard fallback.
-// vendorId 'House'/empty returns exactly the pre-vendor value.
+// vendorId 'Standard'/empty returns exactly the pre-vendor value.
 const colMatPrice = resolveMaterialPrice
 
 function SectionLabel({ title }) {
@@ -144,7 +144,7 @@ export default function ColumnsSummary({ module }) {
     materialPrices = {},
     materialRows = [],
     vendorNames = {},
-    installVendor = 'House',
+    installVendor = 'Standard',
     calc = null,
   } = data
   const isSub = subType === 'Subcontractor'
@@ -155,7 +155,7 @@ export default function ColumnsSummary({ module }) {
   // Material prices resolve through the saved Vendor selection.
   const matPrice = (dbName, fallback, vendorId) =>
     colMatPrice(dbName, vendorId, materialRows, materialPrices, fallback)
-  const vendorLabel = v => (!v || v === 'House' ? 'Standard' : vendorNames[v] || 'Vendor')
+  const vendorLabel = v => (!v || v === 'Standard' ? 'Standard' : vendorNames[v] || 'Vendor')
 
   const fmt2 = v =>
     `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
