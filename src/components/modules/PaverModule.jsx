@@ -54,7 +54,9 @@ import {
 const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
 
 const n = v => parseFloat(v) || 0
-const sfToTons = (sf, depthIn) => (n(sf) / 200) * n(depthIn)
+// Base-rock tonnage density (SF·inch per ton). The 200 divisor is a tunable
+// estimating coefficient — callers pass the DB-editable value.
+const sfToTons = (sf, depthIn, divisor = 200) => (n(sf) / (n(divisor) || 200)) * n(depthIn)
 
 const BASE_METHODS = ['Skid Good', 'Skid OK', 'Mini Skid', 'Hand']
 
@@ -171,6 +173,9 @@ function calcPaver(
   const sleevesMatLF = mr['Paver - Sleeves'] ?? MAT_DEFAULTS.sleevesMat
   const palletCharge = mr['Paver - Pallet Charge'] ?? MAT_DEFAULTS.palletCharge
   const deliveryFlat = mr['Paver - Delivery'] ?? MAT_DEFAULTS.delivery
+  // Tunable estimating coefficients (DB-editable via misc_rates).
+  const tonsDivisor = mr['Paver - Tons Divisor'] ?? 200 // SF·inch per ton (base rock density)
+  const deliverySFPerIncrement = mr['Paver - Delivery SF Increment'] ?? 900 // SF per delivery charge
 
   const BASE_RATE_MAP = {
     'Skid Good': baseBobcatGood,
@@ -187,7 +192,7 @@ function calcPaver(
     // base prep beyond the pavers). Use the optional Base SF when provided;
     // otherwise fall back to the paver SF.
     const baseSf = row.baseSf !== '' && row.baseSf != null ? n(row.baseSf) : sf
-    const baseTons = sfToTons(baseSf, depthIn)
+    const baseTons = sfToTons(baseSf, depthIn, tonsDivisor)
     const baseRate = BASE_RATE_MAP[row.method] ?? baseBobcatOK
     const baseHrs = baseTons > 0 ? baseTons / baseRate : 0
 
@@ -361,7 +366,7 @@ function calcPaver(
   // Base rock is priced per-area (vendor/type aware) from the ACTIVE tab's rows;
   // sands/delivery follow the active tab's material SF.
   const baseRockCost = matAreas.reduce((s, a) => s + (a.baseMatCost || 0), 0)
-  const beddingSandCost = sfToTons(matInstallSF, 1) * beddingSandPerTon
+  const beddingSandCost = sfToTons(matInstallSF, 1, tonsDivisor) * beddingSandPerTon
   const jointSandCost = matInstallSF * jointSandPerSF
   const polySandCost = mPolySand ? matInstallSF * polySandPerSF : 0
   const polySandExistingCost = mPolyExistingSF * polySandExistingPerSF
@@ -374,7 +379,7 @@ function calcPaver(
   // in material_rates as "Paver - Delivery" and represents the per-increment
   // fee, not a one-time flat charge.
   const paverSelected = matInstallSF > 0
-  const deliveryIncrements = paverSelected ? Math.ceil(matInstallSF / 900) : 0
+  const deliveryIncrements = paverSelected ? Math.ceil(matInstallSF / deliverySFPerIncrement) : 0
   const deliveryCost = deliveryIncrements * deliveryFlat
   const shipping = isSubTab ? 0 : n(state.shippingCharge)
   const salesTaxRate = n(state.salesTax) / 100
@@ -482,6 +487,8 @@ function calcPaver(
     palletCharge,
     deliveryFlat,
     vertPricePerLF,
+    tonsDivisor,
+    deliverySFPerIncrement,
   }
 }
 
@@ -1221,6 +1228,24 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         ...catalogBlockItems(PAVER_CAT.base),
         ...materialRateRows('Paver - Base Rock'),
         ...materialRateRows('Bedding Sand'),
+        {
+          label: 'Tons Divisor (base rock density)',
+          table: 'misc_rates',
+          name: 'Paver - Tons Divisor',
+          category: 'Paver',
+          mode: 'coefficient',
+          unitLabel: 'SF·in/ton',
+          value: calc.tonsDivisor,
+        },
+        {
+          label: 'Delivery SF Increment',
+          table: 'misc_rates',
+          name: 'Paver - Delivery SF Increment',
+          category: 'Paver',
+          mode: 'coefficient',
+          unitLabel: 'SF',
+          value: calc.deliverySFPerIncrement,
+        },
       ],
     },
     {
@@ -2104,7 +2129,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
               </div>
               <p className="text-xs text-gray-400 mt-0.5">
                 {calc.deliveryIncrements} × {fmt2(calc.deliveryFlat)} (
-                {calc.totalInstallSF.toLocaleString()} SF ÷ 900)
+                {calc.totalInstallSF.toLocaleString()} SF ÷ {calc.deliverySFPerIncrement})
               </p>
             </>
           ) : (

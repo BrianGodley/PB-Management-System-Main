@@ -516,20 +516,27 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   ].filter(x => x.s.enabled)
 
   // ─ Volume helpers ─
+  // Tunable estimating coefficients — table-driven via the merged rate map
+  // (misc_rates), read by name with the literal only as a fallback. The fixed
+  // 27 cu-ft/cu-yd conversions below are math-invariant and stay inline.
+  const avgDepthRatio = materialPrices['Pool Avg Depth Ratio'] ?? 2 / 3
+  const excavSwell = materialPrices['Pool Excavation Swell Factor'] ?? 1.07
+  const shotShellFt = materialPrices['Pool Shotcrete Shell Thickness'] ?? 0.5
+  const shotSwell = materialPrices['Pool Shotcrete Swell Factor'] ?? 1.07
   function avgDepth(s) {
-    return (n(s.maxDepth) * 2) / 3
+    return n(s.maxDepth) * avgDepthRatio
   }
 
   function excavCY(s) {
     if (!n(s.waterSF)) return 0
-    return ((n(s.waterSF) * avgDepth(s)) / 27) * 1.07
+    return ((n(s.waterSF) * avgDepth(s)) / 27) * excavSwell
   }
 
   function shotcreteCYFn(s) {
     if (!n(s.waterSF)) return 0
-    const bot = (n(s.waterSF) * 0.5) / 27
-    const wall = (n(s.perimLF) * avgDepth(s) * 0.5) / 27
-    return (bot + wall) * 1.07
+    const bot = (n(s.waterSF) * shotShellFt) / 27
+    const wall = (n(s.perimLF) * avgDepth(s) * shotShellFt) / 27
+    return (bot + wall) * shotSwell
   }
 
   const totalExcavCY = activeStructs.reduce((s, x) => s + excavCY(x.s), 0)
@@ -568,16 +575,18 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   // ─ Waterline Tile ─
   let tileHrs = 0,
     tileMat = 0
+  // Tile coverage (SF of tile per LF of waterline) — table-driven coefficient.
+  const tileSfPerLf = materialPrices['Pool Tile SF per LF'] ?? 0.5
   activeStructs.forEach(({ tileKey }) => {
     const t = tile[tileKey] || {}
     const lf = n(t.lf)
     if (!lf) return
     const installRate =
       laborRates[`Tile - ${t.installType}`] ?? TILE_INSTALL_DEFAULTS[t.installType] ?? 0.356
-    // tile mat = LF × 0.5 SF/LF × price/SF (approximate: waterline tile width ~6")
+    // tile mat = LF × (SF/LF coverage) × price/SF (waterline tile width ~6")
     const matPriceSF = n(t.matPricePerSF)
     tileHrs += lf * installRate
-    tileMat += lf * 0.5 * matPriceSF
+    tileMat += lf * tileSfPerLf * matPriceSF
   })
 
   // ─ Spillways ─
@@ -603,7 +612,9 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     if (!lf) return
     const sided = cr.sided === 'double' ? 2 : 1
     const def = COPING_DEFAULTS[cr.type] || { mat: 8.5, hrs: 0.4 }
-    const matRate = materialPrices[`Coping - ${cr.type}`] ?? def.mat
+    // Coping MATERIAL rate is keyed distinctly from the same-named labor rate so
+    // the two don't collide in the merged rate map (misc_rates vs labor_rates).
+    const matRate = materialPrices[`Coping Mat - ${cr.type}`] ?? def.mat
     const labRate = laborRates[`Coping - ${cr.type}`] ?? def.hrs
     copingHrs += lf * sided * labRate
     copingMat += lf * sided * matRate
@@ -612,16 +623,20 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   // ─ Raised Surfaces ─
   let raisedHrs = 0,
     raisedMat = 0
+  // Per-corner labor add and per-corner material factor — table-driven coefficients.
+  const raisedCornerHrs = materialPrices['Pool Raised Corner Labor'] ?? 0.5
+  const raisedCornerMatFactor = materialPrices['Pool Raised Corner Mat Factor'] ?? 0.2
   raisedSurfaces.forEach(rs => {
     const sqft = n(rs.sqft)
     const corners = n(rs.corners)
     if (!sqft) return
     const def = RAISED_SURFACE_DEFAULTS[rs.matType] || { mat: 6.5, hrs: 0.356 }
-    const matRate = materialPrices[`Raised - ${rs.matType}`] ?? def.mat
+    // Raised MATERIAL rate is keyed distinctly from the same-named labor rate.
+    const matRate = materialPrices[`Raised Mat - ${rs.matType}`] ?? def.mat
     const labRate = laborRates[`Raised - ${rs.matType}`] ?? def.hrs
     const curveMult = 1 + n(rs.curvePct) / 100
-    raisedHrs += sqft * labRate * curveMult + corners * 0.5
-    raisedMat += sqft * matRate + corners * (def.mat * 0.2)
+    raisedHrs += sqft * labRate * curveMult + corners * raisedCornerHrs
+    raisedMat += sqft * matRate + corners * (def.mat * raisedCornerMatFactor)
   })
 
   // ─ Interior Finish (rates from subcontractor_rates, category='Pool') ─
@@ -1249,39 +1264,72 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
     },
     {
       group: 'Spillways',
-      items: SPILLWAY_TYPES.map(t => ({
-        label: `Spillway - ${t}`,
-        table: 'labor_rates',
-        name: `Spillway - ${t}`,
-        category: 'Pool',
-        mode: 'coefficient',
-        unitLabel: 'hrs/LF',
-        value: laborRates[`Spillway - ${t}`] ?? SPILLWAY_DEFAULTS[t]?.hrs,
-      })),
+      items: [
+        ...SPILLWAY_TYPES.map(t => ({
+          label: `Spillway - ${t}`,
+          table: 'labor_rates',
+          name: `Spillway - ${t}`,
+          category: 'Pool',
+          mode: 'coefficient',
+          unitLabel: 'hrs/LF',
+          value: laborRates[`Spillway - ${t}`] ?? SPILLWAY_DEFAULTS[t]?.hrs,
+        })),
+        ...SPILLWAY_TYPES.map(t => ({
+          label: `Spillway Material - ${t}`,
+          table: 'misc_rates',
+          name: `Spillway ${t}`,
+          category: 'Pool',
+          mode: 'currency',
+          unitLabel: 'LF',
+          value: materialPrices[`Spillway ${t}`] ?? SPILLWAY_DEFAULTS[t]?.mat,
+        })),
+      ],
     },
     {
       group: 'Coping',
-      items: COPING_TYPES.map(t => ({
-        label: `Coping - ${t}`,
-        table: 'labor_rates',
-        name: `Coping - ${t}`,
-        category: 'Pool',
-        mode: 'coefficient',
-        unitLabel: 'hrs/LF',
-        value: laborRates[`Coping - ${t}`] ?? COPING_DEFAULTS[t]?.hrs,
-      })),
+      items: [
+        ...COPING_TYPES.map(t => ({
+          label: `Coping - ${t}`,
+          table: 'labor_rates',
+          name: `Coping - ${t}`,
+          category: 'Pool',
+          mode: 'coefficient',
+          unitLabel: 'hrs/LF',
+          value: laborRates[`Coping - ${t}`] ?? COPING_DEFAULTS[t]?.hrs,
+        })),
+        ...COPING_TYPES.map(t => ({
+          label: `Coping Material - ${t}`,
+          table: 'misc_rates',
+          name: `Coping Mat - ${t}`,
+          category: 'Pool',
+          mode: 'currency',
+          unitLabel: 'LF',
+          value: materialPrices[`Coping Mat - ${t}`] ?? COPING_DEFAULTS[t]?.mat,
+        })),
+      ],
     },
     {
       group: 'Raised Surfaces',
-      items: RAISED_SURFACE_TYPES.map(t => ({
-        label: `Raised - ${t}`,
-        table: 'labor_rates',
-        name: `Raised - ${t}`,
-        category: 'Pool',
-        mode: 'coefficient',
-        unitLabel: 'hrs/SF',
-        value: laborRates[`Raised - ${t}`] ?? RAISED_SURFACE_DEFAULTS[t]?.hrs,
-      })),
+      items: [
+        ...RAISED_SURFACE_TYPES.map(t => ({
+          label: `Raised - ${t}`,
+          table: 'labor_rates',
+          name: `Raised - ${t}`,
+          category: 'Pool',
+          mode: 'coefficient',
+          unitLabel: 'hrs/SF',
+          value: laborRates[`Raised - ${t}`] ?? RAISED_SURFACE_DEFAULTS[t]?.hrs,
+        })),
+        ...RAISED_SURFACE_TYPES.map(t => ({
+          label: `Raised Material - ${t}`,
+          table: 'misc_rates',
+          name: `Raised Mat - ${t}`,
+          category: 'Pool',
+          mode: 'currency',
+          unitLabel: 'SF',
+          value: materialPrices[`Raised Mat - ${t}`] ?? RAISED_SURFACE_DEFAULTS[t]?.mat,
+        })),
+      ],
     },
     {
       group: 'Interior Finish (Sub)',
@@ -1297,17 +1345,34 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
     },
     {
       group: 'Pool Equipment',
-      items: Array.from(
-        new Set(Object.values(EQUIPMENT_CATALOG).flat().map(m => m.model))
-      ).map(model => ({
-        label: `Equip Labor - ${model}`,
-        table: 'labor_rates',
-        name: `Equip Labor - ${model}`,
-        category: 'Pool',
-        mode: 'coefficient',
-        unitLabel: 'hrs/ea',
-        value: laborRates[`Equip Labor - ${model}`] ?? 0,
-      })),
+      items: [
+        ...Array.from(
+          new Set(Object.values(EQUIPMENT_CATALOG).flat().map(m => m.model))
+        ).map(model => ({
+          label: `Equip Labor - ${model}`,
+          table: 'labor_rates',
+          name: `Equip Labor - ${model}`,
+          category: 'Pool',
+          mode: 'coefficient',
+          unitLabel: 'hrs/ea',
+          value: laborRates[`Equip Labor - ${model}`] ?? 0,
+        })),
+        // Equipment unit prices — the calc reads materialPrices[model] when a
+        // row leaves its unit-cost blank. Surface each real model (skip the
+        // generic 'Other' placeholder) so its price is editable here.
+        ...Object.values(EQUIPMENT_CATALOG)
+          .flat()
+          .filter((m, i, arr) => m.model !== 'Other' && arr.findIndex(x => x.model === m.model) === i)
+          .map(m => ({
+            label: `Equipment Price - ${m.model}`,
+            table: 'misc_rates',
+            name: m.model,
+            category: 'Pool',
+            mode: 'currency',
+            unitLabel: 'ea',
+            value: materialPrices[m.model] ?? m.price,
+          })),
+      ],
     },
     {
       group: 'Plumbing (Sub)',
@@ -1430,6 +1495,83 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           mode: 'coefficient',
           unitLabel: 'hrs',
           value: laborRates['Pool Plumbing - Base Hours'] ?? 16,
+        },
+        {
+          label: 'Pool Plumbing - Materials',
+          table: 'misc_rates',
+          name: 'Pool Plumbing - Materials',
+          category: 'Pool',
+          mode: 'currency',
+          unitLabel: 'flat',
+          value: materialPrices['Pool Plumbing - Materials'] ?? 350,
+        },
+      ],
+    },
+    {
+      group: 'Estimating Coefficients',
+      items: [
+        {
+          label: 'Pool Avg Depth Ratio',
+          table: 'misc_rates',
+          name: 'Pool Avg Depth Ratio',
+          category: 'Pool',
+          mode: 'coefficient',
+          unitLabel: '× max',
+          value: materialPrices['Pool Avg Depth Ratio'] ?? 2 / 3,
+        },
+        {
+          label: 'Pool Excavation Swell Factor',
+          table: 'misc_rates',
+          name: 'Pool Excavation Swell Factor',
+          category: 'Pool',
+          mode: 'coefficient',
+          unitLabel: '×',
+          value: materialPrices['Pool Excavation Swell Factor'] ?? 1.07,
+        },
+        {
+          label: 'Pool Shotcrete Shell Thickness',
+          table: 'misc_rates',
+          name: 'Pool Shotcrete Shell Thickness',
+          category: 'Pool',
+          mode: 'coefficient',
+          unitLabel: 'ft',
+          value: materialPrices['Pool Shotcrete Shell Thickness'] ?? 0.5,
+        },
+        {
+          label: 'Pool Shotcrete Swell Factor',
+          table: 'misc_rates',
+          name: 'Pool Shotcrete Swell Factor',
+          category: 'Pool',
+          mode: 'coefficient',
+          unitLabel: '×',
+          value: materialPrices['Pool Shotcrete Swell Factor'] ?? 1.07,
+        },
+        {
+          label: 'Pool Tile SF per LF',
+          table: 'misc_rates',
+          name: 'Pool Tile SF per LF',
+          category: 'Pool',
+          mode: 'coefficient',
+          unitLabel: 'SF/LF',
+          value: materialPrices['Pool Tile SF per LF'] ?? 0.5,
+        },
+        {
+          label: 'Pool Raised Corner Labor',
+          table: 'labor_rates',
+          name: 'Pool Raised Corner Labor',
+          category: 'Pool',
+          mode: 'coefficient',
+          unitLabel: 'hrs/corner',
+          value: materialPrices['Pool Raised Corner Labor'] ?? 0.5,
+        },
+        {
+          label: 'Pool Raised Corner Mat Factor',
+          table: 'misc_rates',
+          name: 'Pool Raised Corner Mat Factor',
+          category: 'Pool',
+          mode: 'coefficient',
+          unitLabel: '×',
+          value: materialPrices['Pool Raised Corner Mat Factor'] ?? 0.2,
         },
       ],
     },

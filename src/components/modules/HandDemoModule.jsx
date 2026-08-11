@@ -84,6 +84,17 @@ function calcDemo(
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const mp = materialPrices || {}
   const lr = laborRates || {}
+  // ── Table-driven estimating coefficients (fall back to code constants) ──
+  // Business-tunable assumptions, surfaced as editable coefficient rows in View
+  // Rates (labor_rates, category Demo). Fixed unit conversions (27 cf/cy,
+  // 12 in/ft, 2000 lb/ton, 60 min/hr) stay as literal math.
+  const tonsSfInDenom = lr['Demo - Hand Tons SF-in Denominator'] ?? 200
+  const concreteWeightLbCf = lr['Demo - Hand Concrete Weight lb/cf'] ?? 150
+  const importBaseLaborMult = lr['Demo - Hand Import Base Labor Mult'] ?? 0.5
+  const treeTonnageFactor = lr['Demo - Hand Tree Tonnage Factor'] ?? 0.25
+  const bucketLaborMult = lr['Demo - Hand Bucket Labor Mult'] ?? 2
+  // Local sfToTons shadows the module helper so the tons denominator is editable.
+  const sfToTons = (sf, depthIn) => (n(sf) / tonsSfInDenom) * n(depthIn)
   // Subcontractor rates: a one-off adjustment saved on THIS estimate
   // (state.rateOverrides) takes precedence over the master rate.
   const sr = { ...(subRates || {}) }
@@ -133,7 +144,7 @@ function calcDemo(
   // Vertical: LF × Height(in) × Width(in) → CF → tons (concrete 150 lb/cf)
   function vert(lf, heightIn, widthIn, baseRate, dumpFeePerTon = 0) {
     const cf = n(lf) * (n(heightIn) / 12) * (n(widthIn) / 12)
-    const tons = (cf * 150) / 2000
+    const tons = (cf * concreteWeightLbCf) / 2000
     if (!tons) return { tons: 0, cf: 0, hours: 0, dumpFee: 0 }
     return {
       tons,
@@ -178,7 +189,7 @@ function calcDemo(
   const conc = flat(state.concSF, state.concDepth || 4, rateConc, 0)
   const dirt = flat(state.dirtSF, state.dirtDepth || 4, rateConc, 0)
   const base = flat(state.baseSF, state.baseDepth || 4, rateBase, 0)
-  base.hours = 0.5 * sfLaborHrs(state.baseSF, state.baseDepth || 4, laborBase)
+  base.hours = importBaseLaborMult * sfLaborHrs(state.baseSF, state.baseDepth || 4, laborBase)
   const baseRawCy = flatCf(state.baseSF, state.baseDepth || 4) / 27
   const baseMat = Math.ceil(baseRawCy / 10) * baseMatPer10Cy
   const grass = flat(state.grassSF, state.grassDepth || 4, rateGrass, 0)
@@ -213,7 +224,7 @@ function calcDemo(
   // ── Hand Bucket Areas (confined-access manual work) ───────────────────────
   // Hand Bucket Areas: identical square-foot calc to Concrete demo but at
   // DOUBLE the rate (tight/confined access), and the same container disposal.
-  const laborBucket = laborConc * 2
+  const laborBucket = laborConc * bucketLaborMult
   const bucketCalc = (state.bucketRows || []).map(r => {
     const row = flat(r.sf, r.depth || 4, rateConc, 0)
     row.hours = sfLaborHrs(r.sf, r.depth || 4, laborBucket)
@@ -255,7 +266,7 @@ function calcDemo(
           ? treeMed
           : treeSmall
     const hrs = qty * ht * access * mult
-    const tons = qty * (ht / 10) * 0.25
+    const tons = qty * (ht / 10) * treeTonnageFactor
     const dumpFee = tons * dumpTree
     return { hrs, tons, dumpFee }
   })
@@ -440,6 +451,11 @@ function calcDemo(
     containerPrice,
     containerCy,
     swellFactor,
+    tonsSfInDenom,
+    concreteWeightLbCf,
+    importBaseLaborMult,
+    treeTonnageFactor,
+    bucketLaborMult,
     laborConc,
     laborDirt,
     laborBase,
@@ -883,6 +899,17 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
         matRate('Dump - Tree/Stump', 'Demo - Hand Dump - Tree/Stump', DUMP_FEE_DEFAULTS['Demo - Hand Dump - Tree/Stump'], 'ton'),
         matRate('Container (Low-Boy)', 'Demo - Hand Container (Low-Boy)', CONTAINER_COST, 'container'),
         matRate('Container Capacity', 'Demo - Hand Container Capacity (CY)', CONTAINER_CY, 'cy', 'coefficient'),
+        matRate('Removal Swell', 'Demo - Hand Removal Swell', SWELL, '×', 'coefficient'),
+      ],
+    },
+    {
+      group: 'Estimating Factors',
+      items: [
+        coefRate('Tons SF-in Denominator', 'Demo - Hand Tons SF-in Denominator', calc.tonsSfInDenom, 'SF-in/ton'),
+        coefRate('Concrete Weight', 'Demo - Hand Concrete Weight lb/cf', calc.concreteWeightLbCf, 'lb/cf'),
+        coefRate('Import Base Labor Mult', 'Demo - Hand Import Base Labor Mult', calc.importBaseLaborMult, '×'),
+        coefRate('Bucket Labor Mult', 'Demo - Hand Bucket Labor Mult', calc.bucketLaborMult, '×'),
+        coefRate('Tree Tonnage Factor', 'Demo - Hand Tree Tonnage Factor', calc.treeTonnageFactor, 'ton/10ft-ea'),
       ],
     },
     {

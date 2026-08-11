@@ -104,6 +104,16 @@ function calcDemo(
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const mp = materialPrices || {}
   const lr = laborRates || {}
+  // ── Table-driven estimating coefficients (fall back to code constants) ──
+  // Business-tunable assumptions, surfaced as editable coefficient rows in View
+  // Rates (labor_rates, category Demo). Fixed unit conversions (27 cf/cy,
+  // 12 in/ft, 2000 lb/ton, 60 min/hr) stay as literal math.
+  const tonsSfInDenom = lr['Demo - Skid Tons SF-in Denominator'] ?? 200
+  const concreteWeightLbCf = lr['Demo - Skid Concrete Weight lb/cf'] ?? 150
+  const importBaseLaborMult = lr['Demo - Skid Import Base Labor Mult'] ?? 0.5
+  const treeTonnageFactor = lr['Demo - Skid Tree Tonnage Factor'] ?? 0.25
+  // Local sfToTons shadows the module helper so the tons denominator is editable.
+  const sfToTons = (sf, depthIn) => (n(sf) / tonsSfInDenom) * n(depthIn)
   // Subcontractor rates: a one-off adjustment saved on THIS estimate
   // (state.rateOverrides) takes precedence over the master rate.
   const sr = { ...(subRates || {}) }
@@ -160,7 +170,7 @@ function calcDemo(
   // Vertical: LF × Height(in) × Width(in) → CF → tons (concrete 150 lb/cf)
   function vert(lf, heightIn, widthIn, baseRate, dumpFeePerTon = 0) {
     const cf = n(lf) * (n(heightIn) / 12) * (n(widthIn) / 12)
-    const tons = (cf * 150) / 2000
+    const tons = (cf * concreteWeightLbCf) / 2000
     if (!tons) return { tons: 0, cf: 0, hours: 0, dumpFee: 0 }
     const hours = tons / (baseRate * access)
     const dumpFee = tons * dumpFeePerTon
@@ -190,7 +200,7 @@ function calcDemo(
   const dirt = flat(state.dirtSF, state.dirtDepth || 4, laborDirt, 0)
   const base = flat(state.baseSF, state.baseDepth || 4, laborBase, 0)
   // Import Base: half the square-foot labour rate, priced as material per 10 raw cy.
-  base.hours = 0.5 * sfLaborHrs(state.baseSF, state.baseDepth || 4, laborBase)
+  base.hours = importBaseLaborMult * sfLaborHrs(state.baseSF, state.baseDepth || 4, laborBase)
   const baseRawCy = flatCf(state.baseSF, state.baseDepth || 4) / 27
   const baseMat = Math.ceil(baseRawCy / 10) * baseMatPer10Cy
   const grass = flat(state.grassSF, state.grassDepth || 4, rateGrass, 0)
@@ -255,7 +265,7 @@ function calcDemo(
       ht = n(r.height) || 10
     const mult = r.size === 'Large' ? treeLarge : r.size === 'Medium' ? treeMed : treeSmall
     const hrs = qty * ht * access * mult
-    const tons = qty * (ht / 10) * 0.25
+    const tons = qty * (ht / 10) * treeTonnageFactor
     const dumpFee = tons * dumpGreen
     return { hrs, tons, dumpFee }
   })
@@ -299,7 +309,7 @@ function calcDemo(
       // Misc Vert — $/ton (concrete rate), tons from LF × H × W → CF → 150 lb/cf
       (state.miscVertRows || []).reduce((s, r) => {
         const cf = n(r.lf) * (n(r.heightIn || 0) / 12) * (n(r.widthIn || 8) / 12)
-        const tons = (cf * 150) / 2000
+        const tons = (cf * concreteWeightLbCf) / 2000
         return s + tons * srConc
       }, 0) +
       // Footing — $/ton (concrete rate)
@@ -474,6 +484,10 @@ function calcDemo(
     containerPrice,
     containerCy,
     swellFactor,
+    tonsSfInDenom,
+    concreteWeightLbCf,
+    importBaseLaborMult,
+    treeTonnageFactor,
     difficultyRatio,
     haulSecPerFt,
     haulLoadCy,
@@ -1008,6 +1022,56 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           mode: 'coefficient',
           unitLabel: 'cy',
           value: materialPrices['Demo - Skid Container Capacity (CY)'] ?? CONTAINER_CY,
+        },
+        {
+          label: 'Removal Swell',
+          table: 'misc_rates',
+          name: 'Demo - Skid Removal Swell',
+          category: 'Demo',
+          mode: 'coefficient',
+          unitLabel: '×',
+          value: materialPrices['Demo - Skid Removal Swell'] ?? SWELL,
+        },
+      ],
+    },
+    {
+      group: 'Estimating Factors',
+      items: [
+        {
+          label: 'Tons SF-in Denominator',
+          table: 'labor_rates',
+          name: 'Demo - Skid Tons SF-in Denominator',
+          category: 'Demo',
+          mode: 'coefficient',
+          unitLabel: 'SF-in/ton',
+          value: calc.tonsSfInDenom,
+        },
+        {
+          label: 'Concrete Weight',
+          table: 'labor_rates',
+          name: 'Demo - Skid Concrete Weight lb/cf',
+          category: 'Demo',
+          mode: 'coefficient',
+          unitLabel: 'lb/cf',
+          value: calc.concreteWeightLbCf,
+        },
+        {
+          label: 'Import Base Labor Mult',
+          table: 'labor_rates',
+          name: 'Demo - Skid Import Base Labor Mult',
+          category: 'Demo',
+          mode: 'coefficient',
+          unitLabel: '×',
+          value: calc.importBaseLaborMult,
+        },
+        {
+          label: 'Tree Tonnage Factor',
+          table: 'labor_rates',
+          name: 'Demo - Skid Tree Tonnage Factor',
+          category: 'Demo',
+          mode: 'coefficient',
+          unitLabel: 'ton/10ft-ea',
+          value: calc.treeTonnageFactor,
         },
       ],
     },

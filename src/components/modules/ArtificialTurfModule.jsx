@@ -166,6 +166,8 @@ function calcTurf(
   }
 
   // ── Demo section ──────────────────────────────────────────────────────────
+  // Removal tonnage density (SF·inch per ton) — DB-editable coefficient.
+  const demoTonsDivisor = mp['Turf - Demo Tons Divisor'] ?? 200
   let demoHrs = 0,
     demoMat = 0
   const demoCalc = DEMO_ROWS.map(row => {
@@ -174,7 +176,7 @@ function calcTurf(
     const method = state.demo[row.key]?.method || 'Skid Steer Good'
     const rate = demoRate(method)
     const dumpRate = n(mp[row.dumpKey]) || row.dumpFallback
-    const tons = sf > 0 ? (sf / 200) * inches : 0
+    const tons = sf > 0 ? (sf / demoTonsDivisor) * inches : 0
     const hrs = tons > 0 ? tons / rate : 0
     const mat = tons * dumpRate
     demoHrs += hrs
@@ -194,6 +196,10 @@ function calcTurf(
   //   Weed:   rolls=ceil(SF/1800), hrs=(SF/1000)*weedFabricHrPer1kSF
   let baseHrs = 0,
     baseMat = 0
+  // Gravel-base tonnage density (SF·inch per ton) + weed-fabric roll coverage —
+  // DB-editable estimating coefficients.
+  const gravelBaseTonsDivisor = mp['Turf - Gravel Base Tons Divisor'] ?? 200
+  const weedFabricSFPerRoll = mp['Turf - Weed Fabric SF per Roll'] ?? 1800
   const baseCalc = (state.baseRows || []).map(row => {
     const def = BASE_MATERIALS.find(m => m.key === row.material) || BASE_MATERIALS[0]
     const sf = n(row.sf) || turfAreaSF
@@ -213,7 +219,7 @@ function calcTurf(
       // Base-install labor coefficients are DB-editable (labor_rates).
       const baseSFPerHr = mp['Turf - Base Install SF/hr'] ?? RATE_DEFAULTS.baseSFPerHr
       const baseInstallPH = mp['Turf - Base Install PH'] ?? RATE_DEFAULTS.baseInstallRate
-      qty = sf > 0 ? (sf / 200) * 2 : 0
+      qty = sf > 0 ? (sf / gravelBaseTonsDivisor) * 2 : 0
       hrs = sf > 0 && baseSFPerHr > 0 ? (sf / baseSFPerHr) * baseInstallPH : 0
     } else if (def.key === 'DG') {
       qty = sf > 0 ? (sf * (1 / 12)) / 27 : 0
@@ -221,7 +227,7 @@ function calcTurf(
     } else {
       // Weed-fabric install labor is DB-editable (hrs per 1000 SF).
       const weedHrPer1kSF = mp['Turf - Weed Fabric Install hrs/1kSF'] ?? RATE_DEFAULTS.weedFabricHrPer1kSF
-      qty = sf > 0 ? Math.ceil(sf / 1800) : 0
+      qty = sf > 0 ? Math.ceil(sf / weedFabricSFPerRoll) : 0
       hrs = sf > 0 ? (sf / 1000) * weedHrPer1kSF : 0
     }
     const mat = qty * price
@@ -242,6 +248,8 @@ function calcTurf(
   const turfSFHr = n(lr['Turf - Turf Install SF/hr']) || RATE_DEFAULTS.turfSFHr
   // Turf-placement person-hours multiplier is DB-editable (labor_rates).
   const turfPH = mp['Turf - Turf Install PH'] ?? RATE_DEFAULTS.turfPH
+  // Turf roll width (ft) — DB-editable product spec.
+  const rollWidthFt = mp['Turf - Roll Width FT'] ?? 15
   let turfHrs = 0,
     turfMat = 0,
     totalEdgeLF = 0,
@@ -254,7 +262,7 @@ function calcTurf(
     const pricePerSF = n(brandRow?.unit_cost)
     // In-house derives SF from the 15' roll edge; the Sub tab uses the
     // installed SF the estimator enters directly.
-    const sf = isSub ? installSF : edgeLF * 15
+    const sf = isSub ? installSF : edgeLF * rollWidthFt
     const hrs = !isSub && sf > 0 ? (sf / turfSFHr) * turfPH : 0
     const mat = isSub ? 0 : sf * pricePerSF
     // All-in sub cost for this roll: (sub install $/SF + material $/SF) × SF.
@@ -304,10 +312,12 @@ function calcTurf(
   // Standard Durafill: $0.62/SF
   const infillAreaSF =
     turfAreaSF || (state.baseRows || []).reduce((m, r) => Math.max(m, n(r.sf)), 0)
+  // ZeoFill coverage (SF per bag) — DB-editable product spec.
+  const infillSFPerBag = mp['Turf - Infill SF per Bag'] ?? 30
   let infillMat = 0
   if (!isSub && infillAreaSF > 0) {
     if (state.useZeoFill) {
-      const bags = Math.ceil(infillAreaSF / 30)
+      const bags = Math.ceil(infillAreaSF / infillSFPerBag)
       infillMat = bags * (n(mp['Turf - Infill ZeoFill']) || RATE_DEFAULTS.infillZeoFill)
     } else {
       infillMat = infillAreaSF * (n(mp['Turf - Infill Durafill']) || RATE_DEFAULTS.infillDurafill)
@@ -378,6 +388,12 @@ function calcTurf(
     subStripsCost,
     subInstallPerSF,
     subStripPerLF,
+    // Resolved tunable estimating coefficients (exposed for View Rates + display)
+    demoTonsDivisor,
+    gravelBaseTonsDivisor,
+    weedFabricSFPerRoll,
+    rollWidthFt,
+    infillSFPerBag,
   }
 }
 
@@ -981,6 +997,56 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       ],
     },
     {
+      group: 'Estimating Factors',
+      items: [
+        {
+          label: 'Demo Tons Divisor',
+          table: 'misc_rates',
+          name: 'Turf - Demo Tons Divisor',
+          category: 'Artificial Turf',
+          mode: 'coefficient',
+          unitLabel: 'SF·in/ton',
+          value: materialPrices['Turf - Demo Tons Divisor'] ?? 200,
+        },
+        {
+          label: 'Gravel Base Tons Divisor',
+          table: 'misc_rates',
+          name: 'Turf - Gravel Base Tons Divisor',
+          category: 'Artificial Turf',
+          mode: 'coefficient',
+          unitLabel: 'SF·in/ton',
+          value: materialPrices['Turf - Gravel Base Tons Divisor'] ?? 200,
+        },
+        {
+          label: 'Weed Fabric SF per Roll',
+          table: 'misc_rates',
+          name: 'Turf - Weed Fabric SF per Roll',
+          category: 'Artificial Turf',
+          mode: 'coefficient',
+          unitLabel: 'SF/roll',
+          value: materialPrices['Turf - Weed Fabric SF per Roll'] ?? 1800,
+        },
+        {
+          label: 'Turf Roll Width',
+          table: 'misc_rates',
+          name: 'Turf - Roll Width FT',
+          category: 'Artificial Turf',
+          mode: 'coefficient',
+          unitLabel: 'ft',
+          value: materialPrices['Turf - Roll Width FT'] ?? 15,
+        },
+        {
+          label: 'Infill SF per Bag (ZeoFill)',
+          table: 'misc_rates',
+          name: 'Turf - Infill SF per Bag',
+          category: 'Artificial Turf',
+          mode: 'coefficient',
+          unitLabel: 'SF/bag',
+          value: materialPrices['Turf - Infill SF per Bag'] ?? 30,
+        },
+      ],
+    },
+    {
       group: 'Subcontractor',
       items: [
         {
@@ -1201,7 +1267,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           <span className="text-xs text-amber-700 ml-auto inline-flex items-center gap-1">
             {T.useZeoFill ? (
               <>
-                {Math.ceil(calc.infillAreaSF / 30)} bags @ $
+                {Math.ceil(calc.infillAreaSF / calc.infillSFPerBag)} bags @ $
                 {n(materialPrices['Turf - Infill ZeoFill'] || RATE_DEFAULTS.infillZeoFill).toFixed(
                   2
                 )}

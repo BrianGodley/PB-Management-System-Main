@@ -1076,6 +1076,21 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
         ...Object.values(ADD_ITEM_RATES).flatMap(rate => matRows(rate.dbName, 'ea', rate.matCost)),
       ],
     },
+    {
+      group: 'Subcontractor Trenching',
+      items: [
+        {
+          label: 'Utilities Sub Trench - Per LF',
+          table: 'misc_rates',
+          name: 'Utilities Sub Trench - Per LF',
+          category: 'Utilities',
+          mode: 'currency',
+          unitLabel: 'LF',
+          section: 'sub',
+          value: materialPrices['Utilities Sub Trench - Per LF'] ?? 12,
+        },
+      ],
+    },
   ]
 
   return (

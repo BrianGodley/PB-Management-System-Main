@@ -105,6 +105,16 @@ function calcDemo(
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const mp = materialPrices || {}
   const lr = laborRates || {}
+  // ── Table-driven estimating coefficients (fall back to code constants) ──
+  // Business-tunable assumptions, surfaced as editable coefficient rows in View
+  // Rates (labor_rates, category Demo). Fixed unit conversions (27 cf/cy,
+  // 12 in/ft, 2000 lb/ton, 60 min/hr) stay as literal math.
+  const tonsSfInDenom = lr['Demo - Mini Tons SF-in Denominator'] ?? 200
+  const concreteWeightLbCf = lr['Demo - Mini Concrete Weight lb/cf'] ?? 150
+  const importBaseLaborMult = lr['Demo - Mini Import Base Labor Mult'] ?? 0.5
+  const treeTonnageFactor = lr['Demo - Mini Tree Tonnage Factor'] ?? 0.25
+  // Local sfToTons shadows the module helper so the tons denominator is editable.
+  const sfToTons = (sf, depthIn) => (n(sf) / tonsSfInDenom) * n(depthIn)
   // Subcontractor rates: a one-off adjustment saved on THIS estimate
   // (state.rateOverrides) takes precedence over the master rate.
   const sr = { ...(subRates || {}) }
@@ -171,7 +181,7 @@ function calcDemo(
 
   function vert(lf, heightIn, widthIn, baseRate, dumpFeePerTon = 0, accessLevel = accessNonBob) {
     const cf = n(lf) * (n(heightIn) / 12) * (n(widthIn) / 12)
-    const tons = (cf * 150) / 2000
+    const tons = (cf * concreteWeightLbCf) / 2000
     if (!tons) return { tons: 0, cf: 0, hours: 0, dumpFee: 0 }
     return {
       tons,
@@ -204,7 +214,7 @@ function calcDemo(
   const dirt = flat(state.dirtSF, state.dirtDepth || 4, laborDirt, 0, accessNonBob)
   const base = flat(state.baseSF, state.baseDepth || 4, laborBase, 0, accessNonBob)
   // Import Base: half the square-foot labour rate, priced as material per 10 raw cy.
-  base.hours = 0.5 * sfLaborHrs(state.baseSF, state.baseDepth || 4, laborBase)
+  base.hours = importBaseLaborMult * sfLaborHrs(state.baseSF, state.baseDepth || 4, laborBase)
   const baseRawCy = flatCf(state.baseSF, state.baseDepth || 4) / 27
   const baseMat = Math.ceil(baseRawCy / 10) * baseMatPer10Cy
   const grass = flat(state.grassSF, state.grassDepth || 4, rateGrass, 0, accessBobcat)
@@ -275,7 +285,7 @@ function calcDemo(
       ht = n(r.height) || 10
     const mult = r.size === 'Large' ? treeLarge : r.size === 'Medium' ? treeMed : treeSmall
     const hrs = qty * ht * accessBobcat * mult
-    const tons = qty * (ht / 10) * 0.25
+    const tons = qty * (ht / 10) * treeTonnageFactor
     const dumpFee = tons * dumpTreeStump // Mini: $125.33/ton
     return { hrs, tons, dumpFee }
   })
@@ -473,6 +483,10 @@ function calcDemo(
     containerPrice,
     containerCy,
     swellFactor,
+    tonsSfInDenom,
+    concreteWeightLbCf,
+    importBaseLaborMult,
+    treeTonnageFactor,
     difficultyRatio,
     haulSecPerFt,
     haulLoadCy,
@@ -910,6 +924,16 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
         { label: 'Dump - Import Base', table: 'misc_rates', name: 'Demo - Mini Dump - Import Base', category: 'Demo', mode: 'currency', unitLabel: 'ton', value: materialPrices['Demo - Mini Dump - Import Base'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Import Base'] },
         { label: 'Container (Low-Boy)', table: 'misc_rates', name: 'Demo - Mini Container (Low-Boy)', category: 'Demo', mode: 'currency', unitLabel: 'container', value: materialPrices['Demo - Mini Container (Low-Boy)'] ?? CONTAINER_COST },
         { label: 'Container Capacity', table: 'misc_rates', name: 'Demo - Mini Container Capacity (CY)', category: 'Demo', mode: 'coefficient', unitLabel: 'cy', value: materialPrices['Demo - Mini Container Capacity (CY)'] ?? CONTAINER_CY },
+        { label: 'Removal Swell', table: 'misc_rates', name: 'Demo - Mini Removal Swell', category: 'Demo', mode: 'coefficient', unitLabel: '×', value: materialPrices['Demo - Mini Removal Swell'] ?? SWELL },
+      ],
+    },
+    {
+      group: 'Estimating Factors',
+      items: [
+        { label: 'Tons SF-in Denominator', table: 'labor_rates', name: 'Demo - Mini Tons SF-in Denominator', category: 'Demo', mode: 'coefficient', unitLabel: 'SF-in/ton', value: calc.tonsSfInDenom },
+        { label: 'Concrete Weight', table: 'labor_rates', name: 'Demo - Mini Concrete Weight lb/cf', category: 'Demo', mode: 'coefficient', unitLabel: 'lb/cf', value: calc.concreteWeightLbCf },
+        { label: 'Import Base Labor Mult', table: 'labor_rates', name: 'Demo - Mini Import Base Labor Mult', category: 'Demo', mode: 'coefficient', unitLabel: '×', value: calc.importBaseLaborMult },
+        { label: 'Tree Tonnage Factor', table: 'labor_rates', name: 'Demo - Mini Tree Tonnage Factor', category: 'Demo', mode: 'coefficient', unitLabel: 'ton/10ft-ea', value: calc.treeTonnageFactor },
       ],
     },
     {

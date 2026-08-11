@@ -206,7 +206,12 @@ function calcConcrete(
   // Rebar $/LF (canonical, from the shared Basic Materials 'Rebar' row) and the
   // LF-per-SF conversion factor for the chosen on-center spacing.
   const rebarPerLF = mr['Rebar'] ?? REBAR_CANONICAL_FB
-  const rebarLfPerSf = REBAR_LF_PER_SF[state.rebarSpacing] ?? REBAR_LF_PER_SF['24" OC']
+  // Rebar LF-per-SF conversion by spacing — DB-editable coefficients.
+  const rebarLfPerSfBySpacing = {
+    '24" OC': mr['Concrete - Rebar LF/SF 24" OC'] ?? REBAR_LF_PER_SF['24" OC'],
+    '12" OC': mr['Concrete - Rebar LF/SF 12" OC'] ?? REBAR_LF_PER_SF['12" OC'],
+  }
+  const rebarLfPerSf = rebarLfPerSfBySpacing[state.rebarSpacing] ?? rebarLfPerSfBySpacing['24" OC']
   const formMaterialPerLF = mr['Concrete - Form Lumber LF'] ?? R.formMaterialPerLF
   const sleevePer10LF = mr['Concrete - Sleeve Per 10LF'] ?? R.sleevePer10LF
   const colorCostPerCY = mr['Concrete - Color Per CY'] ?? R.colorCostPerCY
@@ -214,6 +219,8 @@ function calcConcrete(
   const sealerWet5g = mr['Concrete - Sealer Wet 5gal'] ?? R.sealerWet5g
   const vaporBarrierPerSF = mr['Concrete - Vapor Barrier SF'] ?? R.vaporBarrierPerSF
   const costBase = mr['Base - Class II Roadbase'] ?? R.costBase // shared Basic Materials
+  // Sealer coverage (SF per gallon) — DB-editable coefficient.
+  const sealerSFPerGal = mr['Concrete - Sealer SF/gal'] ?? R.sealerSFPerGal
 
   // ── Sub / equipment costs (subcontractor_rates) ──────────────────────────
   const pumpFeeFlat = sr['Concrete - Pump Flat Fee'] ?? R.pumpFeeFlat
@@ -236,13 +243,15 @@ function calcConcrete(
   const hoursAdj = n(state.hoursAdj)
 
   // ── Base ────────────────────────────────────────────────────────────────
+  // Base-rock tonnage density (SF·inch per ton) — DB-editable coefficient.
+  const baseTonsDivisor = mr['Concrete - Base Tons Divisor'] ?? 200
   let baseHrsTot = 0,
     baseMatTot = 0
   const baseCalc = (state.baseRows || []).map(r => {
     const sf = n(r.sf),
       depth = n(r.depth) || 2
     if (!sf) return { tons: 0, hrs: 0, mat: 0 }
-    const tons = (sf / 200) * depth
+    const tons = (sf / baseTonsDivisor) * depth
     // Per-method base rate — DB value via labor_rates['Concrete - Base ...']
     // takes precedence over the hardcoded fallback in BASE_RATES.
     const rate = lr[BASE_METHOD_LABOR_NAME[r.method]] ?? BASE_RATES[r.method] ?? 10.0
@@ -305,7 +314,10 @@ function calcConcrete(
   // ── Travel + backyard ────────────────────────────────────────────────────
   // Old per-module travelHrs retired — now handled by unified walk-access penalty below.
   const travelHrs = 0
-  const backyardHrs = pctBackyard > 0 ? 0.2 * pctBackyard * installHrs : 0
+  // Backyard-access labor add: fraction of install hours added per unit of
+  // pctBackyard — DB-editable coefficient.
+  const backyardFactor = lr['Concrete - Backyard Labor Factor'] ?? 0.2
+  const backyardHrs = pctBackyard > 0 ? backyardFactor * pctBackyard * installHrs : 0
 
   // ── Forming complexity ───────────────────────────────────────────────────
   const preComplexHrs =
@@ -350,7 +362,7 @@ function calcConcrete(
   let sealerHrs = 0,
     sealerMat = 0
   if (sealerSF > 0) {
-    const sealerGals = Math.ceil(sealerSF / R.sealerSFPerGal)
+    const sealerGals = Math.ceil(sealerSF / sealerSFPerGal)
     const price5g = sealerType === 'Natural' ? sealerNatural5g : sealerWet5g
     sealerMat = sealerGals * (price5g / 5)
     const sealSFPerHr = sealerType === 'Natural' ? sealerNaturalSFPerHr : sealerWetSFPerHr
@@ -445,6 +457,10 @@ function calcConcrete(
     concretePerCY,
     rebarPerLF,
     rebarLfPerSf,
+    rebarLfPerSfBySpacing,
+    baseTonsDivisor,
+    sealerSFPerGal,
+    backyardFactor,
     formMaterialPerLF,
     sleevePer10LF,
     colorCostPerCY,
@@ -881,6 +897,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const {
     rebarSFPerHr,
     rebarPerLF,
+    rebarLfPerSfBySpacing,
     formLFPerHr,
     formMaterialPerLF,
     sleeveLFPerHr,
@@ -907,7 +924,8 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   // Rebar — same LF-per-SF conversion × canonical $/LF, using the Sub tab's
   // own on-center spacing.
   if (n(subRebarSF) > 0) {
-    const subRebarLfPerSf = REBAR_LF_PER_SF[subRebarSpacing] ?? REBAR_LF_PER_SF['24" OC']
+    const subRebarLfPerSf =
+      rebarLfPerSfBySpacing[subRebarSpacing] ?? rebarLfPerSfBySpacing['24" OC']
     subSideCost +=
       n(subRebarSF) * subRebarLfPerSf * rebarPerLF + (n(subRebarSF) / rebarSFPerHr) * lrph
   }
@@ -1065,6 +1083,24 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           unitLabel: '%/pt',
           value: calc.complexityPctPerUnit,
         },
+        {
+          label: 'Backyard Labor Factor',
+          table: 'labor_rates',
+          name: 'Concrete - Backyard Labor Factor',
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: '×install hrs',
+          value: calc.backyardFactor,
+        },
+        {
+          label: 'Base Tons Divisor',
+          table: 'misc_rates',
+          name: 'Concrete - Base Tons Divisor',
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: 'SF·in/ton',
+          value: calc.baseTonsDivisor,
+        },
       ],
     },
     {
@@ -1103,6 +1139,24 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           mode: 'coefficient',
           unitLabel: 'SF/hr',
           value: calc.rebarSFPerHr,
+        },
+        {
+          label: 'Rebar LF/SF — 24" OC',
+          table: 'misc_rates',
+          name: 'Concrete - Rebar LF/SF 24" OC',
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: 'LF/SF',
+          value: calc.rebarLfPerSfBySpacing['24" OC'],
+        },
+        {
+          label: 'Rebar LF/SF — 12" OC',
+          table: 'misc_rates',
+          name: 'Concrete - Rebar LF/SF 12" OC',
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: 'LF/SF',
+          value: calc.rebarLfPerSfBySpacing['12" OC'],
         },
         {
           label: 'Concrete - Form Setting',
@@ -1214,6 +1268,15 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           mode: 'coefficient',
           unitLabel: 'SF/hr',
           value: calc.sealerWetSFPerHr,
+        },
+        {
+          label: 'Sealer Coverage (SF/gal)',
+          table: 'misc_rates',
+          name: 'Concrete - Sealer SF/gal',
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: 'SF/gal',
+          value: calc.sealerSFPerGal,
         },
         {
           label: 'Concrete - Sand Finish 400SF',
@@ -1432,7 +1495,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               {activeBaseRows.map((row, i) => {
                 const _sf = n(row.sf),
                   _depth = n(row.depth) || 2
-                const _tons = _sf > 0 ? (_sf / 200) * _depth : 0
+                const _tons = _sf > 0 ? (_sf / calc.baseTonsDivisor) * _depth : 0
                 const methodRate =
                   laborRates[BASE_METHOD_LABOR_NAME[row.method]] ?? BASE_RATES[row.method] ?? 10.0
                 const baseOpts = sectionOptions('Concrete Base', row.vendor, BASE_TYPES)
@@ -1631,8 +1694,8 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               Rebar (Sq Ft)
               <span className="text-gray-400">
                 — {calc.rebarSFPerHr} SF/hr · ${calc.rebarPerLF}/LF ·{' '}
-                {REBAR_LF_PER_SF[activeRebarSpacing] ?? REBAR_LF_PER_SF['24" OC']} LF/SF · $
-                {((REBAR_LF_PER_SF[activeRebarSpacing] ?? REBAR_LF_PER_SF['24" OC']) * calc.rebarPerLF).toFixed(3)}/SF
+                {calc.rebarLfPerSfBySpacing[activeRebarSpacing] ?? calc.rebarLfPerSfBySpacing['24" OC']} LF/SF · $
+                {((calc.rebarLfPerSfBySpacing[activeRebarSpacing] ?? calc.rebarLfPerSfBySpacing['24" OC']) * calc.rebarPerLF).toFixed(3)}/SF
               </span>
             </label>
             <div className="flex items-center gap-2">

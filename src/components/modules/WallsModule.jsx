@@ -147,6 +147,10 @@ const WALL_RATES = {
   // ── Structural coefficients (were hard-coded in the calc functions; fb =
   // legacy value so totals are unchanged until a rate is seeded/edited). ──────
   blockOrderWaste: { db: 'Wall Block Order Waste', fb: 1.1 }, // order multiplier (grey + BB)
+  // Footing horizontal-rebar wrap/waste factor (+10% for wraps). Applied to the
+  // footing horizontal rebar LF in the CMU + PIP calcs. Table-driven so the waste
+  // % is tunable; fb = the legacy 1.1 so totals are unchanged until edited.
+  footingRebarWaste: { db: 'Wall Footing Rebar Waste', fb: 1.1 }, // × (order/wrap multiplier)
   footingPourLab: { db: 'Wall Footing Pour Labor Rate', fb: 0.2037 }, // CY / hr (pour productivity) — legacy, kept for back-compat
   // Footing pour labor split by method. The wall's Footing Pump toggle selects
   // which one drives the calc. Both seeded to the legacy footingPourLab value so
@@ -204,7 +208,10 @@ const WALL_RATES = {
   backfillHandGF: { db: 'Demo - Hand - Grade Fill SF', fb: 1 },
   backfillMiniGF: { db: 'Demo - Mini - Grade Fill SF', fb: 1 },
   backfillSkidGF: { db: 'Demo - Skid - Grade Fill SF', fb: 1 },
-  compJJ: { db: 'Demo - Hand - JJ SF', fb: 1 }, // Jumping Jack; Hand compaction = 3× this
+  compJJ: { db: 'Demo - Hand - JJ SF', fb: 1 }, // Jumping Jack; Hand compaction = handCompactionMult× this
+  // Hand compaction productivity relative to Jumping Jack (Hand = 3× the JJ hrs).
+  // Table-driven multiplier; fb = the legacy 3 so totals are unchanged until edited.
+  handCompactionMult: { db: 'Wall Hand Compaction Multiplier', fb: 3 }, // × (on JJ rate)
   demoSfToTonsDenom: { db: 'Demo SF to Tons Denom', fb: 200 }, // sfToTons: (sf / 200) × depthIn (all Demo modules)
   // Container removal (dump) — per method (misc_rates, category Demo).
   demoHandContainer: { db: 'Demo - Hand Container (Low-Boy)', fb: 770 }, // $ per container
@@ -317,7 +324,7 @@ function wallBackfill(wall = {}, r) {
   if (sf <= 0 || depthIn <= 0) return { hrs: 0 }
   const gfRate = r(BACKFILL_GF_KEY[wall.bkMethod] || 'backfillHandGF')
   const jjRate = r('compJJ')
-  const compRate = (wall.bkCompMethod || 'Jumping Jack') === 'Hand' ? 3 * jjRate : jjRate
+  const compRate = (wall.bkCompMethod || 'Jumping Jack') === 'Hand' ? r('handCompactionMult') * jjRate : jjRate
   const backfillHrs = (sf / 100) * depthIn * gfRate
   const compHrs = (sf / 100) * depthIn * compRate
   return { hrs: backfillHrs + compHrs }
@@ -419,6 +426,7 @@ const WALL_RATE_SPECS = [
       ['pumpGroutLab', 'Pump Fill Grout', 'Walls', 'CF/hr', 'coefficient'],
       ['handGroutLab', 'Hand Fill Grout', 'Walls', 'CF/hr', 'coefficient'],
       ['rebarLab', 'Set Rebar', 'Walls', 'LF/hr', 'coefficient'],
+      ['footingRebarWaste', 'Footing Rebar Waste/Wrap', 'Walls', '×', 'coefficient'],
       ['blockLab', 'CMU Block Install', 'Walls', 'blk/hr', 'coefficient'],
       ['setupCleanLab', 'Setup / Clean', 'Walls', 'LF/hr', 'coefficient'],
     ],
@@ -430,6 +438,7 @@ const WALL_RATE_SPECS = [
       ['concreteHand', 'Concrete — Hand Mix', 'Basic Materials', 'CY', 'currency'],
       ['pipStemCourseLab', 'Pour in Place Install (per 6" Height)', 'Walls', 'hr/LF', 'coefficient'],
       ['rebarLab', 'Set Rebar', 'Walls', 'LF/hr', 'coefficient'],
+      ['footingRebarWaste', 'Footing Rebar Waste/Wrap', 'Walls', '×', 'coefficient'],
       ['footingPourHandLab', 'Hand Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
       ['footingPourPumpLab', 'Pump Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
     ],
@@ -492,7 +501,8 @@ const WALL_RATE_SPECS = [
       ['backfillHandGF', 'Hand — Grade Fill', 'Demo', 'hr/100 SF·in', 'coefficient'],
       ['backfillMiniGF', 'Mini Skid / Excavator — Grade Fill', 'Demo', 'hr/100 SF·in', 'coefficient'],
       ['backfillSkidGF', 'Skid Steer — Grade Fill', 'Demo', 'hr/100 SF·in', 'coefficient'],
-      ['compJJ', 'Jumping Jack Compaction (Hand = 3×)', 'Demo', 'hr/100 SF·in', 'coefficient'],
+      ['compJJ', 'Jumping Jack Compaction (Hand = mult×)', 'Demo', 'hr/100 SF·in', 'coefficient'],
+      ['handCompactionMult', 'Hand Compaction Multiplier (on Jumping Jack)', 'Walls', '×', 'coefficient'],
     ],
   },
   {
@@ -1201,7 +1211,7 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
   const bars = n(rebarSpIn) > 0 ? Math.ceil((n(lf) * 12) / n(rebarSpIn)) : 0
   const wallVertLF = bars * (n(heightIn) / 12)
   const wallHorizLF = n(wall.wallHorizBars) * n(lf)
-  const footingRebarLF = n(lf) * n(horizBars) * 1.1 // +10% for wraps
+  const footingRebarLF = n(lf) * n(horizBars) * r('footingRebarWaste') // +10% for wraps (table-driven)
   const rebarHrs = (wallVertLF + wallHorizLF + footingRebarLF) / r('rebarLab')
   const rebarMat =
     wallVertLF * rebarPrice(wall.wallRebarSize, r) +
@@ -1351,7 +1361,7 @@ function calcOnePIP(wall, r, mp = {}, materialRows = []) {
   // wall horizontals (# × wall length) and wall verticals (# × wall height) —
   // both wall counts as plain counts, no +10%. Labor for ALL rebar stays the
   // shared rebarLab ('Set Rebar').
-  const footingRebarLF = n(lf) * n(horizBars) * 1.1 // +10% ONLY on footing
+  const footingRebarLF = n(lf) * n(horizBars) * r('footingRebarWaste') // +10% ONLY on footing (table-driven)
   const wallHorizLF = n(wall.pipWallHorizBars) * n(lf) // # horizontals × wall length, NO +10%
   const wallVertLF = n(wall.pipWallVertBars) * (n(heightIn) / 12) // # verticals × wall height, NO +10%
   const rebarHrs = (footingRebarLF + wallHorizLF + wallVertLF) / r('rebarLab')
