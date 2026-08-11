@@ -901,6 +901,18 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       ],
     },
     {
+      group: 'Disposal & Containers',
+      items: [
+        { label: 'Dump - Concrete', table: 'misc_rates', name: 'Demo - Mini Dump - Concrete', category: 'Demo', mode: 'currency', unitLabel: 'ton', value: materialPrices['Demo - Mini Dump - Concrete'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Concrete'] },
+        { label: 'Dump - Dirt', table: 'misc_rates', name: 'Demo - Mini Dump - Dirt', category: 'Demo', mode: 'currency', unitLabel: 'ton', value: materialPrices['Demo - Mini Dump - Dirt'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Dirt'] },
+        { label: 'Dump - Green Waste', table: 'misc_rates', name: 'Demo - Mini Dump - Green Waste', category: 'Demo', mode: 'currency', unitLabel: 'ton', value: materialPrices['Demo - Mini Dump - Green Waste'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Green Waste'] },
+        { label: 'Dump - Tree/Stump', table: 'misc_rates', name: 'Demo - Mini Dump - Tree/Stump', category: 'Demo', mode: 'currency', unitLabel: 'ton', value: materialPrices['Demo - Mini Dump - Tree/Stump'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Tree/Stump'] },
+        { label: 'Dump - Import Base', table: 'misc_rates', name: 'Demo - Mini Dump - Import Base', category: 'Demo', mode: 'currency', unitLabel: 'ton', value: materialPrices['Demo - Mini Dump - Import Base'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Import Base'] },
+        { label: 'Container (Low-Boy)', table: 'misc_rates', name: 'Demo - Mini Container (Low-Boy)', category: 'Demo', mode: 'currency', unitLabel: 'container', value: materialPrices['Demo - Mini Container (Low-Boy)'] ?? CONTAINER_COST },
+        { label: 'Container Capacity', table: 'misc_rates', name: 'Demo - Mini Container Capacity (CY)', category: 'Demo', mode: 'coefficient', unitLabel: 'cy', value: materialPrices['Demo - Mini Container Capacity (CY)'] ?? CONTAINER_CY },
+      ],
+    },
+    {
       group: 'Main Demo',
       items: [
         { label: 'Demo - Mini - Concrete SF', table: 'labor_rates', name: 'Demo - Mini - Concrete SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100 SF per in deep', value: calc.laborConc },
@@ -914,6 +926,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       items: [
         { label: 'Demo - Mini - Import Base SF', table: 'labor_rates', name: 'Demo - Mini - Import Base SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100 SF per in deep', value: calc.laborBase },
         { label: 'Demo - Mini - Grade Fill SF', table: 'labor_rates', name: 'Demo - Mini - Grade Fill SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr/100 SF per in deep', value: calc.laborGradeFill },
+        { label: 'Import Base Material', table: 'misc_rates', name: 'Demo - Mini Import Base $/10cy', category: 'Demo', mode: 'currency', unitLabel: '10cy', value: materialPrices['Demo - Mini Import Base $/10cy'] ?? 150 },
       ],
     },
     {

@@ -24,7 +24,6 @@ const OK_RATES = {
   bbqBlock: { dbName: 'BBQ Block', fallback: 2.5 }, // $/block
   bbqRebar: { dbName: 'BBQ Rebar', fallback: 0.4 }, // $/LF
   bbqConcrete: { dbName: 'BBQ Concrete', fallback: 149.5 }, // $/CY (footing & counter)
-  bbqFillMat: { dbName: 'BBQ Fill Material', fallback: 60.0 }, // $/CY grout/fill
   bbqSubWallLF: { dbName: 'BBQ Sub Wall LF', fallback: 150.0 }, // $/LF flat sub price (BBQ wall)
   bbqSubBackLF: { dbName: 'BBQ Sub Backsplash LF', fallback: 100.0 }, // $/LF flat sub price (backsplash)
   applianceHardware: { dbName: 'BBQ Appliance Hardware', fallback: 3.0 }, // $/appliance (misc hardware)
@@ -987,7 +986,6 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
         ...matRows(OK_RATES.bbqBlock.dbName, 'block', p(OK_RATES.bbqBlock.dbName, OK_RATES.bbqBlock.fallback)),
         ...matRows(OK_RATES.bbqRebar.dbName, 'LF', p(OK_RATES.bbqRebar.dbName, OK_RATES.bbqRebar.fallback)),
         ...matRows(OK_RATES.bbqConcrete.dbName, 'CY', p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)),
-        ...matRows(OK_RATES.bbqFillMat.dbName, 'CY', p(OK_RATES.bbqFillMat.dbName, OK_RATES.bbqFillMat.fallback)),
       ],
     },
     {

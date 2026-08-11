@@ -589,7 +589,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
       })
       setLaborRates(l)
     }
-    setMaterialRows(catRes.data || [])
+    setMaterialRows(rows || [])
     setVendors(
       (venRes.data || []).map(v => ({
         id: v.id,

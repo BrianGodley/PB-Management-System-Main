@@ -110,7 +110,6 @@ const R = {
   stampSubPerCY: 120,
   // Non-editable constants
   sealerSFPerGal: 70,
-  crewDaySF: 650,
   laborBurdenPct: 0.29,
   gpmd: 425,
   commissionRate: 0.12,

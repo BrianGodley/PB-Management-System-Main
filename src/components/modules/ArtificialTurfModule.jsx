@@ -210,14 +210,19 @@ function calcTurf(
     let qty = 0,
       hrs = 0
     if (def.key === 'Gravel') {
+      // Base-install labor coefficients are DB-editable (labor_rates).
+      const baseSFPerHr = mp['Turf - Base Install SF/hr'] ?? RATE_DEFAULTS.baseSFPerHr
+      const baseInstallPH = mp['Turf - Base Install PH'] ?? RATE_DEFAULTS.baseInstallRate
       qty = sf > 0 ? (sf / 200) * 2 : 0
-      hrs = sf > 0 ? (sf / RATE_DEFAULTS.baseSFPerHr) * RATE_DEFAULTS.baseInstallRate : 0
+      hrs = sf > 0 && baseSFPerHr > 0 ? (sf / baseSFPerHr) * baseInstallPH : 0
     } else if (def.key === 'DG') {
       qty = sf > 0 ? (sf * (1 / 12)) / 27 : 0
       hrs = 0
     } else {
+      // Weed-fabric install labor is DB-editable (hrs per 1000 SF).
+      const weedHrPer1kSF = mp['Turf - Weed Fabric Install hrs/1kSF'] ?? RATE_DEFAULTS.weedFabricHrPer1kSF
       qty = sf > 0 ? Math.ceil(sf / 1800) : 0
-      hrs = sf > 0 ? (sf / 1000) * RATE_DEFAULTS.weedFabricHrPer1kSF : 0
+      hrs = sf > 0 ? (sf / 1000) * weedHrPer1kSF : 0
     }
     const mat = qty * price
     baseHrs += hrs
@@ -235,7 +240,8 @@ function calcTurf(
   // ── Turf installation (up to 3 rolls of 15' wide) ─────────────────────────
   // hrs = SF/TurfSFHr * TurfPH = SF/20 * 0.5
   const turfSFHr = n(lr['Turf - Turf Install SF/hr']) || RATE_DEFAULTS.turfSFHr
-  const turfPH = RATE_DEFAULTS.turfPH
+  // Turf-placement person-hours multiplier is DB-editable (labor_rates).
+  const turfPH = mp['Turf - Turf Install PH'] ?? RATE_DEFAULTS.turfPH
   let turfHrs = 0,
     turfMat = 0,
     totalEdgeLF = 0,
@@ -280,10 +286,11 @@ function calcTurf(
   // hrs = (totalLF / TurfCutSfHr) * TurfCutRate = (totalLF/100)*1.0
   // mat = installMaterials ($/LF) × totalLF  — matches Excel S18=O18*Q18
   const installMatPerLF = n(mp['Turf - Install Materials']) || RATE_DEFAULTS.installMaterials
+  // Cut/staple/seam labor coefficients are DB-editable (labor_rates).
+  const cutSFHr = mp['Turf - Cut/Staple/Seam LF/hr'] ?? RATE_DEFAULTS.turfCutSFHr
+  const cutPH = mp['Turf - Cut/Staple/Seam PH'] ?? RATE_DEFAULTS.turfCutRate
   const cutHrs =
-    !isSub && totalEdgeLF > 0
-      ? (totalEdgeLF / RATE_DEFAULTS.turfCutSFHr) * RATE_DEFAULTS.turfCutRate
-      : 0
+    !isSub && totalEdgeLF > 0 && cutSFHr > 0 ? (totalEdgeLF / cutSFHr) * cutPH : 0
   // On the Sub tab cut/seam material rolls into the sub cost bucket instead of
   // in-house material.
   const subCutMat = installMatPerLF * totalEdgeLF
@@ -873,6 +880,40 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
   //    that used to have an inline RateEditPopover in this module now lives here.
   const turfRateList = [
     {
+      group: 'Base Installation',
+      items: [
+        {
+          label: 'Base Install',
+          table: 'labor_rates',
+          name: 'Turf - Base Install SF/hr',
+          category: 'Artificial Turf',
+          mode: 'coefficient',
+          unitLabel: 'SF/hr',
+          value: materialPrices['Turf - Base Install SF/hr'] ?? RATE_DEFAULTS.baseSFPerHr,
+        },
+        {
+          label: 'Base Install',
+          table: 'labor_rates',
+          name: 'Turf - Base Install PH',
+          category: 'Artificial Turf',
+          mode: 'coefficient',
+          unitLabel: 'PH',
+          value: materialPrices['Turf - Base Install PH'] ?? RATE_DEFAULTS.baseInstallRate,
+        },
+        {
+          label: 'Weed Fabric Install',
+          table: 'labor_rates',
+          name: 'Turf - Weed Fabric Install hrs/1kSF',
+          category: 'Artificial Turf',
+          mode: 'coefficient',
+          unitLabel: 'hrs/1kSF',
+          value:
+            materialPrices['Turf - Weed Fabric Install hrs/1kSF'] ??
+            RATE_DEFAULTS.weedFabricHrPer1kSF,
+        },
+      ],
+    },
+    {
       group: 'Turf Installation',
       items: [
         {
@@ -883,6 +924,33 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           mode: 'coefficient',
           unitLabel: 'SF/hr',
           value: calc.turfSFHr,
+        },
+        {
+          label: 'Turf Install',
+          table: 'labor_rates',
+          name: 'Turf - Turf Install PH',
+          category: 'Artificial Turf',
+          mode: 'coefficient',
+          unitLabel: 'PH',
+          value: materialPrices['Turf - Turf Install PH'] ?? RATE_DEFAULTS.turfPH,
+        },
+        {
+          label: 'Cut, Staple & Seam',
+          table: 'labor_rates',
+          name: 'Turf - Cut/Staple/Seam LF/hr',
+          category: 'Artificial Turf',
+          mode: 'coefficient',
+          unitLabel: 'LF/hr',
+          value: materialPrices['Turf - Cut/Staple/Seam LF/hr'] ?? RATE_DEFAULTS.turfCutSFHr,
+        },
+        {
+          label: 'Cut, Staple & Seam',
+          table: 'labor_rates',
+          name: 'Turf - Cut/Staple/Seam PH',
+          category: 'Artificial Turf',
+          mode: 'coefficient',
+          unitLabel: 'PH',
+          value: materialPrices['Turf - Cut/Staple/Seam PH'] ?? RATE_DEFAULTS.turfCutRate,
         },
         // Base material catalog ('Turf Base' vendor products + named base fabrics),
         // turf material catalog ('Turf Material' brands) and the named consumables

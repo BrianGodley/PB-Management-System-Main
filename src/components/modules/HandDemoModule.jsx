@@ -858,6 +858,13 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
   const subcRate = (label, name, value, unitLabel = 'ea') => ({
     label, table: 'subcontractor_rates', name, category: 'Demo', mode: 'currency', unitLabel, value,
   })
+  // Material/disposal fees the calc reads by name from the price map (misc_rates,
+  // category Demo). mode defaults to currency; pass 'coefficient' for non-$ values
+  // like container capacity.
+  const matRate = (label, name, fallback, unitLabel = 'ea', mode = 'currency') => ({
+    label, table: 'misc_rates', name, category: 'Demo', mode, unitLabel,
+    value: materialPrices[name] ?? fallback,
+  })
   const handDemoRateList = [
     {
       group: 'Job Site & Hauling',
@@ -865,6 +872,17 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
         coefRate('Difficulty Ratio', 'Demo - Hand Difficulty Ratio', calc.difficultyRatio, '% per 1%'),
         coefRate('Haul Sec/Ft', 'Demo - Hand Haul Sec/Ft', calc.haulSecPerFt, 'sec/ft'),
         coefRate('Haul Load (CY)', 'Demo - Hand Load (CY)', calc.haulLoadCy, 'cy'),
+      ],
+    },
+    {
+      group: 'Disposal & Containers',
+      items: [
+        matRate('Dump - Concrete', 'Demo - Hand Dump - Concrete', DUMP_FEE_DEFAULTS['Demo - Hand Dump - Concrete'], 'ton'),
+        matRate('Dump - Dirt', 'Demo - Hand Dump - Dirt', DUMP_FEE_DEFAULTS['Demo - Hand Dump - Dirt'], 'ton'),
+        matRate('Dump - Green Waste', 'Demo - Hand Dump - Green Waste', DUMP_FEE_DEFAULTS['Demo - Hand Dump - Green Waste'], 'ton'),
+        matRate('Dump - Tree/Stump', 'Demo - Hand Dump - Tree/Stump', DUMP_FEE_DEFAULTS['Demo - Hand Dump - Tree/Stump'], 'ton'),
+        matRate('Container (Low-Boy)', 'Demo - Hand Container (Low-Boy)', CONTAINER_COST, 'container'),
+        matRate('Container Capacity', 'Demo - Hand Container Capacity (CY)', CONTAINER_CY, 'cy', 'coefficient'),
       ],
     },
     {
@@ -881,6 +899,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       items: [
         coefRate('Import Base', 'Demo - Hand - Import Base SF', calc.laborBase),
         coefRate('Grade Fill', 'Demo - Hand - Grade Fill SF', calc.laborGradeFill),
+        matRate('Import Base Material', 'Demo - Hand Import Base $/10cy', 150, '10cy'),
       ],
     },
     {

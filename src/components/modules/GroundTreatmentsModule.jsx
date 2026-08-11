@@ -1256,6 +1256,20 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       ],
     },
     {
+      group: 'Soils',
+      items: [
+        {
+          label: 'Soils Install - Labor Rate',
+          table: 'labor_rates',
+          name: 'Soils Install Labor',
+          category: 'Ground Treatments',
+          mode: 'coefficient',
+          unitLabel: 'hrs/SF-in',
+          value: p('Soils Install Labor', 0.002),
+        },
+      ],
+    },
+    {
       group: 'Mulch',
       items: [
         {

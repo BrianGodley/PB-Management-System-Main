@@ -230,7 +230,11 @@ function calcDrainage(
       d = n(r.depth)
     if (lf > 0 && w > 0 && d > 0) {
       const cf = lf * (w / 12) * (d / 12)
-      trenchHrs += (cf * (TRENCH_MINS_PER_CF[r.equipment] || 10)) / 60
+      const minsPerCf =
+        materialPrices[TRENCH_LABOR_RATE_NAME[r.equipment]] ??
+        TRENCH_MINS_PER_CF[r.equipment] ??
+        10
+      trenchHrs += (cf * minsPerCf) / 60
     }
   })
 
@@ -240,7 +244,7 @@ function calcDrainage(
     if (lf > 0 && rate) {
       const { cost } = drainMatCost(DRAIN_CAT.pipe, r, PIPE_T, materialRows, catDefaults, materialPrices)
       pipeMat += lf * cost
-      pipeHrs += lf * rate.laborPerLF
+      pipeHrs += lf * (materialPrices[PIPE_LABOR_RATE_NAME[r.type]] ?? rate.laborPerLF)
     }
   })
 
@@ -263,7 +267,7 @@ function calcDrainage(
         materialPrices
       )
       frenchMat += lf * cost
-      frenchHrs += lf * rate.laborPerLF
+      frenchHrs += lf * (materialPrices[FRENCH_PIPE_LABOR_RATE_NAME[r.type]] ?? rate.laborPerLF)
     }
   })
   const totalFrenchLF = (frenchRows || []).reduce((s, r) => s + n(r.lf), 0)
@@ -304,7 +308,7 @@ function calcDrainage(
     if (qty > 0 && rate) {
       const { cost } = drainMatCost(DRAIN_CAT.fixture, r, FIX_T, materialRows, catDefaults, materialPrices)
       fixMat += qty * cost
-      fixHrs += qty * rate.laborHrs
+      fixHrs += qty * (materialPrices[FIXTURE_LABOR_RATE_NAME[r.type]] ?? rate.laborHrs)
       totalFixQty += qty
     }
   })
@@ -315,7 +319,7 @@ function calcDrainage(
     const qty = n(additionalItems[`${key}Qty`])
     if (qty > 0) {
       const matCost = materialPrices[rate.dbName] ?? rate.matCost
-      addHrs += qty * rate.laborHrs
+      addHrs += qty * (materialPrices[ADD_ITEM_LABOR_RATE_NAME[key]] ?? rate.laborHrs)
       addMat += qty * matCost
     }
   })
@@ -753,7 +757,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           category: 'Drainage',
           mode: 'coefficient',
           unitLabel: 'min/cf',
-          value: TRENCH_MINS_PER_CF.Trench,
+          value: materialPrices[TRENCH_LABOR_RATE_NAME.Trench] ?? TRENCH_MINS_PER_CF.Trench,
         },
         {
           label: 'Drainage Hand Excavation',
@@ -762,7 +766,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           category: 'Drainage',
           mode: 'coefficient',
           unitLabel: 'min/cf',
-          value: TRENCH_MINS_PER_CF.Hand,
+          value: materialPrices[TRENCH_LABOR_RATE_NAME.Hand] ?? TRENCH_MINS_PER_CF.Hand,
         },
       ],
     },
@@ -776,7 +780,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           category: 'Drainage',
           mode: 'coefficient',
           unitLabel: 'hr/LF',
-          value: PIPE_TYPES[type]?.laborPerLF,
+          value: materialPrices[name] ?? PIPE_TYPES[type]?.laborPerLF,
         })),
         ...catalogBlockItems(DRAIN_CAT.pipe),
       ],
@@ -791,7 +795,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           category: 'Drainage',
           mode: 'coefficient',
           unitLabel: 'hr/LF',
-          value: FRENCH_PIPE_TYPES[type]?.laborPerLF,
+          value: materialPrices[name] ?? FRENCH_PIPE_TYPES[type]?.laborPerLF,
         })),
         {
           label: FRENCH_SOCK_MAT_NAME,
@@ -881,7 +885,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           category: 'Drainage',
           mode: 'coefficient',
           unitLabel: 'hr/ea',
-          value: FIXTURE_TYPES[type]?.laborHrs,
+          value: materialPrices[name] ?? FIXTURE_TYPES[type]?.laborHrs,
         })),
         ...catalogBlockItems(DRAIN_CAT.fixture),
       ],
@@ -895,7 +899,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         category: 'Drainage',
         mode: 'coefficient',
         unitLabel: 'hr/ea',
-        value: ADD_ITEM_RATES[key]?.laborHrs,
+        value: materialPrices[name] ?? ADD_ITEM_RATES[key]?.laborHrs,
       })),
     },
     {
