@@ -46,13 +46,17 @@ export function catalogOptions(
   materialRows,
   subcategory,
   vendorSel,
-  { houseRows = 'exclude', stripPrefix = false } = {}
+  { houseRows = 'exclude', stripPrefix = false, category = null } = {}
 ) {
   const isHouse = !vendorSel || vendorSel === 'House' || vendorSel === 'Custom'
   if (isHouse && houseRows === 'exclude') return []
   const prefix = `${subcategory} - `
   return (materialRows || [])
-    .filter(r => r.sub_category === subcategory && (isHouse ? r.vendor_id == null : r.vendor_id === vendorSel))
+    // Optional Category scope: when a caller passes `category`, only items in
+    // that Category are returned (Category + Sub-category scoping). Without it,
+    // behavior is unchanged (Sub-category only). Used to keep module-specific
+    // pickers (e.g. Fire Pit vs Outdoor Kitchen Wall Finish) from cross-showing.
+    .filter(r => r.sub_category === subcategory && (!category || r.category === category) && (isHouse ? r.vendor_id == null : r.vendor_id === vendorSel))
     .map(r => {
       const label =
         stripPrefix && r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name

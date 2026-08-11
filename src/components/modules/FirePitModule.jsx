@@ -92,8 +92,8 @@ const GROUT_CF_PER_BLOCK = groutCuFtPerBlock(BLOCK_WIDTH_IN, BLOCK_HEIGHT_IN)
 // keeps the built-in per-estimate / master-rate price. Labor is never affected.
 const WF_CAT = 'Wall Finish'
 const CAP_CAT = 'Wall Cap'
-function wfVendorPrice(vendorSel, typeLabel, materialRows, cat = WF_CAT) {
-  const row = catalogItemFor(materialRows, cat, vendorSel, typeLabel, CATALOG_OPTS)
+function wfVendorPrice(vendorSel, typeLabel, materialRows, cat = WF_CAT, opts = {}) {
+  const row = catalogItemFor(materialRows, cat, vendorSel, typeLabel, { ...CATALOG_OPTS, ...opts })
   return row ? n(row.unit_cost) : null
 }
 // Wall-finish master list. Each Type resolves a material unit price (FP_RATES
@@ -130,11 +130,12 @@ const CAP_ROW = () => ({ vendor: 'House', type: 'Flagstone', lf: '' })
 // finish/cap Type. Its material unit is the row's unit_cost; every other calc
 // parameter (unit mode, labMode, waste, tonPerSF, laborCoeff, …) comes from its
 // calc_meta JSON. Built-in types keep their exact WF_META/FP_RATES path unchanged.
-function masterWallMeta(cat, typeLabel, materialRows) {
+function masterWallMeta(cat, typeLabel, materialRows, category = null) {
   const r = catalogItemFor(materialRows, cat, 'House', typeLabel, {
     houseRows: 'null-vendor',
     stripPrefix: true,
     fallbackFirst: false,
+    category,
   })
   if (!r) return null
   const m = r.calc_meta || {}
@@ -149,8 +150,8 @@ function masterWallMeta(cat, typeLabel, materialRows) {
   }
 }
 // Section Type options = built-in labels + master-list additions (deduped).
-function masterWallOptions(cat, builtInList, materialRows) {
-  const extra = catalogOptions(materialRows, cat, 'House', { houseRows: 'null-vendor', stripPrefix: true })
+function masterWallOptions(cat, builtInList, materialRows, category = null) {
+  const extra = catalogOptions(materialRows, cat, 'House', { houseRows: 'null-vendor', stripPrefix: true, category })
     .map(o => o.label)
     .filter(l => !builtInList.includes(l))
   return extra.length ? [...builtInList, ...extra] : builtInList
@@ -374,13 +375,13 @@ function calcFirePit(
 
   // ── Wall finish per-row calc: material (vendor-overridable unit) + labor ──────
   const finishRowCalc = row => {
-    const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows)
+    const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, 'Fire Pit')
     const sf = n(row.sf)
     if (!meta || sf <= 0) return { mat: 0, hrs: 0 }
     const houseUnit = meta.master
       ? meta.matUnit
       : p(FP_RATES[meta.key].dbName, FP_RATES[meta.key].fallback)
-    const unit = wfVendorPrice(row.vendor, row.type, materialRows, WF_CAT) ?? houseUnit
+    const unit = wfVendorPrice(row.vendor, row.type, materialRows, WF_CAT, { category: 'Fire Pit' }) ?? houseUnit
     let mat = 0
     if (meta.unit === 'ton') {
       const tons = sf / meta.tonPerSF
@@ -851,6 +852,9 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
     setWallFinishRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
 
   const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
+  // Wall-finish vendor list scoped to this module's own Category so it lists only
+  // vendors that priced a Wall Finish product under 'Fire Pit' (not OK/Walls).
+  const vendorsForFinish = () => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && r.sub_category === WF_CAT && r.category === 'Fire Pit'))
 
   function handleSave() {
     onSave({
@@ -905,9 +909,9 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
   }
   // Every catalog product tagged with a sub-category (Wall Cap / Wall Finish),
   // one row per vendor (Standard first) — vendor-overridable material prices.
-  const catalogBlockItems = (subcat, unit) =>
+  const catalogBlockItems = (subcat, unit, category) =>
     (materialRows || [])
-      .filter(r0 => r0.sub_category === subcat)
+      .filter(r0 => r0.sub_category === subcat && (!category || r0.category === category))
       .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
       .sort((a, b) => {
         const va = a.vendor_id == null ? '' : vendorNames[a.vendor_id] || '~'
@@ -1021,7 +1025,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
         }),
         // Vendor catalog finish products (Wall Finish sub-category) + each
         // built-in House finish material rate.
-        ...catalogBlockItems(WF_CAT, 'SF'),
+        ...catalogBlockItems(WF_CAT, 'SF', 'Fire Pit'),
         ...WF_LIST.flatMap(type => {
           const meta = WF_META[type]
           return matRows(FP_RATES[meta.key].dbName, meta.unit === 'ton' ? 'ton' : 'SF', p(FP_RATES[meta.key].dbName, FP_RATES[meta.key].fallback))
@@ -1445,7 +1449,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
             </thead>
             <tbody>
               {wallFinishRows.map((row, i) => {
-                const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows)
+                const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, 'Fire Pit')
                 const rc = calc.wallFinishCalc?.[i] || {}
                 return (
                   <tr key={i} className="border-b border-gray-100">
@@ -1457,7 +1461,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                         title="Vendor — overrides material price"
                       >
                         <option value="House">Standard</option>
-                        {vendorsForCategory(WF_CAT).map(v => (
+                        {vendorsForFinish().map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
                           </option>
@@ -1471,7 +1475,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                           value={row.type}
                           onChange={e => setWallFinishRow(i, 'type', e.target.value)}
                         >
-                          {masterWallOptions(WF_CAT, WF_LIST, materialRows).map(t => (
+                          {masterWallOptions(WF_CAT, WF_LIST, materialRows, 'Fire Pit').map(t => (
                             <option key={t} value={t}>
                               {t}
                             </option>
