@@ -275,22 +275,31 @@ const UTIL_CAT = {
   sewerSink: 'Sewer Sinks',
 }
 
-// Merge the built-in Type list with any master-list rows tagged sub_category=cat
-// and left Unspecified (null vendor). Add a row in Master Rates under that marker
-// and it appears here automatically; its paired '<Label> - Labor Rate' row (looked
-// up by name) supplies labor. Built-ins always remain (deduped by label).
+// Type list source of truth = the Master Rates catalog (Standard / null-vendor
+// rows tagged sub_category=cat). Whatever is in the catalog for this category IS
+// the dropdown — so renaming, adding, or deleting an item in Master Rates flows
+// straight through with no duplicates. Built-ins are NO LONGER a second source of
+// options; they only supply a labor-rate name + price/labor fallback for any
+// catalog row that was seeded from a built-in (matched by name).
+// Only when a category has NO catalog rows at all do we fall back to the built-in
+// list (so an un-seeded category still shows something).
 function mergedUtilTypes(cat, builtInArr, materialRows) {
-  const extra = catalogOptions(materialRows, cat, 'House', { houseRows: 'null-vendor', stripPrefix: true })
-    .filter(o => !builtInArr.some(b => b.label === o.label))
-    .map(o => ({
+  const catRows = catalogOptions(materialRows, cat, 'House', {
+    houseRows: 'null-vendor',
+    stripPrefix: true,
+  })
+  if (!catRows.length) return builtInArr
+  return catRows.map(o => {
+    const bi = builtInArr.find(b => b.dbName === o.row.name || b.label === o.label)
+    return {
       label: o.label,
       dbName: o.row.name,
       fallback: n(o.row.unit_cost),
-      laborDbName: `${o.label} - Labor Rate`,
-      laborFallback: 0,
-      fromMaster: true,
-    }))
-  return extra.length ? [...builtInArr, ...extra] : builtInArr
+      laborDbName: bi?.laborDbName ?? `${o.label} - Labor Rate`,
+      laborFallback: bi?.laborFallback ?? 0,
+      fromMaster: !bi,
+    }
+  })
 }
 
 // Resolve a row's material cost + per-unit labor.
