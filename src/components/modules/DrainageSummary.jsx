@@ -52,7 +52,7 @@ export default function DrainageSummary({ module }) {
         .map(r => ({ label: r.type, value: `${n(r.lf)} LF` })),
     },
     {
-      title: 'Drains & Fixtures',
+      title: 'Drain Fixtures',
       rows: (d.fixtureRows || [])
         .filter(r => n(r.qty) > 0)
         .map(r => ({ label: r.type, value: `× ${r.qty}` })),

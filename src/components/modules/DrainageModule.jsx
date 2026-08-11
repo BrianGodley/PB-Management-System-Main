@@ -105,8 +105,6 @@ const ADD_ITEM_LABOR_RATE_NAME = {
   hydrocut: 'Drainage Hydrocut Under Hardscape Labor',
 }
 
-// Default fitting fee per drain unit — overridden by 'Drain Fitting Fee' in material_rates
-const DRAIN_FITTING_FEE = 10
 
 // French-drain fabric + gravel-bed rates ($/ft), stored in misc_rates
 // (category 'Drainage'). Read as materialPrices[name] ?? fb; the code number
@@ -311,9 +309,6 @@ function calcDrainage(
     }
   })
 
-  const fittingFeeEa = materialPrices['Drain Fitting Fee'] ?? DRAIN_FITTING_FEE
-  const drainFittingFee = totalFixQty * fittingFeeEa
-
   let addHrs = 0,
     addMat = 0
   Object.entries(ADD_ITEM_RATES).forEach(([key, rate]) => {
@@ -360,7 +355,7 @@ function calcDrainage(
   const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
   const totalHrs = _preWalkHrs + walkHrs
   const manDays = totalHrs / 8
-  const totalMat = (isSub ? 0 : pipeMat + fixMat + drainFittingFee + addMat + frenchMat) + manMat
+  const totalMat = (isSub ? 0 : pipeMat + fixMat + addMat + frenchMat) + manMat
   const laborCost = totalHrs * laborRatePerHour
   const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
   const subCost = manSub + subDrainCost + (isSub ? subFixtureCost + subAdditionalCost : 0)
@@ -393,8 +388,6 @@ function calcDrainage(
     subCost,
     price,
     walkHrs,
-    drainFittingFee,
-    fittingFeeEa,
     addHrs,
     addMat,
     frenchMat,
@@ -498,9 +491,9 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   // master-rate value — picks up the change without a page refresh. Fetches
   // both the Drainage material rates and the Drainage subcontractor rates.
   async function refreshMaterialPrices() {
-    // material_rates retired: base map (fees like 'Drain Fitting Fee' from
-    // misc_rates) via the new model; catalog subcategories ('Drain Pipe' /
-    // 'Drain Fixtures') already match the module's markers.
+    // material_rates retired: base map via the new model; catalog
+    // subcategories ('Drain Pipe' / 'Drain Fixtures') already match the
+    // module's markers.
     const [matMap, subRes] = await Promise.all([
       fetchStandardRateMap(['Drainage']),
       supabase.from('subcontractor_rates').select('company_name, rate').eq('category', 'Drainage'),
@@ -879,7 +872,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
       ],
     },
     {
-      group: 'Drains & Fixtures',
+      group: 'Drain Fixtures',
       items: [
         ...Object.entries(FIXTURE_LABOR_RATE_NAME).map(([type, name]) => ({
           label: name,
@@ -904,20 +897,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         unitLabel: 'hr/ea',
         value: ADD_ITEM_RATES[key]?.laborHrs,
       })),
-    },
-    {
-      group: 'Fees',
-      items: [
-        {
-          label: 'Drain Fitting Fee',
-          table: 'misc_rates',
-          name: 'Drain Fitting Fee',
-          category: 'Drainage',
-          mode: 'currency',
-          unitLabel: 'ea',
-          value: materialPrices['Drain Fitting Fee'] ?? DRAIN_FITTING_FEE,
-        },
-      ],
     },
     {
       group: 'Subcontractor',
@@ -1508,7 +1487,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
       {/* ── Fixtures (In-House) ── */}
       {!isSub && (
       <div>
-        <SectionHeader title="Drains & Fixtures" />
+        <SectionHeader title="Drain Fixtures" />
         <div className="overflow-x-auto">
           <table className="w-full text-sm table-fixed">
             <colgroup>
