@@ -10,7 +10,7 @@ import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 
-const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
+const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pool Module
@@ -223,7 +223,7 @@ const GAS_TYPE_ARR = Object.entries(GAS_FIXTURE_TYPES).map(([label, t]) => ({ la
 const ELEC_TYPE_ARR = Object.entries(ELECTRICAL_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, fallback: t.cost, laborDbName: t.laborDbName, laborFallback: t.laborHrs }))
 const UTIL_CAT = { line: 'Utility Lines', gas: 'Gas Fixtures', elec: 'Electrical Fixtures' }
 function mergedUtilTypes(cat, builtInArr, materialRows) {
-  const extra = catalogOptions(materialRows, cat, 'Standard', { houseRows: 'null-vendor', stripPrefix: true })
+  const extra = catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true })
     .filter(o => !builtInArr.some(b => b.label === o.label))
     .map(o => ({
       label: o.label,

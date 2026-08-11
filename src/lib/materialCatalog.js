@@ -11,7 +11,7 @@
 // Resolution order (canonical, byte-for-byte identical to the old per-module
 // resolvers, so converting a module never changes its numbers):
 //   1. Selected vendor's row:  materialRows.find(name === n && vendor_id === v).unit_cost
-//   2. House / Unspecified price: name-keyed priceMap[n]  (vendor-agnostic master rate)
+//   2. Standard / Unspecified price: name-keyed priceMap[n]  (vendor-agnostic master rate)
 //   3. Hardcoded fallback:     fb
 // Vendor 'Standard' / '' / null resolves straight to step 2 → 3.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -24,13 +24,10 @@ const num = v => {
 }
 
 // Vendor sentinel for the Standard/Unspecified (universal) price.
-// LEGACY ALIAS: the sentinel was renamed 'House' → 'Standard'. Estimates saved
-// before the rename still store 'House', so both — plus '' / null — mean "use the
-// Standard price". This is the ONE place 'House' survives in code; remove it only
-// after migrating saved estimate data (UPDATE estimate JSON 'House' → 'Standard').
-const isStandardSel = v => !v || v === 'Standard' || v === 'House'
+// '' / null and 'Standard' both mean "use the Standard price".
+const isStandardSel = v => !v || v === 'Standard'
 
-// Name-keyed resolver (Pattern A/B modules). `vendorId` of 'Standard'/''/null → House price.
+// Name-keyed resolver (Pattern A/B modules). `vendorId` of 'Standard'/''/null → Standard price.
 export function resolveMaterialPrice(name, vendorId, materialRows, priceMap, fallback = 0) {
   if (vendorId && !isStandardSel(vendorId)) {
     const row = (materialRows || []).find(r => r.name === name && r.vendor_id === vendorId)
@@ -45,25 +42,25 @@ export function resolveMaterialPrice(name, vendorId, materialRows, priceMap, fal
 // its row. Options tune the per-module behavior so this single implementation
 // reproduces paverOptions / lightingOptions / wfVendorPrice / resolveUtilRow /
 // drainMatCost / turfMatPrice / etc. exactly:
-//   houseRows : 'exclude'     → House/Custom vendor yields no catalog rows
-//                               (module prices House off its name-keyed map)
-//               'null-vendor' → House yields the vendor_id IS NULL rows
+//   standardRows : 'exclude'     → Standard/Custom vendor yields no catalog rows
+//                               (module prices Standard off its name-keyed map)
+//               'null-vendor' → Standard yields the vendor_id IS NULL rows
 //   stripPrefix: true         → label = name minus the '<subcategory> - ' prefix
 export function catalogOptions(
   materialRows,
   subcategory,
   vendorSel,
-  { houseRows = 'exclude', stripPrefix = false, category = null } = {}
+  { standardRows = 'exclude', stripPrefix = false, category = null } = {}
 ) {
-  const isHouse = isStandardSel(vendorSel) || vendorSel === 'Custom'
-  if (isHouse && houseRows === 'exclude') return []
+  const isStandard = isStandardSel(vendorSel) || vendorSel === 'Custom'
+  if (isStandard && standardRows === 'exclude') return []
   const prefix = `${subcategory} - `
   return (materialRows || [])
     // Optional Category scope: when a caller passes `category`, only items in
     // that Category are returned (Category + Sub-category scoping). Without it,
     // behavior is unchanged (Sub-category only). Used to keep module-specific
     // pickers (e.g. Fire Pit vs Outdoor Kitchen Wall Finish) from cross-showing.
-    .filter(r => r.sub_category === subcategory && (!category || r.category === category) && (isHouse ? r.vendor_id == null : r.vendor_id === vendorSel))
+    .filter(r => r.sub_category === subcategory && (!category || r.category === category) && (isStandard ? r.vendor_id == null : r.vendor_id === vendorSel))
     .map(r => {
       const label =
         stripPrefix && r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name
@@ -74,7 +71,7 @@ export function catalogOptions(
 // Resolve a stored selection key to its material_rates row: by id (new saves),
 // then by label/name (legacy saves). By default falls back to the first option;
 // pass fallbackFirst:false to return null when nothing matches (so a module can
-// keep its House default instead).
+// keep its Standard default instead).
 export function catalogItemFor(materialRows, subcategory, vendorSel, key, opts = {}) {
   const { fallbackFirst = true, ...rest } = opts
   const options = catalogOptions(materialRows, subcategory, vendorSel, rest)
@@ -96,7 +93,7 @@ export function catalogItemFor(materialRows, subcategory, vendorSel, key, opts =
 // vendor is folded into '__house__' so callers passing vendor_id null resolve to
 // the universal price. Importers write new effective-dated rows (see
 // supersedeMaterialPrice), so history accrues going forward.
-const HOUSE_KEY = '__house__'
+const STANDARD_KEY = '__house__'
 
 // Price map for a set of materials AS OF a date. asOfDate null/'' → the current
 // open price (effective_end IS NULL). Otherwise → the period covering that date
@@ -126,7 +123,7 @@ export async function fetchPriceLedgerAsOf(materialIds, asOfDate = null) {
   const map = {}
   const bestStart = {} // "materialId|vendorKey" → latest effective_start seen
   ;(ledRes.data || []).forEach(r => {
-    const vk = r.vendor_id == null || r.vendor_id === stdId ? HOUSE_KEY : r.vendor_id
+    const vk = r.vendor_id == null || r.vendor_id === stdId ? STANDARD_KEY : r.vendor_id
     const key = `${r.material_id}|${vk}`
     const start = r.effective_start || ''
     if (bestStart[key] == null || start >= bestStart[key]) {
@@ -146,9 +143,9 @@ export async function fetchOpenPriceLedger(materialIds) {
 export function ledgerPrice(ledgerById, materialId, vendorId, fallback = 0) {
   const led = ledgerById?.[materialId]
   if (led) {
-    const vk = vendorId && !isStandardSel(vendorId) ? vendorId : HOUSE_KEY
+    const vk = vendorId && !isStandardSel(vendorId) ? vendorId : STANDARD_KEY
     if (led[vk] != null) return led[vk]
-    if (led[HOUSE_KEY] != null) return led[HOUSE_KEY]
+    if (led[STANDARD_KEY] != null) return led[STANDARD_KEY]
   }
   return num(fallback)
 }
@@ -158,7 +155,7 @@ export function ledgerPrice(ledgerById, materialId, vendorId, fallback = 0) {
 // material_rates — {id,name,unit_cost,sub_category,vendor_id,calc_meta,collection}
 // — sourced from the rebuilt `material` product + `material_price` (one open
 // price per product×vendor). The Standard vendor is emitted as vendor_id:null so
-// houseRows:'null-vendor' / House resolution behaves exactly as before.
+// standardRows:'null-vendor' / Standard resolution behaves exactly as before.
 //
 // `sub_category` is the taxonomy sub-category NAME (e.g. 'Turf Material'), which
 // equals the legacy marker for the converted modules. Repoints a module by
@@ -546,7 +543,7 @@ export async function resolveTaxonomyIds(categoryName, subCategoryName) {
 //   • materialRows — {id,name,vendor_id,unit,unit_cost,category,sub_category,subcategory}
 //   • vendors   — [{id,name,categories}] (type='vendor'), for the pickers
 // and returns a `resolve(name, vendorId, fallback)` bound to the loaded data plus
-// `vendorOptionsForCategory(cat)` (House/Unspecified first).
+// `vendorOptionsForCategory(cat)` (Standard/Unspecified first).
 //
 // `initial` seeds from a saved estimate ({ materialPrices, materialRows }) so
 // re-opening an estimate doesn't flash empty prices before the fetch lands.

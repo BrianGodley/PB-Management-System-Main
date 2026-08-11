@@ -122,7 +122,7 @@ const BASIC_CATEGORY = 'Basic Materials'
 const GROUT_CONCRETE = { dbName: 'Concrete - Ready Mix (Truck)', fallback: 185 } // $/CY
 
 // Vendor-resolved material price now comes from the shared resolver
-// (src/lib/materialCatalog.js) — same order (vendor row → House name key →
+// (src/lib/materialCatalog.js) — same order (vendor row → Standard name key →
 // fallback), so Columns numbers are byte-for-byte unchanged.
 const colMatPrice = resolveMaterialPrice
 
@@ -153,7 +153,7 @@ function calcColumns(
   const isSub = state.subType === 'Subcontractor'
   const installVendor = state.installVendor // section-level Vendor for Column Install materials
 
-  // mp() = name-keyed House lookup (labor coefficients + House material fallback).
+  // mp() = name-keyed Standard lookup (labor coefficients + Standard material fallback).
   // matP() = vendor-resolved MATERIAL price; with vendor 'Standard'/empty it returns
   // exactly (materialPrices[dbName] ?? fallback) == the pre-vendor mp() value.
   const mp = (dbName, fallback) => materialPrices[dbName] ?? fallback

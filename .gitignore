@@ -43,3 +43,4 @@ supabase_fix_tiers.sql
 /android/app/build/
 /android/app/src/main/assets/public/
 /android/capacitor-cordova-android-plugins/
+.fuse_hidden*

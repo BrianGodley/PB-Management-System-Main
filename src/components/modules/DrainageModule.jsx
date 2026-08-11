@@ -10,7 +10,7 @@ import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 
-const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
+const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drainage Module — fields and calculations from Excel estimator
@@ -141,7 +141,7 @@ const n = v => parseFloat(v) || 0
 
 // ── Vendor catalog: material-only overrides for Drain Pipe / Drain Fixtures ──
 // The Type still sets the item's labor (per-type coefficient, unchanged) AND its
-// House material price. A vendor only overrides the MATERIAL price for the same
+// Standard material price. A vendor only overrides the MATERIAL price for the same
 // item (matched by name in the vendor's catalog); it never affects labor.
 const DRAIN_CAT = { pipe: 'Drain Pipe', fixture: 'Drain Fixtures' }
 function drainMatCost(cat, row, TYPES, materialRows, catDefaults, mp) {
@@ -166,7 +166,7 @@ function drainMatCost(cat, row, TYPES, materialRows, catDefaults, mp) {
 // row in Master Rates under that marker + set its calc_meta and it appears here.
 function masterDrainTypes(cat, builtIn, materialRows, laborField) {
   const out = {}
-  ;(catalogOptions(materialRows, cat, 'Standard', { houseRows: 'null-vendor', stripPrefix: true }) || []).forEach(
+  ;(catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true }) || []).forEach(
     o => {
       if (builtIn[o.label]) return
       const meta = o.row.calc_meta || {}

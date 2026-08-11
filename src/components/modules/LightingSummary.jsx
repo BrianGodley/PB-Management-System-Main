@@ -17,7 +17,7 @@ const n = v => parseFloat(v) || 0
 // Resolve a saved row selection to its material_rates row via the shared library.
 function lightingItemFor(subcat, vendorSel, key, materialRows) {
   return catalogItemFor(materialRows, subcat, vendorSel, key, {
-    houseRows: 'null-vendor',
+    standardRows: 'null-vendor',
     stripPrefix: false,
   })
 }

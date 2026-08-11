@@ -21,7 +21,7 @@ import ModuleHeaderSlot from './ModuleHeaderSlot'
 //   The Zones and Controllers/Timers sections are add/remove ROW tables with a
 //   Vendor column + an Item column. The Item (zone type / timer type) drives the
 //   labor + per-zone / per-timer FORMULA exactly as before; the Vendor ONLY
-//   changes where the MATERIAL unit price comes from (House named-rate fallback
+//   changes where the MATERIAL unit price comes from (Standard named-rate fallback
 //   vs. a vendor's material_rates row). Vendor 'Standard' resolves to the original
 //   math, so In-House numbers never move.
 //
@@ -140,10 +140,10 @@ const r2 = x => Math.round(((x || 0) + Number.EPSILON) * 100) / 100
 // ── Vendor-catalog material price ─────────────────────────────────────────────
 // The ONLY thing the Vendor selection changes: the material $ source. When a real
 // vendor is selected AND a material_rates row exists (name===dbName &&
-// vendor_id===vendorId) use that row's unit_cost; otherwise fall back to the House
+// vendor_id===vendorId) use that row's unit_cost; otherwise fall back to the Standard
 // price (name-keyed materialPrices[dbName]) then the hard fallback. Vendor 'Standard'
 // resolves to exactly the original math, so In-House numbers never move.
-// Shared resolver (src/lib/materialCatalog.js) — same vendor→House→fallback
+// Shared resolver (src/lib/materialCatalog.js) — same vendor→Standard→fallback
 // order. Irrigation keeps separate material/labor maps, so it doesn't use the
 // merged useMaterialCatalog hook.
 const irrMatPrice = resolveMaterialPrice
@@ -152,7 +152,7 @@ const irrMatPrice = resolveMaterialPrice
 // Zone row: In-House labor + material identical to the original per-zone math —
 //   hrs = qty × (mode === 'Hand' ? handRate : trenchRate)   (guarded qty > 0)
 //   mat = qty × material unit price
-// Only the material unit price source is vendor-resolved (House = original price).
+// Only the material unit price source is vendor-resolved (Standard = original price).
 function computeZoneRow(row, handRate, trenchRate, materialPrices, materialRows) {
   const z = zoneMeta(row.type)
   const qty = n(row.qty)
@@ -482,7 +482,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
   // Re-fetch Irrigation master-rate maps + vendor catalog. Called on mount and
   // after any RateEditPopover save so the calc reflects edits immediately.
   const refreshAllRates = useCallback(async () => {
-    // material_rates retired: House/base prices from the new model
+    // material_rates retired: Standard/base prices from the new model
     // (fetchStandardRateMap = Standard + labor + misc, name-keyed); vendor
     // catalog rows from material + material_price. Irrigation resolves by name,
     // never by subcategory, so no remap is needed.
@@ -843,7 +843,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
             {zoneRows.map((row, i) => {
               const c = calc.zoneCalc[i] || computeZoneRow(row, calc.handRate, calc.trenchRate, materialPrices, materialRows)
               const z = zoneMeta(row.type)
-              const isHouse = !row.vendor || row.vendor === 'Standard'
+              const isStandard = !row.vendor || row.vendor === 'Standard'
               const masterMat = materialPrices[z.matKey] ?? z.matFallback
               return (
                 <tr key={i}>
@@ -936,7 +936,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
             {timerRows.map((row, i) => {
               const c = calc.timerCalc[i] || computeTimerRow(row, calc.timerHrs, materialPrices, materialRows)
               const t = timerMeta(row.type)
-              const isHouse = !row.vendor || row.vendor === 'Standard'
+              const isStandard = !row.vendor || row.vendor === 'Standard'
               const masterMat = materialPrices[t.matKey] ?? t.matFallback
               return (
                 <tr key={i}>

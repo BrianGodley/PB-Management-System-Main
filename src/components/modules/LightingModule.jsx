@@ -16,14 +16,14 @@ import {
   fetchModuleCatalog,
 } from '../../lib/materialCatalog'
 
-const CATALOG_OPTS = { houseRows: 'null-vendor', stripPrefix: false }
+const CATALOG_OPTS = { standardRows: 'null-vendor', stripPrefix: false }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Lighting Module — per-vendor catalog layout (mirrors PaverModule).
 //
 // Items live in material_rates (category='Lighting') under a sub_category
 // ('Light Fixture' | 'Transformer' | 'Wire'), optionally tagged to a vendor
-// (vendor_id NULL = House). Lighting-specific attribute columns:
+// (vendor_id NULL = Standard). Lighting-specific attribute columns:
 //   • watts / va        — per-each electrical load (fixtures only)
 //   • labor_hrs_ea       — in-house install hours per each (wire = null)
 //   • sub_price_ea       — subcontractor flat $/each (may be null → unit_cost)
@@ -55,12 +55,12 @@ const n = v => parseFloat(v) || 0
 
 // ── Vendor catalog helpers (mirror PaverModule) ──────────────────────────────
 // Option list for a section = the catalog items for that sub_category + vendor.
-// House (vendorSel === 'Standard' or falsy) → rows with vendor_id == null;
+// Standard (vendorSel === 'Standard' or falsy) → rows with vendor_id == null;
 // otherwise → rows whose vendor_id === vendorSel. Each option carries the
 // material_rates row id (the STABLE, rename-proof key a selection is stored /
 // matched by) plus a clean label.
-// Vendor catalog options + row resolution from the shared library. House =
-// vendor_id IS NULL rows (Lighting prices House from the catalog, not a map).
+// Vendor catalog options + row resolution from the shared library. Standard =
+// vendor_id IS NULL rows (Lighting prices Standard from the catalog, not a map).
 function lightingOptions(subcat, vendorSel, materialRows) {
   return catalogOptions(materialRows, subcat, vendorSel, CATALOG_OPTS)
 }

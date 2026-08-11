@@ -11,7 +11,7 @@ import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../
 import { groutCuFtPerBlock } from '../../lib/cmuGrout'
 import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 
-const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
+const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Outdoor Kitchen (BBQ) Module — based on BBQ Module tab in Excel estimator
@@ -98,7 +98,7 @@ const n = v => parseFloat(v) || 0
 
 // ── Wall-finish vendor catalog ───────────────────────────────────────────────
 // A real vendor overrides ONLY the material unit price for a finish (matched by
-// its Type label in the vendor's 'Wall Finish' catalog); House keeps the
+// its Type label in the vendor's 'Wall Finish' catalog); Standard keeps the
 // built-in per-estimate / master-rate price. Labor is never affected.
 const WF_CAT = 'Wall Finish'
 function wfVendorPrice(vendorSel, typeLabel, materialRows, opts = {}) {
@@ -137,7 +137,7 @@ const WF_ROW = () => ({ vendor: 'Standard', type: 'Tile', sf: '' })
 // waste / tonPerSF / laborCoeff come from its calc_meta. Built-ins are unchanged.
 function masterWallMeta(cat, typeLabel, materialRows, category = null) {
   const r = catalogItemFor(materialRows, cat, 'Standard', typeLabel, {
-    houseRows: 'null-vendor',
+    standardRows: 'null-vendor',
     stripPrefix: true,
     fallbackFirst: false,
     category,
@@ -155,7 +155,7 @@ function masterWallMeta(cat, typeLabel, materialRows, category = null) {
   }
 }
 function masterWallOptions(cat, builtInList, materialRows, category = null) {
-  const extra = catalogOptions(materialRows, cat, 'Standard', { houseRows: 'null-vendor', stripPrefix: true, category })
+  const extra = catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true, category })
     .map(o => o.label)
     .filter(l => !builtInList.includes(l))
   return extra.length ? [...builtInList, ...extra] : builtInList
@@ -200,7 +200,7 @@ const UTIL_CAT = { line: 'Utility Lines', gas: 'Gas Fixtures', elec: 'Electrical
 const OK_TRENCH_RATE_NAME = 'Utilities Trench Excavation'
 const OK_TRENCH_FALLBACK_MIN_PER_CF = 10
 function mergedUtilTypes(cat, builtInArr, materialRows) {
-  const extra = catalogOptions(materialRows, cat, 'Standard', { houseRows: 'null-vendor', stripPrefix: true })
+  const extra = catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true })
     .filter(o => !builtInArr.some(b => b.label === o.label))
     .map(o => ({
       label: o.label,
@@ -1032,7 +1032,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
           }
         }),
         // Vendor catalog finish products (Wall Finish sub-category) + each
-        // built-in House finish material rate.
+        // built-in Standard finish material rate.
         ...catalogBlockItems(WF_CAT, 'SF', 'Outdoor Kitchen'),
         ...WF_LIST.flatMap(type => {
           const meta = WF_META[type]

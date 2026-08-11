@@ -248,7 +248,7 @@ export default function GroundTreatmentsSummary({ module }) {
   // Resolve a section product's saved per-unit price. Vendor products are stored
   // on the row by their (possibly prefix-stripped) LABEL, while the saved
   // materialPrices snapshot is keyed by the full material_rates name (dbName).
-  // Order: hardcoded House array match → raw label as a name → reconstructed
+  // Order: hardcoded Standard array match → raw label as a name → reconstructed
   // "<Subcat> - <label>" name → default.
   const priceForType = (subcat, type, houseArray, defaultVal) => {
     const hit = type != null ? houseArray.find(t => t.label === type) : null
@@ -262,7 +262,7 @@ export default function GroundTreatmentsSummary({ module }) {
   // Vendor-aware, per-row price. Vendor is now stored PER ROW (row.vendor). For a
   // vendor row, price by the reconstructed full material name ("<Subcat> - <label>")
   // read from the saved materialPrices snapshot, since materialRows aren't
-  // snapshotted; if that (and the raw label) miss, fall back to the House
+  // snapshotted; if that (and the raw label) miss, fall back to the Standard
   // resolution. Rows without a vendor (old saves) resolve exactly as before.
   const priceForRow = (subcat, row, houseArray, defaultVal) => {
     const type = row?.type
@@ -632,7 +632,7 @@ export default function GroundTreatmentsSummary({ module }) {
     const savedVendor = _stepperVendor[def.key]
     const legacyRate = n(def.matOverride) || mp(def.matRate.dbName, def.matRate.fallback)
     // New saves resolve the picked Vendor+Type via the material_rates snapshot;
-    // House / old saves keep the legacy per-stone rate.
+    // Standard / old saves keep the legacy per-stone rate.
     const rate =
       savedType != null
         ? priceForRow('Steppers', { type: savedType, vendor: savedVendor }, STEPPER_TYPES, legacyRate)

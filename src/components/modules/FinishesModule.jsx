@@ -15,7 +15,7 @@ import { useMaterialCatalog, resolveMaterialPrice } from '../../lib/materialCata
 // Each of the three sections is an add/remove ROW table with a Vendor column +
 // an Item (type) column. The Item dropdown is ALWAYS the section's fixed type
 // list — the type drives the pricing/labor FORMULA. The Vendor only changes
-// where the MATERIAL price comes from (House named-rate fallback vs. a vendor's
+// where the MATERIAL price comes from (Standard named-rate fallback vs. a vendor's
 // material_rates row). Every coverage / geometry / labor formula is preserved
 // exactly from the original calc — the Vendor selection feeds a different
 // material $ into the same math.
@@ -142,8 +142,8 @@ const CAP_META = {
 // The ONLY thing the Vendor selection changes: the material $ source.
 // If a real vendor is selected AND a material_rates row exists whose name===dbName
 // and vendor_id===vendorId, use that row's unit_cost. Otherwise fall back to the
-// House price (name-keyed materialPrices[dbName]) and finally the hard fallback.
-// Uses the shared resolver (src/lib/materialCatalog.js) — same vendor→House→
+// Standard price (name-keyed materialPrices[dbName]) and finally the hard fallback.
+// Uses the shared resolver (src/lib/materialCatalog.js) — same vendor→Standard→
 // fallback order, so Finishes numbers are byte-for-byte unchanged.
 const finishMatPrice = resolveMaterialPrice
 

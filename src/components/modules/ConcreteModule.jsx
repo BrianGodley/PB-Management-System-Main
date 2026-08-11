@@ -115,11 +115,11 @@ const R = {
   commissionRate: 0.12,
 }
 
-// ── Vendor catalog: House type lists (single default each; vendors add more) ──
-// Base Install material and the Concrete mix each map to one House product;
+// ── Vendor catalog: Standard type lists (single default each; vendors add more) ──
+// Base Install material and the Concrete mix each map to one Standard product;
 // vendors tagged to the 'Concrete Base' / 'Concrete Mix' categories supply
 // additional priced types via material_rates (sub_category + vendor_id).
-// House defaults reference the SHARED Basic Materials rows (same rows Walls /
+// Standard defaults reference the SHARED Basic Materials rows (same rows Walls /
 // Columns / etc. use), so a price change on base or ready-mix propagates
 // everywhere. Vendor-supplied rows still come from the 'Concrete Base' /
 // 'Concrete Mix' sub_category catalog (category 'Concrete').
@@ -130,7 +130,7 @@ const MIX_TYPES = [
   { label: 'Concrete Mix', dbName: 'Concrete - Ready Mix (Truck)', fallback: R.concretePerCY, category: 'Basic Materials' },
 ]
 
-// Resolve a picked Type label against the vendor option list, then the House
+// Resolve a picked Type label against the vendor option list, then the Standard
 // array, else the first available option. Shared by the calc + the render.
 function resolveType(label, opts, houseArray) {
   return (
@@ -166,12 +166,12 @@ function calcConcrete(
   catDefaults = {}
 ) {
   // Per-row/line vendor-aware price resolver. 'Standard' (or a missing/'auto'
-  // vendor → the category default) uses the House array; a real vendor id →
+  // vendor → the category default) uses the Standard array; a real vendor id →
   // that vendor's products for the category, priced from material_rates.
   const rowOpt = (cat, row, houseArray) => {
     const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : catDefaults[cat] || 'Standard'
     if (!vsel || vsel === 'Standard') return resolveType(row.type, houseArray, houseArray)
-    const opts = catalogOptions(materialRows, cat, vsel, { houseRows: 'exclude', stripPrefix: true }).map(
+    const opts = catalogOptions(materialRows, cat, vsel, { standardRows: 'exclude', stripPrefix: true }).map(
       o => ({ label: o.label, dbName: o.row.name, fallback: n(o.row.unit_cost), category: 'Concrete' })
     )
     return resolveType(row.type, opts, houseArray)
@@ -285,7 +285,7 @@ function calcConcrete(
   // Concrete mix material + volume — per size-tier: each tier's SF × its own
   // depth drives its own CY, priced at that tier's picked mix Vendor/Type.
   // Depth falls back to the legacy single depth for pre-per-tier estimates, so
-  // an all-House job at one depth matches the old flat calc.
+  // an all-Standard job at one depth matches the old flat calc.
   let concreteCY = 0
   const concreteMat = INSTALL_TIERS.reduce((s, t) => {
     const sf = n(installTiers[t.key])
@@ -768,16 +768,16 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     'Concrete Mix': defaultVendorFor('Concrete Mix'),
   }
   // Build a section's Type option list for a given vendor selection. 'Standard'
-  // (or a vendor with no catalog rows) → the House array; a vendor id → that
+  // (or a vendor with no catalog rows) → the Standard array; a vendor id → that
   // vendor's products for the category (priced from material_rates).
   function sectionOptions(subcat, vendorSel, houseArray) {
     const vsel = vendorSel && vendorSel !== 'auto' ? vendorSel : catDefaults[subcat] || 'Standard'
     if (!vsel || vsel === 'Standard') return houseArray
-    const opts = catalogOptions(materialRows, subcat, vsel, { houseRows: 'exclude', stripPrefix: true })
+    const opts = catalogOptions(materialRows, subcat, vsel, { standardRows: 'exclude', stripPrefix: true })
     if (!opts.length) return houseArray
     return opts.map(o => ({ label: o.label, dbName: o.row.name, fallback: n(o.row.unit_cost), category: 'Concrete' }))
   }
-  // Effective vendor for a stored value: 'auto'/unset/House → category default.
+  // Effective vendor for a stored value: 'auto'/unset/Standard → category default.
   const effVendor = (cat, v) => (v && v !== 'auto' && v !== 'Standard' ? v : catDefaults[cat])
 
   // On a NEW estimate, once vendor catalogs load, default the Base rows and each

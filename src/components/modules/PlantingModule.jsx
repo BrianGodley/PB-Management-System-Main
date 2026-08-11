@@ -29,7 +29,7 @@ import { resolveMaterialPrice, fetchModuleCatalog, fetchStandardRateMap } from '
 //   add/remove ROW table with a Vendor column + an Item column. The Item drives
 //   the pricing/labor FORMULA (per-plant/day, per-size, install rate) exactly as
 //   before; the Vendor ONLY changes where the MATERIAL unit price comes from
-//   (House named-rate fallback vs. a vendor's material_rates row). Vendor 'Standard'
+//   (Standard named-rate fallback vs. a vendor's material_rates row). Vendor 'Standard'
 //   resolves to the original math, so In-House numbers never move.
 //
 //   In-House and Subcontractor are independent calculators (makeTab / ihTab /
@@ -196,9 +196,9 @@ function getLargePerDay(laborRates, type) {
 // The ONLY thing the Vendor selection changes: the material $ source. When a
 // real vendor is selected AND a material_rates row exists (name===dbName &&
 // vendor_id===vendorId) use that row's unit_cost; otherwise fall back to the
-// House price (name-keyed mp[dbName]) then the hard fallback. Vendor 'Standard'
+// Standard price (name-keyed mp[dbName]) then the hard fallback. Vendor 'Standard'
 // resolves to exactly the original math, so In-House numbers never move.
-// Shared resolver (src/lib/materialCatalog.js) — same vendor→House→fallback
+// Shared resolver (src/lib/materialCatalog.js) — same vendor→Standard→fallback
 // order. Planting keeps its own separate material/labor maps (plant names can
 // key both), so it doesn't use the merged useMaterialCatalog hook.
 const plantMatPrice = resolveMaterialPrice
@@ -222,7 +222,7 @@ function computePlantRow(row, perDay) {
 }
 
 // Add-on row: labor formula identical to the original per-item math; material is
-// vendor-resolved (House = original mp() price).
+// vendor-resolved (Standard = original mp() price).
 function computeAddonRow(row, laborRates, materialPrices, materialRows) {
   const meta = ADDON_META[row.type] || {}
   const qty = n(row.qty)
@@ -555,7 +555,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
       paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
     }
   )
-  // materialPrices: { 'Plant / Material Name': unit_cost, ... } (House fallback)
+  // materialPrices: { 'Plant / Material Name': unit_cost, ... } (Standard fallback)
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
   // laborRates: { 'Plant Name or Rate Key': rate_value, ... }
   const [laborRates, setLaborRates] = useState(initialData?.laborRates ?? {})
@@ -568,7 +568,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
   // Re-fetch Planting master-rate maps + vendor catalog. Called once on mount and
   // again after any RateEditPopover save so the calc reflects edits immediately.
   const refreshAllRates = useCallback(async () => {
-    // material_rates retired: House/base prices from the new model
+    // material_rates retired: Standard/base prices from the new model
     // (fetchStandardRateMap, name-keyed); vendor catalog rows from
     // material + material_price. Planting resolves by name, not subcategory.
     const [matMap, labRes, rows, venRes] = await Promise.all([
@@ -716,7 +716,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
 
   // ── Row helpers ─────────────────────────────────────────────────────────────
   // Plant row update. Changing Vendor or Item resets the unit price to the
-  // vendor-resolved default (House = original master-rate / catalog price), and
+  // vendor-resolved default (Standard = original master-rate / catalog price), and
   // (on the Sub tab) refreshes the flat $/unit default.
   function plantUpdate(setRows, defaultsMap, i, field, val) {
     setRows(rows =>
@@ -813,7 +813,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
                 const c = computePlantRow(row, perDay)
                 const masterPrice =
                   materialPrices[row.type] ?? defaultsMap[row.type]?.price ?? 0
-                const isHouse = !row.vendor || row.vendor === 'Standard'
+                const isStandard = !row.vendor || row.vendor === 'Standard'
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1.5 pr-2">
@@ -946,7 +946,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
               {addonRows.map((row, i) => {
                 const meta = ADDON_META[row.type] || {}
                 const c = computeAddonRow(row, laborRates, materialPrices, materialRows)
-                const isHouse = !row.vendor || row.vendor === 'Standard'
+                const isStandard = !row.vendor || row.vendor === 'Standard'
                 const houseMat = mp(materialPrices, meta.matKey)
                 return (
                   <tr key={i} className="border-b border-gray-100">

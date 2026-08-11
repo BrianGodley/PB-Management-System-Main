@@ -10,7 +10,7 @@ import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 
-const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
+const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Utilities Module — fields and calculations from Excel estimator (Utilities Module tab)
@@ -280,7 +280,7 @@ const UTIL_CAT = {
 // and it appears here automatically; its paired '<Label> - Labor Rate' row (looked
 // up by name) supplies labor. Built-ins always remain (deduped by label).
 function mergedUtilTypes(cat, builtInArr, materialRows) {
-  const extra = catalogOptions(materialRows, cat, 'Standard', { houseRows: 'null-vendor', stripPrefix: true })
+  const extra = catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true })
     .filter(o => !builtInArr.some(b => b.label === o.label))
     .map(o => ({
       label: o.label,
@@ -295,7 +295,7 @@ function mergedUtilTypes(cat, builtInArr, materialRows) {
 
 // Resolve a row's material cost + per-unit labor.
 // The Type is a built-in item OR a master-list addition (same shape). It defines
-// the labor and the House material price. A vendor NEVER affects labor; it only
+// the labor and the Standard material price. A vendor NEVER affects labor; it only
 // overrides the MATERIAL price for the selected item, matched by the item's name
 // in the vendor's catalog (material_rates for the category + vendor).
 function resolveUtilRow(cat, row, houseArr, materialRows, catDefaults, mp) {

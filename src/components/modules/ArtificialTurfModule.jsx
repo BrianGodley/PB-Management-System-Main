@@ -18,7 +18,7 @@ import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 
-const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
+const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
 
 // ── Demo method rates (tons/hr) — DemoRatesTurf lookup table ────────────────
 const DEMO_METHODS = [
@@ -83,7 +83,7 @@ const RATE_DEFAULTS = {
 const n = v => parseFloat(v) || 0
 
 // ── Vendor catalog: material-only price override ─────────────────────────────
-// The Type (turf brand / base material) still sets the item and its House price;
+// The Type (turf brand / base material) still sets the item and its Standard price;
 // a real vendor only overrides the MATERIAL price for that item (matched by
 // label in the vendor's catalog), never labor.
 const TURF_CAT = { base: 'Turf Base', turf: 'Turf Material' }
@@ -113,19 +113,19 @@ function turfMatPrice(cat, vendorSel, typeLabel, houseName, houseFallback, mater
 //                      to its row, preferring a vendor-specific row over standard.
 function turfBrandOptions(materialRows) {
   return catalogOptions(materialRows, TURF_CAT.turf, 'Standard', {
-    houseRows: 'null-vendor',
+    standardRows: 'null-vendor',
     stripPrefix: true,
   })
 }
 function turfBrandRow(materialRows, vendorSel, key) {
   return (
     catalogItemFor(materialRows, TURF_CAT.turf, vendorSel, key, {
-      houseRows: 'null-vendor',
+      standardRows: 'null-vendor',
       stripPrefix: true,
       fallbackFirst: false,
     }) ||
     catalogItemFor(materialRows, TURF_CAT.turf, 'Standard', key, {
-      houseRows: 'null-vendor',
+      standardRows: 'null-vendor',
       stripPrefix: true,
       fallbackFirst: true,
     })
@@ -779,7 +779,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
     )
     return vendors.filter(v => ids.has(v.id))
   }
-  const catDefaults = {} // Turf defaults to House; a real vendor is an explicit pick.
+  const catDefaults = {} // Turf defaults to Standard; a real vendor is an explicit pick.
 
   // Feed the calc only the ACTIVE tab's inputs plus the shared top-level fields
   // (crewType, subType). Each tab thus prices from its own independent data.

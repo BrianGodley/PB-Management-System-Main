@@ -99,7 +99,7 @@ const n = v => parseFloat(v) || 0
 
 // Vendor-catalog material price. Mirrors ColumnsModule.colMatPrice: a real vendor's
 // material_rates row (name===dbName && vendor_id===vendorId) wins; otherwise fall
-// back to the House price (name-keyed materialPrices) then the hard fallback.
+// back to the Standard price (name-keyed materialPrices) then the hard fallback.
 // vendorId 'Standard'/empty returns exactly the pre-vendor value.
 const colMatPrice = resolveMaterialPrice
 
@@ -149,7 +149,7 @@ export default function ColumnsSummary({ module }) {
   } = data
   const isSub = subType === 'Subcontractor'
 
-  // Labor / non-vendor prices stay House name-keyed.
+  // Labor / non-vendor prices stay Standard name-keyed.
   const price = (dbName, fallback) =>
     materialPrices[dbName] != null ? materialPrices[dbName] : fallback
   // Material prices resolve through the saved Vendor selection.

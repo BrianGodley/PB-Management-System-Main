@@ -7,7 +7,7 @@ import { catalogItemFor } from '../../lib/materialCatalog'
 // include finishes/caps added via Master Rates.
 function masterFinishMeta(cat, typeLabel, materialRows) {
   const r = catalogItemFor(materialRows, cat, 'Standard', typeLabel, {
-    houseRows: 'null-vendor',
+    standardRows: 'null-vendor',
     stripPrefix: true,
     fallbackFirst: false,
   })

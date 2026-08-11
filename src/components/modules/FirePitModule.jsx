@@ -10,7 +10,7 @@ import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../
 import { groutCuFtPerBlock } from '../../lib/cmuGrout'
 import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 
-const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
+const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Fire Pit Module — based on Fire Pit Module tab in Excel estimator
@@ -88,7 +88,7 @@ const GROUT_CF_PER_BLOCK = groutCuFtPerBlock(BLOCK_WIDTH_IN, BLOCK_HEIGHT_IN)
 
 // ── Wall-finish vendor catalog (ported from Outdoor Kitchen) ──────────────────
 // A real vendor overrides ONLY the material unit price for a finish (matched by
-// its Type label in the vendor's catalog under the given sub_category); House
+// its Type label in the vendor's catalog under the given sub_category); Standard
 // keeps the built-in per-estimate / master-rate price. Labor is never affected.
 const WF_CAT = 'Wall Finish'
 const CAP_CAT = 'Wall Cap'
@@ -132,7 +132,7 @@ const CAP_ROW = () => ({ vendor: 'Standard', type: 'Flagstone', lf: '' })
 // calc_meta JSON. Built-in types keep their exact WF_META/FP_RATES path unchanged.
 function masterWallMeta(cat, typeLabel, materialRows, category = null) {
   const r = catalogItemFor(materialRows, cat, 'Standard', typeLabel, {
-    houseRows: 'null-vendor',
+    standardRows: 'null-vendor',
     stripPrefix: true,
     fallbackFirst: false,
     category,
@@ -151,7 +151,7 @@ function masterWallMeta(cat, typeLabel, materialRows, category = null) {
 }
 // Section Type options = built-in labels + master-list additions (deduped).
 function masterWallOptions(cat, builtInList, materialRows, category = null) {
-  const extra = catalogOptions(materialRows, cat, 'Standard', { houseRows: 'null-vendor', stripPrefix: true, category })
+  const extra = catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true, category })
     .map(o => o.label)
     .filter(l => !builtInList.includes(l))
   return extra.length ? [...builtInList, ...extra] : builtInList
@@ -182,7 +182,7 @@ const LINE_TYPE_ARR = Object.entries(UTILITY_LINE_TYPES).map(([label, t]) => ({ 
 const GAS_TYPE_ARR = Object.entries(GAS_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, fallback: t.cost, laborDbName: t.laborDbName, laborFallback: t.laborHrs }))
 const UTIL_CAT = { line: 'Utility Lines', gas: 'Gas Fixtures' }
 function mergedUtilTypes(cat, builtInArr, materialRows) {
-  const extra = catalogOptions(materialRows, cat, 'Standard', { houseRows: 'null-vendor', stripPrefix: true })
+  const extra = catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true })
     .filter(o => !builtInArr.some(b => b.label === o.label))
     .map(o => ({
       label: o.label,
@@ -999,7 +999,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
           }
         }),
         // Vendor catalog cap products (Wall Cap sub-category) + each built-in
-        // House cap $/LF rate.
+        // Standard cap $/LF rate.
         ...catalogBlockItems(CAP_CAT, 'LF'),
         ...CAP_LIST.flatMap(type => {
           const matKey = CAP_META[type].matKey
@@ -1024,7 +1024,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
           }
         }),
         // Vendor catalog finish products (Wall Finish sub-category) + each
-        // built-in House finish material rate.
+        // built-in Standard finish material rate.
         ...catalogBlockItems(WF_CAT, 'SF', 'Fire Pit'),
         ...WF_LIST.flatMap(type => {
           const meta = WF_META[type]

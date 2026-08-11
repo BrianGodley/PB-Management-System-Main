@@ -51,7 +51,7 @@ import {
   fetchStandardRateMap,
 } from '../../lib/materialCatalog'
 
-const CATALOG_OPTS = { houseRows: 'exclude', stripPrefix: true }
+const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
 
 const n = v => parseFloat(v) || 0
 // Base-rock tonnage density (SF·inch per ton). The 200 divisor is a tunable
@@ -111,7 +111,7 @@ const PAVER_CAT = { paver: 'Paver Material', base: 'Base Material' }
 // the material_rates row id (the STABLE key a selection is stored/matched by —
 // rename-proof) plus a human label (name minus the '<sub_category> - ' prefix,
 // and minus the sub_category collection so it reads clean). Empty for
-// House/Custom/unset vendors.
+// Standard/Custom/unset vendors.
 // Vendor catalog options + row resolution now come from the shared library
 // (src/lib/materialCatalog.js) so every module resolves identically.
 function paverOptions(cat, vendorSel, materialRows) {
@@ -197,7 +197,7 @@ function calcPaver(
     const baseHrs = baseTons > 0 ? baseTons / baseRate : 0
 
     // Base material $/ton — vendor-aware. A real vendor overrides via its
-    // catalog item; House ('Class II Roadbase') uses the seeded rate, falling
+    // catalog item; Standard ('Class II Roadbase') uses the seeded rate, falling
     // back to the legacy single base-rock rate.
     let baseTonRate
     if (row.baseVendor && row.baseVendor !== 'Standard' && row.baseVendor !== 'auto') {

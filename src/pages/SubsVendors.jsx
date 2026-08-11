@@ -508,7 +508,7 @@ export default function SubsVendors({ mode = 'sub' }) {
     refresh()
   }
 
-  // The "Unspecified" vendor is a permanent system record (the House / no-vendor
+  // The "Unspecified" vendor is a permanent system record (the Standard / no-vendor
   // stand-in) and must never be deletable.
   const isProtectedVendor = s =>
     ['unspecified', 'standard'].includes((s?.company_name || '').trim().toLowerCase())

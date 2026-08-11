@@ -26,7 +26,7 @@ async function fetchGtRows() {
 function mergedGtOpts(cat, houseArray, materialRows) {
   // Purely table-driven: options come ONLY from the catalog for this sub-category.
   // (houseArray is ignored — no hardcoded fallback list.)
-  return catalogOptions(materialRows, cat, 'Standard', { houseRows: 'null-vendor', stripPrefix: true }).map(
+  return catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true }).map(
     o => ({ label: o.label, dbName: o.row.name, fallback: parseFloat(o.row.unit_cost) || 0, id: o.row.id })
   )
 }
@@ -167,14 +167,14 @@ const DG_TYPES = [
   { label: 'Grey Stabilized Rock Dust', dbName: 'DG - Grey Stabilized Rock Dust', fallback: 145 }, // C&M $145/CY
 ]
 
-// Stepper stone types (material_rates, per TON). House defaults keep existing
+// Stepper stone types (material_rates, per TON). Standard defaults keep existing
 // estimates unchanged (Flagstone / Precast). Vendor rows filter to sub_category
 // 'Steppers'. Labor stays per-line (Soil vs Concrete SF/day), not from the type.
 const STEPPER_TYPES = [
   { label: 'Flagstone', dbName: 'Flagstone Steppers', fallback: 500 },
   { label: 'Precast',   dbName: 'Precast Steppers',   fallback: 200 },
 ]
-// Edging types (material_rates, per LF). House defaults keep existing estimates
+// Edging types (material_rates, per LF). Standard defaults keep existing estimates
 // unchanged (Plastic / Metal). Vendor rows filter to sub_category 'Edging'.
 const EDGING_TYPES = [
   { label: 'Plastic', dbName: 'Plastic Edging', fallback: 1.2 },
@@ -200,7 +200,7 @@ const SOD_TYPES = [
   { label: 'St. Augustine', dbName: 'Sod - St. Augustine', fallback: 1.73 },
 ]
 
-// Soil-prep bed material — single House type; vendors may supply a 'Soil Prep'
+// Soil-prep bed material — single Standard type; vendors may supply a 'Soil Prep'
 // category so the Sod section's Soil Prep line matches the Vendor|Type format.
 const SOIL_PREP_TYPES = [
   { label: 'Soil Prep', dbName: GT_RATES.soilPrepMat.dbName, fallback: GT_RATES.soilPrepMat.fallback },
@@ -237,7 +237,7 @@ const n = v => parseFloat(v) || 0
 
 // Resolve a saved row LABEL to its matching type option {label, dbName, fallback}.
 // Prefers the section's current (possibly vendor-filtered) option list, then the
-// hardcoded House array, then the first available option — so pricing never breaks
+// hardcoded Standard array, then the first available option — so pricing never breaks
 // when a vendor is selected, a product is missing, or an old estimate is reopened.
 function resolveType(label, options, houseArray) {
   return (
@@ -265,23 +265,23 @@ function calcGroundTreatments(
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   // Sod stays single-choice, so its option list is still supplied via opts.
-  // Default to the hardcoded House array so the calc works if opts is absent.
+  // Default to the hardcoded Standard array so the calc works if opts is absent.
   const _opts = {
     sod: opts.sod || [],
   }
   // Per-ROW type option resolver (vendor-aware). 'Standard' (or missing vendor on
-  // an old estimate) → hardcoded House array. A vendor id → that vendor's
+  // an old estimate) → hardcoded Standard array. A vendor id → that vendor's
   // products for the row's material category, priced at the vendor's unit_cost.
   const rowOpt = (cat, row, houseArray) => {
     // Resolve the effective vendor: a stored 'auto' (new default) → the category
-    // default (first real vendor, else House); an explicit 'Standard'/id stays as-is.
+    // default (first real vendor, else Standard); an explicit 'Standard'/id stays as-is.
     const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : (catDefaults[cat] || 'Standard')
     if (!vsel || vsel === 'Standard') {
       const merged = mergedGtOpts(cat, houseArray, materialRows)
       return resolveType(row.type, merged, [])
     }
     // Shared row filtering (subcat + vendor); GT keeps its own label transform.
-    const opts = catalogOptions(materialRows, cat, vsel, { houseRows: 'exclude' }).map(o => ({
+    const opts = catalogOptions(materialRows, cat, vsel, { standardRows: 'exclude' }).map(o => ({
       label: o.row.name.replace(new RegExp('^' + cat + ' - '), '').replace(/^.*? - /, ''),
       dbName: o.row.name,
       fallback: parseFloat(o.row.unit_cost) || 0,
@@ -362,7 +362,7 @@ function calcGroundTreatments(
 
   // ── Edging ─────────────────────────────────────────────────────────────────
   // Labor stays per-line (unchanged). Material rate now comes from the picked
-  // Type (filtered to the picked Vendor's catalog); House defaults to
+  // Type (filtered to the picked Vendor's catalog); Standard defaults to
   // Plastic/Metal so old estimates price identically.
   const plasticLab =
     n(plasticEdgingLF) * p(GT_RATES.plasticEdgingLab.dbName, GT_RATES.plasticEdgingLab.fallback)
@@ -439,7 +439,7 @@ function calcGroundTreatments(
 
   // ── Steppers (Flagstone + Precast, Soil Set + Concrete Set) ─────────────────
   // Each of the 4 lines now resolves its own material rate from a per-line
-  // Vendor + Type pick (House defaults → Flagstone/Precast so old estimates are
+  // Vendor + Type pick (Standard defaults → Flagstone/Precast so old estimates are
   // unchanged). Labor stays per-line (its own SF/day rate). material = tons *
   // perTon, tons = SF/80. flagLab/flagMat/precastLab/precastMat are retained for
   // the return shape; stepLab/stepMat are the section totals fed to the bid.
@@ -1062,11 +1062,11 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
 
   // Build a section's Type option list. 'Standard' → hardcoded array (unchanged).
   // A vendor → that vendor's products for the section's sub_category, priced at
-  // the vendor's unit_cost. Falls back to the House array if the vendor has no
+  // the vendor's unit_cost. Falls back to the Standard array if the vendor has no
   // rows for the sub_category (so the dropdown is never empty).
   function sectionOptions(subcat, vendorSel, houseArray) {
     if (!vendorSel || vendorSel === 'Standard') return mergedGtOpts(subcat, houseArray, materialRows)
-    const opts = catalogOptions(materialRows, subcat, vendorSel, { houseRows: 'exclude', stripPrefix: true })
+    const opts = catalogOptions(materialRows, subcat, vendorSel, { standardRows: 'exclude', stripPrefix: true })
     // Table-driven: a vendor with no catalog rows for this sub-category shows an
     // empty list (no hardcoded fallback).
     return opts.map(o => ({ label: o.label || o.row.name, dbName: o.row.name, fallback: n(o.row.unit_cost), id: o.row.id }))
@@ -1085,7 +1085,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   const soilPrepId = (materialRows.find(r => r.vendor_id == null && r.sub_category === 'Soil Prep') || {}).id
 
   // On a NEW module, once vendor catalogs load, default each section's vendor to
-  // the first real vendor that supplies its category (House then falls to the
+  // the first real vendor that supplies its category (Standard then falls to the
   // bottom of the picker). Runs once; never overrides a saved estimate or an
   // explicit user pick.
   const [vendorDefaultsApplied, setVendorDefaultsApplied] = useState(false)

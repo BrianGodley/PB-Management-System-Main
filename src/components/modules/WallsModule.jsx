@@ -779,9 +779,9 @@ const blankWpRow = () => ({ vendor: 'Standard', type: 'None', sf: '', subEach: '
 // The ONLY thing the Vendor selection changes: the material $ source. When a
 // real vendor is selected AND a material_rates row exists (name===dbName &&
 // vendor_id===vendorId) use that row's unit_cost; otherwise fall back to the
-// House price (name-keyed mp[dbName]) then the hard fallback. Vendor 'Standard'
+// Standard price (name-keyed mp[dbName]) then the hard fallback. Vendor 'Standard'
 // resolves to exactly the original math, so In-House numbers never move.
-// Shared resolver (src/lib/materialCatalog.js) — same vendor→House→fallback order.
+// Shared resolver (src/lib/materialCatalog.js) — same vendor→Standard→fallback order.
 const wallMatPrice = resolveMaterialPrice
 
 // ── Per-row Wall Finish calculator — identical formulas to the original
@@ -978,7 +978,7 @@ function computeWallWpTotals(wall, mp, materialRows) {
 // they appear here, no code change. Dimensions (block_w/h/l_in, inches) drive the
 // block-count math; unit_cost is the per-unit price.
 const MODULAR_SUBCAT = 'Modular Wall'
-const MODULAR_CAT_OPTS = { houseRows: 'null-vendor', stripPrefix: true }
+const MODULAR_CAT_OPTS = { standardRows: 'null-vendor', stripPrefix: true }
 const MODULAR_FALLBACK = { name: 'Modular Block 8x8x16', w: 8, h: 8, l: 16, price: 3.5 }
 // Resolve the selected master-list wall product → { name, w, h, l, price }.
 // vendorSel picks the vendor's row (or the Unspecified/null-vendor row); a
@@ -1509,7 +1509,7 @@ function calcWalls(
       postQty * r('timberPostMat')
 
     // Timber footing — dig + horizontal rebar + pour + concrete, identical math
-    // to brick / PIP. Footing concrete + rebar resolve at Standard (House) prices
+    // to brick / PIP. Footing concrete + rebar resolve at Standard (Standard) prices
     // (timber's vendor picker is wood-only). Footing POUR labor lands in the timber
     // bucket so it's crewed with the timber wall. Blank width/depth ⇒ 0 footing.
     const tLF = n(wall.lf)
@@ -1965,7 +1965,7 @@ function initWpRows(src = {}) {
 }
 // Migrate the legacy fixed finish fields (sandStuccoSF / …RateIn) into the new
 // row model. Each legacy finish that has SF or an override rate becomes a
-// House-vendor row so its In-House numbers stay byte-for-byte identical.
+// Standard-vendor row so its In-House numbers stay byte-for-byte identical.
 function initWallFinishRows(src = {}) {
   if (Array.isArray(src.wallFinishRows) && src.wallFinishRows.length)
     return src.wallFinishRows.map(r => ({ ...r }))
@@ -2047,7 +2047,7 @@ function makeTab(src = {}) {
 }
 
 // Vendors from `vendorOptions` that actually have a priced product in `subcat`
-// (the Standard/House option is always kept). Prevents a vendor that only supplies
+// (the Standard/Standard option is always kept). Prevents a vendor that only supplies
 // one wall sub-type (e.g. Modular Wall) from appearing in another sub-type's picker
 // (e.g. CMU Wall Block) just because both share the 'Walls' category.
 function vendorOptsForSub(vendorOptions, materialRows, subcat) {
@@ -2087,7 +2087,7 @@ function WallWaterproofing({
   // catalog products for the vendor; stale/phantom values are dropped.
   const wpBase = WP_TYPES.filter(t => t !== 'None')
   const wpCatalog = wallCatalogTypes(materialRows, WALL_WP_SUBCAT, row.vendor)
-  // Standard/House → built-in types (+ Standard catalog). A specific vendor →
+  // Standard/Standard → built-in types (+ Standard catalog). A specific vendor →
   // ONLY that vendor's catalog products.
   const wpIsHouse = !row.vendor || row.vendor === 'Standard'
   const wpShown = wpIsHouse
@@ -2178,7 +2178,7 @@ function WallFinishesEditor({
           // real Wall Finish catalog products for the selected vendor. Stale
           // saved values that are neither are dropped (not surfaced as phantoms).
           const catalog = wallCatalogTypes(materialRows, WALL_FINISH_SUBCAT, row.vendor)
-          // Standard/House → built-in finishes (+ Standard catalog). A specific
+          // Standard/Standard → built-in finishes (+ Standard catalog). A specific
           // vendor → ONLY that vendor's catalog products.
           const finIsHouse = !row.vendor || row.vendor === 'Standard'
           const shown = finIsHouse
@@ -2250,7 +2250,7 @@ function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, ma
           // products for the vendor; stale/phantom values are dropped.
           const capBase = CAP_TYPES.filter(t => t !== 'None')
           const catalog = wallCatalogTypes(materialRows, WALL_CAP_SUBCAT, row.vendor)
-          // Standard/House → built-in types (+ any Standard catalog). A specific
+          // Standard/Standard → built-in types (+ any Standard catalog). A specific
           // vendor → ONLY that vendor's catalog products (don't append built-ins).
           const capIsHouse = !row.vendor || row.vendor === 'Standard'
           const shown = capIsHouse
@@ -3194,8 +3194,8 @@ function TimberWallEntry({
             onChange={v => set('timberType')(v)}
             options={(() => {
               const catalog = wallCatalogTypes(materialRows, WOOD_SUBCAT, wall.vendor)
-              const isHouse = !wall.vendor || wall.vendor === 'Standard'
-              const shown = isHouse
+              const isStandard = !wall.vendor || wall.vendor === 'Standard'
+              const shown = isStandard
                 ? [...TIMBER_TYPES, ...catalog.filter(t => !TIMBER_TYPES.includes(t))]
                 : catalog
               return shown.map(t => ({ value: t, label: t }))
