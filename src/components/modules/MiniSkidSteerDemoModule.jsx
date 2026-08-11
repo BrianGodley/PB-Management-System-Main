@@ -568,10 +568,10 @@ const DEFAULT_STATE = {
   subMiscFlatRows: Array(2)
     .fill(null)
     .map(() => ({ label: '', sf: '', depth: 4 })),
-  miscVertRows: Array(4)
+  miscVertRows: Array(1)
     .fill(null)
     .map(() => ({ label: '', lf: '', heightIn: '', widthIn: 8 })),
-  footingRows: Array(4)
+  footingRows: Array(1)
     .fill(null)
     .map(() => ({ label: '', lf: '', heightIn: '', widthIn: 8 })),
   gradeCutSF: '',
@@ -585,7 +585,7 @@ const DEFAULT_STATE = {
   shrubQty: '',
   shrubSqFt: '',
   shrubDensity: '1',
-  shrubRows: Array(4)
+  shrubRows: Array(1)
     .fill(null)
     .map(() => ({ area: '', qty: '', height: '0-1' })),
   stumpSmallQty: '',
@@ -608,8 +608,6 @@ const DEFAULT_STATE = {
   subDemoDepth: 7,
   treeRows: [
     { qty: '', height: 20, size: 'Small' },
-    { qty: '', height: 20, size: 'Medium' },
-    { qty: '', height: 20, size: 'Large' },
   ],
   // Sub tab: its OWN tree rows, independent of In-House.
   subTreeRows: [
@@ -618,8 +616,6 @@ const DEFAULT_STATE = {
     { qty: '', height: 20, size: 'Large' },
   ],
   manualRows: [
-    { label: '', hours: '', materials: '', subCost: '' },
-    { label: '', hours: '', materials: '', subCost: '' },
     { label: '', hours: '', materials: '', subCost: '' },
   ],
   // Sub tab has its OWN manual rows — independent of In-House.
@@ -1022,6 +1018,69 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             rates={miniDemoRateList}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
+            centerSlot={onSwitchType ? (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowDemoSwitcher(v => !v)}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-md border border-green-300 bg-green-50 text-green-800 hover:bg-green-100 hover:border-green-500 transition-colors whitespace-nowrap"
+                  title="Switch to a different Demo module — keep your entries"
+                >
+                  🔁 Change Demo Module
+                </button>
+                {showDemoSwitcher && (
+                  <div className="absolute z-30 top-full left-1/2 -translate-x-1/2 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg p-1">
+                    <p className="text-[10px] uppercase tracking-wide font-bold text-gray-400 px-2 pt-1 pb-0.5">
+                      Switch to
+                    </p>
+                    <button
+                      onClick={() => {
+                        // Hand the source module's full state + rate caches
+                        // up to EstimateDetail so the target module loads
+                        // with everything prefilled.
+                        onSwitchType?.('Hand Demo', {
+                          ...state,
+                          materialPrices,
+                          laborRates,
+                          laborRatePerHour,
+                          subMarkupRate,
+                          subRates,
+                        })
+                        setShowDemoSwitcher(false)
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-green-800 rounded transition-colors"
+                    >
+                      Hand Demo
+                    </button>
+                    <button
+                      onClick={() => {
+                        // Hand the source module's full state + rate caches
+                        // up to EstimateDetail so the target module loads
+                        // with everything prefilled.
+                        onSwitchType?.('Skid Steer Demo', {
+                          ...state,
+                          materialPrices,
+                          laborRates,
+                          laborRatePerHour,
+                          subMarkupRate,
+                          subRates,
+                        })
+                        setShowDemoSwitcher(false)
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-green-800 rounded transition-colors"
+                    >
+                      Skid Steer Demo
+                    </button>
+                    <button
+                      onClick={() => setShowDemoSwitcher(false)}
+                      className="w-full text-left px-3 py-1.5 text-[11px] text-gray-400 hover:text-gray-700"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : null}
           />
         </div>
       </div>
@@ -1031,73 +1090,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
         <WorkTypeChooser value={state.dumpType} onChange={v => set('dumpType', v)} compact />
       </ModuleHeaderSlot>
 
-      {/* Change Demo Module switcher */}
-      {onSwitchType && (
-      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
-        <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Demo Module</span>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowDemoSwitcher(v => !v)}
-              className="text-xs font-semibold px-3 py-1.5 rounded-md border border-green-300 bg-green-50 text-green-800 hover:bg-green-100 hover:border-green-500 transition-colors whitespace-nowrap"
-              title="Switch to a different Demo module — keep your entries"
-            >
-              🔁 Change Demo Module
-            </button>
-            {showDemoSwitcher && (
-              <div className="absolute z-30 top-full left-0 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg p-1">
-                <p className="text-[10px] uppercase tracking-wide font-bold text-gray-400 px-2 pt-1 pb-0.5">
-                  Switch to
-                </p>
-                <button
-                  onClick={() => {
-                    // Hand the source module's full state + rate caches
-                    // up to EstimateDetail so the target module loads
-                    // with everything prefilled.
-                    onSwitchType?.('Hand Demo', {
-                      ...state,
-                      materialPrices,
-                      laborRates,
-                      laborRatePerHour,
-                      subMarkupRate,
-                      subRates,
-                    })
-                    setShowDemoSwitcher(false)
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-green-800 rounded transition-colors"
-                >
-                  Hand Demo
-                </button>
-                <button
-                  onClick={() => {
-                    // Hand the source module's full state + rate caches
-                    // up to EstimateDetail so the target module loads
-                    // with everything prefilled.
-                    onSwitchType?.('Skid Steer Demo', {
-                      ...state,
-                      materialPrices,
-                      laborRates,
-                      laborRatePerHour,
-                      subMarkupRate,
-                      subRates,
-                    })
-                    setShowDemoSwitcher(false)
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-green-800 rounded transition-colors"
-                >
-                  Skid Steer Demo
-                </button>
-                <button
-                  onClick={() => setShowDemoSwitcher(false)}
-                  className="w-full text-left px-3 py-1.5 text-[11px] text-gray-400 hover:text-gray-700"
-                >
-                  Cancel
-                </button>
-              </div>
-            )}
-          </div>
-      </div>
-      )}
       {pricesLoading && (
         <div className="text-xs text-amber-700 bg-amber-50 rounded px-3 py-2">
           Loading current rates…
@@ -1165,10 +1157,10 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       </div>
       </>
       )}
-      {/* Demolition */}
+      {/* MAIN DEMO */}
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>{subSectionTitle('Demolition', isSub)}</span>
+          <span>{subSectionTitle('MAIN DEMO', isSub)}</span>
           {isSelf ? (
             <>
               <span className="font-normal normal-case">· Container ${calc.containerPrice}</span>
@@ -1232,19 +1224,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 rateUnit: 'hr/100sf·in',
               },
               {
-                label: 'Import Base',
-                sfK: 'baseSF',
-                dK: 'baseDepth',
-                dep: 4,
-                row: calc.base,
-                fee: dumpBase,
-                rate: calc.laborBase,
-                rateName: 'Demo - Mini - Import Base SF',
-                rateNote: `½ × ${calc.laborBase} hr/100sf·in`,
-                rateUnit: 'hr/100sf·in',
-                extraIcon: null,
-              },
-              {
                 label: 'Grass/Sod',
                 sfK: 'grassSF',
                 dK: 'grassDepth',
@@ -1254,6 +1233,19 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 rate: calc.laborGrass,
                 rateName: 'Demo - Mini - Grass SF',
                 rateNote: `${calc.laborGrass} hr/100sf·in`,
+                rateUnit: 'hr/100sf·in',
+                extraIcon: null,
+              },
+              {
+                label: 'Grade Cut',
+                sfK: 'gradeCutSF',
+                dK: 'gradeCutDepth',
+                dep: 4,
+                row: calc.gradeCut,
+                fee: dumpDirt,
+                rate: calc.laborGradeCut,
+                rateName: 'Demo - Mini - Grade Cut SF',
+                rateNote: `${calc.laborGradeCut} hr/100sf·in`,
                 rateUnit: 'hr/100sf·in',
                 extraIcon: null,
               },
@@ -1315,93 +1307,73 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
         )}
       </div>
 
-      {/* Misc Flat */}
+      {/* IMPORT */}
+      {isSelf && (
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>{subSectionTitle('Misc Flat Demo', isSub)}{isSelf ? ` — ${calc.laborMiscFlat} hr/100sf·in` : ''}</span>
-          {isSelf && (
-            <>
-              <span className="font-normal normal-case text-gray-500">· container disposal</span>
-            </>
-          )}
-          {isSelf && (
-            <>
-              <span className="font-normal normal-case">· ${dumpConc}/ton dump fee</span>
-            </>
-          )}
-          {isSub && (
-            <>
-              <span className="font-normal normal-case text-gray-500">${calc.miniMiscFlatSubRate}/sf</span>
-            </>
-          )}
+          <span>{subSectionTitle('IMPORT', isSub)}</span>
         </div>
         <table className="w-full text-xs">
           <TH
-            cols={
-              isSelf
-                ? [
-                    { label: 'Description' },
-                    { label: 'SF', w: 'w-24' },
-                    { label: 'Depth (in)', w: 'w-20' },
-                    { label: 'Tons', w: 'w-16' },
-                    { label: 'Disposal', w: 'w-24' },
-                    { label: 'Labor Hrs', w: 'w-20' },
-                  ]
-                : [
-                    { label: 'Description' },
-                    { label: 'SF', w: 'w-24' },
-                    { label: 'Cost', w: 'w-24' },
-                  ]
-            }
+            cols={[
+              { label: 'Material', w: 'w-32' },
+              { label: 'SF', w: 'w-24' },
+              { label: 'Depth (in)', w: 'w-20' },
+              { label: 'Tons', w: 'w-16' },
+              { label: 'Dump Fee', w: 'w-24' },
+              { label: 'Labor Hrs', w: 'w-20' },
+            ]}
           />
           <tbody className="divide-y divide-gray-50">
-            {(isSub ? state.subMiscFlatRows.slice(0, 2) : state.miscFlatRows).map((r, i) => {
-              const cr = calc.miscFlatCalc[i] || { tons: 0, hours: 0, dumpFee: 0 }
-              return (
-                <tr key={i}>
-                  <td className={td}>
-                    <Inp
-                      type="text"
-                      value={r.label}
-                      onChange={e => setRow(isSub ? 'subMiscFlatRows' : 'miscFlatRows', i, 'label', e.target.value)}
-                      placeholder={`Item ${i + 1}`}
-                    />
-                  </td>
-                  <td className={td}>
-                    <Inp
-                      value={r.sf}
-                      onChange={e => setRow(isSub ? 'subMiscFlatRows' : 'miscFlatRows', i, 'sf', e.target.value)}
-                    />
-                  </td>
-                  {isSelf && (
-                    <td className={td}>
-                      <Inp
-                        value={r.depth}
-                        onChange={e => setRow('miscFlatRows', i, 'depth', e.target.value)}
-                        placeholder="4"
-                      />
-                    </td>
-                  )}
-                  {isSelf ? (
-                    <>
-                      <td className={num}>{cr.tons > 0 ? cr.tons.toFixed(1) : '—'}</td>
-                      <td className={num}>{cr.dumpFee > 0 ? fmt2(cr.dumpFee) : '—'}</td>
-                      <td className={num}>{fh(cr.hours)}</td>
-                    </>
-                  ) : (
-                    <td className={num}>{n(r.sf) > 0 ? fmt2(n(r.sf) * calc.miniMiscFlatSubRate) : '—'}</td>
-                  )}
-                </tr>
-              )
-            })}
+            {[
+              {
+                label: 'Import Base',
+                sfK: 'baseSF',
+                dK: 'baseDepth',
+                dep: 4,
+                row: calc.base,
+                rateNote: `½ × ${calc.laborBase} hr/100sf·in`,
+              },
+              {
+                label: 'Grade Fill',
+                sfK: 'gradeFillSF',
+                dK: 'gradeFillDepth',
+                dep: 4,
+                row: calc.gradeFill,
+                rateNote: `${calc.laborGradeFill} hr/100sf·in`,
+              },
+            ].map(({ label, sfK, dK, dep, row, rateNote }) => (
+              <tr key={label}>
+                <td className={`${td} font-medium text-gray-700`}>
+                  <span className="inline-flex items-center gap-1">
+                    {label}
+                    <span className="text-gray-400 font-normal text-[10px]">({rateNote})</span>
+                  </span>
+                </td>
+                <td className={td}>
+                  <Inp value={state[sfK]} onChange={e => set(sfK, e.target.value)} />
+                </td>
+                <td className={td}>
+                  <Inp
+                    value={state[dK]}
+                    onChange={e => set(dK, e.target.value)}
+                    placeholder={String(dep)}
+                  />
+                </td>
+                <td className={num}>{row.tons > 0 ? row.tons.toFixed(1) : '—'}</td>
+                <td className={num}>{row.dumpFee > 0 ? fmt2(row.dumpFee) : '—'}</td>
+                <td className={num}>{fh(row.hours)}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
+      )}
 
-      {/* Misc Vertical */}
+      {/* Vertical Demo */}
       <div className={isSub ? 'hidden' : undefined}>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>{subSectionTitle('Misc Vertical / Structural Demo', isSub)}</span>
+          <span>{subSectionTitle('VERTICAL DEMO', isSub)}</span>
           {isSelf && (
             <>
               <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborMiscVert} hr/100sf·in equiv</span>
@@ -1467,6 +1439,13 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             })}
           </tbody>
         </table>
+        <button
+          type="button"
+          onClick={() => set('miscVertRows', [...state.miscVertRows, { label: '', lf: '', heightIn: '', widthIn: 8 }])}
+          className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+        >
+          + Add Row
+        </button>
       </div>
 
       {/* Footing */}
@@ -1537,6 +1516,13 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             })}
           </tbody>
         </table>
+        <button
+          type="button"
+          onClick={() => set('footingRows', [...state.footingRows, { label: '', lf: '', heightIn: '', widthIn: 8 }])}
+          className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+        >
+          + Add Row
+        </button>
       </div>
 
       {isSub && (
@@ -1591,30 +1577,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           />
           <tbody className="divide-y divide-gray-50">
             {[
-              {
-                label: 'Grade Cut',
-                sfK: 'gradeCutSF',
-                dK: 'gradeCutDepth',
-                dep: 4,
-                tons: calc.gradeCut.tons,
-                hrs: calc.gradeCut.hours,
-                note: `${calc.laborGradeCut} hr/100sf·in`,
-                rate: calc.laborGradeCut,
-                rateName: 'Demo - Mini - Grade Cut SF',
-                rateUnit: 'hr/100sf·in',
-              },
-              {
-                label: 'Grade Fill',
-                sfK: 'gradeFillSF',
-                dK: 'gradeFillDepth',
-                dep: 4,
-                tons: calc.gradeFill.tons,
-                hrs: calc.gradeFill.hours,
-                note: `${calc.laborGradeFill} hr/100sf·in`,
-                rate: calc.laborGradeFill,
-                rateName: 'Demo - Mini - Grade Fill SF',
-                rateUnit: 'hr/100sf·in',
-              },
               {
                 label: 'Jumping Jack',
                 sfK: 'jjSF',
@@ -1754,6 +1716,15 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             {calc.shrubRate} hrs/ea × shrub-height modifier
           </p>
         )}
+        <div>
+          <button
+            type="button"
+            onClick={() => set('shrubRows', [...state.shrubRows, { area: '', qty: '', height: '0-1' }])}
+            className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+          >
+            + Add Row
+          </button>
+        </div>
       </div>
 
       {/* Stump Demo */}
@@ -1907,6 +1878,13 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             })}
           </tbody>
         </table>
+        <button
+          type="button"
+          onClick={() => set(isSub ? 'subTreeRows' : 'treeRows', [...(isSub ? state.subTreeRows : state.treeRows), { qty: '', height: 20, size: 'Small' }])}
+          className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+        >
+          + Add Row
+        </button>
       </div>
 
       {/* Manual */}

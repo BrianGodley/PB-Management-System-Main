@@ -35,6 +35,9 @@ export default function CrewTypeBar({
   // Additional crew selectors rendered after the primary one (Walls only):
   //   [{ label, value, onChange }] — each uses the same crewOptions.
   extraCrews = [],
+  // Optional element rendered centered in the bar (e.g. the demo modules'
+  // "Change Demo Module" switcher). No surrounding label.
+  centerSlot = null,
 }) {
   const { showRateIcons, toggleRateIcons, canAccessRates } = useRateIcons()
   const [showRates, setShowRates] = useState(false)
@@ -72,7 +75,9 @@ export default function CrewTypeBar({
         </span>
       ))}
 
-      <div className="flex items-center gap-3 ml-auto flex-shrink-0">
+      {centerSlot && <div className="mx-auto flex-shrink-0">{centerSlot}</div>}
+
+      <div className={`flex items-center gap-3 flex-shrink-0 ${centerSlot ? '' : 'ml-auto'}`}>
         {canAccessRates && showInlineToggle && (
           <button
             type="button"
