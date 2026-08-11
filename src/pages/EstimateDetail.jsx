@@ -1946,7 +1946,14 @@ export default function EstimateDetail() {
                 </button>
               </div>
             ) : (
-              projects.map(proj => {
+              [...projects]
+                .sort((a, b) =>
+                  (a.project_name || '').localeCompare(b.project_name || '', undefined, {
+                    numeric: true,
+                    sensitivity: 'base',
+                  })
+                )
+                .map(proj => {
                 const projFin = sumFinance(proj.estimate_modules)
                 const isSelected = selectedProject?.id === proj.id
                 return (
@@ -2485,11 +2492,12 @@ export default function EstimateDetail() {
                 )}
                 {/* A disabled fieldset natively disables every input, select,
                     textarea and button inside it — so read-only view can't be
-                    edited or saved. The header ✕ Close sits outside it. */}
-                <fieldset
-                  disabled={moduleReadOnly}
-                  className={`min-w-0 border-0 p-0 m-0 ${moduleReadOnly ? 'opacity-90' : ''}`}
-                >
+                    edited or saved. The header ✕ Close sits outside it.
+                    `display:contents` (Tailwind `contents`) removes the fieldset's
+                    own box so it doesn't break `position:sticky` on the module's
+                    GPMD/CrewType header (a Chromium fieldset+sticky bug) — the
+                    disabling still applies to every control inside. */}
+                <fieldset disabled={moduleReadOnly} className="contents">
                 <Suspense
                   fallback={
                     <div className="flex items-center justify-center py-12 text-sm text-gray-400">
