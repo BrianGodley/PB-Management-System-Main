@@ -293,9 +293,7 @@ export default function GroundTreatmentsSummary({ module }) {
   let planterPrepLine = null
   if (n(soilPrepSF) > 0) {
     const baseLab = mp(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
-    const handAdd =
-      prepTilling === 'Hand' ? mp(GT_RATES.soilPrepHandAdd.dbName, GT_RATES.soilPrepHandAdd.fallback) : 0
-    const hrs = n(soilPrepSF) * (baseLab + handAdd + tillLab(prepTilling))
+    const hrs = n(soilPrepSF) * (baseLab + tillLab(prepTilling))
     let mat = 0
     if (ih.prepType) {
       const CY = (n(soilPrepSF) * (n(ih.prepDepthIn) / 12)) / 27
@@ -316,11 +314,7 @@ export default function GroundTreatmentsSummary({ module }) {
   let sodPrepLine = null
   if (n(ih.sodPrepSF) > 0) {
     const baseLab = mp(GT_RATES.sodPrepLab.dbName, GT_RATES.sodPrepLab.fallback)
-    const handAdd =
-      sodPrepTilling === 'Hand'
-        ? mp(GT_RATES.soilPrepHandAdd.dbName, GT_RATES.soilPrepHandAdd.fallback)
-        : 0
-    const hrs = n(ih.sodPrepSF) * (baseLab + handAdd + tillLab(sodPrepTilling))
+    const hrs = n(ih.sodPrepSF) * (baseLab + tillLab(sodPrepTilling))
     let mat = 0
     if (ih.sodPrepType) {
       const CY = (n(ih.sodPrepSF) * (n(ih.sodPrepDepthIn) / 12)) / 27

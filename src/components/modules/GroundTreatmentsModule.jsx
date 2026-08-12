@@ -408,18 +408,15 @@ function calcGroundTreatments(
 
   // ── Planter Preparation (Soils-style row) ──────────────────────────────────
   // Material = CY × $/CY from the picked soil/amendment (sub-category 'Soils').
-  // Labor = area × (soilPrepLab base + Hand-add soilPrepHandAdd + tilling coeff).
+  // Labor = area × (soilPrepLab base + tilling coeff). Tilling (None/Hand/Tiller)
+  // is the single method control — no separate hand-add (would double-count).
   let soilLab = 0
   let soilMat = 0
   {
     const area = n(soilPrepSF)
     if (area > 0) {
       const baseLab = p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
-      const handAdd =
-        prepTilling === 'Hand' && !_prepIsSub
-          ? p(GT_RATES.soilPrepHandAdd.dbName, GT_RATES.soilPrepHandAdd.fallback)
-          : 0
-      soilLab = area * (baseLab + handAdd + _tillLab(prepTilling))
+      soilLab = area * (baseLab + _tillLab(prepTilling))
       if (prepType) {
         const CY = (area * (n(prepDepthIn) / 12)) / 27
         const st = rowOpt('Soils', { vendor: prepVendor, type: prepType }, [])
@@ -435,11 +432,7 @@ function calcGroundTreatments(
     const area = n(sodPrepSF)
     if (area > 0) {
       const baseLab = p(GT_RATES.sodPrepLab.dbName, GT_RATES.sodPrepLab.fallback)
-      const handAdd =
-        sodPrepTilling === 'Hand' && !_prepIsSub
-          ? p(GT_RATES.soilPrepHandAdd.dbName, GT_RATES.soilPrepHandAdd.fallback)
-          : 0
-      sodPrepLabHrs = area * (baseLab + handAdd + _tillLab(sodPrepTilling))
+      sodPrepLabHrs = area * (baseLab + _tillLab(sodPrepTilling))
       if (sodPrepType) {
         const CY = (area * (n(sodPrepDepthIn) / 12)) / 27
         const st = rowOpt('Soils', { vendor: sodPrepVendor, type: sodPrepType }, [])
