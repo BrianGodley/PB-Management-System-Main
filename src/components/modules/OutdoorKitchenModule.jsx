@@ -1686,9 +1686,6 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
           refreshAllRates={refreshAllRates}
           vendorsForCategory={vendorsForCategory}
         />
-        <p className="mt-1 text-[11px] text-gray-400 italic">
-          Includes trenching for a 6" wide × 24" deep trench per linear foot.
-        </p>
       </div>
 
       {/* ── Gas Fixtures ── */}

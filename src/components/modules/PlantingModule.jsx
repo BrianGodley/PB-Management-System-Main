@@ -1376,11 +1376,6 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
         <>
           <SectionHeader title="Till & Amend Soil" />
           <div>
-            <div className="flex items-center flex-wrap gap-2 text-xs text-gray-400 mb-1">
-              <span>{lr(laborRates, 'Till - Soil Move Rate')} CY/d</span>
-              <span>· {lr(laborRates, 'Till - Tilling Rate')} SF/d</span>
-              <span>· {lr(laborRates, 'Till - Amend Rate')} SF/d</span>
-            </div>
             <p className="text-xs text-gray-500 mb-0.5">Sqft</p>
             <NumInput value={tillSqft} onChange={setTillSqft} placeholder="0" />
             {n(tillSqft) > 0 && (

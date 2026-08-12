@@ -13,7 +13,7 @@ import ModuleHeaderSlot from './ModuleHeaderSlot'
 //   • No Skid Steer Compaction row
 //   • Adds "Hand Bucket Areas" section (tight access; rate 0.38 t/hr)
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState, useEffect, useCallback, useContext } from 'react'
+import { useState, useEffect, useCallback, useContext, useRef } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import { fetchStandardRateMap } from '../../lib/materialCatalog'
@@ -698,6 +698,21 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
   // and hand them up to the parent (EstimateDetail) so it can swap
   // selectedType while keeping the user's entered values.
   const [showDemoSwitcher, setShowDemoSwitcher] = useState(false)
+  // The switcher menu is rendered with position:fixed (anchored to the button)
+  // so it escapes the CrewTypeBar's overflow-x-auto container, which would
+  // otherwise clip it. demoMenuPos holds the computed viewport coordinates.
+  const demoSwitchBtnRef = useRef(null)
+  const [demoMenuPos, setDemoMenuPos] = useState(null)
+  const toggleDemoSwitcher = useCallback(() => {
+    setShowDemoSwitcher(v => {
+      const next = !v
+      if (next) {
+        const r = demoSwitchBtnRef.current?.getBoundingClientRect()
+        if (r) setDemoMenuPos({ top: r.bottom + 4, left: r.left + r.width / 2 })
+      }
+      return next
+    })
+  }, [])
 
   useEffect(() => {
     let alive = true
@@ -1041,15 +1056,22 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
               onSwitchType && (
                 <div className="relative">
                   <button
+                    ref={demoSwitchBtnRef}
                     type="button"
-                    onClick={() => setShowDemoSwitcher(v => !v)}
+                    onClick={toggleDemoSwitcher}
                     className="text-xs font-semibold px-3 py-1.5 rounded-md border border-green-300 bg-green-50 text-green-800 hover:bg-green-100 hover:border-green-500 transition-colors whitespace-nowrap"
                     title="Switch to a different Demo module — keep your entries"
                   >
                     🔁 Change Demo Module
                   </button>
-                  {showDemoSwitcher && (
-                    <div className="absolute z-30 top-full left-1/2 -translate-x-1/2 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg p-1">
+                  {showDemoSwitcher && demoMenuPos && (
+                    <>
+                    {/* Invisible full-screen backdrop closes the menu on outside click */}
+                    <div className="fixed inset-0 z-[90]" onClick={() => setShowDemoSwitcher(false)} />
+                    <div
+                      className="fixed z-[100] w-56 bg-white border border-gray-200 rounded-lg shadow-lg p-1"
+                      style={{ top: demoMenuPos.top, left: demoMenuPos.left, transform: 'translateX(-50%)' }}
+                    >
                       <p className="text-[10px] uppercase tracking-wide font-bold text-gray-400 px-2 pt-1 pb-0.5">
                         Switch to
                       </p>
@@ -1098,6 +1120,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                         Cancel
                       </button>
                     </div>
+                    </>
                   )}
                 </div>
               )
@@ -1120,7 +1143,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       {!isSub && (
       <>
       <SecHdr title="Job Site Conditions" />
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className={isSub ? 'hidden' : undefined}>
           <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
           <Inp
@@ -1154,10 +1177,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
           <Inp value={state.hoursAdj} onChange={e => set('hoursAdj', e.target.value)} step="0.5" />
         </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Demo Type</p>
-          <p className="text-sm font-medium text-gray-700 py-1">{isSelf ? 'In House' : 'Subcontractor'}</p>
-        </div>
       </div>
       </>
       )}
@@ -1165,16 +1184,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           <span>{subSectionTitle('MAIN DEMO', isSub)}</span>
-          {isSelf && (
-            <>
-              <span className="font-normal normal-case">Container ${calc.containerPrice}</span>              <span className="font-normal normal-case">/ {calc.containerCy} cy</span>              <span className="font-normal normal-case">· ×{calc.swellFactor} swell</span>            </>
-          )}
-          {isSub && (
-            <>
-              <span className="text-gray-400 font-normal">·</span>
-              <span className="font-normal normal-case">Concrete / Dirt / Rock / Paver — ${calc.handSubRate}/sf</span>
-            </>
-          )}
         </div>
         <table className="w-full text-xs">
           <TH
@@ -1377,12 +1386,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       <div className={isSub ? 'hidden' : undefined}>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           <span>{subSectionTitle('VERTICAL DEMO', isSub)}</span>
-          {isSelf && (
-            <>
-              <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborMiscVert} hr/100 SF per in deep equiv</span>
-              <span className="font-normal normal-case text-gray-500">· container disposal</span>
-            </>
-          )}
         </div>
         <table className="w-full text-xs">
           <TH
@@ -1448,12 +1451,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       <div className={isSub ? 'hidden' : undefined}>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           <span>{subSectionTitle('Footing Demo', isSub)}</span>
-          {isSelf && (
-            <>
-              <span className="font-normal normal-case text-gray-500">· LF × Height × Width · cu-ft labor {calc.laborFooting} hr/100 SF per in deep equiv</span>
-              <span className="font-normal normal-case text-gray-500">· container disposal</span>
-            </>
-          )}
         </div>
         <table className="w-full text-xs">
           <TH
@@ -1519,12 +1516,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       <div className={isSub ? 'hidden' : undefined}>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           <span>{subSectionTitle('Hand Bucket Areas', isSub)}</span>
-          {isSelf && (
-            <>
-              <span className="font-normal normal-case text-gray-500">· tight/confined access · 2 × concrete rate = {calc.laborBucket} hr/100 SF per in deep</span>
-              <span className="font-normal normal-case text-gray-500">· container disposal</span>
-            </>
-          )}
         </div>
         <table className="w-full text-xs">
           <TH
@@ -1848,29 +1839,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           <span>{subSectionTitle('Tree Demo', isSub)}</span>
-          {isSelf && (
-            <>
-          <span className="font-normal normal-case text-gray-500">· qty × height × size multiplier</span>
-          <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
-            (S:{calc.treeSmall}
-            · M:{calc.treeMed}
-            · L:{calc.treeLarge}
-            hrs/ft)
-          </span>
-            </>
-          )}
-          {isSub && (
-            <span className="font-normal normal-case text-gray-500 inline-flex items-center gap-1">
-              · per tree: 6-12" ${calc.stSmall}
-              · 12-18" ${calc.stMed}
-              · 18-24" ${calc.stLarge}
-            </span>
-          )}
-          {isSelf && (
-            <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
-              · Tree dump
-            </span>
-          )}
         </div>
         <table className="w-full text-xs">
           <TH

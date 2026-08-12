@@ -1708,11 +1708,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       {/* ─── 1. Structure Dimensions ─── */}
       <div>
         <SectionHeader title="Structure Dimensions" />
-        <p className="text-xs text-gray-400 italic mb-2">
-          Dimensions are project measurements — no rate to adjust here. The rates that consume these
-          dimensions (excavation, shotcrete, tile, coping, etc.) have their own calculator icons in
-          the sections below.
-        </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <StructDims
             label="Pool"
@@ -1805,10 +1800,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       {/* ─── 3. Shotcrete ─── */}
       <div>
         <SectionHeader title="Shotcrete (Sub)" />
-        <p className="text-xs text-gray-400 italic mb-2">
-          Auto sub total is calculated from the three sub rates below — edit those rates via the
-          calculator icons in the formula note.
-        </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <div>
             <Label text="Auto Sub Total" />
@@ -2466,10 +2457,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       {subType !== 'Subcontractor' && (
         <div>
           <SectionHeader title="In-House Plumbing" />
-          <p className="text-xs text-gray-400 italic mb-2">
-            Pool plumbing done in-house — labor hours + materials $. Blank fields use the DB
-            master rate; type a value to override (a typed 0 removes it).
-          </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label text="Labor Hours" sub="hrs" />

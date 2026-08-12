@@ -2165,33 +2165,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       {/* ── Mulch ── */}
       <div>
         <SectionHeader title="Mulch" />
-        <p className="text-xs text-gray-400 mb-2 inline-flex items-center flex-wrap gap-x-2">
-          <span className="inline-flex items-center gap-1">
-            {(() => {
-              const mt = resolveType(
-                mulchRows[0]?.type,
-                sectionOptions('Mulch', mulchRows[0]?.vendor, []), [])
-              return (
-                <>
-                  Type ${mt.fallback.toFixed(2)}/CY
-                </>
-              )
-            })()}
-          </span>
-          ·
-          <span className="inline-flex items-center gap-1">
-            ${p(GT_RATES.mulchDelivery.dbName, 75).toFixed(2)} delivery
-          </span>
-          ·
-          <span className="inline-flex items-center gap-1">
-            {p(GT_RATES.mulchLab.dbName, 15)} CY/day labor
-          </span>
-          ·
-          <span className="inline-flex items-center gap-1">
-            Weed fabric ${p(GT_RATES.gravelFabricMat.dbName, 0.1).toFixed(2)}/SF
-            · {p(GT_RATES.gravelFabricLab.dbName, 0.024)} hrs/SF
-          </span>
-        </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -2315,37 +2288,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       {/* ── Decomposed Granite ── */}
       <div>
         <SectionHeader title="Decomposed Granite (D.G.)" />
-        <p className="text-xs text-gray-400 mb-2 inline-flex items-center flex-wrap gap-x-2">
-          <span className="inline-flex items-center gap-1">
-            {(() => {
-              const dt = resolveType(
-                dgRows[0]?.type,
-                sectionOptions('DG', dgRows[0]?.vendor, []), [])
-              return (
-                <>
-                  Type ${dt.fallback.toFixed(2)}/ton
-                </>
-              )
-            })()}
-          </span>
-          ·
-          <span className="inline-flex items-center gap-1">
-            Cement add ${p(GT_RATES.dgCementPerTon.dbName, 20).toFixed(2)}/ton
-          </span>
-          ·
-          <span className="inline-flex items-center gap-1">
-            Hand {p(GT_RATES.dgHandLab.dbName, 0.5)} CY/hr labor
-          </span>
-          ·
-          <span className="inline-flex items-center gap-1">
-            Machine {p(GT_RATES.dgMachineLab.dbName, 12)} CY/day labor
-          </span>
-          ·
-          <span className="inline-flex items-center gap-1">
-            Weed fabric ${p(GT_RATES.gravelFabricMat.dbName, 0.1).toFixed(2)}/SF
-            · {p(GT_RATES.gravelFabricLab.dbName, 0.024)} hrs/SF
-          </span>
-        </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -2498,20 +2440,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       {/* ── Gravel ── */}
       <div>
         <SectionHeader title="Gravel" />
-        <p className="text-xs text-gray-400 mb-2 inline-flex items-center flex-wrap gap-x-2">
-          <span className="inline-flex items-center gap-1">
-            Fabric ${p(GT_RATES.gravelFabricMat.dbName, 0.1).toFixed(2)}/SF mat
-            · {p(GT_RATES.gravelFabricLab.dbName, 0.024)} hrs/SF labor
-          </span>
-          ·
-          <span className="inline-flex items-center gap-1">
-            Machine excav {p(GT_RATES.gravelMachineLab.dbName, 12)} CY/day
-          </span>
-          ·
-          <span className="inline-flex items-center gap-1">
-            Hand excav {p(GT_RATES.gravelHandLab.dbName, 4)} CY/day
-          </span>
-        </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -2660,20 +2588,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       {/* ── Pebble ── */}
       <div>
         <SectionHeader title="Pebble" />
-        <p className="text-xs text-gray-400 mb-2 inline-flex items-center flex-wrap gap-x-2">
-          <span className="inline-flex items-center gap-1">
-            Fabric ${p(GT_RATES.gravelFabricMat.dbName, 0.1).toFixed(2)}/SF mat
-            · {p(GT_RATES.gravelFabricLab.dbName, 0.024)} hrs/SF labor
-          </span>
-          ·
-          <span className="inline-flex items-center gap-1">
-            Machine excav {p(GT_RATES.gravelMachineLab.dbName, 12)} CY/day
-          </span>
-          ·
-          <span className="inline-flex items-center gap-1">
-            Hand excav {p(GT_RATES.gravelHandLab.dbName, 4)} CY/day
-          </span>
-        </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -2810,20 +2724,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       {/* ── Cobbles & Boulders ── */}
       <div>
         <SectionHeader title="Cobbles & Boulders" />
-        <p className="text-xs text-gray-400 mb-2 inline-flex items-center flex-wrap gap-x-2">
-          <span className="inline-flex items-center gap-1">
-            Fabric ${p(GT_RATES.gravelFabricMat.dbName, 0.1).toFixed(2)}/SF mat
-            · {p(GT_RATES.gravelFabricLab.dbName, 0.024)} hrs/SF labor
-          </span>
-          ·
-          <span className="inline-flex items-center gap-1">
-            Machine excav {p(GT_RATES.gravelMachineLab.dbName, 12)} CY/day
-          </span>
-          ·
-          <span className="inline-flex items-center gap-1">
-            Hand excav {p(GT_RATES.gravelHandLab.dbName, 4)} CY/day
-          </span>
-        </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -3026,11 +2926,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       {/* ── Steppers ── */}
       <div>
         <SectionHeader title="Steppers" />
-        <p className="text-xs text-gray-400 mb-2">
-          Each stone splits into a Soil Set and a Concrete Set line. "Concrete Set" differs only by a
-          (slower) editable labor rate — no automatic concrete/mortar material is added (TBD).
-          tons = SF / 80; material = tons × per-ton rate (shared per stone).
-        </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

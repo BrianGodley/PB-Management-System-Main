@@ -215,12 +215,11 @@ const makeTab = (src = {}) => ({
 })
 
 // ── Sub-components ────────────────────────────────────────────────────────────
-function SectionHeader({ title, sub }) {
+function SectionHeader({ title }) {
   const isSub = useContext(SubTabContext)
   return (
     <div className="bg-gray-100 rounded-lg px-4 py-2.5 border border-gray-200 mb-2">
       <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wider">{subSectionTitle(title, isSub)}</h3>
-      {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
     </div>
   )
 }
@@ -498,7 +497,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
 
   // ── Section table renderer ───────────────────────────────────────────────────
   function renderSection(sec) {
-    const { title, subcat, rows, setRows, isFixture, subText } = sec
+    const { title, subcat, rows, setRows, isFixture } = sec
     const vOpts = vendorSelectOptions()
     const itemPlaceholder =
       subcat === LIGHT_CAT.fixture
@@ -508,7 +507,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
           : 'Select wire'
     return (
       <div>
-        <SectionHeader title={title} sub={subText} />
+        <SectionHeader title={title} />
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -826,7 +825,6 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
         rows: fixtureRows,
         setRows: setFixtureRows,
         isFixture: true,
-        subText: 'Total Watts / VA updates automatically',
       })}
 
       {/* ── Transformers ── */}
@@ -835,7 +833,6 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
         subcat: LIGHT_CAT.transformer,
         rows: transformerRows,
         setRows: setTransformerRows,
-        subText: 'Size transformer(s) based on Total VA above',
       })}
 
       {/* ── Wire & Other ── */}

@@ -1045,9 +1045,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         <>
         <div>
           <SectionHeader title="Drainage — Subcontractor" />
-          <p className="text-xs text-gray-500 mb-2">
-            Trenching and drain pipe as one fixed price per linear foot of trench run.
-          </p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
