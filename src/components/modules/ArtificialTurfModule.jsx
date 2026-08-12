@@ -104,9 +104,10 @@ const BASE_MATERIALS = [
 // and the turf-brand picker above). Standard/unset → the null-vendor 'Turf Base'
 // catalog Items; a real vendor → only that vendor's Items. Each catalog Item is
 // mapped back to its built-in (by catalog name / label) so labor + qty math and
-// the built-in matKey/fallback stay intact. When there are NO catalog Items for
-// the selection, Standard falls back to the built-in BASE_MATERIALS list so the
-// picker never empties; a real vendor with nothing under 'Turf Base' shows nothing.
+// the built-in matKey/fallback stay intact. Options come ONLY from the catalog —
+// when there are NO catalog Items for the selected vendor+sub-category the list is
+// empty (the picker shows just its "Select …" placeholder). BASE_MATERIALS is still
+// consulted for labor/qty coefficients on catalog rows, never for options.
 function baseMatOptions(materialRows, vendorSel = 'Standard') {
   // Unset vendor (empty "Select vendor" placeholder) → no items; the estimator
   // picks a vendor first, then the base list populates (vendor-first).
@@ -117,7 +118,7 @@ function baseMatOptions(materialRows, vendorSel = 'Standard') {
     stripPrefix: true,
     category: 'Artificial Turf',
   })
-  if (!catRows.length) return isStd ? BASE_MATERIALS.map(m => ({ ...m, value: m.key })) : []
+  if (!catRows.length) return []
   return catRows.map(o => {
     const bi = BASE_MATERIALS.find(m => m.dbName === o.row.name || m.label === o.label)
     return {

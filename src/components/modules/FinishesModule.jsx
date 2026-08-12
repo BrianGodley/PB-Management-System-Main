@@ -205,9 +205,15 @@ const _isStd = v => !v || v === 'Standard'
 // Type so the option VALUE round-trips row.type and labor/geometry keep working).
 // `alwaysBuiltIn` types (None / PIP Concrete) stay selectable regardless of vendor.
 function finishTypeOptions(materialRows, subcat, builtInTypes, itemByType, vendorSel, alwaysBuiltIn = []) {
-  if (_isStd(vendorSel)) return builtInTypes.map(t => ({ value: t, label: t }))
+  // Catalog-only, vendor-first: Standard/unset → the null-vendor (Standard) catalog
+  // Items; a real vendor → that vendor's Items. Each carried Item is intersected
+  // with this picker's built-in set (via itemByType) so the option VALUE round-trips
+  // row.type and labor/geometry keep working. The built-in Type list is NOT a
+  // wholesale option source anymore; only `alwaysBuiltIn` sentinels (None / PIP
+  // Concrete) — non-material choices, not catalog items — stay regardless of catalog.
+  const isStd = _isStd(vendorSel) || vendorSel === 'auto'
   const carried = new Set(
-    catalogOptions(materialRows, subcat, vendorSel, {
+    catalogOptions(materialRows, subcat, isStd ? 'Standard' : vendorSel, {
       standardRows: 'null-vendor',
       stripPrefix: true,
       category: FINISHES_CATEGORY,

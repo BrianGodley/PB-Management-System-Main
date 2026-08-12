@@ -145,15 +145,12 @@ function columnFinishOptions(materialRows, vendorSel = 'Standard') {
     stripPrefix: true,
     category: COLUMNS_CATEGORY,
   })
-  if (!catRows.length)
-    return isStd
-      ? Object.keys(FINISH_TYPES).map(key => ({
-          value: key, // built-in key round-trips stored rows
-          label: key,
-          typeKey: key, // drives labor + ton/SF branch
-          dbName: FINISH_TYPES[key].dbName, // material-price target (matched by name)
-        }))
-      : []
+  // Catalog-only: options come solely from the catalog (single source of truth).
+  // No built-in FINISH_TYPES fallback — an unseeded 'Column Finish' sub-category
+  // yields an empty list (picker shows its "Select …" placeholder = $0). Below,
+  // FINISH_TYPES is still consulted per catalog item to recover its typeKey
+  // (labor + ton/SF branch) — that is a labor lookup, not an option source.
+  if (!catRows.length) return []
   return catRows.map(o => {
     const typeKey = Object.keys(FINISH_TYPES).find(
       k => FINISH_TYPES[k].dbName === o.row.name || k === o.label

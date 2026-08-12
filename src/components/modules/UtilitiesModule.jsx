@@ -281,9 +281,10 @@ const UTIL_CAT = {
 // Items that the ROW'S SELECTED VENDOR carries in Category 'Utilities' + this
 // Sub-category. Standard → the null-vendor (Standard-priced) Items; a real vendor
 // → only that vendor's Items. So moving an Item from Standard to a vendor makes it
-// appear under that vendor and leave the Standard list. When Standard has no
-// catalog Items yet, fall back to the built-in list; a real vendor with no Items
-// simply shows nothing (they don't carry these).
+// appear under that vendor and leave the Standard list. Options come ONLY from the
+// catalog — when the selected vendor+sub-category has no catalog Items the list is
+// empty (the picker shows just its "Select …" placeholder). The built-in array is
+// still consulted for LABOR coefficients on catalog rows, never for options.
 function mergedUtilTypes(cat, builtInArr, materialRows, vendorSel = 'Standard') {
   const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
   const catRows = catalogOptions(materialRows, cat, isStd ? 'Standard' : vendorSel, {
@@ -291,7 +292,7 @@ function mergedUtilTypes(cat, builtInArr, materialRows, vendorSel = 'Standard') 
     stripPrefix: true,
     category: 'Utilities',
   })
-  if (!catRows.length) return isStd ? builtInArr : []
+  if (!catRows.length) return []
   return catRows.map(o => {
     const bi = builtInArr.find(b => b.dbName === o.row.name || b.label === o.label)
     return {

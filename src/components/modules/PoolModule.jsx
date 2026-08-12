@@ -226,20 +226,11 @@ const UTIL_CAT = { line: 'Utility Lines', gas: 'Gas Fixtures', elec: 'Electrical
 // a real vendor → ONLY that vendor's Items (built-ins fall away).
 function mergedUtilTypes(cat, builtInArr, materialRows, vendorSel = 'Standard') {
   const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
-  if (isStd) {
-    const extra = catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true })
-      .filter(o => !builtInArr.some(b => b.label === o.label))
-      .map(o => ({
-        label: o.label,
-        dbName: o.row.name,
-        fallback: n(o.row.unit_cost),
-        laborDbName: `${o.label} - Labor Rate`,
-        laborFallback: 0,
-        fromMaster: true,
-      }))
-    return extra.length ? [...builtInArr, ...extra] : builtInArr
-  }
-  const catRows = catalogOptions(materialRows, cat, vendorSel, { standardRows: 'null-vendor', stripPrefix: true })
+  // Catalog-only: options come solely from the catalog (single source of truth).
+  // Standard/unset → the null-vendor (Standard) catalog items; a real vendor →
+  // only that vendor's items. The built-in array is consulted ONLY for the labor
+  // db-name / labor fallback of a matching item, never to inject option rows.
+  const catRows = catalogOptions(materialRows, cat, isStd ? 'Standard' : vendorSel, { standardRows: 'null-vendor', stripPrefix: true })
   if (!catRows.length) return []
   return catRows.map(o => {
     const bi = builtInArr.find(b => b.dbName === o.row.name || b.label === o.label)

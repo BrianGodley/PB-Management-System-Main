@@ -161,10 +161,11 @@ function masterWallOptions(cat, builtInList, materialRows, category = null, vend
     return catalogOptions(materialRows, cat, vendorSel, { standardRows: 'null-vendor', stripPrefix: true, category })
       .map(o => o.label)
   }
-  const extra = catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true, category })
+  // Catalog-only: Standard/unset → the null-vendor (Standard) catalog items.
+  // Built-in list no longer injected as options (single source of truth); an
+  // unseeded sub-category yields an empty list (picker shows its placeholder).
+  return catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true, category })
     .map(o => o.label)
-    .filter(l => !builtInList.includes(l))
-  return extra.length ? [...builtInList, ...extra] : builtInList
 }
 
 // ── Electrical & Plumbing catalog — GAS ONLY (ported from Utilities module) ────
@@ -196,32 +197,22 @@ const UTIL_CAT = { line: 'Utility Lines', gas: 'Gas Fixtures' }
 // fallback); a real vendor → ONLY that vendor's catalog items.
 function mergedUtilTypes(cat, builtInArr, materialRows, vendorSel = 'Standard') {
   const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
-  if (!isStd) {
-    // Real vendor → only that vendor's catalog items (no built-in fallback).
-    return catalogOptions(materialRows, cat, vendorSel, { standardRows: 'null-vendor', stripPrefix: true })
-      .map(o => {
-        const bi = builtInArr.find(b => b.label === o.label)
-        return {
-          label: o.label,
-          dbName: o.row.name,
-          fallback: n(o.row.unit_cost),
-          laborDbName: bi?.laborDbName ?? `${o.label} - Labor Rate`,
-          laborFallback: bi?.laborFallback ?? 0,
-          fromMaster: !bi,
-        }
-      })
-  }
-  const extra = catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true })
-    .filter(o => !builtInArr.some(b => b.label === o.label))
-    .map(o => ({
-      label: o.label,
-      dbName: o.row.name,
-      fallback: n(o.row.unit_cost),
-      laborDbName: `${o.label} - Labor Rate`,
-      laborFallback: 0,
-      fromMaster: true,
-    }))
-  return extra.length ? [...builtInArr, ...extra] : builtInArr
+  // Catalog-only: options come solely from the catalog (single source of truth).
+  // Standard/unset → the null-vendor (Standard) catalog items; a real vendor →
+  // only that vendor's items. The built-in array is consulted ONLY for the labor
+  // db-name / labor fallback of a matching item, never to inject option rows.
+  return catalogOptions(materialRows, cat, isStd ? 'Standard' : vendorSel, { standardRows: 'null-vendor', stripPrefix: true })
+    .map(o => {
+      const bi = builtInArr.find(b => b.label === o.label)
+      return {
+        label: o.label,
+        dbName: o.row.name,
+        fallback: n(o.row.unit_cost),
+        laborDbName: bi?.laborDbName ?? `${o.label} - Labor Rate`,
+        laborFallback: bi?.laborFallback ?? 0,
+        fromMaster: !bi,
+      }
+    })
 }
 function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
   const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : 'Standard'

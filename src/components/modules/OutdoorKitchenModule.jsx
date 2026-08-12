@@ -118,13 +118,10 @@ function applianceTypeOptions(materialRows, vendorSel = 'Standard') {
     stripPrefix: true,
     category: OK_APPLIANCE_CATEGORY,
   })
-  const catOpts = catRows.map(o => ({ value: o.label, label: o.label, name: o.row.name, fromMaster: true }))
-  if (!isStd) return catOpts
-  // Catalog is the source of truth: when Appliance Items exist, show ONLY them.
-  // The hardcoded APPLIANCE_TYPES list is a fallback used solely when the catalog
-  // has no appliances yet (older tenants / before seeding).
-  if (catOpts.length) return catOpts
-  return APPLIANCE_TYPES.map(t => ({ value: t, label: t, fromMaster: false }))
+  // Catalog-only: the catalog is the sole source of options. No built-in
+  // APPLIANCE_TYPES fallback — an unseeded 'Appliance' sub-category yields an
+  // empty list (each new row starts on its "Select …" placeholder = $0).
+  return catRows.map(o => ({ value: o.label, label: o.label, name: o.row.name, fromMaster: true }))
 }
 // Vendor-aware unit material price for an Appliance row. A per-row $/ea override
 // wins; otherwise a selected catalog Appliance Item resolves its vendor-aware
@@ -242,13 +239,10 @@ function masterWallMeta(cat, typeLabel, materialRows, category = null) {
 // 'Outdoor Kitchen') is preserved and combined with the vendor filter.
 function masterWallOptions(cat, builtInList, materialRows, category = null, vendorSel = 'Standard') {
   const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
-  if (isStd) {
-    const extra = catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true, category })
-      .map(o => o.label)
-      .filter(l => !builtInList.includes(l))
-    return extra.length ? [...builtInList, ...extra] : builtInList
-  }
-  return catalogOptions(materialRows, cat, vendorSel, { standardRows: 'null-vendor', stripPrefix: true, category })
+  // Catalog-only: Standard/unset → the null-vendor (Standard) catalog items; a
+  // real vendor → only that vendor's items. Built-in list no longer injected as
+  // options (single source of truth); an unseeded sub-category yields empty.
+  return catalogOptions(materialRows, cat, isStd ? 'Standard' : vendorSel, { standardRows: 'null-vendor', stripPrefix: true, category })
     .map(o => o.label)
 }
 
@@ -294,20 +288,11 @@ const OK_TRENCH_FALLBACK_MIN_PER_CF = 10
 // a real vendor → ONLY that vendor's Items (built-ins fall away).
 function mergedUtilTypes(cat, builtInArr, materialRows, vendorSel = 'Standard') {
   const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
-  if (isStd) {
-    const extra = catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true })
-      .filter(o => !builtInArr.some(b => b.label === o.label))
-      .map(o => ({
-        label: o.label,
-        dbName: o.row.name,
-        fallback: n(o.row.unit_cost),
-        laborDbName: `${o.label} - Labor Rate`,
-        laborFallback: 0,
-        fromMaster: true,
-      }))
-    return extra.length ? [...builtInArr, ...extra] : builtInArr
-  }
-  const catRows = catalogOptions(materialRows, cat, vendorSel, { standardRows: 'null-vendor', stripPrefix: true })
+  // Catalog-only: options come solely from the catalog (single source of truth).
+  // Standard/unset → the null-vendor (Standard) catalog items; a real vendor →
+  // only that vendor's items. The built-in array is consulted ONLY for the labor
+  // db-name / labor fallback of a matching item, never to inject option rows.
+  const catRows = catalogOptions(materialRows, cat, isStd ? 'Standard' : vendorSel, { standardRows: 'null-vendor', stripPrefix: true })
   if (!catRows.length) return []
   return catRows.map(o => {
     const bi = builtInArr.find(b => b.dbName === o.row.name || b.label === o.label)

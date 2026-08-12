@@ -2080,16 +2080,10 @@ function WallWaterproofing({
     row.type && row.type !== 'None'
       ? catalogItemPrice(materialRows, WALL_WP_SUBCAT, row.type, row.vendor, wpKey ? WALL_RATES[wpKey].fb : 0)
       : 0
-  // Built-in waterproofing types the calc supports + any real Waterproofing
-  // catalog products for the vendor; stale/phantom values are dropped.
-  const wpBase = WP_TYPES.filter(t => t !== 'None')
-  const wpCatalog = wallCatalogTypes(materialRows, WALL_WP_SUBCAT, row.vendor)
-  // Standard/Standard → built-in types (+ Standard catalog). A specific vendor →
-  // ONLY that vendor's catalog products.
-  const wpIsHouse = !row.vendor || row.vendor === 'Standard'
-  const wpShown = wpIsHouse
-    ? [...wpBase, ...wpCatalog.filter(t => !wpBase.includes(t))]
-    : wpCatalog
+  // Options come ONLY from the catalog (single source of truth): the selected
+  // vendor's Waterproofing products, or the Standard catalog for Standard. No
+  // built-in WP_TYPES seed. ("None" is added separately below.)
+  const wpShown = wallCatalogTypes(materialRows, WALL_WP_SUBCAT, row.vendor)
   return (
     <div className="mt-3 border-t border-gray-100 pt-2">
       <label className="block text-xs text-gray-800 mb-1 font-medium">Waterproofing</label>
@@ -2110,7 +2104,15 @@ function WallWaterproofing({
             onWpUpdate(0, 'type', v)
             pp.check(materialRows, WALL_WP_SUBCAT, v, row.vendor)
           }}
-          options={[{ value: 'None', label: 'None' }, ...wpShown.map(t => ({ value: t, label: t }))]}
+          options={[
+            { value: 'None', label: 'None' },
+            ...wpShown.map(t => ({ value: t, label: t })),
+            // Backward-compat: keep a previously-saved value selectable even if the
+            // catalog no longer lists it for this vendor.
+            ...(row.type && row.type !== 'None' && !wpShown.includes(row.type)
+              ? [{ value: row.type, label: row.type }]
+              : []),
+          ]}
         />
         {/* SF is a PERMANENT field on the row — always shown, regardless of the
             selected type (a "None" row simply doesn't bill it). */}
@@ -2171,16 +2173,12 @@ function WallFinishesEditor({
       <label className="block text-xs text-gray-800 mb-1 font-medium">Finishes</label>
       <div className="space-y-1.5">
         {rows.map((row, i) => {
-          // Item list = the built-in finish types the calc supports, plus any
-          // real Wall Finish catalog products for the selected vendor. Stale
-          // saved values that are neither are dropped (not surfaced as phantoms).
-          const catalog = wallCatalogTypes(materialRows, WALL_FINISH_SUBCAT, row.vendor)
-          // Standard/Standard → built-in finishes (+ Standard catalog). A specific
-          // vendor → ONLY that vendor's catalog products.
-          const finIsHouse = !row.vendor || row.vendor === 'Standard'
-          const shown = finIsHouse
-            ? [...WALL_FINISH_TYPES, ...catalog.filter(t => !WALL_FINISH_TYPES.includes(t))]
-            : catalog
+          // Item list comes ONLY from the catalog (single source of truth): the
+          // selected vendor's Wall Finish products, or the Standard catalog for
+          // Standard. No built-in WALL_FINISH_TYPES seed. Stale saved values not
+          // in the catalog are dropped (except the currently-saved one, kept below
+          // for backward-compat).
+          const shown = wallCatalogTypes(materialRows, WALL_FINISH_SUBCAT, row.vendor)
           return (
             <div key={i} className="flex items-center gap-1.5">
               <DropdownSelect
@@ -2200,7 +2198,13 @@ function WallFinishesEditor({
                   onPatch(i, { type: v }, true)
                   pp.check(materialRows, WALL_FINISH_SUBCAT, v, row.vendor)
                 }}
-                options={[{ value: 'None', label: 'None' }, ...shown.map(t => ({ value: t, label: t }))]}
+                options={[
+                  { value: 'None', label: 'None' },
+                  ...shown.map(t => ({ value: t, label: t })),
+                  ...(row.type && row.type !== 'None' && !shown.includes(row.type)
+                    ? [{ value: row.type, label: row.type }]
+                    : []),
+                ]}
               />
               <NumInput
                 value={row.sf}
@@ -2244,16 +2248,12 @@ function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, ma
       <label className="block text-xs text-gray-800 mb-1 font-medium">Caps</label>
       <div className="space-y-1.5">
         {rows.map((row, i) => {
-          // Built-in cap types the calc supports + any real Wall Cap catalog
-          // products for the vendor; stale/phantom values are dropped.
-          const capBase = CAP_TYPES.filter(t => t !== 'None')
-          const catalog = wallCatalogTypes(materialRows, WALL_CAP_SUBCAT, row.vendor)
-          // Standard/Standard → built-in types (+ any Standard catalog). A specific
-          // vendor → ONLY that vendor's catalog products (don't append built-ins).
-          const capIsHouse = !row.vendor || row.vendor === 'Standard'
-          const shown = capIsHouse
-            ? [...capBase, ...catalog.filter(t => !capBase.includes(t))]
-            : catalog
+          // Item list comes ONLY from the catalog (single source of truth): the
+          // selected vendor's Wall Cap products, or the Standard catalog for
+          // Standard. No built-in CAP_TYPES seed. Stale saved values not in the
+          // catalog are dropped (except the currently-saved one, kept below for
+          // backward-compat).
+          const shown = wallCatalogTypes(materialRows, WALL_CAP_SUBCAT, row.vendor)
           const qtyLabel = row.type === 'Precast' ? 'Qty' : 'LF'
           return (
             <div key={i} className="flex items-center gap-1.5">
@@ -2274,7 +2274,13 @@ function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, ma
                   onPatch(i, { type: v }, true)
                   pp.check(materialRows, WALL_CAP_SUBCAT, v, row.vendor)
                 }}
-                options={[{ value: 'None', label: 'None' }, ...shown.map(t => ({ value: t, label: t }))]}
+                options={[
+                  { value: 'None', label: 'None' },
+                  ...shown.map(t => ({ value: t, label: t })),
+                  ...(row.type && row.type !== 'None' && !shown.includes(row.type)
+                    ? [{ value: row.type, label: row.type }]
+                    : []),
+                ]}
               />
               <NumInput
                 value={row.widthIn}
@@ -3005,10 +3011,16 @@ function ModularWallEntry({
                   className="input text-sm py-1.5 w-full"
                   value={wall.blockType || ''}
                   onChange={v => set('blockType')(v)}
-                  options={CMU_BLOCK_TYPES.map(bt => ({
-                    value: bt.name,
-                    label: `${bt.name} — ${bt.w}×${bt.h}×${bt.l}`,
-                  }))}
+                  placeholder="Select…"
+                  options={(materialRows || [])
+                    .filter(
+                      r =>
+                        r.sub_category === (typeSource?.subcat || WALL_BLOCK_SUBCAT) &&
+                        (!wall.vendor || wall.vendor === 'Standard'
+                          ? r.vendor_id == null
+                          : r.vendor_id === wall.vendor)
+                    )
+                    .map(r => ({ value: r.id, label: r.name }))}
                 />
               )}
         </div>
@@ -3192,12 +3204,17 @@ function TimberWallEntry({
             value={wall.timberType || 'Railroad Treated'}
             onChange={v => set('timberType')(v)}
             options={(() => {
-              const catalog = wallCatalogTypes(materialRows, WOOD_SUBCAT, wall.vendor)
-              const isStandard = !wall.vendor || wall.vendor === 'Standard'
-              const shown = isStandard
-                ? [...TIMBER_TYPES, ...catalog.filter(t => !TIMBER_TYPES.includes(t))]
-                : catalog
-              return shown.map(t => ({ value: t, label: t }))
+              // Options come ONLY from the catalog (single source of truth): the
+              // selected vendor's Wood products, or the Standard catalog. No
+              // built-in TIMBER_TYPES seed. The currently-saved value is kept for
+              // backward-compat even if the catalog no longer lists it.
+              const shown = wallCatalogTypes(materialRows, WOOD_SUBCAT, wall.vendor)
+              return [
+                ...shown.map(t => ({ value: t, label: t })),
+                ...(wall.timberType && !shown.includes(wall.timberType)
+                  ? [{ value: wall.timberType, label: wall.timberType }]
+                  : []),
+              ]
             })()}
           />
         </div>

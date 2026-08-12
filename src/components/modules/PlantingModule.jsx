@@ -230,15 +230,16 @@ function plantTypeOptions(materialRows, subcat, builtInKeys, vendorSel, itemName
     stripPrefix: true,
     category: PLANTING_CATEGORY,
   })
-  const builtInOpts = builtInKeys.map(k => ({ value: k, label: k, builtIn: k, dbName: itemNameFor(k) }))
-  if (!catRows.length) return isStd ? builtInOpts : []
+  // Options come ONLY from the catalog (single source of truth). Built-in keys no
+  // longer seed the option list; they only intersect the catalog to keep each
+  // option's `value` on the built-in key (labor / per-day math backward-compat).
   const out = []
   for (const k of builtInKeys) {
     const want = itemNameFor(k)
     const hit = catRows.find(o => o.label === want || o.row.name === want)
     if (hit) out.push({ value: k, label: k, builtIn: k, dbName: hit.row.name })
   }
-  return out.length ? out : isStd ? builtInOpts : []
+  return out
 }
 
 // ── Per-row calculators ───────────────────────────────────────────────────────

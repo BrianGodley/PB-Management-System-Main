@@ -756,16 +756,21 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     'Concrete Base': defaultVendorFor('Concrete Base'),
     'Concrete Mix': defaultVendorFor('Concrete Mix'),
   }
-  // Build a section's Type option list for a given vendor selection. 'Standard'
-  // (or a vendor with no catalog rows) → the Standard array; a vendor id → that
-  // vendor's products for the category (priced from material_rates).
+  // Build a section's Type option list for a given vendor selection. Options come
+  // ONLY from the catalog: 'Standard' → the null-vendor catalog rows for the
+  // sub-category; a vendor id → that vendor's products for the category. When the
+  // catalog has none, the list is EMPTY (picker shows just its "Select …"
+  // placeholder and the row books $0). houseArray is retained for the price
+  // resolver's fallback (resolveType) only, never as an option source.
   function sectionOptions(subcat, vendorSel, houseArray) {
     // Unset vendor ('' / 'auto') → EMPTY Type list so the picker shows only its
     // own "Select …" placeholder and the row books $0 until a vendor is chosen.
     if (!vendorSel || vendorSel === 'auto') return []
-    if (vendorSel === 'Standard') return houseArray
-    const opts = catalogOptions(materialRows, subcat, vendorSel, { standardRows: 'exclude', stripPrefix: true })
-    if (!opts.length) return houseArray
+    const isStd = vendorSel === 'Standard'
+    const opts = catalogOptions(materialRows, subcat, isStd ? 'Standard' : vendorSel, {
+      standardRows: 'null-vendor',
+      stripPrefix: true,
+    })
     return opts.map(o => ({ label: o.label, dbName: o.row.name, fallback: n(o.row.unit_cost), category: 'Concrete' }))
   }
   // Effective vendor for a stored value: 'auto'/unset/Standard → category default.

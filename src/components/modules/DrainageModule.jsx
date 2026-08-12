@@ -185,14 +185,15 @@ function masterDrainTypes(cat, builtIn, materialRows, laborField) {
 }
 
 // Vendor-first Type OPTION list for a Drain Pipe / Fixtures row (mirrors
-// Utilities' mergedUtilTypes). Standard/unset/auto → the built-in types PLUS the
-// Standard (null-vendor) catalog Items; a real vendor → only that vendor's catalog
-// Items for the sub-category (nothing if they carry none). Options only — the
-// selected type still resolves its price/labor through PIPE_T/FIX_T + drainMatCost,
-// which already applies the vendor's price by matching the item's name.
+// Utilities' mergedUtilTypes). Options come ONLY from the catalog: 'Standard'/
+// 'auto' → the Standard (null-vendor) catalog Items for the sub-category; a real
+// vendor → only that vendor's catalog Items (nothing if they carry none). No
+// built-in types are added to the option list — an unseeded sub-category shows an
+// empty picker. The selected type still resolves its price/labor through
+// PIPE_T/FIX_T + drainMatCost, which already applies the vendor's price by name.
 function drainTypeOptions(cat, builtIn, materialRows, vendorSel) {
   // Unset vendor → empty Type list (only the row's own "Select …" placeholder);
-  // pick a vendor first. 'Standard'/'auto' still yield the built-in + Standard list.
+  // pick a vendor first.
   if (!vendorSel) return []
   const isStd = vendorSel === 'Standard' || vendorSel === 'auto'
   const catRows =
@@ -200,13 +201,6 @@ function drainTypeOptions(cat, builtIn, materialRows, vendorSel) {
       standardRows: 'null-vendor',
       stripPrefix: true,
     }) || []
-  if (isStd) {
-    const labels = Object.keys(builtIn)
-    catRows.forEach(o => {
-      if (!labels.includes(o.label)) labels.push(o.label)
-    })
-    return labels
-  }
   return catRows.map(o => o.label)
 }
 
