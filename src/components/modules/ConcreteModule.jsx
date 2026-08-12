@@ -778,7 +778,9 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     return opts.map(o => ({ label: o.label, dbName: o.row.name, fallback: n(o.row.unit_cost), category: 'Concrete' }))
   }
   // Effective vendor for a stored value: 'auto'/unset/Standard → category default.
-  const effVendor = (cat, v) => (v && v !== 'auto' && v !== 'Standard' ? v : catDefaults[cat])
+  // Honest effective vendor: only unset/'auto' falls back to the category default;
+  // 'Standard' stays 'Standard' so the displayed vendor matches the Type list.
+  const effVendor = (cat, v) => (v && v !== 'auto' ? v : catDefaults[cat])
 
   // On a NEW estimate, once vendor catalogs load, default the Base rows and each
   // install tier to the first real vendor for their category. Never overrides a

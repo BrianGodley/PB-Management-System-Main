@@ -621,7 +621,9 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   // ── Vendor catalog helpers (material-only, per-row Vendor picker) ────────
   const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
   const defaultVendorFor = cat => vendorsForCategory(cat)[0]?.id || 'Standard'
-  const effVendor = (cat, v) => (v && v !== 'auto' && v !== 'Standard' ? v : defaultVendorFor(cat))
+  // Honest effective vendor: only unset/'auto' falls back to the category default;
+  // 'Standard' stays 'Standard' so it's selectable and the Type list matches.
+  const effVendor = (cat, v) => (v && v !== 'auto' ? v : defaultVendorFor(cat))
   const catDefaults = {
     [DRAIN_CAT.pipe]: defaultVendorFor(DRAIN_CAT.pipe),
     [DRAIN_CAT.fixture]: defaultVendorFor(DRAIN_CAT.fixture),
