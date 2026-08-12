@@ -275,9 +275,14 @@ function calcPaver(
   const totalAreaPallets = matAreas.reduce((s, a) => s + a.pallets, 0)
 
   // ── Install labor hours ──────────────────────────────────────────────────────
-  const installHrs = totalInstallSF > 0 ? totalInstallSF / installRate : 0
-  const add80mmHrs =
-    state.is80mm && totalInstallSF > 0 ? (totalInstallSF * add80mmMult) / installRate : 0
+  // Install SF is now entered MANUALLY (no longer auto-derived from the paver
+  // area rows). Labor = manual SF ÷ install rate.
+  const installSFVal = n(state.installSF)
+  const installHrs = installSFVal > 0 ? installSFVal / installRate : 0
+  // 80mm thickness penalty: its own SF input adds a table-driven % (Paver - 80mm
+  // Add, fallback 0.15) to the install labor for that SF.
+  const mm80SFVal = n(state.mm80SF)
+  const add80mmHrs = mm80SFVal > 0 ? (mm80SFVal * add80mmMult) / installRate : 0
   const straightCutHrs = n(state.straightCutLF) > 0 ? n(state.straightCutLF) / straightCutRate : 0
   const curvedCutHrs = n(state.curvedCutLF) > 0 ? n(state.curvedCutLF) / curvedCutRate : 0
   const restraintsHrs = n(state.restraintsLF) > 0 ? n(state.restraintsLF) / restraintRate : 0
@@ -287,10 +292,11 @@ function calcPaver(
   const vertTotalLF = vertRows.reduce((s, r) => s + n(r.lf), 0)
   const vertSoldierHrs = vertTotalLF > 0 ? vertTotalLF / vertSoldierRate : 0
   const sealerHrs = n(state.sealerSF) > 0 ? n(state.sealerSF) / sealerRate : 0
-  const polySandHrs = state.polySand && totalInstallSF > 0 ? totalInstallSF * polySandSpread : 0
-  // Existing pavers: same per-SF spread/labor coefficient as new pavers, but
-  // the SF input is independent (user enters how many SF of existing pavers
-  // they're re-sanding).
+  // Poly Sand — New pavers: own SF input × the poly-sand spread labor coefficient
+  // (Paver - Poly Sand Spread, fallback 0.004 hrs/SF). Independent of the paver area.
+  const polySandNewSFVal = n(state.polySandNewSF)
+  const polySandHrs = polySandNewSFVal * polySandSpread
+  // Poly Sand — Existing pavers: own SF input, same spread coefficient.
   const polySandExistingSFVal = n(state.polySandExistingSF)
   const polySandExistingHrs = polySandExistingSFVal * polySandSpread
   const addStoneHrs = n(state.numStones) * addStonePer
@@ -372,14 +378,16 @@ function calcPaver(
   const mSealerSF = isSubTab ? n(state.subSealerSF) : n(state.sealerSF)
   const mRestraintsLF = isSubTab ? n(state.subRestraintsLF) : n(state.restraintsLF)
   const mSleevesLF = isSubTab ? n(state.subSleevesLF) : n(state.sleevesLF)
-  const mPolySand = isSubTab ? state.subPolySand : state.polySand
+  // Poly-sand New material follows the ACTIVE tab: In-House uses its own SF input
+  // (polySandNewSF); the Sub tab keeps its whole-area toggle (subPolySand).
+  const mPolyNewSF = isSubTab ? (state.subPolySand ? matInstallSF : 0) : n(state.polySandNewSF)
   const mPolyExistingSF = isSubTab ? n(state.subPolySandExistingSF) : n(state.polySandExistingSF)
   // Base rock is priced per-area (vendor/type aware) from the ACTIVE tab's rows;
   // sands/delivery follow the active tab's material SF.
   const baseRockCost = matAreas.reduce((s, a) => s + (a.baseMatCost || 0), 0)
   const beddingSandCost = sfToTons(matInstallSF, 1, tonsDivisor) * beddingSandPerTon
   const jointSandCost = matInstallSF * jointSandPerSF
-  const polySandCost = mPolySand ? matInstallSF * polySandPerSF : 0
+  const polySandCost = mPolyNewSF > 0 ? mPolyNewSF * polySandPerSF : 0
   const polySandExistingCost = mPolyExistingSF * polySandExistingPerSF
   const sealerMatCost = mSealerSF * sealerMatPerSF
   const restraintMatCost = mRestraintsLF * restraintConcrLF
@@ -510,7 +518,6 @@ const DEFAULT_STATE = {
   hoursAdj: 0,
   areaRows: [
     { label: 'Area 1', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: '', baseType: '' },
-    { label: 'Area 2', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: '', baseType: '' },
   ],
   straightCutLF: '',
   curvedCutLF: '',
@@ -528,8 +535,12 @@ const DEFAULT_STATE = {
   // Used only when vertVendor === 'Custom'
   vertCustomPricePerLF: '',
   sealerSF: '',
-  is80mm: false,
-  polySand: false,
+  // Install SF is entered manually (Paver Labor → Install line).
+  installSF: '',
+  // 80mm thickness line — SF that gets the +15% (table-driven) labor penalty.
+  mm80SF: '',
+  // Poly Sand — New pavers: own SF input (Paver Labor line).
+  polySandNewSF: '',
   // SF of existing pavers being re-sanded — independent input, uses
   // the higher "Paver - Poly Sand Existing" material rate.
   polySandExistingSF: '',
@@ -547,7 +558,6 @@ const DEFAULT_STATE = {
   //    (see calc below); the other mirrored fields are captured for scope.
   subAreaRows: [
     { label: 'Area 1', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: '', baseType: '', installType: 'Hand Demo', largeFormat: false, under500: false },
-    { label: 'Area 2', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: '', baseType: '', installType: 'Hand Demo', largeFormat: false, under500: false },
   ],
   // Sub install line items — SF per install type + two surcharge lines.
   subInstall: {
@@ -823,14 +833,11 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   // counterparts on the Subcontractor tab.
   const isSub = state.subType === 'Subcontractor'
   const kArea = isSub ? 'subAreaRows' : 'areaRows'
-  const kIs80mm = isSub ? 'subIs80mm' : 'is80mm'
   const kStraight = isSub ? 'subStraightCutLF' : 'straightCutLF'
   const kCurved = isSub ? 'subCurvedCutLF' : 'curvedCutLF'
   const kRestraints = isSub ? 'subRestraintsLF' : 'restraintsLF'
   const kSleeves = isSub ? 'subSleevesLF' : 'sleevesLF'
   const kSealer = isSub ? 'subSealerSF' : 'sealerSF'
-  const kPolySand = isSub ? 'subPolySand' : 'polySand'
-  const kPolyExisting = isSub ? 'subPolySandExistingSF' : 'polySandExistingSF'
   const kStones = isSub ? 'subNumStones' : 'numStones'
   const kColors = isSub ? 'subNumColors' : 'numColors'
   const kManual = isSub ? 'subManualRows' : 'manualRows'
@@ -1336,7 +1343,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       {!isSub && (
         <>
       <SecHdr title="Job Site Conditions" />
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* Difficulty / walk-access / hours-adj are In-House modifiers only —
             hidden on the Subcontractor tab (sub pricing is a whole-job rate). */}
         {!isSub && (
@@ -1378,36 +1385,6 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             <Inp value={state.hoursAdj} onChange={e => set('hoursAdj', e.target.value)} step="0.5" />
           </div>
         )}
-        <div className="flex flex-col gap-2 justify-center pt-4">
-          <Toggle
-            checked={state[kIs80mm]}
-            onChange={v => set(kIs80mm, v)}
-            label="80mm Pavers (+15%)"
-          />
-          <Toggle
-            checked={state[kPolySand]}
-            onChange={v => set(kPolySand, v)}
-            label="Poly Sand — New Pavers"
-          />
-        </div>
-        {/* Poly sand on existing pavers — independent SF entry; material
-            cost defaults to 1.5× the new-paver rate. */}
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">
-            Poly Sand — Existing Pavers (SF)
-          </p>
-          <Inp
-            value={state[kPolyExisting]}
-            onChange={e => set(kPolyExisting, e.target.value)}
-            placeholder="0"
-          />
-          {calc.polySandExistingSF > 0 && (
-            <p className="text-xs text-gray-400 mt-0.5">
-              {calc.polySandExistingSF.toLocaleString()} SF × $
-              {calc.polySandExistingPerSF}/SF = {fmt2(calc.polySandExistingCost)}
-            </p>
-          )}
-        </div>
       </div>
         </>
       )}
@@ -1416,15 +1393,6 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           <span>{subSectionTitle('Paver Material', isSub)}</span>
-          {calc.matInstallSF > 0 && (
-            <span className="font-normal normal-case text-gray-400">
-              {calc.matInstallSF.toLocaleString()} SF total
-            </span>
-          )}
-          <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
-            · Joint sand ${calc.jointSandPerSF}/SF
-            · Pallet ${calc.palletCharge}
-          </span>
         </div>
         <table className="w-full text-xs">
           <TH
@@ -1509,19 +1477,58 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         </table>
       </div>
 
+      {/* ── Additional Paver Costs (moved directly below Paver Material) ───────── */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <SecHdr title="Additional Paver Costs" />
+        <div>
+          <p className="text-xs text-gray-500 mb-0.5">Sales Tax on Pavers (%)</p>
+          <Inp
+            value={state.salesTax}
+            onChange={e => set('salesTax', e.target.value)}
+            step="0.1"
+            placeholder="0"
+          />
+          {calc.salesTaxCost > 0 && (
+            <p className="text-xs text-gray-400 mt-0.5">{fmt2(calc.salesTaxCost)} tax</p>
+          )}
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 mb-0.5">Shipping / Freight ($)</p>
+          <Inp
+            value={state.shippingCharge}
+            onChange={e => set('shippingCharge', e.target.value)}
+            step="1"
+          />
+        </div>
+        {/* Delivery — auto when any paver is selected, billed per 900 SF
+            increment. Read-only display; the per-increment rate is editable
+            via the View Rates popup. */}
+        <div>
+          <div className="flex items-center gap-1 mb-0.5">
+            <p className="text-xs text-gray-500">Delivery</p>
+          </div>
+          {calc.deliveryIncrements > 0 ? (
+            <>
+              <div className="px-2 py-1.5 rounded border border-gray-200 bg-gray-50 text-sm font-semibold text-gray-700">
+                {fmt2(calc.deliveryCost)}
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {calc.deliveryIncrements} × {fmt2(calc.deliveryFlat)} (
+                {calc.matInstallSF.toLocaleString()} SF ÷ {calc.deliverySFPerIncrement})
+              </p>
+            </>
+          ) : (
+            <div className="px-2 py-1.5 rounded border border-gray-200 bg-gray-50 text-sm text-gray-400 italic">
+              Select a paver to apply
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* ── Base Material — In-House + Subcontractor ──────────────────────────── */}
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           <span>{subSectionTitle('Base Material', isSub)}</span>
-          {calc.totalBaseTons > 0 && (
-            <span className="font-normal normal-case text-gray-400">
-              {calc.totalBaseTons.toFixed(1)} tons base
-            </span>
-          )}
-          <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
-            · Base rock ${calc.baseRockPerTon}/ton
-            · Bedding sand ${calc.beddingSandPerTon}/ton
-          </span>
         </div>
         <table className="w-full text-xs">
           <TH
@@ -1634,12 +1641,6 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       <div>
         <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           {subSectionTitle(isSub ? 'Paver/Demo Installation' : 'Paver Labor', isSub)}
-          {!isSub && (
-            <span className="ml-2 font-normal normal-case text-gray-400">
-              {calc.installRate} SF/hr install · {calc.straightCutRate}/{calc.curvedCutRate} LF/hr
-              cuts
-            </span>
-          )}
         </div>
         {!isSub && (
         <table className="w-full text-xs">
@@ -1660,31 +1661,79 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                 </span>
               </td>
               <td className={td}>
-                <input
-                  type="text"
-                  readOnly
-                  value={calc.totalInstallSF > 0 ? `${calc.totalInstallSF.toLocaleString()} SF` : ''}
-                  placeholder="auto"
-                  className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm bg-gray-50 text-gray-500 focus:outline-none"
+                <Inp
+                  value={state.installSF}
+                  onChange={e => set('installSF', e.target.value)}
+                  placeholder="Install SF"
                 />
               </td>
               <td className={num}>{fh(calc.installHrs)}</td>
-              <td className="py-1 text-xs text-gray-400">auto from areas</td>
+              <td />
             </tr>
-            {state[kIs80mm] && (
-              <tr>
-                <td className={`${td} font-medium text-gray-700`}>
-                  <span className="inline-flex items-center gap-1">
-                    80mm Add <span className="text-gray-400 font-normal">(+15% penalty)</span>
+            <tr>
+              <td className={`${td} font-medium text-gray-700`}>
+                <span className="inline-flex items-center gap-1 flex-wrap">
+                  Poly Sand New{' '}
+                  <span className="text-gray-400 font-normal">
+                    ({laborRates['Paver - Poly Sand Spread'] ?? LABOR_DEFAULTS.polySandSpread}{' '}
+                    hrs/SF)
                   </span>
-                </td>
-                <td className={`${num} text-gray-500`}>
-                  {calc.totalInstallSF > 0 ? calc.totalInstallSF.toLocaleString() : '—'} SF
-                </td>
-                <td className={num}>{fh(calc.add80mmHrs)}</td>
-                <td className="py-1 text-xs text-gray-400">extra for 80mm thickness</td>
-              </tr>
-            )}
+                  <span className="text-gray-400 font-normal">· ${calc.polySandPerSF}/SF mat</span>
+                </span>
+              </td>
+              <td className={td}>
+                <Inp
+                  value={state.polySandNewSF}
+                  onChange={e => set('polySandNewSF', e.target.value)}
+                  placeholder="0 SF"
+                />
+              </td>
+              <td className={num}>{fh(calc.polySandHrs)}</td>
+              <td />
+            </tr>
+            <tr>
+              <td className={`${td} font-medium text-gray-700`}>
+                <span className="inline-flex items-center gap-1 flex-wrap">
+                  Poly Sand Existing{' '}
+                  <span className="text-gray-400 font-normal">
+                    ({laborRates['Paver - Poly Sand Spread'] ?? LABOR_DEFAULTS.polySandSpread}{' '}
+                    hrs/SF)
+                  </span>
+                  <span className="text-gray-400 font-normal">
+                    · ${calc.polySandExistingPerSF}/SF mat
+                  </span>
+                </span>
+              </td>
+              <td className={td}>
+                <Inp
+                  value={state.polySandExistingSF}
+                  onChange={e => set('polySandExistingSF', e.target.value)}
+                  placeholder="0 SF"
+                />
+              </td>
+              <td className={num}>{fh(calc.polySandExistingHrs)}</td>
+              <td />
+            </tr>
+            <tr>
+              <td className={`${td} font-medium text-gray-700`}>
+                <span className="inline-flex items-center gap-1 flex-wrap">
+                  80mm{' '}
+                  <span className="text-gray-400 font-normal">
+                    (+{Math.round((laborRates['Paver - 80mm Add'] ?? LABOR_DEFAULTS.add80mm) * 100)}%
+                    labor)
+                  </span>
+                </span>
+              </td>
+              <td className={td}>
+                <Inp
+                  value={state.mm80SF}
+                  onChange={e => set('mm80SF', e.target.value)}
+                  placeholder="0 SF"
+                />
+              </td>
+              <td className={num}>{fh(calc.add80mmHrs)}</td>
+              <td />
+            </tr>
             {[
               {
                 label: 'Straight Cut',
@@ -1790,48 +1839,6 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
               <td className={num}>{fh(calc.addColorHrs)}</td>
               <td />
             </tr>
-            {state[kPolySand] && (
-              <tr>
-                <td className={`${td} font-medium text-gray-700`}>
-                  <span className="inline-flex items-center gap-1 flex-wrap">
-                    Poly Sand Spread{' '}
-                    <span className="text-gray-400 font-normal">
-                      ({laborRates['Paver - Poly Sand Spread'] ?? LABOR_DEFAULTS.polySandSpread}{' '}
-                      hrs/SF)
-                    </span>
-                    <span className="text-gray-400 font-normal">
-                      · ${calc.polySandPerSF}/SF mat
-                    </span>
-                  </span>
-                </td>
-                <td className={`${num} text-gray-500`}>
-                  {calc.totalInstallSF > 0 ? calc.totalInstallSF.toLocaleString() : '—'} SF
-                </td>
-                <td className={num}>{fh(calc.polySandHrs)}</td>
-                <td className="py-1 text-xs text-gray-400">auto from areas</td>
-              </tr>
-            )}
-            {calc.polySandExistingSF > 0 && (
-              <tr>
-                <td className={`${td} font-medium text-gray-700`}>
-                  <span className="inline-flex items-center gap-1 flex-wrap">
-                    Poly Sand — Existing{' '}
-                    <span className="text-gray-400 font-normal">
-                      ({laborRates['Paver - Poly Sand Spread'] ?? LABOR_DEFAULTS.polySandSpread}{' '}
-                      hrs/SF)
-                    </span>
-                    <span className="text-gray-400 font-normal">
-                      · ${calc.polySandExistingPerSF}/SF mat
-                    </span>
-                  </span>
-                </td>
-                <td className={`${num} text-gray-500`}>
-                  {calc.polySandExistingSF.toLocaleString()} SF
-                </td>
-                <td className={num}>{fh(calc.polySandExistingHrs)}</td>
-                <td className="py-1 text-xs text-gray-400">existing pavers</td>
-              </tr>
-            )}
             <tr>
               <td className={`${td} font-medium text-gray-700`}>
                 <span className="inline-flex items-center gap-1 flex-wrap">
@@ -1920,14 +1927,6 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           <span>{subSectionTitle('Vertical Soldier Course', isSub)}</span>
-          <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
-            {calc.vertSoldierRate} LF/hr — paver priced $/LF (price_per_lf_vert)
-          </span>
-          {calc.vertSoldierHrs > 0 && (
-            <span className="font-normal normal-case text-gray-400">
-              {calc.vertSoldierHrs.toFixed(2)} hrs
-            </span>
-          )}
         </div>
         <table className="w-full text-xs">
           <TH
@@ -2025,54 +2024,6 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         </button>
       </div>
       )}
-
-      {/* ── Added Costs ────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <SecHdr title="Added Costs" />
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Sales Tax on Pavers (%)</p>
-          <Inp
-            value={state.salesTax}
-            onChange={e => set('salesTax', e.target.value)}
-            step="0.1"
-            placeholder="0"
-          />
-          {calc.salesTaxCost > 0 && (
-            <p className="text-xs text-gray-400 mt-0.5">{fmt2(calc.salesTaxCost)} tax</p>
-          )}
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Shipping / Freight ($)</p>
-          <Inp
-            value={state.shippingCharge}
-            onChange={e => set('shippingCharge', e.target.value)}
-            step="1"
-          />
-        </div>
-        {/* Delivery — auto when any paver is selected, billed per 900 SF
-            increment. Read-only display; the per-increment rate is editable
-            via the inline RateEditPopover. */}
-        <div>
-          <div className="flex items-center gap-1 mb-0.5">
-            <p className="text-xs text-gray-500">Delivery</p>
-          </div>
-          {calc.deliveryIncrements > 0 ? (
-            <>
-              <div className="px-2 py-1.5 rounded border border-gray-200 bg-gray-50 text-sm font-semibold text-gray-700">
-                {fmt2(calc.deliveryCost)}
-              </div>
-              <p className="text-xs text-gray-400 mt-0.5">
-                {calc.deliveryIncrements} × {fmt2(calc.deliveryFlat)} (
-                {calc.totalInstallSF.toLocaleString()} SF ÷ {calc.deliverySFPerIncrement})
-              </p>
-            </>
-          ) : (
-            <div className="px-2 py-1.5 rounded border border-gray-200 bg-gray-50 text-sm text-gray-400 italic">
-              Select a paver to apply
-            </div>
-          )}
-        </div>
-      </div>
 
       {/* ── Manual Entry ──────────────────────────────────────────────────────── */}
       <div>

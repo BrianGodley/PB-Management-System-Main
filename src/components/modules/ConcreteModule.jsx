@@ -232,7 +232,6 @@ function calcConcrete(
   const diffPct = n(state.difficulty) / 100
   const layoutHrs = n(state.layoutHrs)
   const distanceLF = n(state.distanceLF)
-  const pctBackyard = n(state.pctBackyard) / 100
   const finishType = state.finishType || 'Broom Finish'
   const colorYes = state.colorYes
   const pumpYes = state.pumpYes
@@ -314,17 +313,13 @@ function calcConcrete(
   const sleeveHrs = sleeveLF / sleeveLFPerHr
   const sleeveMat = sleeveUnits * sleevePer10LF
 
-  // ── Travel + backyard ────────────────────────────────────────────────────
+  // ── Travel ───────────────────────────────────────────────────────────────
   // Old per-module travelHrs retired — now handled by unified walk-access penalty below.
   const travelHrs = 0
-  // Backyard-access labor add: fraction of install hours added per unit of
-  // pctBackyard — DB-editable coefficient.
-  const backyardFactor = lr['Concrete - Backyard Labor Factor'] ?? 0.2
-  const backyardHrs = pctBackyard > 0 ? backyardFactor * pctBackyard * installHrs : 0
 
   // ── Forming complexity ───────────────────────────────────────────────────
   const preComplexHrs =
-    layoutHrs + travelHrs + backyardHrs + baseHrsTot + installHrs + rebarHrs + formHrs + sleeveHrs
+    layoutHrs + travelHrs + baseHrsTot + installHrs + rebarHrs + formHrs + sleeveHrs
 
   // ── Finish add-ons ───────────────────────────────────────────────────────
   let finishHrs = 0,
@@ -429,7 +424,6 @@ function calcConcrete(
     baseCalc,
     layoutHrs,
     travelHrs,
-    backyardHrs,
     complexityHrs,
     complexityPctPerUnit,
     installHrs,
@@ -463,7 +457,6 @@ function calcConcrete(
     rebarLfPerSfBySpacing,
     baseTonsDivisor,
     sealerSFPerGal,
-    backyardFactor,
     formMaterialPerLF,
     sleevePer10LF,
     colorCostPerCY,
@@ -529,7 +522,7 @@ function NumInput({ value, onChange, placeholder = '0', className = '', step = '
 // → $0 until a vendor is chosen).
 const DEFAULT_BASE_ROWS = [{ label: '', method: 'Skid Steer Good', sf: '', depth: '2', vendor: '', type: '' }]
 
-const DEFAULT_MANUAL_ROWS = []
+const DEFAULT_MANUAL_ROWS = [{ label: '', hours: '', materials: '', subCost: '' }]
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -660,7 +653,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
   const [layoutHrs, setLayoutHrs] = useState(initialData?.layoutHrs ?? '')
   const [distanceLF, setDistanceLF] = useState(initialData?.distanceLF ?? '')
-  const [pctBackyard, setPctBackyard] = useState(initialData?.pctBackyard ?? '')
   const [formingComplexity, setFormingComplexity] = useState(initialData?.formingComplexity ?? '')
   const [finishingType, setFinishingType] = useState(initialData?.finishingType ?? 'IH')
   const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
@@ -692,7 +684,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   // ── Independent Subcontractor-tab state ──────────────────────────────────
   // The Sub tab is its own calculator (mirrors the demo / Utilities modules).
   // Each field defaults to the same blank value as its in-house counterpart.
-  // The site-conditions modifiers (difficulty/layout/distance/backyard/
+  // The site-conditions modifiers (difficulty/layout/distance/
   // forming complexity/hours adj) are In-House only and are NOT mirrored.
   const [subInstallSF, setSubInstallSF] = useState(initialData?.subInstallSF ?? '')
   const [subDepthIn, setSubDepthIn] = useState(initialData?.subDepthIn ?? '4')
@@ -733,7 +725,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     difficulty,
     layoutHrs,
     distanceLF,
-    pctBackyard,
     formingComplexity,
     finishingType,
     hoursAdj,
@@ -1060,15 +1051,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           value: calc.complexityPctPerUnit,
         },
         {
-          label: 'Backyard Labor Factor',
-          table: 'labor_rates',
-          name: 'Concrete - Backyard Labor Factor',
-          category: 'Concrete',
-          mode: 'coefficient',
-          unitLabel: '×install hrs',
-          value: calc.backyardFactor,
-        },
-        {
           label: 'Base Tons Divisor',
           table: 'misc_rates',
           name: 'Concrete - Base Tons Divisor',
@@ -1390,12 +1372,12 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
       {!isSub && (
       <div>
         <SectionHeader title="Job Site Conditions" />
-        <div className="grid grid-cols-2 gap-3">
-          <div>
+        <div className="flex gap-3">
+          <div className="flex-1">
             <label className="text-xs text-gray-500 block mb-1">Difficulty Add (%)</label>
             <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
           </div>
-          <div>
+          <div className="flex-1">
             <label
               className="text-xs text-gray-500 block mb-1"
               title="Average Distance from Truck to Work Area"
@@ -1409,32 +1391,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               </p>
             )}
           </div>
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Layout Time (hrs)</label>
-            <NumInput value={layoutHrs} onChange={setLayoutHrs} placeholder="0" />
-          </div>
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">% of Paving in Backyard</label>
-            <NumInput value={pctBackyard} onChange={setPctBackyard} placeholder="0" max="100" />
-          </div>
-          <div>
-            <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap">
-              Forming Complexity (0–100)
-              <span className="text-gray-400">— +{calc.complexityPctPerUnit}% labor / point</span>
-            </label>
-            <NumInput
-              value={formingComplexity}
-              onChange={setFormingComplexity}
-              placeholder="0"
-              max="100"
-            />
-            {calc.complexityHrs > 0 && (
-              <p className="text-[10px] text-gray-500 italic mt-0.5">
-                +{calc.complexityHrs.toFixed(2)} hrs added
-              </p>
-            )}
-          </div>
-          <div>
+          <div className="flex-1">
             <label className="text-xs text-gray-500 block mb-1">Hrs Adjustment</label>
             <NumInput
               value={hoursAdj}
@@ -1445,6 +1402,12 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             />
           </div>
         </div>
+        <div className="grid grid-cols-2 gap-3 mt-3">
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Layout Time (hrs)</label>
+            <NumInput value={layoutHrs} onChange={setLayoutHrs} placeholder="0" />
+          </div>
+        </div>
       </div>
       )}
 
@@ -1452,9 +1415,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
       {!isSub && (
       <div>
         <SectionHeader title="Base Install" />
-        <p className="text-xs text-gray-400 mb-1 inline-flex items-center gap-1">
-          Base material ${calc.costBase}/ton
-        </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm table-fixed">
             {/* Sq Ft + Depth ~3× their prior shrunk width; the freed
@@ -1600,7 +1560,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             ) : (
               <div className="space-y-1">
                 {/* Column labels */}
-                <div className="grid grid-cols-[6rem_9rem_minmax(0,1fr)_5rem_5rem_16rem] items-center gap-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                <div className="grid grid-cols-[6rem_9rem_minmax(0,1fr)_5rem_5rem_16rem] items-center gap-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-center">
                   <span />
                   <span>Vendor</span>
                   <span>Mix</span>
@@ -1698,14 +1658,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             </div>
           )}
           <div>
-            <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap">
-              Rebar (Sq Ft)
-              <span className="text-gray-400">
-                — {calc.rebarSFPerHr} SF/hr · ${calc.rebarPerLF}/LF ·{' '}
-                {calc.rebarLfPerSfBySpacing[activeRebarSpacing] ?? calc.rebarLfPerSfBySpacing['24" OC']} LF/SF · $
-                {((calc.rebarLfPerSfBySpacing[activeRebarSpacing] ?? calc.rebarLfPerSfBySpacing['24" OC']) * calc.rebarPerLF).toFixed(3)}/SF
-              </span>
-            </label>
+            <label className="text-xs text-gray-500 block mb-1">Rebar (Sq Ft)</label>
             <div className="flex items-center gap-2">
               <select
                 className="input text-sm py-1.5 w-28"
@@ -1724,22 +1677,12 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           </div>
           {!isSub && (
           <div>
-            <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1">
-              Form Edging (Lin Ft)
-              <span className="text-gray-400">
-                — {calc.formLFPerHr} LF/hr · ${calc.formMaterialPerLF}/LF
-              </span>
-            </label>
+            <label className="text-xs text-gray-500 block mb-1">Form Edging (Ln Ft)</label>
             <NumInput value={activeFormLF} onChange={setActiveFormLF} />
           </div>
           )}
           <div>
-            <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1">
-              3" Sleeves (Lin Ft)
-              <span className="text-gray-400">
-                — {calc.sleeveLFPerHr} LF/hr · ${calc.sleevePer10LF}/10LF
-              </span>
-            </label>
+            <label className="text-xs text-gray-500 block mb-1">3" Sleeves (Ln Ft)</label>
             <NumInput value={activeSleeveLF} onChange={setActiveSleeveLF} />
           </div>
           {activeConcreteCY > 0 && (
@@ -1751,6 +1694,25 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 </span>{' '}
                 concrete
               </p>
+            </div>
+          )}
+          {!isSub && (
+            <div className="col-span-2">
+              <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap">
+                Forming Complexity (0–100)
+                <span className="text-gray-400">— +{calc.complexityPctPerUnit}% labor / point</span>
+              </label>
+              <NumInput
+                value={formingComplexity}
+                onChange={setFormingComplexity}
+                placeholder="0"
+                max="100"
+              />
+              {calc.complexityHrs > 0 && (
+                <p className="text-[10px] text-gray-500 italic mt-0.5">
+                  +{calc.complexityHrs.toFixed(2)} hrs added
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -1826,39 +1788,11 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             </label>
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1">
-              Vapor Barrier (Sq Ft)
-              {isSub ? (
-                <span className="text-gray-400 inline-flex items-center gap-1">
-                  — ${subVaporBarrierRate}/SF
-                </span>
-              ) : (
-                <>
-                  <span className="text-gray-400">
-                    — {calc.vaporBarrierSFPerHr} SF/hr · ${calc.vaporBarrierPerSF}/SF
-                  </span>
-                </>
-              )}
-            </label>
+            <label className="text-xs text-gray-500 block mb-1">Vapor Barrier (Sq Ft)</label>
             <NumInput value={activeVaporBarrierSF} onChange={setActiveVaporBarrierSF} />
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap">
-              Sealer (Sq Ft)
-              {isSub ? (
-                <span className="text-gray-400 inline-flex items-center gap-1">
-                  — ${subSealerRate}/SF
-                </span>
-              ) : activeSealerType === 'Natural' ? (
-                <span className="text-gray-400 inline-flex items-center gap-1">
-                  — {calc.sealerNaturalSFPerHr} SF/hr · ${calc.sealerNatural5g}/5gal
-                </span>
-              ) : (
-                <span className="text-gray-400 inline-flex items-center gap-1">
-                  — {calc.sealerWetSFPerHr} SF/hr · ${calc.sealerWet5g}/5gal
-                </span>
-              )}
-            </label>
+            <label className="text-xs text-gray-500 block mb-1">Sealer (Sq Ft)</label>
             <div className="flex gap-2">
               <NumInput value={activeSealerSF} onChange={setActiveSealerSF} className="flex-1" />
               <select
