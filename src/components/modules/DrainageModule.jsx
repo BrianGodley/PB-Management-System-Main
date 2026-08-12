@@ -143,7 +143,7 @@ const n = v => parseFloat(v) || 0
 // The Type still sets the item's labor (per-type coefficient, unchanged) AND its
 // Standard material price. A vendor only overrides the MATERIAL price for the same
 // item (matched by name in the vendor's catalog); it never affects labor.
-const DRAIN_CAT = { pipe: 'Drain Pipe', fixture: 'Drain Fixtures' }
+const DRAIN_CAT = { pipe: 'Drain Pipe', french: 'French Drain Pipe', fixture: 'Drain Fixtures' }
 function drainMatCost(cat, row, TYPES, materialRows, catDefaults, mp) {
   const t = TYPES[row.type]
   let dbName = t?.dbName
@@ -287,7 +287,7 @@ function calcDrainage(
     const rate = FRENCH_PIPE_TYPES[r.type]
     if (lf > 0 && rate) {
       const { cost } = drainMatCost(
-        DRAIN_CAT.pipe,
+        DRAIN_CAT.french,
         r,
         FRENCH_PIPE_TYPES,
         materialRows,
@@ -462,7 +462,6 @@ const DEFAULT_ADDITIONAL = {
   sumpPumpQty: '',
   curbCoreQty: '',
   hydrocutQty: '',
-  permitRequired: false,
 }
 const DEFAULT_MANUAL_ROWS = [{ label: '', hours: '', materials: '', subCost: '' }]
 
@@ -625,6 +624,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   const defaultVendorFor = cat => vendorsForCategory(cat)[0]?.id || 'Standard'
   const catDefaults = {
     [DRAIN_CAT.pipe]: defaultVendorFor(DRAIN_CAT.pipe),
+    [DRAIN_CAT.french]: defaultVendorFor(DRAIN_CAT.french),
     [DRAIN_CAT.fixture]: defaultVendorFor(DRAIN_CAT.fixture),
   }
   // Per-row Vendor picker defaults to an empty "Select vendor" placeholder; rows
@@ -879,6 +879,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           value: frenchRate(materialPrices, FRENCH_GRAVEL24_LABOR_NAME),
           section: 'labor',
         },
+        ...catalogBlockItems(DRAIN_CAT.french),
       ],
     },
     {
@@ -1420,7 +1421,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
               {frenchRows.map((row, i) => {
                 const rate = FRENCH_PIPE_TYPES[row.type]
                 const { cost } = drainMatCost(
-                  DRAIN_CAT.pipe,
+                  DRAIN_CAT.french,
                   row,
                   FRENCH_PIPE_TYPES,
                   materialRows,
@@ -1440,10 +1441,10 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                         {!row.vendor && <option value="">Select</option>}
                         {row.vendor &&
                           row.vendor !== 'Standard' &&
-                          !vendorsForCategory(DRAIN_CAT.pipe).some(v => v.id === row.vendor) && (
+                          !vendorsForCategory(DRAIN_CAT.french).some(v => v.id === row.vendor) && (
                             <option value={row.vendor}>{vendorNames[row.vendor] || row.vendor}</option>
                           )}
-                        {vendorsForCategory(DRAIN_CAT.pipe).map(v => (
+                        {vendorsForCategory(DRAIN_CAT.french).map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
                           </option>
@@ -1691,17 +1692,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
               })}
             </tbody>
           </table>
-        </div>
-        <div className="mt-2">
-          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={additionalItems.permitRequired}
-              onChange={e => setAdditionalItems(p => ({ ...p, permitRequired: e.target.checked }))}
-              className="rounded"
-            />
-            * Permit Required
-          </label>
         </div>
       </div>
       )}
