@@ -336,14 +336,14 @@ function EpTable({
                     </div>
                   </td>
                   <td className="py-1 pr-2">
-                    <NumInput value={row[qtyField]} onChange={v => upd(i, qtyField, v)} className="w-full" />
+                    <NumInput value={row[qtyField]} onChange={v => upd(i, qtyField, v)} className="w-full text-center" />
                   </td>
-                  <td className="py-1 text-right text-gray-400 text-xs pr-2">
-                    <span className="inline-flex items-center justify-end gap-1">
+                  <td className="py-1 text-center text-gray-400 text-xs pr-2">
+                    <span className="inline-flex items-center justify-center gap-1">
                       ${matCost.toFixed(2)}
                     </span>
                   </td>
-                  <td className="py-1 text-right text-gray-600 text-xs">
+                  <td className="py-1 text-center text-gray-600 text-xs">
                     {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
                   </td>
                   <td className="py-1 text-center">
@@ -1400,12 +1400,12 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                       </span>
                     </td>
                     <td className="py-1 pr-2">
-                      <NumInput value={row.lf} onChange={v => setCapRow(i, 'lf', v)} className="w-full" />
+                      <NumInput value={row.lf} onChange={v => setCapRow(i, 'lf', v)} className="w-full text-center" />
                     </td>
-                    <td className="py-1 pr-2 text-right text-gray-400 text-xs">
+                    <td className="py-1 pr-2 text-center text-gray-400 text-xs">
                       {rc.unit ? `$${rc.unit.toFixed(2)}/LF` : '—'}
                     </td>
-                    <td className="py-1 text-right text-xs text-gray-600">
+                    <td className="py-1 text-center text-xs text-gray-600">
                       {rc.mat > 0 ? `$${rc.mat.toFixed(2)}` : '—'}
                       {rc.hrs > 0 ? (
                         <span className="text-gray-400"> · {rc.hrs.toFixed(1)}h</span>
@@ -1538,12 +1538,12 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                       </span>
                     </td>
                     <td className="py-1 pr-2">
-                      <NumInput value={row.sf} onChange={v => setWallFinishRow(i, 'sf', v)} className="w-full" />
+                      <NumInput value={row.sf} onChange={v => setWallFinishRow(i, 'sf', v)} className="w-full text-center" />
                     </td>
-                    <td className="py-1 pr-2 text-right text-gray-400 text-xs">
+                    <td className="py-1 pr-2 text-center text-gray-400 text-xs">
                       {rc.unit ? `$${rc.unit.toFixed(2)}/${meta?.unit === 'ton' ? 'ton' : 'SF'}` : '—'}
                     </td>
-                    <td className="py-1 text-right text-xs text-gray-600">
+                    <td className="py-1 text-center text-xs text-gray-600">
                       {rc.mat > 0 ? `$${rc.mat.toFixed(2)}` : '—'}
                       {rc.hrs > 0 ? (
                         <span className="text-gray-400"> · {rc.hrs.toFixed(1)}h</span>
@@ -1581,17 +1581,18 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                     />
                   </td>
                   <td className="py-1 pr-2">
-                    <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} />
+                    <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} className="text-center" />
                   </td>
                   <td className="py-1 pr-2">
                     <NumInput
                       value={row.materials}
                       onChange={v => updateManual(i, 'materials', v)}
+                      className="text-center"
                     />
                   </td>
                   <td className="py-1">
                     {' '}
-                    <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} />
+                    <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} className="text-center" />
                   </td>
                 </tr>
               ))}

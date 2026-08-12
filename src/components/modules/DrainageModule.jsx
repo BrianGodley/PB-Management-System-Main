@@ -1370,14 +1370,14 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                       </div>
                     </td>
                     <td className="py-1 pr-2">
-                      <NumInput value={row.lf} onChange={v => updatePipe(i, 'lf', v)} className="w-full" />
+                      <NumInput value={row.lf} onChange={v => updatePipe(i, 'lf', v)} className="w-full text-center" />
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
-                      <span className="inline-flex items-center justify-end">
+                      <span className="flex items-center justify-center">
                         ${cost.toFixed(2)}
                       </span>
                     </td>
-                    <td className="py-1 text-right text-gray-600 text-xs">
+                    <td className="py-1 text-center text-gray-600 text-xs">
                       {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
                     </td>
                   </tr>
@@ -1471,14 +1471,14 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                       </div>
                     </td>
                     <td className="py-1 pr-2">
-                      <NumInput value={row.lf} onChange={v => updateFrench(i, 'lf', v)} className="w-full" />
+                      <NumInput value={row.lf} onChange={v => updateFrench(i, 'lf', v)} className="w-full text-center" />
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
-                      <span className="inline-flex items-center justify-end">
+                      <span className="flex items-center justify-center">
                         ${cost.toFixed(2)}
                       </span>
                     </td>
-                    <td className="py-1 text-right text-gray-600 text-xs">
+                    <td className="py-1 text-center text-gray-600 text-xs">
                       {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
                     </td>
                   </tr>
@@ -1615,14 +1615,14 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                       </div>
                     </td>
                     <td className="py-1 pr-2">
-                      <NumInput value={row.qty} onChange={v => updateFixture(i, 'qty', v)} className="w-full" />
+                      <NumInput value={row.qty} onChange={v => updateFixture(i, 'qty', v)} className="w-full text-center" />
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
-                      <span className="inline-flex items-center justify-end">
+                      <span className="flex items-center justify-center">
                         {rate ? `$${cost.toFixed(2)}` : '—'}
                       </span>
                     </td>
-                    <td className="py-1 text-right text-gray-600 text-xs">
+                    <td className="py-1 text-center text-gray-600 text-xs">
                       {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
                     </td>
                   </tr>
@@ -1732,17 +1732,18 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                     />
                   </td>
                   <td className="py-1 pr-2">
-                    <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} />
+                    <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} className="text-center" />
                   </td>
                   <td className="py-1 pr-2">
                     <NumInput
                       value={row.materials}
                       onChange={v => updateManual(i, 'materials', v)}
+                      className="text-center"
                     />
                   </td>
                   <td className="py-1">
                     {' '}
-                    <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} />
+                    <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} className="text-center" />
                   </td>
                 </tr>
               ))}

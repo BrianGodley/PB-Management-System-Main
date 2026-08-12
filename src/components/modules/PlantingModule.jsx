@@ -904,6 +904,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
                       <NumInput
                         value={row.qty}
                         onChange={v => plantUpdate(setRows, defaultsMap, i, 'qty', v)}
+                        className="text-center"
                       />
                     </td>
                     {!isSub && (
@@ -925,27 +926,27 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
                       </td>
                     )}
                     {!isSub && (
-                      <td className="py-1.5 text-right text-gray-400 text-xs">
-                        <span className="inline-flex items-center justify-end gap-1">
+                      <td className="py-1.5 text-center text-gray-400 text-xs">
+                        <span className="inline-flex items-center justify-center gap-1">
                           {perDay < 1 ? perDay.toFixed(2) : perDay.toLocaleString()}
                         </span>
                       </td>
                     )}
-                    <td className="py-1.5 text-right text-xs pr-2">
+                    <td className="py-1.5 text-center text-xs pr-2">
                       {isSub ? (
                         <input
                           type="number"
                           step="any"
-                          className="input text-sm py-1 w-24 text-right"
+                          className="input text-sm py-1 w-full text-center"
                           placeholder={r2(c.subUnit).toString()}
                           value={row.subEach ?? ''}
                           onChange={e => plantUpdate(setRows, defaultsMap, i, 'subEach', e.target.value)}
                         />
                       ) : (
-                        <span className="text-gray-600">{c.hrs > 0 ? c.hrs.toFixed(2) : '—'}</span>
+                        <span className="text-gray-600 block text-center">{c.hrs > 0 ? c.hrs.toFixed(2) : '—'}</span>
                       )}
                     </td>
-                    <td className="py-1.5 text-right text-xs text-gray-600">
+                    <td className="py-1.5 text-center text-xs text-gray-600">
                       {(isSub ? c.subMat : c.mat) > 0 ? fmt2(isSub ? c.subMat : c.mat) : '—'}
                     </td>
                     <td className="py-1.5 text-right">
@@ -1055,32 +1056,32 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
                       </select>
                     </td>
                     <td className="py-1.5 pr-2">
-                      <NumInput value={row.qty} onChange={v => addonUpdate(i, 'qty', v)} />
+                      <NumInput value={row.qty} onChange={v => addonUpdate(i, 'qty', v)} className="text-center" />
                     </td>
                     {!isSub && (
-                      <td className="py-1.5 pr-2">
-                        <div className="flex items-center gap-1 flex-wrap text-xs text-gray-400">
+                      <td className="py-1.5 pr-2 text-center">
+                        <div className="flex items-center justify-center gap-1 flex-wrap text-xs text-gray-400">
                           <span>
                             ${c.unitPrice.toFixed(2)}/{meta.unit}
                           </span>
                         </div>
                       </td>
                     )}
-                    <td className="py-1.5 text-right text-xs pr-2">
+                    <td className="py-1.5 text-center text-xs pr-2">
                       {isSub ? (
                         <input
                           type="number"
                           step="any"
-                          className="input text-sm py-1 w-24 text-right"
+                          className="input text-sm py-1 w-full text-center"
                           placeholder={r2(c.subUnit).toString()}
                           value={row.subEach ?? ''}
                           onChange={e => addonUpdate(i, 'subEach', e.target.value)}
                         />
                       ) : (
-                        <span className="text-gray-600">{c.hrs > 0 ? c.hrs.toFixed(2) : '—'}</span>
+                        <span className="text-gray-600 block text-center">{c.hrs > 0 ? c.hrs.toFixed(2) : '—'}</span>
                       )}
                     </td>
-                    <td className="py-1.5 text-right text-xs text-gray-600">
+                    <td className="py-1.5 text-center text-xs text-gray-600">
                       {(isSub ? c.subMat : c.mat) > 0 ? fmt2(isSub ? c.subMat : c.mat) : '—'}
                     </td>
                     <td className="py-1.5 text-right">
@@ -1436,16 +1437,17 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
                     />
                   </td>
                   <td className="py-1 pr-2">
-                    <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} />
+                    <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} className="text-center" />
                   </td>
                   <td className="py-1 pr-2">
                     <NumInput
                       value={row.materials}
                       onChange={v => updateManual(i, 'materials', v)}
+                      className="text-center"
                     />
                   </td>
                   <td className="py-1">
-                    <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} />
+                    <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} className="text-center" />
                   </td>
                 </tr>
               ))}

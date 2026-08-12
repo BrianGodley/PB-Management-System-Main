@@ -581,32 +581,32 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
                       <input
                         type="number"
                         step="1"
-                        className="input text-sm py-1 w-20"
+                        className="input text-sm py-1 w-full text-center"
                         placeholder="0"
                         value={row.qty}
                         onChange={e => updateRow(rows, setRows, i, { qty: e.target.value })}
                       />
                     </td>
-                    <td className="py-1.5 text-right text-gray-400 text-xs pr-2">
+                    <td className="py-1.5 text-center text-gray-400 text-xs pr-2">
                       {isFixture ? (qty > 0 ? watts.toFixed(1) : '—') : '—'}
                     </td>
-                    <td className="py-1.5 text-right text-xs pr-2">
+                    <td className="py-1.5 text-center text-xs pr-2">
                       {isSub ? (
                         <input
                           type="number"
                           step="0.01"
-                          className="input text-sm py-1 w-24 text-right"
+                          className="input text-sm py-1 w-full text-center"
                           placeholder="0.00"
                           value={row.subEach ?? ''}
                           onChange={e => updateRow(rows, setRows, i, { subEach: e.target.value })}
                         />
                       ) : (
-                        <span className="text-gray-400">
+                        <span className="text-gray-400 block text-center">
                           {laborHrs > 0 ? laborHrs.toFixed(2) : '—'}
                         </span>
                       )}
                     </td>
-                    <td className="py-1.5 text-right text-gray-600 text-xs">
+                    <td className="py-1.5 text-center text-gray-600 text-xs">
                       {material > 0 ? fmt2(material) : '—'}
                     </td>
                     <td className="py-1.5 text-right">
@@ -879,7 +879,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
                     <input
                       type="number"
                       step="any"
-                      className="input text-sm py-1 w-20"
+                      className="input text-sm py-1 w-full text-center"
                       placeholder="0"
                       value={row.hours}
                       onChange={e => updateManual(i, 'hours', e.target.value)}
@@ -889,7 +889,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
                     <input
                       type="number"
                       step="any"
-                      className="input text-sm py-1 w-24"
+                      className="input text-sm py-1 w-full text-center"
                       placeholder="0"
                       value={row.materials}
                       onChange={e => updateManual(i, 'materials', e.target.value)}
@@ -899,7 +899,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
                     <input
                       type="number"
                       step="any"
-                      className="input text-sm py-1 w-24"
+                      className="input text-sm py-1 w-full text-center"
                       placeholder="0"
                       value={row.subCost}
                       onChange={e => updateManual(i, 'subCost', e.target.value)}

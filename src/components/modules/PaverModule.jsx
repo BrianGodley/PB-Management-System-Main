@@ -1511,11 +1511,12 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                       value={row.sf}
                       onChange={e => setRow(kArea, i, 'sf', e.target.value)}
                       placeholder="Paver SF"
+                      className="text-center"
                     />
                   </td>
-                  <td className={num}>{a.pricePerSF > 0 ? fmt2(a.pricePerSF) : '—'}</td>
-                  <td className={num}>{a.pallets > 0 ? a.pallets : '—'}</td>
-                  <td className={num}>{a.paverCost > 0 ? fmt(a.paverCost) : '—'}</td>
+                  <td className={`${num} text-center`}>{a.pricePerSF > 0 ? fmt2(a.pricePerSF) : '—'}</td>
+                  <td className={`${num} text-center`}>{a.pallets > 0 ? a.pallets : '—'}</td>
+                  <td className={`${num} text-center`}>{a.paverCost > 0 ? fmt(a.paverCost) : '—'}</td>
                 </tr>
               )
             })}
@@ -1666,6 +1667,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                       value={row.baseSf ?? ''}
                       onChange={e => setRow(kArea, i, 'baseSf', e.target.value)}
                       placeholder={row.sf ? `Base SF (def ${row.sf})` : 'Base SF'}
+                      className="text-center"
                     />
                   </td>
                   <td className={td}>
@@ -1680,10 +1682,11 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                       value={row.depth}
                       onChange={e => setRow(kArea, i, 'depth', e.target.value)}
                       placeholder="6"
+                      className="text-center"
                     />
                   </td>
-                  <td className={num}>{a.baseTons > 0 ? a.baseTons.toFixed(1) : '—'}</td>
-                  <td className={num}>{fh(a.baseHrs)}</td>
+                  <td className={`${num} text-center`}>{a.baseTons > 0 ? a.baseTons.toFixed(1) : '—'}</td>
+                  <td className={`${num} text-center`}>{fh(a.baseHrs)}</td>
                 </tr>
               )
             })}
@@ -2065,9 +2068,10 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                       value={row.lf}
                       onChange={e => setRow('vertRows', i, 'lf', e.target.value)}
                       placeholder="LF"
+                      className="text-center"
                     />
                   </td>
-                  <td className={num}>{cost > 0 ? fmt2(cost) : '—'}</td>
+                  <td className={`${num} text-center`}>{cost > 0 ? fmt2(cost) : '—'}</td>
                 </tr>
               )
             })}
@@ -2119,6 +2123,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                     value={r.hours}
                     onChange={e => setRow(kManual, i, 'hours', e.target.value)}
                     step="0.5"
+                    className="text-center"
                   />
                 </td>
                 <td className={td}>
@@ -2126,6 +2131,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                     value={r.materials}
                     onChange={e => setRow(kManual, i, 'materials', e.target.value)}
                     step="1"
+                    className="text-center"
                   />
                 </td>
                 <td className={td}>
@@ -2133,6 +2139,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                     value={r.subCost}
                     onChange={e => setRow(kManual, i, 'subCost', e.target.value)}
                     step="1"
+                    className="text-center"
                   />
                 </td>
               </tr>

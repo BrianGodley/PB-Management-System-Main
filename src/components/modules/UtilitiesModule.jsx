@@ -1473,14 +1473,14 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                       </div>
                     </td>
                     <td className="py-1 pr-2">
-                      <NumInput value={row.lf} onChange={v => updateLine(i, 'lf', v)} className="w-full" />
+                      <NumInput value={row.lf} onChange={v => updateLine(i, 'lf', v)} className="w-full text-center" />
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
-                      <span className="inline-flex items-center justify-end gap-1">
+                      <span className="flex items-center justify-center gap-1">
                         ${matCost.toFixed(2)}
                       </span>
                     </td>
-                    <td className="py-1 text-right text-gray-600 text-xs">
+                    <td className="py-1 text-center text-gray-600 text-xs">
                       {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
                     </td>
                   </tr>
@@ -1572,14 +1572,14 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                       </div>
                     </td>
                     <td className="py-1 pr-2">
-                      <NumInput value={row.lf} onChange={v => updateWire(i, 'lf', v)} className="w-full" />
+                      <NumInput value={row.lf} onChange={v => updateWire(i, 'lf', v)} className="w-full text-center" />
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
-                      <span className="inline-flex items-center justify-end gap-1">
+                      <span className="flex items-center justify-center gap-1">
                         ${matCost.toFixed(2)}
                       </span>
                     </td>
-                    <td className="py-1 text-right text-gray-600 text-xs">
+                    <td className="py-1 text-center text-gray-600 text-xs">
                       {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
                     </td>
                   </tr>
@@ -1671,14 +1671,14 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                       </div>
                     </td>
                     <td className="py-1 pr-2">
-                      <NumInput value={row.qty} onChange={v => updateElecFixture(i, 'qty', v)} className="w-full" />
+                      <NumInput value={row.qty} onChange={v => updateElecFixture(i, 'qty', v)} className="w-full text-center" />
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
-                      <span className="inline-flex items-center justify-end gap-1">
+                      <span className="flex items-center justify-center gap-1">
                         ${matCost.toFixed(2)}
                       </span>
                     </td>
-                    <td className="py-1 text-right text-gray-600 text-xs">
+                    <td className="py-1 text-center text-gray-600 text-xs">
                       {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
                     </td>
                   </tr>
@@ -1770,14 +1770,14 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                       </div>
                     </td>
                     <td className="py-1 pr-2">
-                      <NumInput value={row.lf} onChange={v => updateGasPipe(i, 'lf', v)} className="w-full" />
+                      <NumInput value={row.lf} onChange={v => updateGasPipe(i, 'lf', v)} className="w-full text-center" />
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
-                      <span className="inline-flex items-center justify-end gap-1">
+                      <span className="flex items-center justify-center gap-1">
                         ${matCost.toFixed(2)}
                       </span>
                     </td>
-                    <td className="py-1 text-right text-gray-600 text-xs">
+                    <td className="py-1 text-center text-gray-600 text-xs">
                       {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
                     </td>
                   </tr>
@@ -1869,14 +1869,14 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                       </div>
                     </td>
                     <td className="py-1 pr-2">
-                      <NumInput value={row.qty} onChange={v => updateFixture(i, 'qty', v)} className="w-full" />
+                      <NumInput value={row.qty} onChange={v => updateFixture(i, 'qty', v)} className="w-full text-center" />
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
-                      <span className="inline-flex items-center justify-end gap-1">
+                      <span className="flex items-center justify-center gap-1">
                         ${matCost.toFixed(2)}
                       </span>
                     </td>
-                    <td className="py-1 text-right text-gray-600 text-xs">
+                    <td className="py-1 text-center text-gray-600 text-xs">
                       {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
                     </td>
                   </tr>
@@ -1975,15 +1975,15 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                             rows.map((rr, idx) => (idx === i ? { ...rr, lf: v } : rr))
                           )
                         }
-                        className="w-full"
+                        className="w-full text-center"
                       />
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
-                      <span className="inline-flex items-center justify-end gap-1">
+                      <span className="flex items-center justify-center gap-1">
                         ${matCost.toFixed(2)}
                       </span>
                     </td>
-                    <td className="py-1 text-right text-gray-600 text-xs">
+                    <td className="py-1 text-center text-gray-600 text-xs">
                       {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
                     </td>
                   </tr>
@@ -2030,17 +2030,18 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                     />
                   </td>
                   <td className="py-1 pr-2">
-                    <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} />
+                    <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} className="text-center" />
                   </td>
                   <td className="py-1 pr-2">
                     <NumInput
                       value={row.materials}
                       onChange={v => updateManual(i, 'materials', v)}
+                      className="text-center"
                     />
                   </td>
                   <td className="py-1">
                     {' '}
-                    <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} />
+                    <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} className="text-center" />
                   </td>
                 </tr>
               ))}

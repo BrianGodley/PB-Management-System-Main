@@ -755,7 +755,7 @@ function MaterialStepSection({
                   </select>
                 </td>
                 <td className="py-1 pr-2">
-                  <NumInput value={row.sf} onChange={v => setRow(i, 'sf', v)} />
+                  <NumInput value={row.sf} onChange={v => setRow(i, 'sf', v)} className="text-center" />
                 </td>
                 <td className="py-1 pr-2">
                   <select
@@ -767,7 +767,7 @@ function MaterialStepSection({
                     <option value="Yes">Yes</option>
                   </select>
                 </td>
-                <td className="py-1 pr-2 text-right text-gray-400 whitespace-nowrap">
+                <td className="py-1 pr-2 text-center text-gray-400 whitespace-nowrap">
                   {isSub ? (
                     sc.cost > 0 ? (
                       fmt2(sc.cost)
@@ -1393,7 +1393,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
                     </select>
                   </td>
                   <td className="py-1 pr-2">
-                    <NumInput value={row.sf} onChange={v => setConcRow(i, 'sf', v)} />
+                    <NumInput value={row.sf} onChange={v => setConcRow(i, 'sf', v)} className="text-center" />
                   </td>
                   <td className="py-1 pr-2">
                     <select
@@ -1408,7 +1408,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
                       ))}
                     </select>
                   </td>
-                  <td className="py-1 pr-2 text-right text-gray-400 whitespace-nowrap">
+                  <td className="py-1 pr-2 text-center text-gray-400 whitespace-nowrap">
                     {isSub ? (
                       sc.cost > 0 ? fmt2(sc.cost) : '—'
                     ) : (
@@ -1467,13 +1467,13 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
                   />
                 </td>
                 <td className="py-1 pr-2">
-                  <NumInput value={row.hours} onChange={v => setManual(i, 'hours', v)} />
+                  <NumInput value={row.hours} onChange={v => setManual(i, 'hours', v)} className="text-center" />
                 </td>
                 <td className="py-1 pr-2">
-                  <NumInput value={row.materials} onChange={v => setManual(i, 'materials', v)} />
+                  <NumInput value={row.materials} onChange={v => setManual(i, 'materials', v)} className="text-center" />
                 </td>
                 <td className="py-1">
-                  <NumInput value={row.subCost} onChange={v => setManual(i, 'subCost', v)} />
+                  <NumInput value={row.subCost} onChange={v => setManual(i, 'subCost', v)} className="text-center" />
                 </td>
               </tr>
             ))}

@@ -917,7 +917,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
     `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   const fh = v => (v > 0 ? v.toFixed(2) : '—')
   const td = 'py-1.5 pr-2 align-top'
-  const num = 'py-1.5 pr-2 text-gray-600 tabular-nums text-xs align-top'
+  const num = 'py-1.5 pr-2 text-gray-600 tabular-nums text-xs align-top text-center'
   const demoMethodKeys = DEMO_METHODS.map(m => m.key)
   const demoMethodLabels = DEMO_METHODS.map(m => m.label)
   const brandOpts = turfBrandOptions(materialRows)
@@ -1344,6 +1344,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                       value={row.sf}
                       onChange={e => setBaseRow(i, 'sf', e.target.value)}
                       placeholder={calc.turfAreaSF || '0'}
+                      className="text-center"
                     />
                   </td>
                   <td className={num}>
@@ -1474,12 +1475,14 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                         <Inp
                           value={roll.installSF || ''}
                           onChange={e => setRoll(i, 'installSF', e.target.value)}
+                          className="text-center"
                         />
                       </td>
                       <td className={td}>
                         <Inp
                           value={roll.edgeLF}
                           onChange={e => setRoll(i, 'edgeLF', e.target.value)}
+                          className="text-center"
                         />
                       </td>
                       <td className={num}>{cr.rowSubCost > 0 ? fmt2(cr.rowSubCost) : '—'}</td>
@@ -1490,6 +1493,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                         <Inp
                           value={roll.edgeLF}
                           onChange={e => setRoll(i, 'edgeLF', e.target.value)}
+                          className="text-center"
                         />
                       </td>
                       <td className={num}>{cr.sf > 0 ? cr.sf.toLocaleString() : '—'}</td>
@@ -1619,6 +1623,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                     <Inp
                       value={strip?.lf || ''}
                       onChange={e => setStripRow(i, 'lf', e.target.value)}
+                      className="text-center"
                     />
                   </td>
                   <td className={td}>
@@ -1627,6 +1632,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                       onChange={e => setStripRow(i, 'widthIn', e.target.value)}
                       placeholder="12"
                       step="1"
+                      className="text-center"
                     />
                   </td>
                   {calc.isSub ? (
@@ -1680,6 +1686,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                     value={r.hours}
                     onChange={e => setRow(i, 'hours', e.target.value)}
                     step="0.5"
+                    className="text-center"
                   />
                 </td>
                 <td className={td}>
@@ -1687,6 +1694,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                     value={r.materials}
                     onChange={e => setRow(i, 'materials', e.target.value)}
                     step="1"
+                    className="text-center"
                   />
                 </td>
                 <td className={td}>
@@ -1694,6 +1702,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                     value={r.subCost}
                     onChange={e => setRow(i, 'subCost', e.target.value)}
                     step="1"
+                    className="text-center"
                   />
                 </td>
               </tr>

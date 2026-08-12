@@ -390,7 +390,7 @@ function SecHdr({ title }) {
     </div>
   )
 }
-function Inp({ value, onChange, placeholder = '0', type = 'number', step }) {
+function Inp({ value, onChange, placeholder = '0', type = 'number', step, className = '' }) {
   return (
     <input
       type={type}
@@ -398,7 +398,7 @@ function Inp({ value, onChange, placeholder = '0', type = 'number', step }) {
       onChange={onChange}
       placeholder={placeholder}
       step={step}
-      className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+      className={`w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 ${className}`}
     />
   )
 }
@@ -625,7 +625,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
   const fh = v => (v > 0 ? v.toFixed(2) : '—')
 
   const td = 'py-1.5 pr-2 align-top'
-  const num = 'py-1.5 pr-2 text-gray-600 tabular-nums text-xs align-top'
+  const num = 'py-1.5 pr-2 text-gray-600 tabular-nums text-xs align-top text-center'
 
   function handleSave() {
     onSave({
@@ -876,7 +876,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
                     </div>
                   </td>
                   <td className={td}>
-                    <Inp value={row.qty} onChange={e => zoneUpdate(i, 'qty', e.target.value)} />
+                    <Inp value={row.qty} onChange={e => zoneUpdate(i, 'qty', e.target.value)} className="text-center" />
                   </td>
                   <td className={td}>
                     <Sel
@@ -885,12 +885,12 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
                       options={['Hand', 'Trench']}
                     />
                   </td>
-                  <td className={td}>
+                  <td className={`${td} text-center`}>
                     {isSub ? (
                       <input
                         type="number"
                         step="any"
-                        className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-1 focus:ring-blue-400"
+                        className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-1 focus:ring-blue-400"
                         placeholder={r2(c.unitPrice).toString()}
                         value={row.subEach ?? ''}
                         onChange={e => zoneUpdate(i, 'subEach', e.target.value)}
@@ -970,14 +970,14 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
                     </div>
                   </td>
                   <td className={td}>
-                    <Inp value={row.qty} onChange={e => timerUpdate(i, 'qty', e.target.value)} />
+                    <Inp value={row.qty} onChange={e => timerUpdate(i, 'qty', e.target.value)} className="text-center" />
                   </td>
-                  <td className={td}>
+                  <td className={`${td} text-center`}>
                     {isSub ? (
                       <input
                         type="number"
                         step="any"
-                        className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-1 focus:ring-blue-400"
+                        className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-1 focus:ring-blue-400"
                         placeholder={r2(c.unitPrice).toString()}
                         value={row.subEach ?? ''}
                         onChange={e => timerUpdate(i, 'subEach', e.target.value)}
@@ -1037,13 +1037,14 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
                   />
                 </td>
                 <td className={td}>
-                  <Inp value={r.hours} onChange={e => updateManual(i, 'hours', e.target.value)} step="0.5" />
+                  <Inp value={r.hours} onChange={e => updateManual(i, 'hours', e.target.value)} step="0.5" className="text-center" />
                 </td>
                 <td className={td}>
                   <Inp
                     value={r.materials}
                     onChange={e => updateManual(i, 'materials', e.target.value)}
                     step="1"
+                    className="text-center"
                   />
                 </td>
                 <td className={td}>
@@ -1051,6 +1052,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
                     value={r.subCost}
                     onChange={e => updateManual(i, 'subCost', e.target.value)}
                     step="1"
+                    className="text-center"
                   />
                 </td>
               </tr>

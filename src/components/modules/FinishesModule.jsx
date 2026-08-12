@@ -730,7 +730,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
   function rateCell(row, meta, setRows, i, compute) {
     if (!meta || !meta.matKey) return <span className="text-xs text-gray-300">—</span>
     return (
-      <div className="flex items-center gap-1 flex-wrap">
+      <div className="flex items-center justify-center gap-1 flex-wrap">
         {meta.override ? (
           <div className="relative w-24">
             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
@@ -820,16 +820,16 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
                       <NumInput
                         value={row.sf}
                         onChange={v => patchRow(setRows, i, { sf: v }, compute, false)}
-                        className="w-24"
+                        className="w-full text-center"
                       />
                     </td>
                     <td className="py-1.5 pr-2">{rateCell(row, meta, setRows, i, compute)}</td>
-                    <td className="py-1.5 text-right text-xs pr-2">
+                    <td className="py-1.5 text-center text-xs pr-2">
                       {isSub ? (
                         <input
                           type="number"
                           step="any"
-                          className="input text-sm py-1 w-24 text-right"
+                          className="input text-sm py-1 w-full text-center"
                           placeholder={r2(c.subUnit).toString()}
                           value={row.subEach ?? ''}
                           onChange={e =>
@@ -837,12 +837,12 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
                           }
                         />
                       ) : (
-                        <span className="text-gray-400">{c.hrs > 0 ? c.hrs.toFixed(2) : '—'}</span>
+                        <span className="text-gray-400 block text-center">{c.hrs > 0 ? c.hrs.toFixed(2) : '—'}</span>
                       )}
                     </td>
-                    <td className="py-1.5 text-right text-xs text-gray-600">
+                    <td className="py-1.5 text-center text-xs text-gray-600">
                       {(isSub ? c.subMat : c.mat) > 0 ? (
-                        <div className="text-right">
+                        <div className="text-center">
                           <div>{fmt2(isSub ? c.subMat : c.mat)}</div>
                           {!isSub && c.tons > 0 && (
                             <div className="text-gray-400">{c.tons.toFixed(2)} tons</div>
@@ -957,7 +957,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
                         <NumInput
                           value={row.widthIn}
                           onChange={v => patchRow(setCapRows, i, { widthIn: v }, computeCapRow, true)}
-                          className="w-20"
+                          className="w-full text-center"
                           placeholder="4"
                         />
                       )}
@@ -975,24 +975,24 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
                               false
                             )
                           }
-                          className="w-20"
+                          className="w-full text-center"
                           placeholder="0"
                         />
                       )}
                     </td>
-                    <td className="py-1.5 pr-2">
+                    <td className="py-1.5 pr-2 text-center">
                       {isActive ? rateCell(row, meta, setCapRows, i, computeCapRow) : (
                         <span className="text-xs text-gray-300">—</span>
                       )}
                     </td>
-                    <td className="py-1.5 text-right text-xs pr-2">
+                    <td className="py-1.5 text-center text-xs pr-2">
                       {!isActive ? (
-                        <span className="text-gray-300">—</span>
+                        <span className="text-gray-300 block text-center">—</span>
                       ) : isSub ? (
                         <input
                           type="number"
                           step="any"
-                          className="input text-sm py-1 w-24 text-right"
+                          className="input text-sm py-1 w-full text-center"
                           placeholder={r2(c.subUnit).toString()}
                           value={row.subEach ?? ''}
                           onChange={e =>
@@ -1000,10 +1000,10 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
                           }
                         />
                       ) : (
-                        <span className="text-gray-400">{c.hrs > 0 ? c.hrs.toFixed(2) : '—'}</span>
+                        <span className="text-gray-400 block text-center">{c.hrs > 0 ? c.hrs.toFixed(2) : '—'}</span>
                       )}
                     </td>
-                    <td className="py-1.5 text-right text-xs text-gray-600">
+                    <td className="py-1.5 text-center text-xs text-gray-600">
                       {(isSub ? c.subMat : c.mat) > 0 ? fmt2(isSub ? c.subMat : c.mat) : '—'}
                     </td>
                     <td className="py-1.5 text-right">
@@ -1267,17 +1267,18 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
                     />
                   </td>
                   <td className="py-1 pr-2">
-                    <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} />
+                    <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} className="text-center" />
                   </td>
                   <td className="py-1 pr-2">
                     <NumInput
                       value={row.materials}
                       onChange={v => updateManual(i, 'materials', v)}
+                      className="text-center"
                     />
                   </td>
                   <td className="py-1">
                     {' '}
-                    <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} />
+                    <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} className="text-center" />
                   </td>
                 </tr>
               ))}

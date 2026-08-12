@@ -3988,14 +3988,14 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
                   />
                 </td>
                 <td className="py-1 pr-2">
-                  <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} />
+                  <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} className="text-center" />
                 </td>
                 <td className="py-1 pr-2">
-                  <NumInput value={row.materials} onChange={v => updateManual(i, 'materials', v)} />
+                  <NumInput value={row.materials} onChange={v => updateManual(i, 'materials', v)} className="text-center" />
                 </td>
                 <td className="py-1">
                   {' '}
-                  <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} />
+                  <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} className="text-center" />
                 </td>
               </tr>
             ))}

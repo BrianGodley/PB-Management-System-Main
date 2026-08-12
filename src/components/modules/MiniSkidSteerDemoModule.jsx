@@ -1177,9 +1177,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             onChange={e => set('difficulty', e.target.value)}
             step="5"
           />
-          <p className="text-[10px] text-gray-500 mt-0.5 inline-flex items-center gap-1">
-            {calc.difficultyRatio}% labor per 1%
-          </p>
         </div>
         <div className={isSub ? 'hidden' : undefined}>
           <p
@@ -1193,11 +1190,6 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             onChange={e => set('distanceLF', e.target.value)}
             step="5"
           />
-          <p className="text-[10px] text-gray-500 mt-0.5 inline-flex items-center gap-1 flex-wrap">
-            {calc.haulSecPerFt} sec/ft
-            · {calc.haulLoadCy} cy/load
-            {calc.walkHrs > 0 && <span>· +{calc.walkHrs.toFixed(2)} hrs haul</span>}
-          </p>
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
@@ -1902,6 +1894,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                     type="text"
                     value={r.label}
                     onChange={e => setRow(isSub ? 'subManualRows' : 'manualRows', i, 'label', e.target.value)}
+                    className="text-center"
                     placeholder="Description"
                   />
                 </td>
@@ -1909,6 +1902,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                   <Inp
                     value={r.hours}
                     onChange={e => setRow(isSub ? 'subManualRows' : 'manualRows', i, 'hours', e.target.value)}
+                    className="text-center"
                     step="0.5"
                   />
                 </td>
@@ -1916,6 +1910,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                   <Inp
                     value={r.materials}
                     onChange={e => setRow(isSub ? 'subManualRows' : 'manualRows', i, 'materials', e.target.value)}
+                    className="text-center"
                     step="1"
                   />
                 </td>
@@ -1923,6 +1918,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                   <Inp
                     value={r.subCost}
                     onChange={e => setRow(isSub ? 'subManualRows' : 'manualRows', i, 'subCost', e.target.value)}
+                    className="text-center"
                     step="1"
                   />
                 </td>

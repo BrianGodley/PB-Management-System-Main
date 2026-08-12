@@ -1502,16 +1502,17 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                       </div>
                     </td>
                     <td className="py-1 pr-2">
-                      <NumInput value={row.sf} onChange={v => updateBaseRow(i, 'sf', v)} />
+                      <NumInput value={row.sf} onChange={v => updateBaseRow(i, 'sf', v)} className="text-center" />
                     </td>
                     <td className="py-1 pr-2">
                       <NumInput
                         value={row.depth}
                         onChange={v => updateBaseRow(i, 'depth', v)}
                         placeholder="2"
+                        className="text-center"
                       />
                     </td>
-                    <td className="py-1 text-right text-gray-500 text-xs">
+                    <td className="py-1 text-center text-gray-500 text-xs">
                       {c.hrs > 0 ? c.hrs.toFixed(2) : '—'}
                       {c.mat > 0 && <p className="text-gray-400">{fmt2(c.mat)}</p>}
                     </td>
@@ -1618,13 +1619,13 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                         value={installTiers[t.key] ?? ''}
                         onChange={v => setInstallTiers({ ...installTiers, [t.key]: v })}
                         placeholder="0"
-                        className="w-full"
+                        className="w-full text-center"
                       />
                       <NumInput
                         value={installTierDepth[t.key] ?? ''}
                         onChange={v => setInstallTierDepth({ ...installTierDepth, [t.key]: v })}
                         placeholder="4"
-                        className="w-full"
+                        className="w-full text-center"
                       />
                       <div className="flex items-center justify-end gap-2 whitespace-nowrap">
                         <span className="text-[11px] text-gray-400 inline-flex items-center gap-1">
@@ -1833,17 +1834,18 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                     />
                   </td>
                   <td className="py-1 pr-2">
-                    <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} />
+                    <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} className="text-center" />
                   </td>
                   <td className="py-1 pr-2">
                     <NumInput
                       value={row.materials}
                       onChange={v => updateManual(i, 'materials', v)}
+                      className="text-center"
                     />
                   </td>
                   <td className="py-1">
                     {' '}
-                    <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} />
+                    <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} className="text-center" />
                   </td>
                 </tr>
               ))}

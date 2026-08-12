@@ -366,14 +366,14 @@ function EpTable({
                     </div>
                   </td>
                   <td className="py-1 pr-2">
-                    <NumInput value={row[qtyField]} onChange={v => upd(i, qtyField, v)} className="w-full" />
+                    <NumInput value={row[qtyField]} onChange={v => upd(i, qtyField, v)} className="w-full text-center" />
                   </td>
-                  <td className="py-1 text-right text-gray-400 text-xs pr-2">
-                    <span className="inline-flex items-center justify-end gap-1">
+                  <td className="py-1 text-center text-gray-400 text-xs pr-2">
+                    <span className="inline-flex items-center justify-center gap-1">
                       ${matCost.toFixed(2)}
                     </span>
                   </td>
-                  <td className="py-1 text-right text-gray-600 text-xs">
+                  <td className="py-1 text-center text-gray-600 text-xs">
                     {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
                   </td>
                   <td className="py-1 text-center">
@@ -2528,15 +2528,15 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
               </div>
               <div>
                 {i === 0 && <Label text="Hours" center />}
-                <NumInput value={r.hours} onChange={v => updManual(i, 'hours', v)} />
+                <NumInput value={r.hours} onChange={v => updManual(i, 'hours', v)} className="text-center" />
               </div>
               <div>
                 {i === 0 && <Label text="Materials $" center />}
-                <NumInput value={r.materials} onChange={v => updManual(i, 'materials', v)} />
+                <NumInput value={r.materials} onChange={v => updManual(i, 'materials', v)} className="text-center" />
               </div>
               <div>
                 {i === 0 && <Label text="Sub Cost $" center />}
-                <NumInput value={r.subCost} onChange={v => updManual(i, 'subCost', v)} />
+                <NumInput value={r.subCost} onChange={v => updManual(i, 'subCost', v)} className="text-center" />
               </div>
               <button
                 type="button"

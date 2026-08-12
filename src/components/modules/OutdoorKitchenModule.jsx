@@ -430,14 +430,14 @@ function EpTable({
                     </div>
                   </td>
                   <td className="py-1 pr-2">
-                    <NumInput value={row[qtyField]} onChange={v => upd(i, qtyField, v)} className="w-full" />
+                    <NumInput value={row[qtyField]} onChange={v => upd(i, qtyField, v)} className="w-full text-center" />
                   </td>
-                  <td className="py-1 text-right text-gray-400 text-xs pr-2">
-                    <span className="inline-flex items-center justify-end gap-1">
+                  <td className="py-1 text-center text-gray-400 text-xs pr-2">
+                    <span className="inline-flex items-center justify-center gap-1">
                       ${matCost.toFixed(2)}
                     </span>
                   </td>
-                  <td className="py-1 text-right text-gray-600 text-xs">
+                  <td className="py-1 text-center text-gray-600 text-xs">
                     {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
                   </td>
                   <td className="py-1 text-center">
@@ -1465,13 +1465,13 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                         </span>
                       </td>
                       <td className="py-1 pr-2">
-                        <NumInput value={row.qty} onChange={v => setRow('qty', v)} className="w-full" placeholder="0" />
+                        <NumInput value={row.qty} onChange={v => setRow('qty', v)} className="w-full text-center" placeholder="0" />
                       </td>
                       <td className="py-1 pr-2">
                         <NumInput
                           value={row.unitCost}
                           onChange={v => setRow('unitCost', v)}
-                          className="w-full"
+                          className="w-full text-center"
                           placeholder={applianceUnitPrice(row, materialRows, p, true).toFixed(2)}
                         />
                       </td>
@@ -1489,14 +1489,14 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                         <NumInput
                           value={row.hours}
                           onChange={v => setRow('hours', v)}
-                          className="w-full"
+                          className="w-full text-center"
                           placeholder={p(
                             OK_RATES.applianceInstallHrs.dbName,
                             OK_RATES.applianceInstallHrs.fallback
                           ).toFixed(2)}
                         />
                       </td>
-                      <td className="py-1 pr-2 text-right text-xs text-gray-600">
+                      <td className="py-1 pr-2 text-center text-xs text-gray-600">
                         {row.clientProvided ? 'client' : eqMat > 0 ? `$${eqMat.toFixed(2)}` : '—'}
                       </td>
                       <td className="py-1 text-center">
@@ -1606,13 +1606,13 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                         </span>
                       </td>
                       <td className="py-1 pr-2">
-                        <NumInput value={row.qty} onChange={v => setRow('qty', v)} className="w-full" placeholder="0" />
+                        <NumInput value={row.qty} onChange={v => setRow('qty', v)} className="w-full text-center" placeholder="0" />
                       </td>
                       <td className="py-1 pr-2">
                         <NumInput
                           value={row.unitCost}
                           onChange={v => setRow('unitCost', v)}
-                          className="w-full"
+                          className="w-full text-center"
                           placeholder={sinkUnitPrice(row, materialRows, p, true).toFixed(2)}
                         />
                       </td>
@@ -1630,14 +1630,14 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                         <NumInput
                           value={row.hours}
                           onChange={v => setRow('hours', v)}
-                          className="w-full"
+                          className="w-full text-center"
                           placeholder={p(
                             OK_RATES.sinkLab.dbName,
                             OK_RATES.sinkLab.fallback
                           ).toFixed(2)}
                         />
                       </td>
-                      <td className="py-1 pr-2 text-right text-xs text-gray-600">
+                      <td className="py-1 pr-2 text-center text-xs text-gray-600">
                         {row.clientProvided ? 'client' : skMat > 0 ? `$${skMat.toFixed(2)}` : '—'}
                       </td>
                       <td className="py-1 text-center">
@@ -1784,12 +1784,12 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                       </span>
                     </td>
                     <td className="py-1 pr-2">
-                      <NumInput value={row.sf} onChange={v => setWallFinishRow(i, 'sf', v)} className="w-full" />
+                      <NumInput value={row.sf} onChange={v => setWallFinishRow(i, 'sf', v)} className="w-full text-center" />
                     </td>
-                    <td className="py-1 pr-2 text-right text-gray-400 text-xs">
+                    <td className="py-1 pr-2 text-center text-gray-400 text-xs">
                       {rc.unit ? `$${rc.unit.toFixed(2)}/${meta?.unit === 'ton' ? 'ton' : 'SF'}` : '—'}
                     </td>
-                    <td className="py-1 text-right text-xs text-gray-600">
+                    <td className="py-1 text-center text-xs text-gray-600">
                       {rc.mat > 0 ? `$${rc.mat.toFixed(2)}` : '—'}
                       {rc.hrs > 0 ? (
                         <span className="text-gray-400"> · {rc.hrs.toFixed(1)}h</span>
@@ -1827,17 +1827,18 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                     />
                   </td>
                   <td className="py-1 pr-2">
-                    <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} />
+                    <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} className="text-center" />
                   </td>
                   <td className="py-1 pr-2">
                     <NumInput
                       value={row.materials}
                       onChange={v => updateManual(i, 'materials', v)}
+                      className="text-center"
                     />
                   </td>
                   <td className="py-1">
                     {' '}
-                    <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} />
+                    <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} className="text-center" />
                   </td>
                 </tr>
               ))}
