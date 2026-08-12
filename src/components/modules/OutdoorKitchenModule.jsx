@@ -1245,59 +1245,6 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
       {/* ── BBQ Structure ── */}
       <div>
         <SectionHeader title="BBQ Structure" />
-        {isSub ? (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3 text-[11px] text-gray-500">
-            <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">
-              Subcontractor Structure Rates ($/LF)
-            </p>
-            <div className="flex flex-wrap gap-x-3 gap-y-1">
-              <span className="inline-flex items-center gap-1">
-                BBQ Wall ${p(OK_RATES.bbqSubWallLF.dbName, 150).toFixed(2)}/LF
-              </span>
-              <span className="inline-flex items-center gap-1">
-                Backsplash ${p(OK_RATES.bbqSubBackLF.dbName, 100).toFixed(2)}/LF
-              </span>
-            </div>
-          </div>
-        ) : (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3 text-[11px] text-gray-500">
-          <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">
-            BBQ Structural Rates
-          </p>
-          <div className="flex flex-wrap gap-x-3 gap-y-1">
-            <span className="inline-flex items-center gap-1">
-              Block ${p(OK_RATES.bbqBlock.dbName, 2.5).toFixed(2)}/ea
-            </span>
-            <span className="inline-flex items-center gap-1">
-              Rebar ${p(OK_RATES.bbqRebar.dbName, 0.4).toFixed(2)}/LF
-            </span>
-            <span className="inline-flex items-center gap-1">
-              Concrete ${p(OK_RATES.bbqConcrete.dbName, 149.5).toFixed(2)}/CY
-            </span>
-            <span className="inline-flex items-center gap-1">
-              Grout ${p(OK_RATES.bbqConcrete.dbName, 149.5).toFixed(2)}/CY ·{' '}
-              {groutCuFtPerBlock(8, 8)} cf/block
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
-            <span className="inline-flex items-center gap-1">
-              Excavate {p(OK_RATES.excavateLab.dbName, 5)} CF/hr
-            </span>
-            <span className="inline-flex items-center gap-1">
-              Rebar {p(OK_RATES.rebarLab.dbName, 146)} LF/day
-            </span>
-            <span className="inline-flex items-center gap-1">
-              Pour {p(OK_RATES.pourFootingLab.dbName, 4)} hrs/CY
-            </span>
-            <span className="inline-flex items-center gap-1">
-              Block {p(OK_RATES.installBlockLab.dbName, 60)} blk/day
-            </span>
-            <span className="inline-flex items-center gap-1">
-              Fill {p(OK_RATES.fillBlockLab.dbName, 146)} blk/day
-            </span>
-          </div>
-        </div>
-        )}
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div>
             <label className="block text-xs text-gray-500 mb-1">BBQ Wall Length (LF)</label>
@@ -1351,28 +1298,6 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
       {/* ── Countertop ── */}
       <div>
         <SectionHeader title="Concrete Countertop" />
-        <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-2 text-[11px] text-gray-500">
-          <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">
-            Countertop Rates
-          </p>
-          <div className="flex flex-wrap gap-x-3 gap-y-1">
-            <span className="inline-flex items-center gap-1">
-              Concrete ${p(OK_RATES.bbqConcrete.dbName, 149.5).toFixed(2)}/CY
-            </span>
-            <span className="inline-flex items-center gap-1">
-              Form {p(OK_RATES.counterFormLab.dbName, 20)} LF/hr
-            </span>
-            <span className="inline-flex items-center gap-1">
-              Pour {p(OK_RATES.counterPourLab.dbName, 50)} SF/day
-            </span>
-            <span className="inline-flex items-center gap-1">
-              Broom {p(OK_RATES.counterBroomLab.dbName, 60)} SF/day
-            </span>
-            <span className="inline-flex items-center gap-1">
-              Polish {p(OK_RATES.counterPolishLab.dbName, 18)} SF/day
-            </span>
-          </div>
-        </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs text-gray-500 mb-1">Area (SF)</label>
