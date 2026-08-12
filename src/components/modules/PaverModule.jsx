@@ -15,7 +15,8 @@ import ModuleHeaderSlot from './ModuleHeaderSlot'
 //   Paver - 80mm Add         0.15 (multiplier × install SF / install rate)
 //   Paver - Stone Add        0.05 hrs/ea
 //   Paver - Color Add        0.05 hrs/ea
-//   Paver - Poly Sand Spread 0.004 hrs/SF
+//   Paver - Poly Sand New    0.004 hrs/SF
+//   Paver - Poly Sand Existing 0.0075 hrs/SF (labor)
 //   Paver - Base Skid Steer Good 10 tons/hr
 //   Paver - Base Skid Steer OK   7.5 tons/hr
 //   Paver - Base Mini Skid Steer  5 tons/hr
@@ -81,7 +82,8 @@ const LABOR_DEFAULTS = {
   add80mm: 0.15,
   addStone: 0.05,
   addColor: 0.05,
-  polySandSpread: 0.004,
+  polySandSpread: 0.004, // Poly Sand New labor coefficient (hrs/SF)
+  polySandExistingSpread: 0.0075, // Poly Sand Existing labor coefficient (hrs/SF)
   baseBobcatGood: 10,
   baseBobcatOK: 7.5,
   baseMiniBobcat: 5,
@@ -153,7 +155,10 @@ function calcPaver(
   const add80mmMult = lr['Paver - 80mm Add'] ?? LABOR_DEFAULTS.add80mm
   const addStonePer = lr['Paver - Stone Add'] ?? LABOR_DEFAULTS.addStone
   const addColorPer = lr['Paver - Color Add'] ?? LABOR_DEFAULTS.addColor
-  const polySandSpread = lr['Paver - Poly Sand Spread'] ?? LABOR_DEFAULTS.polySandSpread
+  // Poly Sand labor coefficients — New and Existing are now independent rates.
+  const polySandNewSpread = lr['Paver - Poly Sand New'] ?? LABOR_DEFAULTS.polySandSpread
+  const polySandExistingSpread =
+    lr['Paver - Poly Sand Existing'] ?? LABOR_DEFAULTS.polySandExistingSpread
   const baseBobcatGood = lr['Paver - Base Skid Steer Good'] ?? LABOR_DEFAULTS.baseBobcatGood
   const baseBobcatOK = lr['Paver - Base Skid Steer OK'] ?? LABOR_DEFAULTS.baseBobcatOK
   const baseMiniBobcat = lr['Paver - Base Mini Skid Steer'] ?? LABOR_DEFAULTS.baseMiniBobcat
@@ -163,11 +168,8 @@ function calcPaver(
   const baseRockPerTon = mr['Paver - Base Rock'] ?? MAT_DEFAULTS.baseRock
   const beddingSandPerTon = mr['Bedding Sand'] ?? MAT_DEFAULTS.beddingSand // shared Basic Materials
   const jointSandPerSF = mr['Paver - Joint Sand'] ?? MAT_DEFAULTS.jointSand
+  // Single poly-sand MATERIAL rate used for BOTH New and Existing pavers.
   const polySandPerSF = mr['Paver - Poly Sand'] ?? MAT_DEFAULTS.polySandMat
-  // Existing-paver poly sand rate falls back to 1.5× the new-paver rate so
-  // changing the base rate cascades sensibly until an admin overrides it.
-  const polySandExistingPerSF =
-    mr['Paver - Poly Sand Existing'] ?? polySandPerSF * 1.5
   const sealerMatPerSF = mr['Paver - Sealer'] ?? MAT_DEFAULTS.sealerMat
   const restraintConcrLF = mr['Paver - Restraint Concrete'] ?? MAT_DEFAULTS.restraintConcr
   const sleevesMatLF = mr['Paver - Sleeves'] ?? MAT_DEFAULTS.sleevesMat
@@ -292,13 +294,14 @@ function calcPaver(
   const vertTotalLF = vertRows.reduce((s, r) => s + n(r.lf), 0)
   const vertSoldierHrs = vertTotalLF > 0 ? vertTotalLF / vertSoldierRate : 0
   const sealerHrs = n(state.sealerSF) > 0 ? n(state.sealerSF) / sealerRate : 0
-  // Poly Sand — New pavers: own SF input × the poly-sand spread labor coefficient
-  // (Paver - Poly Sand Spread, fallback 0.004 hrs/SF). Independent of the paver area.
+  // Poly Sand — New pavers: own SF input × the New poly-sand labor coefficient
+  // (Paver - Poly Sand New, fallback 0.004 hrs/SF). Independent of the paver area.
   const polySandNewSFVal = n(state.polySandNewSF)
-  const polySandHrs = polySandNewSFVal * polySandSpread
-  // Poly Sand — Existing pavers: own SF input, same spread coefficient.
+  const polySandHrs = polySandNewSFVal * polySandNewSpread
+  // Poly Sand — Existing pavers: own SF input × its OWN Existing labor coefficient
+  // (Paver - Poly Sand Existing, fallback 0.0075 hrs/SF).
   const polySandExistingSFVal = n(state.polySandExistingSF)
-  const polySandExistingHrs = polySandExistingSFVal * polySandSpread
+  const polySandExistingHrs = polySandExistingSFVal * polySandExistingSpread
   const addStoneHrs = n(state.numStones) * addStonePer
   const addColorHrs = n(state.numColors) * addColorPer
 
@@ -388,7 +391,8 @@ function calcPaver(
   const beddingSandCost = sfToTons(matInstallSF, 1, tonsDivisor) * beddingSandPerTon
   const jointSandCost = matInstallSF * jointSandPerSF
   const polySandCost = mPolyNewSF > 0 ? mPolyNewSF * polySandPerSF : 0
-  const polySandExistingCost = mPolyExistingSF * polySandExistingPerSF
+  // Existing poly sand MATERIAL uses the SAME single rate as New (Paver - Poly Sand).
+  const polySandExistingCost = mPolyExistingSF * polySandPerSF
   const sealerMatCost = mSealerSF * sealerMatPerSF
   const restraintMatCost = mRestraintsLF * restraintConcrLF
   const sleevesMatCost = mSleevesLF * sleevesMatLF
@@ -499,7 +503,6 @@ function calcPaver(
     beddingSandPerTon,
     jointSandPerSF,
     polySandPerSF,
-    polySandExistingPerSF,
     sealerMatPerSF,
     restraintConcrLF,
     sleevesMatLF,
@@ -841,6 +844,29 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   const kStones = isSub ? 'subNumStones' : 'numStones'
   const kColors = isSub ? 'subNumColors' : 'numColors'
   const kManual = isSub ? 'subManualRows' : 'manualRows'
+
+  // Append an empty area row to the ACTIVE tab's shared area array. Both the
+  // Paver Material and Base Material tables render from state[kArea], so a new
+  // row shows up in both. Empty vendor ('' → "Select") means the row is
+  // unselected and contributes $0 until filled (calc is guarded on selection).
+  const addAreaRow = () => {
+    const rows = state[kArea] || []
+    const base = {
+      label: `Area ${rows.length + 1}`,
+      method: 'Skid OK',
+      sf: '',
+      depth: 6,
+      paverVendor: '',
+      paverType: '',
+      customPricePerSF: '',
+      baseVendor: '',
+      baseType: '',
+    }
+    const newRow = isSub
+      ? { ...base, installType: 'Hand Demo', largeFormat: false, under500: false }
+      : base
+    set(kArea, [...rows, newRow])
+  }
 
   // ── Sub tab unit-price rates (per-SF install types + per-LF sleeves) ─────────
   // Simple $/SF install pricing keyed by install type, plus per-SF surcharges
@@ -1204,13 +1230,24 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           value: laborRates['Paver - Color Add'] ?? LABOR_DEFAULTS.addColor,
         },
         {
-          label: 'Paver - Poly Sand Spread',
+          label: 'Poly Sand New',
           table: 'labor_rates',
-          name: 'Paver - Poly Sand Spread',
+          name: 'Paver - Poly Sand New',
           category: 'Paver',
           mode: 'coefficient',
           unitLabel: 'hrs/SF',
-          value: laborRates['Paver - Poly Sand Spread'] ?? LABOR_DEFAULTS.polySandSpread,
+          value: laborRates['Paver - Poly Sand New'] ?? LABOR_DEFAULTS.polySandSpread,
+        },
+        {
+          label: 'Poly Sand Existing',
+          table: 'labor_rates',
+          name: 'Paver - Poly Sand Existing',
+          category: 'Paver',
+          mode: 'coefficient',
+          unitLabel: 'hrs/SF',
+          value:
+            laborRates['Paver - Poly Sand Existing'] ??
+            LABOR_DEFAULTS.polySandExistingSpread,
         },
         {
           label: 'Paver - Sealer',
@@ -1234,8 +1271,16 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         // named consumables (sands, sealer, restraint, sleeves, pallet/delivery).
         ...catalogBlockItems(PAVER_CAT.paver),
         ...materialRateRows('Paver - Joint Sand'),
+        {
+          label: 'Poly Sand',
+          table: 'material_rates',
+          name: 'Paver - Poly Sand',
+          category: 'Paver',
+          mode: 'currency',
+          unitLabel: '$/SF',
+          value: calc.polySandPerSF,
+        },
         ...materialRateRows('Paver - Poly Sand'),
-        ...materialRateRows('Paver - Poly Sand Existing'),
         ...materialRateRows('Paver - Sealer'),
         ...materialRateRows('Paver - Restraint Concrete'),
         ...materialRateRows('Paver - Sleeves'),
@@ -1476,6 +1521,13 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             })}
           </tbody>
         </table>
+        <button
+          type="button"
+          onClick={() => addAreaRow()}
+          className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+        >
+          + Add row
+        </button>
       </div>
 
       {/* ── Additional Paver Costs (moved directly below Paver Material) ───────── */}
@@ -1637,6 +1689,13 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             })}
           </tbody>
         </table>
+        <button
+          type="button"
+          onClick={() => addAreaRow()}
+          className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+        >
+          + Add row
+        </button>
       </div>
 
       {/* ── Paver Labor (In-House) / Paver/Demo Installation (Sub) ─────────── */}
@@ -1677,7 +1736,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                 <span className="inline-flex items-center gap-1 flex-wrap">
                   Poly Sand New{' '}
                   <span className="text-gray-400 font-normal">
-                    ({laborRates['Paver - Poly Sand Spread'] ?? LABOR_DEFAULTS.polySandSpread}{' '}
+                    ({laborRates['Paver - Poly Sand New'] ?? LABOR_DEFAULTS.polySandSpread}{' '}
                     hrs/SF)
                   </span>
                   <span className="text-gray-400 font-normal">· ${calc.polySandPerSF}/SF mat</span>
@@ -1698,11 +1757,12 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                 <span className="inline-flex items-center gap-1 flex-wrap">
                   Poly Sand Existing{' '}
                   <span className="text-gray-400 font-normal">
-                    ({laborRates['Paver - Poly Sand Spread'] ?? LABOR_DEFAULTS.polySandSpread}{' '}
+                    ({laborRates['Paver - Poly Sand Existing'] ??
+                      LABOR_DEFAULTS.polySandExistingSpread}{' '}
                     hrs/SF)
                   </span>
                   <span className="text-gray-400 font-normal">
-                    · ${calc.polySandExistingPerSF}/SF mat
+                    · ${calc.polySandPerSF}/SF mat
                   </span>
                 </span>
               </td>
