@@ -527,7 +527,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
       fetchStandardRateMap(['Drainage']),
       supabase.from('subcontractor_rates').select('company_name, rate').eq('category', 'Drainage'),
     ])
-    setMaterialPrices(matMap)
+    setMaterialPrices(initialData?.materialPrices ? { ...matMap, ...initialData.materialPrices } : matMap)
     if (subRes.data) {
       const sr = {}
       subRes.data.forEach(r => {
@@ -563,8 +563,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         })
     }
 
-    // Fetch material prices unless we have a saved snapshot from initialData
-    if (initialData?.materialPrices) return
+    // Always refresh the catalog on open so newly-added Master Rates items appear.
     refreshMaterialPrices()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -739,7 +738,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         laborBurdenPct,
         gpmd,
         materialPrices, // snapshot of prices used — so the summary always reflects save-time costs
-        materialRows, // vendor catalog snapshot (for re-edit pricing)
+        // materialRows (live catalog) intentionally NOT persisted — fetched fresh on open.
         subRates,
         calc,
       },

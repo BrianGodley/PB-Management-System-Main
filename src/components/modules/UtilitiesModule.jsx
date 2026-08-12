@@ -602,7 +602,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
         .eq('type', 'vendor')
         .order('company_name'),
     ])
-    setMaterialPrices(prices)
+    setMaterialPrices(initialData?.materialPrices ? { ...prices, ...initialData.materialPrices } : prices)
     setMaterialRows(catRows || [])
     setVendors(
       (venRes.data || []).map(v => ({
@@ -661,7 +661,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
         })
     }
 
-    if (initialData?.materialPrices) return
+    // Always refresh the catalog on open so newly-added Master Rates items appear.
     refreshAllRates().then(() => setPricesLoading(false))
   }, [refreshAllRates])
 
@@ -998,7 +998,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
         laborBurdenPct,
         gpmd,
         materialPrices,
-        materialRows, // ← vendor catalog snapshot (for re-edit pricing)
+        // materialRows (live catalog) intentionally NOT persisted — fetched fresh on open.
         calc,
       },
     })

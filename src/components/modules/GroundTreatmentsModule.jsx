@@ -1058,7 +1058,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     }
   }, [])
 
-  const state = { crewType, subType, subGpMarkupRate, ...cur, materialRows }
+  // materialRows (live catalog) intentionally NOT persisted — fetched fresh on open.
+  const state = { crewType, subType, subGpMarkupRate, ...cur }
 
   // Build a section's Type option list. Vendor-first: a real vendor -> that vendor's catalog Items; Standard/unset -> the Standard (null-vendor) catalog Items.
   // A vendor → that vendor's products for the section's sub_category, priced at

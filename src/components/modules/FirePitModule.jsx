@@ -743,7 +743,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
     ;(labRes.data || []).forEach(r => {
       prices[r.name] = parseFloat(r.rate) || 0
     })
-    setMaterialPrices(prices)
+    setMaterialPrices(initialData?.materialPrices ? { ...prices, ...initialData.materialPrices } : prices)
     setMaterialRows(rows || [])
     setVendors(
       (venRes.data || []).map(v => ({
@@ -776,7 +776,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
           }
         })
     }
-    if (initialData?.materialPrices) return
+    // Always refresh the catalog on open so newly-added Master Rates items appear.
     refreshAllRates().then(() => setPricesLoading(false))
   }, [refreshAllRates])
 
@@ -848,7 +848,8 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
     }
   }, [])
 
-  const state = { crewType, subType, subGpMarkupRate, ...cur, materialRows }
+  // materialRows (live catalog) intentionally NOT persisted — fetched fresh on open.
+  const state = { crewType, subType, subGpMarkupRate, ...cur }
   const calcRaw = calcFirePit(
     state,
     laborRatePerHour,
