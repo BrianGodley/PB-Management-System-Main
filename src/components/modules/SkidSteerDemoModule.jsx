@@ -1877,6 +1877,108 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
       </div>
       )}
 
+      {/* Grading */}
+      <div>
+        <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
+          {subSectionTitle('Compaction', isDemoSub)}
+        </div>
+        {isSelf && (
+        <table className="w-full text-xs">
+          <TH
+            cols={[
+              { label: '', w: 'w-36' },
+              { label: 'SF', w: 'w-24' },
+              { label: 'Depth (in)', w: 'w-20' },
+              { label: 'Tons', w: 'w-16' },
+              { label: 'Labor Hrs', w: 'w-20' },
+            ]}
+          />
+          <tbody className="divide-y divide-gray-50">
+            {[
+              {
+                label: 'Jumping Jack',
+                sfK: 'jjSF',
+                dK: 'jjDepth',
+                dep: 4,
+                tons: calc.jjTons,
+                hrs: calc.jjHrs,
+                note: `${calc.laborJJ} hr/100 SF per in deep`,
+                rate: calc.laborJJ,
+                rateName: 'Demo - Skid - JJ SF',
+                rateUnit: 'hr/100 SF per in deep',
+              },
+              {
+                label: 'SS Compact',
+                sfK: 'ssCmpSF',
+                dK: 'ssCmpDepth',
+                dep: 4,
+                tons: calc.ssCmpTons,
+                hrs: calc.ssCmpHrs,
+                note: `${calc.laborSS} hr/100 SF per in deep`,
+                rate: calc.laborSS,
+                rateName: 'Demo - Skid - SS Compact SF',
+                rateUnit: 'hr/100 SF per in deep',
+              },
+            ].map(({ label, sfK, dK, dep, tons, hrs, note, rate, rateName, rateUnit }) => (
+              <tr key={label}>
+                <td className={`${td} font-medium text-gray-700`}>
+                  <span className="inline-flex items-center gap-1">
+                    {label}
+                    <span className="text-gray-400 font-normal">({note})</span>
+                  </span>
+                </td>
+                <td className={td}>
+                  <Inp value={state[sfK]} onChange={e => set(sfK, e.target.value)} />
+                </td>
+                <td className={td}>
+                  <Inp
+                    value={state[dK]}
+                    onChange={e => set(dK, e.target.value)}
+                    placeholder={String(dep)}
+                  />
+                </td>
+                <td className={num}>{tons > 0 ? tons.toFixed(1) : '—'}</td>
+                <td className={num}>{fh(hrs)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        )}
+        {isDemoSub && (
+          <table className="w-full text-xs">
+            <TH
+              cols={[
+                { label: '', w: 'w-48' },
+                { label: 'SF', w: 'w-24' },
+                { label: 'Cost', w: 'w-24' },
+              ]}
+            />
+            <tbody className="divide-y divide-gray-50">
+              {[
+                { label: 'Grade Cut', key: 'subGradeCutSF', rate: calc.sgCut, rateName: 'Sub Grade - Skid Cut SF' },
+                { label: 'Grade Fill', key: 'subGradeFillSF', rate: calc.sgFill, rateName: 'Sub Grade - Skid Fill SF' },
+                { label: 'Jumping Jack', key: 'subJjSF', rate: calc.sgJJ, rateName: 'Sub Grade - Skid JJ SF' },
+                { label: 'Sheepsfoot Compactor', key: 'sheepsfootSF', rate: calc.sgSheep, rateName: 'Sub Grade - Skid Sheepsfoot SF' },
+                { label: 'Roll Compactor', key: 'rollCompSF', rate: calc.sgRoll, rateName: 'Sub Grade - Skid Roll SF' },
+                { label: 'SS Compact', key: 'subSsCmpSF', rate: calc.sgSS, rateName: 'Sub Grade - Skid SS Compact SF' },
+              ].map(({ label, key, rate, rateName }) => (
+                <tr key={key}>
+                  <td className={`${td} font-medium text-gray-700`}>
+                    <span className="inline-flex items-center gap-1">
+                      {label}
+                      <span className="text-gray-400 font-normal">(${rate}/sf)</span>
+                    </span>
+                  </td>
+                  <td className={td}>
+                    <Inp value={state[key]} onChange={e => set(key, e.target.value)} />
+                  </td>
+                  <td className={num}>{n(state[key]) > 0 ? fmt2(n(state[key]) * rate) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
       {/* Misc Vertical */}
       <div className={isDemoSub ? 'hidden' : undefined}>
         <div className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2 flex items-center gap-2">
@@ -2040,108 +2142,6 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
         </>
       )}
 
-      {/* Grading */}
-      <div>
-        <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          {subSectionTitle('Grading', isDemoSub)}
-        </div>
-        {isSelf && (
-        <table className="w-full text-xs">
-          <TH
-            cols={[
-              { label: '', w: 'w-36' },
-              { label: 'SF', w: 'w-24' },
-              { label: 'Depth (in)', w: 'w-20' },
-              { label: 'Tons', w: 'w-16' },
-              { label: 'Labor Hrs', w: 'w-20' },
-            ]}
-          />
-          <tbody className="divide-y divide-gray-50">
-            {[
-              {
-                label: 'Jumping Jack',
-                sfK: 'jjSF',
-                dK: 'jjDepth',
-                dep: 4,
-                tons: calc.jjTons,
-                hrs: calc.jjHrs,
-                note: `${calc.laborJJ} hr/100 SF per in deep`,
-                rate: calc.laborJJ,
-                rateName: 'Demo - Skid - JJ SF',
-                rateUnit: 'hr/100 SF per in deep',
-              },
-              {
-                label: 'SS Compact',
-                sfK: 'ssCmpSF',
-                dK: 'ssCmpDepth',
-                dep: 4,
-                tons: calc.ssCmpTons,
-                hrs: calc.ssCmpHrs,
-                note: `${calc.laborSS} hr/100 SF per in deep`,
-                rate: calc.laborSS,
-                rateName: 'Demo - Skid - SS Compact SF',
-                rateUnit: 'hr/100 SF per in deep',
-              },
-            ].map(({ label, sfK, dK, dep, tons, hrs, note, rate, rateName, rateUnit }) => (
-              <tr key={label}>
-                <td className={`${td} font-medium text-gray-700`}>
-                  <span className="inline-flex items-center gap-1">
-                    {label}
-                    <span className="text-gray-400 font-normal">({note})</span>
-                  </span>
-                </td>
-                <td className={td}>
-                  <Inp value={state[sfK]} onChange={e => set(sfK, e.target.value)} />
-                </td>
-                <td className={td}>
-                  <Inp
-                    value={state[dK]}
-                    onChange={e => set(dK, e.target.value)}
-                    placeholder={String(dep)}
-                  />
-                </td>
-                <td className={num}>{tons > 0 ? tons.toFixed(1) : '—'}</td>
-                <td className={num}>{fh(hrs)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        )}
-        {isDemoSub && (
-          <table className="w-full text-xs">
-            <TH
-              cols={[
-                { label: '', w: 'w-48' },
-                { label: 'SF', w: 'w-24' },
-                { label: 'Cost', w: 'w-24' },
-              ]}
-            />
-            <tbody className="divide-y divide-gray-50">
-              {[
-                { label: 'Grade Cut', key: 'subGradeCutSF', rate: calc.sgCut, rateName: 'Sub Grade - Skid Cut SF' },
-                { label: 'Grade Fill', key: 'subGradeFillSF', rate: calc.sgFill, rateName: 'Sub Grade - Skid Fill SF' },
-                { label: 'Jumping Jack', key: 'subJjSF', rate: calc.sgJJ, rateName: 'Sub Grade - Skid JJ SF' },
-                { label: 'Sheepsfoot Compactor', key: 'sheepsfootSF', rate: calc.sgSheep, rateName: 'Sub Grade - Skid Sheepsfoot SF' },
-                { label: 'Roll Compactor', key: 'rollCompSF', rate: calc.sgRoll, rateName: 'Sub Grade - Skid Roll SF' },
-                { label: 'SS Compact', key: 'subSsCmpSF', rate: calc.sgSS, rateName: 'Sub Grade - Skid SS Compact SF' },
-              ].map(({ label, key, rate, rateName }) => (
-                <tr key={key}>
-                  <td className={`${td} font-medium text-gray-700`}>
-                    <span className="inline-flex items-center gap-1">
-                      {label}
-                      <span className="text-gray-400 font-normal">(${rate}/sf)</span>
-                    </span>
-                  </td>
-                  <td className={td}>
-                    <Inp value={state[key]} onChange={e => set(key, e.target.value)} />
-                  </td>
-                  <td className={num}>{n(state[key]) > 0 ? fmt2(n(state[key]) * rate) : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
 
       {isSelf && (
         <>
