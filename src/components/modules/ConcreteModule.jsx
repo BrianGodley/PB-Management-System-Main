@@ -1500,7 +1500,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                         onChange={e => updateBaseRow(i, 'vendor', e.target.value)}
                         title="Vendor"
                       >
-                        {!row.vendor && <option value="">Select vendor</option>}
+                        {!row.vendor && <option value="">Select</option>}
                         {vendorsForCategory('Concrete Base').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
@@ -1628,7 +1628,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                         }
                         title="Mix vendor"
                       >
-                        {!installTierVendor[t.key] && <option value="">Select vendor</option>}
+                        {!installTierVendor[t.key] && <option value="">Select</option>}
                         {vendorsForCategory('Concrete Mix').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}

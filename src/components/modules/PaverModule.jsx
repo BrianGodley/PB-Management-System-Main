@@ -1463,7 +1463,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                         setRow(kArea, i, 'paverType', '')
                       }}
                     >
-                      <option value="">Select vendor</option>
+                      <option value="">Select</option>
                       {vendorsForCategory(PAVER_CAT.paver).map(v => (
                         <option key={v.id} value={v.id}>
                           {v.name}
@@ -1568,7 +1568,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                         }
                       }}
                     >
-                      <option value="">Select vendor</option>
+                      <option value="">Select</option>
                       <option value="Standard">Standard</option>
                       {vendorsForCategory(PAVER_CAT.base).map(v => (
                         <option key={v.id} value={v.id}>
@@ -1969,7 +1969,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                         setRow('vertRows', i, 'type', '')
                       }}
                     >
-                      <option value="">Select vendor</option>
+                      <option value="">Select</option>
                       {vendorsForCategory(PAVER_CAT.paver).map(v => (
                         <option key={v.id} value={v.id}>
                           {v.name}

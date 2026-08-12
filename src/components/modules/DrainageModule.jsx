@@ -1329,7 +1329,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                         onChange={e => updatePipe(i, 'vendor', e.target.value)}
                         title="Vendor"
                       >
-                        {!row.vendor && <option value="">Select vendor</option>}
+                        {!row.vendor && <option value="">Select</option>}
                         {row.vendor &&
                           row.vendor !== 'Standard' &&
                           !vendorsForCategory(DRAIN_CAT.pipe).some(v => v.id === row.vendor) && (
@@ -1442,7 +1442,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                         onChange={e => updateFrench(i, 'vendor', e.target.value)}
                         title="Vendor"
                       >
-                        {!row.vendor && <option value="">Select vendor</option>}
+                        {!row.vendor && <option value="">Select</option>}
                         {row.vendor &&
                           row.vendor !== 'Standard' &&
                           !vendorsForCategory(DRAIN_CAT.pipe).some(v => v.id === row.vendor) && (
@@ -1574,7 +1574,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                         onChange={e => updateFixture(i, 'vendor', e.target.value)}
                         title="Vendor"
                       >
-                        {!row.vendor && <option value="">Select vendor</option>}
+                        {!row.vendor && <option value="">Select</option>}
                         {row.vendor &&
                           row.vendor !== 'Standard' &&
                           !vendorsForCategory(DRAIN_CAT.fixture).some(v => v.id === row.vendor) && (

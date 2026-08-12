@@ -1055,7 +1055,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
     const known = rv === 'Standard' || list.some(v => v.id === rv)
     return (
       <>
-        {!rv && <option value="">Select vendor</option>}
+        {!rv && <option value="">Select</option>}
         {rv && !known && <option value={rv}>{vendorNames[rv] || rv}</option>}
         {list.map(v => (
           <option key={v.id} value={v.id}>

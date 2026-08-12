@@ -1899,7 +1899,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                           onChange={e => setVendor(e.target.value)}
                           title="Vendor"
                         >
-                          {!vendor && <option value="">Select vendor</option>}
+                          {!vendor && <option value="">Select</option>}
                           {vendor &&
                             vendor !== 'Standard' &&
                             !vendorsForCategory('Soils').some(v => v.id === vendor) && (
@@ -2023,7 +2023,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         onChange={e => setSodVendor(e.target.value)}
                         title="Vendor"
                       >
-                        {!sodVendor && <option value="">Select vendor</option>}
+                        {!sodVendor && <option value="">Select</option>}
                         {sodVendor &&
                           sodVendor !== 'Standard' &&
                           !vendorsForCategory('Sod').some(v => v.id === sodVendor) && (
@@ -2108,7 +2108,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         onChange={e => setSodFertilizerVendor(e.target.value)}
                         title="Vendor"
                       >
-                        {!sodFertilizerVendor && <option value="">Select vendor</option>}
+                        {!sodFertilizerVendor && <option value="">Select</option>}
                         {sodFertilizerVendor &&
                           sodFertilizerVendor !== 'Standard' &&
                           !vendorsForCategory('Fertilizer').some(v => v.id === sodFertilizerVendor) && (
@@ -2218,7 +2218,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         onChange={e => updateMulch(i, 'vendor', e.target.value)}
                         title="Vendor"
                       >
-                        {!row.vendor && <option value="">Select vendor</option>}
+                        {!row.vendor && <option value="">Select</option>}
                         {row.vendor &&
                           row.vendor !== 'Standard' &&
                           !vendorsForCategory('Mulch').some(v => v.id === row.vendor) && (
@@ -2371,7 +2371,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         onChange={e => updateDg(i, 'vendor', e.target.value)}
                         title="Vendor"
                       >
-                        {!row.vendor && <option value="">Select vendor</option>}
+                        {!row.vendor && <option value="">Select</option>}
                         {row.vendor &&
                           row.vendor !== 'Standard' &&
                           !vendorsForCategory('DG').some(v => v.id === row.vendor) && (
@@ -2539,7 +2539,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         onChange={e => updateGravel(i, 'vendor', e.target.value)}
                         title="Vendor"
                       >
-                        {!row.vendor && <option value="">Select vendor</option>}
+                        {!row.vendor && <option value="">Select</option>}
                         {row.vendor &&
                           row.vendor !== 'Standard' &&
                           !vendorsForCategory('Gravel').some(v => v.id === row.vendor) && (
@@ -2701,7 +2701,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         onChange={e => updatePebble(i, 'vendor', e.target.value)}
                         title="Vendor"
                       >
-                        {!row.vendor && <option value="">Select vendor</option>}
+                        {!row.vendor && <option value="">Select</option>}
                         {row.vendor &&
                           row.vendor !== 'Standard' &&
                           !vendorsForCategory('Pebble').some(v => v.id === row.vendor) && (
@@ -2850,7 +2850,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         onChange={e => updateCobble(i, 'vendor', e.target.value)}
                         title="Vendor"
                       >
-                        {!row.vendor && <option value="">Select vendor</option>}
+                        {!row.vendor && <option value="">Select</option>}
                         {row.vendor &&
                           row.vendor !== 'Standard' &&
                           !vendorsForCategory('Cobbles').some(v => v.id === row.vendor) && (
@@ -2975,7 +2975,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         onChange={e => setEdgingVendor(e.target.value)}
                         title="Vendor"
                       >
-                        {!edgingVendor && <option value="">Select vendor</option>}
+                        {!edgingVendor && <option value="">Select</option>}
                         {edgingVendor &&
                           edgingVendor !== 'Standard' &&
                           !vendorsForCategory('Edging').some(v => v.id === edgingVendor) && (
@@ -3095,7 +3095,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         }
                         title="Vendor"
                       >
-                        {!stepperVendor[row.key] && <option value="">Select vendor</option>}
+                        {!stepperVendor[row.key] && <option value="">Select</option>}
                         {stepperVendor[row.key] &&
                           stepperVendor[row.key] !== 'Standard' &&
                           !vendorsForCategory('Steppers').some(v => v.id === stepperVendor[row.key]) && (

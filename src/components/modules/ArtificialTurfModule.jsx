@@ -1302,7 +1302,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                       onChange={e => setBaseRow(i, 'vendor', e.target.value)}
                       title="Vendor"
                     >
-                      <option value="">Select vendor</option>
+                      <option value="">Select</option>
                       <option value="Standard">Standard</option>
                       {vendorsSupplyingMarker(TURF_CAT.base).map(v => (
                         <option key={v.id} value={v.id}>
@@ -1450,7 +1450,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                       onChange={e => setRoll(i, 'vendor', e.target.value)}
                       title="Vendor"
                     >
-                      <option value="">Select vendor</option>
+                      <option value="">Select</option>
                       <option value="Standard">Standard</option>
                       {vendorsSupplyingMarker(TURF_CAT.turf).map(v => (
                         <option key={v.id} value={v.id}>
@@ -1597,7 +1597,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                       onChange={e => setStripRow(i, 'vendor', e.target.value)}
                       title="Vendor"
                     >
-                      <option value="">Select vendor</option>
+                      <option value="">Select</option>
                       <option value="Standard">Standard</option>
                       {vendorsSupplyingMarker(TURF_CAT.turf).map(v => (
                         <option key={v.id} value={v.id}>

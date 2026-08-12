@@ -79,10 +79,10 @@ const SUB_BASE_DEFAULT = 30 // $/LF starting base for every sub step section
 // catalog sub_category (subs_vendors + material_rates). Shape mirrors Paver
 // Steps: Vendor · Type · Form · SF · Grouted?.
 const MAT_SECTIONS = [
-  { key: 'paver', title: 'Paver Steps', cat: 'Paver Material', rowsKey: 'paverRows', subKey: 'subPaverRows', baseKey: kSubPaverBase },
-  { key: 'brick', title: 'Brick Steps', cat: 'Brick', rowsKey: 'brickRows', subKey: 'subBrickRows', baseKey: 'Steps - Sub Brick Base' },
-  { key: 'tile', title: 'Tiled Steps', cat: 'Tile', rowsKey: 'tileRows', subKey: 'subTileRows', baseKey: 'Steps - Sub Tile Base' },
-  { key: 'flag', title: 'Flagstone Steps', cat: 'Flagstone', rowsKey: 'flagRows', subKey: 'subFlagRows', baseKey: 'Steps - Sub Flagstone Base' },
+  { key: 'paver', title: 'Paver Steps', matWord: 'Paver', cat: 'Paver Material', rowsKey: 'paverRows', subKey: 'subPaverRows', baseKey: kSubPaverBase },
+  { key: 'brick', title: 'Brick Steps', matWord: 'Brick', cat: 'Brick', rowsKey: 'brickRows', subKey: 'subBrickRows', baseKey: 'Steps - Sub Brick Base' },
+  { key: 'tile', title: 'Tiled Steps', matWord: 'Tile', cat: 'Tile', rowsKey: 'tileRows', subKey: 'subTileRows', baseKey: 'Steps - Sub Tile Base' },
+  { key: 'flag', title: 'Flagstone Steps', matWord: 'Flagstone', cat: 'Flagstone', rowsKey: 'flagRows', subKey: 'subFlagRows', baseKey: 'Steps - Sub Flagstone Base' },
 ]
 
 // ── Vendor-catalog helpers (same as PaverModule) ─────────────────────────────
@@ -652,17 +652,19 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
 const cellSel =
   'w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400'
 
-const PAVER_ROW = () => ({ vendor: 'Standard', type: '', form: 'Straight', sf: '', grouted: false })
-const CONC_ROW = () => ({ vendor: 'Standard', type: '', form: 'Straight', sf: '', finish: 'Smooth' })
+const PAVER_ROW = () => ({ vendor: '', type: '', form: 'Straight', sf: '', grouted: false })
+const CONC_ROW = () => ({ vendor: '', type: '', form: 'Straight', sf: '', finish: 'Smooth' })
 const MANUAL_ROW = () => ({ label: '', hours: '', materials: '', subCost: '' })
 
-const DEFAULT_PAVER_ROWS = () => [PAVER_ROW(), PAVER_ROW(), PAVER_ROW()]
-const DEFAULT_CONC_ROWS = [CONC_ROW(), CONC_ROW(), CONC_ROW()]
+// Start every step-material section empty — rows are added via "+ Add row".
+const DEFAULT_PAVER_ROWS = () => []
+const DEFAULT_CONC_ROWS = []
 
 // Reusable Vendor · Type · Form · SF · Grouted step section (Paver / Brick /
 // Tiled / Flagstone). Type options come from the given catalog sub_category.
 function MaterialStepSection({
   title,
+  matWord = 'Material',
   cat,
   baseKey,
   rows,
@@ -679,12 +681,12 @@ function MaterialStepSection({
     setRows(rs => rs.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   return (
     <div>
-      <SectionHeader title={title} sub="Vendor · Type · Form · SF · Grouted" />
+      <SectionHeader title={title} />
       <table className="w-full text-xs">
         <thead>
           <tr className="text-gray-400 border-b border-gray-200">
             <th className="text-left pb-1 pr-2 font-medium w-40">Vendor</th>
-            <th className="text-left pb-1 pr-2 font-medium">Type</th>
+            <th className="text-left pb-1 pr-2 font-medium">{`${matWord} Type`}</th>
             <th className="text-left pb-1 pr-2 font-medium w-24">Form</th>
             <th className="text-left pb-1 pr-2 font-medium w-20">{isSub ? 'LF' : 'SF'}</th>
             <th className="text-left pb-1 pr-2 font-medium w-24">Grouted?</th>
@@ -705,12 +707,21 @@ function MaterialStepSection({
                     value={row.vendor}
                     onChange={e => setRow(i, 'vendor', e.target.value)}
                   >
+                    <option value="">Select</option>
                     <option value="Standard">Standard</option>
                     {vForCat.map(v => (
                       <option key={v.id} value={v.id}>
                         {v.name}
                       </option>
                     ))}
+                    {row.vendor &&
+                      row.vendor !== 'Standard' &&
+                      !vForCat.some(v => String(v.id) === String(row.vendor)) && (
+                        <option value={row.vendor}>
+                          {vendors.find(v => String(v.id) === String(row.vendor))?.name ||
+                            'Saved vendor'}
+                        </option>
+                      )}
                   </select>
                 </td>
                 <td className="py-1 pr-2">
@@ -720,7 +731,7 @@ function MaterialStepSection({
                     onChange={e => setRow(i, 'type', e.target.value)}
                     disabled={!opts.length}
                   >
-                    <option value="">{opts.length ? 'Select material' : 'Pick vendor first'}</option>
+                    <option value="">{`Select ${matWord.toLowerCase()} type`}</option>
                     {row.type && !opts.some(o => o.label === row.type) && (
                       <option value={row.type}>{row.type}</option>
                     )}
@@ -799,11 +810,7 @@ function MaterialStepSection({
     </div>
   )
 }
-const DEFAULT_MANUAL_ROWS = [
-  { label: 'Misc 1', hours: '', materials: '', subCost: '' },
-  { label: 'Misc 2', hours: '', materials: '', subCost: '' },
-  { label: 'Misc 3', hours: '', materials: '', subCost: '' },
-]
+const DEFAULT_MANUAL_ROWS = []
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function StepsModule({ onSave, onBack, saving, initialData }) {
@@ -917,7 +924,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
   const [subConcRows, setSubConcRows] = useState(initialData?.subConcRows ?? DEFAULT_CONC_ROWS)
   const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
   const [subManualRows, setSubManualRows] = useState(
-    initialData?.subManualRows ?? [MANUAL_ROW(), MANUAL_ROW()]
+    initialData?.subManualRows ?? []
   )
 
   const [salesTaxRate, setSalesTaxRate] = useState(0)
@@ -1285,6 +1292,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         <MaterialStepSection
           key={sec.key}
           title={sec.title}
+          matWord={sec.matWord}
           cat={sec.cat}
           baseKey={sec.baseKey}
           rows={sectionState[sec.key].rows}
@@ -1302,7 +1310,6 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
       <div>
         <SectionHeader
           title="Concrete Steps"
-          sub="Vendor · Type · Form · SF · Finish"
           right={
             <button
               type="button"
@@ -1317,7 +1324,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           <thead>
             <tr className="text-gray-400 border-b border-gray-200">
               <th className="text-left pb-1 pr-2 font-medium w-40">Vendor</th>
-              <th className="text-left pb-1 pr-2 font-medium">Type</th>
+              <th className="text-left pb-1 pr-2 font-medium">Concrete Type</th>
               <th className="text-left pb-1 pr-2 font-medium w-24">Form</th>
               <th className="text-left pb-1 pr-2 font-medium w-20">{isSub ? 'LF' : 'SF'}</th>
               <th className="text-left pb-1 pr-2 font-medium">Finish</th>
@@ -1337,12 +1344,23 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
                       value={row.vendor}
                       onChange={e => setConcRow(i, 'vendor', e.target.value)}
                     >
+                      <option value="">Select</option>
                       <option value="Standard">Standard</option>
                       {vendorsForCategory(CONC_VENDOR_CAT).map(v => (
                         <option key={v.id} value={v.id}>
                           {v.name}
                         </option>
                       ))}
+                      {row.vendor &&
+                        row.vendor !== 'Standard' &&
+                        !vendorsForCategory(CONC_VENDOR_CAT).some(
+                          v => String(v.id) === String(row.vendor)
+                        ) && (
+                          <option value={row.vendor}>
+                            {vendors.find(v => String(v.id) === String(row.vendor))?.name ||
+                              'Saved vendor'}
+                          </option>
+                        )}
                     </select>
                   </td>
                   <td className="py-1 pr-2">
@@ -1351,7 +1369,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
                       value={row.type || ''}
                       onChange={e => setConcRow(i, 'type', e.target.value)}
                     >
-                      {!row.type && <option value="">Select type</option>}
+                      {!row.type && <option value="">Select concrete type</option>}
                       {row.type && !CONC_TYPES.includes(row.type) && (
                         <option value={row.type}>{row.type}</option>
                       )}
