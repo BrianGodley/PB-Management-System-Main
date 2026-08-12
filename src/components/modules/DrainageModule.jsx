@@ -157,7 +157,9 @@ function drainMatCost(cat, row, TYPES, materialRows, catDefaults, mp) {
     dbName = vrow.name
     fallback = n(vrow.unit_cost)
   }
-  return { dbName, cost: mp[dbName] ?? fallback }
+  // Selected vendor's catalog row wins; only fall back to the Standard name-map (mp)
+  // when there is no catalog row for the selection.
+  return { dbName, cost: vrow ? n(vrow.unit_cost) : (mp[dbName] ?? fallback) }
 }
 
 // Master-list additions for a drain section: rows tagged sub_category=cat

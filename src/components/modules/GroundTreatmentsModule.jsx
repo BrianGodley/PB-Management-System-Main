@@ -347,7 +347,7 @@ function calcGroundTreatments(
       anyMulch = true
       const CY = (n(r.sf) * (n(r.depth) / 12)) / 27
       const mt = rowOpt('Mulch', r, [])
-      mulchMat += CY * p(mt.dbName, mt.fallback)
+      mulchMat += CY * mt.fallback
       mulchLab += (CY / mulchCYPerDay) * 8 + (n(r.sf) / mulchCoverageSfDay) * 8
       if (r.weedFabric === 'Yes') {
         mulchMat += n(r.sf) * p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)
@@ -370,14 +370,14 @@ function calcGroundTreatments(
     'Edging',
     { vendor: (edgingVendor || {}).plastic, type: (edgingType || {}).plastic || 'Plastic' }, [])
   const plasticMat =
-    n(plasticEdgingLF) * p(_plasticEdgeOpt.dbName, _plasticEdgeOpt.fallback)
+    n(plasticEdgingLF) * _plasticEdgeOpt.fallback
   const metalLab =
     n(metalEdgingLF) * p(GT_RATES.metalEdgingLab.dbName, GT_RATES.metalEdgingLab.fallback)
   const _metalEdgeOpt = rowOpt(
     'Edging',
     { vendor: (edgingVendor || {}).metal, type: (edgingType || {}).metal || 'Metal' }, [])
   const metalMat =
-    n(metalEdgingLF) * p(_metalEdgeOpt.dbName, _metalEdgeOpt.fallback)
+    n(metalEdgingLF) * _metalEdgeOpt.fallback
 
   // ── Preparation (Planting Bed Prep) ─────────────────────────────────────────
   // Area = Planter → existing Soil Prep rates; Area = Sod → independent Sod Soil
@@ -404,7 +404,7 @@ function calcGroundTreatments(
   // ── Sod ────────────────────────────────────────────────────────────────────
   let sodLab = n(sodSF) * p(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback)
   const sodT = resolveType(sodType, _opts.sod, [])
-  let sodMat = n(sodSF) * p(sodT.dbName, sodT.fallback)
+  let sodMat = n(sodSF) * sodT.fallback
 
   // Fertilizer — auto-figured bags from sod SF × coverage (SF/bag). Material only.
   let fertMat = 0
@@ -417,7 +417,7 @@ function calcGroundTreatments(
   if (fertT && fertT.dbName && _fertSF > 0) {
     const sfPerBag = p(GT_RATES.fertilizerSFPerBag.dbName, GT_RATES.fertilizerSFPerBag.fallback)
     const bags = sfPerBag > 0 ? Math.ceil(_fertSF / sfPerBag) : 0
-    fertMat = bags * p(fertT.dbName, fertT.fallback)
+    fertMat = bags * fertT.fallback
   }
 
   // ── Soils (optional amendment lines) ────────────────────────────────────────
@@ -427,7 +427,7 @@ function calcGroundTreatments(
     if (!n(r.sf)) return
     const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
     const st = rowOpt('Soils', r, [])
-    soilsMat += CY * p(st.dbName, st.fallback)
+    soilsMat += CY * st.fallback
     // Labor: 0.002 hr per SF per inch of depth (2" doubles it, 3" triples, …).
     soilsLab += n(r.sf) * n(r.depthIn) * p('Soils Install Labor', 0.002)
   })
@@ -461,7 +461,7 @@ function calcGroundTreatments(
     stepLines.forEach(ln => {
       if (!(n(ln.sf) > 0)) return
       const opt = rowOpt('Steppers', { vendor: _sv[ln.key], type: _st[ln.key] || ln.defType }, [])
-      const perTon = p(opt.dbName, opt.fallback)
+      const perTon = opt.fallback
       const sfPerDay = p(ln.labRate.dbName, ln.labRate.fallback)
       const lab = sfPerDay > 0 ? (n(ln.sf) / sfPerDay) * 8 : 0
       const mat = (n(ln.sf) / stepperSfPerTon) * perTon
@@ -494,7 +494,7 @@ function calcGroundTreatments(
           : ((tons * dgRemovalSwell) / dgMachineRate) * 8 + (n(r.sf) / dgCoverageSfDay) * 8 + tons
       dgLab += baseHrs + (cement ? tons * dgCementLaborFactor : 0)
       dgMat +=
-        (tons * p(dgt.dbName, dgt.fallback) +
+        (tons * dgt.fallback +
           (cement
             ? tons * p(GT_RATES.dgCementPerTon.dbName, GT_RATES.dgCementPerTon.fallback)
             : 0)) *
@@ -525,7 +525,7 @@ function calcGroundTreatments(
       : 0
     gravelLab += excavLab + fabricLab
     const gtype = rowOpt('Gravel', r, [])
-    const costPerCY = p(gtype.dbName, gtype.fallback)
+    const costPerCY = gtype.fallback
     gravelMat +=
       CY * costPerCY +
       (wantFabric ? n(r.sf) * p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback) : 0)
@@ -548,7 +548,7 @@ function calcGroundTreatments(
       : 0
     pebbleLab += excavLab + fabricLab
     const ptype = rowOpt('Pebble', r, [])
-    const costPerCY = p(ptype.dbName, ptype.fallback)
+    const costPerCY = ptype.fallback
     pebbleMat +=
       CY * costPerCY +
       (wantFabric ? n(r.sf) * p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback) : 0)
@@ -568,7 +568,7 @@ function calcGroundTreatments(
       n(r.sf) * p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
     cobbleLab += excavLab + fabricLab
     const ctype = rowOpt('Cobbles', r, [])
-    const costPerCY = p(ctype.dbName, ctype.fallback)
+    const costPerCY = ctype.fallback
     cobbleMat +=
       CY * costPerCY +
       n(r.sf) * p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)
@@ -1884,7 +1884,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               {soilsRows.map((row, i) => {
                 const rowOpts = sectionOptions('Soils', row.vendor, [])
                 const st = resolveType(row.type, rowOpts, [])
-                const typeCost = p(st.dbName, st.fallback)
+                const typeCost = st.fallback
                 const CY = (n(row.sf) * (n(row.depthIn) / 12)) / 27
                 const mat = CY * typeCost
                 return (
@@ -2003,7 +2003,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 const st = resolveType(sodType, sodOpts, [])
                 return (
                   <>
-                    ${p(st.dbName, st.fallback).toFixed(2)}/SF
+                    ${st.fallback.toFixed(2)}/SF
                   </>
                 )
               })()}
@@ -2013,7 +2013,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 $
                 {(() => {
                   const st = resolveType(sodType, sodOpts, [])
-                  return (n(sodSF) * p(st.dbName, st.fallback)).toFixed(2)
+                  return (n(sodSF) * st.fallback).toFixed(2)
                 })()}{' '}
                 mat
               </span>
@@ -2070,11 +2070,11 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               const bags = sfPerBag > 0 && fertSF > 0 ? Math.ceil(fertSF / sfPerBag) : 0
               return (
                 <span className="text-xs text-gray-400 inline-flex items-center gap-1 flex-wrap">
-                  ${p(ft.dbName, ft.fallback).toFixed(2)}/bag
+                  ${ft.fallback.toFixed(2)}/bag
                   · 1 bag / {sfPerBag} SF
                   {bags > 0 && (
                     <span className="text-gray-500">
-                      = {bags} bag{bags > 1 ? 's' : ''} · ${(bags * p(ft.dbName, ft.fallback)).toFixed(2)}
+                      = {bags} bag{bags > 1 ? 's' : ''} · ${(bags * ft.fallback).toFixed(2)}
                     </span>
                   )}
                 </span>
@@ -2095,7 +2095,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 sectionOptions('Mulch', mulchRows[0]?.vendor, []), [])
               return (
                 <>
-                  Type ${p(mt.dbName, mt.fallback).toFixed(2)}/CY
+                  Type ${mt.fallback.toFixed(2)}/CY
                 </>
               )
             })()}
@@ -2130,7 +2130,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               {mulchRows.map((row, i) => {
                 const rowOpts = sectionOptions('Mulch', row.vendor, [])
                 const mt = resolveType(row.type, rowOpts, [])
-                const typeCost = p(mt.dbName, mt.fallback)
+                const typeCost = mt.fallback
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-1">
@@ -2234,7 +2234,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 sectionOptions('DG', dgRows[0]?.vendor, []), [])
               return (
                 <>
-                  Type ${p(dt.dbName, dt.fallback).toFixed(2)}/ton
+                  Type ${dt.fallback.toFixed(2)}/ton
                 </>
               )
             })()}
@@ -2429,7 +2429,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               {gravelRows.map((row, i) => {
                 const rowOpts = sectionOptions('Gravel', row.vendor, [])
                 const gtype = resolveType(row.type, rowOpts, [])
-                const typeCost = p(gtype.dbName, gtype.fallback)
+                const typeCost = gtype.fallback
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-1">
@@ -2533,7 +2533,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 const CY = (n(row.sf) * (n(row.depthIn) / 12)) / 27
                 const gtype = resolveType(row.type, sectionOptions('Gravel', row.vendor, []), [])
                 const mat =
-                  CY * p(gtype.dbName, gtype.fallback) +
+                  CY * gtype.fallback +
                   ((row.weedFabric ?? 'Yes') === 'Yes' ? n(row.sf) * p(GT_RATES.gravelFabricMat.dbName, 0.1) : 0)
                 return (
                   <span key={i} className="text-xs text-gray-400">
@@ -2580,7 +2580,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               {pebbleRows.map((row, i) => {
                 const rowOpts = sectionOptions('Pebble', row.vendor, [])
                 const ptype = resolveType(row.type, rowOpts, [])
-                const typeCost = p(ptype.dbName, ptype.fallback)
+                const typeCost = ptype.fallback
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-1">
@@ -2672,7 +2672,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 const CY = (n(row.sf) * (n(row.depthIn) / 12)) / 27
                 const ptype = resolveType(row.type, sectionOptions('Pebble', row.vendor, []), [])
                 const mat =
-                  CY * p(ptype.dbName, ptype.fallback) +
+                  CY * ptype.fallback +
                   ((row.weedFabric ?? 'Yes') === 'Yes' ? n(row.sf) * p(GT_RATES.gravelFabricMat.dbName, 0.1) : 0)
                 return (
                   <span key={i} className="text-xs text-gray-400">
@@ -2718,7 +2718,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               {cobbleRows.map((row, i) => {
                 const rowOpts = sectionOptions('Cobbles', row.vendor, [])
                 const ctype = resolveType(row.type, rowOpts, [])
-                const typeCost = p(ctype.dbName, ctype.fallback)
+                const typeCost = ctype.fallback
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-1">
@@ -2799,7 +2799,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 const CY = (n(row.sf) * (n(row.depthIn) / 12)) / 27
                 const ctype = resolveType(row.type, sectionOptions('Cobbles', row.vendor, []), [])
                 const mat =
-                  CY * p(ctype.dbName, ctype.fallback) +
+                  CY * ctype.fallback +
                   n(row.sf) * p(GT_RATES.gravelFabricMat.dbName, 0.1)
                 return (
                   <span key={i} className="text-xs text-gray-400">
@@ -2820,7 +2820,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           {(() => {
             const opts = sectionOptions('Edging', edgingVendor.plastic, [])
             const t = resolveType(edgingType.plastic, opts, [])
-            const rate = p(t.dbName, t.fallback)
+            const rate = t.fallback
             return (
               <LabeledRow
                 label="Plastic Edging"
@@ -2875,7 +2875,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           {(() => {
             const opts = sectionOptions('Edging', edgingVendor.metal, [])
             const t = resolveType(edgingType.metal, opts, [])
-            const rate = p(t.dbName, t.fallback)
+            const rate = t.fallback
             return (
               <LabeledRow
                 label="Metal Edging"
@@ -2982,7 +2982,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 const rowOpts = sectionOptions('Steppers', stepperVendor[row.key], [])
                 const st = resolveType(stepperType[row.key], rowOpts, [])
                 const sfPerDay = p(row.labRate.dbName, row.labRate.fallback)
-                const perTon = p(st.dbName, st.fallback)
+                const perTon = st.fallback
                 const sfN = n(row.sf)
                 const tons = sfN / 80
                 const mat = tons * perTon

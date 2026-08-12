@@ -255,7 +255,9 @@ function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
     matDbName = vrow.name
     matFallback = n(vrow.unit_cost)
   }
-  const matCost = mp[matDbName] ?? matFallback
+  // Selected vendor's catalog row wins; only fall back to the Standard name-map (mp)
+  // when there is no catalog row for the selection.
+  const matCost = vrow ? n(vrow.unit_cost) : (mp[matDbName] ?? matFallback)
   const matOpt = { label: builtIn?.label, dbName: matDbName, fallback: matFallback }
   return { opts: merged, matOpt, matCost, laborVal, laborBuiltIn: builtIn }
 }

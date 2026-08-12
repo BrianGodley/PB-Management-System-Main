@@ -332,7 +332,11 @@ function resolveUtilRow(cat, row, houseArr, materialRows, catDefaults, mp) {
     matDbName = vrow.name
     matFallback = n(vrow.unit_cost)
   }
-  const matCost = mp[matDbName] ?? matFallback
+  // The SELECTED vendor's catalog row (vrow) is the source of truth for its price.
+  // Only when there's no catalog row for the selection do we fall back to the
+  // name-keyed Standard map (mp). Previously mp[name] (the Standard price) wrongly
+  // won even when a real vendor row existed, so a vendor showed the Standard price.
+  const matCost = vrow ? n(vrow.unit_cost) : (mp[matDbName] ?? matFallback)
   // matOpt drives the Type dropdown value + the material rate popover target.
   const matOpt = { label: builtIn?.label, dbName: matDbName, fallback: matFallback }
   return { opts: merged, matOpt, matCost, laborVal, laborBuiltIn: builtIn }
