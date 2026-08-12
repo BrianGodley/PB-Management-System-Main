@@ -180,8 +180,26 @@ export async function fetchModuleCatalog(categories) {
   // Prefer to hide archived materials, but fall back gracefully if the
   // archived_at column hasn't been migrated yet — otherwise the filter errors
   // and the estimator loses every catalog block/material.
-  let matRes = await supabase.from('material').select(sel).in('category_id', catIds).is('archived_at', null)
-  if (matRes.error) matRes = await supabase.from('material').select(sel).in('category_id', catIds)
+  //
+  // Page past PostgREST's default row cap (1000): a large catalog spanning
+  // several categories (e.g. 50+ appliances tipping Outdoor Kitchen + Utilities
+  // + Walls over the limit) would otherwise silently truncate the newest rows
+  // out of the pickers — items show in Master Rates but never in the module.
+  const PAGE = 1000
+  const pageAll = async withArchivedFilter => {
+    const out = []
+    for (let from = 0; ; from += PAGE) {
+      let q = supabase.from('material').select(sel).in('category_id', catIds)
+      if (withArchivedFilter) q = q.is('archived_at', null)
+      const { data: pg, error } = await q.range(from, from + PAGE - 1)
+      if (error) return { error }
+      out.push(...(pg || []))
+      if (!pg || pg.length < PAGE) break
+    }
+    return { data: out }
+  }
+  let matRes = await pageAll(true)
+  if (matRes.error) matRes = await pageAll(false)
   const data = matRes.data
   const rows = []
   ;(data || []).forEach(m => {
