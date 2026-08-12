@@ -1060,7 +1060,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
 
   const state = { crewType, subType, subGpMarkupRate, ...cur, materialRows }
 
-  // Build a section's Type option list. 'Standard' → hardcoded array (unchanged).
+  // Build a section's Type option list. Vendor-first: a real vendor -> that vendor's catalog Items; Standard/unset -> the Standard (null-vendor) catalog Items.
   // A vendor → that vendor's products for the section's sub_category, priced at
   // the vendor's unit_cost. Falls back to the Standard array if the vendor has no
   // rows for the sub_category (so the dropdown is never empty).
