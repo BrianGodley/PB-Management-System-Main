@@ -1182,7 +1182,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             cols={
               isSelf
                 ? [
-                    { label: 'Material', w: 'w-32' },
+                    { label: '', w: 'w-32' },
                     { label: 'SF', w: 'w-24' },
                     { label: 'Depth (in)', w: 'w-20' },
                     { label: 'Tons', w: 'w-16' },
@@ -1190,7 +1190,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                     { label: 'Labor Hrs', w: 'w-20' },
                   ]
                 : [
-                    { label: 'Material', w: 'w-40' },
+                    { label: '', w: 'w-40' },
                     { label: 'SF', w: 'w-24' },
                     { label: 'Depth (in)', w: 'w-20' },
                     { label: 'Cost', w: 'w-24' },
@@ -1320,7 +1320,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
         <table className="w-full text-xs">
           <TH
             cols={[
-              { label: 'Material', w: 'w-40' },
+              { label: '', w: 'w-40' },
               { label: 'SF', w: 'w-24' },
               { label: 'Depth (in)', w: 'w-20' },
               { label: 'Tons', w: 'w-16' },
@@ -1606,7 +1606,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
         <table className="w-full text-xs">
           <TH
             cols={[
-              { label: 'Operation', w: 'w-40' },
+              { label: '', w: 'w-40' },
               { label: 'SF', w: 'w-24' },
               { label: 'Depth (in)', w: 'w-20' },
               { label: 'Tons', w: 'w-16' },
@@ -1661,7 +1661,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
           <table className="w-full text-xs">
             <TH
               cols={[
-                { label: 'Operation', w: 'w-48' },
+                { label: '', w: 'w-48' },
                 { label: 'SF', w: 'w-24' },
                 { label: 'Cost', w: 'w-24' },
               ]}
@@ -1745,11 +1745,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             })}
           </tbody>
         </table>
-        {isSelf && (
-          <p className="text-xs text-gray-400 mt-1 inline-flex items-center gap-1">
-            {calc.shrubRate} hrs/ea × shrub-height modifier
-          </p>
-        )}
         <div>
           <button
             type="button"
@@ -1811,15 +1806,6 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
               {label}
             </p>
             <Inp value={state[key]} onChange={e => set(key, e.target.value)} />
-            <p className="text-xs text-gray-400 mt-0.5">
-              {isSub
-                ? n(state[key]) > 0
-                  ? `${fmt2(n(state[key]) * subRate)} — $${subRate}/ea`
-                  : `$${subRate}/ea`
-                : hrs > 0
-                  ? `${hrs.toFixed(2)} hrs — ${sub}`
-                  : sub}
-            </p>
           </div>
         ))}
       </div>

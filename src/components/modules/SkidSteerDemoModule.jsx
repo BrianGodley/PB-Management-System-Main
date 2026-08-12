@@ -1690,7 +1690,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
             cols={
               isSelf
                 ? [
-                    { label: 'Material', w: 'w-32' },
+                    { label: '', w: 'w-32' },
                     { label: 'SF', w: 'w-24' },
                     { label: 'Depth (in)', w: 'w-20' },
                     { label: 'Tons', w: 'w-16' },
@@ -1698,7 +1698,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                     { label: 'Labor Hrs', w: 'w-20' },
                   ]
                 : [
-                    { label: 'Material', w: 'w-40' },
+                    { label: '', w: 'w-40' },
                     { label: 'SF', w: 'w-24' },
                     { label: 'Depth (in)', w: 'w-20' },
                     { label: 'Cost', w: 'w-24' },
@@ -2052,7 +2052,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
         <table className="w-full text-xs">
           <TH
             cols={[
-              { label: 'Operation', w: 'w-36' },
+              { label: '', w: 'w-36' },
               { label: 'SF', w: 'w-24' },
               { label: 'Depth (in)', w: 'w-20' },
               { label: 'Tons', w: 'w-16' },
@@ -2114,7 +2114,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           <table className="w-full text-xs">
             <TH
               cols={[
-                { label: 'Operation', w: 'w-48' },
+                { label: '', w: 'w-48' },
                 { label: 'SF', w: 'w-24' },
                 { label: 'Cost', w: 'w-24' },
               ]}
@@ -2202,11 +2202,6 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
         >
           + Add Row
         </button>
-        {isSelf && (
-          <p className="text-xs text-gray-400 mt-1 inline-flex items-center gap-1">
-            {calc.shrubRate} hrs/ea × shrub-height modifier
-          </p>
-        )}
       </div>
 
       {/* Stump Demo */}
@@ -2259,15 +2254,6 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
               {label}
             </p>
             <Inp value={state[key]} onChange={e => set(key, e.target.value)} />
-            <p className="text-xs text-gray-400 mt-0.5">
-              {isDemoSub
-                ? n(state[key]) > 0
-                  ? `${fmt2(n(state[key]) * subRate)} — $${subRate}/ea`
-                  : `$${subRate}/ea`
-                : hrs > 0
-                  ? `${hrs.toFixed(2)} hrs — ${sub}`
-                  : sub}
-            </p>
           </div>
         ))}
       </div>
