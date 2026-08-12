@@ -762,8 +762,6 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
 
 const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 1', hours: '', materials: '', subCost: '' },
-  { label: 'Misc 2', hours: '', materials: '', subCost: '' },
-  { label: 'Misc 3', hours: '', materials: '', subCost: '' },
 ]
 
 // Per-tab input record. In-House and Sub each hold their own independent copy so
@@ -781,11 +779,11 @@ function makeTab(src = {}) {
     footingDepthIn: src.footingDepthIn ?? '12',
     counterSF: src.counterSF ?? '',
     counterFinish: src.counterFinish ?? 'Broom Finish',
-    equipmentRows: src.equipmentRows ?? [EQUIP_ROW(), EQUIP_ROW(), EQUIP_ROW(), EQUIP_ROW()],
-    epLineRows: src.epLineRows ?? [EP_LINE_ROW(), EP_LINE_ROW()],
-    epGasRows: src.epGasRows ?? [EP_GAS_ROW(), EP_GAS_ROW()],
-    epElecRows: src.epElecRows ?? [EP_ELEC_ROW(), EP_ELEC_ROW()],
-    wallFinishRows: src.wallFinishRows ?? [WF_ROW(), WF_ROW()],
+    equipmentRows: src.equipmentRows ?? [EQUIP_ROW(), EQUIP_ROW(), EQUIP_ROW()],
+    epLineRows: src.epLineRows ?? [EP_LINE_ROW()],
+    epGasRows: src.epGasRows ?? [EP_GAS_ROW()],
+    epElecRows: src.epElecRows ?? [EP_ELEC_ROW()],
+    wallFinishRows: src.wallFinishRows ?? [WF_ROW()],
     manualRows: src.manualRows ?? DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
   }
 }
@@ -1091,12 +1089,10 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
       group: 'Appliances',
       items: [
         okLaborItem('applianceInstallHrs', 'hrs/ea'),
-        // Vendor catalog appliance products + each built-in equipment master
-        // rate + shared install hardware.
+        // Vendor catalog appliance products + shared install hardware. The
+        // hardcoded APPLIANCE_TYPES generic rates are no longer listed — the
+        // catalog is the source of truth.
         ...catalogBlockItems('Appliance', 'ea', 'Outdoor Kitchen'),
-        ...APPLIANCE_TYPES.flatMap(type =>
-          matRows(applianceRateName(type), 'ea', p(applianceRateName(type), 0))
-        ),
         ...matRows(OK_RATES.applianceHardware.dbName, 'ea', p(OK_RATES.applianceHardware.dbName, OK_RATES.applianceHardware.fallback)),
       ],
     },
