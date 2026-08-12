@@ -311,7 +311,18 @@ function mergedUtilTypes(cat, builtInArr, materialRows, vendorSel = 'Standard') 
 // overrides the MATERIAL price for the selected item, matched by the item's name
 // in the vendor's catalog (material_rates for the category + vendor).
 function resolveUtilRow(cat, row, houseArr, materialRows, catDefaults, mp) {
-  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : catDefaults[cat] || 'Standard'
+  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : ''
+  // Unset vendor → empty Type list and no material/labor, so the row contributes
+  // $0 until a vendor (Standard or a real vendor) is chosen.
+  if (!vsel) {
+    return {
+      opts: [],
+      matOpt: { label: row.type, dbName: undefined, fallback: 0 },
+      matCost: 0,
+      laborVal: 0,
+      laborBuiltIn: null,
+    }
+  }
   // Type options are the SELECTED VENDOR'S items (vendor-first, like Paver).
   const merged = mergedUtilTypes(cat, houseArr, materialRows, vsel)
   const builtIn = merged.find(o => o.label === row.type) || merged[0]
@@ -564,22 +575,22 @@ const DEFAULT_TRENCH_ROWS = [
   { equipment: 'Trench', lf: '', width: '', depth: '' },
 ]
 const DEFAULT_LINE_ROWS = [
-  { type: '', laborType: '', lf: '', vendor: 'auto' },
+  { type: '', laborType: '', lf: '', vendor: '' },
 ]
 const DEFAULT_GASPIPE_ROWS = [
-  { type: '', laborType: '', lf: '', vendor: 'auto' },
+  { type: '', laborType: '', lf: '', vendor: '' },
 ]
 const DEFAULT_WIRE_ROWS = [
-  { type: '', laborType: '', lf: '', vendor: 'auto' },
+  { type: '', laborType: '', lf: '', vendor: '' },
 ]
 const DEFAULT_FIXTURE_ROWS = [
-  { type: '', laborType: '', qty: '', vendor: 'auto' },
+  { type: '', laborType: '', qty: '', vendor: '' },
 ]
 const DEFAULT_ELEC_FIXTURE_ROWS = [
-  { type: '', laborType: '', qty: '', vendor: 'auto' },
+  { type: '', laborType: '', qty: '', vendor: '' },
 ]
 const DEFAULT_SEWER_LINE_ROWS = [
-  { type: '', laborType: '', lf: '', vendor: 'auto' },
+  { type: '', laborType: '', lf: '', vendor: '' },
 ]
 const DEFAULT_ADDITIONAL = {
   curbCoreQty: '',
@@ -780,10 +791,10 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   // ── Vendor catalog helpers (per-row Vendor/Type pickers) ─────────────────
   const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
   const defaultVendorFor = cat => vendorsForCategory(cat)[0]?.id || 'Standard'
-  // Honest effective vendor: only unset/'auto' falls back to the category default.
-  // 'Standard' stays 'Standard' so the dropdown's displayed vendor ALWAYS matches
-  // the vendor the Type list is built from (resolveUtilRow uses the same rule).
-  const effVendor = (cat, v) => (v && v !== 'auto' ? v : defaultVendorFor(cat))
+  // Vendor picker is controlled by the RAW row vendor. Unset/'auto' → '' so the
+  // dropdown shows the empty "Select vendor" placeholder (no auto-resolve to a
+  // default vendor). A chosen vendor (incl. 'Standard') is shown as-is.
+  const effVendor = (cat, v) => (v && v !== 'auto' ? v : '')
   const catDefaults = {
     [UTIL_CAT.line]: defaultVendorFor(UTIL_CAT.line),
     [UTIL_CAT.gasPipe]: defaultVendorFor(UTIL_CAT.gasPipe),
@@ -793,41 +804,9 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
     [UTIL_CAT.sewerLine]: defaultVendorFor(UTIL_CAT.sewerLine),
   }
 
-  // On a NEW estimate, once vendor catalogs load, default each Line/Fixture row's
-  // vendor to the first real vendor for its category. Never overrides a saved
-  // estimate (has a materialPrices snapshot) or an explicit pick.
-  const [vendorDefaultsApplied, setVendorDefaultsApplied] = useState(false)
-  useEffect(() => {
-    const isSaved = initialData?.materialPrices && Object.keys(initialData.materialPrices).length > 0
-    if (vendorDefaultsApplied || isSaved || !vendors.length) return
-    setVendorDefaultsApplied(true)
-    const needsDefault = v => !v || v === 'Standard' || v === 'auto'
-    const migLine = rows =>
-      (rows || []).map(r => (needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor(UTIL_CAT.line) } : r))
-    const migGasPipe = rows =>
-      (rows || []).map(r => (needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor(UTIL_CAT.gasPipe) } : r))
-    const migWire = rows =>
-      (rows || []).map(r => (needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor(UTIL_CAT.wire) } : r))
-    const migGas = rows =>
-      (rows || []).map(r => (needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor(UTIL_CAT.gas) } : r))
-    const migElec = rows =>
-      (rows || []).map(r => (needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor(UTIL_CAT.elec) } : r))
-    const migSewerLine = rows =>
-      (rows || []).map(r => (needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor(UTIL_CAT.sewerLine) } : r))
-    setLineRows(migLine)
-    setSubLineRows(migLine)
-    setGasPipeRows(migGasPipe)
-    setSubGasPipeRows(migGasPipe)
-    setWireRows(migWire)
-    setSubWireRows(migWire)
-    setFixtureRows(migGas)
-    setSubFixtureRows(migGas)
-    setElecFixtureRows(migElec)
-    setSubElecFixtureRows(migElec)
-    setSewerLineRows(migSewerLine)
-    setSubSewerLineRows(migSewerLine)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vendors, vendorDefaultsApplied])
+  // Rows now default to an EMPTY vendor ("Select vendor" placeholder); we no
+  // longer auto-fill unset rows with a default vendor. An unset vendor yields an
+  // empty Type list and contributes $0 until a vendor is chosen.
 
   // In-house calc — now vendor-aware via materialRows + catDefaults.
   const inHouse = calcUtilities(
@@ -1066,6 +1045,27 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   //    Each section lists its LABOR rates first, then every MATERIAL rate
   //    (per vendor from the catalog) — mirrors the Walls module View Rates.
   const vendorNames = Object.fromEntries((vendors || []).map(v => [v.id, v.name]))
+  // Options for a per-row Vendor <select>. Shows an empty "Select vendor"
+  // placeholder when the row vendor is unset (never auto-resolves to a default),
+  // a backward-compat option for a stored vendor no longer in the catalog list,
+  // then the category's vendors + Standard.
+  const vendorOptions = (cat, rawVendor) => {
+    const list = vendorsForCategory(cat)
+    const rv = rawVendor && rawVendor !== 'auto' ? rawVendor : ''
+    const known = rv === 'Standard' || list.some(v => v.id === rv)
+    return (
+      <>
+        {!rv && <option value="">Select vendor</option>}
+        {rv && !known && <option value={rv}>{vendorNames[rv] || rv}</option>}
+        {list.map(v => (
+          <option key={v.id} value={v.id}>
+            {v.name}
+          </option>
+        ))}
+        <option value="Standard">Standard</option>
+      </>
+    )
+  }
   // Material rows for a catalog item (matched by name). One row per vendor
   // (Standard first), each editable straight to material_price — same helper
   // shape Walls uses.
@@ -1424,7 +1424,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
-                <th className="text-left pb-1 pr-2 font-medium">Line Type</th>
+                <th className="text-left pb-1 pr-2 font-medium">Pipe Type</th>
                 <th className="text-left pb-1 pr-2 font-medium">Linear Feet</th>
                 <th className="text-right pb-1 pr-2 font-medium text-gray-400">$/LF</th>
                 <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
@@ -1450,12 +1450,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                         onChange={e => changeRowVendor('line', i, e.target.value)}
                         title="Vendor"
                       >
-                        {vendorsForCategory(UTIL_CAT.line).map(v => (
-                          <option key={v.id} value={v.id}>
-                            {v.name}
-                          </option>
-                        ))}
-                        <option value="Standard">Standard</option>
+                        {vendorOptions(UTIL_CAT.line, row.vendor)}
                       </select>
                     </td>
                     <td className="py-1 pr-2">
@@ -1465,7 +1460,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                           value={row.type || ''}
                           onChange={e => changeRowType('line', i, e.target.value)}
                         >
-                          {!row.type && <option value="">Select line type</option>}
+                          {!row.type && <option value="">Select pipe</option>}
                           {row.type && !opts.some(o => o.label === row.type) && (
                             <option value={row.type}>{row.type}</option>
                           )}
@@ -1503,7 +1498,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                   type: '',
                   laborType: '',
                   lf: '',
-                  vendor: defaultVendorFor(UTIL_CAT.line),
+                  vendor: '',
                 },
               ])
             }
@@ -1554,12 +1549,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                         onChange={e => changeRowVendor('wire', i, e.target.value)}
                         title="Vendor"
                       >
-                        {vendorsForCategory(UTIL_CAT.wire).map(v => (
-                          <option key={v.id} value={v.id}>
-                            {v.name}
-                          </option>
-                        ))}
-                        <option value="Standard">Standard</option>
+                        {vendorOptions(UTIL_CAT.wire, row.vendor)}
                       </select>
                     </td>
                     <td className="py-1 pr-2">
@@ -1607,7 +1597,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                   type: '',
                   laborType: '',
                   lf: '',
-                  vendor: defaultVendorFor(UTIL_CAT.wire),
+                  vendor: '',
                 },
               ])
             }
@@ -1658,12 +1648,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                         onChange={e => changeRowVendor('elec', i, e.target.value)}
                         title="Vendor"
                       >
-                        {vendorsForCategory(UTIL_CAT.elec).map(v => (
-                          <option key={v.id} value={v.id}>
-                            {v.name}
-                          </option>
-                        ))}
-                        <option value="Standard">Standard</option>
+                        {vendorOptions(UTIL_CAT.elec, row.vendor)}
                       </select>
                     </td>
                     <td className="py-1 pr-2">
@@ -1711,7 +1696,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                   type: '',
                   laborType: '',
                   qty: '',
-                  vendor: defaultVendorFor(UTIL_CAT.elec),
+                  vendor: '',
                 },
               ])
             }
@@ -1762,12 +1747,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                         onChange={e => changeRowVendor('gasPipe', i, e.target.value)}
                         title="Vendor"
                       >
-                        {vendorsForCategory(UTIL_CAT.gasPipe).map(v => (
-                          <option key={v.id} value={v.id}>
-                            {v.name}
-                          </option>
-                        ))}
-                        <option value="Standard">Standard</option>
+                        {vendorOptions(UTIL_CAT.gasPipe, row.vendor)}
                       </select>
                     </td>
                     <td className="py-1 pr-2">
@@ -1815,7 +1795,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                   type: '',
                   laborType: '',
                   lf: '',
-                  vendor: defaultVendorFor(UTIL_CAT.gasPipe),
+                  vendor: '',
                 },
               ])
             }
@@ -1866,12 +1846,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                         onChange={e => changeRowVendor('gas', i, e.target.value)}
                         title="Vendor"
                       >
-                        {vendorsForCategory(UTIL_CAT.gas).map(v => (
-                          <option key={v.id} value={v.id}>
-                            {v.name}
-                          </option>
-                        ))}
-                        <option value="Standard">Standard</option>
+                        {vendorOptions(UTIL_CAT.gas, row.vendor)}
                       </select>
                     </td>
                     <td className="py-1 pr-2">
@@ -1919,7 +1894,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                   type: '',
                   laborType: '',
                   qty: '',
-                  vendor: defaultVendorFor(UTIL_CAT.gas),
+                  vendor: '',
                 },
               ])
             }
@@ -1944,7 +1919,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
-                <th className="text-left pb-1 pr-2 font-medium">Sewer Line</th>
+                <th className="text-left pb-1 pr-2 font-medium">Sewer Pipe</th>
                 <th className="text-left pb-1 pr-2 font-medium">Linear Feet</th>
                 <th className="text-right pb-1 pr-2 font-medium text-gray-400">$/LF</th>
                 <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
@@ -1970,12 +1945,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                         onChange={e => changeRowVendor('sewerLine', i, e.target.value)}
                         title="Vendor"
                       >
-                        {vendorsForCategory(UTIL_CAT.sewerLine).map(v => (
-                          <option key={v.id} value={v.id}>
-                            {v.name}
-                          </option>
-                        ))}
-                        <option value="Standard">Standard</option>
+                        {vendorOptions(UTIL_CAT.sewerLine, row.vendor)}
                       </select>
                     </td>
                     <td className="py-1 pr-2">
@@ -1985,7 +1955,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                           value={row.type || ''}
                           onChange={e => changeRowType('sewerLine', i, e.target.value)}
                         >
-                          {!row.type && <option value="">Select line</option>}
+                          {!row.type && <option value="">Select pipe</option>}
                           {row.type && !opts.some(o => o.label === row.type) && (
                             <option value={row.type}>{row.type}</option>
                           )}
@@ -2027,7 +1997,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
             onClick={() =>
               setActiveSewerLineRows(r => [
                 ...r,
-                { type: '', laborType: '', lf: '', vendor: defaultVendorFor(UTIL_CAT.sewerLine) },
+                { type: '', laborType: '', lf: '', vendor: '' },
               ])
             }
           >

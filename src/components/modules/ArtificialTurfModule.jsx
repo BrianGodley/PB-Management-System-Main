@@ -108,7 +108,10 @@ const BASE_MATERIALS = [
 // the selection, Standard falls back to the built-in BASE_MATERIALS list so the
 // picker never empties; a real vendor with nothing under 'Turf Base' shows nothing.
 function baseMatOptions(materialRows, vendorSel = 'Standard') {
-  const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
+  // Unset vendor (empty "Select vendor" placeholder) → no items; the estimator
+  // picks a vendor first, then the base list populates (vendor-first).
+  if (!vendorSel) return []
+  const isStd = vendorSel === 'Standard' || vendorSel === 'auto'
   const catRows = catalogOptions(materialRows, TURF_CAT.base, isStd ? 'Standard' : vendorSel, {
     standardRows: 'null-vendor',
     stripPrefix: true,
@@ -147,8 +150,11 @@ function turfMatPrice(cat, vendorSel, typeLabel, houseName, houseFallback, mater
 //   turfBrandRow     → resolve a saved selection (row id, or a legacy key/label)
 //                      to its row, preferring a vendor-specific row over standard.
 function turfBrandOptions(materialRows, vendorSel = 'Standard') {
-  // Vendor-first (mirrors Paver's paverOptions): Standard/unset/auto → the
-  // null-vendor Standard products; a real vendor → only that vendor's Items.
+  // Unset vendor (empty "Select vendor" placeholder) → no items until a vendor
+  // is chosen, then the list populates (vendor-first).
+  if (!vendorSel) return []
+  // Vendor-first (mirrors Paver's paverOptions): Standard/auto → the null-vendor
+  // Standard products; a real vendor → only that vendor's Items.
   const vsel = vendorSel && vendorSel !== 'auto' ? vendorSel : 'Standard'
   return catalogOptions(materialRows, TURF_CAT.turf, vsel, {
     standardRows: 'null-vendor',
@@ -340,19 +346,29 @@ function calcTurf(
   // Narrow/custom cut strips — separate from the 15' wide rolls.
   // Labor: hrs = (LF / 100) * 8  — Excel R20=(E21/100)*8
   // Material: brand $/SF × (LF × width ft)  — Excel S20=O20*Q20 (manual inputs)
-  const stripsLF = n(state.strips?.lf)
-  const stripsWidthIn = n(state.strips?.widthIn) || 12
-  const stripsBrandRow = turfBrandRow(materialRows, state.strips?.vendor, state.strips?.brand)
-  const stripsPrice = n(stripsBrandRow?.unit_cost)
-  const stripsSF = stripsLF * (stripsWidthIn / 12)
-  // Unselected strips (no brand) contribute nothing (no crash, no fallback).
-  const hasStrips = !!(state.strips && state.strips.brand)
+  // Now a user-managed list of strip rows (was a single row).
   // Labor rate is DB-editable (LF/hr). Legacy (LF/100)*8 == LF/12.5.
   const stripLFHr = n(lr['Turf - Strip Install LF/hr']) || RATE_DEFAULTS.stripLFHr
-  const stripsHrs = hasStrips && !isSub && stripsLF > 0 && stripLFHr > 0 ? stripsLF / stripLFHr : 0
-  const stripsMat = hasStrips && !isSub ? stripsPrice * stripsSF : 0
-  // Sub strips: flat $/LF sub install + brand material $/SF.
-  const subStripsCost = hasStrips ? stripsLF * subStripPerLF + stripsPrice * stripsSF : 0
+  let stripsHrs = 0,
+    stripsMat = 0,
+    subStripsCost = 0
+  const stripCalc = (state.stripRows || []).map(strip => {
+    const lf = n(strip?.lf)
+    const widthIn = n(strip?.widthIn) || 12
+    // Unselected strip (no brand) contributes nothing (no crash, no fallback).
+    const has = !!(strip && strip.brand)
+    const brandRow = has ? turfBrandRow(materialRows, strip?.vendor, strip?.brand) : null
+    const price = n(brandRow?.unit_cost)
+    const sf = lf * (widthIn / 12)
+    const hrs = has && !isSub && lf > 0 && stripLFHr > 0 ? lf / stripLFHr : 0
+    const mat = has && !isSub ? price * sf : 0
+    // Sub strips: flat $/LF sub install + brand material $/SF.
+    const rowSubCost = has ? lf * subStripPerLF + price * sf : 0
+    stripsHrs += hrs
+    stripsMat += mat
+    subStripsCost += rowSubCost
+    return { lf, widthIn, price, sf, hrs, mat, rowSubCost }
+  })
 
   // ── Cut, Staple & Seam ────────────────────────────────────────────────────
   // hrs = (totalLF / TurfCutSfHr) * TurfCutRate = (totalLF/100)*1.0
@@ -432,13 +448,10 @@ function calcTurf(
     turfHrs,
     turfSFHr,
     turfMat,
-    stripsLF,
-    stripsWidthIn,
-    stripsSF,
+    stripCalc,
     stripsHrs,
     stripLFHr,
     stripsMat,
-    stripsPrice,
     cutHrs,
     cutMat,
     subCutMat,
@@ -472,23 +485,11 @@ const DEFAULT_STATE = {
     soil: { sf: '', inches: '4', method: 'Skid Steer Good' },
     lawn: { sf: '', inches: '4', method: 'Skid Steer Good' },
   },
-  baseRows: [
-    { material: '', sf: '', vendor: 'Standard' },
-    { material: '', sf: '', vendor: 'Standard' },
-    { material: '', sf: '', vendor: 'Standard' },
-  ],
+  baseRows: [{ material: '', sf: '', vendor: '' }],
   useZeoFill: false,
-  rolls: [
-    { brand: '', edgeLF: '', vendor: 'Standard' },
-    { brand: '', edgeLF: '', vendor: 'Standard' },
-    { brand: '', edgeLF: '', vendor: 'Standard' },
-  ],
-  strips: { lf: '', widthIn: '12', brand: '', vendor: 'Standard' },
-  manualRows: [
-    { label: '', hours: '', materials: '', subCost: '' },
-    { label: '', hours: '', materials: '', subCost: '' },
-    { label: '', hours: '', materials: '', subCost: '' },
-  ],
+  rolls: [{ brand: '', edgeLF: '', vendor: '' }],
+  stripRows: [{ lf: '', widthIn: '12', brand: '', vendor: '' }],
+  manualRows: [{ label: '', hours: '', materials: '', subCost: '' }],
 }
 
 // ── Per-tab input record ──────────────────────────────────────────────────────
@@ -509,7 +510,8 @@ function makeTurfTab(src = {}) {
     baseRows: (src.baseRows || d.baseRows).map(r => ({ ...r })),
     useZeoFill: src.useZeoFill ?? d.useZeoFill,
     rolls: (src.rolls || d.rolls).map(r => ({ ...r })),
-    strips: { ...d.strips, ...(src.strips || {}) },
+    // strips was a single object; migrate legacy saves into the new row list.
+    stripRows: (src.stripRows || (src.strips ? [src.strips] : d.stripRows)).map(r => ({ ...r })),
     manualRows: (src.manualRows || d.manualRows).map(r => ({ ...r })),
   }
 }
@@ -788,7 +790,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           ...p,
           [k]: {
             ...cur,
-            baseRows: [...(cur.baseRows || []), { material: '', sf: '', vendor: 'Standard' }],
+            baseRows: [...(cur.baseRows || []), { material: '', sf: '', vendor: '' }],
           },
         }
       }),
@@ -814,6 +816,18 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       }),
     []
   )
+  const addRoll = useCallback(
+    () =>
+      setState(p => {
+        const k = tabKey(p)
+        const cur = p[k]
+        return {
+          ...p,
+          [k]: { ...cur, rolls: [...(cur.rolls || []), { brand: '', edgeLF: '', vendor: '' }] },
+        }
+      }),
+    []
+  )
   const setRow = useCallback(
     (i, f, v) =>
       setState(p => {
@@ -825,12 +839,30 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       }),
     []
   )
-  const setStrips = useCallback(
-    (field, val) =>
+  const setStripRow = useCallback(
+    (i, field, val) =>
       setState(p => {
         const k = tabKey(p)
         const cur = p[k]
-        return { ...p, [k]: { ...cur, strips: { ...cur.strips, [field]: val } } }
+        const stripRows = (cur.stripRows || []).map((r, idx) =>
+          idx === i ? { ...r, [field]: val } : r
+        )
+        return { ...p, [k]: { ...cur, stripRows } }
+      }),
+    []
+  )
+  const addStripRow = useCallback(
+    () =>
+      setState(p => {
+        const k = tabKey(p)
+        const cur = p[k]
+        return {
+          ...p,
+          [k]: {
+            ...cur,
+            stripRows: [...(cur.stripRows || []), { lf: '', widthIn: '12', brand: '', vendor: '' }],
+          },
+        }
       }),
     []
   )
@@ -891,8 +923,6 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
   const brandOpts = turfBrandOptions(materialRows)
   const brandKeys = brandOpts.map(o => o.id)
   const brandLabels = brandOpts.map(o => o.label)
-  // Turf Strips is a single row — its Type list is filtered by the strips' vendor.
-  const stripsBrandOpts = turfBrandOptions(materialRows, T.strips?.vendor)
 
   function handleSave() {
     onSave({
@@ -1238,7 +1268,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           <TH
             cols={[
               { label: 'Vendor', w: 'w-28' },
-              { label: 'Material' },
+              { label: 'Base Type' },
               { label: 'Sq Ft', w: 'w-20' },
               { label: 'Qty', w: 'w-16' },
               { label: 'Hrs', w: 'w-16' },
@@ -1268,16 +1298,17 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                   <td className={td}>
                     <select
                       className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
-                      value={row.vendor || 'Standard'}
+                      value={row.vendor || ''}
                       onChange={e => setBaseRow(i, 'vendor', e.target.value)}
                       title="Vendor"
                     >
+                      <option value="">Select vendor</option>
+                      <option value="Standard">Standard</option>
                       {vendorsSupplyingMarker(TURF_CAT.base).map(v => (
                         <option key={v.id} value={v.id}>
                           {v.name}
                         </option>
                       ))}
-                      <option value="Standard">Standard</option>
                     </select>
                   </td>
                   <td className={td}>
@@ -1288,7 +1319,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                         onChange={e => setBaseRow(i, 'material', e.target.value)}
                         title="Material"
                       >
-                        {!row.material && <option value="">Select material</option>}
+                        {!row.material && <option value="">Select base</option>}
                         {row.material &&
                           !baseOpts.some(
                             o =>
@@ -1382,34 +1413,20 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       {/* Turf Installation */}
       <div>
         <SecHdr title="Turf Installation (15' Wide Rolls)" />
-        <div className="text-xs text-gray-400 mb-2">
-          {calc.isSub ? (
-            <>
-              Flat subcontractor install: <span className="text-gray-500">${calc.subInstallPerSF}/SF</span>{' '}
-              + brand material ($/SF). Enter the installed square footage per brand.
-            </>
-          ) : (
-            <>
-              Each row edits both rates: <span className="text-gray-500">material</span> ($/SF, per
-              brand) and <span className="text-gray-500">install labor</span> ({calc.turfSFHr} SF/hr,
-              shared).
-            </>
-          )}
-        </div>
         <table className="w-full text-xs">
           <TH
             cols={
               calc.isSub
                 ? [
                     { label: 'Vendor', w: 'w-28' },
-                    { label: 'Turf Brand' },
+                    { label: 'Turf Type' },
                     { label: 'Install SF', w: 'w-24' },
                     { label: 'Edge LF', w: 'w-20' },
                     { label: 'Material', w: 'w-24' },
                   ]
                 : [
                     { label: 'Vendor', w: 'w-28' },
-                    { label: 'Turf Brand' },
+                    { label: 'Turf Type' },
                     { label: 'Edge LF', w: 'w-20' },
                     { label: 'Sq Ft', w: 'w-20' },
                     { label: 'Hrs', w: 'w-16' },
@@ -1420,28 +1437,31 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           <tbody className="divide-y divide-gray-50">
             {T.rolls.map((roll, i) => {
               const cr = calc.rollCalc[i]
-              const brandRow = turfBrandRow(materialRows, roll.vendor, roll.brand)
+              // Only resolve a brand row when one is selected — an empty picker
+              // must not auto-fill the first turf.
+              const brandRow = roll.brand ? turfBrandRow(materialRows, roll.vendor, roll.brand) : null
               const rollBrandOpts = turfBrandOptions(materialRows, roll.vendor)
               return (
                 <tr key={i}>
                   <td className={td}>
                     <select
                       className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
-                      value={roll.vendor || 'Standard'}
+                      value={roll.vendor || ''}
                       onChange={e => setRoll(i, 'vendor', e.target.value)}
                       title="Vendor"
                     >
+                      <option value="">Select vendor</option>
+                      <option value="Standard">Standard</option>
                       {vendorsSupplyingMarker(TURF_CAT.turf).map(v => (
                         <option key={v.id} value={v.id}>
                           {v.name}
                         </option>
                       ))}
-                      <option value="Standard">Standard</option>
                     </select>
                   </td>
                   <td className={td}>
                     <Sel
-                      value={brandRow?.id || roll.brand || ''}
+                      value={roll.brand ? (brandRow?.id || roll.brand) : ''}
                       onChange={e => setRoll(i, 'brand', e.target.value)}
                       options={rollBrandOpts.map(o => o.id)}
                       optionLabels={rollBrandOpts.map(o => o.label)}
@@ -1482,6 +1502,13 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
             })}
           </tbody>
         </table>
+        <button
+          type="button"
+          onClick={addRoll}
+          className="mt-2 text-xs text-blue-600 hover:text-blue-700 font-medium"
+        >
+          ＋ Add row
+        </button>
 
         {/* Cut, Staple & Seam — auto-calculated */}
         {calc.totalEdgeLF > 0 && (
@@ -1536,14 +1563,14 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
               calc.isSub
                 ? [
                     { label: 'Vendor', w: 'w-28' },
-                    { label: 'Turf Brand' },
+                    { label: 'Turf Type' },
                     { label: 'Length (LF)', w: 'w-24' },
                     { label: 'Width (in)', w: 'w-20' },
                     { label: 'Material', w: 'w-24' },
                   ]
                 : [
                     { label: 'Vendor', w: 'w-28' },
-                    { label: 'Turf Brand' },
+                    { label: 'Turf Type' },
                     { label: 'Length (LF)', w: 'w-24' },
                     { label: 'Width (in)', w: 'w-20' },
                     { label: 'Sq Ft', w: 'w-16' },
@@ -1552,60 +1579,77 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                   ]
             }
           />
-          <tbody>
-            <tr>
-              <td className={td}>
-                <select
-                  className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
-                  value={T.strips?.vendor || 'Standard'}
-                  onChange={e => setStrips('vendor', e.target.value)}
-                  title="Vendor"
-                >
-                  {vendorsSupplyingMarker(TURF_CAT.turf).map(v => (
-                    <option key={v.id} value={v.id}>
-                      {v.name}
-                    </option>
-                  ))}
-                  <option value="Standard">Standard</option>
-                </select>
-              </td>
-              <td className={td}>
-                <Sel
-                  value={turfBrandRow(materialRows, T.strips?.vendor, T.strips?.brand)?.id || T.strips?.brand || ''}
-                  onChange={e => setStrips('brand', e.target.value)}
-                  placeholder="Select turf"
-                  options={stripsBrandOpts.map(o => o.id)}
-                  optionLabels={stripsBrandOpts.map(o => o.label)}
-                />
-              </td>
-              <td className={td}>
-                <Inp
-                  value={T.strips?.lf || ''}
-                  onChange={e => setStrips('lf', e.target.value)}
-                />
-              </td>
-              <td className={td}>
-                <Inp
-                  value={T.strips?.widthIn || '12'}
-                  onChange={e => setStrips('widthIn', e.target.value)}
-                  placeholder="12"
-                  step="1"
-                />
-              </td>
-              {calc.isSub ? (
-                <td className={num}>{calc.subStripsCost > 0 ? fmt2(calc.subStripsCost) : '—'}</td>
-              ) : (
-                <>
-                  <td className={num}>
-                    {calc.stripsSF > 0 ? calc.stripsSF.toLocaleString() : '—'}
+          <tbody className="divide-y divide-gray-50">
+            {(T.stripRows || []).map((strip, i) => {
+              const sc = calc.stripCalc?.[i] || {}
+              const rowStripsBrandOpts = turfBrandOptions(materialRows, strip?.vendor)
+              // Only resolve a brand row when one is selected — an empty picker
+              // must not auto-fill the first turf.
+              const stripBrandRow = strip?.brand
+                ? turfBrandRow(materialRows, strip?.vendor, strip?.brand)
+                : null
+              return (
+                <tr key={i}>
+                  <td className={td}>
+                    <select
+                      className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
+                      value={strip?.vendor || ''}
+                      onChange={e => setStripRow(i, 'vendor', e.target.value)}
+                      title="Vendor"
+                    >
+                      <option value="">Select vendor</option>
+                      <option value="Standard">Standard</option>
+                      {vendorsSupplyingMarker(TURF_CAT.turf).map(v => (
+                        <option key={v.id} value={v.id}>
+                          {v.name}
+                        </option>
+                      ))}
+                    </select>
                   </td>
-                  <td className={num}>{fh(calc.stripsHrs)}</td>
-                  <td className={num}>{calc.stripsMat > 0 ? fmt2(calc.stripsMat) : '—'}</td>
-                </>
-              )}
-            </tr>
+                  <td className={td}>
+                    <Sel
+                      value={strip?.brand ? (stripBrandRow?.id || strip?.brand) : ''}
+                      onChange={e => setStripRow(i, 'brand', e.target.value)}
+                      placeholder="Select turf"
+                      options={rowStripsBrandOpts.map(o => o.id)}
+                      optionLabels={rowStripsBrandOpts.map(o => o.label)}
+                    />
+                  </td>
+                  <td className={td}>
+                    <Inp
+                      value={strip?.lf || ''}
+                      onChange={e => setStripRow(i, 'lf', e.target.value)}
+                    />
+                  </td>
+                  <td className={td}>
+                    <Inp
+                      value={strip?.widthIn || '12'}
+                      onChange={e => setStripRow(i, 'widthIn', e.target.value)}
+                      placeholder="12"
+                      step="1"
+                    />
+                  </td>
+                  {calc.isSub ? (
+                    <td className={num}>{sc.rowSubCost > 0 ? fmt2(sc.rowSubCost) : '—'}</td>
+                  ) : (
+                    <>
+                      <td className={num}>{sc.sf > 0 ? sc.sf.toLocaleString() : '—'}</td>
+                      <td className={num}>{fh(sc.hrs)}</td>
+                      <td className={num}>{sc.mat > 0 ? fmt2(sc.mat) : '—'}</td>
+                    </>
+                  )}
+                </tr>
+              )
+            })}
           </tbody>
         </table>
+        <button
+          type="button"
+          onClick={addStripRow}
+          className="mt-2 text-xs text-blue-600 hover:text-blue-700 font-medium"
+        >
+          ＋ Add row
+        </button>
       </div>
 
       {/* Manual Entry */}

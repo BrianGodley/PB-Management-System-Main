@@ -191,7 +191,10 @@ function masterDrainTypes(cat, builtIn, materialRows, laborField) {
 // selected type still resolves its price/labor through PIPE_T/FIX_T + drainMatCost,
 // which already applies the vendor's price by matching the item's name.
 function drainTypeOptions(cat, builtIn, materialRows, vendorSel) {
-  const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
+  // Unset vendor → empty Type list (only the row's own "Select …" placeholder);
+  // pick a vendor first. 'Standard'/'auto' still yield the built-in + Standard list.
+  if (!vendorSel) return []
+  const isStd = vendorSel === 'Standard' || vendorSel === 'auto'
   const catRows =
     catalogOptions(materialRows, cat, isStd ? 'Standard' : vendorSel, {
       standardRows: 'null-vendor',
@@ -450,10 +453,10 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
 
 // ── Default blank rows ─────────────────────────────────────────────────────────
 const DEFAULT_TRENCH_ROWS = [{ equipment: 'Hand', lf: '', width: '', depth: '' }]
-const DEFAULT_PIPE_ROWS = [{ type: '', lf: '', vendor: 'auto' }]
-const DEFAULT_FIXTURE_ROWS = [{ type: '', qty: '', vendor: 'auto' }]
+const DEFAULT_PIPE_ROWS = [{ type: '', lf: '', vendor: '' }]
+const DEFAULT_FIXTURE_ROWS = [{ type: '', qty: '', vendor: '' }]
 const DEFAULT_FRENCH_ROWS = [
-  { type: '', lf: '', vendor: 'auto' },
+  { type: '', lf: '', vendor: '' },
 ]
 const DEFAULT_ADDITIONAL = {
   sumpPumpQty: '',
@@ -622,34 +625,13 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   // ── Vendor catalog helpers (material-only, per-row Vendor picker) ────────
   const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
   const defaultVendorFor = cat => vendorsForCategory(cat)[0]?.id || 'Standard'
-  // Honest effective vendor: only unset/'auto' falls back to the category default;
-  // 'Standard' stays 'Standard' so it's selectable and the Type list matches.
-  const effVendor = (cat, v) => (v && v !== 'auto' ? v : defaultVendorFor(cat))
   const catDefaults = {
     [DRAIN_CAT.pipe]: defaultVendorFor(DRAIN_CAT.pipe),
     [DRAIN_CAT.fixture]: defaultVendorFor(DRAIN_CAT.fixture),
   }
-  // On a NEW estimate, default each pipe/fixture row's vendor to the first real
-  // vendor for its category once catalogs load. Never overrides a saved estimate.
-  const [vendorDefaultsApplied, setVendorDefaultsApplied] = useState(false)
-  useEffect(() => {
-    const isSaved = initialData?.materialPrices && Object.keys(initialData.materialPrices).length > 0
-    if (vendorDefaultsApplied || isSaved || !vendors.length) return
-    setVendorDefaultsApplied(true)
-    const needs = v => !v || v === 'Standard' || v === 'auto'
-    setPipeRows(rows =>
-      (rows || []).map(r => (needs(r.vendor) ? { ...r, vendor: defaultVendorFor(DRAIN_CAT.pipe) } : r))
-    )
-    setFrenchRows(rows =>
-      (rows || []).map(r => (needs(r.vendor) ? { ...r, vendor: defaultVendorFor(DRAIN_CAT.pipe) } : r))
-    )
-    setFixtureRows(rows =>
-      (rows || []).map(r =>
-        needs(r.vendor) ? { ...r, vendor: defaultVendorFor(DRAIN_CAT.fixture) } : r
-      )
-    )
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vendors, vendorDefaultsApplied])
+  // Per-row Vendor picker defaults to an empty "Select vendor" placeholder; rows
+  // are NOT auto-assigned a default vendor. An unset vendor yields an empty Type
+  // list, so the row stays $0 until the user picks a vendor (then a type).
 
   const calcRaw = calcDrainage(
     {
@@ -1343,10 +1325,16 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                     <td className="py-1 pr-2">
                       <select
                         className="input text-sm py-1 w-full"
-                        value={effVendor(DRAIN_CAT.pipe, row.vendor)}
+                        value={row.vendor || ''}
                         onChange={e => updatePipe(i, 'vendor', e.target.value)}
                         title="Vendor"
                       >
+                        {!row.vendor && <option value="">Select vendor</option>}
+                        {row.vendor &&
+                          row.vendor !== 'Standard' &&
+                          !vendorsForCategory(DRAIN_CAT.pipe).some(v => v.id === row.vendor) && (
+                            <option value={row.vendor}>{vendorNames[row.vendor] || row.vendor}</option>
+                          )}
                         {vendorsForCategory(DRAIN_CAT.pipe).map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
@@ -1367,7 +1355,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                               DRAIN_CAT.pipe,
                               PIPE_TYPES,
                               materialRows,
-                              effVendor(DRAIN_CAT.pipe, row.vendor)
+                              row.vendor
                             )
                             return (
                               <>
@@ -1403,7 +1391,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           <button
             type="button"
             onClick={() =>
-              setPipeRows(rows => [...rows, { type: '', lf: '', vendor: 'auto' }])
+              setPipeRows(rows => [...rows, { type: '', lf: '', vendor: '' }])
             }
             className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
           >
@@ -1450,10 +1438,16 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                     <td className="py-1 pr-2">
                       <select
                         className="input text-sm py-1 w-full"
-                        value={effVendor(DRAIN_CAT.pipe, row.vendor)}
+                        value={row.vendor || ''}
                         onChange={e => updateFrench(i, 'vendor', e.target.value)}
                         title="Vendor"
                       >
+                        {!row.vendor && <option value="">Select vendor</option>}
+                        {row.vendor &&
+                          row.vendor !== 'Standard' &&
+                          !vendorsForCategory(DRAIN_CAT.pipe).some(v => v.id === row.vendor) && (
+                            <option value={row.vendor}>{vendorNames[row.vendor] || row.vendor}</option>
+                          )}
                         {vendorsForCategory(DRAIN_CAT.pipe).map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
@@ -1498,7 +1492,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           <button
             type="button"
             onClick={() =>
-              setFrenchRows(rows => [...rows, { type: '', lf: '', vendor: 'auto' }])
+              setFrenchRows(rows => [...rows, { type: '', lf: '', vendor: '' }])
             }
             className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
           >
@@ -1576,10 +1570,16 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                     <td className="py-1 pr-2">
                       <select
                         className="input text-sm py-1 w-full"
-                        value={effVendor(DRAIN_CAT.fixture, row.vendor)}
+                        value={row.vendor || ''}
                         onChange={e => updateFixture(i, 'vendor', e.target.value)}
                         title="Vendor"
                       >
+                        {!row.vendor && <option value="">Select vendor</option>}
+                        {row.vendor &&
+                          row.vendor !== 'Standard' &&
+                          !vendorsForCategory(DRAIN_CAT.fixture).some(v => v.id === row.vendor) && (
+                            <option value={row.vendor}>{vendorNames[row.vendor] || row.vendor}</option>
+                          )}
                         {vendorsForCategory(DRAIN_CAT.fixture).map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
@@ -1600,7 +1600,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                               DRAIN_CAT.fixture,
                               FIXTURE_TYPES,
                               materialRows,
-                              effVendor(DRAIN_CAT.fixture, row.vendor)
+                              row.vendor
                             )
                             return (
                               <>
@@ -1636,7 +1636,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           <button
             type="button"
             onClick={() =>
-              setFixtureRows(rows => [...rows, { type: '', qty: '', vendor: 'auto' }])
+              setFixtureRows(rows => [...rows, { type: '', qty: '', vendor: '' }])
             }
             className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
           >

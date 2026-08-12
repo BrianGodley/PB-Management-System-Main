@@ -199,8 +199,11 @@ function calcPaver(
     // Base material $/ton — vendor-aware. A real vendor overrides via its
     // catalog item; Standard ('Class II Roadbase') uses the seeded rate, falling
     // back to the legacy single base-rock rate.
-    let baseTonRate
-    if (row.baseVendor && row.baseVendor !== 'Standard' && row.baseVendor !== 'auto') {
+    let baseTonRate = 0
+    if (!row.baseVendor) {
+      // No base vendor selected yet → $0 base material (pick a vendor first).
+      baseTonRate = 0
+    } else if (row.baseVendor !== 'Standard' && row.baseVendor !== 'auto') {
       const bItem = paverItemFor(
         PAVER_CAT.base,
         row.baseVendor,
@@ -279,7 +282,10 @@ function calcPaver(
   const curvedCutHrs = n(state.curvedCutLF) > 0 ? n(state.curvedCutLF) / curvedCutRate : 0
   const restraintsHrs = n(state.restraintsLF) > 0 ? n(state.restraintsLF) / restraintRate : 0
   const sleevesHrs = n(state.sleevesLF) > 0 ? n(state.sleevesLF) / sleevesRate : 0
-  const vertSoldierHrs = n(state.vertSoldierLF) > 0 ? n(state.vertSoldierLF) / vertSoldierRate : 0
+  // Vertical Soldier Course rows (In-House). LF summed across rows drives labor.
+  const vertRows = Array.isArray(state.vertRows) ? state.vertRows : []
+  const vertTotalLF = vertRows.reduce((s, r) => s + n(r.lf), 0)
+  const vertSoldierHrs = vertTotalLF > 0 ? vertTotalLF / vertSoldierRate : 0
   const sealerHrs = n(state.sealerSF) > 0 ? n(state.sealerSF) / sealerRate : 0
   const polySandHrs = state.polySand && totalInstallSF > 0 ? totalInstallSF * polySandSpread : 0
   // Existing pavers: same per-SF spread/labor coefficient as new pavers, but
@@ -294,33 +300,35 @@ function calcPaver(
   // Priced from the ACTIVE tab's fields so each tab's material is independent.
   // In-House uses Vendor + Type from the paver catalog (price_per_lf_vert) with
   // Custom / legacy brand-name fallbacks; the Sub tab uses its own brand/name.
-  const vSoldierLF = isSubTab ? n(state.subVertSoldierLF) : n(state.vertSoldierLF)
-  let vertPricePerLF = 0
+  const vSoldierLF = isSubTab ? n(state.subVertSoldierLF) : vertTotalLF
+  let vertPaverCost = 0
   if (isSubTab) {
+    // Sub tab keeps the legacy single-record soldier fields (no rows UI on Sub).
+    let ppl = 0
     if (state.subVertPaverBrand === 'Custom') {
-      vertPricePerLF = n(state.subVertCustomPricePerLF)
+      ppl = n(state.subVertCustomPricePerLF)
     } else if (state.subVertPaverBrand) {
       const vpd = pp.find(
         p => p.brand === state.subVertPaverBrand && p.name === state.subVertPaverName
       )
-      vertPricePerLF = vpd?.price_per_lf_vert || 0
+      ppl = vpd?.price_per_lf_vert || 0
     }
-  } else if (state.vertVendor === 'Custom' || state.vertPaverBrand === 'Custom') {
-    vertPricePerLF = n(state.vertCustomPricePerLF)
-  } else if (state.vertVendor && (state.vertId || state.vertType)) {
-    // Vendor chosen but no paver selected yet → $0 (no fallback to first item).
-    const vItem = paverItemFor(
-      PAVER_CAT.paver,
-      state.vertVendor,
-      state.vertId || state.vertType,
-      materialRows
-    )
-    vertPricePerLF = vItem ? n(vItem.price_per_lf_vert) : 0
-  } else if (state.vertPaverBrand) {
-    const vpd = pp.find(p => p.brand === state.vertPaverBrand && p.name === state.vertPaverName)
-    vertPricePerLF = vpd?.price_per_lf_vert || 0
+    vertPaverCost = n(state.subVertSoldierLF) * ppl
+  } else {
+    // In-House: sum each row's LF × its own $/LF (vendor catalog or Custom).
+    for (const r of vertRows) {
+      const lf = n(r.lf)
+      let ppl = 0
+      if (r.vendor === 'Custom') {
+        ppl = n(r.customPricePerLF)
+      } else if (r.vendor && (r.id || r.type)) {
+        // Vendor chosen but no paver selected yet → $0 (no fallback to first item).
+        const vItem = paverItemFor(PAVER_CAT.paver, r.vendor, r.id || r.type, materialRows)
+        ppl = vItem ? n(vItem.price_per_lf_vert) : 0
+      }
+      vertPaverCost += lf * ppl
+    }
   }
-  const vertPaverCost = vSoldierLF * vertPricePerLF
 
   const totalPallets = totalAreaPallets
 
@@ -489,7 +497,6 @@ function calcPaver(
     sleevesMatLF,
     palletCharge,
     deliveryFlat,
-    vertPricePerLF,
     tonsDivisor,
     deliverySFPerIncrement,
   }
@@ -502,9 +509,8 @@ const DEFAULT_STATE = {
   crewType: 'Paver',
   hoursAdj: 0,
   areaRows: [
-    { label: 'Area 1', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: 'Standard', baseType: 'Class II Roadbase' },
-    { label: 'Area 2', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: 'Standard', baseType: 'Class II Roadbase' },
-    { label: 'Area 3', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: 'Standard', baseType: 'Class II Roadbase' },
+    { label: 'Area 1', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: '', baseType: '' },
+    { label: 'Area 2', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: '', baseType: '' },
   ],
   straightCutLF: '',
   curvedCutLF: '',
@@ -512,6 +518,10 @@ const DEFAULT_STATE = {
   numStones: '',
   numColors: '',
   sleevesLF: '',
+  // Vertical Soldier Course — array of rows (Vendor → Paver → LF). Legacy single-
+  // record fields (vertSoldierLF/vertVendor/vertType/vertCustomPricePerLF) are
+  // kept for backward-compat and migrated into vertRows on load (see ensureVertRows).
+  vertRows: [],
   vertSoldierLF: '',
   vertVendor: '',
   vertType: '',
@@ -528,8 +538,6 @@ const DEFAULT_STATE = {
   shippingCharge: '',
   manualRows: [
     { label: '', hours: '', materials: '', subCost: '' },
-    { label: '', hours: '', materials: '', subCost: '' },
-    { label: '', hours: '', materials: '', subCost: '' },
   ],
 
   // ── Subcontractor tab — independent copies of every mirrored field so the
@@ -538,9 +546,8 @@ const DEFAULT_STATE = {
   //    are NOT mirrored. Sub cost itself uses an install-only whole-job rate
   //    (see calc below); the other mirrored fields are captured for scope.
   subAreaRows: [
-    { label: 'Area 1', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: 'Standard', baseType: 'Class II Roadbase', installType: 'Hand Demo', largeFormat: false, under500: false },
-    { label: 'Area 2', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: 'Standard', baseType: 'Class II Roadbase', installType: 'Hand Demo', largeFormat: false, under500: false },
-    { label: 'Area 3', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: 'Standard', baseType: 'Class II Roadbase', installType: 'Hand Demo', largeFormat: false, under500: false },
+    { label: 'Area 1', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: '', baseType: '', installType: 'Hand Demo', largeFormat: false, under500: false },
+    { label: 'Area 2', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: '', baseType: '', installType: 'Hand Demo', largeFormat: false, under500: false },
   ],
   // Sub install line items — SF per install type + two surcharge lines.
   subInstall: {
@@ -567,10 +574,32 @@ const DEFAULT_STATE = {
   subIs80mm: false,
   subPolySand: false,
   subPolySandExistingSF: '',
-  subManualRows: [
-    { label: '', hours: '', materials: '', subCost: '' },
-    { label: '', hours: '', materials: '', subCost: '' },
-  ],
+  subManualRows: [],
+}
+
+// ── Backward-compat: migrate legacy single-record Vertical Soldier fields into
+// the vertRows array so older saved estimates render + price via the new rows UI.
+function ensureVertRows(s) {
+  if (Array.isArray(s.vertRows) && s.vertRows.length) return s
+  const hasLegacy =
+    s.vertVendor ||
+    s.vertId ||
+    s.vertType ||
+    s.vertCustomPricePerLF ||
+    (s.vertSoldierLF != null && s.vertSoldierLF !== '' && Number(s.vertSoldierLF) > 0)
+  if (!hasLegacy) return s
+  return {
+    ...s,
+    vertRows: [
+      {
+        vendor: s.vertVendor || '',
+        id: s.vertId || '',
+        type: s.vertType || '',
+        customPricePerLF: s.vertCustomPricePerLF || '',
+        lf: s.vertSoldierLF || '',
+      },
+    ],
+  }
 }
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
@@ -647,7 +676,9 @@ function TH({ cols }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function PaverModule({ initialData, onSave, onCancel }) {
-  const [state, setState] = useState(() => ({ ...DEFAULT_STATE, ...(initialData || {}) }))
+  const [state, setState] = useState(() =>
+    ensureVertRows({ ...DEFAULT_STATE, ...(initialData || {}) })
+  )
 
   // Free-text notes for this module — Sam writes auto-generated
   // takeoffs here via create_estimate_from_takeoff, and the user can
@@ -797,10 +828,6 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   const kCurved = isSub ? 'subCurvedCutLF' : 'curvedCutLF'
   const kRestraints = isSub ? 'subRestraintsLF' : 'restraintsLF'
   const kSleeves = isSub ? 'subSleevesLF' : 'sleevesLF'
-  const kVertSoldier = isSub ? 'subVertSoldierLF' : 'vertSoldierLF'
-  const kVertBrand = isSub ? 'subVertPaverBrand' : 'vertPaverBrand'
-  const kVertName = isSub ? 'subVertPaverName' : 'vertPaverName'
-  const kVertCustom = isSub ? 'subVertCustomPricePerLF' : 'vertCustomPricePerLF'
   const kSealer = isSub ? 'subSealerSF' : 'sealerSF'
   const kPolySand = isSub ? 'subPolySand' : 'polySand'
   const kPolyExisting = isSub ? 'subPolySandExistingSF' : 'polySandExistingSF'
@@ -1403,7 +1430,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           <TH
             cols={[
               { label: 'Vendor', w: 'w-40' },
-              { label: 'Type' },
+              { label: 'Paver Type' },
               { label: 'SF', w: 'w-24' },
               { label: '$/SF', w: 'w-12' },
               { label: 'Pallets', w: 'w-12' },
@@ -1436,7 +1463,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                         setRow(kArea, i, 'paverType', '')
                       }}
                     >
-                      <option value="">— Vendor —</option>
+                      <option value="">Select vendor</option>
                       {vendorsForCategory(PAVER_CAT.paver).map(v => (
                         <option key={v.id} value={v.id}>
                           {v.name}
@@ -1500,7 +1527,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           <TH
             cols={[
               { label: 'Vendor', w: 'w-36' },
-              { label: 'Type', w: 'w-40' },
+              { label: 'Base Type', w: 'w-40' },
               { label: 'Base SF', w: 'w-24' },
               { label: 'Base Install', w: 'w-36' },
               { label: 'Base (in)', w: 'w-14' },
@@ -1511,20 +1538,27 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           <tbody className="divide-y divide-gray-50">
             {state[kArea].map((row, i) => {
               const a = (isSub ? calc.subAreas : calc.areas)[i] || {}
+              const baseUnset = !row.baseVendor
               const isRealBase = row.baseVendor && row.baseVendor !== 'Standard'
               const bOpts = isRealBase
                 ? paverOptions(PAVER_CAT.base, row.baseVendor, materialRows)
-                : ['Class II Roadbase']
+                : baseUnset
+                  ? [{ value: '', label: 'Select base' }]
+                  : ['Class II Roadbase']
               return (
                 <tr key={i}>
                   <td className={td}>
                     <select
                       className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
-                      value={row.baseVendor || 'Standard'}
+                      value={row.baseVendor || ''}
                       onChange={e => {
                         const v = e.target.value
                         setRow(kArea, i, 'baseVendor', v)
-                        if (v === 'Standard') {
+                        if (!v) {
+                          // Empty placeholder → clear selection ($0 base material).
+                          setRow(kArea, i, 'baseId', '')
+                          setRow(kArea, i, 'baseType', '')
+                        } else if (v === 'Standard') {
                           setRow(kArea, i, 'baseId', '')
                           setRow(kArea, i, 'baseType', 'Class II Roadbase')
                         } else {
@@ -1534,6 +1568,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                         }
                       }}
                     >
+                      <option value="">Select vendor</option>
                       <option value="Standard">Standard</option>
                       {vendorsForCategory(PAVER_CAT.base).map(v => (
                         <option key={v.id} value={v.id}>
@@ -1545,9 +1580,14 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                   <td className={td}>
                     <Sel
                       value={
-                        isRealBase ? row.baseId || '' : row.baseType || 'Class II Roadbase'
+                        isRealBase
+                          ? row.baseId || ''
+                          : baseUnset
+                            ? ''
+                            : row.baseType || 'Class II Roadbase'
                       }
                       onChange={e => {
+                        if (baseUnset) return
                         if (!isRealBase) {
                           setRow(kArea, i, 'baseType', e.target.value)
                           return
@@ -1877,79 +1917,112 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
 
       {/* ── Vertical Soldier Course — In-House only ───────────────────────────── */}
       {!isSub && (
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="col-span-full flex items-center flex-wrap gap-x-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-1">
+      <div>
+        <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           <span>{subSectionTitle('Vertical Soldier Course', isSub)}</span>
           <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
-            {calc.vertSoldierRate} LF/hr
-            — paver priced $/LF (price_per_lf_vert)
+            {calc.vertSoldierRate} LF/hr — paver priced $/LF (price_per_lf_vert)
           </span>
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Vertical Soldier LF</p>
-          <Inp value={state[kVertSoldier]} onChange={e => set(kVertSoldier, e.target.value)} />
           {calc.vertSoldierHrs > 0 && (
-            <p className="text-xs text-gray-400 mt-0.5">{calc.vertSoldierHrs.toFixed(2)} hrs</p>
+            <span className="font-normal normal-case text-gray-400">
+              {calc.vertSoldierHrs.toFixed(2)} hrs
+            </span>
           )}
         </div>
-        <div className="sm:col-span-2">
-          <p className="text-xs text-gray-500 mb-0.5">Paver (priced per LF)</p>
-          <div className="flex items-center gap-2">
-            <select
-              className="w-40 shrink-0 border border-gray-200 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
-              value={state.vertVendor || ''}
-              onChange={e => {
-                const v = e.target.value
-                set('vertVendor', v)
-                // Reset the paver selection so the user explicitly picks one.
-                set('vertId', '')
-                set('vertType', '')
-              }}
-            >
-              <option value="">— Vendor —</option>
-              {vendorsForCategory(PAVER_CAT.paver).map(v => (
-                <option key={v.id} value={v.id}>
-                  {v.name}
-                </option>
-              ))}
-              <option value="Custom">Custom (inline)</option>
-            </select>
-            <div className="flex-1 min-w-0">
-              {state.vertVendor === 'Custom' ? (
-                <Inp
-                  value={state.vertCustomPricePerLF || ''}
-                  onChange={e => set('vertCustomPricePerLF', e.target.value)}
-                  placeholder="$/LF"
-                />
-              ) : (
-                <Sel
-                  value={state.vertId || ''}
-                  onChange={e => {
-                    const id = e.target.value
-                    const vopts = paverOptions(PAVER_CAT.paver, state.vertVendor, materialRows)
-                    const opt = vopts.find(o => o.id === id)
-                    set('vertId', id)
-                    set('vertType', opt ? opt.stored : '')
-                  }}
-                  options={
-                    state.vertId
-                      ? paverOptions(PAVER_CAT.paver, state.vertVendor, materialRows)
-                      : [
-                          { value: '', label: 'Select paver' },
-                          ...paverOptions(PAVER_CAT.paver, state.vertVendor, materialRows),
-                        ]
-                  }
-                />
-              )}
-            </div>
-          </div>
-          {calc.vertPaverCost > 0 && (
-            <p className="text-xs text-gray-400 mt-0.5">
-              {n(state[kVertSoldier]).toLocaleString()} LF × {fmt2(calc.vertPricePerLF)}/LF ={' '}
-              {fmt2(calc.vertPaverCost)}
-            </p>
-          )}
-        </div>
+        <table className="w-full text-xs">
+          <TH
+            cols={[
+              { label: 'Vendor', w: 'w-40' },
+              { label: 'Paver Type' },
+              { label: 'LF', w: 'w-24' },
+              { label: 'Cost', w: 'w-24' },
+            ]}
+          />
+          <tbody className="divide-y divide-gray-50">
+            {(state.vertRows || []).map((row, i) => {
+              const vOpts = paverOptions(PAVER_CAT.paver, row.vendor, materialRows)
+              const vSelOpts = !row.id
+                ? [{ value: '', label: 'Select paver' }, ...vOpts]
+                : vOpts.some(o => o.value === row.id)
+                  ? vOpts
+                  : [{ value: row.id, label: row.type || row.id }, ...vOpts]
+              const lf = n(row.lf)
+              let ppl = 0
+              if (row.vendor === 'Custom') {
+                ppl = n(row.customPricePerLF)
+              } else if (row.vendor && (row.id || row.type)) {
+                const it = paverItemFor(PAVER_CAT.paver, row.vendor, row.id || row.type, materialRows)
+                ppl = it ? n(it.price_per_lf_vert) : 0
+              }
+              const cost = lf * ppl
+              return (
+                <tr key={i}>
+                  <td className={td}>
+                    <select
+                      className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      value={row.vendor || ''}
+                      onChange={e => {
+                        const v = e.target.value
+                        setRow('vertRows', i, 'vendor', v)
+                        // Reset paver selection so the user explicitly picks one.
+                        setRow('vertRows', i, 'id', '')
+                        setRow('vertRows', i, 'type', '')
+                      }}
+                    >
+                      <option value="">Select vendor</option>
+                      {vendorsForCategory(PAVER_CAT.paver).map(v => (
+                        <option key={v.id} value={v.id}>
+                          {v.name}
+                        </option>
+                      ))}
+                      <option value="Custom">Custom (inline)</option>
+                    </select>
+                  </td>
+                  <td className={td}>
+                    {row.vendor === 'Custom' ? (
+                      <Inp
+                        value={row.customPricePerLF || ''}
+                        onChange={e => setRow('vertRows', i, 'customPricePerLF', e.target.value)}
+                        placeholder="$/LF"
+                      />
+                    ) : (
+                      <Sel
+                        value={row.id || ''}
+                        onChange={e => {
+                          const id = e.target.value
+                          const opt = vOpts.find(o => o.id === id)
+                          setRow('vertRows', i, 'id', id)
+                          setRow('vertRows', i, 'type', opt ? opt.stored : '')
+                        }}
+                        options={vSelOpts}
+                      />
+                    )}
+                  </td>
+                  <td className={td}>
+                    <Inp
+                      value={row.lf}
+                      onChange={e => setRow('vertRows', i, 'lf', e.target.value)}
+                      placeholder="LF"
+                    />
+                  </td>
+                  <td className={num}>{cost > 0 ? fmt2(cost) : '—'}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        <button
+          type="button"
+          onClick={() =>
+            set('vertRows', [
+              ...(state.vertRows || []),
+              { vendor: '', id: '', type: '', customPricePerLF: '', lf: '' },
+            ])
+          }
+          className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+        >
+          + Add row
+        </button>
       </div>
       )}
 

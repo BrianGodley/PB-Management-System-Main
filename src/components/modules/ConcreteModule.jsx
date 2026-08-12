@@ -524,17 +524,12 @@ function NumInput({ value, onChange, placeholder = '0', className = '', step = '
 
 // ── Default state ─────────────────────────────────────────────────────────────
 
-const DEFAULT_BASE_ROWS = [
-  { label: 'Area 1', method: 'Skid Steer Good', sf: '', depth: '2', vendor: 'auto', type: '' },
-  { label: 'Area 2', method: 'Skid Steer Good', sf: '', depth: '2', vendor: 'auto', type: '' },
-  { label: 'Area 3', method: 'Skid Steer Good', sf: '', depth: '2', vendor: 'auto', type: '' },
-]
+// Start with ZERO seeded rows — the user adds rows via "+ Add row". Every added
+// row defaults vendor to '' (empty "Select vendor" placeholder → empty Type list
+// → $0 until a vendor is chosen).
+const DEFAULT_BASE_ROWS = []
 
-const DEFAULT_MANUAL_ROWS = [
-  { label: 'Misc 1', hours: '', materials: '', subCost: '' },
-  { label: 'Misc 2', hours: '', materials: '', subCost: '' },
-  { label: 'Misc 3', hours: '', materials: '', subCost: '' },
-]
+const DEFAULT_MANUAL_ROWS = []
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -774,9 +769,11 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   // (or a vendor with no catalog rows) → the Standard array; a vendor id → that
   // vendor's products for the category (priced from material_rates).
   function sectionOptions(subcat, vendorSel, houseArray) {
-    const vsel = vendorSel && vendorSel !== 'auto' ? vendorSel : catDefaults[subcat] || 'Standard'
-    if (!vsel || vsel === 'Standard') return houseArray
-    const opts = catalogOptions(materialRows, subcat, vsel, { standardRows: 'exclude', stripPrefix: true })
+    // Unset vendor ('' / 'auto') → EMPTY Type list so the picker shows only its
+    // own "Select …" placeholder and the row books $0 until a vendor is chosen.
+    if (!vendorSel || vendorSel === 'auto') return []
+    if (vendorSel === 'Standard') return houseArray
+    const opts = catalogOptions(materialRows, subcat, vendorSel, { standardRows: 'exclude', stripPrefix: true })
     if (!opts.length) return houseArray
     return opts.map(o => ({ label: o.label, dbName: o.row.name, fallback: n(o.row.unit_cost), category: 'Concrete' }))
   }
@@ -785,36 +782,10 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   // 'Standard' stays 'Standard' so the displayed vendor matches the Type list.
   const effVendor = (cat, v) => (v && v !== 'auto' ? v : catDefaults[cat])
 
-  // On a NEW estimate, once vendor catalogs load, default the Base rows and each
-  // install tier to the first real vendor for their category. Never overrides a
-  // saved estimate (has a materialRates snapshot) or an explicit pick.
-  const [vendorDefaultsApplied, setVendorDefaultsApplied] = useState(false)
-  useEffect(() => {
-    const isSaved =
-      initialData?.materialRates && Object.keys(initialData.materialRates).length > 0
-    if (vendorDefaultsApplied || isSaved || !vendors.length) return
-    setVendorDefaultsApplied(true)
-    const needsDefault = v => !v || v === 'Standard' || v === 'auto'
-    setBaseRows(rows =>
-      (rows || []).map(r =>
-        needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor('Concrete Base') } : r
-      )
-    )
-    setSubBaseRows(rows =>
-      (rows || []).map(r =>
-        needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor('Concrete Base') } : r
-      )
-    )
-    setInstallTierVendor(v => {
-      const d = defaultVendorFor('Concrete Mix')
-      const nv = { ...v }
-      INSTALL_TIERS.forEach(t => {
-        if (needsDefault(nv[t.key])) nv[t.key] = d
-      })
-      return nv
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vendors, vendorDefaultsApplied])
+  // NOTE: per the shared "Vendor Select" convention, per-row/per-tier vendor is
+  // left UNSET ('') on a new estimate so each picker shows a "Select vendor"
+  // placeholder (empty Type list + $0 row) until the user chooses. No auto-
+  // default to the first real vendor.
 
   // Active-tab wiring: the mirrored field sections edit whichever set matches
   // the current tab, so In-House and Subcontractor are fully independent
@@ -1485,7 +1456,17 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           Base material ${calc.costBase}/ton
         </p>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-fixed">
+            {/* Sq Ft + Depth shrunk to ~1/4 of their natural share; the freed
+                space is absorbed by the widened Type column. */}
+            <colgroup>
+              <col />
+              <col className="w-[42%]" />
+              <col />
+              <col className="w-[4%]" />
+              <col className="w-[4%]" />
+              <col />
+            </colgroup>
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
@@ -1515,10 +1496,11 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                     <td className="py-1 pr-2">
                       <select
                         className="input text-sm py-1 min-w-0"
-                        value={effVendor('Concrete Base', row.vendor)}
+                        value={row.vendor || ''}
                         onChange={e => updateBaseRow(i, 'vendor', e.target.value)}
                         title="Vendor"
                       >
+                        {!row.vendor && <option value="">Select vendor</option>}
                         {vendorsForCategory('Concrete Base').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
@@ -1534,7 +1516,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                           value={row.type || ''}
                           onChange={e => updateBaseRow(i, 'type', e.target.value)}
                         >
-                          {!row.type && <option value="">Select material</option>}
+                          {!row.type && <option value="">Select type</option>}
                           {row.type && !baseOpts.some(o => o.label === row.type) && (
                             <option value={row.type}>{row.type}</option>
                           )}
@@ -1578,6 +1560,18 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               })}
             </tbody>
           </table>
+          <button
+            type="button"
+            onClick={() =>
+              setActiveBaseRows(rows => [
+                ...(rows || []),
+                { label: '', method: 'Skid Steer Good', sf: '', depth: '2', vendor: '', type: '' },
+              ])
+            }
+            className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+          >
+            + Add row
+          </button>
         </div>
       </div>
       )}
@@ -1609,7 +1603,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 <div className="grid grid-cols-[6rem_9rem_minmax(0,1fr)_5rem_5rem_16rem] items-center gap-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
                   <span />
                   <span>Vendor</span>
-                  <span>Type</span>
+                  <span>Mix</span>
                   <span>Sq Ft</span>
                   <span>Depth (In)</span>
                   <span />
@@ -1628,12 +1622,13 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                       <span className="text-[11px] text-gray-500">{t.label}</span>
                       <select
                         className="input text-xs py-1 w-full"
-                        value={effVendor('Concrete Mix', installTierVendor[t.key])}
+                        value={installTierVendor[t.key] || ''}
                         onChange={e =>
                           setInstallTierVendor({ ...installTierVendor, [t.key]: e.target.value })
                         }
                         title="Mix vendor"
                       >
+                        {!installTierVendor[t.key] && <option value="">Select vendor</option>}
                         {vendorsForCategory('Concrete Mix').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
