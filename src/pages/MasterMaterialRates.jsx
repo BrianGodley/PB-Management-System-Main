@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { setMaterialPrice, restoreMaterial } from '../lib/materialCatalog'
-import MaterialDetailModal from '../components/MaterialDetailModal'
+import MaterialDetailModal, { MoveMaterialModal, CopyMaterialModal } from '../components/MaterialDetailModal'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Master Material Rates — the two-view catalog on the NEW pricing model
@@ -34,24 +34,8 @@ export default function MasterMaterialRates() {
   const [loading, setLoading] = useState(true)
   const [cat, setCat] = useState('All')
   const [q, setQ] = useState('')
-  const [editing, setEditing] = useState(null) // { priceId|null, materialId, vendorId, value }
-  const [saving, setSaving] = useState(false)
   const [detail, setDetail] = useState(null) // row shown in the detail modal
   const [adding, setAdding] = useState(null) // 'standard' | 'vendor' → AddMaterialModal
-  const [moveCopy, setMoveCopy] = useState(null) // source → MoveCopyMaterialModal
-  const sourceFromRow = r => ({
-    kind: 'material',
-    materialId: r.m.id,
-    priceId: r.priceId,
-    description: r.m.description,
-    unit: r.m.unit,
-    categoryId: r.m.category_id,
-    subcategoryId: r.m.subcategory_id,
-    categoryName: r.m.category?.name,
-    price: r.price,
-    vendorId: r.vendorId,
-    vendorName: r.vName || 'Standard',
-  })
   const [sort, setSort] = useState({ key: 'description', dir: 'asc' })
   const toggleSort = key =>
     setSort(s => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }))
@@ -199,36 +183,6 @@ export default function MasterMaterialRates() {
     return arr
   }, [rows, sort])
 
-  // ── Save a price (update the open row, or insert one for Standard) ─────────
-  // Updates local state in place so the new price shows instantly — no full
-  // table re-fetch / flicker.
-  const savePrice = async r => {
-    setSaving(true)
-    const val = n(editing.value)
-    if (r.priceId) {
-      await supabase.from('material_price').update({ price: val }).eq('id', r.priceId)
-      setMaterials(ms =>
-        ms.map(m =>
-          m.id === r.m.id
-            ? { ...m, prices: (m.prices || []).map(p => (p.id === r.priceId ? { ...p, price: val } : p)) }
-            : m
-        )
-      )
-    } else if (r.vendorId) {
-      const { data } = await supabase
-        .from('material_price')
-        .insert({ material_id: r.m.id, vendor_id: r.vendorId, price: val, source: 'manual' })
-        .select('id, price, vendor_id, effective_end')
-        .single()
-      if (data)
-        setMaterials(ms =>
-          ms.map(m => (m.id === r.m.id ? { ...m, prices: [...(m.prices || []), data] } : m))
-        )
-    }
-    setEditing(null)
-    setSaving(false)
-  }
-
   const setDefault = async m => {
     if (!m.subcategory_id) return
     // Only one default per sub-category: clear the sub-category, then set this one.
@@ -338,17 +292,17 @@ export default function MasterMaterialRates() {
                 </tr>
               ) : (
                 sortedRows.map(r => {
-                  const isEd = editing && editing.key === r.key
                   return (
-                    <tr key={r.key} className="hover:bg-gray-50 group">
+                    <tr
+                      key={r.key}
+                      onClick={() => setDetail(r)}
+                      className="hover:bg-gray-50 group cursor-pointer"
+                      title="View / edit product"
+                    >
                       <td className="px-3 py-1.5 font-mono text-[11px] whitespace-nowrap">
-                        <button
-                          onClick={() => setDetail(r)}
-                          className="text-green-700 hover:text-green-900 hover:underline"
-                          title="View / edit product"
-                        >
+                        <span className="text-green-700 group-hover:text-green-900 group-hover:underline">
                           {r.code}
-                        </button>
+                        </span>
                       </td>
                       {isVendorView && (
                         <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">{r.vName}</td>
@@ -369,30 +323,18 @@ export default function MasterMaterialRates() {
                       </td>
                       <td className="px-3 py-1.5 text-gray-500 whitespace-nowrap">{r.m.unit || '—'}</td>
                       <td className="px-3 py-1.5 text-right whitespace-nowrap">
-                        {isEd && !isArchivedView ? (
-                          <input
-                            autoFocus
-                            type="number"
-                            step="0.01"
-                            className="w-24 border border-green-300 rounded-md px-2 py-1 text-xs text-right"
-                            value={editing.value}
-                            onChange={e => setEditing({ ...editing, value: e.target.value })}
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') savePrice(r)
-                              if (e.key === 'Escape') setEditing(null)
-                            }}
-                          />
-                        ) : (
-                          <span className={r.price == null ? 'text-gray-300' : 'text-gray-800 font-semibold'}>
-                            {money(r.price)}
-                          </span>
-                        )}
+                        <span className={r.price == null ? 'text-gray-300' : 'text-gray-800 font-semibold'}>
+                          {money(r.price)}
+                        </span>
                       </td>
                       {!isVendorView && !isArchivedView && (
                         <td className="px-3 py-1.5 text-center">
                           <button
                             title={r.m.is_default ? 'Default for its sub-category' : 'Set as sub-category default'}
-                            onClick={() => setDefault(r.m)}
+                            onClick={e => {
+                              e.stopPropagation()
+                              setDefault(r.m)
+                            }}
                             className={r.m.is_default ? 'text-amber-500' : 'text-gray-300 hover:text-amber-400'}
                           >
                             ★
@@ -402,38 +344,17 @@ export default function MasterMaterialRates() {
                       <td className="px-3 py-1.5 text-right whitespace-nowrap">
                         {isArchivedView ? (
                           <button
-                            onClick={() => restore(r)}
+                            onClick={e => {
+                              e.stopPropagation()
+                              restore(r)
+                            }}
                             className="text-green-700 font-semibold hover:text-green-900"
                           >
                             Restore
                           </button>
-                        ) : isEd ? (
-                          <>
-                            <button
-                              onClick={() => savePrice(r)}
-                              disabled={saving}
-                              className="text-green-700 font-semibold mr-2"
-                            >
-                              Save
-                            </button>
-                            <button onClick={() => setEditing(null)} className="text-gray-400">
-                              Cancel
-                            </button>
-                          </>
                         ) : (
-                          <span className="opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                            <button
-                              onClick={() => setEditing({ key: r.key, value: r.price ?? '' })}
-                              className="text-gray-500 hover:text-gray-800 mr-2"
-                            >
-                              {r.price == null ? 'Set price' : 'Edit Price'}
-                            </button>
-                            <button
-                              onClick={() => setMoveCopy(sourceFromRow(r))}
-                              className="text-blue-600 hover:text-blue-800"
-                            >
-                              Move/Copy
-                            </button>
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-gray-400">
+                            Edit ›
                           </span>
                         )}
                       </td>
@@ -468,16 +389,6 @@ export default function MasterMaterialRates() {
         />
       )}
 
-      {moveCopy && (
-        <MoveCopyMaterialModal
-          source={moveCopy}
-          onClose={() => setMoveCopy(null)}
-          onDone={() => {
-            setMoveCopy(null)
-            load()
-          }}
-        />
-      )}
     </div>
   )
 }
@@ -646,217 +557,6 @@ function AddMaterialModal({ mode, vendors, onClose, onSaved }) {
   )
 }
 
-// ── Move / Copy modal ─────────────────────────────────────────────────────────
-// Copy (or move) an item between the three tables: Standard, Vendor (both the
-// material + material_price model) and Misc (misc_rates). `source` describes the
-// row being acted on:
-//   { kind:'material', materialId, priceId, description, unit, categoryId,
-//     subcategoryId, categoryName, price, vendorId }
-//   { kind:'misc', miscId, name, rate, category }
-function MoveCopyMaterialModal({ source, onClose, onDone }) {
-  const fromMaterial = source.kind === 'material'
-  const [mode, setMode] = useState('copy') // 'copy' | 'move'
-  // Default destination: from a material → Misc; from a misc → Standard.
-  const [dest, setDest] = useState(fromMaterial ? 'misc' : 'standard')
-  const [vendors, setVendors] = useState([])
-  const [cats, setCats] = useState([])
-  const [subs, setSubs] = useState([])
-  const [destVendorId, setDestVendorId] = useState('')
-  const [miscCategory, setMiscCategory] = useState(source.categoryName || '')
-  // Fields needed when creating a material FROM a misc rate.
-  const [description, setDescription] = useState(source.name || source.description || '')
-  const [unit, setUnit] = useState(source.unit || '')
-  const [catId, setCatId] = useState('')
-  const [subId, setSubId] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [err, setErr] = useState('')
-
-  useEffect(() => {
-    Promise.all([
-      supabase.from('subs_vendors').select('id, company_name'),
-      supabase.from('category').select('id, name').order('name'),
-      supabase.from('subcategory').select('id, name, category_id').order('name'),
-    ]).then(([v, c, s]) => {
-      setVendors(v.data || [])
-      setCats(c.data || [])
-      setSubs(s.data || [])
-    })
-  }, [])
-
-  const stdId = useMemo(
-    () => vendors.find(v => isStandardName(v.company_name))?.id || null,
-    [vendors]
-  )
-  const vendorOpts = (vendors || []).filter(v => !isStandardName(v.company_name))
-  const subOpts = subs.filter(s => s.category_id === catId)
-  const amount = fromMaterial ? source.price : source.rate
-
-  async function submit() {
-    setErr('')
-    setSaving(true)
-    try {
-      if (fromMaterial) {
-        if (dest === 'misc') {
-          await supabase.from('misc_rates').insert({
-            name: source.description,
-            rate: amount ?? 0,
-            category: miscCategory.trim() || source.categoryName || null,
-          })
-          if (mode === 'move' && source.priceId)
-            await supabase.from('material_price').delete().eq('id', source.priceId)
-        } else {
-          if (dest === 'vendor' && !destVendorId) throw new Error('Pick a vendor.')
-          const destVendor = dest === 'standard' ? null : destVendorId
-          const destVendorResolved = dest === 'standard' ? stdId : destVendorId
-          await setMaterialPrice(source.materialId, destVendor, Number(amount ?? 0))
-          // Move = remove the source price, unless it IS the destination row.
-          if (mode === 'move' && source.priceId && destVendorResolved !== source.vendorId)
-            await supabase.from('material_price').delete().eq('id', source.priceId)
-        }
-      } else {
-        // Misc → material (Standard or Vendor): create the product + its price.
-        if (!description.trim()) throw new Error('Description is required.')
-        if (!catId) throw new Error('Category is required.')
-        if (!subId) throw new Error('Sub-category is required.')
-        if (dest === 'vendor' && !destVendorId) throw new Error('Pick a vendor.')
-        const { data: mat, error } = await supabase
-          .from('material')
-          .insert({ description: description.trim(), category_id: catId, subcategory_id: subId, unit: unit.trim() || null })
-          .select('id')
-          .single()
-        if (error) throw new Error(error.message)
-        await setMaterialPrice(mat.id, dest === 'standard' ? null : destVendorId, Number(amount ?? 0))
-        if (mode === 'move' && source.miscId)
-          await supabase.from('misc_rates').delete().eq('id', source.miscId)
-      }
-      setSaving(false)
-      onDone()
-    } catch (e) {
-      setErr(e?.message || 'Failed.')
-      setSaving(false)
-    }
-  }
-
-  const inputCls =
-    'w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-700/30 focus:border-green-700'
-  const srcLabel = fromMaterial
-    ? `${source.vendorName || 'Standard'} — ${source.description}`
-    : `Misc — ${source.name}`
-  const destOpts = fromMaterial
-    ? [{ k: 'standard', l: 'Standard' }, { k: 'vendor', l: 'Vendor' }, { k: 'misc', l: 'Misc' }]
-    : [{ k: 'standard', l: 'Standard' }, { k: 'vendor', l: 'Vendor' }]
-
-  return createPortal(
-    <div className="fixed inset-0 z-[9998] bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
-          <h2 className="text-base font-bold text-gray-800">Move / Copy Material</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg">✕</button>
-        </div>
-        <div className="p-5 space-y-3">
-          <div className="text-xs text-gray-500">
-            Source: <span className="font-medium text-gray-800">{srcLabel}</span>
-            {amount != null && <> · <span className="font-mono">{num4(amount)}</span></>}
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Action</label>
-            <div className="flex gap-2">
-              {[{ k: 'copy', l: 'Copy' }, { k: 'move', l: 'Move' }].map(o => (
-                <button
-                  key={o.k}
-                  onClick={() => setMode(o.k)}
-                  className={`flex-1 py-1.5 rounded-lg border text-sm font-medium ${
-                    mode === o.k ? 'bg-green-700 text-white border-green-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  {o.l}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Destination table</label>
-            <div className="flex gap-2">
-              {destOpts.map(o => (
-                <button
-                  key={o.k}
-                  onClick={() => setDest(o.k)}
-                  className={`flex-1 py-1.5 rounded-lg border text-sm font-medium ${
-                    dest === o.k ? 'bg-gray-800 text-white border-gray-800' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  {o.l}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {dest === 'vendor' && (
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Vendor *</label>
-              <select value={destVendorId} onChange={e => setDestVendorId(e.target.value)} className={inputCls}>
-                <option value="">Select vendor…</option>
-                {vendorOpts.map(v => (
-                  <option key={v.id} value={v.id}>{v.company_name}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {fromMaterial && dest === 'misc' && (
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Misc Category</label>
-              <input value={miscCategory} onChange={e => setMiscCategory(e.target.value)} className={inputCls} placeholder="e.g. Walls" />
-            </div>
-          )}
-
-          {!fromMaterial && (dest === 'standard' || dest === 'vendor') && (
-            <>
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">Description *</label>
-                <input value={description} onChange={e => setDescription(e.target.value)} className={inputCls} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Category *</label>
-                  <select value={catId} onChange={e => { setCatId(e.target.value); setSubId('') }} className={inputCls}>
-                    <option value="">Select…</option>
-                    {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Sub-Category *</label>
-                  <select value={subId} onChange={e => setSubId(e.target.value)} className={inputCls} disabled={!catId}>
-                    <option value="">Select…</option>
-                    {subOpts.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">Unit</label>
-                <input value={unit} onChange={e => setUnit(e.target.value)} className={inputCls} placeholder="ea / SF / LF…" />
-              </div>
-            </>
-          )}
-
-          {err && <p className="text-xs text-red-600">{err}</p>}
-          <div className="flex gap-2 pt-1">
-            <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">
-              Cancel
-            </button>
-            <button onClick={submit} disabled={saving} className="flex-1 py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 disabled:opacity-50">
-              {saving ? 'Working…' : mode === 'move' ? 'Move' : 'Copy'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>,
-    document.body
-  )
-}
-
 // ── Misc rates tab ────────────────────────────────────────────────────────────
 // Simple CRUD over the misc_rates table (name · rate · category). Misc values can
 // be flat fees OR coefficients/markups, so the rate is shown as a plain number
@@ -871,7 +571,7 @@ function MiscRatesPanel() {
   const [saving, setSaving] = useState(false)
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState({ category: '', name: '', rate: '' })
-  const [moveCopy, setMoveCopy] = useState(null) // misc source → MoveCopyMaterialModal
+  const [moveCopy, setMoveCopy] = useState(null) // { source, mode:'move'|'copy' } → Move/Copy modal
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1086,11 +786,25 @@ function MiscRatesPanel() {
                           </button>
                           <button
                             onClick={() =>
-                              setMoveCopy({ kind: 'misc', miscId: r.id, name: r.name, rate: r.rate, category: r.category })
+                              setMoveCopy({
+                                mode: 'move',
+                                source: { kind: 'misc', miscId: r.id, name: r.name, rate: r.rate, category: r.category },
+                              })
                             }
                             className="text-blue-600 hover:text-blue-800 mr-2"
                           >
-                            Move/Copy
+                            Move
+                          </button>
+                          <button
+                            onClick={() =>
+                              setMoveCopy({
+                                mode: 'copy',
+                                source: { kind: 'misc', miscId: r.id, name: r.name, rate: r.rate, category: r.category },
+                              })
+                            }
+                            className="text-blue-600 hover:text-blue-800 mr-2"
+                          >
+                            Copy
                           </button>
                           <button onClick={() => delRow(r.id)} className="text-red-400 hover:text-red-600">
                             Delete
@@ -1106,9 +820,19 @@ function MiscRatesPanel() {
         </table>
       </div>
 
-      {moveCopy && (
-        <MoveCopyMaterialModal
-          source={moveCopy}
+      {moveCopy && moveCopy.mode === 'move' && (
+        <MoveMaterialModal
+          source={moveCopy.source}
+          onClose={() => setMoveCopy(null)}
+          onDone={() => {
+            setMoveCopy(null)
+            load()
+          }}
+        />
+      )}
+      {moveCopy && moveCopy.mode === 'copy' && (
+        <CopyMaterialModal
+          source={moveCopy.source}
           onClose={() => setMoveCopy(null)}
           onDone={() => {
             setMoveCopy(null)
