@@ -93,6 +93,7 @@ const APPLIANCE_TYPES = [
 ]
 const applianceRateName = type => `BBQ Equip - ${type}`
 const EQUIP_ROW = () => ({ vendor: 'Standard', type: '', qty: '0', unitCost: '', clientProvided: false, hours: '' })
+const SINK_ROW = () => ({ vendor: 'Standard', type: '', qty: '0', unitCost: '', clientProvided: false, hours: '' })
 
 const n = v => parseFloat(v) || 0
 
@@ -142,6 +143,38 @@ function applianceUnitPrice(row, materialRows, p, ignoreOverride = false) {
   })
   if (vrow) return n(vrow.unit_cost)
   return p(applianceRateName(row.type), 0)
+}
+
+// ── Vendor-first Sink picker (Sub-category 'Sink' under 'Outdoor Kitchen') ────
+// Parallel to the Appliance picker above, scoped to the catalog Sub-category
+// 'Sink'. The catalog is the SOLE source — there is NO built-in fallback list,
+// so if no Sink Items are seeded the picker is simply empty (each new row starts
+// on an empty "Select sink" placeholder and contributes $0).
+const OK_SINK_CAT = 'Sink'
+function sinkTypeOptions(materialRows, vendorSel = 'Standard') {
+  const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
+  const catRows = catalogOptions(materialRows, OK_SINK_CAT, isStd ? 'Standard' : vendorSel, {
+    standardRows: 'null-vendor',
+    stripPrefix: true,
+    category: OK_APPLIANCE_CATEGORY,
+  })
+  return catRows.map(o => ({ value: o.label, label: o.label, name: o.row.name, fromMaster: true }))
+}
+// Vendor-aware unit material price for a Sink row. A per-row $/ea override wins;
+// otherwise a selected catalog Sink Item resolves its vendor-aware price
+// (Standard = the null-vendor price, a real vendor = that vendor's price). An
+// unselected row (empty type) resolves nothing and prices to $0.
+function sinkUnitPrice(row, materialRows, p, ignoreOverride = false) {
+  if (!ignoreOverride && row.unitCost !== '' && row.unitCost != null) return n(row.unitCost)
+  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : 'Standard'
+  const vrow = catalogItemFor(materialRows, OK_SINK_CAT, vsel, row.type, {
+    standardRows: 'null-vendor',
+    stripPrefix: true,
+    category: OK_APPLIANCE_CATEGORY,
+    fallbackFirst: false,
+  })
+  if (vrow) return n(vrow.unit_cost)
+  return 0
 }
 
 // ── Wall-finish vendor catalog ───────────────────────────────────────────────
@@ -466,6 +499,7 @@ function calcOutdoorKitchen(
     materialRows,
     wallFinishRows,
     equipmentRows,
+    sinkRows,
     epLineRows,
     epGasRows,
     epElecRows,
@@ -608,6 +642,19 @@ function calcOutdoorKitchen(
     equipHrs += q * hrsEa
     if (!r.clientProvided) equipMat += q * unit
   })
+  // Sinks: mirror appliances — vendor-aware catalog material + per-row install
+  // labor. Default install hrs/ea comes from the master Sink labor rate; a row
+  // with an empty (unselected) type prices to $0.
+  const sinkInstallHrsEa = p(OK_RATES.sinkLab.dbName, OK_RATES.sinkLab.fallback)
+  let sinkRowsHrs = 0
+  let sinkRowsMat = 0
+  ;(sinkRows || []).forEach(r => {
+    const q = r.qty === undefined || r.qty === null ? 1 : n(r.qty)
+    const unit = sinkUnitPrice(r, materialRows, p)
+    const hrsEa = r.hours !== '' && r.hours != null ? n(r.hours) : sinkInstallHrsEa
+    sinkRowsHrs += q * hrsEa
+    if (!r.clientProvided) sinkRowsMat += q * unit
+  })
   const installAppHrs =
     n(applianceCount) > 0
       ? (n(applianceCount) / p(OK_RATES.applianceLab.dbName, OK_RATES.applianceLab.fallback)) * 8
@@ -657,6 +704,7 @@ function calcOutdoorKitchen(
     : 0
   const baseHrs =
     equipHrs +
+    sinkRowsHrs +
     (isSubTab ? 0 : structureHrs) +
     counterFormHrs +
     counterPourHrs +
@@ -677,6 +725,7 @@ function calcOutdoorKitchen(
     counterConcMat +
     counterPolishMat +
     equipMat +
+    sinkRowsMat +
     epMat +
     finishMat +
     manMat
@@ -725,11 +774,12 @@ function calcOutdoorKitchen(
     // section breakdowns
     structureMat: blockMat + rebarMat + footingMat + fillMat,
     counterMat: counterConcMat + counterPolishMat,
-    servicesMat: equipMat + epMat,
+    servicesMat: equipMat + sinkRowsMat + epMat,
     finishesMat: finishMat,
     finishMat,
     finishHrs,
     equipMat,
+    sinkRowsMat,
     epMat,
     epHrs,
     manMat,
@@ -780,6 +830,7 @@ function makeTab(src = {}) {
     counterSF: src.counterSF ?? '',
     counterFinish: src.counterFinish ?? 'Broom Finish',
     equipmentRows: src.equipmentRows ?? [EQUIP_ROW(), EQUIP_ROW(), EQUIP_ROW()],
+    sinkRows: src.sinkRows ?? [SINK_ROW()],
     epLineRows: src.epLineRows ?? [EP_LINE_ROW()],
     epGasRows: src.epGasRows ?? [EP_GAS_ROW()],
     epElecRows: src.epElecRows ?? [EP_ELEC_ROW()],
@@ -913,6 +964,8 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
   const setCounterFinish = setField('counterFinish')
   const equipmentRows = cur.equipmentRows
   const setEquipmentRows = setField('equipmentRows')
+  const sinkRows = cur.sinkRows
+  const setSinkRows = setField('sinkRows')
   const epLineRows = cur.epLineRows
   const setEpLineRows = setField('epLineRows')
   const epGasRows = cur.epGasRows
@@ -1094,6 +1147,15 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
         // catalog is the source of truth.
         ...catalogBlockItems('Appliance', 'ea', 'Outdoor Kitchen'),
         ...matRows(OK_RATES.applianceHardware.dbName, 'ea', p(OK_RATES.applianceHardware.dbName, OK_RATES.applianceHardware.fallback)),
+      ],
+    },
+    {
+      group: 'Sinks',
+      items: [
+        // Per-row install labor default + vendor catalog Sink products (the
+        // catalog is the sole source; no hardcoded generic sink rates).
+        okLaborItem('sinkLab', 'hrs/ea'),
+        ...catalogBlockItems('Sink', 'ea', 'Outdoor Kitchen'),
       ],
     },
     {
@@ -1465,6 +1527,147 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
         </div>
       </div>
 
+      {/* ── Sinks ── */}
+      <div>
+        <SectionHeader title="Sinks" />
+        <div className="space-y-0">
+          {/* Sink rows — Vendor · Type · Qty · $/ea · Client Provided · Labor · Material */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm table-fixed">
+              <colgroup>
+                <col className="w-[120px]" />
+                <col />
+                <col className="w-[56px]" />
+                <col className="w-[80px]" />
+                <col className="w-[96px]" />
+                <col className="w-[80px]" />
+                <col className="w-[92px]" />
+                <col className="w-6" />
+              </colgroup>
+              <thead>
+                <tr className="text-xs text-gray-500 border-b border-gray-200">
+                  <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
+                  <th className="text-left pb-1 pr-2 font-medium">Type</th>
+                  <th className="text-left pb-1 pr-2 font-medium">Qty</th>
+                  <th className="text-left pb-1 pr-2 font-medium">$/ea</th>
+                  <th className="text-left pb-1 pr-2 font-medium">Client Provided</th>
+                  <th className="text-left pb-1 pr-2 font-medium">Labor (hrs/ea)</th>
+                  <th className="text-right pb-1 pr-2 font-medium text-gray-400">Material $</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {sinkRows.map((row, i) => {
+                  const skQty = row.qty === undefined || row.qty === null ? 1 : n(row.qty)
+                  const skUnit = sinkUnitPrice(row, materialRows, p)
+                  const skMat = row.clientProvided ? 0 : skQty * skUnit
+                  const sinkOpts = sinkTypeOptions(materialRows, row.vendor)
+                  const setRow = (field, val) =>
+                    setSinkRows(rs =>
+                      rs.map((r, idx) => (idx === i ? { ...r, [field]: val } : r))
+                    )
+                  return (
+                    <tr key={i} className="border-b border-gray-100">
+                      <td className="py-1 pr-2">
+                        <select
+                          className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white w-full"
+                          value={row.vendor || 'Standard'}
+                          onChange={e => setRow('vendor', e.target.value)}
+                        >
+                          <option value="Standard">Standard</option>
+                          {vendorsForCategory('Sink').map(v => (
+                            <option key={v.id} value={v.id}>
+                              {v.name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="py-1 pr-2">
+                        <span className="flex items-center gap-1">
+                          <select
+                            className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white flex-1 min-w-0"
+                            value={row.type}
+                            onChange={e => setRow('type', e.target.value)}
+                          >
+                            {/* Empty new rows show a placeholder rather than a
+                                hardcoded default sink. */}
+                            {!row.type && <option value="">Select sink</option>}
+                            {/* Backward-compat: keep a stored value that isn't in the
+                                current (vendor-scoped) options selectable/visible. */}
+                            {row.type && !sinkOpts.some(o => o.value === row.type) && (
+                              <option value={row.type}>{row.type}</option>
+                            )}
+                            {sinkOpts.map(o => (
+                              <option key={o.value} value={o.value}>
+                                {o.label}
+                              </option>
+                            ))}
+                          </select>
+                        </span>
+                      </td>
+                      <td className="py-1 pr-2">
+                        <NumInput value={row.qty} onChange={v => setRow('qty', v)} className="w-full" placeholder="0" />
+                      </td>
+                      <td className="py-1 pr-2">
+                        <NumInput
+                          value={row.unitCost}
+                          onChange={v => setRow('unitCost', v)}
+                          className="w-full"
+                          placeholder={sinkUnitPrice(row, materialRows, p, true).toFixed(2)}
+                        />
+                      </td>
+                      <td className="py-1 pr-2">
+                        <select
+                          className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white w-full"
+                          value={row.clientProvided ? 'Yes' : 'No'}
+                          onChange={e => setRow('clientProvided', e.target.value === 'Yes')}
+                        >
+                          <option value="No">No</option>
+                          <option value="Yes">Yes</option>
+                        </select>
+                      </td>
+                      <td className="py-1 pr-2">
+                        <NumInput
+                          value={row.hours}
+                          onChange={v => setRow('hours', v)}
+                          className="w-full"
+                          placeholder={p(
+                            OK_RATES.sinkLab.dbName,
+                            OK_RATES.sinkLab.fallback
+                          ).toFixed(2)}
+                        />
+                      </td>
+                      <td className="py-1 pr-2 text-right text-xs text-gray-600">
+                        {row.clientProvided ? 'client' : skMat > 0 ? `$${skMat.toFixed(2)}` : '—'}
+                      </td>
+                      <td className="py-1 text-center">
+                        {sinkRows.length > 1 && (
+                          <button
+                            type="button"
+                            className="text-gray-300 hover:text-red-500"
+                            title="Remove row"
+                            onClick={() => setSinkRows(rs => rs.filter((_, idx) => idx !== i))}
+                          >
+                            ×
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            <button
+              type="button"
+              onClick={() => setSinkRows(rs => [...rs, SINK_ROW()])}
+              className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+            >
+              + Add sink
+            </button>
+          </div>
+        </div>
+      </div>
+
 
       {/* ── Utility Lines (line labor + material + 6"×24" trenching) ── */}
       <div>
@@ -1675,6 +1878,11 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                 Appliances: <strong>${calc.equipMat.toFixed(2)}</strong>
               </span>
             )}
+            {calc.sinkRowsMat > 0 && (
+              <span>
+                Sinks: <strong>${calc.sinkRowsMat.toFixed(2)}</strong>
+              </span>
+            )}
             {calc.epMat > 0 && (
               <span>
                 Electrical & Plumbing: <strong>${calc.epMat.toFixed(2)}</strong>
@@ -1722,6 +1930,11 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
             {calc.equipMat > 0 && (
               <span>
                 Appliances: <strong>${calc.equipMat.toFixed(2)}</strong>
+              </span>
+            )}
+            {calc.sinkRowsMat > 0 && (
+              <span>
+                Sinks: <strong>${calc.sinkRowsMat.toFixed(2)}</strong>
               </span>
             )}
             {calc.epMat > 0 && (

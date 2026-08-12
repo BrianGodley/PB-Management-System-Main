@@ -23,6 +23,8 @@ const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
 
 // dbName = name in material_rates for the material cost row
 // laborDbName = name in material_rates for the labor rate row (hrs per unit)
+// Electrical Pipe (conduit) — electrical-conduit entries only. Gas-pipe entries
+// moved to GAS_PIPE_TYPES (Gas Pipe Sub-category) below.
 const UTILITY_LINE_TYPES = {
   'PVC Conduit with Electrical': {
     costPerLF: 1.92,
@@ -30,6 +32,10 @@ const UTILITY_LINE_TYPES = {
     laborPerLF: 0.05,
     laborDbName: 'PVC Conduit with Electrical - Labor Rate',
   },
+}
+
+// Gas Pipe — poly + black iron gas pipe entries (moved out of UTILITY_LINE_TYPES).
+const GAS_PIPE_TYPES = {
   '1-1/2" Poly Gas Pipe': {
     costPerLF: 4.25,
     dbName: '1-1/2" Poly Gas Pipe',
@@ -171,22 +177,6 @@ const SEWER_LINE_TYPES = {
   },
 }
 
-// Sewer sinks — qty = number of sinks, 6 labor hrs each.
-const SEWER_SINK_TYPES = {
-  'Turbo 2" x 14" Sink w/fittings': {
-    cost: 397,
-    dbName: 'Turbo 2" x 14" Sink w/fittings',
-    laborHrs: 6,
-    laborDbName: 'Turbo 2" x 14" Sink w/fittings - Labor Rate',
-  },
-  'Kraus 15" Drop Sink w/fittings': {
-    cost: 585,
-    dbName: 'Kraus 15" Drop Sink w/fittings',
-    laborHrs: 6,
-    laborDbName: 'Kraus 15" Drop Sink w/fittings - Labor Rate',
-  },
-}
-
 // Combined lookup so a row of either kind resolves its rate.
 const FIXTURE_TYPES = { ...GAS_FIXTURE_TYPES, ...ELECTRICAL_FIXTURE_TYPES }
 
@@ -238,6 +228,13 @@ const LINE_TYPE_ARR = Object.entries(UTILITY_LINE_TYPES).map(([label, t]) => ({
   laborDbName: t.laborDbName,
   laborFallback: t.laborPerLF,
 }))
+const GASPIPE_TYPE_ARR = Object.entries(GAS_PIPE_TYPES).map(([label, t]) => ({
+  label,
+  dbName: t.dbName,
+  fallback: t.costPerLF,
+  laborDbName: t.laborDbName,
+  laborFallback: t.laborPerLF,
+}))
 // Electrical Wiring has NO code built-ins — it's purely catalog-sourced (items
 // live only under the 'Electrical Wiring' Sub-category on the Home Depot vendor).
 const WIRE_TYPE_ARR = []
@@ -262,21 +259,14 @@ const SEWER_LINE_ARR = Object.entries(SEWER_LINE_TYPES).map(([label, t]) => ({
   laborDbName: t.laborDbName,
   laborFallback: t.laborPerLF,
 }))
-const SEWER_SINK_ARR = Object.entries(SEWER_SINK_TYPES).map(([label, t]) => ({
-  label,
-  dbName: t.dbName,
-  fallback: t.cost,
-  laborDbName: t.laborDbName,
-  laborFallback: t.laborHrs,
-}))
 // Section → material category name (used for vendor tagging + catalog lookup).
 const UTIL_CAT = {
-  line: 'Utility Lines',
+  line: 'Electrical Pipe',
+  gasPipe: 'Gas Pipe',
   wire: 'Electrical Wiring',
   gas: 'Gas Fixtures',
   elec: 'Electrical Fixtures',
-  sewerLine: 'Sewer Lines',
-  sewerSink: 'Sewer Sinks',
+  sewerLine: 'Sewer Pipe',
 }
 
 // Type list = the Master Rates catalog (Items in Category 'Utilities' + this
@@ -362,11 +352,11 @@ function calcUtilities(
     hoursAdj,
     trenchRows,
     lineRows,
+    gasPipeRows,
     wireRows,
     fixtureRows,
     elecFixtureRows,
     sewerLineRows,
-    sewerSinkRows,
     additionalItems,
     electricSubpanelSubCost,
     manualRows,
@@ -375,14 +365,14 @@ function calcUtilities(
   let trenchHrs = 0
   let lineHrs = 0,
     lineMat = 0
+  let gasPipeHrs = 0,
+    gasPipeMat = 0
   let wireHrs = 0,
     wireMat = 0
   let fixHrs = 0,
     fixMat = 0
   let sewerLineHrs = 0,
     sewerLineMat = 0
-  let sinkHrs = 0,
-    sinkMat = 0
   let addHrs = 0,
     addMat = 0
   let manHrs = 0,
@@ -416,6 +406,22 @@ function calcUtilities(
     )
     lineMat += lf * matCost
     lineHrs += lf * laborVal
+  })
+
+  ;(gasPipeRows || []).forEach(r => {
+    if (!r.type) return
+    const lf = n(r.lf)
+    if (lf <= 0) return
+    const { matCost, laborVal } = resolveUtilRow(
+      UTIL_CAT.gasPipe,
+      r,
+      GASPIPE_TYPE_ARR,
+      materialRows,
+      catDefaults,
+      materialPrices
+    )
+    gasPipeMat += lf * matCost
+    gasPipeHrs += lf * laborVal
   })
 
   ;(wireRows || []).forEach(r => {
@@ -470,22 +476,6 @@ function calcUtilities(
     sewerLineMat += lf * matCost
     sewerLineHrs += lf * laborVal
   })
-  // Sewer sinks — material + labor per sink
-  ;(sewerSinkRows || []).forEach(r => {
-    if (!r.type) return
-    const qty = n(r.qty)
-    if (qty <= 0) return
-    const { matCost, laborVal } = resolveUtilRow(
-      UTIL_CAT.sewerSink,
-      r,
-      SEWER_SINK_ARR,
-      materialRows,
-      catDefaults,
-      materialPrices
-    )
-    sinkMat += qty * matCost
-    sinkHrs += qty * laborVal
-  })
 
   Object.entries(ADD_ITEM_RATES).forEach(([key, rate]) => {
     const qty = n(additionalItems[`${key}Qty`])
@@ -503,14 +493,15 @@ function calcUtilities(
     manSub += n(r.subCost)
   })
 
-  const baseHrs = trenchHrs + lineHrs + wireHrs + fixHrs + sewerLineHrs + sinkHrs + addHrs + manHrs
+  const baseHrs =
+    trenchHrs + lineHrs + gasPipeHrs + wireHrs + fixHrs + sewerLineHrs + addHrs + manHrs
   const diffMod = 1 + n(difficulty) / 100
   const adjHrs = n(hoursAdj)
   const _preWalkHrs = baseHrs * diffMod + adjHrs
   const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
   const totalHrs = _preWalkHrs + walkHrs
   const manDays = totalHrs / 8
-  const totalMat = lineMat + wireMat + fixMat + sewerLineMat + sinkMat + addMat + manMat
+  const totalMat = lineMat + gasPipeMat + wireMat + fixMat + sewerLineMat + addMat + manMat
   const laborCost = totalHrs * laborRatePerHour
   const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
   const gp = manDays * gpmd
@@ -532,14 +523,14 @@ function calcUtilities(
     trenchHrs,
     lineHrs,
     lineMat,
+    gasPipeHrs,
+    gasPipeMat,
     wireHrs,
     wireMat,
     fixHrs,
     fixMat,
     sewerLineHrs,
     sewerLineMat,
-    sinkHrs,
-    sinkMat,
     addHrs,
     addMat,
   }
@@ -575,6 +566,9 @@ const DEFAULT_TRENCH_ROWS = [
 const DEFAULT_LINE_ROWS = [
   { type: '', laborType: '', lf: '', vendor: 'auto' },
 ]
+const DEFAULT_GASPIPE_ROWS = [
+  { type: '', laborType: '', lf: '', vendor: 'auto' },
+]
 const DEFAULT_WIRE_ROWS = [
   { type: '', laborType: '', lf: '', vendor: 'auto' },
 ]
@@ -586,9 +580,6 @@ const DEFAULT_ELEC_FIXTURE_ROWS = [
 ]
 const DEFAULT_SEWER_LINE_ROWS = [
   { type: '', laborType: '', lf: '', vendor: 'auto' },
-]
-const DEFAULT_SEWER_SINK_ROWS = [
-  { type: '', laborType: '', qty: '', vendor: 'auto' },
 ]
 const DEFAULT_ADDITIONAL = {
   curbCoreQty: '',
@@ -705,6 +696,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
   const [trenchRows, setTrenchRows] = useState(initialData?.trenchRows ?? DEFAULT_TRENCH_ROWS)
   const [lineRows, setLineRows] = useState(initialData?.lineRows ?? DEFAULT_LINE_ROWS)
+  const [gasPipeRows, setGasPipeRows] = useState(initialData?.gasPipeRows ?? DEFAULT_GASPIPE_ROWS)
   const [wireRows, setWireRows] = useState(initialData?.wireRows ?? DEFAULT_WIRE_ROWS)
   const [fixtureRows, setFixtureRows] = useState(initialData?.fixtureRows ?? DEFAULT_FIXTURE_ROWS)
   const [elecFixtureRows, setElecFixtureRows] = useState(
@@ -712,9 +704,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   )
   const [sewerLineRows, setSewerLineRows] = useState(
     initialData?.sewerLineRows ?? DEFAULT_SEWER_LINE_ROWS
-  )
-  const [sewerSinkRows, setSewerSinkRows] = useState(
-    initialData?.sewerSinkRows ?? DEFAULT_SEWER_SINK_ROWS
   )
   const [additionalItems, setAdditionalItems] = useState(
     initialData?.additionalItems ?? DEFAULT_ADDITIONAL
@@ -732,6 +721,9 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
     initialData?.subTrenchRows ?? [{ lf: '' }]
   )
   const [subLineRows, setSubLineRows] = useState(initialData?.subLineRows ?? DEFAULT_LINE_ROWS)
+  const [subGasPipeRows, setSubGasPipeRows] = useState(
+    initialData?.subGasPipeRows ?? DEFAULT_GASPIPE_ROWS
+  )
   const [subWireRows, setSubWireRows] = useState(initialData?.subWireRows ?? DEFAULT_WIRE_ROWS)
   const [subFixtureRows, setSubFixtureRows] = useState(
     initialData?.subFixtureRows ?? DEFAULT_FIXTURE_ROWS
@@ -741,9 +733,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   )
   const [subSewerLineRows, setSubSewerLineRows] = useState(
     initialData?.subSewerLineRows ?? DEFAULT_SEWER_LINE_ROWS
-  )
-  const [subSewerSinkRows, setSubSewerSinkRows] = useState(
-    initialData?.subSewerSinkRows ?? DEFAULT_SEWER_SINK_ROWS
   )
   const [subAdditionalItems, setSubAdditionalItems] = useState(
     initialData?.subAdditionalItems ?? DEFAULT_ADDITIONAL
@@ -772,19 +761,19 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   // tab, so In-House and Subcontractor are fully independent calculators.
   const isSub = subType === 'Subcontractor'
   const activeLineRows = isSub ? subLineRows : lineRows
+  const activeGasPipeRows = isSub ? subGasPipeRows : gasPipeRows
   const activeWireRows = isSub ? subWireRows : wireRows
   const activeFixtureRows = isSub ? subFixtureRows : fixtureRows
   const activeElecFixtureRows = isSub ? subElecFixtureRows : elecFixtureRows
   const activeSewerLineRows = isSub ? subSewerLineRows : sewerLineRows
-  const activeSewerSinkRows = isSub ? subSewerSinkRows : sewerSinkRows
   const activeAdditionalItems = isSub ? subAdditionalItems : additionalItems
   const activeManualRows = isSub ? subManualRows : manualRows
   const setActiveLineRows = isSub ? setSubLineRows : setLineRows
+  const setActiveGasPipeRows = isSub ? setSubGasPipeRows : setGasPipeRows
   const setActiveWireRows = isSub ? setSubWireRows : setWireRows
   const setActiveFixtureRows = isSub ? setSubFixtureRows : setFixtureRows
   const setActiveElecFixtureRows = isSub ? setSubElecFixtureRows : setElecFixtureRows
   const setActiveSewerLineRows = isSub ? setSubSewerLineRows : setSewerLineRows
-  const setActiveSewerSinkRows = isSub ? setSubSewerSinkRows : setSewerSinkRows
   const setActiveAdditionalItems = isSub ? setSubAdditionalItems : setAdditionalItems
   const setActiveManualRows = isSub ? setSubManualRows : setManualRows
 
@@ -797,11 +786,11 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   const effVendor = (cat, v) => (v && v !== 'auto' ? v : defaultVendorFor(cat))
   const catDefaults = {
     [UTIL_CAT.line]: defaultVendorFor(UTIL_CAT.line),
+    [UTIL_CAT.gasPipe]: defaultVendorFor(UTIL_CAT.gasPipe),
     [UTIL_CAT.wire]: defaultVendorFor(UTIL_CAT.wire),
     [UTIL_CAT.gas]: defaultVendorFor(UTIL_CAT.gas),
     [UTIL_CAT.elec]: defaultVendorFor(UTIL_CAT.elec),
     [UTIL_CAT.sewerLine]: defaultVendorFor(UTIL_CAT.sewerLine),
-    [UTIL_CAT.sewerSink]: defaultVendorFor(UTIL_CAT.sewerSink),
   }
 
   // On a NEW estimate, once vendor catalogs load, default each Line/Fixture row's
@@ -815,6 +804,8 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
     const needsDefault = v => !v || v === 'Standard' || v === 'auto'
     const migLine = rows =>
       (rows || []).map(r => (needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor(UTIL_CAT.line) } : r))
+    const migGasPipe = rows =>
+      (rows || []).map(r => (needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor(UTIL_CAT.gasPipe) } : r))
     const migWire = rows =>
       (rows || []).map(r => (needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor(UTIL_CAT.wire) } : r))
     const migGas = rows =>
@@ -823,10 +814,10 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
       (rows || []).map(r => (needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor(UTIL_CAT.elec) } : r))
     const migSewerLine = rows =>
       (rows || []).map(r => (needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor(UTIL_CAT.sewerLine) } : r))
-    const migSewerSink = rows =>
-      (rows || []).map(r => (needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor(UTIL_CAT.sewerSink) } : r))
     setLineRows(migLine)
     setSubLineRows(migLine)
+    setGasPipeRows(migGasPipe)
+    setSubGasPipeRows(migGasPipe)
     setWireRows(migWire)
     setSubWireRows(migWire)
     setFixtureRows(migGas)
@@ -835,8 +826,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
     setSubElecFixtureRows(migElec)
     setSewerLineRows(migSewerLine)
     setSubSewerLineRows(migSewerLine)
-    setSewerSinkRows(migSewerSink)
-    setSubSewerSinkRows(migSewerSink)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendors, vendorDefaultsApplied])
 
@@ -847,11 +836,11 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
       hoursAdj,
       trenchRows,
       lineRows,
+      gasPipeRows,
       wireRows,
       fixtureRows,
       elecFixtureRows,
       sewerLineRows,
-      sewerSinkRows,
       additionalItems,
       electricSubpanelSubCost,
       manualRows,
@@ -883,6 +872,20 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
       UTIL_CAT.line,
       r,
       LINE_TYPE_ARR,
+      materialRows,
+      catDefaults,
+      materialPrices
+    )
+    subSideCost += lf * matCost + lf * laborVal * laborRatePerHour
+  })
+  ;(subGasPipeRows || []).forEach(r => {
+    if (!r.type) return
+    const lf = n(r.lf)
+    if (lf <= 0) return
+    const { matCost, laborVal } = resolveUtilRow(
+      UTIL_CAT.gasPipe,
+      r,
+      GASPIPE_TYPE_ARR,
       materialRows,
       catDefaults,
       materialPrices
@@ -934,20 +937,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
       materialPrices
     )
     subSideCost += lf * matCost + lf * laborVal * laborRatePerHour
-  })
-  ;(subSewerSinkRows || []).forEach(r => {
-    if (!r.type) return
-    const qty = n(r.qty)
-    if (qty <= 0) return
-    const { matCost, laborVal } = resolveUtilRow(
-      UTIL_CAT.sewerSink,
-      r,
-      SEWER_SINK_ARR,
-      materialRows,
-      catDefaults,
-      materialPrices
-    )
-    subSideCost += qty * matCost + qty * laborVal * laborRatePerHour
   })
   Object.entries(ADD_ITEM_RATES).forEach(([key, rate]) => {
     const qty = n(subAdditionalItems[`${key}Qty`])
@@ -1002,6 +991,9 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   function updateLine(i, field, val) {
     setActiveLineRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
+  function updateGasPipe(i, field, val) {
+    setActiveGasPipeRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  }
   function updateWire(i, field, val) {
     setActiveWireRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
@@ -1018,11 +1010,11 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   // simple per-row field sets. Section = 'line' | 'gas' | 'elec'.
   const _sectionSetter = {
     line: setActiveLineRows,
+    gasPipe: setActiveGasPipeRows,
     wire: setActiveWireRows,
     gas: setActiveFixtureRows,
     elec: setActiveElecFixtureRows,
     sewerLine: setActiveSewerLineRows,
-    sewerSink: setActiveSewerSinkRows,
   }
   function changeRowType(section, i, val) {
     _sectionSetter[section](rows => rows.map((r, idx) => (idx === i ? { ...r, type: val } : r)))
@@ -1041,21 +1033,21 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
         hoursAdj,
         trenchRows,
         lineRows,
+        gasPipeRows,
         wireRows,
         fixtureRows,
         elecFixtureRows,
         sewerLineRows,
-        sewerSinkRows,
         additionalItems,
         electricSubpanelSubCost,
         manualRows,
         subTrenchRows,
         subLineRows,
+        subGasPipeRows,
         subWireRows,
         subFixtureRows,
         subElecFixtureRows,
         subSewerLineRows,
-        subSewerSinkRows,
         subAdditionalItems,
         subManualRows,
         subType,
@@ -1114,12 +1106,21 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
       ],
     },
     {
-      group: 'Utility Lines',
+      group: 'Electrical Pipe',
       items: [
         ...Object.values(UTILITY_LINE_TYPES).map(t =>
           laborRow(t.laborDbName, 'hr/LF', materialPrices[t.laborDbName] ?? t.laborPerLF)
         ),
         ...Object.values(UTILITY_LINE_TYPES).flatMap(t => matRows(t.dbName, 'LF', t.costPerLF)),
+      ],
+    },
+    {
+      group: 'Gas Pipe',
+      items: [
+        ...Object.values(GAS_PIPE_TYPES).map(t =>
+          laborRow(t.laborDbName, 'hr/LF', materialPrices[t.laborDbName] ?? t.laborPerLF)
+        ),
+        ...Object.values(GAS_PIPE_TYPES).flatMap(t => matRows(t.dbName, 'LF', t.costPerLF)),
       ],
     },
     {
@@ -1155,21 +1156,12 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
       ],
     },
     {
-      group: 'Sewer Lines',
+      group: 'Sewer Pipe',
       items: [
         ...Object.values(SEWER_LINE_TYPES).map(t =>
           laborRow(t.laborDbName, 'hr/LF', materialPrices[t.laborDbName] ?? t.laborPerLF)
         ),
         ...Object.values(SEWER_LINE_TYPES).flatMap(t => matRows(t.dbName, 'LF', t.costPerLF)),
-      ],
-    },
-    {
-      group: 'Sewer Sinks',
-      items: [
-        ...Object.values(SEWER_SINK_TYPES).map(t =>
-          laborRow(t.laborDbName, 'hr/ea', materialPrices[t.laborDbName] ?? t.laborHrs)
-        ),
-        ...Object.values(SEWER_SINK_TYPES).flatMap(t => matRows(t.dbName, 'ea', t.cost)),
       ],
     },
     {
@@ -1417,9 +1409,9 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
         </div>
       </div>
 
-      {/* ── Utility Lines ── */}
+      {/* ── Electrical Pipe ── */}
       <div>
-        <SectionHeader title="Utility Lines" />
+        <SectionHeader title="Electrical Pipe" />
         <div className="overflow-x-auto">
           <table className="w-full text-sm table-fixed">
             <colgroup>
@@ -1625,110 +1617,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
         </div>
       </div>
 
-      {/* ── Fixtures ── */}
-      <div>
-        <SectionHeader title="Gas Fixtures" />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm table-fixed">
-            <colgroup>
-              <col className="w-[128px]" />
-              <col />
-              <col className="w-[84px]" />
-              <col className="w-[96px]" />
-              <col className="w-[96px]" />
-            </colgroup>
-            <thead>
-              <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
-                <th className="text-left pb-1 pr-2 font-medium">Fixture</th>
-                <th className="text-left pb-1 pr-2 font-medium">Qty</th>
-                <th className="text-right pb-1 pr-2 font-medium text-gray-400">$/Ea</th>
-                <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
-              </tr>
-            </thead>
-            <tbody>
-              {activeFixtureRows.map((row, i) => {
-                const { opts, matOpt, matCost, laborVal, laborBuiltIn } = resolveUtilRow(
-                  UTIL_CAT.gas,
-                  row,
-                  GAS_TYPE_ARR,
-                  materialRows,
-                  catDefaults,
-                  materialPrices
-                )
-                const mat = n(row.qty) * matCost
-                return (
-                  <tr key={i} className="border-b border-gray-100">
-                    <td className="py-1 pr-2">
-                      <select
-                        className="input text-sm py-1 w-full"
-                        value={effVendor(UTIL_CAT.gas, row.vendor)}
-                        onChange={e => changeRowVendor('gas', i, e.target.value)}
-                        title="Vendor"
-                      >
-                        {vendorsForCategory(UTIL_CAT.gas).map(v => (
-                          <option key={v.id} value={v.id}>
-                            {v.name}
-                          </option>
-                        ))}
-                        <option value="Standard">Standard</option>
-                      </select>
-                    </td>
-                    <td className="py-1 pr-2">
-                      <div className="flex items-center gap-1">
-                        <select
-                          className="input text-sm py-1 flex-1 min-w-0"
-                          value={row.type || ''}
-                          onChange={e => changeRowType('gas', i, e.target.value)}
-                        >
-                          {!row.type && <option value="">Select fixture</option>}
-                          {row.type && !opts.some(o => o.label === row.type) && (
-                            <option value={row.type}>{row.type}</option>
-                          )}
-                          {opts.map(o => (
-                            <option key={o.label} value={o.label}>
-                              {o.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </td>
-                    <td className="py-1 pr-2">
-                      <NumInput value={row.qty} onChange={v => updateFixture(i, 'qty', v)} className="w-full" />
-                    </td>
-                    <td className="py-1 text-right text-gray-400 text-xs pr-2">
-                      <span className="inline-flex items-center justify-end gap-1">
-                        ${matCost.toFixed(2)}
-                      </span>
-                    </td>
-                    <td className="py-1 text-right text-gray-600 text-xs">
-                      {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-          <button
-            type="button"
-            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
-            onClick={() =>
-              setActiveFixtureRows(r => [
-                ...r,
-                {
-                  type: '',
-                  laborType: '',
-                  qty: '',
-                  vendor: defaultVendorFor(UTIL_CAT.gas),
-                },
-              ])
-            }
-          >
-            + Add row
-          </button>
-        </div>
-      </div>
-
       {/* ── Electrical Fixtures ── */}
       <div>
         <SectionHeader title="Electrical Fixtures" />
@@ -1833,9 +1721,217 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
         </div>
       </div>
 
-      {/* ── Sewer Lines ── */}
+      {/* ── Gas Pipe ── */}
       <div>
-        <SectionHeader title="Sewer Lines" />
+        <SectionHeader title="Gas Pipe" />
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              <col className="w-[128px]" />
+              <col />
+              <col className="w-[84px]" />
+              <col className="w-[96px]" />
+              <col className="w-[96px]" />
+            </colgroup>
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
+                <th className="text-left pb-1 pr-2 font-medium">Pipe Type</th>
+                <th className="text-left pb-1 pr-2 font-medium">Linear Feet</th>
+                <th className="text-right pb-1 pr-2 font-medium text-gray-400">$/LF</th>
+                <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activeGasPipeRows.map((row, i) => {
+                const { opts, matOpt, matCost, laborVal, laborBuiltIn } = resolveUtilRow(
+                  UTIL_CAT.gasPipe,
+                  row,
+                  GASPIPE_TYPE_ARR,
+                  materialRows,
+                  catDefaults,
+                  materialPrices
+                )
+                const mat = n(row.lf) * matCost
+                return (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-2">
+                      <select
+                        className="input text-sm py-1 w-full"
+                        value={effVendor(UTIL_CAT.gasPipe, row.vendor)}
+                        onChange={e => changeRowVendor('gasPipe', i, e.target.value)}
+                        title="Vendor"
+                      >
+                        {vendorsForCategory(UTIL_CAT.gasPipe).map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                        <option value="Standard">Standard</option>
+                      </select>
+                    </td>
+                    <td className="py-1 pr-2">
+                      <div className="flex items-center gap-1">
+                        <select
+                          className="input text-sm py-1 flex-1 min-w-0"
+                          value={row.type || ''}
+                          onChange={e => changeRowType('gasPipe', i, e.target.value)}
+                        >
+                          {!row.type && <option value="">Select pipe</option>}
+                          {row.type && !opts.some(o => o.label === row.type) && (
+                            <option value={row.type}>{row.type}</option>
+                          )}
+                          {opts.map(o => (
+                            <option key={o.label} value={o.label}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </td>
+                    <td className="py-1 pr-2">
+                      <NumInput value={row.lf} onChange={v => updateGasPipe(i, 'lf', v)} className="w-full" />
+                    </td>
+                    <td className="py-1 text-right text-gray-400 text-xs pr-2">
+                      <span className="inline-flex items-center justify-end gap-1">
+                        ${matCost.toFixed(2)}
+                      </span>
+                    </td>
+                    <td className="py-1 text-right text-gray-600 text-xs">
+                      {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <button
+            type="button"
+            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+            onClick={() =>
+              setActiveGasPipeRows(r => [
+                ...r,
+                {
+                  type: '',
+                  laborType: '',
+                  lf: '',
+                  vendor: defaultVendorFor(UTIL_CAT.gasPipe),
+                },
+              ])
+            }
+          >
+            + Add row
+          </button>
+        </div>
+      </div>
+
+      {/* ── Gas Fixtures ── */}
+      <div>
+        <SectionHeader title="Gas Fixtures" />
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              <col className="w-[128px]" />
+              <col />
+              <col className="w-[84px]" />
+              <col className="w-[96px]" />
+              <col className="w-[96px]" />
+            </colgroup>
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
+                <th className="text-left pb-1 pr-2 font-medium">Fixture</th>
+                <th className="text-left pb-1 pr-2 font-medium">Qty</th>
+                <th className="text-right pb-1 pr-2 font-medium text-gray-400">$/Ea</th>
+                <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activeFixtureRows.map((row, i) => {
+                const { opts, matOpt, matCost, laborVal, laborBuiltIn } = resolveUtilRow(
+                  UTIL_CAT.gas,
+                  row,
+                  GAS_TYPE_ARR,
+                  materialRows,
+                  catDefaults,
+                  materialPrices
+                )
+                const mat = n(row.qty) * matCost
+                return (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-2">
+                      <select
+                        className="input text-sm py-1 w-full"
+                        value={effVendor(UTIL_CAT.gas, row.vendor)}
+                        onChange={e => changeRowVendor('gas', i, e.target.value)}
+                        title="Vendor"
+                      >
+                        {vendorsForCategory(UTIL_CAT.gas).map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                        <option value="Standard">Standard</option>
+                      </select>
+                    </td>
+                    <td className="py-1 pr-2">
+                      <div className="flex items-center gap-1">
+                        <select
+                          className="input text-sm py-1 flex-1 min-w-0"
+                          value={row.type || ''}
+                          onChange={e => changeRowType('gas', i, e.target.value)}
+                        >
+                          {!row.type && <option value="">Select fixture</option>}
+                          {row.type && !opts.some(o => o.label === row.type) && (
+                            <option value={row.type}>{row.type}</option>
+                          )}
+                          {opts.map(o => (
+                            <option key={o.label} value={o.label}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </td>
+                    <td className="py-1 pr-2">
+                      <NumInput value={row.qty} onChange={v => updateFixture(i, 'qty', v)} className="w-full" />
+                    </td>
+                    <td className="py-1 text-right text-gray-400 text-xs pr-2">
+                      <span className="inline-flex items-center justify-end gap-1">
+                        ${matCost.toFixed(2)}
+                      </span>
+                    </td>
+                    <td className="py-1 text-right text-gray-600 text-xs">
+                      {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <button
+            type="button"
+            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+            onClick={() =>
+              setActiveFixtureRows(r => [
+                ...r,
+                {
+                  type: '',
+                  laborType: '',
+                  qty: '',
+                  vendor: defaultVendorFor(UTIL_CAT.gas),
+                },
+              ])
+            }
+          >
+            + Add row
+          </button>
+        </div>
+      </div>
+
+      {/* ── Sewer Pipe ── */}
+      <div>
+        <SectionHeader title="Sewer Pipe" />
         <div className="overflow-x-auto">
           <table className="w-full text-sm table-fixed">
             <colgroup>
@@ -1932,118 +2028,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
               setActiveSewerLineRows(r => [
                 ...r,
                 { type: '', laborType: '', lf: '', vendor: defaultVendorFor(UTIL_CAT.sewerLine) },
-              ])
-            }
-          >
-            + Add row
-          </button>
-        </div>
-      </div>
-
-      {/* ── Sewer Sinks ── */}
-      <div>
-        <SectionHeader title="Sinks" />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm table-fixed">
-            <colgroup>
-              <col className="w-[128px]" />
-              <col />
-              <col className="w-[84px]" />
-              <col className="w-[96px]" />
-              <col className="w-[96px]" />
-            </colgroup>
-            <thead>
-              <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
-                <th className="text-left pb-1 pr-2 font-medium">Sink</th>
-                <th className="text-left pb-1 pr-2 font-medium"># Sinks</th>
-                <th className="text-right pb-1 pr-2 font-medium text-gray-400">$/Ea</th>
-                <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
-              </tr>
-            </thead>
-            <tbody>
-              {activeSewerSinkRows.map((row, i) => {
-                const { opts, matOpt, matCost, laborVal, laborBuiltIn } = resolveUtilRow(
-                  UTIL_CAT.sewerSink,
-                  row,
-                  SEWER_SINK_ARR,
-                  materialRows,
-                  catDefaults,
-                  materialPrices
-                )
-                const mat = n(row.qty) * matCost
-                return (
-                  <tr key={i} className="border-b border-gray-100">
-                    <td className="py-1 pr-2">
-                      <select
-                        className="input text-sm py-1 w-full"
-                        value={effVendor(UTIL_CAT.sewerSink, row.vendor)}
-                        onChange={e => changeRowVendor('sewerSink', i, e.target.value)}
-                        title="Vendor"
-                      >
-                        {vendorsForCategory(UTIL_CAT.sewerSink).map(v => (
-                          <option key={v.id} value={v.id}>
-                            {v.name}
-                          </option>
-                        ))}
-                        <option value="Standard">Standard</option>
-                      </select>
-                    </td>
-                    <td className="py-1 pr-2">
-                      <div className="flex items-center gap-1">
-                        <select
-                          className="input text-sm py-1 flex-1 min-w-0"
-                          value={row.type || ''}
-                          onChange={e => changeRowType('sewerSink', i, e.target.value)}
-                        >
-                          {!row.type && <option value="">Select sink</option>}
-                          {row.type && !opts.some(o => o.label === row.type) && (
-                            <option value={row.type}>{row.type}</option>
-                          )}
-                          {opts.map(o => (
-                            <option key={o.label} value={o.label}>
-                              {o.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </td>
-                    <td className="py-1 pr-2">
-                      <NumInput
-                        value={row.qty}
-                        onChange={v =>
-                          setActiveSewerSinkRows(rows =>
-                            rows.map((rr, idx) => (idx === i ? { ...rr, qty: v } : rr))
-                          )
-                        }
-                        className="w-full"
-                      />
-                    </td>
-                    <td className="py-1 text-right text-gray-400 text-xs pr-2">
-                      <span className="inline-flex items-center justify-end gap-1">
-                        ${matCost.toFixed(2)}
-                      </span>
-                    </td>
-                    <td className="py-1 text-right text-gray-600 text-xs">
-                      {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-          <button
-            type="button"
-            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
-            onClick={() =>
-              setActiveSewerSinkRows(r => [
-                ...r,
-                {
-                  type: '',
-                  laborType: '',
-                  qty: '',
-                  vendor: defaultVendorFor(UTIL_CAT.sewerSink),
-                },
               ])
             }
           >
