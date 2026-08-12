@@ -1752,7 +1752,19 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                   </td>
                   {isSub ? (
                     <td className="py-1">
-                      <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} className="text-center" />
+                      <div className="flex items-center gap-1">
+                        <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} className="text-center flex-1" />
+                        {manualRows.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setManualRows(rows => rows.filter((_, idx) => idx !== i))}
+                            className="text-gray-300 hover:text-red-500 text-sm px-1"
+                            title="Remove line"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
                     </td>
                   ) : (
                     <>
@@ -1760,11 +1772,23 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                         <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} className="text-center" />
                       </td>
                       <td className="py-1">
-                        <NumInput
-                          value={row.materials}
-                          onChange={v => updateManual(i, 'materials', v)}
-                          className="text-center"
-                        />
+                        <div className="flex items-center gap-1">
+                          <NumInput
+                            value={row.materials}
+                            onChange={v => updateManual(i, 'materials', v)}
+                            className="text-center flex-1"
+                          />
+                          {manualRows.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => setManualRows(rows => rows.filter((_, idx) => idx !== i))}
+                              className="text-gray-300 hover:text-red-500 text-sm px-1"
+                              title="Remove line"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </>
                   )}
