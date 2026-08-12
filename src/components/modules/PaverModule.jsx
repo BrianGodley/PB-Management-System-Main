@@ -1130,8 +1130,10 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                   : calc.baseHand,
         })),
         // Base material catalog (vendor-supplied 'Base Material' products) + the
-        // named base/setting materials (base rock, bedding sand).
+        // named base/setting materials (Standard Class II Roadbase, base rock,
+        // bedding sand).
         ...catalogBlockItems(PAVER_CAT.base),
+        ...materialRateRows('Base Material - Class II Roadbase'),
         ...materialRateRows('Paver - Base Rock'),
         ...materialRateRows('Bedding Sand'),
         {

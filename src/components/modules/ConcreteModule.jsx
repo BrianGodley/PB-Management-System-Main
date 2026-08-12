@@ -1402,12 +1402,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             />
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3 mt-3">
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Layout Time (hrs)</label>
-            <NumInput value={layoutHrs} onChange={setLayoutHrs} placeholder="0" />
-          </div>
-        </div>
       </div>
       )}
 
@@ -1673,7 +1667,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                   </option>
                 ))}
               </select>
-              <NumInput value={activeRebarSF} onChange={setActiveRebarSF} className="flex-1" />
+              <NumInput value={activeRebarSF} onChange={setActiveRebarSF} placeholder="Sq Ft" className="flex-1" />
             </div>
           </div>
           {!isSub && (
@@ -1716,6 +1710,10 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               )}
             </div>
           )}
+          <div className="col-span-2">
+            <label className="text-xs text-gray-500 block mb-1">Layout Time (hrs)</label>
+            <NumInput value={layoutHrs} onChange={setLayoutHrs} placeholder="0" />
+          </div>
         </div>
       </div>
 
