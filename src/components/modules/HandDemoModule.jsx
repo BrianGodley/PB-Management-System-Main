@@ -651,10 +651,10 @@ function Sel({ value, onChange, options }) {
   )
 }
 
-function TH({ cols }) {
+function TH({ cols, center }) {
   return (
     <thead>
-      <tr className="text-left text-gray-400 border-b border-gray-100 text-xs">
+      <tr className={`${center ? 'text-center' : 'text-left'} text-gray-400 border-b border-gray-100 text-xs`}>
         {cols.map((c, i) => (
           <th key={i} className={`py-1 pr-2 font-medium ${c.w || ''}`}>
             {c.label}
@@ -1951,6 +1951,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
         </div>
         <table className="w-full text-xs">
           <TH
+            center
             cols={[
               { label: 'Description' },
               { label: 'Hours', w: 'w-20' },

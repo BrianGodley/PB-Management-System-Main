@@ -3971,10 +3971,10 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="text-xs text-gray-500 border-b border-gray-200">
-              <th className="text-left pb-1 pr-2 font-medium">Description</th>
-              <th className="text-left pb-1 pr-2 font-medium">Hours</th>
-              <th className="text-left pb-1 pr-2 font-medium">Materials $</th>
-              <th className="text-left pb-1 font-medium">Sub Cost $</th>
+              <th className="text-center pb-1 pr-2 font-medium">Description</th>
+              <th className="text-center pb-1 pr-2 font-medium">Hours</th>
+              <th className="text-center pb-1 pr-2 font-medium">Materials $</th>
+              <th className="text-center pb-1 font-medium">Sub Cost $</th>
             </tr>
           </thead>
           <tbody>

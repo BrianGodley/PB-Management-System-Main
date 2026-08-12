@@ -685,12 +685,12 @@ function MaterialStepSection({
       <table className="w-full text-xs">
         <thead>
           <tr className="text-gray-400 border-b border-gray-200">
-            <th className="text-left pb-1 pr-2 font-medium w-40">Vendor</th>
-            <th className="text-left pb-1 pr-2 font-medium">{`${matWord} Type`}</th>
-            <th className="text-left pb-1 pr-2 font-medium w-24">Form</th>
-            <th className="text-left pb-1 pr-2 font-medium w-20">{isSub ? 'LF' : 'SF'}</th>
-            <th className="text-left pb-1 pr-2 font-medium w-24">Grouted?</th>
-            <th className="text-right pb-1 pr-2 font-medium w-28">{isSub ? 'Sub $' : 'Hrs · Mat'}</th>
+            <th className="text-center pb-1 pr-2 font-medium w-40">Vendor</th>
+            <th className="text-center pb-1 pr-2 font-medium">{`${matWord} Type`}</th>
+            <th className="text-center pb-1 pr-2 font-medium w-24">Form</th>
+            <th className="text-center pb-1 pr-2 font-medium w-20">{isSub ? 'LF' : 'SF'}</th>
+            <th className="text-center pb-1 pr-2 font-medium w-24">Grouted?</th>
+            <th className="text-center pb-1 pr-2 font-medium w-28">{isSub ? 'Sub $' : 'Hrs · Mat'}</th>
             <th className="w-6"></th>
           </tr>
         </thead>
@@ -1323,12 +1323,12 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         <table className="w-full text-xs">
           <thead>
             <tr className="text-gray-400 border-b border-gray-200">
-              <th className="text-left pb-1 pr-2 font-medium w-40">Vendor</th>
-              <th className="text-left pb-1 pr-2 font-medium">Concrete Type</th>
-              <th className="text-left pb-1 pr-2 font-medium w-24">Form</th>
-              <th className="text-left pb-1 pr-2 font-medium w-20">{isSub ? 'LF' : 'SF'}</th>
-              <th className="text-left pb-1 pr-2 font-medium">Finish</th>
-              <th className="text-right pb-1 pr-2 font-medium w-28">{isSub ? 'Sub $' : 'Hrs · Mat'}</th>
+              <th className="text-center pb-1 pr-2 font-medium w-40">Vendor</th>
+              <th className="text-center pb-1 pr-2 font-medium">Concrete Type</th>
+              <th className="text-center pb-1 pr-2 font-medium w-24">Form</th>
+              <th className="text-center pb-1 pr-2 font-medium w-20">{isSub ? 'LF' : 'SF'}</th>
+              <th className="text-center pb-1 pr-2 font-medium">Finish</th>
+              <th className="text-center pb-1 pr-2 font-medium w-28">{isSub ? 'Sub $' : 'Hrs · Mat'}</th>
               <th className="w-6"></th>
             </tr>
           </thead>
@@ -1451,10 +1451,10 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="text-xs text-gray-500 border-b border-gray-200">
-              <th className="text-left pb-1 pr-2 font-medium">Description</th>
-              <th className="text-left pb-1 pr-2 font-medium">Hours</th>
-              <th className="text-left pb-1 pr-2 font-medium">Materials $</th>
-              <th className="text-left pb-1 font-medium">Sub Cost $</th>
+              <th className="text-center pb-1 pr-2 font-medium">Description</th>
+              <th className="text-center pb-1 pr-2 font-medium">Hours</th>
+              <th className="text-center pb-1 pr-2 font-medium">Materials $</th>
+              <th className="text-center pb-1 font-medium">Sub Cost $</th>
             </tr>
           </thead>
           <tbody>

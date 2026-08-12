@@ -379,11 +379,11 @@ function EpTable({
           </colgroup>
           <thead>
             <tr className="text-xs text-gray-500 border-b border-gray-200">
-              <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
-              <th className="text-left pb-1 pr-2 font-medium">Type</th>
-              <th className="text-left pb-1 pr-2 font-medium">{qtyLabel}</th>
-              <th className="text-right pb-1 pr-2 font-medium text-gray-400">$/{unitLabel}</th>
-              <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
+              <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
+              <th className="text-center pb-1 pr-2 font-medium">Type</th>
+              <th className="text-center pb-1 pr-2 font-medium">{qtyLabel}</th>
+              <th className="text-center pb-1 pr-2 font-medium text-gray-400">$/{unitLabel}</th>
+              <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
               <th></th>
             </tr>
           </thead>
@@ -1405,13 +1405,13 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
               </colgroup>
               <thead>
                 <tr className="text-xs text-gray-500 border-b border-gray-200">
-                  <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
-                  <th className="text-left pb-1 pr-2 font-medium">Type</th>
-                  <th className="text-left pb-1 pr-2 font-medium">Qty</th>
-                  <th className="text-left pb-1 pr-2 font-medium">$/ea</th>
-                  <th className="text-left pb-1 pr-2 font-medium">Client Provided</th>
-                  <th className="text-left pb-1 pr-2 font-medium">Labor (hrs/ea)</th>
-                  <th className="text-right pb-1 pr-2 font-medium text-gray-400">Material $</th>
+                  <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
+                  <th className="text-center pb-1 pr-2 font-medium">Type</th>
+                  <th className="text-center pb-1 pr-2 font-medium">Qty</th>
+                  <th className="text-center pb-1 pr-2 font-medium">$/ea</th>
+                  <th className="text-center pb-1 pr-2 font-medium">Client Provided</th>
+                  <th className="text-center pb-1 pr-2 font-medium">Labor (hrs/ea)</th>
+                  <th className="text-center pb-1 pr-2 font-medium text-gray-400">Material $</th>
                   <th></th>
                 </tr>
               </thead>
@@ -1546,13 +1546,13 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
               </colgroup>
               <thead>
                 <tr className="text-xs text-gray-500 border-b border-gray-200">
-                  <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
-                  <th className="text-left pb-1 pr-2 font-medium">Type</th>
-                  <th className="text-left pb-1 pr-2 font-medium">Qty</th>
-                  <th className="text-left pb-1 pr-2 font-medium">$/ea</th>
-                  <th className="text-left pb-1 pr-2 font-medium">Client Provided</th>
-                  <th className="text-left pb-1 pr-2 font-medium">Labor (hrs/ea)</th>
-                  <th className="text-right pb-1 pr-2 font-medium text-gray-400">Material $</th>
+                  <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
+                  <th className="text-center pb-1 pr-2 font-medium">Type</th>
+                  <th className="text-center pb-1 pr-2 font-medium">Qty</th>
+                  <th className="text-center pb-1 pr-2 font-medium">$/ea</th>
+                  <th className="text-center pb-1 pr-2 font-medium">Client Provided</th>
+                  <th className="text-center pb-1 pr-2 font-medium">Labor (hrs/ea)</th>
+                  <th className="text-center pb-1 pr-2 font-medium text-gray-400">Material $</th>
                   <th></th>
                 </tr>
               </thead>
@@ -1743,11 +1743,11 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
             </colgroup>
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
-                <th className="text-left pb-1 pr-2 font-medium">Type</th>
-                <th className="text-left pb-1 pr-2 font-medium">SF</th>
-                <th className="text-right pb-1 pr-2 font-medium text-gray-400">$/Unit</th>
-                <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
+                <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
+                <th className="text-center pb-1 pr-2 font-medium">Type</th>
+                <th className="text-center pb-1 pr-2 font-medium">SF</th>
+                <th className="text-center pb-1 pr-2 font-medium text-gray-400">$/Unit</th>
+                <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
               </tr>
             </thead>
             <tbody>
@@ -1813,10 +1813,10 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-left pb-1 pr-2 font-medium">Description</th>
-                <th className="text-left pb-1 pr-2 font-medium">Hours</th>
-                <th className="text-left pb-1 pr-2 font-medium">Materials $</th>
-                <th className="text-left pb-1 font-medium">Sub Cost $</th>
+                <th className="text-center pb-1 pr-2 font-medium">Description</th>
+                <th className="text-center pb-1 pr-2 font-medium">Hours</th>
+                <th className="text-center pb-1 pr-2 font-medium">Materials $</th>
+                <th className="text-center pb-1 font-medium">Sub Cost $</th>
               </tr>
             </thead>
             <tbody>

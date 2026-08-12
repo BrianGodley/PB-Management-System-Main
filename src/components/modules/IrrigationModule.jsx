@@ -428,7 +428,7 @@ function Sel({ value, onChange, options, placeholder }) {
 function TH({ cols }) {
   return (
     <thead>
-      <tr className="text-left text-gray-400 border-b border-gray-100 text-xs">
+      <tr className="text-center text-gray-400 border-b border-gray-100 text-xs">
         {cols.map((c, i) => (
           <th key={i} className={`py-1 pr-2 font-medium ${c.w || ''}`}>
             {c.label}

@@ -311,11 +311,11 @@ function EpTable({
           </colgroup>
           <thead>
             <tr className="text-xs text-gray-500 border-b border-gray-200">
-              <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
-              <th className="text-left pb-1 pr-2 font-medium">Type</th>
-              <th className="text-left pb-1 pr-2 font-medium">{qtyLabel}</th>
-              <th className="text-right pb-1 pr-2 font-medium text-gray-400">$/{unitLabel}</th>
-              <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
+              <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
+              <th className="text-center pb-1 pr-2 font-medium">Type</th>
+              <th className="text-center pb-1 pr-2 font-medium">{qtyLabel}</th>
+              <th className="text-center pb-1 pr-2 font-medium text-gray-400">$/{unitLabel}</th>
+              <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
               <th></th>
             </tr>
           </thead>
@@ -873,9 +873,9 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
   )
 }
 
-function Label({ text, sub }) {
+function Label({ text, sub, center }) {
   return (
-    <label className="block text-xs font-medium text-gray-600 mb-0.5">
+    <label className={`block text-xs font-medium text-gray-600 mb-0.5 ${center ? 'text-center' : ''}`}>
       {text}
       {sub && <span className="text-gray-400 font-normal ml-1">({sub})</span>}
     </label>
@@ -2531,7 +2531,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           {T.manualRows.map((r, i) => (
             <div key={i} className="grid grid-cols-5 gap-2 items-end">
               <div className="col-span-2">
-                {i === 0 && <Label text="Description" />}
+                {i === 0 && <Label text="Description" center />}
                 <input
                   className="input text-sm py-1.5"
                   placeholder="Description"
@@ -2540,15 +2540,15 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                 />
               </div>
               <div>
-                {i === 0 && <Label text="Hours" />}
+                {i === 0 && <Label text="Hours" center />}
                 <NumInput value={r.hours} onChange={v => updManual(i, 'hours', v)} />
               </div>
               <div>
-                {i === 0 && <Label text="Materials $" />}
+                {i === 0 && <Label text="Materials $" center />}
                 <NumInput value={r.materials} onChange={v => updManual(i, 'materials', v)} />
               </div>
               <div>
-                {i === 0 && <Label text="Sub Cost $" />}
+                {i === 0 && <Label text="Sub Cost $" center />}
                 <NumInput value={r.subCost} onChange={v => updManual(i, 'subCost', v)} />
               </div>
               <button
