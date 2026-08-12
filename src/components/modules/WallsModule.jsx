@@ -619,7 +619,7 @@ const DEFAULT_CMU = () => ({
   ...DEMO_DEFAULTS(),
   ...DRAIN_DEFAULTS(),
   ...BACKFILL_DEFAULTS(),
-  finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
+  finishRows: [blankWallFinishRow()],
   capRows: [blankCapRow()],
 })
 const DEFAULT_PIP = () => ({
@@ -640,7 +640,7 @@ const DEFAULT_PIP = () => ({
   ...DEMO_DEFAULTS(),
   ...DRAIN_DEFAULTS(),
   ...BACKFILL_DEFAULTS(),
-  finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
+  finishRows: [blankWallFinishRow()],
   capRows: [blankCapRow()],
 })
 // Modular block wall — duplicates the CMU fields EXCEPT rebar spacing, horiz
@@ -661,7 +661,7 @@ const DEFAULT_MODULAR = () => ({
   ...DEMO_DEFAULTS(),
   ...DRAIN_DEFAULTS(),
   ...BACKFILL_DEFAULTS(),
-  finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
+  finishRows: [blankWallFinishRow()],
   capRows: [blankCapRow()],
 })
 // Brick wall — same structure/pricing model as Modular (block + footing, no
@@ -682,7 +682,7 @@ const DEFAULT_BRICK = () => ({
   ...DEMO_DEFAULTS(),
   ...DRAIN_DEFAULTS(),
   ...BACKFILL_DEFAULTS(),
-  finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
+  finishRows: [blankWallFinishRow()],
   capRows: [blankCapRow()],
 })
 // Timber / Lumber wall — now a multi-wall array entry (mirrors CMU/PIP/etc.).
@@ -771,8 +771,8 @@ const WP_LABOR_KEY = {
   'Dimple Membrane': 'wpLabDimple',
 }
 
-const blankWallFinishRow = () => ({ vendor: 'Standard', type: 'Sand Stucco', sf: '', rateIn: '', subEach: '' })
-const blankCapRow = () => ({ vendor: 'Standard', type: 'None', widthIn: '', lf: '', qty: '', subEach: '' })
+const blankWallFinishRow = () => ({ vendor: 'Standard', type: '', sf: '', rateIn: '', subEach: '' })
+const blankCapRow = () => ({ vendor: 'Standard', type: '', widthIn: '', lf: '', qty: '', subEach: '' })
 const blankWpRow = () => ({ vendor: 'Standard', type: 'None', sf: '', subEach: '' })
 
 // ── Vendor-catalog material price ─────────────────────────────────────────────
@@ -1780,7 +1780,7 @@ function initWallWp(w = {}) {
 function initWallExtras(w = {}) {
   const fin = Array.isArray(w.finishRows) && w.finishRows.length
     ? w.finishRows.map(r => ({ ...r }))
-    : [{ ...blankWallFinishRow(), type: 'None' }]
+    : [blankWallFinishRow()]
   const cap = Array.isArray(w.capRows) && w.capRows.length
     ? w.capRows.map(r => ({ vendor: 'Standard', subEach: '', ...r }))
     : [blankCapRow()]
@@ -1830,7 +1830,7 @@ function initCmuWalls(src = {}) {
         groutPump: legacyGrout,
         subEach: '',
         wpRows: [blankWpRow()],
-        finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
+        finishRows: [blankWallFinishRow()],
         capRows: [blankCapRow()],
       },
     ]
@@ -1865,7 +1865,7 @@ function initPipWalls(src = {}) {
         footingPump: 'Yes',
         subEach: '',
         wpRows: [blankWpRow()],
-        finishRows: [{ ...blankWallFinishRow(), type: 'None' }],
+        finishRows: [blankWallFinishRow()],
         capRows: [blankCapRow()],
       },
     ]
@@ -1987,7 +1987,7 @@ function initWallFinishRows(src = {}) {
   push('Tile', 'tileSF', 'tileRateIn')
   push('Real Flagstone', 'flagstoneSF', 'flagstoneRateIn')
   push('Real Stone', 'realStoneSF', 'realStoneRateIn')
-  return rows.length ? rows : [blankWallFinishRow(), { ...blankWallFinishRow(), type: 'Ledgerstone' }]
+  return rows.length ? rows : [blankWallFinishRow(), blankWallFinishRow()]
 }
 function makeTab(src = {}) {
   const cmuWalls = initCmuWalls(src)
@@ -2197,7 +2197,8 @@ function WallFinishesEditor({
               />
               <DropdownSelect
                 className="input text-sm py-1 flex-[1.5] min-w-0"
-                value={row.type || 'None'}
+                value={row.type || ''}
+                placeholder="Select finish"
                 onChange={v => {
                   onPatch(i, { type: v }, true)
                   pp.check(materialRows, WALL_FINISH_SUBCAT, v, row.vendor)
@@ -2270,7 +2271,8 @@ function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, ma
               />
               <DropdownSelect
                 className="input text-sm py-1 flex-[1.5] min-w-0"
-                value={row.type || 'None'}
+                value={row.type || ''}
+                placeholder="Select cap"
                 onChange={v => {
                   onPatch(i, { type: v }, true)
                   pp.check(materialRows, WALL_CAP_SUBCAT, v, row.vendor)

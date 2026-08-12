@@ -98,6 +98,8 @@ function paverItemFor(cat, vendorSel, typeLabel, materialRows) {
 // Shared by every Vendor/Type step section (Paver/Brick/Tile/Flagstone); `cat`
 // selects which material catalog sub_category the Type options come from.
 function matStepRowCalc(r, laborRates, materialRows, cat = PAVER_STEP_CAT, priceOf = item => n(item?.unit_cost)) {
+  // Unselected step (no material Type) contributes nothing (no crash, no fallback).
+  if (!r.type) return { sf: n(r.sf), hrs: 0, mat: 0, price: 0, pallets: 0 }
   const sf = n(r.sf)
   const rate = n(laborRates[kPaverForm(r.form)] ?? PAVER_FORM_DEFAULT[r.form] ?? 0)
   const hrs = sf > 0 && rate > 0 ? sf / rate : 0
@@ -116,6 +118,8 @@ function matStepRowCalc(r, laborRates, materialRows, cat = PAVER_STEP_CAT, price
 }
 
 function concRowCalc(r, laborRates, materialRates) {
+  // Unselected concrete step (no Type) contributes nothing (no crash, no fallback).
+  if (!r.type) return { sf: n(r.sf), hrs: 0, mat: 0 }
   const sf = n(r.sf)
   const typeHrs = n(laborRates[kConcTypeHrs(r.type)] ?? 0)
   const finishHrs = n(laborRates[kFinishHrs(r.finish)] ?? 0)
@@ -130,6 +134,8 @@ function concRowCalc(r, laborRates, materialRates) {
 // Sub rows are unit priced per LF: rate = base + applicable per-LF modifiers.
 // On the Sub tab the row quantity field represents linear feet.
 function matStepSubRowCalc(r, mr, baseKey = kSubPaverBase) {
+  // Unselected step (no material Type) contributes nothing.
+  if (!r.type) return { lf: n(r.sf), rate: 0, cost: 0 }
   const lf = n(r.sf)
   const base = n(mr[baseKey] ?? SUB_BASE_DEFAULT)
   const form = n(mr[kSubForm(r.form)] ?? 0)
@@ -138,6 +144,8 @@ function matStepSubRowCalc(r, mr, baseKey = kSubPaverBase) {
   return { lf, rate, cost: lf * rate }
 }
 function concSubRowCalc(r, mr) {
+  // Unselected concrete step (no Type) contributes nothing.
+  if (!r.type) return { lf: n(r.sf), rate: 0, cost: 0 }
   const lf = n(r.sf)
   const base = n(mr[kSubConcBase] ?? SUB_BASE_DEFAULT)
   const form = n(mr[kSubForm(r.form)] ?? 0)
@@ -645,7 +653,7 @@ const cellSel =
   'w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400'
 
 const PAVER_ROW = () => ({ vendor: 'Standard', type: '', form: 'Straight', sf: '', grouted: false })
-const CONC_ROW = () => ({ vendor: 'Standard', type: 'Standard', form: 'Straight', sf: '', finish: 'Smooth' })
+const CONC_ROW = () => ({ vendor: 'Standard', type: '', form: 'Straight', sf: '', finish: 'Smooth' })
 const MANUAL_ROW = () => ({ label: '', hours: '', materials: '', subCost: '' })
 
 const DEFAULT_PAVER_ROWS = () => [PAVER_ROW(), PAVER_ROW(), PAVER_ROW()]
@@ -712,7 +720,10 @@ function MaterialStepSection({
                     onChange={e => setRow(i, 'type', e.target.value)}
                     disabled={!opts.length}
                   >
-                    <option value="">{opts.length ? '— Type —' : 'Pick vendor first'}</option>
+                    <option value="">{opts.length ? 'Select material' : 'Pick vendor first'}</option>
+                    {row.type && !opts.some(o => o.label === row.type) && (
+                      <option value={row.type}>{row.type}</option>
+                    )}
                     {opts.map(o => (
                       <option key={o.label} value={o.label}>
                         {o.label}
@@ -1337,9 +1348,13 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
                   <td className="py-1 pr-2">
                     <select
                       className={cellSel}
-                      value={row.type}
+                      value={row.type || ''}
                       onChange={e => setConcRow(i, 'type', e.target.value)}
                     >
+                      {!row.type && <option value="">Select type</option>}
+                      {row.type && !CONC_TYPES.includes(row.type) && (
+                        <option value={row.type}>{row.type}</option>
+                      )}
                       {CONC_TYPES.map(t => (
                         <option key={t} value={t}>
                           {t}

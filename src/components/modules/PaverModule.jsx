@@ -220,7 +220,9 @@ function calcPaver(
     let sfPerPallet = 0
     if (isCustom) {
       pricePerSF = n(row.customPricePerSF)
-    } else if (row.paverVendor) {
+    } else if (row.paverVendor && (row.paverId || row.paverType)) {
+      // Skip rows with a vendor but no paver chosen yet — they price at $0 rather
+      // than falling back to the vendor's first catalog item.
       const item = paverItemFor(
         PAVER_CAT.paver,
         row.paverVendor,
@@ -305,7 +307,8 @@ function calcPaver(
     }
   } else if (state.vertVendor === 'Custom' || state.vertPaverBrand === 'Custom') {
     vertPricePerLF = n(state.vertCustomPricePerLF)
-  } else if (state.vertVendor) {
+  } else if (state.vertVendor && (state.vertId || state.vertType)) {
+    // Vendor chosen but no paver selected yet → $0 (no fallback to first item).
     const vItem = paverItemFor(
       PAVER_CAT.paver,
       state.vertVendor,
@@ -1411,6 +1414,13 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             {state[kArea].map((row, i) => {
               const a = (isSub ? calc.subAreas : calc.areas)[i] || {}
               const pOpts = paverOptions(PAVER_CAT.paver, row.paverVendor, materialRows)
+              // Empty default + "Select paver" placeholder; keep a stored id that is
+              // not in the current catalog selectable (backward-compat).
+              const paverSelOpts = !row.paverId
+                ? [{ value: '', label: 'Select paver' }, ...pOpts]
+                : pOpts.some(o => o.value === row.paverId)
+                  ? pOpts
+                  : [{ value: row.paverId, label: row.paverType || row.paverId }, ...pOpts]
               return (
                 <tr key={i}>
                   <td className={td}>
@@ -1420,9 +1430,10 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                       onChange={e => {
                         const v = e.target.value
                         setRow(kArea, i, 'paverVendor', v)
-                        const opts = paverOptions(PAVER_CAT.paver, v, materialRows)
-                        setRow(kArea, i, 'paverId', opts[0]?.id || '')
-                        setRow(kArea, i, 'paverType', opts[0]?.stored || '')
+                        // Reset the paver selection so the user explicitly picks
+                        // (no fallback to the vendor's first catalog item).
+                        setRow(kArea, i, 'paverId', '')
+                        setRow(kArea, i, 'paverType', '')
                       }}
                     >
                       <option value="">— Vendor —</option>
@@ -1450,7 +1461,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                           setRow(kArea, i, 'paverId', id)
                           setRow(kArea, i, 'paverType', opt ? opt.stored : '')
                         }}
-                        options={pOpts}
+                        options={paverSelOpts}
                       />
                     )}
                   </td>
@@ -1890,9 +1901,9 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
               onChange={e => {
                 const v = e.target.value
                 set('vertVendor', v)
-                const opts = paverOptions(PAVER_CAT.paver, v, materialRows)
-                set('vertId', opts[0]?.id || '')
-                set('vertType', opts[0]?.stored || '')
+                // Reset the paver selection so the user explicitly picks one.
+                set('vertId', '')
+                set('vertType', '')
               }}
             >
               <option value="">— Vendor —</option>
@@ -1920,7 +1931,14 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                     set('vertId', id)
                     set('vertType', opt ? opt.stored : '')
                   }}
-                  options={paverOptions(PAVER_CAT.paver, state.vertVendor, materialRows)}
+                  options={
+                    state.vertId
+                      ? paverOptions(PAVER_CAT.paver, state.vertVendor, materialRows)
+                      : [
+                          { value: '', label: 'Select paver' },
+                          ...paverOptions(PAVER_CAT.paver, state.vertVendor, materialRows),
+                        ]
+                  }
                 />
               )}
             </div>

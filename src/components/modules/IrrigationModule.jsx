@@ -154,6 +154,9 @@ const irrMatPrice = resolveMaterialPrice
 //   mat = qty × material unit price
 // Only the material unit price source is vendor-resolved (Standard = original price).
 function computeZoneRow(row, handRate, trenchRate, materialPrices, materialRows) {
+  // Unselected zone row contributes nothing (no crash, no fallback-to-first).
+  if (!row.type)
+    return { z: zoneMeta(row.type), qty: n(row.qty), mode: row.mode, rate: 0, hrs: 0, unitPrice: 0, mat: 0, subEach: 0, subMat: 0 }
   const z = zoneMeta(row.type)
   const qty = n(row.qty)
   const mode = row.mode || z.defaultMode
@@ -169,6 +172,9 @@ function computeZoneRow(row, handRate, trenchRate, materialPrices, materialRows)
 // Timer row: In-House labor + material identical to the original per-timer math —
 //   hrs = qty × timerHrs ;  mat = qty × material unit price
 function computeTimerRow(row, timerHrs, materialPrices, materialRows) {
+  // Unselected timer row contributes nothing (no crash, no fallback-to-first).
+  if (!row.type)
+    return { t: timerMeta(row.type), qty: n(row.qty), hrs: 0, unitPrice: 0, mat: 0, subEach: 0, subMat: 0 }
   const t = timerMeta(row.type)
   const qty = n(row.qty)
   const hrs = qty * timerHrs
@@ -323,9 +329,9 @@ function calcIrrigation(
 
 // ── Default rows / factories ──────────────────────────────────────────────────
 const defaultZoneRows = () =>
-  ZONE_TYPES.map(z => ({ vendor: 'Standard', type: z.key, qty: '', mode: z.defaultMode, subEach: '' }))
+  ZONE_TYPES.map(z => ({ vendor: 'Standard', type: '', qty: '', mode: z.defaultMode, subEach: '' }))
 const defaultTimerRows = () =>
-  TIMER_TYPES.map(t => ({ vendor: 'Standard', type: t.key, qty: '', subEach: '' }))
+  TIMER_TYPES.map(() => ({ vendor: 'Standard', type: '', qty: '', subEach: '' }))
 const DEFAULT_MANUAL_ROWS = () => [
   { label: '', hours: '', materials: '', subCost: '' },
   { label: '', hours: '', materials: '', subCost: '' },
@@ -396,23 +402,26 @@ function Inp({ value, onChange, placeholder = '0', type = 'number', step }) {
     />
   )
 }
-function Sel({ value, onChange, options }) {
+function Sel({ value, onChange, options, placeholder }) {
   // options: array of strings OR { value, label }
+  // When `placeholder` is provided, an unset value shows the placeholder (empty
+  // option) and a stored value not in `options` stays selectable (backward-compat).
+  const norm = options.map(o => (typeof o === 'string' ? { value: o, label: o } : o))
+  const hasVal = value !== '' && value != null
+  const known = norm.some(o => o.value === value)
   return (
     <select
-      value={value}
+      value={hasVal ? value : ''}
       onChange={onChange}
       className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
     >
-      {options.map(o => {
-        const val = typeof o === 'string' ? o : o.value
-        const label = typeof o === 'string' ? o : o.label
-        return (
-          <option key={val} value={val}>
-            {label}
-          </option>
-        )
-      })}
+      {placeholder && !hasVal && <option value="">{placeholder}</option>}
+      {placeholder && hasVal && !known && <option value={value}>{value}</option>}
+      {norm.map(o => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
     </select>
   )
 }
@@ -861,6 +870,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
                           value={row.type}
                           onChange={e => zoneUpdate(i, 'type', e.target.value)}
                           options={ZONE_OPTIONS}
+                          placeholder="Select zone"
                         />
                       </div>
                     </div>
@@ -909,7 +919,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
         </table>
         <button
           type="button"
-          onClick={() => setZoneRows(rows => [...rows, { vendor: 'Standard', type: 'planterSpray', qty: '', mode: 'Hand', subEach: '' }])}
+          onClick={() => setZoneRows(rows => [...rows, { vendor: 'Standard', type: '', qty: '', mode: 'Hand', subEach: '' }])}
           className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
         >
           + Add zone
@@ -954,6 +964,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
                           value={row.type}
                           onChange={e => timerUpdate(i, 'type', e.target.value)}
                           options={TIMER_OPTIONS}
+                          placeholder="Select timer"
                         />
                       </div>
                     </div>
@@ -995,7 +1006,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
         </table>
         <button
           type="button"
-          onClick={() => setTimerRows(rows => [...rows, { vendor: 'Standard', type: 'timer4', qty: '', subEach: '' }])}
+          onClick={() => setTimerRows(rows => [...rows, { vendor: 'Standard', type: '', qty: '', subEach: '' }])}
           className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
         >
           + Add timer

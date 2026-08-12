@@ -396,6 +396,7 @@ function calcUtilities(
   })
 
   lineRows.forEach(r => {
+    if (!r.type) return
     const lf = n(r.lf)
     if (lf <= 0) return
     const { matCost, laborVal } = resolveUtilRow(
@@ -412,6 +413,7 @@ function calcUtilities(
 
   const _fixtureLoop = (rows, cat, houseArr) => {
     ;(rows || []).forEach(r => {
+      if (!r.type) return
       const qty = n(r.qty)
       if (qty <= 0) return
       const { matCost, laborVal } = resolveUtilRow(
@@ -431,6 +433,7 @@ function calcUtilities(
 
   // Sewer lines — material + labor per LF (trenching handled by Trenching section)
   ;(sewerLineRows || []).forEach(r => {
+    if (!r.type) return
     const lf = n(r.lf)
     if (lf <= 0) return
     const { matCost, laborVal } = resolveUtilRow(
@@ -446,6 +449,7 @@ function calcUtilities(
   })
   // Sewer sinks — material + labor per sink
   ;(sewerSinkRows || []).forEach(r => {
+    if (!r.type) return
     const qty = n(r.qty)
     if (qty <= 0) return
     const { matCost, laborVal } = resolveUtilRow(
@@ -544,19 +548,19 @@ const DEFAULT_TRENCH_ROWS = [
   { equipment: 'Trench', lf: '', width: '', depth: '' },
 ]
 const DEFAULT_LINE_ROWS = [
-  { type: 'PVC Conduit with Electrical', laborType: 'PVC Conduit with Electrical', lf: '', vendor: 'auto' },
+  { type: '', laborType: '', lf: '', vendor: 'auto' },
 ]
 const DEFAULT_FIXTURE_ROWS = [
-  { type: '12" Single Gas Ring', laborType: '12" Single Gas Ring', qty: '', vendor: 'auto' },
+  { type: '', laborType: '', qty: '', vendor: 'auto' },
 ]
 const DEFAULT_ELEC_FIXTURE_ROWS = [
-  { type: 'GFCI Protected Receptacles', laborType: 'GFCI Protected Receptacles', qty: '', vendor: 'auto' },
+  { type: '', laborType: '', qty: '', vendor: 'auto' },
 ]
 const DEFAULT_SEWER_LINE_ROWS = [
-  { type: '4" ABS', laborType: '4" ABS', lf: '', vendor: 'auto' },
+  { type: '', laborType: '', lf: '', vendor: 'auto' },
 ]
 const DEFAULT_SEWER_SINK_ROWS = [
-  { type: 'Turbo 2" x 14" Sink w/fittings', laborType: 'Turbo 2" x 14" Sink w/fittings', qty: '', vendor: 'auto' },
+  { type: '', laborType: '', qty: '', vendor: 'auto' },
 ]
 const DEFAULT_ADDITIONAL = {
   curbCoreQty: '',
@@ -835,6 +839,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
     subSideCost += n(r.lf) * subTrenchRate
   })
   subLineRows.forEach(r => {
+    if (!r.type) return
     const lf = n(r.lf)
     if (lf <= 0) return
     const { matCost, laborVal } = resolveUtilRow(
@@ -849,6 +854,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   })
   const _subFixtureLoop = (rows, cat, houseArr) => {
     ;(rows || []).forEach(r => {
+      if (!r.type) return
       const qty = n(r.qty)
       if (qty <= 0) return
       const { matCost, laborVal } = resolveUtilRow(
@@ -865,6 +871,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   _subFixtureLoop(subFixtureRows, UTIL_CAT.gas, GAS_TYPE_ARR)
   _subFixtureLoop(subElecFixtureRows, UTIL_CAT.elec, ELEC_TYPE_ARR)
   ;(subSewerLineRows || []).forEach(r => {
+    if (!r.type) return
     const lf = n(r.lf)
     if (lf <= 0) return
     const { matCost, laborVal } = resolveUtilRow(
@@ -878,6 +885,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
     subSideCost += lf * matCost + lf * laborVal * laborRatePerHour
   })
   ;(subSewerSinkRows || []).forEach(r => {
+    if (!r.type) return
     const qty = n(r.qty)
     if (qty <= 0) return
     const { matCost, laborVal } = resolveUtilRow(
@@ -1404,9 +1412,13 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                       <div className="flex items-center gap-1">
                         <select
                           className="input text-sm py-1 flex-1 min-w-0"
-                          value={matOpt?.label}
+                          value={row.type || ''}
                           onChange={e => changeRowType('line', i, e.target.value)}
                         >
+                          {!row.type && <option value="">Select line type</option>}
+                          {row.type && !opts.some(o => o.label === row.type) && (
+                            <option value={row.type}>{row.type}</option>
+                          )}
                           {opts.map(o => (
                             <option key={o.label} value={o.label}>
                               {o.label}
@@ -1438,8 +1450,8 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
               setActiveLineRows(r => [
                 ...r,
                 {
-                  type: 'PVC Conduit with Electrical',
-                  laborType: 'PVC Conduit with Electrical',
+                  type: '',
+                  laborType: '',
                   lf: '',
                   vendor: defaultVendorFor(UTIL_CAT.line),
                 },
@@ -1504,9 +1516,13 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                       <div className="flex items-center gap-1">
                         <select
                           className="input text-sm py-1 flex-1 min-w-0"
-                          value={matOpt?.label}
+                          value={row.type || ''}
                           onChange={e => changeRowType('gas', i, e.target.value)}
                         >
+                          {!row.type && <option value="">Select fixture</option>}
+                          {row.type && !opts.some(o => o.label === row.type) && (
+                            <option value={row.type}>{row.type}</option>
+                          )}
                           {opts.map(o => (
                             <option key={o.label} value={o.label}>
                               {o.label}
@@ -1538,8 +1554,8 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
               setActiveFixtureRows(r => [
                 ...r,
                 {
-                  type: '12" Single Gas Ring',
-                  laborType: '12" Single Gas Ring',
+                  type: '',
+                  laborType: '',
                   qty: '',
                   vendor: defaultVendorFor(UTIL_CAT.gas),
                 },
@@ -1604,9 +1620,13 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                       <div className="flex items-center gap-1">
                         <select
                           className="input text-sm py-1 flex-1 min-w-0"
-                          value={matOpt?.label}
+                          value={row.type || ''}
                           onChange={e => changeRowType('elec', i, e.target.value)}
                         >
+                          {!row.type && <option value="">Select fixture</option>}
+                          {row.type && !opts.some(o => o.label === row.type) && (
+                            <option value={row.type}>{row.type}</option>
+                          )}
                           {opts.map(o => (
                             <option key={o.label} value={o.label}>
                               {o.label}
@@ -1638,8 +1658,8 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
               setActiveElecFixtureRows(r => [
                 ...r,
                 {
-                  type: 'GFCI Protected Receptacles',
-                  laborType: 'GFCI Protected Receptacles',
+                  type: '',
+                  laborType: '',
                   qty: '',
                   vendor: defaultVendorFor(UTIL_CAT.elec),
                 },
@@ -1704,9 +1724,13 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                       <div className="flex items-center gap-1">
                         <select
                           className="input text-sm py-1 flex-1 min-w-0"
-                          value={matOpt?.label}
+                          value={row.type || ''}
                           onChange={e => changeRowType('sewerLine', i, e.target.value)}
                         >
+                          {!row.type && <option value="">Select line</option>}
+                          {row.type && !opts.some(o => o.label === row.type) && (
+                            <option value={row.type}>{row.type}</option>
+                          )}
                           {opts.map(o => (
                             <option key={o.label} value={o.label}>
                               {o.label}
@@ -1745,7 +1769,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
             onClick={() =>
               setActiveSewerLineRows(r => [
                 ...r,
-                { type: '4" ABS', laborType: '4" ABS', lf: '', vendor: defaultVendorFor(UTIL_CAT.sewerLine) },
+                { type: '', laborType: '', lf: '', vendor: defaultVendorFor(UTIL_CAT.sewerLine) },
               ])
             }
           >
@@ -1807,9 +1831,13 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                       <div className="flex items-center gap-1">
                         <select
                           className="input text-sm py-1 flex-1 min-w-0"
-                          value={matOpt?.label}
+                          value={row.type || ''}
                           onChange={e => changeRowType('sewerSink', i, e.target.value)}
                         >
+                          {!row.type && <option value="">Select sink</option>}
+                          {row.type && !opts.some(o => o.label === row.type) && (
+                            <option value={row.type}>{row.type}</option>
+                          )}
                           {opts.map(o => (
                             <option key={o.label} value={o.label}>
                               {o.label}
@@ -1849,8 +1877,8 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
               setActiveSewerSinkRows(r => [
                 ...r,
                 {
-                  type: 'Turbo 2" x 14" Sink w/fittings',
-                  laborType: 'Turbo 2" x 14" Sink w/fittings',
+                  type: '',
+                  laborType: '',
                   qty: '',
                   vendor: defaultVendorFor(UTIL_CAT.sewerSink),
                 },

@@ -274,9 +274,9 @@ function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
   const matOpt = { label: builtIn?.label, dbName: matDbName, fallback: matFallback }
   return { opts: merged, matOpt, matCost, laborVal, laborBuiltIn: builtIn }
 }
-const EP_LINE_ROW = () => ({ type: 'PVC Conduit with Electrical', lf: '', vendor: 'Standard' })
-const EP_GAS_ROW = () => ({ type: '12" Single Gas Ring', qty: '', vendor: 'Standard' })
-const EP_ELEC_ROW = () => ({ type: 'GFCI Protected Receptacles', qty: '', vendor: 'Standard' })
+const EP_LINE_ROW = () => ({ type: '', lf: '', vendor: 'Standard' })
+const EP_GAS_ROW = () => ({ type: '', qty: '', vendor: 'Standard' })
+const EP_ELEC_ROW = () => ({ type: '', qty: '', vendor: 'Standard' })
 
 // Reusable Electrical & Plumbing table (Utility Lines / Gas / Electrical).
 function EpTable({
@@ -350,9 +350,13 @@ function EpTable({
                     <div className="flex items-center gap-1">
                       <select
                         className="input text-sm py-1 flex-1 min-w-0"
-                        value={matOpt?.label}
+                        value={row.type || ''}
                         onChange={e => upd(i, 'type', e.target.value)}
                       >
+                        {!row.type && <option value="">Select type</option>}
+                        {row.type && !opts.some(o => o.label === row.type) && (
+                          <option value={row.type}>{row.type}</option>
+                        )}
                         {opts.map(o => (
                           <option key={o.label} value={o.label}>
                             {o.label}
@@ -416,11 +420,11 @@ const defaultTileStruct = () => ({
   matPricePerSF: '2.50',
   waterproof: false,
 })
-const defaultInteriorStruct = () => ({ type: 'White Plaster', subCost: '' })
-const newSpillway = () => ({ struct: 'Pool', type: 'TILE', qty: '1', lf: '' })
-const newCopingRow = () => ({ struct: 'Pool', type: 'Paver Bullnose', lf: '', sided: 'single' })
-const newRaisedSurface = () => ({ matType: '6" Square Tile', sqft: '', curvePct: '', corners: '' })
-const newEquipRow = () => ({ category: 'Pump', model: 'VSHP270AUT', qty: '1', unitCost: '' })
+const defaultInteriorStruct = () => ({ type: '', subCost: '' })
+const newSpillway = () => ({ struct: 'Pool', type: '', qty: '1', lf: '' })
+const newCopingRow = () => ({ struct: 'Pool', type: '', lf: '', sided: 'single' })
+const newRaisedSurface = () => ({ matType: '', sqft: '', curvePct: '', corners: '' })
+const newEquipRow = () => ({ category: 'Pump', model: '', qty: '1', unitCost: '' })
 const newManualRow = () => ({ label: '', hours: '', materials: '', subCost: '' })
 
 // Per-tab input record. In-House and Sub each hold their own independent copy so
@@ -613,6 +617,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   let spillwayHrs = 0,
     spillwayMat = 0
   spillways.forEach(sw => {
+    if (!sw.type) return
     const qty = n(sw.qty)
     const lf = n(sw.lf)
     if (!qty || !lf) return
@@ -628,6 +633,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   let copingHrs = 0,
     copingMat = 0
   copingRows.forEach(cr => {
+    if (!cr.type) return
     const lf = n(cr.lf)
     if (!lf) return
     const sided = cr.sided === 'double' ? 2 : 1
@@ -647,6 +653,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   const raisedCornerHrs = materialPrices['Pool Raised Corner Labor'] ?? 0.5
   const raisedCornerMatFactor = materialPrices['Pool Raised Corner Mat Factor'] ?? 0.2
   raisedSurfaces.forEach(rs => {
+    if (!rs.matType) return
     const sqft = n(rs.sqft)
     const corners = n(rs.corners)
     if (!sqft) return
@@ -666,7 +673,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     const manSub = n(fin.subCost)
     if (manSub > 0) {
       interiorSub += manSub
-    } else if (isSubTab) {
+    } else if (isSubTab && fin.type) {
       const sf = n(s.waterSF)
       const priceSF = subRates[`Interior Finish - ${fin.type}`] ?? INTERIOR_DEFAULTS[fin.type] ?? 45
       interiorSub += sf * priceSF
@@ -732,6 +739,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   let epHrs = 0
   let epMat = 0
   ;(state.epLineRows || []).forEach(r => {
+    if (!r.type) return
     const lf = n(r.lf)
     if (lf <= 0) return
     const { matCost, laborVal } = resolveUtilRow(UTIL_CAT.line, r, LINE_TYPE_ARR, materialRows, materialPrices)
@@ -743,6 +751,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     [state.epElecRows, UTIL_CAT.elec, ELEC_TYPE_ARR],
   ].forEach(([rows, cat, arr]) => {
     ;(rows || []).forEach(r => {
+      if (!r.type) return
       const qty = n(r.qty)
       if (qty <= 0) return
       const { matCost, laborVal } = resolveUtilRow(cat, r, arr, materialRows, materialPrices)
@@ -1945,9 +1954,13 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                 <div className="flex items-center gap-1">
                   <select
                     className="input text-sm py-1.5 flex-1 min-w-0"
-                    value={sw.type}
+                    value={sw.type || ''}
                     onChange={e => updSpillway(i, 'type', e.target.value)}
                   >
+                    {!sw.type && <option value="">Select type</option>}
+                    {sw.type && !SPILLWAY_TYPES.includes(sw.type) && (
+                      <option value={sw.type}>{sw.type}</option>
+                    )}
                     {SPILLWAY_TYPES.map(t => (
                       <option key={t}>{t}</option>
                     ))}
@@ -2004,9 +2017,13 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                 <div className="flex items-center gap-1">
                   <select
                     className="input text-sm py-1.5 flex-1 min-w-0"
-                    value={cr.type}
+                    value={cr.type || ''}
                     onChange={e => updCoping(i, 'type', e.target.value)}
                   >
+                    {!cr.type && <option value="">Select type</option>}
+                    {cr.type && !COPING_TYPES.includes(cr.type) && (
+                      <option value={cr.type}>{cr.type}</option>
+                    )}
                     {COPING_TYPES.map(t => (
                       <option key={t}>{t}</option>
                     ))}
@@ -2058,9 +2075,13 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                 <div className="flex items-center gap-1">
                   <select
                     className="input text-sm py-1.5 flex-1 min-w-0"
-                    value={rs.matType}
+                    value={rs.matType || ''}
                     onChange={e => updRaised(i, 'matType', e.target.value)}
                   >
+                    {!rs.matType && <option value="">Select material</option>}
+                    {rs.matType && !RAISED_SURFACE_TYPES.includes(rs.matType) && (
+                      <option value={rs.matType}>{rs.matType}</option>
+                    )}
                     {RAISED_SURFACE_TYPES.map(t => (
                       <option key={t}>{t}</option>
                     ))}
@@ -2132,7 +2153,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                       <div className="flex items-center gap-1">
                         <select
                           className="input text-sm py-1.5 flex-1 min-w-0"
-                          value={fin.type}
+                          value={fin.type || ''}
                           onChange={e =>
                             upd('interiorFinish', {
                               ...T.interiorFinish,
@@ -2140,6 +2161,10 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                             })
                           }
                         >
+                          {!fin.type && <option value="">Select finish</option>}
+                          {fin.type && !INTERIOR_TYPES.includes(fin.type) && (
+                            <option value={fin.type}>{fin.type}</option>
+                          )}
                           {INTERIOR_TYPES.map(t => (
                             <option key={t}>{t}</option>
                           ))}
@@ -2207,9 +2232,13 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                   <div className="flex items-center gap-1">
                     <select
                       className="input text-sm py-1.5 flex-1 min-w-0"
-                      value={eq.model}
+                      value={eq.model || ''}
                       onChange={e => updEquip(i, 'model', e.target.value)}
                     >
+                      {!eq.model && <option value="">Select model</option>}
+                      {eq.model && !models.some(m => m.model === eq.model) && (
+                        <option value={eq.model}>{eq.model}</option>
+                      )}
                       {models.map(m => (
                         <option key={m.model} value={m.model}>
                           {m.model}

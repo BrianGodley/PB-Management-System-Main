@@ -246,6 +246,8 @@ function plantTypeOptions(materialRows, subcat, builtInKeys, vendorSel, itemName
 // unit price — IDENTICAL to the original `qty * n(r.price)`, including the
 // perDay > 0 guard that skips both hrs and material when the labor rate is 0.
 function computePlantRow(row, perDay) {
+  // Unselected plant row contributes nothing (no crash, no fallback-to-first).
+  if (!row.type) return { qty: n(row.qty), hrs: 0, mat: 0, subUnit: 0, subEach: 0, subMat: 0 }
   const qty = n(row.qty)
   let hrs = 0,
     mat = 0
@@ -262,6 +264,9 @@ function computePlantRow(row, perDay) {
 // Add-on row: labor formula identical to the original per-item math; material is
 // vendor-resolved (Standard = original mp() price).
 function computeAddonRow(row, laborRates, materialPrices, materialRows) {
+  // Unselected add-on row contributes nothing (no crash, no fallback-to-first).
+  if (!row.type)
+    return { qty: n(row.qty), hrs: 0, mat: 0, subUnit: 0, subEach: 0, subMat: 0, rate: 0, unitPrice: 0, unit: '' }
   const meta = ADDON_META[row.type] || {}
   const qty = n(row.qty)
   const rate = lr(laborRates, meta.labKey)
@@ -480,30 +485,32 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
 }
 
 // ── Default rows / factories ──────────────────────────────────────────────────
-function newSmallRow(type = 'Flats of Groundcover', materialPrices = {}, materialRows = []) {
+function newSmallRow(type = '', materialPrices = {}, materialRows = []) {
+  if (!type) return { vendor: 'Standard', type: '', qty: '', price: '', subEach: '' }
   const fb = SMALL_PLANT_DEFAULTS[type]?.price ?? 0
   return { vendor: 'Standard', type, qty: '', price: plantMatPrice(type, 'Standard', materialRows, materialPrices, fb), subEach: '' }
 }
-function newLargeRow(type = '15 gallon standard', materialPrices = {}, materialRows = []) {
+function newLargeRow(type = '', materialPrices = {}, materialRows = []) {
+  if (!type) return { vendor: 'Standard', type: '', qty: '', price: '', subEach: '' }
   const fb = LARGE_PLANT_DEFAULTS[type]?.price ?? 0
   return { vendor: 'Standard', type, qty: '', price: plantMatPrice(type, 'Standard', materialRows, materialPrices, fb), subEach: '' }
 }
-const blankAddonRow = () => ({ vendor: 'Standard', type: 'Tree Stake', qty: '', subEach: '' })
+const blankAddonRow = () => ({ vendor: 'Standard', type: '', qty: '', subEach: '' })
 
 const DEFAULT_SMALL_ROWS = () =>
   Array.from({ length: 4 }, () => ({
     vendor: 'Standard',
-    type: 'Flats of Groundcover',
+    type: '',
     qty: '',
-    price: SMALL_PLANT_DEFAULTS['Flats of Groundcover'].price,
+    price: '',
     subEach: '',
   }))
 const DEFAULT_LARGE_ROWS = () =>
   Array.from({ length: 4 }, () => ({
     vendor: 'Standard',
-    type: '15 gallon standard',
+    type: '',
     qty: '',
-    price: LARGE_PLANT_DEFAULTS['15 gallon standard'].price,
+    price: '',
     subEach: '',
   }))
 const DEFAULT_ADDON_ROWS = () => [blankAddonRow()]
@@ -856,7 +863,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
                 const typeOpts = plantTypeOptions(materialRows, subcat, TYPES, row.vendor)
                 const selType =
                   typeOpts.find(o => o.value === row.type || o.dbName === row.type) ||
-                  typeOpts[0] || { value: row.type, label: row.type }
+                  { value: row.type, label: row.type }
                 const masterPrice =
                   materialPrices[row.type] ?? defaultsMap[row.type]?.price ?? 0
                 const isStandard = !row.vendor || row.vendor === 'Standard'
@@ -878,9 +885,14 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
                     <td className="py-1.5 pr-2">
                       <select
                         className="input text-sm py-1 w-full"
-                        value={selType?.value ?? row.type}
+                        value={row.type ? (selType?.value ?? row.type) : ''}
                         onChange={e => plantUpdate(setRows, defaultsMap, i, 'type', e.target.value)}
                       >
+                        {!row.type && <option value="">Select plant</option>}
+                        {row.type &&
+                          !typeOpts.some(o => o.value === row.type || o.dbName === row.type) && (
+                            <option value={row.type}>{row.type}</option>
+                          )}
                         {typeOpts.map(o => (
                           <option key={o.value} value={o.value}>
                             {o.label}
@@ -959,8 +971,8 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
             setRows(rows => [
               ...rows,
               defaultsMap === SMALL_PLANT_DEFAULTS
-                ? newSmallRow('Flats of Groundcover', materialPrices, materialRows)
-                : newLargeRow('15 gallon standard', materialPrices, materialRows),
+                ? newSmallRow('', materialPrices, materialRows)
+                : newLargeRow('', materialPrices, materialRows),
             ])
           }
         >
@@ -1009,7 +1021,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
                 )
                 const selType =
                   typeOpts.find(o => o.value === row.type) ||
-                  typeOpts[0] || { value: row.type, label: row.type }
+                  { value: row.type, label: row.type }
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1.5 pr-2">
@@ -1028,9 +1040,13 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
                     <td className="py-1.5 pr-2">
                       <select
                         className="input text-sm py-1 w-full"
-                        value={selType?.value ?? row.type}
+                        value={row.type ? (selType?.value ?? row.type) : ''}
                         onChange={e => addonUpdate(i, 'type', e.target.value)}
                       >
+                        {!row.type && <option value="">Select add-on</option>}
+                        {row.type && !typeOpts.some(o => o.value === row.type) && (
+                          <option value={row.type}>{row.type}</option>
+                        )}
                         {typeOpts.map(o => (
                           <option key={o.value} value={o.value}>
                             {o.label}

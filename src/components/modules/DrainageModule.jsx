@@ -450,10 +450,10 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
 
 // ── Default blank rows ─────────────────────────────────────────────────────────
 const DEFAULT_TRENCH_ROWS = [{ equipment: 'Hand', lf: '', width: '', depth: '' }]
-const DEFAULT_PIPE_ROWS = [{ type: '3" SDR 35', lf: '', vendor: 'auto' }]
-const DEFAULT_FIXTURE_ROWS = [{ type: '3" Area Drain', qty: '', vendor: 'auto' }]
+const DEFAULT_PIPE_ROWS = [{ type: '', lf: '', vendor: 'auto' }]
+const DEFAULT_FIXTURE_ROWS = [{ type: '', qty: '', vendor: 'auto' }]
 const DEFAULT_FRENCH_ROWS = [
-  { type: '4" Perforated', lf: '', vendor: 'auto' },
+  { type: '', lf: '', vendor: 'auto' },
 ]
 const DEFAULT_ADDITIONAL = {
   sumpPumpQty: '',
@@ -1127,10 +1127,13 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                     <td className="py-1 pr-2">
                       <select
                         className="input text-sm py-1 w-full min-w-0"
-                        value={row.type}
+                        value={row.type || ''}
                         onChange={e => updateSubFixture(i, 'type', e.target.value)}
                       >
-                        <option value="">-- Select --</option>
+                        {!row.type && <option value="">Select fixture</option>}
+                        {row.type && !Object.keys(FIX_T).includes(row.type) && (
+                          <option value={row.type}>{row.type}</option>
+                        )}
                         {Object.keys(FIX_T).map(t => (
                           <option key={t}>{t}</option>
                         ))}
@@ -1151,7 +1154,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
             <button
               type="button"
               className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
-              onClick={() => setSubFixtureRows(r => [...r, { type: '3" Area Drain', qty: '' }])}
+              onClick={() => setSubFixtureRows(r => [...r, { type: '', qty: '' }])}
             >
               + Add fixture
             </button>
@@ -1356,17 +1359,28 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                       <div className="flex items-center gap-1">
                         <select
                           className="input text-sm py-1 flex-1 min-w-0"
-                          value={row.type}
+                          value={row.type || ''}
                           onChange={e => updatePipe(i, 'type', e.target.value)}
                         >
-                          {drainTypeOptions(
-                            DRAIN_CAT.pipe,
-                            PIPE_TYPES,
-                            materialRows,
-                            effVendor(DRAIN_CAT.pipe, row.vendor)
-                          ).map(t => (
-                            <option key={t}>{t}</option>
-                          ))}
+                          {(() => {
+                            const pipeOpts = drainTypeOptions(
+                              DRAIN_CAT.pipe,
+                              PIPE_TYPES,
+                              materialRows,
+                              effVendor(DRAIN_CAT.pipe, row.vendor)
+                            )
+                            return (
+                              <>
+                                {!row.type && <option value="">Select pipe</option>}
+                                {row.type && !pipeOpts.includes(row.type) && (
+                                  <option value={row.type}>{row.type}</option>
+                                )}
+                                {pipeOpts.map(t => (
+                                  <option key={t}>{t}</option>
+                                ))}
+                              </>
+                            )
+                          })()}
                         </select>
                       </div>
                     </td>
@@ -1389,7 +1403,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           <button
             type="button"
             onClick={() =>
-              setPipeRows(rows => [...rows, { type: '3" SDR 35', lf: '', vendor: 'auto' }])
+              setPipeRows(rows => [...rows, { type: '', lf: '', vendor: 'auto' }])
             }
             className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
           >
@@ -1452,9 +1466,13 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                       <div className="flex items-center gap-1">
                         <select
                           className="input text-sm py-1 flex-1 min-w-0"
-                          value={row.type}
+                          value={row.type || ''}
                           onChange={e => updateFrench(i, 'type', e.target.value)}
                         >
+                          {!row.type && <option value="">Select pipe</option>}
+                          {row.type && !Object.keys(FRENCH_PIPE_TYPES).includes(row.type) && (
+                            <option value={row.type}>{row.type}</option>
+                          )}
                           {Object.keys(FRENCH_PIPE_TYPES).map(t => (
                             <option key={t}>{t}</option>
                           ))}
@@ -1480,7 +1498,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           <button
             type="button"
             onClick={() =>
-              setFrenchRows(rows => [...rows, { type: '4" Perforated', lf: '', vendor: 'auto' }])
+              setFrenchRows(rows => [...rows, { type: '', lf: '', vendor: 'auto' }])
             }
             className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
           >
@@ -1574,18 +1592,28 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                       <div className="flex items-center gap-1">
                         <select
                           className="input text-sm py-1 flex-1 min-w-0"
-                          value={row.type}
+                          value={row.type || ''}
                           onChange={e => updateFixture(i, 'type', e.target.value)}
                         >
-                          <option value="">-- Select --</option>
-                          {drainTypeOptions(
-                            DRAIN_CAT.fixture,
-                            FIXTURE_TYPES,
-                            materialRows,
-                            effVendor(DRAIN_CAT.fixture, row.vendor)
-                          ).map(t => (
-                            <option key={t}>{t}</option>
-                          ))}
+                          {(() => {
+                            const fixOpts = drainTypeOptions(
+                              DRAIN_CAT.fixture,
+                              FIXTURE_TYPES,
+                              materialRows,
+                              effVendor(DRAIN_CAT.fixture, row.vendor)
+                            )
+                            return (
+                              <>
+                                {!row.type && <option value="">Select fixture</option>}
+                                {row.type && !fixOpts.includes(row.type) && (
+                                  <option value={row.type}>{row.type}</option>
+                                )}
+                                {fixOpts.map(t => (
+                                  <option key={t}>{t}</option>
+                                ))}
+                              </>
+                            )
+                          })()}
                         </select>
                       </div>
                     </td>
@@ -1608,7 +1636,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           <button
             type="button"
             onClick={() =>
-              setFixtureRows(rows => [...rows, { type: '3" Area Drain', qty: '', vendor: 'auto' }])
+              setFixtureRows(rows => [...rows, { type: '', qty: '', vendor: 'auto' }])
             }
             className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
           >

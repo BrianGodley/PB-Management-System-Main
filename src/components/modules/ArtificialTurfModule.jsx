@@ -239,6 +239,9 @@ function calcTurf(
   const gravelBaseTonsDivisor = mp['Turf - Gravel Base Tons Divisor'] ?? 200
   const weedFabricSFPerRoll = mp['Turf - Weed Fabric SF per Roll'] ?? 1800
   const baseCalc = (state.baseRows || []).map(row => {
+    // Unselected base material contributes nothing (no crash, no fallback-to-first).
+    if (!row.material)
+      return { material: '', label: '', qtyUnit: '', sf: n(row.sf), qty: 0, hrs: 0, mat: 0, price: 0 }
     // Vendor-first Type resolution (mirrors UtilitiesModule): the picker lists the
     // selected vendor's 'Turf Base' catalog Items; map the stored selection back to
     // its built-in so labor/qty coefficients keep working. Backward-compat: old
@@ -252,7 +255,7 @@ function calcTurf(
           o.key === row.material ||
           o.dbName === row.material ||
           o.label === row.material
-      ) || baseOpts[0]
+      ) || null
     const def = BASE_MATERIALS.find(m => m.key === (opt?.key ?? row.material)) || BASE_MATERIALS[0]
     const sf = n(row.sf) || turfAreaSF
     // Material price from the chosen catalog Item, vendor-aware (matched by the
@@ -311,6 +314,10 @@ function calcTurf(
     subTurfCost = 0
 
   const rollCalc = state.rolls.map(roll => {
+    // Unselected turf roll (no brand) contributes nothing — no labor, no material,
+    // and its edge LF is excluded from cut/seam totals (no crash, no fallback).
+    if (!roll.brand)
+      return { edgeLF: n(roll.edgeLF), installSF: n(roll.installSF), sf: 0, brand: '', pricePerSF: 0, hrs: 0, mat: 0, rowSubCost: 0 }
     const edgeLF = n(roll.edgeLF)
     const installSF = n(roll.installSF)
     const brandRow = turfBrandRow(materialRows, roll.vendor, roll.brand)
@@ -338,12 +345,14 @@ function calcTurf(
   const stripsBrandRow = turfBrandRow(materialRows, state.strips?.vendor, state.strips?.brand)
   const stripsPrice = n(stripsBrandRow?.unit_cost)
   const stripsSF = stripsLF * (stripsWidthIn / 12)
+  // Unselected strips (no brand) contribute nothing (no crash, no fallback).
+  const hasStrips = !!(state.strips && state.strips.brand)
   // Labor rate is DB-editable (LF/hr). Legacy (LF/100)*8 == LF/12.5.
   const stripLFHr = n(lr['Turf - Strip Install LF/hr']) || RATE_DEFAULTS.stripLFHr
-  const stripsHrs = !isSub && stripsLF > 0 && stripLFHr > 0 ? stripsLF / stripLFHr : 0
-  const stripsMat = isSub ? 0 : stripsPrice * stripsSF
+  const stripsHrs = hasStrips && !isSub && stripsLF > 0 && stripLFHr > 0 ? stripsLF / stripLFHr : 0
+  const stripsMat = hasStrips && !isSub ? stripsPrice * stripsSF : 0
   // Sub strips: flat $/LF sub install + brand material $/SF.
-  const subStripsCost = stripsLF * subStripPerLF + stripsPrice * stripsSF
+  const subStripsCost = hasStrips ? stripsLF * subStripPerLF + stripsPrice * stripsSF : 0
 
   // ── Cut, Staple & Seam ────────────────────────────────────────────────────
   // hrs = (totalLF / TurfCutSfHr) * TurfCutRate = (totalLF/100)*1.0
@@ -464,17 +473,17 @@ const DEFAULT_STATE = {
     lawn: { sf: '', inches: '4', method: 'Skid Steer Good' },
   },
   baseRows: [
-    { material: 'Gravel', sf: '', vendor: 'Standard' },
-    { material: 'DG', sf: '', vendor: 'Standard' },
-    { material: 'Weed', sf: '', vendor: 'Standard' },
+    { material: '', sf: '', vendor: 'Standard' },
+    { material: '', sf: '', vendor: 'Standard' },
+    { material: '', sf: '', vendor: 'Standard' },
   ],
   useZeoFill: false,
   rolls: [
-    { brand: 'Socal Blen Supreme 80', edgeLF: '', vendor: 'Standard' },
-    { brand: 'Socal Blen Supreme 80', edgeLF: '', vendor: 'Standard' },
-    { brand: 'Socal Blen Supreme 80', edgeLF: '', vendor: 'Standard' },
+    { brand: '', edgeLF: '', vendor: 'Standard' },
+    { brand: '', edgeLF: '', vendor: 'Standard' },
+    { brand: '', edgeLF: '', vendor: 'Standard' },
   ],
-  strips: { lf: '', widthIn: '12', brand: 'Socal Blen Supreme 80', vendor: 'Standard' },
+  strips: { lf: '', widthIn: '12', brand: '', vendor: 'Standard' },
   manualRows: [
     { label: '', hours: '', materials: '', subCost: '' },
     { label: '', hours: '', materials: '', subCost: '' },
@@ -526,13 +535,19 @@ function Inp({ value, onChange, placeholder = '0', type = 'number', step, classN
     />
   )
 }
-function Sel({ value, onChange, options, optionLabels }) {
+function Sel({ value, onChange, options, optionLabels, placeholder }) {
+  // When `placeholder` is provided, an unset value shows the placeholder (empty
+  // option) and a stored value not in `options` stays selectable (backward-compat).
+  const hasVal = value !== '' && value != null
+  const known = options.includes(value)
   return (
     <select
-      value={value}
+      value={hasVal ? value : ''}
       onChange={onChange}
       className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
     >
+      {placeholder && !hasVal && <option value="">{placeholder}</option>}
+      {placeholder && hasVal && !known && <option value={value}>{value}</option>}
       {options.map((o, i) => (
         <option key={o} value={o}>
           {optionLabels ? optionLabels[i] : o}
@@ -773,7 +788,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           ...p,
           [k]: {
             ...cur,
-            baseRows: [...(cur.baseRows || []), { material: 'Gravel', sf: '', vendor: 'Standard' }],
+            baseRows: [...(cur.baseRows || []), { material: '', sf: '', vendor: 'Standard' }],
           },
         }
       }),
@@ -1242,7 +1257,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                     o.key === row.material ||
                     o.dbName === row.material ||
                     o.label === row.material
-                ) || baseOpts[0]
+                ) || null
               const def = BASE_MATERIALS.find(m => m.key === (selOpt?.key ?? row.material)) || BASE_MATERIALS[0]
               const bc = calc.baseCalc?.[i] || {}
               const unitLabel = def.qtyUnit === 'roll' ? 'roll' : 'ton'
@@ -1269,10 +1284,19 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                     <div className="flex items-center gap-1">
                       <select
                         className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
-                        value={selOpt?.value ?? row.material}
+                        value={row.material ? (selOpt?.value ?? row.material) : ''}
                         onChange={e => setBaseRow(i, 'material', e.target.value)}
                         title="Material"
                       >
+                        {!row.material && <option value="">Select material</option>}
+                        {row.material &&
+                          !baseOpts.some(
+                            o =>
+                              o.value === row.material ||
+                              o.key === row.material ||
+                              o.dbName === row.material ||
+                              o.label === row.material
+                          ) && <option value={row.material}>{row.material}</option>}
                         {baseOpts.map(o => (
                           <option key={o.dbName || o.value} value={o.value}>
                             {o.label}
@@ -1417,10 +1441,11 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                   </td>
                   <td className={td}>
                     <Sel
-                      value={brandRow?.id || roll.brand}
+                      value={brandRow?.id || roll.brand || ''}
                       onChange={e => setRoll(i, 'brand', e.target.value)}
                       options={rollBrandOpts.map(o => o.id)}
                       optionLabels={rollBrandOpts.map(o => o.label)}
+                      placeholder="Select turf"
                     />
                   </td>
                   {calc.isSub ? (
@@ -1546,8 +1571,9 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
               </td>
               <td className={td}>
                 <Sel
-                  value={turfBrandRow(materialRows, T.strips?.vendor, T.strips?.brand)?.id || T.strips?.brand || stripsBrandOpts[0]?.id}
+                  value={turfBrandRow(materialRows, T.strips?.vendor, T.strips?.brand)?.id || T.strips?.brand || ''}
                   onChange={e => setStrips('brand', e.target.value)}
+                  placeholder="Select turf"
                   options={stripsBrandOpts.map(o => o.id)}
                   optionLabels={stripsBrandOpts.map(o => o.label)}
                 />

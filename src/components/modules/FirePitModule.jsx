@@ -110,7 +110,7 @@ const WF_META = {
   'Real Stone': { key: 'realStone', labKey: 'realStoneLab', unit: 'ton', tonPerSF: 70, labMode: 'perSF', delivPerTon: 180, addPerSF: 1 },
 }
 const WF_LIST = Object.keys(WF_META)
-const WF_ROW = () => ({ vendor: 'Standard', type: 'Tile', sf: '' })
+const WF_ROW = () => ({ vendor: 'Standard', type: '', sf: '' })
 
 // ── Wall cap catalog ──────────────────────────────────────────────────────────
 // Caps are measured in LINEAR FEET. Each Type resolves a $/LF master material
@@ -123,7 +123,7 @@ const CAP_META = {
   'Bullnose Brick': { matKey: 'capBullnose', labKey: 'capBullnoseLab' },
 }
 const CAP_LIST = Object.keys(CAP_META)
-const CAP_ROW = () => ({ vendor: 'Standard', type: 'Flagstone', lf: '' })
+const CAP_ROW = () => ({ vendor: 'Standard', type: '', lf: '' })
 
 // ── Master-list finish/cap support ───────────────────────────────────────────
 // A material_rates row tagged sub_category=cat (Unspecified) becomes a selectable
@@ -245,8 +245,8 @@ function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
   const matOpt = { label: builtIn?.label, dbName: matDbName, fallback: matFallback }
   return { opts: merged, matOpt, matCost, laborVal, laborBuiltIn: builtIn }
 }
-const EP_LINE_ROW = () => ({ type: '1-1/2" Poly Gas Pipe', lf: '', vendor: 'Standard' })
-const EP_GAS_ROW = () => ({ type: '12" Single Gas Ring', qty: '', vendor: 'Standard' })
+const EP_LINE_ROW = () => ({ type: '', lf: '', vendor: 'Standard' })
+const EP_GAS_ROW = () => ({ type: '', qty: '', vendor: 'Standard' })
 
 // Reusable Electrical & Plumbing table (Gas Line / Gas Fixtures).
 function EpTable({
@@ -320,9 +320,13 @@ function EpTable({
                     <div className="flex items-center gap-1">
                       <select
                         className="input text-sm py-1 flex-1 min-w-0"
-                        value={matOpt?.label}
+                        value={row.type || ''}
                         onChange={e => upd(i, 'type', e.target.value)}
                       >
+                        {!row.type && <option value="">Select type</option>}
+                        {row.type && !opts.some(o => o.label === row.type) && (
+                          <option value={row.type}>{row.type}</option>
+                        )}
                         {opts.map(o => (
                           <option key={o.label} value={o.label}>
                             {o.label}
@@ -467,6 +471,7 @@ function calcFirePit(
   let epHrs = 0
   let epMat = 0
   ;(epLineRows || []).forEach(r => {
+    if (!r.type) return
     const lf = n(r.lf)
     if (lf <= 0) return
     const { matCost, laborVal } = resolveUtilRow(UTIL_CAT.line, r, LINE_TYPE_ARR, materialRows, mp)
@@ -475,6 +480,7 @@ function calcFirePit(
     epHrs += (lf * GAS_TRENCH_CF_PER_LF * gasTrenchMinsPerCF) / 60 // 6"×24" trenching
   })
   ;(epGasRows || []).forEach(r => {
+    if (!r.type) return
     const qty = n(r.qty)
     if (qty <= 0) return
     const { matCost, laborVal } = resolveUtilRow(UTIL_CAT.gas, r, GAS_TYPE_ARR, materialRows, mp)
@@ -1371,14 +1377,25 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                       <span className="flex items-center gap-1">
                         <select
                           className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white flex-1 min-w-0"
-                          value={row.type}
+                          value={row.type || ''}
                           onChange={e => setCapRow(i, 'type', e.target.value)}
                         >
-                          {masterWallOptions(CAP_CAT, CAP_LIST, materialRows, null, row.vendor).map(t => (
-                            <option key={t} value={t}>
-                              {t}
-                            </option>
-                          ))}
+                          {(() => {
+                            const capOpts = masterWallOptions(CAP_CAT, CAP_LIST, materialRows, null, row.vendor)
+                            return (
+                              <>
+                                {!row.type && <option value="">Select cap</option>}
+                                {row.type && !capOpts.includes(row.type) && (
+                                  <option value={row.type}>{row.type}</option>
+                                )}
+                                {capOpts.map(t => (
+                                  <option key={t} value={t}>
+                                    {t}
+                                  </option>
+                                ))}
+                              </>
+                            )
+                          })()}
                         </select>
                       </span>
                     </td>
@@ -1505,9 +1522,13 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                       <span className="flex items-center gap-1">
                         <select
                           className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white flex-1 min-w-0"
-                          value={row.type}
+                          value={row.type || ''}
                           onChange={e => setWallFinishRow(i, 'type', e.target.value)}
                         >
+                          {!row.type && <option value="">Select material</option>}
+                          {row.type && !masterWallOptions(WF_CAT, WF_LIST, materialRows, 'Fire Pit', row.vendor).includes(row.type) && (
+                            <option value={row.type}>{row.type}</option>
+                          )}
                           {masterWallOptions(WF_CAT, WF_LIST, materialRows, 'Fire Pit', row.vendor).map(t => (
                             <option key={t} value={t}>
                               {t}

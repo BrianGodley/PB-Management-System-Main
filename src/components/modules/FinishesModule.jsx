@@ -517,13 +517,13 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
 }
 
 // ── Default rows / factories ──────────────────────────────────────────────────
-const blankFlatRow = () => ({ vendor: 'Standard', type: 'Tile', sf: '', rateIn: '', subEach: '' })
-const blankCapRow = () => ({ vendor: 'Standard', type: 'None', widthIn: '', lf: '', qty: '', subEach: '' })
-const blankWallRow = () => ({ vendor: 'Standard', type: 'Sand Stucco', sf: '', rateIn: '', subEach: '' })
+const blankFlatRow = () => ({ vendor: 'Standard', type: '', sf: '', rateIn: '', subEach: '' })
+const blankCapRow = () => ({ vendor: 'Standard', type: '', widthIn: '', lf: '', qty: '', subEach: '' })
+const blankWallRow = () => ({ vendor: 'Standard', type: '', sf: '', rateIn: '', subEach: '' })
 
-const DEFAULT_FLAT_ROWS = () => [blankFlatRow(), { ...blankFlatRow(), type: 'Flagstone' }]
+const DEFAULT_FLAT_ROWS = () => [blankFlatRow(), blankFlatRow()]
 const DEFAULT_CAP_ROWS = () => [blankCapRow(), blankCapRow()]
-const DEFAULT_WALL_ROWS = () => [blankWallRow(), { ...blankWallRow(), type: 'Ledgerstone' }]
+const DEFAULT_WALL_ROWS = () => [blankWallRow(), blankWallRow()]
 
 const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 1', hours: '', materials: '', subCost: '' },
@@ -753,7 +753,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
   }
 
   // ── SF-based section renderer (Flatwork + Wall Finishes) ───────────────────
-  function renderSfSection(title, rows, setRows, TYPES, META, compute, blank, subcat, itemByType) {
+  function renderSfSection(title, rows, setRows, TYPES, META, compute, blank, subcat, itemByType, placeholder = 'Select material') {
     return (
       <div>
         <SectionHeader title={title} />
@@ -781,7 +781,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
                 // Items intersected with this picker's set. Keep the stored type
                 // visible even if the vendor doesn't carry it (round-trips row.type).
                 const typeOpts = finishTypeOptions(materialRows, subcat, TYPES, itemByType, row.vendor)
-                if (!typeOpts.some(o => o.value === row.type))
+                if (row.type && !typeOpts.some(o => o.value === row.type))
                   typeOpts.unshift({ value: row.type, label: row.type })
                 return (
                   <tr key={i} className="border-b border-gray-100">
@@ -803,11 +803,12 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
                     <td className="py-1.5 pr-2">
                       <select
                         className="input text-sm py-1 w-full"
-                        value={row.type}
+                        value={row.type || ''}
                         onChange={e =>
                           patchRow(setRows, i, { type: e.target.value }, compute, true)
                         }
                       >
+                        {!row.type && <option value="">{placeholder}</option>}
                         {typeOpts.map(o => (
                           <option key={o.value} value={o.value}>
                             {o.label}
@@ -903,7 +904,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
               {capRows.map((row, i) => {
                 const c = computeCapRow(row, materialPrices, materialRows)
                 const meta = CAP_META[row.type] || {}
-                const isActive = row.type !== 'None'
+                const isActive = !!row.type && row.type !== 'None'
                 // Vendor-first Type list. Standard → CAP_TYPES; a real vendor → its
                 // 'Cap' catalog Items (Flagstone/Precast/Bullnose Brick) intersected
                 // with CAP_TYPES, PLUS the always-available built-ins None + PIP
@@ -916,7 +917,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
                   row.vendor,
                   ['None', 'PIP Concrete']
                 )
-                if (!typeOpts.some(o => o.value === row.type))
+                if (row.type && !typeOpts.some(o => o.value === row.type))
                   typeOpts.unshift({ value: row.type, label: row.type })
                 return (
                   <tr key={i} className="border-b border-gray-100">
@@ -938,11 +939,12 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
                     <td className="py-1.5 pr-2">
                       <select
                         className="input text-sm py-1 w-full"
-                        value={row.type}
+                        value={row.type || ''}
                         onChange={e =>
                           patchRow(setCapRows, i, { type: e.target.value }, computeCapRow, true)
                         }
                       >
+                        {!row.type && <option value="">Select cap</option>}
                         {typeOpts.map(o => (
                           <option key={o.value} value={o.value}>
                             {o.label}
@@ -1220,7 +1222,8 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
         computeFlatRow,
         blankFlatRow,
         FINISH_SUBCAT.flat,
-        FLAT_ITEM_BY_TYPE
+        FLAT_ITEM_BY_TYPE,
+        'Select material'
       )}
 
       {/* ── Wall Caps ── */}
@@ -1236,7 +1239,8 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
         computeWallRow,
         blankWallRow,
         FINISH_SUBCAT.wall,
-        WALL_ITEM_BY_TYPE
+        WALL_ITEM_BY_TYPE,
+        'Select finish'
       )}
 
       {/* ── Manual Entry ── */}

@@ -257,7 +257,8 @@ function calcConcrete(
     const rate = lr[BASE_METHOD_LABOR_NAME[r.method]] ?? BASE_RATES[r.method] ?? 10.0
     const hrs = tons / rate
     const bt = rowOpt('Concrete Base', r, BASE_TYPES)
-    const mat = tons * (mr[bt.dbName] ?? bt.fallback)
+    // Empty material picker → no material cost (labor still driven by method).
+    const mat = r.type ? tons * (mr[bt.dbName] ?? bt.fallback) : 0
     baseHrsTot += hrs
     baseMatTot += mat
     return { tons, hrs, mat, rate }
@@ -293,6 +294,8 @@ function calcConcrete(
     const d = n(installTierDepth[t.key]) || depthIn
     const tierCY = ((d / 12) * sf) / 27
     concreteCY += tierCY
+    // Empty mix picker → no concrete material cost for this tier.
+    if (!installTierType[t.key]) return s
     const mt = rowOpt(
       'Concrete Mix',
       { vendor: installTierVendor[t.key], type: installTierType[t.key] },
@@ -522,9 +525,9 @@ function NumInput({ value, onChange, placeholder = '0', className = '', step = '
 // ── Default state ─────────────────────────────────────────────────────────────
 
 const DEFAULT_BASE_ROWS = [
-  { label: 'Area 1', method: 'Skid Steer Good', sf: '', depth: '2', vendor: 'auto', type: 'Import Base' },
-  { label: 'Area 2', method: 'Skid Steer Good', sf: '', depth: '2', vendor: 'auto', type: 'Import Base' },
-  { label: 'Area 3', method: 'Skid Steer Good', sf: '', depth: '2', vendor: 'auto', type: 'Import Base' },
+  { label: 'Area 1', method: 'Skid Steer Good', sf: '', depth: '2', vendor: 'auto', type: '' },
+  { label: 'Area 2', method: 'Skid Steer Good', sf: '', depth: '2', vendor: 'auto', type: '' },
+  { label: 'Area 3', method: 'Skid Steer Good', sf: '', depth: '2', vendor: 'auto', type: '' },
 ]
 
 const DEFAULT_MANUAL_ROWS = [
@@ -1505,7 +1508,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 const baseRate = materialRates[bt.dbName] ?? bt.fallback
                 const c = {
                   hrs: _tons > 0 ? _tons / methodRate : 0,
-                  mat: _tons * baseRate,
+                  mat: row.type ? _tons * baseRate : 0,
                 }
                 return (
                   <tr key={i} className="border-b border-gray-100">
@@ -1528,9 +1531,13 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                       <div className="flex items-center gap-1">
                         <select
                           className="input text-sm py-1 min-w-0"
-                          value={bt.label}
+                          value={row.type || ''}
                           onChange={e => updateBaseRow(i, 'type', e.target.value)}
                         >
+                          {!row.type && <option value="">Select material</option>}
+                          {row.type && !baseOpts.some(o => o.label === row.type) && (
+                            <option value={row.type}>{row.type}</option>
+                          )}
                           {baseOpts.map(o => (
                             <option key={o.label} value={o.label}>
                               {o.label}
@@ -1636,12 +1643,16 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                       </select>
                       <select
                         className="input text-xs py-1 w-full"
-                        value={mt.label}
+                        value={installTierType[t.key] || ''}
                         onChange={e =>
                           setInstallTierType({ ...installTierType, [t.key]: e.target.value })
                         }
                         title="Mix type"
                       >
+                        {!installTierType[t.key] && <option value="">Select mix</option>}
+                        {installTierType[t.key] && !mixOpts.some(o => o.label === installTierType[t.key]) && (
+                          <option value={installTierType[t.key]}>{installTierType[t.key]}</option>
+                        )}
                         {mixOpts.map(o => (
                           <option key={o.label} value={o.label}>
                             {o.label}

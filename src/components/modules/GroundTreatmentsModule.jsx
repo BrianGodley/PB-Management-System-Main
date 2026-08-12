@@ -344,6 +344,7 @@ function calcGroundTreatments(
     let anyMulch = false
     ;(mulchRows || []).forEach(r => {
       if (!(n(r.sf) > 0)) return
+      if (!r.type) return
       anyMulch = true
       const CY = (n(r.sf) * (n(r.depth) / 12)) / 27
       const mt = rowOpt('Mulch', r, [])
@@ -425,6 +426,7 @@ function calcGroundTreatments(
   let soilsLab = 0
   ;(soilsRows || []).forEach(r => {
     if (!n(r.sf)) return
+    if (!r.type) return
     const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
     const st = rowOpt('Soils', r, [])
     soilsMat += CY * st.fallback
@@ -485,6 +487,7 @@ function calcGroundTreatments(
     const dgMachineRate = p(GT_RATES.dgMachineLab.dbName, GT_RATES.dgMachineLab.fallback)
     ;(dgRows || []).forEach(r => {
       if (!(n(r.sf) > 0)) return
+      if (!r.type) return
       const tons = (n(r.sf) * n(r.depth)) / dgTonsDenom
       const cement = r.cement === 'Yes'
       const dgt = rowOpt('DG', r, [])
@@ -511,6 +514,7 @@ function calcGroundTreatments(
     gravelMat = 0
   gravelRows.forEach(r => {
     if (!n(r.sf)) return
+    if (!r.type) return
     const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
     const machineRate = p(GT_RATES.gravelMachineLab.dbName, GT_RATES.gravelMachineLab.fallback)
     const handRate = p(GT_RATES.gravelHandLab.dbName, GT_RATES.gravelHandLab.fallback)
@@ -536,6 +540,7 @@ function calcGroundTreatments(
     pebbleMat = 0
   ;(pebbleRows || []).forEach(r => {
     if (!n(r.sf)) return
+    if (!r.type) return
     const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
     const machineRate = p(GT_RATES.gravelMachineLab.dbName, GT_RATES.gravelMachineLab.fallback)
     const handRate = p(GT_RATES.gravelHandLab.dbName, GT_RATES.gravelHandLab.fallback)
@@ -559,6 +564,7 @@ function calcGroundTreatments(
     cobbleMat = 0
   ;(cobbleRows || []).forEach(r => {
     if (!n(r.sf)) return
+    if (!r.type) return
     const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
     const machineRate = p(GT_RATES.gravelMachineLab.dbName, GT_RATES.gravelMachineLab.fallback)
     const handRate = p(GT_RATES.gravelHandLab.dbName, GT_RATES.gravelHandLab.fallback)
@@ -749,28 +755,28 @@ function VendorPicker({ vendors = [], value = 'Standard', onChange, label = 'Ven
 }
 
 const DEFAULT_GRAVEL_ROWS = [
-  { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3', weedFabric: 'Yes', vendor: 'auto' },
-  { sf: '', method: 'Hand', type: 'Crushed Pea Gravel', depthIn: '3', weedFabric: 'Yes', vendor: 'auto' },
+  { sf: '', method: 'Hand', type: '', depthIn: '3', weedFabric: 'Yes', vendor: 'auto' },
+  { sf: '', method: 'Hand', type: '', depthIn: '3', weedFabric: 'Yes', vendor: 'auto' },
 ]
 const DEFAULT_SOILS_ROWS = [
-  { type: 'Topsoil (Sandy Loam)', sf: '', depthIn: '2', vendor: 'auto' },
-  { type: 'Topsoil (Sandy Loam)', sf: '', depthIn: '2', vendor: 'auto' },
+  { type: '', sf: '', depthIn: '2', vendor: 'auto' },
+  { type: '', sf: '', depthIn: '2', vendor: 'auto' },
 ]
 const DEFAULT_PEBBLE_ROWS = [
-  { sf: '', method: 'Hand', type: 'Arizona River Rock', depthIn: '3', weedFabric: 'Yes', vendor: 'auto' },
-  { sf: '', method: 'Hand', type: 'Arizona River Rock', depthIn: '3', weedFabric: 'Yes', vendor: 'auto' },
+  { sf: '', method: 'Hand', type: '', depthIn: '3', weedFabric: 'Yes', vendor: 'auto' },
+  { sf: '', method: 'Hand', type: '', depthIn: '3', weedFabric: 'Yes', vendor: 'auto' },
 ]
 const DEFAULT_COBBLE_ROWS = [
-  { sf: '', method: 'Hand', type: 'Granite River Rock', depthIn: '3', vendor: 'auto' },
-  { sf: '', method: 'Hand', type: 'Granite River Rock', depthIn: '3', vendor: 'auto' },
+  { sf: '', method: 'Hand', type: '', depthIn: '3', vendor: 'auto' },
+  { sf: '', method: 'Hand', type: '', depthIn: '3', vendor: 'auto' },
 ]
 const DEFAULT_MULCH_ROWS = [
-  { type: 'Premium Mulch', sf: '', depth: '2', weedFabric: 'No', vendor: 'auto' },
-  { type: 'Premium Mulch', sf: '', depth: '2', weedFabric: 'No', vendor: 'auto' },
+  { type: '', sf: '', depth: '2', weedFabric: 'No', vendor: 'auto' },
+  { type: '', sf: '', depth: '2', weedFabric: 'No', vendor: 'auto' },
 ]
 const DEFAULT_DG_ROWS = [
-  { type: 'Decomposed Granite', sf: '', depth: '3.5', weedFabric: 'No', method: 'Machine', cement: 'No', vendor: 'auto' },
-  { type: 'Decomposed Granite', sf: '', depth: '3.5', weedFabric: 'No', method: 'Machine', cement: 'No', vendor: 'auto' },
+  { type: '', sf: '', depth: '3.5', weedFabric: 'No', method: 'Machine', cement: 'No', vendor: 'auto' },
+  { type: '', sf: '', depth: '3.5', weedFabric: 'No', method: 'Machine', cement: 'No', vendor: 'auto' },
 ]
 const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 1', hours: '', materials: '', subCost: '' },
@@ -796,7 +802,7 @@ function makeTab(src = {}) {
               depth: src.mulchDepth || '2',
               weedFabric: src.mulchWeedFabric || 'No',
             },
-            { type: 'Premium Mulch', sf: '', depth: '2', weedFabric: 'No' },
+            { type: '', sf: '', depth: '2', weedFabric: 'No' },
           ]
         : DEFAULT_MULCH_ROWS.map(r => ({ ...r }))),
     plasticEdgingLF: src.plasticEdgingLF ?? '',
@@ -836,7 +842,7 @@ function makeTab(src = {}) {
               method: src.dgMethod || 'Machine',
               cement: src.dgCement || 'No',
             },
-            { type: 'Decomposed Granite', sf: '', depth: '3.5', weedFabric: 'No', method: 'Machine', cement: 'No' },
+            { type: '', sf: '', depth: '3.5', weedFabric: 'No', method: 'Machine', cement: 'No' },
           ]
         : DEFAULT_DG_ROWS.map(r => ({ ...r }))),
     gravelRows: src.gravelRows ?? DEFAULT_GRAVEL_ROWS.map(r => ({ ...r })),
@@ -1692,11 +1698,15 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <div key={i} className="flex items-center gap-2 mb-1">
                       <select
                         className="input text-sm py-1 flex-1 min-w-0"
-                        value={t?.label || ''}
+                        value={row.type || ''}
                         onChange={e =>
                           setRows(rs => rs.map((rr, idx) => (idx === i ? { ...rr, type: e.target.value } : rr)))
                         }
                       >
+                        {!row.type && <option value="">Select material</option>}
+                        {row.type && !opts.some(o => o.label === row.type) && (
+                          <option value={row.type}>{row.type}</option>
+                        )}
                         {opts.map(o => (
                           <option key={o.label} value={o.label}>
                             {o.label}
@@ -1907,9 +1917,13 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.type || rowOpts[0]?.label}
+                        value={row.type || ''}
                         onChange={e => updateSoils(i, 'type', e.target.value)}
                       >
+                        {!row.type && <option value="">Select material</option>}
+                        {row.type && !rowOpts.some(o => o.label === row.type) && (
+                          <option value={row.type}>{row.type}</option>
+                        )}
                         {rowOpts.map(t => (
                           <option key={t.label} value={t.label}>
                             {t.label}
@@ -1959,7 +1973,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             onClick={() =>
               setSoilsRows(r => [
                 ...r,
-                { type: SOIL_TYPES[0]?.label ?? 'Topsoil (Sandy Loam)', sf: '', depthIn: '2', vendor: defaultVendorFor('Soils') },
+                { type: '', sf: '', depthIn: '2', vendor: defaultVendorFor('Soils') },
               ])
             }
           >
@@ -2151,9 +2165,13 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.type || rowOpts[0]?.label}
+                        value={row.type || ''}
                         onChange={e => updateMulch(i, 'type', e.target.value)}
                       >
+                        {!row.type && <option value="">Select material</option>}
+                        {row.type && !rowOpts.some(o => o.label === row.type) && (
+                          <option value={row.type}>{row.type}</option>
+                        )}
                         {rowOpts.map(t => (
                           <option key={t.label} value={t.label}>
                             {t.label}
@@ -2214,7 +2232,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             onClick={() =>
               setMulchRows(r => [
                 ...r,
-                { type: MULCH_TYPES[0]?.label ?? 'Premium Mulch', sf: '', depth: '2', weedFabric: 'No', vendor: defaultVendorFor('Mulch') },
+                { type: '', sf: '', depth: '2', weedFabric: 'No', vendor: defaultVendorFor('Mulch') },
               ])
             }
             className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
@@ -2293,9 +2311,13 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.type || rowOpts[0]?.label}
+                        value={row.type || ''}
                         onChange={e => updateDg(i, 'type', e.target.value)}
                       >
+                        {!row.type && <option value="">Select material</option>}
+                        {row.type && !rowOpts.some(o => o.label === row.type) && (
+                          <option value={row.type}>{row.type}</option>
+                        )}
                         {rowOpts.map(t => (
                           <option key={t.label} value={t.label}>
                             {t.label}
@@ -2369,7 +2391,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               setDgRows(r => [
                 ...r,
                 {
-                  type: DG_TYPES[0]?.label ?? 'Decomposed Granite',
+                  type: '',
                   sf: '',
                   depth: '3.5',
                   weedFabric: 'No',
@@ -2450,9 +2472,13 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.type || rowOpts[0]?.label}
+                        value={row.type || ''}
                         onChange={e => updateGravel(i, 'type', e.target.value)}
                       >
+                        {!row.type && <option value="">Select material</option>}
+                        {row.type && !rowOpts.some(o => o.label === row.type) && (
+                          <option value={row.type}>{row.type}</option>
+                        )}
                         {rowOpts.map(t => (
                           <option key={t.label} value={t.label}>
                             {t.label}
@@ -2520,7 +2546,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             onClick={() =>
               setGravelRows(r => [
                 ...r,
-                { sf: '', method: 'Hand', type: GRAVEL_TYPES[0]?.label ?? 'Crushed Pea Gravel', depthIn: '3', weedFabric: 'Yes', vendor: defaultVendorFor('Gravel') },
+                { sf: '', method: 'Hand', type: '', depthIn: '3', weedFabric: 'Yes', vendor: defaultVendorFor('Gravel') },
               ])
             }
           >
@@ -2530,7 +2556,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           {gravelRows.some(r => n(r.sf) > 0) && (
             <div className="mt-1 flex gap-4 flex-wrap">
               {gravelRows.map((row, i) => {
-                if (!n(row.sf)) return null
+                if (!n(row.sf) || !row.type) return null
                 const CY = (n(row.sf) * (n(row.depthIn) / 12)) / 27
                 const gtype = resolveType(row.type, sectionOptions('Gravel', row.vendor, []), [])
                 const mat =
@@ -2601,9 +2627,13 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.type || rowOpts[0]?.label}
+                        value={row.type || ''}
                         onChange={e => updatePebble(i, 'type', e.target.value)}
                       >
+                        {!row.type && <option value="">Select material</option>}
+                        {row.type && !rowOpts.some(o => o.label === row.type) && (
+                          <option value={row.type}>{row.type}</option>
+                        )}
                         {rowOpts.map(t => (
                           <option key={t.label} value={t.label}>
                             {t.label}
@@ -2659,7 +2689,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             onClick={() =>
               setPebbleRows(r => [
                 ...r,
-                { sf: '', method: 'Hand', type: PEBBLE_TYPES[0]?.label ?? 'Arizona River Rock', depthIn: '3', weedFabric: 'Yes', vendor: defaultVendorFor('Pebble') },
+                { sf: '', method: 'Hand', type: '', depthIn: '3', weedFabric: 'Yes', vendor: defaultVendorFor('Pebble') },
               ])
             }
           >
@@ -2669,7 +2699,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           {pebbleRows.some(r => n(r.sf) > 0) && (
             <div className="mt-1 flex gap-4 flex-wrap">
               {pebbleRows.map((row, i) => {
-                if (!n(row.sf)) return null
+                if (!n(row.sf) || !row.type) return null
                 const CY = (n(row.sf) * (n(row.depthIn) / 12)) / 27
                 const ptype = resolveType(row.type, sectionOptions('Pebble', row.vendor, []), [])
                 const mat =
@@ -2739,9 +2769,13 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.type || rowOpts[0]?.label}
+                        value={row.type || ''}
                         onChange={e => updateCobble(i, 'type', e.target.value)}
                       >
+                        {!row.type && <option value="">Select material</option>}
+                        {row.type && !rowOpts.some(o => o.label === row.type) && (
+                          <option value={row.type}>{row.type}</option>
+                        )}
                         {rowOpts.map(t => (
                           <option key={t.label} value={t.label}>
                             {t.label}
@@ -2786,7 +2820,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             onClick={() =>
               setCobbleRows(r => [
                 ...r,
-                { sf: '', method: 'Hand', type: COBBLE_TYPES[0]?.label ?? 'Granite River Rock', depthIn: '3', vendor: defaultVendorFor('Cobbles') },
+                { sf: '', method: 'Hand', type: '', depthIn: '3', vendor: defaultVendorFor('Cobbles') },
               ])
             }
           >
@@ -2796,7 +2830,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           {cobbleRows.some(r => n(r.sf) > 0) && (
             <div className="mt-1 flex gap-4 flex-wrap">
               {cobbleRows.map((row, i) => {
-                if (!n(row.sf)) return null
+                if (!n(row.sf) || !row.type) return null
                 const CY = (n(row.sf) * (n(row.depthIn) / 12)) / 27
                 const ctype = resolveType(row.type, sectionOptions('Cobbles', row.vendor, []), [])
                 const mat =

@@ -232,6 +232,8 @@ function calcColumns(
   let finishHrs = 0,
     finishMat = 0
   finishRows.forEach(r => {
+    // Unselected finish rows contribute nothing (empty default + placeholder).
+    if (!r.type) return
     // Vendor-first Type resolution (mirrors ArtificialTurfModule): the picker lists
     // the selected vendor's 'Column Finish' catalog Items; map the stored selection
     // back to its built-in FINISH_TYPES entry so the finish LABOR + ton/SF branch
@@ -347,10 +349,10 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
 const DEFAULT_FINISH_ROWS = [
-  { type: 'Sand Stucco', qty: '', vendor: 'Standard' },
-  { type: 'Sand Stucco', qty: '', vendor: 'Standard' },
-  { type: 'Ledgerstone Veneer Panels', qty: '', vendor: 'Standard' },
-  { type: 'Tile', qty: '', vendor: 'Standard' },
+  { type: '', qty: '', vendor: 'Standard' },
+  { type: '', qty: '', vendor: 'Standard' },
+  { type: '', qty: '', vendor: 'Standard' },
+  { type: '', qty: '', vendor: 'Standard' },
 ]
 const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 1', hours: '', materials: '', subCost: '' },
@@ -937,9 +939,13 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
                       <div className="flex items-center gap-1">
                         <select
                           className="input text-sm py-1 flex-1 min-w-0"
-                          value={row.type}
+                          value={row.type || ''}
                           onChange={e => updateFinish(i, 'type', e.target.value)}
                         >
+                          {!row.type && <option value="">Select finish</option>}
+                          {row.type && !finishOpts.some(o => o.value === row.type) && (
+                            <option value={row.type}>{row.type}</option>
+                          )}
                           {finishOpts.map(o => (
                             <option key={o.value} value={o.value}>
                               {o.label}
@@ -968,7 +974,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
           <button
             type="button"
             className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
-            onClick={() => setFinishRows(r => [...r, { type: 'Sand Stucco', qty: '', vendor: 'Standard' }])}
+            onClick={() => setFinishRows(r => [...r, { type: '', qty: '', vendor: 'Standard' }])}
           >
             + Add row
           </button>

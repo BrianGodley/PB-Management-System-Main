@@ -500,6 +500,12 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
   function renderSection(sec) {
     const { title, subcat, rows, setRows, isFixture, subText } = sec
     const vOpts = vendorSelectOptions()
+    const itemPlaceholder =
+      subcat === LIGHT_CAT.fixture
+        ? 'Select fixture'
+        : subcat === LIGHT_CAT.transformer
+          ? 'Select transformer'
+          : 'Select wire'
     return (
       <div>
         <SectionHeader title={title} sub={subText} />
@@ -521,7 +527,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
             <tbody>
               {rows.map((row, i) => {
                 const opts = lightingOptions(subcat, row.vendor, materialRows)
-                const selId = row.itemId || opts[0]?.id || ''
+                const selId = row.itemId || ''
                 const item = lightingItemFor(subcat, row.vendor, row.itemId, materialRows)
                 const qty = n(row.qty)
                 const watts = item ? qty * n(item.watts) : 0
@@ -560,6 +566,10 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
                         onChange={e => onItemChange(subcat, rows, setRows, i, row, e.target.value)}
                       >
                         {opts.length === 0 && <option value="">— No items —</option>}
+                        {opts.length > 0 && !row.itemId && <option value="">{itemPlaceholder}</option>}
+                        {row.itemId && !opts.some(o => o.id === row.itemId) && (
+                          <option value={row.itemId}>{item?.name || 'Saved item'}</option>
+                        )}
                         {opts.map(o => (
                           <option key={o.id} value={o.id}>
                             {o.label}
