@@ -527,7 +527,7 @@ function NumInput({ value, onChange, placeholder = '0', className = '', step = '
 // Start with ZERO seeded rows — the user adds rows via "+ Add row". Every added
 // row defaults vendor to '' (empty "Select vendor" placeholder → empty Type list
 // → $0 until a vendor is chosen).
-const DEFAULT_BASE_ROWS = []
+const DEFAULT_BASE_ROWS = [{ label: '', method: 'Skid Steer Good', sf: '', depth: '2', vendor: '', type: '' }]
 
 const DEFAULT_MANUAL_ROWS = []
 
@@ -1457,24 +1457,24 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
         </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm table-fixed">
-            {/* Sq Ft + Depth shrunk to ~1/4 of their natural share; the freed
+            {/* Sq Ft + Depth ~3× their prior shrunk width; the freed
                 space is absorbed by the widened Type column. */}
             <colgroup>
               <col />
-              <col className="w-[42%]" />
+              <col className="w-[28%]" />
               <col />
-              <col className="w-[4%]" />
-              <col className="w-[4%]" />
+              <col className="w-[12%]" />
+              <col className="w-[12%]" />
               <col />
             </colgroup>
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
-                <th className="text-left pb-1 pr-2 font-medium">Type</th>
-                <th className="text-left pb-1 pr-2 font-medium">Method</th>
-                <th className="text-left pb-1 pr-2 font-medium">Sq Ft</th>
-                <th className="text-left pb-1 pr-2 font-medium">Depth (in)</th>
-                <th className="text-right pb-1 font-medium text-gray-400">Hrs</th>
+                <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
+                <th className="text-center pb-1 pr-2 font-medium">Type</th>
+                <th className="text-center pb-1 pr-2 font-medium">Method</th>
+                <th className="text-center pb-1 pr-2 font-medium">Sq Ft</th>
+                <th className="text-center pb-1 pr-2 font-medium">Depth (in)</th>
+                <th className="text-center pb-1 font-medium text-gray-400">Hrs</th>
               </tr>
             </thead>
             <tbody>
