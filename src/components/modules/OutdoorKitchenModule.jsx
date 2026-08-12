@@ -833,7 +833,9 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
     ;(labRes.data || []).forEach(r => {
       prices[r.name] = parseFloat(r.rate) || 0
     })
-    setMaterialPrices(prices)
+    // A saved estimate may carry its own price snapshot; let those win over the
+    // fresh map, but always take the fresh catalog rows so new items appear.
+    setMaterialPrices(initialData?.materialPrices ? { ...prices, ...initialData.materialPrices } : prices)
     setMaterialRows(rows || [])
     setVendors(
       (venRes.data || []).map(v => ({
@@ -866,7 +868,8 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
           }
         })
     }
-    if (initialData?.materialPrices) return
+    // Always refresh the catalog on open (even when a price snapshot exists) so
+    // newly-added Master Rates items show up in older estimates' pickers.
     refreshAllRates().then(() => setPricesLoading(false))
   }, [refreshAllRates])
 
@@ -936,7 +939,10 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
     }
   }, [])
 
-  const state = { crewType, subType, subGpMarkupRate, ...cur, materialRows }
+  // NOTE: materialRows (the live catalog) is intentionally NOT persisted — it is
+  // reference data fetched fresh on open. Freezing it into the estimate made
+  // newly-added catalog items (e.g. appliances) invisible in older estimates.
+  const state = { crewType, subType, subGpMarkupRate, ...cur }
   const calcRaw = calcOutdoorKitchen(
     state,
     laborRatePerHour,
