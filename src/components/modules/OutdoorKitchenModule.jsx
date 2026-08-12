@@ -96,6 +96,52 @@ const EQUIP_ROW = () => ({ vendor: 'Standard', type: 'BBQ Grill', qty: '0', unit
 
 const n = v => parseFloat(v) || 0
 
+// ── Vendor-first Appliance Type picker ───────────────────────────────────────
+// Mirrors baseMatOptions (ArtificialTurf) / mergedUtilTypes (this file). The
+// dropdown shows the Items the ROW'S SELECTED VENDOR carries in Category
+// 'Outdoor Kitchen', Sub-category 'Appliance':
+//   Standard/unset/auto → the null-vendor (Standard-priced) catalog Appliance
+//     Items merged with the built-in APPLIANCE_TYPES (any built-in not already
+//     covered by a catalog Item is appended). When there are NO catalog Items
+//     yet (pre-seed), the built-in list stands alone so nothing breaks.
+//   a real vendor → ONLY that vendor's Appliance Items (built-ins fall away).
+// Each option's value is its label: a built-in generic prices off the master
+// `BBQ Equip - <type>` rate; a catalog Item prices off its own vendor-aware
+// unit price (see applianceUnitPrice).
+const OK_APPLIANCE_CAT = 'Appliance'
+const OK_APPLIANCE_CATEGORY = 'Outdoor Kitchen'
+function applianceTypeOptions(materialRows, vendorSel = 'Standard') {
+  const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
+  const catRows = catalogOptions(materialRows, OK_APPLIANCE_CAT, isStd ? 'Standard' : vendorSel, {
+    standardRows: 'null-vendor',
+    stripPrefix: true,
+    category: OK_APPLIANCE_CATEGORY,
+  })
+  const catOpts = catRows.map(o => ({ value: o.label, label: o.label, name: o.row.name, fromMaster: true }))
+  if (!isStd) return catOpts
+  const covered = new Set(catRows.map(o => o.label))
+  const builtInOpts = APPLIANCE_TYPES.filter(t => !covered.has(t)).map(t => ({ value: t, label: t, fromMaster: false }))
+  return catOpts.length ? [...catOpts, ...builtInOpts] : builtInOpts
+}
+// Vendor-aware unit material price for an Appliance row. A per-row $/ea override
+// wins; otherwise a selected catalog Appliance Item resolves its vendor-aware
+// price (Standard = the null-vendor price, a real vendor = that vendor's price);
+// a built-in generic type (no catalog Item) keeps the master `BBQ Equip - <type>`
+// rate. Backward-compatible: an old row storing an APPLIANCE_TYPES value resolves
+// via the built-in branch unchanged.
+function applianceUnitPrice(row, materialRows, p, ignoreOverride = false) {
+  if (!ignoreOverride && row.unitCost !== '' && row.unitCost != null) return n(row.unitCost)
+  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : 'Standard'
+  const vrow = catalogItemFor(materialRows, OK_APPLIANCE_CAT, vsel, row.type, {
+    standardRows: 'null-vendor',
+    stripPrefix: true,
+    category: OK_APPLIANCE_CATEGORY,
+    fallbackFirst: false,
+  })
+  if (vrow) return n(vrow.unit_cost)
+  return p(applianceRateName(row.type), 0)
+}
+
 // ── Wall-finish vendor catalog ───────────────────────────────────────────────
 // A real vendor overrides ONLY the material unit price for a finish (matched by
 // its Type label in the vendor's 'Wall Finish' catalog); Standard keeps the
@@ -552,9 +598,9 @@ function calcOutdoorKitchen(
   ;(equipmentRows || []).forEach(r => {
     // Missing qty (older estimates) counts as 1; each unit multiplies labor + material.
     const q = r.qty === undefined || r.qty === null ? 1 : n(r.qty)
-    // Unit material $: the inline $/ea if entered, else the master rate for the type.
-    const unit =
-      r.unitCost !== '' && r.unitCost != null ? n(r.unitCost) : p(applianceRateName(r.type), 0)
+    // Unit material $: the inline $/ea override if entered, else the vendor-aware
+    // catalog price for a selected Appliance Item, else the built-in master rate.
+    const unit = applianceUnitPrice(r, materialRows, p)
     // Labor hrs/ea: explicit override if entered, else the install coefficient.
     const hrsEa = r.hours !== '' && r.hours != null ? n(r.hours) : applianceHrsEa
     equipHrs += q * hrsEa
@@ -1039,7 +1085,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
         okLaborItem('applianceInstallHrs', 'hrs/ea'),
         // Vendor catalog appliance products + each built-in equipment master
         // rate + shared install hardware.
-        ...catalogBlockItems('Appliance', 'ea'),
+        ...catalogBlockItems('Appliance', 'ea', 'Outdoor Kitchen'),
         ...APPLIANCE_TYPES.flatMap(type =>
           matRows(applianceRateName(type), 'ea', p(applianceRateName(type), 0))
         ),
@@ -1381,11 +1427,9 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
               <tbody>
                 {equipmentRows.map((row, i) => {
                   const eqQty = row.qty === undefined || row.qty === null ? 1 : n(row.qty)
-                  const eqUnit =
-                    row.unitCost !== '' && row.unitCost != null
-                      ? n(row.unitCost)
-                      : p(applianceRateName(row.type), 0)
+                  const eqUnit = applianceUnitPrice(row, materialRows, p)
                   const eqMat = row.clientProvided ? 0 : eqQty * eqUnit
+                  const applOpts = applianceTypeOptions(materialRows, row.vendor)
                   const setRow = (field, val) =>
                     setEquipmentRows(rs =>
                       rs.map((r, idx) => (idx === i ? { ...r, [field]: val } : r))
@@ -1413,9 +1457,14 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                             value={row.type}
                             onChange={e => setRow('type', e.target.value)}
                           >
-                            {APPLIANCE_TYPES.map(t => (
-                              <option key={t} value={t}>
-                                {t}
+                            {/* Backward-compat: keep a stored value that isn't in the
+                                current (vendor-scoped) options selectable/visible. */}
+                            {row.type && !applOpts.some(o => o.value === row.type) && (
+                              <option value={row.type}>{row.type}</option>
+                            )}
+                            {applOpts.map(o => (
+                              <option key={o.value} value={o.value}>
+                                {o.label}
                               </option>
                             ))}
                           </select>
@@ -1429,7 +1478,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                           value={row.unitCost}
                           onChange={v => setRow('unitCost', v)}
                           className="w-full"
-                          placeholder={p(applianceRateName(row.type), 0).toFixed(2)}
+                          placeholder={applianceUnitPrice(row, materialRows, p, true).toFixed(2)}
                         />
                       </td>
                       <td className="py-1 pr-2">
