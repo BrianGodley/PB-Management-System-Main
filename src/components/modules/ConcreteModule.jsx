@@ -1374,7 +1374,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
         <SectionHeader title="Job Site Conditions" />
         <div className="flex gap-3">
           <div className="flex-1">
-            <label className="text-xs text-gray-500 block mb-1 text-center">Difficulty Add (%)</label>
+            <label className="text-xs text-gray-500 block mb-1">Difficulty Add (%)</label>
             <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
           </div>
           <div className="flex-1">
@@ -1392,7 +1392,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             )}
           </div>
           <div className="flex-1">
-            <label className="text-xs text-gray-500 block mb-1 text-center">Hrs Adjustment</label>
+            <label className="text-xs text-gray-500 block mb-1">Hrs Adjustment</label>
             <NumInput
               value={hoursAdj}
               onChange={setHoursAdj}
@@ -1404,7 +1404,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
         </div>
         <div className="grid grid-cols-2 gap-3 mt-3">
           <div>
-            <label className="text-xs text-gray-500 block mb-1 text-center">Layout Time (hrs)</label>
+            <label className="text-xs text-gray-500 block mb-1">Layout Time (hrs)</label>
             <NumInput value={layoutHrs} onChange={setLayoutHrs} placeholder="0" />
           </div>
         </div>
@@ -1542,7 +1542,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
         <div className="grid grid-cols-2 gap-3 items-end">
           <div className={!isSub ? 'col-span-2' : undefined}>
             {isSub && (
-              <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap text-center">
+              <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap">
                 Installation (Sq Ft)
                 <span className="text-gray-400 inline-flex items-center gap-1">
                   — ${subSlabRate}/SF all-in
@@ -1653,12 +1653,12 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           </div>
           {isSub && (
             <div>
-              <label className="text-xs text-gray-500 block mb-1 text-center">Depth (inches)</label>
+              <label className="text-xs text-gray-500 block mb-1">Depth (inches)</label>
               <NumInput value={activeDepthIn} onChange={setActiveDepthIn} placeholder="4" />
             </div>
           )}
           <div>
-            <label className="text-xs text-gray-500 block mb-1 text-center">Rebar (Sq Ft)</label>
+            <label className="text-xs text-gray-500 block mb-1">Rebar (Sq Ft)</label>
             <div className="flex items-center gap-2">
               <select
                 className="input text-sm py-1.5 w-28"
@@ -1677,12 +1677,12 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           </div>
           {!isSub && (
           <div>
-            <label className="text-xs text-gray-500 block mb-1 text-center">Form Edging (Ln Ft)</label>
+            <label className="text-xs text-gray-500 block mb-1">Form Edging (Ln Ft)</label>
             <NumInput value={activeFormLF} onChange={setActiveFormLF} />
           </div>
           )}
           <div>
-            <label className="text-xs text-gray-500 block mb-1 text-center">3" Sleeves (Ln Ft)</label>
+            <label className="text-xs text-gray-500 block mb-1">3" Sleeves (Ln Ft)</label>
             <NumInput value={activeSleeveLF} onChange={setActiveSleeveLF} />
           </div>
           {activeConcreteCY > 0 && (
@@ -1698,7 +1698,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           )}
           {!isSub && (
             <div className="col-span-2">
-              <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap text-center">
+              <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap">
                 Forming Complexity (0–100)
                 <span className="text-gray-400">— +{calc.complexityPctPerUnit}% labor / point</span>
               </label>
@@ -1723,7 +1723,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
         <SectionHeader title="Finish Options" />
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap text-center">
+            <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap">
               Finish Type
               {isSub &&
                 (subFinishCfg ? (
@@ -1777,7 +1777,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             </select>
           </div>
           <div className="flex items-end gap-4 pb-1 flex-wrap">
-            <label className="flex items-center gap-1.5 text-sm cursor-pointer text-center">
+            <label className="flex items-center gap-1.5 text-sm cursor-pointer">
               <input
                 type="checkbox"
                 checked={activeColorYes}
@@ -1788,11 +1788,11 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             </label>
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1 text-center">Vapor Barrier (Sq Ft)</label>
+            <label className="text-xs text-gray-500 block mb-1">Vapor Barrier (Sq Ft)</label>
             <NumInput value={activeVaporBarrierSF} onChange={setActiveVaporBarrierSF} />
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1 text-center">Sealer (Sq Ft)</label>
+            <label className="text-xs text-gray-500 block mb-1">Sealer (Sq Ft)</label>
             <div className="flex gap-2">
               <NumInput value={activeSealerSF} onChange={setActiveSealerSF} className="flex-1" />
               <select
