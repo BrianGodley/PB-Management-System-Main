@@ -774,27 +774,15 @@ function VendorPicker({ vendors = [], value = 'Standard', onChange, label = 'Ven
   )
 }
 
-const DEFAULT_GRAVEL_ROWS = [
-  { sf: '', method: 'Hand', type: '', depthIn: '3', weedFabric: 'Yes', vendor: '' },
-]
+const DEFAULT_GRAVEL_ROWS = []
 const DEFAULT_SOILS_ROWS = [
   { type: '', sf: '', depthIn: '2', vendor: '' },
 ]
-const DEFAULT_PEBBLE_ROWS = [
-  { sf: '', method: 'Hand', type: '', depthIn: '3', weedFabric: 'Yes', vendor: '' },
-]
-const DEFAULT_COBBLE_ROWS = [
-  { sf: '', method: 'Hand', type: '', depthIn: '3', vendor: '' },
-]
-const DEFAULT_MULCH_ROWS = [
-  { type: '', sf: '', depth: '2', weedFabric: 'No', vendor: '' },
-]
-const DEFAULT_DG_ROWS = [
-  { type: '', sf: '', depth: '3.5', weedFabric: 'No', method: 'Machine', cement: 'No', vendor: '' },
-]
-const DEFAULT_MANUAL_ROWS = [
-  { label: 'Misc 1', hours: '', materials: '', subCost: '' },
-]
+const DEFAULT_PEBBLE_ROWS = []
+const DEFAULT_COBBLE_ROWS = []
+const DEFAULT_MULCH_ROWS = []
+const DEFAULT_DG_ROWS = []
+const DEFAULT_MANUAL_ROWS = []
 // Per-tab input record. In-House and Sub each hold their own independent copy so
 // the two tabs are separate calculators. Shared fields (rates, vendors list,
 // crewType, notes, walkAccess, subType) live on the component, not here.
