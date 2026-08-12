@@ -2424,16 +2424,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           >
             + Add line
           </button>
-          {(n(calc.dgMat) > 0 || n(calc.dgLab) > 0) && (
-            <div className="mt-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-gray-600 flex gap-6">
-              <span>
-                Material: <strong>${calc.dgMat.toFixed(2)}</strong>
-              </span>
-              <span>
-                Labor: <strong>{calc.dgLab.toFixed(2)} hrs</strong>
-              </span>
-            </div>
-          )}
         </div>
       </div>
 
