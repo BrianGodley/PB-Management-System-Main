@@ -774,14 +774,24 @@ function VendorPicker({ vendors = [], value = 'Standard', onChange, label = 'Ven
   )
 }
 
-const DEFAULT_GRAVEL_ROWS = []
+const DEFAULT_GRAVEL_ROWS = [
+  { sf: '', method: 'Hand', type: '', depthIn: '3', weedFabric: 'Yes', vendor: '' },
+]
 const DEFAULT_SOILS_ROWS = [
   { type: '', sf: '', depthIn: '2', vendor: '' },
 ]
-const DEFAULT_PEBBLE_ROWS = []
-const DEFAULT_COBBLE_ROWS = []
-const DEFAULT_MULCH_ROWS = []
-const DEFAULT_DG_ROWS = []
+const DEFAULT_PEBBLE_ROWS = [
+  { sf: '', method: 'Hand', type: '', depthIn: '3', weedFabric: 'Yes', vendor: '' },
+]
+const DEFAULT_COBBLE_ROWS = [
+  { sf: '', method: 'Hand', type: '', depthIn: '3', vendor: '' },
+]
+const DEFAULT_MULCH_ROWS = [
+  { type: '', sf: '', depth: '2', weedFabric: 'No', vendor: '' },
+]
+const DEFAULT_DG_ROWS = [
+  { type: '', sf: '', depth: '3.5', weedFabric: 'No', method: 'Machine', cement: 'No', vendor: '' },
+]
 const DEFAULT_MANUAL_ROWS = []
 // Per-tab input record. In-House and Sub each hold their own independent copy so
 // the two tabs are separate calculators. Shared fields (rates, vendors list,
@@ -1921,10 +1931,10 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         </select>
                       </td>
                       <td className="py-1 pr-1">
-                        <NumInput value={area} onChange={setArea} placeholder="SF" className="w-20" />
+                        <NumInput value={area} onChange={setArea} placeholder="SF" className="w-full text-center" />
                       </td>
                       <td className="py-1 pr-1">
-                        <NumInput value={depth} onChange={setDepth} placeholder="2" className="w-20" />
+                        <NumInput value={depth} onChange={setDepth} placeholder="2" className="w-full text-center" />
                       </td>
                       <td className="py-1 pr-1">
                         <select
@@ -1939,11 +1949,11 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         </select>
                       </td>
                       <td className="py-1 pr-1">
-                        <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
+                        <span className="text-xs text-gray-500 flex items-center justify-center gap-1 whitespace-nowrap">
                           ${typeCost.toFixed(2)}/CY
                         </span>
                       </td>
-                      <td className="py-1 text-right text-xs text-gray-600 whitespace-nowrap">
+                      <td className="py-1 text-center text-xs text-gray-600 whitespace-nowrap">
                         {n(area) > 0 ? `$${mat.toFixed(2)} · ${hrs.toFixed(2)} hrs` : '—'}
                       </td>
                     </tr>
@@ -2045,14 +2055,14 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <NumInput value={sodSF} onChange={setSodSF} placeholder="SF" className="w-20" />
+                      <NumInput value={sodSF} onChange={setSodSF} placeholder="SF" className="w-full text-center" />
                     </td>
                     <td className="py-1 pr-1">
-                      <span className="text-xs text-gray-500 whitespace-nowrap">
+                      <span className="text-xs text-gray-500 whitespace-nowrap block text-center">
                         ${st.fallback.toFixed(2)}/SF
                       </span>
                     </td>
-                    <td className="py-1 text-right text-xs text-gray-600 whitespace-nowrap">
+                    <td className="py-1 text-center text-xs text-gray-600 whitespace-nowrap">
                       {sodType && n(sodSF) > 0 ? `$${(n(sodSF) * st.fallback).toFixed(2)}` : '—'}
                     </td>
                   </tr>
@@ -2134,10 +2144,10 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         value={sodFertilizerSF}
                         onChange={setSodFertilizerSF}
                         placeholder="SF"
-                        className="w-20"
+                        className="w-full text-center"
                       />
                     </td>
-                    <td className="py-1 text-right text-xs text-gray-600 whitespace-nowrap">
+                    <td className="py-1 text-center text-xs text-gray-600 whitespace-nowrap">
                       {ft && ft.dbName && sodFertilizer
                         ? `$${ft.fallback.toFixed(2)}/bag · 1 bag / ${sfPerBag} SF${
                             bags > 0 ? ` = ${bags} bag${bags > 1 ? 's' : ''} · $${(bags * ft.fallback).toFixed(2)}` : ''
@@ -2213,11 +2223,11 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <NumInput value={row.sf} onChange={v => updateMulch(i, 'sf', v)} className="w-16" />
+                      <NumInput value={row.sf} onChange={v => updateMulch(i, 'sf', v)} className="w-full text-center" />
                     </td>
                     <td className="py-1 pr-1">
                       <select
-                        className="input text-sm py-1.5 w-20"
+                        className="input text-sm py-1.5 w-full"
                         value={row.depth}
                         onChange={e => updateMulch(i, 'depth', e.target.value)}
                       >
@@ -2229,7 +2239,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
+                      <span className="text-xs text-gray-500 flex items-center justify-center gap-1 whitespace-nowrap">
                         ${typeCost.toFixed(2)}/CY
                       </span>
                     </td>
@@ -2335,14 +2345,14 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <NumInput value={row.sf} onChange={v => updateDg(i, 'sf', v)} className="w-16" />
+                      <NumInput value={row.sf} onChange={v => updateDg(i, 'sf', v)} className="w-full text-center" />
                     </td>
                     <td className="py-1 pr-1">
                       <NumInput
                         value={row.depth}
                         onChange={v => updateDg(i, 'depth', v)}
                         placeholder="3.5"
-                        className="w-20"
+                        className="w-full text-center"
                       />
                     </td>
                     <td className="py-1 pr-1">
@@ -2489,7 +2499,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <NumInput value={row.sf} onChange={v => updateGravel(i, 'sf', v)} className="w-16" />
+                      <NumInput value={row.sf} onChange={v => updateGravel(i, 'sf', v)} className="w-full text-center" />
                     </td>
                     <td className="py-1 pr-1">
                       <select
@@ -2502,7 +2512,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
+                      <span className="text-xs text-gray-500 flex items-center justify-center gap-1 whitespace-nowrap">
                         ${typeCost.toFixed(2)}/CY
                       </span>
                     </td>
@@ -2523,7 +2533,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                           value={row.depthIn}
                           onChange={v => updateGravel(i, 'depthIn', v)}
                           placeholder="3"
-                          className="w-20"
+                          className="w-full text-center"
                         />
                         {gravelRows.length > 1 && (
                           <button
@@ -2637,7 +2647,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <NumInput value={row.sf} onChange={v => updatePebble(i, 'sf', v)} className="w-16" />
+                      <NumInput value={row.sf} onChange={v => updatePebble(i, 'sf', v)} className="w-full text-center" />
                     </td>
                     <td className="py-1 pr-1">
                       <select
@@ -2650,7 +2660,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
+                      <span className="text-xs text-gray-500 flex items-center justify-center gap-1 whitespace-nowrap">
                         ${typeCost.toFixed(2)}/CY
                       </span>
                     </td>
@@ -2670,7 +2680,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         value={row.depthIn}
                         onChange={v => updatePebble(i, 'depthIn', v)}
                         placeholder="3"
-                        className="w-20"
+                        className="w-full text-center"
                       />
                     </td>
                   </tr>
@@ -2772,7 +2782,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <NumInput value={row.sf} onChange={v => updateCobble(i, 'sf', v)} className="w-16" />
+                      <NumInput value={row.sf} onChange={v => updateCobble(i, 'sf', v)} className="w-full text-center" />
                     </td>
                     <td className="py-1 pr-1">
                       <select
@@ -2785,7 +2795,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
+                      <span className="text-xs text-gray-500 flex items-center justify-center gap-1 whitespace-nowrap">
                         ${typeCost.toFixed(2)}/CY
                       </span>
                     </td>
@@ -2794,7 +2804,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         value={row.depthIn}
                         onChange={v => updateCobble(i, 'depthIn', v)}
                         placeholder="3"
-                        className="w-20"
+                        className="w-full text-center"
                       />
                     </td>
                   </tr>
@@ -2897,12 +2907,12 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <NumInput value={edgingLF} onChange={setEdgingLF} placeholder="LF" className="w-20" />
+                      <NumInput value={edgingLF} onChange={setEdgingLF} placeholder="LF" className="w-full text-center" />
                     </td>
                     <td className="py-1 pr-1">
-                      <span className="text-xs text-gray-500 whitespace-nowrap">${rate.toFixed(2)}/LF</span>
+                      <span className="text-xs text-gray-500 whitespace-nowrap block text-center">${rate.toFixed(2)}/LF</span>
                     </td>
-                    <td className="py-1 text-right text-xs text-gray-600 whitespace-nowrap">
+                    <td className="py-1 text-center text-xs text-gray-600 whitespace-nowrap">
                       {edgingType && n(edgingLF) > 0 ? `$${(n(edgingLF) * rate).toFixed(2)}` : '—'}
                     </td>
                   </tr>
@@ -3014,24 +3024,24 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         ))}
                       </select>
                     </td>
-                    <td className="py-1 pr-2 text-xs text-gray-700 whitespace-nowrap">{row.label}</td>
+                    <td className="py-1 pr-2 text-center text-xs text-gray-700 whitespace-nowrap">{row.label}</td>
                     <td className="py-1 pr-2">
-                      <NumInput value={row.sf} onChange={row.set} />
+                      <NumInput value={row.sf} onChange={row.set} className="text-center" />
                     </td>
                     <td className="py-1 pr-2">
-                      <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
+                      <span className="text-xs text-gray-500 flex items-center justify-center gap-1 whitespace-nowrap">
                         {sfPerDay} SF/day
                       </span>
                     </td>
                     <td className="py-1 pr-2">
-                      <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
+                      <span className="text-xs text-gray-500 flex items-center justify-center gap-1 whitespace-nowrap">
                         ${perTon.toFixed(2)}/ton
                       </span>
                     </td>
-                    <td className="py-1 text-right text-xs text-gray-400 pr-2">
+                    <td className="py-1 text-center text-xs text-gray-400 pr-2">
                       {sfN > 0 ? tons.toFixed(2) : '—'}
                     </td>
-                    <td className="py-1 text-right text-xs text-gray-600 whitespace-nowrap">
+                    <td className="py-1 text-center text-xs text-gray-600 whitespace-nowrap">
                       {sfN > 0 ? `$${mat.toFixed(2)} · ${hrs.toFixed(2)} hrs` : '—'}
                     </td>
                   </tr>
@@ -3069,17 +3079,18 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     />
                   </td>
                   <td className="py-1 pr-2">
-                    <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} />
+                    <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} className="text-center" />
                   </td>
                   <td className="py-1 pr-2">
                     <NumInput
                       value={row.materials}
                       onChange={v => updateManual(i, 'materials', v)}
+                      className="text-center"
                     />
                   </td>
                   <td className="py-1">
                     {' '}
-                    <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} />
+                    <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} className="text-center" />
                   </td>
                 </tr>
               ))}
