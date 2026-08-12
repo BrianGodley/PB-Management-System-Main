@@ -275,22 +275,32 @@ const UTIL_CAT = {
   sewerSink: 'Sewer Sinks',
 }
 
-// Merge the built-in Type list with any master-list rows tagged sub_category=cat
-// and left Unspecified (null vendor). Add a row in Master Rates under that marker
-// and it appears here automatically; its paired '<Label> - Labor Rate' row (looked
-// up by name) supplies labor. Built-ins always remain (deduped by label).
+// Type list = the Master Rates catalog (Items in Category 'Utilities' + this
+// Sub-category, Standard/null-vendor). Whatever is in the catalog IS the dropdown,
+// so renaming / adding / deleting an Item in Master Rates flows straight through
+// with NO duplicates. Built-ins are NOT a second source of options — they only
+// supply a labor-rate name + price/labor FALLBACK for any Item that was seeded
+// from a built-in (matched by name). Labor for each type is the Item's paired
+// '<name> - Labor Rate' row (looked up by name). Only when a Sub-category has NO
+// catalog Items at all do we fall back to the built-in list.
 function mergedUtilTypes(cat, builtInArr, materialRows) {
-  const extra = catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true })
-    .filter(o => !builtInArr.some(b => b.label === o.label))
-    .map(o => ({
+  const catRows = catalogOptions(materialRows, cat, 'Standard', {
+    standardRows: 'null-vendor',
+    stripPrefix: true,
+    category: 'Utilities',
+  })
+  if (!catRows.length) return builtInArr
+  return catRows.map(o => {
+    const bi = builtInArr.find(b => b.dbName === o.row.name || b.label === o.label)
+    return {
       label: o.label,
       dbName: o.row.name,
       fallback: n(o.row.unit_cost),
-      laborDbName: `${o.label} - Labor Rate`,
-      laborFallback: 0,
-      fromMaster: true,
-    }))
-  return extra.length ? [...builtInArr, ...extra] : builtInArr
+      laborDbName: bi?.laborDbName ?? `${o.label} - Labor Rate`,
+      laborFallback: bi?.laborFallback ?? 0,
+      fromMaster: !bi,
+    }
+  })
 }
 
 // Resolve a row's material cost + per-unit labor.
