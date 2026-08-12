@@ -154,11 +154,21 @@ function masterWallMeta(cat, typeLabel, materialRows, category = null) {
     master: true,
   }
 }
-function masterWallOptions(cat, builtInList, materialRows, category = null) {
-  const extra = catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true, category })
+// Vendor-first Type list (mirrors Paver/Utilities): the dropdown shows the Items
+// the ROW'S SELECTED VENDOR carries in this Category + Sub-category. Standard/unset
+// → the null-vendor (Standard-priced) Items merged with the built-in list; a real
+// vendor → ONLY that vendor's Items (built-ins fall away). Category scoping (e.g.
+// 'Outdoor Kitchen') is preserved and combined with the vendor filter.
+function masterWallOptions(cat, builtInList, materialRows, category = null, vendorSel = 'Standard') {
+  const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
+  if (isStd) {
+    const extra = catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true, category })
+      .map(o => o.label)
+      .filter(l => !builtInList.includes(l))
+    return extra.length ? [...builtInList, ...extra] : builtInList
+  }
+  return catalogOptions(materialRows, cat, vendorSel, { standardRows: 'null-vendor', stripPrefix: true, category })
     .map(o => o.label)
-    .filter(l => !builtInList.includes(l))
-  return extra.length ? [...builtInList, ...extra] : builtInList
 }
 
 // ── Electrical & Plumbing catalog (ported from the Utilities module) ──────────
@@ -199,26 +209,44 @@ const UTIL_CAT = { line: 'Utility Lines', gas: 'Gas Fixtures', elec: 'Electrical
 // Trenching for utility lines (machine trench, min/cf; from the Utilities schedule).
 const OK_TRENCH_RATE_NAME = 'Utilities Trench Excavation'
 const OK_TRENCH_FALLBACK_MIN_PER_CF = 10
-function mergedUtilTypes(cat, builtInArr, materialRows) {
-  const extra = catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true })
-    .filter(o => !builtInArr.some(b => b.label === o.label))
-    .map(o => ({
+// Vendor-first Type list: Standard/unset → null-vendor Items merged with built-ins;
+// a real vendor → ONLY that vendor's Items (built-ins fall away).
+function mergedUtilTypes(cat, builtInArr, materialRows, vendorSel = 'Standard') {
+  const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
+  if (isStd) {
+    const extra = catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true })
+      .filter(o => !builtInArr.some(b => b.label === o.label))
+      .map(o => ({
+        label: o.label,
+        dbName: o.row.name,
+        fallback: n(o.row.unit_cost),
+        laborDbName: `${o.label} - Labor Rate`,
+        laborFallback: 0,
+        fromMaster: true,
+      }))
+    return extra.length ? [...builtInArr, ...extra] : builtInArr
+  }
+  const catRows = catalogOptions(materialRows, cat, vendorSel, { standardRows: 'null-vendor', stripPrefix: true })
+  if (!catRows.length) return []
+  return catRows.map(o => {
+    const bi = builtInArr.find(b => b.dbName === o.row.name || b.label === o.label)
+    return {
       label: o.label,
       dbName: o.row.name,
       fallback: n(o.row.unit_cost),
-      laborDbName: `${o.label} - Labor Rate`,
-      laborFallback: 0,
-      fromMaster: true,
-    }))
-  return extra.length ? [...builtInArr, ...extra] : builtInArr
+      laborDbName: bi?.laborDbName ?? `${o.label} - Labor Rate`,
+      laborFallback: bi?.laborFallback ?? 0,
+      fromMaster: !bi,
+    }
+  })
 }
 function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
-  const merged = mergedUtilTypes(cat, houseArr, materialRows)
+  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : 'Standard'
+  const merged = mergedUtilTypes(cat, houseArr, materialRows, vsel)
   const builtIn = merged.find(o => o.label === row.type) || merged[0]
   const laborVal = mp[builtIn?.laborDbName] ?? builtIn?.laborFallback ?? 0
   let matDbName = builtIn?.dbName
   let matFallback = builtIn?.fallback ?? 0
-  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : 'Standard'
   const vrow = catalogItemFor(materialRows, cat, vsel, builtIn?.label, {
     ...CATALOG_OPTS,
     fallbackFirst: false,
@@ -1564,7 +1592,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                           value={row.type}
                           onChange={e => setWallFinishRow(i, 'type', e.target.value)}
                         >
-                          {masterWallOptions(WF_CAT, WF_LIST, materialRows, 'Outdoor Kitchen').map(t => (
+                          {masterWallOptions(WF_CAT, WF_LIST, materialRows, 'Outdoor Kitchen', row.vendor || 'Standard').map(t => (
                             <option key={t} value={t}>
                               {t}
                             </option>

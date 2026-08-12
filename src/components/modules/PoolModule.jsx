@@ -222,26 +222,44 @@ const LINE_TYPE_ARR = Object.entries(UTILITY_LINE_TYPES).map(([label, t]) => ({ 
 const GAS_TYPE_ARR = Object.entries(GAS_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, fallback: t.cost, laborDbName: t.laborDbName, laborFallback: t.laborHrs }))
 const ELEC_TYPE_ARR = Object.entries(ELECTRICAL_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, fallback: t.cost, laborDbName: t.laborDbName, laborFallback: t.laborHrs }))
 const UTIL_CAT = { line: 'Utility Lines', gas: 'Gas Fixtures', elec: 'Electrical Fixtures' }
-function mergedUtilTypes(cat, builtInArr, materialRows) {
-  const extra = catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true })
-    .filter(o => !builtInArr.some(b => b.label === o.label))
-    .map(o => ({
+// Vendor-first Type list: Standard/unset → null-vendor Items merged with built-ins;
+// a real vendor → ONLY that vendor's Items (built-ins fall away).
+function mergedUtilTypes(cat, builtInArr, materialRows, vendorSel = 'Standard') {
+  const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
+  if (isStd) {
+    const extra = catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true })
+      .filter(o => !builtInArr.some(b => b.label === o.label))
+      .map(o => ({
+        label: o.label,
+        dbName: o.row.name,
+        fallback: n(o.row.unit_cost),
+        laborDbName: `${o.label} - Labor Rate`,
+        laborFallback: 0,
+        fromMaster: true,
+      }))
+    return extra.length ? [...builtInArr, ...extra] : builtInArr
+  }
+  const catRows = catalogOptions(materialRows, cat, vendorSel, { standardRows: 'null-vendor', stripPrefix: true })
+  if (!catRows.length) return []
+  return catRows.map(o => {
+    const bi = builtInArr.find(b => b.dbName === o.row.name || b.label === o.label)
+    return {
       label: o.label,
       dbName: o.row.name,
       fallback: n(o.row.unit_cost),
-      laborDbName: `${o.label} - Labor Rate`,
-      laborFallback: 0,
-      fromMaster: true,
-    }))
-  return extra.length ? [...builtInArr, ...extra] : builtInArr
+      laborDbName: bi?.laborDbName ?? `${o.label} - Labor Rate`,
+      laborFallback: bi?.laborFallback ?? 0,
+      fromMaster: !bi,
+    }
+  })
 }
 function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
-  const merged = mergedUtilTypes(cat, houseArr, materialRows)
+  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : 'Standard'
+  const merged = mergedUtilTypes(cat, houseArr, materialRows, vsel)
   const builtIn = merged.find(o => o.label === row.type) || merged[0]
   const laborVal = mp[builtIn?.laborDbName] ?? builtIn?.laborFallback ?? 0
   let matDbName = builtIn?.dbName
   let matFallback = builtIn?.fallback ?? 0
-  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : 'Standard'
   const vrow = catalogItemFor(materialRows, cat, vsel, builtIn?.label, {
     ...CATALOG_OPTS,
     fallbackFirst: false,

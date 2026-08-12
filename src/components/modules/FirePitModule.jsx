@@ -149,8 +149,18 @@ function masterWallMeta(cat, typeLabel, materialRows, category = null) {
     master: true,
   }
 }
-// Section Type options = built-in labels + master-list additions (deduped).
-function masterWallOptions(cat, builtInList, materialRows, category = null) {
+// Section Type options — VENDOR-FIRST (like Paver/Utilities). The row's selected
+// Vendor filters the Type list: Standard/unset → the null-vendor (Standard)
+// catalog items merged with the built-in labels (built-in fallback); a real
+// vendor → ONLY that vendor's catalog items. Category scoping (e.g. Fire Pit vs
+// Outdoor Kitchen Wall Finish) is combined with the vendor filter.
+function masterWallOptions(cat, builtInList, materialRows, category = null, vendorSel = 'Standard') {
+  const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
+  if (!isStd) {
+    // Real vendor → only that vendor's catalog items (no built-in fallback).
+    return catalogOptions(materialRows, cat, vendorSel, { standardRows: 'null-vendor', stripPrefix: true, category })
+      .map(o => o.label)
+  }
   const extra = catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true, category })
     .map(o => o.label)
     .filter(l => !builtInList.includes(l))
@@ -181,7 +191,26 @@ const GAS_FIXTURE_TYPES = {
 const LINE_TYPE_ARR = Object.entries(UTILITY_LINE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, fallback: t.costPerLF, laborDbName: t.laborDbName, laborFallback: t.laborPerLF }))
 const GAS_TYPE_ARR = Object.entries(GAS_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, fallback: t.cost, laborDbName: t.laborDbName, laborFallback: t.laborHrs }))
 const UTIL_CAT = { line: 'Utility Lines', gas: 'Gas Fixtures' }
-function mergedUtilTypes(cat, builtInArr, materialRows) {
+// Gas Type options — VENDOR-FIRST (like Utilities). Standard/unset → the
+// null-vendor (Standard) catalog items merged with the built-in list (built-in
+// fallback); a real vendor → ONLY that vendor's catalog items.
+function mergedUtilTypes(cat, builtInArr, materialRows, vendorSel = 'Standard') {
+  const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
+  if (!isStd) {
+    // Real vendor → only that vendor's catalog items (no built-in fallback).
+    return catalogOptions(materialRows, cat, vendorSel, { standardRows: 'null-vendor', stripPrefix: true })
+      .map(o => {
+        const bi = builtInArr.find(b => b.label === o.label)
+        return {
+          label: o.label,
+          dbName: o.row.name,
+          fallback: n(o.row.unit_cost),
+          laborDbName: bi?.laborDbName ?? `${o.label} - Labor Rate`,
+          laborFallback: bi?.laborFallback ?? 0,
+          fromMaster: !bi,
+        }
+      })
+  }
   const extra = catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true })
     .filter(o => !builtInArr.some(b => b.label === o.label))
     .map(o => ({
@@ -195,12 +224,13 @@ function mergedUtilTypes(cat, builtInArr, materialRows) {
   return extra.length ? [...builtInArr, ...extra] : builtInArr
 }
 function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
-  const merged = mergedUtilTypes(cat, houseArr, materialRows)
+  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : 'Standard'
+  // Type options are the SELECTED VENDOR'S items (vendor-first, like Paver).
+  const merged = mergedUtilTypes(cat, houseArr, materialRows, vsel)
   const builtIn = merged.find(o => o.label === row.type) || merged[0]
   const laborVal = mp[builtIn?.laborDbName] ?? builtIn?.laborFallback ?? 0
   let matDbName = builtIn?.dbName
   let matFallback = builtIn?.fallback ?? 0
-  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : 'Standard'
   const vrow = catalogItemFor(materialRows, cat, vsel, builtIn?.label, {
     ...CATALOG_OPTS,
     fallbackFirst: false,
@@ -1341,7 +1371,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                           value={row.type}
                           onChange={e => setCapRow(i, 'type', e.target.value)}
                         >
-                          {masterWallOptions(CAP_CAT, CAP_LIST, materialRows).map(t => (
+                          {masterWallOptions(CAP_CAT, CAP_LIST, materialRows, null, row.vendor).map(t => (
                             <option key={t} value={t}>
                               {t}
                             </option>
@@ -1475,7 +1505,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                           value={row.type}
                           onChange={e => setWallFinishRow(i, 'type', e.target.value)}
                         >
-                          {masterWallOptions(WF_CAT, WF_LIST, materialRows, 'Fire Pit').map(t => (
+                          {masterWallOptions(WF_CAT, WF_LIST, materialRows, 'Fire Pit', row.vendor).map(t => (
                             <option key={t} value={t}>
                               {t}
                             </option>

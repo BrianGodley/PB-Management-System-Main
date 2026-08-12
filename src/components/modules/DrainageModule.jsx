@@ -182,6 +182,29 @@ function masterDrainTypes(cat, builtIn, materialRows, laborField) {
   return out
 }
 
+// Vendor-first Type OPTION list for a Drain Pipe / Fixtures row (mirrors
+// Utilities' mergedUtilTypes). Standard/unset/auto → the built-in types PLUS the
+// Standard (null-vendor) catalog Items; a real vendor → only that vendor's catalog
+// Items for the sub-category (nothing if they carry none). Options only — the
+// selected type still resolves its price/labor through PIPE_T/FIX_T + drainMatCost,
+// which already applies the vendor's price by matching the item's name.
+function drainTypeOptions(cat, builtIn, materialRows, vendorSel) {
+  const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
+  const catRows =
+    catalogOptions(materialRows, cat, isStd ? 'Standard' : vendorSel, {
+      standardRows: 'null-vendor',
+      stripPrefix: true,
+    }) || []
+  if (isStd) {
+    const labels = Object.keys(builtIn)
+    catRows.forEach(o => {
+      if (!labels.includes(o.label)) labels.push(o.label)
+    })
+    return labels
+  }
+  return catRows.map(o => o.label)
+}
+
 // materialPrices — { 'dbName': unit_cost, ... } fetched from material_rates
 function calcDrainage(
   state,
@@ -1333,7 +1356,12 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                           value={row.type}
                           onChange={e => updatePipe(i, 'type', e.target.value)}
                         >
-                          {Object.keys(PIPE_T).map(t => (
+                          {drainTypeOptions(
+                            DRAIN_CAT.pipe,
+                            PIPE_TYPES,
+                            materialRows,
+                            effVendor(DRAIN_CAT.pipe, row.vendor)
+                          ).map(t => (
                             <option key={t}>{t}</option>
                           ))}
                         </select>
@@ -1547,7 +1575,12 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                           onChange={e => updateFixture(i, 'type', e.target.value)}
                         >
                           <option value="">-- Select --</option>
-                          {Object.keys(FIX_T).map(t => (
+                          {drainTypeOptions(
+                            DRAIN_CAT.fixture,
+                            FIXTURE_TYPES,
+                            materialRows,
+                            effVendor(DRAIN_CAT.fixture, row.vendor)
+                          ).map(t => (
                             <option key={t}>{t}</option>
                           ))}
                         </select>

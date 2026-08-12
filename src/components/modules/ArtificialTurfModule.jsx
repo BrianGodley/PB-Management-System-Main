@@ -111,8 +111,11 @@ function turfMatPrice(cat, vendorSel, typeLabel, houseName, houseFallback, mater
 //   turfBrandOptions → the standard products for the picker ({id, label, row}).
 //   turfBrandRow     → resolve a saved selection (row id, or a legacy key/label)
 //                      to its row, preferring a vendor-specific row over standard.
-function turfBrandOptions(materialRows) {
-  return catalogOptions(materialRows, TURF_CAT.turf, 'Standard', {
+function turfBrandOptions(materialRows, vendorSel = 'Standard') {
+  // Vendor-first (mirrors Paver's paverOptions): Standard/unset/auto → the
+  // null-vendor Standard products; a real vendor → only that vendor's Items.
+  const vsel = vendorSel && vendorSel !== 'auto' ? vendorSel : 'Standard'
+  return catalogOptions(materialRows, TURF_CAT.turf, vsel, {
     standardRows: 'null-vendor',
     stripPrefix: true,
   })
@@ -821,6 +824,8 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
   const brandOpts = turfBrandOptions(materialRows)
   const brandKeys = brandOpts.map(o => o.id)
   const brandLabels = brandOpts.map(o => o.label)
+  // Turf Strips is a single row — its Type list is filtered by the strips' vendor.
+  const stripsBrandOpts = turfBrandOptions(materialRows, T.strips?.vendor)
 
   function handleSave() {
     onSave({
@@ -1329,6 +1334,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
             {T.rolls.map((roll, i) => {
               const cr = calc.rollCalc[i]
               const brandRow = turfBrandRow(materialRows, roll.vendor, roll.brand)
+              const rollBrandOpts = turfBrandOptions(materialRows, roll.vendor)
               return (
                 <tr key={i}>
                   <td className={td}>
@@ -1350,8 +1356,8 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                     <Sel
                       value={brandRow?.id || roll.brand}
                       onChange={e => setRoll(i, 'brand', e.target.value)}
-                      options={brandKeys}
-                      optionLabels={brandLabels}
+                      options={rollBrandOpts.map(o => o.id)}
+                      optionLabels={rollBrandOpts.map(o => o.label)}
                     />
                   </td>
                   {calc.isSub ? (
@@ -1477,10 +1483,10 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
               </td>
               <td className={td}>
                 <Sel
-                  value={turfBrandRow(materialRows, T.strips?.vendor, T.strips?.brand)?.id || T.strips?.brand || brandKeys[0]}
+                  value={turfBrandRow(materialRows, T.strips?.vendor, T.strips?.brand)?.id || T.strips?.brand || stripsBrandOpts[0]?.id}
                   onChange={e => setStrips('brand', e.target.value)}
-                  options={brandKeys}
-                  optionLabels={brandLabels}
+                  options={stripsBrandOpts.map(o => o.id)}
+                  optionLabels={stripsBrandOpts.map(o => o.label)}
                 />
               </td>
               <td className={td}>
