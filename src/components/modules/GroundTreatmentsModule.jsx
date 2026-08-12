@@ -814,7 +814,6 @@ function makeTab(src = {}) {
               depth: src.mulchDepth || '2',
               weedFabric: src.mulchWeedFabric || 'No',
             },
-            { type: '', sf: '', depth: '2', weedFabric: 'No' },
           ]
         : DEFAULT_MULCH_ROWS.map(r => ({ ...r }))),
     plasticEdgingLF: src.plasticEdgingLF ?? '',
@@ -868,7 +867,6 @@ function makeTab(src = {}) {
               method: src.dgMethod || 'Machine',
               cement: src.dgCement || 'No',
             },
-            { type: '', sf: '', depth: '3.5', weedFabric: 'No', method: 'Machine', cement: 'No' },
           ]
         : DEFAULT_DG_ROWS.map(r => ({ ...r }))),
     gravelRows: src.gravelRows ?? DEFAULT_GRAVEL_ROWS.map(r => ({ ...r })),
