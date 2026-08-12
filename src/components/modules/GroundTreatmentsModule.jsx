@@ -1078,6 +1078,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   const setEdgingVendor = setField('edgingVendor')
   const edgingType = cur.edgingType
   const setEdgingType = setField('edgingType')
+  const edgingLF = cur.edgingLF
+  const setEdgingLF = setField('edgingLF')
   const dgRows = cur.dgRows
   const setDgRows = setField('dgRows')
   const gravelRows = cur.gravelRows
