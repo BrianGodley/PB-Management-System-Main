@@ -238,6 +238,9 @@ const LINE_TYPE_ARR = Object.entries(UTILITY_LINE_TYPES).map(([label, t]) => ({
   laborDbName: t.laborDbName,
   laborFallback: t.laborPerLF,
 }))
+// Electrical Wiring has NO code built-ins — it's purely catalog-sourced (items
+// live only under the 'Electrical Wiring' Sub-category on the Home Depot vendor).
+const WIRE_TYPE_ARR = []
 const GAS_TYPE_ARR = Object.entries(GAS_FIXTURE_TYPES).map(([label, t]) => ({
   label,
   dbName: t.dbName,
@@ -269,6 +272,7 @@ const SEWER_SINK_ARR = Object.entries(SEWER_SINK_TYPES).map(([label, t]) => ({
 // Section → material category name (used for vendor tagging + catalog lookup).
 const UTIL_CAT = {
   line: 'Utility Lines',
+  wire: 'Electrical Wiring',
   gas: 'Gas Fixtures',
   elec: 'Electrical Fixtures',
   sewerLine: 'Sewer Lines',
@@ -358,6 +362,7 @@ function calcUtilities(
     hoursAdj,
     trenchRows,
     lineRows,
+    wireRows,
     fixtureRows,
     elecFixtureRows,
     sewerLineRows,
@@ -370,6 +375,8 @@ function calcUtilities(
   let trenchHrs = 0
   let lineHrs = 0,
     lineMat = 0
+  let wireHrs = 0,
+    wireMat = 0
   let fixHrs = 0,
     fixMat = 0
   let sewerLineHrs = 0,
@@ -409,6 +416,22 @@ function calcUtilities(
     )
     lineMat += lf * matCost
     lineHrs += lf * laborVal
+  })
+
+  ;(wireRows || []).forEach(r => {
+    if (!r.type) return
+    const lf = n(r.lf)
+    if (lf <= 0) return
+    const { matCost, laborVal } = resolveUtilRow(
+      UTIL_CAT.wire,
+      r,
+      WIRE_TYPE_ARR,
+      materialRows,
+      catDefaults,
+      materialPrices
+    )
+    wireMat += lf * matCost
+    wireHrs += lf * laborVal
   })
 
   const _fixtureLoop = (rows, cat, houseArr) => {
@@ -480,14 +503,14 @@ function calcUtilities(
     manSub += n(r.subCost)
   })
 
-  const baseHrs = trenchHrs + lineHrs + fixHrs + sewerLineHrs + sinkHrs + addHrs + manHrs
+  const baseHrs = trenchHrs + lineHrs + wireHrs + fixHrs + sewerLineHrs + sinkHrs + addHrs + manHrs
   const diffMod = 1 + n(difficulty) / 100
   const adjHrs = n(hoursAdj)
   const _preWalkHrs = baseHrs * diffMod + adjHrs
   const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
   const totalHrs = _preWalkHrs + walkHrs
   const manDays = totalHrs / 8
-  const totalMat = lineMat + fixMat + sewerLineMat + sinkMat + addMat + manMat
+  const totalMat = lineMat + wireMat + fixMat + sewerLineMat + sinkMat + addMat + manMat
   const laborCost = totalHrs * laborRatePerHour
   const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
   const gp = manDays * gpmd
@@ -509,6 +532,8 @@ function calcUtilities(
     trenchHrs,
     lineHrs,
     lineMat,
+    wireHrs,
+    wireMat,
     fixHrs,
     fixMat,
     sewerLineHrs,
@@ -550,6 +575,9 @@ const DEFAULT_TRENCH_ROWS = [
 const DEFAULT_LINE_ROWS = [
   { type: '', laborType: '', lf: '', vendor: 'auto' },
 ]
+const DEFAULT_WIRE_ROWS = [
+  { type: '', laborType: '', lf: '', vendor: 'auto' },
+]
 const DEFAULT_FIXTURE_ROWS = [
   { type: '', laborType: '', qty: '', vendor: 'auto' },
 ]
@@ -565,7 +593,6 @@ const DEFAULT_SEWER_SINK_ROWS = [
 const DEFAULT_ADDITIONAL = {
   curbCoreQty: '',
   hydrocutQty: '',
-  permitRequired: false,
 }
 const DEFAULT_MANUAL_ROWS = []
 
@@ -678,6 +705,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
   const [trenchRows, setTrenchRows] = useState(initialData?.trenchRows ?? DEFAULT_TRENCH_ROWS)
   const [lineRows, setLineRows] = useState(initialData?.lineRows ?? DEFAULT_LINE_ROWS)
+  const [wireRows, setWireRows] = useState(initialData?.wireRows ?? DEFAULT_WIRE_ROWS)
   const [fixtureRows, setFixtureRows] = useState(initialData?.fixtureRows ?? DEFAULT_FIXTURE_ROWS)
   const [elecFixtureRows, setElecFixtureRows] = useState(
     initialData?.elecFixtureRows ?? DEFAULT_ELEC_FIXTURE_ROWS
@@ -704,6 +732,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
     initialData?.subTrenchRows ?? [{ lf: '' }]
   )
   const [subLineRows, setSubLineRows] = useState(initialData?.subLineRows ?? DEFAULT_LINE_ROWS)
+  const [subWireRows, setSubWireRows] = useState(initialData?.subWireRows ?? DEFAULT_WIRE_ROWS)
   const [subFixtureRows, setSubFixtureRows] = useState(
     initialData?.subFixtureRows ?? DEFAULT_FIXTURE_ROWS
   )
@@ -743,6 +772,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   // tab, so In-House and Subcontractor are fully independent calculators.
   const isSub = subType === 'Subcontractor'
   const activeLineRows = isSub ? subLineRows : lineRows
+  const activeWireRows = isSub ? subWireRows : wireRows
   const activeFixtureRows = isSub ? subFixtureRows : fixtureRows
   const activeElecFixtureRows = isSub ? subElecFixtureRows : elecFixtureRows
   const activeSewerLineRows = isSub ? subSewerLineRows : sewerLineRows
@@ -750,6 +780,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   const activeAdditionalItems = isSub ? subAdditionalItems : additionalItems
   const activeManualRows = isSub ? subManualRows : manualRows
   const setActiveLineRows = isSub ? setSubLineRows : setLineRows
+  const setActiveWireRows = isSub ? setSubWireRows : setWireRows
   const setActiveFixtureRows = isSub ? setSubFixtureRows : setFixtureRows
   const setActiveElecFixtureRows = isSub ? setSubElecFixtureRows : setElecFixtureRows
   const setActiveSewerLineRows = isSub ? setSubSewerLineRows : setSewerLineRows
@@ -766,6 +797,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   const effVendor = (cat, v) => (v && v !== 'auto' ? v : defaultVendorFor(cat))
   const catDefaults = {
     [UTIL_CAT.line]: defaultVendorFor(UTIL_CAT.line),
+    [UTIL_CAT.wire]: defaultVendorFor(UTIL_CAT.wire),
     [UTIL_CAT.gas]: defaultVendorFor(UTIL_CAT.gas),
     [UTIL_CAT.elec]: defaultVendorFor(UTIL_CAT.elec),
     [UTIL_CAT.sewerLine]: defaultVendorFor(UTIL_CAT.sewerLine),
@@ -783,6 +815,8 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
     const needsDefault = v => !v || v === 'Standard' || v === 'auto'
     const migLine = rows =>
       (rows || []).map(r => (needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor(UTIL_CAT.line) } : r))
+    const migWire = rows =>
+      (rows || []).map(r => (needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor(UTIL_CAT.wire) } : r))
     const migGas = rows =>
       (rows || []).map(r => (needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor(UTIL_CAT.gas) } : r))
     const migElec = rows =>
@@ -793,6 +827,8 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
       (rows || []).map(r => (needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor(UTIL_CAT.sewerSink) } : r))
     setLineRows(migLine)
     setSubLineRows(migLine)
+    setWireRows(migWire)
+    setSubWireRows(migWire)
     setFixtureRows(migGas)
     setSubFixtureRows(migGas)
     setElecFixtureRows(migElec)
@@ -811,6 +847,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
       hoursAdj,
       trenchRows,
       lineRows,
+      wireRows,
       fixtureRows,
       elecFixtureRows,
       sewerLineRows,
@@ -846,6 +883,20 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
       UTIL_CAT.line,
       r,
       LINE_TYPE_ARR,
+      materialRows,
+      catDefaults,
+      materialPrices
+    )
+    subSideCost += lf * matCost + lf * laborVal * laborRatePerHour
+  })
+  ;(subWireRows || []).forEach(r => {
+    if (!r.type) return
+    const lf = n(r.lf)
+    if (lf <= 0) return
+    const { matCost, laborVal } = resolveUtilRow(
+      UTIL_CAT.wire,
+      r,
+      WIRE_TYPE_ARR,
       materialRows,
       catDefaults,
       materialPrices
@@ -951,6 +1002,9 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   function updateLine(i, field, val) {
     setActiveLineRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
+  function updateWire(i, field, val) {
+    setActiveWireRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  }
   function updateFixture(i, field, val) {
     setActiveFixtureRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
@@ -964,6 +1018,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   // simple per-row field sets. Section = 'line' | 'gas' | 'elec'.
   const _sectionSetter = {
     line: setActiveLineRows,
+    wire: setActiveWireRows,
     gas: setActiveFixtureRows,
     elec: setActiveElecFixtureRows,
     sewerLine: setActiveSewerLineRows,
@@ -986,6 +1041,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
         hoursAdj,
         trenchRows,
         lineRows,
+        wireRows,
         fixtureRows,
         elecFixtureRows,
         sewerLineRows,
@@ -995,6 +1051,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
         manualRows,
         subTrenchRows,
         subLineRows,
+        subWireRows,
         subFixtureRows,
         subElecFixtureRows,
         subSewerLineRows,
@@ -1063,6 +1120,20 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
           laborRow(t.laborDbName, 'hr/LF', materialPrices[t.laborDbName] ?? t.laborPerLF)
         ),
         ...Object.values(UTILITY_LINE_TYPES).flatMap(t => matRows(t.dbName, 'LF', t.costPerLF)),
+      ],
+    },
+    {
+      // Electrical Wiring has no code built-ins — surface every catalog Item
+      // seeded under the 'Electrical Wiring' Sub-category (one block per vendor).
+      group: 'Electrical Wiring',
+      items: [
+        ...Array.from(
+          new Set(
+            (materialRows || [])
+              .filter(r0 => r0.sub_category === UTIL_CAT.wire)
+              .map(r0 => r0.name)
+          )
+        ).flatMap(name => matRows(name, 'LF', 0)),
       ],
     },
     {
@@ -1316,7 +1387,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
       {/* ── Additional Subgrade Work ── */}
       <div>
         <SectionHeader title="Additional Subgrade Work" />
-        <div className="space-y-2">
+        <div className="space-y-0.5">
           {/* Curb Core & Hydrocut — qty based */}
           {Object.entries(ADD_ITEM_RATES).map(([key, rate]) => {
             const qty = n(activeAdditionalItems[`${key}Qty`])
@@ -1343,19 +1414,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
               </div>
             )
           })}
-
-          {/* Permit Required */}
-          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer py-1">
-            <input
-              type="checkbox"
-              checked={activeAdditionalItems.permitRequired}
-              onChange={e =>
-                setActiveAdditionalItems(p => ({ ...p, permitRequired: e.target.checked }))
-              }
-              className="rounded"
-            />
-            * Permit Required
-          </label>
         </div>
       </div>
 
@@ -1454,6 +1512,110 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                   laborType: '',
                   lf: '',
                   vendor: defaultVendorFor(UTIL_CAT.line),
+                },
+              ])
+            }
+          >
+            + Add row
+          </button>
+        </div>
+      </div>
+
+      {/* ── Electrical Wiring ── */}
+      <div>
+        <SectionHeader title="Electrical Wiring" />
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              <col className="w-[128px]" />
+              <col />
+              <col className="w-[84px]" />
+              <col className="w-[96px]" />
+              <col className="w-[96px]" />
+            </colgroup>
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
+                <th className="text-left pb-1 pr-2 font-medium">Wire Type</th>
+                <th className="text-left pb-1 pr-2 font-medium">Linear Feet</th>
+                <th className="text-right pb-1 pr-2 font-medium text-gray-400">$/LF</th>
+                <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activeWireRows.map((row, i) => {
+                const { opts, matOpt, matCost, laborVal, laborBuiltIn } = resolveUtilRow(
+                  UTIL_CAT.wire,
+                  row,
+                  WIRE_TYPE_ARR,
+                  materialRows,
+                  catDefaults,
+                  materialPrices
+                )
+                const mat = n(row.lf) * matCost
+                return (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-2">
+                      <select
+                        className="input text-sm py-1 w-full"
+                        value={effVendor(UTIL_CAT.wire, row.vendor)}
+                        onChange={e => changeRowVendor('wire', i, e.target.value)}
+                        title="Vendor"
+                      >
+                        {vendorsForCategory(UTIL_CAT.wire).map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                        <option value="Standard">Standard</option>
+                      </select>
+                    </td>
+                    <td className="py-1 pr-2">
+                      <div className="flex items-center gap-1">
+                        <select
+                          className="input text-sm py-1 flex-1 min-w-0"
+                          value={row.type || ''}
+                          onChange={e => changeRowType('wire', i, e.target.value)}
+                        >
+                          {!row.type && <option value="">Select wire</option>}
+                          {row.type && !opts.some(o => o.label === row.type) && (
+                            <option value={row.type}>{row.type}</option>
+                          )}
+                          {opts.map(o => (
+                            <option key={o.label} value={o.label}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </td>
+                    <td className="py-1 pr-2">
+                      <NumInput value={row.lf} onChange={v => updateWire(i, 'lf', v)} className="w-full" />
+                    </td>
+                    <td className="py-1 text-right text-gray-400 text-xs pr-2">
+                      <span className="inline-flex items-center justify-end gap-1">
+                        ${matCost.toFixed(2)}
+                      </span>
+                    </td>
+                    <td className="py-1 text-right text-gray-600 text-xs">
+                      {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <button
+            type="button"
+            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+            onClick={() =>
+              setActiveWireRows(r => [
+                ...r,
+                {
+                  type: '',
+                  laborType: '',
+                  lf: '',
+                  vendor: defaultVendorFor(UTIL_CAT.wire),
                 },
               ])
             }
