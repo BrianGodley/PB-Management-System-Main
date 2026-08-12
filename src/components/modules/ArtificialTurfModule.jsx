@@ -90,11 +90,46 @@ const TURF_CAT = { base: 'Turf Base', turf: 'Turf Material' }
 // Base-install material picker options. Each computes qty differently:
 // Gravel/DG are priced per ton, Weed per roll. Vendor overrides material price
 // only (matched by label); labor is per-material preset math.
+// `dbName` maps each built-in to its catalog Item name under Sub-category
+// 'Turf Base' (Gravel↔"Gravel Base", DG↔"DG Base", Weed↔"Weed Barrier Fabric").
+// The built-in `label` ('2" Gravel Base' …) differs from the catalog name, so
+// vendor/catalog price lookups key off `dbName`, while labor/qty coefficients
+// still key off `key` (Gravel/DG/Weed).
 const BASE_MATERIALS = [
-  { key: 'Gravel', label: '2" Gravel Base', matKey: 'Turf - Gravel Base', fallbackKey: 'gravelBase', qtyUnit: 't' },
-  { key: 'DG', label: '1" DG Base', matKey: 'Turf - DG Base', fallbackKey: 'dgBase', qtyUnit: 't' },
-  { key: 'Weed', label: 'Weed Barrier Fabric', matKey: 'Turf - Weed Barrier Fabric', fallbackKey: 'weedFabric', qtyUnit: 'roll' },
+  { key: 'Gravel', label: '2" Gravel Base', dbName: 'Gravel Base', matKey: 'Turf - Gravel Base', fallbackKey: 'gravelBase', qtyUnit: 't' },
+  { key: 'DG', label: '1" DG Base', dbName: 'DG Base', matKey: 'Turf - DG Base', fallbackKey: 'dgBase', qtyUnit: 't' },
+  { key: 'Weed', label: 'Weed Barrier Fabric', dbName: 'Weed Barrier Fabric', matKey: 'Turf - Weed Barrier Fabric', fallbackKey: 'weedFabric', qtyUnit: 'roll' },
 ]
+// Vendor-first Base-material picker options (mirrors UtilitiesModule.mergedUtilTypes
+// and the turf-brand picker above). Standard/unset → the null-vendor 'Turf Base'
+// catalog Items; a real vendor → only that vendor's Items. Each catalog Item is
+// mapped back to its built-in (by catalog name / label) so labor + qty math and
+// the built-in matKey/fallback stay intact. When there are NO catalog Items for
+// the selection, Standard falls back to the built-in BASE_MATERIALS list so the
+// picker never empties; a real vendor with nothing under 'Turf Base' shows nothing.
+function baseMatOptions(materialRows, vendorSel = 'Standard') {
+  const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
+  const catRows = catalogOptions(materialRows, TURF_CAT.base, isStd ? 'Standard' : vendorSel, {
+    standardRows: 'null-vendor',
+    stripPrefix: true,
+    category: 'Artificial Turf',
+  })
+  if (!catRows.length) return isStd ? BASE_MATERIALS.map(m => ({ ...m, value: m.key })) : []
+  return catRows.map(o => {
+    const bi = BASE_MATERIALS.find(m => m.dbName === o.row.name || m.label === o.label)
+    return {
+      ...(bi || {}),
+      key: bi?.key, // built-in key drives labor/qty branch (Gravel/DG/Weed)
+      value: bi?.key || o.row.name, // built-in key round-trips stored rows; else the Item name
+      label: o.label, // show the catalog Item name
+      dbName: o.row.name, // material-price target (matched by name for the vendor)
+      qtyUnit: bi?.qtyUnit || 't',
+      matKey: bi?.matKey,
+      fallbackKey: bi?.fallbackKey,
+      fromMaster: !bi,
+    }
+  })
+}
 function turfMatPrice(cat, vendorSel, typeLabel, houseName, houseFallback, materialRows, catDefaults, mp) {
   const vsel = vendorSel && vendorSel !== 'auto' ? vendorSel : catDefaults?.[cat] || 'Standard'
   const vrow = catalogItemFor(materialRows, cat, vsel, typeLabel, {
@@ -204,12 +239,29 @@ function calcTurf(
   const gravelBaseTonsDivisor = mp['Turf - Gravel Base Tons Divisor'] ?? 200
   const weedFabricSFPerRoll = mp['Turf - Weed Fabric SF per Roll'] ?? 1800
   const baseCalc = (state.baseRows || []).map(row => {
-    const def = BASE_MATERIALS.find(m => m.key === row.material) || BASE_MATERIALS[0]
+    // Vendor-first Type resolution (mirrors UtilitiesModule): the picker lists the
+    // selected vendor's 'Turf Base' catalog Items; map the stored selection back to
+    // its built-in so labor/qty coefficients keep working. Backward-compat: old
+    // rows store the built-in key (Gravel/DG/Weed); newer/vendor rows may store the
+    // catalog Item name/label.
+    const baseOpts = baseMatOptions(materialRows, row.vendor)
+    const opt =
+      baseOpts.find(
+        o =>
+          o.value === row.material ||
+          o.key === row.material ||
+          o.dbName === row.material ||
+          o.label === row.material
+      ) || baseOpts[0]
+    const def = BASE_MATERIALS.find(m => m.key === (opt?.key ?? row.material)) || BASE_MATERIALS[0]
     const sf = n(row.sf) || turfAreaSF
+    // Material price from the chosen catalog Item, vendor-aware (matched by the
+    // catalog Item name). Standard falls through turfMatPrice to the name-keyed
+    // Standard map (def.matKey) exactly as before, so Standard pricing is unchanged.
     const price = turfMatPrice(
       TURF_CAT.base,
       row.vendor,
-      def.label,
+      opt?.dbName || def.dbName,
       def.matKey,
       RATE_DEFAULTS[def.fallbackKey],
       materialRows,
@@ -1181,10 +1233,21 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           />
           <tbody className="divide-y divide-gray-50">
             {(T.baseRows || []).map((row, i) => {
-              const def = BASE_MATERIALS.find(m => m.key === row.material) || BASE_MATERIALS[0]
+              // Vendor-first Type list (mirrors the turf-brand picker below).
+              const baseOpts = baseMatOptions(materialRows, row.vendor)
+              const selOpt =
+                baseOpts.find(
+                  o =>
+                    o.value === row.material ||
+                    o.key === row.material ||
+                    o.dbName === row.material ||
+                    o.label === row.material
+                ) || baseOpts[0]
+              const def = BASE_MATERIALS.find(m => m.key === (selOpt?.key ?? row.material)) || BASE_MATERIALS[0]
               const bc = calc.baseCalc?.[i] || {}
               const unitLabel = def.qtyUnit === 'roll' ? 'roll' : 'ton'
-              const rate = n(materialPrices[def.matKey] || RATE_DEFAULTS[def.fallbackKey])
+              // Vendor-aware price for the chip (the calc already resolved it).
+              const rate = n(bc.price ?? materialPrices[def.matKey] ?? RATE_DEFAULTS[def.fallbackKey])
               return (
                 <tr key={i}>
                   <td className={td}>
@@ -1206,13 +1269,13 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                     <div className="flex items-center gap-1">
                       <select
                         className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
-                        value={row.material}
+                        value={selOpt?.value ?? row.material}
                         onChange={e => setBaseRow(i, 'material', e.target.value)}
                         title="Material"
                       >
-                        {BASE_MATERIALS.map(m => (
-                          <option key={m.key} value={m.key}>
-                            {m.label}
+                        {baseOpts.map(o => (
+                          <option key={o.dbName || o.value} value={o.value}>
+                            {o.label}
                           </option>
                         ))}
                       </select>

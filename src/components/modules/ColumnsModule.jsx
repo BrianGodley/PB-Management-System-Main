@@ -8,7 +8,7 @@ import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { useMaterialCatalog, resolveMaterialPrice } from '../../lib/materialCatalog'
+import { useMaterialCatalog, resolveMaterialPrice, catalogOptions } from '../../lib/materialCatalog'
 import { groutCyPerBlock } from '../../lib/cmuGrout'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -126,6 +126,48 @@ const GROUT_CONCRETE = { dbName: 'Concrete - Ready Mix (Truck)', fallback: 185 }
 // fallback), so Columns numbers are byte-for-byte unchanged.
 const colMatPrice = resolveMaterialPrice
 
+// Catalog sub-category the Column Finishes live under (Category 'Columns').
+const COLUMN_FINISH_SUBCAT = 'Column Finish'
+// Vendor-first Column-Finish Type options (mirrors ArtificialTurfModule.baseMatOptions
+// and UtilitiesModule.mergedUtilTypes). Standard/unset/auto → the built-in
+// FINISH_TYPES list (unchanged); a real vendor → only the 'Column Finish' catalog
+// Items that vendor carries. Each catalog Item is mapped back to its built-in
+// FINISH_TYPES entry — matched by the entry's `dbName` (== the Item name; some
+// catalog names differ from the key, e.g. 'Tile - Columns' ↔ key 'Tile') — so the
+// finish LABOR and the ton/SF branch stay keyed on the built-in, while the catalog
+// Item name becomes the vendor-aware material-PRICE target. A vendor that carries
+// nothing under 'Column Finish' shows an empty list (they don't supply these);
+// Standard never empties because it falls back to FINISH_TYPES.
+function columnFinishOptions(materialRows, vendorSel = 'Standard') {
+  const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
+  const catRows = catalogOptions(materialRows, COLUMN_FINISH_SUBCAT, isStd ? 'Standard' : vendorSel, {
+    standardRows: 'null-vendor',
+    stripPrefix: true,
+    category: COLUMNS_CATEGORY,
+  })
+  if (!catRows.length)
+    return isStd
+      ? Object.keys(FINISH_TYPES).map(key => ({
+          value: key, // built-in key round-trips stored rows
+          label: key,
+          typeKey: key, // drives labor + ton/SF branch
+          dbName: FINISH_TYPES[key].dbName, // material-price target (matched by name)
+        }))
+      : []
+  return catRows.map(o => {
+    const typeKey = Object.keys(FINISH_TYPES).find(
+      k => FINISH_TYPES[k].dbName === o.row.name || k === o.label
+    )
+    return {
+      value: typeKey || o.row.name, // built-in key round-trips; else the Item name
+      label: o.label, // show the catalog Item name
+      typeKey, // built-in FINISH_TYPES key (labor / ton|SF branch)
+      dbName: o.row.name, // vendor-aware material-price target (matched by name)
+      fromMaster: !typeKey,
+    }
+  })
+}
+
 // ── Column geometry helpers ───────────────────────────────────────────────────
 // Standard CMU blocks are 8"×8"×16" (face) or 8"×8"×8" (corner/half)
 // We use 8" module for both dimensions.
@@ -190,19 +232,34 @@ function calcColumns(
   let finishHrs = 0,
     finishMat = 0
   finishRows.forEach(r => {
-    const rate = FINISH_TYPES[r.type]
+    // Vendor-first Type resolution (mirrors ArtificialTurfModule): the picker lists
+    // the selected vendor's 'Column Finish' catalog Items; map the stored selection
+    // back to its built-in FINISH_TYPES entry so the finish LABOR + ton/SF branch
+    // keep working. Backward-compat: legacy rows store the FINISH_TYPES key; vendor/
+    // newer rows may store the catalog Item name/label.
+    const opts = columnFinishOptions(materialRows, r.vendor)
+    const opt =
+      opts.find(
+        o => o.value === r.type || o.typeKey === r.type || o.dbName === r.type || o.label === r.type
+      ) || opts[0]
+    const rate = FINISH_TYPES[opt?.typeKey ?? r.type] ?? FINISH_TYPES[r.type]
     if (!rate || !n(r.qty)) return
+    // Material-PRICE target = the selected catalog Item name (falls back to the
+    // built-in dbName, which is the same catalog name), priced vendor-aware. Labor
+    // stays keyed on the built-in FINISH_TYPES entry. Standard is byte-for-byte
+    // unchanged (priceDbName == rate.dbName).
+    const priceDbName = opt?.dbName || rate.dbName
     if (isSub) {
       // Sub tab: flat $/SF, no separate labor. Vendor overrides the flat source.
       finishMat += n(r.qty) * matP(rate.subDbName, rate.subFallback ?? 0, r.vendor)
     } else if (rate.unit === 'SF') {
-      const cost = matP(rate.dbName, rate.costPerSF, r.vendor)
+      const cost = matP(priceDbName, rate.costPerSF, r.vendor)
       const labRate = mp(rate.laborDbName, rate.laborHrsPerSF)
       finishMat += n(r.qty) * cost
       finishHrs += n(r.qty) * labRate
     } else {
       // ton-based (flagstone, real stone) — Vendor overrides the material $ only.
-      const cost = matP(rate.dbName, rate.costPerTon, r.vendor)
+      const cost = matP(priceDbName, rate.costPerTon, r.vendor)
       const labRate = mp(rate.laborDbName, rate.laborHrsPer)
       finishMat += n(r.qty) * cost
       finishHrs += n(r.qty) * labRate
@@ -835,14 +892,28 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
             </thead>
             <tbody>
               {finishRows.map((row, i) => {
-                const rate = FINISH_TYPES[row.type]
+                // Vendor-first Type list: the selected vendor's 'Column Finish'
+                // catalog Items (Standard → the built-in FINISH_TYPES list). Map the
+                // stored selection back to its built-in for labor + the ton/SF branch.
+                const finishOpts = columnFinishOptions(materialRows, row.vendor)
+                const selOpt =
+                  finishOpts.find(
+                    o =>
+                      o.value === row.type ||
+                      o.typeKey === row.type ||
+                      o.dbName === row.type ||
+                      o.label === row.type
+                  ) || finishOpts[0]
+                const rate = FINISH_TYPES[selOpt?.typeKey ?? row.type] ?? FINISH_TYPES[row.type]
                 const isTon = rate?.unit === 'ton'
                 const defCost = isTon ? rate?.costPerTon : rate?.costPerSF
+                // Material-price target = the selected catalog Item name (vendor-aware).
+                const priceDbName = selOpt?.dbName || rate?.dbName
                 // Sub tab: flat $/SF rate; In-House: material cost per unit.
                 // Vendor overrides ONLY this material price (row.vendor).
                 const cost = isSub
                   ? colMat(rate?.subDbName, row.vendor, rate?.subFallback ?? 0)
-                  : colMat(rate?.dbName, row.vendor, defCost ?? 0)
+                  : colMat(priceDbName, row.vendor, defCost ?? 0)
                 const defLab = isTon ? rate?.laborHrsPer : rate?.laborHrsPerSF
                 const labRate = materialPrices[rate?.laborDbName] ?? defLab ?? 0
                 const unitLabel = isSub ? 'SF' : rate?.unit ?? 'SF'
@@ -869,8 +940,10 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
                           value={row.type}
                           onChange={e => updateFinish(i, 'type', e.target.value)}
                         >
-                          {Object.keys(FINISH_TYPES).map(t => (
-                            <option key={t}>{t}</option>
+                          {finishOpts.map(o => (
+                            <option key={o.value} value={o.value}>
+                              {o.label}
+                            </option>
                           ))}
                         </select>
                       </div>

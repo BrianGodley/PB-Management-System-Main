@@ -7,7 +7,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { useMaterialCatalog, resolveMaterialPrice } from '../../lib/materialCatalog'
+import { useMaterialCatalog, resolveMaterialPrice, catalogOptions } from '../../lib/materialCatalog'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Finishes Module — Flatwork, Wall Caps, Wall Finishes
@@ -138,6 +138,107 @@ const CAP_META = {
   'Bullnose Brick': { matKey: 'capBullnose', matUnit: 'LF' },
 }
 
+// ── Vendor-first Type pickers (mirror ArtificialTurfModule.baseMatOptions) ─────
+// Each picker's built-in Type list stays the source of truth for LABOR + geometry
+// (compute switches on row.type). The Vendor selection changes only WHICH catalog
+// Items appear in the Type dropdown and where the MATERIAL $ resolves from:
+//   Standard/unset → the picker's built-in Type list (unchanged legacy behavior).
+//   Real vendor    → only that vendor's catalog Items, INTERSECTED with this
+//                    picker's built-in set (so shared 'Finish Material' can't
+//                    cross-show wall items under Flatwork or vice-versa).
+// Two pickers (Flatwork + Wall Finishes) read the SAME sub-category 'Finish
+// Material'; each keeps only its own Items via its type→Item map — no data split.
+const FINISH_SUBCAT = { flat: 'Finish Material', cap: 'Cap', wall: 'Finish Material' }
+
+// built-in Type → catalog Item name (per picker). Only types with a catalog Item
+// are listed; 'None' / 'PIP Concrete' have no catalog Item (built-ins only).
+const FLAT_ITEM_BY_TYPE = {
+  Tile: 'Tile Flatwork',
+  Brick: 'Brick Flatwork',
+  Flagstone: 'Flagstone Flatwork',
+  Porcelain: 'Porcelain Flatwork',
+}
+const CAP_ITEM_BY_TYPE = {
+  Flagstone: 'Flagstone',
+  Precast: 'Precast',
+  'Bullnose Brick': 'Bullnose Brick',
+}
+const WALL_ITEM_BY_TYPE = {
+  'Sand Stucco': 'Sand Stucco - Finishes',
+  'Smooth Stucco': 'Smooth Stucco - Finishes',
+  Ledgerstone: 'Ledgerstone - Finishes',
+  'Stacked Stone': 'Stacked Stone - Finishes',
+  Tile: 'Tile - Finishes',
+  'Real Flagstone': 'Real Flagstone - Finishes',
+  'Real Stone': 'Real Stone - Finishes',
+}
+
+// FINISHES_RATES matKey → catalog Item name, for the vendor-aware price lookup.
+// (Wall items: Item name == the FINISHES_RATES db name. Cap/Flatwork: they differ,
+// so the vendor price must resolve on the catalog Item name, not the db name.)
+const FINISH_CAT_ITEM = {
+  // Wall Caps (sub_category 'Cap')
+  capFlagstone: 'Flagstone',
+  capPrecast: 'Precast',
+  capBullnose: 'Bullnose Brick',
+  // Flatwork (sub_category 'Finish Material', FLAT set)
+  flatTile: 'Tile Flatwork',
+  flatBrick: 'Brick Flatwork',
+  flatFlagstone: 'Flagstone Flatwork',
+  flatPorcelain: 'Porcelain Flatwork',
+  // Wall Finishes (sub_category 'Finish Material', WALL set)
+  sandStucco: 'Sand Stucco - Finishes',
+  smoothStucco: 'Smooth Stucco - Finishes',
+  ledgerstone: 'Ledgerstone - Finishes',
+  stackedStone: 'Stacked Stone - Finishes',
+  tile: 'Tile - Finishes',
+  realFlagstone: 'Real Flagstone - Finishes',
+  realStone: 'Real Stone - Finishes',
+  // concreteTruck (PIP cap), stoneScrews, tileAdhesive: no catalog Item → Standard only
+}
+
+const _isStd = v => !v || v === 'Standard'
+
+// Vendor-first Type options for one picker. Standard/unset → the built-in Type
+// list unchanged. Real vendor → the vendor's 'null-vendor'-scoped catalog Items
+// INTERSECTED with this picker's built-in set (each mapped back to its built-in
+// Type so the option VALUE round-trips row.type and labor/geometry keep working).
+// `alwaysBuiltIn` types (None / PIP Concrete) stay selectable regardless of vendor.
+function finishTypeOptions(materialRows, subcat, builtInTypes, itemByType, vendorSel, alwaysBuiltIn = []) {
+  if (_isStd(vendorSel)) return builtInTypes.map(t => ({ value: t, label: t }))
+  const carried = new Set(
+    catalogOptions(materialRows, subcat, vendorSel, {
+      standardRows: 'null-vendor',
+      stripPrefix: true,
+      category: FINISHES_CATEGORY,
+    }).map(o => o.label)
+  )
+  const opts = []
+  builtInTypes.forEach(t => {
+    if (alwaysBuiltIn.includes(t)) {
+      opts.push({ value: t, label: t })
+      return
+    }
+    const item = itemByType[t]
+    if (item && carried.has(item)) opts.push({ value: t, label: item })
+  })
+  return opts
+}
+
+// Vendor-aware material price for a FINISHES_RATES key: a real vendor's catalog
+// Item price when that vendor carries the mapped Item; otherwise the existing
+// name-keyed Standard price (mp[db] → hard fallback). Standard is byte-for-byte
+// unchanged from the old resolveMaterialPrice(db, 'Standard', …) path.
+function finishMatPriceV(matKey, vendor, materialRows, mp) {
+  const spec = FINISHES_RATES[matKey]
+  const item = FINISH_CAT_ITEM[matKey]
+  if (vendor && vendor !== 'Standard' && item) {
+    const vp = resolveMaterialPrice(item, vendor, materialRows, {}, NaN)
+    if (Number.isFinite(vp)) return vp
+  }
+  return mp?.[spec.db] ?? spec.fb
+}
+
 // ── Vendor-catalog material price ─────────────────────────────────────────────
 // The ONLY thing the Vendor selection changes: the material $ source.
 // If a real vendor is selected AND a material_rates row exists whose name===dbName
@@ -154,7 +255,7 @@ const finishMatPrice = resolveMaterialPrice
 function computeFlatRow(row, mp, materialRows) {
   const sf = n(row.sf)
   const v = row.vendor
-  const price = k => finishMatPrice(FINISHES_RATES[k].db, v, materialRows, mp, FINISHES_RATES[k].fb)
+  const price = k => finishMatPriceV(k, v, materialRows, mp)
   const lab = k => mp?.[FINISHES_RATES[k].db] ?? FINISHES_RATES[k].fb
   let mat = 0,
     hrs = 0,
@@ -196,7 +297,7 @@ function computeCapRow(row, mp, materialRows) {
     widthIn = n(row.widthIn),
     qty = n(row.qty)
   const v = row.vendor
-  const price = k => finishMatPrice(FINISHES_RATES[k].db, v, materialRows, mp, FINISHES_RATES[k].fb)
+  const price = k => finishMatPriceV(k, v, materialRows, mp)
   const lab = k => mp?.[FINISHES_RATES[k].db] ?? FINISHES_RATES[k].fb
   let mat = 0,
     hrs = 0,
@@ -239,7 +340,7 @@ function computeCapRow(row, mp, materialRows) {
 function computeWallRow(row, mp, materialRows) {
   const sf = n(row.sf)
   const v = row.vendor
-  const price = k => finishMatPrice(FINISHES_RATES[k].db, v, materialRows, mp, FINISHES_RATES[k].fb)
+  const price = k => finishMatPriceV(k, v, materialRows, mp)
   const lab = k => mp?.[FINISHES_RATES[k].db] ?? FINISHES_RATES[k].fb
   let mat = 0,
     hrs = 0,
@@ -573,7 +674,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
 
   const p = db => materialPrices[db] ?? undefined
   const finishMat = (matKey, vendor) =>
-    finishMatPrice(FINISHES_RATES[matKey].db, vendor, materialRows, materialPrices, FINISHES_RATES[matKey].fb)
+    finishMatPriceV(matKey, vendor, materialRows, materialPrices)
 
   // ── Vendor / row helpers ──────────────────────────────────────────────────
   const vendorOptions = vendorOptionsForCategory(FINISHES_CATEGORY)
@@ -652,7 +753,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
   }
 
   // ── SF-based section renderer (Flatwork + Wall Finishes) ───────────────────
-  function renderSfSection(title, rows, setRows, TYPES, META, compute, blank) {
+  function renderSfSection(title, rows, setRows, TYPES, META, compute, blank, subcat, itemByType) {
     return (
       <div>
         <SectionHeader title={title} />
@@ -675,6 +776,13 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
               {rows.map((row, i) => {
                 const c = compute(row, materialPrices, materialRows)
                 const meta = META[row.type] || {}
+                // Vendor-first Type list (mirrors ArtificialTurf baseMatOptions):
+                // Standard → the built-in TYPES; a real vendor → only its catalog
+                // Items intersected with this picker's set. Keep the stored type
+                // visible even if the vendor doesn't carry it (round-trips row.type).
+                const typeOpts = finishTypeOptions(materialRows, subcat, TYPES, itemByType, row.vendor)
+                if (!typeOpts.some(o => o.value === row.type))
+                  typeOpts.unshift({ value: row.type, label: row.type })
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1.5 pr-2">
@@ -700,8 +808,10 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
                           patchRow(setRows, i, { type: e.target.value }, compute, true)
                         }
                       >
-                        {TYPES.map(t => (
-                          <option key={t}>{t}</option>
+                        {typeOpts.map(o => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
                         ))}
                       </select>
                     </td>
@@ -794,6 +904,20 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
                 const c = computeCapRow(row, materialPrices, materialRows)
                 const meta = CAP_META[row.type] || {}
                 const isActive = row.type !== 'None'
+                // Vendor-first Type list. Standard → CAP_TYPES; a real vendor → its
+                // 'Cap' catalog Items (Flagstone/Precast/Bullnose Brick) intersected
+                // with CAP_TYPES, PLUS the always-available built-ins None + PIP
+                // Concrete (no catalog Item). Stored type stays visible.
+                const typeOpts = finishTypeOptions(
+                  materialRows,
+                  FINISH_SUBCAT.cap,
+                  CAP_TYPES,
+                  CAP_ITEM_BY_TYPE,
+                  row.vendor,
+                  ['None', 'PIP Concrete']
+                )
+                if (!typeOpts.some(o => o.value === row.type))
+                  typeOpts.unshift({ value: row.type, label: row.type })
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1.5 pr-2">
@@ -819,8 +943,10 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
                           patchRow(setCapRows, i, { type: e.target.value }, computeCapRow, true)
                         }
                       >
-                        {CAP_TYPES.map(t => (
-                          <option key={t}>{t}</option>
+                        {typeOpts.map(o => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
                         ))}
                       </select>
                     </td>
@@ -1092,7 +1218,9 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
         FLAT_TYPES,
         FLAT_META,
         computeFlatRow,
-        blankFlatRow
+        blankFlatRow,
+        FINISH_SUBCAT.flat,
+        FLAT_ITEM_BY_TYPE
       )}
 
       {/* ── Wall Caps ── */}
@@ -1106,7 +1234,9 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
         WALL_FINISH_TYPES,
         WALL_META,
         computeWallRow,
-        blankWallRow
+        blankWallRow,
+        FINISH_SUBCAT.wall,
+        WALL_ITEM_BY_TYPE
       )}
 
       {/* ── Manual Entry ── */}

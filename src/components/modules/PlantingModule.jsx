@@ -8,7 +8,7 @@ import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { resolveMaterialPrice, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
+import { resolveMaterialPrice, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Planting Module
@@ -202,6 +202,44 @@ function getLargePerDay(laborRates, type) {
 // order. Planting keeps its own separate material/labor maps (plant names can
 // key both), so it doesn't use the merged useMaterialCatalog hook.
 const plantMatPrice = resolveMaterialPrice
+
+// Catalog sub-categories that back the three Type pickers. 'Plants' holds BOTH
+// Small and Large plant Items — each picker intersects it with its own built-in
+// set (SMALL_PLANT_DEFAULTS / LARGE_PLANT_DEFAULTS) so the sub-category is never
+// split. Add-Ons live under 'Amendments'.
+const PLANTS_SUBCAT = 'Plants'
+const ADDONS_SUBCAT = 'Amendments'
+
+// ── Vendor-first Type picker options ─────────────────────────────────────────
+// Mirrors ArtificialTurfModule.baseMatOptions / UtilitiesModule.mergedUtilTypes.
+// The Type list is now driven by the material catalog, scoped to the picker's
+// sub-category and INTERSECTED with that picker's built-in set:
+//   • Standard / unset / auto → the null-vendor catalog Items for the set, or —
+//     when the catalog carries none yet — the full built-in list (never empties)
+//   • a real vendor → ONLY that vendor's Items in the set (nothing if they carry
+//     none of them)
+// Each option keeps `value` = the BUILT-IN key so labor / per-day math and the
+// stored row.type keep keying on the built-in (backward-compat with old saves).
+// `itemNameFor(key)` returns the catalog Item name a built-in maps to — identity
+// for Small/Large Plants (Item name === key) and ADDON_META.matKey for Add-Ons
+// (e.g. key 'Root Barrier 12"' ↔ Item 'Root Barrier 12in').
+function plantTypeOptions(materialRows, subcat, builtInKeys, vendorSel, itemNameFor = k => k) {
+  const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
+  const catRows = catalogOptions(materialRows, subcat, isStd ? 'Standard' : vendorSel, {
+    standardRows: 'null-vendor',
+    stripPrefix: true,
+    category: PLANTING_CATEGORY,
+  })
+  const builtInOpts = builtInKeys.map(k => ({ value: k, label: k, builtIn: k, dbName: itemNameFor(k) }))
+  if (!catRows.length) return isStd ? builtInOpts : []
+  const out = []
+  for (const k of builtInKeys) {
+    const want = itemNameFor(k)
+    const hit = catRows.find(o => o.label === want || o.row.name === want)
+    if (hit) out.push({ value: k, label: k, builtIn: k, dbName: hit.row.name })
+  }
+  return out.length ? out : isStd ? builtInOpts : []
+}
 
 // ── Per-row calculators ───────────────────────────────────────────────────────
 // Plant row: In-House material = qty × the row's (editable, vendor-defaulted)
@@ -785,7 +823,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
     `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   // ── Plant section renderer (Small Plants / Large Plants) ────────────────────
-  function renderPlantSection(title, rows, setRows, defaultsMap, TYPES, perDayFn, addLabel) {
+  function renderPlantSection(title, rows, setRows, defaultsMap, TYPES, perDayFn, addLabel, subcat) {
     return (
       <div>
         <SectionHeader title={title} />
@@ -811,6 +849,14 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
               {rows.map((row, i) => {
                 const perDay = perDayFn(laborRates, row.type)
                 const c = computePlantRow(row, perDay)
+                // Vendor-first Type list (mirrors Turf's baseMatOptions): the
+                // selected vendor's 'Plants' Items intersected with THIS picker's
+                // built-in set. Standard/unset → the full built-in list. `value`
+                // stays the built-in key so labor/per-day + stored row.type hold.
+                const typeOpts = plantTypeOptions(materialRows, subcat, TYPES, row.vendor)
+                const selType =
+                  typeOpts.find(o => o.value === row.type || o.dbName === row.type) ||
+                  typeOpts[0] || { value: row.type, label: row.type }
                 const masterPrice =
                   materialPrices[row.type] ?? defaultsMap[row.type]?.price ?? 0
                 const isStandard = !row.vendor || row.vendor === 'Standard'
@@ -832,11 +878,13 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
                     <td className="py-1.5 pr-2">
                       <select
                         className="input text-sm py-1 w-full"
-                        value={row.type}
+                        value={selType?.value ?? row.type}
                         onChange={e => plantUpdate(setRows, defaultsMap, i, 'type', e.target.value)}
                       >
-                        {TYPES.map(t => (
-                          <option key={t}>{t}</option>
+                        {typeOpts.map(o => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
                         ))}
                       </select>
                     </td>
@@ -948,6 +996,20 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
                 const c = computeAddonRow(row, laborRates, materialPrices, materialRows)
                 const isStandard = !row.vendor || row.vendor === 'Standard'
                 const houseMat = mp(materialPrices, meta.matKey)
+                // Vendor-first Type list: the selected vendor's 'Amendments' Items
+                // intersected with ADDON_TYPES, matched by each item's matKey (the
+                // catalog Item name — '12"' key ↔ '12in' Item). `value` stays the
+                // ADDON_META key so meta lookups + matKey pricing are unchanged.
+                const typeOpts = plantTypeOptions(
+                  materialRows,
+                  ADDONS_SUBCAT,
+                  ADDON_TYPES,
+                  row.vendor,
+                  k => ADDON_META[k]?.matKey || k
+                )
+                const selType =
+                  typeOpts.find(o => o.value === row.type) ||
+                  typeOpts[0] || { value: row.type, label: row.type }
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1.5 pr-2">
@@ -966,11 +1028,13 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
                     <td className="py-1.5 pr-2">
                       <select
                         className="input text-sm py-1 w-full"
-                        value={row.type}
+                        value={selType?.value ?? row.type}
                         onChange={e => addonUpdate(i, 'type', e.target.value)}
                       >
-                        {ADDON_TYPES.map(t => (
-                          <option key={t}>{t}</option>
+                        {typeOpts.map(o => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
                         ))}
                       </select>
                     </td>
@@ -1318,7 +1382,8 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
         SMALL_PLANT_DEFAULTS,
         Object.keys(SMALL_PLANT_DEFAULTS),
         getSmallPerDay,
-        '+ Add Row'
+        '+ Add Row',
+        PLANTS_SUBCAT
       )}
 
       {/* ── Large Plants / Trees ── */}
@@ -1329,7 +1394,8 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
         LARGE_PLANT_DEFAULTS,
         Object.keys(LARGE_PLANT_DEFAULTS),
         getLargePerDay,
-        '+ Add Row'
+        '+ Add Row',
+        PLANTS_SUBCAT
       )}
 
       {/* ── Planting Add-Ons ── */}
