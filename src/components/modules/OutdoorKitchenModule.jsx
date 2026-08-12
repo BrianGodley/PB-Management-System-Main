@@ -746,7 +746,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
         .from('labor_rates')
         .select('name, rate')
         .in('category', ['Outdoor Kitchen', 'Utilities']),
-      fetchModuleCatalog(['Outdoor Kitchen', 'Utilities', 'Fire Pit', 'Walls']),
+      fetchModuleCatalog(['Outdoor Kitchen', 'Utilities', 'Walls']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')

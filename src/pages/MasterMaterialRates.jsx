@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
-import { setMaterialPrice } from '../lib/materialCatalog'
+import { setMaterialPrice, restoreMaterial } from '../lib/materialCatalog'
 import MaterialDetailModal from '../components/MaterialDetailModal'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -28,7 +28,7 @@ const vendorCode = name =>
   isStandardName(name) ? 'STD' : (name || '').replace(/[^a-z0-9]/gi, '').slice(0, 4).toUpperCase() || 'VEN'
 
 export default function MasterMaterialRates() {
-  const [view, setView] = useState('vendor') // 'vendor' | 'standard'
+  const [view, setView] = useState('vendor') // 'vendor' | 'standard' | 'archived'
   const [materials, setMaterials] = useState([])
   const [vendors, setVendors] = useState([])
   const [loading, setLoading] = useState(true)
@@ -62,7 +62,7 @@ export default function MasterMaterialRates() {
       supabase
         .from('material')
         .select(
-          `id, description, unit, is_default, collection, category_id, subcategory_id,
+          `id, description, unit, is_default, collection, category_id, subcategory_id, archived_at,
            category:category_id ( code, name ),
            subcategory:subcategory_id ( code, name ),
            prices:material_price ( id, price, vendor_id, effective_end )`
@@ -120,7 +120,27 @@ export default function MasterMaterialRates() {
           .filter(Boolean)
           .some(s => s.toLowerCase().includes(q.toLowerCase())))
     const out = []
-    materials.filter(match).forEach(m => {
+    // Archived view — one row per soft-deleted product, regardless of price/vendor.
+    if (view === 'archived') {
+      materials
+        .filter(m => m.archived_at != null)
+        .filter(match)
+        .forEach(m => {
+          const sp = openPrices(m).find(p => p.vendor_id === standardVendorId)
+          out.push({
+            key: m.id,
+            m,
+            priceId: sp?.id ?? null,
+            vendorId: standardVendorId,
+            price: sp?.price ?? null,
+            code: codeFor(m, 'Standard'),
+            archived: true,
+          })
+        })
+      return out
+    }
+    // Normal views exclude archived products.
+    materials.filter(m => !m.archived_at).filter(match).forEach(m => {
       const opens = openPrices(m)
       if (view === 'standard') {
         const sp = opens.find(p => p.vendor_id === standardVendorId)
@@ -218,6 +238,12 @@ export default function MasterMaterialRates() {
   }
 
   const isVendorView = view === 'vendor'
+  const isArchivedView = view === 'archived'
+
+  const restore = async r => {
+    await restoreMaterial(r.m.id)
+    await load()
+  }
 
   return (
     <div className="mt-3 flex-1 min-h-0 flex flex-col">
@@ -228,6 +254,7 @@ export default function MasterMaterialRates() {
             { k: 'vendor', l: 'Vendor' },
             { k: 'standard', l: 'Standard' },
             { k: 'misc', l: 'Misc' },
+            { k: 'archived', l: 'Archived' },
           ].map(t => (
             <button
               key={t.k}
@@ -267,12 +294,14 @@ export default function MasterMaterialRates() {
             onChange={e => setQ(e.target.value)}
           />
           <div className="ml-auto flex items-center gap-2">
-            <button
-              onClick={() => setAdding(isVendorView ? 'vendor' : 'standard')}
-              className="text-xs px-2 py-1 rounded bg-green-700 text-white hover:bg-green-800"
-            >
-              {isVendorView ? '+ Add Vendor Material' : '+ Add Standard Material'}
-            </button>
+            {!isArchivedView && (
+              <button
+                onClick={() => setAdding(isVendorView ? 'vendor' : 'standard')}
+                className="text-xs px-2 py-1 rounded bg-green-700 text-white hover:bg-green-800"
+              >
+                {isVendorView ? '+ Add Vendor Material' : '+ Add Standard Material'}
+              </button>
+            )}
             <span className="text-xs text-gray-400">{rows.length} items</span>
           </div>
         </div>
@@ -288,7 +317,9 @@ export default function MasterMaterialRates() {
                 <Th k="description" sort={sort} onSort={toggleSort}>Description</Th>
                 <Th k="unit" sort={sort} onSort={toggleSort}>Unit</Th>
                 <Th k="price" sort={sort} onSort={toggleSort} align="right">Price</Th>
-                {!isVendorView && <th className="px-3 py-2 font-semibold text-center">Default</th>}
+                {!isVendorView && !isArchivedView && (
+                  <th className="px-3 py-2 font-semibold text-center">Default</th>
+                )}
                 <th className="px-3 py-2 w-36" />
               </tr>
             </thead>
@@ -338,7 +369,7 @@ export default function MasterMaterialRates() {
                       </td>
                       <td className="px-3 py-1.5 text-gray-500 whitespace-nowrap">{r.m.unit || '—'}</td>
                       <td className="px-3 py-1.5 text-right whitespace-nowrap">
-                        {isEd ? (
+                        {isEd && !isArchivedView ? (
                           <input
                             autoFocus
                             type="number"
@@ -357,7 +388,7 @@ export default function MasterMaterialRates() {
                           </span>
                         )}
                       </td>
-                      {!isVendorView && (
+                      {!isVendorView && !isArchivedView && (
                         <td className="px-3 py-1.5 text-center">
                           <button
                             title={r.m.is_default ? 'Default for its sub-category' : 'Set as sub-category default'}
@@ -369,7 +400,14 @@ export default function MasterMaterialRates() {
                         </td>
                       )}
                       <td className="px-3 py-1.5 text-right whitespace-nowrap">
-                        {isEd ? (
+                        {isArchivedView ? (
+                          <button
+                            onClick={() => restore(r)}
+                            className="text-green-700 font-semibold hover:text-green-900"
+                          >
+                            Restore
+                          </button>
+                        ) : isEd ? (
                           <>
                             <button
                               onClick={() => savePrice(r)}

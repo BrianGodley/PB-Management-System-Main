@@ -700,7 +700,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
         .from('labor_rates')
         .select('name, rate')
         .in('category', ['Fire Pit', 'Utilities']),
-      fetchModuleCatalog(['Fire Pit', 'Outdoor Kitchen', 'Walls', 'Utilities']),
+      fetchModuleCatalog(['Fire Pit', 'Walls', 'Utilities']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
