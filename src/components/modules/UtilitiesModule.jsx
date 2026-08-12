@@ -752,7 +752,10 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   // ── Vendor catalog helpers (per-row Vendor/Type pickers) ─────────────────
   const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
   const defaultVendorFor = cat => vendorsForCategory(cat)[0]?.id || 'Standard'
-  const effVendor = (cat, v) => (v && v !== 'auto' && v !== 'Standard' ? v : defaultVendorFor(cat))
+  // Honest effective vendor: only unset/'auto' falls back to the category default.
+  // 'Standard' stays 'Standard' so the dropdown's displayed vendor ALWAYS matches
+  // the vendor the Type list is built from (resolveUtilRow uses the same rule).
+  const effVendor = (cat, v) => (v && v !== 'auto' ? v : defaultVendorFor(cat))
   const catDefaults = {
     [UTIL_CAT.line]: defaultVendorFor(UTIL_CAT.line),
     [UTIL_CAT.gas]: defaultVendorFor(UTIL_CAT.gas),
