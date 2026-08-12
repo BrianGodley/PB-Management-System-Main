@@ -119,9 +119,11 @@ function applianceTypeOptions(materialRows, vendorSel = 'Standard') {
   })
   const catOpts = catRows.map(o => ({ value: o.label, label: o.label, name: o.row.name, fromMaster: true }))
   if (!isStd) return catOpts
-  const covered = new Set(catRows.map(o => o.label))
-  const builtInOpts = APPLIANCE_TYPES.filter(t => !covered.has(t)).map(t => ({ value: t, label: t, fromMaster: false }))
-  return catOpts.length ? [...catOpts, ...builtInOpts] : builtInOpts
+  // Catalog is the source of truth: when Appliance Items exist, show ONLY them.
+  // The hardcoded APPLIANCE_TYPES list is a fallback used solely when the catalog
+  // has no appliances yet (older tenants / before seeding).
+  if (catOpts.length) return catOpts
+  return APPLIANCE_TYPES.map(t => ({ value: t, label: t, fromMaster: false }))
 }
 // Vendor-aware unit material price for an Appliance row. A per-row $/ea override
 // wins; otherwise a selected catalog Appliance Item resolves its vendor-aware
