@@ -57,6 +57,11 @@ const GT_RATES = {
   soilPrepHandAdd: { dbName: 'Soil Prep - Hand Add', fallback: 0.06 }, // hrs/SF — Method = Hand add (In-House only)
   sodPrepMat: { dbName: 'Sod Soil Prep', fallback: 0.1558 }, // $/SF  (Area = Sod)
   sodPrepLab: { dbName: 'Sod Soil Prep - Labor Rate', fallback: 0.012 }, // hrs/SF (Area = Sod)
+  // ── Tilling (Planter Prep + Sod Prep) — labor per SF by tilling method ──────
+  // Added on top of the base soil-prep labor. None = no tilling. Seed real
+  // incremental tilling labor via labor_rates (category Ground Treatments).
+  tillHandLab: { dbName: 'GT - Till Hand Labor Rate', fallback: 0.06 }, // hrs/SF
+  tillTillerLab: { dbName: 'GT - Till Tiller Labor Rate', fallback: 0.012 }, // hrs/SF
 
   // ── Sod ────────────────────────────────────────────────────────────────────
   sodMarathonMat: { dbName: 'Sod - Marathon', fallback: 1.2 }, // $/SF
@@ -295,9 +300,19 @@ function calcGroundTreatments(
     mulchRows,
     plasticEdgingLF,
     metalEdgingLF,
+    edgingVendor,
+    edgingType,
+    edgingLF,
     soilPrepSF,
-    prepMethod,
-    prepArea,
+    prepVendor,
+    prepType,
+    prepDepthIn,
+    prepTilling,
+    sodPrepSF,
+    sodPrepVendor,
+    sodPrepType,
+    sodPrepDepthIn,
+    sodPrepTilling,
     sodSF,
     sodType,
     sodFertilizer,
@@ -309,8 +324,6 @@ function calcGroundTreatments(
     precastConcreteSF,
     stepperVendor,
     stepperType,
-    edgingVendor,
-    edgingType,
     dgRows,
     gravelRows,
     soilsRows,
@@ -365,20 +378,18 @@ function calcGroundTreatments(
   // Labor stays per-line (unchanged). Material rate now comes from the picked
   // Type (filtered to the picked Vendor's catalog); Standard defaults to
   // Plastic/Metal so old estimates price identically.
-  const plasticLab =
-    n(plasticEdgingLF) * p(GT_RATES.plasticEdgingLab.dbName, GT_RATES.plasticEdgingLab.fallback)
-  const _plasticEdgeOpt = rowOpt(
-    'Edging',
-    { vendor: (edgingVendor || {}).plastic, type: (edgingType || {}).plastic || 'Plastic' }, [])
-  const plasticMat =
-    n(plasticEdgingLF) * _plasticEdgeOpt.fallback
-  const metalLab =
-    n(metalEdgingLF) * p(GT_RATES.metalEdgingLab.dbName, GT_RATES.metalEdgingLab.fallback)
-  const _metalEdgeOpt = rowOpt(
-    'Edging',
-    { vendor: (edgingVendor || {}).metal, type: (edgingType || {}).metal || 'Metal' }, [])
-  const metalMat =
-    n(metalEdgingLF) * _metalEdgeOpt.fallback
+  // ONE combined Edging row (Vendor + Type + LF). Material from the picked Type
+  // (filtered to the Vendor's catalog). Labor rate keys off the Type: a metal-ish
+  // type uses the Metal labor rate, otherwise the Plastic labor rate. Empty
+  // (no type) → $0. Guarded so an unselected row contributes nothing.
+  const _edgeLF = n(edgingLF)
+  const _edgeOpt = rowOpt('Edging', { vendor: edgingVendor, type: edgingType }, [])
+  const _edgeIsMetal = /metal/i.test(edgingType || '')
+  const _edgeLabRate = _edgeIsMetal
+    ? p(GT_RATES.metalEdgingLab.dbName, GT_RATES.metalEdgingLab.fallback)
+    : p(GT_RATES.plasticEdgingLab.dbName, GT_RATES.plasticEdgingLab.fallback)
+  const edgingLab = edgingType ? _edgeLF * _edgeLabRate : 0
+  const edgingMat = edgingType ? _edgeLF * _edgeOpt.fallback : 0
 
   // ── Preparation (Planting Bed Prep) ─────────────────────────────────────────
   // Area = Planter → existing Soil Prep rates; Area = Sod → independent Sod Soil
@@ -387,25 +398,61 @@ function calcGroundTreatments(
   // but never gets the Hand labor add). soilLab/soilMat keep their downstream
   // wiring (base labor hours + total material).
   const _prepIsSub = state.subType === 'Subcontractor'
-  const _prepBaseLab =
-    prepArea === 'Sod'
-      ? p(GT_RATES.sodPrepLab.dbName, GT_RATES.sodPrepLab.fallback)
-      : p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
-  const _prepBaseMat =
-    prepArea === 'Sod'
-      ? p(GT_RATES.sodPrepMat.dbName, GT_RATES.sodPrepMat.fallback)
-      : p(GT_RATES.soilPrepMat.dbName, GT_RATES.soilPrepMat.fallback)
-  const _prepHandAdd =
-    prepMethod === 'Hand' && !_prepIsSub
-      ? p(GT_RATES.soilPrepHandAdd.dbName, GT_RATES.soilPrepHandAdd.fallback)
-      : 0
-  let soilLab = n(soilPrepSF) * (_prepBaseLab + _prepHandAdd)
-  let soilMat = n(soilPrepSF) * _prepBaseMat
+  // Tilling labor (hrs/SF) added on top of the base soil-prep labor. None = 0.
+  const _tillLab = method =>
+    method === 'Hand'
+      ? p(GT_RATES.tillHandLab.dbName, GT_RATES.tillHandLab.fallback)
+      : method === 'Tiller'
+        ? p(GT_RATES.tillTillerLab.dbName, GT_RATES.tillTillerLab.fallback)
+        : 0
+
+  // ── Planter Preparation (Soils-style row) ──────────────────────────────────
+  // Material = CY × $/CY from the picked soil/amendment (sub-category 'Soils').
+  // Labor = area × (soilPrepLab base + Hand-add soilPrepHandAdd + tilling coeff).
+  let soilLab = 0
+  let soilMat = 0
+  {
+    const area = n(soilPrepSF)
+    if (area > 0) {
+      const baseLab = p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
+      const handAdd =
+        prepTilling === 'Hand' && !_prepIsSub
+          ? p(GT_RATES.soilPrepHandAdd.dbName, GT_RATES.soilPrepHandAdd.fallback)
+          : 0
+      soilLab = area * (baseLab + handAdd + _tillLab(prepTilling))
+      if (prepType) {
+        const CY = (area * (n(prepDepthIn) / 12)) / 27
+        const st = rowOpt('Soils', { vendor: prepVendor, type: prepType }, [])
+        soilMat = CY * st.fallback
+      }
+    }
+  }
+
+  // ── Sod Preparation (Soils-style row, sod-prep labor base) ──────────────────
+  let sodPrepLabHrs = 0
+  let sodPrepMatCost = 0
+  {
+    const area = n(sodPrepSF)
+    if (area > 0) {
+      const baseLab = p(GT_RATES.sodPrepLab.dbName, GT_RATES.sodPrepLab.fallback)
+      const handAdd =
+        sodPrepTilling === 'Hand' && !_prepIsSub
+          ? p(GT_RATES.soilPrepHandAdd.dbName, GT_RATES.soilPrepHandAdd.fallback)
+          : 0
+      sodPrepLabHrs = area * (baseLab + handAdd + _tillLab(sodPrepTilling))
+      if (sodPrepType) {
+        const CY = (area * (n(sodPrepDepthIn) / 12)) / 27
+        const st = rowOpt('Soils', { vendor: sodPrepVendor, type: sodPrepType }, [])
+        sodPrepMatCost = CY * st.fallback
+      }
+    }
+  }
 
   // ── Sod ────────────────────────────────────────────────────────────────────
   let sodLab = n(sodSF) * p(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback)
   const sodT = resolveType(sodType, _opts.sod, [])
-  let sodMat = n(sodSF) * sodT.fallback
+  // No sod variety picked → $0 material (labor still applies to entered SF).
+  let sodMat = sodType ? n(sodSF) * sodT.fallback : 0
 
   // Fertilizer — auto-figured bags from sod SF × coverage (SF/bag). Material only.
   let fertMat = 0
@@ -415,28 +462,10 @@ function calcGroundTreatments(
       : (catDefaults.Fertilizer || 'Standard')
   const fertT = rowOpt('Fertilizer', { vendor: _fertV, type: sodFertilizer }, [])
   const _fertSF = n(sodFertilizerSF) || n(sodSF)
-  if (fertT && fertT.dbName && _fertSF > 0) {
+  if (sodFertilizer && fertT && fertT.dbName && _fertSF > 0) {
     const sfPerBag = p(GT_RATES.fertilizerSFPerBag.dbName, GT_RATES.fertilizerSFPerBag.fallback)
     const bags = sfPerBag > 0 ? Math.ceil(_fertSF / sfPerBag) : 0
     fertMat = bags * fertT.fallback
-  }
-
-  // ── Soils (optional amendment lines) ────────────────────────────────────────
-  let soilsMat = 0
-  let soilsLab = 0
-  ;(soilsRows || []).forEach(r => {
-    if (!n(r.sf)) return
-    if (!r.type) return
-    const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
-    const st = rowOpt('Soils', r, [])
-    soilsMat += CY * st.fallback
-    // Labor: 0.002 hr per SF per inch of depth (2" doubles it, 3" triples, …).
-    soilsLab += n(r.sf) * n(r.depthIn) * p('Soils Install Labor', 0.002)
-  })
-  // Sub tab: no Soils section — subcontractors supply their own soil.
-  if (state.subType === 'Subcontractor') {
-    soilsMat = 0
-    soilsLab = 0
   }
 
   // ── Steppers (Flagstone + Precast, Soil Set + Concrete Set) ─────────────────
@@ -593,10 +622,9 @@ function calcGroundTreatments(
   // ── Totals ─────────────────────────────────────────────────────────────────
   const baseHrs =
     mulchLab +
-    plasticLab +
-    metalLab +
+    edgingLab +
     soilLab +
-    soilsLab +
+    sodPrepLabHrs +
     sodLab +
     stepLab +
     dgLab +
@@ -611,9 +639,9 @@ function calcGroundTreatments(
   const manDays = totalHrs / 8
   totalMat =
     mulchMat +
-    plasticMat +
-    metalMat +
+    edgingMat +
     soilMat +
+    sodPrepMatCost +
     sodMat +
     fertMat +
     stepMat +
@@ -621,7 +649,6 @@ function calcGroundTreatments(
     gravelMat +
     pebbleMat +
     cobbleMat +
-    soilsMat +
     manMat
   const laborCost = totalHrs * lrph
   const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
@@ -675,12 +702,12 @@ function calcGroundTreatments(
     // section breakdowns for summary
     mulchLab,
     mulchMat,
-    plasticLab,
-    plasticMat,
-    metalLab,
-    metalMat,
+    edgingLab,
+    edgingMat,
     soilLab,
     soilMat,
+    sodPrepLab: sodPrepLabHrs,
+    sodPrepMat: sodPrepMatCost,
     sodLab,
     sodMat,
     flagLab,
@@ -755,33 +782,25 @@ function VendorPicker({ vendors = [], value = 'Standard', onChange, label = 'Ven
 }
 
 const DEFAULT_GRAVEL_ROWS = [
-  { sf: '', method: 'Hand', type: '', depthIn: '3', weedFabric: 'Yes', vendor: 'auto' },
-  { sf: '', method: 'Hand', type: '', depthIn: '3', weedFabric: 'Yes', vendor: 'auto' },
+  { sf: '', method: 'Hand', type: '', depthIn: '3', weedFabric: 'Yes', vendor: '' },
 ]
 const DEFAULT_SOILS_ROWS = [
-  { type: '', sf: '', depthIn: '2', vendor: 'auto' },
-  { type: '', sf: '', depthIn: '2', vendor: 'auto' },
+  { type: '', sf: '', depthIn: '2', vendor: '' },
 ]
 const DEFAULT_PEBBLE_ROWS = [
-  { sf: '', method: 'Hand', type: '', depthIn: '3', weedFabric: 'Yes', vendor: 'auto' },
-  { sf: '', method: 'Hand', type: '', depthIn: '3', weedFabric: 'Yes', vendor: 'auto' },
+  { sf: '', method: 'Hand', type: '', depthIn: '3', weedFabric: 'Yes', vendor: '' },
 ]
 const DEFAULT_COBBLE_ROWS = [
-  { sf: '', method: 'Hand', type: '', depthIn: '3', vendor: 'auto' },
-  { sf: '', method: 'Hand', type: '', depthIn: '3', vendor: 'auto' },
+  { sf: '', method: 'Hand', type: '', depthIn: '3', vendor: '' },
 ]
 const DEFAULT_MULCH_ROWS = [
-  { type: '', sf: '', depth: '2', weedFabric: 'No', vendor: 'auto' },
-  { type: '', sf: '', depth: '2', weedFabric: 'No', vendor: 'auto' },
+  { type: '', sf: '', depth: '2', weedFabric: 'No', vendor: '' },
 ]
 const DEFAULT_DG_ROWS = [
-  { type: '', sf: '', depth: '3.5', weedFabric: 'No', method: 'Machine', cement: 'No', vendor: 'auto' },
-  { type: '', sf: '', depth: '3.5', weedFabric: 'No', method: 'Machine', cement: 'No', vendor: 'auto' },
+  { type: '', sf: '', depth: '3.5', weedFabric: 'No', method: 'Machine', cement: 'No', vendor: '' },
 ]
 const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 1', hours: '', materials: '', subCost: '' },
-  { label: 'Misc 2', hours: '', materials: '', subCost: '' },
-  { label: 'Misc 3', hours: '', materials: '', subCost: '' },
 ]
 // Per-tab input record. In-House and Sub each hold their own independent copy so
 // the two tabs are separate calculators. Shared fields (rates, vendors list,
@@ -808,8 +827,19 @@ function makeTab(src = {}) {
     plasticEdgingLF: src.plasticEdgingLF ?? '',
     metalEdgingLF: src.metalEdgingLF ?? '',
     soilPrepSF: src.soilPrepSF ?? '',
-    // Preparation section — Method (Tiller default / Hand adds per-SF labor) and
-    // Area (Planter default → Soil Prep rates / Sod → Sod Soil Prep rates).
+    // Planter Preparation — Soils-style row (Vendor + soil/amendment Type + Area
+    // (soilPrepSF) + Depth → CY × $/CY) plus a Tilling method (None/Hand/Tiller).
+    prepVendor: src.prepVendor ?? '',
+    prepType: src.prepType ?? '',
+    prepDepthIn: src.prepDepthIn ?? '2',
+    prepTilling: src.prepTilling ?? (src.prepMethod === 'Hand' ? 'Hand' : 'Tiller'),
+    // Sod Preparation — independent Soils-style row using the sod-prep labor base.
+    sodPrepSF: src.sodPrepSF ?? src.sodSoilPrepSF ?? '',
+    sodPrepVendor: src.sodPrepVendor ?? '',
+    sodPrepType: src.sodPrepType ?? '',
+    sodPrepDepthIn: src.sodPrepDepthIn ?? '2',
+    sodPrepTilling: src.sodPrepTilling ?? 'Tiller',
+    // Legacy prep fields kept for backward-compat with saved estimates + summary.
     prepMethod: src.prepMethod ?? 'Tiller',
     prepArea: src.prepArea ?? 'Planter',
     sodSoilPrepSF: src.sodSoilPrepSF ?? '',
@@ -817,18 +847,21 @@ function makeTab(src = {}) {
     sodSoilPrepType: src.sodSoilPrepType ?? 'Soil Prep',
     sodFertilizerSF: src.sodFertilizerSF ?? '',
     sodSF: src.sodSF ?? '',
-    sodType: src.sodType ?? 'Marathon',
-    sodFertilizer: src.sodFertilizer ?? 'None',
+    sodType: src.sodType ?? '',
+    sodFertilizer: src.sodFertilizer ?? '',
     flagstoneSoilSF: src.flagstoneSoilSF ?? '',
     flagstoneConcreteSF: src.flagstoneConcreteSF ?? '',
     precastSoilSF: src.precastSoilSF ?? '',
     precastConcreteSF: src.precastConcreteSF ?? '',
     stepperVendor:
-      src.stepperVendor ?? { flagSoil: 'Standard', flagConc: 'Standard', precSoil: 'Standard', precConc: 'Standard' },
+      src.stepperVendor ?? { flagSoil: '', flagConc: '', precSoil: '', precConc: '' },
     stepperType:
-      src.stepperType ?? { flagSoil: 'Flagstone', flagConc: 'Flagstone', precSoil: 'Precast', precConc: 'Precast' },
-    edgingVendor: src.edgingVendor ?? { plastic: 'Standard', metal: 'Standard' },
-    edgingType: src.edgingType ?? { plastic: 'Plastic', metal: 'Metal' },
+      src.stepperType ?? { flagSoil: '', flagConc: '', precSoil: '', precConc: '' },
+    // Edging — single combined row (Vendor + Type + LF). Backward-compat: old
+    // saved data stored maps for edgingVendor/edgingType; coerce to '' strings.
+    edgingVendor: typeof src.edgingVendor === 'string' ? src.edgingVendor : '',
+    edgingType: typeof src.edgingType === 'string' ? src.edgingType : '',
+    edgingLF: src.edgingLF ?? '',
     // D.G. multi-row. Backward-compat: migrate a legacy single DG entry.
     dgRows:
       src.dgRows ??
@@ -850,8 +883,8 @@ function makeTab(src = {}) {
     pebbleRows: src.pebbleRows ?? DEFAULT_PEBBLE_ROWS.map(r => ({ ...r })),
     cobbleRows: src.cobbleRows ?? DEFAULT_COBBLE_ROWS.map(r => ({ ...r })),
     manualRows: src.manualRows ?? DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
-    sodVendor: src.sodVendor ?? 'Standard',
-    sodFertilizerVendor: src.sodFertilizerVendor ?? 'Standard',
+    sodVendor: src.sodVendor ?? '',
+    sodFertilizerVendor: src.sodFertilizerVendor ?? '',
   }
 }
 
@@ -998,6 +1031,26 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   const setMetalEdgingLF = setField('metalEdgingLF')
   const soilPrepSF = cur.soilPrepSF
   const setSoilPrepSF = setField('soilPrepSF')
+  // Planter Preparation row accessors
+  const prepVendor = cur.prepVendor
+  const setPrepVendor = setField('prepVendor')
+  const prepType = cur.prepType
+  const setPrepType = setField('prepType')
+  const prepDepthIn = cur.prepDepthIn
+  const setPrepDepthIn = setField('prepDepthIn')
+  const prepTilling = cur.prepTilling
+  const setPrepTilling = setField('prepTilling')
+  // Sod Preparation row accessors
+  const sodPrepSF = cur.sodPrepSF
+  const setSodPrepSF = setField('sodPrepSF')
+  const sodPrepVendor = cur.sodPrepVendor
+  const setSodPrepVendor = setField('sodPrepVendor')
+  const sodPrepType = cur.sodPrepType
+  const setSodPrepType = setField('sodPrepType')
+  const sodPrepDepthIn = cur.sodPrepDepthIn
+  const setSodPrepDepthIn = setField('sodPrepDepthIn')
+  const sodPrepTilling = cur.sodPrepTilling
+  const setSodPrepTilling = setField('sodPrepTilling')
   const prepMethod = cur.prepMethod
   const setPrepMethod = setField('prepMethod')
   const prepArea = cur.prepArea
@@ -1072,7 +1125,10 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   // the vendor's unit_cost. Falls back to the Standard array if the vendor has no
   // rows for the sub_category (so the dropdown is never empty).
   function sectionOptions(subcat, vendorSel, houseArray) {
-    if (!vendorSel || vendorSel === 'Standard') return mergedGtOpts(subcat, houseArray, materialRows)
+    // Unset vendor → empty Type list (only the row's own "Select …" placeholder);
+    // pick a vendor first. Explicit 'Standard' still yields the Standard catalog.
+    if (!vendorSel) return []
+    if (vendorSel === 'Standard') return mergedGtOpts(subcat, houseArray, materialRows)
     const opts = catalogOptions(materialRows, subcat, vendorSel, { standardRows: 'exclude', stripPrefix: true })
     // Table-driven: a vendor with no catalog rows for this sub-category shows an
     // empty list (no hardcoded fallback).
@@ -1091,55 +1147,9 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   const dgCementId = (materialRows.find(r => r.vendor_id == null && r.sub_category === 'DG' && /cement/i.test(r.name || '')) || {}).id
   const soilPrepId = (materialRows.find(r => r.vendor_id == null && r.sub_category === 'Soil Prep') || {}).id
 
-  // On a NEW module, once vendor catalogs load, default each section's vendor to
-  // the first real vendor that supplies its category (Standard then falls to the
-  // bottom of the picker). Runs once; never overrides a saved estimate or an
-  // explicit user pick.
-  const [vendorDefaultsApplied, setVendorDefaultsApplied] = useState(false)
-  useEffect(() => {
-    // Only skip for a genuinely SAVED estimate (has a price snapshot). A new
-    // module always receives a non-empty initialData (gpmd/notes/etc.), so
-    // guarding on `initialData` alone would wrongly suppress the defaults.
-    if (vendorDefaultsApplied || initialData?.materialPrices || !vendors.length) return
-    setVendorDefaultsApplied(true)
-    // A field/row that hasn't been explicitly set yet — the 'auto' sentinel that
-    // default rows ship with, a leftover 'Standard', or an empty value. Only these
-    // get pushed to the category's first real vendor; an explicit user pick stays.
-    const needsDefault = v => !v || v === 'Standard' || v === 'auto'
-    const migRows = (cat, rows) =>
-      (rows || []).map(r => (needsDefault(r.vendor) ? { ...r, vendor: defaultVendorFor(cat) } : r))
-    const migMap = (obj, cat) => {
-      const d = defaultVendorFor(cat)
-      const nv = { ...(obj || {}) }
-      Object.keys(nv).forEach(k => {
-        if (needsDefault(nv[k])) nv[k] = d
-      })
-      return nv
-    }
-    // Migrate BOTH tabs so each independent calculator gets its section vendor
-    // defaults (In-House and Sub stay separate).
-    const migTab = t => ({
-      ...t,
-      gravelRows: migRows('Gravel', t.gravelRows),
-      pebbleRows: migRows('Pebble', t.pebbleRows),
-      cobbleRows: migRows('Cobbles', t.cobbleRows),
-      soilsRows: migRows('Soils', t.soilsRows),
-      mulchRows: migRows('Mulch', t.mulchRows),
-      dgRows: migRows('DG', t.dgRows),
-      sodVendor: needsDefault(t.sodVendor) ? defaultVendorFor('Sod') : t.sodVendor,
-      sodFertilizerVendor: needsDefault(t.sodFertilizerVendor)
-        ? defaultVendorFor('Fertilizer')
-        : t.sodFertilizerVendor,
-      sodSoilPrepVendor: needsDefault(t.sodSoilPrepVendor)
-        ? defaultVendorFor('Soil Prep')
-        : t.sodSoilPrepVendor,
-      stepperVendor: migMap(t.stepperVendor, 'Steppers'),
-      edgingVendor: migMap(t.edgingVendor, 'Edging'),
-    })
-    setIhTab(migTab)
-    setSubTab(migTab)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vendors, initialData, vendorDefaultsApplied])
+  // Per-row/section Vendor pickers now default to an empty "Select vendor"
+  // placeholder (unset → empty Type list + $0 row). No auto-resolve of unset →
+  // default vendor: the user picks the vendor first, then the Type list populates.
 
   const sodOpts = sectionOptions('Sod', sodVendor, [])
   const soilPrepOpts = sectionOptions('Soil Prep', sodSoilPrepVendor, SOIL_PREP_TYPES)
@@ -1249,6 +1259,24 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           mode: 'coefficient',
           unitLabel: 'hrs/SF',
           value: p(GT_RATES.soilPrepHandAdd.dbName, GT_RATES.soilPrepHandAdd.fallback),
+        },
+        {
+          label: 'Tilling - Hand Labor Rate',
+          table: 'labor_rates',
+          name: GT_RATES.tillHandLab.dbName,
+          category: 'Ground Treatments',
+          mode: 'coefficient',
+          unitLabel: 'hrs/SF',
+          value: p(GT_RATES.tillHandLab.dbName, GT_RATES.tillHandLab.fallback),
+        },
+        {
+          label: 'Tilling - Tiller Labor Rate',
+          table: 'labor_rates',
+          name: GT_RATES.tillTillerLab.dbName,
+          category: 'Ground Treatments',
+          mode: 'coefficient',
+          unitLabel: 'hrs/SF',
+          value: p(GT_RATES.tillTillerLab.dbName, GT_RATES.tillTillerLab.fallback),
         },
       ],
     },
@@ -1692,7 +1720,9 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                   {_pencil(nm, 'SF')}
                 </div>
                 {(rows || []).map((row, i) => {
-                  const opts = sectionOptions(subcat, row.vendor, [])
+                  // Sub scope has no per-row vendor picker; show the Standard
+                  // catalog when unset so the (informational) Type list is usable.
+                  const opts = sectionOptions(subcat, row.vendor || 'Standard', [])
                   const t = resolveType(row.type, opts, [])
                   return (
                     <div key={i} className="flex items-center gap-2 mb-1">
@@ -1745,10 +1775,10 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 <span className="text-xs font-bold text-gray-600 uppercase">Sod</span>
                 <select
                   className="input text-sm py-1 flex-1 min-w-0"
-                  value={resolveType(sodType, sectionOptions('Sod', sodVendor, []), [])?.label || ''}
+                  value={resolveType(sodType, sectionOptions('Sod', sodVendor || 'Standard', []), [])?.label || ''}
                   onChange={e => setSodType(e.target.value)}
                 >
-                  {sectionOptions('Sod', sodVendor, []).map(o => (
+                  {sectionOptions('Sod', sodVendor || 'Standard', []).map(o => (
                     <option key={o.label} value={o.label}>
                       {o.label}
                     </option>
@@ -1815,116 +1845,216 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       {/* In-House sections (hidden on the Sub tab) */}
       {!isSub && (
         <>
-      {/* ── Preparation ── */}
-      <div>
-        <SectionHeader title="Preparation" />
-        <div className="space-y-0">
-          {(() => {
-            const isSodArea = prepArea === 'Sod'
-            const matName = isSodArea ? GT_RATES.sodPrepMat.dbName : GT_RATES.soilPrepMat.dbName
-            const matVal = isSodArea
-              ? p(GT_RATES.sodPrepMat.dbName, GT_RATES.sodPrepMat.fallback)
-              : p(GT_RATES.soilPrepMat.dbName, GT_RATES.soilPrepMat.fallback)
-            const labName = isSodArea ? GT_RATES.sodPrepLab.dbName : GT_RATES.soilPrepLab.dbName
-            const labVal = isSodArea
-              ? p(GT_RATES.sodPrepLab.dbName, GT_RATES.sodPrepLab.fallback)
-              : p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
-            const handAdd = p(GT_RATES.soilPrepHandAdd.dbName, GT_RATES.soilPrepHandAdd.fallback)
-            const isSubTab = subType === 'Subcontractor'
-            return (
-              <LabeledRow
-                label="Till and Amend"
-                note={n(soilPrepSF) > 0 ? `$${(n(soilPrepSF) * matVal).toFixed(2)} mat` : null}
-              >
-                <select
-                  className="input text-sm py-1.5 w-28"
-                  value={prepMethod}
-                  onChange={e => setPrepMethod(e.target.value)}
-                  title="Method"
-                >
-                  <option value="Tiller">Tiller</option>
-                  <option value="Hand">Hand</option>
-                </select>
-                <select
-                  className="input text-sm py-1.5 w-28"
-                  value={prepArea}
-                  onChange={e => setPrepArea(e.target.value)}
-                  title="Area"
-                >
-                  <option value="Planter">Planter</option>
-                  <option value="Sod">Sod</option>
-                </select>
-                <NumInput
-                  value={soilPrepSF}
-                  onChange={setSoilPrepSF}
-                  placeholder="SF"
-                  className="w-28"
-                />
-                <span className="text-xs text-gray-400 inline-flex items-center gap-1 flex-wrap">
-                  ${matVal.toFixed(4)}/SF
-                  {prepMethod === 'Hand' && (
-                    <>
-                      · Hand{isSubTab ? ' (In-House only)' : ` +${handAdd} hrs/SF`}
-                    </>
-                  )}
-                </span>
-              </LabeledRow>
-            )
-          })()}
-        </div>
-      </div>
+      {/* ── Planter Preparation ── */}
+      {(() => {
+        // Shared renderer for a Soils-style prep row (Planter / Sod). Material =
+        // CY × $/CY from the picked soil/amendment (sub-category 'Soils'); labor =
+        // area × (base soil-prep labor + Hand-add + tilling coeff).
+        const isSubTab = subType === 'Subcontractor'
+        const tillHrs = method =>
+          method === 'Hand'
+            ? p(GT_RATES.tillHandLab.dbName, GT_RATES.tillHandLab.fallback)
+            : method === 'Tiller'
+              ? p(GT_RATES.tillTillerLab.dbName, GT_RATES.tillTillerLab.fallback)
+              : 0
+        const prepSection = ({
+          title,
+          vendor,
+          setVendor,
+          type,
+          setType,
+          area,
+          setArea,
+          depth,
+          setDepth,
+          tilling,
+          setTilling,
+          baseLabRate,
+        }) => {
+          const rowOpts = sectionOptions('Soils', vendor, [])
+          const st = resolveType(type, rowOpts, [])
+          const typeCost = st.fallback
+          const CY = (n(area) * (n(depth) / 12)) / 27
+          const mat = type ? CY * typeCost : 0
+          const handAdd =
+            tilling === 'Hand' && !isSubTab
+              ? p(GT_RATES.soilPrepHandAdd.dbName, GT_RATES.soilPrepHandAdd.fallback)
+              : 0
+          const hrs = n(area) > 0 ? n(area) * (baseLabRate + handAdd + tillHrs(tilling)) : 0
+          return (
+            <div>
+              <SectionHeader title={title} />
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs text-gray-500 border-b border-gray-200">
+                      <th className="text-left pb-1 pr-1 font-medium">Vendor</th>
+                      <th className="text-left pb-1 pr-1 font-medium">Soil/Amendment Type</th>
+                      <th className="text-left pb-1 pr-1 font-medium">Area (SF)</th>
+                      <th className="text-left pb-1 pr-1 font-medium">Depth (in)</th>
+                      <th className="text-left pb-1 pr-1 font-medium">Tilling</th>
+                      <th className="text-left pb-1 pr-1 font-medium">$/CY</th>
+                      <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b border-gray-100">
+                      <td className="py-1 pr-1">
+                        <select
+                          className="input text-sm py-1.5"
+                          value={vendor || ''}
+                          onChange={e => setVendor(e.target.value)}
+                          title="Vendor"
+                        >
+                          {!vendor && <option value="">Select vendor</option>}
+                          {vendor &&
+                            vendor !== 'Standard' &&
+                            !vendorsForCategory('Soils').some(v => v.id === vendor) && (
+                              <option value={vendor}>{vendor}</option>
+                            )}
+                          {vendorsForCategory('Soils').map(v => (
+                            <option key={v.id} value={v.id}>
+                              {v.name}
+                            </option>
+                          ))}
+                          <option value="Standard">Standard</option>
+                        </select>
+                      </td>
+                      <td className="py-1 pr-1">
+                        <select
+                          className="input text-sm py-1.5"
+                          value={type || ''}
+                          onChange={e => setType(e.target.value)}
+                        >
+                          {!type && <option value="">Select soil/amendment</option>}
+                          {type && !rowOpts.some(o => o.label === type) && (
+                            <option value={type}>{type}</option>
+                          )}
+                          {rowOpts.map(t => (
+                            <option key={t.label} value={t.label}>
+                              {t.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="py-1 pr-1">
+                        <NumInput value={area} onChange={setArea} placeholder="SF" className="w-20" />
+                      </td>
+                      <td className="py-1 pr-1">
+                        <NumInput value={depth} onChange={setDepth} placeholder="2" className="w-20" />
+                      </td>
+                      <td className="py-1 pr-1">
+                        <select
+                          className="input text-sm py-1.5"
+                          value={tilling || 'None'}
+                          onChange={e => setTilling(e.target.value)}
+                          title="Tilling"
+                        >
+                          <option value="None">None</option>
+                          <option value="Hand">Hand</option>
+                          <option value="Tiller">Tiller</option>
+                        </select>
+                      </td>
+                      <td className="py-1 pr-1">
+                        <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
+                          ${typeCost.toFixed(2)}/CY
+                        </span>
+                      </td>
+                      <td className="py-1 text-right text-xs text-gray-600 whitespace-nowrap">
+                        {n(area) > 0 ? `$${mat.toFixed(2)} · ${hrs.toFixed(2)} hrs` : '—'}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )
+        }
+        return (
+          <>
+            {prepSection({
+              title: 'Planter Preparation',
+              vendor: prepVendor,
+              setVendor: setPrepVendor,
+              type: prepType,
+              setType: setPrepType,
+              area: soilPrepSF,
+              setArea: setSoilPrepSF,
+              depth: prepDepthIn,
+              setDepth: setPrepDepthIn,
+              tilling: prepTilling,
+              setTilling: setPrepTilling,
+              baseLabRate: p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback),
+            })}
+            {prepSection({
+              title: 'Sod Preparation',
+              vendor: sodPrepVendor,
+              setVendor: setSodPrepVendor,
+              type: sodPrepType,
+              setType: setSodPrepType,
+              area: sodPrepSF,
+              setArea: setSodPrepSF,
+              depth: sodPrepDepthIn,
+              setDepth: setSodPrepDepthIn,
+              tilling: sodPrepTilling,
+              setTilling: setSodPrepTilling,
+              baseLabRate: p(GT_RATES.sodPrepLab.dbName, GT_RATES.sodPrepLab.fallback),
+            })}
+          </>
+        )
+      })()}
 
-      {/* ── Soils (In-House only — subcontractors bring their own soil) ── */}
-      {!isSub && (
+      {/* ── Sod ── */}
       <div>
-        <SectionHeader title="Soils" />
-        <p className="text-xs text-gray-400 mb-2">Optional soil / amendment lines (material only). Vendor is per-row.</p>
+        <SectionHeader title="Sod" />
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-left pb-1 pr-1 font-medium">Vendor</th>
-                <th className="text-left pb-1 pr-1 font-medium">Type</th>
-                <th className="text-left pb-1 pr-1 font-medium">Area (SF)</th>
-                <th className="text-left pb-1 pr-1 font-medium">Depth (in)</th>
-                <th className="text-left pb-1 pr-1 font-medium">$/CY</th>
+                <th className="text-left pb-1 pr-1 font-medium">Sod Type</th>
+                <th className="text-left pb-1 pr-1 font-medium">SF</th>
+                <th className="text-left pb-1 pr-1 font-medium">$/SF</th>
                 <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
               </tr>
             </thead>
             <tbody>
-              {soilsRows.map((row, i) => {
-                const rowOpts = sectionOptions('Soils', row.vendor, [])
-                const st = resolveType(row.type, rowOpts, [])
-                const typeCost = st.fallback
-                const CY = (n(row.sf) * (n(row.depthIn) / 12)) / 27
-                const mat = CY * typeCost
+              {(() => {
+                const st = resolveType(sodType, sodOpts, [])
                 return (
-                  <tr key={i} className="border-b border-gray-100">
+                  <tr className="border-b border-gray-100">
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.vendor || 'Standard'}
-                        onChange={e => changeRowVendor('Soils', SOIL_TYPES, updateSoils, i, e.target.value)}
+                        value={sodVendor || ''}
+                        onChange={e => setSodVendor(e.target.value)}
+                        title="Vendor"
                       >
-                        <option value="Standard">Standard</option>
-                        {vendorsForCategory('Soils').map(v => (
+                        {!sodVendor && <option value="">Select vendor</option>}
+                        {sodVendor &&
+                          sodVendor !== 'Standard' &&
+                          !vendorsForCategory('Sod').some(v => v.id === sodVendor) && (
+                            <option value={sodVendor}>{sodVendor}</option>
+                          )}
+                        {vendorsForCategory('Sod').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
                           </option>
                         ))}
+                        <option value="Standard">Standard</option>
                       </select>
                     </td>
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.type || ''}
-                        onChange={e => updateSoils(i, 'type', e.target.value)}
+                        value={sodType || ''}
+                        onChange={e => setSodType(e.target.value)}
                       >
-                        {!row.type && <option value="">Select material</option>}
-                        {row.type && !rowOpts.some(o => o.label === row.type) && (
-                          <option value={row.type}>{row.type}</option>
+                        {!sodType && <option value="">Select sod</option>}
+                        {sodType && !sodOpts.some(o => o.label === sodType) && (
+                          <option value={sodType}>{sodType}</option>
                         )}
-                        {rowOpts.map(t => (
+                        {sodOpts.map(t => (
                           <option key={t.label} value={t.label}>
                             {t.label}
                           </option>
@@ -1932,170 +2062,110 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <NumInput value={row.sf} onChange={v => updateSoils(i, 'sf', v)} className="w-16" />
+                      <NumInput value={sodSF} onChange={setSodSF} placeholder="SF" className="w-20" />
                     </td>
                     <td className="py-1 pr-1">
-                      <NumInput
-                        value={row.depthIn}
-                        onChange={v => updateSoils(i, 'depthIn', v)}
-                        placeholder="2"
-                        className="w-20"
-                      />
-                    </td>
-                    <td className="py-1 pr-1">
-                      <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
-                        ${typeCost.toFixed(2)}/CY
+                      <span className="text-xs text-gray-500 whitespace-nowrap">
+                        ${st.fallback.toFixed(2)}/SF
                       </span>
                     </td>
-                    <td className="py-1 text-right text-xs text-gray-600">
-                      <div className="flex items-center justify-end gap-1">
-                        <span>{n(row.sf) > 0 ? `$${mat.toFixed(2)}` : '—'}</span>
-                        {soilsRows.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => setSoilsRows(rows => rows.filter((_, idx) => idx !== i))}
-                            className="text-gray-300 hover:text-red-500 text-sm px-1"
-                            title="Remove line"
-                          >
-                            ×
-                          </button>
-                        )}
-                      </div>
+                    <td className="py-1 text-right text-xs text-gray-600 whitespace-nowrap">
+                      {sodType && n(sodSF) > 0 ? `$${(n(sodSF) * st.fallback).toFixed(2)}` : '—'}
                     </td>
                   </tr>
                 )
-              })}
+              })()}
             </tbody>
           </table>
-          <button
-            type="button"
-            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
-            onClick={() =>
-              setSoilsRows(r => [
-                ...r,
-                { type: '', sf: '', depthIn: '2', vendor: defaultVendorFor('Soils') },
-              ])
-            }
-          >
-            + Add line
-          </button>
         </div>
       </div>
-      )}
 
-      {/* ── Sod ── */}
+      {/* ── Sod Fertilizer ── */}
       <div>
-        <SectionHeader title="Sod" />
-        <div className="space-y-0">
-          <LabeledRow label="Sod">
-            <select
-              className="input text-sm py-1.5 w-32"
-              value={sodVendor}
-              onChange={e => changeSodVendor(e.target.value)}
-              title="Vendor"
-            >
-              <option value="Standard">Standard</option>
-              {vendorsForCategory('Sod').map(v => (
-                <option key={v.id} value={v.id}>
-                  {v.name}
-                </option>
-              ))}
-            </select>
-            <select
-              className="input text-sm py-1.5 flex-1"
-              value={sodType}
-              onChange={e => setSodType(e.target.value)}
-            >
-              {sodOpts.map(t => (
-                <option key={t.label} value={t.label}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-            <NumInput value={sodSF} onChange={setSodSF} placeholder="SF" className="w-24" />
-            <span className="text-xs text-gray-400 inline-flex items-center gap-1">
+        <SectionHeader title="Sod Fertilizer" />
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-1 font-medium">Vendor</th>
+                <th className="text-left pb-1 pr-1 font-medium">Fertilizer Type</th>
+                <th className="text-left pb-1 pr-1 font-medium">SF</th>
+                <th className="text-right pb-1 font-medium text-gray-400">Coverage / Cost</th>
+              </tr>
+            </thead>
+            <tbody>
               {(() => {
-                const st = resolveType(sodType, sodOpts, [])
+                const fertOpts = sectionOptions('Fertilizer', sodFertilizerVendor, [])
+                const ft = resolveType(sodFertilizer, fertOpts, [])
+                const sfPerBag = p(
+                  GT_RATES.fertilizerSFPerBag.dbName,
+                  GT_RATES.fertilizerSFPerBag.fallback
+                )
+                const fertSF = n(sodFertilizerSF) || n(sodSF)
+                const bags =
+                  sodFertilizer && ft && ft.dbName && sfPerBag > 0 && fertSF > 0
+                    ? Math.ceil(fertSF / sfPerBag)
+                    : 0
                 return (
-                  <>
-                    ${st.fallback.toFixed(2)}/SF
-                  </>
+                  <tr className="border-b border-gray-100">
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={sodFertilizerVendor || ''}
+                        onChange={e => setSodFertilizerVendor(e.target.value)}
+                        title="Vendor"
+                      >
+                        {!sodFertilizerVendor && <option value="">Select vendor</option>}
+                        {sodFertilizerVendor &&
+                          sodFertilizerVendor !== 'Standard' &&
+                          !vendorsForCategory('Fertilizer').some(v => v.id === sodFertilizerVendor) && (
+                            <option value={sodFertilizerVendor}>{sodFertilizerVendor}</option>
+                          )}
+                        {vendorsForCategory('Fertilizer').map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                        <option value="Standard">Standard</option>
+                      </select>
+                    </td>
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={sodFertilizer || ''}
+                        onChange={e => setSodFertilizer(e.target.value)}
+                      >
+                        {!sodFertilizer && <option value="">Select fertilizer</option>}
+                        {sodFertilizer && !fertOpts.some(o => o.label === sodFertilizer) && (
+                          <option value={sodFertilizer}>{sodFertilizer}</option>
+                        )}
+                        {fertOpts.map(t => (
+                          <option key={t.label} value={t.label}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1 pr-1">
+                      <NumInput
+                        value={sodFertilizerSF}
+                        onChange={setSodFertilizerSF}
+                        placeholder="SF"
+                        className="w-20"
+                      />
+                    </td>
+                    <td className="py-1 text-right text-xs text-gray-600 whitespace-nowrap">
+                      {ft && ft.dbName && sodFertilizer
+                        ? `$${ft.fallback.toFixed(2)}/bag · 1 bag / ${sfPerBag} SF${
+                            bags > 0 ? ` = ${bags} bag${bags > 1 ? 's' : ''} · $${(bags * ft.fallback).toFixed(2)}` : ''
+                          }`
+                        : '—'}
+                    </td>
+                  </tr>
                 )
               })()}
-            </span>
-            {n(sodSF) > 0 && (
-              <span className="text-xs text-gray-400">
-                $
-                {(() => {
-                  const st = resolveType(sodType, sodOpts, [])
-                  return (n(sodSF) * st.fallback).toFixed(2)
-                })()}{' '}
-                mat
-              </span>
-            )}
-          </LabeledRow>
-          <LabeledRow label="Fertilizer">
-            <select
-              className="input text-sm py-1.5 w-32"
-              value={sodFertilizerVendor}
-              onChange={e => {
-                const v = e.target.value
-                setSodFertilizerVendor(v)
-                const opts = sectionOptions('Fertilizer', v, [])
-                if (!opts.some(o => o.label === sodFertilizer)) setSodFertilizer(opts[0]?.label || '')
-              }}
-              title="Vendor"
-            >
-              <option value="Standard">Standard</option>
-              {vendorsForCategory('Fertilizer').map(v => (
-                <option key={v.id} value={v.id}>
-                  {v.name}
-                </option>
-              ))}
-            </select>
-            <select
-              className="input text-sm py-1.5 flex-1"
-              value={sodFertilizer}
-              onChange={e => setSodFertilizer(e.target.value)}
-            >
-              {sectionOptions('Fertilizer', sodFertilizerVendor, []).map(t => (
-                <option key={t.label} value={t.label}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-            <NumInput
-              value={sodFertilizerSF}
-              onChange={setSodFertilizerSF}
-              placeholder="SF"
-              className="w-24"
-            />
-            {(() => {
-              const ft = resolveType(
-                sodFertilizer,
-                sectionOptions('Fertilizer', sodFertilizerVendor, []),
-                []
-              )
-              if (!ft || !ft.dbName) return null
-              const sfPerBag = p(
-                GT_RATES.fertilizerSFPerBag.dbName,
-                GT_RATES.fertilizerSFPerBag.fallback
-              )
-              const fertSF = n(sodFertilizerSF) || n(sodSF)
-              const bags = sfPerBag > 0 && fertSF > 0 ? Math.ceil(fertSF / sfPerBag) : 0
-              return (
-                <span className="text-xs text-gray-400 inline-flex items-center gap-1 flex-wrap">
-                  ${ft.fallback.toFixed(2)}/bag
-                  · 1 bag / {sfPerBag} SF
-                  {bags > 0 && (
-                    <span className="text-gray-500">
-                      = {bags} bag{bags > 1 ? 's' : ''} · ${(bags * ft.fallback).toFixed(2)}
-                    </span>
-                  )}
-                </span>
-              )
-            })()}
-          </LabeledRow>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -2134,7 +2204,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-left pb-1 pr-1 font-medium">Vendor</th>
-                <th className="text-left pb-1 pr-1 font-medium">Type</th>
+                <th className="text-left pb-1 pr-1 font-medium">Mulch Type</th>
                 <th className="text-left pb-1 pr-1 font-medium">Area (SF)</th>
                 <th className="text-left pb-1 pr-1 font-medium">Depth (in)</th>
                 <th className="text-left pb-1 pr-1 font-medium">$/CY</th>
@@ -2151,15 +2221,22 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.vendor || 'Standard'}
-                        onChange={e => changeRowVendor('Mulch', MULCH_TYPES, updateMulch, i, e.target.value)}
+                        value={row.vendor || ''}
+                        onChange={e => updateMulch(i, 'vendor', e.target.value)}
+                        title="Vendor"
                       >
-                        <option value="Standard">Standard</option>
+                        {!row.vendor && <option value="">Select vendor</option>}
+                        {row.vendor &&
+                          row.vendor !== 'Standard' &&
+                          !vendorsForCategory('Mulch').some(v => v.id === row.vendor) && (
+                            <option value={row.vendor}>{row.vendor}</option>
+                          )}
                         {vendorsForCategory('Mulch').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
                           </option>
                         ))}
+                        <option value="Standard">Standard</option>
                       </select>
                     </td>
                     <td className="py-1 pr-1">
@@ -2168,7 +2245,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         value={row.type || ''}
                         onChange={e => updateMulch(i, 'type', e.target.value)}
                       >
-                        {!row.type && <option value="">Select material</option>}
+                        {!row.type && <option value="">Select mulch</option>}
                         {row.type && !rowOpts.some(o => o.label === row.type) && (
                           <option value={row.type}>{row.type}</option>
                         )}
@@ -2281,7 +2358,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-left pb-1 pr-1 font-medium">Vendor</th>
-                <th className="text-left pb-1 pr-1 font-medium">Type</th>
+                <th className="text-left pb-1 pr-1 font-medium">DG Type</th>
                 <th className="text-left pb-1 pr-1 font-medium">Area (SF)</th>
                 <th className="text-left pb-1 pr-1 font-medium">Depth (in)</th>
                 <th className="text-left pb-1 pr-1 font-medium">Weed Fabric</th>
@@ -2297,15 +2374,22 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.vendor || 'Standard'}
-                        onChange={e => changeRowVendor('DG', DG_TYPES, updateDg, i, e.target.value)}
+                        value={row.vendor || ''}
+                        onChange={e => updateDg(i, 'vendor', e.target.value)}
+                        title="Vendor"
                       >
-                        <option value="Standard">Standard</option>
+                        {!row.vendor && <option value="">Select vendor</option>}
+                        {row.vendor &&
+                          row.vendor !== 'Standard' &&
+                          !vendorsForCategory('DG').some(v => v.id === row.vendor) && (
+                            <option value={row.vendor}>{row.vendor}</option>
+                          )}
                         {vendorsForCategory('DG').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
                           </option>
                         ))}
+                        <option value="Standard">Standard</option>
                       </select>
                     </td>
                     <td className="py-1 pr-1">
@@ -2314,7 +2398,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         value={row.type || ''}
                         onChange={e => updateDg(i, 'type', e.target.value)}
                       >
-                        {!row.type && <option value="">Select material</option>}
+                        {!row.type && <option value="">Select DG</option>}
                         {row.type && !rowOpts.some(o => o.label === row.type) && (
                           <option value={row.type}>{row.type}</option>
                         )}
@@ -2440,7 +2524,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-left pb-1 pr-1 font-medium">Vendor</th>
-                <th className="text-left pb-1 pr-1 font-medium">Type</th>
+                <th className="text-left pb-1 pr-1 font-medium">Gravel Type</th>
                 <th className="text-left pb-1 pr-1 font-medium">SF</th>
                 <th className="text-left pb-1 pr-1 font-medium">Method</th>
                 <th className="text-left pb-1 pr-1 font-medium">$/CY</th>
@@ -2458,15 +2542,22 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.vendor || 'Standard'}
-                        onChange={e => changeRowVendor('Gravel', GRAVEL_TYPES, updateGravel, i, e.target.value)}
+                        value={row.vendor || ''}
+                        onChange={e => updateGravel(i, 'vendor', e.target.value)}
+                        title="Vendor"
                       >
-                        <option value="Standard">Standard</option>
+                        {!row.vendor && <option value="">Select vendor</option>}
+                        {row.vendor &&
+                          row.vendor !== 'Standard' &&
+                          !vendorsForCategory('Gravel').some(v => v.id === row.vendor) && (
+                            <option value={row.vendor}>{row.vendor}</option>
+                          )}
                         {vendorsForCategory('Gravel').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
                           </option>
                         ))}
+                        <option value="Standard">Standard</option>
                       </select>
                     </td>
                     <td className="py-1 pr-1">
@@ -2475,7 +2566,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         value={row.type || ''}
                         onChange={e => updateGravel(i, 'type', e.target.value)}
                       >
-                        {!row.type && <option value="">Select material</option>}
+                        {!row.type && <option value="">Select gravel</option>}
                         {row.type && !rowOpts.some(o => o.label === row.type) && (
                           <option value={row.type}>{row.type}</option>
                         )}
@@ -2595,7 +2686,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-left pb-1 pr-1 font-medium">Vendor</th>
-                <th className="text-left pb-1 pr-1 font-medium">Type</th>
+                <th className="text-left pb-1 pr-1 font-medium">Pebble Type</th>
                 <th className="text-left pb-1 pr-1 font-medium">SF</th>
                 <th className="text-left pb-1 pr-1 font-medium">Method</th>
                 <th className="text-left pb-1 pr-1 font-medium">$/CY</th>
@@ -2613,15 +2704,22 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.vendor || 'Standard'}
-                        onChange={e => changeRowVendor('Pebble', PEBBLE_TYPES, updatePebble, i, e.target.value)}
+                        value={row.vendor || ''}
+                        onChange={e => updatePebble(i, 'vendor', e.target.value)}
+                        title="Vendor"
                       >
-                        <option value="Standard">Standard</option>
+                        {!row.vendor && <option value="">Select vendor</option>}
+                        {row.vendor &&
+                          row.vendor !== 'Standard' &&
+                          !vendorsForCategory('Pebble').some(v => v.id === row.vendor) && (
+                            <option value={row.vendor}>{row.vendor}</option>
+                          )}
                         {vendorsForCategory('Pebble').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
                           </option>
                         ))}
+                        <option value="Standard">Standard</option>
                       </select>
                     </td>
                     <td className="py-1 pr-1">
@@ -2630,7 +2728,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         value={row.type || ''}
                         onChange={e => updatePebble(i, 'type', e.target.value)}
                       >
-                        {!row.type && <option value="">Select material</option>}
+                        {!row.type && <option value="">Select pebble</option>}
                         {row.type && !rowOpts.some(o => o.label === row.type) && (
                           <option value={row.type}>{row.type}</option>
                         )}
@@ -2738,7 +2836,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-left pb-1 pr-1 font-medium">Vendor</th>
-                <th className="text-left pb-1 pr-1 font-medium">Type</th>
+                <th className="text-left pb-1 pr-1 font-medium">Cobble Type</th>
                 <th className="text-left pb-1 pr-1 font-medium">SF</th>
                 <th className="text-left pb-1 pr-1 font-medium">Method</th>
                 <th className="text-left pb-1 pr-1 font-medium">$/CY</th>
@@ -2755,15 +2853,22 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={row.vendor || 'Standard'}
-                        onChange={e => changeRowVendor('Cobbles', COBBLE_TYPES, updateCobble, i, e.target.value)}
+                        value={row.vendor || ''}
+                        onChange={e => updateCobble(i, 'vendor', e.target.value)}
+                        title="Vendor"
                       >
-                        <option value="Standard">Standard</option>
+                        {!row.vendor && <option value="">Select vendor</option>}
+                        {row.vendor &&
+                          row.vendor !== 'Standard' &&
+                          !vendorsForCategory('Cobbles').some(v => v.id === row.vendor) && (
+                            <option value={row.vendor}>{row.vendor}</option>
+                          )}
                         {vendorsForCategory('Cobbles').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
                           </option>
                         ))}
+                        <option value="Standard">Standard</option>
                       </select>
                     </td>
                     <td className="py-1 pr-1">
@@ -2772,7 +2877,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         value={row.type || ''}
                         onChange={e => updateCobble(i, 'type', e.target.value)}
                       >
-                        {!row.type && <option value="">Select material</option>}
+                        {!row.type && <option value="">Select cobble</option>}
                         {row.type && !rowOpts.some(o => o.label === row.type) && (
                           <option value={row.type}>{row.type}</option>
                         )}
@@ -2850,114 +2955,78 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       {/* ── Edging ── */}
       <div>
         <SectionHeader title="Edging" />
-        <div className="space-y-0">
-          {/* Plastic Edging — Vendor + Type per line (material from picked type; labor per line) */}
-          {(() => {
-            const opts = sectionOptions('Edging', edgingVendor.plastic, [])
-            const t = resolveType(edgingType.plastic, opts, [])
-            const rate = t.fallback
-            return (
-              <LabeledRow
-                label="Plastic Edging"
-                note={
-                  n(plasticEdgingLF) > 0 ? `$${(n(plasticEdgingLF) * rate).toFixed(2)} mat` : null
-                }
-              >
-                <select
-                  className="input text-sm py-1.5 w-32"
-                  value={edgingVendor.plastic || 'Standard'}
-                  onChange={e => {
-                    const v = e.target.value
-                    setEdgingVendor(ev => ({ ...ev, plastic: v }))
-                    const first = sectionOptions('Edging', v, [])[0]?.label
-                    if (first) setEdgingType(et => ({ ...et, plastic: first }))
-                  }}
-                  title="Vendor"
-                >
-                  <option value="Standard">Standard</option>
-                  {vendorsForCategory('Edging').map(v => (
-                    <option key={v.id} value={v.id}>
-                      {v.name}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className="input text-sm py-1.5"
-                  value={edgingType.plastic}
-                  onChange={e => setEdgingType(et => ({ ...et, plastic: e.target.value }))}
-                  title="Type"
-                >
-                  {opts.map(o => (
-                    <option key={o.label} value={o.label}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-                <NumInput
-                  value={plasticEdgingLF}
-                  onChange={setPlasticEdgingLF}
-                  placeholder="LF"
-                  className="w-28"
-                />
-                <span className="text-xs text-gray-400 inline-flex items-center gap-1">
-                  ${rate.toFixed(2)}/LF
-                </span>
-              </LabeledRow>
-            )
-          })()}
-
-          {/* Metal Edging — Vendor + Type per line (material from picked type; labor per line) */}
-          {(() => {
-            const opts = sectionOptions('Edging', edgingVendor.metal, [])
-            const t = resolveType(edgingType.metal, opts, [])
-            const rate = t.fallback
-            return (
-              <LabeledRow
-                label="Metal Edging"
-                note={n(metalEdgingLF) > 0 ? `$${(n(metalEdgingLF) * rate).toFixed(2)} mat` : null}
-              >
-                <select
-                  className="input text-sm py-1.5 w-32"
-                  value={edgingVendor.metal || 'Standard'}
-                  onChange={e => {
-                    const v = e.target.value
-                    setEdgingVendor(ev => ({ ...ev, metal: v }))
-                    const first = sectionOptions('Edging', v, [])[0]?.label
-                    if (first) setEdgingType(et => ({ ...et, metal: first }))
-                  }}
-                  title="Vendor"
-                >
-                  <option value="Standard">Standard</option>
-                  {vendorsForCategory('Edging').map(v => (
-                    <option key={v.id} value={v.id}>
-                      {v.name}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className="input text-sm py-1.5"
-                  value={edgingType.metal}
-                  onChange={e => setEdgingType(et => ({ ...et, metal: e.target.value }))}
-                  title="Type"
-                >
-                  {opts.map(o => (
-                    <option key={o.label} value={o.label}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-                <NumInput
-                  value={metalEdgingLF}
-                  onChange={setMetalEdgingLF}
-                  placeholder="LF"
-                  className="w-28"
-                />
-                <span className="text-xs text-gray-400 inline-flex items-center gap-1">
-                  ${rate.toFixed(2)}/LF
-                </span>
-              </LabeledRow>
-            )
-          })()}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-1 font-medium">Vendor</th>
+                <th className="text-left pb-1 pr-1 font-medium">Edging Type</th>
+                <th className="text-left pb-1 pr-1 font-medium">LF</th>
+                <th className="text-left pb-1 pr-1 font-medium">$/LF</th>
+                <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(() => {
+                // ONE combined Edging row — the Type picker lists both Plastic and
+                // Metal (plus vendor edging). Labor keys off the picked Type.
+                const opts = sectionOptions('Edging', edgingVendor, [])
+                const t = resolveType(edgingType, opts, [])
+                const rate = t.fallback
+                return (
+                  <tr className="border-b border-gray-100">
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={edgingVendor || ''}
+                        onChange={e => setEdgingVendor(e.target.value)}
+                        title="Vendor"
+                      >
+                        {!edgingVendor && <option value="">Select vendor</option>}
+                        {edgingVendor &&
+                          edgingVendor !== 'Standard' &&
+                          !vendorsForCategory('Edging').some(v => v.id === edgingVendor) && (
+                            <option value={edgingVendor}>{edgingVendor}</option>
+                          )}
+                        {vendorsForCategory('Edging').map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                        <option value="Standard">Standard</option>
+                      </select>
+                    </td>
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={edgingType || ''}
+                        onChange={e => setEdgingType(e.target.value)}
+                      >
+                        {!edgingType && <option value="">Select edging</option>}
+                        {edgingType && !opts.some(o => o.label === edgingType) && (
+                          <option value={edgingType}>{edgingType}</option>
+                        )}
+                        {opts.map(o => (
+                          <option key={o.label} value={o.label}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1 pr-1">
+                      <NumInput value={edgingLF} onChange={setEdgingLF} placeholder="LF" className="w-20" />
+                    </td>
+                    <td className="py-1 pr-1">
+                      <span className="text-xs text-gray-500 whitespace-nowrap">${rate.toFixed(2)}/LF</span>
+                    </td>
+                    <td className="py-1 text-right text-xs text-gray-600 whitespace-nowrap">
+                      {edgingType && n(edgingLF) > 0 ? `$${(n(edgingLF) * rate).toFixed(2)}` : '—'}
+                    </td>
+                  </tr>
+                )
+              })()}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -2974,7 +3043,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-left pb-1 pr-2 font-medium">Vendor</th>
-                <th className="text-left pb-1 pr-2 font-medium">Type</th>
+                <th className="text-left pb-1 pr-2 font-medium">Stepper Type</th>
                 <th className="text-left pb-1 pr-2 font-medium">Line</th>
                 <th className="text-left pb-1 pr-2 font-medium">Area (SF)</th>
                 <th className="text-left pb-1 pr-2 font-medium">Labor</th>
@@ -3027,32 +3096,39 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-2">
                       <select
                         className="input text-sm py-1.5"
-                        value={stepperVendor[row.key] || 'Standard'}
-                        onChange={e => {
-                          const v = e.target.value
-                          setStepperVendor(sv => ({ ...sv, [row.key]: v }))
-                          const first = sectionOptions('Steppers', v, [])[0]?.label
-                          if (first) setStepperType(st => ({ ...st, [row.key]: first }))
-                        }}
+                        value={stepperVendor[row.key] || ''}
+                        onChange={e =>
+                          setStepperVendor(sv => ({ ...sv, [row.key]: e.target.value }))
+                        }
                         title="Vendor"
                       >
-                        <option value="Standard">Standard</option>
+                        {!stepperVendor[row.key] && <option value="">Select vendor</option>}
+                        {stepperVendor[row.key] &&
+                          stepperVendor[row.key] !== 'Standard' &&
+                          !vendorsForCategory('Steppers').some(v => v.id === stepperVendor[row.key]) && (
+                            <option value={stepperVendor[row.key]}>{stepperVendor[row.key]}</option>
+                          )}
                         {vendorsForCategory('Steppers').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
                           </option>
                         ))}
+                        <option value="Standard">Standard</option>
                       </select>
                     </td>
                     <td className="py-1 pr-2">
                       <select
                         className="input text-sm py-1.5"
-                        value={stepperType[row.key] || rowOpts[0]?.label}
+                        value={stepperType[row.key] || ''}
                         onChange={e =>
                           setStepperType(st => ({ ...st, [row.key]: e.target.value }))
                         }
-                        title="Type"
+                        title="Stepper Type"
                       >
+                        {!stepperType[row.key] && <option value="">Select stepper</option>}
+                        {stepperType[row.key] && !rowOpts.some(o => o.label === stepperType[row.key]) && (
+                          <option value={stepperType[row.key]}>{stepperType[row.key]}</option>
+                        )}
                         {rowOpts.map(o => (
                           <option key={o.label} value={o.label}>
                             {o.label}

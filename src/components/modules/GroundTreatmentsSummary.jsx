@@ -32,6 +32,10 @@ const GT_RATES = {
   soilPrepHandAdd: { dbName: 'Soil Prep - Hand Add', fallback: 0.06 },
   sodPrepMat: { dbName: 'Sod Soil Prep', fallback: 0.1558 },
   sodPrepLab: { dbName: 'Sod Soil Prep - Labor Rate', fallback: 0.012 },
+  // Tilling (Planter Prep + Sod Prep) — per-SF labor added on top of the base
+  // prep labor by tilling method (mirror of the module).
+  tillHandLab: { dbName: 'GT - Till Hand Labor Rate', fallback: 0.06 },
+  tillTillerLab: { dbName: 'GT - Till Tiller Labor Rate', fallback: 0.012 },
   sodMarathonMat: { dbName: 'Sod - Marathon', fallback: 1.2 },
   sodStAugMat: { dbName: 'Sod - St. Augustine', fallback: 1.97 },
   fertilizerSFPerBag: { dbName: 'Fertilizer - SF Per Bag', fallback: 4000 },
@@ -209,11 +213,7 @@ export default function GroundTreatmentsSummary({ module }) {
     mulchType = 'Premium Mulch',
     mulchWeedFabric = 'No',
     mulchRows,
-    plasticEdgingLF = 0,
-    metalEdgingLF = 0,
     soilPrepSF = 0,
-    sodSoilPrepSF = 0,
-    sodSoilPrepType = 'Soil Prep',
     sodSF = 0,
     sodType = 'Marathon',
     sodFertilizer = 'None',
@@ -234,7 +234,6 @@ export default function GroundTreatmentsSummary({ module }) {
     dgCement = 'Yes',
     dgRows,
     gravelRows = [],
-    soilsRows = [],
     pebbleRows = [],
     cobbleRows = [],
     manualRows = [],
@@ -275,45 +274,61 @@ export default function GroundTreatmentsSummary({ module }) {
     return priceForType(subcat, type, houseArray, defaultVal)
   }
 
-  // ── Preparation ──────────────────────────────────────────────────────────────
-  // Area = Planter → Soil Prep rates; Area = Sod → Sod Soil Prep rates. Method =
-  // Hand adds a per-SF labor coefficient (In-House). Money still comes from the
-  // saved calc; this line is the display breakdown.
-  const prepMethod = ih.prepMethod || 'Tiller'
-  const prepArea = ih.prepArea || 'Planter'
-  let soilPrepLine = null
+  // ── Tilling labor coefficient (hrs/SF) by method — mirror of the module ───────
+  // Added on top of the base prep labor. None = 0. Hand/Tiller each key off their
+  // own DB coefficient (GT - Till Hand/Tiller Labor Rate).
+  const tillLab = method =>
+    method === 'Hand'
+      ? mp(GT_RATES.tillHandLab.dbName, GT_RATES.tillHandLab.fallback)
+      : method === 'Tiller'
+        ? mp(GT_RATES.tillTillerLab.dbName, GT_RATES.tillTillerLab.fallback)
+        : 0
+
+  // ── Planter Preparation (Soils-style row) ─────────────────────────────────────
+  // Material = CY × $/CY from the picked soil/amendment (sub-category 'Soils').
+  // CY = area × (depth/12) / 27. Labor = area × (soilPrepLab base + Hand-add
+  // soilPrepHandAdd + tilling coeff). This single-column view is the In-House
+  // record, so the Hand-add always applies (Sub tab never gets it in the module).
+  const prepTilling = ih.prepTilling || 'Tiller'
+  let planterPrepLine = null
   if (n(soilPrepSF) > 0) {
-    const isSodArea = prepArea === 'Sod'
-    const matRate = isSodArea
-      ? mp(GT_RATES.sodPrepMat.dbName, GT_RATES.sodPrepMat.fallback)
-      : mp(GT_RATES.soilPrepMat.dbName, GT_RATES.soilPrepMat.fallback)
-    const baseLab = isSodArea
-      ? mp(GT_RATES.sodPrepLab.dbName, GT_RATES.sodPrepLab.fallback)
-      : mp(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
+    const baseLab = mp(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
     const handAdd =
-      prepMethod === 'Hand' ? mp(GT_RATES.soilPrepHandAdd.dbName, GT_RATES.soilPrepHandAdd.fallback) : 0
-    const mat = n(soilPrepSF) * matRate
-    const hrs = n(soilPrepSF) * (baseLab + handAdd)
-    soilPrepLine = {
-      label: `Till and Amend (${prepArea}${prepMethod === 'Hand' ? ', Hand' : ''}) — ${n(soilPrepSF).toLocaleString()} SF`,
+      prepTilling === 'Hand' ? mp(GT_RATES.soilPrepHandAdd.dbName, GT_RATES.soilPrepHandAdd.fallback) : 0
+    const hrs = n(soilPrepSF) * (baseLab + handAdd + tillLab(prepTilling))
+    let mat = 0
+    if (ih.prepType) {
+      const CY = (n(soilPrepSF) * (n(ih.prepDepthIn) / 12)) / 27
+      const rate = priceForRow('Soils', { type: ih.prepType, vendor: ih.prepVendor }, SOIL_TYPES, 0)
+      mat = CY * rate
+    }
+    planterPrepLine = {
+      label: `Planter Prep${ih.prepType ? ` (${ih.prepType})` : ''}${prepTilling && prepTilling !== 'None' ? ` · ${prepTilling} till` : ''} — ${n(soilPrepSF).toLocaleString()} SF`,
       value: fmt2(mat),
       sub: `${hrs.toFixed(2)} hrs`,
     }
   }
 
-  // ── Sod bed soil prep (same rates, entered in the Sod section) ─────────────────
-  let sodSoilPrepLine = null
-  if (n(sodSoilPrepSF) > 0) {
-    const rate = priceForRow(
-      'Soil Prep',
-      { type: sodSoilPrepType, vendor: ih.sodSoilPrepVendor },
-      SOIL_PREP_TYPES,
-      GT_RATES.soilPrepMat.fallback
-    )
-    const mat = n(sodSoilPrepSF) * rate
-    const hrs = n(sodSoilPrepSF) * mp(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
-    sodSoilPrepLine = {
-      label: `Soil Prep — ${n(sodSoilPrepSF).toLocaleString()} SF`,
+  // ── Sod Preparation (Soils-style row, sod-prep labor base) ────────────────────
+  // Independent state (sodPrepSF/Vendor/Type/DepthIn/Tilling). Same structure as
+  // Planter Prep but using the sod-prep base labor coefficient.
+  const sodPrepTilling = ih.sodPrepTilling || 'Tiller'
+  let sodPrepLine = null
+  if (n(ih.sodPrepSF) > 0) {
+    const baseLab = mp(GT_RATES.sodPrepLab.dbName, GT_RATES.sodPrepLab.fallback)
+    const handAdd =
+      sodPrepTilling === 'Hand'
+        ? mp(GT_RATES.soilPrepHandAdd.dbName, GT_RATES.soilPrepHandAdd.fallback)
+        : 0
+    const hrs = n(ih.sodPrepSF) * (baseLab + handAdd + tillLab(sodPrepTilling))
+    let mat = 0
+    if (ih.sodPrepType) {
+      const CY = (n(ih.sodPrepSF) * (n(ih.sodPrepDepthIn) / 12)) / 27
+      const rate = priceForRow('Soils', { type: ih.sodPrepType, vendor: ih.sodPrepVendor }, SOIL_TYPES, 0)
+      mat = CY * rate
+    }
+    sodPrepLine = {
+      label: `Sod Prep${ih.sodPrepType ? ` (${ih.sodPrepType})` : ''}${sodPrepTilling && sodPrepTilling !== 'None' ? ` · ${sodPrepTilling} till` : ''} — ${n(ih.sodPrepSF).toLocaleString()} SF`,
       value: fmt2(mat),
       sub: `${hrs.toFixed(2)} hrs`,
     }
@@ -332,20 +347,29 @@ export default function GroundTreatmentsSummary({ module }) {
     }
   }
 
-  // ── Fertilizer (auto bags from sod SF) ─────────────────────────────────────────
+  // ── Sod Fertilizer (own section — auto bags from fertilizer SF) ────────────────
+  // Vendor-aware: rate resolves from the picked Vendor+Type (Standard defaults to
+  // the FERTILIZER_TYPES $/bag). Bags = ceil(SF / SF-per-bag). SF defaults to the
+  // sod SF when no explicit fertilizer SF is entered — mirror of the module.
   let fertLine = null
   {
     const ft = FERTILIZER_TYPES.find(t => t.label === sodFertilizer)
     const fertSF = n(sodFertilizerSF) || n(sodSF)
-    if (ft && ft.dbName && fertSF > 0) {
+    if (sodFertilizer && sodFertilizer !== 'None' && fertSF > 0) {
       const sfPerBag = mp(GT_RATES.fertilizerSFPerBag.dbName, GT_RATES.fertilizerSFPerBag.fallback)
       const bags = sfPerBag > 0 ? Math.ceil(fertSF / sfPerBag) : 0
-      const mat = bags * mp(ft.dbName, ft.fallback)
-      if (bags > 0)
+      const perBag = priceForRow(
+        'Fertilizer',
+        { type: sodFertilizer, vendor: ih.sodFertilizerVendor },
+        FERTILIZER_TYPES,
+        ft ? ft.fallback : 0
+      )
+      const mat = bags * perBag
+      if (bags > 0 && perBag > 0)
         fertLine = {
           label: `Fertilizer (${sodFertilizer})`,
           value: fmt2(mat),
-          sub: `${bags} bag${bags > 1 ? 's' : ''} · ${fmt2(mp(ft.dbName, ft.fallback))}/bag`,
+          sub: `${bags} bag${bags > 1 ? 's' : ''} · ${fmt2(perBag)}/bag`,
         }
     }
   }
@@ -462,21 +486,6 @@ export default function GroundTreatmentsSummary({ module }) {
     })
     .filter(Boolean)
 
-  // ── Soils (material only) ──────────────────────────────────────────────────────
-  const soilsLines = soilsRows
-    .map((r, i) => {
-      if (!n(r.sf)) return null
-      const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
-      const rate = priceForRow('Soils', r, SOIL_TYPES, SOIL_TYPES[0].fallback)
-      return {
-        key: i,
-        label: `${r.type || 'Soil'} — ${n(r.sf).toLocaleString()} SF × ${n(r.depthIn)}"`,
-        value: fmt2(CY * rate),
-        sub: `${CY.toFixed(2)} CY · ${fmt2(rate)}/CY`,
-      }
-    })
-    .filter(Boolean)
-
   // ── Pebble (same calc/labor as Gravel; PEBBLE_TYPES material) ──────────────────
   const pebbleLines = pebbleRows
     .map((r, i) => {
@@ -537,40 +546,28 @@ export default function GroundTreatmentsSummary({ module }) {
     })
     .filter(Boolean)
 
-  // ── Edging ────────────────────────────────────────────────────────────────────
+  // ── Edging (single combined row: Vendor + Type + LF) ──────────────────────────
+  // Material rate comes from the picked Vendor+Type. Labor rate keys off the Type:
+  // a metal-ish type uses the Metal labor rate, otherwise the Plastic labor rate —
+  // exactly as the module does. No type picked → no line ($0).
   const edgingLines = []
-
-  if (n(plasticEdgingLF) > 0) {
-    // Material rate now comes from the picked Vendor+Type; labor stays per line.
-    // Old estimates (no edgingType/edgingVendor) fall back to the fixed Plastic rate.
+  if (n(ih.edgingLF) > 0 && ih.edgingType) {
+    const isMetal = /metal/i.test(ih.edgingType || '')
     const rate = priceForRow(
       'Edging',
-      { type: ih.edgingType?.plastic, vendor: ih.edgingVendor?.plastic },
+      { type: ih.edgingType, vendor: ih.edgingVendor },
       EDGING_TYPES,
-      mp(GT_RATES.plasticEdgingMat.dbName, GT_RATES.plasticEdgingMat.fallback)
+      isMetal
+        ? mp(GT_RATES.metalEdgingMat.dbName, GT_RATES.metalEdgingMat.fallback)
+        : mp(GT_RATES.plasticEdgingMat.dbName, GT_RATES.plasticEdgingMat.fallback)
     )
-    const mat = n(plasticEdgingLF) * rate
-    const hrs =
-      n(plasticEdgingLF) * mp(GT_RATES.plasticEdgingLab.dbName, GT_RATES.plasticEdgingLab.fallback)
+    const labRate = isMetal
+      ? mp(GT_RATES.metalEdgingLab.dbName, GT_RATES.metalEdgingLab.fallback)
+      : mp(GT_RATES.plasticEdgingLab.dbName, GT_RATES.plasticEdgingLab.fallback)
+    const mat = n(ih.edgingLF) * rate
+    const hrs = n(ih.edgingLF) * labRate
     edgingLines.push({
-      label: `Plastic Edging — ${n(plasticEdgingLF).toLocaleString()} LF`,
-      value: fmt2(mat),
-      sub: `${hrs.toFixed(2)} hrs · ${fmt2(rate)}/LF`,
-    })
-  }
-
-  if (n(metalEdgingLF) > 0) {
-    const rate = priceForRow(
-      'Edging',
-      { type: ih.edgingType?.metal, vendor: ih.edgingVendor?.metal },
-      EDGING_TYPES,
-      mp(GT_RATES.metalEdgingMat.dbName, GT_RATES.metalEdgingMat.fallback)
-    )
-    const mat = n(metalEdgingLF) * rate
-    const hrs =
-      n(metalEdgingLF) * mp(GT_RATES.metalEdgingLab.dbName, GT_RATES.metalEdgingLab.fallback)
-    edgingLines.push({
-      label: `Metal Edging — ${n(metalEdgingLF).toLocaleString()} LF`,
+      label: `${ih.edgingType} Edging — ${n(ih.edgingLF).toLocaleString()} LF`,
       value: fmt2(mat),
       sub: `${hrs.toFixed(2)} hrs · ${fmt2(rate)}/LF`,
     })
@@ -654,14 +651,13 @@ export default function GroundTreatmentsSummary({ module }) {
   )
 
   const hasAnyLines =
-    soilPrepLine ||
-    sodSoilPrepLine ||
+    planterPrepLine ||
+    sodPrepLine ||
     sodLine ||
     fertLine ||
     mulchLines.length ||
     dgLines.length ||
     gravelLines.length ||
-    soilsLines.length ||
     pebbleLines.length ||
     cobbleLines.length ||
     edgingLines.length ||
@@ -715,42 +711,39 @@ export default function GroundTreatmentsSummary({ module }) {
         <p className="text-xs text-gray-400 text-center py-4">No line items entered.</p>
       ) : (
         <>
-          {soilPrepLine && (
+          {planterPrepLine && (
             <>
-              <SectionLabel title="Preparation" />
+              <SectionLabel title="Planter Preparation" />
               <LineRow
-                label={soilPrepLine.label}
-                value={soilPrepLine.value}
-                sub={soilPrepLine.sub}
+                label={planterPrepLine.label}
+                value={planterPrepLine.value}
+                sub={planterPrepLine.sub}
               />
             </>
           )}
 
-          {(sodSoilPrepLine || sodLine || fertLine) && (
+          {sodPrepLine && (
             <>
-              <SectionLabel title="Sod" />
-              {sodSoilPrepLine && (
-                <LineRow
-                  label={sodSoilPrepLine.label}
-                  value={sodSoilPrepLine.value}
-                  sub={sodSoilPrepLine.sub}
-                />
-              )}
-              {sodLine && (
-                <LineRow label={sodLine.label} value={sodLine.value} sub={sodLine.sub} />
-              )}
-              {fertLine && (
-                <LineRow label={fertLine.label} value={fertLine.value} sub={fertLine.sub} />
-              )}
+              <SectionLabel title="Sod Preparation" />
+              <LineRow
+                label={sodPrepLine.label}
+                value={sodPrepLine.value}
+                sub={sodPrepLine.sub}
+              />
             </>
           )}
 
-          {soilsLines.length > 0 && (
+          {sodLine && (
             <>
-              <SectionLabel title="Soils" />
-              {soilsLines.map(l => (
-                <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />
-              ))}
+              <SectionLabel title="Sod" />
+              <LineRow label={sodLine.label} value={sodLine.value} sub={sodLine.sub} />
+            </>
+          )}
+
+          {fertLine && (
+            <>
+              <SectionLabel title="Sod Fertilizer" />
+              <LineRow label={fertLine.label} value={fertLine.value} sub={fertLine.sub} />
             </>
           )}
 
