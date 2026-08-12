@@ -283,13 +283,21 @@ const UTIL_CAT = {
 // from a built-in (matched by name). Labor for each type is the Item's paired
 // '<name> - Labor Rate' row (looked up by name). Only when a Sub-category has NO
 // catalog Items at all do we fall back to the built-in list.
-function mergedUtilTypes(cat, builtInArr, materialRows) {
-  const catRows = catalogOptions(materialRows, cat, 'Standard', {
+// Vendor-first Type list (mirrors Paver's paverOptions): the dropdown shows the
+// Items that the ROW'S SELECTED VENDOR carries in Category 'Utilities' + this
+// Sub-category. Standard → the null-vendor (Standard-priced) Items; a real vendor
+// → only that vendor's Items. So moving an Item from Standard to a vendor makes it
+// appear under that vendor and leave the Standard list. When Standard has no
+// catalog Items yet, fall back to the built-in list; a real vendor with no Items
+// simply shows nothing (they don't carry these).
+function mergedUtilTypes(cat, builtInArr, materialRows, vendorSel = 'Standard') {
+  const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
+  const catRows = catalogOptions(materialRows, cat, isStd ? 'Standard' : vendorSel, {
     standardRows: 'null-vendor',
     stripPrefix: true,
     category: 'Utilities',
   })
-  if (!catRows.length) return builtInArr
+  if (!catRows.length) return isStd ? builtInArr : []
   return catRows.map(o => {
     const bi = builtInArr.find(b => b.dbName === o.row.name || b.label === o.label)
     return {
@@ -309,12 +317,13 @@ function mergedUtilTypes(cat, builtInArr, materialRows) {
 // overrides the MATERIAL price for the selected item, matched by the item's name
 // in the vendor's catalog (material_rates for the category + vendor).
 function resolveUtilRow(cat, row, houseArr, materialRows, catDefaults, mp) {
-  const merged = mergedUtilTypes(cat, houseArr, materialRows)
+  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : catDefaults[cat] || 'Standard'
+  // Type options are the SELECTED VENDOR'S items (vendor-first, like Paver).
+  const merged = mergedUtilTypes(cat, houseArr, materialRows, vsel)
   const builtIn = merged.find(o => o.label === row.type) || merged[0]
   const laborVal = mp[builtIn?.laborDbName] ?? builtIn?.laborFallback ?? 0
   let matDbName = builtIn?.dbName
   let matFallback = builtIn?.fallback ?? 0
-  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : catDefaults[cat] || 'Standard'
   const vrow = catalogItemFor(materialRows, cat, vsel, builtIn?.label, {
     ...CATALOG_OPTS,
     fallbackFirst: false,
