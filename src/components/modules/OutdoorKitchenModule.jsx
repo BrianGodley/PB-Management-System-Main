@@ -92,7 +92,7 @@ const APPLIANCE_TYPES = [
   'Other',
 ]
 const applianceRateName = type => `BBQ Equip - ${type}`
-const EQUIP_ROW = () => ({ vendor: 'Standard', type: 'BBQ Grill', qty: '0', unitCost: '', clientProvided: false, hours: '' })
+const EQUIP_ROW = () => ({ vendor: 'Standard', type: '', qty: '0', unitCost: '', clientProvided: false, hours: '' })
 
 const n = v => parseFloat(v) || 0
 
@@ -1465,6 +1465,9 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                             value={row.type}
                             onChange={e => setRow('type', e.target.value)}
                           >
+                            {/* Empty new rows show a placeholder rather than a
+                                hardcoded default appliance. */}
+                            {!row.type && <option value="">Select appliance…</option>}
                             {/* Backward-compat: keep a stored value that isn't in the
                                 current (vendor-scoped) options selectable/visible. */}
                             {row.type && !applOpts.some(o => o.value === row.type) && (
