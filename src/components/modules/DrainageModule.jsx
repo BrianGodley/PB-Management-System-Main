@@ -464,9 +464,7 @@ const DEFAULT_ADDITIONAL = {
   hydrocutQty: '',
   permitRequired: false,
 }
-const DEFAULT_MANUAL_ROWS = [
-  { label: 'Misc 1', hours: '', materials: '', subCost: '' },
-]
+const DEFAULT_MANUAL_ROWS = [{ label: '', hours: '', materials: '', subCost: '' }]
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function DrainageModule({ onSave, onBack, saving, initialData }) {

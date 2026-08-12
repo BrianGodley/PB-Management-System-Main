@@ -477,7 +477,7 @@ function makeTab(data = {}) {
     epLineRows: data.epLineRows ?? [EP_LINE_ROW(), EP_LINE_ROW()],
     epGasRows: data.epGasRows ?? [EP_GAS_ROW(), EP_GAS_ROW()],
     epElecRows: data.epElecRows ?? [EP_ELEC_ROW(), EP_ELEC_ROW()],
-    manualRows: data.manualRows ?? [newManualRow(), newManualRow(), newManualRow()],
+    manualRows: data.manualRows ?? [newManualRow()],
   }
 }
 
@@ -2516,35 +2516,60 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         <SectionHeader title="Manual Entry" />
         <div className="space-y-2">
           {T.manualRows.map((r, i) => (
-            <div key={i} className="grid grid-cols-5 gap-2 items-end">
-              <div className="col-span-2">
+            <div
+              key={i}
+              className={`grid ${isSub ? 'grid-cols-2' : 'grid-cols-3'} gap-2 items-end`}
+            >
+              <div>
                 {i === 0 && <Label text="Description" center />}
                 <input
-                  className="input text-sm py-1.5"
+                  className="input text-sm py-1.5 w-full"
                   placeholder="Description"
                   value={r.label}
                   onChange={e => updManual(i, 'label', e.target.value)}
                 />
               </div>
-              <div>
-                {i === 0 && <Label text="Hours" center />}
-                <NumInput value={r.hours} onChange={v => updManual(i, 'hours', v)} className="text-center" />
-              </div>
-              <div>
-                {i === 0 && <Label text="Materials $" center />}
-                <NumInput value={r.materials} onChange={v => updManual(i, 'materials', v)} className="text-center" />
-              </div>
-              <div>
-                {i === 0 && <Label text="Sub Cost $" center />}
-                <NumInput value={r.subCost} onChange={v => updManual(i, 'subCost', v)} className="text-center" />
-              </div>
-              <button
-                type="button"
-                onClick={() => removeManual(i)}
-                className="text-gray-300 hover:text-red-400 text-lg pb-1"
-              >
-                ✕
-              </button>
+              {isSub ? (
+                <div>
+                  {i === 0 && <Label text="Cost $" center />}
+                  <div className="flex items-center gap-1">
+                    <NumInput value={r.subCost} onChange={v => updManual(i, 'subCost', v)} className="text-center flex-1" />
+                    {T.manualRows.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeManual(i)}
+                        className="text-gray-300 hover:text-red-500 text-sm px-1"
+                        title="Remove line"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    {i === 0 && <Label text="Hours" center />}
+                    <NumInput value={r.hours} onChange={v => updManual(i, 'hours', v)} className="text-center" />
+                  </div>
+                  <div>
+                    {i === 0 && <Label text="Materials $" center />}
+                    <div className="flex items-center gap-1">
+                      <NumInput value={r.materials} onChange={v => updManual(i, 'materials', v)} className="text-center flex-1" />
+                      {T.manualRows.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeManual(i)}
+                          className="text-gray-300 hover:text-red-500 text-sm px-1"
+                          title="Remove line"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           ))}
           <button

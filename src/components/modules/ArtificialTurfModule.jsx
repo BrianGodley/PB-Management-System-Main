@@ -1661,14 +1661,27 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       {/* Manual Entry */}
       <div>
         <SecHdr title="Manual Entry" />
-        <table className="w-full text-xs">
+        <table className="w-full text-xs table-fixed">
+          <colgroup>
+            {isSub ? (
+              <>
+                <col className="w-1/2" />
+                <col className="w-1/2" />
+              </>
+            ) : (
+              <>
+                <col className="w-1/3" />
+                <col className="w-1/3" />
+                <col className="w-1/3" />
+              </>
+            )}
+          </colgroup>
           <TH
-            cols={[
-              { label: 'Description' },
-              { label: 'Hours', w: 'w-20' },
-              { label: 'Materials ($)', w: 'w-24' },
-              { label: 'Sub Cost ($)', w: 'w-24' },
-            ]}
+            cols={
+              isSub
+                ? [{ label: 'Description' }, { label: 'Cost ($)' }]
+                : [{ label: 'Description' }, { label: 'Hours' }, { label: 'Materials ($)' }]
+            }
           />
           <tbody className="divide-y divide-gray-50">
             {T.manualRows.map((r, i) => (
@@ -1681,30 +1694,59 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                     placeholder="Description"
                   />
                 </td>
-                <td className={td}>
-                  <Inp
-                    value={r.hours}
-                    onChange={e => setRow(i, 'hours', e.target.value)}
-                    step="0.5"
-                    className="text-center"
-                  />
-                </td>
-                <td className={td}>
-                  <Inp
-                    value={r.materials}
-                    onChange={e => setRow(i, 'materials', e.target.value)}
-                    step="1"
-                    className="text-center"
-                  />
-                </td>
-                <td className={td}>
-                  <Inp
-                    value={r.subCost}
-                    onChange={e => setRow(i, 'subCost', e.target.value)}
-                    step="1"
-                    className="text-center"
-                  />
-                </td>
+                {isSub ? (
+                  <td className={td}>
+                    <div className="flex items-center gap-1">
+                      <Inp
+                        value={r.subCost}
+                        onChange={e => setRow(i, 'subCost', e.target.value)}
+                        step="1"
+                        className="text-center flex-1"
+                      />
+                      {T.manualRows.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setT('manualRows', T.manualRows.filter((_, idx) => idx !== i))}
+                          className="text-gray-300 hover:text-red-500 text-sm px-1"
+                          title="Remove line"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                ) : (
+                  <>
+                    <td className={td}>
+                      <Inp
+                        value={r.hours}
+                        onChange={e => setRow(i, 'hours', e.target.value)}
+                        step="0.5"
+                        className="text-center"
+                      />
+                    </td>
+                    <td className={td}>
+                      <div className="flex items-center gap-1">
+                        <Inp
+                          value={r.materials}
+                          onChange={e => setRow(i, 'materials', e.target.value)}
+                          step="1"
+                          className="text-center flex-1"
+                        />
+                        {T.manualRows.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setT('manualRows', T.manualRows.filter((_, idx) => idx !== i))}
+                            className="text-gray-300 hover:text-red-500 text-sm px-1"
+                            title="Remove line"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </>
+                )}
               </tr>
             ))}
           </tbody>

@@ -196,11 +196,7 @@ function calcLighting(
 // ── Default blank state ───────────────────────────────────────────────────────
 const blankRow = () => ({ vendor: 'Standard', itemId: '', qty: '', subEach: '' })
 const blankRows = () => [blankRow(), blankRow(), blankRow()]
-const DEFAULT_MANUAL_ROWS = [
-  { label: 'Misc 1', hours: '', materials: '', subCost: '' },
-  { label: 'Misc 2', hours: '', materials: '', subCost: '' },
-  { label: 'Misc 3', hours: '', materials: '', subCost: '' },
-]
+const DEFAULT_MANUAL_ROWS = [{ label: '', hours: '', materials: '', subCost: '' }]
 
 // makeTab() seeds a tab's independent takeoff inputs; ihData / subData persist
 // both. Legacy modules (flat data, no ihData) load into the In-House tab.
@@ -856,13 +852,32 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
       <div>
         <SectionHeader title="Manual Entry" />
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              {isSub ? (
+                <>
+                  <col className="w-1/2" />
+                  <col className="w-1/2" />
+                </>
+              ) : (
+                <>
+                  <col className="w-1/3" />
+                  <col className="w-1/3" />
+                  <col className="w-1/3" />
+                </>
+              )}
+            </colgroup>
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-center pb-1 pr-2 font-medium">Description</th>
-                <th className="text-center pb-1 pr-2 font-medium">Hours</th>
-                <th className="text-center pb-1 pr-2 font-medium">Materials $</th>
-                <th className="text-center pb-1 font-medium">Sub Cost $</th>
+                {isSub ? (
+                  <th className="text-center pb-1 font-medium">Cost $</th>
+                ) : (
+                  <>
+                    <th className="text-center pb-1 pr-2 font-medium">Hours</th>
+                    <th className="text-center pb-1 font-medium">Materials $</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -870,41 +885,70 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
                 <tr key={i} className="border-b border-gray-100">
                   <td className="py-1 pr-2">
                     <input
-                      className="input text-sm py-1"
+                      className="input text-sm py-1 w-full"
                       value={row.label}
                       onChange={e => updateManual(i, 'label', e.target.value)}
                     />
                   </td>
-                  <td className="py-1 pr-2">
-                    <input
-                      type="number"
-                      step="any"
-                      className="input text-sm py-1 w-full text-center"
-                      placeholder="0"
-                      value={row.hours}
-                      onChange={e => updateManual(i, 'hours', e.target.value)}
-                    />
-                  </td>
-                  <td className="py-1 pr-2">
-                    <input
-                      type="number"
-                      step="any"
-                      className="input text-sm py-1 w-full text-center"
-                      placeholder="0"
-                      value={row.materials}
-                      onChange={e => updateManual(i, 'materials', e.target.value)}
-                    />
-                  </td>
-                  <td className="py-1">
-                    <input
-                      type="number"
-                      step="any"
-                      className="input text-sm py-1 w-full text-center"
-                      placeholder="0"
-                      value={row.subCost}
-                      onChange={e => updateManual(i, 'subCost', e.target.value)}
-                    />
-                  </td>
+                  {isSub ? (
+                    <td className="py-1">
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          step="any"
+                          className="input text-sm py-1 w-full text-center flex-1"
+                          placeholder="0"
+                          value={row.subCost}
+                          onChange={e => updateManual(i, 'subCost', e.target.value)}
+                        />
+                        {manualRows.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setManualRows(rows => rows.filter((_, idx) => idx !== i))}
+                            className="text-gray-300 hover:text-red-500 text-sm px-1"
+                            title="Remove line"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  ) : (
+                    <>
+                      <td className="py-1 pr-2">
+                        <input
+                          type="number"
+                          step="any"
+                          className="input text-sm py-1 w-full text-center"
+                          placeholder="0"
+                          value={row.hours}
+                          onChange={e => updateManual(i, 'hours', e.target.value)}
+                        />
+                      </td>
+                      <td className="py-1">
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            step="any"
+                            className="input text-sm py-1 w-full text-center flex-1"
+                            placeholder="0"
+                            value={row.materials}
+                            onChange={e => updateManual(i, 'materials', e.target.value)}
+                          />
+                          {manualRows.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => setManualRows(rows => rows.filter((_, idx) => idx !== i))}
+                              className="text-gray-300 hover:text-red-500 text-sm px-1"
+                              title="Remove line"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </>
+                  )}
                 </tr>
               ))}
             </tbody>

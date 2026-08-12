@@ -587,7 +587,9 @@ const DEFAULT_STATE = {
   subIs80mm: false,
   subPolySand: false,
   subPolySandExistingSF: '',
-  subManualRows: [],
+  subManualRows: [
+    { label: '', hours: '', materials: '', subCost: '' },
+  ],
 }
 
 // ── Backward-compat: migrate legacy single-record Vertical Soldier fields into
@@ -2099,15 +2101,28 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           {subSectionTitle('Manual Entry', isSub)}
         </div>
-        <table className="w-full text-xs">
+        <table className="w-full text-xs table-fixed">
+          <colgroup>
+            {isSub ? (
+              <>
+                <col className="w-1/2" />
+                <col className="w-1/2" />
+              </>
+            ) : (
+              <>
+                <col className="w-1/3" />
+                <col className="w-1/3" />
+                <col className="w-1/3" />
+              </>
+            )}
+          </colgroup>
           <TH
             center
-            cols={[
-              { label: 'Description' },
-              { label: 'Hours', w: 'w-20' },
-              { label: 'Materials ($)', w: 'w-28' },
-              { label: 'Sub Cost ($)', w: 'w-28' },
-            ]}
+            cols={
+              isSub
+                ? [{ label: 'Description' }, { label: 'Cost ($)' }]
+                : [{ label: 'Description' }, { label: 'Hours' }, { label: 'Materials ($)' }]
+            }
           />
           <tbody className="divide-y divide-gray-50">
             {state[kManual].map((r, i) => (
@@ -2120,30 +2135,59 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                     placeholder="Description"
                   />
                 </td>
-                <td className={td}>
-                  <Inp
-                    value={r.hours}
-                    onChange={e => setRow(kManual, i, 'hours', e.target.value)}
-                    step="0.5"
-                    className="text-center"
-                  />
-                </td>
-                <td className={td}>
-                  <Inp
-                    value={r.materials}
-                    onChange={e => setRow(kManual, i, 'materials', e.target.value)}
-                    step="1"
-                    className="text-center"
-                  />
-                </td>
-                <td className={td}>
-                  <Inp
-                    value={r.subCost}
-                    onChange={e => setRow(kManual, i, 'subCost', e.target.value)}
-                    step="1"
-                    className="text-center"
-                  />
-                </td>
+                {isSub ? (
+                  <td className={td}>
+                    <div className="flex items-center gap-1">
+                      <Inp
+                        value={r.subCost}
+                        onChange={e => setRow(kManual, i, 'subCost', e.target.value)}
+                        step="1"
+                        className="text-center flex-1"
+                      />
+                      {state[kManual].length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => set(kManual, state[kManual].filter((_, idx) => idx !== i))}
+                          className="text-gray-300 hover:text-red-500 text-sm px-1"
+                          title="Remove line"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                ) : (
+                  <>
+                    <td className={td}>
+                      <Inp
+                        value={r.hours}
+                        onChange={e => setRow(kManual, i, 'hours', e.target.value)}
+                        step="0.5"
+                        className="text-center"
+                      />
+                    </td>
+                    <td className={td}>
+                      <div className="flex items-center gap-1">
+                        <Inp
+                          value={r.materials}
+                          onChange={e => setRow(kManual, i, 'materials', e.target.value)}
+                          step="1"
+                          className="text-center flex-1"
+                        />
+                        {state[kManual].length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => set(kManual, state[kManual].filter((_, idx) => idx !== i))}
+                            className="text-gray-300 hover:text-red-500 text-sm px-1"
+                            title="Remove line"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </>
+                )}
               </tr>
             ))}
           </tbody>

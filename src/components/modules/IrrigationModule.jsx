@@ -332,11 +332,7 @@ const defaultZoneRows = () =>
   ZONE_TYPES.map(z => ({ vendor: 'Standard', type: '', qty: '', mode: z.defaultMode, subEach: '' }))
 const defaultTimerRows = () =>
   TIMER_TYPES.map(() => ({ vendor: 'Standard', type: '', qty: '', subEach: '' }))
-const DEFAULT_MANUAL_ROWS = () => [
-  { label: '', hours: '', materials: '', subCost: '' },
-  { label: '', hours: '', materials: '', subCost: '' },
-  { label: '', hours: '', materials: '', subCost: '' },
-]
+const DEFAULT_MANUAL_ROWS = () => [{ label: '', hours: '', materials: '', subCost: '' }]
 
 // Migrate the legacy fixed zoneQtys/zoneModes maps into the new row model. Every
 // zone type becomes a row (qty defaults to '' → 0), so a legacy save's In-House
@@ -1016,14 +1012,27 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
       {/* Manual Entry */}
       <div>
         <SecHdr title="Manual Entry" />
-        <table className="w-full text-xs">
+        <table className="w-full text-xs table-fixed">
+          <colgroup>
+            {isSub ? (
+              <>
+                <col className="w-1/2" />
+                <col className="w-1/2" />
+              </>
+            ) : (
+              <>
+                <col className="w-1/3" />
+                <col className="w-1/3" />
+                <col className="w-1/3" />
+              </>
+            )}
+          </colgroup>
           <TH
-            cols={[
-              { label: 'Description' },
-              { label: 'Hours', w: 'w-20' },
-              { label: 'Materials ($)', w: 'w-28' },
-              { label: 'Sub Cost ($)', w: 'w-28' },
-            ]}
+            cols={
+              isSub
+                ? [{ label: 'Description' }, { label: 'Cost ($)' }]
+                : [{ label: 'Description' }, { label: 'Hours' }, { label: 'Materials ($)' }]
+            }
           />
           <tbody className="divide-y divide-gray-50">
             {manualRows.map((r, i) => (
@@ -1036,25 +1045,54 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
                     placeholder="Description"
                   />
                 </td>
-                <td className={td}>
-                  <Inp value={r.hours} onChange={e => updateManual(i, 'hours', e.target.value)} step="0.5" className="text-center" />
-                </td>
-                <td className={td}>
-                  <Inp
-                    value={r.materials}
-                    onChange={e => updateManual(i, 'materials', e.target.value)}
-                    step="1"
-                    className="text-center"
-                  />
-                </td>
-                <td className={td}>
-                  <Inp
-                    value={r.subCost}
-                    onChange={e => updateManual(i, 'subCost', e.target.value)}
-                    step="1"
-                    className="text-center"
-                  />
-                </td>
+                {isSub ? (
+                  <td className={td}>
+                    <div className="flex items-center gap-1">
+                      <Inp
+                        value={r.subCost}
+                        onChange={e => updateManual(i, 'subCost', e.target.value)}
+                        step="1"
+                        className="text-center flex-1"
+                      />
+                      {manualRows.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setManualRows(rows => rows.filter((_, idx) => idx !== i))}
+                          className="text-gray-300 hover:text-red-500 text-sm px-1"
+                          title="Remove line"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                ) : (
+                  <>
+                    <td className={td}>
+                      <Inp value={r.hours} onChange={e => updateManual(i, 'hours', e.target.value)} step="0.5" className="text-center" />
+                    </td>
+                    <td className={td}>
+                      <div className="flex items-center gap-1">
+                        <Inp
+                          value={r.materials}
+                          onChange={e => updateManual(i, 'materials', e.target.value)}
+                          step="1"
+                          className="text-center flex-1"
+                        />
+                        {manualRows.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setManualRows(rows => rows.filter((_, idx) => idx !== i))}
+                            className="text-gray-300 hover:text-red-500 text-sm px-1"
+                            title="Remove line"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </>
+                )}
               </tr>
             ))}
           </tbody>

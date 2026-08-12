@@ -810,9 +810,7 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
   )
 }
 
-const DEFAULT_MANUAL_ROWS = [
-  { label: 'Misc 1', hours: '', materials: '', subCost: '' },
-]
+const DEFAULT_MANUAL_ROWS = [{ label: '', hours: '', materials: '', subCost: '' }]
 
 // Per-tab input record. In-House and Sub each hold their own independent copy so
 // the two tabs are separate calculators.
@@ -1807,13 +1805,32 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
       <div>
         <SectionHeader title="Manual Entry" />
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              {isSub ? (
+                <>
+                  <col className="w-1/2" />
+                  <col className="w-1/2" />
+                </>
+              ) : (
+                <>
+                  <col className="w-1/3" />
+                  <col className="w-1/3" />
+                  <col className="w-1/3" />
+                </>
+              )}
+            </colgroup>
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-center pb-1 pr-2 font-medium">Description</th>
-                <th className="text-center pb-1 pr-2 font-medium">Hours</th>
-                <th className="text-center pb-1 pr-2 font-medium">Materials $</th>
-                <th className="text-center pb-1 font-medium">Sub Cost $</th>
+                {isSub ? (
+                  <th className="text-center pb-1 font-medium">Cost $</th>
+                ) : (
+                  <>
+                    <th className="text-center pb-1 pr-2 font-medium">Hours</th>
+                    <th className="text-center pb-1 font-medium">Materials $</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -1821,25 +1838,53 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                 <tr key={i} className="border-b border-gray-100">
                   <td className="py-1 pr-2">
                     <input
-                      className="input text-sm py-1"
+                      className="input text-sm py-1 w-full"
                       value={row.label}
                       onChange={e => updateManual(i, 'label', e.target.value)}
                     />
                   </td>
-                  <td className="py-1 pr-2">
-                    <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} className="text-center" />
-                  </td>
-                  <td className="py-1 pr-2">
-                    <NumInput
-                      value={row.materials}
-                      onChange={v => updateManual(i, 'materials', v)}
-                      className="text-center"
-                    />
-                  </td>
-                  <td className="py-1">
-                    {' '}
-                    <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} className="text-center" />
-                  </td>
+                  {isSub ? (
+                    <td className="py-1">
+                      <div className="flex items-center gap-1">
+                        <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} className="text-center flex-1" />
+                        {manualRows.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setManualRows(rows => rows.filter((_, idx) => idx !== i))}
+                            className="text-gray-300 hover:text-red-500 text-sm px-1"
+                            title="Remove line"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  ) : (
+                    <>
+                      <td className="py-1 pr-2">
+                        <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} className="text-center" />
+                      </td>
+                      <td className="py-1">
+                        <div className="flex items-center gap-1">
+                          <NumInput
+                            value={row.materials}
+                            onChange={v => updateManual(i, 'materials', v)}
+                            className="text-center flex-1"
+                          />
+                          {manualRows.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => setManualRows(rows => rows.filter((_, idx) => idx !== i))}
+                              className="text-gray-300 hover:text-red-500 text-sm px-1"
+                              title="Remove line"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </>
+                  )}
                 </tr>
               ))}
             </tbody>

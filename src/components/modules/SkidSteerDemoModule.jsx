@@ -667,9 +667,6 @@ const DEFAULT_STATE = {
   // Sub tab has its OWN manual rows — independent of In-House.
   subManualRows: [
     { label: '', hours: '', materials: '', subCost: '' },
-    { label: '', hours: '', materials: '', subCost: '' },
-    { label: '', hours: '', materials: '', subCost: '' },
-    { label: '', hours: '', materials: '', subCost: '' },
   ],
 }
 
@@ -2342,54 +2339,92 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
         <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           {subSectionTitle('Manual Entry', isDemoSub)}
         </div>
-        <table className="w-full text-xs">
+        <table className="w-full text-xs table-fixed">
           <TH
             center
-            cols={[
-              { label: 'Description' },
-              { label: 'Hours', w: 'w-20' },
-              { label: 'Materials ($)', w: 'w-28' },
-              { label: 'Sub Cost ($)', w: 'w-28' },
-            ]}
+            cols={
+              isDemoSub
+                ? [
+                    { label: 'Description', w: 'w-1/2' },
+                    { label: 'Cost ($)', w: 'w-1/2' },
+                  ]
+                : [
+                    { label: 'Description', w: 'w-1/3' },
+                    { label: 'Hours', w: 'w-1/3' },
+                    { label: 'Materials ($)', w: 'w-1/3' },
+                  ]
+            }
           />
           <tbody className="divide-y divide-gray-50">
-            {(isDemoSub ? state.subManualRows : state.manualRows).map((r, i) => (
+            {(isDemoSub ? state.subManualRows : state.manualRows).map((r, i, arr) => {
+              const key = isDemoSub ? 'subManualRows' : 'manualRows'
+              return (
               <tr key={i}>
                 <td className={td}>
                   <Inp
                     type="text"
                     value={r.label}
-                    onChange={e => setRow(isDemoSub ? 'subManualRows' : 'manualRows', i, 'label', e.target.value)}
+                    onChange={e => setRow(key, i, 'label', e.target.value)}
                     className="text-center"
                     placeholder="Description"
                   />
                 </td>
-                <td className={td}>
-                  <Inp
-                    value={r.hours}
-                    onChange={e => setRow(isDemoSub ? 'subManualRows' : 'manualRows', i, 'hours', e.target.value)}
-                    className="text-center"
-                    step="0.5"
-                  />
-                </td>
-                <td className={td}>
-                  <Inp
-                    value={r.materials}
-                    onChange={e => setRow(isDemoSub ? 'subManualRows' : 'manualRows', i, 'materials', e.target.value)}
-                    className="text-center"
-                    step="1"
-                  />
-                </td>
-                <td className={td}>
-                  <Inp
-                    value={r.subCost}
-                    onChange={e => setRow(isDemoSub ? 'subManualRows' : 'manualRows', i, 'subCost', e.target.value)}
-                    className="text-center"
-                    step="1"
-                  />
-                </td>
+                {isDemoSub ? (
+                  <td className={td}>
+                    <div className="flex items-center gap-1">
+                      <Inp
+                        value={r.subCost}
+                        onChange={e => setRow(key, i, 'subCost', e.target.value)}
+                        className="text-center flex-1"
+                        step="1"
+                      />
+                      {arr.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => set(key, arr.filter((_, idx) => idx !== i))}
+                          className="text-gray-300 hover:text-red-500 text-sm px-1"
+                          title="Remove line"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                ) : (
+                  <>
+                    <td className={td}>
+                      <Inp
+                        value={r.hours}
+                        onChange={e => setRow(key, i, 'hours', e.target.value)}
+                        className="text-center"
+                        step="0.5"
+                      />
+                    </td>
+                    <td className={td}>
+                      <div className="flex items-center gap-1">
+                        <Inp
+                          value={r.materials}
+                          onChange={e => setRow(key, i, 'materials', e.target.value)}
+                          className="text-center flex-1"
+                          step="1"
+                        />
+                        {arr.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => set(key, arr.filter((_, idx) => idx !== i))}
+                            className="text-gray-300 hover:text-red-500 text-sm px-1"
+                            title="Remove line"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </>
+                )}
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
         <button
