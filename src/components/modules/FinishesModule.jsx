@@ -927,7 +927,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
                       </select>
                     </td>
                     <td className="py-1.5 pr-2">
-                      {isActive && row.type !== 'Precast' && (
+                      {row.type !== 'Precast' && (
                         <NumInput
                           value={row.widthIn}
                           onChange={v => patchRow(setCapRows, i, { widthIn: v }, computeCapRow, true)}
@@ -938,22 +938,20 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
                     </td>
                     <td className="py-1.5">
                       <div className="flex items-center gap-1">
-                        {isActive && (
-                          <NumInput
-                            value={row.type === 'Precast' ? row.qty : row.lf}
-                            onChange={v =>
-                              patchRow(
-                                setCapRows,
-                                i,
-                                row.type === 'Precast' ? { qty: v } : { lf: v },
-                                computeCapRow,
-                                false
-                              )
-                            }
-                            className="w-full text-center"
-                            placeholder="0"
-                          />
-                        )}
+                        <NumInput
+                          value={row.type === 'Precast' ? row.qty : row.lf}
+                          onChange={v =>
+                            patchRow(
+                              setCapRows,
+                              i,
+                              row.type === 'Precast' ? { qty: v } : { lf: v },
+                              computeCapRow,
+                              false
+                            )
+                          }
+                          className="w-full text-center"
+                          placeholder="0"
+                        />
                         {capRows.length > 1 && (
                           <button
                             type="button"
