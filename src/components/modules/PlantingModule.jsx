@@ -1198,38 +1198,6 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
   }
   const plantingRateList = [
     {
-      group: 'Till & Amend Soil',
-      items: [
-        {
-          label: 'Till - Soil Move Rate',
-          table: 'labor_rates',
-          name: 'Till - Soil Move Rate',
-          category: 'Planting',
-          mode: 'coefficient',
-          unitLabel: 'CY/day',
-          value: lr(laborRates, 'Till - Soil Move Rate'),
-        },
-        {
-          label: 'Till - Tilling Rate',
-          table: 'labor_rates',
-          name: 'Till - Tilling Rate',
-          category: 'Planting',
-          mode: 'coefficient',
-          unitLabel: 'SF/day',
-          value: lr(laborRates, 'Till - Tilling Rate'),
-        },
-        {
-          label: 'Till - Amend Rate',
-          table: 'labor_rates',
-          name: 'Till - Amend Rate',
-          category: 'Planting',
-          mode: 'coefficient',
-          unitLabel: 'SF/day',
-          value: lr(laborRates, 'Till - Amend Rate'),
-        },
-      ],
-    },
-    {
       group: 'Small Plants',
       items: [
         ...Object.keys(SMALL_PLANT_DEFAULTS).map(type => ({
@@ -1365,20 +1333,6 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
               <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
               <NumInput value={hoursAdj} onChange={setHoursAdj} placeholder="0" />
             </div>
-          </div>
-        </>
-      )}
-
-      {/* Till & Amend Soil — In-House only (labor, no material) */}
-      {!isSub && (
-        <>
-          <SectionHeader title="Till & Amend Soil" />
-          <div>
-            <p className="text-xs text-gray-500 mb-0.5">Sqft</p>
-            <NumInput value={tillSqft} onChange={setTillSqft} placeholder="0" />
-            {n(tillSqft) > 0 && (
-              <p className="text-xs text-gray-400 mt-1">{calc.tillHrs.toFixed(2)} hrs estimated</p>
-            )}
           </div>
         </>
       )}
