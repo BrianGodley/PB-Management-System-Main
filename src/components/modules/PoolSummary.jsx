@@ -67,6 +67,7 @@ export default function PoolSummary({ module }) {
     spa = {},
     basin = {},
     vault = {},
+    trough = {},
     excavation = {},
     tile = {},
     spillways = [],
@@ -94,9 +95,10 @@ export default function PoolSummary({ module }) {
   const activeStructs = [
     ['Pool', pool],
     ['Spa', spa],
-    ['Infinity Basin', basin],
     ['Cover Vault', vault],
-  ].filter(([, s]) => s.enabled)
+    ['Infinity Edge Basin', basin],
+    ['Zero Edge Trough', trough],
+  ].filter(([, s]) => s && s.enabled)
 
   const avgDepth = s => (n(s.maxDepth) * 2) / 3
 
@@ -243,8 +245,12 @@ export default function PoolSummary({ module }) {
       {activeStructs.some(([k]) => {
         const fin = interiorFinish[k] || {}
         const s =
-          { pool, spa, basin, vault }[
-            k === 'Pool' ? 'pool' : k === 'Spa' ? 'spa' : k === 'Infinity Basin' ? 'basin' : 'vault'
+          { pool, spa, basin, vault, trough }[
+            k === 'Pool' ? 'pool'
+              : k === 'Spa' ? 'spa'
+              : k === 'Cover Vault' ? 'vault'
+              : k === 'Infinity Edge Basin' ? 'basin'
+              : 'trough'
           ] || {}
         return n(fin.subCost) > 0 || n(s.waterSF) > 0
       }) && (

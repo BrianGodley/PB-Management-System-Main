@@ -418,6 +418,17 @@ const newRaisedSurface = () => ({ matType: '', sqft: '', curvePct: '', corners: 
 const newEquipRow = () => ({ category: 'Pump', model: '', qty: '1', unitCost: '' })
 const newManualRow = () => ({ label: '', hours: '', materials: '', subCost: '' })
 
+// Old estimates keyed the basin's tile/interior maps under 'Infinity Basin'.
+// The label is now 'Infinity Edge Basin' — carry the old value forward so a
+// saved estimate doesn't lose its basin tile/interior data on reload.
+function migrateStructMap(m) {
+  if (!m || typeof m !== 'object') return m
+  if (m['Infinity Basin'] && !m['Infinity Edge Basin']) {
+    return { ...m, 'Infinity Edge Basin': m['Infinity Basin'] }
+  }
+  return m
+}
+
 // Per-tab input record. In-House and Sub each hold their own independent copy so
 // the two tabs are separate calculators. Only these user-input fields live here;
 // rate maps, crew type, labor rate, etc. stay shared at the top level of state.
@@ -430,6 +441,7 @@ function makeTab(data = {}) {
     spa: data.spa ?? defaultStruct(),
     basin: data.basin ?? defaultStruct(),
     vault: data.vault ?? defaultStruct(),
+    trough: data.trough ?? defaultStruct(),
     excavation: data.excavation ?? {
       equipment: 'IH - Bobcat 72"',
       fromTrucksLF: '',
@@ -437,20 +449,22 @@ function makeTab(data = {}) {
       subCost: '',
     },
     shotcrete: data.shotcrete ?? { manualSubCost: '' },
-    tile: data.tile ?? {
+    tile: migrateStructMap(data.tile) ?? {
       Pool: defaultTileStruct(),
       Spa: defaultTileStruct(),
-      'Infinity Basin': defaultTileStruct(),
       'Cover Vault': defaultTileStruct(),
+      'Infinity Edge Basin': defaultTileStruct(),
+      'Zero Edge Trough': defaultTileStruct(),
     },
     spillways: data.spillways ?? [newSpillway()],
     copingRows: data.copingRows ?? [newCopingRow()],
     raisedSurfaces: data.raisedSurfaces ?? [],
-    interiorFinish: data.interiorFinish ?? {
+    interiorFinish: migrateStructMap(data.interiorFinish) ?? {
       Pool: defaultInteriorStruct(),
       Spa: defaultInteriorStruct(),
-      'Infinity Basin': defaultInteriorStruct(),
       'Cover Vault': defaultInteriorStruct(),
+      'Infinity Edge Basin': defaultInteriorStruct(),
+      'Zero Edge Trough': defaultInteriorStruct(),
     },
     equipment: data.equipment ?? [newEquipRow(), newEquipRow()],
     plumbing: data.plumbing ?? {
@@ -504,6 +518,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     spa,
     basin,
     vault,
+    trough,
     excavation,
     shotcrete,
     tile,
@@ -526,8 +541,9 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   const activeStructs = [
     { key: 'Pool', s: pool, tileKey: 'Pool', iKey: 'Pool' },
     { key: 'Spa', s: spa, tileKey: 'Spa', iKey: 'Spa' },
-    { key: 'Infinity Basin', s: basin, tileKey: 'Infinity Basin', iKey: 'Infinity Basin' },
     { key: 'Cover Vault', s: vault, tileKey: 'Cover Vault', iKey: 'Cover Vault' },
+    { key: 'Infinity Edge Basin', s: basin, tileKey: 'Infinity Edge Basin', iKey: 'Infinity Edge Basin' },
+    { key: 'Zero Edge Trough', s: trough || {}, tileKey: 'Zero Edge Trough', iKey: 'Zero Edge Trough' },
   ].filter(x => x.s.enabled)
 
   // ─ Volume helpers ─
@@ -873,16 +889,16 @@ function Label({ text, sub, center }) {
   )
 }
 
-function StructDims({ label, data, onChange, alwaysEnabled }) {
+function StructDims({ label, data, onChange, alwaysEnabled, oneRow }) {
   const toggle = () => onChange({ ...data, enabled: !data.enabled })
   if (!alwaysEnabled && !data.enabled) {
     return (
       <button
         type="button"
         onClick={toggle}
-        className="w-full text-left px-3 py-2 rounded-lg border border-dashed border-gray-300 text-xs text-gray-400 hover:border-green-400 hover:text-green-600 transition-colors"
+        className="w-full text-left px-3 py-2 rounded-lg border border-green-500 text-xs font-medium text-green-700 hover:bg-green-50 hover:border-green-600 transition-colors"
       >
-        + Enable {label}
+        + Add {label}
       </button>
     )
   }
@@ -900,14 +916,14 @@ function StructDims({ label, data, onChange, alwaysEnabled }) {
           </button>
         )}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+      <div className={`grid grid-cols-2 ${oneRow ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-2`}>
         {[
           ['Water Surface', 'waterSF', 'sqft'],
           ['Perimeter', 'perimLF', 'LF'],
           ['Max Depth', 'maxDepth', 'ft'],
           ['Steps / Bench', 'stepBenchLF', 'LF'],
           // Dam Wall is spa-only (separates the spa from pool water surface).
-          // Pool, Infinity Basin and Cover Vault don't use it.
+          // Pool, Cover Vault, Infinity Edge Basin and Zero Edge Trough don't use it.
           ...(label === 'Spa' ? [['Dam Wall', 'damWallLF', 'LF']] : []),
         ].map(([lbl, key, unit]) => (
           <div key={key}>
@@ -915,14 +931,12 @@ function StructDims({ label, data, onChange, alwaysEnabled }) {
             <NumInput value={data[key]} onChange={v => onChange({ ...data, [key]: v })} />
           </div>
         ))}
-        {n(data.maxDepth) > 0 && (
-          <div className="flex items-end">
-            <p className="text-xs text-gray-400 pb-2">
-              Avg depth: {((n(data.maxDepth) * 2) / 3).toFixed(2)}′
-            </p>
-          </div>
-        )}
       </div>
+      {n(data.maxDepth) > 0 && (
+        <p className="text-xs text-gray-400 mt-1">
+          Avg depth: {((n(data.maxDepth) * 2) / 3).toFixed(2)}′
+        </p>
+      )}
     </div>
   )
 }
@@ -1184,10 +1198,11 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
   const activeStructList = [
     ['Pool', T.pool, true],
     ['Spa', T.spa, false],
-    ['Infinity Basin', T.basin, false],
     ['Cover Vault', T.vault, false],
+    ['Infinity Edge Basin', T.basin, false],
+    ['Zero Edge Trough', T.trough, false],
   ]
-    .filter(([, s, always]) => always || s.enabled)
+    .filter(([, s, always]) => always || (s && s.enabled))
     .map(([k]) => k)
 
   // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
@@ -1699,23 +1714,29 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       {/* ─── 1. Structure Dimensions ─── */}
       <div>
         <SectionHeader title="Structure Dimensions" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <StructDims
-            label="Pool"
-            data={T.pool}
-            onChange={v => updStruct('pool', v)}
-            alwaysEnabled
-          />
+        <StructDims
+          label="Pool"
+          data={T.pool}
+          onChange={v => updStruct('pool', v)}
+          alwaysEnabled
+          oneRow
+        />
+        <div className="mt-3 space-y-2">
           <StructDims label="Spa" data={T.spa} onChange={v => updStruct('spa', v)} />
-          <StructDims
-            label="Infinity Basin"
-            data={T.basin}
-            onChange={v => updStruct('basin', v)}
-          />
           <StructDims
             label="Cover Vault"
             data={T.vault}
             onChange={v => updStruct('vault', v)}
+          />
+          <StructDims
+            label="Infinity Edge Basin"
+            data={T.basin}
+            onChange={v => updStruct('basin', v)}
+          />
+          <StructDims
+            label="Zero Edge Trough"
+            data={T.trough}
+            onChange={v => updStruct('trough', v)}
           />
         </div>
         {calc.totalExcavCY > 0 && (
@@ -1831,10 +1852,11 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           {[
             ['Pool', T.pool],
             ['Spa', T.spa],
-            ['Infinity Basin', T.basin],
             ['Cover Vault', T.vault],
+            ['Infinity Edge Basin', T.basin],
+            ['Zero Edge Trough', T.trough],
           ]
-            .filter(([, s]) => s.enabled)
+            .filter(([, s]) => s && s.enabled)
             .map(([k]) => {
               const t = T.tile[k] || defaultTileStruct()
               return (
@@ -2117,10 +2139,11 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           {[
             ['Pool', T.pool],
             ['Spa', T.spa],
-            ['Infinity Basin', T.basin],
             ['Cover Vault', T.vault],
+            ['Infinity Edge Basin', T.basin],
+            ['Zero Edge Trough', T.trough],
           ]
-            .filter(([, s]) => s.enabled)
+            .filter(([, s]) => s && s.enabled)
             .map(([k, s]) => {
               const fin = T.interiorFinish[k] || defaultInteriorStruct()
               const priceSF =
