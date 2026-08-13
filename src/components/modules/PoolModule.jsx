@@ -442,11 +442,21 @@ function makeTab(data = {}) {
     basin: data.basin ?? defaultStruct(),
     vault: data.vault ?? defaultStruct(),
     trough: data.trough ?? defaultStruct(),
-    excavation: data.excavation ?? {
+    // Excavation now carries its OWN In-House / Sub toggle (independent of the
+    // module-level tab). Sub mode picks a subcontractor company and auto-fills
+    // that sub's Pool excavation rate (overridable). Merge over defaults so
+    // older saved estimates gain the new fields. 'From Trucks' was dropped
+    // (handled in Job Site Conditions).
+    excavation: {
+      mode: 'In-House',
       equipment: 'IH - Bobcat 72"',
-      fromTrucksLF: '',
       toDumpMiles: '',
+      subVendor: 'Our Trucking',
+      subVendorId: null,
+      subRate: '',
+      subRateUnit: '',
       subCost: '',
+      ...(data.excavation || {}),
     },
     shotcrete: data.shotcrete ?? { manualSubCost: '' },
     tile: migrateStructMap(data.tile) ?? {
@@ -574,13 +584,19 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   const totalShotCY = activeStructs.reduce((s, x) => s + shotcreteCYFn(x.s), 0)
 
   // ─ Excavation ─
-  const isSubExcav = excavation.equipment === 'Sub Bobcat / Mini Bob'
+  const isSubExcav = excavation.mode === 'Sub'
   // DB value via labor_rates['Excavation - ...'] takes precedence over hardcoded fallback
   const excavLaborName = EXCAVATION_LABOR_NAME[excavation.equipment]
   const equipRate =
     (excavLaborName && laborRates[excavLaborName]) ?? EXCAVATION_RATES[excavation.equipment] ?? 7.33
   const excavHrs = !isSubExcav && equipRate > 0 ? totalExcavCY / equipRate : 0
-  const excavSub = isSubExcav ? n(excavation.subCost) : 0
+  // Sub cost: auto-fill from the chosen sub's stored rate (per-CY rates are
+  // multiplied by dug volume; flat/lump rates used as-is), overridable by a
+  // manually entered subCost on this estimate.
+  const excavAutoSub = /yd/i.test(excavation.subRateUnit || '')
+    ? n(excavation.subRate) * totalExcavCY
+    : n(excavation.subRate)
+  const excavSub = isSubExcav ? (n(excavation.subCost) || excavAutoSub) : 0
 
   // Shotcrete / Interior Finish / Plumbing / Steel auto-subs apply on the Sub
   // tab ONLY. On the In-House tab their AUTO amount is not charged (done
@@ -841,6 +857,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     totalExcavCY,
     totalShotCY,
     excavHrs,
+    excavAutoSub,
     tileHrs,
     spillwayHrs,
     copingHrs,
@@ -972,6 +989,8 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
   const [subRates, setSubRates] = useState({})
   const [materialRows, setMaterialRows] = useState([])
   const [vendors, setVendors] = useState([])
+  const [subCompanies, setSubCompanies] = useState([]) // subs_vendors type='sub'
+  const [subExcavRows, setSubExcavRows] = useState([]) // subcontractor_rates (Pool) w/ company
   const [loadingRates, setLoadingRates] = useState(true)
 
   // ── Sales tax — applied to totalMat across every module so the bid
@@ -1018,15 +1037,20 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
 
   // Re-fetch all three Pool rate tables. Called on mount and after edits.
   const refreshAllRates = useCallback(async () => {
-    const [mp, labRes, subRes, catRows, venRes] = await Promise.all([
+    const [mp, labRes, subRes, catRows, venRes, subCoRes] = await Promise.all([
       fetchStandardRateMap(['Pool', 'Utilities']),
       supabase.from('labor_rates').select('name,rate').in('category', ['Pool', 'Utilities']),
-      supabase.from('subcontractor_rates').select('trade,rate').eq('category', 'Pool'),
+      supabase.from('subcontractor_rates').select('company_name,trade,rate,unit').eq('category', 'Pool'),
       fetchModuleCatalog(['Utilities']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
         .eq('type', 'vendor')
+        .order('company_name'),
+      supabase
+        .from('subs_vendors')
+        .select('id, company_name')
+        .eq('type', 'sub')
         .order('company_name'),
     ])
     const lr = {}
@@ -1040,9 +1064,16 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
     setMaterialPrices(mp)
     setLaborRates(lr)
     setSubRates(sr)
+    setSubExcavRows(subRes.data || [])
     setMaterialRows(catRows || [])
     setVendors(
       (venRes.data || []).map(v => ({
+        id: v.id,
+        name: v.company_name,
+      }))
+    )
+    setSubCompanies(
+      (subCoRes.data || []).map(v => ({
         id: v.id,
         name: v.company_name,
       }))
@@ -1065,6 +1096,28 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       return { ...p, rateOverrides: next }
     })
   const updStruct = (key, val) => updT(key, val)
+  // Find a subcontractor's Pool excavation rate (prefer an excavation/dig/haul/
+  // demo trade line; else the first Pool rate on file for that company).
+  const excavSubRateFor = name => {
+    if (!name) return null
+    const rows = subExcavRows.filter(r => (r.company_name || '') === name)
+    if (!rows.length) return null
+    const pick = rows.find(r => /excav|dig|haul|demo|dirt|remov/i.test(r.trade || '')) || rows[0]
+    return { rate: parseFloat(pick.rate) || 0, unit: pick.unit || '' }
+  }
+  // Pick a sub company for excavation: store the company + snapshot its rate so
+  // the estimate is reproducible even if the master rate later changes.
+  const chooseExcavSub = name => {
+    const r = excavSubRateFor(name)
+    const co = subCompanies.find(c => c.name === name)
+    upd('excavation', {
+      ...T.excavation,
+      subVendor: name,
+      subVendorId: co?.id ?? null,
+      subRate: r ? r.rate : '',
+      subRateUnit: r ? r.unit : '',
+    })
+  }
   const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
   const setEpRows = key => fn => updT(key, arr => fn(arr || []))
 
@@ -1754,40 +1807,77 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       {/* ─── 2. Excavation ─── */}
       <div>
         <SectionHeader title="Excavation" />
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="sm:col-span-2">
-            <Label text="Equipment" />
-            <div className="flex items-center gap-1">
+        {/* Excavation-specific In-House / Sub toggle (independent of the
+            module-level tab). Sub mode shows a subcontractor picker. */}
+        <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden mb-3">
+          {['In-House', 'Sub'].map(m => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => upd('excavation', { ...T.excavation, mode: m })}
+              className={`px-4 py-1.5 text-xs font-medium ${
+                (T.excavation.mode || 'In-House') === m
+                  ? 'bg-green-600 text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+
+        {(T.excavation.mode || 'In-House') === 'In-House' ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="sm:col-span-3">
+              <Label text="Equipment" />
               <select
-                className="input text-sm py-1.5 flex-1 min-w-0"
+                className="input text-sm py-1.5 w-full"
                 value={T.excavation.equipment}
-                onChange={e =>
-                  upd('excavation', { ...T.excavation, equipment: e.target.value })
-                }
+                onChange={e => upd('excavation', { ...T.excavation, equipment: e.target.value })}
               >
-                {EXCAVATION_TYPES.map(t => (
+                {EXCAVATION_TYPES.filter(t => t !== 'Sub Bobcat / Mini Bob').map(t => (
                   <option key={t}>{t}</option>
                 ))}
               </select>
             </div>
-          </div>
-          <div>
-            <Label text="From Trucks" sub="LF" />
-            <NumInput
-              value={T.excavation.fromTrucksLF}
-              onChange={v => upd('excavation', { ...T.excavation, fromTrucksLF: v })}
-            />
-          </div>
-          <div>
-            <Label text="To Dump" sub="miles" />
-            <NumInput
-              value={T.excavation.toDumpMiles}
-              onChange={v => upd('excavation', { ...T.excavation, toDumpMiles: v })}
-            />
-          </div>
-          {T.excavation.equipment === 'Sub Bobcat / Mini Bob' && (
             <div>
-              <Label text="Sub Cost" />
+              <Label text="To Dump" sub="miles" />
+              <NumInput
+                value={T.excavation.toDumpMiles}
+                onChange={v => upd('excavation', { ...T.excavation, toDumpMiles: v })}
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="sm:col-span-2">
+              <Label text="Subcontractor" />
+              <select
+                className="input text-sm py-1.5 w-full"
+                value={T.excavation.subVendor || ''}
+                onChange={e => chooseExcavSub(e.target.value)}
+              >
+                <option value="">Select…</option>
+                {subCompanies.map(c => (
+                  <option key={c.id} value={c.name}>
+                    {c.name}
+                  </option>
+                ))}
+                {T.excavation.subVendor &&
+                  !subCompanies.some(c => c.name === T.excavation.subVendor) && (
+                    <option value={T.excavation.subVendor}>{T.excavation.subVendor}</option>
+                  )}
+              </select>
+            </div>
+            <div>
+              <Label text="To Dump" sub="miles" />
+              <NumInput
+                value={T.excavation.toDumpMiles}
+                onChange={v => upd('excavation', { ...T.excavation, toDumpMiles: v })}
+              />
+            </div>
+            <div>
+              <Label text="Sub Cost" sub={T.excavation.subRate ? 'auto — override' : 'enter'} />
               <div className="relative">
                 <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
                   $
@@ -1796,11 +1886,20 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                   value={T.excavation.subCost}
                   onChange={v => upd('excavation', { ...T.excavation, subCost: v })}
                   className="pl-6"
+                  placeholder={calc.excavAutoSub ? Math.round(calc.excavAutoSub).toString() : 'cost'}
                 />
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+        {(T.excavation.mode || 'In-House') === 'Sub' && calc.excavAutoSub > 0 && (
+          <p className="text-xs text-gray-500 mt-2 px-1">
+            {T.excavation.subVendor || 'Sub'} rate: ${Number(T.excavation.subRate || 0).toLocaleString()}
+            {/yd/i.test(T.excavation.subRateUnit || '') ? ` per Cu Yd × ${calc.totalExcavCY.toFixed(1)}` : ''} →{' '}
+            <strong>${Math.round(calc.excavAutoSub).toLocaleString()}</strong>
+            {n(T.excavation.subCost) > 0 ? ' (overridden)' : ' auto'}
+          </p>
+        )}
         {calc.excavHrs > 0 && (
           <p className="text-xs text-gray-500 mt-2 px-1">
             {EXCAVATION_RATES[T.excavation.equipment] ?? '—'} Cu Yd/hr →{' '}
