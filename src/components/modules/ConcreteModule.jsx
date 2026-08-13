@@ -1170,7 +1170,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
         // Concrete mix catalog (vendor-supplied 'Concrete Mix' products) + the
         // named install materials (rebar, form lumber, sleeves, color).
         ...catalogBlockItems('Concrete Mix'),
-        ...materialRateRows('Rebar'),
+        ...materialRateRows('Rebar ' + (rebarSize || '#4')),
         ...materialRateRows('Concrete - Form Lumber LF'),
         ...materialRateRows('Concrete - Sleeve Per 10LF'),
         ...materialRateRows('Concrete - Color Per CY'),
@@ -1585,6 +1585,45 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
       </div>
       )}
 
+      {/* ── Rebar Install ── */}
+      <div>
+        <SectionHeader title="Rebar Install" />
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Size</label>
+            <select
+              className="input text-sm py-1.5 w-full"
+              value={rebarSize}
+              onChange={e => setRebarSize(e.target.value)}
+            >
+              {REBAR_SIZES.map(s => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Pattern</label>
+            <select
+              className="input text-sm py-1.5 w-full"
+              value={activeRebarSpacing}
+              onChange={e => setActiveRebarSpacing(e.target.value)}
+            >
+              {REBAR_SPACINGS.map(s => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Sq Ft</label>
+            <NumInput value={activeRebarSF} onChange={setActiveRebarSF} placeholder="Sq Ft" className="w-full" />
+          </div>
+        </div>
+      </div>
+
       {/* ── Concrete Install ── */}
       <div>
         <SectionHeader title="Concrete Install" />
@@ -1706,36 +1745,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               <NumInput value={activeDepthIn} onChange={setActiveDepthIn} placeholder="4" />
             </div>
           )}
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Rebar (Sq Ft)</label>
-            <div className="flex items-center gap-2">
-              <select
-                className="input text-sm py-1.5 w-20"
-                value={rebarSize}
-                onChange={e => setRebarSize(e.target.value)}
-                title="Rebar size"
-              >
-                {REBAR_SIZES.map(s => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="input text-sm py-1.5 w-24"
-                value={activeRebarSpacing}
-                onChange={e => setActiveRebarSpacing(e.target.value)}
-                title="Rebar on-center spacing"
-              >
-                {REBAR_SPACINGS.map(s => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-              <NumInput value={activeRebarSF} onChange={setActiveRebarSF} placeholder="Sq Ft" className="flex-1" />
-            </div>
-          </div>
           {!isSub && (
           <div>
             <label className="text-xs text-gray-500 block mb-1">Form Edging (Ln Ft)</label>
