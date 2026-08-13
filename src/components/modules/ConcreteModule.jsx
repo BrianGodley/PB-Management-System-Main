@@ -23,11 +23,11 @@ import { catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../
 
 // ── Rate tables (method-indexed — not in DB) ──────────────────────────────────
 
+// Base spread labor: HOURS PER INCH of depth PER 100 SF of area (not tons/hr).
 const BASE_RATES = {
-  'Skid Steer Good': 10.0,
-  'Skid Steer OK': 7.5,
-  'Mini Skid Steer': 5.0,
-  Wheelbarrow: 3.34,
+  'Skid Steer': 0.25,
+  'Mini Skid Steer': 0.5,
+  Wheelbarrow: 1.0,
   Hand: 2.5,
 }
 
@@ -35,14 +35,15 @@ const BASE_RATES = {
 // icon next to the method dropdown can edit the t/hr rate. Names must match
 // the seed file.
 const BASE_METHOD_LABOR_NAME = {
-  'Skid Steer Good': 'Concrete - Base Skid Steer Good',
-  'Skid Steer OK': 'Concrete - Base Skid Steer OK',
+  'Skid Steer': 'Concrete - Base Skid Steer',
   'Mini Skid Steer': 'Concrete - Base Mini Skid Steer',
   Wheelbarrow: 'Concrete - Base Wheelbarrow',
   Hand: 'Concrete - Base Hand',
 }
 
 const METHODS = Object.keys(BASE_RATES)
+// Map legacy saved base methods to the consolidated set.
+const normBaseMethod = m => (m === 'Skid Steer OK' || m === 'Skid Steer Good' ? 'Skid Steer' : m)
 const FINISH_TYPES = [
   'Broom Finish',
   'Smooth Trowel',
@@ -242,25 +243,23 @@ function calcConcrete(
   const hoursAdj = n(state.hoursAdj)
 
   // ── Base ────────────────────────────────────────────────────────────────
-  // Base-rock tonnage density (SF·inch per ton) — DB-editable coefficient.
-  const baseTonsDivisor = mr['Concrete - Base Tons Divisor'] ?? 200
   let baseHrsTot = 0,
     baseMatTot = 0
   const baseCalc = (state.baseRows || []).map(r => {
     const sf = n(r.sf),
       depth = n(r.depth) || 2
-    if (!sf) return { tons: 0, hrs: 0, mat: 0 }
-    const tons = (sf / baseTonsDivisor) * depth
-    // Per-method base rate — DB value via labor_rates['Concrete - Base ...']
-    // takes precedence over the hardcoded fallback in BASE_RATES.
-    const rate = lr[BASE_METHOD_LABOR_NAME[r.method]] ?? BASE_RATES[r.method] ?? 10.0
-    const hrs = tons / rate
+    if (!sf) return { hrs: 0, mat: 0 }
+    const m = normBaseMethod(r.method)
+    // Both labor AND material are by AREA: (SF ÷ 100) × depth(in) × rate.
+    // Labor rate = labor_rates['Concrete - Base ...'] (hrs per inch per 100 SF).
+    const rate = lr[BASE_METHOD_LABOR_NAME[m]] ?? BASE_RATES[m] ?? 0.25
+    const hrs = (sf / 100) * depth * rate
     const bt = rowOpt('Concrete Base', r, BASE_TYPES)
-    // Empty material picker → no material cost (labor still driven by method).
-    const mat = r.type ? tons * (mr[bt.dbName] ?? bt.fallback) : 0
+    // Material = (SF ÷ 100) × depth(in) × item price ($ per 100 SF per inch).
+    const mat = r.type ? (sf / 100) * depth * (mr[bt.dbName] ?? bt.fallback) : 0
     baseHrsTot += hrs
     baseMatTot += mat
-    return { tons, hrs, mat, rate }
+    return { hrs, mat, rate }
   })
 
   // ── Concrete install ─────────────────────────────────────────────────────
@@ -455,7 +454,6 @@ function calcConcrete(
     rebarPerLF,
     rebarLfPerSf,
     rebarLfPerSfBySpacing,
-    baseTonsDivisor,
     sealerSFPerGal,
     formMaterialPerLF,
     sleevePer10LF,
@@ -520,7 +518,7 @@ function NumInput({ value, onChange, placeholder = '0', className = '', step = '
 // Start with ZERO seeded rows — the user adds rows via "+ Add row". Every added
 // row defaults vendor to '' (empty "Select vendor" placeholder → empty Type list
 // → $0 until a vendor is chosen).
-const DEFAULT_BASE_ROWS = [{ label: '', method: 'Skid Steer Good', sf: '', depth: '2', vendor: '', type: '' }]
+const DEFAULT_BASE_ROWS = [{ label: '', method: 'Skid Steer', sf: '', depth: '2', vendor: '', type: '' }]
 
 const DEFAULT_MANUAL_ROWS = [{ label: '', hours: '', materials: '', subCost: '' }]
 
@@ -1055,15 +1053,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           unitLabel: '%/pt',
           value: calc.complexityPctPerUnit,
         },
-        {
-          label: 'Base Tons Divisor',
-          table: 'misc_rates',
-          name: 'Concrete - Base Tons Divisor',
-          category: 'Concrete',
-          mode: 'coefficient',
-          unitLabel: 'SF·in/ton',
-          value: calc.baseTonsDivisor,
-        },
       ],
     },
     {
@@ -1075,7 +1064,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: BASE_METHOD_LABOR_NAME[m],
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 't/hr',
+          unitLabel: 'hrs/in·100sf',
           value: laborRates[BASE_METHOD_LABOR_NAME[m]] ?? BASE_RATES[m],
         })),
         // Base material catalog (vendor-supplied 'Concrete Base' products).
@@ -1440,15 +1429,15 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               {activeBaseRows.map((row, i) => {
                 const _sf = n(row.sf),
                   _depth = n(row.depth) || 2
-                const _tons = _sf > 0 ? (_sf / calc.baseTonsDivisor) * _depth : 0
+                const _bm = normBaseMethod(row.method)
                 const methodRate =
-                  laborRates[BASE_METHOD_LABOR_NAME[row.method]] ?? BASE_RATES[row.method] ?? 10.0
+                  laborRates[BASE_METHOD_LABOR_NAME[_bm]] ?? BASE_RATES[_bm] ?? 0.25
                 const baseOpts = sectionOptions('Concrete Base', row.vendor, BASE_TYPES)
                 const bt = resolveType(row.type, baseOpts, BASE_TYPES)
                 const baseRate = materialRates[bt.dbName] ?? bt.fallback
                 const c = {
-                  hrs: _tons > 0 ? _tons / methodRate : 0,
-                  mat: row.type ? _tons * baseRate : 0,
+                  hrs: _sf > 0 ? (_sf / 100) * _depth * methodRate : 0,
+                  mat: row.type ? (_sf / 100) * _depth * baseRate : 0,
                 }
                 return (
                   <tr key={i} className="border-b border-gray-100">
@@ -1491,7 +1480,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                       <div className="flex items-center gap-1">
                         <select
                           className="input text-sm py-1 flex-1 min-w-0"
-                          value={row.method}
+                          value={normBaseMethod(row.method)}
                           onChange={e => updateBaseRow(i, 'method', e.target.value)}
                         >
                           {METHODS.map(m => (
@@ -1525,7 +1514,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             onClick={() =>
               setActiveBaseRows(rows => [
                 ...(rows || []),
-                { label: '', method: 'Skid Steer Good', sf: '', depth: '2', vendor: '', type: '' },
+                { label: '', method: 'Skid Steer', sf: '', depth: '2', vendor: '', type: '' },
               ])
             }
             className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
