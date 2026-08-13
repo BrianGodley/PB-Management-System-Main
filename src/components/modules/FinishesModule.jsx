@@ -760,18 +760,17 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
       <div>
         <SectionHeader title={title} />
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              <col className="w-1/3" />
+              <col className="w-1/3" />
+              <col className="w-1/3" />
+            </colgroup>
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-center pb-1 pr-2 font-medium w-40">Vendor</th>
-                <th className="text-center pb-1 pr-2 font-medium w-36">Item</th>
-                <th className="text-center pb-1 pr-2 font-medium w-24">SF</th>
-                <th className="text-center pb-1 pr-2 font-medium">Rate</th>
-                <th className="text-center pb-1 pr-2 font-medium text-gray-400 w-24">
-                  {isSub ? 'Flat $/unit' : 'Labor hrs'}
-                </th>
-                <th className="text-center pb-1 pr-2 font-medium text-gray-400 w-24">Material $</th>
-                <th className="w-6" />
+                <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
+                <th className="text-center pb-1 pr-2 font-medium">Item</th>
+                <th className="text-center pb-1 pr-2 font-medium">SF</th>
               </tr>
             </thead>
             <tbody>
@@ -818,51 +817,24 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
                         ))}
                       </select>
                     </td>
-                    <td className="py-1.5 pr-2">
-                      <NumInput
-                        value={row.sf}
-                        onChange={v => patchRow(setRows, i, { sf: v }, compute, false)}
-                        className="w-full text-center"
-                      />
-                    </td>
-                    <td className="py-1.5 pr-2">{rateCell(row, meta, setRows, i, compute)}</td>
-                    <td className="py-1.5 text-center text-xs pr-2">
-                      {isSub ? (
-                        <input
-                          type="number"
-                          step="any"
-                          className="input text-sm py-1 w-full text-center"
-                          placeholder={r2(c.subUnit).toString()}
-                          value={row.subEach ?? ''}
-                          onChange={e =>
-                            patchRow(setRows, i, { subEach: e.target.value }, compute, false)
-                          }
+                    <td className="py-1.5">
+                      <div className="flex items-center gap-1">
+                        <NumInput
+                          value={row.sf}
+                          onChange={v => patchRow(setRows, i, { sf: v }, compute, false)}
+                          className="w-full text-center"
                         />
-                      ) : (
-                        <span className="text-gray-400 block text-center">{c.hrs > 0 ? c.hrs.toFixed(2) : '—'}</span>
-                      )}
-                    </td>
-                    <td className="py-1.5 text-center text-xs text-gray-600">
-                      {(isSub ? c.subMat : c.mat) > 0 ? (
-                        <div className="text-center">
-                          <div>{fmt2(isSub ? c.subMat : c.mat)}</div>
-                          {!isSub && c.tons > 0 && (
-                            <div className="text-gray-400">{c.tons.toFixed(2)} tons</div>
-                          )}
-                        </div>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td className="py-1.5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => removeRow(setRows, i)}
-                        className="text-gray-300 hover:text-red-500 text-xs px-1"
-                        title="Remove row"
-                      >
-                        ✕
-                      </button>
+                        {rows.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeRow(setRows, i)}
+                            className="text-gray-300 hover:text-red-500 text-xs px-1"
+                            title="Remove row"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )
@@ -872,7 +844,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
           <button
             type="button"
             onClick={() => addRow(setRows, blank)}
-            className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+            className="mt-2 text-xs text-green-700 hover:text-green-900 font-medium"
           >
             + Add row
           </button>
@@ -887,19 +859,19 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
       <div>
         <SectionHeader title="Wall Caps" />
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              <col className="w-1/4" />
+              <col className="w-1/4" />
+              <col className="w-1/4" />
+              <col className="w-1/4" />
+            </colgroup>
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-center pb-1 pr-2 font-medium w-40">Vendor</th>
-                <th className="text-center pb-1 pr-2 font-medium w-36">Item</th>
-                <th className="text-center pb-1 pr-2 font-medium w-20">Width (in)</th>
-                <th className="text-center pb-1 pr-2 font-medium w-24">LF / Qty</th>
-                <th className="text-center pb-1 pr-2 font-medium">Rate</th>
-                <th className="text-center pb-1 pr-2 font-medium text-gray-400 w-24">
-                  {isSub ? 'Flat $/unit' : 'Labor hrs'}
-                </th>
-                <th className="text-center pb-1 pr-2 font-medium text-gray-400 w-24">Material $</th>
-                <th className="w-6" />
+                <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
+                <th className="text-center pb-1 pr-2 font-medium">Item</th>
+                <th className="text-center pb-1 pr-2 font-medium">Width (in)</th>
+                <th className="text-center pb-1 pr-2 font-medium">LF / Qty</th>
               </tr>
             </thead>
             <tbody>
@@ -964,59 +936,35 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
                         />
                       )}
                     </td>
-                    <td className="py-1.5 pr-2">
-                      {isActive && (
-                        <NumInput
-                          value={row.type === 'Precast' ? row.qty : row.lf}
-                          onChange={v =>
-                            patchRow(
-                              setCapRows,
-                              i,
-                              row.type === 'Precast' ? { qty: v } : { lf: v },
-                              computeCapRow,
-                              false
-                            )
-                          }
-                          className="w-full text-center"
-                          placeholder="0"
-                        />
-                      )}
-                    </td>
-                    <td className="py-1.5 pr-2 text-center">
-                      {isActive ? rateCell(row, meta, setCapRows, i, computeCapRow) : (
-                        <span className="text-xs text-gray-300">—</span>
-                      )}
-                    </td>
-                    <td className="py-1.5 text-center text-xs pr-2">
-                      {!isActive ? (
-                        <span className="text-gray-300 block text-center">—</span>
-                      ) : isSub ? (
-                        <input
-                          type="number"
-                          step="any"
-                          className="input text-sm py-1 w-full text-center"
-                          placeholder={r2(c.subUnit).toString()}
-                          value={row.subEach ?? ''}
-                          onChange={e =>
-                            patchRow(setCapRows, i, { subEach: e.target.value }, computeCapRow, false)
-                          }
-                        />
-                      ) : (
-                        <span className="text-gray-400 block text-center">{c.hrs > 0 ? c.hrs.toFixed(2) : '—'}</span>
-                      )}
-                    </td>
-                    <td className="py-1.5 text-center text-xs text-gray-600">
-                      {(isSub ? c.subMat : c.mat) > 0 ? fmt2(isSub ? c.subMat : c.mat) : '—'}
-                    </td>
-                    <td className="py-1.5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => removeRow(setCapRows, i)}
-                        className="text-gray-300 hover:text-red-500 text-xs px-1"
-                        title="Remove row"
-                      >
-                        ✕
-                      </button>
+                    <td className="py-1.5">
+                      <div className="flex items-center gap-1">
+                        {isActive && (
+                          <NumInput
+                            value={row.type === 'Precast' ? row.qty : row.lf}
+                            onChange={v =>
+                              patchRow(
+                                setCapRows,
+                                i,
+                                row.type === 'Precast' ? { qty: v } : { lf: v },
+                                computeCapRow,
+                                false
+                              )
+                            }
+                            className="w-full text-center"
+                            placeholder="0"
+                          />
+                        )}
+                        {capRows.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeRow(setCapRows, i)}
+                            className="text-gray-300 hover:text-red-500 text-xs px-1"
+                            title="Remove row"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )
@@ -1026,7 +974,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
           <button
             type="button"
             onClick={() => addRow(setCapRows, blankCapRow)}
-            className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+            className="mt-2 text-xs text-green-700 hover:text-green-900 font-medium"
           >
             + Add row
           </button>
@@ -1336,7 +1284,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
           <button
             type="button"
             onClick={() => setManualRows(rows => [...rows, { label: '', hours: '', materials: '', subCost: '' }])}
-            className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+            className="mt-2 text-xs text-green-700 hover:text-green-900 font-medium"
           >
             + Add manual entry
           </button>
