@@ -347,6 +347,7 @@ function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loadin
           value={form[col.key] ?? ''}
           onChange={e => setField(col.key, e.target.value)}
         >
+          {col.placeholder && <option value="">{col.placeholder}</option>}
           {col.options.map(o => {
             const val = typeof o === 'object' ? o.value : o
             const lab = typeof o === 'object' ? o.label : o
@@ -798,10 +799,30 @@ export default function MasterRates({ only } = {}) {
   const codeCell = map => r => (
     <span className="font-mono text-xs text-gray-500">{map.get(r.id) || '—'}</span>
   )
+  // Category / Sub-Category dropdown options = managed taxonomy (from the new
+  // Categories tabs) merged with the built-in defaults and any value already on
+  // a row, so nothing existing disappears and newly-added categories show up.
+  const uniqSorted = arr => Array.from(new Set(arr.filter(Boolean))).sort()
+  const laborCatOptions = useMemo(
+    () => uniqSorted([...LABOR_CATEGORY_OPTIONS, ...laborCats.map(c => c.name), ...labor.map(r => r.category)]),
+    [laborCats, labor]
+  )
+  const laborSubOptions = useMemo(
+    () => uniqSorted([...laborSubcats.map(x => x.name), ...labor.map(r => r.sub_category)]),
+    [laborSubcats, labor]
+  )
+  const subCatOptions = useMemo(
+    () => uniqSorted([...SUB_CATEGORY_OPTIONS, ...subTaxCats.map(c => c.name), ...subs.map(r => r.category)]),
+    [subTaxCats, subs]
+  )
+  const subSubOptions = useMemo(
+    () => uniqSorted([...subTaxSubcats.map(x => x.name), ...subs.map(r => r.sub_category)]),
+    [subTaxSubcats, subs]
+  )
   const laborColumns = [
     { key: 'code', label: 'Code', editable: false, render: codeCell(laborCodeMap) },
-    { key: 'category', label: 'Category', type: 'select', options: LABOR_CATEGORY_OPTIONS },
-    { key: 'sub_category', label: 'Sub Category', placeholder: 'describe…' },
+    { key: 'category', label: 'Category', type: 'select', options: laborCatOptions },
+    { key: 'sub_category', label: 'Sub Category', type: 'select', options: laborSubOptions, placeholder: 'describe…' },
     { key: 'name', label: 'Item', bold: true, stripCat: true, placeholder: 'e.g. Demo - Tree Small' },
     { key: 'notes', label: 'Labor Description', placeholder: 'Optional notes' },
     { key: 'unit', label: 'Unit', type: 'select', options: LABOR_UNIT_OPTIONS },
@@ -815,9 +836,9 @@ export default function MasterRates({ only } = {}) {
   ]
   const subColumns = [
     { key: 'code', label: 'Code', editable: false, render: codeCell(subCodeMap) },
-    { key: 'category', label: 'Category', type: 'select', options: SUB_CATEGORY_OPTIONS },
+    { key: 'category', label: 'Category', type: 'select', options: subCatOptions },
     { key: 'company_name', label: 'Subcontractor', placeholder: 'e.g. ABC Concrete Co.' },
-    { key: 'sub_category', label: 'Sub Category', placeholder: 'describe…' },
+    { key: 'sub_category', label: 'Sub Category', type: 'select', options: subSubOptions, placeholder: 'describe…' },
     { key: 'trade', label: 'Item', bold: true, stripCat: true, placeholder: 'e.g. Flatwork Pour' },
     { key: 'unit', label: 'Unit', type: 'select', options: SUB_UNIT_OPTIONS },
     { key: 'rate', label: 'Unit Price', type: 'number', step: '0.01', prefix: '$' },
