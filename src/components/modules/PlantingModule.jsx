@@ -40,42 +40,44 @@ import { resolveMaterialPrice, catalogOptions, fetchModuleCatalog, fetchStandard
 const PLANTING_CATEGORY = 'Planting'
 
 // Hardcoded fallbacks (used when DB row not present yet)
+// perDay is now a per-HOUR rate (plants/hr = old plants/day ÷ 8). Price unchanged.
 const SMALL_PLANT_DEFAULTS = {
-  'Flats of Groundcover': { perDay: 25, price: 18.0 },
-  'Flats of 4" pots': { perDay: 20, price: 20.0 },
-  '4" pots standard': { perDay: 280, price: 0.0 },
-  '4" pots succulents': { perDay: 280, price: 7.0 },
-  '6" pots standard': { perDay: 180, price: 0.0 },
-  '6" pots succulents': { perDay: 180, price: 12.0 },
-  '1 gallon standard': { perDay: 70, price: 6.5 },
-  '1 gallon premium': { perDay: 70, price: 8.0 },
-  '1 gallon succulents': { perDay: 70, price: 18.0 },
-  '3 gallon standard': { perDay: 70, price: 7.0 },
-  '5 gallon standard': { perDay: 40, price: 17.0 },
-  '5 gallon premium': { perDay: 40, price: 35.0 },
-  '5 gallon succulents': { perDay: 40, price: 39.0 },
-  '5 gallon bamboo': { perDay: 40, price: 40.0 },
-  '5 gallon palm': { perDay: 40, price: 50.0 },
+  'Flats of Groundcover': { perDay: 3.125, price: 18.0 },
+  'Flats of 4" pots': { perDay: 2.5, price: 20.0 },
+  '4" pots standard': { perDay: 35, price: 0.0 },
+  '4" pots succulents': { perDay: 35, price: 7.0 },
+  '6" pots standard': { perDay: 22.5, price: 0.0 },
+  '6" pots succulents': { perDay: 22.5, price: 12.0 },
+  '1 gallon standard': { perDay: 8.75, price: 6.5 },
+  '1 gallon premium': { perDay: 8.75, price: 8.0 },
+  '1 gallon succulents': { perDay: 8.75, price: 18.0 },
+  '3 gallon standard': { perDay: 8.75, price: 7.0 },
+  '5 gallon standard': { perDay: 5, price: 17.0 },
+  '5 gallon premium': { perDay: 5, price: 35.0 },
+  '5 gallon succulents': { perDay: 5, price: 39.0 },
+  '5 gallon bamboo': { perDay: 5, price: 40.0 },
+  '5 gallon palm': { perDay: 5, price: 50.0 },
 }
 
+// perDay is now a per-HOUR rate (plants/hr = old plants/day ÷ 8). Price unchanged.
 const LARGE_PLANT_DEFAULTS = {
-  '15 gallon standard': { perDay: 15, price: 52.0 },
-  '15 gallon premium': { perDay: 15, price: 90.0 },
-  '15 gallon succulents': { perDay: 15, price: 225.0 },
-  '15 gallon fruit': { perDay: 15, price: 145.0 },
-  '15 gallon palms': { perDay: 15, price: 175.0 },
-  '24" box standard': { perDay: 4, price: 185.0 },
-  '24" box premium': { perDay: 4, price: 250.0 },
-  '24" box fruit': { perDay: 4, price: 0.0 },
-  '24" box palm': { perDay: 4, price: 0.0 },
-  '36" box standard': { perDay: 0.75, price: 450.0 },
-  '36" box premium': { perDay: 0.75, price: 600.0 },
-  '36" box fruit': { perDay: 0.75, price: 0.0 },
-  '36" box palm': { perDay: 0.75, price: 0.0 },
-  '48" box standard': { perDay: 0.3, price: 800.0 },
-  '48" box premium': { perDay: 0.3, price: 0.0 },
-  '48" box fruit': { perDay: 0.3, price: 0.0 },
-  '48" box palm': { perDay: 0.3, price: 0.0 },
+  '15 gallon standard': { perDay: 1.875, price: 52.0 },
+  '15 gallon premium': { perDay: 1.875, price: 90.0 },
+  '15 gallon succulents': { perDay: 1.875, price: 225.0 },
+  '15 gallon fruit': { perDay: 1.875, price: 145.0 },
+  '15 gallon palms': { perDay: 1.875, price: 175.0 },
+  '24" box standard': { perDay: 0.5, price: 185.0 },
+  '24" box premium': { perDay: 0.5, price: 250.0 },
+  '24" box fruit': { perDay: 0.5, price: 0.0 },
+  '24" box palm': { perDay: 0.5, price: 0.0 },
+  '36" box standard': { perDay: 0.09375, price: 450.0 },
+  '36" box premium': { perDay: 0.09375, price: 600.0 },
+  '36" box fruit': { perDay: 0.09375, price: 0.0 },
+  '36" box palm': { perDay: 0.09375, price: 0.0 },
+  '48" box standard': { perDay: 0.0375, price: 800.0 },
+  '48" box premium': { perDay: 0.0375, price: 0.0 },
+  '48" box fruit': { perDay: 0.0375, price: 0.0 },
+  '48" box palm': { perDay: 0.0375, price: 0.0 },
 }
 
 // Fallback labor rate defaults for add-ons and till
@@ -83,7 +85,7 @@ const LABOR_DEFAULTS = {
   'Till - Soil Move Rate': 39, // CY/day
   'Till - Tilling Rate': 3600, // sqft/day
   'Till - Amend Rate': 900, // sqft/day
-  'Tree Stakes - Install Rate': 24, // stakes/day
+  'Tree Stakes - Install Rate': 3, // stakes/hr (was 24 stakes/day ÷ 8)
   'Root Barrier - Install Rate': 20, // min/LF
   'Gopher Basket - Install Rate': 2, // min/basket
   'Mesh Flat - Install Rate': 0.7, // min/sqft
@@ -105,7 +107,7 @@ const ADDON_MAT_DEFAULTS = {
 // ── Planting Add-On item catalog (the Item dropdown; NOT from the DB) ──────────
 // Each add-on Item carries its own labor formula + material/labor DB names. The
 // labor formula is byte-for-byte identical to the original per-item math:
-//   mode 'perDay' → hrs = (qty / rate) * 8   (rate = units/day, guarded > 0)
+//   mode 'perDay' → hrs = qty / rate         (rate = units/HOUR, guarded > 0)
 //   mode 'perMin' → hrs = (qty * rate) / 60  (rate = minutes/unit)
 const ADDON_META = {
   'Tree Stake': {
@@ -113,7 +115,7 @@ const ADDON_META = {
     labKey: 'Tree Stakes - Install Rate',
     mode: 'perDay',
     unit: 'ea',
-    labUnit: 'stakes/day',
+    labUnit: 'stakes/hr',
   },
   'Root Barrier 12"': {
     matKey: 'Root Barrier 12in',
@@ -186,10 +188,10 @@ function mp(materialPrices, key) {
 }
 
 function getSmallPerDay(laborRates, type) {
-  return laborRates[type] ?? SMALL_PLANT_DEFAULTS[type]?.perDay ?? 25
+  return laborRates[type] ?? SMALL_PLANT_DEFAULTS[type]?.perDay ?? 3.125
 }
 function getLargePerDay(laborRates, type) {
-  return laborRates[type] ?? LARGE_PLANT_DEFAULTS[type]?.perDay ?? 15
+  return laborRates[type] ?? LARGE_PLANT_DEFAULTS[type]?.perDay ?? 1.875
 }
 
 // ── Vendor-catalog material price ─────────────────────────────────────────────
@@ -253,7 +255,7 @@ function computePlantRow(row, perDay) {
   let hrs = 0,
     mat = 0
   if (qty > 0 && perDay > 0) {
-    hrs = (qty / perDay) * 8
+    hrs = qty / perDay // perDay is now a per-HOUR rate
     mat = qty * n(row.price)
   }
   const subUnit = n(row.price)
@@ -272,7 +274,7 @@ function computeAddonRow(row, laborRates, materialPrices, materialRows) {
   const qty = n(row.qty)
   const rate = lr(laborRates, meta.labKey)
   let hrs = 0
-  if (meta.mode === 'perDay') hrs = rate > 0 ? (qty / rate) * 8 : 0
+  if (meta.mode === 'perDay') hrs = rate > 0 ? qty / rate : 0 // rate is now per-HOUR
   else if (meta.mode === 'perMin') hrs = (qty * rate) / 60
   const unitPrice = plantMatPrice(
     meta.matKey,
@@ -1206,7 +1208,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
           name: type,
           category: 'Planting',
           mode: 'coefficient',
-          unitLabel: 'per day',
+          unitLabel: 'per hour',
           value: getSmallPerDay(laborRates, type),
         })),
         ...Object.keys(SMALL_PLANT_DEFAULTS).flatMap(type =>
@@ -1223,7 +1225,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
           name: type,
           category: 'Planting',
           mode: 'coefficient',
-          unitLabel: 'per day',
+          unitLabel: 'per hour',
           value: getLargePerDay(laborRates, type),
         })),
         ...Object.keys(LARGE_PLANT_DEFAULTS).flatMap(type =>

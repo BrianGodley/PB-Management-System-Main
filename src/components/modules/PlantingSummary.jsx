@@ -12,49 +12,50 @@
 import FinancialSummaryList from './FinancialSummaryList'
 import { resolveMaterialPrice } from '../../lib/materialCatalog'
 
+// perDay is a per-HOUR rate (plants/hr = old plants/day ÷ 8). Price unchanged.
 const SMALL_PLANT_DEFAULTS = {
-  'Flats of Groundcover': { perDay: 25, price: 18.0 },
-  'Flats of 4" pots': { perDay: 20, price: 20.0 },
-  '4" pots standard': { perDay: 280, price: 0.0 },
-  '4" pots succulents': { perDay: 280, price: 7.0 },
-  '6" pots standard': { perDay: 180, price: 0.0 },
-  '6" pots succulents': { perDay: 180, price: 12.0 },
-  '1 gallon standard': { perDay: 70, price: 6.5 },
-  '1 gallon premium': { perDay: 70, price: 8.0 },
-  '1 gallon succulents': { perDay: 70, price: 18.0 },
-  '3 gallon standard': { perDay: 70, price: 7.0 },
-  '5 gallon standard': { perDay: 40, price: 17.0 },
-  '5 gallon premium': { perDay: 40, price: 35.0 },
-  '5 gallon succulents': { perDay: 40, price: 39.0 },
-  '5 gallon bamboo': { perDay: 40, price: 40.0 },
-  '5 gallon palm': { perDay: 40, price: 50.0 },
+  'Flats of Groundcover': { perDay: 3.125, price: 18.0 },
+  'Flats of 4" pots': { perDay: 2.5, price: 20.0 },
+  '4" pots standard': { perDay: 35, price: 0.0 },
+  '4" pots succulents': { perDay: 35, price: 7.0 },
+  '6" pots standard': { perDay: 22.5, price: 0.0 },
+  '6" pots succulents': { perDay: 22.5, price: 12.0 },
+  '1 gallon standard': { perDay: 8.75, price: 6.5 },
+  '1 gallon premium': { perDay: 8.75, price: 8.0 },
+  '1 gallon succulents': { perDay: 8.75, price: 18.0 },
+  '3 gallon standard': { perDay: 8.75, price: 7.0 },
+  '5 gallon standard': { perDay: 5, price: 17.0 },
+  '5 gallon premium': { perDay: 5, price: 35.0 },
+  '5 gallon succulents': { perDay: 5, price: 39.0 },
+  '5 gallon bamboo': { perDay: 5, price: 40.0 },
+  '5 gallon palm': { perDay: 5, price: 50.0 },
 }
 
 const LARGE_PLANT_DEFAULTS = {
-  '15 gallon standard': { perDay: 15, price: 52.0 },
-  '15 gallon premium': { perDay: 15, price: 90.0 },
-  '15 gallon succulents': { perDay: 15, price: 225.0 },
-  '15 gallon fruit': { perDay: 15, price: 145.0 },
-  '15 gallon palms': { perDay: 15, price: 175.0 },
-  '24" box standard': { perDay: 4, price: 185.0 },
-  '24" box premium': { perDay: 4, price: 250.0 },
-  '24" box fruit': { perDay: 4, price: 0.0 },
-  '24" box palm': { perDay: 4, price: 0.0 },
-  '36" box standard': { perDay: 0.75, price: 450.0 },
-  '36" box premium': { perDay: 0.75, price: 600.0 },
-  '36" box fruit': { perDay: 0.75, price: 0.0 },
-  '36" box palm': { perDay: 0.75, price: 0.0 },
-  '48" box standard': { perDay: 0.3, price: 800.0 },
-  '48" box premium': { perDay: 0.3, price: 0.0 },
-  '48" box fruit': { perDay: 0.3, price: 0.0 },
-  '48" box palm': { perDay: 0.3, price: 0.0 },
+  '15 gallon standard': { perDay: 1.875, price: 52.0 },
+  '15 gallon premium': { perDay: 1.875, price: 90.0 },
+  '15 gallon succulents': { perDay: 1.875, price: 225.0 },
+  '15 gallon fruit': { perDay: 1.875, price: 145.0 },
+  '15 gallon palms': { perDay: 1.875, price: 175.0 },
+  '24" box standard': { perDay: 0.5, price: 185.0 },
+  '24" box premium': { perDay: 0.5, price: 250.0 },
+  '24" box fruit': { perDay: 0.5, price: 0.0 },
+  '24" box palm': { perDay: 0.5, price: 0.0 },
+  '36" box standard': { perDay: 0.09375, price: 450.0 },
+  '36" box premium': { perDay: 0.09375, price: 600.0 },
+  '36" box fruit': { perDay: 0.09375, price: 0.0 },
+  '36" box palm': { perDay: 0.09375, price: 0.0 },
+  '48" box standard': { perDay: 0.0375, price: 800.0 },
+  '48" box premium': { perDay: 0.0375, price: 0.0 },
+  '48" box fruit': { perDay: 0.0375, price: 0.0 },
+  '48" box palm': { perDay: 0.0375, price: 0.0 },
 }
 
 const LABOR_DEFAULTS = {
   'Till - Soil Move Rate': 39,
   'Till - Tilling Rate': 3600,
   'Till - Amend Rate': 900,
-  'Tree Stakes - Install Rate': 24,
+  'Tree Stakes - Install Rate': 3,
   'Root Barrier - Install Rate': 20,
   'Gopher Basket - Install Rate': 2,
   'Mesh Flat - Install Rate': 0.7,
@@ -170,14 +171,14 @@ export default function PlantingSummary({ module }) {
         const qty = n(r.qty)
         const perDay = laborRates[r.type] ?? defaultsMap[r.type]?.perDay ?? 0
         const unitPrice = n(r.price)
-        const hrs = perDay > 0 ? (qty / perDay) * 8 : 0
+        const hrs = perDay > 0 ? qty / perDay : 0 // perDay is now per-HOUR
         const subEach = r.subEach !== '' && r.subEach != null ? n(r.subEach) : unitPrice
         const material = isSub ? qty * subEach : perDay > 0 ? qty * unitPrice : 0
         const parts = []
         if (isSub) parts.push(`${fmt2(subEach)}/ea flat`)
         else {
           parts.push(`${hrs.toFixed(2)} hrs`)
-          parts.push(`${perDay < 1 ? perDay.toFixed(2) : perDay.toLocaleString()} plants/day`)
+          parts.push(`${perDay < 1 ? perDay.toFixed(3) : perDay.toLocaleString()} plants/hr`)
           parts.push(`${fmt2(unitPrice)}/ea`)
         }
         return {
@@ -207,7 +208,7 @@ export default function PlantingSummary({ module }) {
         ADDON_MAT_DEFAULTS[meta.matKey] ?? 0
       )
       let hrs = 0
-      if (meta.mode === 'perDay') hrs = rate > 0 ? (qty / rate) * 8 : 0
+      if (meta.mode === 'perDay') hrs = rate > 0 ? qty / rate : 0 // rate is now per-HOUR
       else if (meta.mode === 'perMin') hrs = (qty * rate) / 60
       const subEach = r.subEach !== '' && r.subEach != null ? n(r.subEach) : unitPrice
       const material = isSub ? qty * subEach : qty * unitPrice
