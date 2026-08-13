@@ -1,27 +1,26 @@
 import WorkTypeChooser from './WorkTypeChooser'
 import CrewTypeBar from './CrewTypeBar'
 import ModuleHeaderSlot from './ModuleHeaderSlot'
-import { useState, useEffect, useCallback, useContext } from 'react'
+import { useState, useEffect, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
-import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { useMaterialCatalog, resolveMaterialPrice, catalogOptions } from '../../lib/materialCatalog'
 import { groutCyPerBlock } from '../../lib/cmuGrout'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Columns Module — fields and calculations from Excel estimator (Columns Module tab)
-// Column Install auto-calculates CMU blocks, rebar, footing, and fill from
-// quantity, height, and width inputs.
+// Columns Module — 4 column TYPES (CMU / Poured In Place / Modular / Brick),
+// mirroring WallsModule. Each type has its OWN array of column rows (Add Column),
+// its own vendor-first Type picker, and its own material-quantity math adapted to
+// a vertical column footprint. In-House / Sub tabs stay independent (SubTabContext).
 // ─────────────────────────────────────────────────────────────────────────────
 
-// dbName = name in material_rates (category = 'Columns')
-// Hardcoded values are fallbacks when DB row is absent.
-// subDbName / subFallback = flat Subcontractor $/SF price for the finish
-// (Sub tab prices finishes as a single flat rate per SF — no in-house
-//  material + labor breakdown). subFallback seeds a starting value.
+// dbName = name in the catalog (Standard) / labor_rates. Hardcoded values are
+// LABOR fallbacks (allowed) or catalog-material fallbacks Brian OK'd (CMU block,
+// grout concrete, rebar). New material lines (modular block, brick, mix, forms,
+// mortar) resolve ONLY from the catalog — no hardcoded $ fallback.
 const FINISH_TYPES = {
   'Sand Stucco': {
     costPerSF: 0,
@@ -89,25 +88,51 @@ const FINISH_TYPES = {
 }
 
 const BLOCK_RATES = {
-  blockMatCost: { dbName: 'CMU Block', fallback: 2.5 }, // $/block
-  // Rebar now references the shared Basic Materials 'Rebar' row (canonical
-  // $1.388/LF) so a vendor price change on rebar flows through here too.
+  blockMatCost: { dbName: 'CMU Block', fallback: 2.5 }, // $/block (CMU fallback when no block picked)
   rebarMatCost: { dbName: 'Rebar', fallback: 1.388 }, // $/LF (Basic Materials)
-  faceBlockMat: { dbName: 'Face Block', fallback: 3.0 }, // $/block (decorative)
-  // Grout fill is now priced at the concrete rate by volume (block count ×
-  // cu-ft/block ÷ 27 × concrete $/CY) via the shared Basic Materials concrete
-  // row — see cmuGrout.js. fillMatCost (flat $/block) is retired.
-  // Labor rates
-  installLaborHrs: { dbName: 'CMU Install Labor', fallback: 0.083 }, // hrs per block (~5 min)
+  faceBlockMat: { dbName: 'Face Block', fallback: 3.0 },
+  // Labor rates (fallbacks OK)
+  installLaborHrs: { dbName: 'CMU Install Labor', fallback: 0.083 }, // hrs per block
   excavateLaborHrs: { dbName: 'Excavate Footing Labor', fallback: 0.5 }, // hrs per column
   pourLaborHrs: { dbName: 'Pour Footing Labor', fallback: 0.25 }, // hrs per column
   fillLaborHrs: { dbName: 'Fill Labor', fallback: 0.05 }, // hrs per block
 }
 
-// User-selectable rebar size (canonical Basic Materials rows 'Rebar #3'…'Rebar #8',
-// priced per Ln Ft). Default '#4'. Mirrors ConcreteModule. Size drives ONLY the
-// material name/price; rebar labor (Set Rebar) stays shared/size-independent.
+// New per-type LABOR coefficients (fallbacks OK). Brick laying mirrors Walls'
+// brickLayLab (1.75 hr/SF); PIP form + pour mirror ConcreteModule-style rates.
+const BRICK_LAY = { dbName: 'Column Brick Lay Labor', fallback: 1.75 } // hrs / SF of brick face
+const PIP_FORM_LAB = { dbName: 'Column Form Labor', fallback: 0.08 } // hrs / SF of form
+const PIP_POUR_LAB = { dbName: 'Column Pour Labor', fallback: 1.5 } // hrs / CY poured
+
+// Catalog NAMES for optional (catalog-only) materials — $0 until seeded so no
+// hardcoded material price ever beats the catalog.
+const MORTAR_NAME = 'Mortar'
+const FORM_LUMBER_NAME = 'Column Form Lumber'
+
+// User-selectable rebar size (canonical Basic Materials rows 'Rebar #3'…'Rebar #8').
 const REBAR_SIZES = ['#3', '#4', '#5', '#6', '#8']
+
+// Column-type sub-tabs (mirror WallsModule wallType). NO Timber for Columns.
+const COL_TYPE_TABS = [
+  { key: 'CMU', label: 'CMU Block' },
+  { key: 'PIP', label: 'Poured In Place' },
+  { key: 'Modular', label: 'Modular' },
+  { key: 'Brick', label: 'Brick' },
+]
+
+// Per-type Type-picker catalog sub-categories (vendor-first, id-linked — same
+// products the matching Walls / Concrete tabs use). Loaded into the module's
+// catalog via the extra categories on useMaterialCatalog below.
+//  - CMU columns share the Walls 'Wall Block' dimensioned block products.
+//  - Modular / Brick share the exact Walls Modular / Brick sub-categories.
+//  - PIP pours a 'Concrete Mix' product (Concrete Install), priced per CY.
+const CMU_BLOCK_SUBCAT = 'Wall Block'
+const MODULAR_SUBCAT = 'Modular Wall'
+const BRICK_SUBCAT = 'Brick'
+const CONC_MIX_SUBCAT = 'Concrete Mix'
+// Which row field stores the Type selection per column type.
+const TYPE_FIELD = { CMU: 'blockType', Modular: 'blockType', Brick: 'brickType', PIP: 'mixType' }
+const TYPE_LABEL = { CMU: 'Block Type', Modular: 'Block Type', Brick: 'Brick Type', PIP: 'Concrete Mix' }
 
 const DEFAULTS = {
   laborRatePerHour: 35,
@@ -119,30 +144,18 @@ const DEFAULTS = {
 const n = v => parseFloat(v) || 0
 
 const COLUMNS_CATEGORY = 'Columns'
-// Shared cross-module catalog of basic materials (concrete, base, sand, rebar,
-// grout). Columns resolves its rebar + grout concrete from here so vendor
-// prices propagate.
 const BASIC_CATEGORY = 'Basic Materials'
-// Grout fill is priced at the concrete ready-mix rate (shared Basic Materials).
+// Extra categories loaded so the Modular / Brick / CMU-block / Concrete-mix
+// pickers resolve their products (they live under Walls / Concrete).
+const WALLS_CATEGORY = 'Walls'
+const CONCRETE_CATEGORY = 'Concrete'
+// Grout fill priced at the concrete ready-mix rate (shared Basic Materials).
 const GROUT_CONCRETE = { dbName: 'Concrete - Ready Mix (Truck)', fallback: 185 } // $/CY
 
-// Vendor-resolved material price now comes from the shared resolver
-// (src/lib/materialCatalog.js) — same order (vendor row → Standard name key →
-// fallback), so Columns numbers are byte-for-byte unchanged.
 const colMatPrice = resolveMaterialPrice
 
 // Catalog sub-category the Column Finishes live under (Category 'Columns').
 const COLUMN_FINISH_SUBCAT = 'Column Finish'
-// Vendor-first Column-Finish Type options (mirrors ArtificialTurfModule.baseMatOptions
-// and UtilitiesModule.mergedUtilTypes). Standard/unset/auto → the built-in
-// FINISH_TYPES list (unchanged); a real vendor → only the 'Column Finish' catalog
-// Items that vendor carries. Each catalog Item is mapped back to its built-in
-// FINISH_TYPES entry — matched by the entry's `dbName` (== the Item name; some
-// catalog names differ from the key, e.g. 'Tile - Columns' ↔ key 'Tile') — so the
-// finish LABOR and the ton/SF branch stay keyed on the built-in, while the catalog
-// Item name becomes the vendor-aware material-PRICE target. A vendor that carries
-// nothing under 'Column Finish' shows an empty list (they don't supply these);
-// Standard never empties because it falls back to FINISH_TYPES.
 function columnFinishOptions(materialRows, vendorSel = 'Standard') {
   const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
   const catRows = catalogOptions(materialRows, COLUMN_FINISH_SUBCAT, isStd ? 'Standard' : vendorSel, {
@@ -150,39 +163,188 @@ function columnFinishOptions(materialRows, vendorSel = 'Standard') {
     stripPrefix: true,
     category: COLUMNS_CATEGORY,
   })
-  // Catalog-only: options come solely from the catalog (single source of truth).
-  // No built-in FINISH_TYPES fallback — an unseeded 'Column Finish' sub-category
-  // yields an empty list (picker shows its "Select …" placeholder = $0). Below,
-  // FINISH_TYPES is still consulted per catalog item to recover its typeKey
-  // (labor + ton/SF branch) — that is a labor lookup, not an option source.
   if (!catRows.length) return []
   return catRows.map(o => {
     const typeKey = Object.keys(FINISH_TYPES).find(
       k => FINISH_TYPES[k].dbName === o.row.name || k === o.label
     )
     return {
-      value: typeKey || o.row.name, // built-in key round-trips; else the Item name
-      label: o.label, // show the catalog Item name
-      typeKey, // built-in FINISH_TYPES key (labor / ton|SF branch)
-      dbName: o.row.name, // vendor-aware material-price target (matched by name)
+      value: typeKey || o.row.name,
+      label: o.label,
+      typeKey,
+      dbName: o.row.name,
       fromMaster: !typeKey,
     }
   })
 }
 
-// ── Column geometry helpers ───────────────────────────────────────────────────
-// Standard CMU blocks are 8"×8"×16" (face) or 8"×8"×8" (corner/half)
-// We use 8" module for both dimensions.
+// ── Column geometry ───────────────────────────────────────────────────────────
+// Existing CMU geometry (8" module) — kept so a single CMU column with the same
+// inputs prices out byte-for-byte as before.
 function columnGeometry(heightIn, widthIn) {
-  const courses = Math.ceil(n(heightIn) / 8) // 8" per course
-  const blocksWide = Math.ceil(n(widthIn) / 8) // blocks per side
-  const blocksPerCourse = blocksWide * blocksWide // solid column
+  return columnGeometryDims(heightIn, widthIn, 8, 8)
+}
+// Generalized column geometry: courses/blocksWide from the block's dims. A column
+// is a SOLID stack → blocksPerCourse = blocksWide². Defaults (8×8) === legacy CMU.
+function columnGeometryDims(heightIn, widthIn, blockWIn = 8, blockHIn = 8) {
+  const bw = n(blockWIn) || 8
+  const bh = n(blockHIn) || 8
+  const courses = Math.ceil(n(heightIn) / bh)
+  const blocksWide = Math.ceil(n(widthIn) / bw)
+  const blocksPerCourse = blocksWide * blocksWide
   const totalBlocks = courses * blocksPerCourse
-  const rebarLF = (n(heightIn) / 12) * (blocksWide > 1 ? 4 : 1) // LF rebar per column
-  const footingArea = Math.pow(n(widthIn) / 12 + 1, 2) // SF (1 ft larger each side)
+  const rebarLF = (n(heightIn) / 12) * (blocksWide > 1 ? 4 : 1)
+  const footingArea = Math.pow(n(widthIn) / 12 + 1, 2)
   return { courses, blocksWide, blocksPerCourse, totalBlocks, rebarLF, footingArea }
 }
 
+// Resolve a picked catalog product row by id (any vendor).
+function catalogRowById(materialRows, id) {
+  return (materialRows || []).find(r => r.id === id) || null
+}
+// Block dims from a catalog row's calc_meta (fallback to legacy cols / default).
+function blockDims(row, def = { w: 8, h: 8, l: 16 }) {
+  const cm = row && row.calc_meta ? row.calc_meta : {}
+  return {
+    w: n(cm.block_w_in) || n(row && row.block_w_in) || def.w,
+    h: n(cm.block_h_in) || n(row && row.block_h_in) || def.h,
+    l: n(cm.block_l_in) || n(row && row.block_l_in) || def.l,
+  }
+}
+function rebarNameFor(size) {
+  return 'Rebar ' + (size || '#4')
+}
+// Vendor options (Standard + vendors carrying a product) for a sub-category.
+function subcatVendorOptions(materialRows, subcat, vendorNames = {}) {
+  const rows = (materialRows || []).filter(r => r.sub_category === subcat)
+  const ids = [...new Set(rows.filter(r => r.vendor_id).map(r => r.vendor_id))]
+  const out = ids
+    .map(id => ({ value: id, label: vendorNames[id] || 'Vendor' }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+  out.unshift({ value: 'Standard', label: 'Standard' })
+  return out
+}
+// Product options for a sub-category filtered by the chosen vendor (vendor-first).
+function subcatProductOptions(materialRows, subcat, vendorSel) {
+  const isStd = !vendorSel || vendorSel === 'Standard'
+  return (materialRows || [])
+    .filter(r => r.sub_category === subcat && (isStd ? r.vendor_id == null : r.vendor_id === vendorSel))
+    .map(r => ({ value: r.id, label: r.name, row: r }))
+}
+function labelWithDims(row) {
+  const d = blockDims(row, { w: 0, h: 0, l: 0 })
+  return d.w ? `${row.name} — ${d.w}×${d.h}×${d.l}` : row.name
+}
+
+// ── Per-column-row calculators (pure; shared shape used by module + summary) ──
+function pxHelpers(materialPrices, materialRows) {
+  const mp = (db, fb) => (materialPrices[db] != null ? materialPrices[db] : fb)
+  const matP = (db, fb, v) => colMatPrice(db, v, materialRows, materialPrices, fb)
+  return { mp, matP }
+}
+const rowHasGeo = c => n(c.qty) > 0 && n(c.heightIn) > 0 && n(c.widthIn) > 0
+
+// CMU column: blocks + grout fill + rebar (+ footing dig/pour labor). Block price
+// = picked catalog row, else the 'CMU Block' rate (preserves legacy CMU $).
+function calcCmuCol(c, materialPrices, materialRows) {
+  const { mp, matP } = pxHelpers(materialPrices, materialRows)
+  if (!rowHasGeo(c)) return { mat: 0, hrs: 0 }
+  const picked = catalogRowById(materialRows, c.blockType)
+  const dims = picked ? blockDims(picked) : { w: 8, h: 8, l: 16 }
+  const geo = columnGeometryDims(c.heightIn, c.widthIn, dims.w, dims.h)
+  const totalBlocks = geo.totalBlocks * n(c.qty)
+  const totalRebar = geo.rebarLF * n(c.qty)
+  const blockPrice = picked
+    ? n(picked.unit_cost)
+    : matP(BLOCK_RATES.blockMatCost.dbName, BLOCK_RATES.blockMatCost.fallback, c.vendor)
+  const groutCY = totalBlocks * groutCyPerBlock(dims.w, dims.h)
+  const mat =
+    totalBlocks * blockPrice +
+    groutCY * matP(GROUT_CONCRETE.dbName, GROUT_CONCRETE.fallback, c.vendor) +
+    totalRebar * matP(rebarNameFor(c.rebarSize), BLOCK_RATES.rebarMatCost.fallback, c.vendor)
+  const hrs =
+    n(c.qty) * mp(BLOCK_RATES.excavateLaborHrs.dbName, BLOCK_RATES.excavateLaborHrs.fallback) +
+    n(c.qty) * mp(BLOCK_RATES.pourLaborHrs.dbName, BLOCK_RATES.pourLaborHrs.fallback) +
+    totalBlocks * mp(BLOCK_RATES.installLaborHrs.dbName, BLOCK_RATES.installLaborHrs.fallback) +
+    totalBlocks * mp(BLOCK_RATES.fillLaborHrs.dbName, BLOCK_RATES.fillLaborHrs.fallback)
+  return { mat, hrs, totalBlocks, groutCY, totalRebar, courses: geo.courses, blocksPerCourse: geo.blocksPerCourse }
+}
+
+// Modular column: block dims from the 'Modular Wall' row → solid stack × price.
+// No grout / no fill labor (mirrors Walls modular). Catalog-only block $ ($0 if
+// unpriced/unpicked).
+function calcModularCol(c, materialPrices, materialRows) {
+  const { mp, matP } = pxHelpers(materialPrices, materialRows)
+  if (!rowHasGeo(c)) return { mat: 0, hrs: 0 }
+  const picked = catalogRowById(materialRows, c.blockType)
+  const dims = picked ? blockDims(picked) : { w: 8, h: 8, l: 16 }
+  const geo = columnGeometryDims(c.heightIn, c.widthIn, dims.w, dims.h)
+  const totalBlocks = geo.totalBlocks * n(c.qty)
+  const totalRebar = geo.rebarLF * n(c.qty)
+  const blockPrice = picked ? n(picked.unit_cost) : 0
+  const mat =
+    totalBlocks * blockPrice +
+    totalRebar * matP(rebarNameFor(c.rebarSize), BLOCK_RATES.rebarMatCost.fallback, c.vendor)
+  const hrs =
+    n(c.qty) * mp(BLOCK_RATES.excavateLaborHrs.dbName, BLOCK_RATES.excavateLaborHrs.fallback) +
+    n(c.qty) * mp(BLOCK_RATES.pourLaborHrs.dbName, BLOCK_RATES.pourLaborHrs.fallback) +
+    totalBlocks * mp(BLOCK_RATES.installLaborHrs.dbName, BLOCK_RATES.installLaborHrs.fallback)
+  return { mat, hrs, totalBlocks, totalRebar, courses: geo.courses, blocksPerCourse: geo.blocksPerCourse }
+}
+
+// Brick column: bricks = face sqft (4 sides × height) × bricks-per-sqft (calc_meta
+// per_sqft, default 7 — includes mortar joint spacing, same as Walls brick). Brick
+// $ + optional 'Mortar' catalog line + rebar. Laying labor = face sqft × BRICK_LAY.
+function calcBrickCol(c, materialPrices, materialRows) {
+  const { mp, matP } = pxHelpers(materialPrices, materialRows)
+  if (!rowHasGeo(c)) return { mat: 0, hrs: 0 }
+  const picked = catalogRowById(materialRows, c.brickType)
+  const perSqft = n(picked && picked.calc_meta && picked.calc_meta.per_sqft) || 7
+  const brickPrice = picked ? n(picked.unit_cost) : 0
+  const faceSqft = 4 * (n(c.widthIn) / 12) * (n(c.heightIn) / 12) * n(c.qty)
+  const bricks = faceSqft * perSqft
+  const totalRebar = columnGeometryDims(c.heightIn, c.widthIn).rebarLF * n(c.qty)
+  const mat =
+    bricks * brickPrice +
+    faceSqft * matP(MORTAR_NAME, 0, c.vendor) +
+    totalRebar * matP(rebarNameFor(c.rebarSize), BLOCK_RATES.rebarMatCost.fallback, c.vendor)
+  const hrs =
+    n(c.qty) * mp(BLOCK_RATES.excavateLaborHrs.dbName, BLOCK_RATES.excavateLaborHrs.fallback) +
+    n(c.qty) * mp(BLOCK_RATES.pourLaborHrs.dbName, BLOCK_RATES.pourLaborHrs.fallback) +
+    faceSqft * mp(BRICK_LAY.dbName, BRICK_LAY.fallback)
+  return { mat, hrs, bricks, faceSqft, totalRebar }
+}
+
+// PIP column: poured volume = footprint (w²) × height → CY × mix price. + forms
+// (4 faces × form $/SF) + rebar (+ footing dig/pour labor). Mix $ = picked
+// 'Concrete Mix' row, else the shared ready-mix concrete rate.
+function calcPipCol(c, materialPrices, materialRows) {
+  const { mp, matP } = pxHelpers(materialPrices, materialRows)
+  if (!rowHasGeo(c)) return { mat: 0, hrs: 0 }
+  const picked = catalogRowById(materialRows, c.mixType)
+  const mixPrice = picked ? n(picked.unit_cost) : matP(GROUT_CONCRETE.dbName, GROUT_CONCRETE.fallback, c.vendor)
+  const footprintSF = Math.pow(n(c.widthIn) / 12, 2)
+  const pourCF = footprintSF * (n(c.heightIn) / 12)
+  const totalCY = (pourCF / 27) * n(c.qty)
+  const formSF = 4 * (n(c.widthIn) / 12) * (n(c.heightIn) / 12) * n(c.qty)
+  const totalRebar = columnGeometryDims(c.heightIn, c.widthIn).rebarLF * n(c.qty)
+  const mat =
+    totalCY * mixPrice +
+    formSF * matP(FORM_LUMBER_NAME, 0, c.vendor) +
+    totalRebar * matP(rebarNameFor(c.rebarSize), BLOCK_RATES.rebarMatCost.fallback, c.vendor)
+  const hrs =
+    n(c.qty) * mp(BLOCK_RATES.excavateLaborHrs.dbName, BLOCK_RATES.excavateLaborHrs.fallback) +
+    n(c.qty) * mp(BLOCK_RATES.pourLaborHrs.dbName, BLOCK_RATES.pourLaborHrs.fallback) +
+    totalCY * mp(PIP_POUR_LAB.dbName, PIP_POUR_LAB.fallback) +
+    formSF * mp(PIP_FORM_LAB.dbName, PIP_FORM_LAB.fallback)
+  return { mat, hrs, totalCY, formSF, totalRebar }
+}
+
+// Exported so ColumnsSummary can reuse the SAME per-column math (single source of
+// truth) instead of recomputing with a stale model.
+export const ROW_CALC = { CMU: calcCmuCol, PIP: calcPipCol, Modular: calcModularCol, Brick: calcBrickCol }
+
+// ── Main calc ─────────────────────────────────────────────────────────────────
 function calcColumns(
   state,
   laborRatePerHour = DEFAULTS.laborRatePerHour,
@@ -192,83 +354,57 @@ function calcColumns(
   laborBurdenPct = DEFAULTS.laborBurdenPct,
   materialRows = []
 ) {
-  const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
-  const { difficulty, hoursAdj, qty, heightIn, widthIn, finishRows, manualRows } = state
+  const _pace = parseFloat(walkAccess && walkAccess.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
+  const { difficulty, hoursAdj, cmuCols, pipCols, modularCols, brickCols, finishRows, manualRows } = state
   const isSub = state.subType === 'Subcontractor'
-  const installVendor = state.installVendor // section-level Vendor for Column Install materials
-  // Sized canonical rebar row (Basic Materials 'Rebar #<size>', $/LF). Labor unchanged.
-  const rebarName = 'Rebar ' + (state.rebarSize || '#4')
+  const { mp, matP } = pxHelpers(materialPrices, materialRows)
 
-  // mp() = name-keyed Standard lookup (labor coefficients + Standard material fallback).
-  // matP() = vendor-resolved MATERIAL price; with vendor 'Standard'/empty it returns
-  // exactly (materialPrices[dbName] ?? fallback) == the pre-vendor mp() value.
-  const mp = (dbName, fallback) => materialPrices[dbName] ?? fallback
-  const matP = (dbName, fallback, vendorId) =>
-    colMatPrice(dbName, vendorId, materialRows, materialPrices, fallback)
-
+  // ── Installation — ALL column types contribute simultaneously (mirrors
+  //    WallsModule: switching the visible tab never drops the other types). ──
   let installHrs = 0,
     installMat = 0
+  ;(cmuCols || []).forEach(c => {
+    const r = calcCmuCol(c, materialPrices, materialRows)
+    installMat += r.mat
+    installHrs += r.hrs
+  })
+  ;(pipCols || []).forEach(c => {
+    const r = calcPipCol(c, materialPrices, materialRows)
+    installMat += r.mat
+    installHrs += r.hrs
+  })
+  ;(modularCols || []).forEach(c => {
+    const r = calcModularCol(c, materialPrices, materialRows)
+    installMat += r.mat
+    installHrs += r.hrs
+  })
+  ;(brickCols || []).forEach(c => {
+    const r = calcBrickCol(c, materialPrices, materialRows)
+    installMat += r.mat
+    installHrs += r.hrs
+  })
 
-  if (n(qty) > 0 && n(heightIn) > 0 && n(widthIn) > 0) {
-    const geo = columnGeometry(heightIn, widthIn)
-    const totalBlocks = geo.totalBlocks * n(qty)
-    const totalRebar = geo.rebarLF * n(qty)
-
-    // Material costs — unit prices resolve through the section Vendor.
-    // Grout fill = block count × cu-ft/block ÷ 27 × concrete $/CY (columns are
-    // solid-grouted 8x8x16 → 0.5 cu ft/block). Concrete rate is the shared
-    // Basic Materials row, so vendor price changes propagate.
-    const groutCY = totalBlocks * groutCyPerBlock(8, 8)
-    installMat +=
-      totalBlocks * matP(BLOCK_RATES.blockMatCost.dbName, BLOCK_RATES.blockMatCost.fallback, installVendor) +
-      groutCY * matP(GROUT_CONCRETE.dbName, GROUT_CONCRETE.fallback, installVendor) +
-      totalRebar * matP(rebarName, BLOCK_RATES.rebarMatCost.fallback, installVendor)
-
-    // Labor hours
-    installHrs +=
-      n(qty) * mp(BLOCK_RATES.excavateLaborHrs.dbName, BLOCK_RATES.excavateLaborHrs.fallback) +
-      n(qty) * mp(BLOCK_RATES.pourLaborHrs.dbName, BLOCK_RATES.pourLaborHrs.fallback) +
-      totalBlocks * mp(BLOCK_RATES.installLaborHrs.dbName, BLOCK_RATES.installLaborHrs.fallback) +
-      totalBlocks * mp(BLOCK_RATES.fillLaborHrs.dbName, BLOCK_RATES.fillLaborHrs.fallback)
-  }
-
-  // Finishes
+  // Finishes (PIP tab only in the UI, but tab-level so they always price).
   let finishHrs = 0,
     finishMat = 0
-  finishRows.forEach(r => {
-    // Unselected finish rows contribute nothing (empty default + placeholder).
+  ;(finishRows || []).forEach(r => {
     if (!r.type) return
-    // Vendor-first Type resolution (mirrors ArtificialTurfModule): the picker lists
-    // the selected vendor's 'Column Finish' catalog Items; map the stored selection
-    // back to its built-in FINISH_TYPES entry so the finish LABOR + ton/SF branch
-    // keep working. Backward-compat: legacy rows store the FINISH_TYPES key; vendor/
-    // newer rows may store the catalog Item name/label.
     const opts = columnFinishOptions(materialRows, r.vendor)
     const opt =
       opts.find(
         o => o.value === r.type || o.typeKey === r.type || o.dbName === r.type || o.label === r.type
       ) || opts[0]
-    const rate = FINISH_TYPES[opt?.typeKey ?? r.type] ?? FINISH_TYPES[r.type]
+    const rate = FINISH_TYPES[(opt && opt.typeKey) || r.type] || FINISH_TYPES[r.type]
     if (!rate || !n(r.qty)) return
-    // Material-PRICE target = the selected catalog Item name (falls back to the
-    // built-in dbName, which is the same catalog name), priced vendor-aware. Labor
-    // stays keyed on the built-in FINISH_TYPES entry. Standard is byte-for-byte
-    // unchanged (priceDbName == rate.dbName).
-    const priceDbName = opt?.dbName || rate.dbName
+    const priceDbName = (opt && opt.dbName) || rate.dbName
     if (isSub) {
-      // Sub tab: flat $/SF, no separate labor. Vendor overrides the flat source.
-      finishMat += n(r.qty) * matP(rate.subDbName, rate.subFallback ?? 0, r.vendor)
+      finishMat += n(r.qty) * matP(rate.subDbName, rate.subFallback || 0, r.vendor)
     } else if (rate.unit === 'SF') {
-      const cost = matP(priceDbName, rate.costPerSF, r.vendor)
-      const labRate = mp(rate.laborDbName, rate.laborHrsPerSF)
-      finishMat += n(r.qty) * cost
-      finishHrs += n(r.qty) * labRate
+      finishMat += n(r.qty) * matP(priceDbName, rate.costPerSF, r.vendor)
+      finishHrs += n(r.qty) * mp(rate.laborDbName, rate.laborHrsPerSF)
     } else {
-      // ton-based (flagstone, real stone) — Vendor overrides the material $ only.
-      const cost = matP(priceDbName, rate.costPerTon, r.vendor)
-      const labRate = mp(rate.laborDbName, rate.laborHrsPer)
-      finishMat += n(r.qty) * cost
-      finishHrs += n(r.qty) * labRate
+      finishMat += n(r.qty) * matP(priceDbName, rate.costPerTon, r.vendor)
+      finishHrs += n(r.qty) * mp(rate.laborDbName, rate.laborHrsPer)
     }
   })
 
@@ -276,7 +412,7 @@ function calcColumns(
   let manHrs = 0,
     manMat = 0,
     manSub = 0
-  manualRows.forEach(r => {
+  ;(manualRows || []).forEach(r => {
     manHrs += n(r.hours)
     manMat += n(r.materials)
     manSub += n(r.subCost)
@@ -292,8 +428,6 @@ function calcColumns(
   const laborCost = totalHrs * laborRatePerHour
   const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
 
-  // Sub tab: GpmdBar's 'sub' variant totals subCost + subGp + commission and
-  // ignores totalMat/laborCost/gp, so route the itemized scope INTO subCost.
   let gp, subCost, subGp, commission, price
   if (isSub) {
     gp = 0
@@ -351,9 +485,120 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
   )
 }
 
+// One column row (Vendor | Type | Qty | Height | Width | Rebar) + live cost hint.
+function ColEntry({ type, row, idx, total, onChange, onRemove, vendorOptions, typeOptions, typeLabel, rowCalc }) {
+  const set = f => v => onChange(idx, f, v)
+  const tf = TYPE_FIELD[type]
+  const sel = row[tf] || ''
+  const hint = rowCalc && (rowCalc.mat > 0 || rowCalc.hrs > 0)
+  return (
+    <div className="border border-gray-200 rounded-xl p-3 mb-3 bg-white">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-semibold text-black uppercase tracking-wide">Column {idx + 1}</span>
+        {total > 1 && (
+          <button
+            onClick={() => onRemove(idx)}
+            className="text-xs text-red-400 hover:text-red-600 px-2 py-0.5 rounded border border-red-100 hover:border-red-300 transition-colors"
+          >
+            Remove
+          </button>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="col-span-2">
+          <label className="block text-xs text-gray-500 mb-1">Vendor</label>
+          <select
+            className="input text-sm py-1.5 w-full"
+            value={row.vendor || 'Standard'}
+            onChange={e => set('vendor')(e.target.value)}
+          >
+            {vendorOptions.map(o => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="col-span-2">
+          <label className="block text-xs text-gray-500 mb-1">{typeLabel}</label>
+          <select
+            className="input text-sm py-1.5 w-full"
+            value={sel}
+            onChange={e => set(tf)(e.target.value)}
+          >
+            <option value="">{typeOptions.length ? 'Select…' : 'No products — add in Master Rates'}</option>
+            {sel && !typeOptions.some(o => o.value === sel) && <option value={sel}>{sel}</option>}
+            {typeOptions.map(o => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Quantity</label>
+          <NumInput value={row.qty} onChange={set('qty')} placeholder="0" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Height (in)</label>
+          <NumInput value={row.heightIn} onChange={set('heightIn')} placeholder="0" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Width (in)</label>
+          <NumInput value={row.widthIn} onChange={set('widthIn')} placeholder="0" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Rebar Size</label>
+          <select
+            className="input text-sm py-1.5 w-full"
+            value={row.rebarSize || '#4'}
+            onChange={e => set('rebarSize')(e.target.value)}
+          >
+            {REBAR_SIZES.map(s => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      {hint && (
+        <div className="mt-2 text-[11px] text-gray-500 flex flex-wrap gap-x-4 gap-y-0.5">
+          <span>
+            Material: <strong>${rowCalc.mat.toFixed(2)}</strong>
+          </span>
+          <span>
+            Labor: <strong>{rowCalc.hrs.toFixed(2)} hrs</strong>
+          </span>
+          {rowCalc.totalBlocks ? (
+            <span>
+              Blocks: <strong>{rowCalc.totalBlocks}</strong>
+            </span>
+          ) : null}
+          {rowCalc.totalCY ? (
+            <span>
+              Concrete: <strong>{rowCalc.totalCY.toFixed(2)} CY</strong>
+            </span>
+          ) : null}
+          {rowCalc.bricks ? (
+            <span>
+              Bricks: <strong>{Math.round(rowCalc.bricks)}</strong>
+            </span>
+          ) : null}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Defaults ──────────────────────────────────────────────────────────────────
 const DEFAULT_FINISH_ROWS = [{ type: '', qty: '', vendor: 'Standard' }]
 const DEFAULT_MANUAL_ROWS = [{ label: '', hours: '', materials: '', subCost: '' }]
+const blankCmuCol = () => ({ vendor: 'Standard', blockType: '', qty: '', heightIn: '', widthIn: '', rebarSize: '#4' })
+const blankPipCol = () => ({ vendor: 'Standard', mixType: '', qty: '', heightIn: '', widthIn: '', rebarSize: '#4' })
+const blankModularCol = () => ({ vendor: 'Standard', blockType: '', qty: '', heightIn: '', widthIn: '', rebarSize: '#4' })
+const blankBrickCol = () => ({ vendor: 'Standard', brickType: '', qty: '', heightIn: '', widthIn: '', rebarSize: '#4' })
+const BLANK_FOR = { CMU: blankCmuCol, PIP: blankPipCol, Modular: blankModularCol, Brick: blankBrickCol }
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
@@ -364,27 +609,20 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
     initialData?.laborBurdenPct ?? DEFAULTS.laborBurdenPct
   )
 
-  // Free-text notes for this module — Sam writes auto-generated
-  // takeoffs here via create_estimate_from_takeoff, and the user can
-  // overwrite / append their own.
   const [notes, setNotes] = useState(initialData?.notes ?? '')
   const [walkAccess, setWalkAccess] = useState(
     initialData?.walkAccess ?? {
       paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
     }
   )
-  // Shared material catalog — fetches Columns material + labor rates, the
-  // material_rates rows, and vendors, and exposes the canonical resolver.
-  // (Replaces the old per-module fetch + colMatPrice copy.)
   const {
     priceMap: materialPrices,
     materialRows,
-    vendors,
     vendorNames,
     loading: pricesLoading,
     refresh: refreshAllRates,
     vendorOptionsForCategory,
-  } = useMaterialCatalog([COLUMNS_CATEGORY, BASIC_CATEGORY], {
+  } = useMaterialCatalog([COLUMNS_CATEGORY, BASIC_CATEGORY, WALLS_CATEGORY, CONCRETE_CATEGORY], {
     materialPrices: initialData?.materialPrices,
     materialRows: initialData?.materialRows,
   })
@@ -399,15 +637,12 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
           if (!data) return
           if (data.labor_rate_per_hour != null)
             setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
-          if (data.labor_burden_pct != null)
-            setLaborBurdenPct(parseFloat(data.labor_burden_pct))
+          if (data.labor_burden_pct != null) setLaborBurdenPct(parseFloat(data.labor_burden_pct))
           if (data.walk_access_pace_lf_per_min != null) {
             const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
             setWalkAccess({
               paceLfPerMin:
-                Number.isFinite(_wpace) && _wpace > 0
-                  ? _wpace
-                  : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+                Number.isFinite(_wpace) && _wpace > 0 ? _wpace : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
             })
           }
         })
@@ -417,62 +652,71 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
   const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
-  // Shared rebar size (In-House structural rebar). A single shared value across
-  // both tabs — rebar lives on the In-House structural side. Default '#4'.
-  const [rebarSize, setRebarSize] = useState(initialData?.rebarSize ?? '#4')
-
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Masonry')
   const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
   const isSub = subType === 'Subcontractor'
 
-  // ── Per-tab independence — In-House and Subcontractor keep their own
-  //    takeoff inputs so entering data on one tab never changes the other.
-  //    makeTab() seeds a tab's defaults; ihData/subData persist both.
-  //    Legacy modules (flat data, no ihData) load into the In-House tab.
-  const makeTab = (src = {}) => ({
-    difficulty: src.difficulty ?? '',
-    hoursAdj: src.hoursAdj ?? '',
-    qty: src.qty ?? '',
-    heightIn: src.heightIn ?? '',
-    widthIn: src.widthIn ?? '',
-    distanceLF: src.distanceLF ?? '',
-    // Section-level Vendor for the Column Install materials. 'Standard' = current price.
-    installVendor: src.installVendor ?? 'Standard',
-    finishRows: src.finishRows
-      ? src.finishRows.map(r => ({ vendor: 'Standard', ...r }))
-      : DEFAULT_FINISH_ROWS.map(r => ({ ...r })),
-    manualRows: src.manualRows ? src.manualRows.map(r => ({ ...r })) : DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
-  })
+  // ── Per-tab independence — In-House / Sub keep their own takeoff inputs. Each
+  //    tab now carries a per-TYPE array of column rows (mirrors WallsModule). ──
+  const makeTab = (src = {}) => {
+    // Legacy single-CMU estimate migration: old bids stored tab-level qty/height/
+    // width/installVendor/rebarSize → fold onto cmuCols[0] so totals don't move.
+    const legacyCmu =
+      !src.cmuCols && (src.qty != null || src.heightIn != null || src.widthIn != null)
+        ? [
+            {
+              vendor: src.installVendor ?? 'Standard',
+              blockType: '',
+              qty: src.qty ?? '',
+              heightIn: src.heightIn ?? '',
+              widthIn: src.widthIn ?? '',
+              rebarSize: src.rebarSize ?? '#4',
+            },
+          ]
+        : null
+    return {
+      difficulty: src.difficulty ?? '',
+      hoursAdj: src.hoursAdj ?? '',
+      colType: src.colType ?? 'CMU',
+      distanceLF: src.distanceLF ?? '',
+      cmuCols: src.cmuCols ? src.cmuCols.map(r => ({ ...blankCmuCol(), ...r })) : legacyCmu || [blankCmuCol()],
+      pipCols: src.pipCols ? src.pipCols.map(r => ({ ...blankPipCol(), ...r })) : [blankPipCol()],
+      modularCols: src.modularCols ? src.modularCols.map(r => ({ ...blankModularCol(), ...r })) : [blankModularCol()],
+      brickCols: src.brickCols ? src.brickCols.map(r => ({ ...blankBrickCol(), ...r })) : [blankBrickCol()],
+      finishRows: src.finishRows
+        ? src.finishRows.map(r => ({ vendor: 'Standard', ...r }))
+        : DEFAULT_FINISH_ROWS.map(r => ({ ...r })),
+      manualRows: src.manualRows ? src.manualRows.map(r => ({ ...r })) : DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
+    }
+  }
   const [ihTab, setIhTab] = useState(() => makeTab(initialData?.ihData ?? initialData))
   const [subTab, setSubTab] = useState(() => makeTab(initialData?.subData))
   const cur = isSub ? subTab : ihTab
   const setCur = isSub ? setSubTab : setIhTab
-  const setField = k => v =>
-    setCur(p => ({ ...p, [k]: typeof v === 'function' ? v(p[k]) : v }))
+  const setField = k => v => setCur(p => ({ ...p, [k]: typeof v === 'function' ? v(p[k]) : v }))
 
+  const colType = cur.colType ?? 'CMU'
+  const setColType = setField('colType')
   const difficulty = cur.difficulty
   const setDifficulty = setField('difficulty')
   const hoursAdj = cur.hoursAdj
   const setHoursAdj = setField('hoursAdj')
-  const qty = cur.qty
-  const setQty = setField('qty')
-  const heightIn = cur.heightIn
-  const setHeightIn = setField('heightIn')
-  const widthIn = cur.widthIn
-  const setWidthIn = setField('widthIn')
   const distanceLF = cur.distanceLF
   const setDistanceLF = setField('distanceLF')
-  const installVendor = cur.installVendor ?? 'Standard'
-  const setInstallVendor = setField('installVendor')
+  const cmuCols = cur.cmuCols
+  const setCmuCols = setField('cmuCols')
+  const pipCols = cur.pipCols
+  const setPipCols = setField('pipCols')
+  const modularCols = cur.modularCols
+  const setModularCols = setField('modularCols')
+  const brickCols = cur.brickCols
+  const setBrickCols = setField('brickCols')
   const finishRows = cur.finishRows
   const setFinishRows = setField('finishRows')
   const manualRows = cur.manualRows
   const setManualRows = setField('manualRows')
 
-  // ── Sales tax — applied to totalMat across every module so the bid
-  //    reflects supplier-invoiced material cost. Sourced from
-  //    company_settings.sales_tax_rate via fetchSalesTaxRate(). Default
-  //    0 (no tax) until the admin sets it in Opportunities → Settings.
+  // ── Sales tax ──
   const [salesTaxRate, setSalesTaxRate] = useState(0)
   useEffect(() => {
     let alive = true
@@ -484,9 +728,11 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
     }
   }, [])
 
-  // Vendor pickers: only vendors that supply the Columns category. 'Standard' first.
+  // Vendor pickers.
   const vendorOptions = vendorOptionsForCategory(COLUMNS_CATEGORY)
-  // Vendor-resolved material price for display (calc uses the same resolver).
+  const modularVendorOptions = subcatVendorOptions(materialRows, MODULAR_SUBCAT, vendorNames)
+  const brickVendorOptions = subcatVendorOptions(materialRows, BRICK_SUBCAT, vendorNames)
+  const concMixVendorOptions = subcatVendorOptions(materialRows, CONC_MIX_SUBCAT, vendorNames)
   const colMat = (dbName, vendorId, fallback) =>
     colMatPrice(dbName, vendorId, materialRows, materialPrices, fallback)
 
@@ -494,16 +740,16 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
     {
       difficulty,
       hoursAdj,
-      qty,
-      heightIn,
-      widthIn,
-      installVendor,
+      colType,
+      cmuCols,
+      pipCols,
+      modularCols,
+      brickCols,
       finishRows,
       manualRows,
       distanceLF,
       subType,
       subGpMarkupRate,
-      rebarSize,
     },
     laborRatePerHour,
     materialPrices,
@@ -512,10 +758,6 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
     laborBurdenPct,
     materialRows
   )
-  // Apply company sales tax to the module's total material cost so the
-  // estimate price matches what suppliers actually invoice. Stored
-  // material_cost (saved with the module) ends up tax-inclusive too,
-  // so bid totals add up to GpmdBar's displayed price.
   const _salesTaxAmt = (calcRaw.totalMat || 0) * (salesTaxRate || 0)
   const calc =
     _salesTaxAmt > 0
@@ -527,9 +769,47 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
         }
       : calcRaw
 
-  // Show geometry preview when all three inputs filled
-  const geo =
-    n(qty) > 0 && n(heightIn) > 0 && n(widthIn) > 0 ? columnGeometry(heightIn, widthIn) : null
+  // Per-type row count for the tab-bar badges.
+  const colTypeCount = key => {
+    const arr = { CMU: cmuCols, PIP: pipCols, Modular: modularCols, Brick: brickCols }[key] || []
+    return arr.filter(rowHasGeo).length
+  }
+
+  // Per-type Installation config (arrays + handlers + vendor/type option sources).
+  const TYPE_CFG = {
+    CMU: {
+      arr: cmuCols,
+      setter: setCmuCols,
+      blank: blankCmuCol,
+      vendorOptions,
+      typeOptions: v => subcatProductOptions(materialRows, CMU_BLOCK_SUBCAT, v).map(o => ({ value: o.value, label: labelWithDims(o.row) })),
+    },
+    PIP: {
+      arr: pipCols,
+      setter: setPipCols,
+      blank: blankPipCol,
+      vendorOptions: concMixVendorOptions,
+      typeOptions: v => subcatProductOptions(materialRows, CONC_MIX_SUBCAT, v).map(o => ({ value: o.value, label: o.label })),
+    },
+    Modular: {
+      arr: modularCols,
+      setter: setModularCols,
+      blank: blankModularCol,
+      vendorOptions: modularVendorOptions,
+      typeOptions: v => subcatProductOptions(materialRows, MODULAR_SUBCAT, v).map(o => ({ value: o.value, label: labelWithDims(o.row) })),
+    },
+    Brick: {
+      arr: brickCols,
+      setter: setBrickCols,
+      blank: blankBrickCol,
+      vendorOptions: brickVendorOptions,
+      typeOptions: v => subcatProductOptions(materialRows, BRICK_SUBCAT, v).map(o => ({ value: o.value, label: o.label })),
+    },
+  }
+  const activeCfg = TYPE_CFG[colType]
+  const updateColFor = setter => (i, field, val) =>
+    setter(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  const removeColFor = setter => i => setter(rows => rows.filter((_, idx) => idx !== i))
 
   function updateFinish(i, field, val) {
     setFinishRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
@@ -546,14 +826,14 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
       data: {
         difficulty,
         hoursAdj,
-        qty,
-        heightIn,
-        widthIn,
+        colType,
         distanceLF,
-        installVendor,
+        cmuCols,
+        pipCols,
+        modularCols,
+        brickCols,
         finishRows,
         manualRows,
-        rebarSize,
         crewType,
         subType,
         subGpMarkupRate,
@@ -570,14 +850,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
     })
   }
 
-  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
-  //    that used to have an inline RateEditPopover in this module now lives here.
-  //    Each section lists its LABOR rates first, then every MATERIAL rate (per
-  //    vendor from the catalog, Standard first) — mirrors the Walls module.
-  // Material rows for a catalog item (matched by NAME, same as colMatPrice). One
-  // row per vendor (Standard first), each editable straight to material_price.
-  // When no catalog product carries the name yet, a single name-keyed Standard
-  // row is shown (still material_price — material_rates is retired).
+  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). ──
   const _colMatRows = (dbName, unit, fallback, category = COLUMNS_CATEGORY) => {
     const rows = (materialRows || []).filter(r0 => r0.name === dbName)
     if (rows.length) {
@@ -611,51 +884,30 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
       },
     ]
   }
+  const _laborItem = (rate, unitLabel) => ({
+    label: rate.dbName,
+    table: 'labor_rates',
+    name: rate.dbName,
+    category: COLUMNS_CATEGORY,
+    mode: 'coefficient',
+    unitLabel,
+    value: materialPrices[rate.dbName] ?? rate.fallback,
+  })
   const columnsRateList = [
     {
       group: 'Column Install',
       items: [
-        {
-          label: BLOCK_RATES.installLaborHrs.dbName,
-          table: 'labor_rates',
-          name: BLOCK_RATES.installLaborHrs.dbName,
-          category: COLUMNS_CATEGORY,
-          mode: 'coefficient',
-          unitLabel: 'hrs/blk',
-          value: materialPrices[BLOCK_RATES.installLaborHrs.dbName] ?? BLOCK_RATES.installLaborHrs.fallback,
-        },
-        {
-          label: BLOCK_RATES.excavateLaborHrs.dbName,
-          table: 'labor_rates',
-          name: BLOCK_RATES.excavateLaborHrs.dbName,
-          category: COLUMNS_CATEGORY,
-          mode: 'coefficient',
-          unitLabel: 'hrs/col',
-          value: materialPrices[BLOCK_RATES.excavateLaborHrs.dbName] ?? BLOCK_RATES.excavateLaborHrs.fallback,
-        },
-        {
-          label: BLOCK_RATES.pourLaborHrs.dbName,
-          table: 'labor_rates',
-          name: BLOCK_RATES.pourLaborHrs.dbName,
-          category: COLUMNS_CATEGORY,
-          mode: 'coefficient',
-          unitLabel: 'hrs/col',
-          value: materialPrices[BLOCK_RATES.pourLaborHrs.dbName] ?? BLOCK_RATES.pourLaborHrs.fallback,
-        },
-        {
-          label: BLOCK_RATES.fillLaborHrs.dbName,
-          table: 'labor_rates',
-          name: BLOCK_RATES.fillLaborHrs.dbName,
-          category: COLUMNS_CATEGORY,
-          mode: 'coefficient',
-          unitLabel: 'hrs/blk',
-          value: materialPrices[BLOCK_RATES.fillLaborHrs.dbName] ?? BLOCK_RATES.fillLaborHrs.fallback,
-        },
-        // Column Install materials (block, grouted-fill concrete, rebar). Rebar
-        // + concrete are shared Basic Materials rows.
+        _laborItem(BLOCK_RATES.installLaborHrs, 'hrs/blk'),
+        _laborItem(BLOCK_RATES.excavateLaborHrs, 'hrs/col'),
+        _laborItem(BLOCK_RATES.pourLaborHrs, 'hrs/col'),
+        _laborItem(BLOCK_RATES.fillLaborHrs, 'hrs/blk'),
+        _laborItem(BRICK_LAY, 'hrs/SF'),
+        _laborItem(PIP_FORM_LAB, 'hrs/SF'),
+        _laborItem(PIP_POUR_LAB, 'hrs/CY'),
+        // CMU fallback block + grout concrete + rebar (all sizes).
         ..._colMatRows(BLOCK_RATES.blockMatCost.dbName, 'block', BLOCK_RATES.blockMatCost.fallback),
         ..._colMatRows(GROUT_CONCRETE.dbName, 'CY', GROUT_CONCRETE.fallback, BASIC_CATEGORY),
-        ..._colMatRows('Rebar ' + (rebarSize || '#4'), 'LF', BLOCK_RATES.rebarMatCost.fallback, BASIC_CATEGORY),
+        ...REBAR_SIZES.flatMap(s => _colMatRows(rebarNameFor(s), 'LF', BLOCK_RATES.rebarMatCost.fallback, BASIC_CATEGORY)),
       ],
     },
     {
@@ -673,13 +925,8 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
             value: materialPrices[rate.laborDbName] ?? defLab ?? 0,
           }
         }),
-        // Finish materials — one block per finish type (per vendor, Standard first).
         ...Object.values(FINISH_TYPES).flatMap(rate =>
-          _colMatRows(
-            rate.dbName,
-            rate.unit,
-            rate.unit === 'ton' ? rate.costPerTon : rate.costPerSF
-          )
+          _colMatRows(rate.dbName, rate.unit, rate.unit === 'ton' ? rate.costPerTon : rate.costPerSF)
         ),
       ],
     },
@@ -687,387 +934,266 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
 
   return (
     <SubTabContext.Provider value={isSub}>
-    <div className="space-y-5">
-      {/* ── Frozen header: GPMD bar + Crew Type / View Rates bar ── */}
-      <div className="sticky top-0 z-20 -mx-6 bg-white shadow-md">
-        <div className="px-6 pt-1 pb-1 bg-gray-900">
-          <GpmdBar
-            variant={subType === 'Subcontractor' ? 'sub' : 'inhouse'}
-            sticky
-            totalMat={calc.totalMat}
-            totalHrs={calc.totalHrs}
-            manDays={calc.manDays}
-            laborCost={calc.laborCost}
-            laborRatePerHour={laborRatePerHour}
-            burden={calc.burden}
-            gp={calc.gp}
-            commission={calc.commission}
-            subCost={calc.subCost}
-            gpmd={gpmd}
-            price={calc.price}
-            subMarkupRate={subGpMarkupRate}
-          />
-        </div>
-        <div className="px-6 py-2">
-          <CrewTypeBar
-            crewType={crewType}
-            onCrewTypeChange={setCrewType}
-            title="Columns"
-            rates={columnsRateList}
-            refreshAllRates={refreshAllRates}
-            showInlineToggle={false}
-          />
-        </div>
-      </div>
-
-      <ModuleHeaderSlot>
-        <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} compact />
-      </ModuleHeaderSlot>
-
-      {pricesLoading && (
-        <div className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
-          Loading material prices from Master Rates…
-        </div>
-      )}
-
-      {/* Settings — Job Site Conditions is In-House only (hidden on Sub tab) */}
-      {subType !== 'Subcontractor' && (
-        <>
-      <SectionHeader title="Job Site Conditions" />
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
-          <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
-        </div>
-        <div>
-          <p
-            className="text-xs text-gray-500 mb-0.5"
-            title="Average Distance from Truck to Work Area"
-          >
-            Truck → Work Area (Avg LF)
-          </p>
-          <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
-          {calc.walkHrs > 0 && (
-            <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">
-              +{calc.walkHrs.toFixed(2)} hrs walk-access
-            </p>
-          )}
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
-          <NumInput value={hoursAdj} onChange={setHoursAdj} placeholder="0" />
-        </div>
-      </div>
-        </>
-      )}
-
-      {/* ── Installation ── */}
-      <div>
-        <SectionHeader title="Installation" />
-        {/* Section Vendor — overrides ONLY the material unit prices (CMU Block,
-            Fill/Grout, Rebar) used by the geometry calc. 'Standard' = current price. */}
-        <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200 mb-3">
-          <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Vendor</label>
-          <select
-            value={installVendor || 'Standard'}
-            onChange={e => setInstallVendor(e.target.value)}
-            className="input text-sm py-1 w-48"
-          >
-            {vendorOptions.map(o => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          <span className="text-[11px] text-gray-400">material prices only</span>
-        </div>
-        {/* Rates reference box — In-House only (hidden on Sub tab) */}
-        {!isSub && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3 text-[11px] text-gray-500">
-          <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">
-            Column Install Rates
-          </p>
-          <div className="flex flex-wrap gap-x-3 gap-y-1">
-            <span className="inline-flex items-center gap-1">
-              Block $
-              {colMat(
-                BLOCK_RATES.blockMatCost.dbName,
-                installVendor,
-                BLOCK_RATES.blockMatCost.fallback
-              ).toFixed(2)}
-              /ea
-            </span>
-            <span className="inline-flex items-center gap-1">
-              Rebar {rebarSize || '#4'} $
-              {colMat(
-                'Rebar ' + (rebarSize || '#4'),
-                installVendor,
-                BLOCK_RATES.rebarMatCost.fallback
-              ).toFixed(2)}
-              /LF
-            </span>
-            <span className="inline-flex items-center gap-1">
-              Grout (concrete) $
-              {colMat(GROUT_CONCRETE.dbName, installVendor, GROUT_CONCRETE.fallback).toFixed(2)}
-              /CY · {(groutCyPerBlock(8, 8) * 27).toFixed(2)} cf/block
-            </span>
+      <div className="space-y-5">
+        {/* ── Frozen header: GPMD bar + Crew Type / View Rates + Column-Type bar ── */}
+        <div className="sticky top-0 z-20 -mx-6 bg-white shadow-md">
+          <div className="px-6 pt-1 pb-1 bg-gray-900">
+            <GpmdBar
+              variant={subType === 'Subcontractor' ? 'sub' : 'inhouse'}
+              sticky
+              totalMat={calc.totalMat}
+              totalHrs={calc.totalHrs}
+              manDays={calc.manDays}
+              laborCost={calc.laborCost}
+              laborRatePerHour={laborRatePerHour}
+              burden={calc.burden}
+              gp={calc.gp}
+              commission={calc.commission}
+              subCost={calc.subCost}
+              gpmd={gpmd}
+              price={calc.price}
+              subMarkupRate={subGpMarkupRate}
+            />
           </div>
-          <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
-            <span className="inline-flex items-center gap-1">
-              Install{' '}
-              {materialPrices[BLOCK_RATES.installLaborHrs.dbName] ??
-                BLOCK_RATES.installLaborHrs.fallback}{' '}
-              hrs/blk
-            </span>
-            <span className="inline-flex items-center gap-1">
-              Excavate{' '}
-              {materialPrices[BLOCK_RATES.excavateLaborHrs.dbName] ??
-                BLOCK_RATES.excavateLaborHrs.fallback}{' '}
-              hrs/col
-            </span>
-            <span className="inline-flex items-center gap-1">
-              Pour{' '}
-              {materialPrices[BLOCK_RATES.pourLaborHrs.dbName] ?? BLOCK_RATES.pourLaborHrs.fallback}{' '}
-              hrs/col
-            </span>
-            <span className="inline-flex items-center gap-1">
-              Fill{' '}
-              {materialPrices[BLOCK_RATES.fillLaborHrs.dbName] ?? BLOCK_RATES.fillLaborHrs.fallback}{' '}
-              hrs/blk
-            </span>
+          <div className="px-6 py-2">
+            <CrewTypeBar
+              crewType={crewType}
+              onCrewTypeChange={setCrewType}
+              title="Columns"
+              rates={columnsRateList}
+              refreshAllRates={refreshAllRates}
+              showInlineToggle={false}
+            />
           </div>
-        </div>
-        )}
-        <div className="grid grid-cols-3 gap-3 mb-3">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Quantity of Columns</label>
-            <NumInput value={qty} onChange={setQty} placeholder="0" />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Height (Inches)</label>
-            <NumInput value={heightIn} onChange={setHeightIn} placeholder="0" />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Width (Inches)</label>
-            <NumInput value={widthIn} onChange={setWidthIn} placeholder="0" />
-          </div>
-          <div>
-            {/* Sized canonical rebar (Basic Materials 'Rebar #<size>', $/LF).
-                Drives the rebar MATERIAL price only; Set Rebar labor is unchanged. */}
-            <label className="block text-xs text-gray-500 mb-1">Rebar Size</label>
-            <select
-              value={rebarSize || '#4'}
-              onChange={e => setRebarSize(e.target.value)}
-              className="input text-sm py-1.5 w-full"
-            >
-              {REBAR_SIZES.map(s => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
+          {/* ── Frozen Column-Type sub-tab bar (mirrors WallsModule wallType). ── */}
+          <div className="px-6 pb-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Column Type</p>
+            <div className="flex gap-2">
+              {COL_TYPE_TABS.map(t => (
+                <button
+                  key={t.key}
+                  onClick={() => setColType(t.key)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                    colType === t.key
+                      ? 'bg-green-700 text-white border-green-700'
+                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {t.label}
+                  {colTypeCount(t.key) > 0 ? ` (${colTypeCount(t.key)})` : ''}
+                </button>
               ))}
-            </select>
+            </div>
           </div>
         </div>
 
-        {/* Geometry preview */}
-        {geo && (
-          <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-xs text-gray-700 grid grid-cols-2 gap-x-6 gap-y-1">
-            <span>
-              Blocks per course: <strong>{geo.blocksPerCourse}</strong>
-            </span>
-            <span>
-              Courses: <strong>{geo.courses}</strong>
-            </span>
-            <span>
-              Total blocks per column: <strong>{geo.totalBlocks}</strong>
-            </span>
-            <span>
-              Total blocks (all): <strong>{geo.totalBlocks * n(qty)}</strong>
-            </span>
-            <span>
-              Rebar per column: <strong>{geo.rebarLF.toFixed(1)} LF</strong>
-            </span>
-            <span>
-              Footing area: <strong>{geo.footingArea.toFixed(1)} SF</strong>
-            </span>
+        <ModuleHeaderSlot>
+          <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} compact />
+        </ModuleHeaderSlot>
+
+        {pricesLoading && (
+          <div className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+            Loading material prices from Master Rates…
           </div>
         )}
-      </div>
 
-      {/* ── Finishes ── */}
-      <div>
-        <SectionHeader title="Finishes" />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-center pb-1 pr-2 font-medium w-36">Vendor</th>
-                <th className="text-center pb-1 pr-2 font-medium">Finish Type</th>
-                <th className="text-center pb-1 pr-2 font-medium">Qty</th>
-                <th className="text-center pb-1 pr-2 font-medium text-gray-400">Unit</th>
-                <th className="text-center pb-1 pr-2 font-medium text-gray-400">$/Unit</th>
-                <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
-              </tr>
-            </thead>
-            <tbody>
-              {finishRows.map((row, i) => {
-                // Vendor-first Type list: the selected vendor's 'Column Finish'
-                // catalog Items (Standard → the built-in FINISH_TYPES list). Map the
-                // stored selection back to its built-in for labor + the ton/SF branch.
-                const finishOpts = columnFinishOptions(materialRows, row.vendor)
-                const selOpt =
-                  finishOpts.find(
-                    o =>
-                      o.value === row.type ||
-                      o.typeKey === row.type ||
-                      o.dbName === row.type ||
-                      o.label === row.type
-                  ) || finishOpts[0]
-                const rate = FINISH_TYPES[selOpt?.typeKey ?? row.type] ?? FINISH_TYPES[row.type]
-                const isTon = rate?.unit === 'ton'
-                const defCost = isTon ? rate?.costPerTon : rate?.costPerSF
-                // Material-price target = the selected catalog Item name (vendor-aware).
-                const priceDbName = selOpt?.dbName || rate?.dbName
-                // Sub tab: flat $/SF rate; In-House: material cost per unit.
-                // Vendor overrides ONLY this material price (row.vendor).
-                const cost = isSub
-                  ? colMat(rate?.subDbName, row.vendor, rate?.subFallback ?? 0)
-                  : colMat(priceDbName, row.vendor, defCost ?? 0)
-                const defLab = isTon ? rate?.laborHrsPer : rate?.laborHrsPerSF
-                const labRate = materialPrices[rate?.laborDbName] ?? defLab ?? 0
-                const unitLabel = isSub ? 'SF' : rate?.unit ?? 'SF'
-                const mat = n(row.qty) * cost
-                return (
-                  <tr key={i} className="border-b border-gray-100">
-                    <td className="py-1 pr-2">
-                      <select
-                        className="input text-sm py-1 w-full"
-                        value={row.vendor || 'Standard'}
-                        onChange={e => updateFinish(i, 'vendor', e.target.value)}
-                      >
-                        {vendorOptions.map(o => (
-                          <option key={o.value} value={o.value}>
-                            {o.label}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="py-1 pr-2">
-                      <div className="flex items-center gap-1">
-                        <select
-                          className="input text-sm py-1 flex-1 min-w-0"
-                          value={row.type || ''}
-                          onChange={e => updateFinish(i, 'type', e.target.value)}
-                        >
-                          {!row.type && <option value="">Select finish</option>}
-                          {row.type && !finishOpts.some(o => o.value === row.type) && (
-                            <option value={row.type}>{row.type}</option>
-                          )}
-                          {finishOpts.map(o => (
-                            <option key={o.value} value={o.value}>
-                              {o.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </td>
-                    <td className="py-1 pr-2">
-                      <NumInput value={row.qty} onChange={v => updateFinish(i, 'qty', v)} className="text-center" />
-                    </td>
-                    <td className="py-1 pr-2 text-xs text-gray-400 text-center">{unitLabel}</td>
-                    <td className="py-1 text-center text-gray-400 text-xs pr-2">
-                      <span className="inline-flex items-center justify-center gap-1">
-                        ${cost.toFixed(2)}
-                      </span>
-                    </td>
-                    <td className="py-1 text-center text-gray-600 text-xs">
-                      {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+        {/* Settings — Job Site Conditions is In-House only (hidden on Sub tab) */}
+        {subType !== 'Subcontractor' && (
+          <>
+            <SectionHeader title="Job Site Conditions" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
+                <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-0.5" title="Average Distance from Truck to Work Area">
+                  Truck → Work Area (Avg LF)
+                </p>
+                <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
+                {calc.walkHrs > 0 && (
+                  <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">
+                    +{calc.walkHrs.toFixed(2)} hrs walk-access
+                  </p>
+                )}
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
+                <NumInput value={hoursAdj} onChange={setHoursAdj} placeholder="0" />
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── Installation — per-type column rows (Add Column) ── */}
+        <div>
+          <SectionHeader title="Installation" />
+          {activeCfg.arr.map((row, i) => (
+            <ColEntry
+              key={i}
+              type={colType}
+              row={row}
+              idx={i}
+              total={activeCfg.arr.length}
+              onChange={updateColFor(activeCfg.setter)}
+              onRemove={removeColFor(activeCfg.setter)}
+              vendorOptions={activeCfg.vendorOptions}
+              typeOptions={activeCfg.typeOptions(row.vendor)}
+              typeLabel={TYPE_LABEL[colType]}
+              rowCalc={ROW_CALC[colType](row, materialPrices, materialRows)}
+            />
+          ))}
           <button
             type="button"
             className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
-            onClick={() => setFinishRows(r => [...r, { type: '', qty: '', vendor: 'Standard' }])}
+            onClick={() => activeCfg.setter(rows => [...rows, activeCfg.blank()])}
           >
-            + Add row
+            + Add Column
           </button>
         </div>
-      </div>
 
-      {/* ── Manual Entry ── */}
-      <div>
-        <SectionHeader title="Manual Entry" />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm table-fixed">
-            <colgroup>
-              {isSub ? (
-                <>
-                  <col className="w-1/2" />
-                  <col className="w-1/2" />
-                </>
-              ) : (
-                <>
-                  <col className="w-1/3" />
-                  <col className="w-1/3" />
-                  <col className="w-1/3" />
-                </>
-              )}
-            </colgroup>
-            <thead>
-              <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-center pb-1 pr-2 font-medium">Description</th>
+        {/* ── Finishes — Poured In Place tab only ── */}
+        {colType === 'PIP' && (
+          <div>
+            <SectionHeader title="Finishes" />
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-xs text-gray-500 border-b border-gray-200">
+                    <th className="text-center pb-1 pr-2 font-medium w-36">Vendor</th>
+                    <th className="text-center pb-1 pr-2 font-medium">Finish Type</th>
+                    <th className="text-center pb-1 pr-2 font-medium">Qty</th>
+                    <th className="text-center pb-1 pr-2 font-medium text-gray-400">Unit</th>
+                    <th className="text-center pb-1 pr-2 font-medium text-gray-400">$/Unit</th>
+                    <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {finishRows.map((row, i) => {
+                    const finishOpts = columnFinishOptions(materialRows, row.vendor)
+                    const selOpt =
+                      finishOpts.find(
+                        o =>
+                          o.value === row.type ||
+                          o.typeKey === row.type ||
+                          o.dbName === row.type ||
+                          o.label === row.type
+                      ) || finishOpts[0]
+                    const rate = FINISH_TYPES[(selOpt && selOpt.typeKey) ?? row.type] ?? FINISH_TYPES[row.type]
+                    const isTon = rate?.unit === 'ton'
+                    const defCost = isTon ? rate?.costPerTon : rate?.costPerSF
+                    const priceDbName = (selOpt && selOpt.dbName) || rate?.dbName
+                    const cost = isSub
+                      ? colMat(rate?.subDbName, row.vendor, rate?.subFallback ?? 0)
+                      : colMat(priceDbName, row.vendor, defCost ?? 0)
+                    const unitLabel = isSub ? 'SF' : rate?.unit ?? 'SF'
+                    const mat = n(row.qty) * cost
+                    return (
+                      <tr key={i} className="border-b border-gray-100">
+                        <td className="py-1 pr-2">
+                          <select
+                            className="input text-sm py-1 w-full"
+                            value={row.vendor || 'Standard'}
+                            onChange={e => updateFinish(i, 'vendor', e.target.value)}
+                          >
+                            {vendorOptions.map(o => (
+                              <option key={o.value} value={o.value}>
+                                {o.label}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="py-1 pr-2">
+                          <div className="flex items-center gap-1">
+                            <select
+                              className="input text-sm py-1 flex-1 min-w-0"
+                              value={row.type || ''}
+                              onChange={e => updateFinish(i, 'type', e.target.value)}
+                            >
+                              {!row.type && <option value="">Select finish</option>}
+                              {row.type && !finishOpts.some(o => o.value === row.type) && (
+                                <option value={row.type}>{row.type}</option>
+                              )}
+                              {finishOpts.map(o => (
+                                <option key={o.value} value={o.value}>
+                                  {o.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </td>
+                        <td className="py-1 pr-2">
+                          <NumInput value={row.qty} onChange={v => updateFinish(i, 'qty', v)} className="text-center" />
+                        </td>
+                        <td className="py-1 pr-2 text-xs text-gray-400 text-center">{unitLabel}</td>
+                        <td className="py-1 text-center text-gray-400 text-xs pr-2">
+                          <span className="inline-flex items-center justify-center gap-1">${cost.toFixed(2)}</span>
+                        </td>
+                        <td className="py-1 text-center text-gray-600 text-xs">
+                          {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+              <button
+                type="button"
+                className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+                onClick={() => setFinishRows(r => [...r, { type: '', qty: '', vendor: 'Standard' }])}
+              >
+                + Add row
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Manual Entry — every type ── */}
+        <div>
+          <SectionHeader title="Manual Entry" />
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm table-fixed">
+              <colgroup>
                 {isSub ? (
-                  <th className="text-center pb-1 font-medium">Cost $</th>
+                  <>
+                    <col className="w-1/2" />
+                    <col className="w-1/2" />
+                  </>
                 ) : (
                   <>
-                    <th className="text-center pb-1 pr-2 font-medium">Hours</th>
-                    <th className="text-center pb-1 font-medium">Materials $</th>
+                    <col className="w-1/3" />
+                    <col className="w-1/3" />
+                    <col className="w-1/3" />
                   </>
                 )}
-              </tr>
-            </thead>
-            <tbody>
-              {manualRows.map((row, i) => (
-                <tr key={i} className="border-b border-gray-100">
-                  <td className="py-1 pr-2">
-                    <input
-                      className="input text-sm py-1 w-full"
-                      value={row.label}
-                      onChange={e => updateManual(i, 'label', e.target.value)}
-                    />
-                  </td>
+              </colgroup>
+              <thead>
+                <tr className="text-xs text-gray-500 border-b border-gray-200">
+                  <th className="text-center pb-1 pr-2 font-medium">Description</th>
                   {isSub ? (
-                    <td className="py-1">
-                      <div className="flex items-center gap-1">
-                        <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} className="text-center flex-1" />
-                        {manualRows.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => setManualRows(rows => rows.filter((_, idx) => idx !== i))}
-                            className="text-gray-300 hover:text-red-500 text-sm px-1"
-                            title="Remove line"
-                          >
-                            ×
-                          </button>
-                        )}
-                      </div>
-                    </td>
+                    <th className="text-center pb-1 font-medium">Cost $</th>
                   ) : (
                     <>
-                      <td className="py-1 pr-2">
-                        <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} className="text-center" />
-                      </td>
+                      <th className="text-center pb-1 pr-2 font-medium">Hours</th>
+                      <th className="text-center pb-1 font-medium">Materials $</th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {manualRows.map((row, i) => (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-2">
+                      <input
+                        className="input text-sm py-1 w-full"
+                        value={row.label}
+                        onChange={e => updateManual(i, 'label', e.target.value)}
+                      />
+                    </td>
+                    {isSub ? (
                       <td className="py-1">
                         <div className="flex items-center gap-1">
-                          <NumInput
-                            value={row.materials}
-                            onChange={v => updateManual(i, 'materials', v)}
-                            className="text-center flex-1"
-                          />
+                          <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} className="text-center flex-1" />
                           {manualRows.length > 1 && (
                             <button
                               type="button"
@@ -1080,32 +1206,52 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
                           )}
                         </div>
                       </td>
-                    </>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <button
-            type="button"
-            onClick={() => setManualRows(rows => [...rows, { label: '', hours: '', materials: '', subCost: '' }])}
-            className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
-          >
-            + Add manual entry
+                    ) : (
+                      <>
+                        <td className="py-1 pr-2">
+                          <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} className="text-center" />
+                        </td>
+                        <td className="py-1">
+                          <div className="flex items-center gap-1">
+                            <NumInput value={row.materials} onChange={v => updateManual(i, 'materials', v)} className="text-center flex-1" />
+                            {manualRows.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => setManualRows(rows => rows.filter((_, idx) => idx !== i))}
+                                className="text-gray-300 hover:text-red-500 text-sm px-1"
+                                title="Remove line"
+                              >
+                                ×
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <button
+              type="button"
+              onClick={() => setManualRows(rows => [...rows, { label: '', hours: '', materials: '', subCost: '' }])}
+              className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+            >
+              + Add manual entry
+            </button>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-3 pt-2">
+          <button onClick={onBack} className="btn-secondary flex-1">
+            ← Back
+          </button>
+          <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
+            {saving ? 'Saving...' : 'Save'}
           </button>
         </div>
       </div>
-
-      {/* Actions */}
-      <div className="flex gap-3 pt-2">
-        <button onClick={onBack} className="btn-secondary flex-1">
-          ← Back
-        </button>
-        <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
-          {saving ? 'Saving...' : 'Save'}
-        </button>
-      </div>
-    </div>
     </SubTabContext.Provider>
   )
 }

@@ -1,6 +1,6 @@
 import FinancialSummaryList from './FinancialSummaryList'
-import { groutCyPerBlock } from '../../lib/cmuGrout'
 import { resolveMaterialPrice } from '../../lib/materialCatalog'
+import { ROW_CALC } from './ColumnsModule'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ColumnsSummary — read-only detail view for a saved Columns module
@@ -134,9 +134,10 @@ export default function ColumnsSummary({ module }) {
   const {
     difficulty = 0,
     hoursAdj = 0,
-    qty = 0,
-    heightIn = 0,
-    widthIn = 0,
+    cmuCols = [],
+    pipCols = [],
+    modularCols = [],
+    brickCols = [],
     finishRows = [],
     manualRows = [],
     subType = 'In-House',
@@ -144,7 +145,6 @@ export default function ColumnsSummary({ module }) {
     materialPrices = {},
     materialRows = [],
     vendorNames = {},
-    installVendor = 'Standard',
     calc = null,
   } = data
   const isSub = subType === 'Subcontractor'
@@ -160,78 +160,35 @@ export default function ColumnsSummary({ module }) {
   const fmt2 = v =>
     `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-  // ── Column Install ───────────────────────────────────────────────────────────
-  let installSection = null
-  if (n(qty) > 0 && n(heightIn) > 0 && n(widthIn) > 0) {
-    const geo = columnGeometry(heightIn, widthIn)
-    const totalBlocks = geo.totalBlocks * n(qty)
-    const totalRebar = geo.rebarLF * n(qty)
-
-    const blockCost = matPrice(
-      BLOCK_RATES.blockMatCost.dbName,
-      BLOCK_RATES.blockMatCost.fallback,
-      installVendor
-    )
-    // Grout fill = block count × cu-ft/block ÷ 27 × concrete $/CY.
-    const groutCY = totalBlocks * groutCyPerBlock(8, 8)
-    const concreteCost = matPrice(GROUT_CONCRETE.dbName, GROUT_CONCRETE.fallback, installVendor)
-    const rebarCost = matPrice(
-      BLOCK_RATES.rebarMatCost.dbName,
-      BLOCK_RATES.rebarMatCost.fallback,
-      installVendor
-    )
-    const excavateLab = price(
-      BLOCK_RATES.excavateLaborHrs.dbName,
-      BLOCK_RATES.excavateLaborHrs.fallback
-    )
-    const pourLab = price(BLOCK_RATES.pourLaborHrs.dbName, BLOCK_RATES.pourLaborHrs.fallback)
-    const installLab = price(
-      BLOCK_RATES.installLaborHrs.dbName,
-      BLOCK_RATES.installLaborHrs.fallback
-    )
-    const fillLab = price(BLOCK_RATES.fillLaborHrs.dbName, BLOCK_RATES.fillLaborHrs.fallback)
-
-    const matTotal = totalBlocks * blockCost + groutCY * concreteCost + totalRebar * rebarCost
-    const hrsTotal =
-      n(qty) * excavateLab + n(qty) * pourLab + totalBlocks * installLab + totalBlocks * fillLab
-
-    installSection = (
-      <>
-        <SectionLabel title="Column Install" />
-        <div className="bg-green-50 rounded-lg px-3 py-2 mb-1 grid grid-cols-2 gap-x-4 gap-y-0.5">
-          <span className="text-xs text-gray-600">
-            Columns: <strong>{n(qty)}</strong>
-          </span>
-          <span className="text-xs text-gray-600">
-            Courses: <strong>{geo.courses}</strong>
-          </span>
-          <span className="text-xs text-gray-600">
-            Blocks/course: <strong>{geo.blocksPerCourse}</strong>
-          </span>
-          <span className="text-xs text-gray-600">
-            Total blocks: <strong>{totalBlocks}</strong>
-          </span>
-          <span className="text-xs text-gray-600">
-            Rebar total: <strong>{totalRebar.toFixed(1)} LF</strong>
-          </span>
-          <span className="text-xs text-gray-600">
-            Height × Width:{' '}
-            <strong>
-              {n(heightIn)}" × {n(widthIn)}"
-            </strong>
-          </span>
-          <span className="text-xs text-gray-600">
-            Vendor: <strong>{vendorLabel(installVendor)}</strong>
-          </span>
-        </div>
-        <LineRow
-          label="CMU Blocks + Fill + Grout"
-          value={fmt2(matTotal)}
-          sub={`${hrsTotal.toFixed(2)} hrs labor`}
-        />
-      </>
-    )
-  }
+  // ── Installation — per-column-type breakdown (reuses the module's calculators) ──
+  const rowHasGeo = c => n(c.qty) > 0 && n(c.heightIn) > 0 && n(c.widthIn) > 0
+  const COL_TYPES = [
+    ['CMU', cmuCols],
+    ['PIP', pipCols],
+    ['Modular', modularCols],
+    ['Brick', brickCols],
+  ]
+  const installLines = []
+  COL_TYPES.forEach(([type, arr]) => {
+    ;(arr || []).forEach((c, i) => {
+      if (!rowHasGeo(c)) return
+      const r = ROW_CALC[type](c, materialPrices, materialRows) || { mat: 0, hrs: 0 }
+      installLines.push({
+        key: `${type}-${i}`,
+        label: `${type} — ${n(c.qty)} ea · ${n(c.heightIn)}"×${n(c.widthIn)}"`,
+        value: fmt2(r.mat),
+        sub: `${n(r.hrs).toFixed(2)} hrs labor`,
+      })
+    })
+  })
+  const installSection = installLines.length ? (
+    <>
+      <SectionLabel title="Installation" />
+      {installLines.map(l => (
+        <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />
+      ))}
+    </>
+  ) : null
 
   // ── Finishes ─────────────────────────────────────────────────────────────────
   const finishLines = finishRows
@@ -281,10 +238,7 @@ export default function ColumnsSummary({ module }) {
   const subCost = n(savedCalc.subCost)
   const priceTotal = n(savedCalc.price)
 
-  const hasAnyLines =
-    (n(qty) > 0 && n(heightIn) > 0 && n(widthIn) > 0) ||
-    finishLines.length ||
-    manualLines.length
+  const hasAnyLines = installLines.length || finishLines.length || manualLines.length
 
   return (
     <div className="space-y-1 text-sm">
