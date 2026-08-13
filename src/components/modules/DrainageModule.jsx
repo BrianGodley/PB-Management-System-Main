@@ -1231,8 +1231,12 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                   w = n(row.width),
                   d = n(row.depth)
                 const cf = lf > 0 && w > 0 && d > 0 ? lf * (w / 12) * (d / 12) : 0
-                const hrs = cf > 0 ? (cf * (TRENCH_MINS_PER_CF[row.equipment] || 10)) / 60 : 0
+                // Use the same rate source as the calc (DB value first, hardcoded
+                // fallback second) so the row's Est. Hrs matches the GPMD total.
                 const laborName = TRENCH_LABOR_RATE_NAME[row.equipment]
+                const minsPerCf =
+                  materialPrices[laborName] ?? TRENCH_MINS_PER_CF[row.equipment] ?? 10
+                const hrs = cf > 0 ? (cf * minsPerCf) / 60 : 0
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
