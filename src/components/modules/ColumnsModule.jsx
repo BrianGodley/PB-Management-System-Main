@@ -352,12 +352,7 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
 }
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
-const DEFAULT_FINISH_ROWS = [
-  { type: '', qty: '', vendor: 'Standard' },
-  { type: '', qty: '', vendor: 'Standard' },
-  { type: '', qty: '', vendor: 'Standard' },
-  { type: '', qty: '', vendor: 'Standard' },
-]
+const DEFAULT_FINISH_ROWS = [{ type: '', qty: '', vendor: 'Standard' }]
 const DEFAULT_MANUAL_ROWS = [{ label: '', hours: '', materials: '', subCost: '' }]
 
 // ── Main Component ────────────────────────────────────────────────────────────
@@ -766,9 +761,9 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
         </>
       )}
 
-      {/* ── Column Install ── */}
+      {/* ── Installation ── */}
       <div>
-        <SectionHeader title="Column Install" />
+        <SectionHeader title="Installation" />
         {/* Section Vendor — overrides ONLY the material unit prices (CMU Block,
             Fill/Grout, Rebar) used by the geometry calc. 'Standard' = current price. */}
         <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200 mb-3">
