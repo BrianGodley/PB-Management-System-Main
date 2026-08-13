@@ -1069,7 +1069,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Forming Complexity % Per Unit',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: '%/pt',
+          unitLabel: '% per pt',
           value: calc.complexityPctPerUnit,
         },
         {
@@ -1092,7 +1092,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: BASE_METHOD_LABOR_NAME[m],
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'hrs/in·100sf',
+          unitLabel: 'hrs per in·100 Sq Ft',
           value: laborRates[BASE_METHOD_LABOR_NAME[m]] ?? BASE_RATES[m],
         })),
         // Base material catalog (vendor-supplied 'Concrete Base' products).
@@ -1108,7 +1108,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: t.rateName,
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'SF/hr',
+          unitLabel: 'Sq Ft per hr',
           value: laborRates[t.rateName] ?? t.def,
         })),
         {
@@ -1117,7 +1117,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Rebar 24" OC',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'SF/hr',
+          unitLabel: 'Sq Ft per hr',
           value: calc.rebarSFPerHr,
         },
         {
@@ -1126,7 +1126,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Rebar LF/SF 24" OC',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'LF/SF',
+          unitLabel: 'Ln Ft per Sq Ft',
           value: calc.rebarLfPerSfBySpacing['24" OC'],
         },
         {
@@ -1135,7 +1135,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Rebar LF/SF 12" OC',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'LF/SF',
+          unitLabel: 'Ln Ft per Sq Ft',
           value: calc.rebarLfPerSfBySpacing['12" OC'],
         },
         {
@@ -1144,7 +1144,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Form Setting',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'LF/hr',
+          unitLabel: 'Ln Ft per hr',
           value: calc.formLFPerHr,
         },
         {
@@ -1153,7 +1153,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Sleeves',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'LF/hr',
+          unitLabel: 'Ln Ft per hr',
           value: calc.sleeveLFPerHr,
         },
         {
@@ -1171,7 +1171,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Pump Per CY',
           category: 'Concrete',
           mode: 'currency',
-          unitLabel: 'CY',
+          unitLabel: 'Cu Yd',
           value: calc.pumpFeePerCY,
         },
         // Concrete mix catalog (vendor-supplied 'Concrete Mix' products) + the
@@ -1192,7 +1192,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Sand Finish SF/hr',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'SF/hr',
+          unitLabel: 'Sq Ft per hr',
           value: calc.sandFinishSFPerHr,
         },
         {
@@ -1201,7 +1201,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Salt Finish SF/hr',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'SF/hr',
+          unitLabel: 'Sq Ft per hr',
           value: calc.saltFinishSFPerHr,
         },
         {
@@ -1210,7 +1210,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Exposed Aggregate SF/hr',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'SF/hr',
+          unitLabel: 'Sq Ft per hr',
           value: calc.exposedAggSFPerHr,
         },
         {
@@ -1219,7 +1219,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Seeded Aggregate SF/hr',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'SF/hr',
+          unitLabel: 'Sq Ft per hr',
           value: calc.seededAggSFPerHr,
         },
         {
@@ -1228,7 +1228,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Vapor Barrier',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'SF/hr',
+          unitLabel: 'Sq Ft per hr',
           value: calc.vaporBarrierSFPerHr,
         },
         {
@@ -1237,7 +1237,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Sealer Natural',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'SF/hr',
+          unitLabel: 'Sq Ft per hr',
           value: calc.sealerNaturalSFPerHr,
         },
         {
@@ -1246,7 +1246,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Sealer Wet-Look',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'SF/hr',
+          unitLabel: 'Sq Ft per hr',
           value: calc.sealerWetSFPerHr,
         },
         {
@@ -1255,7 +1255,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Sealer SF/gal',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'SF/gal',
+          unitLabel: 'Sq Ft per gal',
           value: calc.sealerSFPerGal,
         },
         {
@@ -1264,7 +1264,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Sand Finish 400SF',
           category: 'Concrete',
           mode: 'currency',
-          unitLabel: '400SF',
+          unitLabel: '400 Sq Ft',
           value: calc.sandFinishPer400SF,
         },
         {
@@ -1282,7 +1282,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Stamp Sub Per CY',
           category: 'Concrete',
           mode: 'currency',
-          unitLabel: 'CY',
+          unitLabel: 'Cu Yd',
           value: calc.stampSubPerCY,
         },
         // Finish material catalog (sealers, vapor barrier).
@@ -1300,7 +1300,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete Sub - Per SF',
           category: 'Concrete',
           mode: 'currency',
-          unitLabel: 'SF',
+          unitLabel: 'Sq Ft',
           value: subSlabRate,
         },
         ...Object.entries(SUB_FINISH_RATES).flatMap(([, cfg]) => {
@@ -1311,7 +1311,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               name: cfg.labor.name,
               category: 'Concrete',
               mode: 'currency',
-              unitLabel: 'SF',
+              unitLabel: 'Sq Ft',
               value: subRates[cfg.labor.name] ?? cfg.labor.def,
             },
           ]
@@ -1322,7 +1322,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               name: cfg.mat.name,
               category: 'Concrete',
               mode: 'currency',
-              unitLabel: 'SF',
+              unitLabel: 'Sq Ft',
               value: subRates[cfg.mat.name] ?? cfg.mat.def,
             })
           }
@@ -1334,7 +1334,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete Sub - Vapor Barrier Per SF',
           category: 'Concrete',
           mode: 'currency',
-          unitLabel: 'SF',
+          unitLabel: 'Sq Ft',
           value: subVaporBarrierRate,
         },
         {
@@ -1343,7 +1343,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete Sub - Sealer Per SF',
           category: 'Concrete',
           mode: 'currency',
-          unitLabel: 'SF',
+          unitLabel: 'Sq Ft',
           value: subSealerRate,
         },
       ],

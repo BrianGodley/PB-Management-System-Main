@@ -1007,7 +1007,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           name: 'Turf - Base Install SF/hr',
           category: 'Artificial Turf',
           mode: 'coefficient',
-          unitLabel: 'SF/hr',
+          unitLabel: 'Sq Ft per hr',
           value: materialPrices['Turf - Base Install SF/hr'] ?? RATE_DEFAULTS.baseSFPerHr,
         },
         {
@@ -1025,7 +1025,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           name: 'Turf - Weed Fabric Install hrs/1kSF',
           category: 'Artificial Turf',
           mode: 'coefficient',
-          unitLabel: 'hrs/1kSF',
+          unitLabel: 'hrs per 1kSF',
           value:
             materialPrices['Turf - Weed Fabric Install hrs/1kSF'] ??
             RATE_DEFAULTS.weedFabricHrPer1kSF,
@@ -1041,7 +1041,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           name: 'Turf - Turf Install SF/hr',
           category: 'Artificial Turf',
           mode: 'coefficient',
-          unitLabel: 'SF/hr',
+          unitLabel: 'Sq Ft per hr',
           value: calc.turfSFHr,
         },
         {
@@ -1059,7 +1059,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           name: 'Turf - Cut/Staple/Seam LF/hr',
           category: 'Artificial Turf',
           mode: 'coefficient',
-          unitLabel: 'LF/hr',
+          unitLabel: 'Ln Ft per hr',
           value: materialPrices['Turf - Cut/Staple/Seam LF/hr'] ?? RATE_DEFAULTS.turfCutSFHr,
         },
         {
@@ -1094,7 +1094,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           name: 'Turf - Strip Install LF/hr',
           category: 'Artificial Turf',
           mode: 'coefficient',
-          unitLabel: 'LF/hr',
+          unitLabel: 'Ln Ft per hr',
           value: calc.stripLFHr,
         },
       ],
@@ -1108,7 +1108,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           name: 'Turf - Demo Tons Divisor',
           category: 'Artificial Turf',
           mode: 'coefficient',
-          unitLabel: 'SF·in/ton',
+          unitLabel: 'Sq Ft·in per Tons',
           value: materialPrices['Turf - Demo Tons Divisor'] ?? 200,
         },
         {
@@ -1117,7 +1117,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           name: 'Turf - Gravel Base Tons Divisor',
           category: 'Artificial Turf',
           mode: 'coefficient',
-          unitLabel: 'SF·in/ton',
+          unitLabel: 'Sq Ft·in per Tons',
           value: materialPrices['Turf - Gravel Base Tons Divisor'] ?? 200,
         },
         {
@@ -1126,7 +1126,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           name: 'Turf - Weed Fabric SF per Roll',
           category: 'Artificial Turf',
           mode: 'coefficient',
-          unitLabel: 'SF/roll',
+          unitLabel: 'Sq Ft per roll',
           value: materialPrices['Turf - Weed Fabric SF per Roll'] ?? 1800,
         },
         {
@@ -1144,7 +1144,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           name: 'Turf - Infill SF per Bag',
           category: 'Artificial Turf',
           mode: 'coefficient',
-          unitLabel: 'SF/bag',
+          unitLabel: 'Sq Ft per bag',
           value: materialPrices['Turf - Infill SF per Bag'] ?? 30,
         },
       ],
@@ -1158,7 +1158,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           name: 'Turf Sub - Install Per SF',
           category: 'Artificial Turf',
           mode: 'currency',
-          unitLabel: 'SF',
+          unitLabel: 'Sq Ft',
           value: calc.subInstallPerSF,
         },
         {
@@ -1167,7 +1167,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           name: 'Turf Sub - Strip Per LF',
           category: 'Artificial Turf',
           mode: 'currency',
-          unitLabel: 'LF',
+          unitLabel: 'Ln Ft',
           value: calc.subStripPerLF,
         },
       ],

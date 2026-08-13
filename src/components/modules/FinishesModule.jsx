@@ -99,43 +99,43 @@ const WALL_FINISH_TYPES = [
 // Per-type rate metadata: which FINISHES_RATES material + labor key each type
 // uses, its display unit, and whether it carries an editable $/ton override.
 const FLAT_META = {
-  Tile: { matKey: 'flatTile', labKey: 'flatTileLab', matUnit: 'SF', labUnit: 'hrs/SF' },
-  Brick: { matKey: 'flatBrick', labKey: 'flatBrickLab', matUnit: 'brick', labUnit: 'hrs/SF' },
+  Tile: { matKey: 'flatTile', labKey: 'flatTileLab', matUnit: 'Sq Ft', labUnit: 'hrs per Sq Ft' },
+  Brick: { matKey: 'flatBrick', labKey: 'flatBrickLab', matUnit: 'brick', labUnit: 'hrs per Sq Ft' },
   Flagstone: {
     matKey: 'flatFlagstone',
     labKey: 'flatFlagstoneLab',
-    matUnit: 'ton',
-    labUnit: 'hrs/SF',
+    matUnit: 'Tons',
+    labUnit: 'hrs per Sq Ft',
     override: true,
   },
-  Porcelain: { matKey: 'flatPorcelain', labKey: 'flatPorcelainLab', matUnit: 'SF', labUnit: 'hrs/SF' },
+  Porcelain: { matKey: 'flatPorcelain', labKey: 'flatPorcelainLab', matUnit: 'Sq Ft', labUnit: 'hrs per Sq Ft' },
 }
 const WALL_META = {
-  'Sand Stucco': { matKey: 'sandStucco', labKey: 'sandStuccoLab', matUnit: 'SF', labUnit: 'SF/day' },
-  'Smooth Stucco': { matKey: 'smoothStucco', labKey: 'smoothStuccoLab', matUnit: 'SF', labUnit: 'SF/day' },
-  Ledgerstone: { matKey: 'ledgerstone', labKey: 'ledgerstoneLab', matUnit: 'SF', labUnit: 'SF/day' },
-  'Stacked Stone': { matKey: 'stackedStone', labKey: 'stackedStoneLab', matUnit: 'SF', labUnit: 'SF/day' },
-  Tile: { matKey: 'tile', labKey: 'tileLab', matUnit: 'SF', labUnit: 'hrs/SF' },
+  'Sand Stucco': { matKey: 'sandStucco', labKey: 'sandStuccoLab', matUnit: 'Sq Ft', labUnit: 'Sq Ft per day' },
+  'Smooth Stucco': { matKey: 'smoothStucco', labKey: 'smoothStuccoLab', matUnit: 'Sq Ft', labUnit: 'Sq Ft per day' },
+  Ledgerstone: { matKey: 'ledgerstone', labKey: 'ledgerstoneLab', matUnit: 'Sq Ft', labUnit: 'Sq Ft per day' },
+  'Stacked Stone': { matKey: 'stackedStone', labKey: 'stackedStoneLab', matUnit: 'Sq Ft', labUnit: 'Sq Ft per day' },
+  Tile: { matKey: 'tile', labKey: 'tileLab', matUnit: 'Sq Ft', labUnit: 'hrs per Sq Ft' },
   'Real Flagstone': {
     matKey: 'realFlagstone',
     labKey: 'flagstoneLab',
-    matUnit: 'ton',
-    labUnit: 'hrs/SF',
+    matUnit: 'Tons',
+    labUnit: 'hrs per Sq Ft',
     override: true,
   },
   'Real Stone': {
     matKey: 'realStone',
     labKey: 'realStoneLab',
-    matUnit: 'ton',
-    labUnit: 'hrs/SF',
+    matUnit: 'Tons',
+    labUnit: 'hrs per Sq Ft',
     override: true,
   },
 }
 const CAP_META = {
-  Flagstone: { matKey: 'capFlagstone', matUnit: 'ton' },
-  Precast: { matKey: 'capPrecast', matUnit: 'ea' },
-  'PIP Concrete': { matKey: 'concreteTruck', matUnit: 'CY' },
-  'Bullnose Brick': { matKey: 'capBullnose', matUnit: 'LF' },
+  Flagstone: { matKey: 'capFlagstone', matUnit: 'Tons' },
+  Precast: { matKey: 'capPrecast', matUnit: 'Each' },
+  'PIP Concrete': { matKey: 'concreteTruck', matUnit: 'Cu Yd' },
+  'Bullnose Brick': { matKey: 'capBullnose', matUnit: 'Ln Ft' },
 }
 
 // ── Vendor-first Type pickers (mirror ArtificialTurfModule.baseMatOptions) ─────
@@ -770,7 +770,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Item</th>
-                <th className="text-center pb-1 pr-2 font-medium">SF</th>
+                <th className="text-center pb-1 pr-2 font-medium">Sq Ft</th>
               </tr>
             </thead>
             <tbody>

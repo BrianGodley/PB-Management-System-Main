@@ -1298,7 +1298,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.soilPrepLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'hrs/SF',
+          unitLabel: 'hrs per Sq Ft',
           value: p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback),
         },
         {
@@ -1307,7 +1307,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.sodPrepLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'hrs/SF',
+          unitLabel: 'hrs per Sq Ft',
           value: p(GT_RATES.sodPrepLab.dbName, GT_RATES.sodPrepLab.fallback),
         },
         {
@@ -1316,7 +1316,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.soilPrepHandAdd.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'hrs/SF',
+          unitLabel: 'hrs per Sq Ft',
           value: p(GT_RATES.soilPrepHandAdd.dbName, GT_RATES.soilPrepHandAdd.fallback),
         },
         {
@@ -1325,7 +1325,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.tillHandLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'hrs/SF',
+          unitLabel: 'hrs per Sq Ft',
           value: p(GT_RATES.tillHandLab.dbName, GT_RATES.tillHandLab.fallback),
         },
         {
@@ -1334,7 +1334,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.tillTillerLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'hrs/SF',
+          unitLabel: 'hrs per Sq Ft',
           value: p(GT_RATES.tillTillerLab.dbName, GT_RATES.tillTillerLab.fallback),
         },
       ],
@@ -1348,7 +1348,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.sodLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'hrs/SF',
+          unitLabel: 'hrs per Sq Ft',
           value: p(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback),
         },
         {
@@ -1357,7 +1357,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.fertilizerSFPerBag.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'SF/bag',
+          unitLabel: 'Sq Ft per bag',
           value: p(GT_RATES.fertilizerSFPerBag.dbName, GT_RATES.fertilizerSFPerBag.fallback),
         },
       ],
@@ -1371,7 +1371,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: 'Soils Install Labor',
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'hrs/SF-in',
+          unitLabel: 'hrs per Sq Ft per in',
           value: p('Soils Install Labor', 0.002),
         },
       ],
@@ -1385,7 +1385,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.mulchLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'CY/day',
+          unitLabel: 'Cu Yd per day',
           value: p(GT_RATES.mulchLab.dbName, GT_RATES.mulchLab.fallback),
         },
         {
@@ -1403,7 +1403,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: 'GT - Mulch Coverage SF/Day',
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'SF/day',
+          unitLabel: 'Sq Ft per day',
           value: p('GT - Mulch Coverage SF/Day', 3200),
         },
       ],
@@ -1417,7 +1417,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.gravelFabricLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'hrs/SF',
+          unitLabel: 'hrs per Sq Ft',
           value: p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback),
         },
       ],
@@ -1431,7 +1431,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.dgHandLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'CY/hr',
+          unitLabel: 'Cu Yd per hr',
           value: p(GT_RATES.dgHandLab.dbName, GT_RATES.dgHandLab.fallback),
         },
         {
@@ -1440,7 +1440,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.dgMachineLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'CY/day',
+          unitLabel: 'Cu Yd per day',
           value: p(GT_RATES.dgMachineLab.dbName, GT_RATES.dgMachineLab.fallback),
         },
         {
@@ -1449,7 +1449,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: 'GT - DG Tons Denominator',
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'SF-in/ton',
+          unitLabel: 'Sq Ft per in per Tons',
           value: p('GT - DG Tons Denominator', 200),
         },
         {
@@ -1467,7 +1467,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: 'GT - DG Cleanup Coverage SF/Day',
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'SF/day',
+          unitLabel: 'Sq Ft per day',
           value: p('GT - DG Cleanup Coverage SF/Day', 1000),
         },
         {
@@ -1476,7 +1476,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: 'GT - DG Cement Labor Factor',
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'hrs/ton',
+          unitLabel: 'hrs per Tons',
           value: p('GT - DG Cement Labor Factor', 1.25),
         },
         {
@@ -1499,7 +1499,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.gravelMachineLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'CY/day',
+          unitLabel: 'Cu Yd per day',
           value: p(GT_RATES.gravelMachineLab.dbName, GT_RATES.gravelMachineLab.fallback),
         },
         {
@@ -1508,7 +1508,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.gravelHandLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'CY/day',
+          unitLabel: 'Cu Yd per day',
           value: p(GT_RATES.gravelHandLab.dbName, GT_RATES.gravelHandLab.fallback),
         },
         {
@@ -1531,7 +1531,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.plasticEdgingLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'hrs/LF',
+          unitLabel: 'hrs per Ln Ft',
           value: p(GT_RATES.plasticEdgingLab.dbName, GT_RATES.plasticEdgingLab.fallback),
         },
         {
@@ -1540,7 +1540,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.metalEdgingLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'hrs/LF',
+          unitLabel: 'hrs per Ln Ft',
           value: p(GT_RATES.metalEdgingLab.dbName, GT_RATES.metalEdgingLab.fallback),
         },
       ],
@@ -1554,7 +1554,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.flagstoneSoilLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'SF/day',
+          unitLabel: 'Sq Ft per day',
           value: p(GT_RATES.flagstoneSoilLab.dbName, GT_RATES.flagstoneSoilLab.fallback),
         },
         {
@@ -1563,7 +1563,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.flagstoneConcreteLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'SF/day',
+          unitLabel: 'Sq Ft per day',
           value: p(GT_RATES.flagstoneConcreteLab.dbName, GT_RATES.flagstoneConcreteLab.fallback),
         },
         {
@@ -1572,7 +1572,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.precastSoilLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'SF/day',
+          unitLabel: 'Sq Ft per day',
           value: p(GT_RATES.precastSoilLab.dbName, GT_RATES.precastSoilLab.fallback),
         },
         {
@@ -1581,7 +1581,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.precastConcreteLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'SF/day',
+          unitLabel: 'Sq Ft per day',
           value: p(GT_RATES.precastConcreteLab.dbName, GT_RATES.precastConcreteLab.fallback),
         },
         {
@@ -1590,7 +1590,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: 'GT - Steppers SF Per Ton',
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'SF/ton',
+          unitLabel: 'Sq Ft per Tons',
           value: p('GT - Steppers SF Per Ton', 80),
         },
       ],
@@ -1604,7 +1604,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: 'Soil Prep Sub - $/SF',
           category: 'Ground Treatments',
           mode: 'currency',
-          unitLabel: 'SF',
+          unitLabel: 'Sq Ft',
           value: p('Soil Prep Sub - $/SF', 0),
         },
         {
@@ -1613,7 +1613,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: 'Sod Sub - $/SF',
           category: 'Ground Treatments',
           mode: 'currency',
-          unitLabel: 'SF',
+          unitLabel: 'Sq Ft',
           value: p('Sod Sub - $/SF', 0),
         },
         {
@@ -1622,7 +1622,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: 'Mulch Sub - $/SF',
           category: 'Ground Treatments',
           mode: 'currency',
-          unitLabel: 'SF',
+          unitLabel: 'Sq Ft',
           value: p('Mulch Sub - $/SF', 0),
         },
         {
@@ -1631,7 +1631,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: 'DG Sub - $/SF',
           category: 'Ground Treatments',
           mode: 'currency',
-          unitLabel: 'SF',
+          unitLabel: 'Sq Ft',
           value: p('DG Sub - $/SF', 0),
         },
         {
@@ -1640,7 +1640,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: 'Gravel Sub - $/SF',
           category: 'Ground Treatments',
           mode: 'currency',
-          unitLabel: 'SF',
+          unitLabel: 'Sq Ft',
           value: p('Gravel Sub - $/SF', 0),
         },
         {
@@ -1649,7 +1649,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: 'Pebble Sub - $/SF',
           category: 'Ground Treatments',
           mode: 'currency',
-          unitLabel: 'SF',
+          unitLabel: 'Sq Ft',
           value: p('Pebble Sub - $/SF', 0),
         },
         {
@@ -1658,7 +1658,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: 'Cobbles Sub - $/SF',
           category: 'Ground Treatments',
           mode: 'currency',
-          unitLabel: 'SF',
+          unitLabel: 'Sq Ft',
           value: p('Cobbles Sub - $/SF', 0),
         },
         {
@@ -1667,7 +1667,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: 'Edging Sub - $/LF',
           category: 'Ground Treatments',
           mode: 'currency',
-          unitLabel: 'LF',
+          unitLabel: 'Ln Ft',
           value: p('Edging Sub - $/LF', 0),
         },
         {
@@ -1676,7 +1676,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: 'Steppers Sub - $/SF',
           category: 'Ground Treatments',
           mode: 'currency',
-          unitLabel: 'SF',
+          unitLabel: 'Sq Ft',
           value: p('Steppers Sub - $/SF', 0),
         },
       ],
@@ -1805,7 +1805,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       <NumInput
                         value={row.sf}
                         onChange={v => setRows(rs => rs.map((rr, idx) => (idx === i ? { ...rr, sf: v } : rr)))}
-                        placeholder="SF"
+                        placeholder="Sq Ft"
                         className="w-24"
                       />
                       <span className="text-xs text-gray-600 w-20 text-right">{_money(n(row.sf) * rt)}</span>
@@ -1822,7 +1822,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               {/* Preparation */}
               <div className="flex items-center gap-2 mb-4">
                 <span className="text-xs font-bold text-gray-600 uppercase flex-1">Preparation</span>
-                <NumInput value={soilPrepSF} onChange={setSoilPrepSF} placeholder="SF" className="w-24" />
+                <NumInput value={soilPrepSF} onChange={setSoilPrepSF} placeholder="Sq Ft" className="w-24" />
                 {_pencil('Soil Prep Sub - $/SF', 'SF')}
                 <span className="text-xs text-gray-600 w-20 text-right">
                   {_money(n(soilPrepSF) * _r('Soil Prep Sub - $/SF'))}
@@ -1843,7 +1843,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     </option>
                   ))}
                 </select>
-                <NumInput value={sodSF} onChange={setSodSF} placeholder="SF" className="w-24" />
+                <NumInput value={sodSF} onChange={setSodSF} placeholder="Sq Ft" className="w-24" />
                 {_pencil('Sod Sub - $/SF', 'SF')}
                 <span className="text-xs text-gray-600 w-20 text-right">
                   {_money(n(sodSF) * _r('Sod Sub - $/SF'))}
@@ -1868,7 +1868,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 ].map(([lbl, val, set]) => (
                   <div key={lbl} className="flex items-center gap-2 mb-1">
                     <span className="text-xs text-gray-500 flex-1">{lbl}</span>
-                    <NumInput value={val} onChange={set} placeholder="LF" className="w-24" />
+                    <NumInput value={val} onChange={set} placeholder="Ln Ft" className="w-24" />
                     <span className="text-xs text-gray-600 w-20 text-right">
                       {_money(n(val) * _r('Edging Sub - $/LF'))}
                     </span>
@@ -1890,7 +1890,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 ].map(([lbl, val, set]) => (
                   <div key={lbl} className="flex items-center gap-2 mb-1">
                     <span className="text-xs text-gray-500 flex-1">{lbl}</span>
-                    <NumInput value={val} onChange={set} placeholder="SF" className="w-24" />
+                    <NumInput value={val} onChange={set} placeholder="Sq Ft" className="w-24" />
                     <span className="text-xs text-gray-600 w-20 text-right">
                       {_money(n(val) * _r('Steppers Sub - $/SF'))}
                     </span>
@@ -1995,7 +1995,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                             <NumInput
                               value={row.area}
                               onChange={v => upd(i, 'area', v)}
-                              placeholder="SF"
+                              placeholder="Sq Ft"
                               className="w-full text-center"
                             />
                           </td>
@@ -2084,7 +2084,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-center pb-1 pr-1 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-1 font-medium">Sod Type</th>
-                <th className="text-center pb-1 pr-1 font-medium">SF</th>
+                <th className="text-center pb-1 pr-1 font-medium">Sq Ft</th>
                 <th className="text-center pb-1 pr-1 font-medium">$/SF</th>
                 <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
               </tr>
@@ -2137,7 +2137,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       <NumInput
                         value={row.sf}
                         onChange={v => updateSodRow(i, 'sf', v)}
-                        placeholder="SF"
+                        placeholder="Sq Ft"
                         className="w-full text-center"
                       />
                     </td>
@@ -2185,7 +2185,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-center pb-1 pr-1 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-1 font-medium">Fertilizer Type</th>
-                <th className="text-center pb-1 pr-1 font-medium">SF</th>
+                <th className="text-center pb-1 pr-1 font-medium">Sq Ft</th>
                 <th className="text-center pb-1 font-medium text-gray-400">Coverage / Cost</th>
               </tr>
             </thead>
@@ -2250,7 +2250,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         <NumInput
                           value={row.sf}
                           onChange={v => updateSodFert(i, 'sf', v)}
-                          placeholder="SF"
+                          placeholder="Sq Ft"
                           className="w-full text-center"
                         />
                       </td>
@@ -2565,7 +2565,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-center pb-1 pr-1 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-1 font-medium">Gravel Type</th>
-                <th className="text-center pb-1 pr-1 font-medium">SF</th>
+                <th className="text-center pb-1 pr-1 font-medium">Sq Ft</th>
                 <th className="text-center pb-1 pr-1 font-medium">Method</th>
                 <th className="text-center pb-1 pr-1 font-medium">$/CY</th>
                 <th className="text-center pb-1 pr-1 font-medium">Weed Barrier</th>
@@ -2713,7 +2713,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-center pb-1 pr-1 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-1 font-medium">Pebble Type</th>
-                <th className="text-center pb-1 pr-1 font-medium">SF</th>
+                <th className="text-center pb-1 pr-1 font-medium">Sq Ft</th>
                 <th className="text-center pb-1 pr-1 font-medium">Method</th>
                 <th className="text-center pb-1 pr-1 font-medium">$/CY</th>
                 <th className="text-center pb-1 pr-1 font-medium">Weed Barrier</th>
@@ -2849,7 +2849,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-center pb-1 pr-1 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-1 font-medium">Cobble Type</th>
-                <th className="text-center pb-1 pr-1 font-medium">SF</th>
+                <th className="text-center pb-1 pr-1 font-medium">Sq Ft</th>
                 <th className="text-center pb-1 pr-1 font-medium">Method</th>
                 <th className="text-center pb-1 pr-1 font-medium">$/CY</th>
                 <th className="text-center pb-1 font-medium">Depth (in)</th>
@@ -2973,7 +2973,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-center pb-1 pr-1 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-1 font-medium">Edging Type</th>
-                <th className="text-center pb-1 pr-1 font-medium">LF</th>
+                <th className="text-center pb-1 pr-1 font-medium">Ln Ft</th>
                 <th className="text-center pb-1 pr-1 font-medium">$/LF</th>
                 <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
               </tr>
@@ -3026,7 +3026,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <NumInput value={edgingLF} onChange={setEdgingLF} placeholder="LF" className="w-full text-center" />
+                      <NumInput value={edgingLF} onChange={setEdgingLF} placeholder="Ln Ft" className="w-full text-center" />
                     </td>
                     <td className="py-1 pr-1">
                       <span className="text-xs text-gray-500 whitespace-nowrap block text-center">${rate.toFixed(2)}/LF</span>

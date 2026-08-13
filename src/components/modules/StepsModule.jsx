@@ -1068,7 +1068,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           name: kPaverForm(f),
           category: 'Steps',
           mode: 'coefficient',
-          unitLabel: 'LF/hr',
+          unitLabel: 'Ln Ft per hr',
           value: laborRates[kPaverForm(f)] ?? PAVER_FORM_DEFAULT[f],
         })),
         ...catalogBlockItems(PAVER_STEP_CAT),
@@ -1090,7 +1090,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           name: kConcTypeHrs(t),
           category: 'Steps',
           mode: 'coefficient',
-          unitLabel: 'hr/SF',
+          unitLabel: 'hr per Sq Ft',
           value: laborRates[kConcTypeHrs(t)] ?? 0,
         })),
         ...STEP_FORMS.map(f => ({
@@ -1108,7 +1108,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           name: kFinishHrs(f),
           category: 'Steps',
           mode: 'coefficient',
-          unitLabel: 'hr/SF',
+          unitLabel: 'hr per Sq Ft',
           value: laborRates[kFinishHrs(f)] ?? 0,
         })),
         // Per-vendor concrete-mix catalog products.
@@ -1120,7 +1120,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           name: kConcTypeMat(t),
           category: 'Steps',
           mode: 'currency',
-          unitLabel: 'SF',
+          unitLabel: 'Sq Ft',
           value: materialRates[kConcTypeMat(t)] ?? 0,
         })),
         ...CONC_FINISHES.map(f => ({
@@ -1129,7 +1129,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           name: kFinishMat(f),
           category: 'Steps',
           mode: 'currency',
-          unitLabel: 'SF',
+          unitLabel: 'Sq Ft',
           value: materialRates[kFinishMat(f)] ?? 0,
         })),
       ],
@@ -1143,7 +1143,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           name: sec.baseKey,
           category: 'Steps',
           mode: 'currency',
-          unitLabel: 'LF',
+          unitLabel: 'Ln Ft',
           value: materialRates[sec.baseKey] ?? SUB_BASE_DEFAULT,
         })),
         {
@@ -1152,7 +1152,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           name: kSubConcBase,
           category: 'Steps',
           mode: 'currency',
-          unitLabel: 'LF',
+          unitLabel: 'Ln Ft',
           value: materialRates[kSubConcBase] ?? SUB_BASE_DEFAULT,
         },
         ...STEP_FORMS.map(f => ({
@@ -1161,7 +1161,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           name: kSubForm(f),
           category: 'Steps',
           mode: 'currency',
-          unitLabel: 'LF',
+          unitLabel: 'Ln Ft',
           value: materialRates[kSubForm(f)] ?? 0,
         })),
         {
@@ -1170,7 +1170,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           name: kSubGrouted,
           category: 'Steps',
           mode: 'currency',
-          unitLabel: 'LF',
+          unitLabel: 'Ln Ft',
           value: materialRates[kSubGrouted] ?? 0,
         },
         ...CONC_TYPES.map(t => ({
@@ -1179,7 +1179,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           name: kSubType(t),
           category: 'Steps',
           mode: 'currency',
-          unitLabel: 'LF',
+          unitLabel: 'Ln Ft',
           value: materialRates[kSubType(t)] ?? 0,
         })),
         ...CONC_FINISHES.map(f => ({
@@ -1188,7 +1188,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           name: kSubFinish(f),
           category: 'Steps',
           mode: 'currency',
-          unitLabel: 'LF',
+          unitLabel: 'Ln Ft',
           value: materialRates[kSubFinish(f)] ?? 0,
         })),
       ],

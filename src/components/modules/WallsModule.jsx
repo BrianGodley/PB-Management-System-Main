@@ -719,23 +719,23 @@ const WALL_FINISH_TYPES = [
   'Real Stone',
 ]
 const WALL_FINISH_META = {
-  'Sand Stucco': { matKey: 'sandStucco', labKey: 'sandStuccoLab', matUnit: 'SF', labUnit: 'SF/day' },
+  'Sand Stucco': { matKey: 'sandStucco', labKey: 'sandStuccoLab', matUnit: 'Sq Ft', labUnit: 'Sq Ft per day' },
   'Smooth Stucco': {
     matKey: 'smoothStucco',
     labKey: 'smoothStuccoLab',
-    matUnit: 'SF',
-    labUnit: 'SF/day',
+    matUnit: 'Sq Ft',
+    labUnit: 'Sq Ft per day',
   },
-  Ledgerstone: { matKey: 'ledgerstone', labKey: 'ledgerstoneLab', matUnit: 'SF', labUnit: 'SF/day' },
+  Ledgerstone: { matKey: 'ledgerstone', labKey: 'ledgerstoneLab', matUnit: 'Sq Ft', labUnit: 'Sq Ft per day' },
   'Stacked Stone': {
     matKey: 'stackedStone',
     labKey: 'stackedStoneLab',
-    matUnit: 'SF',
-    labUnit: 'SF/day',
+    matUnit: 'Sq Ft',
+    labUnit: 'Sq Ft per day',
   },
-  Tile: { matKey: 'tile', labKey: 'tileLab', matUnit: 'SF', labUnit: 'hrs/SF' },
-  'Real Flagstone': { matKey: 'flagstone', labKey: 'flagstoneLab', matUnit: 'ton', labUnit: 'hrs/SF' },
-  'Real Stone': { matKey: 'realStone', labKey: 'realStoneLab', matUnit: 'ton', labUnit: 'hrs/SF' },
+  Tile: { matKey: 'tile', labKey: 'tileLab', matUnit: 'Sq Ft', labUnit: 'hrs per Sq Ft' },
+  'Real Flagstone': { matKey: 'flagstone', labKey: 'flagstoneLab', matUnit: 'Tons', labUnit: 'hrs per Sq Ft' },
+  'Real Stone': { matKey: 'realStone', labKey: 'realStoneLab', matUnit: 'Tons', labUnit: 'hrs per Sq Ft' },
 }
 
 const WP_TYPES = [
@@ -2122,7 +2122,7 @@ function WallWaterproofing({
           placeholder="0"
           className="w-20 shrink-0"
         />
-        <span className="text-xs text-gray-400 shrink-0">SF</span>
+        <span className="text-xs text-gray-400 shrink-0">Sq Ft</span>
         {row.type !== 'None' && (
           <span className="inline-flex items-center gap-1 text-xs text-gray-400 shrink-0">
             ${r2(wpUnit).toFixed(2)}/SF
@@ -2212,7 +2212,7 @@ function WallFinishesEditor({
                 placeholder="0"
                 className="w-20 shrink-0"
               />
-              <span className="text-xs text-gray-400 shrink-0">SF</span>
+              <span className="text-xs text-gray-400 shrink-0">Sq Ft</span>
               <button
                 type="button"
                 onClick={() => onRemove(i)}

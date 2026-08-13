@@ -1183,7 +1183,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
           name: 'Utilities Sub Trench - Per LF',
           category: 'Utilities',
           mode: 'currency',
-          unitLabel: 'LF',
+          unitLabel: 'Ln Ft',
           section: 'sub',
           value: materialPrices['Utilities Sub Trench - Per LF'] ?? 12,
         },

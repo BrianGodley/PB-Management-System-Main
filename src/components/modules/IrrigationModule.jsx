@@ -710,7 +710,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
           name: 'Irrigation - Hand Zone',
           category: 'Irrigation',
           mode: 'coefficient',
-          unitLabel: 'hrs/zone',
+          unitLabel: 'hrs per zone',
           value: calc.handRate,
         },
         {
@@ -719,7 +719,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
           name: 'Irrigation - Trench Zone',
           category: 'Irrigation',
           mode: 'coefficient',
-          unitLabel: 'hrs/zone',
+          unitLabel: 'hrs per zone',
           value: calc.trenchRate,
         },
         ...ZONE_TYPES.flatMap(z =>
@@ -736,7 +736,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
           name: 'Irrigation - Timer Install',
           category: 'Irrigation',
           mode: 'coefficient',
-          unitLabel: 'hrs/ea',
+          unitLabel: 'hrs per Each',
           value: calc.timerHrs,
         },
         ...TIMER_TYPES.flatMap(t =>

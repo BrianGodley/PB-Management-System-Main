@@ -1191,7 +1191,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
           name: t.laborDbName,
           category: 'Utilities',
           mode: 'coefficient',
-          unitLabel: 'hrs/LF',
+          unitLabel: 'hrs per Ln Ft',
           value: p(t.laborDbName, t.laborFallback),
         })),
         ...GAS_TYPE_ARR.map(t => ({
@@ -1200,7 +1200,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
           name: t.laborDbName,
           category: 'Utilities',
           mode: 'coefficient',
-          unitLabel: 'hrs/ea',
+          unitLabel: 'hrs per Each',
           value: p(t.laborDbName, t.laborFallback),
         })),
         ...ELEC_TYPE_ARR.map(t => ({
@@ -1209,7 +1209,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
           name: t.laborDbName,
           category: 'Utilities',
           mode: 'coefficient',
-          unitLabel: 'hrs/ea',
+          unitLabel: 'hrs per Each',
           value: p(t.laborDbName, t.laborFallback),
         })),
         // Built-in BBQ service materials + the shared utility-line / fixture
@@ -1753,7 +1753,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Type</th>
-                <th className="text-center pb-1 pr-2 font-medium">SF</th>
+                <th className="text-center pb-1 pr-2 font-medium">Sq Ft</th>
                 <th className="text-center pb-1 pr-2 font-medium text-gray-400">$/Unit</th>
                 <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
               </tr>

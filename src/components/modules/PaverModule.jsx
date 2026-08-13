@@ -1107,7 +1107,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: 'Paver - Walk Access Pace',
           category: 'Paver',
           mode: 'coefficient',
-          unitLabel: 'LF/min',
+          unitLabel: 'Ln Ft per min',
           value: calc.walkPace,
         },
       ],
@@ -1121,7 +1121,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: BASE_METHOD_LABOR_NAME[m],
           category: 'Paver',
           mode: 'coefficient',
-          unitLabel: 't/hr',
+          unitLabel: 't per hr',
           value:
             m === 'Skid Good'
               ? calc.baseBobcatGood
@@ -1144,7 +1144,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: 'Paver - Tons Divisor',
           category: 'Paver',
           mode: 'coefficient',
-          unitLabel: 'SF·in/ton',
+          unitLabel: 'Sq Ft·in per Tons',
           value: calc.tonsDivisor,
         },
         {
@@ -1153,7 +1153,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: 'Paver - Delivery SF Increment',
           category: 'Paver',
           mode: 'coefficient',
-          unitLabel: 'SF',
+          unitLabel: 'Sq Ft',
           value: calc.deliverySFPerIncrement,
         },
       ],
@@ -1167,7 +1167,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: 'Paver - Install',
           category: 'Paver',
           mode: 'coefficient',
-          unitLabel: 'SF/hr',
+          unitLabel: 'Sq Ft per hr',
           value: calc.installRate,
         },
         {
@@ -1176,7 +1176,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: 'Paver - 80mm Add',
           category: 'Paver',
           mode: 'coefficient',
-          unitLabel: '× SF/install',
+          unitLabel: '× Sq Ft per install',
           value: laborRates['Paver - 80mm Add'] ?? LABOR_DEFAULTS.add80mm,
         },
         {
@@ -1185,7 +1185,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: 'Paver - Straight Cut',
           category: 'Paver',
           mode: 'coefficient',
-          unitLabel: 'LF/hr',
+          unitLabel: 'Ln Ft per hr',
           value: calc.straightCutRate,
         },
         {
@@ -1194,7 +1194,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: 'Paver - Curved Cut',
           category: 'Paver',
           mode: 'coefficient',
-          unitLabel: 'LF/hr',
+          unitLabel: 'Ln Ft per hr',
           value: calc.curvedCutRate,
         },
         {
@@ -1203,7 +1203,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: 'Paver - Restraints',
           category: 'Paver',
           mode: 'coefficient',
-          unitLabel: 'LF/hr',
+          unitLabel: 'Ln Ft per hr',
           value: calc.restraintRate,
         },
         {
@@ -1212,7 +1212,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: 'Paver - Sleeves',
           category: 'Paver',
           mode: 'coefficient',
-          unitLabel: 'LF/hr',
+          unitLabel: 'Ln Ft per hr',
           value: calc.sleevesRate,
         },
         {
@@ -1221,7 +1221,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: 'Paver - Stone Add',
           category: 'Paver',
           mode: 'coefficient',
-          unitLabel: 'hrs/ea',
+          unitLabel: 'hrs per Each',
           value: laborRates['Paver - Stone Add'] ?? LABOR_DEFAULTS.addStone,
         },
         {
@@ -1230,7 +1230,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: 'Paver - Color Add',
           category: 'Paver',
           mode: 'coefficient',
-          unitLabel: 'hrs/ea',
+          unitLabel: 'hrs per Each',
           value: laborRates['Paver - Color Add'] ?? LABOR_DEFAULTS.addColor,
         },
         {
@@ -1239,7 +1239,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: 'Paver - Poly Sand New',
           category: 'Paver',
           mode: 'coefficient',
-          unitLabel: 'hrs/SF',
+          unitLabel: 'hrs per Sq Ft',
           value: laborRates['Paver - Poly Sand New'] ?? LABOR_DEFAULTS.polySandSpread,
         },
         {
@@ -1248,7 +1248,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: 'Paver - Poly Sand Existing',
           category: 'Paver',
           mode: 'coefficient',
-          unitLabel: 'hrs/SF',
+          unitLabel: 'hrs per Sq Ft',
           value:
             laborRates['Paver - Poly Sand Existing'] ??
             LABOR_DEFAULTS.polySandExistingSpread,
@@ -1259,7 +1259,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: 'Paver - Sealer',
           category: 'Paver',
           mode: 'coefficient',
-          unitLabel: 'SF/hr',
+          unitLabel: 'Sq Ft per hr',
           value: calc.sealerRate,
         },
         {
@@ -1268,7 +1268,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: 'Paver - Vertical Soldier',
           category: 'Paver',
           mode: 'coefficient',
-          unitLabel: 'LF/hr',
+          unitLabel: 'Ln Ft per hr',
           value: calc.vertSoldierRate,
         },
         // Paver material catalog (vendor-supplied 'Paver Material' products) + the
@@ -1281,7 +1281,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: 'Paver - Poly Sand',
           category: 'Paver',
           mode: 'currency',
-          unitLabel: '$/SF',
+          unitLabel: '$ per Sq Ft',
           value: calc.polySandPerSF,
         },
         ...materialRateRows('Paver - Poly Sand'),
@@ -1301,7 +1301,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: ln.name,
           category: 'Paver',
           mode: 'currency',
-          unitLabel: 'SF',
+          unitLabel: 'Sq Ft',
           value: subRateFor(ln),
           section: 'labor',
         })),
@@ -1311,7 +1311,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: 'Paver Sub - Sleeves LF',
           category: 'Paver',
           mode: 'currency',
-          unitLabel: 'LF',
+          unitLabel: 'Ln Ft',
           value: sleevesSubRate,
           section: 'labor',
         },
@@ -1829,7 +1829,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                 rateName: 'Paver - Restraints',
                 matName: 'Paver - Restraint Concrete',
                 matRate: calc.restraintConcrLF,
-                matUnit: 'LF',
+                matUnit: 'Ln Ft',
               },
               {
                 label: 'Sleeves',
@@ -1840,7 +1840,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                 rateName: 'Paver - Sleeves',
                 matName: 'Paver - Sleeves',
                 matRate: calc.sleevesMatLF,
-                matUnit: 'LF',
+                matUnit: 'Ln Ft',
               },
             ].map(({ label, rate, key, hrs, unit, rateName, matName, matRate, matUnit }) => (
               <tr key={key}>
@@ -2071,7 +2071,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                     <Inp
                       value={row.lf}
                       onChange={e => setRow('vertRows', i, 'lf', e.target.value)}
-                      placeholder="LF"
+                      placeholder="Ln Ft"
                       className="text-center"
                     />
                   </td>

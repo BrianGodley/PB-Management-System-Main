@@ -1199,7 +1199,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
           name: FP_RATES.digLab.dbName,
           category: 'Fire Pit',
           mode: 'coefficient',
-          unitLabel: 'CF/hr',
+          unitLabel: 'Cu Ft per hr',
           value: p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback),
         },
         {
@@ -1208,7 +1208,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
           name: FP_RATES.rebarLab.dbName,
           category: 'Fire Pit',
           mode: 'coefficient',
-          unitLabel: 'LF/hr',
+          unitLabel: 'Ln Ft per hr',
           value: p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback),
         },
         {
@@ -1217,7 +1217,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
           name: FP_RATES.blockLab.dbName,
           category: 'Fire Pit',
           mode: 'coefficient',
-          unitLabel: 'blk/hr',
+          unitLabel: 'blk per hr',
           value: p(FP_RATES.blockLab.dbName, FP_RATES.blockLab.fallback),
         },
         {
@@ -1226,7 +1226,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
           name: FP_RATES.handGroutLab.dbName,
           category: 'Fire Pit',
           mode: 'coefficient',
-          unitLabel: 'CF/hr',
+          unitLabel: 'Cu Ft per hr',
           value: p(FP_RATES.handGroutLab.dbName, FP_RATES.handGroutLab.fallback),
         },
         {
@@ -1235,7 +1235,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
           name: FP_RATES.pumpGroutLab.dbName,
           category: 'Fire Pit',
           mode: 'coefficient',
-          unitLabel: 'CF/hr',
+          unitLabel: 'Cu Ft per hr',
           value: p(FP_RATES.pumpGroutLab.dbName, FP_RATES.pumpGroutLab.fallback),
         },
         ...matRows(FP_RATES.fpBlock.dbName, 'block', p(FP_RATES.fpBlock.dbName, FP_RATES.fpBlock.fallback)),
@@ -1255,7 +1255,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
             name: FP_RATES[labKey].dbName,
             category: 'Fire Pit',
             mode: 'coefficient',
-            unitLabel: 'hrs/LF',
+            unitLabel: 'hrs per Ln Ft',
             value: p(FP_RATES[labKey].dbName, FP_RATES[labKey].fallback),
           }
         }),
@@ -1302,7 +1302,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
           name: t.laborDbName,
           category: 'Utilities',
           mode: 'coefficient',
-          unitLabel: 'hrs/LF',
+          unitLabel: 'hrs per Ln Ft',
           value: materialPrices[t.laborDbName] ?? t.laborFallback,
         })),
         ...LINE_TYPE_ARR.flatMap(t => matRows(t.dbName, 'LF', materialPrices[t.dbName] ?? t.fallback)),
@@ -1317,7 +1317,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
           name: t.laborDbName,
           category: 'Utilities',
           mode: 'coefficient',
-          unitLabel: 'hrs/ea',
+          unitLabel: 'hrs per Each',
           value: materialPrices[t.laborDbName] ?? t.laborFallback,
         })),
         ...GAS_TYPE_ARR.flatMap(t => matRows(t.dbName, 'ea', materialPrices[t.dbName] ?? t.fallback)),
@@ -1609,7 +1609,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Type</th>
-                <th className="text-center pb-1 pr-2 font-medium">LF</th>
+                <th className="text-center pb-1 pr-2 font-medium">Ln Ft</th>
                 <th className="text-center pb-1 pr-2 font-medium text-gray-400">$/LF</th>
                 <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
                 <th></th>
@@ -1757,7 +1757,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Type</th>
-                <th className="text-center pb-1 pr-2 font-medium">SF</th>
+                <th className="text-center pb-1 pr-2 font-medium">Sq Ft</th>
                 <th className="text-center pb-1 pr-2 font-medium text-gray-400">$/Unit</th>
                 <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
               </tr>
