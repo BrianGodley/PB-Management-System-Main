@@ -330,8 +330,10 @@ function calcIrrigation(
 // ── Default rows / factories ──────────────────────────────────────────────────
 const defaultZoneRows = () =>
   ZONE_TYPES.map(z => ({ vendor: 'Standard', type: '', qty: '', mode: z.defaultMode, subEach: '' }))
-const defaultTimerRows = () =>
-  TIMER_TYPES.map(() => ({ vendor: 'Standard', type: '', qty: '', subEach: '' }))
+const defaultTimerRows = () => [
+  { vendor: 'Standard', type: '', qty: '', subEach: '' },
+  { vendor: 'Standard', type: '', qty: '', subEach: '' },
+]
 const DEFAULT_MANUAL_ROWS = () => [{ label: '', hours: '', materials: '', subCost: '' }]
 
 // Migrate the legacy fixed zoneQtys/zoneModes maps into the new row model. Every
@@ -916,7 +918,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
         <button
           type="button"
           onClick={() => setZoneRows(rows => [...rows, { vendor: 'Standard', type: '', qty: '', mode: 'Hand', subEach: '' }])}
-          className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+          className="mt-2 text-xs text-green-700 hover:text-green-900 font-medium"
         >
           + Add zone
         </button>
@@ -1003,7 +1005,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
         <button
           type="button"
           onClick={() => setTimerRows(rows => [...rows, { vendor: 'Standard', type: '', qty: '', subEach: '' }])}
-          className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+          className="mt-2 text-xs text-green-700 hover:text-green-900 font-medium"
         >
           + Add timer
         </button>
@@ -1102,7 +1104,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
           onClick={() =>
             setManualRows(rows => [...rows, { label: '', hours: '', materials: '', subCost: '' }])
           }
-          className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+          className="mt-2 text-xs text-green-700 hover:text-green-900 font-medium"
         >
           + Add manual entry
         </button>
