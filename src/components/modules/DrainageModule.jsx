@@ -18,38 +18,37 @@ const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
 // so changes in Master Rates are reflected here automatically.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// dbName must match the name column in material_rates exactly
+// dbName must match the name column in material_rates exactly. These maps carry
+// ONLY the item identity (dbName); every price/coefficient is read live from the
+// rate tables (material_price / labor_rates / misc_rates) — no hardcoded values.
 // Solid Drain Pipe types (perforated types live in FRENCH_PIPE_TYPES below).
 const PIPE_TYPES = {
-  '4" SDR 35': { laborPerLF: 0.0495, costPerLF: 2.26, dbName: '4" SDR 35 Pipe' },
-  '3" SDR 35': { laborPerLF: 0.045, costPerLF: 1.48, dbName: '3" SDR 35 Pipe' },
-  '6" SDR 35': { laborPerLF: 0.06, costPerLF: 3.72, dbName: '6" SDR 35 Pipe' },
-  '4" Triple Wall': { laborPerLF: 0.05, costPerLF: 1.03, dbName: '4" Triple Wall Pipe' },
-  '3" Triple Wall': { laborPerLF: 0.045, costPerLF: 0.86, dbName: '3" Triple Wall Pipe' },
+  '4" SDR 35': { dbName: '4" SDR 35 Pipe' },
+  '3" SDR 35': { dbName: '3" SDR 35 Pipe' },
+  '6" SDR 35': { dbName: '6" SDR 35 Pipe' },
+  '4" Triple Wall': { dbName: '4" Triple Wall Pipe' },
+  '3" Triple Wall': { dbName: '3" Triple Wall Pipe' },
 }
 
 // French Drain pipe types — perforated pipe, same shape as PIPE_TYPES.
 const FRENCH_PIPE_TYPES = {
-  '4" Perforated': { laborPerLF: 0.05, costPerLF: 2.26, dbName: '4" Perforated Pipe' },
-  '3" Perforated': { laborPerLF: 0.045, costPerLF: 1.48, dbName: '3" Perforated Pipe' },
+  '4" Perforated': { dbName: '4" Perforated Pipe' },
+  '3" Perforated': { dbName: '3" Perforated Pipe' },
 }
 
 const FIXTURE_TYPES = {
-  '3" Area Drain': { laborHrs: 0.495, cost: 3.27, dbName: '3" Area Drain' },
-  '4" Area Drain': { laborHrs: 0.495, cost: 1.9, dbName: '4" Area Drain' },
-  '3" Atrium Drain': { laborHrs: 0.495, cost: 9.59, dbName: '3" Atrium Drain' },
-  '4" Atrium Drain': { laborHrs: 0.495, cost: 7.19, dbName: '4" Atrium Drain' },
-  '4" Brass Area Drain': { laborHrs: 0.495, cost: 16.36, dbName: '4" Brass Area Drain' },
-  '3" Brass Area Drain': { laborHrs: 0.495, cost: 16.36, dbName: '3" Brass Area Drain' },
-  'Downspout Connector': { laborHrs: 0.495, cost: 7.01, dbName: 'Downspout Connector' },
-  '4" Paver Top Inlet': { laborHrs: 0.75, cost: 23.63, dbName: '4" Paver Top Inlet' },
-  '9" x 9" Catch Basin': { laborHrs: 0.495, cost: 16.9, dbName: '9" x 9" Catch Basin' },
-  '12" x 12" Catch Basin': { laborHrs: 0.495, cost: 21.6, dbName: '12" x 12" Catch Basin' },
-  '24" x 24" Catch Basin': { laborHrs: 0.495, cost: 225, dbName: '24" x 24" Catch Basin' },
+  '3" Area Drain': { dbName: '3" Area Drain' },
+  '4" Area Drain': { dbName: '4" Area Drain' },
+  '3" Atrium Drain': { dbName: '3" Atrium Drain' },
+  '4" Atrium Drain': { dbName: '4" Atrium Drain' },
+  '4" Brass Area Drain': { dbName: '4" Brass Area Drain' },
+  '3" Brass Area Drain': { dbName: '3" Brass Area Drain' },
+  'Downspout Connector': { dbName: 'Downspout Connector' },
+  '4" Paver Top Inlet': { dbName: '4" Paver Top Inlet' },
+  '9" x 9" Catch Basin': { dbName: '9" x 9" Catch Basin' },
+  '12" x 12" Catch Basin': { dbName: '12" x 12" Catch Basin' },
+  '24" x 24" Catch Basin': { dbName: '24" x 24" Catch Basin' },
 }
-
-// minutes per cubic foot by equipment type
-const TRENCH_MINS_PER_CF = { Trench: 10, Hand: 12.5 }
 
 // ── Labor-coefficient lookup maps ─────────────────────────────────────────
 // Each entry points the inline calculator icon at a row in `labor_rates`
@@ -85,16 +84,12 @@ const FIXTURE_LABOR_RATE_NAME = {
   '24" x 24" Catch Basin': 'Drainage 24" x 24" Catch Basin Labor',
 }
 
-// Additional item rates — qty drives both labor hours AND material cost
+// Additional items — identity only. Labor hours come from labor_rates
+// (ADD_ITEM_LABOR_RATE_NAME) and material cost from materialPrices[dbName].
 const ADD_ITEM_RATES = {
-  sumpPump: { laborHrs: 3, matCost: 650, label: 'Sump Pump', dbName: 'Sump Pump' },
-  curbCore: { laborHrs: 2, matCost: 250, label: 'Curb Core *', dbName: 'Curb Core' },
-  hydrocut: {
-    laborHrs: 2,
-    matCost: 50,
-    label: 'Hydrocut Under Hardscape *',
-    dbName: 'Hydrocut Under Hardscape',
-  },
+  sumpPump: { label: 'Sump Pump', dbName: 'Sump Pump' },
+  curbCore: { label: 'Curb Core *', dbName: 'Curb Core' },
+  hydrocut: { label: 'Hydrocut Under Hardscape *', dbName: 'Hydrocut Under Hardscape' },
 }
 
 // Labor-coefficient lookup for Additional Items — matches names seeded in
@@ -107,8 +102,8 @@ const ADD_ITEM_LABOR_RATE_NAME = {
 
 
 // French-drain fabric + gravel-bed rates ($/ft), stored in misc_rates
-// (category 'Drainage'). Read as materialPrices[name] ?? fb; the code number
-// here is only a last-resort fallback. Applied to TOTAL French-drain LF.
+// (category 'Drainage'). Read live from materialPrices[name] — no fallback.
+// Applied to TOTAL French-drain LF.
 const FRENCH_SOCK_MAT_NAME = 'Drainage Drain Sock Material'
 const FRENCH_SOCK_LABOR_NAME = 'Drainage Drain Sock Labor'
 const FRENCH_BURRITO_MAT_NAME = 'Drainage Burrito Wrap Material'
@@ -117,17 +112,8 @@ const FRENCH_GRAVEL12_MAT_NAME = 'Drainage Gravel Bed 12in Material'
 const FRENCH_GRAVEL12_LABOR_NAME = 'Drainage Gravel Bed 12in Labor'
 const FRENCH_GRAVEL24_MAT_NAME = 'Drainage Gravel Bed 24in Material'
 const FRENCH_GRAVEL24_LABOR_NAME = 'Drainage Gravel Bed 24in Labor'
-const FRENCH_RATE_FB = {
-  [FRENCH_SOCK_MAT_NAME]: 1,
-  [FRENCH_SOCK_LABOR_NAME]: 1,
-  [FRENCH_BURRITO_MAT_NAME]: 1,
-  [FRENCH_BURRITO_LABOR_NAME]: 1.75,
-  [FRENCH_GRAVEL12_MAT_NAME]: 2,
-  [FRENCH_GRAVEL12_LABOR_NAME]: 1,
-  [FRENCH_GRAVEL24_MAT_NAME]: 8,
-  [FRENCH_GRAVEL24_LABOR_NAME]: 3,
-}
-const frenchRate = (mp, name) => mp[name] ?? FRENCH_RATE_FB[name] ?? 0
+// Read live from the rate map only — no hardcoded fallback.
+const frenchRate = (mp, name) => n(mp[name])
 
 const DEFAULTS = {
   laborRatePerHour: 35,
@@ -147,19 +133,15 @@ const DRAIN_CAT = { pipe: 'Drain Pipe', french: 'French Drain Pipe', fixture: 'D
 function drainMatCost(cat, row, TYPES, materialRows, catDefaults, mp) {
   const t = TYPES[row.type]
   let dbName = t?.dbName
-  let fallback = t?.costPerLF ?? t?.cost ?? 0
   const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : catDefaults[cat] || 'Standard'
   const vrow = catalogItemFor(materialRows, cat, vsel, row.type, {
     ...CATALOG_OPTS,
     fallbackFirst: false,
   })
-  if (vrow) {
-    dbName = vrow.name
-    fallback = n(vrow.unit_cost)
-  }
-  // Selected vendor's catalog row wins; only fall back to the Standard name-map (mp)
-  // when there is no catalog row for the selection.
-  return { dbName, cost: vrow ? n(vrow.unit_cost) : (mp[dbName] ?? fallback) }
+  if (vrow) dbName = vrow.name
+  // Selected vendor's catalog row wins; otherwise the Standard price by name.
+  // No hardcoded fallback — an unpriced item contributes $0 (surfaced as $0).
+  return { dbName, cost: vrow ? n(vrow.unit_cost) : n(mp[dbName]) }
 }
 
 // Master-list additions for a drain section: rows tagged sub_category=cat
@@ -252,10 +234,7 @@ function calcDrainage(
       d = n(r.depth)
     if (lf > 0 && w > 0 && d > 0) {
       const cf = lf * (w / 12) * (d / 12)
-      const minsPerCf =
-        materialPrices[TRENCH_LABOR_RATE_NAME[r.equipment]] ??
-        TRENCH_MINS_PER_CF[r.equipment] ??
-        10
+      const minsPerCf = n(materialPrices[TRENCH_LABOR_RATE_NAME[r.equipment]])
       trenchHrs += (cf * minsPerCf) / 60
     }
   })
@@ -266,7 +245,7 @@ function calcDrainage(
     if (lf > 0 && rate) {
       const { cost } = drainMatCost(DRAIN_CAT.pipe, r, PIPE_T, materialRows, catDefaults, materialPrices)
       pipeMat += lf * cost
-      pipeHrs += lf * (materialPrices[PIPE_LABOR_RATE_NAME[r.type]] ?? rate.laborPerLF)
+      pipeHrs += lf * n(materialPrices[PIPE_LABOR_RATE_NAME[r.type]])
     }
   })
 
@@ -289,7 +268,7 @@ function calcDrainage(
         materialPrices
       )
       frenchMat += lf * cost
-      frenchHrs += lf * (materialPrices[FRENCH_PIPE_LABOR_RATE_NAME[r.type]] ?? rate.laborPerLF)
+      frenchHrs += lf * n(materialPrices[FRENCH_PIPE_LABOR_RATE_NAME[r.type]])
     }
   })
   const totalFrenchLF = (frenchRows || []).reduce((s, r) => s + n(r.lf), 0)
@@ -330,7 +309,7 @@ function calcDrainage(
     if (qty > 0 && rate) {
       const { cost } = drainMatCost(DRAIN_CAT.fixture, r, FIX_T, materialRows, catDefaults, materialPrices)
       fixMat += qty * cost
-      fixHrs += qty * (materialPrices[FIXTURE_LABOR_RATE_NAME[r.type]] ?? rate.laborHrs)
+      fixHrs += qty * n(materialPrices[FIXTURE_LABOR_RATE_NAME[r.type]])
       totalFixQty += qty
     }
   })
@@ -340,9 +319,8 @@ function calcDrainage(
   Object.entries(ADD_ITEM_RATES).forEach(([key, rate]) => {
     const qty = n(additionalItems[`${key}Qty`])
     if (qty > 0) {
-      const matCost = materialPrices[rate.dbName] ?? rate.matCost
-      addHrs += qty * (materialPrices[ADD_ITEM_LABOR_RATE_NAME[key]] ?? rate.laborHrs)
-      addMat += qty * matCost
+      addHrs += qty * n(materialPrices[ADD_ITEM_LABOR_RATE_NAME[key]])
+      addMat += qty * n(materialPrices[rate.dbName])
     }
   })
 
@@ -357,16 +335,16 @@ function calcDrainage(
   // is replaced by that sub cost.
   // Sub side is independent of In-House now: its own trench-run LF list, priced
   // at the fixed $/LF. In-House always computes its own labour/material.
-  const subRatePerLF = subRates['Drainage Sub - Per LF'] ?? 16
+  const subRatePerLF = n(subRates['Drainage Sub - Per LF'])
   const subLf = (subTrenchRows || []).reduce((sum, r) => sum + n(r.lf), 0)
   const subDrainCost = subLf * subRatePerLF
 
   // Sub tab's own flat-priced Drain Fixtures + Additional Items — independent
   // of the In-House hourly sections. Each rate is a fixed sub cost.
-  const subFixtureFlat = subRates['Drainage Sub - Fixture Flat'] ?? 20
-  const subSumpPumpRate = subRates['Drainage Sub - Sump Pump'] ?? 300
-  const subCurbCoreRate = subRates['Drainage Sub - Curb Core'] ?? 250
-  const subHydrocutRate = subRates['Drainage Sub - Hydrocut Per LF'] ?? 10
+  const subFixtureFlat = n(subRates['Drainage Sub - Fixture Flat'])
+  const subSumpPumpRate = n(subRates['Drainage Sub - Sump Pump'])
+  const subCurbCoreRate = n(subRates['Drainage Sub - Curb Core'])
+  const subHydrocutRate = n(subRates['Drainage Sub - Hydrocut Per LF'])
   const subFixQty = (subFixtureRows || []).reduce((s, r) => s + n(r.qty), 0)
   const subFixtureCost = subFixQty * subFixtureFlat
   const sa = subAdditionalItems || {}
@@ -757,7 +735,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           category: 'Drainage',
           mode: 'coefficient',
           unitLabel: 'min per Cu Ft',
-          value: materialPrices[TRENCH_LABOR_RATE_NAME.Trench] ?? TRENCH_MINS_PER_CF.Trench,
+          value: materialPrices[TRENCH_LABOR_RATE_NAME.Trench],
         },
         {
           label: 'Drainage Hand Excavation',
@@ -766,7 +744,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           category: 'Drainage',
           mode: 'coefficient',
           unitLabel: 'min per Cu Ft',
-          value: materialPrices[TRENCH_LABOR_RATE_NAME.Hand] ?? TRENCH_MINS_PER_CF.Hand,
+          value: materialPrices[TRENCH_LABOR_RATE_NAME.Hand],
         },
       ],
     },
@@ -780,7 +758,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           category: 'Drainage',
           mode: 'coefficient',
           unitLabel: 'hr per Ln Ft',
-          value: materialPrices[name] ?? PIPE_TYPES[type]?.laborPerLF,
+          value: materialPrices[name],
         })),
         ...catalogBlockItems(DRAIN_CAT.pipe),
       ],
@@ -795,7 +773,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           category: 'Drainage',
           mode: 'coefficient',
           unitLabel: 'hr per Ln Ft',
-          value: materialPrices[name] ?? FRENCH_PIPE_TYPES[type]?.laborPerLF,
+          value: materialPrices[name],
         })),
         {
           label: FRENCH_SOCK_MAT_NAME,
@@ -886,7 +864,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           category: 'Drainage',
           mode: 'coefficient',
           unitLabel: 'hr per Each',
-          value: materialPrices[name] ?? FIXTURE_TYPES[type]?.laborHrs,
+          value: materialPrices[name],
         })),
         ...catalogBlockItems(DRAIN_CAT.fixture),
       ],
@@ -900,7 +878,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         category: 'Drainage',
         mode: 'coefficient',
         unitLabel: 'hr per Each',
-        value: materialPrices[name] ?? ADD_ITEM_RATES[key]?.laborHrs,
+        value: materialPrices[name],
       })),
     },
     {
@@ -913,7 +891,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           category: 'Drainage',
           mode: 'currency',
           unitLabel: 'Ln Ft',
-          value: subRates['Drainage Sub - Per LF'] ?? 16,
+          value: subRates['Drainage Sub - Per LF'],
         },
         {
           label: 'Drainage Sub - Fixture Flat',
@@ -922,7 +900,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           category: 'Drainage',
           mode: 'currency',
           unitLabel: 'fixture',
-          value: subRates['Drainage Sub - Fixture Flat'] ?? 20,
+          value: subRates['Drainage Sub - Fixture Flat'],
         },
         {
           label: 'Drainage Sub - Sump Pump',
@@ -931,7 +909,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           category: 'Drainage',
           mode: 'currency',
           unitLabel: 'Each',
-          value: subRates['Drainage Sub - Sump Pump'] ?? 300,
+          value: subRates['Drainage Sub - Sump Pump'],
         },
         {
           label: 'Drainage Sub - Curb Core',
@@ -940,7 +918,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           category: 'Drainage',
           mode: 'currency',
           unitLabel: 'Each',
-          value: subRates['Drainage Sub - Curb Core'] ?? 250,
+          value: subRates['Drainage Sub - Curb Core'],
         },
         {
           label: 'Drainage Sub - Hydrocut Per LF',
@@ -949,7 +927,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           category: 'Drainage',
           mode: 'currency',
           unitLabel: 'Ln Ft',
-          value: subRates['Drainage Sub - Hydrocut Per LF'] ?? 10,
+          value: subRates['Drainage Sub - Hydrocut Per LF'],
         },
       ],
     },
@@ -1234,8 +1212,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                 // Use the same rate source as the calc (DB value first, hardcoded
                 // fallback second) so the row's Est. Hrs matches the GPMD total.
                 const laborName = TRENCH_LABOR_RATE_NAME[row.equipment]
-                const minsPerCf =
-                  materialPrices[laborName] ?? TRENCH_MINS_PER_CF[row.equipment] ?? 10
+                const minsPerCf = n(materialPrices[laborName])
                 const hrs = cf > 0 ? (cf * minsPerCf) / 60 : 0
                 return (
                   <tr key={i} className="border-b border-gray-100">
@@ -1658,8 +1635,9 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
             <tbody>
               {Object.entries(ADD_ITEM_RATES).map(([key, rate]) => {
                 const qty = n(additionalItems[`${key}Qty`])
-                const matCost = materialPrices[rate.dbName] ?? rate.matCost
+                const matCost = n(materialPrices[rate.dbName])
                 const laborName = ADD_ITEM_LABOR_RATE_NAME[key]
+                const laborHrsRate = n(materialPrices[laborName])
                 return (
                   <tr key={key} className="border-b border-gray-100">
                     <td className="py-1.5 pr-2 text-xs text-gray-700">{rate.label}</td>
@@ -1677,7 +1655,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                     </td>
                     <td className="py-1.5 text-right text-gray-400 text-xs pr-2">
                       <span className="inline-flex items-center justify-end">
-                        {qty > 0 ? (qty * rate.laborHrs).toFixed(1) : `${rate.laborHrs} / ea`}
+                        {qty > 0 ? (qty * laborHrsRate).toFixed(1) : `${laborHrsRate} / ea`}
                       </span>
                     </td>
                     <td className="py-1.5 text-right text-gray-600 text-xs">
