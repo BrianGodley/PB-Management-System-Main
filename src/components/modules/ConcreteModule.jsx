@@ -550,6 +550,9 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   // vendor list, used to build the per-line Vendor/Type pickers.
   const [materialRows, setMaterialRows] = useState(initialData?.materialRows ?? [])
   const [vendors, setVendors] = useState([])
+  // Gate the "unpriced items" banner until rates have actually loaded, so it never
+  // flashes on first open (empty rate map → everything looks unpriced for a frame).
+  const [ratesLoaded, setRatesLoaded] = useState(false)
   // One-off subcontractor rates for this estimate only (undefined clears one).
   const [rateOverrides, setRateOverrides] = useState(initialData?.rateOverrides ?? {})
   const setOverride = (name, value) =>
@@ -613,6 +616,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
       })
       setSubRates(m)
     }
+    setRatesLoaded(true)
   }, [])
 
   // Fetch all three rate tables (skip if re-editing — use saved snapshots)
@@ -620,7 +624,10 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     const hasLr = initialData?.laborRates && Object.keys(initialData.laborRates).length > 0
     const hasMr = initialData?.materialRates && Object.keys(initialData.materialRates).length > 0
     const hasSr = initialData?.subRates && Object.keys(initialData.subRates).length > 0
-    if (hasLr && hasMr && hasSr) return
+    if (hasLr && hasMr && hasSr) {
+      setRatesLoaded(true) // re-editing: snapshots already populate the rate maps
+      return
+    }
     refreshAllRates()
   }, [refreshAllRates])
 
@@ -1379,7 +1386,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
         </div>
       </div>
 
-      {calc.unpriced && calc.unpriced.length > 0 && (
+      {ratesLoaded && calc.unpriced && calc.unpriced.length > 0 && (
         <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3">
           <p className="text-sm font-medium text-red-800">
             {calc.unpriced.length} item{calc.unpriced.length > 1 ? 's have' : ' has'} no price yet —

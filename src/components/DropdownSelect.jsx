@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DropdownSelect — a native-<select> replacement that ALWAYS opens downward
@@ -30,12 +31,24 @@ export default function DropdownSelect({
   menuClassName = '',
   disabled = false,
   searchable = false,
+  // When true the menu is rendered in a body-level portal (fixed-positioned at the
+  // trigger) so it escapes any overflow/scroll container — no clipping, no weird
+  // scrolling inside a section frame.
+  portal = false,
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [rect, setRect] = useState(null)
   const rootRef = useRef(null)
   const listRef = useRef(null)
   const searchRef = useRef(null)
+
+  // Measure the trigger so a portaled menu can position itself at it.
+  const place = useCallback(() => {
+    if (!rootRef.current) return
+    const r = rootRef.current.getBoundingClientRect()
+    setRect({ top: r.bottom, left: r.left, width: r.width })
+  }, [])
 
   // eslint-disable-next-line eqeqeq
   const selected = options.find(o => o.value == value)
@@ -43,11 +56,15 @@ export default function DropdownSelect({
 
   const close = useCallback(() => setOpen(false), [])
 
-  // Close on outside click / Escape.
+  // Close on outside click / Escape. A portaled menu lives outside rootRef, so
+  // also treat clicks inside the menu (listRef) as "inside".
   useEffect(() => {
     if (!open) return
+    const inside = t =>
+      (rootRef.current && rootRef.current.contains(t)) ||
+      (listRef.current && listRef.current.contains(t))
     const onDoc = e => {
-      if (rootRef.current && !rootRef.current.contains(e.target)) close()
+      if (!inside(e.target)) close()
     }
     const onKey = e => {
       if (e.key === 'Escape') close()
@@ -60,17 +77,27 @@ export default function DropdownSelect({
     }
   }, [open, close])
 
-  // When opening, scroll the selected option into view; reset + focus search.
+  // When opening, position the (portaled) menu, scroll the selected option into
+  // view, reset + focus search. When portaled, keep it pinned to the trigger on
+  // scroll/resize.
   useEffect(() => {
-    if (open) {
-      setQuery('')
-      if (searchable && searchRef.current) searchRef.current.focus()
-      if (listRef.current) {
-        const el = listRef.current.querySelector('[data-selected="true"]')
-        if (el) el.scrollIntoView({ block: 'nearest' })
-      }
+    if (!open) return
+    setQuery('')
+    place()
+    if (searchable && searchRef.current) searchRef.current.focus()
+    if (listRef.current) {
+      const el = listRef.current.querySelector('[data-selected="true"]')
+      if (el) el.scrollIntoView({ block: 'nearest' })
     }
-  }, [open, searchable])
+    if (!portal) return
+    const onMove = () => place()
+    window.addEventListener('scroll', onMove, true)
+    window.addEventListener('resize', onMove)
+    return () => {
+      window.removeEventListener('scroll', onMove, true)
+      window.removeEventListener('resize', onMove)
+    }
+  }, [open, searchable, portal, place])
 
   const pick = o => {
     if (o.disabled) return
@@ -123,7 +150,14 @@ export default function DropdownSelect({
       {open && (
         <div
           ref={listRef}
-          className={`absolute z-50 top-full left-0 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg py-1 ${menuClassName}`}
+          style={
+            portal && rect
+              ? { position: 'fixed', top: rect.top + 4, left: rect.left, width: rect.width }
+              : undefined
+          }
+          className={`${
+            portal ? 'z-[100]' : 'absolute z-50 top-full left-0 mt-1 w-full'
+          } max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg py-1 ${menuClassName}`}
         >
           {searchable && (
             <div className="sticky top-0 bg-white px-2 pt-1 pb-2 border-b border-gray-100">

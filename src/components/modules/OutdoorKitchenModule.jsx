@@ -1460,6 +1460,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                         {/* Searchable, always-downward picker — long appliance list. */}
                         <DropdownSelect
                           searchable
+                          portal
                           className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white w-full"
                           placeholder="Select appliance…"
                           value={row.type || ''}
