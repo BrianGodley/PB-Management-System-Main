@@ -360,7 +360,7 @@ function WallQtyDetail({ t = {}, isSub, materialPrices, materialRows, vendorLabe
               <LineRow label="Vendor" value={vendorLabel(w.vendor)} />
             )}
             {w.blockType && <LineRow label="Block Type" value={blockLabel(w.blockType)} />}
-            <LineRow label="Linear Feet" value={`${n(w.lf)} LF`} />
+            <LineRow label="Linear Feet" value={`${n(w.lf)} Ln Ft`} />
             <LineRow label="Wall Height" value={`${n(w.heightIn)} in`} />
             <LineRow
               label="Footing"
@@ -371,14 +371,14 @@ function WallQtyDetail({ t = {}, isSub, materialPrices, materialRows, vendorLabe
             <LineRow label="% Grouted" value={`${n(w.pctGrouted)}%`} />
             {n(w.pctCurved) > 0 && <LineRow label="% Curved" value={`${n(w.pctCurved)}%`} />}
             {isSub && (n(w.subEach) > 0 || (w.subEach != null && w.subEach !== '')) && (
-              <LineRow label="Sub Flat" value={`${fmt(w.subEach)}/LF`} />
+              <LineRow label="Sub Flat" value={`${fmt(w.subEach)} per Ln Ft`} />
             )}
           </div>
         ))}
       {cmuWalls.length === 0 && n(cmuLF) > 0 && (
         <>
           <SectionLabel title="CMU Structure" />
-          <LineRow label="Linear Feet" value={`${n(cmuLF)} LF`} />
+          <LineRow label="Linear Feet" value={`${n(cmuLF)} Ln Ft`} />
           <LineRow label="Wall Height" value={`${n(cmuHeightIn)} in`} />
           <LineRow label="Footing" value={`${n(cmuFootingWIn)}"W × ${n(cmuFootingDIn)}"D`} />
           <LineRow label="Rebar Spacing" value={`${n(cmuRebarSpIn)}" on-center`} />
@@ -404,17 +404,17 @@ function WallQtyDetail({ t = {}, isSub, materialPrices, materialRows, vendorLabe
             {w.vendor && w.vendor !== 'Standard' && (
               <LineRow label="Vendor" value={vendorLabel(w.vendor)} />
             )}
-            <LineRow label="Linear Feet" value={`${n(w.lf)} LF`} />
+            <LineRow label="Linear Feet" value={`${n(w.lf)} Ln Ft`} />
             <LineRow label="Wall Height" value={`${n(w.heightIn)} in`} />
             {isSub && (n(w.subEach) > 0 || (w.subEach != null && w.subEach !== '')) && (
-              <LineRow label="Sub Flat" value={`${fmt(w.subEach)}/LF`} />
+              <LineRow label="Sub Flat" value={`${fmt(w.subEach)} per Ln Ft`} />
             )}
           </div>
         ))}
       {pipWalls.length === 0 && n(pipLF) > 0 && (
         <>
           <SectionLabel title="Poured In Place" />
-          <LineRow label="Linear Feet" value={`${n(pipLF)} LF`} />
+          <LineRow label="Linear Feet" value={`${n(pipLF)} Ln Ft`} />
           <LineRow label="Wall Height" value={`${n(pipHeightIn)} in`} />
         </>
       )}
@@ -430,7 +430,7 @@ function WallQtyDetail({ t = {}, isSub, materialPrices, materialRows, vendorLabe
               <LineRow label="Vendor" value={vendorLabel(w.vendor)} />
             )}
             {w.blockType && <LineRow label="Block Type" value={blockLabel(w.blockType)} />}
-            <LineRow label="Linear Feet" value={`${n(w.lf)} LF`} />
+            <LineRow label="Linear Feet" value={`${n(w.lf)} Ln Ft`} />
             <LineRow label="Wall Height" value={`${n(w.heightIn)} in`} />
             <LineRow
               label="Footing"
@@ -438,7 +438,7 @@ function WallQtyDetail({ t = {}, isSub, materialPrices, materialRows, vendorLabe
             />
             {n(w.pctCurved) > 0 && <LineRow label="% Curved" value={`${n(w.pctCurved)}%`} />}
             {isSub && (n(w.subEach) > 0 || (w.subEach != null && w.subEach !== '')) && (
-              <LineRow label="Sub Flat" value={`${fmt(w.subEach)}/LF`} />
+              <LineRow label="Sub Flat" value={`${fmt(w.subEach)} per Ln Ft`} />
             )}
           </div>
         ))}
@@ -457,7 +457,7 @@ function WallQtyDetail({ t = {}, isSub, materialPrices, materialRows, vendorLabe
               <LineRow label="Vendor" value={vendorLabel(w.vendor)} />
             )}
             {w.blockType && <LineRow label="Block Type" value={blockLabel(w.blockType)} />}
-            <LineRow label="Linear Feet" value={`${n(w.lf)} LF`} />
+            <LineRow label="Linear Feet" value={`${n(w.lf)} Ln Ft`} />
             <LineRow label="Wall Height" value={`${n(w.heightIn)} in`} />
             <LineRow
               label="Footing"
@@ -465,7 +465,7 @@ function WallQtyDetail({ t = {}, isSub, materialPrices, materialRows, vendorLabe
             />
             {n(w.pctCurved) > 0 && <LineRow label="% Curved" value={`${n(w.pctCurved)}%`} />}
             {isSub && (n(w.subEach) > 0 || (w.subEach != null && w.subEach !== '')) && (
-              <LineRow label="Sub Flat" value={`${fmt(w.subEach)}/LF`} />
+              <LineRow label="Sub Flat" value={`${fmt(w.subEach)} per Ln Ft`} />
             )}
           </div>
         ))}
@@ -478,11 +478,11 @@ function WallQtyDetail({ t = {}, isSub, materialPrices, materialRows, vendorLabe
         <>
           <SectionLabel title="Timber Wall" />
           <LineRow label="Timber Type" value={timberType} />
-          <LineRow label="Linear Feet" value={`${n(timberLF)} LF`} />
+          <LineRow label="Linear Feet" value={`${n(timberLF)} Ln Ft`} />
           <LineRow label="Wall Height" value={`${n(timberHeightIn)} in`} />
           {n(timberPosts) > 0 && <LineRow label="Steel Posts" value={`${n(timberPosts)} qty`} />}
           {isSub && timberSubEach != null && timberSubEach !== '' && (
-            <LineRow label="Sub Flat" value={`${fmt(timberSubEach)}/LF`} />
+            <LineRow label="Sub Flat" value={`${fmt(timberSubEach)} per Ln Ft`} />
           )}
         </>
       )}

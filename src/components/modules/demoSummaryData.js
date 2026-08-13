@@ -51,7 +51,7 @@ export function buildDemoSummary(module, cfg) {
   // ── In House — entered quantities ──────────────────────────────────────────
   const qSF = (label, sf, depth) =>
     n(sf) > 0
-      ? { label, value: `${n(sf).toLocaleString()} SF`, sub: depth ? `${depth}"` : undefined }
+      ? { label, value: `${n(sf).toLocaleString()} Sq Ft`, sub: depth ? `${depth}"` : undefined }
       : null
 
   const demoRows = [
@@ -64,7 +64,7 @@ export function buildDemoSummary(module, cfg) {
   const miscFlatRows = (d.miscFlatRows || [])
     .map((r, i) =>
       n(r.sf) > 0
-        ? { label: r.label || `Item ${i + 1}`, value: `${n(r.sf)} SF`, sub: `${r.depth || 4}"` }
+        ? { label: r.label || `Item ${i + 1}`, value: `${n(r.sf)} Sq Ft`, sub: `${r.depth || 4}"` }
         : null
     )
     .filter(Boolean)
@@ -74,7 +74,7 @@ export function buildDemoSummary(module, cfg) {
       n(r.lf) > 0
         ? {
             label: r.label || `Item ${i + 1}`,
-            value: `${n(r.lf)} LF`,
+            value: `${n(r.lf)} Ln Ft`,
             sub: `${r.heightIn || 0}" × ${r.widthIn || 8}"`,
           }
         : null
@@ -84,7 +84,7 @@ export function buildDemoSummary(module, cfg) {
   const footingRows = (d.footingRows || [])
     .map((r, i) =>
       n(r.sf) > 0
-        ? { label: r.label || `Footing ${i + 1}`, value: `${n(r.sf)} SF`, sub: `${r.depth || 12}"` }
+        ? { label: r.label || `Footing ${i + 1}`, value: `${n(r.sf)} Sq Ft`, sub: `${r.depth || 12}"` }
         : null
     )
     .filter(Boolean)
@@ -96,7 +96,7 @@ export function buildDemoSummary(module, cfg) {
     cfg.hasSS ? qSF('SS Compact', d.ssCmpSF) : null,
   ].filter(Boolean)
 
-  const rebarRows = n(d.rebarSF) > 0 ? [{ label: 'Rebar', value: `${n(d.rebarSF).toLocaleString()} SF` }] : []
+  const rebarRows = n(d.rebarSF) > 0 ? [{ label: 'Rebar', value: `${n(d.rebarSF).toLocaleString()} Sq Ft` }] : []
 
   const shrubArrRows = (d.shrubRows || [])
     .filter(r => n(r.qty) > 0)
@@ -144,15 +144,15 @@ export function buildDemoSummary(module, cfg) {
   // ── Subcontractor — quantities only (pricing lives in the Summary box) ─────
   const subDemoRows =
     n(d.subDemoSF) > 0
-      ? [{ label: 'Demolition', value: `${n(d.subDemoSF).toLocaleString()} SF`, sub: `${d.subDemoDepth || 7}"` }]
+      ? [{ label: 'Demolition', value: `${n(d.subDemoSF).toLocaleString()} Sq Ft`, sub: `${d.subDemoDepth || 7}"` }]
       : []
 
   const subMiscFlatRows = (d.subMiscFlatRows || [])
     .slice(0, 2)
     .filter(r => n(r.sf) > 0)
-    .map((r, i) => ({ label: r.label || `Item ${i + 1}`, value: `${n(r.sf)} SF` }))
+    .map((r, i) => ({ label: r.label || `Item ${i + 1}`, value: `${n(r.sf)} Sq Ft` }))
 
-  const sg = (label, sf) => (n(sf) > 0 ? { label, value: `${n(sf).toLocaleString()} SF` } : null)
+  const sg = (label, sf) => (n(sf) > 0 ? { label, value: `${n(sf).toLocaleString()} Sq Ft` } : null)
   const subGradeRows = [
     sg('Grade Cut', d.subGradeCutSF),
     sg('Grade Fill', d.subGradeFillSF),

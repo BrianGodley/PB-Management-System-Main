@@ -50,7 +50,7 @@ const ZONE_TYPES = [
   },
   {
     key: 'lawn',
-    label: 'Lawn Zone (≤ 1,000 SF)',
+    label: 'Lawn Zone (≤ 1,000 Sq Ft)',
     defaultMode: 'Trench',
     matKey: 'Irrigation Zone - Lawn',
     matFallback: 345,
@@ -71,7 +71,7 @@ const ZONE_TYPES = [
   },
   {
     key: 'dripline',
-    label: 'Planter Dripline (≤ 700 SF)',
+    label: 'Planter Dripline (≤ 700 Sq Ft)',
     defaultMode: 'Trench',
     matKey: 'Irrigation Zone - Planter Dripline',
     matFallback: 345,

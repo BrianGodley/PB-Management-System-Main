@@ -79,10 +79,10 @@ const SEALER_TYPES = ['Natural', 'Wet-Look']
 // In-House pour+finish is priced by job-size tier — each tier has its own
 // SF/hr labour rate (editable via labor_rates, category 'Concrete').
 const INSTALL_TIERS = [
-  { key: 's100_300', label: '100–300 SF', rateName: 'Concrete - Install 100-300', def: 6.5 },
-  { key: 's300_600', label: '300–600 SF', rateName: 'Concrete - Install 300-600', def: 12 },
-  { key: 's600_1000', label: '600–1000 SF', rateName: 'Concrete - Install 600-1000', def: 20 },
-  { key: 's1000_2000', label: '1000–2000 SF', rateName: 'Concrete - Install 1000-2000', def: 24 },
+  { key: 's100_300', label: '100–300 Sq Ft', rateName: 'Concrete - Install 100-300', def: 6.5 },
+  { key: 's300_600', label: '300–600 Sq Ft', rateName: 'Concrete - Install 300-600', def: 12 },
+  { key: 's600_1000', label: '600–1000 Sq Ft', rateName: 'Concrete - Install 600-1000', def: 20 },
+  { key: 's1000_2000', label: '1000–2000 Sq Ft', rateName: 'Concrete - Install 1000-2000', def: 24 },
   { key: 's2000plus', label: '2000+ SF', rateName: 'Concrete - Install 2000+', def: 28 },
 ]
 
@@ -1733,7 +1733,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                           {is300plus ? 'pump' : 'pump not included'}
                         </span>
                         <span className="text-[11px] text-gray-400 inline-flex items-center gap-1">
-                          {rate} SF/hr
+                          {rate} Sq Ft/hr
                         </span>
                       </div>
                     </div>
@@ -1767,7 +1767,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               <p className="text-xs text-gray-400">
                 ≈{' '}
                 <span className="font-semibold text-gray-600">
-                  {activeConcreteCY.toFixed(2)} CY
+                  {activeConcreteCY.toFixed(2)} Cu Yd
                 </span>{' '}
                 concrete
               </p>
@@ -1821,23 +1821,23 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 ))}
               {!isSub && activeFinishType === 'Sand Finish' && (
                 <span className="text-gray-400 inline-flex items-center gap-1 flex-wrap">
-                  — {calc.sandFinishSFPerHr} SF/hr
+                  — {calc.sandFinishSFPerHr} Sq Ft/hr
                   · sand sub ${calc.sandFinishPer400SF}/400SF
                 </span>
               )}
               {!isSub && activeFinishType === 'Salt Finish' && (
                 <span className="text-gray-400 inline-flex items-center gap-1">
-                  — {calc.saltFinishSFPerHr} SF/hr
+                  — {calc.saltFinishSFPerHr} Sq Ft/hr
                 </span>
               )}
               {!isSub && activeFinishType === 'Exposed Aggregate' && (
                 <span className="text-gray-400 inline-flex items-center gap-1">
-                  — {calc.exposedAggSFPerHr} SF/hr
+                  — {calc.exposedAggSFPerHr} Sq Ft/hr
                 </span>
               )}
               {!isSub && activeFinishType === 'Seeded Aggregate' && (
                 <span className="text-gray-400 inline-flex items-center gap-1">
-                  — {calc.seededAggSFPerHr} SF/hr
+                  — {calc.seededAggSFPerHr} Sq Ft/hr
                 </span>
               )}
               {!isSub && activeFinishType === 'Stamped' && (
@@ -1865,7 +1865,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 onChange={e => setActiveColorYes(e.target.checked)}
                 className="accent-green-600"
               />
-              <span className="text-gray-700">Color Hardener (${calc.colorCostPerCY}/CY)</span>
+              <span className="text-gray-700">Color Hardener (${calc.colorCostPerCY} per Cu Yd)</span>
             </label>
           </div>
           <div>

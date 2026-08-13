@@ -1934,7 +1934,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       <th className="text-center pb-1 pr-1 font-medium">Area (SF)</th>
                       <th className="text-center pb-1 pr-1 font-medium">Depth (in)</th>
                       <th className="text-center pb-1 pr-1 font-medium">Tilling</th>
-                      <th className="text-center pb-1 pr-1 font-medium">$/CY</th>
+                      <th className="text-center pb-1 pr-1 font-medium">$ per Cu Yd</th>
                       <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
                     </tr>
                   </thead>
@@ -2085,7 +2085,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 <th className="text-center pb-1 pr-1 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-1 font-medium">Sod Type</th>
                 <th className="text-center pb-1 pr-1 font-medium">Sq Ft</th>
-                <th className="text-center pb-1 pr-1 font-medium">$/SF</th>
+                <th className="text-center pb-1 pr-1 font-medium">$ per Sq Ft</th>
                 <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
               </tr>
             </thead>
@@ -2258,7 +2258,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         <div className="flex items-center justify-end gap-1">
                           <span>
                             {ft && ft.dbName && row.fertilizer
-                              ? `$${ft.fallback.toFixed(2)}/bag · 1 bag / ${sfPerBag} SF${
+                              ? `$${ft.fallback.toFixed(2)}/bag · 1 bag / ${sfPerBag} Sq Ft${
                                   bags > 0 ? ` = ${bags} bag${bags > 1 ? 's' : ''} · $${(bags * ft.fallback).toFixed(2)}` : ''
                                 }`
                               : '—'}
@@ -2302,7 +2302,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 <th className="text-center pb-1 pr-1 font-medium">Mulch Type</th>
                 <th className="text-center pb-1 pr-1 font-medium">Area (SF)</th>
                 <th className="text-center pb-1 pr-1 font-medium">Depth (in)</th>
-                <th className="text-center pb-1 pr-1 font-medium">$/CY</th>
+                <th className="text-center pb-1 pr-1 font-medium">$ per Cu Yd</th>
                 <th className="text-center pb-1 font-medium">Weed Fabric</th>
               </tr>
             </thead>
@@ -2567,7 +2567,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 <th className="text-center pb-1 pr-1 font-medium">Gravel Type</th>
                 <th className="text-center pb-1 pr-1 font-medium">Sq Ft</th>
                 <th className="text-center pb-1 pr-1 font-medium">Method</th>
-                <th className="text-center pb-1 pr-1 font-medium">$/CY</th>
+                <th className="text-center pb-1 pr-1 font-medium">$ per Cu Yd</th>
                 <th className="text-center pb-1 pr-1 font-medium">Weed Barrier</th>
                 <th className="text-center pb-1 font-medium">Depth (in)</th>
               </tr>
@@ -2695,7 +2695,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                   ((row.weedFabric ?? 'Yes') === 'Yes' ? n(row.sf) * p(GT_RATES.gravelFabricMat.dbName, 0.1) : 0)
                 return (
                   <span key={i} className="text-xs text-gray-400">
-                    #{i + 1}: {CY.toFixed(2)} CY · ${mat.toFixed(2)} mat
+                    #{i + 1}: {CY.toFixed(2)} Cu Yd · ${mat.toFixed(2)} mat
                   </span>
                 )
               })}
@@ -2715,7 +2715,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 <th className="text-center pb-1 pr-1 font-medium">Pebble Type</th>
                 <th className="text-center pb-1 pr-1 font-medium">Sq Ft</th>
                 <th className="text-center pb-1 pr-1 font-medium">Method</th>
-                <th className="text-center pb-1 pr-1 font-medium">$/CY</th>
+                <th className="text-center pb-1 pr-1 font-medium">$ per Cu Yd</th>
                 <th className="text-center pb-1 pr-1 font-medium">Weed Barrier</th>
                 <th className="text-center pb-1 font-medium">Depth (in)</th>
               </tr>
@@ -2831,7 +2831,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                   ((row.weedFabric ?? 'Yes') === 'Yes' ? n(row.sf) * p(GT_RATES.gravelFabricMat.dbName, 0.1) : 0)
                 return (
                   <span key={i} className="text-xs text-gray-400">
-                    #{i + 1}: {CY.toFixed(2)} CY · ${mat.toFixed(2)} mat
+                    #{i + 1}: {CY.toFixed(2)} Cu Yd · ${mat.toFixed(2)} mat
                   </span>
                 )
               })}
@@ -2851,7 +2851,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 <th className="text-center pb-1 pr-1 font-medium">Cobble Type</th>
                 <th className="text-center pb-1 pr-1 font-medium">Sq Ft</th>
                 <th className="text-center pb-1 pr-1 font-medium">Method</th>
-                <th className="text-center pb-1 pr-1 font-medium">$/CY</th>
+                <th className="text-center pb-1 pr-1 font-medium">$ per Cu Yd</th>
                 <th className="text-center pb-1 font-medium">Depth (in)</th>
               </tr>
             </thead>
@@ -2955,7 +2955,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                   n(row.sf) * p(GT_RATES.gravelFabricMat.dbName, 0.1)
                 return (
                   <span key={i} className="text-xs text-gray-400">
-                    #{i + 1}: {CY.toFixed(2)} CY · ${mat.toFixed(2)} mat
+                    #{i + 1}: {CY.toFixed(2)} Cu Yd · ${mat.toFixed(2)} mat
                   </span>
                 )
               })}
@@ -2974,7 +2974,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 <th className="text-center pb-1 pr-1 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-1 font-medium">Edging Type</th>
                 <th className="text-center pb-1 pr-1 font-medium">Ln Ft</th>
-                <th className="text-center pb-1 pr-1 font-medium">$/LF</th>
+                <th className="text-center pb-1 pr-1 font-medium">$ per Ln Ft</th>
                 <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
               </tr>
             </thead>
@@ -3029,7 +3029,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       <NumInput value={edgingLF} onChange={setEdgingLF} placeholder="Ln Ft" className="w-full text-center" />
                     </td>
                     <td className="py-1 pr-1">
-                      <span className="text-xs text-gray-500 whitespace-nowrap block text-center">${rate.toFixed(2)}/LF</span>
+                      <span className="text-xs text-gray-500 whitespace-nowrap block text-center">${rate.toFixed(2)} per Ln Ft</span>
                     </td>
                     <td className="py-1 text-center text-xs text-gray-600 whitespace-nowrap">
                       {edgingType && n(edgingLF) > 0 ? `$${(n(edgingLF) * rate).toFixed(2)}` : '—'}
@@ -3149,7 +3149,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     </td>
                     <td className="py-1 pr-2">
                       <span className="text-xs text-gray-500 flex items-center justify-center gap-1 whitespace-nowrap">
-                        {sfPerDay} SF/day
+                        {sfPerDay} Sq Ft/day
                       </span>
                     </td>
                     <td className="py-1 pr-2">

@@ -15,7 +15,7 @@ function buildSections(f, isSub) {
     .filter(r => n(r.sf) > 0)
     .map(r => ({
       label: `${r.label || 'Base'}${r.method ? ` (${r.method})` : ''}`,
-      value: `${n(r.sf).toLocaleString()} SF`,
+      value: `${n(r.sf).toLocaleString()} Sq Ft`,
       sub: `${r.depth || 2}"${r.type ? ` · ${r.type}` : ''}`,
     }))
 
@@ -23,10 +23,10 @@ function buildSections(f, isSub) {
   if (f.installTiers) {
     // In-House install is entered per job-size tier.
     const TIER_LABELS = {
-      s100_300: '100–300 SF',
-      s300_600: '300–600 SF',
-      s600_1000: '600–1000 SF',
-      s1000_2000: '1000–2000 SF',
+      s100_300: '100–300 Sq Ft',
+      s300_600: '300–600 Sq Ft',
+      s600_1000: '600–1000 Sq Ft',
+      s1000_2000: '1000–2000 Sq Ft',
       s2000plus: '2000+ SF',
     }
     Object.entries(TIER_LABELS).forEach(([k, label]) => {
@@ -34,20 +34,20 @@ function buildSections(f, isSub) {
         const mix = (f.installTierType || {})[k]
         install.push({
           label: `Install (${label})`,
-          value: `${n(f.installTiers[k]).toLocaleString()} SF`,
+          value: `${n(f.installTiers[k]).toLocaleString()} Sq Ft`,
           sub: `${f.depthIn || 4}"${mix ? ` · ${mix}` : ''}`,
         })
       }
     })
   } else if (n(f.installSF) > 0)
-    install.push({ label: 'Pour + Finish', value: `${n(f.installSF).toLocaleString()} SF`, sub: `${f.depthIn || 4}"` })
+    install.push({ label: 'Pour + Finish', value: `${n(f.installSF).toLocaleString()} Sq Ft`, sub: `${f.depthIn || 4}"` })
   if (n(f.rebarSF) > 0)
-    install.push({ label: 'Rebar 24" OC', value: `${n(f.rebarSF).toLocaleString()} SF` })
+    install.push({ label: 'Rebar 24" OC', value: `${n(f.rebarSF).toLocaleString()} Sq Ft` })
   // Form Edging is In-House only (not on the sub side).
   if (!isSub && n(f.formLF) > 0)
-    install.push({ label: 'Form Edging', value: `${n(f.formLF).toLocaleString()} LF` })
+    install.push({ label: 'Form Edging', value: `${n(f.formLF).toLocaleString()} Ln Ft` })
   if (n(f.sleeveLF) > 0)
-    install.push({ label: '3" Sleeves', value: `${n(f.sleeveLF).toLocaleString()} LF` })
+    install.push({ label: '3" Sleeves', value: `${n(f.sleeveLF).toLocaleString()} Ln Ft` })
 
   const options = []
   if (n(f.installSF) > 0 && f.finishType) options.push({ label: 'Finish', value: f.finishType })
@@ -63,11 +63,11 @@ function buildSections(f, isSub) {
   if (pumpOn)
     options.push({ label: 'Concrete Pump', value: f.installTiers ? 'Yes (auto 300+)' : 'Yes' })
   if (n(f.vaporBarrierSF) > 0)
-    options.push({ label: 'Vapor Barrier', value: `${n(f.vaporBarrierSF).toLocaleString()} SF` })
+    options.push({ label: 'Vapor Barrier', value: `${n(f.vaporBarrierSF).toLocaleString()} Sq Ft` })
   if (n(f.sealerSF) > 0)
     options.push({
       label: `Sealer (${f.sealerType || 'Natural'})`,
-      value: `${n(f.sealerSF).toLocaleString()} SF`,
+      value: `${n(f.sealerSF).toLocaleString()} Sq Ft`,
     })
 
   const manual = isSub

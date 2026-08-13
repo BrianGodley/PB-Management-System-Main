@@ -21,7 +21,7 @@ const ZONE_TYPES = [
   },
   {
     key: 'lawn',
-    label: 'Lawn Zone (≤ 1,000 SF)',
+    label: 'Lawn Zone (≤ 1,000 Sq Ft)',
     defaultMode: 'Trench',
     matKey: 'Irrigation Zone - Lawn',
     matFallback: 345,
@@ -42,7 +42,7 @@ const ZONE_TYPES = [
   },
   {
     key: 'dripline',
-    label: 'Planter Dripline (≤ 700 SF)',
+    label: 'Planter Dripline (≤ 700 Sq Ft)',
     defaultMode: 'Trench',
     matKey: 'Irrigation Zone - Planter Dripline',
     matFallback: 345,
@@ -174,7 +174,7 @@ export default function IrrigationSummary({ module }) {
         key: i,
         label: `${vendorLabel(r.vendor)} · ${t.label} × ${qty}`,
         value: material > 0 ? fmt2(material) : '—',
-        sub: isSub ? `${fmt2(subEach)}/ea flat` : fh(hrs) || `${timerHrs} hrs/ea`,
+        sub: isSub ? `${fmt2(subEach)} per Each flat` : fh(hrs) || `${timerHrs} hrs per Each`,
       }
     })
 

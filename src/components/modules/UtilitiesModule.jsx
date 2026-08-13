@@ -1427,7 +1427,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                 <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Pipe Type</th>
                 <th className="text-center pb-1 pr-2 font-medium">Linear Feet</th>
-                <th className="text-center pb-1 pr-2 font-medium text-gray-400">$/LF</th>
+                <th className="text-center pb-1 pr-2 font-medium text-gray-400">$ per Ln Ft</th>
                 <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
               </tr>
             </thead>
@@ -1526,7 +1526,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                 <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Wire Type</th>
                 <th className="text-center pb-1 pr-2 font-medium">Linear Feet</th>
-                <th className="text-center pb-1 pr-2 font-medium text-gray-400">$/LF</th>
+                <th className="text-center pb-1 pr-2 font-medium text-gray-400">$ per Ln Ft</th>
                 <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
               </tr>
             </thead>
@@ -1724,7 +1724,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                 <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Pipe Type</th>
                 <th className="text-center pb-1 pr-2 font-medium">Linear Feet</th>
-                <th className="text-center pb-1 pr-2 font-medium text-gray-400">$/LF</th>
+                <th className="text-center pb-1 pr-2 font-medium text-gray-400">$ per Ln Ft</th>
                 <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
               </tr>
             </thead>
@@ -1922,7 +1922,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                 <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Sewer Pipe</th>
                 <th className="text-center pb-1 pr-2 font-medium">Linear Feet</th>
-                <th className="text-center pb-1 pr-2 font-medium text-gray-400">$/LF</th>
+                <th className="text-center pb-1 pr-2 font-medium text-gray-400">$ per Ln Ft</th>
                 <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
               </tr>
             </thead>

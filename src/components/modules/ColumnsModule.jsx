@@ -577,7 +577,7 @@ function ColEntry({ type, row, idx, total, onChange, onRemove, vendorOptions, ty
           ) : null}
           {rowCalc.totalCY ? (
             <span>
-              Concrete: <strong>{rowCalc.totalCY.toFixed(2)} CY</strong>
+              Concrete: <strong>{rowCalc.totalCY.toFixed(2)} Cu Yd</strong>
             </span>
           ) : null}
           {rowCalc.bricks ? (

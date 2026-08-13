@@ -14,18 +14,18 @@ const fmt2 = v =>
 function buildSections(t = {}, { sub = false } = {}) {
   const structure = []
   if (n(t.bbqLengthLF) > 0)
-    structure.push({ label: 'BBQ Wall', value: `${n(t.bbqLengthLF)} LF × ${n(t.bbqHeightIn) || 48}"` })
+    structure.push({ label: 'BBQ Wall', value: `${n(t.bbqLengthLF)} Ln Ft × ${n(t.bbqHeightIn) || 48}"` })
   if (n(t.backLengthLF) > 0)
     structure.push({
       label: 'Backsplash',
-      value: `${n(t.backLengthLF)} LF × ${n(t.backHeightIn) || 48}"`,
+      value: `${n(t.backLengthLF)} Ln Ft × ${n(t.backHeightIn) || 48}"`,
     })
 
   const counter = []
   if (n(t.counterSF) > 0)
     counter.push({
       label: `Countertop (${t.counterFinish || 'Broom Finish'})`,
-      value: `${n(t.counterSF)} SF`,
+      value: `${n(t.counterSF)} Sq Ft`,
     })
 
   const appliances = (t.equipmentRows || [])
@@ -33,13 +33,13 @@ function buildSections(t = {}, { sub = false } = {}) {
     .map(r => ({
       label: `${r.type || 'Equipment'}${r.clientProvided ? ' (client provided)' : ''}`,
       value: `× ${n(r.qty)}`,
-      sub: n(r.hours) > 0 ? `${n(r.hours)} hrs/ea` : undefined,
+      sub: n(r.hours) > 0 ? `${n(r.hours)} hrs per Each` : undefined,
     }))
 
   const ep = []
   ;(t.epLineRows || [])
     .filter(r => n(r.lf) > 0)
-    .forEach(r => ep.push({ label: r.type || 'Utility line', value: `${n(r.lf)} LF` }))
+    .forEach(r => ep.push({ label: r.type || 'Utility line', value: `${n(r.lf)} Ln Ft` }))
   ;(t.epGasRows || [])
     .filter(r => n(r.qty) > 0)
     .forEach(r => ep.push({ label: r.type || 'Gas fixture', value: `× ${n(r.qty)}` }))
@@ -49,7 +49,7 @@ function buildSections(t = {}, { sub = false } = {}) {
 
   const finishes = (t.wallFinishRows || [])
     .filter(r => n(r.sf) > 0)
-    .map(r => ({ label: r.type || 'Finish', value: `${n(r.sf)} SF` }))
+    .map(r => ({ label: r.type || 'Finish', value: `${n(r.sf)} Sq Ft` }))
 
   const manual = sub
     ? (t.manualRows || [])

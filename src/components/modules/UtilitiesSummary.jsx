@@ -37,7 +37,7 @@ export default function UtilitiesSummary({ module }) {
         .filter(r => n(r.lf) > 0)
         .map(r => ({
           label: r.equipment || 'Trench',
-          value: `${n(r.lf)} LF`,
+          value: `${n(r.lf)} Ln Ft`,
           sub: n(r.width) || n(r.depth) ? `${n(r.width)}"W × ${n(r.depth)}"D` : undefined,
         })),
     },
@@ -45,7 +45,7 @@ export default function UtilitiesSummary({ module }) {
       title: 'Utility Lines',
       rows: (d.lineRows || [])
         .filter(r => n(r.lf) > 0)
-        .map(r => ({ label: r.type, value: `${n(r.lf)} LF` })),
+        .map(r => ({ label: r.type, value: `${n(r.lf)} Ln Ft` })),
     },
     {
       title: 'Gas Fixtures',
@@ -63,7 +63,7 @@ export default function UtilitiesSummary({ module }) {
       title: 'Sewer Lines',
       rows: (d.sewerLineRows || [])
         .filter(r => n(r.lf) > 0)
-        .map(r => ({ label: r.type, value: `${n(r.lf)} LF` })),
+        .map(r => ({ label: r.type, value: `${n(r.lf)} Ln Ft` })),
     },
     {
       title: 'Sinks',
@@ -89,13 +89,13 @@ export default function UtilitiesSummary({ module }) {
       title: 'Trenching',
       rows: (d.subTrenchRows || [])
         .filter(r => n(r.lf) > 0)
-        .map(r => ({ label: 'Trenching', value: `${n(r.lf)} LF` })),
+        .map(r => ({ label: 'Trenching', value: `${n(r.lf)} Ln Ft` })),
     },
     {
       title: 'Utility Lines',
       rows: (d.subLineRows || [])
         .filter(r => n(r.lf) > 0)
-        .map(r => ({ label: r.type, value: `${n(r.lf)} LF` })),
+        .map(r => ({ label: r.type, value: `${n(r.lf)} Ln Ft` })),
     },
     {
       title: 'Gas Fixtures',
@@ -113,7 +113,7 @@ export default function UtilitiesSummary({ module }) {
       title: 'Sewer Lines',
       rows: (d.subSewerLineRows || [])
         .filter(r => n(r.lf) > 0)
-        .map(r => ({ label: r.type, value: `${n(r.lf)} LF` })),
+        .map(r => ({ label: r.type, value: `${n(r.lf)} Ln Ft` })),
     },
     {
       title: 'Sinks',

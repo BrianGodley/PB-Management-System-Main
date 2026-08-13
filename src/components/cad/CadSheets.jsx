@@ -223,7 +223,7 @@ export default function CadSheets({ unit, layers, entities, drawingName, sheets,
         case 'circle': {
           if (!P[0]) break;
           const r = (e.props?.radius || 0) * scale * k;
-          if (r > 0) out.push(<circle key={e.id} cx={P[0].x} cy={P[0].y} r={r} fill="none" {...common} />);
+          if (r > 0) out.push(<circle key={e.id} cx={P[0].x} Cu Yd={P[0].y} r={r} fill="none" {...common} />);
           break;
         }
         case 'text': {
@@ -242,7 +242,7 @@ export default function CadSheets({ unit, layers, entities, drawingName, sheets,
           const fs = Math.max(4, Math.min(120, (e.props?.size || 2) * 0.35 * scale * k));
           out.push(
             <g key={e.id}>
-              {r > 0 && <circle cx={P[0].x} cy={P[0].y} r={r} fill="none" {...common} />}
+              {r > 0 && <circle cx={P[0].x} Cu Yd={P[0].y} r={r} fill="none" {...common} />}
               {e.props?.label ? (
                 <text x={P[0].x} y={P[0].y + r + fs} fill={color} fontSize={fs} textAnchor="middle" fontFamily="sans-serif" style={{ userSelect: 'none' }}>
                   {e.props.label}

@@ -175,11 +175,11 @@ export default function PlantingSummary({ module }) {
         const subEach = r.subEach !== '' && r.subEach != null ? n(r.subEach) : unitPrice
         const material = isSub ? qty * subEach : perDay > 0 ? qty * unitPrice : 0
         const parts = []
-        if (isSub) parts.push(`${fmt2(subEach)}/ea flat`)
+        if (isSub) parts.push(`${fmt2(subEach)} per Each flat`)
         else {
           parts.push(`${hrs.toFixed(2)} hrs`)
           parts.push(`${perDay < 1 ? perDay.toFixed(3) : perDay.toLocaleString()} plants/hr`)
-          parts.push(`${fmt2(unitPrice)}/ea`)
+          parts.push(`${fmt2(unitPrice)} per Each`)
         }
         return {
           key: i,

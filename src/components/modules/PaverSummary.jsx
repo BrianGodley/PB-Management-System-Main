@@ -21,31 +21,31 @@ function paverSections(f, isSub) {
             [r.paverBrand, r.paverName].filter(Boolean).join(' ') ||
             'Pavers'
       const sub = [r.depth ? `${r.depth}"` : null, r.method].filter(Boolean).join(' · ')
-      return { label, value: `${n(r.sf).toLocaleString()} SF`, sub: sub || undefined }
+      return { label, value: `${n(r.sf).toLocaleString()} Sq Ft`, sub: sub || undefined }
     })
 
   const details = []
   if (f.is80mm) details.push({ label: '80mm pavers', value: 'Yes' })
   if (n(f.straightCutLF) > 0)
-    details.push({ label: 'Straight cut', value: `${n(f.straightCutLF).toLocaleString()} LF` })
+    details.push({ label: 'Straight cut', value: `${n(f.straightCutLF).toLocaleString()} Ln Ft` })
   if (n(f.curvedCutLF) > 0)
-    details.push({ label: 'Curved cut', value: `${n(f.curvedCutLF).toLocaleString()} LF` })
+    details.push({ label: 'Curved cut', value: `${n(f.curvedCutLF).toLocaleString()} Ln Ft` })
   if (n(f.restraintsLF) > 0)
-    details.push({ label: 'Restraints', value: `${n(f.restraintsLF).toLocaleString()} LF` })
+    details.push({ label: 'Restraints', value: `${n(f.restraintsLF).toLocaleString()} Ln Ft` })
   if (n(f.sleevesLF) > 0)
-    details.push({ label: 'Sleeves', value: `${n(f.sleevesLF).toLocaleString()} LF` })
+    details.push({ label: 'Sleeves', value: `${n(f.sleevesLF).toLocaleString()} Ln Ft` })
   if (n(f.vertSoldierLF) > 0)
     details.push({
       label: `Vertical soldier${f.vertType || f.vertPaverName ? ` (${f.vertType || f.vertPaverName})` : ''}`,
-      value: `${n(f.vertSoldierLF).toLocaleString()} LF`,
+      value: `${n(f.vertSoldierLF).toLocaleString()} Ln Ft`,
     })
   if (n(f.sealerSF) > 0)
-    details.push({ label: 'Sealer', value: `${n(f.sealerSF).toLocaleString()} SF` })
+    details.push({ label: 'Sealer', value: `${n(f.sealerSF).toLocaleString()} Sq Ft` })
   if (f.polySand) details.push({ label: 'Poly sand', value: 'Yes' })
   if (n(f.polySandExistingSF) > 0)
     details.push({
       label: 'Poly sand (existing)',
-      value: `${n(f.polySandExistingSF).toLocaleString()} SF`,
+      value: `${n(f.polySandExistingSF).toLocaleString()} Sq Ft`,
     })
   if (n(f.numStones) > 0) details.push({ label: 'Stones', value: `× ${n(f.numStones)}` })
   if (n(f.numColors) > 0) details.push({ label: 'Colors', value: `× ${n(f.numColors)}` })
@@ -102,15 +102,15 @@ export default function PaverSummary({ module }) {
     ['tileConcrete', 'Tile Paver in Concrete'],
     ['permeable', 'Permeable Paver'],
     ['largeFormat', 'Large Format Paver'],
-    ['under500', 'Less than 500 SF'],
+    ['under500', 'Less than 500 Sq Ft'],
   ]
   const si = d.subInstall || {}
   const installRows = SUB_LINES.filter(([k]) => n(si[k]) > 0).map(([k, label]) => ({
     label,
-    value: `${n(si[k]).toLocaleString()} SF`,
+    value: `${n(si[k]).toLocaleString()} Sq Ft`,
   }))
   if (n(d.subSleevesLF) > 0)
-    installRows.push({ label: 'Sleeves', value: `${n(d.subSleevesLF).toLocaleString()} LF` })
+    installRows.push({ label: 'Sleeves', value: `${n(d.subSleevesLF).toLocaleString()} Ln Ft` })
   const subManual = (d.subManualRows || [])
     .filter(r => n(r.subCost) > 0)
     .map((r, i) => ({ label: r.label || `Item ${i + 1}`, value: fmt2(r.subCost) }))

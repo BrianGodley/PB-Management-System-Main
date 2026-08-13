@@ -56,10 +56,10 @@ const CONC_FINISHES = ['Smooth', 'Broom', 'Sanded', 'Salted', 'Exposed Aggregate
 
 // ── Rate-key builders (category 'Steps') ─────────────────────────────────────
 const kPaverForm = form => `Steps - ${form}` // labor LF/hr
-const kConcTypeHrs = t => `Steps - Conc ${t} Hrs/SF` // labor hrs/SF
-const kConcTypeMat = t => `Steps - Conc ${t} $/SF` // material $/SF
-const kFinishHrs = f => `Steps - Finish ${f} Hrs/SF` // labor +hrs/SF
-const kFinishMat = f => `Steps - Finish ${f} $/SF` // material +$/SF
+const kConcTypeHrs = t => `Steps - Conc ${t} Hrs per Sq Ft` // labor hrs per Sq Ft
+const kConcTypeMat = t => `Steps - Conc ${t} $ per Sq Ft` // material $ per Sq Ft
+const kFinishHrs = f => `Steps - Finish ${f} Hrs per Sq Ft` // labor +hrs per Sq Ft
+const kFinishMat = f => `Steps - Finish ${f} $ per Sq Ft` // material +$ per Sq Ft
 const kConcForm = form => `Steps - Conc Form ${form}` // labor multiplier
 
 // Subcontractor pricing is UNIT priced per linear foot — no hourly labor. A
@@ -67,10 +67,10 @@ const kConcForm = form => `Steps - Conc Form ${form}` // labor multiplier
 // base. All stored in material_rates (category 'Steps').
 const kSubPaverBase = 'Steps - Sub Paver Base' // $/LF
 const kSubConcBase = 'Steps - Sub Conc Base' // $/LF
-const kSubForm = form => `Steps - Sub Form ${form}` // +$/LF
+const kSubForm = form => `Steps - Sub Form ${form}` // +$ per Ln Ft
 const kSubGrouted = 'Steps - Sub Grouted' // +$/LF (paver, when grouted)
-const kSubType = t => `Steps - Sub Type ${t}` // +$/LF (concrete type)
-const kSubFinish = f => `Steps - Sub Finish ${f}` // +$/LF (concrete finish)
+const kSubType = t => `Steps - Sub Type ${t}` // +$ per Ln Ft (concrete type)
+const kSubFinish = f => `Steps - Sub Finish ${f}` // +$ per Ln Ft (concrete finish)
 
 const PAVER_FORM_DEFAULT = { Straight: 1.5, Curved: 1.0 } // LF/hr fallbacks
 const SUB_BASE_DEFAULT = 30 // $/LF starting base for every sub step section
@@ -460,8 +460,8 @@ function StepsRatesModal({ open, onClose, onSaved, isSub = false }) {
                 <thead>
                   <tr className="text-gray-400 border-b border-gray-200">
                     <th className="text-left pb-1 font-medium">Type</th>
-                    <th className="text-right pb-1 font-medium">Labor (hrs/SF)</th>
-                    <th className="text-right pb-1 font-medium">Material ($/SF)</th>
+                    <th className="text-right pb-1 font-medium">Labor (hrs per Sq Ft)</th>
+                    <th className="text-right pb-1 font-medium">Material ($ per Sq Ft)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -485,8 +485,8 @@ function StepsRatesModal({ open, onClose, onSaved, isSub = false }) {
                 <thead>
                   <tr className="text-gray-400 border-b border-gray-200">
                     <th className="text-left pb-1 font-medium">Finish</th>
-                    <th className="text-right pb-1 font-medium">+Labor (hrs/SF)</th>
-                    <th className="text-right pb-1 font-medium">+Material ($/SF)</th>
+                    <th className="text-right pb-1 font-medium">+Labor (hrs per Sq Ft)</th>
+                    <th className="text-right pb-1 font-medium">+Material ($ per Sq Ft)</th>
                   </tr>
                 </thead>
                 <tbody>

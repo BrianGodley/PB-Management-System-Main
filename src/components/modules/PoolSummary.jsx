@@ -123,8 +123,8 @@ export default function PoolSummary({ module }) {
             <LineRow
               key={k}
               label={k}
-              value={`${n(s.waterSF).toLocaleString()} SF`}
-              sub={`${n(s.perimLF)} LF perim · ${n(s.maxDepth)}′ max (${avgDepth(s).toFixed(2)}′ avg)`}
+              value={`${n(s.waterSF).toLocaleString()} Sq Ft`}
+              sub={`${n(s.perimLF)} Ln Ft perim · ${n(s.maxDepth)}′ max (${avgDepth(s).toFixed(2)}′ avg)`}
             />
           ))}
         </>
@@ -137,7 +137,7 @@ export default function PoolSummary({ module }) {
           <LineRow
             label={excavation.equipment || '—'}
             value={n(savedCalc.excavHrs) > 0 ? `${n(savedCalc.excavHrs).toFixed(1)} hrs` : 'Sub'}
-            sub={`${n(savedCalc.totalExcavCY).toFixed(1)} CY${n(savedCalc.excavSub) > 0 ? ' · ' + fmt2(savedCalc.excavSub) + ' sub' : ''}`}
+            sub={`${n(savedCalc.totalExcavCY).toFixed(1)} Cu Yd${n(savedCalc.excavSub) > 0 ? ' · ' + fmt2(savedCalc.excavSub) + ' sub' : ''}`}
           />
         </>
       )}
@@ -149,7 +149,7 @@ export default function PoolSummary({ module }) {
           <LineRow
             label="Shotcrete Sub"
             value={fmt2(savedCalc.shotcreteSub)}
-            sub={`${n(savedCalc.totalShotCY).toFixed(1)} CY shell`}
+            sub={`${n(savedCalc.totalShotCY).toFixed(1)} Cu Yd shell`}
           />
         </>
       )}
@@ -167,8 +167,8 @@ export default function PoolSummary({ module }) {
               <LineRow
                 key={k}
                 label={`${k} — ${t.installType || '6" Squares'}`}
-                value={`${lf} LF`}
-                sub={`${hrs.toFixed(1)} hrs · $${n(t.matPricePerSF)}/SF mat${t.waterproof ? ' · WP' : ''}`}
+                value={`${lf} Ln Ft`}
+                sub={`${hrs.toFixed(1)} hrs · $${n(t.matPricePerSF)} per Sq Ft mat${t.waterproof ? ' · WP' : ''}`}
               />
             )
           })}
@@ -188,7 +188,7 @@ export default function PoolSummary({ module }) {
                 <LineRow
                   key={i}
                   label={`${sw.struct} — ${sw.type} × ${sw.qty}`}
-                  value={`${totalLF} LF`}
+                  value={`${totalLF} Ln Ft`}
                   sub={`${(totalLF * def.hrs).toFixed(1)} hrs · ${fmt2(totalLF * def.mat)} mat`}
                 />
               )
@@ -210,7 +210,7 @@ export default function PoolSummary({ module }) {
                 <LineRow
                   key={i}
                   label={`${cr.struct} — ${cr.type}${cr.sided === 'double' ? ' (double)' : ''}`}
-                  value={`${n(cr.lf)} LF`}
+                  value={`${n(cr.lf)} Ln Ft`}
                   sub={`${(totalLF * def.hrs).toFixed(1)} hrs · ${fmt2(totalLF * def.mat)} mat`}
                 />
               )
@@ -228,7 +228,7 @@ export default function PoolSummary({ module }) {
               <LineRow
                 key={i}
                 label={rs.matType}
-                value={`${n(rs.sqft)} SF`}
+                value={`${n(rs.sqft)} Sq Ft`}
                 sub={
                   n(rs.curvePct) > 0
                     ? `${rs.curvePct}% curve · ${rs.corners || 0} corners`

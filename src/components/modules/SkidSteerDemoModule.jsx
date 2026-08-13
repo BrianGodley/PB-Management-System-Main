@@ -1713,8 +1713,8 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 fee: dumpConc,
                 rate: calc.laborConc,
                 rateName: 'Demo - Skid - Concrete SF',
-                rateNote: `${calc.laborConc} hr/100 SF per in deep`,
-                rateUnit: 'hr/100 SF per in deep',
+                rateNote: `${calc.laborConc} hr/100 Sq Ft per in deep`,
+                rateUnit: 'hr/100 Sq Ft per in deep',
               },
               {
                 label: 'Dirt/Rock',
@@ -1725,8 +1725,8 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 fee: dumpDirt,
                 rate: calc.laborDirt,
                 rateName: 'Demo - Skid - Dirt SF',
-                rateNote: `${calc.laborDirt} hr/100 SF per in deep`,
-                rateUnit: 'hr/100 SF per in deep',
+                rateNote: `${calc.laborDirt} hr/100 Sq Ft per in deep`,
+                rateUnit: 'hr/100 Sq Ft per in deep',
               },
               {
                 label: 'Grass/Sod',
@@ -1737,8 +1737,8 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 fee: dumpGreen,
                 rate: calc.laborGrass,
                 rateName: 'Demo - Skid - Grass SF',
-                rateNote: `${calc.laborGrass} hr/100 SF per in deep`,
-                rateUnit: 'hr/100 SF per in deep',
+                rateNote: `${calc.laborGrass} hr/100 Sq Ft per in deep`,
+                rateUnit: 'hr/100 Sq Ft per in deep',
                 extraIcon: null,
               },
               {
@@ -1750,8 +1750,8 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 fee: dumpDirt,
                 rate: calc.laborGradeCut,
                 rateName: 'Demo - Skid - Grade Cut SF',
-                rateNote: `${calc.laborGradeCut} hr/100 SF per in deep`,
-                rateUnit: 'hr/100 SF per in deep',
+                rateNote: `${calc.laborGradeCut} hr/100 Sq Ft per in deep`,
+                rateUnit: 'hr/100 Sq Ft per in deep',
                 extraIcon: null,
               },
             ].map(({ label, sfK, dK, dep, row, rate, rateName, rateNote, rateUnit, extraIcon }) => (
@@ -1839,7 +1839,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 dep: 4,
                 tons: calc.base.tons,
                 hrs: calc.base.hours,
-                note: `½ × ${calc.laborBase} hr/100 SF per in deep`,
+                note: `½ × ${calc.laborBase} hr/100 Sq Ft per in deep`,
               },
               {
                 label: 'Grade Fill',
@@ -1848,7 +1848,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 dep: 4,
                 tons: calc.gradeFill.tons,
                 hrs: calc.gradeFill.hours,
-                note: `${calc.laborGradeFill} hr/100 SF per in deep`,
+                note: `${calc.laborGradeFill} hr/100 Sq Ft per in deep`,
               },
             ].map(({ label, sfK, dK, dep, tons, hrs, note }) => (
               <tr key={label}>
@@ -1902,10 +1902,10 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 dep: 4,
                 tons: calc.jjTons,
                 hrs: calc.jjHrs,
-                note: `${calc.laborJJ} hr/100 SF per in deep`,
+                note: `${calc.laborJJ} hr/100 Sq Ft per in deep`,
                 rate: calc.laborJJ,
                 rateName: 'Demo - Skid - JJ SF',
-                rateUnit: 'hr/100 SF per in deep',
+                rateUnit: 'hr/100 Sq Ft per in deep',
               },
               {
                 label: 'SS Compact',
@@ -1914,10 +1914,10 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 dep: 4,
                 tons: calc.ssCmpTons,
                 hrs: calc.ssCmpHrs,
-                note: `${calc.laborSS} hr/100 SF per in deep`,
+                note: `${calc.laborSS} hr/100 Sq Ft per in deep`,
                 rate: calc.laborSS,
                 rateName: 'Demo - Skid - SS Compact SF',
-                rateUnit: 'hr/100 SF per in deep',
+                rateUnit: 'hr/100 Sq Ft per in deep',
               },
             ].map(({ label, sfK, dK, dep, tons, hrs, note, rate, rateName, rateUnit }) => (
               <tr key={label}>
@@ -1966,7 +1966,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                   <td className={`${td} font-medium text-gray-700`}>
                     <span className="inline-flex items-center gap-1">
                       {label}
-                      <span className="text-gray-400 font-normal">(${rate}/sf)</span>
+                      <span className="text-gray-400 font-normal">(${rate} per Sq Ft)</span>
                     </span>
                   </td>
                   <td className={td}>
@@ -2209,7 +2209,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
             label: 'Small (up to 12")',
             key: 'stumpSmallQty',
             hrs: calc.stumpSmallHrs,
-            sub: `${calc.stumpSmallRate} hrs/ea`,
+            sub: `${calc.stumpSmallRate} hrs per Each`,
             rate: calc.stumpSmallRate,
             rateName: 'Demo - Skid Stump Small',
             subRate: calc.ssSmall,
@@ -2219,7 +2219,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
             label: 'Medium (12"–24")',
             key: 'stumpMedQty',
             hrs: calc.stumpMedHrs,
-            sub: `${calc.stumpMedRate} hrs/ea`,
+            sub: `${calc.stumpMedRate} hrs per Each`,
             rate: calc.stumpMedRate,
             rateName: 'Demo - Skid Stump Medium',
             subRate: calc.ssMed,
@@ -2229,7 +2229,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
             label: 'Large (24"–36")',
             key: 'stumpLargeQty',
             hrs: calc.stumpLargeHrs,
-            sub: `${calc.stumpLargeRate} hrs/ea`,
+            sub: `${calc.stumpLargeRate} hrs per Each`,
             rate: calc.stumpLargeRate,
             rateName: 'Demo - Skid Stump Large',
             subRate: calc.ssLarge,
@@ -2239,7 +2239,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
             label: 'Extra Large (36"–48")',
             key: 'stumpXLQty',
             hrs: calc.stumpXLHrs,
-            sub: `${calc.stumpXLRate} hrs/ea`,
+            sub: `${calc.stumpXLRate} hrs per Each`,
             rate: calc.stumpXLRate,
             rateName: 'Demo - Skid Stump XL',
             subRate: calc.ssXL,

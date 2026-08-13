@@ -370,7 +370,7 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
             <input type="number" value={flatSF} onChange={e => setField('flatSF')(e.target.value)} placeholder="0" className={inp} />
             {!isSub && (
               <p className="text-[11px] text-gray-400 mt-1">
-                {effRate('flatHrsPer1k')} hr / 1,000 SF
+                {effRate('flatHrsPer1k')} hr / 1,000 Sq Ft
               </p>
             )}
           </div>
@@ -381,7 +381,7 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
             <input type="number" value={hillSF} onChange={e => setField('hillSF')(e.target.value)} placeholder="0" className={inp} />
             {!isSub && (
               <p className="text-[11px] text-gray-400 mt-1">
-                {effRate('hillHrsPer1k')} hr / 1,000 SF
+                {effRate('hillHrsPer1k')} hr / 1,000 Sq Ft
               </p>
             )}
           </div>
@@ -404,7 +404,7 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
             <p className="text-[11px] text-gray-400 mt-1">
               Strict price per square foot × area × visits.
               {subRateDefault != null && (cur.subRatePerSF === '' || cur.subRatePerSF == null) && (
-                <span className="ml-1">default {fmt(subRateDefault)}/SF</span>
+                <span className="ml-1">default {fmt(subRateDefault)} per Sq Ft</span>
               )}
             </p>
           </div>
@@ -420,7 +420,7 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm space-y-1.5">
           <div className="flex justify-between">
             <span className="text-gray-500">Total area × visits</span>
-            <span className="font-medium">{(calc.subArea * calc.visits).toLocaleString()} SF</span>
+            <span className="font-medium">{(calc.subArea * calc.visits).toLocaleString()} Sq Ft</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">Rate</span>
@@ -463,7 +463,7 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
           </div>
           <div className="flex justify-between">
             <span className="font-semibold text-gray-700 flex items-center gap-1">
-              Material Cost ({fmt(effRate('materialPer1k'))} / 1,000 SF)
+              Material Cost ({fmt(effRate('materialPer1k'))} / 1,000 Sq Ft)
             </span>
             <span className="font-bold text-gray-900">{fmt(calc.totalMat)}</span>
           </div>

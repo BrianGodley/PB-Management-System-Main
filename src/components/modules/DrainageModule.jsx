@@ -1077,7 +1077,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
             </button>
           </div>
           <p className="text-xs text-gray-400 mt-2 inline-flex items-center gap-1">
-            ${calc.subRatePerLF}/LF × {calc.subLf} LF = ${calc.subDrainCost.toFixed(2)}
+            ${calc.subRatePerLF}/LF × {calc.subLf} Ln Ft = ${calc.subDrainCost.toFixed(2)}
           </p>
         </div>
 
@@ -1294,7 +1294,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                 <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Pipe Type</th>
                 <th className="text-center pb-1 pr-2 font-medium">Linear Feet</th>
-                <th className="text-center pb-1 pr-2 font-medium text-gray-400">$/LF</th>
+                <th className="text-center pb-1 pr-2 font-medium text-gray-400">$ per Ln Ft</th>
                 <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
               </tr>
             </thead>
@@ -1407,7 +1407,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                 <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Pipe Type</th>
                 <th className="text-center pb-1 pr-2 font-medium">Linear Feet</th>
-                <th className="text-center pb-1 pr-2 font-medium text-gray-400">$/LF</th>
+                <th className="text-center pb-1 pr-2 font-medium text-gray-400">$ per Ln Ft</th>
                 <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
               </tr>
             </thead>

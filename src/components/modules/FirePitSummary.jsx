@@ -264,7 +264,7 @@ export default function FirePitSummary({ module }) {
       if (lf <= 0) return null
       const unit = mp(r.type, GAS_LINE_FALLBACK[r.type] ?? 0)
       const labCoef = mp(`${r.type} - Labor Rate`, GAS_LINE_LAB_FALLBACK[r.type] ?? 0)
-      return { label: r.type, qty: `${lf} LF`, mat: lf * unit, hrs: lf * labCoef }
+      return { label: r.type, qty: `${lf} Ln Ft`, mat: lf * unit, hrs: lf * labCoef }
     })
     .filter(Boolean)
   const gasFixtureLines = (epGasRows || [])
@@ -273,7 +273,7 @@ export default function FirePitSummary({ module }) {
       if (qty <= 0) return null
       const unit = mp(r.type, GAS_FIXTURE_FALLBACK[r.type] ?? 0)
       const labCoef = mp(`${r.type} - Labor Rate`, GAS_FIXTURE_LAB_FALLBACK[r.type] ?? 0)
-      return { label: r.type, qty: `${qty} ea`, mat: qty * unit, hrs: qty * labCoef }
+      return { label: r.type, qty: `${qty} Each`, mat: qty * unit, hrs: qty * labCoef }
     })
     .filter(Boolean)
   const gasMat =
@@ -343,18 +343,18 @@ export default function FirePitSummary({ module }) {
       {n(wallLF) > 0 && (
         <>
           <SectionLabel title="Structure" />
-          <LineRow label="Wall Perimeter" value={`${n(wallLF)} LF × ${n(wallHeightIn)}" high`} />
+          <LineRow label="Wall Perimeter" value={`${n(wallLF)} Ln Ft × ${n(wallHeightIn)}" high`} />
           <LineRow
             label="Blocks"
             value={`${totalBlocks.toFixed(0)} (${blocksPerCourse} × ${coursesCount} courses + waste)`}
           />
-          <LineRow label="Footing" value={`${footingCY.toFixed(3)} CY`} />
+          <LineRow label="Footing" value={`${footingCY.toFixed(3)} Cu Yd`} />
           <LineRow
             label="Grout"
-            value={`${groutCY.toFixed(3)} CY (${pctGrouted}% filled)`}
+            value={`${groutCY.toFixed(3)} Cu Yd (${pctGrouted}% filled)`}
             sub={useGroutPump === 'Yes' ? 'Pump' : 'Hand mix'}
           />
-          <LineRow label="Rebar" value={`${totalRebarLF.toFixed(0)} LF`} />
+          <LineRow label="Rebar" value={`${totalRebarLF.toFixed(0)} Ln Ft`} />
           {curveAddHrs > 0 && (
             <LineRow
               label="Curve Add"
@@ -375,7 +375,7 @@ export default function FirePitSummary({ module }) {
         <>
           <SectionLabel title="Wall Caps" />
           {capLines.map((c, i) => (
-            <LineRow key={i} label={c.label} value={`${c.lf} LF`} sub={fmt(c.mat)} />
+            <LineRow key={i} label={c.label} value={`${c.lf} Ln Ft`} sub={fmt(c.mat)} />
           ))}
         </>
       )}
@@ -405,7 +405,7 @@ export default function FirePitSummary({ module }) {
         <>
           <SectionLabel title="Wall Finishes" />
           {finishLines.map((c, i) => (
-            <LineRow key={i} label={c.label} value={`${c.sf} SF`} sub={fmt(c.mat)} />
+            <LineRow key={i} label={c.label} value={`${c.sf} Sq Ft`} sub={fmt(c.mat)} />
           ))}
         </>
       )}

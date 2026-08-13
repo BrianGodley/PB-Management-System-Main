@@ -1356,13 +1356,13 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
               Blocks: <strong>{calc.blockOrdered.toFixed(0)}</strong>
             </span>
             <span>
-              Footing: <strong>{calc.footingCY.toFixed(2)} CY</strong>
+              Footing: <strong>{calc.footingCY.toFixed(2)} Cu Yd</strong>
             </span>
             <span>
-              Rebar: <strong>{calc.rebarLF.toFixed(0)} LF</strong>
+              Rebar: <strong>{calc.rebarLF.toFixed(0)} Ln Ft</strong>
             </span>
             <span>
-              Fill: <strong>{calc.fillCY.toFixed(3)} CY</strong>
+              Fill: <strong>{calc.fillCY.toFixed(3)} Cu Yd</strong>
             </span>
           </div>
         )}
@@ -1423,9 +1423,9 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                   <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
                   <th className="text-center pb-1 pr-2 font-medium">Type</th>
                   <th className="text-center pb-1 pr-2 font-medium">Qty</th>
-                  <th className="text-center pb-1 pr-2 font-medium">$/ea</th>
+                  <th className="text-center pb-1 pr-2 font-medium">$ per Each</th>
                   <th className="text-center pb-1 pr-2 font-medium">Client Provided</th>
-                  <th className="text-center pb-1 pr-2 font-medium">Labor (hrs/ea)</th>
+                  <th className="text-center pb-1 pr-2 font-medium">Labor (hrs per Each)</th>
                   <th className="text-center pb-1 pr-2 font-medium text-gray-400">Material $</th>
                   <th></th>
                 </tr>
@@ -1560,9 +1560,9 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                   <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
                   <th className="text-center pb-1 pr-2 font-medium">Type</th>
                   <th className="text-center pb-1 pr-2 font-medium">Qty</th>
-                  <th className="text-center pb-1 pr-2 font-medium">$/ea</th>
+                  <th className="text-center pb-1 pr-2 font-medium">$ per Each</th>
                   <th className="text-center pb-1 pr-2 font-medium">Client Provided</th>
-                  <th className="text-center pb-1 pr-2 font-medium">Labor (hrs/ea)</th>
+                  <th className="text-center pb-1 pr-2 font-medium">Labor (hrs per Each)</th>
                   <th className="text-center pb-1 pr-2 font-medium text-gray-400">Material $</th>
                   <th></th>
                 </tr>

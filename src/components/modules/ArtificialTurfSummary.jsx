@@ -48,7 +48,7 @@ export default function ArtificialTurfSummary({ module }) {
     const dd = (ih.demo || {})[row.key] || {}
     return {
       label: `${row.label} · ${dd.method || 'Skid Steer Good'}`,
-      value: `${n(dd.sf).toLocaleString()} SF`,
+      value: `${n(dd.sf).toLocaleString()} Sq Ft`,
       sub: `${n(dd.inches) || 4}" depth`,
       sf: n(dd.sf),
     }
@@ -62,26 +62,26 @@ export default function ArtificialTurfSummary({ module }) {
         .filter(r => n(r.sf) > 0 || turfAreaSF > 0)
         .map(r => ({
           label: BASE_LABELS[r.material] || r.material || 'Base',
-          value: `${(n(r.sf) || turfAreaSF).toLocaleString()} SF`,
+          value: `${(n(r.sf) || turfAreaSF).toLocaleString()} Sq Ft`,
         }))
     : []
 
   // ── Turf Installation ───────────────────────────────────────────────────────
   const rollInHouse = (ih.rolls || [])
     .filter(r => n(r.edgeLF) > 0)
-    .map(r => ({ label: brandLabel(d.materialRows, r.brand), value: `${n(r.edgeLF).toLocaleString()} LF edge` }))
+    .map(r => ({ label: brandLabel(d.materialRows, r.brand), value: `${n(r.edgeLF).toLocaleString()} Ln Ft edge` }))
   const rollSub = (sub.rolls || [])
     .filter(r => n(r.installSF) > 0)
-    .map(r => ({ label: brandLabel(d.materialRows, r.brand), value: `${n(r.installSF).toLocaleString()} SF` }))
+    .map(r => ({ label: brandLabel(d.materialRows, r.brand), value: `${n(r.installSF).toLocaleString()} Sq Ft` }))
 
   // ── Turf Strips ─────────────────────────────────────────────────────────────
   const stripRows =
     n(ih.strips?.lf) > 0
-      ? [{ label: 'Turf Strips', value: `${n(ih.strips.lf).toLocaleString()} LF` }]
+      ? [{ label: 'Turf Strips', value: `${n(ih.strips.lf).toLocaleString()} Ln Ft` }]
       : []
   const subStripRows =
     n(sub.strips?.lf) > 0
-      ? [{ label: 'Turf Strips', value: `${n(sub.strips.lf).toLocaleString()} LF` }]
+      ? [{ label: 'Turf Strips', value: `${n(sub.strips.lf).toLocaleString()} Ln Ft` }]
       : []
 
   // ── Manual ─────────────────────────────────────────────────────────────────

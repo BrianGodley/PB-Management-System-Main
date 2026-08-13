@@ -41,7 +41,7 @@ export default function DrainageSummary({ module }) {
         .filter(r => n(r.lf) > 0)
         .map(r => ({
           label: r.equipment || 'Trench',
-          value: `${n(r.lf)} LF`,
+          value: `${n(r.lf)} Ln Ft`,
           sub: n(r.width) || n(r.depth) ? `${n(r.width)}"W × ${n(r.depth)}"D` : undefined,
         })),
     },
@@ -49,7 +49,7 @@ export default function DrainageSummary({ module }) {
       title: 'Drain Pipe',
       rows: (d.pipeRows || [])
         .filter(r => n(r.lf) > 0)
-        .map(r => ({ label: r.type, value: `${n(r.lf)} LF` })),
+        .map(r => ({ label: r.type, value: `${n(r.lf)} Ln Ft` })),
     },
     {
       title: 'Drain Fixtures',
@@ -73,7 +73,7 @@ export default function DrainageSummary({ module }) {
       title: 'Trenching',
       rows: (d.subTrenchRows || [])
         .filter(r => n(r.lf) > 0)
-        .map(r => ({ label: 'Trenching', value: `${n(r.lf)} LF` })),
+        .map(r => ({ label: 'Trenching', value: `${n(r.lf)} Ln Ft` })),
     },
     {
       title: 'Drain Fixtures',

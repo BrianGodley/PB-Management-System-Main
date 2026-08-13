@@ -1558,7 +1558,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             step="1"
           />
         </div>
-        {/* Delivery — auto when any paver is selected, billed per 900 SF
+        {/* Delivery — auto when any paver is selected, billed per 900 Sq Ft
             increment. Read-only display; the per-increment rate is editable
             via the View Rates popup. */}
         <div>
@@ -1572,7 +1572,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
               </div>
               <p className="text-xs text-gray-400 mt-0.5">
                 {calc.deliveryIncrements} × {fmt2(calc.deliveryFlat)} (
-                {calc.matInstallSF.toLocaleString()} SF ÷ {calc.deliverySFPerIncrement})
+                {calc.matInstallSF.toLocaleString()} Sq Ft ÷ {calc.deliverySFPerIncrement})
               </p>
             </>
           ) : (
@@ -1725,7 +1725,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
               <td className={`${td} font-medium text-gray-700`}>
                 <span className="inline-flex items-center gap-1">
                   Install{' '}
-                  <span className="text-gray-400 font-normal">({calc.installRate} SF/hr)</span>
+                  <span className="text-gray-400 font-normal">({calc.installRate} Sq Ft/hr)</span>
                 </span>
               </td>
               <td className={td}>
@@ -1746,14 +1746,14 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                     ({laborRates['Paver - Poly Sand New'] ?? LABOR_DEFAULTS.polySandSpread}{' '}
                     hrs/SF)
                   </span>
-                  <span className="text-gray-400 font-normal">· ${calc.polySandPerSF}/SF mat</span>
+                  <span className="text-gray-400 font-normal">· ${calc.polySandPerSF} per Sq Ft mat</span>
                 </span>
               </td>
               <td className={td}>
                 <Inp
                   value={state.polySandNewSF}
                   onChange={e => set('polySandNewSF', e.target.value)}
-                  placeholder="0 SF"
+                  placeholder="0 Sq Ft"
                 />
               </td>
               <td className={num}>{fh(calc.polySandHrs)}</td>
@@ -1777,7 +1777,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                 <Inp
                   value={state.polySandExistingSF}
                   onChange={e => set('polySandExistingSF', e.target.value)}
-                  placeholder="0 SF"
+                  placeholder="0 Sq Ft"
                 />
               </td>
               <td className={num}>{fh(calc.polySandExistingHrs)}</td>
@@ -1797,7 +1797,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                 <Inp
                   value={state.mm80SF}
                   onChange={e => set('mm80SF', e.target.value)}
-                  placeholder="0 SF"
+                  placeholder="0 Sq Ft"
                 />
               </td>
               <td className={num}>{fh(calc.add80mmHrs)}</td>
@@ -1912,15 +1912,15 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
               <td className={`${td} font-medium text-gray-700`}>
                 <span className="inline-flex items-center gap-1 flex-wrap">
                   Sealer{' '}
-                  <span className="text-gray-400 font-normal">({calc.sealerRate} SF/hr)</span>
-                  <span className="text-gray-400 font-normal">· ${calc.sealerMatPerSF}/SF mat</span>
+                  <span className="text-gray-400 font-normal">({calc.sealerRate} Sq Ft/hr)</span>
+                  <span className="text-gray-400 font-normal">· ${calc.sealerMatPerSF} per Sq Ft mat</span>
                 </span>
               </td>
               <td className={td}>
                 <Inp
                   value={state[kSealer]}
                   onChange={e => set(kSealer, e.target.value)}
-                  placeholder="0 SF"
+                  placeholder="0 Sq Ft"
                 />
               </td>
               <td className={num}>{fh(calc.sealerHrs)}</td>
@@ -1973,7 +1973,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                     <Inp
                       value={state[kSleeves]}
                       onChange={e => set(kSleeves, e.target.value)}
-                      placeholder="0 LF"
+                      placeholder="0 Ln Ft"
                     />
                   </td>
                   <td className={num}>

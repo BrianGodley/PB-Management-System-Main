@@ -75,7 +75,7 @@ export default function LightingSummary({ module }) {
         const watts = isFixture && item ? qty * n(item.watts) : 0
         const subParts = []
         if (!isSub && hrs > 0) subParts.push(`${hrs.toFixed(2)} hrs`)
-        if (isSub) subParts.push(`${fmt2(eachSub)}/ea`)
+        if (isSub) subParts.push(`${fmt2(eachSub)} per Each`)
         if (isFixture && watts > 0) subParts.push(`${watts.toFixed(1)} W`)
         return {
           key: `${subcat}-${i}`,

@@ -73,7 +73,7 @@ export default function WeedAbatementSummary({ module }) {
       {isSub ? (
         <>
           <SectionLabel title="Subcontractor" />
-          <LineRow label="Total Area × Visits" value={`${totalAreaVisits.toLocaleString()} SF`} />
+          <LineRow label="Total Area × Visits" value={`${totalAreaVisits.toLocaleString()} Sq Ft`} />
           <LineRow label="Rate" value={`${fmt(calc.subRatePerSF)} / SF`} />
           {n(calc.subFlat) > 0 && <LineRow label="Flat Add" value={fmt(calc.subFlat)} />}
           <LineRow label="Subcontractor Cost" value={fmt(calc.subCost)} highlight />

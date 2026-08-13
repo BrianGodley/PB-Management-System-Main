@@ -159,7 +159,7 @@ export default function SendToEstimateModal({ takeoff, unit = 'ft', drawingName 
       // Human-readable notes for every mapped quantity (context + fallback).
       const lines = []
       g.area.forEach(a => lines.push(`Area — ${a.name}: ${Math.round(a.area)} ${areaUnit}`))
-      g.linear.forEach(l => lines.push(`Linear — ${l.name}: ${Math.round(l.length)} LF`))
+      g.linear.forEach(l => lines.push(`Linear — ${l.name}: ${Math.round(l.length)} Ln Ft`))
       g.selection.forEach(s => lines.push(`${s.qty}× ${s.label}${s.category ? ` (${s.category})` : ''}${s.extended != null ? ` = $${s.extended.toFixed(2)}` : ''}`))
       const notes = `From CAD takeoff "${drawingName || 'drawing'}":\n${lines.join('\n')}`
 
@@ -342,7 +342,7 @@ export default function SendToEstimateModal({ takeoff, unit = 'ft', drawingName 
                     <div className="space-y-1">
                       {linRows.map(r => (
                         <div key={r.layer} className="flex items-center gap-2 text-sm">
-                          <span className="flex-1 truncate text-gray-700">{r.name} <span className="text-gray-400">· {Math.round(r.length)} LF</span></span>
+                          <span className="flex-1 truncate text-gray-700">{r.name} <span className="text-gray-400">· {Math.round(r.length)} Ln Ft</span></span>
                           <TargetSelect value={linTargets[r.layer]} onChange={v => setLinTargets(m => ({ ...m, [r.layer]: v }))} />
                         </div>
                       ))}

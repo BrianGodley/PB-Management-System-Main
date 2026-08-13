@@ -175,7 +175,7 @@ export default function ColumnsSummary({ module }) {
       const r = ROW_CALC[type](c, materialPrices, materialRows) || { mat: 0, hrs: 0 }
       installLines.push({
         key: `${type}-${i}`,
-        label: `${type} — ${n(c.qty)} ea · ${n(c.heightIn)}"×${n(c.widthIn)}"`,
+        label: `${type} — ${n(c.qty)} Each · ${n(c.heightIn)}"×${n(c.widthIn)}"`,
         value: fmt2(r.mat),
         sub: `${n(r.hrs).toFixed(2)} hrs labor`,
       })
@@ -202,9 +202,9 @@ export default function ColumnsSummary({ module }) {
         const mat = n(r.qty) * flat
         return {
           key: i,
-          label: `${r.type} — ${n(r.qty)} SF`,
+          label: `${r.type} — ${n(r.qty)} Sq Ft`,
           value: fmt2(mat),
-          sub: `${fmt2(flat)}/SF flat  ·  ${vLabel}`,
+          sub: `${fmt2(flat)} per Sq Ft flat  ·  ${vLabel}`,
         }
       }
       const isTon = rate.unit === 'ton'

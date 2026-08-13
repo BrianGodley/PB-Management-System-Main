@@ -66,14 +66,14 @@ const RATE_DEFAULTS = {
   turfCutRate: 1.0, // PH for cut/staple/seam (TurfCutRate)
   stripLFHr: 12.5, // LF/hr for narrow/custom strips — equals legacy (LF/100)*8
 
-  weedFabricHrPer1kSF: 8, // hrs per 1000 SF for weed fabric — (SF/1000)*8
+  weedFabricHrPer1kSF: 8, // hrs per 1000 Sq Ft for weed fabric — (SF/1000)*8
   // Material rates
   gravelBase: 6.9, // $/ton (Gravel Base — $6.90/ton)
   dgBase: 57.5, // $/ton (DG Base)
-  weedFabric: 165.0, // $/roll (per 1800 SF)
+  weedFabric: 165.0, // $/roll (per 1800 Sq Ft)
   installMaterials: 0.14, // $/LF (staples $0.029 + seam $0.050 + nails $0.061 per SF, × LF)
   infillDurafill: 0.62, // $/SF (TurfInfillSF)
-  infillZeoFill: 30.0, // $/bag (per 30 SF)
+  infillZeoFill: 30.0, // $/bag (per 30 Sq Ft)
   // Pricing factors — from Excel Module #1 O3/O4
   laborBurden: 0.29, // 29% burden on labor cost (Module #1 O4)
   commissionRate: 0.12, // 12% commission on gross profit (Module #1 O3 = Comm)
@@ -1520,7 +1520,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           <div className="mt-2 bg-gray-50 rounded-lg px-3 py-2 text-xs flex justify-between">
             <span className="text-gray-600 font-medium inline-flex items-center gap-1">
               Cut, Staple &amp; Seam
-              <span className="text-gray-400 font-normal ml-1">({calc.totalEdgeLF} LF total)</span>
+              <span className="text-gray-400 font-normal ml-1">({calc.totalEdgeLF} Ln Ft total)</span>
             </span>
             <div className="flex gap-4">
               {!calc.isSub && <span className="text-gray-700">{fh(calc.cutHrs)} hrs</span>}
@@ -1537,7 +1537,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
             <span className="text-gray-600 font-medium">
               {T.useZeoFill ? 'ZeoFill Pet Infill' : 'Durafill Infill'}
               <span className="text-gray-400 font-normal ml-2">
-                ({calc.infillAreaSF.toLocaleString()} SF)
+                ({calc.infillAreaSF.toLocaleString()} Sq Ft)
               </span>
             </span>
             <span className="text-gray-700">{fmt2(calc.infillMat)}</span>
@@ -1552,13 +1552,13 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           {calc.isSub ? (
             <>
               For narrow strips that don't come off a standard 15' roll. Flat subcontractor rate:{' '}
-              <span className="text-gray-600">${calc.subStripPerLF}/LF</span> + brand material ($/SF).
+              <span className="text-gray-600">${calc.subStripPerLF} per Ln Ft</span> + brand material ($ per Sq Ft).
             </>
           ) : (
             <>
               For narrow strips that don't come off a standard 15' roll. Row edits both rates:{' '}
-              <span className="text-gray-600">material</span> ($/SF, per brand) and{' '}
-              <span className="text-gray-600">install labor</span> ({calc.stripLFHr} LF/hr).
+              <span className="text-gray-600">material</span> ($ per Sq Ft, per brand) and{' '}
+              <span className="text-gray-600">install labor</span> ({calc.stripLFHr} Ln Ft/hr).
             </>
           )}
         </div>
@@ -1764,11 +1764,11 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       {/* Turf area context chip */}
       {calc.turfAreaSF > 0 && (
         <div className="flex gap-3 text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
-          <span className="font-medium text-gray-700">{calc.turfAreaSF.toLocaleString()} SF</span>
+          <span className="font-medium text-gray-700">{calc.turfAreaSF.toLocaleString()} Sq Ft</span>
           <span>turf area</span>
           {calc.infillAreaSF !== calc.turfAreaSF && (
             <span className="text-gray-400">
-              · {calc.infillAreaSF.toLocaleString()} SF infill base
+              · {calc.infillAreaSF.toLocaleString()} Sq Ft infill base
             </span>
           )}
         </div>

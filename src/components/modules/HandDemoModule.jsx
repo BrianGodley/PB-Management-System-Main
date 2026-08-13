@@ -880,7 +880,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
 
   // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
   //    that used to have an inline RateEditPopover in this module now lives here.
-  const coefRate = (label, name, value, unitLabel = 'hr/100 SF per in deep') => ({
+  const coefRate = (label, name, value, unitLabel = 'hr/100 Sq Ft per in deep') => ({
     label, table: 'labor_rates', name, category: 'Demo', mode: 'coefficient', unitLabel, value,
   })
   const subcRate = (label, name, value, unitLabel = 'ea') => ({
@@ -1205,8 +1205,8 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 fee: dumpConc,
                 rate: calc.laborConc,
                 rateName: 'Demo - Hand - Concrete SF',
-                rateNote: `${calc.laborConc} hr/100 SF per in deep`,
-                rateUnit: 'hr/100 SF per in deep',
+                rateNote: `${calc.laborConc} hr/100 Sq Ft per in deep`,
+                rateUnit: 'hr/100 Sq Ft per in deep',
               },
               {
                 label: 'Dirt/Rock',
@@ -1217,8 +1217,8 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 fee: dumpDirt,
                 rate: calc.laborDirt,
                 rateName: 'Demo - Hand - Dirt SF',
-                rateNote: `${calc.laborDirt} hr/100 SF per in deep`,
-                rateUnit: 'hr/100 SF per in deep',
+                rateNote: `${calc.laborDirt} hr/100 Sq Ft per in deep`,
+                rateUnit: 'hr/100 Sq Ft per in deep',
               },
               {
                 label: 'Grass/Sod',
@@ -1229,8 +1229,8 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 fee: dumpGreen,
                 rate: calc.laborGrass,
                 rateName: 'Demo - Hand - Grass SF',
-                rateNote: `${calc.laborGrass} hr/100 SF per in deep`,
-                rateUnit: 'hr/100 SF per in deep',
+                rateNote: `${calc.laborGrass} hr/100 Sq Ft per in deep`,
+                rateUnit: 'hr/100 Sq Ft per in deep',
               },
               {
                 label: 'Grade Cut',
@@ -1241,8 +1241,8 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 fee: 0,
                 rate: calc.laborGradeCut,
                 rateName: 'Demo - Hand - Grade Cut SF',
-                rateNote: `${calc.laborGradeCut} hr/100 SF per in deep`,
-                rateUnit: 'hr/100 SF per in deep',
+                rateNote: `${calc.laborGradeCut} hr/100 Sq Ft per in deep`,
+                rateUnit: 'hr/100 Sq Ft per in deep',
               },
             ].map(({ label, sfK, dK, dep, row, rate, rateName, rateNote, rateUnit, extraIcon }) => (
               <tr key={label}>
@@ -1292,7 +1292,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             <p className="text-xs text-gray-500 mb-0.5 inline-flex items-center gap-1">
               Rebar SF
               <span className="text-gray-400 font-normal">
-                (1 hr per {calc.rebarSfPerHr} SF)
+                (1 hr per {calc.rebarSfPerHr} Sq Ft)
               </span>
             </p>
             <Inp
@@ -1333,7 +1333,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 4,
                 tons: calc.base.tons,
                 hrs: calc.base.hours,
-                note: `½ × ${calc.laborBase} hr/100 SF per in deep`,
+                note: `½ × ${calc.laborBase} hr/100 Sq Ft per in deep`,
               },
               {
                 label: 'Grade Fill',
@@ -1342,7 +1342,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 4,
                 tons: calc.gradeFill.tons,
                 hrs: calc.gradeFill.hours,
-                note: `${calc.laborGradeFill} hr/100 SF per in deep`,
+                note: `${calc.laborGradeFill} hr/100 Sq Ft per in deep`,
               },
             ].map(({ label, sfK, dK, dep, tons, hrs, note }) => (
               <tr key={label}>
@@ -1396,10 +1396,10 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 4,
                 tons: 0,
                 hrs: calc.jjHrs,
-                note: `${calc.laborJJ} hr/100 SF per in deep`,
+                note: `${calc.laborJJ} hr/100 Sq Ft per in deep`,
                 rate: calc.laborJJ,
                 rateName: 'Demo - Hand - JJ SF',
-                rateUnit: 'hr/100 SF per in deep',
+                rateUnit: 'hr/100 Sq Ft per in deep',
               },
             ].map(({ label, sfK, dK, dep, tons, hrs, note, rate, rateName, rateUnit }) => (
               <tr key={label}>
@@ -1452,7 +1452,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                   <td className={`${td} font-medium text-gray-700`}>
                     <span className="inline-flex items-center gap-1">
                       {label}
-                      <span className="text-gray-400 font-normal">(${rate}/sf)</span>
+                      <span className="text-gray-400 font-normal">(${rate} per Sq Ft)</span>
                     </span>
                   </td>
                   <td className={td}>
@@ -1761,7 +1761,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             label: 'Small (up to 12")',
             key: 'stumpSmallQty',
             hrs: calc.stumpSmallHrs,
-            sub: `${calc.stumpSmallRate} hrs/ea`,
+            sub: `${calc.stumpSmallRate} hrs per Each`,
             rate: calc.stumpSmallRate,
             rateName: 'Demo - Hand Stump Small',
             subRate: calc.ssSmall,
@@ -1771,7 +1771,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             label: 'Medium (12"–24")',
             key: 'stumpMedQty',
             hrs: calc.stumpMedHrs,
-            sub: `${calc.stumpMedRate} hrs/ea`,
+            sub: `${calc.stumpMedRate} hrs per Each`,
             rate: calc.stumpMedRate,
             rateName: 'Demo - Hand Stump Medium',
             subRate: calc.ssMed,
@@ -1781,7 +1781,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             label: 'Large (24"–36")',
             key: 'stumpLargeQty',
             hrs: calc.stumpLargeHrs,
-            sub: `${calc.stumpLargeRate} hrs/ea`,
+            sub: `${calc.stumpLargeRate} hrs per Each`,
             rate: calc.stumpLargeRate,
             rateName: 'Demo - Hand Stump Large',
             subRate: calc.ssLarge,
@@ -1791,7 +1791,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             label: 'Extra Large (36"–48")',
             key: 'stumpXLQty',
             hrs: calc.stumpXLHrs,
-            sub: `${calc.stumpXLRate} hrs/ea`,
+            sub: `${calc.stumpXLRate} hrs per Each`,
             rate: calc.stumpXLRate,
             rateName: 'Demo - Hand Stump XL',
             subRate: calc.ssXL,

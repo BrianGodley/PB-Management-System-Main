@@ -375,7 +375,7 @@ function computeWallRow(row, mp, materialRows) {
       break
     case 'Tile':
       hrs = sf > 0 ? sf * lab('tileLab') : 0
-      mat = sf > 0 ? sf * price('tile') + sf * lab('tileAdhesive') : 0 // adhesive/grout $/SF
+      mat = sf > 0 ? sf * price('tile') + sf * lab('tileAdhesive') : 0 // adhesive/grout $ per Sq Ft
       subUnit = price('tile') + lab('tileAdhesive')
       break
     case 'Real Flagstone': {

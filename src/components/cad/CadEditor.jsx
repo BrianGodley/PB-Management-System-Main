@@ -343,7 +343,7 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
   const areaLabel = unit === 'ft' ? 'SF' : `${unit}²`;
   const fmtLen = (v) => `${v.toFixed(1)} ${lenUnit}`;
   const fmtArea = (v) => `${v.toFixed(1)} ${areaLabel}`;
-  const fmtLF = (v) => `${v.toFixed(1)} LF`; // linear takeoff label
+  const fmtLF = (v) => `${v.toFixed(1)} Ln Ft`; // linear takeoff label
   const fmtMoney = (v) =>
     `$${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -1171,7 +1171,7 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
       shape = <polygon points={ent.points.map((pt) => `${pt.x},${pt.y}`).join(' ')} {...common} />;
     } else if (ent.type === 'circle') {
       const c = ent.points[0];
-      shape = <circle cx={c.x} cy={c.y} r={p.radius || 0} {...common} />;
+      shape = <circle cx={c.x} Cu Yd={c.y} r={p.radius || 0} {...common} />;
     } else if (ent.type === 'text') {
       const c = ent.points[0];
       const fs = p.fontSize || 1;
@@ -1218,7 +1218,7 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
             </>
           ) : (
             <>
-              <circle cx={c.x} cy={c.y} r={half} fill={fillColor} stroke={stroke} strokeWidth={1} vectorEffect="non-scaling-stroke" />
+              <circle cx={c.x} Cu Yd={c.y} r={half} fill={fillColor} stroke={stroke} strokeWidth={1} vectorEffect="non-scaling-stroke" />
               <text
                 x={c.x}
                 y={c.y}
@@ -1337,7 +1337,7 @@ export default function CadEditor({ drawing, onBack, onSaved }) {
     if (draft.type === 'circle') {
       const c = draft.points[0];
       const r = Math.hypot(cursor.x - c.x, cursor.y - c.y);
-      return <circle cx={c.x} cy={c.y} r={r} {...pv} />;
+      return <circle cx={c.x} Cu Yd={c.y} r={r} {...pv} />;
     }
     if (draft.type === 'polyline' || draft.type === 'polygon') {
       const pts = [...draft.points, cursor];

@@ -323,7 +323,7 @@ export default function GroundTreatmentsSummary({ module }) {
       }
       return {
         key: i,
-        label: `Planter Prep${r.type ? ` (${r.type})` : ''}${tilling && tilling !== 'None' ? ` · ${tilling} till` : ''} — ${n(r.area).toLocaleString()} SF`,
+        label: `Planter Prep${r.type ? ` (${r.type})` : ''}${tilling && tilling !== 'None' ? ` · ${tilling} till` : ''} — ${n(r.area).toLocaleString()} Sq Ft`,
         value: fmt2(mat),
         sub: `${hrs.toFixed(2)} hrs`,
       }
@@ -359,7 +359,7 @@ export default function GroundTreatmentsSummary({ module }) {
       }
       return {
         key: i,
-        label: `Sod Prep${r.type ? ` (${r.type})` : ''}${tilling && tilling !== 'None' ? ` · ${tilling} till` : ''} — ${n(r.area).toLocaleString()} SF`,
+        label: `Sod Prep${r.type ? ` (${r.type})` : ''}${tilling && tilling !== 'None' ? ` · ${tilling} till` : ''} — ${n(r.area).toLocaleString()} Sq Ft`,
         value: fmt2(mat),
         sub: `${hrs.toFixed(2)} hrs`,
       }
@@ -381,9 +381,9 @@ export default function GroundTreatmentsSummary({ module }) {
       const hrs = n(r.sf) * mp(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback)
       return {
         key: i,
-        label: `Sod${r.type ? ` (${r.type})` : ''} — ${n(r.sf).toLocaleString()} SF`,
+        label: `Sod${r.type ? ` (${r.type})` : ''} — ${n(r.sf).toLocaleString()} Sq Ft`,
         value: fmt2(mat),
-        sub: `${hrs.toFixed(2)} hrs · ${fmt2(rate)}/SF`,
+        sub: `${hrs.toFixed(2)} hrs · ${fmt2(rate)} per Sq Ft`,
       }
     })
     .filter(Boolean)
@@ -454,9 +454,9 @@ export default function GroundTreatmentsSummary({ module }) {
       }
       return {
         key: i,
-        label: `${r.type || 'Mulch'} — ${n(r.sf).toLocaleString()} SF × ${n(r.depth)}"${fabric ? ' · weed fabric' : ''}`,
+        label: `${r.type || 'Mulch'} — ${n(r.sf).toLocaleString()} Sq Ft × ${n(r.depth)}"${fabric ? ' · weed fabric' : ''}`,
         value: fmt2(mat),
-        sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} CY`,
+        sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} Cu Yd`,
       }
     })
     .filter(Boolean)
@@ -503,9 +503,9 @@ export default function GroundTreatmentsSummary({ module }) {
       }
       return {
         key: i,
-        label: `${r.type || 'D.G.'} — ${n(r.sf).toLocaleString()} SF @ ${n(r.depth)}" (${r.method}${cement ? ', cement' : ''}${fabric ? ', fabric' : ''})`,
+        label: `${r.type || 'D.G.'} — ${n(r.sf).toLocaleString()} Sq Ft @ ${n(r.depth)}" (${r.method}${cement ? ', cement' : ''}${fabric ? ', fabric' : ''})`,
         value: fmt2(mat),
-        sub: `${hrs.toFixed(2)} hrs · ${tons.toFixed(2)} tons`,
+        sub: `${hrs.toFixed(2)} hrs · ${tons.toFixed(2)} Tons`,
       }
     })
     .filter(Boolean)
@@ -530,9 +530,9 @@ export default function GroundTreatmentsSummary({ module }) {
       const hrs = excavLab + fabricLab
       return {
         key: i,
-        label: `Gravel #${i + 1}${r.type ? ` (${r.type})` : ''} — ${n(r.sf).toLocaleString()} SF × ${n(r.depthIn)}" (${r.method})`,
+        label: `Gravel #${i + 1}${r.type ? ` (${r.type})` : ''} — ${n(r.sf).toLocaleString()} Sq Ft × ${n(r.depthIn)}" (${r.method})`,
         value: fmt2(mat),
-        sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} CY · $${costPerCY.toFixed ? costPerCY.toFixed(2) : costPerCY}/CY`,
+        sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} Cu Yd · $${costPerCY.toFixed ? costPerCY.toFixed(2) : costPerCY} per Cu Yd`,
       }
     })
     .filter(Boolean)
@@ -560,9 +560,9 @@ export default function GroundTreatmentsSummary({ module }) {
       const hrs = excavLab + fabricLab
       return {
         key: i,
-        label: `Pebble #${i + 1}${r.type ? ` (${r.type})` : ''} — ${n(r.sf).toLocaleString()} SF × ${n(r.depthIn)}" (${r.method})`,
+        label: `Pebble #${i + 1}${r.type ? ` (${r.type})` : ''} — ${n(r.sf).toLocaleString()} Sq Ft × ${n(r.depthIn)}" (${r.method})`,
         value: fmt2(mat),
-        sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} CY · $${costPerCY.toFixed ? costPerCY.toFixed(2) : costPerCY}/CY`,
+        sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} Cu Yd · $${costPerCY.toFixed ? costPerCY.toFixed(2) : costPerCY} per Cu Yd`,
       }
     })
     .filter(Boolean)
@@ -590,9 +590,9 @@ export default function GroundTreatmentsSummary({ module }) {
       const hrs = excavLab + fabricLab
       return {
         key: i,
-        label: `Cobble #${i + 1}${r.type ? ` (${r.type})` : ''} — ${n(r.sf).toLocaleString()} SF × ${n(r.depthIn)}" (${r.method})`,
+        label: `Cobble #${i + 1}${r.type ? ` (${r.type})` : ''} — ${n(r.sf).toLocaleString()} Sq Ft × ${n(r.depthIn)}" (${r.method})`,
         value: fmt2(mat),
-        sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} CY · $${costPerCY.toFixed ? costPerCY.toFixed(2) : costPerCY}/CY`,
+        sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} Cu Yd · $${costPerCY.toFixed ? costPerCY.toFixed(2) : costPerCY} per Cu Yd`,
       }
     })
     .filter(Boolean)
@@ -618,9 +618,9 @@ export default function GroundTreatmentsSummary({ module }) {
     const mat = n(ih.edgingLF) * rate
     const hrs = n(ih.edgingLF) * labRate
     edgingLines.push({
-      label: `${ih.edgingType} Edging — ${n(ih.edgingLF).toLocaleString()} LF`,
+      label: `${ih.edgingType} Edging — ${n(ih.edgingLF).toLocaleString()} Ln Ft`,
       value: fmt2(mat),
-      sub: `${hrs.toFixed(2)} hrs · ${fmt2(rate)}/LF`,
+      sub: `${hrs.toFixed(2)} hrs · ${fmt2(rate)} per Ln Ft`,
     })
   }
 
@@ -690,9 +690,9 @@ export default function GroundTreatmentsSummary({ module }) {
     const hrs = sfPerDay > 0 ? (def.sf / sfPerDay) * 8 : 0
     const typeSuffix = savedType && savedType !== def.houseType ? ` · ${savedType}` : ''
     stepperLines.push({
-      label: `${def.label} — ${def.sf.toLocaleString()} SF`,
+      label: `${def.label} — ${def.sf.toLocaleString()} Sq Ft`,
       value: fmt2(mat),
-      sub: `${hrs.toFixed(2)} hrs · ${tons.toFixed(2)} tons · ${fmt2(rate)}/ton${typeSuffix}`,
+      sub: `${hrs.toFixed(2)} hrs · ${tons.toFixed(2)} Tons · ${fmt2(rate)} per Tons${typeSuffix}`,
     })
   })
 

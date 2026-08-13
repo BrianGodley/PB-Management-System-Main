@@ -1721,10 +1721,10 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         {calc.totalExcavCY > 0 && (
           <div className="mt-2 flex gap-4 text-xs text-gray-500 px-1">
             <span>
-              Excavation: <strong>{calc.totalExcavCY.toFixed(1)} CY</strong>
+              Excavation: <strong>{calc.totalExcavCY.toFixed(1)} Cu Yd</strong>
             </span>
             <span>
-              Shotcrete shell: <strong>{calc.totalShotCY.toFixed(1)} CY</strong>
+              Shotcrete shell: <strong>{calc.totalShotCY.toFixed(1)} Cu Yd</strong>
             </span>
           </div>
         )}
@@ -1782,7 +1782,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         </div>
         {calc.excavHrs > 0 && (
           <p className="text-xs text-gray-500 mt-2 px-1">
-            {EXCAVATION_RATES[T.excavation.equipment] ?? '—'} CY/hr →{' '}
+            {EXCAVATION_RATES[T.excavation.equipment] ?? '—'} Cu Yd/hr →{' '}
             <strong>{calc.excavHrs.toFixed(1)} hrs</strong>
           </p>
         )}
@@ -1815,7 +1815,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           </div>
           <div className="flex items-end pb-1">
             <p className="text-xs text-gray-400 inline-flex items-center flex-wrap gap-x-1">
-              {calc.totalShotCY.toFixed(1)} CY × $
+              {calc.totalShotCY.toFixed(1)} Cu Yd × $
               {subRates['Shotcrete Material'] ?? SHOTCRETE_MAT_PER_CY}/CY mat + max($
               {(subRates['Shotcrete Minimum Labor'] ?? SHOTCRETE_LABOR_MIN).toLocaleString()}, CY × $
               {subRates['Shotcrete Labor'] ?? SHOTCRETE_LABOR_PER_CY}/CY lab)
@@ -1868,7 +1868,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                       </div>
                     </div>
                     <div>
-                      <Label text="Material" sub="$/SF" />
+                      <Label text="Material" sub="$ per Sq Ft" />
                       <select
                         className="input text-sm py-1.5"
                         value={t.matPricePerSF}
@@ -1880,7 +1880,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                         }
                       >
                         {TILE_MAT_OPTIONS.map(p => (
-                          <option key={p}>${p}/SF</option>
+                          <option key={p}>${p} per Sq Ft</option>
                         ))}
                       </select>
                     </div>
@@ -2154,7 +2154,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                       </div>
                     </div>
                     <div>
-                      <Label text="Auto Sub" sub={`$${priceSF}/SF`} />
+                      <Label text="Auto Sub" sub={`$${priceSF} per Sq Ft`} />
                       <div className="input text-sm py-1.5 bg-gray-50 text-gray-600">
                         {autoSub > 0 ? fmt2(autoSub) : '—'}
                       </div>

@@ -1564,24 +1564,24 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
             ) : null}
             {calc.structActive.bricks ? (
               <span>
-                Bricks: <strong>{Math.round(calc.structActive.bricks)}</strong> ({calc.structActive.faceSF?.toFixed(0)} SF face)
+                Bricks: <strong>{Math.round(calc.structActive.bricks)}</strong> ({calc.structActive.faceSF?.toFixed(0)} Sq Ft face)
               </span>
             ) : null}
             {calc.structActive.pourCY ? (
               <span>
-                Concrete: <strong>{calc.structActive.pourCY.toFixed(3)} CY</strong>
+                Concrete: <strong>{calc.structActive.pourCY.toFixed(3)} Cu Yd</strong>
               </span>
             ) : null}
             <span>
-              Footing: <strong>{(calc.structActive.footingCY || 0).toFixed(3)} CY</strong>
+              Footing: <strong>{(calc.structActive.footingCY || 0).toFixed(3)} Cu Yd</strong>
             </span>
             {calc.structActive.groutCY ? (
               <span>
-                Grout: <strong>{calc.structActive.groutCY.toFixed(3)} CY</strong>
+                Grout: <strong>{calc.structActive.groutCY.toFixed(3)} Cu Yd</strong>
               </span>
             ) : null}
             <span>
-              Rebar: <strong>{(calc.structActive.totalRebarLF || 0).toFixed(0)} LF</strong>
+              Rebar: <strong>{(calc.structActive.totalRebarLF || 0).toFixed(0)} Ln Ft</strong>
             </span>
             {calc.structActive.curveAddHrs > 0 && (
               <span>
@@ -1610,7 +1610,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                 <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Type</th>
                 <th className="text-center pb-1 pr-2 font-medium">Ln Ft</th>
-                <th className="text-center pb-1 pr-2 font-medium text-gray-400">$/LF</th>
+                <th className="text-center pb-1 pr-2 font-medium text-gray-400">$ per Ln Ft</th>
                 <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
                 <th></th>
               </tr>
@@ -1666,7 +1666,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                       <NumInput value={row.lf} onChange={v => setCapRow(i, 'lf', v)} className="w-full text-center" />
                     </td>
                     <td className="py-1 pr-2 text-center text-gray-400 text-xs">
-                      {rc.unit ? `$${rc.unit.toFixed(2)}/LF` : '—'}
+                      {rc.unit ? `$${rc.unit.toFixed(2)} per Ln Ft` : '—'}
                     </td>
                     <td className="py-1 text-center text-xs text-gray-600">
                       {rc.mat > 0 ? `$${rc.mat.toFixed(2)}` : '—'}

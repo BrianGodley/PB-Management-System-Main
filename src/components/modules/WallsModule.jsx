@@ -488,9 +488,9 @@ const WALL_RATE_SPECS = [
     // changes the one shared rate. Excavator shares the Mini Skid rate.
     group: 'Slope Removal (Shared Demo Module Rate)',
     items: [
-      ['demoHandDirt', 'Hand — Dirt Removal', 'Demo', 'hr/100 SF·in', 'coefficient'],
-      ['demoMiniDirt', 'Mini Skid / Excavator — Dirt Removal', 'Demo', 'hr/100 SF·in', 'coefficient'],
-      ['demoSkidDirt', 'Skid Steer — Dirt Removal', 'Demo', 'hr/100 SF·in', 'coefficient'],
+      ['demoHandDirt', 'Hand — Dirt Removal', 'Demo', 'hr/100 Sq Ft·in', 'coefficient'],
+      ['demoMiniDirt', 'Mini Skid / Excavator — Dirt Removal', 'Demo', 'hr/100 Sq Ft·in', 'coefficient'],
+      ['demoSkidDirt', 'Skid Steer — Dirt Removal', 'Demo', 'hr/100 Sq Ft·in', 'coefficient'],
     ],
   },
   {
@@ -498,10 +498,10 @@ const WALL_RATE_SPECS = [
     // uses the Mini Skid rate; Hand compaction = 3× the Jumping Jack rate.
     group: 'Backfilling & Compaction (Shared Demo Module Rate)',
     items: [
-      ['backfillHandGF', 'Hand — Grade Fill', 'Demo', 'hr/100 SF·in', 'coefficient'],
-      ['backfillMiniGF', 'Mini Skid / Excavator — Grade Fill', 'Demo', 'hr/100 SF·in', 'coefficient'],
-      ['backfillSkidGF', 'Skid Steer — Grade Fill', 'Demo', 'hr/100 SF·in', 'coefficient'],
-      ['compJJ', 'Jumping Jack Compaction (Hand = mult×)', 'Demo', 'hr/100 SF·in', 'coefficient'],
+      ['backfillHandGF', 'Hand — Grade Fill', 'Demo', 'hr/100 Sq Ft·in', 'coefficient'],
+      ['backfillMiniGF', 'Mini Skid / Excavator — Grade Fill', 'Demo', 'hr/100 Sq Ft·in', 'coefficient'],
+      ['backfillSkidGF', 'Skid Steer — Grade Fill', 'Demo', 'hr/100 Sq Ft·in', 'coefficient'],
+      ['compJJ', 'Jumping Jack Compaction (Hand = mult×)', 'Demo', 'hr/100 Sq Ft·in', 'coefficient'],
       ['handCompactionMult', 'Hand Compaction Multiplier (on Jumping Jack)', 'Walls', '×', 'coefficient'],
     ],
   },
@@ -2671,7 +2671,7 @@ function CmuWallEntry({
       </div>
       {isSub && (
         <div className="mt-2 flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-gray-500">Sub flat $/LF</span>
+          <span className="text-xs text-gray-500">Sub flat $ per Ln Ft</span>
           <div className="relative w-28">
             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
             <input
@@ -2839,16 +2839,16 @@ function PipWallEntry({
       {hasData && detail && (
         <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 text-xs text-gray-600 flex flex-wrap gap-4">
           <span>
-            Concrete: <strong>{detail.concCY.toFixed(2)} CY</strong>
+            Concrete: <strong>{detail.concCY.toFixed(2)} Cu Yd</strong>
           </span>
           {detail.footingCY > 0 && (
             <span>
-              Footing: <strong>{detail.footingCY.toFixed(3)} CY</strong>
+              Footing: <strong>{detail.footingCY.toFixed(3)} Cu Yd</strong>
             </span>
           )}
           {detail.horizRebarLF > 0 && (
             <span>
-              Footing rebar: <strong>{Math.round(detail.horizRebarLF)} LF</strong>
+              Footing rebar: <strong>{Math.round(detail.horizRebarLF)} Ln Ft</strong>
             </span>
           )}
           <span>
@@ -2858,7 +2858,7 @@ function PipWallEntry({
       )}
       {isSub && (
         <div className="mt-2 flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-gray-500">Sub flat $/LF</span>
+          <span className="text-xs text-gray-500">Sub flat $ per Ln Ft</span>
           <div className="relative w-28">
             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
             <input
@@ -3087,7 +3087,7 @@ function ModularWallEntry({
           )}
           {detail.footingCY != null && (
             <span>
-              Footing: <strong>{detail.footingCY.toFixed(3)} CY</strong>
+              Footing: <strong>{detail.footingCY.toFixed(3)} Cu Yd</strong>
             </span>
           )}
           {detail.curveAdd > 0 && (
@@ -3099,7 +3099,7 @@ function ModularWallEntry({
       )}
       {isSub && (
         <div className="mt-2 flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-gray-500">Sub flat $/LF</span>
+          <span className="text-xs text-gray-500">Sub flat $ per Ln Ft</span>
           <div className="relative w-28">
             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
             <input
@@ -3275,7 +3275,7 @@ function TimberWallEntry({
       <p className="text-[11px] text-gray-400 mt-1">Leave width/depth blank for no footing.</p>
       {isSub && (
         <div className="mt-3 flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-gray-500">Sub flat $/LF</span>
+          <span className="text-xs text-gray-500">Sub flat $ per Ln Ft</span>
           <div className="relative w-28">
             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
             <input
