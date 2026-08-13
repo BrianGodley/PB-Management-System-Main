@@ -6,6 +6,7 @@ import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
+import DropdownSelect from '../DropdownSelect'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { groutCuFtPerBlock } from '../../lib/cmuGrout'
@@ -40,14 +41,15 @@ const OK_RATES = {
 
   // ── Labor productivity rates ────────────────────────────────────────────────
   excavateLab: { dbName: 'BBQ Excavate Labor Rate', fallback: 5 }, // CF/hr
-  rebarLab: { dbName: 'BBQ Rebar Labor Rate', fallback: 146 }, // LF/day
+  rebarLab: { dbName: 'BBQ Rebar Labor Rate', fallback: 18.25 }, // LF/hr (was 146 LF/day ÷ 8)
   pourFootingLab: { dbName: 'BBQ Pour Footing Labor Rate', fallback: 4 }, // hrs/CY
-  installBlockLab: { dbName: 'BBQ Block Install Labor Rate', fallback: 60 }, // blocks/day
-  fillBlockLab: { dbName: 'BBQ Fill Block Labor Rate', fallback: 146 }, // blocks/day (×80/75 factor in calc)
+  installBlockLab: { dbName: 'BBQ Block Install Labor Rate', fallback: 7.5 }, // blocks/hr (was 60 blk/day ÷ 8)
+  fillBlockLab: { dbName: 'BBQ Fill Block Labor Rate', fallback: 18.25 }, // blocks/hr (was 146 blk/day ÷ 8; ×80/75 factor in calc)
   counterFormLab: { dbName: 'BBQ Counter Form Labor Rate', fallback: 20 }, // LF of form/hr (×2 LF/SF in calc)
-  counterPourLab: { dbName: 'BBQ Counter Pour Labor Rate', fallback: 50 }, // SF/day
-  counterBroomLab: { dbName: 'BBQ Counter Broom Labor Rate', fallback: 60 }, // SF/day
-  counterPolishLab: { dbName: 'BBQ Counter Polish Labor Rate', fallback: 18 }, // SF/day
+  counterPourLab: { dbName: 'BBQ Counter Pour Labor Rate', fallback: 6.25 }, // SF/hr (was 50 SF/day ÷ 8)
+  counterBroomLab: { dbName: 'BBQ Counter Broom Labor Rate', fallback: 7.5 }, // SF/hr (was 60 SF/day ÷ 8)
+  counterPolishLab: { dbName: 'BBQ Counter Polish Labor Rate', fallback: 2.25 }, // SF/hr (was 18 SF/day ÷ 8)
+  counterTrowelLab: { dbName: 'BBQ Counter Trowel Labor Rate', fallback: 5.625 }, // SF/hr (45 SF/day ÷ 8)
   applianceLab: { dbName: 'BBQ Appliance Labor Rate', fallback: 2.75 }, // appliances/day (legacy)
   applianceInstallHrs: { dbName: 'BBQ Appliance Install Hrs', fallback: 2.9 }, // hrs per appliance (install labor coefficient)
   gficLab: { dbName: 'BBQ GFIC Labor Rate', fallback: 2 }, // hrs/unit
@@ -69,7 +71,7 @@ const DEFAULTS = {
   commissionRate: 0.12,
 }
 
-const COUNTER_FINISHES = ['Broom Finish', 'Polished Finish']
+const COUNTER_FINISHES = ['Broom Finish', 'Polished Finish', 'Trowel Finish']
 
 // Canonical size-based rebar catalog. Rebar is priced per Ln Ft from Basic
 // Materials → Reinforcement rows named 'Rebar #<size>'. Default #4.
@@ -582,20 +584,20 @@ function calcOutdoorKitchen(
     totalLF > 0
       ? (totalLF * footingAreaSF) / p(OK_RATES.excavateLab.dbName, OK_RATES.excavateLab.fallback)
       : 0
+  // Rates below are per-HOUR (LF/hr, blk/hr, SF/hr) — hours = qty / rate.
   const rebarHrs =
-    rebarLF > 0 ? (rebarLF / p(OK_RATES.rebarLab.dbName, OK_RATES.rebarLab.fallback)) * 8 : 0
+    rebarLF > 0 ? rebarLF / p(OK_RATES.rebarLab.dbName, OK_RATES.rebarLab.fallback) : 0
   const pourFootingHrs =
     footingCY > 0
       ? footingCY * p(OK_RATES.pourFootingLab.dbName, OK_RATES.pourFootingLab.fallback)
       : 0
   const installBlockHrs =
     blockWaste > 0
-      ? (blockWaste / p(OK_RATES.installBlockLab.dbName, OK_RATES.installBlockLab.fallback)) * 8
+      ? blockWaste / p(OK_RATES.installBlockLab.dbName, OK_RATES.installBlockLab.fallback)
       : 0
   const fillBlockHrs =
     blockRaw > 0
-      ? (((80 / 75) * blockRaw) / p(OK_RATES.fillBlockLab.dbName, OK_RATES.fillBlockLab.fallback)) *
-        8
+      ? ((80 / 75) * blockRaw) / p(OK_RATES.fillBlockLab.dbName, OK_RATES.fillBlockLab.fallback)
       : 0
   const counterFormHrs =
     n(counterSF) > 0
@@ -603,15 +605,19 @@ function calcOutdoorKitchen(
       : 0
   const counterPourHrs =
     n(counterSF) > 0
-      ? (n(counterSF) / p(OK_RATES.counterPourLab.dbName, OK_RATES.counterPourLab.fallback)) * 8
+      ? n(counterSF) / p(OK_RATES.counterPourLab.dbName, OK_RATES.counterPourLab.fallback)
       : 0
   const counterBroomHrs =
     counterFinish === 'Broom Finish'
-      ? (n(counterSF) / p(OK_RATES.counterBroomLab.dbName, OK_RATES.counterBroomLab.fallback)) * 8
+      ? n(counterSF) / p(OK_RATES.counterBroomLab.dbName, OK_RATES.counterBroomLab.fallback)
       : 0
   const counterPolishHrs =
     counterFinish === 'Polished Finish'
-      ? (n(counterSF) / p(OK_RATES.counterPolishLab.dbName, OK_RATES.counterPolishLab.fallback)) * 8
+      ? n(counterSF) / p(OK_RATES.counterPolishLab.dbName, OK_RATES.counterPolishLab.fallback)
+      : 0
+  const counterTrowelHrs =
+    counterFinish === 'Trowel Finish'
+      ? n(counterSF) / p(OK_RATES.counterTrowelLab.dbName, OK_RATES.counterTrowelLab.fallback)
       : 0
   // Equipment table — per-line labor (hours entered directly, replacing the old
   // single Layout Hours field) + material from the master rate, zeroed when the
@@ -700,6 +706,7 @@ function calcOutdoorKitchen(
     counterPourHrs +
     counterBroomHrs +
     counterPolishHrs +
+    counterTrowelHrs +
     epHrs +
     finishHrs +
     manHrs
@@ -1110,10 +1117,10 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
       group: 'BBQ Structure',
       items: [
         okLaborItem('excavateLab', 'CF/hr'),
-        okLaborItem('rebarLab', 'LF/day'),
+        okLaborItem('rebarLab', 'LF/hr'),
         okLaborItem('pourFootingLab', 'hrs/CY'),
-        okLaborItem('installBlockLab', 'blk/day'),
-        okLaborItem('fillBlockLab', 'blk/day'),
+        okLaborItem('installBlockLab', 'blk/hr'),
+        okLaborItem('fillBlockLab', 'blk/hr'),
         ...matRows(OK_RATES.bbqBlock.dbName, 'block', p(OK_RATES.bbqBlock.dbName, OK_RATES.bbqBlock.fallback)),
         ...matRows('Rebar ' + (rebarSize || '#4'), 'LF', p('Rebar ' + (rebarSize || '#4'), OK_RATES.bbqRebar.fallback)),
         ...matRows(OK_RATES.bbqConcrete.dbName, 'CY', p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)),
@@ -1123,9 +1130,10 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
       group: 'Concrete Countertop',
       items: [
         okLaborItem('counterFormLab', 'LF/hr'),
-        okLaborItem('counterPourLab', 'SF/day'),
-        okLaborItem('counterBroomLab', 'SF/day'),
-        okLaborItem('counterPolishLab', 'SF/day'),
+        okLaborItem('counterPourLab', 'SF/hr'),
+        okLaborItem('counterBroomLab', 'SF/hr'),
+        okLaborItem('counterPolishLab', 'SF/hr'),
+        okLaborItem('counterTrowelLab', 'SF/hr'),
         // Countertop is poured from the same concrete master rate as the footing.
         ...matRows(OK_RATES.bbqConcrete.dbName, 'CY', p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)),
       ],
@@ -1449,27 +1457,22 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                         </select>
                       </td>
                       <td className="py-1 pr-2">
-                        <span className="flex items-center gap-1">
-                          <select
-                            className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white flex-1 min-w-0"
-                            value={row.type}
-                            onChange={e => setRow('type', e.target.value)}
-                          >
-                            {/* Empty new rows show a placeholder rather than a
-                                hardcoded default appliance. */}
-                            {!row.type && <option value="">Select appliance…</option>}
-                            {/* Backward-compat: keep a stored value that isn't in the
-                                current (vendor-scoped) options selectable/visible. */}
-                            {row.type && !applOpts.some(o => o.value === row.type) && (
-                              <option value={row.type}>{row.type}</option>
-                            )}
-                            {applOpts.map(o => (
-                              <option key={o.value} value={o.value}>
-                                {o.label}
-                              </option>
-                            ))}
-                          </select>
-                        </span>
+                        {/* Searchable, always-downward picker — long appliance list. */}
+                        <DropdownSelect
+                          searchable
+                          className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white w-full"
+                          placeholder="Select appliance…"
+                          value={row.type || ''}
+                          onChange={val => setRow('type', val)}
+                          options={[
+                            // Backward-compat: keep a stored value not in the current
+                            // (vendor-scoped) options selectable.
+                            ...(row.type && !applOpts.some(o => o.value === row.type)
+                              ? [{ value: row.type, label: row.type }]
+                              : []),
+                            ...applOpts.map(o => ({ value: o.value, label: o.label })),
+                          ]}
+                        />
                       </td>
                       <td className="py-1 pr-2">
                         <NumInput value={row.qty} onChange={v => setRow('qty', v)} className="w-full text-center" placeholder="0" />

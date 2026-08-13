@@ -29,10 +29,13 @@ export default function DropdownSelect({
   buttonClassName = '',
   menuClassName = '',
   disabled = false,
+  searchable = false,
 }) {
   const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
   const rootRef = useRef(null)
   const listRef = useRef(null)
+  const searchRef = useRef(null)
 
   // eslint-disable-next-line eqeqeq
   const selected = options.find(o => o.value == value)
@@ -57,19 +60,28 @@ export default function DropdownSelect({
     }
   }, [open, close])
 
-  // When opening, scroll the selected option into view.
+  // When opening, scroll the selected option into view; reset + focus search.
   useEffect(() => {
-    if (open && listRef.current) {
-      const el = listRef.current.querySelector('[data-selected="true"]')
-      if (el) el.scrollIntoView({ block: 'nearest' })
+    if (open) {
+      setQuery('')
+      if (searchable && searchRef.current) searchRef.current.focus()
+      if (listRef.current) {
+        const el = listRef.current.querySelector('[data-selected="true"]')
+        if (el) el.scrollIntoView({ block: 'nearest' })
+      }
     }
-  }, [open])
+  }, [open, searchable])
 
   const pick = o => {
     if (o.disabled) return
     onChange?.(o.value)
     close()
   }
+
+  const shown =
+    searchable && query.trim()
+      ? options.filter(o => String(o.label).toLowerCase().includes(query.trim().toLowerCase()))
+      : options
 
   return (
     // The caller's className (width / flex-1 / the `input` visual style) lives on
@@ -113,10 +125,22 @@ export default function DropdownSelect({
           ref={listRef}
           className={`absolute z-50 top-full left-0 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg py-1 ${menuClassName}`}
         >
-          {options.length === 0 ? (
+          {searchable && (
+            <div className="sticky top-0 bg-white px-2 pt-1 pb-2 border-b border-gray-100">
+              <input
+                ref={searchRef}
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                onKeyDown={e => e.stopPropagation()}
+                placeholder="Search…"
+                className="w-full rounded-md border border-gray-200 px-2 py-1 text-sm outline-none focus:border-blue-400"
+              />
+            </div>
+          )}
+          {shown.length === 0 ? (
             <div className="px-3 py-2 text-sm text-gray-400">No options</div>
           ) : (
-            options.map((o, i) => {
+            shown.map((o, i) => {
               // eslint-disable-next-line eqeqeq
               const isSel = o.value == value
               return (
