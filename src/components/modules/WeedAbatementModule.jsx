@@ -361,8 +361,9 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
         </div>
       </div>
 
-      {/* Areas + visits */}
-      <div className="grid sm:grid-cols-2 gap-4">
+      {/* Areas + visits — reserve the tallest (Mixed = 2 rows) height so switching
+          modes never shifts the sections below. */}
+      <div className="grid sm:grid-cols-2 gap-4 content-start sm:min-h-[9.5rem]">
         {mode !== 'hillside' && (
           <div>
             <label className={lbl}>Flat Area (SF)</label>
