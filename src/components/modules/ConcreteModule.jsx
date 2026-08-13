@@ -1362,6 +1362,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             {calc.unpriced.map(it => (
               <button
                 key={it.name}
+                type="button"
                 className="rounded-full border border-red-300 bg-white px-3 py-1 text-sm text-red-700 hover:bg-red-100"
                 onClick={() => setUnpricedItem(it)}
               >
