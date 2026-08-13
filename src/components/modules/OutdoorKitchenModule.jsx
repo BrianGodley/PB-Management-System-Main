@@ -71,6 +71,10 @@ const DEFAULTS = {
 
 const COUNTER_FINISHES = ['Broom Finish', 'Polished Finish']
 
+// Canonical size-based rebar catalog. Rebar is priced per Ln Ft from Basic
+// Materials → Reinforcement rows named 'Rebar #<size>'. Default #4.
+const REBAR_SIZES = ['#3', '#4', '#5', '#6', '#8']
+
 // Fixed equipment list for the Appliances table. Each priced from an editable
 // master material rate `BBQ Equip - <type>` (category 'Outdoor Kitchen',
 // default 0). Client-provided equipment zeroes material but keeps labor.
@@ -476,6 +480,7 @@ function calcOutdoorKitchen(
     footingDepthIn,
     counterSF,
     counterFinish,
+    rebarSize,
     applianceCount,
     gficCount,
     sinkYN,
@@ -653,7 +658,7 @@ function calcOutdoorKitchen(
 
   // ── Material Costs ──────────────────────────────────────────────────────────
   const blockMat = blockOrdered * p(OK_RATES.bbqBlock.dbName, OK_RATES.bbqBlock.fallback)
-  const rebarMat = rebarLF * p(OK_RATES.bbqRebar.dbName, OK_RATES.bbqRebar.fallback)
+  const rebarMat = rebarLF * p('Rebar ' + (rebarSize || '#4'), OK_RATES.bbqRebar.fallback)
   const footingMat = footingCY * p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)
   const fillMat = fillCY * p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)
   const counterConcMat = counterCY * p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)
@@ -830,6 +835,9 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
   const [laborBurdenPct, setLaborBurdenPct] = useState(
     initialData?.laborBurdenPct ?? DEFAULTS.laborBurdenPct
   )
+  // User-selectable rebar size (size-based canonical catalog). Shared across the
+  // In-House/Sub tabs — rebar lives only on the In-House structural side.
+  const [rebarSize, setRebarSize] = useState(initialData?.rebarSize ?? '#4')
 
   // Free-text notes for this module — Sam writes auto-generated
   // takeoffs here via create_estimate_from_takeoff, and the user can
@@ -978,7 +986,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
   // NOTE: materialRows (the live catalog) is intentionally NOT persisted — it is
   // reference data fetched fresh on open. Freezing it into the estimate made
   // newly-added catalog items (e.g. appliances) invisible in older estimates.
-  const state = { crewType, subType, subGpMarkupRate, ...cur }
+  const state = { crewType, subType, subGpMarkupRate, ...cur, rebarSize }
   const calcRaw = calcOutdoorKitchen(
     state,
     laborRatePerHour,
@@ -1020,6 +1028,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
         walkAccess,
         laborRatePerHour,
         laborBurdenPct,
+        rebarSize,
         gpmd,
         materialPrices,
         calc,
@@ -1106,7 +1115,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
         okLaborItem('installBlockLab', 'blk/day'),
         okLaborItem('fillBlockLab', 'blk/day'),
         ...matRows(OK_RATES.bbqBlock.dbName, 'block', p(OK_RATES.bbqBlock.dbName, OK_RATES.bbqBlock.fallback)),
-        ...matRows(OK_RATES.bbqRebar.dbName, 'LF', p(OK_RATES.bbqRebar.dbName, OK_RATES.bbqRebar.fallback)),
+        ...matRows('Rebar ' + (rebarSize || '#4'), 'LF', p('Rebar ' + (rebarSize || '#4'), OK_RATES.bbqRebar.fallback)),
         ...matRows(OK_RATES.bbqConcrete.dbName, 'CY', p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)),
       ],
     },
@@ -1314,6 +1323,21 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Footing Depth (inches)</label>
                 <NumInput value={footingDepthIn} onChange={setFootingDepthIn} placeholder="12" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Rebar Size</label>
+                <select
+                  className="input text-sm py-1.5 w-full"
+                  value={rebarSize}
+                  onChange={e => setRebarSize(e.target.value)}
+                  title="Rebar size"
+                >
+                  {REBAR_SIZES.map(s => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
               </div>
             </>
           )}

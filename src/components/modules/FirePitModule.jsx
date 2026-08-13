@@ -20,10 +20,15 @@ const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
 // Standard CMU block: 16"L × 8"H × 8"W
 // ─────────────────────────────────────────────────────────────────────────────
 
+// User-selectable rebar size. Rebar is priced per Ln Ft off the canonical
+// Basic Materials → Reinforcement rows ('Rebar #3' … 'Rebar #8'). The picked
+// size resolves the material name; labor stays on the FP Set Rebar rate.
+const REBAR_SIZES = ['#3', '#4', '#5', '#6', '#8']
+
 const FP_RATES = {
   // ── Structural material costs ───────────────────────────────────────────────
   fpBlock: { dbName: 'FP Block', fallback: 2.5 }, // $/block
-  fpRebar: { dbName: 'FP Rebar', fallback: 0.5 }, // $/LF
+  fpRebar: { dbName: 'FP Rebar', fallback: 0.5 }, // $/LF (fallback price only; name now size-based)
   fpConcrete: { dbName: 'FP Concrete', fallback: 149.5 }, // $/CY (footing & grout)
   fpGroutPump: { dbName: 'FP Grout Pump Setup', fallback: 150.0 }, // flat fee when pump used
 
@@ -528,7 +533,7 @@ function calcFirePit(
 
   // ── Material costs ────────────────────────────────────────────────────────────
   const blockMat = totalBlocks * p(FP_RATES.fpBlock.dbName, FP_RATES.fpBlock.fallback)
-  const rebarMat = totalRebarLF * p(FP_RATES.fpRebar.dbName, FP_RATES.fpRebar.fallback)
+  const rebarMat = totalRebarLF * p('Rebar ' + (state.rebarSize || '#4'), FP_RATES.fpRebar.fallback)
   const footingMat = footingCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
   const groutMat = groutCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
   const pumpSetupMat =
@@ -779,6 +784,9 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
   // ── State ──────────────────────────────────────────────────────────────────
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Masonry')
   const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
+  // Shared rebar bar size (default #4). Resolves the canonical Basic Materials
+  // 'Rebar #<size>' material name; a single value covers both tabs.
+  const [rebarSize, setRebarSize] = useState(initialData?.rebarSize ?? '#4')
   // Independent In-House vs Sub input records — each tab is its own calculator.
   const [ihTab, setIhTab] = useState(() => makeTab(initialData?.ihData || initialData))
   const [subTab, setSubTab] = useState(() => makeTab(initialData?.subData || {}))
@@ -842,7 +850,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
   }, [])
 
   // materialRows (live catalog) intentionally NOT persisted — fetched fresh on open.
-  const state = { crewType, subType, subGpMarkupRate, ...cur }
+  const state = { crewType, subType, subGpMarkupRate, rebarSize, ...cur }
   const calcRaw = calcFirePit(
     state,
     laborRatePerHour,
@@ -1196,7 +1204,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
               Block ${p(FP_RATES.fpBlock.dbName, 2.5).toFixed(2)}/ea
             </span>
             <span className="inline-flex items-center gap-1">
-              Rebar ${p(FP_RATES.fpRebar.dbName, 0.5).toFixed(2)}/LF
+              Rebar {rebarSize} ${p('Rebar ' + (rebarSize || '#4'), 0.5).toFixed(2)}/LF
             </span>
             <span className="inline-flex items-center gap-1">
               Concrete ${p(FP_RATES.fpConcrete.dbName, 149.5).toFixed(2)}/CY
@@ -1246,6 +1254,21 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
           <div>
             <label className="block text-xs text-gray-500 mb-1">Rebar Spacing (inches)</label>
             <NumInput value={rebarSpacingIn} onChange={setRebarSpacingIn} placeholder="16" />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Rebar Size</label>
+            <select
+              className="input text-sm py-1.5 w-full"
+              value={rebarSize}
+              onChange={e => setRebarSize(e.target.value)}
+              title="Rebar bar size"
+            >
+              {REBAR_SIZES.map(s => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-xs text-gray-500 mb-1">Bond Beam Courses</label>

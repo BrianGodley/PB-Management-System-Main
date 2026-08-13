@@ -104,6 +104,11 @@ const BLOCK_RATES = {
   fillLaborHrs: { dbName: 'Fill Labor', fallback: 0.05 }, // hrs per block
 }
 
+// User-selectable rebar size (canonical Basic Materials rows 'Rebar #3'…'Rebar #8',
+// priced per Ln Ft). Default '#4'. Mirrors ConcreteModule. Size drives ONLY the
+// material name/price; rebar labor (Set Rebar) stays shared/size-independent.
+const REBAR_SIZES = ['#3', '#4', '#5', '#6', '#8']
+
 const DEFAULTS = {
   laborRatePerHour: 35,
   laborBurdenPct: 0.29,
@@ -191,6 +196,8 @@ function calcColumns(
   const { difficulty, hoursAdj, qty, heightIn, widthIn, finishRows, manualRows } = state
   const isSub = state.subType === 'Subcontractor'
   const installVendor = state.installVendor // section-level Vendor for Column Install materials
+  // Sized canonical rebar row (Basic Materials 'Rebar #<size>', $/LF). Labor unchanged.
+  const rebarName = 'Rebar ' + (state.rebarSize || '#4')
 
   // mp() = name-keyed Standard lookup (labor coefficients + Standard material fallback).
   // matP() = vendor-resolved MATERIAL price; with vendor 'Standard'/empty it returns
@@ -215,7 +222,7 @@ function calcColumns(
     installMat +=
       totalBlocks * matP(BLOCK_RATES.blockMatCost.dbName, BLOCK_RATES.blockMatCost.fallback, installVendor) +
       groutCY * matP(GROUT_CONCRETE.dbName, GROUT_CONCRETE.fallback, installVendor) +
-      totalRebar * matP(BLOCK_RATES.rebarMatCost.dbName, BLOCK_RATES.rebarMatCost.fallback, installVendor)
+      totalRebar * matP(rebarName, BLOCK_RATES.rebarMatCost.fallback, installVendor)
 
     // Labor hours
     installHrs +=
@@ -415,6 +422,10 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
   const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
+  // Shared rebar size (In-House structural rebar). A single shared value across
+  // both tabs — rebar lives on the In-House structural side. Default '#4'.
+  const [rebarSize, setRebarSize] = useState(initialData?.rebarSize ?? '#4')
+
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Masonry')
   const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
   const isSub = subType === 'Subcontractor'
@@ -497,6 +508,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
       distanceLF,
       subType,
       subGpMarkupRate,
+      rebarSize,
     },
     laborRatePerHour,
     materialPrices,
@@ -546,6 +558,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
         installVendor,
         finishRows,
         manualRows,
+        rebarSize,
         crewType,
         subType,
         subGpMarkupRate,
@@ -647,7 +660,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
         // + concrete are shared Basic Materials rows.
         ..._colMatRows(BLOCK_RATES.blockMatCost.dbName, 'block', BLOCK_RATES.blockMatCost.fallback),
         ..._colMatRows(GROUT_CONCRETE.dbName, 'CY', GROUT_CONCRETE.fallback, BASIC_CATEGORY),
-        ..._colMatRows(BLOCK_RATES.rebarMatCost.dbName, 'LF', BLOCK_RATES.rebarMatCost.fallback, BASIC_CATEGORY),
+        ..._colMatRows('Rebar ' + (rebarSize || '#4'), 'LF', BLOCK_RATES.rebarMatCost.fallback, BASIC_CATEGORY),
       ],
     },
     {
@@ -790,9 +803,9 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
               /ea
             </span>
             <span className="inline-flex items-center gap-1">
-              Rebar $
+              Rebar {rebarSize || '#4'} $
               {colMat(
-                BLOCK_RATES.rebarMatCost.dbName,
+                'Rebar ' + (rebarSize || '#4'),
                 installVendor,
                 BLOCK_RATES.rebarMatCost.fallback
               ).toFixed(2)}
@@ -842,6 +855,22 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
           <div>
             <label className="block text-xs text-gray-500 mb-1">Width (Inches)</label>
             <NumInput value={widthIn} onChange={setWidthIn} placeholder="0" />
+          </div>
+          <div>
+            {/* Sized canonical rebar (Basic Materials 'Rebar #<size>', $/LF).
+                Drives the rebar MATERIAL price only; Set Rebar labor is unchanged. */}
+            <label className="block text-xs text-gray-500 mb-1">Rebar Size</label>
+            <select
+              value={rebarSize || '#4'}
+              onChange={e => setRebarSize(e.target.value)}
+              className="input text-sm py-1.5 w-full"
+            >
+              {REBAR_SIZES.map(s => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 

@@ -132,6 +132,9 @@ function resolveType(label, opts) {
 // 0.59 LF of rebar per SF; 12" OC uses 1.20 LF/SF.
 const REBAR_LF_PER_SF = { '24" OC': 0.59, '12" OC': 1.2 }
 const REBAR_SPACINGS = ['24" OC', '12" OC']
+// Rebar sizes — priced per Ln Ft from the canonical Basic Materials → Reinforcement
+// catalog rows ('Rebar #3' … 'Rebar #8'). Shared across all modules.
+const REBAR_SIZES = ['#3', '#4', '#5', '#6', '#8']
 
 // ── Calculation engine ────────────────────────────────────────────────────────
 
@@ -201,7 +204,10 @@ function calcConcrete(
   const concretePerCY = mr['Concrete - Ready Mix (Truck)'] ?? 0 // display-only; Install prices per-row from the catalog (mt.fallback)
   // Rebar $/LF (canonical, from the shared Basic Materials 'Rebar' row) and the
   // LF-per-SF conversion factor for the chosen on-center spacing.
-  const rebarPerLF = P.price('Rebar', { category: 'Basic Materials', unit: 'LF' })
+  const rebarPerLF = P.price('Rebar ' + (state.rebarSize || '#4'), {
+    category: 'Basic Materials',
+    unit: 'Ln Ft',
+  })
   // Rebar LF-per-SF conversion by spacing — DB-editable coefficients (kept).
   const rebarLfPerSfBySpacing = {
     '24" OC': mr['Concrete - Rebar LF/SF 24" OC'] ?? REBAR_LF_PER_SF['24" OC'],
@@ -668,6 +674,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const [depthIn, setDepthIn] = useState(initialData?.depthIn ?? '4')
   const [rebarSF, setRebarSF] = useState(initialData?.rebarSF ?? '')
   const [rebarSpacing, setRebarSpacing] = useState(initialData?.rebarSpacing ?? '24" OC')
+  const [rebarSize, setRebarSize] = useState(initialData?.rebarSize ?? '#4')
   const [formLF, setFormLF] = useState(initialData?.formLF ?? '')
   const [sleeveLF, setSleeveLF] = useState(initialData?.sleeveLF ?? '')
 
@@ -737,6 +744,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     depthIn,
     rebarSF,
     rebarSpacing,
+    rebarSize,
     formLF,
     sleeveLF,
     finishType,
@@ -1702,7 +1710,19 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             <label className="text-xs text-gray-500 block mb-1">Rebar (Sq Ft)</label>
             <div className="flex items-center gap-2">
               <select
-                className="input text-sm py-1.5 w-28"
+                className="input text-sm py-1.5 w-20"
+                value={rebarSize}
+                onChange={e => setRebarSize(e.target.value)}
+                title="Rebar size"
+              >
+                {REBAR_SIZES.map(s => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="input text-sm py-1.5 w-24"
                 value={activeRebarSpacing}
                 onChange={e => setActiveRebarSpacing(e.target.value)}
                 title="Rebar on-center spacing"
