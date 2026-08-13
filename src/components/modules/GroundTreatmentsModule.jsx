@@ -318,6 +318,11 @@ function calcGroundTreatments(
     sodFertilizer,
     sodFertilizerVendor,
     sodFertilizerSF,
+    // Multi-row sections (each an array of per-row objects; mirror mulchRows).
+    planterPrepRows,
+    sodPrepRows,
+    sodRows,
+    sodFertRows,
     flagstoneSoilSF,
     flagstoneConcreteSF,
     precastSoilSF,
@@ -406,60 +411,71 @@ function calcGroundTreatments(
         ? p(GT_RATES.tillTillerLab.dbName, GT_RATES.tillTillerLab.fallback)
         : 0
 
-  // ── Planter Preparation (Soils-style row) ──────────────────────────────────
-  // Material = CY × $/CY from the picked soil/amendment (sub-category 'Soils').
-  // Labor = area × (soilPrepLab base + tilling coeff). Tilling (None/Hand/Tiller)
-  // is the single method control — no separate hand-add (would double-count).
+  // ── Planter Preparation (multi-row, Soils-style) ────────────────────────────
+  // Each row: Material = CY × $/CY from the picked soil/amendment (sub-category
+  // 'Soils'); Labor = area × (soilPrepLab base + tilling coeff). Tilling
+  // (None/Hand/Tiller) is the single method control — no separate hand-add
+  // (would double-count). Section totals SUM every row.
   let soilLab = 0
   let soilMat = 0
-  {
-    const area = n(soilPrepSF)
-    if (area > 0) {
-      const baseLab = p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
-      soilLab = area * (baseLab + _tillLab(prepTilling))
-      if (prepType) {
-        const CY = (area * (n(prepDepthIn) / 12)) / 27
-        const st = rowOpt('Soils', { vendor: prepVendor, type: prepType }, [])
-        soilMat = CY * st.fallback
-      }
+  ;(planterPrepRows || []).forEach(r => {
+    const area = n(r.area)
+    if (!(area > 0)) return
+    const baseLab = p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
+    soilLab += area * (baseLab + _tillLab(r.tilling))
+    if (r.type) {
+      const CY = (area * (n(r.depthIn) / 12)) / 27
+      const st = rowOpt('Soils', { vendor: r.vendor, type: r.type }, [])
+      soilMat += CY * st.fallback
     }
-  }
+  })
 
-  // ── Sod Preparation (Soils-style row, sod-prep labor base) ──────────────────
+  // ── Sod Preparation (multi-row, Soils-style, sod-prep labor base) ───────────
   let sodPrepLabHrs = 0
   let sodPrepMatCost = 0
-  {
-    const area = n(sodPrepSF)
-    if (area > 0) {
-      const baseLab = p(GT_RATES.sodPrepLab.dbName, GT_RATES.sodPrepLab.fallback)
-      sodPrepLabHrs = area * (baseLab + _tillLab(sodPrepTilling))
-      if (sodPrepType) {
-        const CY = (area * (n(sodPrepDepthIn) / 12)) / 27
-        const st = rowOpt('Soils', { vendor: sodPrepVendor, type: sodPrepType }, [])
-        sodPrepMatCost = CY * st.fallback
-      }
+  ;(sodPrepRows || []).forEach(r => {
+    const area = n(r.area)
+    if (!(area > 0)) return
+    const baseLab = p(GT_RATES.sodPrepLab.dbName, GT_RATES.sodPrepLab.fallback)
+    sodPrepLabHrs += area * (baseLab + _tillLab(r.tilling))
+    if (r.type) {
+      const CY = (area * (n(r.depthIn) / 12)) / 27
+      const st = rowOpt('Soils', { vendor: r.vendor, type: r.type }, [])
+      sodPrepMatCost += CY * st.fallback
     }
-  }
+  })
 
-  // ── Sod ────────────────────────────────────────────────────────────────────
-  let sodLab = n(sodSF) * p(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback)
-  const sodT = resolveType(sodType, _opts.sod, [])
-  // No sod variety picked → $0 material (labor still applies to entered SF).
-  let sodMat = sodType ? n(sodSF) * sodT.fallback : 0
+  // ── Sod (multi-row) ─────────────────────────────────────────────────────────
+  // Per row: labor = SF × sodLab; material = SF × the picked variety's $/SF
+  // (no variety picked → $0 material, labor still applies). Section sums rows.
+  let sodLab = 0
+  let sodMat = 0
+  ;(sodRows || []).forEach(r => {
+    const sf = n(r.sf)
+    sodLab += sf * p(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback)
+    if (r.type) {
+      const st = rowOpt('Sod', { vendor: r.vendor, type: r.type }, [])
+      sodMat += sf * st.fallback
+    }
+  })
 
-  // Fertilizer — auto-figured bags from sod SF × coverage (SF/bag). Material only.
+  // ── Sod Fertilizer (multi-row) ──────────────────────────────────────────────
+  // Auto-figured bags from fertilizer SF × coverage (SF/bag), material only.
+  // A row with no explicit SF falls back to the total sod SF (sum of sodRows),
+  // mirroring the legacy single-row default. Section sums every row.
   let fertMat = 0
-  const _fertV =
-    sodFertilizerVendor && sodFertilizerVendor !== 'auto'
-      ? sodFertilizerVendor
-      : (catDefaults.Fertilizer || 'Standard')
-  const fertT = rowOpt('Fertilizer', { vendor: _fertV, type: sodFertilizer }, [])
-  const _fertSF = n(sodFertilizerSF) || n(sodSF)
-  if (sodFertilizer && fertT && fertT.dbName && _fertSF > 0) {
-    const sfPerBag = p(GT_RATES.fertilizerSFPerBag.dbName, GT_RATES.fertilizerSFPerBag.fallback)
-    const bags = sfPerBag > 0 ? Math.ceil(_fertSF / sfPerBag) : 0
-    fertMat = bags * fertT.fallback
-  }
+  const _sodSFTotal = (sodRows || []).reduce((a, r) => a + n(r.sf), 0)
+  ;(sodFertRows || []).forEach(r => {
+    const _fertV =
+      r.vendor && r.vendor !== 'auto' ? r.vendor : (catDefaults.Fertilizer || 'Standard')
+    const fertT = rowOpt('Fertilizer', { vendor: _fertV, type: r.fertilizer }, [])
+    const _fertSF = n(r.sf) || _sodSFTotal
+    if (r.fertilizer && fertT && fertT.dbName && _fertSF > 0) {
+      const sfPerBag = p(GT_RATES.fertilizerSFPerBag.dbName, GT_RATES.fertilizerSFPerBag.fallback)
+      const bags = sfPerBag > 0 ? Math.ceil(_fertSF / sfPerBag) : 0
+      fertMat += bags * fertT.fallback
+    }
+  })
 
   // ── Steppers (Flagstone + Precast, Soil Set + Concrete Set) ─────────────────
   // Each of the 4 lines now resolves its own material rate from a per-line
@@ -874,6 +890,37 @@ function makeTab(src = {}) {
     manualRows: src.manualRows ?? DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
     sodVendor: src.sodVendor ?? '',
     sodFertilizerVendor: src.sodFertilizerVendor ?? '',
+    // ── Multi-row sections. Each defaults to ONE row seeded from the legacy
+    //    scalar fields so a saved estimate's single entry still shows. The old
+    //    scalar fields above are kept (harmless) for backward-compat + Sub scope.
+    planterPrepRows: src.planterPrepRows ?? [
+      {
+        area: src.soilPrepSF ?? '',
+        vendor: src.prepVendor ?? '',
+        type: src.prepType ?? '',
+        depthIn: src.prepDepthIn ?? '2',
+        tilling: src.prepTilling ?? (src.prepMethod === 'Hand' ? 'Hand' : 'Tiller'),
+      },
+    ],
+    sodPrepRows: src.sodPrepRows ?? [
+      {
+        area: src.sodPrepSF ?? src.sodSoilPrepSF ?? '',
+        vendor: src.sodPrepVendor ?? '',
+        type: src.sodPrepType ?? '',
+        depthIn: src.sodPrepDepthIn ?? '2',
+        tilling: src.sodPrepTilling ?? 'Tiller',
+      },
+    ],
+    sodRows: src.sodRows ?? [
+      { vendor: src.sodVendor ?? '', type: src.sodType ?? '', sf: src.sodSF ?? '' },
+    ],
+    sodFertRows: src.sodFertRows ?? [
+      {
+        vendor: src.sodFertilizerVendor ?? '',
+        fertilizer: src.sodFertilizer ?? '',
+        sf: src.sodFertilizerSF ?? '',
+      },
+    ],
   }
 }
 
@@ -1092,6 +1139,15 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   const setSodVendor = setField('sodVendor')
   const sodFertilizerVendor = cur.sodFertilizerVendor
   const setSodFertilizerVendor = setField('sodFertilizerVendor')
+  // Multi-row section accessors (mirror mulchRows).
+  const planterPrepRows = cur.planterPrepRows
+  const setPlanterPrepRows = setField('planterPrepRows')
+  const sodPrepRows = cur.sodPrepRows
+  const setSodPrepRows = setField('sodPrepRows')
+  const sodRows = cur.sodRows
+  const setSodRows = setField('sodRows')
+  const sodFertRows = cur.sodFertRows
+  const setSodFertRows = setField('sodFertRows')
 
   // ── Sales tax — applied to totalMat across every module so the bid
   //    reflects supplier-invoiced material cost. Sourced from
@@ -1189,6 +1245,18 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   }
   function updateDg(i, field, val) {
     setDgRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  }
+  function updatePlanterPrep(i, field, val) {
+    setPlanterPrepRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  }
+  function updateSodPrep(i, field, val) {
+    setSodPrepRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  }
+  function updateSodRow(i, field, val) {
+    setSodRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  }
+  function updateSodFert(i, field, val) {
+    setSodFertRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
   function updateManual(i, field, val) {
     setManualRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
@@ -1848,30 +1916,12 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             : method === 'Tiller'
               ? p(GT_RATES.tillTillerLab.dbName, GT_RATES.tillTillerLab.fallback)
               : 0
-        const prepSection = ({
-          title,
-          vendor,
-          setVendor,
-          type,
-          setType,
-          area,
-          setArea,
-          depth,
-          setDepth,
-          tilling,
-          setTilling,
-          baseLabRate,
-        }) => {
-          const rowOpts = sectionOptions('Soils', vendor, [])
-          const st = resolveType(type, rowOpts, [])
-          const typeCost = st.fallback
-          const CY = (n(area) * (n(depth) / 12)) / 27
-          const mat = type ? CY * typeCost : 0
-          const handAdd =
-            tilling === 'Hand' && !isSubTab
-              ? p(GT_RATES.soilPrepHandAdd.dbName, GT_RATES.soilPrepHandAdd.fallback)
-              : 0
-          const hrs = n(area) > 0 ? n(area) * (baseLabRate + handAdd + tillHrs(tilling)) : 0
+        // Multi-row Soils-style prep renderer. Each row is Vendor + Soil/Amendment
+        // Type + Area + Depth + Tilling; a "+ Add Row" appends another row and a
+        // "×" removes one (only when >1). Material/labor computed per row.
+        const prepSection = ({ title, rows, setRows, baseLabRate }) => {
+          const upd = (i, field, val) =>
+            setRows(rs => rs.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
           return (
             <div>
               <SectionHeader title={title} />
@@ -1889,74 +1939,120 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     </tr>
                   </thead>
                   <tbody>
-                    <tr className="border-b border-gray-100">
-                      <td className="py-1 pr-1">
-                        <select
-                          className="input text-sm py-1.5"
-                          value={vendor || ''}
-                          onChange={e => setVendor(e.target.value)}
-                          title="Vendor"
-                        >
-                          {!vendor && <option value="">Select</option>}
-                          {vendor &&
-                            vendor !== 'Standard' &&
-                            !vendorsForCategory('Soils').some(v => v.id === vendor) && (
-                              <option value={vendor}>{vendor}</option>
-                            )}
-                          {vendorsForCategory('Soils').map(v => (
-                            <option key={v.id} value={v.id}>
-                              {v.name}
-                            </option>
-                          ))}
-                          <option value="Standard">Standard</option>
-                        </select>
-                      </td>
-                      <td className="py-1 pr-1">
-                        <select
-                          className="input text-sm py-1.5"
-                          value={type || ''}
-                          onChange={e => setType(e.target.value)}
-                        >
-                          {!type && <option value="">Select soil/amendment</option>}
-                          {type && !rowOpts.some(o => o.label === type) && (
-                            <option value={type}>{type}</option>
-                          )}
-                          {rowOpts.map(t => (
-                            <option key={t.label} value={t.label}>
-                              {t.label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="py-1 pr-1">
-                        <NumInput value={area} onChange={setArea} placeholder="SF" className="w-full text-center" />
-                      </td>
-                      <td className="py-1 pr-1">
-                        <NumInput value={depth} onChange={setDepth} placeholder="2" className="w-full text-center" />
-                      </td>
-                      <td className="py-1 pr-1">
-                        <select
-                          className="input text-sm py-1.5"
-                          value={tilling || 'None'}
-                          onChange={e => setTilling(e.target.value)}
-                          title="Tilling"
-                        >
-                          <option value="None">None</option>
-                          <option value="Hand">Hand</option>
-                          <option value="Tiller">Tiller</option>
-                        </select>
-                      </td>
-                      <td className="py-1 pr-1">
-                        <span className="text-xs text-gray-500 flex items-center justify-center gap-1 whitespace-nowrap">
-                          ${typeCost.toFixed(2)}/CY
-                        </span>
-                      </td>
-                      <td className="py-1 text-center text-xs text-gray-600 whitespace-nowrap">
-                        {n(area) > 0 ? `$${mat.toFixed(2)} · ${hrs.toFixed(2)} hrs` : '—'}
-                      </td>
-                    </tr>
+                    {(rows || []).map((row, i) => {
+                      const rowOpts = sectionOptions('Soils', row.vendor, [])
+                      const st = resolveType(row.type, rowOpts, [])
+                      const typeCost = st.fallback
+                      const CY = (n(row.area) * (n(row.depthIn) / 12)) / 27
+                      const mat = row.type ? CY * typeCost : 0
+                      const handAdd =
+                        row.tilling === 'Hand' && !isSubTab
+                          ? p(GT_RATES.soilPrepHandAdd.dbName, GT_RATES.soilPrepHandAdd.fallback)
+                          : 0
+                      const hrs =
+                        n(row.area) > 0 ? n(row.area) * (baseLabRate + handAdd + tillHrs(row.tilling)) : 0
+                      return (
+                        <tr key={i} className="border-b border-gray-100">
+                          <td className="py-1 pr-1">
+                            <select
+                              className="input text-sm py-1.5"
+                              value={row.vendor || ''}
+                              onChange={e => upd(i, 'vendor', e.target.value)}
+                              title="Vendor"
+                            >
+                              {!row.vendor && <option value="">Select</option>}
+                              {row.vendor &&
+                                row.vendor !== 'Standard' &&
+                                !vendorsForCategory('Soils').some(v => v.id === row.vendor) && (
+                                  <option value={row.vendor}>{row.vendor}</option>
+                                )}
+                              {vendorsForCategory('Soils').map(v => (
+                                <option key={v.id} value={v.id}>
+                                  {v.name}
+                                </option>
+                              ))}
+                              <option value="Standard">Standard</option>
+                            </select>
+                          </td>
+                          <td className="py-1 pr-1">
+                            <select
+                              className="input text-sm py-1.5"
+                              value={row.type || ''}
+                              onChange={e => upd(i, 'type', e.target.value)}
+                            >
+                              {!row.type && <option value="">Select soil/amendment</option>}
+                              {row.type && !rowOpts.some(o => o.label === row.type) && (
+                                <option value={row.type}>{row.type}</option>
+                              )}
+                              {rowOpts.map(t => (
+                                <option key={t.label} value={t.label}>
+                                  {t.label}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="py-1 pr-1">
+                            <NumInput
+                              value={row.area}
+                              onChange={v => upd(i, 'area', v)}
+                              placeholder="SF"
+                              className="w-full text-center"
+                            />
+                          </td>
+                          <td className="py-1 pr-1">
+                            <NumInput
+                              value={row.depthIn}
+                              onChange={v => upd(i, 'depthIn', v)}
+                              placeholder="2"
+                              className="w-full text-center"
+                            />
+                          </td>
+                          <td className="py-1 pr-1">
+                            <select
+                              className="input text-sm py-1.5"
+                              value={row.tilling || 'None'}
+                              onChange={e => upd(i, 'tilling', e.target.value)}
+                              title="Tilling"
+                            >
+                              <option value="None">None</option>
+                              <option value="Hand">Hand</option>
+                              <option value="Tiller">Tiller</option>
+                            </select>
+                          </td>
+                          <td className="py-1 pr-1">
+                            <span className="text-xs text-gray-500 flex items-center justify-center gap-1 whitespace-nowrap">
+                              ${typeCost.toFixed(2)}/CY
+                            </span>
+                          </td>
+                          <td className="py-1 text-center text-xs text-gray-600 whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1">
+                              <span>{n(row.area) > 0 ? `$${mat.toFixed(2)} · ${hrs.toFixed(2)} hrs` : '—'}</span>
+                              {(rows || []).length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setRows(rs => rs.filter((_, idx) => idx !== i))}
+                                  className="text-gray-300 hover:text-red-500 text-sm px-1"
+                                  title="Remove line"
+                                >
+                                  ×
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setRows(r => [...r, { area: '', vendor: '', type: '', depthIn: '2', tilling: 'Tiller' }])
+                  }
+                  className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+                >
+                  + Add Row
+                </button>
               </div>
             </div>
           )
@@ -1965,30 +2061,14 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           <>
             {prepSection({
               title: 'Planter Preparation',
-              vendor: prepVendor,
-              setVendor: setPrepVendor,
-              type: prepType,
-              setType: setPrepType,
-              area: soilPrepSF,
-              setArea: setSoilPrepSF,
-              depth: prepDepthIn,
-              setDepth: setPrepDepthIn,
-              tilling: prepTilling,
-              setTilling: setPrepTilling,
+              rows: planterPrepRows,
+              setRows: setPlanterPrepRows,
               baseLabRate: p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback),
             })}
             {prepSection({
               title: 'Sod Preparation',
-              vendor: sodPrepVendor,
-              setVendor: setSodPrepVendor,
-              type: sodPrepType,
-              setType: setSodPrepType,
-              area: sodPrepSF,
-              setArea: setSodPrepSF,
-              depth: sodPrepDepthIn,
-              setDepth: setSodPrepDepthIn,
-              tilling: sodPrepTilling,
-              setTilling: setSodPrepTilling,
+              rows: sodPrepRows,
+              setRows: setSodPrepRows,
               baseLabRate: p(GT_RATES.sodPrepLab.dbName, GT_RATES.sodPrepLab.fallback),
             })}
           </>
@@ -2010,22 +2090,23 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               </tr>
             </thead>
             <tbody>
-              {(() => {
-                const st = resolveType(sodType, sodOpts, [])
+              {(sodRows || []).map((row, i) => {
+                const rowOpts = sectionOptions('Sod', row.vendor, [])
+                const st = resolveType(row.type, rowOpts, [])
                 return (
-                  <tr className="border-b border-gray-100">
+                  <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={sodVendor || ''}
-                        onChange={e => setSodVendor(e.target.value)}
+                        value={row.vendor || ''}
+                        onChange={e => updateSodRow(i, 'vendor', e.target.value)}
                         title="Vendor"
                       >
-                        {!sodVendor && <option value="">Select</option>}
-                        {sodVendor &&
-                          sodVendor !== 'Standard' &&
-                          !vendorsForCategory('Sod').some(v => v.id === sodVendor) && (
-                            <option value={sodVendor}>{sodVendor}</option>
+                        {!row.vendor && <option value="">Select</option>}
+                        {row.vendor &&
+                          row.vendor !== 'Standard' &&
+                          !vendorsForCategory('Sod').some(v => v.id === row.vendor) && (
+                            <option value={row.vendor}>{row.vendor}</option>
                           )}
                         {vendorsForCategory('Sod').map(v => (
                           <option key={v.id} value={v.id}>
@@ -2038,14 +2119,14 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={sodType || ''}
-                        onChange={e => setSodType(e.target.value)}
+                        value={row.type || ''}
+                        onChange={e => updateSodRow(i, 'type', e.target.value)}
                       >
-                        {!sodType && <option value="">Select sod</option>}
-                        {sodType && !sodOpts.some(o => o.label === sodType) && (
-                          <option value={sodType}>{sodType}</option>
+                        {!row.type && <option value="">Select sod</option>}
+                        {row.type && !rowOpts.some(o => o.label === row.type) && (
+                          <option value={row.type}>{row.type}</option>
                         )}
-                        {sodOpts.map(t => (
+                        {rowOpts.map(t => (
                           <option key={t.label} value={t.label}>
                             {t.label}
                           </option>
@@ -2053,7 +2134,12 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <NumInput value={sodSF} onChange={setSodSF} placeholder="SF" className="w-full text-center" />
+                      <NumInput
+                        value={row.sf}
+                        onChange={v => updateSodRow(i, 'sf', v)}
+                        placeholder="SF"
+                        className="w-full text-center"
+                      />
                     </td>
                     <td className="py-1 pr-1">
                       <span className="text-xs text-gray-500 whitespace-nowrap block text-center">
@@ -2061,13 +2147,32 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </span>
                     </td>
                     <td className="py-1 text-center text-xs text-gray-600 whitespace-nowrap">
-                      {sodType && n(sodSF) > 0 ? `$${(n(sodSF) * st.fallback).toFixed(2)}` : '—'}
+                      <div className="flex items-center justify-end gap-1">
+                        <span>{row.type && n(row.sf) > 0 ? `$${(n(row.sf) * st.fallback).toFixed(2)}` : '—'}</span>
+                        {(sodRows || []).length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setSodRows(rs => rs.filter((_, idx) => idx !== i))}
+                            className="text-gray-300 hover:text-red-500 text-sm px-1"
+                            title="Remove line"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )
-              })()}
+              })}
             </tbody>
           </table>
+          <button
+            type="button"
+            onClick={() => setSodRows(r => [...r, { vendor: '', type: '', sf: '' }])}
+            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+          >
+            + Add Row
+          </button>
         </div>
       </div>
 
@@ -2086,77 +2191,103 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             </thead>
             <tbody>
               {(() => {
-                const fertOpts = sectionOptions('Fertilizer', sodFertilizerVendor, [])
-                const ft = resolveType(sodFertilizer, fertOpts, [])
                 const sfPerBag = p(
                   GT_RATES.fertilizerSFPerBag.dbName,
                   GT_RATES.fertilizerSFPerBag.fallback
                 )
-                const fertSF = n(sodFertilizerSF) || n(sodSF)
-                const bags =
-                  sodFertilizer && ft && ft.dbName && sfPerBag > 0 && fertSF > 0
-                    ? Math.ceil(fertSF / sfPerBag)
-                    : 0
-                return (
-                  <tr className="border-b border-gray-100">
-                    <td className="py-1 pr-1">
-                      <select
-                        className="input text-sm py-1.5"
-                        value={sodFertilizerVendor || ''}
-                        onChange={e => setSodFertilizerVendor(e.target.value)}
-                        title="Vendor"
-                      >
-                        {!sodFertilizerVendor && <option value="">Select</option>}
-                        {sodFertilizerVendor &&
-                          sodFertilizerVendor !== 'Standard' &&
-                          !vendorsForCategory('Fertilizer').some(v => v.id === sodFertilizerVendor) && (
-                            <option value={sodFertilizerVendor}>{sodFertilizerVendor}</option>
+                // Rows with no explicit SF fall back to the total sod SF (sum of
+                // sodRows) — mirror of the calc's single-row legacy default.
+                const sodSFTotal = (sodRows || []).reduce((a, r) => a + n(r.sf), 0)
+                return (sodFertRows || []).map((row, i) => {
+                  const fertOpts = sectionOptions('Fertilizer', row.vendor, [])
+                  const ft = resolveType(row.fertilizer, fertOpts, [])
+                  const fertSF = n(row.sf) || sodSFTotal
+                  const bags =
+                    row.fertilizer && ft && ft.dbName && sfPerBag > 0 && fertSF > 0
+                      ? Math.ceil(fertSF / sfPerBag)
+                      : 0
+                  return (
+                    <tr key={i} className="border-b border-gray-100">
+                      <td className="py-1 pr-1">
+                        <select
+                          className="input text-sm py-1.5"
+                          value={row.vendor || ''}
+                          onChange={e => updateSodFert(i, 'vendor', e.target.value)}
+                          title="Vendor"
+                        >
+                          {!row.vendor && <option value="">Select</option>}
+                          {row.vendor &&
+                            row.vendor !== 'Standard' &&
+                            !vendorsForCategory('Fertilizer').some(v => v.id === row.vendor) && (
+                              <option value={row.vendor}>{row.vendor}</option>
+                            )}
+                          {vendorsForCategory('Fertilizer').map(v => (
+                            <option key={v.id} value={v.id}>
+                              {v.name}
+                            </option>
+                          ))}
+                          <option value="Standard">Standard</option>
+                        </select>
+                      </td>
+                      <td className="py-1 pr-1">
+                        <select
+                          className="input text-sm py-1.5"
+                          value={row.fertilizer || ''}
+                          onChange={e => updateSodFert(i, 'fertilizer', e.target.value)}
+                        >
+                          {!row.fertilizer && <option value="">Select fertilizer</option>}
+                          {row.fertilizer && !fertOpts.some(o => o.label === row.fertilizer) && (
+                            <option value={row.fertilizer}>{row.fertilizer}</option>
                           )}
-                        {vendorsForCategory('Fertilizer').map(v => (
-                          <option key={v.id} value={v.id}>
-                            {v.name}
-                          </option>
-                        ))}
-                        <option value="Standard">Standard</option>
-                      </select>
-                    </td>
-                    <td className="py-1 pr-1">
-                      <select
-                        className="input text-sm py-1.5"
-                        value={sodFertilizer || ''}
-                        onChange={e => setSodFertilizer(e.target.value)}
-                      >
-                        {!sodFertilizer && <option value="">Select fertilizer</option>}
-                        {sodFertilizer && !fertOpts.some(o => o.label === sodFertilizer) && (
-                          <option value={sodFertilizer}>{sodFertilizer}</option>
-                        )}
-                        {fertOpts.map(t => (
-                          <option key={t.label} value={t.label}>
-                            {t.label}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="py-1 pr-1">
-                      <NumInput
-                        value={sodFertilizerSF}
-                        onChange={setSodFertilizerSF}
-                        placeholder="SF"
-                        className="w-full text-center"
-                      />
-                    </td>
-                    <td className="py-1 text-center text-xs text-gray-600 whitespace-nowrap">
-                      {ft && ft.dbName && sodFertilizer
-                        ? `$${ft.fallback.toFixed(2)}/bag · 1 bag / ${sfPerBag} SF${
-                            bags > 0 ? ` = ${bags} bag${bags > 1 ? 's' : ''} · $${(bags * ft.fallback).toFixed(2)}` : ''
-                          }`
-                        : '—'}
-                    </td>
-                  </tr>
-                )
+                          {fertOpts.map(t => (
+                            <option key={t.label} value={t.label}>
+                              {t.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="py-1 pr-1">
+                        <NumInput
+                          value={row.sf}
+                          onChange={v => updateSodFert(i, 'sf', v)}
+                          placeholder="SF"
+                          className="w-full text-center"
+                        />
+                      </td>
+                      <td className="py-1 text-center text-xs text-gray-600 whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1">
+                          <span>
+                            {ft && ft.dbName && row.fertilizer
+                              ? `$${ft.fallback.toFixed(2)}/bag · 1 bag / ${sfPerBag} SF${
+                                  bags > 0 ? ` = ${bags} bag${bags > 1 ? 's' : ''} · $${(bags * ft.fallback).toFixed(2)}` : ''
+                                }`
+                              : '—'}
+                          </span>
+                          {(sodFertRows || []).length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => setSodFertRows(rs => rs.filter((_, idx) => idx !== i))}
+                              className="text-gray-300 hover:text-red-500 text-sm px-1"
+                              title="Remove line"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
               })()}
             </tbody>
           </table>
+          <button
+            type="button"
+            onClick={() => setSodFertRows(r => [...r, { vendor: '', fertilizer: '', sf: '' }])}
+            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+          >
+            + Add Row
+          </button>
         </div>
       </div>
 
@@ -2278,7 +2409,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             }
             className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
           >
-            + Add line
+            + Add Row
           </button>
         </div>
       </div>
@@ -2420,7 +2551,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             }
             className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
           >
-            + Add line
+            + Add Row
           </button>
         </div>
       </div>
@@ -2550,7 +2681,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               ])
             }
           >
-            + Add line
+            + Add Row
           </button>
           {/* Show CY / material preview below table */}
           {gravelRows.some(r => n(r.sf) > 0) && (
@@ -2686,7 +2817,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               ])
             }
           >
-            + Add line
+            + Add Row
           </button>
           {/* Show CY / material preview below table */}
           {pebbleRows.some(r => n(r.sf) > 0) && (
@@ -2810,7 +2941,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               ])
             }
           >
-            + Add line
+            + Add Row
           </button>
           {/* Show CY / material preview below table */}
           {cobbleRows.some(r => n(r.sf) > 0) && (

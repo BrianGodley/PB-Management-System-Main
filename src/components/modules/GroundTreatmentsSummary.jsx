@@ -218,6 +218,11 @@ export default function GroundTreatmentsSummary({ module }) {
     sodType = 'Marathon',
     sodFertilizer = 'None',
     sodFertilizerSF = 0,
+    // Multi-row sections (new model). Legacy estimates fall back to the scalars.
+    planterPrepRows,
+    sodPrepRows,
+    sodRows,
+    sodFertRows,
     flagstoneSF = 0,
     flagstoneRate,
     precastSF = 0,
@@ -284,89 +289,141 @@ export default function GroundTreatmentsSummary({ module }) {
         ? mp(GT_RATES.tillTillerLab.dbName, GT_RATES.tillTillerLab.fallback)
         : 0
 
-  // ── Planter Preparation (Soils-style row) ─────────────────────────────────────
-  // Material = CY × $/CY from the picked soil/amendment (sub-category 'Soils').
-  // CY = area × (depth/12) / 27. Labor = area × (soilPrepLab base + Hand-add
-  // soilPrepHandAdd + tilling coeff). This single-column view is the In-House
-  // record, so the Hand-add always applies (Sub tab never gets it in the module).
-  const prepTilling = ih.prepTilling || 'Tiller'
-  let planterPrepLine = null
-  if (n(soilPrepSF) > 0) {
-    const baseLab = mp(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
-    const hrs = n(soilPrepSF) * (baseLab + tillLab(prepTilling))
-    let mat = 0
-    if (ih.prepType) {
-      const CY = (n(soilPrepSF) * (n(ih.prepDepthIn) / 12)) / 27
-      const rate = priceForRow('Soils', { type: ih.prepType, vendor: ih.prepVendor }, SOIL_TYPES, 0)
-      mat = CY * rate
-    }
-    planterPrepLine = {
-      label: `Planter Prep${ih.prepType ? ` (${ih.prepType})` : ''}${prepTilling && prepTilling !== 'None' ? ` · ${prepTilling} till` : ''} — ${n(soilPrepSF).toLocaleString()} SF`,
-      value: fmt2(mat),
-      sub: `${hrs.toFixed(2)} hrs`,
-    }
-  }
+  // ── Planter Preparation (multi-row, Soils-style) ──────────────────────────────
+  // Each row: Material = CY × $/CY from the picked soil/amendment (sub-category
+  // 'Soils'); CY = area × (depth/12) / 27; Labor = area × (soilPrepLab base +
+  // Hand-add soilPrepHandAdd + tilling coeff). This single-column view is the
+  // In-House record, so the Hand-add always applies. Legacy estimates (scalar
+  // fields) synthesize a one-row array.
+  const _planterPrepRows =
+    Array.isArray(planterPrepRows) && planterPrepRows.length
+      ? planterPrepRows
+      : n(soilPrepSF) > 0
+        ? [
+            {
+              area: soilPrepSF,
+              vendor: ih.prepVendor,
+              type: ih.prepType,
+              depthIn: ih.prepDepthIn,
+              tilling: ih.prepTilling || 'Tiller',
+            },
+          ]
+        : []
+  const planterPrepLines = _planterPrepRows
+    .map((r, i) => {
+      if (!(n(r.area) > 0)) return null
+      const baseLab = mp(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
+      const tilling = r.tilling || 'Tiller'
+      const hrs = n(r.area) * (baseLab + tillLab(tilling))
+      let mat = 0
+      if (r.type) {
+        const CY = (n(r.area) * (n(r.depthIn) / 12)) / 27
+        const rate = priceForRow('Soils', { type: r.type, vendor: r.vendor }, SOIL_TYPES, 0)
+        mat = CY * rate
+      }
+      return {
+        key: i,
+        label: `Planter Prep${r.type ? ` (${r.type})` : ''}${tilling && tilling !== 'None' ? ` · ${tilling} till` : ''} — ${n(r.area).toLocaleString()} SF`,
+        value: fmt2(mat),
+        sub: `${hrs.toFixed(2)} hrs`,
+      }
+    })
+    .filter(Boolean)
 
-  // ── Sod Preparation (Soils-style row, sod-prep labor base) ────────────────────
-  // Independent state (sodPrepSF/Vendor/Type/DepthIn/Tilling). Same structure as
-  // Planter Prep but using the sod-prep base labor coefficient.
-  const sodPrepTilling = ih.sodPrepTilling || 'Tiller'
-  let sodPrepLine = null
-  if (n(ih.sodPrepSF) > 0) {
-    const baseLab = mp(GT_RATES.sodPrepLab.dbName, GT_RATES.sodPrepLab.fallback)
-    const hrs = n(ih.sodPrepSF) * (baseLab + tillLab(sodPrepTilling))
-    let mat = 0
-    if (ih.sodPrepType) {
-      const CY = (n(ih.sodPrepSF) * (n(ih.sodPrepDepthIn) / 12)) / 27
-      const rate = priceForRow('Soils', { type: ih.sodPrepType, vendor: ih.sodPrepVendor }, SOIL_TYPES, 0)
-      mat = CY * rate
-    }
-    sodPrepLine = {
-      label: `Sod Prep${ih.sodPrepType ? ` (${ih.sodPrepType})` : ''}${sodPrepTilling && sodPrepTilling !== 'None' ? ` · ${sodPrepTilling} till` : ''} — ${n(ih.sodPrepSF).toLocaleString()} SF`,
-      value: fmt2(mat),
-      sub: `${hrs.toFixed(2)} hrs`,
-    }
-  }
+  // ── Sod Preparation (multi-row, Soils-style, sod-prep labor base) ─────────────
+  const _sodPrepRows =
+    Array.isArray(sodPrepRows) && sodPrepRows.length
+      ? sodPrepRows
+      : n(ih.sodPrepSF) > 0
+        ? [
+            {
+              area: ih.sodPrepSF,
+              vendor: ih.sodPrepVendor,
+              type: ih.sodPrepType,
+              depthIn: ih.sodPrepDepthIn,
+              tilling: ih.sodPrepTilling || 'Tiller',
+            },
+          ]
+        : []
+  const sodPrepLines = _sodPrepRows
+    .map((r, i) => {
+      if (!(n(r.area) > 0)) return null
+      const baseLab = mp(GT_RATES.sodPrepLab.dbName, GT_RATES.sodPrepLab.fallback)
+      const tilling = r.tilling || 'Tiller'
+      const hrs = n(r.area) * (baseLab + tillLab(tilling))
+      let mat = 0
+      if (r.type) {
+        const CY = (n(r.area) * (n(r.depthIn) / 12)) / 27
+        const rate = priceForRow('Soils', { type: r.type, vendor: r.vendor }, SOIL_TYPES, 0)
+        mat = CY * rate
+      }
+      return {
+        key: i,
+        label: `Sod Prep${r.type ? ` (${r.type})` : ''}${tilling && tilling !== 'None' ? ` · ${tilling} till` : ''} — ${n(r.area).toLocaleString()} SF`,
+        value: fmt2(mat),
+        sub: `${hrs.toFixed(2)} hrs`,
+      }
+    })
+    .filter(Boolean)
 
-  // ── Sod ──────────────────────────────────────────────────────────────────────
-  let sodLine = null
-  if (n(sodSF) > 0) {
-    const rate = priceForRow('Sod', { type: sodType, vendor: ih.sodVendor }, SOD_TYPES, SOD_TYPES[0].fallback)
-    const mat = n(sodSF) * rate
-    const hrs = n(sodSF) * mp(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback)
-    sodLine = {
-      label: `Sod (${sodType}) — ${n(sodSF).toLocaleString()} SF`,
-      value: fmt2(mat),
-      sub: `${hrs.toFixed(2)} hrs · ${fmt2(rate)}/SF`,
-    }
-  }
+  // ── Sod (multi-row) ───────────────────────────────────────────────────────────
+  const _sodRows =
+    Array.isArray(sodRows) && sodRows.length
+      ? sodRows
+      : n(sodSF) > 0
+        ? [{ vendor: ih.sodVendor, type: sodType, sf: sodSF }]
+        : []
+  const sodLines = _sodRows
+    .map((r, i) => {
+      if (!(n(r.sf) > 0)) return null
+      const rate = priceForRow('Sod', { type: r.type, vendor: r.vendor }, SOD_TYPES, SOD_TYPES[0].fallback)
+      const mat = n(r.sf) * rate
+      const hrs = n(r.sf) * mp(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback)
+      return {
+        key: i,
+        label: `Sod${r.type ? ` (${r.type})` : ''} — ${n(r.sf).toLocaleString()} SF`,
+        value: fmt2(mat),
+        sub: `${hrs.toFixed(2)} hrs · ${fmt2(rate)}/SF`,
+      }
+    })
+    .filter(Boolean)
+  const _sodSFTotal = _sodRows.reduce((a, r) => a + n(r.sf), 0)
 
-  // ── Sod Fertilizer (own section — auto bags from fertilizer SF) ────────────────
+  // ── Sod Fertilizer (multi-row — auto bags from fertilizer SF) ─────────────────
   // Vendor-aware: rate resolves from the picked Vendor+Type (Standard defaults to
-  // the FERTILIZER_TYPES $/bag). Bags = ceil(SF / SF-per-bag). SF defaults to the
-  // sod SF when no explicit fertilizer SF is entered — mirror of the module.
-  let fertLine = null
-  {
-    const ft = FERTILIZER_TYPES.find(t => t.label === sodFertilizer)
-    const fertSF = n(sodFertilizerSF) || n(sodSF)
-    if (sodFertilizer && sodFertilizer !== 'None' && fertSF > 0) {
+  // the FERTILIZER_TYPES $/bag). Bags = ceil(SF / SF-per-bag). A row's SF defaults
+  // to the total sod SF when none entered — mirror of the module.
+  const _sodFertRows =
+    Array.isArray(sodFertRows) && sodFertRows.length
+      ? sodFertRows
+      : sodFertilizer && sodFertilizer !== 'None'
+        ? [{ vendor: ih.sodFertilizerVendor, fertilizer: sodFertilizer, sf: sodFertilizerSF }]
+        : []
+  const fertLines = _sodFertRows
+    .map((r, i) => {
+      const fert = r.fertilizer
+      if (!fert || fert === 'None') return null
+      const ft = FERTILIZER_TYPES.find(t => t.label === fert)
+      const fertSF = n(r.sf) || _sodSFTotal
+      if (!(fertSF > 0)) return null
       const sfPerBag = mp(GT_RATES.fertilizerSFPerBag.dbName, GT_RATES.fertilizerSFPerBag.fallback)
       const bags = sfPerBag > 0 ? Math.ceil(fertSF / sfPerBag) : 0
       const perBag = priceForRow(
         'Fertilizer',
-        { type: sodFertilizer, vendor: ih.sodFertilizerVendor },
+        { type: fert, vendor: r.vendor },
         FERTILIZER_TYPES,
         ft ? ft.fallback : 0
       )
       const mat = bags * perBag
-      if (bags > 0 && perBag > 0)
-        fertLine = {
-          label: `Fertilizer (${sodFertilizer})`,
-          value: fmt2(mat),
-          sub: `${bags} bag${bags > 1 ? 's' : ''} · ${fmt2(perBag)}/bag`,
-        }
-    }
-  }
+      if (!(bags > 0 && perBag > 0)) return null
+      return {
+        key: i,
+        label: `Fertilizer (${fert})`,
+        value: fmt2(mat),
+        sub: `${bags} bag${bags > 1 ? 's' : ''} · ${fmt2(perBag)}/bag`,
+      }
+    })
+    .filter(Boolean)
 
   // ── Mulch (multi-row) ─────────────────────────────────────────────────────────
   // New modules store d.mulchRows; legacy modules store single mulchSF/…, which
@@ -645,10 +702,10 @@ export default function GroundTreatmentsSummary({ module }) {
   )
 
   const hasAnyLines =
-    planterPrepLine ||
-    sodPrepLine ||
-    sodLine ||
-    fertLine ||
+    planterPrepLines.length ||
+    sodPrepLines.length ||
+    sodLines.length ||
+    fertLines.length ||
     mulchLines.length ||
     dgLines.length ||
     gravelLines.length ||
@@ -705,39 +762,39 @@ export default function GroundTreatmentsSummary({ module }) {
         <p className="text-xs text-gray-400 text-center py-4">No line items entered.</p>
       ) : (
         <>
-          {planterPrepLine && (
+          {planterPrepLines.length > 0 && (
             <>
               <SectionLabel title="Planter Preparation" />
-              <LineRow
-                label={planterPrepLine.label}
-                value={planterPrepLine.value}
-                sub={planterPrepLine.sub}
-              />
+              {planterPrepLines.map(l => (
+                <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />
+              ))}
             </>
           )}
 
-          {sodPrepLine && (
+          {sodPrepLines.length > 0 && (
             <>
               <SectionLabel title="Sod Preparation" />
-              <LineRow
-                label={sodPrepLine.label}
-                value={sodPrepLine.value}
-                sub={sodPrepLine.sub}
-              />
+              {sodPrepLines.map(l => (
+                <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />
+              ))}
             </>
           )}
 
-          {sodLine && (
+          {sodLines.length > 0 && (
             <>
               <SectionLabel title="Sod" />
-              <LineRow label={sodLine.label} value={sodLine.value} sub={sodLine.sub} />
+              {sodLines.map(l => (
+                <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />
+              ))}
             </>
           )}
 
-          {fertLine && (
+          {fertLines.length > 0 && (
             <>
               <SectionLabel title="Sod Fertilizer" />
-              <LineRow label={fertLine.label} value={fertLine.value} sub={fertLine.sub} />
+              {fertLines.map(l => (
+                <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />
+              ))}
             </>
           )}
 
