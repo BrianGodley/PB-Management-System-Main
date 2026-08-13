@@ -548,6 +548,11 @@ export default function MasterRates({ only } = {}) {
   // when embedded as a tab under Vendors / Subcontractors / Jobs settings).
   const [activeTabState, setActiveTab] = useState('materials')
   const activeTab = only || activeTabState
+  // Embedded (only=…) views hide the top tab bar, so surface the taxonomy via a
+  // small inner Rates / Categories toggle. Scope follows the embedded table.
+  const embedScope = only === 'subs' ? 'sub' : only === 'labor' ? 'labor' : null
+  const [embeddedView, setEmbeddedView] = useState('rates') // 'rates' | 'tax'
+  const showRateTable = !only || embeddedView === 'rates'
   const [showImport, setShowImport] = useState(false)
   const [showMerge, setShowMerge] = useState(false)
   const [showCatalog, setShowCatalog] = useState(false)
@@ -936,8 +941,38 @@ export default function MasterRates({ only } = {}) {
         </div>
       )}
 
+      {/* Embedded views (only=…) hide the tab bar — surface Categories here. */}
+      {only && embedScope && (
+        <div className="flex gap-1 border-b border-gray-200 mb-3">
+          {[
+            { key: 'rates', label: only === 'labor' ? 'Labor Rates' : 'Subcontractor Rates' },
+            { key: 'tax', label: 'Categories' },
+          ].map(t => (
+            <button
+              key={t.key}
+              onClick={() => setEmbeddedView(t.key)}
+              className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+                embeddedView === t.key
+                  ? 'border-green-700 text-green-800'
+                  : 'border-transparent text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Embedded taxonomy (Categories + Sub-Categories for the scoped table) */}
+      {only && embedScope && embeddedView === 'tax' && (
+        <div>
+          <TaxonomyManager scope={embedScope} kind="category" />
+          <TaxonomyManager scope={embedScope} kind="subcategory" />
+        </div>
+      )}
+
       {/* Materials */}
-      {activeTab === 'materials' && (
+      {showRateTable && activeTab === 'materials' && (
         <div>
           <RateTable
             addLabel="Add Material"
@@ -989,7 +1024,7 @@ export default function MasterRates({ only } = {}) {
       )}
 
       {/* Labor */}
-      {activeTab === 'labor' && (
+      {showRateTable && activeTab === 'labor' && (
         <div>
           <RateTable
             addLabel="Add Labor Rate"
@@ -1025,7 +1060,7 @@ export default function MasterRates({ only } = {}) {
       )}
 
       {/* Subs */}
-      {activeTab === 'subs' && (
+      {showRateTable && activeTab === 'subs' && (
         <div>
           <RateTable
             addLabel="Add Subcontractor"
