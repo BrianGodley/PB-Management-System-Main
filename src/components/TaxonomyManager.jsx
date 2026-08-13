@@ -21,6 +21,20 @@ const SCOPES = {
     hasMaterials: false,
     hasVendor: false,
   },
+  // In-house labor rate taxonomy (own lists, no material links / vendor).
+  labor: {
+    catTable: 'labor_category',
+    subTable: 'labor_subcategory',
+    hasMaterials: false,
+    hasVendor: false,
+  },
+  // Subcontractor rate taxonomy (own lists).
+  sub: {
+    catTable: 'subcontractor_category',
+    subTable: 'subcontractor_subcategory',
+    hasMaterials: false,
+    hasVendor: false,
+  },
 }
 
 export default function TaxonomyManager({ kind = 'category', scope = 'material' }) {

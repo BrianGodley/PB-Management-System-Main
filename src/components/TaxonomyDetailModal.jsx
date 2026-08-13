@@ -17,6 +17,18 @@ const SCOPE_TABLES = {
     hasMaterials: false,
     hasVendor: false,
   },
+  labor: {
+    catTable: 'labor_category',
+    subTable: 'labor_subcategory',
+    hasMaterials: false,
+    hasVendor: false,
+  },
+  sub: {
+    catTable: 'subcontractor_category',
+    subTable: 'subcontractor_subcategory',
+    hasMaterials: false,
+    hasVendor: false,
+  },
 }
 
 export default function TaxonomyDetailModal({

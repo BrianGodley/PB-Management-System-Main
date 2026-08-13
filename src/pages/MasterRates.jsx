@@ -6,6 +6,42 @@ import PriceSheetImportModal from '../components/PriceSheetImportModal'
 import VendorCatalogImportModal from '../components/VendorCatalogImportModal'
 import MergeDuplicatesModal from '../components/MergeDuplicatesModal'
 import { fetchProductTypes, validateCalcMeta, indexProductTypes } from '../lib/productTypes'
+import TaxonomyManager from '../components/TaxonomyManager'
+
+// ── Identity code per labor / subcontractor rate (generated on the fly, never
+// stored — mirrors the material + misc-rate codes). Format:
+//   <PREFIX>-<CatCode>-<SubCode>-<NNNN>  (SubCode omitted when no sub-category)
+// CatCode / SubCode come from the taxonomy tables, matched by name; if a name
+// isn't in the taxonomy yet, a 6-char alphanumeric slug of the text is used.
+// NNNN is the row's stable 1-based index within its (category, sub-category)
+// group, sorted by name. Returns a Map(id → code).
+function buildRateCodeMap(rows, cats, subs, prefix, nameField) {
+  const slug = s => ((s || '').replace(/[^a-z0-9]/gi, '').slice(0, 6).toUpperCase()) || 'GEN'
+  const catCode = name => cats.find(c => c.name === name)?.code || slug(name)
+  const subCode = (catName, subName) => {
+    if (!subName) return null
+    const cat = cats.find(c => c.name === catName)
+    const s = subs.find(x => x.name === subName && (!cat || x.category_id === cat.id))
+    return s?.code || slug(subName)
+  }
+  const seq = {}
+  const counters = {}
+  ;[...rows]
+    .sort((a, b) => String(a[nameField] || '').localeCompare(String(b[nameField] || '')))
+    .forEach(r => {
+      const key = `${r.category || ''}|${r.sub_category || ''}`
+      counters[key] = (counters[key] || 0) + 1
+      seq[r.id] = counters[key]
+    })
+  const map = new Map()
+  rows.forEach(r => {
+    const cc = catCode(r.category)
+    const sc = subCode(r.category, r.sub_category)
+    const nnnn = String(seq[r.id] || 0).padStart(4, '0')
+    map.set(r.id, sc ? `${prefix}-${cc}-${sc}-${nnnn}` : `${prefix}-${cc}-${nnnn}`)
+  })
+  return map
+}
 
 // ── Which estimate modules consume a given rate ──────────────────────────────
 // Most rates carry a `category` that IS the module; a few categories / vendor
@@ -501,7 +537,9 @@ function ModuleTags({ modules }) {
 const TABS = [
   { key: 'materials', label: 'Materials' },
   { key: 'labor', label: 'Labor Rates' },
+  { key: 'labor_tax', label: 'Labor Categories' },
   { key: 'subs', label: 'Subcontractors' },
+  { key: 'sub_tax', label: 'Sub Categories' },
 ]
 
 export default function MasterRates({ only } = {}) {
@@ -517,6 +555,11 @@ export default function MasterRates({ only } = {}) {
   const [labor, setLabor] = useState([])
   const [subs, setSubs] = useState([])
   const [vendors, setVendors] = useState([])
+  // Labor / subcontractor taxonomy (for generated codes; tables may not exist yet)
+  const [laborCats, setLaborCats] = useState([])
+  const [laborSubcats, setLaborSubcats] = useState([])
+  const [subTaxCats, setSubTaxCats] = useState([])
+  const [subTaxSubcats, setSubTaxSubcats] = useState([])
   const [loading, setLoading] = useState(true)
   const [matCategory, setMatCategory] = useState('All')
   const [matVendor, setMatVendor] = useState('All')
@@ -545,16 +588,25 @@ export default function MasterRates({ only } = {}) {
 
   async function fetchAll() {
     setLoading(true)
-    const [mats, labRes, subRes, vendorRes] = await Promise.all([
+    const [mats, labRes, subRes, vendorRes, lc, ls, sc, ss] = await Promise.all([
       fetchAllMaterialsAdmin(),
       supabase.from('labor_rates').select('*').order('name'),
       supabase.from('subcontractor_rates').select('*').order('company_name'),
       supabase.from('subs_vendors').select('id, company_name, type').order('company_name'),
+      // Taxonomy tables (may not exist yet → data null → [] → codes fall back to slug)
+      supabase.from('labor_category').select('id, code, name'),
+      supabase.from('labor_subcategory').select('id, code, name, category_id'),
+      supabase.from('subcontractor_category').select('id, code, name'),
+      supabase.from('subcontractor_subcategory').select('id, code, name, category_id'),
     ])
     if (mats) setMaterials(mats)
     if (labRes.data) setLabor(labRes.data)
     if (subRes.data) setSubs(subRes.data)
     if (vendorRes.data) setVendors(vendorRes.data)
+    setLaborCats(lc.data || [])
+    setLaborSubcats(ls.data || [])
+    setSubTaxCats(sc.data || [])
+    setSubTaxSubcats(ss.data || [])
     // Product types are reference data; tolerant of the table not existing yet.
     setProductTypes(await fetchProductTypes())
     setLoading(false)
@@ -734,7 +786,20 @@ export default function MasterRates({ only } = {}) {
       render: r => <ModuleTags modules={estimateModules(r.category, r.sub_category)} />,
     },
   ]
+  // Generated identity codes for labor / subcontractor rows (like materials).
+  const laborCodeMap = useMemo(
+    () => buildRateCodeMap(labor, laborCats, laborSubcats, 'LAB', 'name'),
+    [labor, laborCats, laborSubcats]
+  )
+  const subCodeMap = useMemo(
+    () => buildRateCodeMap(subs, subTaxCats, subTaxSubcats, 'SUB', 'trade'),
+    [subs, subTaxCats, subTaxSubcats]
+  )
+  const codeCell = map => r => (
+    <span className="font-mono text-xs text-gray-500">{map.get(r.id) || '—'}</span>
+  )
   const laborColumns = [
+    { key: 'code', label: 'Code', editable: false, render: codeCell(laborCodeMap) },
     { key: 'category', label: 'Category', type: 'select', options: LABOR_CATEGORY_OPTIONS },
     { key: 'sub_category', label: 'Sub Category', placeholder: 'describe…' },
     { key: 'name', label: 'Item', bold: true, stripCat: true, placeholder: 'e.g. Demo - Tree Small' },
@@ -749,6 +814,7 @@ export default function MasterRates({ only } = {}) {
     },
   ]
   const subColumns = [
+    { key: 'code', label: 'Code', editable: false, render: codeCell(subCodeMap) },
     { key: 'category', label: 'Category', type: 'select', options: SUB_CATEGORY_OPTIONS },
     { key: 'company_name', label: 'Subcontractor', placeholder: 'e.g. ABC Concrete Co.' },
     { key: 'sub_category', label: 'Sub Category', placeholder: 'describe…' },
@@ -982,6 +1048,30 @@ export default function MasterRates({ only } = {}) {
             })}
             loading={loading}
           />
+        </div>
+      )}
+
+      {/* Labor taxonomy (Categories + Sub-Categories) */}
+      {activeTab === 'labor_tax' && (
+        <div>
+          <p className="text-xs text-gray-500 mb-1">
+            Master Category &amp; Sub-Category lists for In-House Labor Rates. Drive the codes
+            shown on the Labor Rates tab.
+          </p>
+          <TaxonomyManager scope="labor" kind="category" />
+          <TaxonomyManager scope="labor" kind="subcategory" />
+        </div>
+      )}
+
+      {/* Subcontractor taxonomy (Categories + Sub-Categories) */}
+      {activeTab === 'sub_tax' && (
+        <div>
+          <p className="text-xs text-gray-500 mb-1">
+            Master Category &amp; Sub-Category lists for Subcontractor Rates. Drive the codes
+            shown on the Subcontractors tab.
+          </p>
+          <TaxonomyManager scope="sub" kind="category" />
+          <TaxonomyManager scope="sub" kind="subcategory" />
         </div>
       )}
     </div>
