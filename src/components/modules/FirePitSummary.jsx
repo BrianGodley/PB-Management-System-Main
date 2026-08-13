@@ -1,6 +1,9 @@
 import FinancialSummaryList from './FinancialSummaryList'
-import { groutCuFtPerBlock } from '../../lib/cmuGrout'
 import { catalogItemFor } from '../../lib/materialCatalog'
+import { STRUCT_CALC } from './FirePitModule'
+
+const STRUCT_TYPES = ['CMU', 'PIP', 'Modular', 'Brick']
+const STRUCT_LABEL = { CMU: 'CMU Block', PIP: 'Poured in Place', Modular: 'Modular', Brick: 'Brick' }
 
 // Resolve a master-list finish/cap row (sub_category=cat, Unspecified) → meta with
 // its material unit + calc_meta params, mirroring the module so summary line items
@@ -115,11 +118,6 @@ const GAS_LINE_FALLBACK = {
   '2" Black Iron Gas Pipe': 5.72,
 }
 
-const BLOCK_LENGTH_IN = 16
-const BLOCK_HEIGHT_IN = 8
-const BLOCK_WIDTH_IN = 8
-const GROUT_CF_PER_BLOCK = groutCuFtPerBlock(BLOCK_WIDTH_IN, BLOCK_HEIGHT_IN) // shared CMU grout model
-
 const DEFAULTS = { laborRatePerHour: 35, laborBurdenPct: 0.29, gpmd: 425, commissionRate: 0.12 }
 
 const n = v => parseFloat(v) || 0
@@ -162,16 +160,6 @@ export default function FirePitSummary({ module }) {
   const {
     difficulty = 0,
     hoursAdj = 0,
-    layoutHrs = 0,
-    wallLF = 0,
-    wallHeightIn = 40,
-    footingWidthIn = 12,
-    footingDepthIn = 12,
-    rebarSpacingIn = 16,
-    bondBeamCourses = 1,
-    pctGrouted = 100,
-    pctCurved = 0,
-    useGroutPump = 'No',
     capRows = [],
     wallFinishRows = [],
     epLineRows = [],
@@ -183,44 +171,40 @@ export default function FirePitSummary({ module }) {
     gpmd = DEFAULTS.gpmd,
     materialPrices = {},
     materialRows = [],
+    calc: savedCalc = null,
   } = data
   // Reference the Sub record so it is available for future breakdown use.
   void sub
 
   const mp = (dbName, fallback) => materialPrices[dbName] ?? fallback
 
-  // ── Re-derive quantities ────────────────────────────────────────────────────
-  const blocksPerCourse = n(wallLF) > 0 ? Math.ceil((n(wallLF) * 12) / BLOCK_LENGTH_IN) : 0
-  const coursesCount = n(wallHeightIn) > 0 ? Math.ceil(n(wallHeightIn) / BLOCK_HEIGHT_IN) : 0
-  const rawBlocks = blocksPerCourse * coursesCount
-  const totalBlocks = rawBlocks * 1.1
-
-  const footingCF = (n(footingWidthIn) / 12) * (n(footingDepthIn) / 12) * n(wallLF)
-  const footingCY = footingCF / 27
-  const groutCF = rawBlocks * GROUT_CF_PER_BLOCK * (n(pctGrouted) / 100)
-  const groutCY = groutCF / 27
-
-  const vertRebars = n(rebarSpacingIn) > 0 ? Math.ceil((n(wallLF) * 12) / n(rebarSpacingIn)) : 0
-  const vertRebarLF = (vertRebars * (n(wallHeightIn) + n(footingDepthIn))) / 12
-  const horizRebarLF = (2 + n(bondBeamCourses)) * n(wallLF)
-  const totalRebarLF = vertRebarLF + horizRebarLF
-
-  // Labor hours
-  const layoutHrsN = n(layoutHrs)
-  const digHrs =
-    footingCF > 0 ? footingCF / mp(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
-  const rebarHrs =
-    totalRebarLF > 0 ? totalRebarLF / mp(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
-  const setBlockHrs =
-    rawBlocks > 0 ? rawBlocks / mp(FP_RATES.blockLab.dbName, FP_RATES.blockLab.fallback) : 0
-  const groutRate =
-    useGroutPump === 'Yes'
-      ? mp(FP_RATES.pumpGroutLab.dbName, FP_RATES.pumpGroutLab.fallback)
-      : mp(FP_RATES.handGroutLab.dbName, FP_RATES.handGroutLab.fallback)
-  const groutHrs = groutCF > 0 ? groutCF / groutRate : 0
-
-  const structuralBaseHrs = digHrs + rebarHrs + setBlockHrs + groutHrs
-  const curveAddHrs = structuralBaseHrs * (n(pctCurved) / 100) * 0.25
+  // ── Structure — reuse the module's exported per-type calculators so every
+  //    structure type (CMU/PIP/Modular/Brick) reprices from a single source of
+  //    truth (not the old CMU-only derivation). Legacy bids stored the CMU wall
+  //    flat on the In-House record → fold onto structs.CMU. ────────────────────
+  const structs =
+    ih.structs || {
+      CMU: {
+        wallLF: ih.wallLF,
+        wallHeightIn: ih.wallHeightIn,
+        footingWidthIn: ih.footingWidthIn,
+        footingDepthIn: ih.footingDepthIn,
+        rebarSpacingIn: ih.rebarSpacingIn,
+        bondBeamCourses: ih.bondBeamCourses,
+        pctGrouted: ih.pctGrouted,
+        pctCurved: ih.pctCurved,
+        useGroutPump: ih.useGroutPump,
+        layoutHrs: ih.layoutHrs,
+        rebarSize: ih.rebarSize ?? data.rebarSize ?? '#4',
+      },
+    }
+  const structResults = STRUCT_TYPES.map(t => ({
+    type: t,
+    struct: structs[t] || {},
+    ...(STRUCT_CALC[t](structs[t] || {}, materialPrices, materialRows) || { mat: 0, hrs: 0 }),
+  })).filter(r => n(r.struct.wallLF) > 0)
+  const structMat = structResults.reduce((s, r) => s + n(r.mat), 0)
+  const structHrs = structResults.reduce((s, r) => s + n(r.hrs), 0)
 
   // ── Wall caps ($/LF material) ────────────────────────────────────────────────
   const capLines = (capRows || [])
@@ -308,7 +292,7 @@ export default function FirePitSummary({ module }) {
 
   // Materials
   const blockMat = totalBlocks * mp(FP_RATES.fpBlock.dbName, FP_RATES.fpBlock.fallback)
-  const rebarMat = totalRebarLF * mp(FP_RATES.fpRebar.dbName, FP_RATES.fpRebar.fallback)
+  const rebarMat = totalRebarLF * mp('Rebar ' + (rebarSize || '#4'), FP_RATES.fpRebar.fallback)
   const footingMat = footingCY * mp(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
   const groutMat = groutCY * mp(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
   const pumpSetupMat =

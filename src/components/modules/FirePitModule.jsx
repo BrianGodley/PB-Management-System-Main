@@ -91,6 +91,73 @@ const BLOCK_WIDTH_IN = 8
 // modules (8x8x16 = 0.5 cu ft). Priced at the concrete rate (fpConcrete).
 const GROUT_CF_PER_BLOCK = groutCuFtPerBlock(BLOCK_WIDTH_IN, BLOCK_HEIGHT_IN)
 
+// ── Structure-type tabs (mirror ColumnsModule / WallsModule wall types) ─────────
+// A fire-pit structure is a LINEAR WALL, so each type mirrors the matching Walls
+// wall math (wallLF × wallHeightIn) rather than a column footprint. CMU keeps the
+// exact legacy FP block/grout/rebar/footing math; the other three add poured,
+// modular-stack and brick-face math.
+const STRUCT_TYPE_TABS = [
+  { key: 'CMU', label: 'CMU Block' },
+  { key: 'PIP', label: 'Poured in Place' },
+  { key: 'Modular', label: 'Modular' },
+  { key: 'Brick', label: 'Brick' },
+]
+// Per-type Type-picker catalog sub-categories (vendor-first, id-linked — the same
+// products the matching Walls / Concrete tabs use). CMU shares the dimensioned
+// 'Wall Block' products (same as Columns CMU); Modular/Brick share the Walls
+// Modular/Brick sub-categories; PIP pours a 'Concrete Mix' product.
+const CMU_BLOCK_SUBCAT = 'Wall Block'
+const MODULAR_SUBCAT = 'Modular Wall'
+const BRICK_SUBCAT = 'Brick'
+const CONC_MIX_SUBCAT = 'Concrete Mix'
+const SUBCAT_FOR = { CMU: CMU_BLOCK_SUBCAT, PIP: CONC_MIX_SUBCAT, Modular: MODULAR_SUBCAT, Brick: BRICK_SUBCAT }
+const TYPE_LABEL = { CMU: 'Block Type', PIP: 'Concrete Mix', Modular: 'Block Type', Brick: 'Brick Type' }
+
+// New per-type material lines resolve ONLY from the catalog ($0 if unpriced) —
+// no hardcoded material fallback (mirrors Columns). Mortar + form lumber.
+const MORTAR_NAME = 'Mortar'
+const FORM_LUMBER_NAME = 'FP Form Lumber'
+// New per-type LABOR coefficients (labor fallbacks allowed). Brick laying mirrors
+// Walls' brickLayLab (1.75 hr/SF); PIP form + pour mirror the Columns PIP rates.
+const FP_BRICK_LAY = { dbName: 'FP Brick Lay Labor Rate', fallback: 1.75 } // hrs / SF of brick face
+const FP_FORM_LAB = { dbName: 'FP Form Labor Rate', fallback: 0.08 } // hrs / SF of form
+const FP_POUR_LAB = { dbName: 'FP Pour Concrete Labor Rate', fallback: 1.5 } // hrs / CY poured
+
+// Resolve a picked catalog product row by id (any vendor).
+function catalogRowById(materialRows, id) {
+  return (materialRows || []).find(r => r.id === id) || null
+}
+// Block dims from a catalog row's calc_meta (fallback to legacy cols / default).
+function blockDims(row, def = { w: 8, h: 8, l: 16 }) {
+  const cm = row && row.calc_meta ? row.calc_meta : {}
+  return {
+    w: n(cm.block_w_in) || n(row && row.block_w_in) || def.w,
+    h: n(cm.block_h_in) || n(row && row.block_h_in) || def.h,
+    l: n(cm.block_l_in) || n(row && row.block_l_in) || def.l,
+  }
+}
+// Vendor options (Standard + vendors carrying a product) for a sub-category.
+function subcatVendorOptions(materialRows, subcat, vendorNames = {}) {
+  const rows = (materialRows || []).filter(r => r.sub_category === subcat)
+  const ids = [...new Set(rows.filter(r => r.vendor_id).map(r => r.vendor_id))]
+  const out = ids
+    .map(id => ({ value: id, label: vendorNames[id] || 'Vendor' }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+  out.unshift({ value: 'Standard', label: 'Standard' })
+  return out
+}
+// Product options for a sub-category filtered by the chosen vendor (vendor-first).
+function subcatProductOptions(materialRows, subcat, vendorSel) {
+  const isStd = !vendorSel || vendorSel === 'Standard'
+  return (materialRows || [])
+    .filter(r => r.sub_category === subcat && (isStd ? r.vendor_id == null : r.vendor_id === vendorSel))
+    .map(r => ({ value: r.id, label: r.name, row: r }))
+}
+function labelWithDims(row) {
+  const d = blockDims(row, { w: 0, h: 0, l: 0 })
+  return d.w ? `${row.name} — ${d.w}×${d.h}×${d.l}` : row.name
+}
+
 // ── Wall-finish vendor catalog (ported from Outdoor Kitchen) ──────────────────
 // A real vendor overrides ONLY the material unit price for a finish (matched by
 // its Type label in the vendor's catalog under the given sub_category); Standard
@@ -371,6 +438,155 @@ function EpTable({
   )
 }
 
+// ── Per-type structure calculators (pure; shared shape used by module + summary) ─
+// Each takes a per-type structure record `s` (wall takeoff + vendor + matType +
+// rebarSize) and returns { mat, hrs, ...quantities }. A fire-pit structure is a
+// LINEAR wall (wallLF × wallHeightIn); each type mirrors the matching Walls math.
+// Material prices: picked catalog row's unit_cost, else the OK'd concrete/rebar
+// fallback (CMU block/concrete/rebar) or $0 for the new catalog-only lines
+// (modular block, brick, mortar, form lumber). Labor coefficients unchanged.
+const structHasGeo = s => n(s?.wallLF) > 0 && n(s?.wallHeightIn) > 0
+
+// Footing + rebar geometry shared by all four types (identical to legacy FP).
+function structFootingRebar(s) {
+  const wallLF = n(s.wallLF)
+  const wallHeightIn = n(s.wallHeightIn)
+  const footingCF = (n(s.footingWidthIn) / 12) * (n(s.footingDepthIn) / 12) * wallLF
+  const footingCY = footingCF / 27
+  const vertRebars = n(s.rebarSpacingIn) > 0 ? Math.ceil((wallLF * 12) / n(s.rebarSpacingIn)) : 0
+  const vertRebarLF = (vertRebars * (wallHeightIn + n(s.footingDepthIn))) / 12
+  const horizRebarLF = (2 + n(s.bondBeamCourses)) * wallLF // 2 footing bars + bond beams
+  const totalRebarLF = vertRebarLF + horizRebarLF
+  return { footingCF, footingCY, totalRebarLF }
+}
+
+// CMU — the EXACT legacy FP block/grout/rebar/footing math. Block price = picked
+// 'Wall Block' catalog row, else the FP Block rate (preserves legacy $).
+function calcCmuStruct(s, mp = {}, materialRows = []) {
+  const p = (db, fb) => (mp[db] != null ? mp[db] : fb)
+  if (!structHasGeo(s)) return { mat: 0, hrs: 0 }
+  const wallLF = n(s.wallLF)
+  const wallHeightIn = n(s.wallHeightIn)
+  const blocksPerCourse = Math.ceil((wallLF * 12) / BLOCK_LENGTH_IN)
+  const coursesCount = Math.ceil(wallHeightIn / BLOCK_HEIGHT_IN)
+  const rawBlocks = blocksPerCourse * coursesCount
+  const totalBlocks = rawBlocks * 1.1
+  const { footingCF, footingCY, totalRebarLF } = structFootingRebar(s)
+  const groutCF = rawBlocks * GROUT_CF_PER_BLOCK * (n(s.pctGrouted) / 100)
+  const groutCY = groutCF / 27
+  const digHrs = footingCF > 0 ? footingCF / p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
+  const rebarHrs = totalRebarLF > 0 ? totalRebarLF / p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
+  const setBlockHrs = rawBlocks > 0 ? rawBlocks / p(FP_RATES.blockLab.dbName, FP_RATES.blockLab.fallback) : 0
+  const groutRate = s.useGroutPump === 'Yes'
+    ? p(FP_RATES.pumpGroutLab.dbName, FP_RATES.pumpGroutLab.fallback)
+    : p(FP_RATES.handGroutLab.dbName, FP_RATES.handGroutLab.fallback)
+  const groutHrs = groutCF > 0 ? groutCF / groutRate : 0
+  const structuralBaseHrs = digHrs + rebarHrs + setBlockHrs + groutHrs
+  const curveAddHrs = structuralBaseHrs * (n(s.pctCurved) / 100) * 0.25
+  const picked = catalogRowById(materialRows, s.matType)
+  const blockPrice = picked ? n(picked.unit_cost) : p(FP_RATES.fpBlock.dbName, FP_RATES.fpBlock.fallback)
+  const blockMat = totalBlocks * blockPrice
+  const rebarMat = totalRebarLF * p('Rebar ' + (s.rebarSize || '#4'), FP_RATES.fpRebar.fallback)
+  const footingMat = footingCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
+  const groutMat = groutCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
+  const pumpSetupMat = s.useGroutPump === 'Yes' && groutCF > 0
+    ? p(FP_RATES.fpGroutPump.dbName, FP_RATES.fpGroutPump.fallback)
+    : 0
+  const mat = blockMat + rebarMat + footingMat + groutMat + pumpSetupMat
+  const hrs = n(s.layoutHrs) + structuralBaseHrs + curveAddHrs
+  return { mat, hrs, blocksPerCourse, coursesCount, rawBlocks, totalBlocks, footingCF, footingCY, groutCF, groutCY, totalRebarLF, curveAddHrs, blockMat, rebarMat, footingMat, groutMat, pumpSetupMat }
+}
+
+// Poured in Place — poured volume = wallLF × (height/12) × (wall width/12) → CY ×
+// mix price (picked 'Concrete Mix' row, else FP Concrete rate) + forms (2 faces ×
+// face SF × form lumber, catalog-only $0) + rebar + footing.
+function calcPipStruct(s, mp = {}, materialRows = []) {
+  const p = (db, fb) => (mp[db] != null ? mp[db] : fb)
+  if (!structHasGeo(s)) return { mat: 0, hrs: 0 }
+  const wallLF = n(s.wallLF)
+  const wallHt = n(s.wallHeightIn) / 12
+  const wallWidthIn = n(s.wallWidthIn) || BLOCK_WIDTH_IN
+  const pourCF = wallLF * wallHt * (wallWidthIn / 12)
+  const pourCY = pourCF / 27
+  const formSF = 2 * wallLF * wallHt
+  const { footingCF, footingCY, totalRebarLF } = structFootingRebar(s)
+  const picked = catalogRowById(materialRows, s.matType)
+  const mixPrice = picked ? n(picked.unit_cost) : p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
+  const pourMat = pourCY * mixPrice
+  const formMat = formSF * p(FORM_LUMBER_NAME, 0)
+  const rebarMat = totalRebarLF * p('Rebar ' + (s.rebarSize || '#4'), FP_RATES.fpRebar.fallback)
+  const footingMat = footingCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
+  const mat = pourMat + formMat + rebarMat + footingMat
+  const digHrs = footingCF > 0 ? footingCF / p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
+  const rebarHrs = totalRebarLF > 0 ? totalRebarLF / p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
+  const pourHrs = pourCY * p(FP_POUR_LAB.dbName, FP_POUR_LAB.fallback)
+  const formHrs = formSF * p(FP_FORM_LAB.dbName, FP_FORM_LAB.fallback)
+  const structuralBaseHrs = digHrs + rebarHrs + pourHrs + formHrs
+  const curveAddHrs = structuralBaseHrs * (n(s.pctCurved) / 100) * 0.25
+  const hrs = n(s.layoutHrs) + structuralBaseHrs + curveAddHrs
+  return { mat, hrs, pourCY, formSF, footingCF, footingCY, totalRebarLF, curveAddHrs, pourMat, formMat, rebarMat, footingMat }
+}
+
+// Modular — block stack from the picked 'Modular Wall' row's dims × price
+// (catalog-only $0 if unpriced/unpicked); rebar + footing; NO grout.
+function calcModularStruct(s, mp = {}, materialRows = []) {
+  const p = (db, fb) => (mp[db] != null ? mp[db] : fb)
+  if (!structHasGeo(s)) return { mat: 0, hrs: 0 }
+  const wallLF = n(s.wallLF)
+  const wallHeightIn = n(s.wallHeightIn)
+  const picked = catalogRowById(materialRows, s.matType)
+  const dims = picked ? blockDims(picked) : { w: 8, h: 8, l: 16 }
+  const blocksPerCourse = Math.ceil((wallLF * 12) / dims.l)
+  const coursesCount = Math.ceil(wallHeightIn / dims.h)
+  const rawBlocks = blocksPerCourse * coursesCount
+  const totalBlocks = rawBlocks * 1.1
+  const { footingCF, footingCY, totalRebarLF } = structFootingRebar(s)
+  const blockPrice = picked ? n(picked.unit_cost) : 0
+  const blockMat = totalBlocks * blockPrice
+  const rebarMat = totalRebarLF * p('Rebar ' + (s.rebarSize || '#4'), FP_RATES.fpRebar.fallback)
+  const footingMat = footingCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
+  const mat = blockMat + rebarMat + footingMat
+  const digHrs = footingCF > 0 ? footingCF / p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
+  const rebarHrs = totalRebarLF > 0 ? totalRebarLF / p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
+  const setBlockHrs = rawBlocks > 0 ? rawBlocks / p(FP_RATES.blockLab.dbName, FP_RATES.blockLab.fallback) : 0
+  const structuralBaseHrs = digHrs + rebarHrs + setBlockHrs
+  const curveAddHrs = structuralBaseHrs * (n(s.pctCurved) / 100) * 0.25
+  const hrs = n(s.layoutHrs) + structuralBaseHrs + curveAddHrs
+  return { mat, hrs, blocksPerCourse, coursesCount, rawBlocks, totalBlocks, footingCF, footingCY, totalRebarLF, curveAddHrs, blockMat, rebarMat, footingMat }
+}
+
+// Brick — bricks = face SF (wallLF × height) × per_sqft (calc_meta.per_sqft,
+// default 7) × $/brick (picked 'Brick' row, $0 if unpriced) + Mortar (catalog-only
+// $0) + rebar + footing. Laying labor = face SF × FP Brick Lay rate.
+function calcBrickStruct(s, mp = {}, materialRows = []) {
+  const p = (db, fb) => (mp[db] != null ? mp[db] : fb)
+  if (!structHasGeo(s)) return { mat: 0, hrs: 0 }
+  const wallLF = n(s.wallLF)
+  const faceSF = wallLF * (n(s.wallHeightIn) / 12)
+  const picked = catalogRowById(materialRows, s.matType)
+  const perSqft = n(picked && picked.calc_meta && picked.calc_meta.per_sqft) || 7
+  const brickPrice = picked ? n(picked.unit_cost) : 0
+  const bricks = faceSF * perSqft
+  const { footingCF, footingCY, totalRebarLF } = structFootingRebar(s)
+  const brickMat = bricks * brickPrice
+  const mortarMat = faceSF * p(MORTAR_NAME, 0)
+  const rebarMat = totalRebarLF * p('Rebar ' + (s.rebarSize || '#4'), FP_RATES.fpRebar.fallback)
+  const footingMat = footingCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
+  const mat = brickMat + mortarMat + rebarMat + footingMat
+  const digHrs = footingCF > 0 ? footingCF / p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
+  const rebarHrs = totalRebarLF > 0 ? totalRebarLF / p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
+  const brickHrs = faceSF * p(FP_BRICK_LAY.dbName, FP_BRICK_LAY.fallback)
+  const structuralBaseHrs = digHrs + rebarHrs + brickHrs
+  const curveAddHrs = structuralBaseHrs * (n(s.pctCurved) / 100) * 0.25
+  const hrs = n(s.layoutHrs) + structuralBaseHrs + curveAddHrs
+  return { mat, hrs, faceSF, bricks, footingCF, footingCY, totalRebarLF, curveAddHrs, brickMat, mortarMat, rebarMat, footingMat }
+}
+
+// Exported so FirePitSummary can reuse the SAME per-type math (single source of
+// truth) instead of recomputing with a stale CMU-only model.
+export const STRUCT_CALC = { CMU: calcCmuStruct, PIP: calcPipStruct, Modular: calcModularStruct, Brick: calcBrickStruct }
+const STRUCT_TYPES = ['CMU', 'PIP', 'Modular', 'Brick']
+
 // ── Calculation engine ────────────────────────────────────────────────────────
 function calcFirePit(
   state,
@@ -384,16 +600,7 @@ function calcFirePit(
   const {
     difficulty,
     hoursAdj,
-    layoutHrs,
-    wallLF,
-    wallHeightIn,
-    footingWidthIn,
-    footingDepthIn,
-    rebarSpacingIn,
-    bondBeamCourses,
-    pctGrouted,
-    pctCurved,
-    useGroutPump,
+    structs,
     capRows,
     wallFinishRows,
     epLineRows,
@@ -454,9 +661,9 @@ function calcFirePit(
   }
   const capCalc = (capRows || []).map(capRowCalc)
   const capMat = capCalc.reduce((s, c) => s + c.mat, 0)
-  // Cap install labor is billed on the In-House tab only; on the Sub tab the flat
-  // structure price already covers cap install labor (cap material still counts).
-  const capHrs = isSubTab ? 0 : capCalc.reduce((s, c) => s + c.hrs, 0)
+  // Every section is itemized on both tabs now (mirrors Columns); the Sub tab
+  // differs only in the financial roll-up (labor+burden become the sub cost).
+  const capHrs = capCalc.reduce((s, c) => s + c.hrs, 0)
 
   // ── Gas Line + Gas Fixtures (Utilities catalog, gas only) ─────────────────────
   // Gas Line = pipe labor + material PLUS trenching (6" wide × 24" deep per LF,
@@ -484,42 +691,18 @@ function calcFirePit(
     epHrs += qty * laborVal
   })
 
-  // ── Block geometry ───────────────────────────────────────────────────────────
-  const blocksPerCourse = n(wallLF) > 0 ? Math.ceil((n(wallLF) * 12) / BLOCK_LENGTH_IN) : 0
-  const coursesCount = n(wallHeightIn) > 0 ? Math.ceil(n(wallHeightIn) / BLOCK_HEIGHT_IN) : 0
-  const rawBlocks = blocksPerCourse * coursesCount
-  const totalBlocks = rawBlocks * 1.1 // +10% waste for ordering
-
-  // ── Footing ──────────────────────────────────────────────────────────────────
-  const footingCF = (n(footingWidthIn) / 12) * (n(footingDepthIn) / 12) * n(wallLF)
-  const footingCY = footingCF / 27
-
-  // ── Grout ────────────────────────────────────────────────────────────────────
-  const groutCF = rawBlocks * GROUT_CF_PER_BLOCK * (n(pctGrouted) / 100)
-  const groutCY = groutCF / 27
-
-  // ── Rebar ────────────────────────────────────────────────────────────────────
-  const vertRebars = n(rebarSpacingIn) > 0 ? Math.ceil((n(wallLF) * 12) / n(rebarSpacingIn)) : 0
-  const vertRebarLF = (vertRebars * (n(wallHeightIn) + n(footingDepthIn))) / 12
-  const horizRebarLF = (2 + n(bondBeamCourses)) * n(wallLF) // 2 footing bars + bond beams
-  const totalRebarLF = vertRebarLF + horizRebarLF
-
-  // ── Labor hours ───────────────────────────────────────────────────────────────
-  const layoutHrsN = n(layoutHrs)
-  const digHrs = footingCF > 0 ? footingCF / p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
-  const rebarHrs =
-    totalRebarLF > 0 ? totalRebarLF / p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
-  const setBlockHrs =
-    rawBlocks > 0 ? rawBlocks / p(FP_RATES.blockLab.dbName, FP_RATES.blockLab.fallback) : 0
-  const groutRate =
-    useGroutPump === 'Yes'
-      ? p(FP_RATES.pumpGroutLab.dbName, FP_RATES.pumpGroutLab.fallback)
-      : p(FP_RATES.handGroutLab.dbName, FP_RATES.handGroutLab.fallback)
-  const groutHrs = groutCF > 0 ? groutCF / groutRate : 0
-
-  // Curved adjustment: curved sections take 25% more structural labor
-  const structuralBaseHrs = digHrs + rebarHrs + setBlockHrs + groutHrs
-  const curveAddHrs = structuralBaseHrs * (n(pctCurved) / 100) * 0.25
+  // ── Structure — ALL four types contribute simultaneously (mirrors Columns /
+  //    Walls: switching the visible tab never drops the other types' data). ─────
+  const structCalcs = {}
+  let structureHrs = 0
+  let structureMatVal = 0
+  STRUCT_TYPES.forEach(t => {
+    const c = STRUCT_CALC[t](structs?.[t] || {}, mp, materialRows)
+    structCalcs[t] = c
+    structureHrs += c.hrs
+    structureMatVal += c.mat
+  })
+  const structActive = structCalcs[state.structureType] || structCalcs.CMU || { mat: 0, hrs: 0 }
 
   // ── Manual ───────────────────────────────────────────────────────────────────
   let manHrs = 0,
@@ -531,37 +714,8 @@ function calcFirePit(
     manSub += n(r.subCost)
   })
 
-  // ── Material costs ────────────────────────────────────────────────────────────
-  const blockMat = totalBlocks * p(FP_RATES.fpBlock.dbName, FP_RATES.fpBlock.fallback)
-  const rebarMat = totalRebarLF * p('Rebar ' + (state.rebarSize || '#4'), FP_RATES.fpRebar.fallback)
-  const footingMat = footingCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
-  const groutMat = groutCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
-  const pumpSetupMat =
-    useGroutPump === 'Yes' && groutCF > 0
-      ? p(FP_RATES.fpGroutPump.dbName, FP_RATES.fpGroutPump.fallback)
-      : 0
-
-  // ── Structure roll-up (In-House itemized vs Sub flat rate) ───────────────────
-  // structureHrs = itemized structure labor; structureMatVal = itemized structure
-  // material. Both are EXCLUDED on the Sub tab and replaced by structureSubCost, a
-  // flat price driven by wall perimeter + wall face area (covers wall build + cap
-  // install labor).
-  const structureHrs = layoutHrsN + structuralBaseHrs + curveAddHrs
-  const structureMatVal = blockMat + rebarMat + footingMat + groutMat + pumpSetupMat
-  const structureSubCost = isSubTab
-    ? n(wallLF) * p(FP_RATES.fpSubStructLF.dbName, FP_RATES.fpSubStructLF.fallback) +
-      n(wallLF) *
-        (n(wallHeightIn) / 12) *
-        p(FP_RATES.fpSubStructHtSF.dbName, FP_RATES.fpSubStructHtSF.fallback)
-    : 0
-
-  // ── Totals ───────────────────────────────────────────────────────────────────
-  const baseHrs =
-    (isSubTab ? 0 : structureHrs) +
-    capHrs +
-    finishHrs +
-    epHrs +
-    manHrs
+  // ── Totals — both tabs itemize; only the roll-up differs (mirrors Columns) ────
+  const baseHrs = structureHrs + capHrs + finishHrs + epHrs + manHrs
 
   const diffMod = 1 + n(difficulty) / 100
   const _preWalkHrs = baseHrs * diffMod + n(hoursAdj)
@@ -569,12 +723,7 @@ function calcFirePit(
   const totalHrs = _preWalkHrs + walkHrs
   const manDays = totalHrs / 8
 
-  const totalMat =
-    (isSubTab ? 0 : structureMatVal) +
-    capMat +
-    finishMat +
-    epMat +
-    manMat
+  const totalMat = structureMatVal + capMat + finishMat + epMat + manMat
 
   const laborCost = totalHrs * lrph
   const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
@@ -585,7 +734,7 @@ function calcFirePit(
   let gp, subCost, subGp, commission, price
   if (isSubTab) {
     gp = 0
-    subCost = totalMat + laborCost + burden + structureSubCost + manSub
+    subCost = totalMat + laborCost + burden + manSub
     subGp = subCost * subMarkup
     commission = subGp * DEFAULTS.commissionRate
     price = subCost + subGp + commission
@@ -609,17 +758,22 @@ function calcFirePit(
     commission,
     subCost,
     price,
-    blocksPerCourse,
-    coursesCount,
-    rawBlocks,
-    totalBlocks,
-    footingCF,
-    footingCY,
-    groutCF,
-    groutCY,
-    totalRebarLF,
-    curveAddHrs,
-    structureMat: blockMat + rebarMat + footingMat + groutMat + pumpSetupMat + capMat,
+    structCalcs,
+    structActive,
+    structureHrs,
+    structureMatVal,
+    // Active-type quantities surfaced for the structure info box.
+    blocksPerCourse: structActive.blocksPerCourse || 0,
+    coursesCount: structActive.coursesCount || 0,
+    rawBlocks: structActive.rawBlocks || 0,
+    totalBlocks: structActive.totalBlocks || 0,
+    footingCF: structActive.footingCF || 0,
+    footingCY: structActive.footingCY || 0,
+    groutCF: structActive.groutCF || 0,
+    groutCY: structActive.groutCY || 0,
+    totalRebarLF: structActive.totalRebarLF || 0,
+    curveAddHrs: structActive.curveAddHrs || 0,
+    structureMat: structureMatVal + capMat,
     capMat,
     capHrs,
     capCalc,
@@ -630,7 +784,6 @@ function calcFirePit(
     epMat,
     epHrs,
     manMat,
-    structureSubCost,
   }
 }
 
@@ -669,16 +822,17 @@ function LabeledRow({ label, children, note }) {
 
 const DEFAULT_MANUAL_ROWS = [{ label: '', hours: '', materials: '', subCost: '' }]
 
-// Per-tab input record. In-House and Sub each hold their own independent copy so
-// the two tabs are separate calculators.
-function makeTab(src = {}) {
+// Per-TYPE structure record — the wall takeoff + vendor/type picker + rebar size
+// for ONE structure type. Each of the four types keeps its own copy so switching
+// the visible tab never drops another type's entered data (mirrors Columns).
+function makeStruct(src = {}) {
   return {
-    difficulty: src.difficulty ?? '',
-    hoursAdj: src.hoursAdj ?? '',
-    layoutHrs: src.layoutHrs ?? '',
-    distanceLF: src.distanceLF ?? '',
+    vendor: src.vendor ?? 'Standard',
+    matType: src.matType ?? '', // picked catalog product id (block / mix / brick)
+    rebarSize: src.rebarSize ?? '#4',
     wallLF: src.wallLF ?? '',
     wallHeightIn: src.wallHeightIn ?? '40',
+    wallWidthIn: src.wallWidthIn ?? '8', // poured-wall thickness (PIP only)
     footingWidthIn: src.footingWidthIn ?? '12',
     footingDepthIn: src.footingDepthIn ?? '12',
     rebarSpacingIn: src.rebarSpacingIn ?? '16',
@@ -686,6 +840,43 @@ function makeTab(src = {}) {
     pctGrouted: src.pctGrouted ?? '100',
     pctCurved: src.pctCurved ?? '0',
     useGroutPump: src.useGroutPump ?? 'No',
+    layoutHrs: src.layoutHrs ?? '',
+  }
+}
+
+// Per-tab input record. In-House and Sub each hold their own independent copy so
+// the two tabs are separate calculators. `structs` holds the four per-type wall
+// takeoffs; `structureType` is the visible tab. Legacy bids stored the CMU wall
+// fields flat on the tab → fold them onto structs.CMU so totals don't move.
+function makeTab(src = {}) {
+  const legacyStruct =
+    !src.structs && (src.wallLF != null || src.wallHeightIn != null || src.footingWidthIn != null)
+      ? makeStruct({
+          rebarSize: src.rebarSize,
+          wallLF: src.wallLF,
+          wallHeightIn: src.wallHeightIn,
+          footingWidthIn: src.footingWidthIn,
+          footingDepthIn: src.footingDepthIn,
+          rebarSpacingIn: src.rebarSpacingIn,
+          bondBeamCourses: src.bondBeamCourses,
+          pctGrouted: src.pctGrouted,
+          pctCurved: src.pctCurved,
+          useGroutPump: src.useGroutPump,
+          layoutHrs: src.layoutHrs,
+        })
+      : null
+  const s = src.structs || {}
+  return {
+    difficulty: src.difficulty ?? '',
+    hoursAdj: src.hoursAdj ?? '',
+    distanceLF: src.distanceLF ?? '',
+    structureType: src.structureType ?? 'CMU',
+    structs: {
+      CMU: makeStruct(s.CMU || legacyStruct || {}),
+      PIP: makeStruct(s.PIP || {}),
+      Modular: makeStruct(s.Modular || {}),
+      Brick: makeStruct(s.Brick || {}),
+    },
     capRows: src.capRows ?? [CAP_ROW(), CAP_ROW()],
     wallFinishRows: src.wallFinishRows ?? [WF_ROW(), WF_ROW()],
     epLineRows: src.epLineRows ?? [EP_LINE_ROW(), EP_LINE_ROW()],
@@ -725,12 +916,12 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
     // catalog comes from the shared Fire Pit / Outdoor Kitchen / Walls
     // categories ('Wall Finish' and 'Wall Cap' subcategories, unchanged names).
     const [matMap, labRes, rows, venRes] = await Promise.all([
-      fetchStandardRateMap(['Fire Pit', 'Utilities']),
+      fetchStandardRateMap(['Fire Pit', 'Utilities', 'Basic Materials', 'Concrete']),
       supabase
         .from('labor_rates')
         .select('name, rate')
         .in('category', ['Fire Pit', 'Utilities']),
-      fetchModuleCatalog(['Fire Pit', 'Walls', 'Utilities']),
+      fetchModuleCatalog(['Fire Pit', 'Walls', 'Utilities', 'Basic Materials', 'Concrete']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
@@ -784,9 +975,6 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
   // ── State ──────────────────────────────────────────────────────────────────
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Masonry')
   const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
-  // Shared rebar bar size (default #4). Resolves the canonical Basic Materials
-  // 'Rebar #<size>' material name; a single value covers both tabs.
-  const [rebarSize, setRebarSize] = useState(initialData?.rebarSize ?? '#4')
   // Independent In-House vs Sub input records — each tab is its own calculator.
   const [ihTab, setIhTab] = useState(() => makeTab(initialData?.ihData || initialData))
   const [subTab, setSubTab] = useState(() => makeTab(initialData?.subData || {}))
@@ -796,33 +984,60 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
   // A single setter factory: accepts a value (scalar fields) or an updater fn (row arrays).
   const setField = k => v =>
     setCur(p => ({ ...p, [k]: typeof v === 'function' ? v(p[k]) : v }))
-  // Derived active-tab field accessors — render bindings stay unchanged.
+  // Derived active-tab (non-structure) field accessors.
   const difficulty = cur.difficulty
   const setDifficulty = setField('difficulty')
   const hoursAdj = cur.hoursAdj
   const setHoursAdj = setField('hoursAdj')
-  const layoutHrs = cur.layoutHrs
-  const setLayoutHrs = setField('layoutHrs')
   const distanceLF = cur.distanceLF
   const setDistanceLF = setField('distanceLF')
-  const wallLF = cur.wallLF
-  const setWallLF = setField('wallLF')
-  const wallHeightIn = cur.wallHeightIn
-  const setWallHeightIn = setField('wallHeightIn')
-  const footingWidthIn = cur.footingWidthIn
-  const setFootingWidthIn = setField('footingWidthIn')
-  const footingDepthIn = cur.footingDepthIn
-  const setFootingDepthIn = setField('footingDepthIn')
-  const rebarSpacingIn = cur.rebarSpacingIn
-  const setRebarSpacingIn = setField('rebarSpacingIn')
-  const bondBeamCourses = cur.bondBeamCourses
-  const setBondBeamCourses = setField('bondBeamCourses')
-  const pctGrouted = cur.pctGrouted
-  const setPctGrouted = setField('pctGrouted')
-  const pctCurved = cur.pctCurved
-  const setPctCurved = setField('pctCurved')
-  const useGroutPump = cur.useGroutPump
-  const setUseGroutPump = setField('useGroutPump')
+
+  // ── Structure type + per-type struct accessors (mirror Columns colType). Every
+  //    type's struct persists independently; only the active one is edited/shown. ─
+  const structureType = cur.structureType ?? 'CMU'
+  const setStructureType = setField('structureType')
+  const activeStruct = cur.structs[structureType] || cur.structs.CMU
+  // Set a field on a given type's struct (updater fn or scalar).
+  const setStructField = (type, field) => v =>
+    setCur(p => ({
+      ...p,
+      structs: {
+        ...p.structs,
+        [type]: {
+          ...p.structs[type],
+          [field]: typeof v === 'function' ? v(p.structs[type][field]) : v,
+        },
+      },
+    }))
+  // Active-struct field bindings.
+  const rebarSize = activeStruct.rebarSize
+  const setRebarSize = setStructField(structureType, 'rebarSize')
+  const layoutHrs = activeStruct.layoutHrs
+  const setLayoutHrs = setStructField(structureType, 'layoutHrs')
+  const wallLF = activeStruct.wallLF
+  const setWallLF = setStructField(structureType, 'wallLF')
+  const wallHeightIn = activeStruct.wallHeightIn
+  const setWallHeightIn = setStructField(structureType, 'wallHeightIn')
+  const wallWidthIn = activeStruct.wallWidthIn
+  const setWallWidthIn = setStructField(structureType, 'wallWidthIn')
+  const footingWidthIn = activeStruct.footingWidthIn
+  const setFootingWidthIn = setStructField(structureType, 'footingWidthIn')
+  const footingDepthIn = activeStruct.footingDepthIn
+  const setFootingDepthIn = setStructField(structureType, 'footingDepthIn')
+  const rebarSpacingIn = activeStruct.rebarSpacingIn
+  const setRebarSpacingIn = setStructField(structureType, 'rebarSpacingIn')
+  const bondBeamCourses = activeStruct.bondBeamCourses
+  const setBondBeamCourses = setStructField(structureType, 'bondBeamCourses')
+  const pctGrouted = activeStruct.pctGrouted
+  const setPctGrouted = setStructField(structureType, 'pctGrouted')
+  const pctCurved = activeStruct.pctCurved
+  const setPctCurved = setStructField(structureType, 'pctCurved')
+  const useGroutPump = activeStruct.useGroutPump
+  const setUseGroutPump = setStructField(structureType, 'useGroutPump')
+  const structVendor = activeStruct.vendor
+  const setStructVendor = setStructField(structureType, 'vendor')
+  const structMatType = activeStruct.matType
+  const setStructMatType = setStructField(structureType, 'matType')
   const capRows = cur.capRows
   const setCapRows = setField('capRows')
   const wallFinishRows = cur.wallFinishRows
@@ -849,8 +1064,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
     }
   }, [])
 
-  // materialRows (live catalog) intentionally NOT persisted — fetched fresh on open.
-  const state = { crewType, subType, subGpMarkupRate, rebarSize, ...cur }
+  const state = { crewType, subType, subGpMarkupRate, ...cur }
   const calcRaw = calcFirePit(
     state,
     laborRatePerHour,
@@ -904,6 +1118,8 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
         laborBurdenPct,
         gpmd,
         materialPrices,
+        materialRows,
+        vendorNames,
         calc,
       },
     })
@@ -913,6 +1129,17 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
   //    lists its LABOR rates first, then every MATERIAL rate (per vendor from the
   //    module catalog, Standard first) — mirrors the Walls / Utilities View Rates.
   const vendorNames = Object.fromEntries((vendors || []).map(v => [v.id, v.name]))
+
+  // ── Structure Type-picker option sources (vendor-first, per structure type) ──
+  const structVendorOptions = type => subcatVendorOptions(materialRows, SUBCAT_FOR[type], vendorNames)
+  const structTypeOptions = (type, vendorSel) =>
+    subcatProductOptions(materialRows, SUBCAT_FOR[type], vendorSel).map(o => ({
+      value: o.value,
+      label: type === 'CMU' || type === 'Modular' ? labelWithDims(o.row) : o.label,
+    }))
+  // Per-type contribution badge for the sticky tab bar (has a wall entered?).
+  const structTypeCount = key => (n(cur.structs?.[key]?.wallLF) > 0 ? 1 : 0)
+
   // Material rows for a catalog item (matched by name). One row per vendor
   // (Standard first), each editable straight to material_price; falls back to a
   // single Standard row at the current rate when no catalog row exists.
@@ -1131,6 +1358,26 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
             showInlineToggle={false}
           />
         </div>
+        {/* ── Frozen Structure-Type sub-tab bar (mirrors ColumnsModule). ── */}
+        <div className="px-6 pb-2">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Structure Type</p>
+          <div className="flex gap-2">
+            {STRUCT_TYPE_TABS.map(t => (
+              <button
+                key={t.key}
+                onClick={() => setStructureType(t.key)}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                  structureType === t.key
+                    ? 'bg-green-700 text-white border-green-700'
+                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {t.label}
+                {structTypeCount(t.key) > 0 ? ' •' : ''}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <ModuleHeaderSlot>
@@ -1174,64 +1421,55 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
         </>
       )}
 
-      {/* ── Fire Pit Structure ── */}
+      {/* ── Fire Pit Installation — per structure type (CMU/PIP/Modular/Brick) ── */}
       <div>
-        <SectionHeader title="Fire Pit Structure (CMU Block)" />
-        {isSub ? (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3 text-[11px] text-gray-500">
-            <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">
-              Subcontractor Structure Rates
-            </p>
-            <div className="flex flex-wrap gap-x-3 gap-y-1">
-              <span className="inline-flex items-center gap-1">
-                Structure ${p(FP_RATES.fpSubStructLF.dbName, 0).toFixed(2)}/LF
-              </span>
-              <span className="inline-flex items-center gap-1">
-                Wall Face ${p(FP_RATES.fpSubStructHtSF.dbName, 0).toFixed(2)}/SF
-              </span>
-            </div>
-            <p className="text-[10px] text-gray-400 mt-1 italic">
-              Flat sub price covers the wall build and cap install labor.
-            </p>
+        <SectionHeader title="Fire Pit Installation" />
+
+        {/* Vendor + Type material picker (vendor-first, catalog-sourced). */}
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Vendor</label>
+            <select
+              className="input text-sm py-1.5 w-full"
+              value={structVendor || 'Standard'}
+              onChange={e => {
+                setStructVendor(e.target.value)
+                setStructMatType('')
+              }}
+            >
+              {structVendorOptions(structureType).map(o => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
           </div>
-        ) : (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3 text-[11px] text-gray-500">
-          <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">
-            FP Structural Rates (click any to edit)
-          </p>
-          <div className="flex flex-wrap gap-x-3 gap-y-1">
-            <span className="inline-flex items-center gap-1">
-              Block ${p(FP_RATES.fpBlock.dbName, 2.5).toFixed(2)}/ea
-            </span>
-            <span className="inline-flex items-center gap-1">
-              Rebar {rebarSize} ${p('Rebar ' + (rebarSize || '#4'), 0.5).toFixed(2)}/LF
-            </span>
-            <span className="inline-flex items-center gap-1">
-              Concrete ${p(FP_RATES.fpConcrete.dbName, 149.5).toFixed(2)}/CY
-            </span>
-            <span className="inline-flex items-center gap-1">
-              Grout pump ${p(FP_RATES.fpGroutPump.dbName, 150).toFixed(2)}
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
-            <span className="inline-flex items-center gap-1">
-              Dig {p(FP_RATES.digLab.dbName, 4)} CF/hr
-            </span>
-            <span className="inline-flex items-center gap-1">
-              Rebar {p(FP_RATES.rebarLab.dbName, 35)} LF/hr
-            </span>
-            <span className="inline-flex items-center gap-1">
-              Block {p(FP_RATES.blockLab.dbName, 10.4)} blk/hr
-            </span>
-            <span className="inline-flex items-center gap-1">
-              Hand grout {p(FP_RATES.handGroutLab.dbName, 5.5)} CF/hr
-            </span>
-            <span className="inline-flex items-center gap-1">
-              Pump grout {p(FP_RATES.pumpGroutLab.dbName, 81)} CF/hr
-            </span>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">{TYPE_LABEL[structureType]}</label>
+            {(() => {
+              const opts = structTypeOptions(structureType, structVendor)
+              return (
+                <select
+                  className="input text-sm py-1.5 w-full"
+                  value={structMatType || ''}
+                  onChange={e => setStructMatType(e.target.value)}
+                >
+                  <option value="">{opts.length ? 'Select…' : 'No products — add in Master Rates'}</option>
+                  {structMatType && !opts.some(o => o.value === structMatType) && (
+                    <option value={structMatType}>{structMatType}</option>
+                  )}
+                  {opts.map(o => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              )
+            })()}
           </div>
         </div>
-        )}
+
+        {/* Wall takeoff fields. */}
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div>
             <label className="block text-xs text-gray-500 mb-1">Wall Perimeter (LF)</label>
@@ -1241,8 +1479,12 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
             <label className="block text-xs text-gray-500 mb-1">Wall Height (inches)</label>
             <NumInput value={wallHeightIn} onChange={setWallHeightIn} placeholder="40" />
           </div>
-          {!isSub && (
-            <>
+          {structureType === 'PIP' && (
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Wall Width / Thickness (inches)</label>
+              <NumInput value={wallWidthIn} onChange={setWallWidthIn} placeholder="8" />
+            </div>
+          )}
           <div>
             <label className="block text-xs text-gray-500 mb-1">Footing Width (inches)</label>
             <NumInput value={footingWidthIn} onChange={setFootingWidthIn} placeholder="12" />
@@ -1274,15 +1516,17 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
             <label className="block text-xs text-gray-500 mb-1">Bond Beam Courses</label>
             <NumInput value={bondBeamCourses} onChange={setBondBeamCourses} placeholder="1" />
           </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">% Grouted</label>
-            <div className="relative">
-              <NumInput value={pctGrouted} onChange={setPctGrouted} placeholder="100" />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-                %
-              </span>
+          {structureType === 'CMU' && (
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">% Grouted</label>
+              <div className="relative">
+                <NumInput value={pctGrouted} onChange={setPctGrouted} placeholder="100" />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+                  %
+                </span>
+              </div>
             </div>
-          </div>
+          )}
           <div>
             <label className="block text-xs text-gray-500 mb-1">% Curved Wall</label>
             <div className="relative">
@@ -1292,22 +1536,20 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
               </span>
             </div>
           </div>
-            </>
-          )}
         </div>
 
-        {!isSub && (
-          <>
-        <LabeledRow label="Use Grout Pump?">
-          <select
-            className="input text-sm py-1.5 w-28"
-            value={useGroutPump}
-            onChange={e => setUseGroutPump(e.target.value)}
-          >
-            <option>No</option>
-            <option>Yes</option>
-          </select>
-        </LabeledRow>
+        {structureType === 'CMU' && (
+          <LabeledRow label="Use Grout Pump?">
+            <select
+              className="input text-sm py-1.5 w-28"
+              value={useGroutPump}
+              onChange={e => setUseGroutPump(e.target.value)}
+            >
+              <option>No</option>
+              <option>Yes</option>
+            </select>
+          </LabeledRow>
+        )}
 
         <LabeledRow label="Layout Time (Hours)">
           <NumInput value={layoutHrs} onChange={setLayoutHrs} placeholder="0" className="w-28" />
@@ -1315,27 +1557,38 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
 
         {n(wallLF) > 0 && (
           <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-gray-600 flex flex-wrap gap-4">
-            <span>
-              Blocks: <strong>{calc.totalBlocks.toFixed(0)}</strong> ({calc.blocksPerCourse} ×{' '}
-              {calc.coursesCount} courses + 10% waste)
-            </span>
-            <span>
-              Footing: <strong>{calc.footingCY.toFixed(3)} CY</strong>
-            </span>
-            <span>
-              Grout: <strong>{calc.groutCY.toFixed(3)} CY</strong>
-            </span>
-            <span>
-              Rebar: <strong>{calc.totalRebarLF.toFixed(0)} LF</strong>
-            </span>
-            {calc.curveAddHrs > 0 && (
+            {calc.structActive.totalBlocks ? (
               <span>
-                Curve add: <strong>{calc.curveAddHrs.toFixed(2)} hrs</strong>
+                Blocks: <strong>{calc.structActive.totalBlocks.toFixed(0)}</strong> ({calc.structActive.blocksPerCourse} × {calc.structActive.coursesCount} courses + 10% waste)
+              </span>
+            ) : null}
+            {calc.structActive.bricks ? (
+              <span>
+                Bricks: <strong>{Math.round(calc.structActive.bricks)}</strong> ({calc.structActive.faceSF?.toFixed(0)} SF face)
+              </span>
+            ) : null}
+            {calc.structActive.pourCY ? (
+              <span>
+                Concrete: <strong>{calc.structActive.pourCY.toFixed(3)} CY</strong>
+              </span>
+            ) : null}
+            <span>
+              Footing: <strong>{(calc.structActive.footingCY || 0).toFixed(3)} CY</strong>
+            </span>
+            {calc.structActive.groutCY ? (
+              <span>
+                Grout: <strong>{calc.structActive.groutCY.toFixed(3)} CY</strong>
+              </span>
+            ) : null}
+            <span>
+              Rebar: <strong>{(calc.structActive.totalRebarLF || 0).toFixed(0)} LF</strong>
+            </span>
+            {calc.structActive.curveAddHrs > 0 && (
+              <span>
+                Curve add: <strong>{calc.structActive.curveAddHrs.toFixed(2)} hrs</strong>
               </span>
             )}
           </div>
-        )}
-          </>
         )}
       </div>
 
@@ -1486,7 +1739,9 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
         />
       </div>
 
-      {/* ── Wall Finishes ── */}
+      {/* ── Wall Finishes — CMU + PIP only (hidden on Modular + Brick). Rows are
+          tab-level so entered data still prices when hidden. ── */}
+      {(structureType === 'CMU' || structureType === 'PIP') && (
       <div>
         <SectionHeader title="Wall Finishes" />
         <div className="overflow-x-auto">
@@ -1566,6 +1821,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
           </table>
         </div>
       </div>
+      )}
 
       {/* ── Manual Entry ── */}
       <div>
