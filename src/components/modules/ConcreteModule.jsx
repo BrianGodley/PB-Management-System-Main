@@ -28,7 +28,6 @@ const BASE_RATES = {
   'Skid Steer': 0.25,
   'Mini Skid Steer': 0.5,
   Wheelbarrow: 1.0,
-  Hand: 2.5,
 }
 
 // Each base-install method maps to a labor_rates row so the inline calculator
@@ -38,12 +37,16 @@ const BASE_METHOD_LABOR_NAME = {
   'Skid Steer': 'Concrete - Base Skid Steer',
   'Mini Skid Steer': 'Concrete - Base Mini Skid Steer',
   Wheelbarrow: 'Concrete - Base Wheelbarrow',
-  Hand: 'Concrete - Base Hand',
 }
 
 const METHODS = Object.keys(BASE_RATES)
 // Map legacy saved base methods to the consolidated set.
-const normBaseMethod = m => (m === 'Skid Steer OK' || m === 'Skid Steer Good' ? 'Skid Steer' : m)
+const normBaseMethod = m =>
+  m === 'Skid Steer OK' || m === 'Skid Steer Good'
+    ? 'Skid Steer'
+    : m === 'Hand'
+      ? 'Wheelbarrow'
+      : m
 const FINISH_TYPES = [
   'Broom Finish',
   'Smooth Trowel',
@@ -116,30 +119,15 @@ const R = {
   commissionRate: 0.12,
 }
 
-// ── Vendor catalog: Standard type lists (single default each; vendors add more) ──
-// Base Install material and the Concrete mix each map to one Standard product;
-// vendors tagged to the 'Concrete Base' / 'Concrete Mix' categories supply
-// additional priced types via material_rates (sub_category + vendor_id).
-// Standard defaults reference the SHARED Basic Materials rows (same rows Walls /
-// Columns / etc. use), so a price change on base or ready-mix propagates
-// everywhere. Vendor-supplied rows still come from the 'Concrete Base' /
-// 'Concrete Mix' sub_category catalog (category 'Concrete').
-const BASE_TYPES = [
-  { label: 'Import Base', dbName: 'Base - Class II Roadbase', fallback: R.costBase, category: 'Basic Materials' },
-]
-const MIX_TYPES = [
-  { label: 'Concrete Mix', dbName: 'Concrete - Ready Mix (Truck)', fallback: R.concretePerCY, category: 'Basic Materials' },
-]
+// Base Install ('Concrete Base') and Concrete Install mix ('Concrete Mix') source
+// their Type options AND price/description entirely from the catalog, per vendor
+// (Standard = the null-vendor rows). No built-in product list.
 
-// Resolve a picked Type label against the vendor option list, then the Standard
-// array, else the first available option. Shared by the calc + the render.
-function resolveType(label, opts, houseArray) {
-  return (
-    (label != null && opts.find(o => o.label === label)) ||
-    (label != null && houseArray.find(o => o.label === label)) ||
-    opts[0] ||
-    houseArray[0]
-  )
+// Resolve a picked Type label against the CATALOG option list only. No built-in
+// fallback: an unmatched/unseeded pick resolves to $0 (price + description come
+// solely from the catalog row the user selected). Shared by the calc + render.
+function resolveType(label, opts) {
+  return (label != null && opts.find(o => o.label === label)) || { dbName: null, fallback: 0 }
 }
 
 // Rebar is priced by LINEAR FEET of bar, converted from the slab SF takeoff by
@@ -169,13 +157,17 @@ function calcConcrete(
   // Per-row/line vendor-aware price resolver. 'Standard' (or a missing/'auto'
   // vendor → the category default) uses the Standard array; a real vendor id →
   // that vendor's products for the category, priced from material_rates.
-  const rowOpt = (cat, row, houseArray) => {
+  const rowOpt = (cat, row) => {
     const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : catDefaults[cat] || 'Standard'
-    if (!vsel || vsel === 'Standard') return resolveType(row.type, houseArray, houseArray)
-    const opts = catalogOptions(materialRows, cat, vsel, { standardRows: 'exclude', stripPrefix: true }).map(
-      o => ({ label: o.label, dbName: o.row.name, fallback: n(o.row.unit_cost), category: 'Concrete' })
-    )
-    return resolveType(row.type, opts, houseArray)
+    const isStd = !vsel || vsel === 'Standard'
+    // Resolve the picked Type against the CATALOG so price/description come from
+    // the actual selected item: Standard → the null-vendor rows, a real vendor →
+    // that vendor's rows. No built-in fallback — an unseeded pick prices at $0.
+    const opts = catalogOptions(materialRows, cat, isStd ? 'Standard' : vsel, {
+      standardRows: 'null-vendor',
+      stripPrefix: true,
+    }).map(o => ({ label: o.label, dbName: o.row.name, fallback: n(o.row.unit_cost) }))
+    return resolveType(row.type, opts)
   }
   // Subcontractor rates: a one-off adjustment saved on THIS estimate
   // (state.rateOverrides) takes precedence over the master rate.
@@ -254,9 +246,9 @@ function calcConcrete(
     // Labor rate = labor_rates['Concrete - Base ...'] (hrs per inch per 100 SF).
     const rate = lr[BASE_METHOD_LABOR_NAME[m]] ?? BASE_RATES[m] ?? 0.25
     const hrs = (sf / 100) * depth * rate
-    const bt = rowOpt('Concrete Base', r, BASE_TYPES)
-    // Material = (SF ÷ 100) × depth(in) × item price ($ per 100 SF per inch).
-    const mat = r.type ? (sf / 100) * depth * (mr[bt.dbName] ?? bt.fallback) : 0
+    const bt = rowOpt('Concrete Base', r)
+    // Material = (SF ÷ 100) × depth(in) × the picked catalog item's price.
+    const mat = r.type ? (sf / 100) * depth * bt.fallback : 0
     baseHrsTot += hrs
     baseMatTot += mat
     return { hrs, mat, rate }
@@ -294,12 +286,11 @@ function calcConcrete(
     concreteCY += tierCY
     // Empty mix picker → no concrete material cost for this tier.
     if (!installTierType[t.key]) return s
-    const mt = rowOpt(
-      'Concrete Mix',
-      { vendor: installTierVendor[t.key], type: installTierType[t.key] },
-      MIX_TYPES
-    )
-    return s + tierCY * (mr[mt.dbName] ?? mt.fallback)
+    const mt = rowOpt('Concrete Mix', {
+      vendor: installTierVendor[t.key],
+      type: installTierType[t.key],
+    })
+    return s + tierCY * mt.fallback
   }, 0)
 
   const rebarHrs = rebarSF > 0 ? rebarSF / rebarSFPerHr : 0
@@ -1432,9 +1423,9 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 const _bm = normBaseMethod(row.method)
                 const methodRate =
                   laborRates[BASE_METHOD_LABOR_NAME[_bm]] ?? BASE_RATES[_bm] ?? 0.25
-                const baseOpts = sectionOptions('Concrete Base', row.vendor, BASE_TYPES)
-                const bt = resolveType(row.type, baseOpts, BASE_TYPES)
-                const baseRate = materialRates[bt.dbName] ?? bt.fallback
+                const baseOpts = sectionOptions('Concrete Base', row.vendor)
+                const bt = resolveType(row.type, baseOpts)
+                const baseRate = bt.fallback
                 const c = {
                   hrs: _sf > 0 ? (_sf / 100) * _depth * methodRate : 0,
                   mat: row.type ? (_sf / 100) * _depth * baseRate : 0,
@@ -1560,9 +1551,9 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 {INSTALL_TIERS.map(t => {
                   const rate = laborRates[t.rateName] ?? t.def
                   const is300plus = t.key !== 's100_300'
-                  const mixOpts = sectionOptions('Concrete Mix', installTierVendor[t.key], MIX_TYPES)
-                  const mt = resolveType(installTierType[t.key], mixOpts, MIX_TYPES)
-                  const mixRate = materialRates[mt.dbName] ?? mt.fallback
+                  const mixOpts = sectionOptions('Concrete Mix', installTierVendor[t.key])
+                  const mt = resolveType(installTierType[t.key], mixOpts)
+                  const mixRate = mt.fallback
                   return (
                     <div
                       key={t.key}
