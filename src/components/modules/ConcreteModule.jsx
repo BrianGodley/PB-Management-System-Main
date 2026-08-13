@@ -20,6 +20,8 @@ import { SubRateOverrideProvider } from '../SubRateOverrideContext.jsx'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
+import UnpricedItemModal, { makePriceLookup } from '../UnpricedItemModal'
+import NewCatalogItemModal from '../NewCatalogItemModal'
 
 // ── Rate tables (method-indexed — not in DB) ──────────────────────────────────
 
@@ -96,16 +98,8 @@ const R = {
   vaporBarrierSFPerHr: 15,
   // Forming complexity: % of labor added per point of the 0–100 input.
   complexityPctPerUnit: 1,
-  // Material unit costs (material_rates)
-  concretePerCY: 185,
-  rebarSFPrice: 0.8625,
-  formMaterialPerLF: 1.73,
-  sleevePer10LF: 4.6,
-  colorCostPerCY: 28.75,
-  sealerNatural5g: 150,
-  sealerWet5g: 190,
-  vaporBarrierPerSF: 0.22,
-  costBase: 7.5,
+  // Material $ come ONLY from the catalog (no hardcoded fallbacks). Unpriced
+  // items are surfaced to the user via the inline pricing modal.
   // Sub / equipment costs (subcontractor_rates)
   pumpFeeFlat: 316.25,
   pumpFeePerCY: 9.2,
@@ -135,7 +129,6 @@ function resolveType(label, opts) {
 // shared Basic Materials 'Rebar' row). Values set with Brian: 24" OC uses
 // 0.59 LF of rebar per SF; 12" OC uses 1.20 LF/SF.
 const REBAR_LF_PER_SF = { '24" OC': 0.59, '12" OC': 1.2 }
-const REBAR_CANONICAL_FB = 1.388 // $/LF fallback (matches Basic Materials seed)
 const REBAR_SPACINGS = ['24" OC', '12" OC']
 
 // ── Calculation engine ────────────────────────────────────────────────────────
@@ -195,23 +188,27 @@ function calcConcrete(
   const seededAggSFPerHr = lr['Concrete - Seeded Aggregate SF/hr'] ?? 40
 
   // ── Material unit costs (material_rates) ─────────────────────────────────
-  const concretePerCY = mr['Concrete - Ready Mix (Truck)'] ?? R.concretePerCY // shared Basic Materials
+  // Material $ come ONLY from the catalog (no hardcoded fallbacks). A name with
+  // no catalog price is recorded on P.unpriced and returned so the module can
+  // prompt the user to price it inline — never silently defaulted.
+  const P = makePriceLookup(mr, materialRows)
+  const concretePerCY = mr['Concrete - Ready Mix (Truck)'] ?? 0 // display-only; Install prices per-row from the catalog (mt.fallback)
   // Rebar $/LF (canonical, from the shared Basic Materials 'Rebar' row) and the
   // LF-per-SF conversion factor for the chosen on-center spacing.
-  const rebarPerLF = mr['Rebar'] ?? REBAR_CANONICAL_FB
-  // Rebar LF-per-SF conversion by spacing — DB-editable coefficients.
+  const rebarPerLF = P.price('Rebar', { category: 'Basic Materials', unit: 'LF' })
+  // Rebar LF-per-SF conversion by spacing — DB-editable coefficients (kept).
   const rebarLfPerSfBySpacing = {
     '24" OC': mr['Concrete - Rebar LF/SF 24" OC'] ?? REBAR_LF_PER_SF['24" OC'],
     '12" OC': mr['Concrete - Rebar LF/SF 12" OC'] ?? REBAR_LF_PER_SF['12" OC'],
   }
   const rebarLfPerSf = rebarLfPerSfBySpacing[state.rebarSpacing] ?? rebarLfPerSfBySpacing['24" OC']
-  const formMaterialPerLF = mr['Concrete - Form Lumber LF'] ?? R.formMaterialPerLF
-  const sleevePer10LF = mr['Concrete - Sleeve Per 10LF'] ?? R.sleevePer10LF
-  const colorCostPerCY = mr['Concrete - Color Per CY'] ?? R.colorCostPerCY
-  const sealerNatural5g = mr['Concrete - Sealer Natural 5gal'] ?? R.sealerNatural5g
-  const sealerWet5g = mr['Concrete - Sealer Wet 5gal'] ?? R.sealerWet5g
-  const vaporBarrierPerSF = mr['Concrete - Vapor Barrier SF'] ?? R.vaporBarrierPerSF
-  const costBase = mr['Base - Class II Roadbase'] ?? R.costBase // shared Basic Materials
+  const formMaterialPerLF = P.price('Concrete - Form Lumber LF', { category: 'Concrete', unit: 'LF' })
+  const sleevePer10LF = P.price('Concrete - Sleeve Per 10LF', { category: 'Concrete', unit: '10LF' })
+  const colorCostPerCY = P.price('Concrete - Color Per CY', { category: 'Concrete', unit: 'CY' })
+  const sealerNatural5g = P.price('Concrete - Sealer Natural 5gal', { category: 'Concrete', unit: '5gal' })
+  const sealerWet5g = P.price('Concrete - Sealer Wet 5gal', { category: 'Concrete', unit: '5gal' })
+  const vaporBarrierPerSF = P.price('Concrete - Vapor Barrier SF', { category: 'Concrete', unit: 'SF' })
+  const costBase = mr['Base - Class II Roadbase'] ?? 0 // display-only; Base prices per-row from the catalog (bt.fallback)
   // Sealer coverage (SF per gallon) — DB-editable coefficient.
   const sealerSFPerGal = mr['Concrete - Sealer SF/gal'] ?? R.sealerSFPerGal
 
@@ -400,6 +397,7 @@ function calcConcrete(
   const price = totalMat + laborCost + burden + gp + commission + subCost
 
   return {
+    unpriced: P.unpricedList,
     walkHrs,
     totalHrs,
     manDays,
@@ -645,6 +643,11 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const [formingComplexity, setFormingComplexity] = useState(initialData?.formingComplexity ?? '')
   const [finishingType, setFinishingType] = useState(initialData?.finishingType ?? 'IH')
   const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
+
+  // Inline catalog modals: an unpriced item to price, or an empty sub-category to
+  // add an item to. Both write back to the catalog then refresh rates.
+  const [unpricedItem, setUnpricedItem] = useState(null)
+  const [newItemTarget, setNewItemTarget] = useState(null)
 
   // Install
   const [installTiers, setInstallTiers] = useState(initialData?.installTiers ?? {})
@@ -1349,6 +1352,26 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
         </div>
       </div>
 
+      {calc.unpriced && calc.unpriced.length > 0 && (
+        <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3">
+          <p className="text-sm font-medium text-red-800">
+            {calc.unpriced.length} item{calc.unpriced.length > 1 ? 's have' : ' has'} no price yet —
+            click to price:
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {calc.unpriced.map(it => (
+              <button
+                key={it.name}
+                className="rounded-full border border-red-300 bg-white px-3 py-1 text-sm text-red-700 hover:bg-red-100"
+                onClick={() => setUnpricedItem(it)}
+              >
+                {it.label} · $0.00
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <ModuleHeaderSlot>
         <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} compact />
       </ModuleHeaderSlot>
@@ -1465,6 +1488,24 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                             </option>
                           ))}
                         </select>
+                        {row.vendor && baseOpts.length === 0 && (
+                          <button
+                            type="button"
+                            className="whitespace-nowrap rounded border border-blue-300 px-2 py-1 text-xs text-blue-700 hover:bg-blue-50"
+                            title="This sub-category has no items — add one"
+                            onClick={() =>
+                              setNewItemTarget({
+                                category: 'Concrete',
+                                subCategory: 'Concrete Base',
+                                label: 'Concrete Base',
+                                unit: 'ton',
+                                vendorId: row.vendor !== 'Standard' ? row.vendor : null,
+                              })
+                            }
+                          >
+                            + Add item
+                          </button>
+                        )}
                       </div>
                     </td>
                     <td className="py-1 pr-2">
@@ -1900,6 +1941,21 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           {saving ? 'Saving...' : 'Save'}
         </button>
       </div>
+
+      {unpricedItem && (
+        <UnpricedItemModal
+          item={unpricedItem}
+          onClose={() => setUnpricedItem(null)}
+          onSaved={refreshAllRates}
+        />
+      )}
+      {newItemTarget && (
+        <NewCatalogItemModal
+          target={newItemTarget}
+          onClose={() => setNewItemTarget(null)}
+          onSaved={refreshAllRates}
+        />
+      )}
     </div>
     </SubRateOverrideProvider>
     </SubTabContext.Provider>

@@ -363,6 +363,32 @@ export async function saveStandardNamedRate(name, price, category = null) {
   }
 }
 
+// Create a new catalog item (material) under a Category → Sub-category and set
+// its Standard (or picked-vendor) price. Used by the inline "add item" flow when
+// a picker's sub-category is an empty set. Mirrors SelectionsBrowser's create
+// path. Returns the new material id.
+export async function createCatalogItem({ name, category, subCategory, unit = null, price = null, vendorId = null }) {
+  const desc = (name || '').trim()
+  if (!desc) throw new Error('Item name is required.')
+  const { category_id, subcategory_id, error: taxErr } = await resolveTaxonomyIds(category, subCategory)
+  if (taxErr) throw new Error(taxErr)
+  const payload = {
+    description: desc,
+    category_id,
+    subcategory_id,
+    unit: (unit || '').trim() || null,
+    attributes: {},
+  }
+  const { data: ins, error: insErr } = await supabase.from('material').insert(payload).select('id')
+  if (insErr) throw new Error('Create failed: ' + insErr.message)
+  const materialId = ins?.[0]?.id || null
+  if (!materialId) throw new Error('Create returned no row — RLS likely blocked the insert.')
+  if (price !== '' && price != null) {
+    await setMaterialPrice(materialId, vendorId || null, Number(price))
+  }
+  return materialId
+}
+
 // All materials mapped to the legacy material_rates row shape (for admin list
 // views): one row per material with its Standard (universal) open price. Sorted
 // by name. Used by the old Master Rates page's Materials tab.
