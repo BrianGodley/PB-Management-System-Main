@@ -6,6 +6,7 @@ import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
+import DropdownSelect from '../DropdownSelect'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import {
@@ -205,8 +206,8 @@ const makeTab = (src = {}) => ({
   hoursAdj: src.hoursAdj ?? '',
   distanceLF: src.distanceLF ?? '',
   fixtureRows: src.fixtureRows ? src.fixtureRows.map(r => ({ ...r })) : blankRows(),
-  transformerRows: src.transformerRows ? src.transformerRows.map(r => ({ ...r })) : blankRows(),
-  wireRows: src.wireRows ? src.wireRows.map(r => ({ ...r })) : blankRows(),
+  transformerRows: src.transformerRows ? src.transformerRows.map(r => ({ ...r })) : [blankRow()],
+  wireRows: src.wireRows ? src.wireRows.map(r => ({ ...r })) : [blankRow()],
   manualRows: src.manualRows ? src.manualRows.map(r => ({ ...r })) : DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
 })
 
@@ -555,23 +556,24 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
                       </select>
                     </td>
                     <td className="py-1.5 pr-2">
-                      <select
+                      {/* Searchable, portal-rendered item picker — long catalog lists. */}
+                      <DropdownSelect
+                        searchable
+                        portal
                         className="input text-sm py-1 w-full"
+                        placeholder={opts.length === 0 ? '— No items —' : itemPlaceholder}
                         value={selId}
-                        onChange={e => onItemChange(subcat, rows, setRows, i, row, e.target.value)}
-                      >
-                        {opts.length === 0 && <option value="">— No items —</option>}
-                        {opts.length > 0 && !row.itemId && <option value="">{itemPlaceholder}</option>}
-                        {row.itemId && !opts.some(o => o.id === row.itemId) && (
-                          <option value={row.itemId}>{item?.name || 'Saved item'}</option>
-                        )}
-                        {opts.map(o => (
-                          <option key={o.id} value={o.id}>
-                            {o.label}
-                            {o.row.unit ? ` (${o.row.unit})` : ''}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={val => onItemChange(subcat, rows, setRows, i, row, val)}
+                        options={[
+                          ...(row.itemId && !opts.some(o => o.id === row.itemId)
+                            ? [{ value: row.itemId, label: item?.name || 'Saved item' }]
+                            : []),
+                          ...opts.map(o => ({
+                            value: o.id,
+                            label: `${o.label}${o.row.unit ? ` (${o.row.unit})` : ''}`,
+                          })),
+                        ]}
+                      />
                     </td>
                     <td className="py-1.5 pr-2">
                       <input
@@ -623,7 +625,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
           <button
             type="button"
             onClick={() => addRow(setRows)}
-            className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+            className="mt-2 text-xs text-green-700 hover:text-green-900 font-medium"
           >
             + Add row
           </button>
@@ -958,7 +960,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
             onClick={() =>
               setManualRows(rows => [...rows, { label: '', hours: '', materials: '', subCost: '' }])
             }
-            className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+            className="mt-2 text-xs text-green-700 hover:text-green-900 font-medium"
           >
             + Add manual entry
           </button>
