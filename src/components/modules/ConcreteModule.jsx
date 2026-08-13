@@ -98,6 +98,8 @@ const R = {
   vaporBarrierSFPerHr: 15,
   // Forming complexity: % of labor added per point of the 0–100 input.
   complexityPctPerUnit: 1,
+  // Hand Mix labor uplift (% added to pour & finish hours for hand-mixed tiers).
+  handMixUpliftPct: 15,
   // Material $ come ONLY from the catalog (no hardcoded fallbacks). Unpriced
   // items are surfaced to the user via the inline pricing modal.
   // Sub / equipment costs (subcontractor_rates)
@@ -186,6 +188,10 @@ function calcConcrete(
   const saltFinishSFPerHr = lr['Concrete - Salt Finish SF/hr'] ?? 25
   const exposedAggSFPerHr = lr['Concrete - Exposed Aggregate SF/hr'] ?? 50
   const seededAggSFPerHr = lr['Concrete - Seeded Aggregate SF/hr'] ?? 40
+  // Hand Mix takes more labor to produce than truck-delivered mix. Applied as a
+  // % uplift to that tier's pour & finish hours. Tunable coefficient — lives in
+  // labor_rates (View Rates), fallback kept per labor/coeff rule.
+  const handMixUpliftPct = lr['Concrete - Hand Mix Labor Uplift %'] ?? R.handMixUpliftPct
 
   // ── Material unit costs (material_rates) ─────────────────────────────────
   // Material $ come ONLY from the catalog (no hardcoded fallbacks). A name with
@@ -268,7 +274,10 @@ function calcConcrete(
     const sf = n(installTiers[t.key])
     if (!sf) return s
     const rate = lr[t.rateName] ?? t.def
-    return s + (rate > 0 ? sf / rate : 0)
+    let hrs = rate > 0 ? sf / rate : 0
+    // Hand Mix uplift: producing mix by hand adds labor to this tier.
+    if (/hand\s*mix/i.test(installTierType[t.key] || '')) hrs *= 1 + handMixUpliftPct / 100
+    return s + hrs
   }, 0)
   // Concrete mix material + volume — per size-tier: each tier's SF × its own
   // depth drives its own CY, priced at that tier's picked mix Vendor/Type.
@@ -414,6 +423,7 @@ function calcConcrete(
     travelHrs,
     complexityHrs,
     complexityPctPerUnit,
+    handMixUpliftPct,
     installHrs,
     rebarHrs,
     formHrs,
@@ -1046,6 +1056,15 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           mode: 'coefficient',
           unitLabel: '%/pt',
           value: calc.complexityPctPerUnit,
+        },
+        {
+          label: 'Concrete - Hand Mix Labor Uplift %',
+          table: 'labor_rates',
+          name: 'Concrete - Hand Mix Labor Uplift %',
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: '%',
+          value: calc.handMixUpliftPct,
         },
       ],
     },
