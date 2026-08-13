@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { setMaterialPrice, restoreMaterial } from '../lib/materialCatalog'
 import MaterialDetailModal, { MoveMaterialModal, CopyMaterialModal } from '../components/MaterialDetailModal'
+import { formatUnit } from '../lib/units'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Master Material Rates — the two-view catalog on the NEW pricing model
@@ -321,7 +322,7 @@ export default function MasterMaterialRates() {
                           </span>
                         )}
                       </td>
-                      <td className="px-3 py-1.5 text-gray-500 whitespace-nowrap">{r.m.unit || '—'}</td>
+                      <td className="px-3 py-1.5 text-gray-500 whitespace-nowrap">{r.m.unit ? formatUnit(r.m.unit) : '—'}</td>
                       <td className="px-3 py-1.5 text-right whitespace-nowrap">
                         <span className={r.price == null ? 'text-gray-300' : 'text-gray-800 font-semibold'}>
                           {money(r.price)}
@@ -515,7 +516,7 @@ function AddMaterialModal({ mode, vendors, onClose, onSaved }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">Unit</label>
-              <input value={unit} onChange={e => setUnit(e.target.value)} className={inputCls} placeholder="ea / SF / LF…" />
+              <input value={unit} onChange={e => setUnit(e.target.value)} className={inputCls} placeholder="Each / Sq Ft / Ln Ft…" />
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">

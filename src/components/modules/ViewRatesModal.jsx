@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import RateEditPopover from '../RateEditPopover'
+import { formatUnit } from '../../lib/units'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ViewRatesModal — a single popup listing EVERY rate a module uses so the user
@@ -27,10 +28,12 @@ function fmtVal(item) {
   if (v == null || v === '') return '—'
   const num = typeof v === 'number' ? v : parseFloat(v)
   if (Number.isNaN(num)) return String(v)
-  // Coefficients aren't dollars; currency gets a $ and 2 decimals.
-  if (item.mode === 'coefficient') return `${num}${item.unitLabel ? ` ${item.unitLabel}` : ''}`
+  // Coefficients aren't dollars; currency gets a $ and 2 decimals. Units are
+  // normalized to the standard scheme (Sq Ft / Ln Ft / Cu Yd …) at display.
+  const u = item.unitLabel ? formatUnit(item.unitLabel) : ''
+  if (item.mode === 'coefficient') return `${num}${u ? ` ${u}` : ''}`
   return `$${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${
-    item.unitLabel ? `/${item.unitLabel}` : ''
+    u ? ` per ${u}` : ''
   }`
 }
 
