@@ -307,8 +307,11 @@ function calcTurf(
     // now per Cu Yd). Volume = SF × depth/12 ÷ 27, with DB-editable install
     // depths (misc_rates). Weed is now the shared 'Weed Fabric' record priced
     // per Sq Ft — billed SF × $/SF (company-wide consolidation).
-    const classIIDepthIn = n(mp['Turf - Class II Depth In'])
-    const dgDepthIn = n(mp['Turf - DG Depth In'])
+    // Install depths are DB-editable (misc_rates) but fall back to their spec
+    // defaults so the Cu Yd quantity never zeroes if the rate row is missing
+    // (allowed coefficient fallbacks).
+    const classIIDepthIn = n(mp['Turf - Class II Depth In']) || 3
+    const dgDepthIn = n(mp['Turf - DG Depth In']) || 1
     let qty = 0, // display quantity (Cu Yd for Class II/DG, Sq Ft for Weed)
       hrs = 0
     if (def.key === 'Gravel') {
