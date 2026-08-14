@@ -511,6 +511,14 @@ export default function SubsVendors({ mode = 'sub' }) {
       setSaving(false)
       return
     }
+    // Keep the denormalized sub name on assigned subcontractor rates in sync, so a
+    // vendor rename flows through to Master Rates and the estimator pickers.
+    if (editSub) {
+      await supabase
+        .from('subcontractor_rates')
+        .update({ company_name: payload.company_name })
+        .eq('vendor_id', editSub.id)
+    }
     setSaving(false)
     closeModal()
     refresh()
@@ -1770,8 +1778,7 @@ function SubModal({
   // Subcontractor rate items assigned to this record (matched on company_name).
   const [assignedItems, setAssignedItems] = useState([])
   useEffect(() => {
-    const name = (form.company_name || '').trim()
-    if (!recordId || !name) {
+    if (!recordId) {
       setAssignedItems([])
       return
     }
@@ -1779,7 +1786,7 @@ function SubModal({
     supabase
       .from('subcontractor_rates')
       .select('id, category, sub_category, trade, rate, unit')
-      .eq('company_name', name)
+      .eq('vendor_id', recordId)
       .order('category')
       .order('sub_category')
       .order('trade')
@@ -1789,7 +1796,7 @@ function SubModal({
     return () => {
       gone = true
     }
-  }, [recordId, form.company_name])
+  }, [recordId])
   // View vs edit: existing records open read-only; a new record opens editable.
   const [editing, setEditing] = useState(!isEdit)
   // Subs get Details + Contracts; vendors get Details + Quotes.
