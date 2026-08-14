@@ -1362,13 +1362,13 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         <table className="w-full text-xs">
           <TH
             cols={[
-              { label: 'Base', w: 'w-28' },
+              { label: '', w: 'w-20' },
               { label: 'Vendor', w: 'w-32' },
-              { label: 'Type', w: 'w-28' },
-              { label: 'Sq Ft', w: 'w-20' },
-              { label: 'Qty', w: 'w-16' },
-              { label: 'Hrs', w: 'w-16' },
-              { label: 'Material', w: 'w-24' },
+              { label: 'Type' },
+              { label: 'Sq Ft', w: 'w-14' },
+              { label: 'Qty', w: 'w-14' },
+              { label: 'Hrs', w: 'w-12' },
+              { label: 'Material', w: 'w-20' },
             ]}
           />
           <tbody className="divide-y divide-gray-50">
