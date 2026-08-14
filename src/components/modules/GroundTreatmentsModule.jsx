@@ -2110,40 +2110,43 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
         )
       })()}
 
-      {/* ── Sod ── */}
+      {/* ── Edging ── */}
       <div>
-        <SectionHeader title="Sod" />
+        <SectionHeader title="Edging" />
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-center pb-1 pr-1 font-medium">Vendor</th>
-                <th className="text-center pb-1 pr-1 font-medium">Sod Type</th>
-                <th className="text-center pb-1 pr-1 font-medium">Sq Ft</th>
-                <th className="text-center pb-1 pr-1 font-medium">$ per Sq Ft</th>
+                <th className="text-center pb-1 pr-1 font-medium">Edging Type</th>
+                <th className="text-center pb-1 pr-1 font-medium">Ln Ft</th>
+                <th className="text-center pb-1 pr-1 font-medium">$ per Ln Ft</th>
                 <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
               </tr>
             </thead>
             <tbody>
-              {(sodRows || []).map((row, i) => {
-                const rowOpts = sectionOptions('Sod', row.vendor, [])
-                const st = resolveType(row.type, rowOpts, [])
+              {edgingRows.map((row, i) => {
+                // The Type picker lists both Plastic and Metal (plus vendor edging).
+                // Labor keys off the picked Type.
+                const opts = sectionOptions('Edging', row.vendor, [])
+                const t = resolveType(row.type, opts, [])
+                const rate = t.fallback
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
                         value={row.vendor || ''}
-                        onChange={e => updateSodRow(i, 'vendor', e.target.value)}
+                        onChange={e => updateEdging(i, 'vendor', e.target.value)}
                         title="Vendor"
                       >
                         {!row.vendor && <option value="">Select</option>}
                         {row.vendor &&
                           row.vendor !== 'Standard' &&
-                          !vendorsForCategory('Sod').some(v => v.id === row.vendor) && (
+                          !vendorsForCategory('Edging').some(v => v.id === row.vendor) && (
                             <option value={row.vendor}>{row.vendor}</option>
                           )}
-                        {vendorsForCategory('Sod').map(v => (
+                        {vendorsForCategory('Edging').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
                           </option>
@@ -2155,267 +2158,34 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       <select
                         className="input text-sm py-1.5"
                         value={row.type || ''}
-                        onChange={e => updateSodRow(i, 'type', e.target.value)}
+                        onChange={e => updateEdging(i, 'type', e.target.value)}
                       >
-                        {!row.type && <option value="">Select Sod</option>}
-                        {row.type && !rowOpts.some(o => o.label === row.type) && (
+                        {!row.type && <option value="">Select edging</option>}
+                        {row.type && !opts.some(o => o.label === row.type) && (
                           <option value={row.type}>{row.type}</option>
                         )}
-                        {rowOpts.map(t => (
-                          <option key={t.label} value={t.label}>
-                            {t.label}
+                        {opts.map(o => (
+                          <option key={o.label} value={o.label}>
+                            {o.label}
                           </option>
                         ))}
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <NumInput
-                        value={row.sf}
-                        onChange={v => updateSodRow(i, 'sf', v)}
-                        placeholder="Sq Ft"
-                        className="w-full text-center"
-                      />
+                      <NumInput value={row.lf} onChange={v => updateEdging(i, 'lf', v)} placeholder="Ln Ft" className="w-full text-center" />
                     </td>
                     <td className="py-1 pr-1">
-                      <span className="text-xs text-gray-500 whitespace-nowrap block text-center">
-                        ${st.fallback.toFixed(2)}/SF
-                      </span>
-                    </td>
-                    <td className="py-1 text-center text-xs text-gray-600 whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-1">
-                        <span>{row.type && n(row.sf) > 0 ? `$${(n(row.sf) * st.fallback).toFixed(2)}` : '—'}</span>
-                        {(sodRows || []).length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => setSodRows(rs => rs.filter((_, idx) => idx !== i))}
-                            className="text-gray-300 hover:text-red-500 text-sm px-1"
-                            title="Remove line"
-                          >
-                            ×
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-          <button
-            type="button"
-            onClick={() => setSodRows(r => [...r, { vendor: '', type: '', sf: '' }])}
-            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
-          >
-            + Add Row
-          </button>
-        </div>
-      </div>
-
-      {/* ── Sod Fertilizer ── */}
-      <div>
-        <SectionHeader title="Sod Fertilizer" />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-center pb-1 pr-1 font-medium">Vendor</th>
-                <th className="text-center pb-1 pr-1 font-medium">Fertilizer Type</th>
-                <th className="text-center pb-1 pr-1 font-medium">Sq Ft</th>
-                <th className="text-center pb-1 font-medium text-gray-400">Coverage / Cost</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(() => {
-                const sfPerBag = p(GT_RATES.fertilizerSFPerBag.dbName)
-                // Rows with no explicit SF fall back to the total sod SF (sum of
-                // sodRows) — mirror of the calc's single-row legacy default.
-                const sodSFTotal = (sodRows || []).reduce((a, r) => a + n(r.sf), 0)
-                return (sodFertRows || []).map((row, i) => {
-                  const fertOpts = sectionOptions('Fertilizer', row.vendor, [])
-                  const ft = resolveType(row.fertilizer, fertOpts, [])
-                  const fertSF = n(row.sf) || sodSFTotal
-                  const bags =
-                    row.fertilizer && ft && ft.dbName && sfPerBag > 0 && fertSF > 0
-                      ? Math.ceil(fertSF / sfPerBag)
-                      : 0
-                  return (
-                    <tr key={i} className="border-b border-gray-100">
-                      <td className="py-1 pr-1">
-                        <select
-                          className="input text-sm py-1.5"
-                          value={row.vendor || ''}
-                          onChange={e => updateSodFert(i, 'vendor', e.target.value)}
-                          title="Vendor"
-                        >
-                          {!row.vendor && <option value="">Select</option>}
-                          {row.vendor &&
-                            row.vendor !== 'Standard' &&
-                            !vendorsForCategory('Fertilizer').some(v => v.id === row.vendor) && (
-                              <option value={row.vendor}>{row.vendor}</option>
-                            )}
-                          {vendorsForCategory('Fertilizer').map(v => (
-                            <option key={v.id} value={v.id}>
-                              {v.name}
-                            </option>
-                          ))}
-                          <option value="Standard">Standard</option>
-                        </select>
-                      </td>
-                      <td className="py-1 pr-1">
-                        <select
-                          className="input text-sm py-1.5"
-                          value={row.fertilizer || ''}
-                          onChange={e => updateSodFert(i, 'fertilizer', e.target.value)}
-                        >
-                          {!row.fertilizer && <option value="">Select Fertilizer</option>}
-                          {row.fertilizer && !fertOpts.some(o => o.label === row.fertilizer) && (
-                            <option value={row.fertilizer}>{row.fertilizer}</option>
-                          )}
-                          {fertOpts.map(t => (
-                            <option key={t.label} value={t.label}>
-                              {t.label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="py-1 pr-1">
-                        <NumInput
-                          value={row.sf}
-                          onChange={v => updateSodFert(i, 'sf', v)}
-                          placeholder="Sq Ft"
-                          className="w-full text-center"
-                        />
-                      </td>
-                      <td className="py-1 text-center text-xs text-gray-600 whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1">
-                          <span>
-                            {ft && ft.dbName && row.fertilizer
-                              ? `$${ft.fallback.toFixed(2)}/bag · 1 bag / ${sfPerBag} Sq Ft${
-                                  bags > 0 ? ` = ${bags} bag${bags > 1 ? 's' : ''} · $${(bags * ft.fallback).toFixed(2)}` : ''
-                                }`
-                              : '—'}
-                          </span>
-                          {(sodFertRows || []).length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => setSodFertRows(rs => rs.filter((_, idx) => idx !== i))}
-                              className="text-gray-300 hover:text-red-500 text-sm px-1"
-                              title="Remove line"
-                            >
-                              ×
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              })()}
-            </tbody>
-          </table>
-          <button
-            type="button"
-            onClick={() => setSodFertRows(r => [...r, { vendor: '', fertilizer: '', sf: '' }])}
-            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
-          >
-            + Add Row
-          </button>
-        </div>
-      </div>
-
-      {/* ── Mulch ── */}
-      <div>
-        <SectionHeader title="Mulch" />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-center pb-1 pr-1 font-medium">Vendor</th>
-                <th className="text-center pb-1 pr-1 font-medium">Mulch Type</th>
-                <th className="text-center pb-1 pr-1 font-medium">Area (SF)</th>
-                <th className="text-center pb-1 pr-1 font-medium">Depth (in)</th>
-                <th className="text-center pb-1 pr-1 font-medium">Weed Fabric</th>
-                <th className="text-center pb-1 font-medium">$ per Cu Yd</th>
-              </tr>
-            </thead>
-            <tbody>
-              {mulchRows.map((row, i) => {
-                const rowOpts = sectionOptions('Mulch', row.vendor, [])
-                const mt = resolveType(row.type, rowOpts, [])
-                const typeCost = mt.fallback
-                return (
-                  <tr key={i} className="border-b border-gray-100">
-                    <td className="py-1 pr-1">
-                      <select
-                        className="input text-sm py-1.5"
-                        value={row.vendor || ''}
-                        onChange={e => updateMulch(i, 'vendor', e.target.value)}
-                        title="Vendor"
-                      >
-                        {!row.vendor && <option value="">Select</option>}
-                        {row.vendor &&
-                          row.vendor !== 'Standard' &&
-                          !vendorsForCategory('Mulch').some(v => v.id === row.vendor) && (
-                            <option value={row.vendor}>{row.vendor}</option>
-                          )}
-                        {vendorsForCategory('Mulch').map(v => (
-                          <option key={v.id} value={v.id}>
-                            {v.name}
-                          </option>
-                        ))}
-                        <option value="Standard">Standard</option>
-                      </select>
-                    </td>
-                    <td className="py-1 pr-1">
-                      <select
-                        className="input text-sm py-1.5"
-                        value={row.type || ''}
-                        onChange={e => updateMulch(i, 'type', e.target.value)}
-                      >
-                        {!row.type && <option value="">Select Mulch</option>}
-                        {row.type && !rowOpts.some(o => o.label === row.type) && (
-                          <option value={row.type}>{row.type}</option>
-                        )}
-                        {rowOpts.map(t => (
-                          <option key={t.label} value={t.label}>
-                            {t.label}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="py-1 pr-1">
-                      <NumInput value={row.sf} onChange={v => updateMulch(i, 'sf', v)} className="w-full text-center" />
-                    </td>
-                    <td className="py-1 pr-1">
-                      <select
-                        className="input text-sm py-1.5 w-full"
-                        value={row.depth}
-                        onChange={e => updateMulch(i, 'depth', e.target.value)}
-                      >
-                        {['1', '2', '3', '4'].map(d => (
-                          <option key={d} value={d}>
-                            {d}" deep
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="py-1 pr-1">
-                      <select
-                        className="input text-sm py-1.5"
-                        value={row.weedFabric}
-                        onChange={e => updateMulch(i, 'weedFabric', e.target.value)}
-                      >
-                        <option value="No">No</option>
-                        <option value="Yes">Yes</option>
-                      </select>
+                      <span className="text-xs text-gray-500 whitespace-nowrap block text-center">${rate.toFixed(2)} per Ln Ft</span>
                     </td>
                     <td className="py-1">
                       <div className="flex items-center justify-center gap-1">
-                        <span className="text-xs text-gray-500 whitespace-nowrap">${typeCost.toFixed(2)}/CY</span>
-                        {mulchRows.length > 1 && (
+                        <span className="text-xs text-gray-600 whitespace-nowrap">
+                          {row.type && n(row.lf) > 0 ? `$${(n(row.lf) * rate).toFixed(2)}` : '—'}
+                        </span>
+                        {edgingRows.length > 1 && (
                           <button
                             type="button"
-                            onClick={() => setMulchRows(rows => rows.filter((_, idx) => idx !== i))}
+                            onClick={() => setEdgingRows(rows => rows.filter((_, idx) => idx !== i))}
                             className="text-gray-300 hover:text-red-500 text-sm px-1"
                             title="Remove line"
                           >
@@ -2431,13 +2201,10 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           </table>
           <button
             type="button"
-            onClick={() =>
-              setMulchRows(r => [
-                ...r,
-                { type: '', sf: '', depth: '2', weedFabric: 'No', vendor: defaultVendorFor('Mulch') },
-              ])
-            }
             className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+            onClick={() =>
+              setEdgingRows(r => [...r, { vendor: defaultVendorFor('Edging'), type: '', lf: '' }])
+            }
           >
             + Add Row
           </button>
@@ -3005,43 +2772,42 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
         </div>
       </div>
 
-      {/* ── Edging ── */}
+      {/* ── Mulch ── */}
       <div>
-        <SectionHeader title="Edging" />
+        <SectionHeader title="Mulch" />
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-center pb-1 pr-1 font-medium">Vendor</th>
-                <th className="text-center pb-1 pr-1 font-medium">Edging Type</th>
-                <th className="text-center pb-1 pr-1 font-medium">Ln Ft</th>
-                <th className="text-center pb-1 pr-1 font-medium">$ per Ln Ft</th>
-                <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
+                <th className="text-center pb-1 pr-1 font-medium">Mulch Type</th>
+                <th className="text-center pb-1 pr-1 font-medium">Area (SF)</th>
+                <th className="text-center pb-1 pr-1 font-medium">Depth (in)</th>
+                <th className="text-center pb-1 pr-1 font-medium">Weed Fabric</th>
+                <th className="text-center pb-1 font-medium">$ per Cu Yd</th>
               </tr>
             </thead>
             <tbody>
-              {edgingRows.map((row, i) => {
-                // The Type picker lists both Plastic and Metal (plus vendor edging).
-                // Labor keys off the picked Type.
-                const opts = sectionOptions('Edging', row.vendor, [])
-                const t = resolveType(row.type, opts, [])
-                const rate = t.fallback
+              {mulchRows.map((row, i) => {
+                const rowOpts = sectionOptions('Mulch', row.vendor, [])
+                const mt = resolveType(row.type, rowOpts, [])
+                const typeCost = mt.fallback
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
                         value={row.vendor || ''}
-                        onChange={e => updateEdging(i, 'vendor', e.target.value)}
+                        onChange={e => updateMulch(i, 'vendor', e.target.value)}
                         title="Vendor"
                       >
                         {!row.vendor && <option value="">Select</option>}
                         {row.vendor &&
                           row.vendor !== 'Standard' &&
-                          !vendorsForCategory('Edging').some(v => v.id === row.vendor) && (
+                          !vendorsForCategory('Mulch').some(v => v.id === row.vendor) && (
                             <option value={row.vendor}>{row.vendor}</option>
                           )}
-                        {vendorsForCategory('Edging').map(v => (
+                        {vendorsForCategory('Mulch').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
                           </option>
@@ -3053,34 +2819,52 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       <select
                         className="input text-sm py-1.5"
                         value={row.type || ''}
-                        onChange={e => updateEdging(i, 'type', e.target.value)}
+                        onChange={e => updateMulch(i, 'type', e.target.value)}
                       >
-                        {!row.type && <option value="">Select edging</option>}
-                        {row.type && !opts.some(o => o.label === row.type) && (
+                        {!row.type && <option value="">Select Mulch</option>}
+                        {row.type && !rowOpts.some(o => o.label === row.type) && (
                           <option value={row.type}>{row.type}</option>
                         )}
-                        {opts.map(o => (
-                          <option key={o.label} value={o.label}>
-                            {o.label}
+                        {rowOpts.map(t => (
+                          <option key={t.label} value={t.label}>
+                            {t.label}
                           </option>
                         ))}
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <NumInput value={row.lf} onChange={v => updateEdging(i, 'lf', v)} placeholder="Ln Ft" className="w-full text-center" />
+                      <NumInput value={row.sf} onChange={v => updateMulch(i, 'sf', v)} className="w-full text-center" />
                     </td>
                     <td className="py-1 pr-1">
-                      <span className="text-xs text-gray-500 whitespace-nowrap block text-center">${rate.toFixed(2)} per Ln Ft</span>
+                      <select
+                        className="input text-sm py-1.5 w-full"
+                        value={row.depth}
+                        onChange={e => updateMulch(i, 'depth', e.target.value)}
+                      >
+                        {['1', '2', '3', '4'].map(d => (
+                          <option key={d} value={d}>
+                            {d}" deep
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.weedFabric}
+                        onChange={e => updateMulch(i, 'weedFabric', e.target.value)}
+                      >
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                      </select>
                     </td>
                     <td className="py-1">
                       <div className="flex items-center justify-center gap-1">
-                        <span className="text-xs text-gray-600 whitespace-nowrap">
-                          {row.type && n(row.lf) > 0 ? `$${(n(row.lf) * rate).toFixed(2)}` : '—'}
-                        </span>
-                        {edgingRows.length > 1 && (
+                        <span className="text-xs text-gray-500 whitespace-nowrap">${typeCost.toFixed(2)}/CY</span>
+                        {mulchRows.length > 1 && (
                           <button
                             type="button"
-                            onClick={() => setEdgingRows(rows => rows.filter((_, idx) => idx !== i))}
+                            onClick={() => setMulchRows(rows => rows.filter((_, idx) => idx !== i))}
                             className="text-gray-300 hover:text-red-500 text-sm px-1"
                             title="Remove line"
                           >
@@ -3096,10 +2880,226 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           </table>
           <button
             type="button"
-            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
             onClick={() =>
-              setEdgingRows(r => [...r, { vendor: defaultVendorFor('Edging'), type: '', lf: '' }])
+              setMulchRows(r => [
+                ...r,
+                { type: '', sf: '', depth: '2', weedFabric: 'No', vendor: defaultVendorFor('Mulch') },
+              ])
             }
+            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+          >
+            + Add Row
+          </button>
+        </div>
+      </div>
+
+      {/* ── Sod ── */}
+      <div>
+        <SectionHeader title="Sod" />
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-center pb-1 pr-1 font-medium">Vendor</th>
+                <th className="text-center pb-1 pr-1 font-medium">Sod Type</th>
+                <th className="text-center pb-1 pr-1 font-medium">Sq Ft</th>
+                <th className="text-center pb-1 pr-1 font-medium">$ per Sq Ft</th>
+                <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(sodRows || []).map((row, i) => {
+                const rowOpts = sectionOptions('Sod', row.vendor, [])
+                const st = resolveType(row.type, rowOpts, [])
+                return (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.vendor || ''}
+                        onChange={e => updateSodRow(i, 'vendor', e.target.value)}
+                        title="Vendor"
+                      >
+                        {!row.vendor && <option value="">Select</option>}
+                        {row.vendor &&
+                          row.vendor !== 'Standard' &&
+                          !vendorsForCategory('Sod').some(v => v.id === row.vendor) && (
+                            <option value={row.vendor}>{row.vendor}</option>
+                          )}
+                        {vendorsForCategory('Sod').map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                        <option value="Standard">Standard</option>
+                      </select>
+                    </td>
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.type || ''}
+                        onChange={e => updateSodRow(i, 'type', e.target.value)}
+                      >
+                        {!row.type && <option value="">Select Sod</option>}
+                        {row.type && !rowOpts.some(o => o.label === row.type) && (
+                          <option value={row.type}>{row.type}</option>
+                        )}
+                        {rowOpts.map(t => (
+                          <option key={t.label} value={t.label}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1 pr-1">
+                      <NumInput
+                        value={row.sf}
+                        onChange={v => updateSodRow(i, 'sf', v)}
+                        placeholder="Sq Ft"
+                        className="w-full text-center"
+                      />
+                    </td>
+                    <td className="py-1 pr-1">
+                      <span className="text-xs text-gray-500 whitespace-nowrap block text-center">
+                        ${st.fallback.toFixed(2)}/SF
+                      </span>
+                    </td>
+                    <td className="py-1 text-center text-xs text-gray-600 whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-1">
+                        <span>{row.type && n(row.sf) > 0 ? `$${(n(row.sf) * st.fallback).toFixed(2)}` : '—'}</span>
+                        {(sodRows || []).length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setSodRows(rs => rs.filter((_, idx) => idx !== i))}
+                            className="text-gray-300 hover:text-red-500 text-sm px-1"
+                            title="Remove line"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <button
+            type="button"
+            onClick={() => setSodRows(r => [...r, { vendor: '', type: '', sf: '' }])}
+            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+          >
+            + Add Row
+          </button>
+        </div>
+      </div>
+
+      {/* ── Sod Fertilizer ── */}
+      <div>
+        <SectionHeader title="Sod Fertilizer" />
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-center pb-1 pr-1 font-medium">Vendor</th>
+                <th className="text-center pb-1 pr-1 font-medium">Fertilizer Type</th>
+                <th className="text-center pb-1 pr-1 font-medium">Sq Ft</th>
+                <th className="text-center pb-1 font-medium text-gray-400">Coverage / Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(() => {
+                const sfPerBag = p(GT_RATES.fertilizerSFPerBag.dbName)
+                // Rows with no explicit SF fall back to the total sod SF (sum of
+                // sodRows) — mirror of the calc's single-row legacy default.
+                const sodSFTotal = (sodRows || []).reduce((a, r) => a + n(r.sf), 0)
+                return (sodFertRows || []).map((row, i) => {
+                  const fertOpts = sectionOptions('Fertilizer', row.vendor, [])
+                  const ft = resolveType(row.fertilizer, fertOpts, [])
+                  const fertSF = n(row.sf) || sodSFTotal
+                  const bags =
+                    row.fertilizer && ft && ft.dbName && sfPerBag > 0 && fertSF > 0
+                      ? Math.ceil(fertSF / sfPerBag)
+                      : 0
+                  return (
+                    <tr key={i} className="border-b border-gray-100">
+                      <td className="py-1 pr-1">
+                        <select
+                          className="input text-sm py-1.5"
+                          value={row.vendor || ''}
+                          onChange={e => updateSodFert(i, 'vendor', e.target.value)}
+                          title="Vendor"
+                        >
+                          {!row.vendor && <option value="">Select</option>}
+                          {row.vendor &&
+                            row.vendor !== 'Standard' &&
+                            !vendorsForCategory('Fertilizer').some(v => v.id === row.vendor) && (
+                              <option value={row.vendor}>{row.vendor}</option>
+                            )}
+                          {vendorsForCategory('Fertilizer').map(v => (
+                            <option key={v.id} value={v.id}>
+                              {v.name}
+                            </option>
+                          ))}
+                          <option value="Standard">Standard</option>
+                        </select>
+                      </td>
+                      <td className="py-1 pr-1">
+                        <select
+                          className="input text-sm py-1.5"
+                          value={row.fertilizer || ''}
+                          onChange={e => updateSodFert(i, 'fertilizer', e.target.value)}
+                        >
+                          {!row.fertilizer && <option value="">Select Fertilizer</option>}
+                          {row.fertilizer && !fertOpts.some(o => o.label === row.fertilizer) && (
+                            <option value={row.fertilizer}>{row.fertilizer}</option>
+                          )}
+                          {fertOpts.map(t => (
+                            <option key={t.label} value={t.label}>
+                              {t.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="py-1 pr-1">
+                        <NumInput
+                          value={row.sf}
+                          onChange={v => updateSodFert(i, 'sf', v)}
+                          placeholder="Sq Ft"
+                          className="w-full text-center"
+                        />
+                      </td>
+                      <td className="py-1 text-center text-xs text-gray-600 whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1">
+                          <span>
+                            {ft && ft.dbName && row.fertilizer
+                              ? `$${ft.fallback.toFixed(2)}/bag · 1 bag / ${sfPerBag} Sq Ft${
+                                  bags > 0 ? ` = ${bags} bag${bags > 1 ? 's' : ''} · $${(bags * ft.fallback).toFixed(2)}` : ''
+                                }`
+                              : '—'}
+                          </span>
+                          {(sodFertRows || []).length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => setSodFertRows(rs => rs.filter((_, idx) => idx !== i))}
+                              className="text-gray-300 hover:text-red-500 text-sm px-1"
+                              title="Remove line"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              })()}
+            </tbody>
+          </table>
+          <button
+            type="button"
+            onClick={() => setSodFertRows(r => [...r, { vendor: '', fertilizer: '', sf: '' }])}
+            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
           >
             + Add Row
           </button>
