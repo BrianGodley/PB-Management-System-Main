@@ -769,7 +769,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       supabase.from('labor_rates').select('name, rate').eq('category', 'Artificial Turf'),
       supabase
         .from('subcontractor_rates')
-        .select('company_name, rate')
+        .select('item_key, rate')
         .eq('category', 'Artificial Turf'),
       fetchModuleCatalog(['Artificial Turf']),
       supabase
@@ -807,7 +807,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
     if (subRes.data) {
       const m = {}
       subRes.data.forEach(r => {
-        m[r.company_name] = parseFloat(r.rate) || 0
+        m[r.item_key] = parseFloat(r.rate) || 0
       })
       setSubRates(m)
     }

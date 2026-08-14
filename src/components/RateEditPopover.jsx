@@ -61,7 +61,9 @@ async function resolvePriceVendor(vendorId) {
 const NAME_COLUMN = {
   material_rates: 'name',
   labor_rates: 'name',
-  subcontractor_rates: 'company_name',
+  // Subcontractor rates are matched by item_key (the stable item text). company_name
+  // now holds the assigned subcontractor, so it can't be the match key.
+  subcontractor_rates: 'item_key',
 }
 
 export default function RateEditPopover({

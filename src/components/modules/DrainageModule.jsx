@@ -495,13 +495,13 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
     // module's markers.
     const [matMap, subRes] = await Promise.all([
       fetchStandardRateMap(['Drainage']),
-      supabase.from('subcontractor_rates').select('company_name, rate').eq('category', 'Drainage'),
+      supabase.from('subcontractor_rates').select('item_key, rate').eq('category', 'Drainage'),
     ])
     setMaterialPrices(initialData?.materialPrices ? { ...matMap, ...initialData.materialPrices } : matMap)
     if (subRes.data) {
       const sr = {}
       subRes.data.forEach(r => {
-        sr[r.company_name] = parseFloat(r.rate) || 0
+        sr[r.item_key] = parseFloat(r.rate) || 0
       })
       setSubRates(sr)
     }

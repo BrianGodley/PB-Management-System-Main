@@ -1017,7 +1017,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     const [labRes, feeRes, subRes, gtRows, venRes] = await Promise.all([
       supabase.from('labor_rates').select('name, rate').eq('category', 'Ground Treatments'),
       supabase.from('misc_rates').select('name, rate').eq('category', 'Ground Treatments'),
-      supabase.from('subcontractor_rates').select('company_name, rate').eq('category', 'Ground Treatments'),
+      supabase.from('subcontractor_rates').select('item_key, rate').eq('category', 'Ground Treatments'),
       fetchGtRows(),
       supabase.from('subs_vendors').select('id, company_name').eq('type', 'vendor').order('company_name'),
     ])
@@ -1033,7 +1033,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       prices[r.name] = parseFloat(r.rate) || 0
     })
     ;(subRes.data || []).forEach(r => {
-      prices[r.company_name] = parseFloat(r.rate) || 0
+      prices[r.item_key] = parseFloat(r.rate) || 0
     })
     setMaterialPrices(prices)
     setMaterialRows(gtRows || [])

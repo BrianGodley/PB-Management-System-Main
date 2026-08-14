@@ -776,7 +776,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       // fees from misc_rates, labor from labor_rates — all by name.
       fetchStandardRateMap(['Demo']),
       supabase.from('labor_rates').select('name,rate,rate_per_day'),
-      supabase.from('subcontractor_rates').select('company_name,rate'),
+      supabase.from('subcontractor_rates').select('item_key,rate'),
     ])
     setMaterialPrices(matMap)
     if (lrRes.data) {
@@ -789,7 +789,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
     if (srRes.data) {
       const m = {}
       srRes.data.forEach(r => {
-        m[r.company_name] = parseFloat(r.rate)
+        m[r.item_key] = parseFloat(r.rate)
       })
       setSubRates(m)
     }

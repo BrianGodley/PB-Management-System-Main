@@ -623,7 +623,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     const [lrRes, matMap, srRes, rows, venRes] = await Promise.all([
       supabase.from('labor_rates').select('name, rate').eq('category', 'Concrete'),
       fetchStandardRateMap(['Concrete', 'Basic Materials']),
-      supabase.from('subcontractor_rates').select('company_name, rate').eq('category', 'Concrete'),
+      supabase.from('subcontractor_rates').select('item_key, rate').eq('category', 'Concrete'),
       fetchModuleCatalog(['Concrete', 'Basic Materials']),
       supabase
         .from('subs_vendors')
@@ -649,7 +649,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     if (srRes.data) {
       const m = {}
       srRes.data.forEach(r => {
-        m[r.company_name] = r.rate
+        m[r.item_key] = r.rate
       })
       setSubRates(m)
     }
