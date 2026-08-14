@@ -241,13 +241,15 @@ function calcConcrete(
       depth = n(r.depth) || 2
     if (!sf) return { hrs: 0, mat: 0 }
     const m = normBaseMethod(r.method)
-    // Both labor AND material are by AREA: (SF ÷ 100) × depth(in) × rate.
+    // LABOR is by AREA: (SF ÷ 100) × depth(in) × rate.
     // Labor rate = labor_rates['Concrete - Base ...'] (hrs per inch per 100 SF).
     const rate = n(lr[BASE_METHOD_LABOR_NAME[m]])
     const hrs = (sf / 100) * depth * rate
     const bt = rowOpt('Concrete Base', r)
-    // Material = (SF ÷ 100) × depth(in) × the picked catalog item's price.
-    const mat = r.type ? (sf / 100) * depth * bt.fallback : 0
+    // MATERIAL is by VOLUME, priced per CUBIC YARD (company-wide). Base
+    // cubic yards = SF × depth(in)/12 ÷ 27; the picked catalog item's price
+    // is now interpreted as $/Cu Yd.
+    const mat = r.type ? (sf * (depth / 12) / 27) * bt.fallback : 0
     baseHrsTot += hrs
     baseMatTot += mat
     return { hrs, mat, rate }
@@ -1585,7 +1587,8 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 const baseRate = bt.fallback
                 const c = {
                   hrs: _sf > 0 ? (_sf / 100) * _depth * methodRate : 0,
-                  mat: row.type ? (_sf / 100) * _depth * baseRate : 0,
+                  // Material priced per Cu Yd: SF × depth(in)/12 ÷ 27 × $/Cu Yd.
+                  mat: row.type ? (_sf * (_depth / 12) / 27) * baseRate : 0,
                 }
                 return (
                   <tr key={i} className="border-b border-gray-100">
@@ -1632,7 +1635,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                                 category: 'Concrete',
                                 subCategory: 'Concrete Base',
                                 label: 'Concrete Base',
-                                unit: 'ton',
+                                unit: 'Cu Yd',
                                 vendorId: row.vendor !== 'Standard' ? row.vendor : null,
                               })
                             }

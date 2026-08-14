@@ -82,8 +82,8 @@ const GT_RATES = {
   precastConcreteLab: { dbName: 'Precast Steppers - Concrete Labor' }, // SF/day
 
   // ── Decomposed Granite ─────────────────────────────────────────────────────
-  dgPerTon: { dbName: 'Decomposed Granite' }, // $/ton
-  dgCementPerTon: { dbName: 'DG Cement Mix' }, // $/ton add-on
+  dgPerTon: { dbName: 'Decomposed Granite' }, // $/Cu Yd (DG material now priced per cubic yard)
+  dgCementPerTon: { dbName: 'DG Cement Mix' }, // $/ton add-on (cement mix still per ton)
   dgHandLab: { dbName: 'DG - Hand Labor Rate' }, // CY/hr (labor_rates)
   dgMachineLab: { dbName: 'DG - Machine Labor Rate' }, // CY/day (labor_rates)
 
@@ -163,8 +163,9 @@ const MULCH_TYPES = [
   { label: 'Medium Bark Nugget', dbName: 'Mulch - Medium Bark Nugget' },
 ]
 
-// D.G. product types (material_rates, per TON — matches the existing per-ton DG
-// material calc). Default 'Decomposed Granite' keeps existing estimates unchanged.
+// D.G. product types (catalog material, per CUBIC YARD — DG material is now priced
+// per Cu Yd, matching the company-wide base-aggregate change). Default
+// 'Decomposed Granite' keeps existing estimates unchanged.
 const DG_TYPES = [
   { label: 'Decomposed Granite', dbName: 'Decomposed Granite' }, // C&M $50/CY
   { label: 'Stabilized DG', dbName: 'DG - Stabilized' }, // C&M $75/CY
@@ -524,6 +525,12 @@ function calcGroundTreatments(
       if (!(n(r.sf) > 0)) return
       if (!r.type) return
       const tons = (n(r.sf) * n(r.depth)) / dgTonsDenom
+      // DG MATERIAL is now priced per CUBIC YARD (company-wide base-aggregate
+      // change): material $ = CY × $/CY. Volume in CY uses the fixed unit math
+      // (27 cf/cy × 12 in/ft → SF × depth_in / 324). `tons` is retained ONLY for
+      // labor (excavation/placement) and the per-ton Cement Mix add-on — both
+      // unchanged — so dgTonsDenom is still in use (harmless if it were unused).
+      const CY = (n(r.sf) * (n(r.depth) / 12)) / 27
       const cement = r.cement === 'Yes'
       const dgt = rowOpt('DG', r, [])
       const baseHrs =
@@ -532,7 +539,7 @@ function calcGroundTreatments(
           : ((tons * dgRemovalSwell) / dgMachineRate) * 8 + (n(r.sf) / dgCoverageSfDay) * 8 + tons
       dgLab += baseHrs + (cement ? tons * dgCementLaborFactor : 0)
       dgMat +=
-        (tons * dgt.fallback +
+        (CY * dgt.fallback +
           (cement
             ? tons * p(GT_RATES.dgCementPerTon.dbName)
             : 0)) *

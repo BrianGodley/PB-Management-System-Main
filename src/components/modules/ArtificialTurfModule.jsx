@@ -83,8 +83,8 @@ const firstDefinedRate = (m, keys) => {
 // vendor/catalog price lookups key off `dbName`, while labor/qty coefficients
 // still key off `key` (Gravel/DG/Weed).
 const BASE_MATERIALS = [
-  { key: 'Gravel', label: 'Class II Roadbase', dbName: 'Gravel Base', matKey: 'Turf - Gravel Base', qtyUnit: 't' },
-  { key: 'DG', label: 'DG', dbName: 'DG Base', matKey: 'Turf - DG Base', qtyUnit: 't' },
+  { key: 'Gravel', label: 'Class II Roadbase', dbName: 'Gravel Base', matKey: 'Turf - Gravel Base', qtyUnit: 'cy' },
+  { key: 'DG', label: 'DG', dbName: 'DG Base', matKey: 'Turf - DG Base', qtyUnit: 'cy' },
   { key: 'Weed', label: 'Weed Barrier', dbName: 'Weed Barrier Fabric', matKey: 'Turf - Weed Barrier Fabric', qtyUnit: 'roll' },
 ]
 // Vendor-first Base-material picker options (mirrors UtilitiesModule.mergedUtilTypes
@@ -276,18 +276,20 @@ function calcTurf(
       if (def.key === 'DG') price = n(mp[SHARED_DG_NAME])
       else if (def.key === 'Gravel') price = n(mp[SHARED_CLASS2_KEY])
     }
-    let qty = 0,
+    // Class II and DG are priced by the cubic yard (matching the master rates,
+    // now per Cu Yd). Volume = SF × depth/12 ÷ 27, with DB-editable install
+    // depths (misc_rates). Weed stays per roll.
+    const classIIDepthIn = n(mp['Turf - Class II Depth In'])
+    const dgDepthIn = n(mp['Turf - DG Depth In'])
+    let qty = 0, // display quantity (Cu Yd for Class II/DG, rolls for Weed)
       hrs = 0
     if (def.key === 'Gravel') {
-      // Class II base install has its own DB-editable labor rate (SF/hr),
-      // driving hours directly — same single-rate model as DG.
       const baseSFPerHr = n(mp['Turf - Base Install SF/hr'])
-      qty = sf > 0 && gravelBaseTonsDivisor > 0 ? (sf / gravelBaseTonsDivisor) * 2 : 0
+      qty = sf > 0 && classIIDepthIn > 0 ? (sf * (classIIDepthIn / 12)) / 27 : 0 // Cu Yd
       hrs = sf > 0 && baseSFPerHr > 0 ? sf / baseSFPerHr : 0
     } else if (def.key === 'DG') {
-      // DG base install has its own DB-editable labor rate (SF/hr).
       const dgSFPerHr = n(mp['Turf - DG Base Install SF/hr'])
-      qty = sf > 0 ? (sf * (1 / 12)) / 27 : 0
+      qty = sf > 0 && dgDepthIn > 0 ? (sf * (dgDepthIn / 12)) / 27 : 0 // Cu Yd
       hrs = sf > 0 && dgSFPerHr > 0 ? sf / dgSFPerHr : 0
     } else {
       // Weed-fabric install labor — DB-editable production rate (SF/hr).
@@ -295,6 +297,7 @@ function calcTurf(
       qty = sf > 0 && weedFabricSFPerRoll > 0 ? Math.ceil(sf / weedFabricSFPerRoll) : 0
       hrs = sf > 0 && weedSFPerHr > 0 ? sf / weedSFPerHr : 0
     }
+    // Class II / DG bill per Cu Yd; Weed bills per roll. Both are qty × price.
     const mat = qty * price
     baseHrs += hrs
     baseMat += mat
@@ -1336,7 +1339,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                 ) || null
               const def = BASE_MATERIALS.find(m => m.key === (selOpt?.key ?? row.material)) || BASE_MATERIALS[0]
               const bc = calc.baseCalc?.[i] || {}
-              const unitLabel = def.qtyUnit === 'roll' ? 'roll' : 'ton'
+              const unitLabel = def.qtyUnit === 'roll' ? 'roll' : 'Cu Yd'
               // Vendor-aware price for the chip (the calc already resolved it).
               const rate = n(bc.price ?? materialPrices[def.matKey])
               return (
@@ -1397,7 +1400,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                     {bc.qty > 0
                       ? def.qtyUnit === 'roll'
                         ? `${bc.qty} ${bc.qty === 1 ? 'roll' : 'rolls'}`
-                        : `${bc.qty.toFixed(2)} t`
+                        : `${bc.qty.toFixed(2)} Cu Yd`
                       : '—'}
                   </td>
                   <td className={num}>{bc.hrs > 0 ? fh(bc.hrs) : '—'}</td>
@@ -1426,30 +1429,6 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         >
           ＋ Add base material
         </button>
-
-        {/* ZeoFill toggle */}
-        <div className="mt-3 flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-          <Toggle
-            checked={T.useZeoFill}
-            onChange={v => setT('useZeoFill', v)}
-            label="ZeoFill Pet Odor Infill (upgrade)"
-          />
-          <span className="text-xs text-amber-700 ml-auto inline-flex items-center gap-1">
-            {T.useZeoFill ? (
-              <>
-                {calc.infillSFPerBag > 0 ? Math.ceil(calc.infillAreaSF / calc.infillSFPerBag) : 0} bags @ $
-                {n(materialPrices['Turf - Infill ZeoFill']).toFixed(2)}
-                /bag
-              </>
-            ) : (
-              <>
-                Durafill @ $
-                {n(materialPrices['Turf - Infill Durafill']).toFixed(2)}
-                /SF
-              </>
-            )}
-          </span>
-        </div>
       </div>
       )}
 
@@ -1555,6 +1534,30 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         >
           ＋ Add row
         </button>
+
+        {/* Pet-odor infill upgrade — sits under the turf install rows. */}
+        <div className="mt-3 flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          <Toggle
+            checked={T.useZeoFill}
+            onChange={v => setT('useZeoFill', v)}
+            label="ZeoFill Pet Odor Infill (upgrade)"
+          />
+          <span className="text-xs text-amber-700 ml-auto inline-flex items-center gap-1">
+            {T.useZeoFill ? (
+              <>
+                {calc.infillSFPerBag > 0 ? Math.ceil(calc.infillAreaSF / calc.infillSFPerBag) : 0} bags @ $
+                {n(materialPrices['Turf - Infill ZeoFill']).toFixed(2)}
+                /bag
+              </>
+            ) : (
+              <>
+                Durafill @ $
+                {n(materialPrices['Turf - Infill Durafill']).toFixed(2)}
+                /SF
+              </>
+            )}
+          </span>
+        </div>
 
         {/* Cut, Staple & Seam — auto-calculated */}
         {calc.totalEdgeLF > 0 && (

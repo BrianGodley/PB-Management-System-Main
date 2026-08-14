@@ -108,8 +108,8 @@ const COBBLE_TYPES = [
   { label: 'Miners Pink',        dbName: 'Cobble - Miners Pink' },
 ]
 
-// D.G. product types (material_rates, per TON). Mirror of the module. Legacy
-// modules without dgType fall through to the first entry (Decomposed Granite).
+// D.G. product types (catalog material, per CUBIC YARD). Mirror of the module.
+// Legacy modules without dgType fall through to the first entry (Decomposed Granite).
 const DG_TYPES = [
   { label: 'Decomposed Granite', dbName: 'Decomposed Granite' },
   { label: 'Stabilized DG', dbName: 'DG - Stabilized' },
@@ -484,11 +484,15 @@ export default function GroundTreatmentsSummary({ module }) {
     .map((r, i) => {
       if (!(n(r.sf) > 0)) return null
       const tons = (n(r.sf) * n(r.depth)) / 200
+      // DG MATERIAL priced per CUBIC YARD (mirrors the module): material $ =
+      // CY × $/CY. CY = SF × depth_in / 324 (27 cf/cy × 12 in/ft). `tons` is kept
+      // only for labor and the per-ton Cement Mix add-on.
+      const CY = (n(r.sf) * (n(r.depth) / 12)) / 27
       const cement = r.cement === 'Yes'
       const fabric = r.weedFabric === 'Yes'
-      const perTon = priceForRow('DG', r, DG_TYPES, 0)
+      const perCY = priceForRow('DG', r, DG_TYPES, 0)
       const matBase =
-        tons * perTon +
+        CY * perCY +
         (cement ? tons * mp(GT_RATES.dgCementPerTon.dbName) : 0)
       let mat = matBase * 1.1
       const baseHrs =
@@ -504,7 +508,7 @@ export default function GroundTreatmentsSummary({ module }) {
         key: i,
         label: `${r.type || 'D.G.'} — ${n(r.sf).toLocaleString()} Sq Ft @ ${n(r.depth)}" (${r.method}${cement ? ', cement' : ''}${fabric ? ', fabric' : ''})`,
         value: fmt2(mat),
-        sub: `${hrs.toFixed(2)} hrs · ${tons.toFixed(2)} Tons`,
+        sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} Cu Yd`,
       }
     })
     .filter(Boolean)

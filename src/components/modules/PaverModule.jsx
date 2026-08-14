@@ -162,17 +162,24 @@ function calcPaver(
     // base prep beyond the pavers). Use the optional Base SF when provided;
     // otherwise fall back to the paver SF.
     const baseSf = row.baseSf !== '' && row.baseSf != null ? n(row.baseSf) : sf
+    // Base LABOR / compaction is still tonnage-based (skid-steer / hand spread
+    // rates are t/hr) — this is unchanged. Tons drive baseHrs only.
     const baseTons = sfToTons(baseSf, depthIn, tonsDivisor)
     const baseRate = BASE_RATE_MAP[row.method] ?? baseBobcatOK
     const baseHrs = baseTons > 0 ? baseTons / baseRate : 0
 
-    // Base material $/ton — vendor-aware. A real vendor overrides via its
-    // catalog item; Standard ('Class II Roadbase') uses the seeded rate, falling
-    // back to the legacy single base-rock rate.
-    let baseTonRate = 0
+    // Base MATERIAL is now priced per CUBIC YARD (company-wide move — base
+    // aggregates are bought by the cubic yard). Loose volume =
+    //   area(SF) × depth(in)/12 (→ Cu Ft) ÷ 27 (→ Cu Yd).
+    const baseCuYd = baseSf > 0 && depthIn > 0 ? (baseSf * (depthIn / 12)) / 27 : 0
+
+    // Base material $/CY — vendor-aware. A real vendor overrides via its catalog
+    // item; Standard ('Class II Roadbase') uses the seeded rate, falling back to
+    // the legacy single base-rock rate. The selected price now represents $/CY.
+    let baseCyRate = 0
     if (!row.baseVendor) {
       // No base vendor selected yet → $0 base material (pick a vendor first).
-      baseTonRate = 0
+      baseCyRate = 0
     } else if (row.baseVendor !== 'Standard' && row.baseVendor !== 'auto') {
       const bItem = paverItemFor(
         PAVER_CAT.base,
@@ -180,11 +187,11 @@ function calcPaver(
         row.baseId || row.baseType,
         materialRows
       )
-      baseTonRate = bItem ? priceOf(bItem) : baseRockPerTon
+      baseCyRate = bItem ? priceOf(bItem) : baseRockPerTon
     } else {
-      baseTonRate = mr['Base Material - Class II Roadbase'] ?? baseRockPerTon
+      baseCyRate = mr['Base Material - Class II Roadbase'] ?? baseRockPerTon
     }
-    const baseMatCost = baseTons * baseTonRate
+    const baseMatCost = baseCuYd * baseCyRate
 
     // Paver material — vendor catalog (Vendor + Type) with a Custom inline-price
     // fallback. Old estimates (paverBrand/paverName) still price via paver_prices.
@@ -219,8 +226,9 @@ function calcPaver(
       baseSf,
       depthIn,
       baseTons,
+      baseCuYd,
       baseHrs,
-      baseTonRate,
+      baseCyRate,
       baseMatCost,
       paverCost,
       pallets,
@@ -240,6 +248,7 @@ function calcPaver(
   const totalInstallSF = areas.reduce((s, a) => s + a.sf, 0) // in-house labor SF
   const matInstallSF = matAreas.reduce((s, a) => s + a.sf, 0) // material SF (active tab)
   const totalBaseTons = matAreas.reduce((s, a) => s + a.baseTons, 0)
+  const totalBaseCuYd = matAreas.reduce((s, a) => s + (a.baseCuYd || 0), 0)
   const totalBaseHrs = areas.reduce((s, a) => s + a.baseHrs, 0)
   const totalPaverCost = matAreas.reduce((s, a) => s + a.paverCost, 0)
   const totalAreaPallets = matAreas.reduce((s, a) => s + a.pallets, 0)
@@ -424,6 +433,7 @@ function calcPaver(
     totalInstallSF,
     matInstallSF,
     totalBaseTons,
+    totalBaseCuYd,
     totalPallets,
     totalAreaPallets,
     installHrs,
@@ -2180,7 +2190,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             )}
             {matBd.baseRockCost > 0 && (
               <span>
-                Base Rock ({matBd.totalBaseTons.toFixed(1)}T):{' '}
+                Base Rock ({matBd.totalBaseCuYd.toFixed(2)} Cu Yd):{' '}
                 <strong>{fmt2(matBd.baseRockCost)}</strong>
               </span>
             )}
