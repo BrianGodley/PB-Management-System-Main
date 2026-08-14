@@ -1227,8 +1227,27 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         // materials live under the Turf Prep group above.)
         ...catalogBlockItems(TURF_CAT.turf),
         ...materialRateRows('Turf - Install Materials'),
-        ...materialRateRows('Turf - Infill ZeoFill'),
-        ...materialRateRows('Turf - Infill Durafill'),
+        // Pet-odor / standard infill are MATERIAL cost upgrades (misc_rates),
+        // billed per bag (ZeoFill) or per Sq Ft (Durafill) — surfaced here so the
+        // material price is editable in View Rates, not hidden as a labor factor.
+        {
+          label: 'ZeoFill Pet Odor Infill',
+          table: 'misc_rates',
+          name: 'Turf - Infill ZeoFill',
+          category: 'Artificial Turf',
+          mode: 'coefficient',
+          unitLabel: '$ per bag',
+          value: materialPrices['Turf - Infill ZeoFill'],
+        },
+        {
+          label: 'Durafill Infill',
+          table: 'misc_rates',
+          name: 'Turf - Infill Durafill',
+          category: 'Artificial Turf',
+          mode: 'coefficient',
+          unitLabel: '$ per Sq Ft',
+          value: materialPrices['Turf - Infill Durafill'],
+        },
       ],
     },
     {
