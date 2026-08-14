@@ -56,6 +56,24 @@ const n = v => parseFloat(v) || 0
 // a real vendor only overrides the MATERIAL price for that item (matched by
 // label in the vendor's catalog), never labor.
 const TURF_CAT = { base: 'Turf Base', turf: 'Turf Material' }
+// Shared Turf Prep base materials. The two prep bases reuse the SAME catalog item
+// + Standard price that other modules already price against, so a rate change
+// propagates everywhere instead of living in Turf's own 'Turf - Gravel/DG Base'
+// rates:
+//   • DG (Class II divisor row) ↔ Ground Treatments 'Decomposed Granite' (per ton)
+//   • Class II Roadbase        ↔ the Concrete module's base item ('Class II
+//     Roadbase', else the 'Base - Class II Roadbase' named rate)
+// Their Standard prices are stashed in the module price map (mp): DG under its own
+// name, Class II under a synthetic key so it can't collide with the Turf Base
+// catalog's OWN 'Class II Roadbase' picker product (same name, different item).
+const SHARED_DG_NAME = 'Decomposed Granite'
+const SHARED_CLASS2_NAMES = ['Class II Roadbase', 'Base - Class II Roadbase']
+const SHARED_CLASS2_KEY = 'Turf Prep — Class II Base (shared)'
+// First key with a defined value wins (no hardcoded price fallback).
+const firstDefinedRate = (m, keys) => {
+  for (const k of keys) if (m && m[k] != null) return m[k]
+  return undefined
+}
 // Base-install material picker options. Each computes qty differently:
 // Gravel/DG are priced per ton, Weed per roll. Vendor overrides material price
 // only (matched by label); labor is per-material preset math.
@@ -238,7 +256,7 @@ function calcTurf(
     // Material price from the chosen catalog Item, vendor-aware (matched by the
     // catalog Item name). Standard falls through turfMatPrice to the name-keyed
     // Standard map (def.matKey) exactly as before, so Standard pricing is unchanged.
-    const price = turfMatPrice(
+    let price = turfMatPrice(
       TURF_CAT.base,
       row.vendor,
       opt?.dbName || def.dbName,
@@ -247,6 +265,17 @@ function calcTurf(
       catDefaults,
       mp
     ).price
+    // Standard/default base MATERIAL price for the two prep bases comes from the
+    // SHARED catalog items other modules use (DG ↔ Ground Treatments 'Decomposed
+    // Granite', Class II ↔ the Concrete base item), so the rate stays in sync. A
+    // real vendor pick keeps its own catalog price (already resolved above); only
+    // the Standard/default price is repointed. Weed is untouched. Qty math below
+    // is unchanged — only the per-unit price source moves.
+    const isStdBaseVendor = !row.vendor || row.vendor === 'Standard' || row.vendor === 'auto'
+    if (isStdBaseVendor) {
+      if (def.key === 'DG') price = n(mp[SHARED_DG_NAME])
+      else if (def.key === 'Gravel') price = n(mp[SHARED_CLASS2_KEY])
+    }
     let qty = 0,
       hrs = 0
     if (def.key === 'Gravel') {
@@ -596,6 +625,10 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
   const [subRates, setSubRates] = useState(initialData?.subRates || {})
   // Vendor catalog: material_rates rows (sub_category + vendor_id) + vendor list.
   const [materialRows, setMaterialRows] = useState(initialData?.materialRows || [])
+  // Shared base catalog rows (Concrete + Basic Materials + Ground Treatments) —
+  // used to surface the shared Class II / DG base items in View Rates so editing
+  // there edits the SAME rate the other modules use.
+  const [sharedBaseRows, setSharedBaseRows] = useState([])
   const [vendors, setVendors] = useState([])
   const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? null)
   const [laborBurdenPct, setLaborBurdenPct] = useState(initialData?.laborBurdenPct ?? null)
@@ -630,7 +663,13 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
     // material_rates retired: base map (incl. shared Demo fees) from the new
     // model; Turf catalog from material + material_price. Markers
     // ('Turf Material'/'Turf Base') are unchanged, so no remap.
-    const [matMap, labRes, subRes, rows, venRes] = await Promise.all([
+    // Also pull the SHARED base categories so the two Turf Prep bases can price
+    // off the same items other modules use: Ground Treatments 'Decomposed Granite'
+    // (DG) and the Concrete base item (Class II). sharedMap is scoped to those
+    // categories only, so its 'Class II Roadbase' is the CONCRETE product and can
+    // never be shadowed by the Turf Base catalog's own same-named picker item.
+    const SHARED_BASE_CATS = ['Concrete', 'Basic Materials', 'Ground Treatments']
+    const [matMap, labRes, subRes, rows, venRes, sharedMap, sharedRows] = await Promise.all([
       fetchStandardRateMap(['Artificial Turf', 'Demo']),
       supabase.from('labor_rates').select('name, rate').eq('category', 'Artificial Turf'),
       supabase
@@ -643,15 +682,25 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         .select('id, company_name')
         .eq('type', 'vendor')
         .order('company_name'),
+      fetchStandardRateMap(SHARED_BASE_CATS),
+      fetchModuleCatalog(SHARED_BASE_CATS),
     ])
     setMaterialRows(rows || [])
+    setSharedBaseRows(sharedRows || [])
     setVendors(
       (venRes.data || []).map(v => ({
         id: v.id,
         name: v.company_name,
       }))
     )
-    setMaterialPrices(matMap)
+    // Land the shared Standard prices in the module price map (mp). DG under its
+    // own name; Class II under a synthetic key so it can't collide with the Turf
+    // Base catalog's own 'Class II Roadbase' picker product.
+    setMaterialPrices({
+      ...matMap,
+      [SHARED_DG_NAME]: firstDefinedRate(sharedMap, [SHARED_DG_NAME]),
+      [SHARED_CLASS2_KEY]: firstDefinedRate(sharedMap, SHARED_CLASS2_NAMES),
+    })
     if (labRes.data) {
       const m = {}
       labRes.data.forEach(r => {
