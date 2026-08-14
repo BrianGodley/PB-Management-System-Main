@@ -1440,15 +1440,15 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
             cols={
               calc.isSub
                 ? [
-                    { label: 'Vendor', w: 'w-28' },
-                    { label: 'Turf Type' },
+                    { label: 'Vendor', w: 'w-40' },
+                    { label: 'Turf Type', w: 'w-32' },
                     { label: 'Install SF', w: 'w-24' },
                     { label: 'Edge LF', w: 'w-20' },
                     { label: 'Material', w: 'w-24' },
                   ]
                 : [
-                    { label: 'Vendor', w: 'w-28' },
-                    { label: 'Turf Type' },
+                    { label: 'Vendor', w: 'w-40' },
+                    { label: 'Turf Type', w: 'w-32' },
                     { label: 'Edge LF', w: 'w-20' },
                     { label: 'Sq Ft', w: 'w-20' },
                     { label: 'Hrs', w: 'w-16' },
