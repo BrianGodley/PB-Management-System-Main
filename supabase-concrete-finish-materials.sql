@@ -36,7 +36,6 @@ and not exists (
 insert into public.material (tenant_id, category_id, subcategory_id, description, unit, calc_meta)
 select c.tenant_id, c.id, sc.id, m.descr, m.unit, m.meta::jsonb
 from public.category c
-join public.subcategory sc on sc.category_id = c.id and sc.name = m.subcat
 cross join (values
   ('Concrete Sealer',           'Glaze and Seal Wet Look',  'gallon', '{"coverageSqFt":100,"coats":2}'),
   ('Concrete Sealer',           'Eagle Natural Look',       'gallon', '{"coverageSqFt":100,"coats":2}'),
@@ -47,6 +46,7 @@ cross join (values
   ('Concrete Finish Material',  'Top Cast 05',              'gallon', '{"coverageSqFt":50,"finish":"Sand Finish"}'),
   ('Concrete Finish Material',  'Top Cast 15',              'gallon', '{"coverageSqFt":50,"finish":"Sand Finish"}')
 ) m(subcat, descr, unit, meta)
+join public.subcategory sc on sc.category_id = c.id and sc.name = m.subcat
 where c.name = 'Concrete'
 and not exists (
   select 1 from public.material x where x.subcategory_id = sc.id and x.description = m.descr

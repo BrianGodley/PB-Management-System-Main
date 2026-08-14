@@ -1900,7 +1900,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           <div className="col-span-2">
             <div className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1.4fr)_5rem_6rem] gap-2 items-end">
               <div>
-                <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap">
+                <label className="text-xs text-gray-500 block mb-1 text-center inline-flex items-center justify-center gap-1 flex-wrap w-full">
                   Finish
                   {!isSub && activeFinishType === 'Sand Finish' && (
                     <span className="text-gray-400">— {calc.sandFinishSFPerHr} Sq Ft/hr</span>
@@ -1917,7 +1917,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 </select>
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Finish Vendor</label>
+                <label className="text-xs text-gray-500 block mb-1 text-center">Vendor</label>
                 <select
                   className={`input text-sm py-1.5 w-full min-w-0 ${finishHasProducts ? '' : 'bg-gray-100 text-gray-400'}`}
                   value={activeFinishMatVendor || ''}
@@ -1938,7 +1938,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 </select>
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Item</label>
+                <label className="text-xs text-gray-500 block mb-1 text-center">Item</label>
                 <select
                   className={`input text-sm py-1.5 w-full min-w-0 ${finishHasProducts ? '' : 'bg-gray-100 text-gray-400'}`}
                   value={activeFinishMatItem || ''}
@@ -1958,22 +1958,23 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 </select>
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Sq Ft</label>
+                <label className="text-xs text-gray-500 block mb-1 text-center">Sq Ft</label>
                 <NumInput value={activeFinishMatSF} onChange={setActiveFinishMatSF} className="w-full text-center" />
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Material</label>
+                <label className="text-xs text-gray-500 block mb-1 text-center">Material</label>
                 <div className="input text-sm py-1.5 w-full text-right bg-gray-50 text-gray-600">
                   {fmt2(calc.finishMat)}
                 </div>
               </div>
             </div>
           </div>
-          {/* ── Sealer: Vendor | Item | Sq Ft | Coats | Material ── */}
+          {/* ── Sealer ── */}
           <div className="col-span-2">
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_5rem_4rem_6rem] gap-2 items-end">
+            <p className="text-[11px] text-gray-700 uppercase tracking-wide mb-1">Sealer</p>
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_5rem_6rem] gap-2 items-end">
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Sealer Vendor</label>
+                <label className="text-xs text-gray-500 block mb-1 text-center">Vendor</label>
                 <select
                   className="input text-sm py-1.5 w-full min-w-0"
                   value={activeSealerVendor || ''}
@@ -1993,7 +1994,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 </select>
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Item</label>
+                <label className="text-xs text-gray-500 block mb-1 text-center">Item</label>
                 <select
                   className="input text-sm py-1.5 w-full min-w-0"
                   value={activeSealerItem || ''}
@@ -2012,31 +2013,23 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 </select>
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Sq Ft</label>
+                <label className="text-xs text-gray-500 block mb-1 text-center">Sq Ft</label>
                 <NumInput value={activeSealerSF} onChange={setActiveSealerSF} className="w-full text-center" />
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Coats</label>
-                <input
-                  className="input text-sm py-1.5 w-full text-center bg-gray-50 text-gray-500"
-                  value={calc.sealerCoats > 0 ? calc.sealerCoats : '—'}
-                  readOnly
-                  tabIndex={-1}
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Material</label>
+                <label className="text-xs text-gray-500 block mb-1 text-center">Material</label>
                 <div className="input text-sm py-1.5 w-full text-right bg-gray-50 text-gray-600">
                   {fmt2(calc.sealerMat)}
                 </div>
               </div>
             </div>
           </div>
-          {/* ── Vapor Barrier: Vendor | Item | Sq Ft | Material ── */}
+          {/* ── Vapor Barrier ── */}
           <div className="col-span-2">
+            <p className="text-[11px] text-gray-700 uppercase tracking-wide mb-1">Vapor Barrier</p>
             <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_5rem_6rem] gap-2 items-end">
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Vapor Barrier Vendor</label>
+                <label className="text-xs text-gray-500 block mb-1 text-center">Vendor</label>
                 <select
                   className="input text-sm py-1.5 w-full min-w-0"
                   value={activeVaporVendor || ''}
@@ -2056,7 +2049,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 </select>
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Item</label>
+                <label className="text-xs text-gray-500 block mb-1 text-center">Item</label>
                 <select
                   className="input text-sm py-1.5 w-full min-w-0"
                   value={activeVaporItem || ''}
@@ -2075,11 +2068,11 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 </select>
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Sq Ft</label>
+                <label className="text-xs text-gray-500 block mb-1 text-center">Sq Ft</label>
                 <NumInput value={activeVaporBarrierSF} onChange={setActiveVaporBarrierSF} className="w-full text-center" />
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Material</label>
+                <label className="text-xs text-gray-500 block mb-1 text-center">Material</label>
                 <div className="input text-sm py-1.5 w-full text-right bg-gray-50 text-gray-600">
                   {fmt2(calc.vaporMat)}
                 </div>
