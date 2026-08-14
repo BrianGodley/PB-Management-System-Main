@@ -1895,70 +1895,79 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
       <div>
         <SectionHeader title="Finish Options" />
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap">
-              Finish Type
-              {isSub &&
-                (subFinishCfg ? (
-                  <span className="text-gray-400 inline-flex items-center gap-1 flex-wrap">
-                    — ${subFinishLaborPerSF}/SF
-                    {subFinishCfg.mat && (
-                      <>
-                        · ${subFinishMatPerSF}/SF mat
-                      </>
+          {/* ── Finish: Finish | Vendor | Item | Sq Ft | Material ──
+              Vendor/Item disabled unless the finish has products (e.g. Sand Finish). */}
+          <div className="col-span-2">
+            <div className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1.4fr)_5rem_6rem] gap-2 items-end">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap">
+                  Finish
+                  {!isSub && activeFinishType === 'Sand Finish' && (
+                    <span className="text-gray-400">— {calc.sandFinishSFPerHr} Sq Ft/hr</span>
+                  )}
+                </label>
+                <select
+                  className="input text-sm py-1.5 w-full"
+                  value={activeFinishType}
+                  onChange={e => setActiveFinishType(e.target.value)}
+                >
+                  {FINISH_TYPES.map(t => (
+                    <option key={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Finish Vendor</label>
+                <select
+                  className={`input text-sm py-1.5 w-full min-w-0 ${finishHasProducts ? '' : 'bg-gray-100 text-gray-400'}`}
+                  value={activeFinishMatVendor || ''}
+                  onChange={e => {
+                    setActiveFinishMatVendor(e.target.value)
+                    setActiveFinishMatItem('')
+                  }}
+                  disabled={!finishHasProducts}
+                  title={finishHasProducts ? 'Finish material vendor' : 'No products for this finish'}
+                >
+                  {!activeFinishMatVendor && <option value="">Select</option>}
+                  {vendorsForCategory('Concrete Finish Material').map(v => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}
+                    </option>
+                  ))}
+                  <option value="Standard">Standard</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Item</label>
+                <select
+                  className={`input text-sm py-1.5 w-full min-w-0 ${finishHasProducts ? '' : 'bg-gray-100 text-gray-400'}`}
+                  value={activeFinishMatItem || ''}
+                  onChange={e => setActiveFinishMatItem(e.target.value)}
+                  disabled={!finishHasProducts}
+                >
+                  {!activeFinishMatItem && <option value="">Select item</option>}
+                  {activeFinishMatItem &&
+                    !sectionOptions('Concrete Finish Material', activeFinishMatVendor).some(o => o.label === activeFinishMatItem) && (
+                      <option value={activeFinishMatItem}>{activeFinishMatItem}</option>
                     )}
-                  </span>
-                ) : (
-                  <span className="text-gray-400">— no added cost</span>
-                ))}
-              {!isSub && activeFinishType === 'Sand Finish' && (
-                <span className="text-gray-400 inline-flex items-center gap-1 flex-wrap">
-                  — {calc.sandFinishSFPerHr} Sq Ft/hr
-                  · sand sub ${calc.sandFinishPer400SF}/400SF
-                </span>
-              )}
-              {!isSub && activeFinishType === 'Salt Finish' && (
-                <span className="text-gray-400 inline-flex items-center gap-1">
-                  — {calc.saltFinishSFPerHr} Sq Ft/hr
-                </span>
-              )}
-              {!isSub && activeFinishType === 'Exposed Aggregate' && (
-                <span className="text-gray-400 inline-flex items-center gap-1">
-                  — {calc.exposedAggSFPerHr} Sq Ft/hr
-                </span>
-              )}
-              {!isSub && activeFinishType === 'Seeded Aggregate' && (
-                <span className="text-gray-400 inline-flex items-center gap-1">
-                  — {calc.seededAggSFPerHr} Sq Ft/hr
-                </span>
-              )}
-              {!isSub && activeFinishType === 'Stamped' && (
-                <span className="text-gray-400 inline-flex items-center gap-1 flex-wrap">
-                  — stamp sub ${calc.stampSubFlat} flat
-                  · ${calc.stampSubPerCY}/CY
-                </span>
-              )}
-            </label>
-            <select
-              className="input text-sm py-1.5"
-              value={activeFinishType}
-              onChange={e => setActiveFinishType(e.target.value)}
-            >
-              {FINISH_TYPES.map(t => (
-                <option key={t}>{t}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex items-end gap-4 pb-1 flex-wrap">
-            <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-              <input
-                type="checkbox"
-                checked={activeColorYes}
-                onChange={e => setActiveColorYes(e.target.checked)}
-                className="accent-green-600"
-              />
-              <span className="text-gray-700">Color Hardener (${calc.colorCostPerCY} per Cu Yd)</span>
-            </label>
+                  {sectionOptions('Concrete Finish Material', activeFinishMatVendor).map(o => (
+                    <option key={o.label} value={o.label}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Sq Ft</label>
+                <NumInput value={activeFinishMatSF} onChange={setActiveFinishMatSF} className="w-full text-center" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Material</label>
+                <div className="input text-sm py-1.5 w-full text-right bg-gray-50 text-gray-600">
+                  {fmt2(calc.finishMat)}
+                </div>
+              </div>
+            </div>
           </div>
           {/* ── Sealer: Vendor | Item | Sq Ft | Coats | Material ── */}
           <div className="col-span-2">
@@ -2077,76 +2086,17 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               </div>
             </div>
           </div>
-          {/* ── Finish material: Finish | Vendor | Item | Sq Ft | Material ──
-              Disabled unless the selected finish has products (e.g. Sand Finish). */}
-          <div className="col-span-2">
-            <div className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1.4fr)_5rem_6rem] gap-2 items-end">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Finish</label>
-                <input
-                  className="input text-sm py-1.5 w-full bg-gray-50 text-gray-500"
-                  value={activeFinishType}
-                  readOnly
-                  tabIndex={-1}
-                  title="From Finish Type above"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Finish Vendor</label>
-                <select
-                  className={`input text-sm py-1.5 w-full min-w-0 ${finishHasProducts ? '' : 'bg-gray-100 text-gray-400'}`}
-                  value={activeFinishMatVendor || ''}
-                  onChange={e => {
-                    setActiveFinishMatVendor(e.target.value)
-                    setActiveFinishMatItem('')
-                  }}
-                  disabled={!finishHasProducts}
-                  title={finishHasProducts ? 'Finish material vendor' : 'No products for this finish'}
-                >
-                  {!activeFinishMatVendor && <option value="">Select</option>}
-                  {vendorsForCategory('Concrete Finish Material').map(v => (
-                    <option key={v.id} value={v.id}>
-                      {v.name}
-                    </option>
-                  ))}
-                  <option value="Standard">Standard</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Item</label>
-                <select
-                  className={`input text-sm py-1.5 w-full min-w-0 ${finishHasProducts ? '' : 'bg-gray-100 text-gray-400'}`}
-                  value={activeFinishMatItem || ''}
-                  onChange={e => setActiveFinishMatItem(e.target.value)}
-                  disabled={!finishHasProducts}
-                >
-                  {!activeFinishMatItem && <option value="">Select item</option>}
-                  {activeFinishMatItem &&
-                    !sectionOptions('Concrete Finish Material', activeFinishMatVendor).some(o => o.label === activeFinishMatItem) && (
-                      <option value={activeFinishMatItem}>{activeFinishMatItem}</option>
-                    )}
-                  {sectionOptions('Concrete Finish Material', activeFinishMatVendor).map(o => (
-                    <option key={o.label} value={o.label}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Sq Ft</label>
-                <NumInput
-                  value={activeFinishMatSF}
-                  onChange={setActiveFinishMatSF}
-                  className="w-full text-center"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Material</label>
-                <div className="input text-sm py-1.5 w-full text-right bg-gray-50 text-gray-600">
-                  {fmt2(calc.finishMat)}
-                </div>
-              </div>
-            </div>
+          {/* ── Color Hardener (bottom) ── */}
+          <div className="col-span-2 flex items-end gap-4 pb-1 flex-wrap">
+            <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={activeColorYes}
+                onChange={e => setActiveColorYes(e.target.checked)}
+                className="accent-green-600"
+              />
+              <span className="text-gray-700">Color Hardener (${calc.colorCostPerCY} per Cu Yd)</span>
+            </label>
           </div>
         </div>
       </div>
