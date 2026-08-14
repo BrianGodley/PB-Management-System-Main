@@ -150,12 +150,12 @@ function calcConcrete(
 
   // ── Labor production rates (labor_rates) ─────────────────────────────────
   const concreteSFPerHr = n(lr['Concrete - Pour & Finish'])
-  // Rebar labor SF/hr is pattern-specific: 18" OC has its own production rate;
-  // 24" and 12" OC share the '24" OC' rate (unchanged). All table-driven.
+  // Rebar labor SF/hr is pattern-specific — each spacing has its own production
+  // rate row. All table-driven.
   const rebarSFPerHrBySpacing = {
     '24" OC': n(lr['Concrete - Rebar 24" OC']),
     '18" OC': n(lr['Concrete - Rebar 18" OC']),
-    '12" OC': n(lr['Concrete - Rebar 24" OC']),
+    '12" OC': n(lr['Concrete - Rebar 12" OC']),
   }
   const rebarSFPerHr =
     rebarSFPerHrBySpacing[state.rebarSpacing] ?? n(lr['Concrete - Rebar 24" OC'])
@@ -1150,7 +1150,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
       group: 'Rebar Install',
       items: [
         {
-          label: 'Rebar Labor — 24"/12" OC',
+          label: 'Rebar Labor — 24" OC',
           table: 'labor_rates',
           name: 'Concrete - Rebar 24" OC',
           category: 'Concrete',
@@ -1166,6 +1166,15 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           mode: 'coefficient',
           unitLabel: 'Sq Ft per hr',
           value: calc.rebarSFPerHrBySpacing['18" OC'],
+        },
+        {
+          label: 'Rebar Labor — 12" OC',
+          table: 'labor_rates',
+          name: 'Concrete - Rebar 12" OC',
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: 'Sq Ft per hr',
+          value: calc.rebarSFPerHrBySpacing['12" OC'],
         },
         {
           label: 'Rebar LF/SF — 24" OC',
@@ -1684,6 +1693,10 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                   const mixOpts = sectionOptions('Concrete Mix', installTierVendor[t.key])
                   const mt = resolveType(installTierType[t.key], mixOpts)
                   const mixRate = mt.fallback
+                  // Cubic yards this tier's Sq Ft + Depth entry equals.
+                  const tierSF = n(installTiers[t.key])
+                  const tierDepth = n(installTierDepth[t.key]) || 4
+                  const tierCY = tierSF > 0 ? ((tierDepth / 12) * tierSF) / 27 : 0
                   return (
                     <div
                       key={t.key}
@@ -1737,6 +1750,11 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                         className="w-full text-center"
                       />
                       <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                        {tierCY > 0 && (
+                          <span className="text-[11px] font-semibold text-gray-600 inline-flex items-center gap-1">
+                            {tierCY.toFixed(2)} Cu Yd
+                          </span>
+                        )}
                         <span className="text-[11px] text-gray-400 inline-flex items-center gap-1">
                           ${Number(mixRate).toFixed(0)}/CY
                         </span>

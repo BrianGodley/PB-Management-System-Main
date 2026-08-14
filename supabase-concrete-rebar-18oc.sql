@@ -24,3 +24,12 @@ where not exists (
   select 1 from public.misc_rates
   where name = 'Concrete - Rebar LF/SF 18" OC' and category = 'Concrete'
 );
+
+-- 12" OC rebar labor split out to its own rate (was sharing the 24" rate): 30 SF/hr.
+insert into public.labor_rates (tenant_id, name, rate, unit, category)
+select t.tid, 'Concrete - Rebar 12" OC', 30, 'Sq Ft per hr', 'Concrete'
+from (select tenant_id tid from public.labor_rates where category = 'Concrete' limit 1) t
+where not exists (
+  select 1 from public.labor_rates
+  where name = 'Concrete - Rebar 12" OC' and category = 'Concrete'
+);
