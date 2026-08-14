@@ -65,9 +65,9 @@ const TURF_CAT = { base: 'Turf Base', turf: 'Turf Material' }
 // vendor/catalog price lookups key off `dbName`, while labor/qty coefficients
 // still key off `key` (Gravel/DG/Weed).
 const BASE_MATERIALS = [
-  { key: 'Gravel', label: '2" Gravel Base', dbName: 'Gravel Base', matKey: 'Turf - Gravel Base', qtyUnit: 't' },
-  { key: 'DG', label: '1" DG Base', dbName: 'DG Base', matKey: 'Turf - DG Base', qtyUnit: 't' },
-  { key: 'Weed', label: 'Weed Barrier Fabric', dbName: 'Weed Barrier Fabric', matKey: 'Turf - Weed Barrier Fabric', qtyUnit: 'roll' },
+  { key: 'Gravel', label: 'Class II', dbName: 'Gravel Base', matKey: 'Turf - Gravel Base', qtyUnit: 't' },
+  { key: 'DG', label: 'DG', dbName: 'DG Base', matKey: 'Turf - DG Base', qtyUnit: 't' },
+  { key: 'Weed', label: 'Weed Barrier', dbName: 'Weed Barrier Fabric', matKey: 'Turf - Weed Barrier Fabric', qtyUnit: 'roll' },
 ]
 // Vendor-first Base-material picker options (mirrors UtilitiesModule.mergedUtilTypes
 // and the turf-brand picker above). Standard/unset → the null-vendor 'Turf Base'
@@ -455,7 +455,14 @@ const DEFAULT_STATE = {
     soil: { sf: '', inches: '4', method: 'Skid Steer Good' },
     lawn: { sf: '', inches: '4', method: 'Skid Steer Good' },
   },
-  baseRows: [{ material: '', sf: '', vendor: '' }],
+  // Master base area — filling this auto-populates each base row's Sq Ft.
+  baseAreaSF: '',
+  // Three standard base layers by default: Class II, DG, Weed Barrier (Standard vendor).
+  baseRows: [
+    { material: 'Gravel', sf: '', vendor: 'Standard' },
+    { material: 'DG', sf: '', vendor: 'Standard' },
+    { material: 'Weed', sf: '', vendor: 'Standard' },
+  ],
   useZeoFill: false,
   rolls: [{ brand: '', edgeLF: '', vendor: '' }],
   stripRows: [{ lf: '', widthIn: '12', brand: '', vendor: '' }],
@@ -771,6 +778,17 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
             baseRows: [...(cur.baseRows || []), { material: '', sf: '', vendor: '' }],
           },
         }
+      }),
+    []
+  )
+  // Master base-area field — sets every base row's Sq Ft to the entered value.
+  const setBaseAreaSF = useCallback(
+    val =>
+      setState(p => {
+        const k = tabKey(p)
+        const cur = p[k]
+        const baseRows = (cur.baseRows || []).map(r => ({ ...r, sf: val }))
+        return { ...p, [k]: { ...cur, baseAreaSF: val, baseRows } }
       }),
     []
   )
@@ -1238,8 +1256,15 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       {state.subType !== 'Subcontractor' && (
       <div>
         <SecHdr title="Base Installation" />
-        <div className="text-xs text-gray-500 mb-2 italic">
-          Enter the turf area square footage.
+        {/* Master area — fills every base row's Sq Ft automatically. */}
+        <div className="flex flex-col items-center mb-3">
+          <label className="text-xs font-medium text-gray-600 mb-1 text-center">Square Footage</label>
+          <Inp
+            value={T.baseAreaSF ?? ''}
+            onChange={e => setBaseAreaSF(e.target.value)}
+            placeholder="0"
+            className="text-center w-32"
+          />
         </div>
         <table className="w-full text-xs">
           <TH
