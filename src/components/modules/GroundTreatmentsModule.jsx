@@ -2146,7 +2146,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         value={row.type || ''}
                         onChange={e => updateSodRow(i, 'type', e.target.value)}
                       >
-                        {!row.type && <option value="">Select sod</option>}
+                        {!row.type && <option value="">Select Sod</option>}
                         {row.type && !rowOpts.some(o => o.label === row.type) && (
                           <option value={row.type}>{row.type}</option>
                         )}
@@ -2256,7 +2256,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                           value={row.fertilizer || ''}
                           onChange={e => updateSodFert(i, 'fertilizer', e.target.value)}
                         >
-                          {!row.fertilizer && <option value="">Select fertilizer</option>}
+                          {!row.fertilizer && <option value="">Select Fertilizer</option>}
                           {row.fertilizer && !fertOpts.some(o => o.label === row.fertilizer) && (
                             <option value={row.fertilizer}>{row.fertilizer}</option>
                           )}
@@ -2361,7 +2361,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         value={row.type || ''}
                         onChange={e => updateMulch(i, 'type', e.target.value)}
                       >
-                        {!row.type && <option value="">Select mulch</option>}
+                        {!row.type && <option value="">Select Mulch</option>}
                         {row.type && !rowOpts.some(o => o.label === row.type) && (
                           <option value={row.type}>{row.type}</option>
                         )}
@@ -2627,7 +2627,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         value={row.type || ''}
                         onChange={e => updateGravel(i, 'type', e.target.value)}
                       >
-                        {!row.type && <option value="">Select gravel</option>}
+                        {!row.type && <option value="">Select Gravel</option>}
                         {row.type && !rowOpts.some(o => o.label === row.type) && (
                           <option value={row.type}>{row.type}</option>
                         )}
@@ -2775,7 +2775,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         value={row.type || ''}
                         onChange={e => updatePebble(i, 'type', e.target.value)}
                       >
-                        {!row.type && <option value="">Select pebble</option>}
+                        {!row.type && <option value="">Select Pebble</option>}
                         {row.type && !rowOpts.some(o => o.label === row.type) && (
                           <option value={row.type}>{row.type}</option>
                         )}
@@ -2910,7 +2910,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         value={row.type || ''}
                         onChange={e => updateCobble(i, 'type', e.target.value)}
                       >
-                        {!row.type && <option value="">Select cobble</option>}
+                        {!row.type && <option value="">Select Cobble &amp; Boulders</option>}
                         {row.type && !rowOpts.some(o => o.label === row.type) && (
                           <option value={row.type}>{row.type}</option>
                         )}
