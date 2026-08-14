@@ -1023,6 +1023,12 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           unitLabel: 'Sq Ft per hr',
           value: materialPrices['Turf - Weed Fabric Install SF/hr'],
         },
+        // Base materials (Turf Base catalog products + named base fabrics) —
+        // surfaced here so Turf Prep has its own editable Materials sub-section.
+        ...catalogBlockItems(TURF_CAT.base),
+        ...materialRateRows('Turf - Gravel Base'),
+        ...materialRateRows('Turf - DG Base'),
+        ...materialRateRows('Turf - Weed Barrier Fabric'),
       ],
     },
     {
@@ -1046,14 +1052,10 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           unitLabel: 'Ln Ft per hr',
           value: materialPrices['Turf - Cut/Staple/Seam LF/hr'],
         },
-        // Base material catalog ('Turf Base' vendor products + named base fabrics),
-        // turf material catalog ('Turf Material' brands) and the named consumables
+        // Turf material catalog ('Turf Material' brands) and the named consumables
         // (install materials, infill). The Turf Strips section reuses this same
-        // 'Turf Material' catalog, so its materials are surfaced here.
-        ...catalogBlockItems(TURF_CAT.base),
-        ...materialRateRows('Turf - Gravel Base'),
-        ...materialRateRows('Turf - DG Base'),
-        ...materialRateRows('Turf - Weed Barrier Fabric'),
+        // 'Turf Material' catalog, so its materials are surfaced here. (Base
+        // materials live under the Turf Prep group above.)
         ...catalogBlockItems(TURF_CAT.turf),
         ...materialRateRows('Turf - Install Materials'),
         ...materialRateRows('Turf - Infill ZeoFill'),
