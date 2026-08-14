@@ -250,11 +250,11 @@ function calcTurf(
     let qty = 0,
       hrs = 0
     if (def.key === 'Gravel') {
-      // Base-install labor coefficients are DB-editable (labor_rates).
+      // Class II base install has its own DB-editable labor rate (SF/hr),
+      // driving hours directly — same single-rate model as DG.
       const baseSFPerHr = n(mp['Turf - Base Install SF/hr'])
-      const baseInstallPH = n(mp['Turf - Base Install PH'])
       qty = sf > 0 && gravelBaseTonsDivisor > 0 ? (sf / gravelBaseTonsDivisor) * 2 : 0
-      hrs = sf > 0 && baseSFPerHr > 0 ? (sf / baseSFPerHr) * baseInstallPH : 0
+      hrs = sf > 0 && baseSFPerHr > 0 ? sf / baseSFPerHr : 0
     } else if (def.key === 'DG') {
       // DG base install has its own DB-editable labor rate (SF/hr).
       const dgSFPerHr = n(mp['Turf - DG Base Install SF/hr'])
