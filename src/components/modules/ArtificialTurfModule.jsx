@@ -106,6 +106,52 @@ const BASE_MATERIALS = [
   { key: 'DG', label: 'DG', dbName: 'DG Base', matKey: 'Turf - DG Base', qtyUnit: 'cy' },
   { key: 'Weed', label: 'Weed Barrier', dbName: 'Weed Barrier Fabric', matKey: SHARED_WEED_NAME, qtyUnit: 'sf' },
 ]
+// Turf Prep is three FIXED base layers, each its own mini-section: a fixed
+// identity (row label) + vendor picker + Type picker whose options are the shared
+// `material` rows for that layer. Vendor + Type together set the price.
+//   Roadbase → Class II items (Basic Materials 'Aggregate & Concrete', matched by
+//     name since that subcategory also holds concrete/sand)
+//   DG Base  → Basic Materials subcategory 'Decomposed Granite'
+//   Weed Barrier → Basic Materials subcategory 'Barriers'
+const BASE_KINDS = [
+  { key: 'Gravel', label: 'Roadbase', match: r => SHARED_CLASS2_NAMES.includes(r.name) },
+  { key: 'DG', label: 'DG Base', match: r => r.sub_category === 'Decomposed Granite' },
+  { key: 'Weed', label: 'Weed Barrier', match: r => r.sub_category === 'Barriers' },
+]
+const baseKindDef = key => BASE_KINDS.find(b => b.key === key) || BASE_KINDS[0]
+// Vendor-first Type options: the shared products for this layer, filtered to the
+// chosen vendor (Standard → null-vendor rows), unique by name.
+function baseTypeOptions(sharedRows, kind, vendorSel) {
+  const def = baseKindDef(kind)
+  const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
+  const seen = new Set()
+  return (sharedRows || [])
+    .filter(def.match)
+    .filter(r => (isStd ? r.vendor_id == null : r.vendor_id === vendorSel))
+    .filter(r => (seen.has(r.name) ? false : (seen.add(r.name), true)))
+    .map(r => ({ label: r.name, value: r.name, price: n(r.unit_cost) }))
+}
+// Vendors that carry any product for this layer (for the row's vendor picker).
+function baseVendorOptions(sharedRows, vendors, kind) {
+  const def = baseKindDef(kind)
+  const ids = new Set(
+    (sharedRows || []).filter(def.match).filter(r => r.vendor_id != null).map(r => r.vendor_id)
+  )
+  return (vendors || []).filter(v => ids.has(v.id))
+}
+// Price for a base row's selected Type + vendor from the shared rows.
+function baseTypePrice(sharedRows, kind, vendorSel, typeName) {
+  if (!typeName) return 0
+  const def = baseKindDef(kind)
+  const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
+  if (!isStd) {
+    const vr = (sharedRows || []).find(r => def.match(r) && r.name === typeName && r.vendor_id === vendorSel)
+    if (vr && n(vr.unit_cost) > 0) return n(vr.unit_cost)
+  }
+  const sr = (sharedRows || []).find(r => def.match(r) && r.name === typeName && r.vendor_id == null)
+  if (sr) return n(sr.unit_cost)
+  return 0
+}
 // Vendor-first Base-material picker options (mirrors UtilitiesModule.mergedUtilTypes
 // and the turf-brand picker above). Standard/unset → the null-vendor 'Turf Base'
 // catalog Items; a real vendor → only that vendor's Items. Each catalog Item is
@@ -257,52 +303,13 @@ function calcTurf(
     // Unselected base material contributes nothing (no crash, no fallback-to-first).
     if (!row.material)
       return { material: '', label: '', qtyUnit: '', sf: n(row.sf), qty: 0, hrs: 0, mat: 0, price: 0 }
-    // Vendor-first Type resolution (mirrors UtilitiesModule): the picker lists the
-    // selected vendor's 'Turf Base' catalog Items; map the stored selection back to
-    // its built-in so labor/qty coefficients keep working. Backward-compat: old
-    // rows store the built-in key (Gravel/DG/Weed); newer/vendor rows may store the
-    // catalog Item name/label.
-    const baseOpts = baseMatOptions(materialRows, row.vendor)
-    const opt =
-      baseOpts.find(
-        o =>
-          o.value === row.material ||
-          o.key === row.material ||
-          o.dbName === row.material ||
-          o.label === row.material
-      ) || null
-    const def = BASE_MATERIALS.find(m => m.key === (opt?.key ?? row.material)) || BASE_MATERIALS[0]
+    // Each base row is a fixed layer (row.material = Gravel/DG/Weed). Its price is
+    // the selected Type product for the chosen vendor, resolved from the shared
+    // `material` + `material_price` rows (Basic Materials / Concrete / Ground
+    // Treatments). Qty math below is unchanged (per-layer).
+    const def = BASE_MATERIALS.find(m => m.key === row.material) || BASE_MATERIALS[0]
     const sf = n(row.sf) || turfAreaSF
-    // Material price from the chosen catalog Item, vendor-aware (matched by the
-    // catalog Item name). Standard falls through turfMatPrice to the name-keyed
-    // Standard map (def.matKey) exactly as before, so Standard pricing is unchanged.
-    let price = turfMatPrice(
-      TURF_CAT.base,
-      row.vendor,
-      opt?.dbName || def.dbName,
-      def.matKey,
-      materialRows,
-      catDefaults,
-      mp
-    ).price
-    // Base MATERIAL prices for all three prep bases come from the SHARED catalog
-    // items other modules use — Class II ↔ Concrete/Basic Materials base, DG ↔
-    // Basic Materials 'Decomposed Granite', Weed ↔ Basic Materials 'Weed Fabric'.
-    // Those items no longer live in the Artificial Turf catalog, so resolve the
-    // chosen vendor's price straight from the shared rows (vendor-aware), falling
-    // back to the shared Standard price. Qty math below is unchanged.
-    const sharedNames =
-      def.key === 'DG' ? [SHARED_DG_NAME]
-      : def.key === 'Gravel' ? SHARED_CLASS2_NAMES
-      : def.key === 'Weed' ? SHARED_WEED_NAMES
-      : null
-    if (sharedNames) {
-      const stdFallback =
-        def.key === 'DG' ? mp[SHARED_DG_NAME]
-        : def.key === 'Gravel' ? mp[SHARED_CLASS2_KEY]
-        : mp[SHARED_WEED_NAME]
-      price = sharedBasePrice(sharedBaseRows, sharedNames, row.vendor, stdFallback)
-    }
+    const price = baseTypePrice(sharedBaseRows, row.material, row.vendor, row.type)
     // Class II and DG are priced by the cubic yard (matching the master rates,
     // now per Cu Yd). Volume = SF × depth/12 ÷ 27, with DB-editable install
     // depths (misc_rates). Weed is now the shared 'Weed Fabric' record priced
@@ -523,11 +530,12 @@ const DEFAULT_STATE = {
   },
   // Master base area — filling this auto-populates each base row's Sq Ft.
   baseAreaSF: '',
-  // Three standard base layers by default: Class II, DG, Weed Barrier (Standard vendor).
+  // Three FIXED base layers, each its own row: Roadbase, DG Base, Weed Barrier.
+  // Each carries a vendor + Type selection that sets its price.
   baseRows: [
-    { material: 'Gravel', sf: '', vendor: 'Standard' },
-    { material: 'DG', sf: '', vendor: 'Standard' },
-    { material: 'Weed', sf: '', vendor: 'Standard' },
+    { material: 'Gravel', type: '', sf: '', vendor: 'Standard' },
+    { material: 'DG', type: '', sf: '', vendor: 'Standard' },
+    { material: 'Weed', type: '', sf: '', vendor: 'Standard' },
   ],
   useZeoFill: false,
   rolls: [{ brand: '', edgeLF: '', vendor: '' }],
@@ -1354,34 +1362,35 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         <table className="w-full text-xs">
           <TH
             cols={[
-              { label: 'Vendor', w: 'w-28' },
-              { label: 'Base Type' },
+              { label: 'Base', w: 'w-28' },
+              { label: 'Vendor', w: 'w-32' },
+              { label: 'Type', w: 'w-28' },
               { label: 'Sq Ft', w: 'w-20' },
               { label: 'Qty', w: 'w-16' },
               { label: 'Hrs', w: 'w-16' },
               { label: 'Material', w: 'w-24' },
-              { label: '', w: 'w-8' },
             ]}
           />
           <tbody className="divide-y divide-gray-50">
             {(T.baseRows || []).map((row, i) => {
-              // Vendor-first Type list (mirrors the turf-brand picker below).
-              const baseOpts = baseMatOptions(materialRows, row.vendor)
-              const selOpt =
-                baseOpts.find(
-                  o =>
-                    o.value === row.material ||
-                    o.key === row.material ||
-                    o.dbName === row.material ||
-                    o.label === row.material
-                ) || null
-              const def = BASE_MATERIALS.find(m => m.key === (selOpt?.key ?? row.material)) || BASE_MATERIALS[0]
+              // Each row is a fixed base layer (Roadbase / DG Base / Weed Barrier).
+              // Vendor + Type pickers are sourced from the shared material rows for
+              // that layer; the calc resolves the price from the selection.
+              const def = BASE_MATERIALS.find(m => m.key === row.material) || BASE_MATERIALS[0]
+              const kdef = baseKindDef(row.material)
+              const typeOpts = baseTypeOptions(sharedBaseRows, row.material, row.vendor)
+              const venOpts = baseVendorOptions(sharedBaseRows, vendors, row.material)
               const bc = calc.baseCalc?.[i] || {}
-              const unitLabel = def.qtyUnit === 'roll' ? 'roll' : 'Cu Yd'
-              // Vendor-aware price for the chip (the calc already resolved it).
-              const rate = n(bc.price ?? materialPrices[def.matKey])
+              const unitLabel =
+                def.qtyUnit === 'sf' ? 'Sq Ft' : def.qtyUnit === 'roll' ? 'roll' : 'Cu Yd'
+              const rate = n(bc.price)
               return (
                 <tr key={i}>
+                  <td className={td}>
+                    <span className="text-xs font-medium text-gray-700 whitespace-nowrap">
+                      {kdef.label}
+                    </span>
+                  </td>
                   <td className={td}>
                     <select
                       className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
@@ -1391,7 +1400,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                     >
                       <option value="">Select</option>
                       <option value="Standard">Standard</option>
-                      {vendorsSupplyingMarker(TURF_CAT.base).map(v => (
+                      {venOpts.map(v => (
                         <option key={v.id} value={v.id}>
                           {v.name}
                         </option>
@@ -1402,21 +1411,16 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                     <div className="flex items-center gap-1">
                       <select
                         className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
-                        value={row.material ? (selOpt?.value ?? row.material) : ''}
-                        onChange={e => setBaseRow(i, 'material', e.target.value)}
-                        title="Material"
+                        value={row.type || ''}
+                        onChange={e => setBaseRow(i, 'type', e.target.value)}
+                        title="Type"
                       >
-                        {!row.material && <option value="">Select base</option>}
-                        {row.material &&
-                          !baseOpts.some(
-                            o =>
-                              o.value === row.material ||
-                              o.key === row.material ||
-                              o.dbName === row.material ||
-                              o.label === row.material
-                          ) && <option value={row.material}>{def.label || row.material}</option>}
-                        {baseOpts.map(o => (
-                          <option key={o.dbName || o.value} value={o.value}>
+                        {!row.type && <option value="">Select type</option>}
+                        {row.type && !typeOpts.some(o => o.value === row.type) && (
+                          <option value={row.type}>{row.type}</option>
+                        )}
+                        {typeOpts.map(o => (
+                          <option key={o.value} value={o.value}>
                             {o.label}
                           </option>
                         ))}
@@ -1436,37 +1440,20 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                   </td>
                   <td className={num}>
                     {bc.qty > 0
-                      ? def.qtyUnit === 'roll'
-                        ? `${bc.qty} ${bc.qty === 1 ? 'roll' : 'rolls'}`
-                        : `${bc.qty.toFixed(2)} Cu Yd`
+                      ? def.qtyUnit === 'sf'
+                        ? `${bc.qty.toLocaleString()} Sq Ft`
+                        : def.qtyUnit === 'roll'
+                          ? `${bc.qty} ${bc.qty === 1 ? 'roll' : 'rolls'}`
+                          : `${bc.qty.toFixed(2)} Cu Yd`
                       : '—'}
                   </td>
                   <td className={num}>{bc.hrs > 0 ? fh(bc.hrs) : '—'}</td>
                   <td className={num}>{bc.mat > 0 ? fmt2(bc.mat) : '—'}</td>
-                  <td className={num}>
-                    {(T.baseRows || []).length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeBaseRow(i)}
-                        className="text-gray-300 hover:text-red-500"
-                        title="Remove row"
-                      >
-                        ×
-                      </button>
-                    )}
-                  </td>
                 </tr>
               )
             })}
           </tbody>
         </table>
-        <button
-          type="button"
-          onClick={addBaseRow}
-          className="mt-2 text-xs text-blue-600 hover:text-blue-700 font-medium"
-        >
-          ＋ Add base material
-        </button>
       </div>
       )}
 
