@@ -231,13 +231,11 @@ export default function MasterMaterialRates() {
       {view === 'misc' ? (
         <MiscRatesPanel />
       ) : view === 'cat' ? (
-        <div className="flex-1 min-h-0 overflow-auto">
-          <TaxonomyManager scope="material" kind="category" />
-        </div>
+        // TaxonomyManager has its own scroll region — no extra overflow wrapper
+        // (that caused a double scrollbar on the taller Sub-Categories list).
+        <TaxonomyManager scope="material" kind="category" />
       ) : view === 'sub' ? (
-        <div className="flex-1 min-h-0 overflow-auto">
-          <TaxonomyManager scope="material" kind="subcategory" />
-        </div>
+        <TaxonomyManager scope="material" kind="subcategory" />
       ) : (
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
         <div className="flex flex-wrap items-center gap-3 px-3 py-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
@@ -285,7 +283,10 @@ export default function MasterMaterialRates() {
                 {!isVendorView && !isArchivedView && (
                   <th className="px-3 py-2 font-semibold text-center">Default</th>
                 )}
-                <th className="px-3 py-2 w-36" />
+                {/* Greedy trailing column soaks up extra width so Code…Price pack
+                    to the left (moves the Unit column left instead of stretching
+                    the Description column). */}
+                <th className="px-3 py-2 w-full" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -324,7 +325,7 @@ export default function MasterMaterialRates() {
                       <td className="px-3 py-1.5 text-gray-600 whitespace-nowrap">
                         {r.m.subcategory?.name || '—'}
                       </td>
-                      <td className="px-3 py-1.5 text-gray-900 font-medium">
+                      <td className="px-3 py-1.5 text-gray-900 font-medium max-w-[22rem]">
                         {r.m.description}
                         {r.m.collection && (
                           <span className="ml-1.5 text-[10px] px-1 py-0.5 rounded bg-gray-100 text-gray-500">

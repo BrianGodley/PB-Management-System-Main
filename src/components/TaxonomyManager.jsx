@@ -204,7 +204,7 @@ export default function TaxonomyManager({ kind = 'category', scope = 'material' 
                 {isCat && <Th k="subcats" label="Sub-Categories" align="center" />}
                 {!isCat && <Th k="category" label="Category" />}
                 {cfg.hasMaterials && <Th k="items" label="Items" align="center" />}
-                {cfg.hasVendor && <Th k="vendor" label="Default Vendor" />}
+                {cfg.hasVendor && <th className="px-3 py-2 font-semibold text-left">Vendor</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -230,11 +230,7 @@ export default function TaxonomyManager({ kind = 'category', scope = 'material' 
                     {isCat && <CountCell n={subCount(row)} onClick={() => openSubList(row)} />}
                     {!isCat && <td className="px-3 py-1.5 text-gray-600">{catName(row.category_id)}</td>}
                     {cfg.hasMaterials && <CountCell n={itemCount(row)} onClick={() => openItemsList(row)} />}
-                    {cfg.hasVendor && (
-                      <td className="px-3 py-1.5 text-gray-600">
-                        {row.default_vendor_id ? vendName(row.default_vendor_id) : 'Standard'}
-                      </td>
-                    )}
+                    {cfg.hasVendor && <td className="px-3 py-1.5 text-gray-600">Standard</td>}
                   </tr>
                 ))
               )}

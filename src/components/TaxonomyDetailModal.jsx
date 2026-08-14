@@ -71,17 +71,8 @@ export default function TaxonomyDetailModal({
     setBusy(true)
     const table = isCat ? cfg.catTable : cfg.subTable
     const payload = isCat
-      ? {
-          code: form.code,
-          name: form.name,
-          ...(cfg.hasVendor ? { default_vendor_id: form.default_vendor_id || null } : {}),
-        }
-      : {
-          category_id: form.category_id,
-          code: form.code,
-          name: form.name,
-          ...(cfg.hasVendor ? { default_vendor_id: form.default_vendor_id || null } : {}),
-        }
+      ? { code: form.code, name: form.name }
+      : { category_id: form.category_id, code: form.code, name: form.name }
     if (row) await supabase.from(table).update(payload).eq('id', row.id)
     else await supabase.from(table).insert(payload)
     setBusy(false)
@@ -134,7 +125,7 @@ export default function TaxonomyDetailModal({
               {!isCat && <Field label="Category" value={catName(row.category_id)} />}
               <Field label="Code" value={row.code} />
               <Field label="Name" value={row.name} />
-              {cfg.hasVendor && <Field label="Default Vendor" value={row.default_vendor_id ? vendName(row.default_vendor_id) : 'Standard'} />}
+              {cfg.hasVendor && <Field label="Vendor" value="Standard" />}
               {cfg.hasMaterials && <Field label="Items" value={String(itemCount)} />}
               {isCat && <Field label="Sub-Categories" value={String(subCnt)} />}
             </>
@@ -175,23 +166,6 @@ export default function TaxonomyDetailModal({
                   />
                 </label>
               </div>
-              {cfg.hasVendor && (
-                <label className="block">
-                  <span className="text-xs text-gray-500">Default Vendor</span>
-                  <select
-                    className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm bg-white"
-                    value={form.default_vendor_id || ''}
-                    onChange={e => setF('default_vendor_id', e.target.value)}
-                  >
-                    <option value="">Standard</option>
-                    {vendors.map(v => (
-                      <option key={v.id} value={v.id}>
-                        {v.company_name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
             </>
           )}
         </div>
