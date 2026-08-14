@@ -55,6 +55,7 @@ const navItems = [
   { path: '/jobs', label: 'Jobs', icon: '🏡' },
   { path: '/equipment-tracking', label: 'Equipment', icon: <SkidSteerIcon /> },
   { path: '/portal/subs', label: 'Subcontractors', icon: '🧑‍🔧' },
+  { path: '/portal/sub-leads', label: 'Subcontractor Leads', icon: '🕵️' },
   { path: '/portal/vendors', label: 'Vendors', icon: '🛒' },
   { path: '/statistics', label: 'Statistics', icon: '📈' },
 ]
@@ -86,6 +87,7 @@ const forestGreenDark = '#3A5038'
 // Mobile screen titles shown centered in the green bar. Longest path prefix
 // wins (so /portal/subs beats /portal). '/' matches Dashboard exactly.
 const SCREEN_TITLES = [
+  ['/portal/sub-leads', 'Subcontractor Leads'],
   ['/portal/subs', 'Subcontractors'],
   ['/portal/vendors', 'Vendors'],
   ['/daily-logs', 'Daily Logs'],
@@ -223,6 +225,7 @@ export default function Layout() {
     { path: '/design', label: 'Design', icon: '📐' },
     { path: '/statistics', label: t('statistics'), icon: '📈' },
     { path: '/portal/subs', label: 'Subcontractors', icon: '🧑‍🔧' },
+    { path: '/portal/sub-leads', label: 'Subcontractor Leads', icon: '🕵️' },
     { path: '/portal/vendors', label: 'Vendors', icon: '🛒' },
     { path: '/hr', label: 'Employees', icon: '🏢' },
   ]

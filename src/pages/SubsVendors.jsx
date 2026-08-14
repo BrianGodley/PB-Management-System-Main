@@ -286,7 +286,7 @@ async function fetchSubsData() {
 }
 
 // ── Main Page ────────────────────────────────────────────────
-export default function SubsVendors({ mode = 'sub' }) {
+export default function SubsVendors({ mode = 'sub', leads = false }) {
   // Cached data — instant on revisit; refresh() forces a refetch after writes.
   const { data: subsData, loading, refresh } = useCachedData('subs_vendors:all', fetchSubsData)
   const subs = subsData ?? []
@@ -529,6 +529,9 @@ export default function SubsVendors({ mode = 'sub' }) {
       supplied_categories: form.supplied_categories || [],
       general_categories: form.general_categories || [],
       updated_at: new Date().toISOString(),
+      // New records inherit the lead flag of the view they were created in;
+      // existing records keep their flag (promotion happens via makePermanent).
+      is_lead: editSub ? (editSub.is_lead || false) : (mode === 'sub' ? leads : false),
     }
     const { error } = editSub
       ? await supabase.from('subs_vendors').update(payload).eq('id', editSub.id)
@@ -548,6 +551,14 @@ export default function SubsVendors({ mode = 'sub' }) {
         .eq('vendor_id', editSub.id)
     }
     setSaving(false)
+    closeModal()
+    refresh()
+  }
+
+  // Promote a lead into the main subcontractor directory.
+  async function makePermanent(sub) {
+    if (!sub) return
+    await supabase.from('subs_vendors').update({ is_lead: false }).eq('id', sub.id)
     closeModal()
     refresh()
   }
@@ -871,6 +882,9 @@ export default function SubsVendors({ mode = 'sub' }) {
   // Filter + search
   const filtered = subs
     .filter(s => (s.type || 'sub') === mode)
+    // Subcontractor Leads live in the same table flagged is_lead; keep them out of
+    // the main directory and vice-versa.
+    .filter(s => mode !== 'sub' || !!s.is_lead === leads)
     .filter(s => {
       const q = search.toLowerCase()
       return (
@@ -969,7 +983,7 @@ export default function SubsVendors({ mode = 'sub' }) {
         <div className="flex items-center gap-2 pr-2 flex-shrink-0">
           {mode === 'sub' ? (
             <button onClick={() => openNew('sub')} className="btn-primary text-xs px-3 py-1.5 whitespace-nowrap">
-              + Add Subcontractor
+              {leads ? '+ Add Lead' : '+ Add Subcontractor'}
             </button>
           ) : (
             <button onClick={() => openNew('vendor')} className="btn-primary text-xs px-3 py-1.5 whitespace-nowrap">
@@ -1323,7 +1337,7 @@ export default function SubsVendors({ mode = 'sub' }) {
                       <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">
                         {mode === 'sub' ? 'Trades' : 'Offers'}
                       </th>
-                      {mode === 'sub' && (
+                      {mode === 'sub' && !leads && (
                         <>
                           <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">
                             Category
@@ -1367,7 +1381,7 @@ export default function SubsVendors({ mode = 'sub' }) {
                               ', '
                             ) || <span className="text-gray-300 italic">—</span>}
                           </td>
-                          {mode === 'sub' && (
+                          {mode === 'sub' && !leads && (
                             <>
                               <td className="px-4 py-2 text-gray-600 truncate">
                                 {(ratesByVendor[sub.id]?.categories || []).join(', ') || (
@@ -1781,6 +1795,10 @@ export default function SubsVendors({ mode = 'sub' }) {
               recordType={form.type}
               recordId={editSub?.id}
               mode={mode}
+              leads={leads}
+              onMakePermanent={
+                leads && editSub ? () => makePermanent(editSub) : null
+              }
               materialCategories={materialCategories}
               generalCategories={generalCategories}
             />
@@ -1812,6 +1830,8 @@ function SubModal({
   recordType,
   recordId,
   mode = 'sub',
+  leads = false,
+  onMakePermanent = null,
   materialCategories = [],
   generalCategories = [],
 }) {
@@ -2281,7 +2301,8 @@ function SubModal({
             </div>
           </div>
 
-          {/* Status */}
+          {/* Status — hidden for leads (not yet a vetted sub) */}
+          {!leads && (
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
             <select
@@ -2296,6 +2317,7 @@ function SubModal({
               ))}
             </select>
           </div>
+          )}
 
           {/* Trades (subs only — vendors use the Materials tab / Categories Supplied) */}
           {recordType === 'sub' && (
@@ -2451,6 +2473,15 @@ function SubModal({
                 Edit
               </button>
             ))}
+          {leads && onMakePermanent && (
+            <button
+              onClick={onMakePermanent}
+              className="px-5 py-3 text-sm rounded-lg bg-green-700 text-white font-semibold hover:bg-green-800"
+              title="Move this lead into the main subcontractor directory"
+            >
+              Make Permanent
+            </button>
+          )}
           <button
             onClick={onClose}
             className="px-5 py-3 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
