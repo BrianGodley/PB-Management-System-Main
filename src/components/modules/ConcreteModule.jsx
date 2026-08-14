@@ -18,7 +18,7 @@ import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { SubRateOverrideProvider } from '../SubRateOverrideContext.jsx'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
-import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
+import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 import UnpricedItemModal, { makePriceLookup } from '../UnpricedItemModal'
 import NewCatalogItemModal from '../NewCatalogItemModal'
@@ -83,13 +83,9 @@ const INSTALL_TIERS = [
 
 // ── Company/estimate defaults (NOT per-item rates) ───────────────────────────
 // Every material/labor/sub RATE is now read live from its table with no
-// hardcoded fallback (guaranteed to exist via supabase-concrete-fallbacks-seed.sql).
-// Only the estimate-level financial defaults remain here.
-const R = {
-  laborBurdenPct: 0.29,
-  gpmd: 425,
-  commissionRate: 0.12,
-}
+// hardcoded fallback. The estimate-level financials (labor rate, burden, GPMD,
+// commission, sub GP markup, walk pace) are sourced from company_settings — no
+// hardcoded code defaults.
 
 // Base Install ('Concrete Base') and Concrete Install mix ('Concrete Mix') source
 // their Type options AND price/description entirely from the catalog, per vendor
@@ -117,15 +113,16 @@ const n = v => parseFloat(v) || 0
 
 function calcConcrete(
   state,
-  laborRatePerHour = 35,
+  laborRatePerHour = null,
   lr = {},
   mr = {},
   sr = {},
-  gpmd = R.gpmd,
+  gpmd = null,
   walkAccess = null,
-  laborBurdenPct = R.laborBurdenPct,
+  laborBurdenPct = null,
   materialRows = [],
-  catDefaults = {}
+  catDefaults = {},
+  commissionRate = null
 ) {
   // Per-row/line vendor-aware price resolver. 'Standard' (or a missing/'auto'
   // vendor → the category default) uses the Standard array; a real vendor id →
@@ -148,8 +145,8 @@ function calcConcrete(
   Object.entries(state.rateOverrides || {}).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== '' && Number.isFinite(Number(v))) sr[k] = Number(v)
   })
-  const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
-  const lrph = n(laborRatePerHour) || 35
+  const _pace = parseFloat(walkAccess?.paceLfPerMin) || 0
+  const lrph = n(laborRatePerHour)
 
   // ── Labor production rates (labor_rates) ─────────────────────────────────
   const concreteSFPerHr = n(lr['Concrete - Pour & Finish'])
@@ -379,9 +376,9 @@ function calcConcrete(
     sealerMat +
     manMat
   const laborCost = totalHrs * lrph
-  const burden = laborCost * (n(laborBurdenPct) || R.laborBurdenPct)
-  const gp = manDays * gpmd
-  const commission = gp * R.commissionRate
+  const burden = laborCost * n(laborBurdenPct)
+  const gp = manDays * n(gpmd)
+  const commission = gp * n(commissionRate)
   const subCost = finishSubCost + manSub
   const price = totalMat + laborCost + burden + gp + commission + subCost
 
@@ -504,8 +501,12 @@ const DEFAULT_MANUAL_ROWS = [{ label: '', hours: '', materials: '', subCost: '' 
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function ConcreteModule({ onSave, onBack, saving, initialData }) {
-  const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? 35)
-  const [laborBurdenPct, setLaborBurdenPct] = useState(initialData?.laborBurdenPct ?? R.laborBurdenPct)
+  const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? null)
+  const [laborBurdenPct, setLaborBurdenPct] = useState(initialData?.laborBurdenPct ?? null)
+  const [gpmd, setGpmd] = useState(initialData?.gpmd ?? null)
+  const [subGpMarkupRate, setSubGpMarkupRate] = useState(initialData?.subGpMarkupRate ?? null)
+  const [commissionRate, setCommissionRate] = useState(initialData?.commissionRate ?? null)
+  const [walkPace, setWalkPace] = useState(initialData?.walkAccess?.paceLfPerMin ?? null)
 
   // Free-text notes for this module — Sam writes auto-generated
   // takeoffs here via create_estimate_from_takeoff, and the user can
@@ -513,7 +514,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const [notes, setNotes] = useState(initialData?.notes ?? '')
   const [walkAccess] = useState(
     initialData?.walkAccess ?? {
-      paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+      paceLfPerMin: null,
     }
   )
   // Rate snapshots keyed by name → rate value (restored from saved data if re-editing)
@@ -542,11 +543,15 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     if (initialData?.laborRatePerHour) return
     supabase
       .from('company_settings')
-      .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min')
+      .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min, estimate_gpmd_default, commission_rate, sub_gp_markup_rate')
       .single()
       .then(({ data }) => {
-        if (data?.labor_rate_per_hour != null) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || 35)
+        if (data?.labor_rate_per_hour != null) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour))
         if (data?.labor_burden_pct != null) setLaborBurdenPct(parseFloat(data.labor_burden_pct))
+        if (data?.walk_access_pace_lf_per_min != null) setWalkPace(parseFloat(data.walk_access_pace_lf_per_min))
+        if (data?.estimate_gpmd_default != null) setGpmd(parseFloat(data.estimate_gpmd_default))
+        if (data?.commission_rate != null) setCommissionRate(parseFloat(data.commission_rate))
+        if (data?.sub_gp_markup_rate != null) setSubGpMarkupRate(parseFloat(data.sub_gp_markup_rate))
       })
   }, [])
 
@@ -737,9 +742,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     baseRows,
     manualRows,
   }
-  const gpmd = initialData?.gpmd ?? R.gpmd
-  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
-
   // ── Vendor catalog helpers (per-line Vendor/Type pickers) ────────────────
   const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
   const defaultVendorFor = cat => vendorsForCategory(cat)[0]?.id || 'Standard'
@@ -825,6 +827,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
       }, 0)
 
   // In-house calc is unchanged — it reads only the in-house state fields.
+  const effWalkAccess = { ...(walkAccess || {}), paceLfPerMin: n(walkAccess?.paceLfPerMin) || walkPace }
   const inHouse = calcConcrete(
     state,
     laborRatePerHour,
@@ -832,10 +835,11 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     materialRates,
     subRates,
     gpmd,
-    walkAccess,
+    effWalkAccess,
     laborBurdenPct,
     materialRows,
-    catDefaults
+    catDefaults,
+    commissionRate
   )
 
   // ── Sub-side cost — a single fully-loaded subcontractor cost figure.
@@ -851,7 +855,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const subFinishCfg = SUB_FINISH_RATES[subFinishType] || null
   const subFinishLaborPerSF = subFinishCfg ? n(subRates[subFinishCfg.labor.name]) : 0
   const subFinishMatPerSF = subFinishCfg?.mat ? n(subRates[subFinishCfg.mat.name]) : 0
-  const lrph = n(laborRatePerHour) || 35
+  const lrph = n(laborRatePerHour)
   // Resolved add-on rates (identical on both tabs — sourced from rate maps).
   const {
     rebarSFPerHr,
@@ -919,7 +923,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const _subCost = inHouse.subCost + subSideCost
   const _subGp = _subCost * subGpMarkupRate
   const _gp = inHouse.gp
-  const _commission = (_gp + _subGp) * R.commissionRate
+  const _commission = (_gp + _subGp) * n(commissionRate)
   const _price =
     inHouse.totalMat + inHouse.laborCost + inHouse.burden + _gp + _subCost + _subGp + _commission
   const calcRaw = {
@@ -976,9 +980,12 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
         subSealerType,
         subBaseRows,
         subManualRows,
-        walkAccess,
+        walkAccess: effWalkAccess,
         laborRatePerHour,
+        laborBurdenPct,
         gpmd,
+        subGpMarkupRate,
+        commissionRate,
         laborRates, // ← production rate snapshot
         materialRates, // ← material cost snapshot
         subRates, // ← sub/equipment cost snapshot

@@ -6,7 +6,7 @@ import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
-import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
+import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { useMaterialCatalog, resolveMaterialPrice, catalogOptions } from '../../lib/materialCatalog'
 import { groutCyPerBlock } from '../../lib/cmuGrout'
 
@@ -117,7 +117,6 @@ const DEFAULTS = {
   laborRatePerHour: 35,
   laborBurdenPct: 0.29,
   gpmd: 425,
-  commissionRate: 0.12,
 }
 
 const n = v => parseFloat(v) || 0
@@ -333,7 +332,7 @@ function calcColumns(
   laborBurdenPct = DEFAULTS.laborBurdenPct,
   materialRows = []
 ) {
-  const _pace = parseFloat(walkAccess && walkAccess.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
+  const _pace = n(walkAccess && walkAccess.paceLfPerMin)
   const { difficulty, hoursAdj, cmuCols, pipCols, modularCols, brickCols, finishRows, manualRows } = state
   const isSub = state.subType === 'Subcontractor'
   const { mp, matP } = pxHelpers(materialPrices, materialRows)
@@ -405,19 +404,19 @@ function calcColumns(
   const manDays = totalHrs / 8
   const totalMat = installMat + finishMat + manMat
   const laborCost = totalHrs * laborRatePerHour
-  const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
+  const burden = laborCost * n(laborBurdenPct)
 
   let gp, subCost, subGp, commission, price
   if (isSub) {
     gp = 0
     subCost = totalMat + laborCost + burden + manSub
-    subGp = subCost * (n(state.subGpMarkupRate) || 0.2)
-    commission = subGp * DEFAULTS.commissionRate
+    subGp = subCost * n(state.subGpMarkupRate)
+    commission = subGp * n(state.commissionRate)
     price = subCost + subGp + commission
   } else {
     gp = manDays * gpmd
     subGp = 0
-    commission = gp * DEFAULTS.commissionRate
+    commission = gp * n(state.commissionRate)
     subCost = manSub
     price = totalMat + laborCost + burden + gp + commission + subCost
   }
@@ -582,16 +581,19 @@ const BLANK_FOR = { CMU: blankCmuCol, PIP: blankPipCol, Modular: blankModularCol
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
   const [laborRatePerHour, setLaborRatePerHour] = useState(
-    initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour
+    initialData?.laborRatePerHour ?? null
   )
   const [laborBurdenPct, setLaborBurdenPct] = useState(
-    initialData?.laborBurdenPct ?? DEFAULTS.laborBurdenPct
+    initialData?.laborBurdenPct ?? null
   )
+  const [gpmd, setGpmd] = useState(initialData?.gpmd ?? null)
+  const [subGpMarkupRate, setSubGpMarkupRate] = useState(initialData?.subGpMarkupRate ?? null)
+  const [commissionRate, setCommissionRate] = useState(initialData?.commissionRate ?? null)
 
   const [notes, setNotes] = useState(initialData?.notes ?? '')
   const [walkAccess, setWalkAccess] = useState(
     initialData?.walkAccess ?? {
-      paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+      paceLfPerMin: null,
     }
   )
   const {
@@ -610,26 +612,28 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
     if (!initialData?.laborRatePerHour) {
       supabase
         .from('company_settings')
-        .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min')
+        .select(
+          'labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min, estimate_gpmd_default, sub_gp_markup_rate, commission_rate'
+        )
         .single()
         .then(({ data }) => {
           if (!data) return
           if (data.labor_rate_per_hour != null)
-            setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
+            setLaborRatePerHour(parseFloat(data.labor_rate_per_hour))
           if (data.labor_burden_pct != null) setLaborBurdenPct(parseFloat(data.labor_burden_pct))
+          if (data.estimate_gpmd_default != null) setGpmd(parseFloat(data.estimate_gpmd_default))
+          if (data.sub_gp_markup_rate != null)
+            setSubGpMarkupRate(parseFloat(data.sub_gp_markup_rate))
+          if (data.commission_rate != null) setCommissionRate(parseFloat(data.commission_rate))
           if (data.walk_access_pace_lf_per_min != null) {
             const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
             setWalkAccess({
-              paceLfPerMin:
-                Number.isFinite(_wpace) && _wpace > 0 ? _wpace : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+              paceLfPerMin: Number.isFinite(_wpace) && _wpace > 0 ? _wpace : null,
             })
           }
         })
     }
   }, [initialData?.laborRatePerHour])
-
-  const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
-  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Masonry')
   const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
@@ -729,6 +733,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
       distanceLF,
       subType,
       subGpMarkupRate,
+      commissionRate,
     },
     laborRatePerHour,
     materialPrices,
@@ -816,6 +821,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
         crewType,
         subType,
         subGpMarkupRate,
+        commissionRate,
         laborRatePerHour,
         laborBurdenPct,
         gpmd,

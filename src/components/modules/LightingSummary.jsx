@@ -104,7 +104,7 @@ export default function LightingSummary({ module }) {
   const burden = n(calc.burden)
   const gp = n(calc.gp)
   const subGp = n(calc.subGp)
-  const commission = n(calc.commission) || gp * 0.12
+  const commission = n(calc.commission)
   const subCost = n(calc.subCost)
   const price = n(calc.price)
   const totalWatts = n(calc.totalWatts)

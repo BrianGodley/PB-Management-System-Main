@@ -44,12 +44,8 @@ const LIGHT_CAT = { fixture: 'Light Fixture', transformer: 'Transformer', wire: 
 // missing row means no markup (0).
 const MATERIAL_MARKUP_NAME = 'Lighting - Material Markup'
 
-const DEFAULTS = {
-  laborRatePerHour: 35,
-  laborBurdenPct: 0.29,
-  gpmd: 425,
-  commissionRate: 0.12,
-}
+// Company/estimate financial settings (labor rate, burden %, GPMD, commission,
+// sub GP markup) are sourced live from company_settings — no hardcoded defaults.
 
 const n = v => parseFloat(v) || 0
 
@@ -109,13 +105,14 @@ function processSection(subcat, rows, materialRows, priceOf = item => n(item.uni
 
 function calcLighting(
   state,
-  laborRatePerHour = DEFAULTS.laborRatePerHour,
+  laborRatePerHour,
   materialRows = [],
-  gpmd = DEFAULTS.gpmd,
+  gpmd,
   walkAccess = null,
-  laborBurdenPct = DEFAULTS.laborBurdenPct,
+  laborBurdenPct,
   priceOf = item => n(item.unit_cost),
-  materialMarkup = null
+  materialMarkup = null,
+  commissionRate
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const { difficulty, hoursAdj, fixtureRows, transformerRows, wireRows, manualRows, distanceLF } =
@@ -153,8 +150,8 @@ function calcLighting(
   const manDays = totalHrs / 8
 
   const totalMat = markedUpMat + (isSub ? 0 : manMat)
-  const laborCost = totalHrs * laborRatePerHour
-  const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
+  const laborCost = totalHrs * n(laborRatePerHour)
+  const burden = laborCost * n(laborBurdenPct)
 
   let gp, subGp, commission, subCost, price
   if (isSub) {
@@ -163,13 +160,13 @@ function calcLighting(
     const itemizedSub = fx.sub + xf.sub + wr.sub
     subCost = itemizedSub + manSub
     gp = 0
-    subGp = subCost * (n(state.subGpMarkupRate) || 0.2)
-    commission = subGp * DEFAULTS.commissionRate
+    subGp = subCost * n(state.subGpMarkupRate)
+    commission = subGp * n(commissionRate)
     price = subCost + subGp + commission
   } else {
-    gp = manDays * gpmd
+    gp = manDays * n(gpmd)
     subGp = 0
-    commission = gp * DEFAULTS.commissionRate
+    commission = gp * n(commissionRate)
     subCost = manSub
     price = totalMat + laborCost + burden + gp + commission + subCost
   }
@@ -223,11 +220,14 @@ function SectionHeader({ title }) {
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function LightingModule({ onSave, onBack, saving, initialData }) {
   const [laborRatePerHour, setLaborRatePerHour] = useState(
-    initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour
+    initialData?.laborRatePerHour ?? null
   )
   const [laborBurdenPct, setLaborBurdenPct] = useState(
-    initialData?.laborBurdenPct ?? DEFAULTS.laborBurdenPct
+    initialData?.laborBurdenPct ?? null
   )
+  const [gpmd, setGpmd] = useState(initialData?.gpmd ?? null)
+  const [commissionRate, setCommissionRate] = useState(initialData?.commissionRate ?? null)
+  const [subGpMarkupRate, setSubGpMarkupRate] = useState(initialData?.subGpMarkupRate ?? null)
 
   // Free-text notes for this module — Sam writes auto-generated takeoffs here
   // via create_estimate_from_takeoff, and the user can overwrite / append.
@@ -282,27 +282,28 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
   useEffect(() => {
     let gone = false
     ;(async () => {
-      if (!initialData?.laborRatePerHour) {
-        supabase
-          .from('company_settings')
-          .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min')
-          .single()
-          .then(({ data }) => {
-            if (gone || !data) return
-            if (data.labor_rate_per_hour != null)
-              setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
-            if (data.labor_burden_pct != null) setLaborBurdenPct(parseFloat(data.labor_burden_pct))
-            if (data.walk_access_pace_lf_per_min != null) {
-              const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
-              setWalkAccess({
-                paceLfPerMin:
-                  Number.isFinite(_wpace) && _wpace > 0
-                    ? _wpace
-                    : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
-              })
-            }
-          })
-      }
+      supabase
+        .from('company_settings')
+        .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min, estimate_gpmd_default, commission_rate, sub_gp_markup_rate')
+        .single()
+        .then(({ data }) => {
+          if (gone || !data) return
+          if (!initialData?.laborRatePerHour && data.labor_rate_per_hour != null)
+            setLaborRatePerHour(parseFloat(data.labor_rate_per_hour))
+          if (!initialData?.laborBurdenPct && data.labor_burden_pct != null) setLaborBurdenPct(parseFloat(data.labor_burden_pct))
+          if (initialData?.gpmd == null && data.estimate_gpmd_default != null) setGpmd(parseFloat(data.estimate_gpmd_default))
+          if (initialData?.commissionRate == null && data.commission_rate != null) setCommissionRate(parseFloat(data.commission_rate))
+          if (initialData?.subGpMarkupRate == null && data.sub_gp_markup_rate != null) setSubGpMarkupRate(parseFloat(data.sub_gp_markup_rate))
+          if (!initialData?.walkAccess && data.walk_access_pace_lf_per_min != null) {
+            const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
+            setWalkAccess({
+              paceLfPerMin:
+                Number.isFinite(_wpace) && _wpace > 0
+                  ? _wpace
+                  : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+            })
+          }
+        })
       await refreshCatalog()
       if (!gone) setLoading(false)
     })()
@@ -310,9 +311,6 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
       gone = true
     }
   }, [refreshCatalog])
-
-  const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
-  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
   // ── Shared (not per-tab) fields ──────────────────────────────────────────────
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Landscape')
@@ -392,7 +390,8 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
     walkAccess,
     laborBurdenPct,
     priceOf,
-    materialMarkup
+    materialMarkup,
+    commissionRate
   )
   const _salesTaxAmt = (calcRaw.totalMat || 0) * (salesTaxRate || 0)
   const calc =
@@ -460,6 +459,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
         crewType,
         subType,
         subGpMarkupRate,
+        commissionRate,
         walkAccess,
         laborRatePerHour,
         laborBurdenPct,

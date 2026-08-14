@@ -186,12 +186,8 @@ const EDGING_TYPES = [
   { label: 'Metal',   dbName: 'Metal Edging' },
 ]
 
-const DEFAULTS = {
-  laborRatePerHour: 35,
-  laborBurdenPct: 0.29,
-  gpmd: 425,
-  commissionRate: 0.12,
-}
+// Company/estimate financial settings (labor rate, burden %, GPMD, commission,
+// sub GP markup) are sourced live from company_settings — no hardcoded defaults.
 
 // Sod varieties — Southland Sod Farms wholesale, Zone 2 delivered $/SF (material_rates).
 const SOD_TYPES = [
@@ -259,14 +255,15 @@ function resolveType(label, options, houseArray) {
 // ── Calculation engine ────────────────────────────────────────────────────────
 function calcGroundTreatments(
   state,
-  lrph = DEFAULTS.laborRatePerHour,
+  lrph,
   mp = {},
-  gpmd = DEFAULTS.gpmd,
+  gpmd,
   walkAccess = null,
-  laborBurdenPct = DEFAULTS.laborBurdenPct,
+  laborBurdenPct,
   opts = {},
   materialRows = [],
-  catDefaults = {}
+  catDefaults = {},
+  commissionRate
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   // Sod stays single-choice, so its option list is still supplied via opts.
@@ -659,10 +656,10 @@ function calcGroundTreatments(
     pebbleMat +
     cobbleMat +
     manMat
-  const laborCost = totalHrs * lrph
-  const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
+  const laborCost = totalHrs * n(lrph)
+  const burden = laborCost * n(laborBurdenPct)
   const isSubTab = state.subType === 'Subcontractor'
-  const subMarkup = n(state.subGpMarkupRate) || 0.2
+  const subMarkup = n(state.subGpMarkupRate)
   // On the Sub tab every section is a FLAT subcontractor unit rate sourced from
   // subcontractor_rates (via mp) — $/SF (or $/LF for edging), not hours+material.
   // (Soils is omitted — subcontractors bring their own soil.)
@@ -684,13 +681,13 @@ function calcGroundTreatments(
     gp = 0
     subCost = sectionSubTotal + manSub // flat subcontractor unit rates
     subGp = subCost * subMarkup
-    commission = subGp * DEFAULTS.commissionRate
+    commission = subGp * n(commissionRate)
     price = subCost + subGp + commission
   } else {
-    gp = manDays * gpmd
+    gp = manDays * n(gpmd)
     subCost = manSub
     subGp = 0
-    commission = gp * DEFAULTS.commissionRate
+    commission = gp * n(commissionRate)
     price = totalMat + laborCost + burden + gp + commission + subCost
   }
 
@@ -927,11 +924,14 @@ function makeTab(src = {}) {
 // ── Main component ────────────────────────────────────────────────────────────
 export default function GroundTreatmentsModule({ onSave, onBack, saving, initialData }) {
   const [laborRatePerHour, setLaborRatePerHour] = useState(
-    initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour
+    initialData?.laborRatePerHour ?? null
   )
   const [laborBurdenPct, setLaborBurdenPct] = useState(
-    initialData?.laborBurdenPct ?? DEFAULTS.laborBurdenPct
+    initialData?.laborBurdenPct ?? null
   )
+  const [gpmd, setGpmd] = useState(initialData?.gpmd ?? null)
+  const [commissionRate, setCommissionRate] = useState(initialData?.commissionRate ?? null)
+  const [subGpMarkupRate, setSubGpMarkupRate] = useState(initialData?.subGpMarkupRate ?? null)
 
   // Free-text notes for this module — Sam writes auto-generated
   // takeoffs here via create_estimate_from_takeoff, and the user can
@@ -1005,28 +1005,32 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   }, [])
 
   useEffect(() => {
-    if (!initialData?.laborRatePerHour) {
-      supabase
-        .from('company_settings')
-        .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min')
-        .single()
-        .then(({ data }) => {
-          if (!data) return
-          if (data.labor_rate_per_hour != null)
-            setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
-          if (data.labor_burden_pct != null)
-            setLaborBurdenPct(parseFloat(data.labor_burden_pct))
-          if (data.walk_access_pace_lf_per_min != null) {
-            const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
-            setWalkAccess({
-              paceLfPerMin:
-                Number.isFinite(_wpace) && _wpace > 0
-                  ? _wpace
-                  : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
-            })
-          }
-        })
-    }
+    supabase
+      .from('company_settings')
+      .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min, estimate_gpmd_default, commission_rate, sub_gp_markup_rate')
+      .single()
+      .then(({ data }) => {
+        if (!data) return
+        if (!initialData?.laborRatePerHour && data.labor_rate_per_hour != null)
+          setLaborRatePerHour(parseFloat(data.labor_rate_per_hour))
+        if (!initialData?.laborBurdenPct && data.labor_burden_pct != null)
+          setLaborBurdenPct(parseFloat(data.labor_burden_pct))
+        if (initialData?.gpmd == null && data.estimate_gpmd_default != null)
+          setGpmd(parseFloat(data.estimate_gpmd_default))
+        if (initialData?.commissionRate == null && data.commission_rate != null)
+          setCommissionRate(parseFloat(data.commission_rate))
+        if (initialData?.subGpMarkupRate == null && data.sub_gp_markup_rate != null)
+          setSubGpMarkupRate(parseFloat(data.sub_gp_markup_rate))
+        if (!initialData?.walkAccess && data.walk_access_pace_lf_per_min != null) {
+          const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
+          setWalkAccess({
+            paceLfPerMin:
+              Number.isFinite(_wpace) && _wpace > 0
+                ? _wpace
+                : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+          })
+        }
+      })
     if (initialData?.materialPrices) {
       // Saved estimate: keep the price snapshot, but still load vendors + rows
       // so the per-section vendor pickers work on re-edit.
@@ -1035,9 +1039,6 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     }
     refreshAllRates().then(() => setPricesLoading(false))
   }, [refreshAllRates, loadVendorData])
-
-  const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
-  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Landscape')
@@ -1209,7 +1210,9 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     walkAccess,
     laborBurdenPct,
     { sod: sodOpts },
-    materialRows
+    materialRows,
+    {},
+    commissionRate
   )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
@@ -1280,7 +1283,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       notes,
       man_days: parseFloat(calc.manDays.toFixed(2)),
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
-      data: { ...state, ihData: ihTab, subData: subTab, walkAccess, laborRatePerHour, laborBurdenPct, gpmd, materialPrices, calc },
+      data: { ...state, ihData: ihTab, subData: subTab, walkAccess, laborRatePerHour, laborBurdenPct, gpmd, commissionRate, subGpMarkupRate, materialPrices, calc },
     })
   }
 

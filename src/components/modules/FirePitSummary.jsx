@@ -86,7 +86,7 @@ const WF_META = {
 
 // Gas fixture + gas line material fallbacks (Utilities catalog).
 
-const DEFAULTS = { laborRatePerHour: 35, laborBurdenPct: 0.29, gpmd: 425, commissionRate: 0.12 }
+const DEFAULTS = { laborRatePerHour: 35 }
 
 const n = v => parseFloat(v) || 0
 const fmt = v =>
@@ -136,10 +136,9 @@ export default function FirePitSummary({ module }) {
   } = ih
   const {
     laborRatePerHour = DEFAULTS.laborRatePerHour,
-    gpmd = DEFAULTS.gpmd,
     materialPrices = {},
     materialRows = [],
-    calc: savedCalc = null,
+    calc: savedCalc = {},
   } = data
   // Reference the Sub record so it is available for future breakdown use.
   void sub
@@ -289,11 +288,11 @@ export default function FirePitSummary({ module }) {
     finishMat +
     gasMat +
     manMat
-  const laborCost = totalHrs * laborRatePerHour
-  const burden = laborCost * DEFAULTS.laborBurdenPct
-  const gp = manDays * gpmd
-  const commission = gp * DEFAULTS.commissionRate
-  const price = totalMat + laborCost + burden + gp + commission + manSub
+  const laborCost = n(savedCalc.laborCost)
+  const burden = n(savedCalc.burden)
+  const gp = n(savedCalc.gp)
+  const commission = n(savedCalc.commission)
+  const price = n(savedCalc.price)
 
   const financeRows = [
     { label: 'Materials', value: fmt(totalMat) },

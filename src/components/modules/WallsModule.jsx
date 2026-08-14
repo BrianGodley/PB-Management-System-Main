@@ -8,7 +8,7 @@ import GpmdBar from './GpmdBar'
 import DropdownSelect from '../DropdownSelect'
 import MissingPriceModal from '../MissingPriceModal'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
-import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
+import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { groutCyPerBlock as cmuGroutCyPerBlock } from '../../lib/cmuGrout'
 import {
   useNewMaterialCatalog,
@@ -591,7 +591,7 @@ const WALL_RATE_SPECS = [
   },
 ]
 
-const DEFAULTS = { laborRatePerHour: 35, laborBurdenPct: 0.29, gpmd: 425, commissionRate: 0.12 }
+const DEFAULTS = { laborRatePerHour: 35, laborBurdenPct: 0.29, gpmd: 425 }
 const n = v => parseFloat(v) || 0
 const r2 = x => Math.round(((x || 0) + Number.EPSILON) * 100) / 100
 
@@ -1412,7 +1412,7 @@ function calcWalls(
   materialRows = []
 ) {
   const r = key => n(mp[WALL_RATES[key].db])
-  const _pace = n(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
+  const _pace = n(walkAccess?.paceLfPerMin)
 
   let structuralHrs = 0,
     structuralMat = 0,
@@ -1648,7 +1648,7 @@ function calcWalls(
   const totalSubMat = structuralSubMat + finishSubMat + capSubMat + wpSubMat
 
   const isSubTab = state.subType === 'Subcontractor'
-  const subMarkup = n(state.subGpMarkupRate) || 0.2
+  const subMarkup = n(state.subGpMarkupRate)
   let gp,
     subCost,
     subGp,
@@ -1673,7 +1673,7 @@ function calcWalls(
     gp = 0
     subCost = totalSubMat + manSub
     subGp = subCost * subMarkup
-    commission = subGp * DEFAULTS.commissionRate
+    commission = subGp * n(state.commissionRate)
     price = subCost + subGp + commission
   } else {
     walkHrs = walkHrsIH
@@ -1681,11 +1681,11 @@ function calcWalls(
     manDays = totalHrs / 8
     totalMat = totalMatIH
     laborCost = totalHrs * lrph
-    burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
+    burden = laborCost * n(laborBurdenPct)
     gp = manDays * gpmd
     subCost = manSub
     subGp = 0
-    commission = gp * DEFAULTS.commissionRate
+    commission = gp * n(state.commissionRate)
     price = totalMat + laborCost + burden + gp + commission + subCost
   }
 
@@ -3301,11 +3301,14 @@ function TimberWallEntry({
 // ─────────────────────────────────────────────────────────────────────────────
 export default function WallsModule({ onSave, onBack, saving, initialData }) {
   const [laborRatePerHour, setLaborRatePerHour] = useState(
-    initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour
+    initialData?.laborRatePerHour ?? null
   )
   const [laborBurdenPct, setLaborBurdenPct] = useState(
-    initialData?.laborBurdenPct ?? DEFAULTS.laborBurdenPct
+    initialData?.laborBurdenPct ?? null
   )
+  const [gpmd, setGpmd] = useState(initialData?.gpmd ?? null)
+  const [subGpMarkupRate, setSubGpMarkupRate] = useState(initialData?.subGpMarkupRate ?? null)
+  const [commissionRate, setCommissionRate] = useState(initialData?.commissionRate ?? null)
 
   // Free-text notes for this module — Sam writes auto-generated
   // takeoffs here via create_estimate_from_takeoff, and the user can
@@ -3313,7 +3316,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
   const [notes, setNotes] = useState(initialData?.notes ?? '')
   const [walkAccess, setWalkAccess] = useState(
     initialData?.walkAccess ?? {
-      paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+      paceLfPerMin: null,
     }
   )
   // Shared material catalog — Walls + Basic Materials rates, rows, vendors, and
@@ -3335,28 +3338,29 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
     if (!initialData?.laborRatePerHour) {
       supabase
         .from('company_settings')
-        .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min')
+        .select(
+          'labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min, estimate_gpmd_default, sub_gp_markup_rate, commission_rate'
+        )
         .maybeSingle()
         .then(({ data }) => {
           if (!data) return
           if (data.labor_rate_per_hour != null)
-            setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
+            setLaborRatePerHour(parseFloat(data.labor_rate_per_hour))
           if (data.labor_burden_pct != null) setLaborBurdenPct(parseFloat(data.labor_burden_pct))
+          if (data.estimate_gpmd_default != null) setGpmd(parseFloat(data.estimate_gpmd_default))
+          if (data.sub_gp_markup_rate != null)
+            setSubGpMarkupRate(parseFloat(data.sub_gp_markup_rate))
+          if (data.commission_rate != null) setCommissionRate(parseFloat(data.commission_rate))
           if (data.walk_access_pace_lf_per_min != null) {
             const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
             setWalkAccess({
-              paceLfPerMin:
-                Number.isFinite(_wpace) && _wpace > 0
-                  ? _wpace
-                  : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+              paceLfPerMin: Number.isFinite(_wpace) && _wpace > 0 ? _wpace : null,
             })
           }
         })
     }
   }, [initialData?.laborRatePerHour])
 
-  const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
-  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
   // ── Shared (not per-tab) selections ─────────────────────────────────────────
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Masonry')
@@ -3642,7 +3646,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
 
   // The calc runs against the ACTIVE tab only — entering data on one tab never
   // affects the other. Shared selections (crew/sub type) are merged on top.
-  const state = { crewType, demoCrewType, timberCrewType, subType, subGpMarkupRate, ...cur }
+  const state = { crewType, demoCrewType, timberCrewType, subType, subGpMarkupRate, commissionRate, ...cur }
   const calcRaw = calcWalls(
     state,
     laborRatePerHour,
@@ -3680,6 +3684,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
         subData: subTab,
         subType,
         subGpMarkupRate,
+        commissionRate,
         laborRatePerHour,
         laborBurdenPct,
         gpmd,

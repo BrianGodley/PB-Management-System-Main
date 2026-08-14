@@ -95,7 +95,7 @@ export default function OutdoorKitchenSummary({ module }) {
     subCost: n(c.subCost) || n(module.sub_cost),
     gp,
     subGp,
-    commission: n(c.commission) || (gp + subGp) * 0.12,
+    commission: n(c.commission),
     price: n(c.price) || n(module.total_price),
   }
 

@@ -96,7 +96,7 @@ export default function PlantingSummary({ module }) {
   const burden = n(savedCalc.burden)
   const gp = n(savedCalc.gp)
   const subGp = n(savedCalc.subGp)
-  const commission = n(savedCalc.commission) || gp * 0.12
+  const commission = n(savedCalc.commission)
   const subCost = n(savedCalc.subCost)
   const priceTotal = n(savedCalc.price)
 

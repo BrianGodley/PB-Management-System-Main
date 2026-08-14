@@ -7,7 +7,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import { SubRateOverrideProvider } from '../SubRateOverrideContext.jsx'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
-import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
+import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 
 const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
@@ -18,8 +18,6 @@ const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
 // Labor rates     → labor_rates    (category = 'Pool') keyed by name
 // ─────────────────────────────────────────────────────────────────────────────
 
-const LABOR_BURDEN = 0.29
-const COMMISSION_RATE = 0.12
 
 // ── Tile install types — labor hrs/LF live in labor_rates as 'Tile - <type>' ─
 const TILE_INSTALL_TYPES = [
@@ -465,9 +463,12 @@ function makeInitial(data = {}) {
     ihData: makeTab(data.ihData || data),
     subData: makeTab(data.subData || {}),
     // ── Shared (top-level) fields — never per-tab ──
-    laborRatePerHour: data.laborRatePerHour ?? 35,
-    laborBurdenPct: data.laborBurdenPct ?? LABOR_BURDEN,
-    gpmd: data.gpmd ?? 425,
+    laborRatePerHour: data.laborRatePerHour ?? null,
+    laborBurdenPct: data.laborBurdenPct ?? null,
+    gpmd: data.gpmd ?? null,
+    commissionRate: data.commissionRate ?? null,
+    subGpMarkupRate: data.subGpMarkupRate ?? null,
+    walkPace: data.walkPace ?? null,
     crewType: data.crewType ?? 'Specialty',
     subType: data.subType ?? 'In-House',
     rateOverrides: data.rateOverrides,
@@ -484,7 +485,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     if (v !== undefined && v !== null && v !== '' && Number.isFinite(Number(v))) subRates[k] = Number(v)
   })
 
-  const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
+  const _pace = parseFloat(walkAccess?.paceLfPerMin) || 0
   const {
     pool,
     spa,
@@ -775,7 +776,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   const subTradeCost =
     excavSub + shotcreteSub + interiorSub + equipmentSub + plumbSub + steelSub + manSub
   const laborCost = totalHrs * lrph
-  const burden = laborCost * (n(laborBurdenPct) || LABOR_BURDEN)
+  const burden = laborCost * n(laborBurdenPct)
   // On the Sub tab every itemized cost — the in-house-style material + labor +
   // burden (waterline tile, coping, spillways, raised surfaces, E&P, manual) AND
   // the pool sub trades — IS the subcontractor cost. Roll it all into subCost so
@@ -783,19 +784,20 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   // scope instead of silently dropping the in-house buckets it ignores. The
   // in-house GP model applies only to the In-House tab. Matches the
   // OutdoorKitchen reference; sub-trade computation above is untouched.
-  const subMarkup = n(state.subGpMarkupRate) || 0.2
+  const subMarkup = n(state.subGpMarkupRate)
+  const commissionRateVal = n(state.commissionRate)
   let gp, subCost, subGp, commission, price
   if (isSubTab) {
     gp = 0
     subCost = totalMat + laborCost + burden + subTradeCost
     subGp = subCost * subMarkup
-    commission = subGp * COMMISSION_RATE
+    commission = subGp * commissionRateVal
     price = subCost + subGp + commission
   } else {
     gp = manDays * gpmdVal
     subCost = subTradeCost
     subGp = 0
-    commission = gp * COMMISSION_RATE
+    commission = gp * commissionRateVal
     price = totalMat + laborCost + burden + subCost + gp + commission
   }
 
@@ -973,17 +975,29 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
     let alive = true
     supabase
       .from('company_settings')
-      .select('labor_rate_per_hour, labor_burden_pct')
+      .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min, estimate_gpmd_default, commission_rate, sub_gp_markup_rate')
       .single()
       .then(({ data }) => {
         if (!alive || !data) return
         setState(s => ({
           ...s,
           ...(data.labor_rate_per_hour != null
-            ? { laborRatePerHour: parseFloat(data.labor_rate_per_hour) || 35 }
+            ? { laborRatePerHour: parseFloat(data.labor_rate_per_hour) }
             : {}),
           ...(data.labor_burden_pct != null
             ? { laborBurdenPct: parseFloat(data.labor_burden_pct) }
+            : {}),
+          ...(data.estimate_gpmd_default != null
+            ? { gpmd: parseFloat(data.estimate_gpmd_default) }
+            : {}),
+          ...(data.commission_rate != null
+            ? { commissionRate: parseFloat(data.commission_rate) }
+            : {}),
+          ...(data.sub_gp_markup_rate != null
+            ? { subGpMarkupRate: parseFloat(data.sub_gp_markup_rate) }
+            : {}),
+          ...(data.walk_access_pace_lf_per_min != null
+            ? { walkPace: parseFloat(data.walk_access_pace_lf_per_min) }
             : {}),
         }))
       })
@@ -1078,12 +1092,15 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
   const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
   const setEpRows = key => fn => updT(key, arr => fn(arr || []))
 
-  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
   // Effective calc input: shared top-level fields + the active tab's inputs.
   // calcPool reads its input fields off this merged object, so the running
   // total reflects only the tab currently being edited.
-  const eff = { ...state, ...T, subGpMarkupRate }
-  const calcRaw = calcPool(eff, materialPrices, laborRates, subRates, state.walkAccess, materialRows)
+  const eff = { ...state, ...T }
+  const effWalkAccess = {
+    ...(state.walkAccess || {}),
+    paceLfPerMin: n(state.walkAccess?.paceLfPerMin) || n(state.walkPace),
+  }
+  const calcRaw = calcPool(eff, materialPrices, laborRates, subRates, effWalkAccess, materialRows)
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
@@ -1650,7 +1667,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             commission={calc.commission}
             price={calc.price}
             gpmd={n(state.gpmd)}
-            subMarkupRate={subGpMarkupRate}
+            subMarkupRate={n(state.subGpMarkupRate)}
           />
         </div>
         <div className="px-6 py-2">

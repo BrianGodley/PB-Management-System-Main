@@ -88,7 +88,9 @@ export default function GpmdBar({
   // ITS side's total: In-House = labour+burden+materials+GP; Sub = subCost+SubGP.
   // 'full' (project/estimate) combines everything.
   const commBase = isSubView ? subGp : isInhouseView ? effectiveGp : effectiveGp + subGp
-  const effectiveComm = directCommission != null ? directCommission : commBase * 0.12
+  // Commission is passed in by every module (sourced from company_settings);
+  // no hardcoded rate here — absent value contributes 0.
+  const effectiveComm = directCommission != null ? directCommission : 0
   const effectivePrice = directPrice != null
     ? directPrice
     : isSubView

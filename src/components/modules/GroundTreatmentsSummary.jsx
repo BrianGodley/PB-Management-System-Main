@@ -722,7 +722,7 @@ export default function GroundTreatmentsSummary({ module }) {
   const laborCost = n(savedCalc.laborCost) || totalHrs * n(laborRatePerHour)
   const burden = n(savedCalc.burden)
   const gp = n(savedCalc.gp)
-  const commission = n(savedCalc.commission) || gp * 0.12
+  const commission = n(savedCalc.commission)
   const subCost = n(savedCalc.subCost)
   const priceTotal = n(savedCalc.price)
 

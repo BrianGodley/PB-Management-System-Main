@@ -44,7 +44,6 @@ const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
 // Sub) — only the active tab's entered rows contribute.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const DEFAULTS = { laborRatePerHour: 35, laborBurdenPct: 0.29, gpmd: 425, commissionRate: 0.12 }
 const n = v => parseFloat(v) || 0
 const fmt2 = v => `$${(n(v)).toFixed(2)}`
 
@@ -165,10 +164,11 @@ function calcSteps(
   laborRates,
   materialRates,
   materialRows,
-  gpmd = DEFAULTS.gpmd,
+  gpmd,
   walkAccess = null,
-  laborBurdenPct = DEFAULTS.laborBurdenPct,
-  subGpMarkupRate = 0.2,
+  laborBurdenPct,
+  subGpMarkupRate,
+  commissionRate,
   priceOf = item => n(item?.unit_cost)
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
@@ -237,12 +237,12 @@ function calcSteps(
   // per-LF sub price, so they never contribute to material.
   const totalMat = stepMat + concMat + manMat
 
-  const laborCost = totalHrs * (n(lrph) || DEFAULTS.laborRatePerHour)
-  const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
+  const laborCost = totalHrs * n(lrph)
+  const burden = laborCost * n(laborBurdenPct)
   const gp = manDays * gpmd
   const subCost = subRowCost + manSub
   const subGp = subCost * subGpMarkupRate
-  const commission = (gp + subGp) * DEFAULTS.commissionRate
+  const commission = (gp + subGp) * n(commissionRate)
   const price = totalMat + laborCost + burden + gp + subCost + subGp + commission
 
   return {
@@ -816,10 +816,10 @@ const DEFAULT_MANUAL_ROWS = [{ label: '', hours: '', materials: '', subCost: '' 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function StepsModule({ onSave, onBack, saving, initialData }) {
   const [laborRatePerHour, setLaborRatePerHour] = useState(
-    initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour
+    initialData?.laborRatePerHour ?? null
   )
   const [laborBurdenPct, setLaborBurdenPct] = useState(
-    initialData?.laborBurdenPct ?? DEFAULTS.laborBurdenPct
+    initialData?.laborBurdenPct ?? null
   )
 
   const [notes, setNotes] = useState(initialData?.notes ?? '')
@@ -877,7 +877,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           .single()
           .then(({ data }) => {
             if (!gone && data?.labor_rate_per_hour != null)
-              setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
+              setLaborRatePerHour(parseFloat(data.labor_rate_per_hour))
             if (!gone && data?.labor_burden_pct != null)
               setLaborBurdenPct(parseFloat(data.labor_burden_pct))
           }),
@@ -904,8 +904,40 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
     }
   }, [materialRows, asOfDate])
 
-  const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
-  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
+  // Estimate-level financial defaults (commission, GPMD, sub-GP markup) sourced
+  // live from company_settings — no hardcoded code fallback. Fetched even when
+  // re-editing so estimates saved before these were persisted still get a rate.
+  const [commissionRate, setCommissionRate] = useState(initialData?.commissionRate ?? null)
+  const [gpmdDefault, setGpmdDefault] = useState(null)
+  const [subGpMarkupRateDefault, setSubGpMarkupRateDefault] = useState(null)
+  useEffect(() => {
+    if (
+      initialData?.commissionRate != null &&
+      initialData?.gpmd != null &&
+      initialData?.subGpMarkupRate != null
+    )
+      return
+    let alive = true
+    supabase
+      .from('company_settings')
+      .select('commission_rate, sub_gp_markup_rate, estimate_gpmd_default')
+      .single()
+      .then(({ data }) => {
+        if (!alive || !data) return
+        if (initialData?.commissionRate == null && data.commission_rate != null)
+          setCommissionRate(parseFloat(data.commission_rate))
+        if (initialData?.gpmd == null && data.estimate_gpmd_default != null)
+          setGpmdDefault(parseFloat(data.estimate_gpmd_default))
+        if (initialData?.subGpMarkupRate == null && data.sub_gp_markup_rate != null)
+          setSubGpMarkupRateDefault(parseFloat(data.sub_gp_markup_rate))
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const gpmd = initialData?.gpmd ?? gpmdDefault
+  const subGpMarkupRate = initialData?.subGpMarkupRate ?? subGpMarkupRateDefault
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [difficulty, setDifficulty] = useState(initialData?.difficulty ?? '')
@@ -983,6 +1015,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
     walkAccess,
     laborBurdenPct,
     subGpMarkupRate,
+    commissionRate,
     priceOf
   )
   const _salesTaxAmt = (calcRaw.totalMat || 0) * (salesTaxRate || 0)
@@ -1021,6 +1054,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         laborBurdenPct,
         gpmd,
         subGpMarkupRate,
+        commissionRate,
         laborRates,
         materialRates,
         materialRows,

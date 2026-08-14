@@ -49,9 +49,10 @@ function calcDemo(
   laborRates,
   subMarkupRate = 0.35,
   subRates = {},
-  gpmd = 425,
+  gpmd,
   walkAccess = null,
-  laborBurdenPct = 0.29
+  laborBurdenPct,
+  commissionRate
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const mp = materialPrices || {}
@@ -76,7 +77,7 @@ function calcDemo(
   const access = 1 // access modifier removed
   const isSub = state.dumpType === 'Subcontractor'
   const isDumpSub = false // disposal follows the In House/Sub toggle
-  const lrph = n(laborRatePerHour) || 35
+  const lrph = n(laborRatePerHour)
   const difficultyRatio = n(lr['Demo - Hand Difficulty Ratio'])
   const diff = 1 + (n(state.difficulty) / 100) * difficultyRatio
   const hrsAdj = n(state.hoursAdj)
@@ -318,7 +319,7 @@ function calcDemo(
   // ── Financials ────────────────────────────────────────────────────────────
   const manDays = totalHrs / 8
   const laborCost = totalHrs * lrph
-  const burden = laborCost * (n(laborBurdenPct) || 0.29)
+  const burden = laborCost * n(laborBurdenPct)
   // Hauling (Subcontractor) — 12-yard loads × per-load rate (sub cost, pre-GP markup).
   const haulTrashRate = n(sr['Demo - Hand Sub Haul - Trash 12yd'])
   const haulConcreteRate = n(sr['Demo - Hand Sub Haul - Concrete 12yd'])
@@ -381,7 +382,7 @@ function calcDemo(
   // project/estimate GPMD stays the base rate (no double-count of Sub GP).
   const subGp = subCost * subMarkupRate
   const gp = manDays * gpmd
-  const commission = (gp + subGp) * 0.12
+  const commission = (gp + subGp) * n(commissionRate)
   const price = laborCost + burden + totalMat + gp + subGp + commission + subCost
 
   return {
@@ -645,8 +646,8 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
   const [notes, setNotes] = useState(initialData?.notes ?? '')
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices || {})
   const [laborRates, setLaborRates] = useState(initialData?.laborRates || {})
-  const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? 35)
-  const [laborBurdenPct, setLaborBurdenPct] = useState(initialData?.laborBurdenPct ?? 0.29)
+  const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? null)
+  const [laborBurdenPct, setLaborBurdenPct] = useState(initialData?.laborBurdenPct ?? null)
   const [walkAccess] = useState(
     initialData?.walkAccess ?? {
       paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
@@ -688,6 +689,38 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
     fetchSalesTaxRate().then(r => {
       if (alive) setSalesTaxRate(r)
     })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  // Estimate-level financial defaults (commission, GPMD, sub-GP markup) sourced
+  // live from company_settings — no hardcoded code fallback. Fetched even when
+  // re-editing so estimates saved before these were persisted still get a rate.
+  const [commissionRate, setCommissionRate] = useState(initialData?.commissionRate ?? null)
+  const [gpmdDefault, setGpmdDefault] = useState(null)
+  const [subGpMarkupRateDefault, setSubGpMarkupRateDefault] = useState(null)
+  useEffect(() => {
+    if (
+      initialData?.commissionRate != null &&
+      initialData?.gpmd != null &&
+      initialData?.subGpMarkupRate != null
+    )
+      return
+    let alive = true
+    supabase
+      .from('company_settings')
+      .select('commission_rate, sub_gp_markup_rate, estimate_gpmd_default')
+      .single()
+      .then(({ data }) => {
+        if (!alive || !data) return
+        if (initialData?.commissionRate == null && data.commission_rate != null)
+          setCommissionRate(parseFloat(data.commission_rate))
+        if (initialData?.gpmd == null && data.estimate_gpmd_default != null)
+          setGpmdDefault(parseFloat(data.estimate_gpmd_default))
+        if (initialData?.subGpMarkupRate == null && data.sub_gp_markup_rate != null)
+          setSubGpMarkupRateDefault(parseFloat(data.sub_gp_markup_rate))
+      })
     return () => {
       alive = false
     }
@@ -735,7 +768,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             .then(({ data }) => {
               if (!gone && data) {
                 if (data.labor_rate_per_hour != null)
-                  setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || 35)
+                  setLaborRatePerHour(parseFloat(data.labor_rate_per_hour))
                 if (data.labor_burden_pct != null)
                   setLaborBurdenPct(parseFloat(data.labor_burden_pct))
                 if (data.sub_markup_rate != null)
@@ -771,8 +804,8 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
     []
   )
 
-  const gpmd = initialData?.gpmd ?? 425
-  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
+  const gpmd = initialData?.gpmd ?? gpmdDefault
+  const subGpMarkupRate = initialData?.subGpMarkupRate ?? subGpMarkupRateDefault
   const calcRaw = calcDemo(
     state,
     laborRatePerHour,
@@ -782,7 +815,8 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
     subRates,
     gpmd,
     walkAccess,
-    laborBurdenPct
+    laborBurdenPct,
+    commissionRate
   )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
@@ -830,6 +864,8 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
         laborRatePerHour,
         laborBurdenPct,
         gpmd,
+        subGpMarkupRate,
+        commissionRate,
         materialPrices,
         laborRates,
         subRates,

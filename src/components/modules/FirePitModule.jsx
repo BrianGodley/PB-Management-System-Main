@@ -6,7 +6,7 @@ import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
-import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
+import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { groutCuFtPerBlock } from '../../lib/cmuGrout'
 import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 
@@ -78,7 +78,6 @@ const DEFAULTS = {
   laborRatePerHour: 35,
   laborBurdenPct: 0.29,
   gpmd: 425,
-  commissionRate: 0.12,
 }
 
 const n = v => parseFloat(v) || 0
@@ -596,7 +595,7 @@ function calcFirePit(
   walkAccess = null,
   laborBurdenPct = DEFAULTS.laborBurdenPct
 ) {
-  const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
+  const _pace = n(walkAccess?.paceLfPerMin)
   const {
     difficulty,
     hoursAdj,
@@ -726,23 +725,23 @@ function calcFirePit(
   const totalMat = structureMatVal + capMat + finishMat + epMat + manMat
 
   const laborCost = totalHrs * lrph
-  const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
+  const burden = laborCost * n(laborBurdenPct)
   // On the Sub tab the itemized scope's cost IS the subcontractor cost — labor +
   // burden + material + any manual sub — and profit is the markup (Sub GP). The
   // in-house GP model applies only to the In-House tab.
-  const subMarkup = n(state.subGpMarkupRate) || 0.2
+  const subMarkup = n(state.subGpMarkupRate)
   let gp, subCost, subGp, commission, price
   if (isSubTab) {
     gp = 0
     subCost = totalMat + laborCost + burden + manSub
     subGp = subCost * subMarkup
-    commission = subGp * DEFAULTS.commissionRate
+    commission = subGp * n(state.commissionRate)
     price = subCost + subGp + commission
   } else {
     gp = manDays * gpmd
     subCost = manSub
     subGp = 0
-    commission = gp * DEFAULTS.commissionRate
+    commission = gp * n(state.commissionRate)
     price = totalMat + laborCost + burden + gp + commission + subCost
   }
 
@@ -888,11 +887,14 @@ function makeTab(src = {}) {
 // ── Main component ────────────────────────────────────────────────────────────
 export default function FirePitModule({ onSave, onBack, saving, initialData }) {
   const [laborRatePerHour, setLaborRatePerHour] = useState(
-    initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour
+    initialData?.laborRatePerHour ?? null
   )
   const [laborBurdenPct, setLaborBurdenPct] = useState(
-    initialData?.laborBurdenPct ?? DEFAULTS.laborBurdenPct
+    initialData?.laborBurdenPct ?? null
   )
+  const [gpmd, setGpmd] = useState(initialData?.gpmd ?? null)
+  const [subGpMarkupRate, setSubGpMarkupRate] = useState(initialData?.subGpMarkupRate ?? null)
+  const [commissionRate, setCommissionRate] = useState(initialData?.commissionRate ?? null)
 
   // Free-text notes for this module — Sam writes auto-generated
   // takeoffs here via create_estimate_from_takeoff, and the user can
@@ -900,7 +902,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
   const [notes, setNotes] = useState(initialData?.notes ?? '')
   const [walkAccess, setWalkAccess] = useState(
     initialData?.walkAccess ?? {
-      paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+      paceLfPerMin: null,
     }
   )
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
@@ -946,21 +948,24 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
     if (!initialData?.laborRatePerHour) {
       supabase
         .from('company_settings')
-        .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min')
+        .select(
+          'labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min, estimate_gpmd_default, sub_gp_markup_rate, commission_rate'
+        )
         .single()
         .then(({ data }) => {
           if (!data) return
           if (data.labor_rate_per_hour != null)
-            setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
+            setLaborRatePerHour(parseFloat(data.labor_rate_per_hour))
           if (data.labor_burden_pct != null)
             setLaborBurdenPct(parseFloat(data.labor_burden_pct))
+          if (data.estimate_gpmd_default != null) setGpmd(parseFloat(data.estimate_gpmd_default))
+          if (data.sub_gp_markup_rate != null)
+            setSubGpMarkupRate(parseFloat(data.sub_gp_markup_rate))
+          if (data.commission_rate != null) setCommissionRate(parseFloat(data.commission_rate))
           if (data.walk_access_pace_lf_per_min != null) {
             const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
             setWalkAccess({
-              paceLfPerMin:
-                Number.isFinite(_wpace) && _wpace > 0
-                  ? _wpace
-                  : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+              paceLfPerMin: Number.isFinite(_wpace) && _wpace > 0 ? _wpace : null,
             })
           }
         })
@@ -968,9 +973,6 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
     // Always refresh the catalog on open so newly-added Master Rates items appear.
     refreshAllRates().then(() => setPricesLoading(false))
   }, [refreshAllRates])
-
-  const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
-  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Masonry')
@@ -1064,7 +1066,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
     }
   }, [])
 
-  const state = { crewType, subType, subGpMarkupRate, ...cur }
+  const state = { crewType, subType, subGpMarkupRate, commissionRate, ...cur }
   const calcRaw = calcFirePit(
     state,
     laborRatePerHour,

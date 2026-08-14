@@ -42,7 +42,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
-import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
+import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import {
   fetchPriceLedgerAsOf,
   ledgerPrice,
@@ -97,20 +97,21 @@ function calcPaver(
   laborRates,
   materialRates,
   paverPrices,
-  gpmd = 425,
+  gpmd = null,
   walkAccess = null,
-  laborBurdenPct = 0.29,
+  laborBurdenPct = null,
   materialRows = [],
-  priceOf = item => n(item?.unit_cost)
+  priceOf = item => n(item?.unit_cost),
+  commissionRate = null
 ) {
   const lr = laborRates || {}
   const mr = materialRates || {}
   const pp = paverPrices || []
   // Walk-access pace is now a Paver-specific editable labor rate (LF/min).
   const walkPace =
-    lr['Paver - Walk Access Pace'] ??
-    parseFloat(walkAccess?.paceLfPerMin) ??
-    DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
+    n(lr['Paver - Walk Access Pace']) ||
+    parseFloat(walkAccess?.paceLfPerMin) ||
+    0
 
   // Labor rates — live from labor_rates, no hardcoded fallback.
   const installRate = n(lr['Paver - Install'])
@@ -395,11 +396,11 @@ function calcPaver(
 
   // ── Financials ────────────────────────────────────────────────────────────────
   const manDays = totalHrs / 8
-  const lrph = n(laborRatePerHour) || 35
+  const lrph = n(laborRatePerHour)
   const laborCost = totalHrs * lrph
-  const burden = laborCost * (n(laborBurdenPct) || 0.29)
-  const gp = manDays * gpmd
-  const commission = gp * 0.12
+  const burden = laborCost * n(laborBurdenPct)
+  const gp = manDays * n(gpmd)
+  const commission = gp * n(commissionRate)
   const subCost = manualSub
   const price = laborCost + burden + totalMat + gp + commission + subCost
 
@@ -669,11 +670,15 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   const [notes, setNotes] = useState(initialData?.notes ?? '')
   const [laborRates, setLaborRates] = useState(initialData?.laborRates || {})
   const [materialRates, setMaterialRates] = useState(initialData?.materialRates || {})
-  const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? 35)
-  const [laborBurdenPct, setLaborBurdenPct] = useState(initialData?.laborBurdenPct ?? 0.29)
+  const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? null)
+  const [laborBurdenPct, setLaborBurdenPct] = useState(initialData?.laborBurdenPct ?? null)
+  const [gpmd, setGpmd] = useState(initialData?.gpmd ?? null)
+  const [subGpMarkupRate, setSubGpMarkupRate] = useState(initialData?.subGpMarkupRate ?? null)
+  const [commissionRate, setCommissionRate] = useState(initialData?.commissionRate ?? null)
+  const [walkPace, setWalkPace] = useState(initialData?.walkAccess?.paceLfPerMin ?? null)
   const [walkAccess] = useState(
     initialData?.walkAccess ?? {
-      paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+      paceLfPerMin: null,
     }
   )
   const [paverPrices, setPaverPrices] = useState(initialData?.paverPrices || [])
@@ -743,13 +748,21 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         !initialData?.laborRatePerHour &&
           supabase
             .from('company_settings')
-            .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min')
+            .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min, estimate_gpmd_default, commission_rate, sub_gp_markup_rate')
             .single()
             .then(({ data }) => {
               if (!gone && data?.labor_rate_per_hour != null)
-                setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || 35)
+                setLaborRatePerHour(parseFloat(data.labor_rate_per_hour))
               if (!gone && data?.labor_burden_pct != null)
                 setLaborBurdenPct(parseFloat(data.labor_burden_pct))
+              if (!gone && data?.walk_access_pace_lf_per_min != null)
+                setWalkPace(parseFloat(data.walk_access_pace_lf_per_min))
+              if (!gone && data?.estimate_gpmd_default != null)
+                setGpmd(parseFloat(data.estimate_gpmd_default))
+              if (!gone && data?.commission_rate != null)
+                setCommissionRate(parseFloat(data.commission_rate))
+              if (!gone && data?.sub_gp_markup_rate != null)
+                setSubGpMarkupRate(parseFloat(data.sub_gp_markup_rate))
             }),
         refreshAllRates(),
         // Paver prices catalog — always fresh
@@ -794,8 +807,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
     []
   )
 
-  const gpmd = initialData?.gpmd ?? 425
-  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
+  const effWalkAccess = { ...(walkAccess || {}), paceLfPerMin: n(walkAccess?.paceLfPerMin) || walkPace }
 
   // ── In-House vs Subcontractor tab ───────────────────────────────────────────
   // The two tabs are independent calculators that SUM together. Each mirrored
@@ -876,10 +888,11 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
     materialRates,
     paverPrices,
     gpmd,
-    walkAccess,
+    effWalkAccess,
     laborBurdenPct,
     materialRows,
-    priceOf
+    priceOf,
+    commissionRate
   )
   // Sub engine — FORCE the Sub tab so it reads the sub area rows (state.subAreaRows
   // …). We take only its MATERIAL total (its labor/GP are ignored — install labor
@@ -891,10 +904,11 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
     materialRates,
     paverPrices,
     gpmd,
-    walkAccess,
+    effWalkAccess,
     laborBurdenPct,
     materialRows,
-    priceOf
+    priceOf,
+    commissionRate
   )
 
   // ── Sub side — per-SF / per-LF unit pricing ─────────────────────────────────
@@ -920,7 +934,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   const _subCost = inHouse.subCost + subSideCost + subPaverMat
   const _subGp = _subCost * subGpMarkupRate
   const _gp = inHouse.gp
-  const _commission = (_gp + _subGp) * 0.12
+  const _commission = (_gp + _subGp) * n(commissionRate)
   const _price =
     inHouse.laborCost +
     inHouse.burden +
@@ -999,10 +1013,12 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       total_price: parseFloat(calc.price.toFixed(2)),
       data: {
         ...state,
-        walkAccess,
+        walkAccess: effWalkAccess,
         laborRatePerHour,
         laborBurdenPct,
         gpmd,
+        subGpMarkupRate,
+        commissionRate,
         laborRates,
         materialRates,
         paverPrices,

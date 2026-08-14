@@ -157,12 +157,8 @@ const ADD_ITEM_RATES = {
   },
 }
 
-const DEFAULTS = {
-  laborRatePerHour: 35,
-  laborBurdenPct: 0.29,
-  gpmd: 425,
-  commissionRate: 0.12,
-}
+// Company/estimate financial settings (labor rate, burden %, GPMD, commission,
+// sub GP markup) are sourced live from company_settings — no hardcoded defaults.
 
 const n = v => parseFloat(v) || 0
 
@@ -288,13 +284,14 @@ function resolveUtilRow(cat, row, houseArr, materialRows, catDefaults, mp) {
 
 function calcUtilities(
   state,
-  laborRatePerHour = DEFAULTS.laborRatePerHour,
+  laborRatePerHour,
   materialPrices = {},
-  gpmd = DEFAULTS.gpmd,
+  gpmd,
   walkAccess = null,
-  laborBurdenPct = DEFAULTS.laborBurdenPct,
+  laborBurdenPct,
   materialRows = [],
-  catDefaults = {}
+  catDefaults = {},
+  commissionRate
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const {
@@ -451,10 +448,10 @@ function calcUtilities(
   const totalHrs = _preWalkHrs + walkHrs
   const manDays = totalHrs / 8
   const totalMat = lineMat + gasPipeMat + wireMat + fixMat + sewerLineMat + addMat + manMat
-  const laborCost = totalHrs * laborRatePerHour
-  const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
-  const gp = manDays * gpmd
-  const commission = gp * DEFAULTS.commissionRate
+  const laborCost = totalHrs * n(laborRatePerHour)
+  const burden = laborCost * n(laborBurdenPct)
+  const gp = manDays * n(gpmd)
+  const commission = gp * n(commissionRate)
   const subCost = manSub
   const price = totalMat + laborCost + burden + gp + commission + subCost
 
@@ -539,11 +536,14 @@ const DEFAULT_MANUAL_ROWS = [{ label: '', hours: '', materials: '', subCost: '' 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function UtilitiesModule({ onSave, onBack, saving, initialData }) {
   const [laborRatePerHour, setLaborRatePerHour] = useState(
-    initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour
+    initialData?.laborRatePerHour ?? null
   )
   const [laborBurdenPct, setLaborBurdenPct] = useState(
-    initialData?.laborBurdenPct ?? DEFAULTS.laborBurdenPct
+    initialData?.laborBurdenPct ?? null
   )
+  const [gpmd, setGpmd] = useState(initialData?.gpmd ?? null)
+  const [commissionRate, setCommissionRate] = useState(initialData?.commissionRate ?? null)
+  const [subGpMarkupRate, setSubGpMarkupRate] = useState(initialData?.subGpMarkupRate ?? null)
 
   // Free-text notes for this module — Sam writes auto-generated
   // takeoffs here via create_estimate_from_takeoff, and the user can
@@ -610,34 +610,32 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   }, [])
 
   useEffect(() => {
-    if (!initialData?.laborRatePerHour) {
-      supabase
-        .from('company_settings')
-        .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min')
-        .single()
-        .then(({ data }) => {
-          if (!data) return
-          if (data.labor_rate_per_hour != null)
-            setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
-          if (data.labor_burden_pct != null) setLaborBurdenPct(parseFloat(data.labor_burden_pct))
-          if (data.walk_access_pace_lf_per_min != null) {
-            const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
-            setWalkAccess({
-              paceLfPerMin:
-                Number.isFinite(_wpace) && _wpace > 0
-                  ? _wpace
-                  : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
-            })
-          }
-        })
-    }
+    supabase
+      .from('company_settings')
+      .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min, estimate_gpmd_default, commission_rate, sub_gp_markup_rate')
+      .single()
+      .then(({ data }) => {
+        if (!data) return
+        if (!initialData?.laborRatePerHour && data.labor_rate_per_hour != null)
+          setLaborRatePerHour(parseFloat(data.labor_rate_per_hour))
+        if (!initialData?.laborBurdenPct && data.labor_burden_pct != null) setLaborBurdenPct(parseFloat(data.labor_burden_pct))
+        if (initialData?.gpmd == null && data.estimate_gpmd_default != null) setGpmd(parseFloat(data.estimate_gpmd_default))
+        if (initialData?.commissionRate == null && data.commission_rate != null) setCommissionRate(parseFloat(data.commission_rate))
+        if (initialData?.subGpMarkupRate == null && data.sub_gp_markup_rate != null) setSubGpMarkupRate(parseFloat(data.sub_gp_markup_rate))
+        if (!initialData?.walkAccess && data.walk_access_pace_lf_per_min != null) {
+          const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
+          setWalkAccess({
+            paceLfPerMin:
+              Number.isFinite(_wpace) && _wpace > 0
+                ? _wpace
+                : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+          })
+        }
+      })
 
     // Always refresh the catalog on open so newly-added Master Rates items appear.
     refreshAllRates().then(() => setPricesLoading(false))
   }, [refreshAllRates])
-
-  const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
-  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
   const [difficulty, setDifficulty] = useState(initialData?.difficulty ?? '')
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Specialty')
@@ -769,7 +767,8 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
     walkAccess,
     laborBurdenPct,
     materialRows,
-    catDefaults
+    catDefaults,
+    commissionRate
   )
 
   // ── Sub-side cost — a single fully-loaded subcontractor cost figure.
@@ -870,9 +869,9 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   // ── Combine: in-house calc + sub-side cost. GP stays in-house; sub cost
   // earns its own markup (subGp); commission applies to both GP pools.
   const _subCost = inHouse.subCost + subSideCost
-  const _subGp = _subCost * subGpMarkupRate
+  const _subGp = _subCost * n(subGpMarkupRate)
   const _gp = inHouse.gp
-  const _commission = (_gp + _subGp) * 0.12
+  const _commission = (_gp + _subGp) * n(commissionRate)
   const _price =
     inHouse.totalMat + inHouse.laborCost + inHouse.burden + _gp + _subCost + _subGp + _commission
   const calcRaw = {
@@ -968,6 +967,8 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
         subAdditionalItems,
         subManualRows,
         subType,
+        subGpMarkupRate,
+        commissionRate,
         laborRatePerHour,
         laborBurdenPct,
         gpmd,

@@ -45,10 +45,8 @@ const DEMO_ROWS = [
 // coefficient and material price is read live from the rate tables (labor_rates
 // / misc_rates / material) — no hardcoded rate fallbacks. Missing rates are
 // guaranteed by supabase-turf-fallbacks-seed.sql.
-const RATE_DEFAULTS = {
-  laborBurden: 0.29, // 29% burden on labor cost (Module #1 O4)
-  commissionRate: 0.12, // 12% commission on gross profit (Module #1 O3 = Comm)
-}
+// Company/estimate financial settings (labor rate, burden %, GPMD, commission,
+// sub GP markup) are sourced live from company_settings — no hardcoded defaults.
 
 // ── Calculation engine ────────────────────────────────────────────────────────
 const n = v => parseFloat(v) || 0
@@ -153,17 +151,18 @@ function calcTurf(
   laborRatePerHour,
   materialPrices,
   laborRates,
-  gpmd = 425,
+  gpmd,
   walkAccess = null,
-  laborBurdenPct = 0.29,
+  laborBurdenPct,
   subRates = {},
   materialRows = [],
-  catDefaults = {}
+  catDefaults = {},
+  commissionRate
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const mp = materialPrices || {}
   const lr = laborRates || {}
-  const lrph = n(laborRatePerHour) || 35
+  const lrph = n(laborRatePerHour)
   const hrsAdj = n(state.hoursAdj)
   const distanceLF = n(state.distanceLF) // avg distance truck to work area
 
@@ -394,9 +393,9 @@ function calcTurf(
 
   const manDays = totalHrs / 8
   const laborCost = totalHrs * lrph
-  const burden = laborCost * (n(laborBurdenPct) || RATE_DEFAULTS.laborBurden) // burden % — company setting, fallback Excel Module #1 O4
-  const gp = manDays * gpmd
-  const commission = gp * RATE_DEFAULTS.commissionRate // 12% of GP — Excel Module #1 O3
+  const burden = laborCost * n(laborBurdenPct)
+  const gp = manDays * n(gpmd)
+  const commission = gp * n(commissionRate)
   const price = laborCost + burden + totalMat + gp + commission + subCost
 
   return {
@@ -592,8 +591,11 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
   // Vendor catalog: material_rates rows (sub_category + vendor_id) + vendor list.
   const [materialRows, setMaterialRows] = useState(initialData?.materialRows || [])
   const [vendors, setVendors] = useState([])
-  const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? 35)
-  const [laborBurdenPct, setLaborBurdenPct] = useState(initialData?.laborBurdenPct ?? 0.29)
+  const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? null)
+  const [laborBurdenPct, setLaborBurdenPct] = useState(initialData?.laborBurdenPct ?? null)
+  const [gpmd, setGpmd] = useState(initialData?.gpmd ?? null)
+  const [commissionRate, setCommissionRate] = useState(initialData?.commissionRate ?? null)
+  const [subGpMarkupRate, setSubGpMarkupRate] = useState(initialData?.subGpMarkupRate ?? null)
   const [walkAccess] = useState(
     initialData?.walkAccess ?? {
       paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
@@ -687,21 +689,26 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
   }, [])
 
   useEffect(() => {
-    if (initialData?.materialPrices && initialData?.laborRatePerHour) return
     let gone = false
     ;(async () => {
       await Promise.all([
-        !initialData?.laborRatePerHour &&
-          supabase
-            .from('company_settings')
-            .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min')
-            .single()
-            .then(({ data }) => {
-              if (!gone && data?.labor_rate_per_hour)
-                setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || 35)
-              if (!gone && data?.labor_burden_pct != null)
-                setLaborBurdenPct(parseFloat(data.labor_burden_pct))
-            }),
+        supabase
+          .from('company_settings')
+          .select('labor_rate_per_hour, labor_burden_pct, estimate_gpmd_default, commission_rate, sub_gp_markup_rate')
+          .single()
+          .then(({ data }) => {
+            if (gone || !data) return
+            if (!initialData?.laborRatePerHour && data.labor_rate_per_hour != null)
+              setLaborRatePerHour(parseFloat(data.labor_rate_per_hour))
+            if (!initialData?.laborBurdenPct && data.labor_burden_pct != null)
+              setLaborBurdenPct(parseFloat(data.labor_burden_pct))
+            if (initialData?.gpmd == null && data.estimate_gpmd_default != null)
+              setGpmd(parseFloat(data.estimate_gpmd_default))
+            if (initialData?.commissionRate == null && data.commission_rate != null)
+              setCommissionRate(parseFloat(data.commission_rate))
+            if (initialData?.subGpMarkupRate == null && data.sub_gp_markup_rate != null)
+              setSubGpMarkupRate(parseFloat(data.sub_gp_markup_rate))
+          }),
         refreshAllRates(),
       ])
       if (!gone) setPricesLoading(false)
@@ -838,9 +845,6 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
     []
   )
 
-  const gpmd = initialData?.gpmd ?? 425
-  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
-
   // ── Vendor catalog helpers (material-only per-line Vendor pickers) ────────
   const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
   // A vendor belongs in a SECTION's dropdown only if they actually price a product
@@ -867,7 +871,8 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
     laborBurdenPct,
     subRates,
     materialRows,
-    catDefaults
+    catDefaults,
+    commissionRate
   )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
@@ -911,6 +916,8 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         laborRatePerHour,
         laborBurdenPct,
         gpmd,
+        commissionRate,
+        subGpMarkupRate,
         materialPrices,
         laborRates,
         subRates,
@@ -922,6 +929,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           totalMat: calc.totalMat,
           subCost: calc.subCost,
           gp: calc.gp,
+          commission: calc.commission,
           price: calc.price,
           turfAreaSF: calc.turfAreaSF,
         },

@@ -71,7 +71,7 @@ export default function PoolSummary({ module }) {
   const burden = n(savedCalc.burden)
   const subCost = n(savedCalc.subCost) || n(module.sub_cost)
   const gp = n(savedCalc.gp)
-  const commission = n(savedCalc.commission) || gp * 0.12
+  const commission = n(savedCalc.commission)
   const price = n(savedCalc.price) || n(module.total_price)
 
   const activeStructs = [

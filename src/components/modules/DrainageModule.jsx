@@ -7,7 +7,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
-import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
+import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 
 const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
@@ -115,12 +115,6 @@ const FRENCH_GRAVEL24_LABOR_NAME = 'Drainage Gravel Bed 24in Labor'
 // Read live from the rate map only — no hardcoded fallback.
 const frenchRate = (mp, name) => n(mp[name])
 
-const DEFAULTS = {
-  laborRatePerHour: 35,
-  laborBurdenPct: 0.29,
-  gpmd: 425,
-  commissionRate: 0.12,
-}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const n = v => parseFloat(v) || 0
@@ -189,17 +183,18 @@ function drainTypeOptions(cat, builtIn, materialRows, vendorSel) {
 // materialPrices — { 'dbName': unit_cost, ... } fetched from material_rates
 function calcDrainage(
   state,
-  laborRatePerHour = DEFAULTS.laborRatePerHour,
+  laborRatePerHour = null,
   materialPrices = {},
-  gpmd = DEFAULTS.gpmd,
+  gpmd = null,
   walkAccess = null,
-  laborBurdenPct = DEFAULTS.laborBurdenPct,
+  laborBurdenPct = null,
   subRates = {},
-  subMarkupRate = 0.2,
+  subMarkupRate = null,
   materialRows = [],
-  catDefaults = {}
+  catDefaults = {},
+  commissionRate = null
 ) {
-  const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
+  const _pace = parseFloat(walkAccess?.paceLfPerMin) || 0
   const {
     difficulty,
     hoursAdj,
@@ -361,13 +356,13 @@ function calcDrainage(
   const manDays = totalHrs / 8
   const totalMat = (isSub ? 0 : pipeMat + fixMat + addMat + frenchMat) + manMat
   const laborCost = totalHrs * laborRatePerHour
-  const burden = laborCost * (n(laborBurdenPct) || DEFAULTS.laborBurdenPct)
+  const burden = laborCost * n(laborBurdenPct)
   const subCost = manSub + subDrainCost + (isSub ? subFixtureCost + subAdditionalCost : 0)
   // Sub work earns a markup (gross profit on subcontracted cost), matching the
   // GPMD bar, so the saved total includes it.
   const subGp = subCost * (subMarkupRate || 0)
   const gp = manDays * gpmd // in-house GP only; bar adds Sub GP once
-  const commission = (gp + subGp) * DEFAULTS.commissionRate
+  const commission = (gp + subGp) * n(commissionRate)
   const price = totalMat + laborCost + burden + gp + subGp + commission + subCost
 
   return {
@@ -440,11 +435,14 @@ const DEFAULT_MANUAL_ROWS = [{ label: '', hours: '', materials: '', subCost: '' 
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function DrainageModule({ onSave, onBack, saving, initialData }) {
   const [laborRatePerHour, setLaborRatePerHour] = useState(
-    initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour
+    initialData?.laborRatePerHour ?? null
   )
   const [laborBurdenPct, setLaborBurdenPct] = useState(
-    initialData?.laborBurdenPct ?? DEFAULTS.laborBurdenPct
+    initialData?.laborBurdenPct ?? null
   )
+  const [gpmd, setGpmd] = useState(initialData?.gpmd ?? null)
+  const [subGpMarkupRate, setSubGpMarkupRate] = useState(initialData?.subGpMarkupRate ?? null)
+  const [commissionRate, setCommissionRate] = useState(initialData?.commissionRate ?? null)
 
   // Free-text notes for this module — Sam writes auto-generated
   // takeoffs here via create_estimate_from_takeoff, and the user can
@@ -453,7 +451,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   const [distanceLF, setDistanceLF] = useState(initialData?.distanceLF ?? '')
   const [walkAccess, setWalkAccess] = useState(
     initialData?.walkAccess ?? {
-      paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+      paceLfPerMin: null,
     }
   )
   // Live material prices from material_rates table (category='Drainage')
@@ -515,21 +513,24 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
     if (!initialData?.laborRatePerHour) {
       supabase
         .from('company_settings')
-        .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min')
+        .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min, estimate_gpmd_default, commission_rate, sub_gp_markup_rate')
         .single()
         .then(({ data }) => {
           if (!data) return
           if (data.labor_rate_per_hour != null)
-            setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
+            setLaborRatePerHour(parseFloat(data.labor_rate_per_hour))
           if (data.labor_burden_pct != null)
             setLaborBurdenPct(parseFloat(data.labor_burden_pct))
+          if (data.estimate_gpmd_default != null)
+            setGpmd(parseFloat(data.estimate_gpmd_default))
+          if (data.commission_rate != null)
+            setCommissionRate(parseFloat(data.commission_rate))
+          if (data.sub_gp_markup_rate != null)
+            setSubGpMarkupRate(parseFloat(data.sub_gp_markup_rate))
           if (data.walk_access_pace_lf_per_min != null) {
             const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
             setWalkAccess({
-              paceLfPerMin:
-                Number.isFinite(_wpace) && _wpace > 0
-                  ? _wpace
-                  : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+              paceLfPerMin: Number.isFinite(_wpace) && _wpace > 0 ? _wpace : null,
             })
           }
         })
@@ -540,8 +541,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
-  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
   const [difficulty, setDifficulty] = useState(initialData?.difficulty ?? '')
   const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
@@ -629,7 +628,8 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
     subRates,
     subGpMarkupRate,
     materialRows,
-    catDefaults
+    catDefaults,
+    commissionRate
   )
   const PIPE_T = { ...PIPE_TYPES, ...masterDrainTypes(DRAIN_CAT.pipe, PIPE_TYPES, materialRows, 'laborPerLF') }
   const FIX_T = { ...FIXTURE_TYPES, ...masterDrainTypes(DRAIN_CAT.fixture, FIXTURE_TYPES, materialRows, 'laborHrs') }
@@ -689,6 +689,9 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         laborRatePerHour,
         laborBurdenPct,
         gpmd,
+        subGpMarkupRate,
+        commissionRate,
+        walkAccess,
         materialPrices, // snapshot of prices used — so the summary always reflects save-time costs
         // materialRows (live catalog) intentionally NOT persisted — fetched fresh on open.
         subRates,

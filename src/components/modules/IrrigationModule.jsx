@@ -109,8 +109,8 @@ const RATE_DEFAULTS = {
   salesTax: 0.095, // 9.5% — company_settings key 'sales_tax_rate'
 }
 
-const SUB_MARKUP_DEFAULT = 0.2
-const COMMISSION_RATE = 0.12
+// Commission, sub GP markup, GPMD, labor rate + burden % are sourced live from
+// company_settings — no hardcoded code defaults.
 
 // ── Calculation engine ────────────────────────────────────────────────────────
 const n = v => parseFloat(v) || 0
@@ -172,14 +172,15 @@ function calcIrrigation(
   materialPrices,
   laborRates,
   salesTax,
-  gpmd = 425,
+  gpmd,
   walkAccess = null,
-  laborBurdenPct = 0.29,
-  materialRows = []
+  laborBurdenPct,
+  materialRows = [],
+  commissionRate
 ) {
   const mp = materialPrices || {}
   const lr = laborRates || {}
-  const lrph = n(laborRatePerHour) || 35
+  const lrph = n(laborRatePerHour)
   const diff = 1 + n(state.difficulty) / 100
   const hrsAdj = n(state.hoursAdj)
   const tax = n(salesTax) || RATE_DEFAULTS.salesTax
@@ -225,7 +226,7 @@ function calcIrrigation(
   const manualMat = manualFiltered.reduce((s, r) => s + n(r.materials), 0)
   const manualSub = manualFiltered.reduce((s, r) => s + n(r.subCost), 0)
 
-  const subMarkup = n(state.subGpMarkupRate) || SUB_MARKUP_DEFAULT
+  const subMarkup = n(state.subGpMarkupRate)
 
   if (isSub) {
     // Sub tab: flat per-unit material only, NO labor hours. The itemized flat cost
@@ -234,7 +235,7 @@ function calcIrrigation(
     const totalMat = subMatTotal
     const subCost = subMatTotal + manualSub
     const subGp = subCost * subMarkup
-    const commission = subGp * COMMISSION_RATE
+    const commission = subGp * n(commissionRate)
     const price = subCost + subGp + commission
     return {
       totalHrs: 0,
@@ -276,9 +277,9 @@ function calcIrrigation(
 
   const manDays = totalHrs / 8
   const laborCost = totalHrs * lrph
-  const burden = laborCost * (n(laborBurdenPct) || 0.29) // 29% — Excel Module #1 O4
-  const gp = manDays * gpmd
-  const commission = gp * COMMISSION_RATE // 12% of GP — Excel Module #1 O3
+  const burden = laborCost * n(laborBurdenPct)
+  const gp = manDays * n(gpmd)
+  const commission = gp * n(commissionRate)
   const price = laborCost + burden + totalMat + gp + commission + subCost
 
   return {
@@ -426,8 +427,8 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
   const [laborRates, setLaborRates] = useState(initialData?.laborRates || {})
   const [materialRows, setMaterialRows] = useState(initialData?.materialRows || [])
   const [vendors, setVendors] = useState([])
-  const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? 35)
-  const [laborBurdenPct, setLaborBurdenPct] = useState(initialData?.laborBurdenPct ?? 0.29)
+  const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? null)
+  const [laborBurdenPct, setLaborBurdenPct] = useState(initialData?.laborBurdenPct ?? null)
   const [salesTax, setSalesTax] = useState(initialData?.salesTax ?? RATE_DEFAULTS.salesTax)
   const [walkAccess, setWalkAccess] = useState(
     initialData?.walkAccess ?? {
@@ -435,8 +436,9 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
     }
   )
   const [pricesLoading, setPricesLoading] = useState(!initialData?.materialPrices)
-  const gpmd = initialData?.gpmd ?? 425
-  const subGpMarkupRate = initialData?.subGpMarkupRate ?? SUB_MARKUP_DEFAULT
+  const [gpmd, setGpmd] = useState(initialData?.gpmd ?? null)
+  const [commissionRate, setCommissionRate] = useState(initialData?.commissionRate ?? null)
+  const [subGpMarkupRate, setSubGpMarkupRate] = useState(initialData?.subGpMarkupRate ?? null)
 
   // ── Shared (not per-tab) selections ─────────────────────────────────────────
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Landscape')
@@ -503,30 +505,35 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
     let gone = false
     ;(async () => {
       await Promise.all([
-        (!initialData?.laborRatePerHour || !initialData?.salesTax || !initialData?.walkAccess) &&
-          supabase
-            .from('company_settings')
-            .select('labor_rate_per_hour, labor_burden_pct, sales_tax_rate, walk_access_pace_lf_per_min')
-            .maybeSingle()
-            .then(({ data }) => {
-              if (!gone && data) {
-                if (!initialData?.laborRatePerHour && data.labor_rate_per_hour)
-                  setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || 35)
-                if (!initialData?.laborBurdenPct && data.labor_burden_pct != null)
-                  setLaborBurdenPct(parseFloat(data.labor_burden_pct))
-                if (!initialData?.salesTax && data.sales_tax_rate != null)
-                  setSalesTax(parseFloat(data.sales_tax_rate) || RATE_DEFAULTS.salesTax)
-                if (!initialData?.walkAccess) {
-                  const pace = parseFloat(data.walk_access_pace_lf_per_min)
-                  setWalkAccess({
-                    paceLfPerMin:
-                      Number.isFinite(pace) && pace > 0
-                        ? pace
-                        : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
-                  })
-                }
+        supabase
+          .from('company_settings')
+          .select('labor_rate_per_hour, labor_burden_pct, sales_tax_rate, walk_access_pace_lf_per_min, estimate_gpmd_default, commission_rate, sub_gp_markup_rate')
+          .maybeSingle()
+          .then(({ data }) => {
+            if (!gone && data) {
+              if (!initialData?.laborRatePerHour && data.labor_rate_per_hour != null)
+                setLaborRatePerHour(parseFloat(data.labor_rate_per_hour))
+              if (!initialData?.laborBurdenPct && data.labor_burden_pct != null)
+                setLaborBurdenPct(parseFloat(data.labor_burden_pct))
+              if (!initialData?.salesTax && data.sales_tax_rate != null)
+                setSalesTax(parseFloat(data.sales_tax_rate) || RATE_DEFAULTS.salesTax)
+              if (initialData?.gpmd == null && data.estimate_gpmd_default != null)
+                setGpmd(parseFloat(data.estimate_gpmd_default))
+              if (initialData?.commissionRate == null && data.commission_rate != null)
+                setCommissionRate(parseFloat(data.commission_rate))
+              if (initialData?.subGpMarkupRate == null && data.sub_gp_markup_rate != null)
+                setSubGpMarkupRate(parseFloat(data.sub_gp_markup_rate))
+              if (!initialData?.walkAccess) {
+                const pace = parseFloat(data.walk_access_pace_lf_per_min)
+                setWalkAccess({
+                  paceLfPerMin:
+                    Number.isFinite(pace) && pace > 0
+                      ? pace
+                      : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+                })
               }
-            }),
+            }
+          }),
         // Always refresh so the vendor list + material catalog load, even when
         // editing a saved estimate (which already carries a materialPrices map).
         refreshAllRates(),
@@ -550,7 +557,8 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
     gpmd,
     walkAccess,
     laborBurdenPct,
-    materialRows
+    materialRows,
+    commissionRate
   )
 
   // ── Vendor helpers ──────────────────────────────────────────────────────────
@@ -620,6 +628,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
         subData: subTab,
         subType,
         subGpMarkupRate,
+        commissionRate,
         crewType,
         laborRatePerHour,
         laborBurdenPct,

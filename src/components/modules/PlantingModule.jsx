@@ -149,12 +149,8 @@ const ADDON_META = {
 }
 const ADDON_TYPES = Object.keys(ADDON_META)
 
-const WORKER_DEFAULTS = {
-  laborRatePerHour: 35,
-  laborBurdenPct: 0.29,
-  gpmd: 425,
-  commissionRate: 0.12,
-}
+// Company/estimate financial settings (labor rate, burden %, GPMD, commission,
+// sub GP markup) are sourced live from company_settings — no hardcoded defaults.
 
 const n = v => parseFloat(v) || 0
 const r2 = x => Math.round(((x || 0) + Number.EPSILON) * 100) / 100
@@ -276,8 +272,9 @@ function calcPlanting(
   materialPrices,
   laborRates,
   walkAccess = null,
-  laborBurdenPct = WORKER_DEFAULTS.laborBurdenPct,
-  materialRows = []
+  laborBurdenPct,
+  materialRows = [],
+  commissionRate
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const {
@@ -371,7 +368,7 @@ function calcPlanting(
   const totalMatIH = smallMat + largeMat + addonMat + manMat + yardCheckMat
   const totalSubMat = smallSubMat + largeSubMat + addonSubMat
 
-  const subMarkup = n(state.subGpMarkupRate) || 0.2
+  const subMarkup = n(state.subGpMarkupRate)
   let totalHrs,
     manDays,
     totalMat,
@@ -399,19 +396,19 @@ function calcPlanting(
     gp = 0
     subCost = totalSubMat + manSub + craneSub
     subGp = subCost * subMarkup
-    commission = subGp * WORKER_DEFAULTS.commissionRate
+    commission = subGp * n(commissionRate)
     price = subCost + subGp + commission
   } else {
     walkHrs = walkHrsIH
     totalHrs = totalHrsIH
     manDays = totalHrs / 8
     totalMat = totalMatIH
-    laborCost = totalHrs * laborRatePerHour
-    burden = laborCost * (n(laborBurdenPct) || WORKER_DEFAULTS.laborBurdenPct)
+    laborCost = totalHrs * n(laborRatePerHour)
+    burden = laborCost * n(laborBurdenPct)
     subCost = craneSub + manSub
-    gp = manDays * gpmd
+    gp = manDays * n(gpmd)
     subGp = 0
-    commission = gp * WORKER_DEFAULTS.commissionRate
+    commission = gp * n(commissionRate)
     price = totalMat + laborCost + burden + gp + commission + subCost
   }
 
@@ -558,11 +555,14 @@ function makeTab(src = {}) {
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function PlantingModule({ onSave, onBack, saving, initialData }) {
   const [laborRatePerHour, setLaborRatePerHour] = useState(
-    initialData?.laborRatePerHour ?? WORKER_DEFAULTS.laborRatePerHour
+    initialData?.laborRatePerHour ?? null
   )
   const [laborBurdenPct, setLaborBurdenPct] = useState(
-    initialData?.laborBurdenPct ?? WORKER_DEFAULTS.laborBurdenPct
+    initialData?.laborBurdenPct ?? null
   )
+  const [gpmd, setGpmd] = useState(initialData?.gpmd ?? null)
+  const [commissionRate, setCommissionRate] = useState(initialData?.commissionRate ?? null)
+  const [subGpMarkupRate, setSubGpMarkupRate] = useState(initialData?.subGpMarkupRate ?? null)
 
   // Free-text notes for this module — Sam writes auto-generated
   // takeoffs here via create_estimate_from_takeoff, and the user can
@@ -617,37 +617,36 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
   }, [])
 
   useEffect(() => {
-    if (!initialData?.laborRatePerHour) {
-      supabase
-        .from('company_settings')
-        .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min')
-        .single()
-        .then(({ data }) => {
-          if (data) {
-            setLaborRatePerHour(
-              parseFloat(data.labor_rate_per_hour) || WORKER_DEFAULTS.laborRatePerHour
-            )
-            if (data.labor_burden_pct != null)
-              setLaborBurdenPct(parseFloat(data.labor_burden_pct))
-            if (data.walk_access_pace_lf_per_min != null) {
-              const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
-              setWalkAccess({
-                paceLfPerMin:
-                  Number.isFinite(_wpace) && _wpace > 0
-                    ? _wpace
-                    : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
-              })
-            }
-          }
-        })
-    }
+    supabase
+      .from('company_settings')
+      .select('labor_rate_per_hour, labor_burden_pct, walk_access_pace_lf_per_min, estimate_gpmd_default, commission_rate, sub_gp_markup_rate')
+      .single()
+      .then(({ data }) => {
+        if (!data) return
+        if (!initialData?.laborRatePerHour && data.labor_rate_per_hour != null)
+          setLaborRatePerHour(parseFloat(data.labor_rate_per_hour))
+        if (!initialData?.laborBurdenPct && data.labor_burden_pct != null)
+          setLaborBurdenPct(parseFloat(data.labor_burden_pct))
+        if (initialData?.gpmd == null && data.estimate_gpmd_default != null)
+          setGpmd(parseFloat(data.estimate_gpmd_default))
+        if (initialData?.commissionRate == null && data.commission_rate != null)
+          setCommissionRate(parseFloat(data.commission_rate))
+        if (initialData?.subGpMarkupRate == null && data.sub_gp_markup_rate != null)
+          setSubGpMarkupRate(parseFloat(data.sub_gp_markup_rate))
+        if (!initialData?.walkAccess && data.walk_access_pace_lf_per_min != null) {
+          const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
+          setWalkAccess({
+            paceLfPerMin:
+              Number.isFinite(_wpace) && _wpace > 0
+                ? _wpace
+                : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+          })
+        }
+      })
     // Always refresh so the vendor list + material catalog load, even when
     // editing a saved estimate (which already carries a materialPrices map).
     refreshAllRates().then(() => setPricesLoading(false))
   }, [refreshAllRates])
-
-  const gpmd = initialData?.gpmd ?? WORKER_DEFAULTS.gpmd
-  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
   // ── Shared (not per-tab) selections ─────────────────────────────────────────
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Landscape')
@@ -708,7 +707,8 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
     laborRates,
     walkAccess,
     laborBurdenPct,
-    materialRows
+    materialRows,
+    commissionRate
   )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
@@ -785,6 +785,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
         subData: subTab,
         subType,
         subGpMarkupRate,
+        commissionRate,
         walkAccess,
         laborRatePerHour,
         laborBurdenPct,

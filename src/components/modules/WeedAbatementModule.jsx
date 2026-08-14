@@ -26,7 +26,8 @@ import CrewTypeBar from './CrewTypeBar'
 import ModuleHeaderSlot from './ModuleHeaderSlot'
 
 const n = v => parseFloat(v) || 0
-const R = { laborRatePerHour: 35, laborBurdenPct: 0.29, gpmd: 425, commissionRate: 0.12 }
+// Company/estimate financial settings (labor rate, burden %, GPMD, commission,
+// sub GP markup) are sourced live from company_settings — no hardcoded defaults.
 
 // In-House labor / material coefficient names. Every value is read live from the
 // price list — labor_rates for the hour coefficients and misc_rates for the
@@ -54,9 +55,10 @@ function makeTab(src = {}) {
 
 function calcWeed(
   state,
-  laborRatePerHour = R.laborRatePerHour,
-  gpmd = R.gpmd,
-  laborBurdenPct = R.laborBurdenPct
+  laborRatePerHour,
+  gpmd,
+  laborBurdenPct,
+  commissionRate
 ) {
   const isSub = state.subType === 'Subcontractor'
   const mode = state.mode || 'flat'
@@ -64,7 +66,7 @@ function calcWeed(
   // Only the areas relevant to the chosen mode contribute.
   const flatSF = mode === 'hillside' ? 0 : n(state.flatSF)
   const hillSF = mode === 'flat' ? 0 : n(state.hillSF)
-  const subMarkup = n(state.subGpMarkupRate) || 0.2
+  const subMarkup = n(state.subGpMarkupRate)
 
   // Price-list coefficients (labor hrs + material $/1k SF), read live from
   // state.rates (the DB values). A missing row contributes 0 — no fallback.
@@ -81,7 +83,7 @@ function calcWeed(
     const subRatePerSF = n(state.subRatePerSF)
     const subCost = subArea * subRatePerSF * visits + n(state.subFlat)
     const subGp = subCost * subMarkup
-    const commission = subGp * R.commissionRate
+    const commission = subGp * n(commissionRate)
     return {
       isSub: true, mode, visits, flatSF, hillSF,
       travelHrs: 0, flatHrs: 0, hillHrs: 0, laborHrs: 0, totalHrs: 0, manDays: 0,
@@ -101,11 +103,11 @@ function calcWeed(
 
   const totalMat = ((flatSF + hillSF) / 1000) * materialPer1k * visits
 
-  const lrph = n(laborRatePerHour) || R.laborRatePerHour
+  const lrph = n(laborRatePerHour)
   const laborCost = totalHrs * lrph
-  const burden = laborCost * laborBurdenPct
-  const gp = manDays * (n(gpmd) || R.gpmd)
-  const commission = gp * R.commissionRate
+  const burden = laborCost * n(laborBurdenPct)
+  const gp = manDays * n(gpmd)
+  const commission = gp * n(commissionRate)
   const subCost = 0
   const price = laborCost + burden + totalMat + gp + commission
 
@@ -118,11 +120,12 @@ function calcWeed(
 }
 
 export default function WeedAbatementModule({ onSave, onBack, saving, initialData }) {
-  const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? R.laborRatePerHour)
-  const [laborBurdenPct, setLaborBurdenPct] = useState(initialData?.laborBurdenPct ?? R.laborBurdenPct)
-  const [gpmd, setGpmd] = useState(initialData?.gpmd ?? R.gpmd)
+  const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? null)
+  const [laborBurdenPct, setLaborBurdenPct] = useState(initialData?.laborBurdenPct ?? null)
+  const [gpmd, setGpmd] = useState(initialData?.gpmd ?? null)
   const [notes, setNotes] = useState(initialData?.notes ?? '')
-  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
+  const [commissionRate, setCommissionRate] = useState(initialData?.commissionRate ?? null)
+  const [subGpMarkupRate, setSubGpMarkupRate] = useState(initialData?.subGpMarkupRate ?? null)
 
   // Master-rate default for the Sub $/SF. Used only when the user leaves the
   // Subcontractor Rate field blank; a typed value always wins.
@@ -184,14 +187,17 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
   // Pull the company labor rate + burden % (HR → Labor Rates). Skip when
   // re-editing a saved module so it keeps the rate it was built with.
   useEffect(() => {
-    if (initialData?.laborRatePerHour) return
     supabase
       .from('company_settings')
-      .select('labor_rate_per_hour, labor_burden_pct')
+      .select('labor_rate_per_hour, labor_burden_pct, estimate_gpmd_default, commission_rate, sub_gp_markup_rate')
       .single()
       .then(({ data }) => {
-        if (data?.labor_rate_per_hour != null) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || R.laborRatePerHour)
-        if (data?.labor_burden_pct != null) setLaborBurdenPct(parseFloat(data.labor_burden_pct))
+        if (!data) return
+        if (!initialData?.laborRatePerHour && data.labor_rate_per_hour != null) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour))
+        if (!initialData?.laborBurdenPct && data.labor_burden_pct != null) setLaborBurdenPct(parseFloat(data.labor_burden_pct))
+        if (initialData?.gpmd == null && data.estimate_gpmd_default != null) setGpmd(parseFloat(data.estimate_gpmd_default))
+        if (initialData?.commissionRate == null && data.commission_rate != null) setCommissionRate(parseFloat(data.commission_rate))
+        if (initialData?.subGpMarkupRate == null && data.sub_gp_markup_rate != null) setSubGpMarkupRate(parseFloat(data.sub_gp_markup_rate))
       })
   }, [])
 
@@ -200,7 +206,7 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
   const effSubRatePerSF =
     cur.subRatePerSF === '' || cur.subRatePerSF == null ? (subRateDefault ?? '') : cur.subRatePerSF
   const state = { subType, subGpMarkupRate, ...cur, subRatePerSF: effSubRatePerSF, rates: rateMap }
-  const calc = calcWeed(state, laborRatePerHour, gpmd, laborBurdenPct)
+  const calc = calcWeed(state, laborRatePerHour, gpmd, laborBurdenPct, commissionRate)
 
   function handleSave() {
     onSave({
@@ -215,6 +221,7 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
         subType,
         crewType,
         subGpMarkupRate,
+        commissionRate,
         laborRatePerHour,
         laborBurdenPct,
         gpmd,
