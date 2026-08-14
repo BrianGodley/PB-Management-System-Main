@@ -1038,6 +1038,16 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
       .sort(catalogSort)
       .map(catalogRowToItem)
+  // Shared base materials pulled from OTHER modules' catalogs (Concrete base /
+  // Ground Treatments DG). Surfaced with their real name + unit (per ton) so the
+  // View Rates row matches the rate Class II / DG actually price against — and
+  // editing it updates the shared item everywhere.
+  const sharedMatRows = names =>
+    (sharedBaseRows || [])
+      .filter(r0 => names.includes(r0.name))
+      .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
+      .sort(catalogSort)
+      .map(catalogRowToItem)
 
   // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
   //    that used to have an inline RateEditPopover in this module now lives here.
@@ -1074,9 +1084,11 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         },
         // Base materials (Turf Base catalog products + named base fabrics) —
         // surfaced here so Turf Prep has its own editable Materials sub-section.
-        ...catalogBlockItems(TURF_CAT.base),
-        ...materialRateRows('Turf - Gravel Base'),
-        ...materialRateRows('Turf - DG Base'),
+        // Class II + DG price off the SHARED items (Concrete base / GT Decomposed
+        // Granite) at their real per-ton rate — not the Turf Base catalog's
+        // per-each rows. Weed Barrier stays a Turf-catalog material.
+        ...sharedMatRows(SHARED_CLASS2_NAMES),
+        ...sharedMatRows([SHARED_DG_NAME]),
         ...materialRateRows('Turf - Weed Barrier Fabric'),
       ],
     },
