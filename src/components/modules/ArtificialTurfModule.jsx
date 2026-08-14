@@ -568,11 +568,12 @@ function makeTurfTab(src = {}) {
 }
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
-function SecHdr({ title }) {
+function SecHdr({ title, right = null }) {
   const isSub = useContext(SubTabContext)
   return (
-    <div className="bg-gray-100 rounded-lg px-4 py-2.5 border border-gray-200 mb-2">
+    <div className="bg-gray-100 rounded-lg px-4 py-2.5 border border-gray-200 mb-2 flex items-center justify-between gap-3">
       <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wider">{subSectionTitle(title, isSub)}</h3>
+      {right}
     </div>
   )
 }
@@ -676,6 +677,41 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
   // there edits the SAME rate the other modules use.
   const [sharedBaseRows, setSharedBaseRows] = useState([])
   const [vendors, setVendors] = useState([])
+  // Company-wide default Vendor + Type per base layer (Roadbase / DG Base / Weed
+  // Barrier), edited via the "Defaults" link and stored on company_settings.
+  // Applied to a NEW module so those fields open pre-selected.
+  const [baseDefaults, setBaseDefaults] = useState(null)
+  const [showBaseDefaults, setShowBaseDefaults] = useState(false)
+  const [defDraft, setDefDraft] = useState({})
+  // On a NEW module, pre-fill each base row's Vendor + Type from the saved
+  // defaults (only rows the user hasn't already set), for both tabs.
+  useEffect(() => {
+    if (!baseDefaults || initialData) return
+    setState(p => {
+      const patch = tab => {
+        if (!tab?.baseRows) return tab
+        let changed = false
+        const baseRows = tab.baseRows.map(r => {
+          const d = baseDefaults[r.material]
+          if (d && !r.type && (!r.vendor || r.vendor === 'Standard')) {
+            changed = true
+            return { ...r, vendor: d.vendor || r.vendor, type: d.type || r.type }
+          }
+          return r
+        })
+        return changed ? { ...tab, baseRows } : tab
+      }
+      return { ...p, ihData: patch(p.ihData), subData: patch(p.subData) }
+    })
+  }, [baseDefaults, initialData])
+  const saveBaseDefaults = useCallback(async () => {
+    const { data: row } = await supabase.from('company_settings').select('id').maybeSingle()
+    if (row?.id) {
+      await supabase.from('company_settings').update({ turf_base_defaults: defDraft }).eq('id', row.id)
+    }
+    setBaseDefaults(defDraft)
+    setShowBaseDefaults(false)
+  }, [defDraft])
   const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? null)
   const [laborBurdenPct, setLaborBurdenPct] = useState(initialData?.laborBurdenPct ?? null)
   const [gpmd, setGpmd] = useState(initialData?.gpmd ?? null)
@@ -796,10 +832,11 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       await Promise.all([
         supabase
           .from('company_settings')
-          .select('labor_rate_per_hour, labor_burden_pct, estimate_gpmd_default, commission_rate, sub_gp_markup_rate')
+          .select('labor_rate_per_hour, labor_burden_pct, estimate_gpmd_default, commission_rate, sub_gp_markup_rate, turf_base_defaults')
           .single()
           .then(({ data }) => {
             if (gone || !data) return
+            setBaseDefaults(data.turf_base_defaults || {})
             if (!initialData?.laborRatePerHour && data.labor_rate_per_hour != null)
               setLaborRatePerHour(parseFloat(data.labor_rate_per_hour))
             if (!initialData?.laborBurdenPct && data.labor_burden_pct != null)
@@ -1348,7 +1385,21 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       {/* Base Installation — In-House only (hidden on Sub tab) */}
       {state.subType !== 'Subcontractor' && (
       <div>
-        <SecHdr title="Turf Prep" />
+        <SecHdr
+          title="Turf Prep"
+          right={
+            <button
+              type="button"
+              onClick={() => {
+                setDefDraft(baseDefaults || {})
+                setShowBaseDefaults(true)
+              }}
+              className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Defaults
+            </button>
+          }
+        />
         {/* Master area — fills every base row's Sq Ft automatically. */}
         <div className="flex flex-col items-center mb-3">
           <label className="text-xs font-medium text-gray-600 mb-1 text-center">Square Footage</label>
@@ -1386,7 +1437,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
               const rate = n(bc.price)
               return (
                 <tr key={i}>
-                  <td className={td}>
+                  <td className="py-1.5 align-middle pl-3 pr-3">
                     <span className="text-xs font-medium text-gray-700 whitespace-nowrap">
                       {kdef.label}
                     </span>
@@ -1858,6 +1909,102 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           Cancel
         </button>
       </div>
+
+      {/* Turf Prep Defaults — set a default Vendor + Type per base layer, stored on
+          company_settings and pre-filled into new modules. */}
+      {showBaseDefaults && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setShowBaseDefaults(false)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl w-full max-w-md p-5"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-sm font-bold text-gray-800">Turf Prep Defaults</h3>
+              <button
+                onClick={() => setShowBaseDefaults(false)}
+                className="text-gray-400 hover:text-gray-600 text-lg leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mb-3">
+              Preselected Vendor + Type for each base layer on new Artificial Turf estimates.
+            </p>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-gray-500 border-b border-gray-200">
+                  <th className="text-left pb-1 font-medium">Base</th>
+                  <th className="text-left pb-1 pl-2 font-medium">Vendor</th>
+                  <th className="text-left pb-1 pl-2 font-medium">Type</th>
+                </tr>
+              </thead>
+              <tbody>
+                {BASE_KINDS.map(k => {
+                  const cur = defDraft[k.key] || {}
+                  const venOpts = baseVendorOptions(sharedBaseRows, vendors, k.key)
+                  const typeOpts = baseTypeOptions(sharedBaseRows, k.key, cur.vendor)
+                  const setD = (field, val) =>
+                    setDefDraft(d => ({ ...d, [k.key]: { ...(d[k.key] || {}), [field]: val } }))
+                  return (
+                    <tr key={k.key} className="border-b border-gray-100">
+                      <td className="py-1.5 font-medium text-gray-700 whitespace-nowrap">{k.label}</td>
+                      <td className="py-1.5 pl-2">
+                        <select
+                          className="w-full border border-gray-200 rounded-md px-2 py-1.5 bg-white"
+                          value={cur.vendor || ''}
+                          onChange={e => setD('vendor', e.target.value)}
+                        >
+                          <option value="">Select</option>
+                          <option value="Standard">Standard</option>
+                          {venOpts.map(v => (
+                            <option key={v.id} value={v.id}>
+                              {v.name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="py-1.5 pl-2">
+                        <select
+                          className="w-full border border-gray-200 rounded-md px-2 py-1.5 bg-white"
+                          value={cur.type || ''}
+                          onChange={e => setD('type', e.target.value)}
+                        >
+                          <option value="">Select type</option>
+                          {cur.type && !typeOpts.some(o => o.value === cur.type) && (
+                            <option value={cur.type}>{cur.type}</option>
+                          )}
+                          {typeOpts.map(o => (
+                            <option key={o.value} value={o.value}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={saveBaseDefaults}
+                className="flex-1 bg-gray-900 text-white py-2 rounded-lg text-sm font-semibold hover:bg-gray-700"
+              >
+                Save Defaults
+              </button>
+              <button
+                onClick={() => setShowBaseDefaults(false)}
+                className="flex-1 border border-gray-200 text-gray-600 py-2 rounded-lg text-sm font-medium hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
     </SubTabContext.Provider>
   )
