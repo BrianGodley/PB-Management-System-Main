@@ -102,7 +102,7 @@ function resolveType(label, opts) {
 // the on-center spacing, then multiplied by the canonical rebar $/LF (the
 // shared Basic Materials 'Rebar' row). Values set with Brian: 24" OC uses
 // 0.59 LF of rebar per SF; 12" OC uses 1.20 LF/SF.
-const REBAR_SPACINGS = ['24" OC', '12" OC']
+const REBAR_SPACINGS = ['24" OC', '18" OC', '12" OC']
 // Rebar sizes — priced per Ln Ft from the canonical Basic Materials → Reinforcement
 // catalog rows ('Rebar #3' … 'Rebar #8'). Shared across all modules.
 const REBAR_SIZES = ['#3', '#4', '#5', '#6', '#8']
@@ -150,7 +150,15 @@ function calcConcrete(
 
   // ── Labor production rates (labor_rates) ─────────────────────────────────
   const concreteSFPerHr = n(lr['Concrete - Pour & Finish'])
-  const rebarSFPerHr = n(lr['Concrete - Rebar 24" OC'])
+  // Rebar labor SF/hr is pattern-specific: 18" OC has its own production rate;
+  // 24" and 12" OC share the '24" OC' rate (unchanged). All table-driven.
+  const rebarSFPerHrBySpacing = {
+    '24" OC': n(lr['Concrete - Rebar 24" OC']),
+    '18" OC': n(lr['Concrete - Rebar 18" OC']),
+    '12" OC': n(lr['Concrete - Rebar 24" OC']),
+  }
+  const rebarSFPerHr =
+    rebarSFPerHrBySpacing[state.rebarSpacing] ?? n(lr['Concrete - Rebar 24" OC'])
   const formLFPerHr = n(lr['Concrete - Form Setting'])
   const sleeveLFPerHr = n(lr['Concrete - Sleeves'])
   const sealerNaturalSFPerHr = n(lr['Concrete - Sealer Natural'])
@@ -182,6 +190,7 @@ function calcConcrete(
   // Rebar LF-per-SF conversion by spacing — DB-editable coefficients (kept).
   const rebarLfPerSfBySpacing = {
     '24" OC': n(mr['Concrete - Rebar LF/SF 24" OC']),
+    '18" OC': n(mr['Concrete - Rebar LF/SF 18" OC']),
     '12" OC': n(mr['Concrete - Rebar LF/SF 12" OC']),
   }
   const rebarLfPerSf = rebarLfPerSfBySpacing[state.rebarSpacing] ?? rebarLfPerSfBySpacing['24" OC']
@@ -276,7 +285,7 @@ function calcConcrete(
     return s + tierCY * mt.fallback
   }, 0)
 
-  const rebarHrs = rebarSF > 0 ? rebarSF / rebarSFPerHr : 0
+  const rebarHrs = rebarSF > 0 && rebarSFPerHr > 0 ? rebarSF / rebarSFPerHr : 0
   const rebarMat = rebarSF * rebarLfPerSf * rebarPerLF
 
   const formHrs = formLF > 0 ? formLF / formLFPerHr : 0
@@ -421,6 +430,7 @@ function calcConcrete(
     // Resolved rates — exposed so the inline calculator icons can show + edit them
     concreteSFPerHr,
     rebarSFPerHr,
+    rebarSFPerHrBySpacing,
     formLFPerHr,
     sleeveLFPerHr,
     sealerNaturalSFPerHr,
@@ -859,6 +869,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   // Resolved add-on rates (identical on both tabs — sourced from rate maps).
   const {
     rebarSFPerHr,
+    rebarSFPerHrBySpacing,
     rebarPerLF,
     rebarLfPerSfBySpacing,
     formLFPerHr,
@@ -889,8 +900,11 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   if (n(subRebarSF) > 0) {
     const subRebarLfPerSf =
       rebarLfPerSfBySpacing[subRebarSpacing] ?? rebarLfPerSfBySpacing['24" OC']
+    const subRebarSFPerHr =
+      rebarSFPerHrBySpacing[subRebarSpacing] ?? rebarSFPerHrBySpacing['24" OC']
     subSideCost +=
-      n(subRebarSF) * subRebarLfPerSf * rebarPerLF + (n(subRebarSF) / rebarSFPerHr) * lrph
+      n(subRebarSF) * subRebarLfPerSf * rebarPerLF +
+      (subRebarSFPerHr > 0 ? n(subRebarSF) / subRebarSFPerHr : 0) * lrph
   }
   // Sleeves
   if (n(subSleeveLF) > 0) {
@@ -1089,33 +1103,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           value: n(laborRates[t.rateName]),
         })),
         {
-          label: 'Concrete - Rebar 24" OC',
-          table: 'labor_rates',
-          name: 'Concrete - Rebar 24" OC',
-          category: 'Concrete',
-          mode: 'coefficient',
-          unitLabel: 'Sq Ft per hr',
-          value: calc.rebarSFPerHr,
-        },
-        {
-          label: 'Rebar LF/SF — 24" OC',
-          table: 'misc_rates',
-          name: 'Concrete - Rebar LF/SF 24" OC',
-          category: 'Concrete',
-          mode: 'coefficient',
-          unitLabel: 'Ln Ft per Sq Ft',
-          value: calc.rebarLfPerSfBySpacing['24" OC'],
-        },
-        {
-          label: 'Rebar LF/SF — 12" OC',
-          table: 'misc_rates',
-          name: 'Concrete - Rebar LF/SF 12" OC',
-          category: 'Concrete',
-          mode: 'coefficient',
-          unitLabel: 'Ln Ft per Sq Ft',
-          value: calc.rebarLfPerSfBySpacing['12" OC'],
-        },
-        {
           label: 'Concrete - Form Setting',
           table: 'labor_rates',
           name: 'Concrete - Form Setting',
@@ -1154,10 +1141,62 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
         // Concrete mix catalog (vendor-supplied 'Concrete Mix' products) + the
         // named install materials (rebar, form lumber, sleeves, color).
         ...catalogBlockItems('Concrete Mix'),
-        ...materialRateRows('Rebar ' + (rebarSize || '#4')),
         ...materialRateRows('Concrete - Form Lumber LF'),
         ...materialRateRows('Concrete - Sleeve Per 10LF'),
         ...materialRateRows('Concrete - Color Per CY'),
+      ],
+    },
+    {
+      group: 'Rebar Install',
+      items: [
+        {
+          label: 'Rebar Labor — 24"/12" OC',
+          table: 'labor_rates',
+          name: 'Concrete - Rebar 24" OC',
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: 'Sq Ft per hr',
+          value: calc.rebarSFPerHrBySpacing['24" OC'],
+        },
+        {
+          label: 'Rebar Labor — 18" OC',
+          table: 'labor_rates',
+          name: 'Concrete - Rebar 18" OC',
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: 'Sq Ft per hr',
+          value: calc.rebarSFPerHrBySpacing['18" OC'],
+        },
+        {
+          label: 'Rebar LF/SF — 24" OC',
+          table: 'misc_rates',
+          name: 'Concrete - Rebar LF/SF 24" OC',
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: 'Ln Ft per Sq Ft',
+          value: calc.rebarLfPerSfBySpacing['24" OC'],
+        },
+        {
+          label: 'Rebar LF/SF — 18" OC',
+          table: 'misc_rates',
+          name: 'Concrete - Rebar LF/SF 18" OC',
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: 'Ln Ft per Sq Ft',
+          value: calc.rebarLfPerSfBySpacing['18" OC'],
+        },
+        {
+          label: 'Rebar LF/SF — 12" OC',
+          table: 'misc_rates',
+          name: 'Concrete - Rebar LF/SF 12" OC',
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: 'Ln Ft per Sq Ft',
+          value: calc.rebarLfPerSfBySpacing['12" OC'],
+        },
+        // Rebar material $/Ln Ft by size (shared Basic Materials → Reinforcement
+        // rows) — globally editable here for every module that uses them.
+        ...REBAR_SIZES.flatMap(sz => materialRateRows('Rebar ' + sz)),
       ],
     },
     {
