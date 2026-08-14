@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { setMaterialPrice, restoreMaterial } from '../lib/materialCatalog'
 import MaterialDetailModal, { MoveMaterialModal, CopyMaterialModal } from '../components/MaterialDetailModal'
+import TaxonomyManager from '../components/TaxonomyManager'
 import { formatUnit } from '../lib/units'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -29,7 +30,7 @@ const vendorCode = name =>
   isStandardName(name) ? 'STD' : (name || '').replace(/[^a-z0-9]/gi, '').slice(0, 4).toUpperCase() || 'VEN'
 
 export default function MasterMaterialRates() {
-  const [view, setView] = useState('vendor') // 'vendor' | 'standard' | 'archived'
+  const [view, setView] = useState('vendor') // 'vendor' | 'standard' | 'misc' | 'cat' | 'sub' | 'archived'
   const [materials, setMaterials] = useState([])
   const [vendors, setVendors] = useState([])
   const [loading, setLoading] = useState(true)
@@ -202,32 +203,41 @@ export default function MasterMaterialRates() {
 
   return (
     <div className="mt-3 flex-1 min-h-0 flex flex-col">
-      {/* View toggle (frozen above the scrolling table) */}
-      <div className="mb-3 flex-shrink-0">
-        <div className="flex justify-center items-center gap-2">
-          {[
-            { k: 'vendor', l: 'Vendor' },
-            { k: 'standard', l: 'Standard' },
-            { k: 'misc', l: 'Misc' },
-            { k: 'archived', l: 'Archived' },
-          ].map(t => (
-            <button
-              key={t.k}
-              onClick={() => setView(t.k)}
-              className={`px-16 py-2.5 text-sm font-semibold rounded-lg border transition-colors ${
-                view === t.k
-                  ? 'bg-green-700 text-white border-green-700'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              {t.l}
-            </button>
-          ))}
-        </div>
+      {/* View toggle (frozen above the scrolling table) — white sub-tab bar to
+          match Sales → Settings and the Labor / Subcontractor rate tables. */}
+      <div className="flex border border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0 rounded-xl mb-3">
+        {[
+          { k: 'vendor', l: 'Vendor' },
+          { k: 'standard', l: 'Standard' },
+          { k: 'misc', l: 'Misc' },
+          { k: 'cat', l: 'Categories' },
+          { k: 'sub', l: 'Sub-Categories' },
+          { k: 'archived', l: 'Archived' },
+        ].map(t => (
+          <button
+            key={t.k}
+            onClick={() => setView(t.k)}
+            className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
+              view === t.k
+                ? 'border-green-700 text-green-800'
+                : 'border-transparent text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            {t.l}
+          </button>
+        ))}
       </div>
 
       {view === 'misc' ? (
         <MiscRatesPanel />
+      ) : view === 'cat' ? (
+        <div className="flex-1 min-h-0 overflow-auto">
+          <TaxonomyManager scope="material" kind="category" />
+        </div>
+      ) : view === 'sub' ? (
+        <div className="flex-1 min-h-0 overflow-auto">
+          <TaxonomyManager scope="material" kind="subcategory" />
+        </div>
       ) : (
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
         <div className="flex flex-wrap items-center gap-3 px-3 py-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">

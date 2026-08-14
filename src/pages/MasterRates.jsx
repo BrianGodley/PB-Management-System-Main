@@ -843,8 +843,8 @@ export default function MasterRates({ only } = {}) {
   ]
   const subColumns = [
     { key: 'code', label: 'Code', editable: false, render: codeCell(subCodeMap) },
-    { key: 'category', label: 'Category', type: 'select', options: subCatOptions },
     { key: 'company_name', label: 'Subcontractor', placeholder: 'e.g. ABC Concrete Co.' },
+    { key: 'category', label: 'Category', type: 'select', options: subCatOptions },
     { key: 'sub_category', label: 'Sub Category', type: 'select', options: subSubOptions, placeholder: 'describe…' },
     { key: 'trade', label: 'Item', bold: true, stripCat: true, placeholder: 'e.g. Flatwork Pour' },
     { key: 'unit', label: 'Unit', type: 'select', options: SUB_UNIT_OPTIONS },
@@ -945,7 +945,7 @@ export default function MasterRates({ only } = {}) {
 
       {/* Embedded views (only=…) hide the tab bar — surface Categories here. */}
       {only && embedScope && (
-        <div className="flex gap-1 border-b border-gray-200 mb-3">
+        <div className="flex border border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0 rounded-xl mb-3">
           {[
             { key: 'rates', label: only === 'labor' ? 'Labor Rates' : 'Subcontractor Rates' },
             { key: 'cat', label: 'Categories' },
@@ -954,7 +954,7 @@ export default function MasterRates({ only } = {}) {
             <button
               key={t.key}
               onClick={() => setEmbeddedView(t.key)}
-              className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+              className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
                 embeddedView === t.key
                   ? 'border-green-700 text-green-800'
                   : 'border-transparent text-gray-500 hover:text-gray-800'
