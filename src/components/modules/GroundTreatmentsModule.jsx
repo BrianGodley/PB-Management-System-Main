@@ -15,8 +15,22 @@ import { catalogOptions, fetchModuleCatalog } from '../../lib/materialCatalog'
 // sub-category is named "Decomposed Granite" — remap it back to the "DG" marker.
 const GT_MARKER_REMAP = { 'Decomposed Granite': 'DG' }
 async function fetchGtRows() {
-  const rows = await fetchModuleCatalog(['Ground Treatments'])
-  return (rows || []).map(r => ({ ...r, sub_category: GT_MARKER_REMAP[r.sub_category] || r.sub_category }))
+  // DG base materials were consolidated company-wide into Basic Materials →
+  // 'Decomposed Granite' (priced per Cu Yd) and MOVED out of Ground Treatments.
+  // Fetch Basic Materials alongside GT, but merge in ONLY its 'Decomposed
+  // Granite' rows so the DG picker/price resolves them — no other Basic
+  // Materials sub-categories leak into the Mulch/Gravel/etc. pickers. The rows
+  // then flow through the existing 'Decomposed Granite' → 'DG' marker remap, so
+  // the DG resolver (which filters by sub_category, not category) is unchanged.
+  const [gtRows, basicRows] = await Promise.all([
+    fetchModuleCatalog(['Ground Treatments']),
+    fetchModuleCatalog(['Basic Materials']),
+  ])
+  const dgFromBasic = (basicRows || []).filter(r => r.sub_category === 'Decomposed Granite')
+  return [...(gtRows || []), ...dgFromBasic].map(r => ({
+    ...r,
+    sub_category: GT_MARKER_REMAP[r.sub_category] || r.sub_category,
+  }))
 }
 
 // Section Type options — DB-driven from the new catalog: every Standard

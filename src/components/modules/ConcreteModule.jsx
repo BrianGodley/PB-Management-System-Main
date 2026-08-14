@@ -110,6 +110,16 @@ const REBAR_SIZES = ['#3', '#4', '#5', '#6', '#8']
 
 const n = v => parseFloat(v) || 0
 
+// Base Install material is the canonical Basic Materials 'Class II Roadbase'
+// ($/Cu Yd). Resolved by NAME from the shared Standard rate map — mirrors
+// ArtificialTurfModule's firstDefinedRate so the old 'Base - Class II Roadbase'
+// key still resolves for pre-consolidation snapshots. First defined value wins.
+const CLASS2_NAMES = ['Class II Roadbase', 'Base - Class II Roadbase']
+const firstDefinedRate = (m, keys) => {
+  for (const k of keys) if (m && m[k] != null) return m[k]
+  return undefined
+}
+
 function calcConcrete(
   state,
   laborRatePerHour = null,
@@ -213,7 +223,10 @@ function calcConcrete(
   const formMaterialPerLF = P.price('Concrete - Form Lumber LF', { category: 'Concrete', unit: 'LF' })
   const sleevePer10LF = P.price('Concrete - Sleeve Per 10LF', { category: 'Concrete', unit: '10LF' })
   const colorCostPerCY = P.price('Concrete - Color Per CY', { category: 'Concrete', unit: 'CY' })
-  const costBase = n(mr['Base - Class II Roadbase']) // display-only; Base prices per-row from the catalog (bt.fallback)
+  // Base Install MATERIAL price ($/Cu Yd) — the canonical Basic Materials
+  // 'Class II Roadbase' Standard price, resolved by name (the old 'Concrete
+  // Base' sub-category source has been consolidated/archived into this record).
+  const costBase = n(firstDefinedRate(mr, CLASS2_NAMES))
 
   // ── Sub / equipment costs (subcontractor_rates) ──────────────────────────
   const pumpFeeFlat = n(sr['Concrete - Pump Flat Fee'])
@@ -246,10 +259,12 @@ function calcConcrete(
     const rate = n(lr[BASE_METHOD_LABOR_NAME[m]])
     const hrs = (sf / 100) * depth * rate
     const bt = rowOpt('Concrete Base', r)
-    // MATERIAL is by VOLUME, priced per CUBIC YARD (company-wide). Base
-    // cubic yards = SF × depth(in)/12 ÷ 27; the picked catalog item's price
-    // is now interpreted as $/Cu Yd.
-    const mat = r.type ? (sf * (depth / 12) / 27) * bt.fallback : 0
+    // MATERIAL is by VOLUME, priced per CUBIC YARD. Base cubic yards =
+    // SF × depth(in)/12 ÷ 27. Priced from the canonical Basic Materials
+    // 'Class II Roadbase' Standard rate (costBase, $/Cu Yd); a vendor-picked
+    // 'Concrete Base' product, if any, overrides that Standard price.
+    const baseRate = bt.fallback > 0 ? bt.fallback : costBase
+    const mat = sf > 0 ? (sf * (depth / 12) / 27) * baseRate : 0
     baseHrsTot += hrs
     baseMatTot += mat
     return { hrs, mat, rate }
@@ -1162,7 +1177,9 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           unitLabel: 'hrs per in·100 Sq Ft',
           value: n(laborRates[BASE_METHOD_LABOR_NAME[m]]),
         })),
-        // Base material catalog (vendor-supplied 'Concrete Base' products).
+        // Canonical base material — Basic Materials 'Class II Roadbase' ($/Cu Yd).
+        ...materialRateRows('Class II Roadbase'),
+        // Base material catalog (any vendor-supplied 'Concrete Base' products).
         ...catalogBlockItems('Concrete Base'),
       ],
     },
@@ -1584,11 +1601,14 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 const methodRate = n(laborRates[BASE_METHOD_LABOR_NAME[_bm]])
                 const baseOpts = sectionOptions('Concrete Base', row.vendor)
                 const bt = resolveType(row.type, baseOpts)
-                const baseRate = bt.fallback
+                // Base material $/Cu Yd = canonical Basic Materials 'Class II
+                // Roadbase' Standard rate (costBase), unless a vendor-picked
+                // 'Concrete Base' product overrides it.
+                const baseRate = bt.fallback > 0 ? bt.fallback : costBase
                 const c = {
                   hrs: _sf > 0 ? (_sf / 100) * _depth * methodRate : 0,
                   // Material priced per Cu Yd: SF × depth(in)/12 ÷ 27 × $/Cu Yd.
-                  mat: row.type ? (_sf * (_depth / 12) / 27) * baseRate : 0,
+                  mat: _sf > 0 ? (_sf * (_depth / 12) / 27) * baseRate : 0,
                 }
                 return (
                   <tr key={i} className="border-b border-gray-100">

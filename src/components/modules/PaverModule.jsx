@@ -174,8 +174,9 @@ function calcPaver(
     const baseCuYd = baseSf > 0 && depthIn > 0 ? (baseSf * (depthIn / 12)) / 27 : 0
 
     // Base material $/CY — vendor-aware. A real vendor overrides via its catalog
-    // item; Standard ('Class II Roadbase') uses the seeded rate, falling back to
-    // the legacy single base-rock rate. The selected price now represents $/CY.
+    // item; Standard resolves the CANONICAL shared Basic Materials record
+    // 'Class II Roadbase' ($24/CY) by NAME (the Paver-specific base item has been
+    // archived) with a legacy-name / base-rock fallback. Price now represents $/CY.
     let baseCyRate = 0
     if (!row.baseVendor) {
       // No base vendor selected yet → $0 base material (pick a vendor first).
@@ -189,7 +190,12 @@ function calcPaver(
       )
       baseCyRate = bItem ? priceOf(bItem) : baseRockPerTon
     } else {
-      baseCyRate = mr['Base Material - Class II Roadbase'] ?? baseRockPerTon
+      // Standard / house price = canonical Basic Materials 'Class II Roadbase'.
+      baseCyRate =
+        n(mr['Class II Roadbase']) ||
+        n(mr['Base - Class II Roadbase']) ||
+        n(mr['Base Material - Class II Roadbase']) ||
+        baseRockPerTon
     }
     const baseMatCost = baseCuYd * baseCyRate
 
@@ -726,7 +732,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
     const [lrRes, matMap, rows, venRes] = await Promise.all([
       supabase.from('labor_rates').select('name,rate').eq('category', 'Paver'),
       fetchStandardRateMap(['Paver', 'Basic Materials']),
-      fetchModuleCatalog(['Paver']),
+      fetchModuleCatalog(['Paver', 'Basic Materials']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
@@ -1129,6 +1135,8 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         // named base/setting materials (Standard Class II Roadbase, base rock,
         // bedding sand).
         ...catalogBlockItems(PAVER_CAT.base),
+        // Canonical shared Basic Materials base rock (now the Standard base price).
+        ...materialRateRows('Class II Roadbase'),
         ...materialRateRows('Base Material - Class II Roadbase'),
         ...materialRateRows('Paver - Base Rock'),
         ...materialRateRows('Bedding Sand'),
