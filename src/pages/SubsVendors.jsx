@@ -411,6 +411,14 @@ export default function SubsVendors({ mode = 'sub' }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Always land on the Directory tab when the module first opens. The same
+  // SubsVendors instance is reused across the /portal/subs and /portal/vendors
+  // routes (same component type, same Outlet slot → no remount), so switching
+  // between them would otherwise keep the previously-selected tab.
+  useEffect(() => {
+    setSvTab('directory')
+  }, [mode])
+
   // If the active tab isn't valid for this mode (e.g. 'contracts' on a vendor
   // module), fall back to the directory so no blank panel shows.
   useEffect(() => {
