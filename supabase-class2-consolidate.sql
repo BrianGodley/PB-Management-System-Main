@@ -13,13 +13,16 @@ set price = 24
 from public.material m
 join public.category c    on c.id = m.category_id
 join public.subcategory s on s.id = m.subcategory_id
-join public.subs_vendors v on v.id = mp.vendor_id
 where mp.material_id = m.id
   and mp.effective_end is null
   and c.name = 'Basic Materials'
   and s.name = 'Aggregate & Concrete'
   and m.description = 'Class II Roadbase'
-  and (v.company_name ilike 'standard' or v.company_name ilike 'unspecified');
+  and exists (
+    select 1 from public.subs_vendors v
+    where v.id = mp.vendor_id
+      and (v.company_name ilike 'standard' or v.company_name ilike 'unspecified')
+  );
 
 update public.material m
 set unit = 'Cu Yd'

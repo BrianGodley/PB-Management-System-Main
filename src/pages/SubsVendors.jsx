@@ -898,17 +898,18 @@ export default function SubsVendors({ mode = 'sub' }) {
             />
           )}
           {mode === 'vendor' && (
-            <DropdownTab
-              icon="🧱"
-              label="Materials"
-              current={svTab}
-              onSelect={setSvTab}
-              items={[
-                { key: 'categories', label: 'Material Categories' },
-                { key: 'subcategories', label: 'Material Sub-Categories' },
-                { key: 'materialRates', label: 'Master Material Rates' },
-              ]}
-            />
+            // Material Categories + Sub-Categories now live as tabs inside Master
+            // Material Rates, so this is a single tab (no dropdown).
+            <button
+              onClick={() => setSvTab('materialRates')}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                svTab === 'materialRates'
+                  ? 'border-green-700 text-green-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              🧱 Materials
+            </button>
           )}
 
           {[
