@@ -5,6 +5,7 @@ import { fetchAllPaginated } from '../lib/fetchAll'
 import { useAuth } from '../contexts/AuthContext'
 import { DEFAULT_ESTIMATE_GPMD, DEFAULT_SALES_TAX_RATE } from '../lib/companyDefaults'
 import ConsultantPicker from '../components/ConsultantPicker'
+import EstimateSettingsPanel from '../components/EstimateSettingsPanel'
 import FunnelsBoard from '../components/FunnelsBoard'
 import SalesCalendar from '../components/SalesCalendar'
 import Bids from './Bids'
@@ -1467,7 +1468,7 @@ export default function Clients() {
         <div className="mt-3 flex-1 flex flex-col overflow-hidden">
           <div className="flex border border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0 rounded-xl mb-3">
             {[
-              { key: 'general', label: '⚙️ General' },
+              { key: 'general', label: '⚙️ Estimate Settings' },
             ].map(t => (
               <button
                 key={t.key}
@@ -1483,12 +1484,7 @@ export default function Clients() {
             ))}
           </div>
           <div className="bg-gray-50 px-6 py-6 flex-1 overflow-y-auto rounded-xl">
-            {clientSettingsTab === 'general' && (
-              <div className="space-y-4">
-                <EstimateGpmdCard />
-                <SalesTaxRateCard />
-              </div>
-            )}
+            {clientSettingsTab === 'general' && <EstimateSettingsPanel />}
           </div>
         </div>
       )}
