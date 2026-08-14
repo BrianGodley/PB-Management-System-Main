@@ -300,6 +300,34 @@ export default function SubsVendors({ mode = 'sub' }) {
   const [error, setError] = useState('')
   const [sortDir, setSortDir] = useState('asc')
   const [selected, setSelected] = useState(new Set())
+  // Category / Sub-Category each sub is associated with, aggregated from the
+  // subcontractor rate items assigned to them (vendor_id).
+  const [ratesByVendor, setRatesByVendor] = useState({})
+  useEffect(() => {
+    let gone = false
+    supabase
+      .from('subcontractor_rates')
+      .select('vendor_id, category, sub_category')
+      .not('vendor_id', 'is', null)
+      .then(({ data }) => {
+        if (gone) return
+        const m = {}
+        ;(data || []).forEach(r => {
+          if (!r.vendor_id) return
+          if (!m[r.vendor_id]) m[r.vendor_id] = { cats: new Set(), subs: new Set() }
+          if (r.category) m[r.vendor_id].cats.add(r.category)
+          if (r.sub_category) m[r.vendor_id].subs.add(r.sub_category)
+        })
+        const out = {}
+        Object.entries(m).forEach(([k, v]) => {
+          out[k] = { categories: [...v.cats].sort(), subCategories: [...v.subs].sort() }
+        })
+        setRatesByVendor(out)
+      })
+    return () => {
+      gone = true
+    }
+  }, [subsData])
   // Import flow: null → 'mapping' → 'preview'
   const [importStep, setImportStep] = useState(null)
   const [importType, setImportType] = useState('sub') // type being imported
@@ -1296,9 +1324,14 @@ export default function SubsVendors({ mode = 'sub' }) {
                         {mode === 'sub' ? 'Trades' : 'Offers'}
                       </th>
                       {mode === 'sub' && (
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">
-                          Services Pricing
-                        </th>
+                        <>
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">
+                            Category
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">
+                            Subcategory
+                          </th>
+                        </>
                       )}
                       {mode === 'vendor' && (
                         <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">
@@ -1335,9 +1368,18 @@ export default function SubsVendors({ mode = 'sub' }) {
                             ) || <span className="text-gray-300 italic">—</span>}
                           </td>
                           {mode === 'sub' && (
-                            <td className="px-4 py-2 text-gray-600 truncate">
-                              {sub.services_pricing || <span className="text-gray-300">—</span>}
-                            </td>
+                            <>
+                              <td className="px-4 py-2 text-gray-600 truncate">
+                                {(ratesByVendor[sub.id]?.categories || []).join(', ') || (
+                                  <span className="text-gray-300 italic">—</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-2 text-gray-600 truncate">
+                                {(ratesByVendor[sub.id]?.subCategories || []).join(', ') || (
+                                  <span className="text-gray-300 italic">—</span>
+                                )}
+                              </td>
+                            </>
                           )}
                           {mode === 'vendor' && (
                             <td className="px-4 py-2 text-gray-600 truncate">
