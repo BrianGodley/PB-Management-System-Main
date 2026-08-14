@@ -50,6 +50,7 @@ export default function TaxonomyManager({ kind = 'category', scope = 'material' 
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null) // { row } | { row: null } (add)
   const [listModal, setListModal] = useState(null) // { title, items:[{label,code}] }
+  const [q, setQ] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -148,6 +149,18 @@ export default function TaxonomyManager({ kind = 'category', scope = 'material' 
       setSortDir('asc')
       return key
     })
+  // Text search over name + code + (sub-categories') parent category name.
+  const visibleRows = useMemo(() => {
+    const s = q.trim().toLowerCase()
+    if (!s) return sortedRows
+    return sortedRows.filter(r =>
+      [r.name, r.code, !isCat ? catName(r.category_id) : '']
+        .filter(Boolean)
+        .some(x => x.toLowerCase().includes(s))
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortedRows, q, cats])
+
   const arrow = key => (sortKey === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '')
   const Th = ({ k, label, align = 'left' }) => (
     <th
@@ -173,17 +186,25 @@ export default function TaxonomyManager({ kind = 'category', scope = 'material' 
   )
 
   return (
-    <div className="mt-3">
+    <div>
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="flex items-center gap-3 px-3 py-2 bg-gray-50 border-b border-gray-200">
-          <h3 className="text-sm font-semibold text-gray-700">{isCat ? 'Categories' : 'Sub-Categories'}</h3>
+        <div className="flex flex-wrap items-center gap-3 px-3 py-2 bg-gray-50 border-b border-gray-200">
+          <h3 className="text-sm font-semibold text-gray-700 whitespace-nowrap">
+            {isCat ? 'Categories' : 'Sub-Categories'}
+          </h3>
+          <input
+            className="border border-gray-200 rounded-md px-2 py-1 text-xs w-56"
+            placeholder={isCat ? 'Search name / code…' : 'Search name / code / category…'}
+            value={q}
+            onChange={e => setQ(e.target.value)}
+          />
           <button
             onClick={() => setModal({ row: null })}
-            className="ml-auto text-sm text-green-700 font-semibold hover:underline"
+            className="ml-auto text-sm text-green-700 font-semibold hover:underline whitespace-nowrap"
           >
             + Add {isCat ? 'Category' : 'Sub-Category'}
           </button>
-          <span className="text-xs text-gray-400">{rows.length}</span>
+          <span className="text-xs text-gray-400">{visibleRows.length}</span>
         </div>
 
         <div className="overflow-auto max-h-[calc(100vh-16rem)]">
@@ -215,7 +236,7 @@ export default function TaxonomyManager({ kind = 'category', scope = 'material' 
                   </td>
                 </tr>
               ) : (
-                sortedRows.map(row => (
+                visibleRows.map(row => (
                   <tr key={row.id} className="hover:bg-gray-50">
                     <td className="px-3 py-1.5 font-mono text-gray-500 text-center">{row.code}</td>
                     <td className="px-3 py-1.5">

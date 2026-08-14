@@ -239,6 +239,9 @@ export default function MasterMaterialRates() {
       ) : (
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
         <div className="flex flex-wrap items-center gap-3 px-3 py-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
+          <h3 className="text-sm font-semibold text-gray-700 whitespace-nowrap">
+            {isArchivedView ? 'Archived' : isVendorView ? 'Vendor Rates' : 'Standard Rates'}
+          </h3>
           <select
             className="border border-gray-200 rounded-md px-2 py-1 text-xs bg-white"
             value={cat}
@@ -260,9 +263,9 @@ export default function MasterMaterialRates() {
             {!isArchivedView && (
               <button
                 onClick={() => setAdding(isVendorView ? 'vendor' : 'standard')}
-                className="text-xs px-2 py-1 rounded bg-green-700 text-white hover:bg-green-800"
+                className="text-sm text-green-700 font-semibold hover:underline whitespace-nowrap"
               >
-                {isVendorView ? '+ Add Vendor Material' : '+ Add Standard Material'}
+                + Add {isVendorView ? 'Vendor Material' : 'Standard Material'}
               </button>
             )}
             <span className="text-xs text-gray-400">{rows.length} items</span>
@@ -676,6 +679,7 @@ function MiscRatesPanel() {
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
       <div className="flex flex-wrap items-center gap-3 px-3 py-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
+        <h3 className="text-sm font-semibold text-gray-700 whitespace-nowrap">Misc Rates</h3>
         <select
           className="border border-gray-200 rounded-md px-2 py-1 text-xs bg-white"
           value={cat}
@@ -696,7 +700,7 @@ function MiscRatesPanel() {
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={() => setAdding(a => !a)}
-            className="text-xs px-2 py-1 rounded bg-green-700 text-white hover:bg-green-800"
+            className="text-sm text-green-700 font-semibold hover:underline whitespace-nowrap"
           >
             {adding ? 'Cancel' : '+ Add Misc Material'}
           </button>
