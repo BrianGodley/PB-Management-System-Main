@@ -16,20 +16,19 @@ const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
 // Utilities Module — fields and calculations from Excel estimator (Utilities Module tab)
 // Covers trenching, utility lines (gas/electrical), gas fixtures, and add-ons.
 //
-// All material costs AND labor time rates are stored in material_rates
-// (category = 'Utilities') so they are fully editable in Master Rates.
-// Hardcoded values here are fallbacks only, used when the DB row is absent.
+// All material costs AND labor time rates are stored in the rate tables
+// (labor_rates + misc_rates + catalog, category = 'Utilities') so they are fully
+// editable in Master Rates. These maps carry ONLY item identity (dbName +
+// laborDbName); every price/coefficient is read live — no hardcoded fallbacks.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// dbName = name in material_rates for the material cost row
-// laborDbName = name in material_rates for the labor rate row (hrs per unit)
+// dbName = material name (catalog Standard / misc_rates) for the material cost.
+// laborDbName = labor_rates name for the per-unit labor coefficient.
 // Electrical Pipe (conduit) — electrical-conduit entries only. Gas-pipe entries
 // moved to GAS_PIPE_TYPES (Gas Pipe Sub-category) below.
 const UTILITY_LINE_TYPES = {
   'PVC Conduit with Electrical': {
-    costPerLF: 1.92,
     dbName: 'PVC Conduit with Electrical',
-    laborPerLF: 0.05,
     laborDbName: 'PVC Conduit with Electrical - Labor Rate',
   },
 }
@@ -37,78 +36,54 @@ const UTILITY_LINE_TYPES = {
 // Gas Pipe — poly + black iron gas pipe entries (moved out of UTILITY_LINE_TYPES).
 const GAS_PIPE_TYPES = {
   '1-1/2" Poly Gas Pipe': {
-    costPerLF: 4.25,
     dbName: '1-1/2" Poly Gas Pipe',
-    laborPerLF: 0.05,
     laborDbName: '1-1/2" Poly Gas Pipe - Labor Rate',
   },
   '1" Black Iron Gas Pipe': {
-    costPerLF: 2.76,
     dbName: '1" Black Iron Gas Pipe',
-    laborPerLF: 0.15,
     laborDbName: '1" Black Iron Gas Pipe - Labor Rate',
   },
   '1-1/2" Black Iron Gas Pipe': {
-    costPerLF: 4.23,
     dbName: '1-1/2" Black Iron Gas Pipe',
-    laborPerLF: 0.2,
     laborDbName: '1-1/2" Black Iron Gas Pipe - Labor Rate',
   },
   '2" Black Iron Gas Pipe': {
-    costPerLF: 5.72,
     dbName: '2" Black Iron Gas Pipe',
-    laborPerLF: 0.25,
     laborDbName: '2" Black Iron Gas Pipe - Labor Rate',
   },
 }
 
 const GAS_FIXTURE_TYPES = {
   '12" Single Gas Ring': {
-    cost: 61.75,
     dbName: '12" Single Gas Ring',
-    laborHrs: 2,
     laborDbName: '12" Single Gas Ring - Labor Rate',
   },
   '18" Single Gas Ring': {
-    cost: 84.75,
     dbName: '18" Single Gas Ring',
-    laborHrs: 2,
     laborDbName: '18" Single Gas Ring - Labor Rate',
   },
   '24" Single Gas Ring': {
-    cost: 107.75,
     dbName: '24" Single Gas Ring',
-    laborHrs: 2,
     laborDbName: '24" Single Gas Ring - Labor Rate',
   },
   '24" Double Gas Ring': {
-    cost: 163.25,
     dbName: '24" Double Gas Ring',
-    laborHrs: 2,
     laborDbName: '24" Double Gas Ring - Labor Rate',
   },
   "2' Straight Gas Bar": {
-    cost: 35.5,
     dbName: "2' Straight Gas Bar",
-    laborHrs: 2,
     laborDbName: "2' Straight Gas Bar - Labor Rate",
   },
   "3' Straight Gas Bar": {
-    cost: 56.0,
     dbName: "3' Straight Gas Bar",
-    laborHrs: 2.5,
     laborDbName: "3' Straight Gas Bar - Labor Rate",
   },
   "4' Straight Gas Bar": {
-    cost: 68.5,
     dbName: "4' Straight Gas Bar",
-    laborHrs: 3,
     laborDbName: "4' Straight Gas Bar - Labor Rate",
   },
   'Gas Shut-Off Valve': {
-    cost: 89.7,
     dbName: 'Gas Shut-Off Valve',
-    laborHrs: 2,
     laborDbName: 'Gas Shut-Off Valve - Labor Rate',
   },
 }
@@ -116,72 +91,49 @@ const GAS_FIXTURE_TYPES = {
 // Electrical fixtures — same table/rate shape as gas, in their own section.
 const ELECTRICAL_FIXTURE_TYPES = {
   'Electric Sub-panel': {
-    cost: 300,
     dbName: 'Electric Sub-panel',
-    laborHrs: 4.5,
     laborDbName: 'Electric Sub-panel - Labor Rate',
   },
   'Electric Disconnect': {
-    cost: 150,
     dbName: 'Electric Disconnect',
-    laborHrs: 2.5,
     laborDbName: 'Electric Disconnect - Labor Rate',
   },
   'GFCI Protected Receptacles': {
-    cost: 86.25,
     dbName: 'GFCI Protected Receptacles',
-    laborHrs: 2,
     laborDbName: 'GFCI Protected Receptacles - Labor Rate',
   },
   'Bubble Covers for Receptacles': {
-    cost: 19.19,
     dbName: 'Bubble Covers for Receptacles',
-    laborHrs: 0.25,
     laborDbName: 'Bubble Covers for Receptacles - Labor Rate',
   },
   'Infratech W2024SS 2000W 240V Heater (Stainless)': {
-    cost: 725.22,
     dbName: 'Infratech W2024SS 2000W 240V Heater (Stainless)',
-    laborHrs: 6,
     laborDbName: 'Infratech W2024SS 2000W 240V Heater (Stainless) - Labor Rate',
   },
   'Infratech W39 Flush Mount Frame': {
-    cost: 572.26,
     dbName: 'Infratech W39 Flush Mount Frame',
-    laborHrs: 2,
     laborDbName: 'Infratech W39 Flush Mount Frame - Labor Rate',
   },
   'Infratech Single Duplex Switch in Surface Mount Gang Box': {
-    cost: 206.11,
     dbName: 'Infratech Single Duplex Switch in Surface Mount Gang Box',
-    laborHrs: 2,
     laborDbName: 'Infratech Single Duplex Switch in Surface Mount Gang Box - Labor Rate',
   },
 }
 
-// Sewer lines — ABS pipe. Labor = the matching Drainage SDR-35 rate + 50%
-// (3": 0.045 → 0.0675; 4": 0.0495 → 0.07425 hrs/LF). Trenching uses the
-// module's existing Trenching section (same min/cf as Drainage).
+// Sewer lines — ABS pipe. Trenching uses the module's existing Trenching section.
 const SEWER_LINE_TYPES = {
   '3" ABS': {
-    costPerLF: 4.5,
     dbName: '3" ABS Sewer Pipe',
-    laborPerLF: 0.0675,
     laborDbName: '3" ABS Sewer Pipe - Labor Rate',
   },
   '4" ABS': {
-    costPerLF: 6.0,
     dbName: '4" ABS Sewer Pipe',
-    laborPerLF: 0.07425,
     laborDbName: '4" ABS Sewer Pipe - Labor Rate',
   },
 }
 
 // Combined lookup so a row of either kind resolves its rate.
 const FIXTURE_TYPES = { ...GAS_FIXTURE_TYPES, ...ELECTRICAL_FIXTURE_TYPES }
-
-// Minutes per cubic foot by equipment type (same as Drainage)
-const TRENCH_MINS_PER_CF = { Trench: 10, Hand: 12.5 }
 
 // Each trench equipment maps to a labor_rates row so the inline calculator
 // icon next to the dropdown can edit the t/hr → min/cf rate.
@@ -192,18 +144,15 @@ const TRENCH_LABOR_RATE_NAME = {
 
 const ADD_ITEM_RATES = {
   // In-house electrical: quantity × install hours + material (NOT a sub cost).
+  // Identity only — material $ + labor hrs read live from the rate tables.
   curbCore: {
-    matCost: 250,
     dbName: 'Curb Core',
     label: 'Curb Core *',
-    laborHrs: 2,
     laborDbName: 'Curb Core - Labor Rate',
   },
   hydrocut: {
-    matCost: 50,
     dbName: 'Hydrocut Under Hardscape',
     label: 'Hydrocut Under Hardscape *',
-    laborHrs: 2,
     laborDbName: 'Hydrocut Under Hardscape - Labor Rate',
   },
 }
@@ -217,23 +166,20 @@ const DEFAULTS = {
 
 const n = v => parseFloat(v) || 0
 
-// ── Vendor catalog: built-in Type lists as {label, dbName, fallback, labor…} ──
-// The section's built-in items become the "Standard" option list; vendors tagged to
-// the matching material category supply additional priced items (material only —
-// labor is kept from the matching/last built-in item).
+// ── Vendor catalog: built-in Type lists as {label, dbName, laborDbName} ──
+// The section's built-in items name the catalog Standard item + its paired labor
+// coefficient row. Vendors tagged to the matching material category supply
+// additional priced items (material only — labor keeps the built-in's labor row).
+// No hardcoded price/labor fallbacks — every value is read live from the tables.
 const LINE_TYPE_ARR = Object.entries(UTILITY_LINE_TYPES).map(([label, t]) => ({
   label,
   dbName: t.dbName,
-  fallback: t.costPerLF,
   laborDbName: t.laborDbName,
-  laborFallback: t.laborPerLF,
 }))
 const GASPIPE_TYPE_ARR = Object.entries(GAS_PIPE_TYPES).map(([label, t]) => ({
   label,
   dbName: t.dbName,
-  fallback: t.costPerLF,
   laborDbName: t.laborDbName,
-  laborFallback: t.laborPerLF,
 }))
 // Electrical Wiring has NO code built-ins — it's purely catalog-sourced (items
 // live only under the 'Electrical Wiring' Sub-category on the Home Depot vendor).
@@ -241,23 +187,17 @@ const WIRE_TYPE_ARR = []
 const GAS_TYPE_ARR = Object.entries(GAS_FIXTURE_TYPES).map(([label, t]) => ({
   label,
   dbName: t.dbName,
-  fallback: t.cost,
   laborDbName: t.laborDbName,
-  laborFallback: t.laborHrs,
 }))
 const ELEC_TYPE_ARR = Object.entries(ELECTRICAL_FIXTURE_TYPES).map(([label, t]) => ({
   label,
   dbName: t.dbName,
-  fallback: t.cost,
   laborDbName: t.laborDbName,
-  laborFallback: t.laborHrs,
 }))
 const SEWER_LINE_ARR = Object.entries(SEWER_LINE_TYPES).map(([label, t]) => ({
   label,
   dbName: t.dbName,
-  fallback: t.costPerLF,
   laborDbName: t.laborDbName,
-  laborFallback: t.laborPerLF,
 }))
 // Section → material category name (used for vendor tagging + catalog lookup).
 const UTIL_CAT = {
@@ -298,9 +238,9 @@ function mergedUtilTypes(cat, builtInArr, materialRows, vendorSel = 'Standard') 
     return {
       label: o.label,
       dbName: o.row.name,
-      fallback: n(o.row.unit_cost),
+      // Catalog Standard price for this Item (DB-resolved, not a hardcoded fallback).
+      catalogPrice: n(o.row.unit_cost),
       laborDbName: bi?.laborDbName ?? `${o.label} - Labor Rate`,
-      laborFallback: bi?.laborFallback ?? 0,
       fromMaster: !bi,
     }
   })
@@ -327,24 +267,22 @@ function resolveUtilRow(cat, row, houseArr, materialRows, catDefaults, mp) {
   // Type options are the SELECTED VENDOR'S items (vendor-first, like Paver).
   const merged = mergedUtilTypes(cat, houseArr, materialRows, vsel)
   const builtIn = merged.find(o => o.label === row.type) || merged[0]
-  const laborVal = mp[builtIn?.laborDbName] ?? builtIn?.laborFallback ?? 0
+  // Labor coefficient read live from labor_rates (via mp) — no hardcoded fallback.
+  const laborVal = n(mp[builtIn?.laborDbName])
   let matDbName = builtIn?.dbName
-  let matFallback = builtIn?.fallback ?? 0
   const vrow = catalogItemFor(materialRows, cat, vsel, builtIn?.label, {
     ...CATALOG_OPTS,
     fallbackFirst: false,
   })
   if (vrow) {
     matDbName = vrow.name
-    matFallback = n(vrow.unit_cost)
   }
   // The SELECTED vendor's catalog row (vrow) is the source of truth for its price.
-  // Only when there's no catalog row for the selection do we fall back to the
-  // name-keyed Standard map (mp). Previously mp[name] (the Standard price) wrongly
-  // won even when a real vendor row existed, so a vendor showed the Standard price.
-  const matCost = vrow ? n(vrow.unit_cost) : (mp[matDbName] ?? matFallback)
+  // Otherwise the name-keyed Standard map (mp) — the catalog Standard price / misc
+  // rate. No hardcoded fallback: an unpriced item contributes $0.
+  const matCost = vrow ? n(vrow.unit_cost) : n(mp[matDbName])
   // matOpt drives the Type dropdown value + the material rate popover target.
-  const matOpt = { label: builtIn?.label, dbName: matDbName, fallback: matFallback }
+  const matOpt = { label: builtIn?.label, dbName: matDbName }
   return { opts: merged, matOpt, matCost, laborVal, laborBuiltIn: builtIn }
 }
 
@@ -397,9 +335,8 @@ function calcUtilities(
       d = n(r.depth)
     if (lf > 0 && w > 0 && d > 0) {
       const cf = lf * (w / 12) * (d / 12)
-      // DB value via labor_rates['Utilities Trench/Hand Excavation'] takes precedence
-      const minsPerCF =
-        materialPrices[TRENCH_LABOR_RATE_NAME[r.equipment]] ?? TRENCH_MINS_PER_CF[r.equipment] ?? 10
+      // min/cf read live from labor_rates['Utilities Trench/Hand Excavation'] — no fallback.
+      const minsPerCF = n(materialPrices[TRENCH_LABOR_RATE_NAME[r.equipment]])
       trenchHrs += (cf * minsPerCF) / 60
     }
   })
@@ -492,8 +429,8 @@ function calcUtilities(
   Object.entries(ADD_ITEM_RATES).forEach(([key, rate]) => {
     const qty = n(additionalItems[`${key}Qty`])
     if (qty > 0) {
-      const matCost = materialPrices[rate.dbName] ?? rate.matCost
-      const laborHrs = materialPrices[rate.laborDbName] ?? rate.laborHrs
+      const matCost = n(materialPrices[rate.dbName])
+      const laborHrs = n(materialPrices[rate.laborDbName])
       addHrs += qty * laborHrs
       addMat += qty * matCost
     }
@@ -839,7 +776,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   // Reuses the exact same per-unit rate lookups as the in-house calc, but
   // books (material$ + labor-hours × labor rate) as a sub COST. It does NOT
   // add to the module's in-house manDays / totalHrs / totalMat / laborCost.
-  const subTrenchRate = materialPrices['Utilities Sub Trench - Per LF'] ?? 12
+  const subTrenchRate = n(materialPrices['Utilities Sub Trench - Per LF'])
   let subSideCost = 0
   subTrenchRows.forEach(r => {
     subSideCost += n(r.lf) * subTrenchRate
@@ -921,8 +858,8 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   Object.entries(ADD_ITEM_RATES).forEach(([key, rate]) => {
     const qty = n(subAdditionalItems[`${key}Qty`])
     if (qty > 0) {
-      const matCost = materialPrices[rate.dbName] ?? rate.matCost
-      const laborHrs = materialPrices[rate.laborDbName] ?? rate.laborHrs
+      const matCost = n(materialPrices[rate.dbName])
+      const laborHrs = n(materialPrices[rate.laborDbName])
       subSideCost += qty * matCost + qty * laborHrs * laborRatePerHour
     }
   })
@@ -1102,26 +1039,26 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
     {
       group: 'Trenching',
       items: [
-        laborRow(TRENCH_LABOR_RATE_NAME.Trench, 'min/cf', materialPrices[TRENCH_LABOR_RATE_NAME.Trench] ?? TRENCH_MINS_PER_CF.Trench),
-        laborRow(TRENCH_LABOR_RATE_NAME.Hand, 'min/cf', materialPrices[TRENCH_LABOR_RATE_NAME.Hand] ?? TRENCH_MINS_PER_CF.Hand),
+        laborRow(TRENCH_LABOR_RATE_NAME.Trench, 'min/cf', materialPrices[TRENCH_LABOR_RATE_NAME.Trench]),
+        laborRow(TRENCH_LABOR_RATE_NAME.Hand, 'min/cf', materialPrices[TRENCH_LABOR_RATE_NAME.Hand]),
       ],
     },
     {
       group: 'Electrical Pipe',
       items: [
         ...Object.values(UTILITY_LINE_TYPES).map(t =>
-          laborRow(t.laborDbName, 'hr/LF', materialPrices[t.laborDbName] ?? t.laborPerLF)
+          laborRow(t.laborDbName, 'hr/LF', materialPrices[t.laborDbName])
         ),
-        ...Object.values(UTILITY_LINE_TYPES).flatMap(t => matRows(t.dbName, 'LF', t.costPerLF)),
+        ...Object.values(UTILITY_LINE_TYPES).flatMap(t => matRows(t.dbName, 'LF', 0)),
       ],
     },
     {
       group: 'Gas Pipe',
       items: [
         ...Object.values(GAS_PIPE_TYPES).map(t =>
-          laborRow(t.laborDbName, 'hr/LF', materialPrices[t.laborDbName] ?? t.laborPerLF)
+          laborRow(t.laborDbName, 'hr/LF', materialPrices[t.laborDbName])
         ),
-        ...Object.values(GAS_PIPE_TYPES).flatMap(t => matRows(t.dbName, 'LF', t.costPerLF)),
+        ...Object.values(GAS_PIPE_TYPES).flatMap(t => matRows(t.dbName, 'LF', 0)),
       ],
     },
     {
@@ -1142,36 +1079,36 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
       group: 'Gas Fixtures',
       items: [
         ...Object.values(GAS_FIXTURE_TYPES).map(t =>
-          laborRow(t.laborDbName, 'hr/ea', materialPrices[t.laborDbName] ?? t.laborHrs)
+          laborRow(t.laborDbName, 'hr/ea', materialPrices[t.laborDbName])
         ),
-        ...Object.values(GAS_FIXTURE_TYPES).flatMap(t => matRows(t.dbName, 'ea', t.cost)),
+        ...Object.values(GAS_FIXTURE_TYPES).flatMap(t => matRows(t.dbName, 'ea', 0)),
       ],
     },
     {
       group: 'Electrical Fixtures',
       items: [
         ...Object.values(ELECTRICAL_FIXTURE_TYPES).map(t =>
-          laborRow(t.laborDbName, 'hr/ea', materialPrices[t.laborDbName] ?? t.laborHrs)
+          laborRow(t.laborDbName, 'hr/ea', materialPrices[t.laborDbName])
         ),
-        ...Object.values(ELECTRICAL_FIXTURE_TYPES).flatMap(t => matRows(t.dbName, 'ea', t.cost)),
+        ...Object.values(ELECTRICAL_FIXTURE_TYPES).flatMap(t => matRows(t.dbName, 'ea', 0)),
       ],
     },
     {
       group: 'Sewer Pipe',
       items: [
         ...Object.values(SEWER_LINE_TYPES).map(t =>
-          laborRow(t.laborDbName, 'hr/LF', materialPrices[t.laborDbName] ?? t.laborPerLF)
+          laborRow(t.laborDbName, 'hr/LF', materialPrices[t.laborDbName])
         ),
-        ...Object.values(SEWER_LINE_TYPES).flatMap(t => matRows(t.dbName, 'LF', t.costPerLF)),
+        ...Object.values(SEWER_LINE_TYPES).flatMap(t => matRows(t.dbName, 'LF', 0)),
       ],
     },
     {
       group: 'Additional Subgrade Work',
       items: [
         ...Object.values(ADD_ITEM_RATES).map(rate =>
-          laborRow(rate.laborDbName, 'hr/ea', materialPrices[rate.laborDbName] ?? rate.laborHrs)
+          laborRow(rate.laborDbName, 'hr/ea', materialPrices[rate.laborDbName])
         ),
-        ...Object.values(ADD_ITEM_RATES).flatMap(rate => matRows(rate.dbName, 'ea', rate.matCost)),
+        ...Object.values(ADD_ITEM_RATES).flatMap(rate => matRows(rate.dbName, 'ea', 0)),
       ],
     },
     {
@@ -1185,7 +1122,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
           mode: 'currency',
           unitLabel: 'Ln Ft',
           section: 'sub',
-          value: materialPrices['Utilities Sub Trench - Per LF'] ?? 12,
+          value: materialPrices['Utilities Sub Trench - Per LF'],
         },
       ],
     },
@@ -1287,10 +1224,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                 const lf = n(row.lf),
                   w = n(row.width),
                   d = n(row.depth)
-                const minsPerCF =
-                  materialPrices[TRENCH_LABOR_RATE_NAME[row.equipment]] ??
-                  TRENCH_MINS_PER_CF[row.equipment] ??
-                  10
+                const minsPerCF = n(materialPrices[TRENCH_LABOR_RATE_NAME[row.equipment]])
                 const cf = lf > 0 && w > 0 && d > 0 ? lf * (w / 12) * (d / 12) : 0
                 const hrs = cf > 0 ? (cf * minsPerCF) / 60 : 0
                 const laborName = TRENCH_LABOR_RATE_NAME[row.equipment]
@@ -1384,8 +1318,8 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
           {/* Curb Core & Hydrocut — qty based */}
           {Object.entries(ADD_ITEM_RATES).map(([key, rate]) => {
             const qty = n(activeAdditionalItems[`${key}Qty`])
-            const matCost = materialPrices[rate.dbName] ?? rate.matCost
-            const laborHrs = materialPrices[rate.laborDbName] ?? rate.laborHrs
+            const matCost = n(materialPrices[rate.dbName])
+            const laborHrs = n(materialPrices[rate.laborDbName])
             return (
               <div key={key} className="flex items-center gap-3 py-1.5 border-b border-gray-100">
                 <span className="text-xs text-gray-700 flex-1 inline-flex items-center gap-1">

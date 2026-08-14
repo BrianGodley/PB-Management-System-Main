@@ -29,32 +29,14 @@ function LineRow({ label, value, sub }) {
 const fmt2 = v =>
   `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-const COPING_DEFAULTS = {
-  'Paver Bullnose': { mat: 8.5, hrs: 0.4 },
-  'Travertine 12"x12"': { mat: 13.0, hrs: 0.444 },
-  'Precast Concrete': { mat: 50.0, hrs: 0.444 },
-  'Arizona Flagstone Eased': { mat: 13.0, hrs: 0.5 },
-  'Other Flagstone': { mat: 18.0, hrs: 0.533 },
-  'Pacific Clay': { mat: 12.0, hrs: 0.41 },
-  'Pour In Place Sand Finish': { mat: 7.5, hrs: 0.727 },
-}
-const SPILLWAY_DEFAULTS = {
-  TILE: { mat: 30.0, hrs: 1.25 },
-  FLAGSTONE: { mat: 24.0, hrs: 0.5 },
-}
-const TILE_INSTALL_DEFAULTS = {
-  '6" Squares': 0.356,
-  '3" Squares': 0.4,
-  '2" Squares': 0.421,
-  '1" Squares': 0.457,
-  Segmental: 0.533,
-  'Multi-Piece': 0.457,
-  'Glass Tile': 0.533,
-}
-const INTERIOR_DEFAULTS = { 'White Plaster': 45, Quartzscapes: 87, Stonescapes: 83 }
-
 export default function PoolSummary({ module }) {
   const data = module?.data || {}
+  // Rate snapshots saved with the module at save time. Line-item hrs/$ shown
+  // below are recomputed from these snapshots (no hardcoded fallback), so the
+  // detail view matches the numbers used when the estimate was created.
+  const laborRates = data.laborRates || {}
+  const materialPrices = data.materialPrices || {}
+  const subRates = data.subRates || {}
   // In-House and Sub are independent tab records. Legacy estimates stored their
   // inputs flat = In-House. Display the quantities for the tab this estimate was
   // saved under (subType); the financial snapshot (calc) is shared top-level.
@@ -164,7 +146,7 @@ export default function PoolSummary({ module }) {
             const t = tile[k] || {}
             const lf = n(t.lf)
             if (!lf) return null
-            const hrs = lf * (TILE_INSTALL_DEFAULTS[t.installType] ?? 0.356)
+            const hrs = lf * n(laborRates[`Tile - ${t.installType}`])
             return (
               <LineRow
                 key={k}
@@ -185,13 +167,14 @@ export default function PoolSummary({ module }) {
             .filter(sw => n(sw.qty) > 0 && n(sw.lf) > 0)
             .map((sw, i) => {
               const totalLF = n(sw.qty) * n(sw.lf)
-              const def = SPILLWAY_DEFAULTS[sw.type] || { mat: 24, hrs: 0.5 }
+              const swHrs = n(laborRates[`Spillway - ${sw.type}`])
+              const swMat = n(materialPrices[`Spillway ${sw.type}`])
               return (
                 <LineRow
                   key={i}
                   label={`${sw.struct} — ${sw.type} × ${sw.qty}`}
                   value={`${totalLF} Ln Ft`}
-                  sub={`${(totalLF * def.hrs).toFixed(1)} hrs · ${fmt2(totalLF * def.mat)} mat`}
+                  sub={`${(totalLF * swHrs).toFixed(1)} hrs · ${fmt2(totalLF * swMat)} mat`}
                 />
               )
             })}
@@ -206,14 +189,15 @@ export default function PoolSummary({ module }) {
             .filter(cr => n(cr.lf) > 0)
             .map((cr, i) => {
               const sided = cr.sided === 'double' ? 2 : 1
-              const def = COPING_DEFAULTS[cr.type] || { mat: 8.5, hrs: 0.4 }
+              const crHrs = n(laborRates[`Coping - ${cr.type}`])
+              const crMat = n(materialPrices[`Coping Mat - ${cr.type}`])
               const totalLF = n(cr.lf) * sided
               return (
                 <LineRow
                   key={i}
                   label={`${cr.struct} — ${cr.type}${cr.sided === 'double' ? ' (double)' : ''}`}
                   value={`${n(cr.lf)} Ln Ft`}
-                  sub={`${(totalLF * def.hrs).toFixed(1)} hrs · ${fmt2(totalLF * def.mat)} mat`}
+                  sub={`${(totalLF * crHrs).toFixed(1)} hrs · ${fmt2(totalLF * crMat)} mat`}
                 />
               )
             })}
@@ -258,7 +242,7 @@ export default function PoolSummary({ module }) {
           <SectionLabel title="Interior Finish" />
           {activeStructs.map(([k, s]) => {
             const fin = interiorFinish[k] || {}
-            const priceSF = INTERIOR_DEFAULTS[fin.type] ?? 45
+            const priceSF = n(subRates[`Interior Finish - ${fin.type}`])
             const sub = n(fin.subCost) || n(s.waterSF) * priceSF
             return sub > 0 ? (
               <LineRow

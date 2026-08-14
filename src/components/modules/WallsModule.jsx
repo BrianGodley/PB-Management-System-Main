@@ -50,21 +50,21 @@ const DRAINAGE_CATEGORY = 'Drainage'
 // Grout cubic-yards per block is derived per block type from W/H/L exactly
 // like the Excel formula: cells (L-2) × H × (W-2) inches³ → cubic yards.
 const CMU_BLOCK_TYPES = [
-  { name: '8x8x16 (GREY)', w: 8, h: 8, l: 16, spec: 24, price: 2.59 },
-  { name: '8x8x16 SPLITFACE', w: 8, h: 8, l: 16, spec: 24, price: 5.19 },
-  { name: '8x8x16 (COLOR)', w: 8, h: 8, l: 16, spec: 24, price: 6.19 },
-  { name: '8x6x16 SLUMP (GREY)', w: 8, h: 6, l: 16, spec: 20, price: 4.09 },
-  { name: '8x6x16 SLUMP (COLOR)', w: 8, h: 6, l: 16, spec: 20, price: 4.59 },
-  { name: '12x8x16 (GREY)', w: 12, h: 8, l: 16, spec: 16, price: 5.39 },
-  { name: '12x8x16 SPLITFACE', w: 12, h: 8, l: 16, spec: 16, price: 7.59 },
-  { name: '12x8x16 (COLOR)', w: 12, h: 8, l: 16, spec: 16, price: 6.39 },
-  { name: '12x6x16 SLUMP (COLOR)', w: 12, h: 6, l: 16, spec: 14, price: 8.6 },
-  { name: '12x6x16 SLUMP (GREY)', w: 12, h: 6, l: 16, spec: 14, price: 7.89 },
-  { name: '6x8x16 (GREY)', w: 6, h: 8, l: 16, spec: 28, price: 2.13 },
-  { name: '6x8x16 SPLITFACE', w: 6, h: 8, l: 16, spec: 28, price: 4.59 },
-  { name: '6x8x16 (COLOR)', w: 6, h: 8, l: 16, spec: 28, price: 2.59 },
-  { name: '6x6x16 SLUMP (COLOR)', w: 6, h: 6, l: 16, spec: 26, price: 3.0 },
-  { name: '6x6x16 SLUMP (GREY)', w: 6, h: 6, l: 16, spec: 26, price: 3.01 },
+  { name: '8x8x16 (GREY)', w: 8, h: 8, l: 16, spec: 24 },
+  { name: '8x8x16 SPLITFACE', w: 8, h: 8, l: 16, spec: 24 },
+  { name: '8x8x16 (COLOR)', w: 8, h: 8, l: 16, spec: 24 },
+  { name: '8x6x16 SLUMP (GREY)', w: 8, h: 6, l: 16, spec: 20 },
+  { name: '8x6x16 SLUMP (COLOR)', w: 8, h: 6, l: 16, spec: 20 },
+  { name: '12x8x16 (GREY)', w: 12, h: 8, l: 16, spec: 16 },
+  { name: '12x8x16 SPLITFACE', w: 12, h: 8, l: 16, spec: 16 },
+  { name: '12x8x16 (COLOR)', w: 12, h: 8, l: 16, spec: 16 },
+  { name: '12x6x16 SLUMP (COLOR)', w: 12, h: 6, l: 16, spec: 14 },
+  { name: '12x6x16 SLUMP (GREY)', w: 12, h: 6, l: 16, spec: 14 },
+  { name: '6x8x16 (GREY)', w: 6, h: 8, l: 16, spec: 28 },
+  { name: '6x8x16 SPLITFACE', w: 6, h: 8, l: 16, spec: 28 },
+  { name: '6x8x16 (COLOR)', w: 6, h: 8, l: 16, spec: 28 },
+  { name: '6x6x16 SLUMP (COLOR)', w: 6, h: 6, l: 16, spec: 26 },
+  { name: '6x6x16 SLUMP (GREY)', w: 6, h: 6, l: 16, spec: 26 },
 ]
 const DEFAULT_BLOCK_NAME = '8x8x16 (GREY)'
 function blockByName(name) {
@@ -86,110 +86,110 @@ function groutCyPerBlock(b) {
 const WALL_RATES = {
   // Basics resolve from the shared "Basic Materials" catalog so vendor price
   // changes propagate. Fallbacks equal the seeded values → price-preserving.
-  rebar: { db: 'Rebar', fb: 1.388 }, // $/LF (Basic Materials) — Brick/Timber only
+  rebar: { db: 'Rebar' }, // $/LF (Basic Materials) — Brick/Timber only
   // Sized rebar material prices (per LF, Standard). CMU + PIP pick a size per
   // wall/footing; labor for ALL rebar stays the shared rebarLab ('Set Rebar').
-  rebar3Mat: { db: 'Rebar #3', fb: 1.2 },
-  rebar4Mat: { db: 'Rebar #4', fb: 1.5 },
-  rebar5Mat: { db: 'Rebar #5', fb: 1.75 },
-  rebar6Mat: { db: 'Rebar #6', fb: 2.0 },
-  rebar8Mat: { db: 'Rebar #8', fb: 2.5 },
-  concreteHand: { db: 'Concrete - Hand Mix', fb: 92.0 }, // $/CY (Basic Materials)
-  concreteTruck: { db: 'Concrete - Ready Mix (Truck)', fb: 185.0 }, // $/CY (Basic Materials)
-  groutPumpSetup: { db: 'Grout Pump - Setup', fb: 402.5 }, // Basic Materials
-  groutPumpPerYd: { db: 'Grout Pump - Per CY', fb: 9.2 }, // Basic Materials
-  digLab: { db: 'Wall Dig Footing Labor Rate', fb: 4.0 },
-  rebarLab: { db: 'Wall Set Rebar Labor Rate', fb: 35.0 },
-  blockLab: { db: 'Wall Set Block Labor Rate', fb: 10.4 },
-  handGroutLab: { db: 'Wall Hand Grout Labor Rate', fb: 5.5 },
-  pumpGroutLab: { db: 'Wall Pump Grout Labor Rate', fb: 81.0 },
-  setupCleanLab: { db: 'Wall Setup Clean Labor Rate', fb: 30.0 },
-  sandStucco: { db: 'Sand Stucco', fb: 0.0 },
-  smoothStucco: { db: 'Smooth Stucco', fb: 0.0 },
-  ledgerstone: { db: 'Ledgerstone', fb: 10.0 },
-  stackedStone: { db: 'Stacked Stone', fb: 10.0 },
-  tile: { db: 'Tile', fb: 6.5 },
-  flagstone: { db: 'Real Flagstone', fb: 400.0 },
-  realStone: { db: 'Real Stone', fb: 400.0 },
-  sandStuccoLab: { db: 'Sand Stucco - Wall Labor Rate', fb: 92 },
-  smoothStuccoLab: { db: 'Smooth Stucco - Wall Labor Rate', fb: 65 },
-  ledgerstoneLab: { db: 'Ledgerstone - Wall Labor Rate', fb: 24 },
-  stackedStoneLab: { db: 'Stacked Stone - Wall Labor Rate', fb: 24 },
-  tileLab: { db: 'Tile - Wall Labor Rate', fb: 0.2867 },
-  flagstoneLab: { db: 'Real Flagstone - Wall Labor Rate', fb: 0.4487 },
-  realStoneLab: { db: 'Real Stone - Wall Labor Rate', fb: 0.8954 },
-  capFlagstone: { db: 'Wall Cap Flagstone', fb: 500.0 },
-  capPrecast: { db: 'Wall Cap Precast', fb: 50.0 },
-  capBullnose: { db: 'Wall Cap Bullnose Brick', fb: 5.0 },
-  wpPrimerMembrane: { db: 'Wall WP Primer Membrane', fb: 1.8 },
-  wp3CoatRollOn: { db: 'Wall WP 3 Coat Roll On', fb: 1.2 },
-  wpThoroseal: { db: 'Wall WP Thoroseal Roll On', fb: 1.5 },
-  wpDimpleMembrane: { db: 'Wall WP Dimple Membrane', fb: 2.1 },
+  rebar3Mat: { db: 'Rebar #3' },
+  rebar4Mat: { db: 'Rebar #4' },
+  rebar5Mat: { db: 'Rebar #5' },
+  rebar6Mat: { db: 'Rebar #6' },
+  rebar8Mat: { db: 'Rebar #8' },
+  concreteHand: { db: 'Concrete - Hand Mix' }, // $/CY (Basic Materials)
+  concreteTruck: { db: 'Concrete - Ready Mix (Truck)' }, // $/CY (Basic Materials)
+  groutPumpSetup: { db: 'Grout Pump - Setup' }, // Basic Materials
+  groutPumpPerYd: { db: 'Grout Pump - Per CY' }, // Basic Materials
+  digLab: { db: 'Wall Dig Footing Labor Rate' },
+  rebarLab: { db: 'Wall Set Rebar Labor Rate' },
+  blockLab: { db: 'Wall Set Block Labor Rate' },
+  handGroutLab: { db: 'Wall Hand Grout Labor Rate' },
+  pumpGroutLab: { db: 'Wall Pump Grout Labor Rate' },
+  setupCleanLab: { db: 'Wall Setup Clean Labor Rate' },
+  sandStucco: { db: 'Sand Stucco' },
+  smoothStucco: { db: 'Smooth Stucco' },
+  ledgerstone: { db: 'Ledgerstone' },
+  stackedStone: { db: 'Stacked Stone' },
+  tile: { db: 'Tile' },
+  flagstone: { db: 'Real Flagstone' },
+  realStone: { db: 'Real Stone' },
+  sandStuccoLab: { db: 'Sand Stucco - Wall Labor Rate' },
+  smoothStuccoLab: { db: 'Smooth Stucco - Wall Labor Rate' },
+  ledgerstoneLab: { db: 'Ledgerstone - Wall Labor Rate' },
+  stackedStoneLab: { db: 'Stacked Stone - Wall Labor Rate' },
+  tileLab: { db: 'Tile - Wall Labor Rate' },
+  flagstoneLab: { db: 'Real Flagstone - Wall Labor Rate' },
+  realStoneLab: { db: 'Real Stone - Wall Labor Rate' },
+  capFlagstone: { db: 'Wall Cap Flagstone' },
+  capPrecast: { db: 'Wall Cap Precast' },
+  capBullnose: { db: 'Wall Cap Bullnose Brick' },
+  wpPrimerMembrane: { db: 'Wall WP Primer Membrane' },
+  wp3CoatRollOn: { db: 'Wall WP 3 Coat Roll On' },
+  wpThoroseal: { db: 'Wall WP Thoroseal Roll On' },
+  wpDimpleMembrane: { db: 'Wall WP Dimple Membrane' },
   // Cap + waterproofing install labor (editable; fallbacks = the original
   // hard-coded coefficients so totals don't move until a rate is changed).
-  capFlagstoneLab: { db: 'Wall Cap Flagstone Labor', fb: 0.25 }, // hr/LF
-  capPrecastLab: { db: 'Wall Cap Precast Labor', fb: 0.2 }, // hr/ea
-  capPipLab: { db: 'Wall Cap PIP Concrete Labor', fb: 0.15 }, // hr/LF
-  capBullnoseLab: { db: 'Wall Cap Bullnose Labor', fb: 0.08 }, // hr/LF
-  wpLabor: { db: 'Wall WP Install Labor', fb: 200 }, // SF/hr
-  wpLabPrimerMembrane: { db: 'Wall WP Primer + Membrane Labor', fb: 100 }, // SF/hr
-  wpLab2Coat: { db: 'Wall WP 2 Coats Roll On Labor', fb: 125 }, // SF/hr
-  wpLabThoroseal: { db: 'Wall WP Thoroseal Labor', fb: 75 }, // SF/hr
-  wpLabDimple: { db: 'Wall WP Dimple Labor', fb: 50 }, // SF/hr
-  brickLayLab: { db: 'Wall Brick Lay Labor', fb: 1.75 }, // hr/SF of brick wall face
+  capFlagstoneLab: { db: 'Wall Cap Flagstone Labor' }, // hr/LF
+  capPrecastLab: { db: 'Wall Cap Precast Labor' }, // hr/ea
+  capPipLab: { db: 'Wall Cap PIP Concrete Labor' }, // hr/LF
+  capBullnoseLab: { db: 'Wall Cap Bullnose Labor' }, // hr/LF
+  wpLabor: { db: 'Wall WP Install Labor' }, // SF/hr
+  wpLabPrimerMembrane: { db: 'Wall WP Primer + Membrane Labor' }, // SF/hr
+  wpLab2Coat: { db: 'Wall WP 2 Coats Roll On Labor' }, // SF/hr
+  wpLabThoroseal: { db: 'Wall WP Thoroseal Labor' }, // SF/hr
+  wpLabDimple: { db: 'Wall WP Dimple Labor' }, // SF/hr
+  brickLayLab: { db: 'Wall Brick Lay Labor' }, // hr/SF of brick wall face
   // Timber / Lumber wall — every coefficient is table-driven (fb = legacy value).
-  timberBdftBase: { db: 'Wall Timber Qty per LF', fb: 0.2917 }, // wood units / LF (base)
-  timberBdftCourse: { db: 'Wall Timber Qty per Added Course', fb: 0.55 }, // wood units / LF / course
-  timberLfLab: { db: 'Wall Timber LF Labor', fb: 0.4417 }, // hr / LF (base)
-  timberCourseLab: { db: 'Wall Timber Added Course Labor', fb: 0.8 }, // hr / LF / course
-  timberPostMat: { db: 'Wall Timber Steel Post', fb: 100 }, // $ / post
-  timberPostLab: { db: 'Wall Timber Steel Post Labor', fb: 0.4667 }, // hr / post
+  timberBdftBase: { db: 'Wall Timber Qty per LF' }, // wood units / LF (base)
+  timberBdftCourse: { db: 'Wall Timber Qty per Added Course' }, // wood units / LF / course
+  timberLfLab: { db: 'Wall Timber LF Labor' }, // hr / LF (base)
+  timberCourseLab: { db: 'Wall Timber Added Course Labor' }, // hr / LF / course
+  timberPostMat: { db: 'Wall Timber Steel Post' }, // $ / post
+  timberPostLab: { db: 'Wall Timber Steel Post Labor' }, // hr / post
   // ── Structural coefficients (were hard-coded in the calc functions; fb =
   // legacy value so totals are unchanged until a rate is seeded/edited). ──────
-  blockOrderWaste: { db: 'Wall Block Order Waste', fb: 1.1 }, // order multiplier (grey + BB)
+  blockOrderWaste: { db: 'Wall Block Order Waste' }, // order multiplier (grey + BB)
   // Footing horizontal-rebar wrap/waste factor (+10% for wraps). Applied to the
   // footing horizontal rebar LF in the CMU + PIP calcs. Table-driven so the waste
   // % is tunable; fb = the legacy 1.1 so totals are unchanged until edited.
-  footingRebarWaste: { db: 'Wall Footing Rebar Waste', fb: 1.1 }, // × (order/wrap multiplier)
-  footingPourLab: { db: 'Wall Footing Pour Labor Rate', fb: 0.2037 }, // CY / hr (pour productivity) — legacy, kept for back-compat
+  footingRebarWaste: { db: 'Wall Footing Rebar Waste' }, // × (order/wrap multiplier)
+  footingPourLab: { db: 'Wall Footing Pour Labor Rate' }, // CY / hr (pour productivity) — legacy, kept for back-compat
   // Footing pour labor split by method. The wall's Footing Pump toggle selects
   // which one drives the calc. Both seeded to the legacy footingPourLab value so
   // existing estimates don't move until a rate is edited.
-  footingPourHandLab: { db: 'Wall Hand Pour Footing Labor Rate', fb: 0.2037 }, // CY / hr (hand pour)
-  footingPourPumpLab: { db: 'Wall Pump Footing Labor Rate', fb: 0.2037 }, // CY / hr (pump pour)
+  footingPourHandLab: { db: 'Wall Hand Pour Footing Labor Rate' }, // CY / hr (hand pour)
+  footingPourPumpLab: { db: 'Wall Pump Footing Labor Rate' }, // CY / hr (pump pour)
   // Modular wall install labor — split OUT of CMU's blockLab so the two are
   // independent. fb equals blockLab's so totals are unchanged until edited.
-  modularInstallLab: { db: 'Wall Modular Install Labor Rate', fb: 10.4 }, // blk / hr
+  modularInstallLab: { db: 'Wall Modular Install Labor Rate' }, // blk / hr
   // Footing EXCAVATION is no longer part of the wall build (footing input fields
   // only drive install + material). All footing digging is priced in the per-wall
   // "Dig and Haul Footing Soil" section: a flat CF/hr dig rate + a soil-haul
   // (container) material cost. Every value is table-driven.
-  footingDigHaulLab: { db: 'Wall Footing Dig+Haul Labor Rate', fb: 8 }, // CF / hr (dig + load — Hand)
-  footingDigHaulExcavLab: { db: 'Wall Footing Dig+Haul Excavator Labor Rate', fb: 25 }, // CF / hr (Excavator)
-  footingSoilSwell: { db: 'Wall Footing Soil Swell', fb: 1.2 }, // loose/broken swell factor
-  footingSoilContainerCy: { db: 'Wall Footing Soil Container CY', fb: 10 }, // CY per haul container
-  footingSoilContainerPrice: { db: 'Wall Footing Soil Container Price', fb: 770 }, // $ per container
-  footingSoilTonsPerCy: { db: 'Wall Footing Soil Tons per CY', fb: 1.5 }, // tons per loose CY (display)
-  curveLab: { db: 'Wall Curve Labor Factor', fb: 0.5 }, // factor on struct hrs per % curved
+  footingDigHaulLab: { db: 'Wall Footing Dig+Haul Labor Rate' }, // CF / hr (dig + load — Hand)
+  footingDigHaulExcavLab: { db: 'Wall Footing Dig+Haul Excavator Labor Rate' }, // CF / hr (Excavator)
+  footingSoilSwell: { db: 'Wall Footing Soil Swell' }, // loose/broken swell factor
+  footingSoilContainerCy: { db: 'Wall Footing Soil Container CY' }, // CY per haul container
+  footingSoilContainerPrice: { db: 'Wall Footing Soil Container Price' }, // $ per container
+  footingSoilTonsPerCy: { db: 'Wall Footing Soil Tons per CY' }, // tons per loose CY (display)
+  curveLab: { db: 'Wall Curve Labor Factor' }, // factor on struct hrs per % curved
   // Poured-In-Place stem coefficients.
-  pipStemLfLab: { db: 'Wall PIP Stem LF Labor', fb: 1.0833 }, // hr / LF (base course)
-  pipStemCourseLab: { db: 'Wall PIP Stem Added Course Labor', fb: 1.6167 }, // hr / LF / added course
-  pipStemCyPerLf: { db: 'Wall PIP Stem CY per LF', fb: 0.2833 }, // CY / LF (base course)
-  pipStemCyPerLfCourse: { db: 'Wall PIP Stem CY per LF per Course', fb: 0.3667 }, // CY / LF / added course
+  pipStemLfLab: { db: 'Wall PIP Stem LF Labor' }, // hr / LF (base course)
+  pipStemCourseLab: { db: 'Wall PIP Stem Added Course Labor' }, // hr / LF / added course
+  pipStemCyPerLf: { db: 'Wall PIP Stem CY per LF' }, // CY / LF (base course)
+  pipStemCyPerLfCourse: { db: 'Wall PIP Stem CY per LF per Course' }, // CY / LF / added course
   // Wall-finish material coefficients (waste / setting-bed / coverage / extras).
-  ledgerWaste: { db: 'Wall Ledgerstone Waste', fb: 1.1 }, // material order multiplier
-  ledgerSetSfPerUnit: { db: 'Wall Ledgerstone Setting SF per Unit', fb: 5 }, // SF per setting unit
-  ledgerSetUnitCost: { db: 'Wall Ledgerstone Setting Unit Cost', fb: 2 }, // $ per setting unit
-  ledgerSubExtraPerSf: { db: 'Wall Ledgerstone Sub Extra per SF', fb: 0.4 }, // $ / SF (sub flat)
-  stackedWaste: { db: 'Wall Stacked Stone Waste', fb: 1.1 }, // material order multiplier
-  stackedSetSfPerUnit: { db: 'Wall Stacked Stone Setting SF per Unit', fb: 5 }, // SF per setting unit
-  stackedSetUnitCost: { db: 'Wall Stacked Stone Setting Unit Cost', fb: 2 }, // $ per setting unit
-  stackedSubExtraPerSf: { db: 'Wall Stacked Stone Sub Extra per SF', fb: 0.4 }, // $ / SF (sub flat)
-  tileExtraPerSf: { db: 'Wall Tile Extra per SF', fb: 1 }, // $ / SF (thinset/grout)
-  flagstoneSfPerTon: { db: 'Wall Real Flagstone SF per Ton', fb: 80 }, // SF coverage per ton
-  flagstoneExtraPerSf: { db: 'Wall Real Flagstone Extra per SF', fb: 1.5 }, // $ / SF (setting)
-  realStoneSfPerTon: { db: 'Wall Real Stone SF per Ton', fb: 70 }, // SF coverage per ton
-  realStoneExtraPerSf: { db: 'Wall Real Stone Extra per SF', fb: 2 }, // $ / SF (setting)
+  ledgerWaste: { db: 'Wall Ledgerstone Waste' }, // material order multiplier
+  ledgerSetSfPerUnit: { db: 'Wall Ledgerstone Setting SF per Unit' }, // SF per setting unit
+  ledgerSetUnitCost: { db: 'Wall Ledgerstone Setting Unit Cost' }, // $ per setting unit
+  ledgerSubExtraPerSf: { db: 'Wall Ledgerstone Sub Extra per SF' }, // $ / SF (sub flat)
+  stackedWaste: { db: 'Wall Stacked Stone Waste' }, // material order multiplier
+  stackedSetSfPerUnit: { db: 'Wall Stacked Stone Setting SF per Unit' }, // SF per setting unit
+  stackedSetUnitCost: { db: 'Wall Stacked Stone Setting Unit Cost' }, // $ per setting unit
+  stackedSubExtraPerSf: { db: 'Wall Stacked Stone Sub Extra per SF' }, // $ / SF (sub flat)
+  tileExtraPerSf: { db: 'Wall Tile Extra per SF' }, // $ / SF (thinset/grout)
+  flagstoneSfPerTon: { db: 'Wall Real Flagstone SF per Ton' }, // SF coverage per ton
+  flagstoneExtraPerSf: { db: 'Wall Real Flagstone Extra per SF' }, // $ / SF (setting)
+  realStoneSfPerTon: { db: 'Wall Real Stone SF per Ton' }, // SF coverage per ton
+  realStoneExtraPerSf: { db: 'Wall Real Stone Extra per SF' }, // $ / SF (setting)
   // ── Per-wall Demo (Slope Removal + Footing Demo). Hours, tons and dump fees
   // reuse the referenced Demo modules' DIRT calc EXACTLY. Every coefficient is
   // table-driven (fb = the value copied from the referenced Demo module) and is
@@ -200,45 +200,45 @@ const WALL_RATES = {
   //   dump  = ceil(removalYards / containerCy) × containerPrice, where
   //           removalYards = (sf × (thickIn/12) / 27) × swell
   // Excavator shares Mini Skid's rates; Footing Demo offers Hand + Excavator.
-  demoHandDirt: { db: 'Demo - Hand - Dirt SF', fb: 1 }, // hr per 100 SF·in (HandDemoModule sfLaborHrs)
-  demoMiniDirt: { db: 'Demo - Mini - Dirt SF', fb: 1 }, // hr per 100 SF·in (MiniSkidSteerDemoModule; Excavator shares)
-  demoSkidDirt: { db: 'Demo - Skid - Dirt SF', fb: 1 }, // hr per 100 SF·in (SkidSteerDemoModule)
+  demoHandDirt: { db: 'Demo - Hand - Dirt SF' }, // hr per 100 SF·in (HandDemoModule sfLaborHrs)
+  demoMiniDirt: { db: 'Demo - Mini - Dirt SF' }, // hr per 100 SF·in (MiniSkidSteerDemoModule; Excavator shares)
+  demoSkidDirt: { db: 'Demo - Skid - Dirt SF' }, // hr per 100 SF·in (SkidSteerDemoModule)
   // Backfilling & Compaction — SHARED with the Demo module's Grade Fill rates
   // (per equipment; Excavator uses Mini) and Jumping Jack rate. hr per 100 SF·in.
-  backfillHandGF: { db: 'Demo - Hand - Grade Fill SF', fb: 1 },
-  backfillMiniGF: { db: 'Demo - Mini - Grade Fill SF', fb: 1 },
-  backfillSkidGF: { db: 'Demo - Skid - Grade Fill SF', fb: 1 },
-  compJJ: { db: 'Demo - Hand - JJ SF', fb: 1 }, // Jumping Jack; Hand compaction = handCompactionMult× this
+  backfillHandGF: { db: 'Demo - Hand - Grade Fill SF' },
+  backfillMiniGF: { db: 'Demo - Mini - Grade Fill SF' },
+  backfillSkidGF: { db: 'Demo - Skid - Grade Fill SF' },
+  compJJ: { db: 'Demo - Hand - JJ SF' }, // Jumping Jack; Hand compaction = handCompactionMult× this
   // Hand compaction productivity relative to Jumping Jack (Hand = 3× the JJ hrs).
   // Table-driven multiplier; fb = the legacy 3 so totals are unchanged until edited.
-  handCompactionMult: { db: 'Wall Hand Compaction Multiplier', fb: 3 }, // × (on JJ rate)
-  demoSfToTonsDenom: { db: 'Demo SF to Tons Denom', fb: 200 }, // sfToTons: (sf / 200) × depthIn (all Demo modules)
+  handCompactionMult: { db: 'Wall Hand Compaction Multiplier' }, // × (on JJ rate)
+  demoSfToTonsDenom: { db: 'Demo SF to Tons Denom' }, // sfToTons: (sf / 200) × depthIn (all Demo modules)
   // Container removal (dump) — per method (misc_rates, category Demo).
-  demoHandContainer: { db: 'Demo - Hand Container (Low-Boy)', fb: 770 }, // $ per container
-  demoHandContainerCy: { db: 'Demo - Hand Container Capacity (CY)', fb: 10 }, // CY per container
-  demoHandSwell: { db: 'Demo - Hand Removal Swell', fb: 1.2 }, // broken-material swell factor
-  demoMiniContainer: { db: 'Demo - Mini Container (Low-Boy)', fb: 770 }, // $ per container (Excavator shares)
-  demoMiniContainerCy: { db: 'Demo - Mini Container Capacity (CY)', fb: 10 }, // CY per container
-  demoMiniSwell: { db: 'Demo - Mini Removal Swell', fb: 1.2 }, // swell factor
-  demoSkidContainer: { db: 'Demo - Skid Container (Low-Boy)', fb: 770 }, // $ per container
-  demoSkidContainerCy: { db: 'Demo - Skid Container Capacity (CY)', fb: 10 }, // CY per container
-  demoSkidSwell: { db: 'Demo - Skid Removal Swell', fb: 1.2 }, // swell factor
+  demoHandContainer: { db: 'Demo - Hand Container (Low-Boy)' }, // $ per container
+  demoHandContainerCy: { db: 'Demo - Hand Container Capacity (CY)' }, // CY per container
+  demoHandSwell: { db: 'Demo - Hand Removal Swell' }, // broken-material swell factor
+  demoMiniContainer: { db: 'Demo - Mini Container (Low-Boy)' }, // $ per container (Excavator shares)
+  demoMiniContainerCy: { db: 'Demo - Mini Container Capacity (CY)' }, // CY per container
+  demoMiniSwell: { db: 'Demo - Mini Removal Swell' }, // swell factor
+  demoSkidContainer: { db: 'Demo - Skid Container (Low-Boy)' }, // $ per container
+  demoSkidContainerCy: { db: 'Demo - Skid Container Capacity (CY)' }, // CY per container
+  demoSkidSwell: { db: 'Demo - Skid Removal Swell' }, // swell factor
   // ── Per-wall Drainage (French Drain). Shares the Drainage module's rate rows
   // (category 'Drainage') so a rate edited in either place changes the one shared
   // row. fb = the Drainage module's Standard values. Read through the merged rate
   // map (category 'Drainage' is loaded into `mp`). NO hard-coded numbers.
-  drainPerf4Mat: { db: '4" Perforated Pipe', fb: 2.26 }, // $/LF material
-  drainPerf3Mat: { db: '3" Perforated Pipe', fb: 1.48 }, // $/LF material
-  drainPerf4Lab: { db: 'Drainage 4" Perforated Pipe Labor', fb: 0.05 }, // hr/LF
-  drainPerf3Lab: { db: 'Drainage 3" Perforated Pipe Labor', fb: 0.045 }, // hr/LF
-  drainSockMat: { db: 'Drainage Drain Sock Material', fb: 1 }, // $/LF
-  drainSockLab: { db: 'Drainage Drain Sock Labor', fb: 1 }, // $/LF (converted to hrs)
-  drainBurritoMat: { db: 'Drainage Burrito Wrap Material', fb: 1 }, // $/LF
-  drainBurritoLab: { db: 'Drainage Burrito Wrap Labor', fb: 1.75 }, // $/LF
-  drainGravel12Mat: { db: 'Drainage Gravel Bed 12in Material', fb: 2 }, // $/LF
-  drainGravel12Lab: { db: 'Drainage Gravel Bed 12in Labor', fb: 1 }, // $/LF
-  drainGravel24Mat: { db: 'Drainage Gravel Bed 24in Material', fb: 8 }, // $/LF
-  drainGravel24Lab: { db: 'Drainage Gravel Bed 24in Labor', fb: 3 }, // $/LF
+  drainPerf4Mat: { db: '4" Perforated Pipe' }, // $/LF material
+  drainPerf3Mat: { db: '3" Perforated Pipe' }, // $/LF material
+  drainPerf4Lab: { db: 'Drainage 4" Perforated Pipe Labor' }, // hr/LF
+  drainPerf3Lab: { db: 'Drainage 3" Perforated Pipe Labor' }, // hr/LF
+  drainSockMat: { db: 'Drainage Drain Sock Material' }, // $/LF
+  drainSockLab: { db: 'Drainage Drain Sock Labor' }, // $/LF (converted to hrs)
+  drainBurritoMat: { db: 'Drainage Burrito Wrap Material' }, // $/LF
+  drainBurritoLab: { db: 'Drainage Burrito Wrap Labor' }, // $/LF
+  drainGravel12Mat: { db: 'Drainage Gravel Bed 12in Material' }, // $/LF
+  drainGravel12Lab: { db: 'Drainage Gravel Bed 12in Labor' }, // $/LF
+  drainGravel24Mat: { db: 'Drainage Gravel Bed 24in Material' }, // $/LF
+  drainGravel24Lab: { db: 'Drainage Gravel Bed 24in Labor' }, // $/LF
 }
 
 // Rebar sizes offered per wall/footing (CMU + PIP). Each maps to its own material
@@ -790,11 +790,11 @@ const wallMatPrice = resolveMaterialPrice
 function computeWallFinishRow(row, mp, materialRows) {
   const sf = n(row.sf)
   const v = row.vendor
-  const lab = k => mp?.[WALL_RATES[k].db] ?? WALL_RATES[k].fb
+  const lab = k => n(mp?.[WALL_RATES[k].db])
   // Material price comes from the selected Wall Finish catalog product (per
   // vendor); a per-estimate $/unit override still wins if entered.
   const meta = WALL_FINISH_META[row.type] || {}
-  const matFb = meta.matKey ? WALL_RATES[meta.matKey].fb : 0
+  const matFb = 0
   const catP = catalogItemPrice(materialRows, WALL_FINISH_SUBCAT, row.type, v, matFb)
   const rate = n(row.rateIn) > 0 ? n(row.rateIn) : catP
   let mat = 0,
@@ -860,7 +860,7 @@ function computeCapRow(row, mp, materialRows) {
     widthIn = n(row.widthIn),
     qty = n(row.qty)
   const v = row.vendor
-  const lab = k => mp?.[WALL_RATES[k].db] ?? WALL_RATES[k].fb
+  const lab = k => n(mp?.[WALL_RATES[k].db])
   // Cap material price from the Wall Cap catalog product (per vendor). PIP
   // Concrete caps price off the concrete rate (a poured cap, not a cap product).
   const capP = (name, fb) => catalogItemPrice(materialRows, WALL_CAP_SUBCAT, name, v, fb)
@@ -872,7 +872,7 @@ function computeCapRow(row, mp, materialRows) {
     dispQty = lf
   switch (row.type) {
     case 'Flagstone': {
-      const pr = capP('Flagstone', WALL_RATES.capFlagstone.fb)
+      const pr = capP('Flagstone', 0)
       mat = (((widthIn / 12) * lf * 0.0833 * 100) / 2000) * pr
       hrs = lf * lab('capFlagstoneLab')
       subUnit = (((widthIn / 12) * 0.0833 * 100) / 2000) * pr
@@ -880,7 +880,7 @@ function computeCapRow(row, mp, materialRows) {
       break
     }
     case 'Precast': {
-      const pr = capP('Precast', WALL_RATES.capPrecast.fb)
+      const pr = capP('Precast', 0)
       const widthFactor = (widthIn || 8) / 8
       mat = qty * pr * widthFactor
       hrs = qty * lab('capPrecastLab')
@@ -891,7 +891,7 @@ function computeCapRow(row, mp, materialRows) {
       break
     }
     case 'PIP Concrete': {
-      const pr = wallMatPrice(WALL_RATES.concreteTruck.db, v, materialRows, mp, WALL_RATES.concreteTruck.fb)
+      const pr = wallMatPrice(WALL_RATES.concreteTruck.db, v, materialRows, mp)
       mat = ((lf * (widthIn / 12) * 0.333) / 27) * pr
       hrs = lf * lab('capPipLab')
       subUnit = (((widthIn / 12) * 0.333) / 27) * pr
@@ -899,7 +899,7 @@ function computeCapRow(row, mp, materialRows) {
       break
     }
     case 'Bullnose Brick': {
-      const pr = capP('Bullnose Brick', WALL_RATES.capBullnose.fb)
+      const pr = capP('Bullnose Brick', 0)
       mat = lf * pr
       hrs = lf * lab('capBullnoseLab')
       subUnit = pr
@@ -944,13 +944,13 @@ function computeWpRow(row, mp, materialRows) {
     subUnit = 0
   if (sf > 0 && k) {
     // Price from the Waterproofing catalog product (per vendor), not a constant.
-    const pr = catalogItemPrice(materialRows, WALL_WP_SUBCAT, row.type, row.vendor, WALL_RATES[k].fb)
+    const pr = catalogItemPrice(materialRows, WALL_WP_SUBCAT, row.type, row.vendor)
     // Per-type install labor (SF/hr). Internal type strings are kept for
     // backward-compat; WP_LABOR_KEY maps them to the per-type labor rate keys.
     const labKey = WP_LABOR_KEY[row.type]
     const wpRate = labKey
-      ? n(mp?.[WALL_RATES[labKey].db]) || WALL_RATES[labKey].fb
-      : n(mp?.[WALL_RATES.wpLabor.db]) || WALL_RATES.wpLabor.fb
+      ? n(mp?.[WALL_RATES[labKey].db])
+      : n(mp?.[WALL_RATES.wpLabor.db])
     mat = sf * pr
     hrs = sf / wpRate
     subUnit = pr
@@ -979,7 +979,7 @@ function computeWallWpTotals(wall, mp, materialRows) {
 // block-count math; unit_cost is the per-unit price.
 const MODULAR_SUBCAT = 'Modular Wall'
 const MODULAR_CAT_OPTS = { standardRows: 'null-vendor', stripPrefix: true }
-const MODULAR_FALLBACK = { name: 'Modular Block 8x8x16', w: 8, h: 8, l: 16, price: 3.5 }
+const MODULAR_FALLBACK = { name: 'Modular Block 8x8x16', w: 8, h: 8, l: 16 }
 // Resolve the selected master-list wall product → { name, w, h, l, price }.
 // vendorSel picks the vendor's row (or the Unspecified/null-vendor row); a
 // missing/legacy key falls back to the first product under that marker.
@@ -988,7 +988,7 @@ function resolveMasterBlock(wall, materialRows, subcat) {
   // (Modular Wall items are vendor-priced, so a Standard-only filter is empty).
   const inSub = (materialRows || []).filter(r => r.sub_category === subcat)
   const row = inSub.find(r => r.id === wall.blockType) || inSub[0]
-  if (!row) return MODULAR_FALLBACK
+  if (!row) return { ...MODULAR_FALLBACK, price: 0 }
   // Block dims now live in the product's calc_meta (new model); fall back to the
   // legacy columns for safety, then to the module defaults.
   const cm = row.calc_meta || {}
@@ -1108,7 +1108,7 @@ function wallCatalogTypes(materialRows, subcat, vendorSel) {
 // Price of a catalog product by (sub-category, name) for the selected vendor —
 // vendor row → Standard row → fallback. This is how finish/cap/waterproofing
 // prices resolve now: from the DB product, not a hard-coded constant.
-function catalogItemPrice(materialRows, subcat, name, vendorSel, fallback) {
+function catalogItemPrice(materialRows, subcat, name, vendorSel, fallback = 0) {
   const rows = (materialRows || []).filter(r => r.sub_category === subcat && r.name === name)
   if (!rows.length) return fallback
   const vsel = vendorSel && vendorSel !== 'Standard' ? vendorSel : null
@@ -1181,7 +1181,7 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
   // (r) and all geometry stay exactly as before. Vendor 'Standard' resolves to
   // the original master-rate / catalog prices, so In-House math is unchanged.
   const v = wall.vendor
-  const pm = key => wallMatPrice(WALL_RATES[key].db, v, materialRows, mp, WALL_RATES[key].fb)
+  const pm = key => wallMatPrice(WALL_RATES[key].db, v, materialRows, mp)
 
   // Selected block type drives both DIMENSIONS (how many blocks per course /
   // per wall height) and PRICE (grey block unit cost). Price prefers a
@@ -1191,7 +1191,7 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
   const b = blockOverride || blockByName(blockType)
   const blockPrice = blockOverride
     ? n(blockOverride.price)
-    : wallMatPrice(wallBlockRateName(b.name), v, materialRows, mp, b.price)
+    : wallMatPrice(wallBlockRateName(b.name), v, materialRows, mp)
   const blocksPerCourse = Math.ceil((n(lf) * 12) / b.l)
   const totalCourses = Math.ceil(n(heightIn) / b.h)
   const regCourses = totalCourses // every course is regular grey block (bond beam removed)
@@ -1288,7 +1288,7 @@ function calcOneBrick(wall, r, mp = {}, materialRows = []) {
     return { hrs: 0, mat: 0, subUnit: 0, subEach: 0, subMat: 0, ...wp0, detail: null }
   }
   const v = wall.vendor
-  const pm = key => wallMatPrice(WALL_RATES[key].db, v, materialRows, mp, WALL_RATES[key].fb)
+  const pm = key => wallMatPrice(WALL_RATES[key].db, v, materialRows, mp)
 
   // Brick material + laying labor.
   const sqft = (heightIn / 12) * lf
@@ -1340,7 +1340,7 @@ function calcOnePIP(wall, r, mp = {}, materialRows = []) {
     return { hrs: 0, mat: 0, concCY: 0, subUnit: 0, subEach: 0, subMat: 0, ...wp0 }
   }
   const v = wall.vendor
-  const pm = key => wallMatPrice(WALL_RATES[key].db, v, materialRows, mp, WALL_RATES[key].fb)
+  const pm = key => wallMatPrice(WALL_RATES[key].db, v, materialRows, mp)
   // Wall stem — the WHOLE wall is priced in 6" courses at one install rate (no
   // separate base-course premium). courses = ceil(height / 6).
   const courses = Math.max(0, Math.ceil(n(heightIn) / 6))
@@ -1411,7 +1411,7 @@ function calcWalls(
   laborBurdenPct = DEFAULTS.laborBurdenPct,
   materialRows = []
 ) {
-  const r = key => mp[WALL_RATES[key].db] ?? WALL_RATES[key].fb
+  const r = key => n(mp[WALL_RATES[key].db])
   const _pace = n(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
 
   let structuralHrs = 0,
@@ -1503,7 +1503,7 @@ function calcWalls(
       postQty * r('timberPostLab')
     // Wood price ($/unit) from the selected type's Walls › Wood catalog entry for
     // the chosen vendor; legacy default $50 keeps existing estimates unchanged.
-    const woodPrice = catalogItemPrice(materialRows, WOOD_SUBCAT, wall.timberType, wall.vendor, 50)
+    const woodPrice = catalogItemPrice(materialRows, WOOD_SUBCAT, wall.timberType, wall.vendor)
     const woodMat =
       n(wall.lf) * (r('timberBdftBase') + addlCourses * r('timberBdftCourse')) * woodPrice +
       postQty * r('timberPostMat')
@@ -1520,7 +1520,7 @@ function calcWalls(
     const tFootingCY = tFootingCF / 27
     const tHorizRebarLF = tHb * tLF
     const tFootPump = (wall.footingPump ?? 'No') === 'Yes'
-    const tpm = key => wallMatPrice(WALL_RATES[key].db, 'Standard', materialRows, mp, WALL_RATES[key].fb)
+    const tpm = key => wallMatPrice(WALL_RATES[key].db, 'Standard', materialRows, mp)
     // Footing excavation is priced in the Dig and Haul Footing Soil section —
     // install (rebar + pour) + material only here.
     const tFootingHrs =
@@ -2072,13 +2072,13 @@ function WallWaterproofing({
 }) {
   const pp = usePricePrompt()
   const row = (Array.isArray(wpRows) && wpRows[0]) || blankWpRow()
-  const rr = key => materialPrices?.[WALL_RATES[key].db] ?? WALL_RATES[key].fb
+  const rr = key => n(materialPrices?.[WALL_RATES[key].db])
   const wpKey = WP_KEY[row.type]
   const wpc = computeWpRow(row, materialPrices, materialRows)
   // Live $/SF for the selected product (per vendor) — shown next to the SF field.
   const wpUnit =
     row.type && row.type !== 'None'
-      ? catalogItemPrice(materialRows, WALL_WP_SUBCAT, row.type, row.vendor, wpKey ? WALL_RATES[wpKey].fb : 0)
+      ? catalogItemPrice(materialRows, WALL_WP_SUBCAT, row.type, row.vendor)
       : 0
   // Options come ONLY from the catalog (single source of truth): the selected
   // vendor's Waterproofing products, or the Standard catalog for Standard. No
@@ -3543,7 +3543,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
     )
   }
 
-  const r = key => materialPrices[WALL_RATES[key].db] ?? WALL_RATES[key].fb
+  const r = key => n(materialPrices[WALL_RATES[key].db])
 
   // Full rate list for the "View Rates" popup, broken down by wall type. Groups
   // flagged with `catalogSubcat` prepend that sub-category's actual catalog block

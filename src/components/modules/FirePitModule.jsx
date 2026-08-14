@@ -27,51 +27,51 @@ const REBAR_SIZES = ['#3', '#4', '#5', '#6', '#8']
 
 const FP_RATES = {
   // ── Structural material costs ───────────────────────────────────────────────
-  fpBlock: { dbName: 'FP Block', fallback: 2.5 }, // $/block
-  fpRebar: { dbName: 'FP Rebar', fallback: 0.5 }, // $/LF (fallback price only; name now size-based)
-  fpConcrete: { dbName: 'FP Concrete', fallback: 149.5 }, // $/CY (footing & grout)
-  fpGroutPump: { dbName: 'FP Grout Pump Setup', fallback: 150.0 }, // flat fee when pump used
+  fpBlock: { dbName: 'FP Block' }, // $/block
+  fpRebar: { dbName: 'FP Rebar' }, // $/LF (fallback price only; name now size-based)
+  fpConcrete: { dbName: 'FP Concrete' }, // $/CY (footing & grout)
+  fpGroutPump: { dbName: 'FP Grout Pump Setup' }, // flat fee when pump used
 
   // ── Subcontractor flat structure rates (Sub tab only) ───────────────────────
   // On the Sub tab the itemized block/rebar/footing/grout takeoff is replaced by
   // a flat price: wall perimeter × $/LF + wall face area × $/SF. This covers the
   // wall build AND cap install labor.
-  fpSubStructLF: { dbName: 'FP Sub Structure $/LF', fallback: 0 }, // $/LF wall build
-  fpSubStructHtSF: { dbName: 'FP Sub Structure Ht $/SF', fallback: 0 }, // $/SF wall face
+  fpSubStructLF: { dbName: 'FP Sub Structure $/LF' }, // $/LF wall build
+  fpSubStructHtSF: { dbName: 'FP Sub Structure Ht $/SF' }, // $/SF wall face
 
   // ── Wall cap costs — simple $/LF master rate + hrs/LF labor coefficient per
   //    cap type, resolved by Type like the OK finishes (vendor-overridable).
-  capFlagstone: { dbName: 'FP Cap Flagstone', fallback: 18.0 }, // $/LF
-  capPrecast: { dbName: 'FP Cap Precast', fallback: 12.0 }, // $/LF
-  capPipConcrete: { dbName: 'FP Cap PIP Concrete', fallback: 10.0 }, // $/LF
-  capBullnose: { dbName: 'FP Cap Bullnose Brick', fallback: 5.0 }, // $/LF
-  capFlagstoneLab: { dbName: 'FP Cap Flagstone Labor Rate', fallback: 0.25 }, // hrs/LF
-  capPrecastLab: { dbName: 'FP Cap Precast Labor Rate', fallback: 0.2 }, // hrs/LF
-  capPipConcreteLab: { dbName: 'FP Cap PIP Concrete Labor Rate', fallback: 0.15 }, // hrs/LF
-  capBullnoseLab: { dbName: 'FP Cap Bullnose Brick Labor Rate', fallback: 0.08 }, // hrs/LF
+  capFlagstone: { dbName: 'FP Cap Flagstone' }, // $/LF
+  capPrecast: { dbName: 'FP Cap Precast' }, // $/LF
+  capPipConcrete: { dbName: 'FP Cap PIP Concrete' }, // $/LF
+  capBullnose: { dbName: 'FP Cap Bullnose Brick' }, // $/LF
+  capFlagstoneLab: { dbName: 'FP Cap Flagstone Labor Rate' }, // hrs/LF
+  capPrecastLab: { dbName: 'FP Cap Precast Labor Rate' }, // hrs/LF
+  capPipConcreteLab: { dbName: 'FP Cap PIP Concrete Labor Rate' }, // hrs/LF
+  capBullnoseLab: { dbName: 'FP Cap Bullnose Brick Labor Rate' }, // hrs/LF
 
   // ── Wall finish material costs ──────────────────────────────────────────────
-  sandStucco: { dbName: 'Sand Stucco - FP', fallback: 0.0 }, // $/SF (labor only by default)
-  smoothStucco: { dbName: 'Smooth Stucco - FP', fallback: 0.0 }, // $/SF
-  ledgerstone: { dbName: 'Ledgerstone - FP', fallback: 10.0 }, // $/SF panel
-  stackedStone: { dbName: 'Stacked Stone - FP', fallback: 10.0 }, // $/SF panel
-  tile: { dbName: 'Tile - FP', fallback: 6.5 }, // $/SF
-  realFlagstone: { dbName: 'Real Flagstone - FP', fallback: 400.0 }, // $/ton (editable per-job)
-  realStone: { dbName: 'Real Stone - FP', fallback: 400.0 }, // $/ton (editable per-job)
+  sandStucco: { dbName: 'Sand Stucco - FP' }, // $/SF (labor only by default)
+  smoothStucco: { dbName: 'Smooth Stucco - FP' }, // $/SF
+  ledgerstone: { dbName: 'Ledgerstone - FP' }, // $/SF panel
+  stackedStone: { dbName: 'Stacked Stone - FP' }, // $/SF panel
+  tile: { dbName: 'Tile - FP' }, // $/SF
+  realFlagstone: { dbName: 'Real Flagstone - FP' }, // $/ton (editable per-job)
+  realStone: { dbName: 'Real Stone - FP' }, // $/ton (editable per-job)
 
   // ── Labor productivity rates ────────────────────────────────────────────────
-  digLab: { dbName: 'FP Dig Footing Labor Rate', fallback: 4.0 }, // CF/hr
-  rebarLab: { dbName: 'FP Set Rebar Labor Rate', fallback: 35.0 }, // LF/hr
-  blockLab: { dbName: 'FP Set Blocks Labor Rate', fallback: 10.4 }, // blocks/hr
-  handGroutLab: { dbName: 'FP Hand Grout Labor Rate', fallback: 5.5 }, // CF/hr
-  pumpGroutLab: { dbName: 'FP Pump Grout Labor Rate', fallback: 81.0 }, // CF/hr
-  sandStuccoLab: { dbName: 'Sand Stucco - FP Labor Rate', fallback: 92 }, // SF/day
-  smoothStuccoLab: { dbName: 'Smooth Stucco - FP Labor Rate', fallback: 65 }, // SF/day
-  ledgerstoneLab: { dbName: 'Ledgerstone - FP Labor Rate', fallback: 24 }, // SF/day
-  stackedStoneLab: { dbName: 'Stacked Stone - FP Labor Rate', fallback: 24 }, // SF/day
-  tileLab: { dbName: 'Tile - FP Labor Rate', fallback: 0.2867 }, // hrs/SF (layout+install)
-  flagstoneLab: { dbName: 'Real Flagstone - FP Labor Rate', fallback: 0.4487 }, // hrs/SF (delivery+install+seal)
-  realStoneLab: { dbName: 'Real Stone - FP Labor Rate', fallback: 0.8954 }, // hrs/SF (transport+install+seal)
+  digLab: { dbName: 'FP Dig Footing Labor Rate' }, // CF/hr
+  rebarLab: { dbName: 'FP Set Rebar Labor Rate' }, // LF/hr
+  blockLab: { dbName: 'FP Set Blocks Labor Rate' }, // blocks/hr
+  handGroutLab: { dbName: 'FP Hand Grout Labor Rate' }, // CF/hr
+  pumpGroutLab: { dbName: 'FP Pump Grout Labor Rate' }, // CF/hr
+  sandStuccoLab: { dbName: 'Sand Stucco - FP Labor Rate' }, // SF/day
+  smoothStuccoLab: { dbName: 'Smooth Stucco - FP Labor Rate' }, // SF/day
+  ledgerstoneLab: { dbName: 'Ledgerstone - FP Labor Rate' }, // SF/day
+  stackedStoneLab: { dbName: 'Stacked Stone - FP Labor Rate' }, // SF/day
+  tileLab: { dbName: 'Tile - FP Labor Rate' }, // hrs/SF (layout+install)
+  flagstoneLab: { dbName: 'Real Flagstone - FP Labor Rate' }, // hrs/SF (delivery+install+seal)
+  realStoneLab: { dbName: 'Real Stone - FP Labor Rate' }, // hrs/SF (transport+install+seal)
 }
 
 const DEFAULTS = {
@@ -119,9 +119,9 @@ const MORTAR_NAME = 'Mortar'
 const FORM_LUMBER_NAME = 'FP Form Lumber'
 // New per-type LABOR coefficients (labor fallbacks allowed). Brick laying mirrors
 // Walls' brickLayLab (1.75 hr/SF); PIP form + pour mirror the Columns PIP rates.
-const FP_BRICK_LAY = { dbName: 'FP Brick Lay Labor Rate', fallback: 1.75 } // hrs / SF of brick face
-const FP_FORM_LAB = { dbName: 'FP Form Labor Rate', fallback: 0.08 } // hrs / SF of form
-const FP_POUR_LAB = { dbName: 'FP Pour Concrete Labor Rate', fallback: 1.5 } // hrs / CY poured
+const FP_BRICK_LAY = { dbName: 'FP Brick Lay Labor Rate' } // hrs / SF of brick face
+const FP_FORM_LAB = { dbName: 'FP Form Labor Rate' } // hrs / SF of form
+const FP_POUR_LAB = { dbName: 'FP Pour Concrete Labor Rate' } // hrs / CY poured
 
 // Resolve a picked catalog product row by id (any vendor).
 function catalogRowById(materialRows, id) {
@@ -246,23 +246,23 @@ function masterWallOptions(cat, builtInList, materialRows, category = null, vend
 // below are used only when the DB row is absent. A vendor overrides ONLY the
 // material price for the selected item; labor always comes from the built-in.
 const UTILITY_LINE_TYPES = {
-  '1-1/2" Poly Gas Pipe': { costPerLF: 4.25, dbName: '1-1/2" Poly Gas Pipe', laborPerLF: 0.05, laborDbName: '1-1/2" Poly Gas Pipe - Labor Rate' },
-  '1" Black Iron Gas Pipe': { costPerLF: 2.76, dbName: '1" Black Iron Gas Pipe', laborPerLF: 0.15, laborDbName: '1" Black Iron Gas Pipe - Labor Rate' },
-  '1-1/2" Black Iron Gas Pipe': { costPerLF: 4.23, dbName: '1-1/2" Black Iron Gas Pipe', laborPerLF: 0.2, laborDbName: '1-1/2" Black Iron Gas Pipe - Labor Rate' },
-  '2" Black Iron Gas Pipe': { costPerLF: 5.72, dbName: '2" Black Iron Gas Pipe', laborPerLF: 0.25, laborDbName: '2" Black Iron Gas Pipe - Labor Rate' },
+  '1-1/2" Poly Gas Pipe': { dbName: '1-1/2" Poly Gas Pipe', laborDbName: '1-1/2" Poly Gas Pipe - Labor Rate' },
+  '1" Black Iron Gas Pipe': { dbName: '1" Black Iron Gas Pipe', laborDbName: '1" Black Iron Gas Pipe - Labor Rate' },
+  '1-1/2" Black Iron Gas Pipe': { dbName: '1-1/2" Black Iron Gas Pipe', laborDbName: '1-1/2" Black Iron Gas Pipe - Labor Rate' },
+  '2" Black Iron Gas Pipe': { dbName: '2" Black Iron Gas Pipe', laborDbName: '2" Black Iron Gas Pipe - Labor Rate' },
 }
 const GAS_FIXTURE_TYPES = {
-  '12" Single Gas Ring': { cost: 61.75, dbName: '12" Single Gas Ring', laborHrs: 2, laborDbName: '12" Single Gas Ring - Labor Rate' },
-  '18" Single Gas Ring': { cost: 84.75, dbName: '18" Single Gas Ring', laborHrs: 2, laborDbName: '18" Single Gas Ring - Labor Rate' },
-  '24" Single Gas Ring': { cost: 107.75, dbName: '24" Single Gas Ring', laborHrs: 2, laborDbName: '24" Single Gas Ring - Labor Rate' },
-  '24" Double Gas Ring': { cost: 163.25, dbName: '24" Double Gas Ring', laborHrs: 2, laborDbName: '24" Double Gas Ring - Labor Rate' },
-  "2' Straight Gas Bar": { cost: 35.5, dbName: "2' Straight Gas Bar", laborHrs: 2, laborDbName: "2' Straight Gas Bar - Labor Rate" },
-  "3' Straight Gas Bar": { cost: 56.0, dbName: "3' Straight Gas Bar", laborHrs: 2.5, laborDbName: "3' Straight Gas Bar - Labor Rate" },
-  "4' Straight Gas Bar": { cost: 68.5, dbName: "4' Straight Gas Bar", laborHrs: 3, laborDbName: "4' Straight Gas Bar - Labor Rate" },
-  'Gas Shut-Off Valve': { cost: 89.7, dbName: 'Gas Shut-Off Valve', laborHrs: 2, laborDbName: 'Gas Shut-Off Valve - Labor Rate' },
+  '12" Single Gas Ring': { dbName: '12" Single Gas Ring', laborDbName: '12" Single Gas Ring - Labor Rate' },
+  '18" Single Gas Ring': { dbName: '18" Single Gas Ring', laborDbName: '18" Single Gas Ring - Labor Rate' },
+  '24" Single Gas Ring': { dbName: '24" Single Gas Ring', laborDbName: '24" Single Gas Ring - Labor Rate' },
+  '24" Double Gas Ring': { dbName: '24" Double Gas Ring', laborDbName: '24" Double Gas Ring - Labor Rate' },
+  "2' Straight Gas Bar": { dbName: "2' Straight Gas Bar", laborDbName: "2' Straight Gas Bar - Labor Rate" },
+  "3' Straight Gas Bar": { dbName: "3' Straight Gas Bar", laborDbName: "3' Straight Gas Bar - Labor Rate" },
+  "4' Straight Gas Bar": { dbName: "4' Straight Gas Bar", laborDbName: "4' Straight Gas Bar - Labor Rate" },
+  'Gas Shut-Off Valve': { dbName: 'Gas Shut-Off Valve', laborDbName: 'Gas Shut-Off Valve - Labor Rate' },
 }
-const LINE_TYPE_ARR = Object.entries(UTILITY_LINE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, fallback: t.costPerLF, laborDbName: t.laborDbName, laborFallback: t.laborPerLF }))
-const GAS_TYPE_ARR = Object.entries(GAS_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, fallback: t.cost, laborDbName: t.laborDbName, laborFallback: t.laborHrs }))
+const LINE_TYPE_ARR = Object.entries(UTILITY_LINE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, laborDbName: t.laborDbName }))
+const GAS_TYPE_ARR = Object.entries(GAS_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, laborDbName: t.laborDbName }))
 const UTIL_CAT = { line: 'Utility Lines', gas: 'Gas Fixtures' }
 // Gas Type options — VENDOR-FIRST (like Utilities). Standard/unset → the
 // null-vendor (Standard) catalog items merged with the built-in list (built-in
@@ -291,7 +291,7 @@ function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
   // Type options are the SELECTED VENDOR'S items (vendor-first, like Paver).
   const merged = mergedUtilTypes(cat, houseArr, materialRows, vsel)
   const builtIn = merged.find(o => o.label === row.type) || merged[0]
-  const laborVal = mp[builtIn?.laborDbName] ?? builtIn?.laborFallback ?? 0
+  const laborVal = n(mp[builtIn?.laborDbName])
   let matDbName = builtIn?.dbName
   let matFallback = builtIn?.fallback ?? 0
   const vrow = catalogItemFor(materialRows, cat, vsel, builtIn?.label, {
@@ -609,7 +609,7 @@ function calcFirePit(
     materialRows,
   } = state
 
-  const p = (dbName, fallback) => mp[dbName] ?? fallback
+  const p = dbName => n(mp[dbName])
   const isSubTab = state.subType === 'Subcontractor'
 
   // ── Wall finish per-row calc: material (vendor-overridable unit) + labor ──────
@@ -670,7 +670,7 @@ function calcFirePit(
   // = 1.0 cf/LF at the Utilities trench excavation rate) — this replaces the old
   // separate Trench section. Vendor overrides only the material unit price.
   const GAS_TRENCH_CF_PER_LF = (6 / 12) * (24 / 12) // = 1.0
-  const gasTrenchMinsPerCF = mp['Utilities Trench Excavation'] ?? 10
+  const gasTrenchMinsPerCF = n(mp['Utilities Trench Excavation'])
   let epHrs = 0
   let epMat = 0
   ;(epLineRows || []).forEach(r => {
@@ -1088,7 +1088,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
         }
       : calcRaw
 
-  const p = (dbName, fallback) => materialPrices[dbName] ?? fallback
+  const p = dbName => n(materialPrices[dbName])
 
   function updateManual(i, field, val) {
     setManualRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
@@ -1303,9 +1303,9 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
           category: 'Utilities',
           mode: 'coefficient',
           unitLabel: 'hrs per Ln Ft',
-          value: materialPrices[t.laborDbName] ?? t.laborFallback,
+          value: n(materialPrices[t.laborDbName]),
         })),
-        ...LINE_TYPE_ARR.flatMap(t => matRows(t.dbName, 'LF', materialPrices[t.dbName] ?? t.fallback)),
+        ...LINE_TYPE_ARR.flatMap(t => matRows(t.dbName, 'LF', n(materialPrices[t.dbName]))),
       ],
     },
     {
@@ -1318,9 +1318,9 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
           category: 'Utilities',
           mode: 'coefficient',
           unitLabel: 'hrs per Each',
-          value: materialPrices[t.laborDbName] ?? t.laborFallback,
+          value: n(materialPrices[t.laborDbName]),
         })),
-        ...GAS_TYPE_ARR.flatMap(t => matRows(t.dbName, 'ea', materialPrices[t.dbName] ?? t.fallback)),
+        ...GAS_TYPE_ARR.flatMap(t => matRows(t.dbName, 'ea', n(materialPrices[t.dbName]))),
       ],
     },
   ]

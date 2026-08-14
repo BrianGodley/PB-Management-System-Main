@@ -39,70 +39,50 @@ import { resolveMaterialPrice, catalogOptions, fetchModuleCatalog, fetchStandard
 
 const PLANTING_CATEGORY = 'Planting'
 
-// Hardcoded fallbacks (used when DB row not present yet)
-// perDay is now a per-HOUR rate (plants/hr = old plants/day ÷ 8). Price unchanged.
-const SMALL_PLANT_DEFAULTS = {
-  'Flats of Groundcover': { perDay: 3.125, price: 18.0 },
-  'Flats of 4" pots': { perDay: 2.5, price: 20.0 },
-  '4" pots standard': { perDay: 35, price: 0.0 },
-  '4" pots succulents': { perDay: 35, price: 7.0 },
-  '6" pots standard': { perDay: 22.5, price: 0.0 },
-  '6" pots succulents': { perDay: 22.5, price: 12.0 },
-  '1 gallon standard': { perDay: 8.75, price: 6.5 },
-  '1 gallon premium': { perDay: 8.75, price: 8.0 },
-  '1 gallon succulents': { perDay: 8.75, price: 18.0 },
-  '3 gallon standard': { perDay: 8.75, price: 7.0 },
-  '5 gallon standard': { perDay: 5, price: 17.0 },
-  '5 gallon premium': { perDay: 5, price: 35.0 },
-  '5 gallon succulents': { perDay: 5, price: 39.0 },
-  '5 gallon bamboo': { perDay: 5, price: 40.0 },
-  '5 gallon palm': { perDay: 5, price: 50.0 },
-}
-
-// perDay is now a per-HOUR rate (plants/hr = old plants/day ÷ 8). Price unchanged.
-const LARGE_PLANT_DEFAULTS = {
-  '15 gallon standard': { perDay: 1.875, price: 52.0 },
-  '15 gallon premium': { perDay: 1.875, price: 90.0 },
-  '15 gallon succulents': { perDay: 1.875, price: 225.0 },
-  '15 gallon fruit': { perDay: 1.875, price: 145.0 },
-  '15 gallon palms': { perDay: 1.875, price: 175.0 },
-  '24" box standard': { perDay: 0.5, price: 185.0 },
-  '24" box premium': { perDay: 0.5, price: 250.0 },
-  '24" box fruit': { perDay: 0.5, price: 0.0 },
-  '24" box palm': { perDay: 0.5, price: 0.0 },
-  '36" box standard': { perDay: 0.09375, price: 450.0 },
-  '36" box premium': { perDay: 0.09375, price: 600.0 },
-  '36" box fruit': { perDay: 0.09375, price: 0.0 },
-  '36" box palm': { perDay: 0.09375, price: 0.0 },
-  '48" box standard': { perDay: 0.0375, price: 800.0 },
-  '48" box premium': { perDay: 0.0375, price: 0.0 },
-  '48" box fruit': { perDay: 0.0375, price: 0.0 },
-  '48" box palm': { perDay: 0.0375, price: 0.0 },
-}
-
-// Fallback labor rate defaults for add-ons and till
-const LABOR_DEFAULTS = {
-  'Till - Soil Move Rate': 39, // CY/day
-  'Till - Tilling Rate': 3600, // sqft/day
-  'Till - Amend Rate': 900, // sqft/day
-  'Tree Stakes - Install Rate': 3, // stakes/hr (was 24 stakes/day ÷ 8)
-  'Root Barrier - Install Rate': 20, // min/LF
-  'Gopher Basket - Install Rate': 2, // min/basket
-  'Mesh Flat - Install Rate': 0.7, // min/sqft
-  'Jute Fabric - Install Rate': 1.1, // min/sqft
-}
-
-// Add-on material fallback prices
-const ADDON_MAT_DEFAULTS = {
-  'Tree Stake': 8.5,
-  'Root Barrier 12in': 5.0,
-  'Root Barrier 24in': 7.0,
-  'Gopher Basket 1 Gal': 3.42,
-  'Gopher Basket 5 Gal': 7.78,
-  'Gopher Basket 15 Gal': 10.5,
-  'Mesh Flat': 1.0,
-  'Jute Fabric': 0.4,
-}
+// Plant-type catalogs — identity ONLY (which Items are "small" vs "large"). Every
+// per-hour install rate (labor_rates) and unit price (material / misc_rates) is
+// read live from the DB — no hardcoded rate fallbacks. Missing values are
+// guaranteed by supabase-planting-fallbacks-seed.sql.
+const SMALL_PLANT_TYPES = [
+  'Flats of Groundcover',
+  'Flats of 4" pots',
+  '4" pots standard',
+  '4" pots succulents',
+  '6" pots standard',
+  '6" pots succulents',
+  '1 gallon standard',
+  '1 gallon premium',
+  '1 gallon succulents',
+  '3 gallon standard',
+  '5 gallon standard',
+  '5 gallon premium',
+  '5 gallon succulents',
+  '5 gallon bamboo',
+  '5 gallon palm',
+]
+const LARGE_PLANT_TYPES = [
+  '15 gallon standard',
+  '15 gallon premium',
+  '15 gallon succulents',
+  '15 gallon fruit',
+  '15 gallon palms',
+  '24" box standard',
+  '24" box premium',
+  '24" box fruit',
+  '24" box palm',
+  '36" box standard',
+  '36" box premium',
+  '36" box fruit',
+  '36" box palm',
+  '48" box standard',
+  '48" box premium',
+  '48" box fruit',
+  '48" box palm',
+]
+// Kept as objects so Object.keys() + identity comparisons (defaultsMap ===
+// SMALL_PLANT_DEFAULTS) still work; values are intentionally empty (identity only).
+const SMALL_PLANT_DEFAULTS = Object.fromEntries(SMALL_PLANT_TYPES.map(k => [k, {}]))
+const LARGE_PLANT_DEFAULTS = Object.fromEntries(LARGE_PLANT_TYPES.map(k => [k, {}]))
 
 // ── Planting Add-On item catalog (the Item dropdown; NOT from the DB) ──────────
 // Each add-on Item carries its own labor formula + material/labor DB names. The
@@ -180,18 +160,20 @@ const n = v => parseFloat(v) || 0
 const r2 = x => Math.round(((x || 0) + Number.EPSILON) * 100) / 100
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+// All rates read live from the DB (labor_rates / material / misc_rates) — no
+// hardcoded fallbacks. Seeds guarantee the values exist.
 function lr(laborRates, key) {
-  return laborRates[key] ?? LABOR_DEFAULTS[key] ?? 0
+  return n(laborRates[key])
 }
 function mp(materialPrices, key) {
-  return materialPrices[key] ?? ADDON_MAT_DEFAULTS[key] ?? 0
+  return n(materialPrices[key])
 }
 
 function getSmallPerDay(laborRates, type) {
-  return laborRates[type] ?? SMALL_PLANT_DEFAULTS[type]?.perDay ?? 3.125
+  return n(laborRates[type])
 }
 function getLargePerDay(laborRates, type) {
-  return laborRates[type] ?? LARGE_PLANT_DEFAULTS[type]?.perDay ?? 1.875
+  return n(laborRates[type])
 }
 
 // ── Vendor-catalog material price ─────────────────────────────────────────────
@@ -276,13 +258,7 @@ function computeAddonRow(row, laborRates, materialPrices, materialRows) {
   let hrs = 0
   if (meta.mode === 'perDay') hrs = rate > 0 ? qty / rate : 0 // rate is now per-HOUR
   else if (meta.mode === 'perMin') hrs = (qty * rate) / 60
-  const unitPrice = plantMatPrice(
-    meta.matKey,
-    row.vendor,
-    materialRows,
-    materialPrices,
-    ADDON_MAT_DEFAULTS[meta.matKey] ?? 0
-  )
+  const unitPrice = plantMatPrice(meta.matKey, row.vendor, materialRows, materialPrices)
   const mat = qty * unitPrice
   const subUnit = unitPrice
   const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : subUnit
@@ -490,13 +466,11 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
 // ── Default rows / factories ──────────────────────────────────────────────────
 function newSmallRow(type = '', materialPrices = {}, materialRows = []) {
   if (!type) return { vendor: 'Standard', type: '', qty: '', price: '', subEach: '' }
-  const fb = SMALL_PLANT_DEFAULTS[type]?.price ?? 0
-  return { vendor: 'Standard', type, qty: '', price: plantMatPrice(type, 'Standard', materialRows, materialPrices, fb), subEach: '' }
+  return { vendor: 'Standard', type, qty: '', price: plantMatPrice(type, 'Standard', materialRows, materialPrices), subEach: '' }
 }
 function newLargeRow(type = '', materialPrices = {}, materialRows = []) {
   if (!type) return { vendor: 'Standard', type: '', qty: '', price: '', subEach: '' }
-  const fb = LARGE_PLANT_DEFAULTS[type]?.price ?? 0
-  return { vendor: 'Standard', type, qty: '', price: plantMatPrice(type, 'Standard', materialRows, materialPrices, fb), subEach: '' }
+  return { vendor: 'Standard', type, qty: '', price: plantMatPrice(type, 'Standard', materialRows, materialPrices), subEach: '' }
 }
 const blankAddonRow = () => ({ vendor: 'Standard', type: '', qty: '', subEach: '' })
 
@@ -768,8 +742,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
         if (idx !== i) return r
         if (field === 'type' || field === 'vendor') {
           const next = { ...r, [field]: val }
-          const fb = defaultsMap[next.type]?.price ?? 0
-          const price = plantMatPrice(next.type, next.vendor, materialRows, materialPrices, fb)
+          const price = plantMatPrice(next.type, next.vendor, materialRows, materialPrices)
           next.price = price
           if (isSub) next.subEach = String(r2(price))
           return next
@@ -863,8 +836,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
                 const selType =
                   typeOpts.find(o => o.value === row.type || o.dbName === row.type) ||
                   { value: row.type, label: row.type }
-                const masterPrice =
-                  materialPrices[row.type] ?? defaultsMap[row.type]?.price ?? 0
+                const masterPrice = n(materialPrices[row.type])
                 const isStandard = !row.vendor || row.vendor === 'Standard'
                 return (
                   <tr key={i} className="border-b border-gray-100">
@@ -1212,7 +1184,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
           value: getSmallPerDay(laborRates, type),
         })),
         ...Object.keys(SMALL_PLANT_DEFAULTS).flatMap(type =>
-          matRows(type, 'ea', materialPrices[type] ?? SMALL_PLANT_DEFAULTS[type].price)
+          matRows(type, 'ea', materialPrices[type])
         ),
       ],
     },
@@ -1229,7 +1201,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
           value: getLargePerDay(laborRates, type),
         })),
         ...Object.keys(LARGE_PLANT_DEFAULTS).flatMap(type =>
-          matRows(type, 'ea', materialPrices[type] ?? LARGE_PLANT_DEFAULTS[type].price)
+          matRows(type, 'ea', materialPrices[type])
         ),
       ],
     },
@@ -1253,11 +1225,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
         })),
         ...ADDON_TYPES.flatMap(t => {
           const meta = ADDON_META[t] || {}
-          return matRows(
-            meta.matKey,
-            meta.unit || 'ea',
-            materialPrices[meta.matKey] ?? ADDON_MAT_DEFAULTS[meta.matKey] ?? 0
-          )
+          return matRows(meta.matKey, meta.unit || 'ea', materialPrices[meta.matKey])
         }),
       ],
     },

@@ -72,8 +72,9 @@ const kSubGrouted = 'Steps - Sub Grouted' // +$/LF (paver, when grouted)
 const kSubType = t => `Steps - Sub Type ${t}` // +$ per Ln Ft (concrete type)
 const kSubFinish = f => `Steps - Sub Finish ${f}` // +$ per Ln Ft (concrete finish)
 
-const PAVER_FORM_DEFAULT = { Straight: 1.5, Curved: 1.0 } // LF/hr fallbacks
-const SUB_BASE_DEFAULT = 30 // $/LF starting base for every sub step section
+// No hardcoded rate fallbacks — every labor coefficient / $/LF base is read live
+// from the rate tables (labor_rates + misc_rates via fetchStandardRateMap). A
+// missing rate contributes 0 until seeded in Master Rates.
 
 // Vendor/Type step sections. Each pulls Type options from its own material
 // catalog sub_category (subs_vendors + material_rates). Shape mirrors Paver
@@ -101,7 +102,7 @@ function matStepRowCalc(r, laborRates, materialRows, cat = PAVER_STEP_CAT, price
   // Unselected step (no material Type) contributes nothing (no crash, no fallback).
   if (!r.type) return { sf: n(r.sf), hrs: 0, mat: 0, price: 0, pallets: 0 }
   const sf = n(r.sf)
-  const rate = n(laborRates[kPaverForm(r.form)] ?? PAVER_FORM_DEFAULT[r.form] ?? 0)
+  const rate = n(laborRates[kPaverForm(r.form)])
   const hrs = sf > 0 && rate > 0 ? sf / rate : 0
   let price = 0
   let sfPerPallet = 0
@@ -121,12 +122,12 @@ function concRowCalc(r, laborRates, materialRates) {
   // Unselected concrete step (no Type) contributes nothing (no crash, no fallback).
   if (!r.type) return { sf: n(r.sf), hrs: 0, mat: 0 }
   const sf = n(r.sf)
-  const typeHrs = n(laborRates[kConcTypeHrs(r.type)] ?? 0)
-  const finishHrs = n(laborRates[kFinishHrs(r.finish)] ?? 0)
-  const formMult = n(laborRates[kConcForm(r.form)] ?? 1)
+  const typeHrs = n(laborRates[kConcTypeHrs(r.type)])
+  const finishHrs = n(laborRates[kFinishHrs(r.finish)])
+  const formMult = n(laborRates[kConcForm(r.form)])
   const hrs = sf * (typeHrs + finishHrs) * formMult
-  const typeMat = n(materialRates[kConcTypeMat(r.type)] ?? 0)
-  const finishMat = n(materialRates[kFinishMat(r.finish)] ?? 0)
+  const typeMat = n(materialRates[kConcTypeMat(r.type)])
+  const finishMat = n(materialRates[kFinishMat(r.finish)])
   const mat = sf * (typeMat + finishMat)
   return { sf, hrs, mat }
 }
@@ -137,9 +138,9 @@ function matStepSubRowCalc(r, mr, baseKey = kSubPaverBase) {
   // Unselected step (no material Type) contributes nothing.
   if (!r.type) return { lf: n(r.sf), rate: 0, cost: 0 }
   const lf = n(r.sf)
-  const base = n(mr[baseKey] ?? SUB_BASE_DEFAULT)
-  const form = n(mr[kSubForm(r.form)] ?? 0)
-  const grouted = r.grouted ? n(mr[kSubGrouted] ?? 0) : 0
+  const base = n(mr[baseKey])
+  const form = n(mr[kSubForm(r.form)])
+  const grouted = r.grouted ? n(mr[kSubGrouted]) : 0
   const rate = base + form + grouted
   return { lf, rate, cost: lf * rate }
 }
@@ -147,10 +148,10 @@ function concSubRowCalc(r, mr) {
   // Unselected concrete step (no Type) contributes nothing.
   if (!r.type) return { lf: n(r.sf), rate: 0, cost: 0 }
   const lf = n(r.sf)
-  const base = n(mr[kSubConcBase] ?? SUB_BASE_DEFAULT)
-  const form = n(mr[kSubForm(r.form)] ?? 0)
-  const type = n(mr[kSubType(r.type)] ?? 0)
-  const finish = n(mr[kSubFinish(r.finish)] ?? 0)
+  const base = n(mr[kSubConcBase])
+  const form = n(mr[kSubForm(r.form)])
+  const type = n(mr[kSubType(r.type)])
+  const finish = n(mr[kSubFinish(r.finish)])
   const rate = base + form + type + finish
   return { lf, rate, cost: lf * rate }
 }
@@ -317,27 +318,27 @@ function StepsRatesModal({ open, onClose, onSaved, isSub = false }) {
         subForm: {},
         subType: {},
         subFinish: {},
-        subGrouted: mr[kSubGrouted] ?? 0,
+        subGrouted: mr[kSubGrouted],
       }
       STEP_FORMS.forEach(f => {
-        d.paverForm[f] = lr[kPaverForm(f)] ?? PAVER_FORM_DEFAULT[f]
-        d.concForm[f] = lr[kConcForm(f)] ?? 1
-        d.subForm[f] = mr[kSubForm(f)] ?? 0
+        d.paverForm[f] = lr[kPaverForm(f)]
+        d.concForm[f] = lr[kConcForm(f)]
+        d.subForm[f] = mr[kSubForm(f)]
       })
       CONC_TYPES.forEach(t => {
-        d.typeHrs[t] = lr[kConcTypeHrs(t)] ?? 0
-        d.typeMat[t] = mr[kConcTypeMat(t)] ?? 0
-        d.subType[t] = mr[kSubType(t)] ?? 0
+        d.typeHrs[t] = lr[kConcTypeHrs(t)]
+        d.typeMat[t] = mr[kConcTypeMat(t)]
+        d.subType[t] = mr[kSubType(t)]
       })
       CONC_FINISHES.forEach(f => {
-        d.finHrs[f] = lr[kFinishHrs(f)] ?? 0
-        d.finMat[f] = mr[kFinishMat(f)] ?? 0
-        d.subFinish[f] = mr[kSubFinish(f)] ?? 0
+        d.finHrs[f] = lr[kFinishHrs(f)]
+        d.finMat[f] = mr[kFinishMat(f)]
+        d.subFinish[f] = mr[kSubFinish(f)]
       })
       MAT_SECTIONS.forEach(sec => {
-        d.subBase[sec.key] = mr[sec.baseKey] ?? SUB_BASE_DEFAULT
+        d.subBase[sec.key] = mr[sec.baseKey]
       })
-      d.subBase.conc = mr[kSubConcBase] ?? SUB_BASE_DEFAULT
+      d.subBase.conc = mr[kSubConcBase]
       setDraft(d)
       setLoading(false)
     })
@@ -1069,7 +1070,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           category: 'Steps',
           mode: 'coefficient',
           unitLabel: 'Ln Ft per hr',
-          value: laborRates[kPaverForm(f)] ?? PAVER_FORM_DEFAULT[f],
+          value: laborRates[kPaverForm(f)],
         })),
         ...catalogBlockItems(PAVER_STEP_CAT),
       ],
@@ -1091,7 +1092,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           category: 'Steps',
           mode: 'coefficient',
           unitLabel: 'hr per Sq Ft',
-          value: laborRates[kConcTypeHrs(t)] ?? 0,
+          value: laborRates[kConcTypeHrs(t)],
         })),
         ...STEP_FORMS.map(f => ({
           label: `Form ${f} Multiplier`,
@@ -1100,7 +1101,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           category: 'Steps',
           mode: 'coefficient',
           unitLabel: '×',
-          value: laborRates[kConcForm(f)] ?? 1,
+          value: laborRates[kConcForm(f)],
         })),
         ...CONC_FINISHES.map(f => ({
           label: `Finish ${f} Labor`,
@@ -1109,7 +1110,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           category: 'Steps',
           mode: 'coefficient',
           unitLabel: 'hr per Sq Ft',
-          value: laborRates[kFinishHrs(f)] ?? 0,
+          value: laborRates[kFinishHrs(f)],
         })),
         // Per-vendor concrete-mix catalog products.
         ...catalogBlockItems(CONC_VENDOR_CAT),
@@ -1121,7 +1122,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           category: 'Steps',
           mode: 'currency',
           unitLabel: 'Sq Ft',
-          value: materialRates[kConcTypeMat(t)] ?? 0,
+          value: materialRates[kConcTypeMat(t)],
         })),
         ...CONC_FINISHES.map(f => ({
           label: `Finish ${f} Material`,
@@ -1130,7 +1131,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           category: 'Steps',
           mode: 'currency',
           unitLabel: 'Sq Ft',
-          value: materialRates[kFinishMat(f)] ?? 0,
+          value: materialRates[kFinishMat(f)],
         })),
       ],
     },
@@ -1144,7 +1145,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           category: 'Steps',
           mode: 'currency',
           unitLabel: 'Ln Ft',
-          value: materialRates[sec.baseKey] ?? SUB_BASE_DEFAULT,
+          value: materialRates[sec.baseKey],
         })),
         {
           label: 'Concrete Base',
@@ -1153,7 +1154,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           category: 'Steps',
           mode: 'currency',
           unitLabel: 'Ln Ft',
-          value: materialRates[kSubConcBase] ?? SUB_BASE_DEFAULT,
+          value: materialRates[kSubConcBase],
         },
         ...STEP_FORMS.map(f => ({
           label: `Form ${f}`,
@@ -1162,7 +1163,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           category: 'Steps',
           mode: 'currency',
           unitLabel: 'Ln Ft',
-          value: materialRates[kSubForm(f)] ?? 0,
+          value: materialRates[kSubForm(f)],
         })),
         {
           label: 'Grouted (paver)',
@@ -1171,7 +1172,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           category: 'Steps',
           mode: 'currency',
           unitLabel: 'Ln Ft',
-          value: materialRates[kSubGrouted] ?? 0,
+          value: materialRates[kSubGrouted],
         },
         ...CONC_TYPES.map(t => ({
           label: `Type ${t}`,
@@ -1180,7 +1181,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           category: 'Steps',
           mode: 'currency',
           unitLabel: 'Ln Ft',
-          value: materialRates[kSubType(t)] ?? 0,
+          value: materialRates[kSubType(t)],
         })),
         ...CONC_FINISHES.map(f => ({
           label: `Finish ${f}`,
@@ -1189,7 +1190,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           category: 'Steps',
           mode: 'currency',
           unitLabel: 'Ln Ft',
-          value: materialRates[kSubFinish(f)] ?? 0,
+          value: materialRates[kSubFinish(f)],
         })),
       ],
     },

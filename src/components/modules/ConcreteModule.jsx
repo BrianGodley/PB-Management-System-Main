@@ -25,12 +25,9 @@ import NewCatalogItemModal from '../NewCatalogItemModal'
 
 // ── Rate tables (method-indexed — not in DB) ──────────────────────────────────
 
-// Base spread labor: HOURS PER INCH of depth PER 100 SF of area (not tons/hr).
-const BASE_RATES = {
-  'Skid Steer': 0.25,
-  'Mini Skid Steer': 0.5,
-  Wheelbarrow: 1.0,
-}
+// Base spread labor methods. HOURS PER INCH of depth PER 100 SF of area come
+// from labor_rates (BASE_METHOD_LABOR_NAME) — identity only, no hardcoded rate.
+const METHODS = ['Skid Steer', 'Mini Skid Steer', 'Wheelbarrow']
 
 // Each base-install method maps to a labor_rates row so the inline calculator
 // icon next to the method dropdown can edit the t/hr rate. Names must match
@@ -40,8 +37,6 @@ const BASE_METHOD_LABOR_NAME = {
   'Mini Skid Steer': 'Concrete - Base Mini Skid Steer',
   Wheelbarrow: 'Concrete - Base Wheelbarrow',
 }
-
-const METHODS = Object.keys(BASE_RATES)
 // Map legacy saved base methods to the consolidated set.
 const normBaseMethod = m =>
   m === 'Skid Steer OK' || m === 'Skid Steer Good'
@@ -62,16 +57,16 @@ const FINISH_TYPES = [
 // Sub-tab finish modifier — flat $/SF (labor) + optional $/SF material, on top
 // of the base install $/SF. Broom + Smooth Trowel have no added cost.
 const SUB_FINISH_RATES = {
-  'Sand Finish': { labor: { name: 'Concrete Sub - Sand Finish Per SF', def: 2 } },
-  'Salt Finish': { labor: { name: 'Concrete Sub - Salt Finish Per SF', def: 3 } },
-  Stamped: { labor: { name: 'Concrete Sub - Stamped Per SF', def: 3 } },
+  'Sand Finish': { labor: { name: 'Concrete Sub - Sand Finish Per SF' } },
+  'Salt Finish': { labor: { name: 'Concrete Sub - Salt Finish Per SF' } },
+  Stamped: { labor: { name: 'Concrete Sub - Stamped Per SF' } },
   'Exposed Aggregate': {
-    labor: { name: 'Concrete Sub - Exposed Aggregate Per SF', def: 5 },
-    mat: { name: 'Concrete Sub - Exposed Aggregate Mat Per SF', def: 2.75 },
+    labor: { name: 'Concrete Sub - Exposed Aggregate Per SF' },
+    mat: { name: 'Concrete Sub - Exposed Aggregate Mat Per SF' },
   },
   'Seeded Aggregate': {
-    labor: { name: 'Concrete Sub - Seeded Aggregate Per SF', def: 4.5 },
-    mat: { name: 'Concrete Sub - Seeded Aggregate Mat Per SF', def: 1.75 },
+    labor: { name: 'Concrete Sub - Seeded Aggregate Per SF' },
+    mat: { name: 'Concrete Sub - Seeded Aggregate Mat Per SF' },
   },
 }
 const SEALER_TYPES = ['Natural', 'Wet-Look']
@@ -79,37 +74,18 @@ const SEALER_TYPES = ['Natural', 'Wet-Look']
 // In-House pour+finish is priced by job-size tier — each tier has its own
 // SF/hr labour rate (editable via labor_rates, category 'Concrete').
 const INSTALL_TIERS = [
-  { key: 's100_300', label: '100–300 Sq Ft', rateName: 'Concrete - Install 100-300', def: 6.5 },
-  { key: 's300_600', label: '300–600 Sq Ft', rateName: 'Concrete - Install 300-600', def: 12 },
-  { key: 's600_1000', label: '600–1000 Sq Ft', rateName: 'Concrete - Install 600-1000', def: 20 },
-  { key: 's1000_2000', label: '1000–2000 Sq Ft', rateName: 'Concrete - Install 1000-2000', def: 24 },
-  { key: 's2000plus', label: '2000+ SF', rateName: 'Concrete - Install 2000+', def: 28 },
+  { key: 's100_300', label: '100–300 Sq Ft', rateName: 'Concrete - Install 100-300' },
+  { key: 's300_600', label: '300–600 Sq Ft', rateName: 'Concrete - Install 300-600' },
+  { key: 's600_1000', label: '600–1000 Sq Ft', rateName: 'Concrete - Install 600-1000' },
+  { key: 's1000_2000', label: '1000–2000 Sq Ft', rateName: 'Concrete - Install 1000-2000' },
+  { key: 's2000plus', label: '2000+ SF', rateName: 'Concrete - Install 2000+' },
 ]
 
-// ── Hardcoded fallbacks (mirror seed values in each table) ───────────────────
+// ── Company/estimate defaults (NOT per-item rates) ───────────────────────────
+// Every material/labor/sub RATE is now read live from its table with no
+// hardcoded fallback (guaranteed to exist via supabase-concrete-fallbacks-seed.sql).
+// Only the estimate-level financial defaults remain here.
 const R = {
-  // Labor production rates (labor_rates)
-  concreteSFPerHr: 23,
-  rebarSFPerHr: 60,
-  formLFPerHr: 18,
-  sleeveLFPerHr: 10,
-  sealerNaturalSFPerHr: 200,
-  sealerWetSFPerHr: 120,
-  vaporBarrierSFPerHr: 15,
-  // Forming complexity: % of labor added per point of the 0–100 input.
-  complexityPctPerUnit: 1,
-  // Hand Mix labor uplift (% added to pour & finish hours for hand-mixed tiers).
-  handMixUpliftPct: 15,
-  // Material $ come ONLY from the catalog (no hardcoded fallbacks). Unpriced
-  // items are surfaced to the user via the inline pricing modal.
-  // Sub / equipment costs (subcontractor_rates)
-  pumpFeeFlat: 316.25,
-  pumpFeePerCY: 9.2,
-  sandFinishPer400SF: 207,
-  stampSubFlat: 800,
-  stampSubPerCY: 120,
-  // Non-editable constants
-  sealerSFPerGal: 70,
   laborBurdenPct: 0.29,
   gpmd: 425,
   commissionRate: 0.12,
@@ -130,7 +106,6 @@ function resolveType(label, opts) {
 // the on-center spacing, then multiplied by the canonical rebar $/LF (the
 // shared Basic Materials 'Rebar' row). Values set with Brian: 24" OC uses
 // 0.59 LF of rebar per SF; 12" OC uses 1.20 LF/SF.
-const REBAR_LF_PER_SF = { '24" OC': 0.59, '12" OC': 1.2 }
 const REBAR_SPACINGS = ['24" OC', '12" OC']
 // Rebar sizes — priced per Ln Ft from the canonical Basic Materials → Reinforcement
 // catalog rows ('Rebar #3' … 'Rebar #8'). Shared across all modules.
@@ -177,31 +152,30 @@ function calcConcrete(
   const lrph = n(laborRatePerHour) || 35
 
   // ── Labor production rates (labor_rates) ─────────────────────────────────
-  const concreteSFPerHr = lr['Concrete - Pour & Finish'] ?? R.concreteSFPerHr
-  const rebarSFPerHr = lr['Concrete - Rebar 24" OC'] ?? R.rebarSFPerHr
-  const formLFPerHr = lr['Concrete - Form Setting'] ?? R.formLFPerHr
-  const sleeveLFPerHr = lr['Concrete - Sleeves'] ?? R.sleeveLFPerHr
-  const sealerNaturalSFPerHr = lr['Concrete - Sealer Natural'] ?? R.sealerNaturalSFPerHr
-  const sealerWetSFPerHr = lr['Concrete - Sealer Wet-Look'] ?? R.sealerWetSFPerHr
-  const vaporBarrierSFPerHr = lr['Concrete - Vapor Barrier'] ?? R.vaporBarrierSFPerHr
-  const complexityPctPerUnit =
-    lr['Concrete - Forming Complexity % Per Unit'] ?? R.complexityPctPerUnit
+  const concreteSFPerHr = n(lr['Concrete - Pour & Finish'])
+  const rebarSFPerHr = n(lr['Concrete - Rebar 24" OC'])
+  const formLFPerHr = n(lr['Concrete - Form Setting'])
+  const sleeveLFPerHr = n(lr['Concrete - Sleeves'])
+  const sealerNaturalSFPerHr = n(lr['Concrete - Sealer Natural'])
+  const sealerWetSFPerHr = n(lr['Concrete - Sealer Wet-Look'])
+  const vaporBarrierSFPerHr = n(lr['Concrete - Vapor Barrier'])
+  const complexityPctPerUnit = n(lr['Concrete - Forming Complexity % Per Unit'])
   // Finish add-on labor coefficients (SF/hr) — editable via labor_rates.
-  const sandFinishSFPerHr = lr['Concrete - Sand Finish SF/hr'] ?? 100
-  const saltFinishSFPerHr = lr['Concrete - Salt Finish SF/hr'] ?? 25
-  const exposedAggSFPerHr = lr['Concrete - Exposed Aggregate SF/hr'] ?? 50
-  const seededAggSFPerHr = lr['Concrete - Seeded Aggregate SF/hr'] ?? 40
+  const sandFinishSFPerHr = n(lr['Concrete - Sand Finish SF/hr'])
+  const saltFinishSFPerHr = n(lr['Concrete - Salt Finish SF/hr'])
+  const exposedAggSFPerHr = n(lr['Concrete - Exposed Aggregate SF/hr'])
+  const seededAggSFPerHr = n(lr['Concrete - Seeded Aggregate SF/hr'])
   // Hand Mix takes more labor to produce than truck-delivered mix. Applied as a
   // % uplift to that tier's pour & finish hours. Tunable coefficient — lives in
-  // labor_rates (View Rates), fallback kept per labor/coeff rule.
-  const handMixUpliftPct = lr['Concrete - Hand Mix Labor Uplift %'] ?? R.handMixUpliftPct
+  // labor_rates (View Rates), read live with no hardcoded fallback.
+  const handMixUpliftPct = n(lr['Concrete - Hand Mix Labor Uplift %'])
 
   // ── Material unit costs (material_rates) ─────────────────────────────────
   // Material $ come ONLY from the catalog (no hardcoded fallbacks). A name with
   // no catalog price is recorded on P.unpriced and returned so the module can
   // prompt the user to price it inline — never silently defaulted.
   const P = makePriceLookup(mr, materialRows)
-  const concretePerCY = mr['Concrete - Ready Mix (Truck)'] ?? 0 // display-only; Install prices per-row from the catalog (mt.fallback)
+  const concretePerCY = n(mr['Concrete - Ready Mix (Truck)']) // display-only; Install prices per-row from the catalog (mt.fallback)
   // Rebar $/LF (canonical, from the shared Basic Materials 'Rebar' row) and the
   // LF-per-SF conversion factor for the chosen on-center spacing.
   const rebarPerLF = P.price('Rebar ' + (state.rebarSize || '#4'), {
@@ -210,8 +184,8 @@ function calcConcrete(
   })
   // Rebar LF-per-SF conversion by spacing — DB-editable coefficients (kept).
   const rebarLfPerSfBySpacing = {
-    '24" OC': mr['Concrete - Rebar LF/SF 24" OC'] ?? REBAR_LF_PER_SF['24" OC'],
-    '12" OC': mr['Concrete - Rebar LF/SF 12" OC'] ?? REBAR_LF_PER_SF['12" OC'],
+    '24" OC': n(mr['Concrete - Rebar LF/SF 24" OC']),
+    '12" OC': n(mr['Concrete - Rebar LF/SF 12" OC']),
   }
   const rebarLfPerSf = rebarLfPerSfBySpacing[state.rebarSpacing] ?? rebarLfPerSfBySpacing['24" OC']
   const formMaterialPerLF = P.price('Concrete - Form Lumber LF', { category: 'Concrete', unit: 'LF' })
@@ -220,16 +194,16 @@ function calcConcrete(
   const sealerNatural5g = P.price('Concrete - Sealer Natural 5gal', { category: 'Concrete', unit: '5gal' })
   const sealerWet5g = P.price('Concrete - Sealer Wet 5gal', { category: 'Concrete', unit: '5gal' })
   const vaporBarrierPerSF = P.price('Concrete - Vapor Barrier SF', { category: 'Concrete', unit: 'SF' })
-  const costBase = mr['Base - Class II Roadbase'] ?? 0 // display-only; Base prices per-row from the catalog (bt.fallback)
-  // Sealer coverage (SF per gallon) — DB-editable coefficient.
-  const sealerSFPerGal = mr['Concrete - Sealer SF/gal'] ?? R.sealerSFPerGal
+  const costBase = n(mr['Base - Class II Roadbase']) // display-only; Base prices per-row from the catalog (bt.fallback)
+  // Sealer coverage (SF per gallon) — DB-editable coefficient (misc_rates).
+  const sealerSFPerGal = n(mr['Concrete - Sealer SF/gal'])
 
   // ── Sub / equipment costs (subcontractor_rates) ──────────────────────────
-  const pumpFeeFlat = sr['Concrete - Pump Flat Fee'] ?? R.pumpFeeFlat
-  const pumpFeePerCY = sr['Concrete - Pump Per CY'] ?? R.pumpFeePerCY
-  const sandFinishPer400SF = sr['Concrete - Sand Finish 400SF'] ?? R.sandFinishPer400SF
-  const stampSubFlat = sr['Concrete - Stamp Sub Flat'] ?? R.stampSubFlat
-  const stampSubPerCY = sr['Concrete - Stamp Sub Per CY'] ?? R.stampSubPerCY
+  const pumpFeeFlat = n(sr['Concrete - Pump Flat Fee'])
+  const pumpFeePerCY = n(sr['Concrete - Pump Per CY'])
+  const sandFinishPer400SF = n(sr['Concrete - Sand Finish 400SF'])
+  const stampSubFlat = n(sr['Concrete - Stamp Sub Flat'])
+  const stampSubPerCY = n(sr['Concrete - Stamp Sub Per CY'])
 
   const diffPct = n(state.difficulty) / 100
   const layoutHrs = n(state.layoutHrs)
@@ -253,7 +227,7 @@ function calcConcrete(
     const m = normBaseMethod(r.method)
     // Both labor AND material are by AREA: (SF ÷ 100) × depth(in) × rate.
     // Labor rate = labor_rates['Concrete - Base ...'] (hrs per inch per 100 SF).
-    const rate = lr[BASE_METHOD_LABOR_NAME[m]] ?? BASE_RATES[m] ?? 0.25
+    const rate = n(lr[BASE_METHOD_LABOR_NAME[m]])
     const hrs = (sf / 100) * depth * rate
     const bt = rowOpt('Concrete Base', r)
     // Material = (SF ÷ 100) × depth(in) × the picked catalog item's price.
@@ -279,7 +253,7 @@ function calcConcrete(
   const installHrs = INSTALL_TIERS.reduce((s, t) => {
     const sf = n(installTiers[t.key])
     if (!sf) return s
-    const rate = lr[t.rateName] ?? t.def
+    const rate = n(lr[t.rateName])
     let hrs = rate > 0 ? sf / rate : 0
     // Hand Mix uplift: producing mix by hand adds labor to this tier.
     if (/hand\s*mix/i.test(installTierType[t.key] || '')) hrs *= 1 + handMixUpliftPct / 100
@@ -869,18 +843,14 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   // exact same per-unit rate lookups as the in-house calc but book
   // (material$ + labor-hours × labor rate) as a sub COST. Nothing here adds
   // to the module's in-house manDays / totalHrs / totalMat / laborCost.
-  const subSlabRate = subRates['Concrete Sub - Per SF'] ?? 12
+  const subSlabRate = n(subRates['Concrete Sub - Per SF'])
   // Sub-side vapor barrier + sealer are flat $/SF (no SF/hr labor component).
-  const subVaporBarrierRate = subRates['Concrete Sub - Vapor Barrier Per SF'] ?? 1
-  const subSealerRate = subRates['Concrete Sub - Sealer Per SF'] ?? 3
+  const subVaporBarrierRate = n(subRates['Concrete Sub - Vapor Barrier Per SF'])
+  const subSealerRate = n(subRates['Concrete Sub - Sealer Per SF'])
   // Sub-side finish modifier ($/SF labor + optional $/SF material).
   const subFinishCfg = SUB_FINISH_RATES[subFinishType] || null
-  const subFinishLaborPerSF = subFinishCfg
-    ? subRates[subFinishCfg.labor.name] ?? subFinishCfg.labor.def
-    : 0
-  const subFinishMatPerSF = subFinishCfg?.mat
-    ? subRates[subFinishCfg.mat.name] ?? subFinishCfg.mat.def
-    : 0
+  const subFinishLaborPerSF = subFinishCfg ? n(subRates[subFinishCfg.labor.name]) : 0
+  const subFinishMatPerSF = subFinishCfg?.mat ? n(subRates[subFinishCfg.mat.name]) : 0
   const lrph = n(laborRatePerHour) || 35
   // Resolved add-on rates (identical on both tabs — sourced from rate maps).
   const {
@@ -1093,7 +1063,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           category: 'Concrete',
           mode: 'coefficient',
           unitLabel: 'hrs per in·100 Sq Ft',
-          value: laborRates[BASE_METHOD_LABOR_NAME[m]] ?? BASE_RATES[m],
+          value: n(laborRates[BASE_METHOD_LABOR_NAME[m]]),
         })),
         // Base material catalog (vendor-supplied 'Concrete Base' products).
         ...catalogBlockItems('Concrete Base'),
@@ -1109,7 +1079,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           category: 'Concrete',
           mode: 'coefficient',
           unitLabel: 'Sq Ft per hr',
-          value: laborRates[t.rateName] ?? t.def,
+          value: n(laborRates[t.rateName]),
         })),
         {
           label: 'Concrete - Rebar 24" OC',
@@ -1312,7 +1282,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               category: 'Concrete',
               mode: 'currency',
               unitLabel: 'Sq Ft',
-              value: subRates[cfg.labor.name] ?? cfg.labor.def,
+              value: n(subRates[cfg.labor.name]),
             },
           ]
           if (cfg.mat) {
@@ -1323,7 +1293,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               category: 'Concrete',
               mode: 'currency',
               unitLabel: 'Sq Ft',
-              value: subRates[cfg.mat.name] ?? cfg.mat.def,
+              value: n(subRates[cfg.mat.name]),
             })
           }
           return rows
@@ -1479,8 +1449,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 const _sf = n(row.sf),
                   _depth = n(row.depth) || 2
                 const _bm = normBaseMethod(row.method)
-                const methodRate =
-                  laborRates[BASE_METHOD_LABOR_NAME[_bm]] ?? BASE_RATES[_bm] ?? 0.25
+                const methodRate = n(laborRates[BASE_METHOD_LABOR_NAME[_bm]])
                 const baseOpts = sectionOptions('Concrete Base', row.vendor)
                 const bt = resolveType(row.type, baseOpts)
                 const baseRate = bt.fallback
@@ -1664,7 +1633,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                   <span />
                 </div>
                 {INSTALL_TIERS.map(t => {
-                  const rate = laborRates[t.rateName] ?? t.def
+                  const rate = n(laborRates[t.rateName])
                   const is300plus = t.key !== 's100_300'
                   const mixOpts = sectionOptions('Concrete Mix', installTierVendor[t.key])
                   const mt = resolveType(installTierType[t.key], mixOpts)

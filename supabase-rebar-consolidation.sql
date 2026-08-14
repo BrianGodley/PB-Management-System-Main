@@ -42,8 +42,8 @@ begin
       select 1 from material_price
       where material_id = v_mat and vendor_id = v_std and effective_end is null
     ) then
-      insert into material_price (material_id, vendor_id, price, source)
-      values (v_mat, v_std, prices[i], 'manual');
+      insert into material_price (material_id, vendor_id, price, source, tenant_id)
+      values (v_mat, v_std, prices[i], 'manual', v_ten);
     end if;
   end loop;
 

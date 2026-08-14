@@ -22,59 +22,30 @@ const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
 
 // ── Demo method rates (tons/hr) — DemoRatesTurf lookup table ────────────────
 const DEMO_METHODS = [
-  {
-    key: 'Skid Steer Good',
-    label: 'Skid Steer (Good)',
-    matKey: 'Turf - Demo Skid Steer Good',
-    fallback: 2.0,
-  },
-  {
-    key: 'Skid Steer OK',
-    label: 'Skid Steer (OK)',
-    matKey: 'Turf - Demo Skid Steer OK',
-    fallback: 1.5,
-  },
-  {
-    key: 'Mini Skid Steer',
-    label: 'Mini Skid Steer',
-    matKey: 'Turf - Demo Mini Skid Steer',
-    fallback: 0.75,
-  },
-  { key: 'Wheelbarrow', label: 'Wheelbarrow', matKey: 'Turf - Demo Wheelbarrow', fallback: 0.5 },
-  { key: 'Hand', label: 'Hand', matKey: 'Turf - Demo Hand', fallback: 0.38 },
+  { key: 'Skid Steer Good', label: 'Skid Steer (Good)', matKey: 'Turf - Demo Skid Steer Good' },
+  { key: 'Skid Steer OK', label: 'Skid Steer (OK)', matKey: 'Turf - Demo Skid Steer OK' },
+  { key: 'Mini Skid Steer', label: 'Mini Skid Steer', matKey: 'Turf - Demo Mini Skid Steer' },
+  { key: 'Wheelbarrow', label: 'Wheelbarrow', matKey: 'Turf - Demo Wheelbarrow' },
+  { key: 'Hand', label: 'Hand', matKey: 'Turf - Demo Hand' },
 ]
 
 // ── Demo row types — each has its dump fee key ────────────────────────────────
 const DEMO_ROWS = [
-  { key: 'concrete', label: 'Concrete', dumpKey: 'Dump Fee - Concrete', dumpFallback: 36.21 },
-  { key: 'soil', label: 'Soil', dumpKey: 'Dump Fee - Dirt', dumpFallback: 36.21 },
-  { key: 'lawn', label: 'Lawn', dumpKey: 'Dump Fee - Green Waste', dumpFallback: 72.19 },
+  { key: 'concrete', label: 'Concrete', dumpKey: 'Dump Fee - Concrete' },
+  { key: 'soil', label: 'Soil', dumpKey: 'Dump Fee - Dirt' },
+  { key: 'lawn', label: 'Lawn', dumpKey: 'Dump Fee - Green Waste' },
 ]
 
 // Turf brands are no longer a hardcoded list — they live in the catalog as
 // products (category 'Artificial Turf', sub_category 'Turf Material'). See
 // turfBrandOptions / turfBrandRow below.
 
-// ── Rate defaults (DB fallbacks) ──────────────────────────────────────────────
+// ── Estimate-config factors ───────────────────────────────────────────────────
+// Only the company/estimate-config constants live here. Every per-item labor
+// coefficient and material price is read live from the rate tables (labor_rates
+// / misc_rates / material) — no hardcoded rate fallbacks. Missing rates are
+// guaranteed by supabase-turf-fallbacks-seed.sql.
 const RATE_DEFAULTS = {
-  // Labor rates
-  baseInstallRate: 0.25, // hrs/10SF (BaseTurfRate) — hrs = (SF/10)*0.25
-  baseSFPerHr: 10, // SF unit for base (BaseTurfSfPerHr)
-  turfSFHr: 20, // SF/hr layout (TurfSFHr)
-  turfPH: 0.5, // person-hours multiplier (TurfPH)
-  turfCutSFHr: 100, // LF/hr for cut/staple/seam (TurfCutSfHr)
-  turfCutRate: 1.0, // PH for cut/staple/seam (TurfCutRate)
-  stripLFHr: 12.5, // LF/hr for narrow/custom strips — equals legacy (LF/100)*8
-
-  weedFabricHrPer1kSF: 8, // hrs per 1000 Sq Ft for weed fabric — (SF/1000)*8
-  // Material rates
-  gravelBase: 6.9, // $/ton (Gravel Base — $6.90/ton)
-  dgBase: 57.5, // $/ton (DG Base)
-  weedFabric: 165.0, // $/roll (per 1800 Sq Ft)
-  installMaterials: 0.14, // $/LF (staples $0.029 + seam $0.050 + nails $0.061 per SF, × LF)
-  infillDurafill: 0.62, // $/SF (TurfInfillSF)
-  infillZeoFill: 30.0, // $/bag (per 30 Sq Ft)
-  // Pricing factors — from Excel Module #1 O3/O4
   laborBurden: 0.29, // 29% burden on labor cost (Module #1 O4)
   commissionRate: 0.12, // 12% commission on gross profit (Module #1 O3 = Comm)
 }
@@ -96,9 +67,9 @@ const TURF_CAT = { base: 'Turf Base', turf: 'Turf Material' }
 // vendor/catalog price lookups key off `dbName`, while labor/qty coefficients
 // still key off `key` (Gravel/DG/Weed).
 const BASE_MATERIALS = [
-  { key: 'Gravel', label: '2" Gravel Base', dbName: 'Gravel Base', matKey: 'Turf - Gravel Base', fallbackKey: 'gravelBase', qtyUnit: 't' },
-  { key: 'DG', label: '1" DG Base', dbName: 'DG Base', matKey: 'Turf - DG Base', fallbackKey: 'dgBase', qtyUnit: 't' },
-  { key: 'Weed', label: 'Weed Barrier Fabric', dbName: 'Weed Barrier Fabric', matKey: 'Turf - Weed Barrier Fabric', fallbackKey: 'weedFabric', qtyUnit: 'roll' },
+  { key: 'Gravel', label: '2" Gravel Base', dbName: 'Gravel Base', matKey: 'Turf - Gravel Base', qtyUnit: 't' },
+  { key: 'DG', label: '1" DG Base', dbName: 'DG Base', matKey: 'Turf - DG Base', qtyUnit: 't' },
+  { key: 'Weed', label: 'Weed Barrier Fabric', dbName: 'Weed Barrier Fabric', matKey: 'Turf - Weed Barrier Fabric', qtyUnit: 'roll' },
 ]
 // Vendor-first Base-material picker options (mirrors UtilitiesModule.mergedUtilTypes
 // and the turf-brand picker above). Standard/unset → the null-vendor 'Turf Base'
@@ -129,19 +100,19 @@ function baseMatOptions(materialRows, vendorSel = 'Standard') {
       dbName: o.row.name, // material-price target (matched by name for the vendor)
       qtyUnit: bi?.qtyUnit || 't',
       matKey: bi?.matKey,
-      fallbackKey: bi?.fallbackKey,
       fromMaster: !bi,
     }
   })
 }
-function turfMatPrice(cat, vendorSel, typeLabel, houseName, houseFallback, materialRows, catDefaults, mp) {
+function turfMatPrice(cat, vendorSel, typeLabel, houseName, materialRows, catDefaults, mp) {
   const vsel = vendorSel && vendorSel !== 'auto' ? vendorSel : catDefaults?.[cat] || 'Standard'
   const vrow = catalogItemFor(materialRows, cat, vsel, typeLabel, {
     ...CATALOG_OPTS,
     fallbackFirst: false,
   })
   if (vrow) return { price: n(vrow.unit_cost), dbName: vrow.name }
-  return { price: n(mp[houseName]) || houseFallback, dbName: houseName }
+  // No hardcoded fallback — an unpriced item resolves to $0 (surfaced as $0).
+  return { price: n(mp[houseName]), dbName: houseName }
 }
 
 // Turf brands live entirely in the catalog now (category 'Artificial Turf',
@@ -201,18 +172,18 @@ function calcTurf(
   // no labor hours). Rates come from subcontractor_rates (category 'Artificial
   // Turf'), keyed by company_name.
   const isSub = state.subType === 'Subcontractor'
-  const subInstallPerSF = subRates['Turf Sub - Install Per SF'] ?? 3
-  const subStripPerLF = subRates['Turf Sub - Strip Per LF'] ?? 10
+  const subInstallPerSF = n(subRates['Turf Sub - Install Per SF'])
+  const subStripPerLF = n(subRates['Turf Sub - Strip Per LF'])
 
   // Look up demo method rate (tons/hr) for each demo row
   function demoRate(method) {
     const m = DEMO_METHODS.find(x => x.key === method)
-    return n(lr[m?.matKey]) || m?.fallback || 2.0
+    return n(lr[m?.matKey])
   }
 
   // ── Demo section ──────────────────────────────────────────────────────────
   // Removal tonnage density (SF·inch per ton) — DB-editable coefficient.
-  const demoTonsDivisor = mp['Turf - Demo Tons Divisor'] ?? 200
+  const demoTonsDivisor = n(mp['Turf - Demo Tons Divisor'])
   let demoHrs = 0,
     demoMat = 0
   const demoCalc = DEMO_ROWS.map(row => {
@@ -220,9 +191,9 @@ function calcTurf(
     const inches = n(state.demo[row.key]?.inches) || 4
     const method = state.demo[row.key]?.method || 'Skid Steer Good'
     const rate = demoRate(method)
-    const dumpRate = n(mp[row.dumpKey]) || row.dumpFallback
-    const tons = sf > 0 ? (sf / demoTonsDivisor) * inches : 0
-    const hrs = tons > 0 ? tons / rate : 0
+    const dumpRate = n(mp[row.dumpKey])
+    const tons = sf > 0 && demoTonsDivisor > 0 ? (sf / demoTonsDivisor) * inches : 0
+    const hrs = tons > 0 && rate > 0 ? tons / rate : 0
     const mat = tons * dumpRate
     demoHrs += hrs
     demoMat += mat
@@ -243,8 +214,8 @@ function calcTurf(
     baseMat = 0
   // Gravel-base tonnage density (SF·inch per ton) + weed-fabric roll coverage —
   // DB-editable estimating coefficients.
-  const gravelBaseTonsDivisor = mp['Turf - Gravel Base Tons Divisor'] ?? 200
-  const weedFabricSFPerRoll = mp['Turf - Weed Fabric SF per Roll'] ?? 1800
+  const gravelBaseTonsDivisor = n(mp['Turf - Gravel Base Tons Divisor'])
+  const weedFabricSFPerRoll = n(mp['Turf - Weed Fabric SF per Roll'])
   const baseCalc = (state.baseRows || []).map(row => {
     // Unselected base material contributes nothing (no crash, no fallback-to-first).
     if (!row.material)
@@ -273,7 +244,6 @@ function calcTurf(
       row.vendor,
       opt?.dbName || def.dbName,
       def.matKey,
-      RATE_DEFAULTS[def.fallbackKey],
       materialRows,
       catDefaults,
       mp
@@ -282,17 +252,17 @@ function calcTurf(
       hrs = 0
     if (def.key === 'Gravel') {
       // Base-install labor coefficients are DB-editable (labor_rates).
-      const baseSFPerHr = mp['Turf - Base Install SF/hr'] ?? RATE_DEFAULTS.baseSFPerHr
-      const baseInstallPH = mp['Turf - Base Install PH'] ?? RATE_DEFAULTS.baseInstallRate
-      qty = sf > 0 ? (sf / gravelBaseTonsDivisor) * 2 : 0
+      const baseSFPerHr = n(mp['Turf - Base Install SF/hr'])
+      const baseInstallPH = n(mp['Turf - Base Install PH'])
+      qty = sf > 0 && gravelBaseTonsDivisor > 0 ? (sf / gravelBaseTonsDivisor) * 2 : 0
       hrs = sf > 0 && baseSFPerHr > 0 ? (sf / baseSFPerHr) * baseInstallPH : 0
     } else if (def.key === 'DG') {
       qty = sf > 0 ? (sf * (1 / 12)) / 27 : 0
       hrs = 0
     } else {
       // Weed-fabric install labor is DB-editable (hrs per 1000 SF).
-      const weedHrPer1kSF = mp['Turf - Weed Fabric Install hrs/1kSF'] ?? RATE_DEFAULTS.weedFabricHrPer1kSF
-      qty = sf > 0 ? Math.ceil(sf / weedFabricSFPerRoll) : 0
+      const weedHrPer1kSF = n(mp['Turf - Weed Fabric Install hrs/1kSF'])
+      qty = sf > 0 && weedFabricSFPerRoll > 0 ? Math.ceil(sf / weedFabricSFPerRoll) : 0
       hrs = sf > 0 ? (sf / 1000) * weedHrPer1kSF : 0
     }
     const mat = qty * price
@@ -310,11 +280,11 @@ function calcTurf(
 
   // ── Turf installation (up to 3 rolls of 15' wide) ─────────────────────────
   // hrs = SF/TurfSFHr * TurfPH = SF/20 * 0.5
-  const turfSFHr = n(lr['Turf - Turf Install SF/hr']) || RATE_DEFAULTS.turfSFHr
+  const turfSFHr = n(lr['Turf - Turf Install SF/hr'])
   // Turf-placement person-hours multiplier is DB-editable (labor_rates).
-  const turfPH = mp['Turf - Turf Install PH'] ?? RATE_DEFAULTS.turfPH
+  const turfPH = n(mp['Turf - Turf Install PH'])
   // Turf roll width (ft) — DB-editable product spec.
-  const rollWidthFt = mp['Turf - Roll Width FT'] ?? 15
+  const rollWidthFt = n(mp['Turf - Roll Width FT'])
   let turfHrs = 0,
     turfMat = 0,
     totalEdgeLF = 0,
@@ -332,7 +302,7 @@ function calcTurf(
     // In-house derives SF from the 15' roll edge; the Sub tab uses the
     // installed SF the estimator enters directly.
     const sf = isSub ? installSF : edgeLF * rollWidthFt
-    const hrs = !isSub && sf > 0 ? (sf / turfSFHr) * turfPH : 0
+    const hrs = !isSub && sf > 0 && turfSFHr > 0 ? (sf / turfSFHr) * turfPH : 0
     const mat = isSub ? 0 : sf * pricePerSF
     // All-in sub cost for this roll: (sub install $/SF + material $/SF) × SF.
     const rowSubCost = installSF * (subInstallPerSF + pricePerSF)
@@ -349,7 +319,7 @@ function calcTurf(
   // Material: brand $/SF × (LF × width ft)  — Excel S20=O20*Q20 (manual inputs)
   // Now a user-managed list of strip rows (was a single row).
   // Labor rate is DB-editable (LF/hr). Legacy (LF/100)*8 == LF/12.5.
-  const stripLFHr = n(lr['Turf - Strip Install LF/hr']) || RATE_DEFAULTS.stripLFHr
+  const stripLFHr = n(lr['Turf - Strip Install LF/hr'])
   let stripsHrs = 0,
     stripsMat = 0,
     subStripsCost = 0
@@ -374,10 +344,10 @@ function calcTurf(
   // ── Cut, Staple & Seam ────────────────────────────────────────────────────
   // hrs = (totalLF / TurfCutSfHr) * TurfCutRate = (totalLF/100)*1.0
   // mat = installMaterials ($/LF) × totalLF  — matches Excel S18=O18*Q18
-  const installMatPerLF = n(mp['Turf - Install Materials']) || RATE_DEFAULTS.installMaterials
+  const installMatPerLF = n(mp['Turf - Install Materials'])
   // Cut/staple/seam labor coefficients are DB-editable (labor_rates).
-  const cutSFHr = mp['Turf - Cut/Staple/Seam LF/hr'] ?? RATE_DEFAULTS.turfCutSFHr
-  const cutPH = mp['Turf - Cut/Staple/Seam PH'] ?? RATE_DEFAULTS.turfCutRate
+  const cutSFHr = n(mp['Turf - Cut/Staple/Seam LF/hr'])
+  const cutPH = n(mp['Turf - Cut/Staple/Seam PH'])
   const cutHrs =
     !isSub && totalEdgeLF > 0 && cutSFHr > 0 ? (totalEdgeLF / cutSFHr) * cutPH : 0
   // On the Sub tab cut/seam material rolls into the sub cost bucket instead of
@@ -394,14 +364,14 @@ function calcTurf(
   const infillAreaSF =
     turfAreaSF || (state.baseRows || []).reduce((m, r) => Math.max(m, n(r.sf)), 0)
   // ZeoFill coverage (SF per bag) — DB-editable product spec.
-  const infillSFPerBag = mp['Turf - Infill SF per Bag'] ?? 30
+  const infillSFPerBag = n(mp['Turf - Infill SF per Bag'])
   let infillMat = 0
   if (!isSub && infillAreaSF > 0) {
     if (state.useZeoFill) {
-      const bags = Math.ceil(infillAreaSF / infillSFPerBag)
-      infillMat = bags * (n(mp['Turf - Infill ZeoFill']) || RATE_DEFAULTS.infillZeoFill)
+      const bags = infillSFPerBag > 0 ? Math.ceil(infillAreaSF / infillSFPerBag) : 0
+      infillMat = bags * n(mp['Turf - Infill ZeoFill'])
     } else {
-      infillMat = infillAreaSF * (n(mp['Turf - Infill Durafill']) || RATE_DEFAULTS.infillDurafill)
+      infillMat = infillAreaSF * n(mp['Turf - Infill Durafill'])
     }
   }
 
@@ -1008,7 +978,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           category: 'Artificial Turf',
           mode: 'coefficient',
           unitLabel: 'Sq Ft per hr',
-          value: materialPrices['Turf - Base Install SF/hr'] ?? RATE_DEFAULTS.baseSFPerHr,
+          value: materialPrices['Turf - Base Install SF/hr'],
         },
         {
           label: 'Base Install',
@@ -1017,7 +987,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           category: 'Artificial Turf',
           mode: 'coefficient',
           unitLabel: 'PH',
-          value: materialPrices['Turf - Base Install PH'] ?? RATE_DEFAULTS.baseInstallRate,
+          value: materialPrices['Turf - Base Install PH'],
         },
         {
           label: 'Weed Fabric Install',
@@ -1026,9 +996,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           category: 'Artificial Turf',
           mode: 'coefficient',
           unitLabel: 'hrs per 1kSF',
-          value:
-            materialPrices['Turf - Weed Fabric Install hrs/1kSF'] ??
-            RATE_DEFAULTS.weedFabricHrPer1kSF,
+          value: materialPrices['Turf - Weed Fabric Install hrs/1kSF'],
         },
       ],
     },
@@ -1051,7 +1019,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           category: 'Artificial Turf',
           mode: 'coefficient',
           unitLabel: 'PH',
-          value: materialPrices['Turf - Turf Install PH'] ?? RATE_DEFAULTS.turfPH,
+          value: materialPrices['Turf - Turf Install PH'],
         },
         {
           label: 'Cut, Staple & Seam',
@@ -1060,7 +1028,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           category: 'Artificial Turf',
           mode: 'coefficient',
           unitLabel: 'Ln Ft per hr',
-          value: materialPrices['Turf - Cut/Staple/Seam LF/hr'] ?? RATE_DEFAULTS.turfCutSFHr,
+          value: materialPrices['Turf - Cut/Staple/Seam LF/hr'],
         },
         {
           label: 'Cut, Staple & Seam',
@@ -1069,7 +1037,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           category: 'Artificial Turf',
           mode: 'coefficient',
           unitLabel: 'PH',
-          value: materialPrices['Turf - Cut/Staple/Seam PH'] ?? RATE_DEFAULTS.turfCutRate,
+          value: materialPrices['Turf - Cut/Staple/Seam PH'],
         },
         // Base material catalog ('Turf Base' vendor products + named base fabrics),
         // turf material catalog ('Turf Material' brands) and the named consumables
@@ -1109,7 +1077,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           category: 'Artificial Turf',
           mode: 'coefficient',
           unitLabel: 'Sq Ft·in per Tons',
-          value: materialPrices['Turf - Demo Tons Divisor'] ?? 200,
+          value: materialPrices['Turf - Demo Tons Divisor'],
         },
         {
           label: 'Gravel Base Tons Divisor',
@@ -1118,7 +1086,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           category: 'Artificial Turf',
           mode: 'coefficient',
           unitLabel: 'Sq Ft·in per Tons',
-          value: materialPrices['Turf - Gravel Base Tons Divisor'] ?? 200,
+          value: materialPrices['Turf - Gravel Base Tons Divisor'],
         },
         {
           label: 'Weed Fabric SF per Roll',
@@ -1127,7 +1095,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           category: 'Artificial Turf',
           mode: 'coefficient',
           unitLabel: 'Sq Ft per roll',
-          value: materialPrices['Turf - Weed Fabric SF per Roll'] ?? 1800,
+          value: materialPrices['Turf - Weed Fabric SF per Roll'],
         },
         {
           label: 'Turf Roll Width',
@@ -1136,7 +1104,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           category: 'Artificial Turf',
           mode: 'coefficient',
           unitLabel: 'ft',
-          value: materialPrices['Turf - Roll Width FT'] ?? 15,
+          value: materialPrices['Turf - Roll Width FT'],
         },
         {
           label: 'Infill SF per Bag (ZeoFill)',
@@ -1145,7 +1113,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           category: 'Artificial Turf',
           mode: 'coefficient',
           unitLabel: 'Sq Ft per bag',
-          value: materialPrices['Turf - Infill SF per Bag'] ?? 30,
+          value: materialPrices['Turf - Infill SF per Bag'],
         },
       ],
     },
@@ -1293,7 +1261,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
               const bc = calc.baseCalc?.[i] || {}
               const unitLabel = def.qtyUnit === 'roll' ? 'roll' : 'ton'
               // Vendor-aware price for the chip (the calc already resolved it).
-              const rate = n(bc.price ?? materialPrices[def.matKey] ?? RATE_DEFAULTS[def.fallbackKey])
+              const rate = n(bc.price ?? materialPrices[def.matKey])
               return (
                 <tr key={i}>
                   <td className={td}>
@@ -1392,18 +1360,14 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           <span className="text-xs text-amber-700 ml-auto inline-flex items-center gap-1">
             {T.useZeoFill ? (
               <>
-                {Math.ceil(calc.infillAreaSF / calc.infillSFPerBag)} bags @ $
-                {n(materialPrices['Turf - Infill ZeoFill'] || RATE_DEFAULTS.infillZeoFill).toFixed(
-                  2
-                )}
+                {calc.infillSFPerBag > 0 ? Math.ceil(calc.infillAreaSF / calc.infillSFPerBag) : 0} bags @ $
+                {n(materialPrices['Turf - Infill ZeoFill']).toFixed(2)}
                 /bag
               </>
             ) : (
               <>
                 Durafill @ $
-                {n(
-                  materialPrices['Turf - Infill Durafill'] || RATE_DEFAULTS.infillDurafill
-                ).toFixed(2)}
+                {n(materialPrices['Turf - Infill Durafill']).toFixed(2)}
                 /SF
               </>
             )}

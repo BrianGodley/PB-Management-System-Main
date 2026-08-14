@@ -47,38 +47,10 @@ const DUMP_TYPES = ['In-House', 'Subcontractor']
 
 const STUB_HEIGHT_MODS = { '0-1': 0.75, '1-2': 1, '2-3': 1.5, '3-4': 2, '4-5': 2.5 }
 
-const RATE_DEFAULTS = {
-  concrete: 0.75, // 'Demo - Mini Skid Steer Concrete/Dirt' (NonBob)
-  grass: 0.75, // 'Demo - Mini Skid Steer Grass' (Bobcat)
-  importBase: 5.0, // 'Demo - Mini Skid Steer Import Base' (NonBob)
-  bobcatConc: 2.0, // Full Bobcat haul rate — used for Grade Cut & Footing
-  bobcatBase: 10.0, // Full Bobcat base spread — used for Grade Fill
-  jj: 1.75, // 'Demo - Mini JJ Compaction'
-  ssCompact: 1.23, // 'Demo - Mini SS Compaction'
-  rebarMin: 0.05, // 'Demo - Mini Rebar'
-  shrub: 0.75, // 'Demo - Mini Shrub'
-  stumpFst: 2.5, // 'Demo - Mini Stump 1st'
-  stumpAdd: 0.75, // 'Demo - Mini Stump Additional'
-  treeSmall: 0.1, // 'Demo - Mini Tree Small'
-  treeMed: 0.15, // 'Demo - Mini Tree Medium'
-  treeLarge: 0.2, // 'Demo - Mini Tree Large'
-}
 
 // Sub Haul rates — billed per 1.5 tons removed (sub cost, not materials)
 // Labor is unchanged in Sub Haul mode; dump fees are replaced by these charges
-const SUB_HAUL_DEFAULTS = {
-  concrete: 85, // $/1.5T — concrete, misc flat/vert, footing
-  dirt: 95, // $/1.5T — dirt/rock, grade cut
-  grass: 120, // $/1.5T — grass/sod
-}
 
-const DUMP_FEE_DEFAULTS = {
-  'Demo - Mini Dump - Concrete': 36.21,
-  'Demo - Mini Dump - Dirt': 36.21,
-  'Demo - Mini Dump - Green Waste': 72.19,
-  'Demo - Mini Dump - Tree/Stump': 125.33,
-  'Demo - Mini Dump - Import Base': 7.5,
-}
 
 // ── Calculation engine ────────────────────────────────────────────────────────
 
@@ -87,9 +59,6 @@ const sfToTons = (sf, depthIn) => (n(sf) / 200) * n(depthIn)
 
 // Container-based removal: SF -> CF (x depth/12) -> CY (/27) -> x swell,
 // billed at a flat rate per low-boy container (per material, rounded up).
-const CONTAINER_COST = 770
-const CONTAINER_CY = 10
-const SWELL = 1.2
 
 function calcDemo(
   state,
@@ -109,10 +78,10 @@ function calcDemo(
   // Business-tunable assumptions, surfaced as editable coefficient rows in View
   // Rates (labor_rates, category Demo). Fixed unit conversions (27 cf/cy,
   // 12 in/ft, 2000 lb/ton, 60 min/hr) stay as literal math.
-  const tonsSfInDenom = lr['Demo - Mini Tons SF-in Denominator'] ?? 200
-  const concreteWeightLbCf = lr['Demo - Mini Concrete Weight lb/cf'] ?? 150
-  const importBaseLaborMult = lr['Demo - Mini Import Base Labor Mult'] ?? 0.5
-  const treeTonnageFactor = lr['Demo - Mini Tree Tonnage Factor'] ?? 0.25
+  const tonsSfInDenom = n(lr['Demo - Mini Tons SF-in Denominator'])
+  const concreteWeightLbCf = n(lr['Demo - Mini Concrete Weight lb/cf'])
+  const importBaseLaborMult = n(lr['Demo - Mini Import Base Labor Mult'])
+  const treeTonnageFactor = n(lr['Demo - Mini Tree Tonnage Factor'])
   // Local sfToTons shadows the module helper so the tons denominator is editable.
   const sfToTons = (sf, depthIn) => (n(sf) / tonsSfInDenom) * n(depthIn)
   // Subcontractor rates: a one-off adjustment saved on THIS estimate
@@ -129,41 +98,41 @@ function calcDemo(
   const isSub = state.dumpType === 'Subcontractor'
   const isDumpSub = false // disposal follows the In House/Sub toggle
   const lrph = n(laborRatePerHour) || 35
-  const difficultyRatio = lr['Demo - Mini Difficulty Ratio'] ?? 1
+  const difficultyRatio = n(lr['Demo - Mini Difficulty Ratio'])
   const diff = 1 + (n(state.difficulty) / 100) * difficultyRatio
   const hrsAdj = n(state.hoursAdj)
 
   // ── Pull rates from DB (lr) with fallbacks ────────────────────────────────
   // Mini Skid Steer rates — used for all operations
-  const laborConc = lr['Demo - Mini - Concrete SF'] ?? 1
-  const laborDirt = lr['Demo - Mini - Dirt SF'] ?? 1
-  const laborGrass = lr['Demo - Mini - Grass SF'] ?? 1
+  const laborConc = n(lr['Demo - Mini - Concrete SF'])
+  const laborDirt = n(lr['Demo - Mini - Dirt SF'])
+  const laborGrass = n(lr['Demo - Mini - Grass SF'])
   // Misc Flat matches Hand Demo: square-foot labour (hr per 100sf·in)
   // plus container disposal, rather than the tons ÷ t/hr model.
-  const laborMiscFlat = lr['Demo - Mini - Misc Flat SF'] ?? 1
-  const laborMiscVert = lr['Demo - Mini - Misc Vert SF'] ?? 1
-  const laborFooting = lr['Demo - Mini - Footing SF'] ?? 1
-  const laborGradeCut = lr['Demo - Mini - Grade Cut SF'] ?? 1
-  const rateGrass = lr['Demo - Mini Skid Steer Grass'] ?? RATE_DEFAULTS.grass
-  const laborBase = lr['Demo - Mini - Import Base SF'] ?? 1
-  const laborGradeFill = lr['Demo - Mini - Grade Fill SF'] ?? 1
-  const laborJJ = lr['Demo - Mini - JJ SF'] ?? 1
-  const laborSS = lr['Demo - Mini - SS Compact SF'] ?? 1
-  const rebarMinPerSF = lr['Demo - Mini Rebar'] ?? RATE_DEFAULTS.rebarMin
-  const shrubRate = lr['Demo - Mini Shrub'] ?? RATE_DEFAULTS.shrub
-  const stumpSmallRate = lr['Demo - Mini Stump Small'] ?? 1.25
-  const stumpMedRate = lr['Demo - Mini Stump Medium'] ?? 2.5
-  const stumpLargeRate = lr['Demo - Mini Stump Large'] ?? 3.75
-  const stumpXLRate = lr['Demo - Mini Stump XL'] ?? 5
-  const treeSmall = lr['Demo - Mini Tree Small'] ?? RATE_DEFAULTS.treeSmall
-  const treeMed = lr['Demo - Mini Tree Medium'] ?? RATE_DEFAULTS.treeMed
-  const treeLarge = lr['Demo - Mini Tree Large'] ?? RATE_DEFAULTS.treeLarge
+  const laborMiscFlat = n(lr['Demo - Mini - Misc Flat SF'])
+  const laborMiscVert = n(lr['Demo - Mini - Misc Vert SF'])
+  const laborFooting = n(lr['Demo - Mini - Footing SF'])
+  const laborGradeCut = n(lr['Demo - Mini - Grade Cut SF'])
+  const rateGrass = n(lr['Demo - Mini Skid Steer Grass'])
+  const laborBase = n(lr['Demo - Mini - Import Base SF'])
+  const laborGradeFill = n(lr['Demo - Mini - Grade Fill SF'])
+  const laborJJ = n(lr['Demo - Mini - JJ SF'])
+  const laborSS = n(lr['Demo - Mini - SS Compact SF'])
+  const rebarMinPerSF = n(lr['Demo - Mini Rebar'])
+  const shrubRate = n(lr['Demo - Mini Shrub'])
+  const stumpSmallRate = n(lr['Demo - Mini Stump Small'])
+  const stumpMedRate = n(lr['Demo - Mini Stump Medium'])
+  const stumpLargeRate = n(lr['Demo - Mini Stump Large'])
+  const stumpXLRate = n(lr['Demo - Mini Stump XL'])
+  const treeSmall = n(lr['Demo - Mini Tree Small'])
+  const treeMed = n(lr['Demo - Mini Tree Medium'])
+  const treeLarge = n(lr['Demo - Mini Tree Large'])
 
-  const dumpConc = mp['Demo - Mini Dump - Concrete'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Concrete']
-  const dumpDirt = mp['Demo - Mini Dump - Dirt'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Dirt']
-  const dumpGreen = mp['Demo - Mini Dump - Green Waste'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Green Waste']
-  const dumpTreeStump = mp['Demo - Mini Dump - Tree/Stump'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Tree/Stump']
-  const dumpBase = mp['Demo - Mini Dump - Import Base'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Import Base']
+  const dumpConc = n(mp['Demo - Mini Dump - Concrete'])
+  const dumpDirt = n(mp['Demo - Mini Dump - Dirt'])
+  const dumpGreen = n(mp['Demo - Mini Dump - Green Waste'])
+  const dumpTreeStump = n(mp['Demo - Mini Dump - Tree/Stump'])
+  const dumpBase = n(mp['Demo - Mini Dump - Import Base'])
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   // accessLevel param lets each call site use the correct NonBob or Bobcat multiplier
@@ -192,9 +161,9 @@ function calcDemo(
   }
 
   // Editable container disposal rates (Master Rates -> Materials, category Demo).
-  const containerPrice = mp['Demo - Mini Container (Low-Boy)'] ?? CONTAINER_COST
-  const containerCy = mp['Demo - Mini Container Capacity (CY)'] ?? CONTAINER_CY
-  const swellFactor = mp['Demo - Mini Removal Swell'] ?? SWELL
+  const containerPrice = n(mp['Demo - Mini Container (Low-Boy)'])
+  const containerCy = n(mp['Demo - Mini Container Capacity (CY)'])
+  const swellFactor = n(mp['Demo - Mini Removal Swell'])
   const removalYards = (sf, depthIn) => ((n(sf) * (n(depthIn) / 12)) / 27) * swellFactor
   const removalContainers = (sf, depthIn) => Math.ceil(removalYards(sf, depthIn) / containerCy)
   const containerCost = (sf, depthIn) =>
@@ -202,12 +171,12 @@ function calcDemo(
   const sfLaborHrs = (sf, depthIn, rate) => (n(sf) / 100) * n(depthIn) * rate
   const cfLaborHrs = (cf, rate) => (n(cf) * 12 / 100) * rate
   const flatCf = (sf, depthIn) => n(sf) * (n(depthIn) / 12)
-  const baseMatPer10Cy = mp['Demo - Mini Import Base $/10cy'] ?? 150
+  const baseMatPer10Cy = n(mp['Demo - Mini Import Base $/10cy'])
   const containerCostCf = cf =>
     Math.ceil(((n(cf) / 27) * swellFactor) / containerCy) * containerPrice
   // Editable hauling coefficients (Master Rates -> Labor, category Demo).
-  const haulSecPerFt = lr['Demo - Mini Haul Sec/Ft'] ?? 0.5
-  const haulLoadCy = lr['Demo - Mini Load (CY)'] ?? 0.2
+  const haulSecPerFt = n(lr['Demo - Mini Haul Sec/Ft'])
+  const haulLoadCy = n(lr['Demo - Mini Load (CY)'])
 
   // ── Demo rows — NonBob access (OK=0.667) ──────────────────────────────────
   const conc = flat(state.concSF, state.concDepth || 4, laborConc, 0, accessNonBob)
@@ -304,9 +273,9 @@ function calcDemo(
 
   // ── Sub Haul cost — per 1.5 tons, goes into subCost (not materials) ──────────
   // DB values (subcontractor_rates category='Sub Haul') take precedence over defaults
-  const shConc = sr['Demo - Mini Sub Haul - Concrete'] ?? SUB_HAUL_DEFAULTS.concrete
-  const shDirt = sr['Demo - Mini Sub Haul - Dirt'] ?? SUB_HAUL_DEFAULTS.dirt
-  const shGrass = sr['Demo - Mini Sub Haul - Grass'] ?? SUB_HAUL_DEFAULTS.grass
+  const shConc = n(sr['Demo - Mini Sub Haul - Concrete'])
+  const shDirt = n(sr['Demo - Mini Sub Haul - Dirt'])
+  const shGrass = n(sr['Demo - Mini Sub Haul - Grass'])
 
   const tonsPerCharge = 1.5 // billing increment
 
@@ -369,37 +338,37 @@ function calcDemo(
   const burden = laborCost * (n(laborBurdenPct) || 0.29)
   // GP = labor component + Universal Sub Markup % on sub haul cost
   // Hauling (Subcontractor) — 12-yard loads × per-load rate (sub cost, pre-GP markup).
-  const haulTrashRate = sr['Demo - Mini Sub Haul - Trash 12yd'] ?? 850
-  const haulConcreteRate = sr['Demo - Mini Sub Haul - Concrete 12yd'] ?? 800
-  const haulSoilRate = sr['Demo - Mini Sub Haul - Soil 12yd'] ?? 650
-  const haulBaseRate = sr['Demo - Mini Sub Haul - Import Base 12yd'] ?? 350
+  const haulTrashRate = n(sr['Demo - Mini Sub Haul - Trash 12yd'])
+  const haulConcreteRate = n(sr['Demo - Mini Sub Haul - Concrete 12yd'])
+  const haulSoilRate = n(sr['Demo - Mini Sub Haul - Soil 12yd'])
+  const haulBaseRate = n(sr['Demo - Mini Sub Haul - Import Base 12yd'])
   const haulCost =
     n(state.haulTrashLoads) * haulTrashRate +
     n(state.haulConcreteLoads) * haulConcreteRate +
     n(state.haulSoilLoads) * haulSoilRate +
     n(state.haulBaseLoads) * haulBaseRate
   // Subcontractor combined demo line: SF × tiered $/sf by depth (concrete/dirt/rock/paver).
-  const miniRateDeep = sr['Sub Demo - Mini 5-7in'] ?? 2.0
-  const miniRateMid = sr['Sub Demo - Mini 2-4in'] ?? 1.75
-  const miniRateShallow = sr['Sub Demo - Mini 1-2in'] ?? 1.5
+  const miniRateDeep = n(sr['Sub Demo - Mini 5-7in'])
+  const miniRateMid = n(sr['Sub Demo - Mini 2-4in'])
+  const miniRateShallow = n(sr['Sub Demo - Mini 1-2in'])
   const miniSubRate = d => {
     const x = n(d)
     return x >= 5 ? miniRateDeep : x >= 2 ? miniRateMid : miniRateShallow
   }
   const subDemoCost = n(state.subDemoSF) * miniSubRate(state.subDemoDepth || 7)
-  const miniMiscFlatSubRate = sr['Sub Demo - Mini Misc Flat'] ?? 2.0
+  const miniMiscFlatSubRate = n(sr['Sub Demo - Mini Misc Flat'])
   const miscFlatSubCost = (state.subMiscFlatRows || [])
     .slice(0, 2)
     .reduce((sum, r) => sum + n(r.sf) * miniMiscFlatSubRate, 0)
   const miniSubDemo = subDemoCost + miscFlatSubCost
 
   // ── Subcontractor fixed unit pricing: Grading ($/sf), Stump & Tree ($/ea) ──
-  const sgCut = sr['Sub Grade - Mini Cut SF'] ?? 0
-  const sgFill = sr['Sub Grade - Mini Fill SF'] ?? 0
-  const sgJJ = sr['Sub Grade - Mini JJ SF'] ?? 0
-  const sgSheep = sr['Sub Grade - Mini Sheepsfoot SF'] ?? 0
-  const sgRoll = sr['Sub Grade - Mini Roll SF'] ?? 0
-  const sgSS = sr['Sub Grade - Mini SS Compact SF'] ?? 0
+  const sgCut = n(sr['Sub Grade - Mini Cut SF'])
+  const sgFill = n(sr['Sub Grade - Mini Fill SF'])
+  const sgJJ = n(sr['Sub Grade - Mini JJ SF'])
+  const sgSheep = n(sr['Sub Grade - Mini Sheepsfoot SF'])
+  const sgRoll = n(sr['Sub Grade - Mini Roll SF'])
+  const sgSS = n(sr['Sub Grade - Mini SS Compact SF'])
   const subGradingCost =
     n(state.subGradeCutSF) * sgCut +
     n(state.subGradeFillSF) * sgFill +
@@ -408,19 +377,19 @@ function calcDemo(
     n(state.rollCompSF) * sgRoll +
     n(state.subSsCmpSF) * sgSS
 
-  const ssSmall = sr['Sub Stump - Mini Small'] ?? 0
-  const ssMed = sr['Sub Stump - Mini Medium'] ?? 0
-  const ssLarge = sr['Sub Stump - Mini Large'] ?? 0
-  const ssXL = sr['Sub Stump - Mini XL'] ?? 0
+  const ssSmall = n(sr['Sub Stump - Mini Small'])
+  const ssMed = n(sr['Sub Stump - Mini Medium'])
+  const ssLarge = n(sr['Sub Stump - Mini Large'])
+  const ssXL = n(sr['Sub Stump - Mini XL'])
   const subStumpCost =
     n(state.stumpSmallQty) * ssSmall +
     n(state.stumpMedQty) * ssMed +
     n(state.stumpLargeQty) * ssLarge +
     n(state.stumpXLQty) * ssXL
 
-  const stSmall = sr['Sub Tree - Mini Small'] ?? 0
-  const stMed = sr['Sub Tree - Mini Medium'] ?? 0
-  const stLarge = sr['Sub Tree - Mini Large'] ?? 0
+  const stSmall = n(sr['Sub Tree - Mini Small'])
+  const stMed = n(sr['Sub Tree - Mini Medium'])
+  const stLarge = n(sr['Sub Tree - Mini Large'])
   const subTreeRateFor = size =>
     size === 'Large' || size === '18" - 24"'
       ? stLarge
@@ -929,14 +898,14 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
     {
       group: 'Disposal & Containers',
       items: [
-        { label: 'Dump - Concrete', table: 'misc_rates', name: 'Demo - Mini Dump - Concrete', category: 'Demo', mode: 'currency', unitLabel: 'Tons', value: materialPrices['Demo - Mini Dump - Concrete'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Concrete'] },
-        { label: 'Dump - Dirt', table: 'misc_rates', name: 'Demo - Mini Dump - Dirt', category: 'Demo', mode: 'currency', unitLabel: 'Tons', value: materialPrices['Demo - Mini Dump - Dirt'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Dirt'] },
-        { label: 'Dump - Green Waste', table: 'misc_rates', name: 'Demo - Mini Dump - Green Waste', category: 'Demo', mode: 'currency', unitLabel: 'Tons', value: materialPrices['Demo - Mini Dump - Green Waste'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Green Waste'] },
-        { label: 'Dump - Tree/Stump', table: 'misc_rates', name: 'Demo - Mini Dump - Tree/Stump', category: 'Demo', mode: 'currency', unitLabel: 'Tons', value: materialPrices['Demo - Mini Dump - Tree/Stump'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Tree/Stump'] },
-        { label: 'Dump - Import Base', table: 'misc_rates', name: 'Demo - Mini Dump - Import Base', category: 'Demo', mode: 'currency', unitLabel: 'Tons', value: materialPrices['Demo - Mini Dump - Import Base'] ?? DUMP_FEE_DEFAULTS['Demo - Mini Dump - Import Base'] },
-        { label: 'Container (Low-Boy)', table: 'misc_rates', name: 'Demo - Mini Container (Low-Boy)', category: 'Demo', mode: 'currency', unitLabel: 'container', value: materialPrices['Demo - Mini Container (Low-Boy)'] ?? CONTAINER_COST },
-        { label: 'Container Capacity', table: 'misc_rates', name: 'Demo - Mini Container Capacity (CY)', category: 'Demo', mode: 'coefficient', unitLabel: 'Cu Yd', value: materialPrices['Demo - Mini Container Capacity (CY)'] ?? CONTAINER_CY },
-        { label: 'Removal Swell', table: 'misc_rates', name: 'Demo - Mini Removal Swell', category: 'Demo', mode: 'coefficient', unitLabel: '×', value: materialPrices['Demo - Mini Removal Swell'] ?? SWELL },
+        { label: 'Dump - Concrete', table: 'misc_rates', name: 'Demo - Mini Dump - Concrete', category: 'Demo', mode: 'currency', unitLabel: 'Tons', value: n(materialPrices['Demo - Mini Dump - Concrete']) },
+        { label: 'Dump - Dirt', table: 'misc_rates', name: 'Demo - Mini Dump - Dirt', category: 'Demo', mode: 'currency', unitLabel: 'Tons', value: n(materialPrices['Demo - Mini Dump - Dirt']) },
+        { label: 'Dump - Green Waste', table: 'misc_rates', name: 'Demo - Mini Dump - Green Waste', category: 'Demo', mode: 'currency', unitLabel: 'Tons', value: n(materialPrices['Demo - Mini Dump - Green Waste']) },
+        { label: 'Dump - Tree/Stump', table: 'misc_rates', name: 'Demo - Mini Dump - Tree/Stump', category: 'Demo', mode: 'currency', unitLabel: 'Tons', value: n(materialPrices['Demo - Mini Dump - Tree/Stump']) },
+        { label: 'Dump - Import Base', table: 'misc_rates', name: 'Demo - Mini Dump - Import Base', category: 'Demo', mode: 'currency', unitLabel: 'Tons', value: n(materialPrices['Demo - Mini Dump - Import Base']) },
+        { label: 'Container (Low-Boy)', table: 'misc_rates', name: 'Demo - Mini Container (Low-Boy)', category: 'Demo', mode: 'currency', unitLabel: 'container', value: n(materialPrices['Demo - Mini Container (Low-Boy)']) },
+        { label: 'Container Capacity', table: 'misc_rates', name: 'Demo - Mini Container Capacity (CY)', category: 'Demo', mode: 'coefficient', unitLabel: 'Cu Yd', value: n(materialPrices['Demo - Mini Container Capacity (CY)']) },
+        { label: 'Removal Swell', table: 'misc_rates', name: 'Demo - Mini Removal Swell', category: 'Demo', mode: 'coefficient', unitLabel: '×', value: n(materialPrices['Demo - Mini Removal Swell']) },
       ],
     },
     {
@@ -962,7 +931,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       items: [
         { label: 'Demo - Mini - Import Base SF', table: 'labor_rates', name: 'Demo - Mini - Import Base SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr per 100 Sq Ft per in deep', value: calc.laborBase },
         { label: 'Demo - Mini - Grade Fill SF', table: 'labor_rates', name: 'Demo - Mini - Grade Fill SF', category: 'Demo', mode: 'coefficient', unitLabel: 'hr per 100 Sq Ft per in deep', value: calc.laborGradeFill },
-        { label: 'Import Base Material', table: 'misc_rates', name: 'Demo - Mini Import Base $/10cy', category: 'Demo', mode: 'currency', unitLabel: '10 Cu Yd', value: materialPrices['Demo - Mini Import Base $/10cy'] ?? 150 },
+        { label: 'Import Base Material', table: 'misc_rates', name: 'Demo - Mini Import Base $/10cy', category: 'Demo', mode: 'currency', unitLabel: '10 Cu Yd', value: n(materialPrices['Demo - Mini Import Base $/10cy']) },
       ],
     },
     {

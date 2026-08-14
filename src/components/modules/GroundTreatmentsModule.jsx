@@ -41,149 +41,149 @@ function mergedGtOpts(cat, houseArray, materialRows) {
 // Fallback values are used when DB row is absent.
 const GT_RATES = {
   // ── Mulch ──────────────────────────────────────────────────────────────────
-  mulchPerCY: { dbName: 'Mulch', fallback: 25.0 }, // $/CY
-  mulchDelivery: { dbName: 'Mulch Delivery Fee', fallback: 75.0 }, // $ flat per delivery
-  mulchLab: { dbName: 'Mulch - Labor Rate', fallback: 15 }, // CY/day spread rate (labor_rates)
+  mulchPerCY: { dbName: 'Mulch' }, // $/CY
+  mulchDelivery: { dbName: 'Mulch Delivery Fee' }, // $ flat per delivery
+  mulchLab: { dbName: 'Mulch - Labor Rate' }, // CY/day spread rate (labor_rates)
 
   // ── Edging ─────────────────────────────────────────────────────────────────
-  plasticEdgingMat: { dbName: 'Plastic Edging', fallback: 1.2 }, // $/LF
-  plasticEdgingLab: { dbName: 'Plastic Edging - Labor Rate', fallback: 0.09 }, // hrs/LF
-  metalEdgingMat: { dbName: 'Metal Edging', fallback: 4.0 }, // $/LF
-  metalEdgingLab: { dbName: 'Metal Edging - Labor Rate', fallback: 0.17 }, // hrs/LF
+  plasticEdgingMat: { dbName: 'Plastic Edging' }, // $/LF
+  plasticEdgingLab: { dbName: 'Plastic Edging - Labor Rate' }, // hrs/LF
+  metalEdgingMat: { dbName: 'Metal Edging' }, // $/LF
+  metalEdgingLab: { dbName: 'Metal Edging - Labor Rate' }, // hrs/LF
 
   // ── Soil Prep / Preparation ──────────────────────────────────────────────────
-  soilPrepMat: { dbName: 'Soil Prep', fallback: 0.1558 }, // $/SF  (Area = Planter)
-  soilPrepLab: { dbName: 'Soil Prep - Labor Rate', fallback: 0.012 }, // hrs/SF (Area = Planter)
-  soilPrepHandAdd: { dbName: 'Soil Prep - Hand Add', fallback: 0.06 }, // hrs/SF — Method = Hand add (In-House only)
-  sodPrepMat: { dbName: 'Sod Soil Prep', fallback: 0.1558 }, // $/SF  (Area = Sod)
-  sodPrepLab: { dbName: 'Sod Soil Prep - Labor Rate', fallback: 0.012 }, // hrs/SF (Area = Sod)
+  soilPrepMat: { dbName: 'Soil Prep' }, // $/SF  (Area = Planter)
+  soilPrepLab: { dbName: 'Soil Prep - Labor Rate' }, // hrs/SF (Area = Planter)
+  soilPrepHandAdd: { dbName: 'Soil Prep - Hand Add' }, // hrs/SF — Method = Hand add (In-House only)
+  sodPrepMat: { dbName: 'Sod Soil Prep' }, // $/SF  (Area = Sod)
+  sodPrepLab: { dbName: 'Sod Soil Prep - Labor Rate' }, // hrs/SF (Area = Sod)
   // ── Tilling (Planter Prep + Sod Prep) — labor per SF by tilling method ──────
   // Added on top of the base soil-prep labor. None = no tilling. Seed real
   // incremental tilling labor via labor_rates (category Ground Treatments).
-  tillHandLab: { dbName: 'GT - Till Hand Labor Rate', fallback: 0.06 }, // hrs/SF
-  tillTillerLab: { dbName: 'GT - Till Tiller Labor Rate', fallback: 0.012 }, // hrs/SF
+  tillHandLab: { dbName: 'GT - Till Hand Labor Rate' }, // hrs/SF
+  tillTillerLab: { dbName: 'GT - Till Tiller Labor Rate' }, // hrs/SF
 
   // ── Sod ────────────────────────────────────────────────────────────────────
-  sodMarathonMat: { dbName: 'Sod - Marathon', fallback: 1.2 }, // $/SF
-  sodStAugMat: { dbName: 'Sod - St. Augustine', fallback: 1.97 }, // $/SF
-  sodLab: { dbName: 'Sod - Labor Rate', fallback: 0.01143 }, // hrs/SF (≈8/700)
-  fertilizerSFPerBag: { dbName: 'Fertilizer - SF Per Bag', fallback: 4000 }, // SF covered per 18-lb bag (labor_rates coefficient)
+  sodMarathonMat: { dbName: 'Sod - Marathon' }, // $/SF
+  sodStAugMat: { dbName: 'Sod - St. Augustine' }, // $/SF
+  sodLab: { dbName: 'Sod - Labor Rate' }, // hrs/SF (≈8/700)
+  fertilizerSFPerBag: { dbName: 'Fertilizer - SF Per Bag' }, // SF covered per 18-lb bag (labor_rates coefficient)
 
   // ── Steppers ───────────────────────────────────────────────────────────────
   // Each stone (Flagstone / Precast) has ONE per-ton material key shared across
   // its Soil Set + Concrete Set lines, and a SEPARATE labor rate (SF/day) per
   // set. "Concrete Set" differs from "Soil Set" only by a (slower) labor rate —
   // no automatic concrete/mortar material is added (values TBD).
-  flagstonePerTon: { dbName: 'Flagstone Steppers', fallback: 500.0 }, // $/ton default
-  flagstoneSoilLab: { dbName: 'Flagstone Steppers - Soil Labor', fallback: 35 }, // SF/day
-  flagstoneConcreteLab: { dbName: 'Flagstone Steppers - Concrete Labor', fallback: 25 }, // SF/day
-  precastPerTon: { dbName: 'Precast Steppers', fallback: 200.0 }, // $/ton default
-  precastSoilLab: { dbName: 'Precast Steppers - Soil Labor', fallback: 50 }, // SF/day
-  precastConcreteLab: { dbName: 'Precast Steppers - Concrete Labor', fallback: 35 }, // SF/day
+  flagstonePerTon: { dbName: 'Flagstone Steppers' }, // $/ton default
+  flagstoneSoilLab: { dbName: 'Flagstone Steppers - Soil Labor' }, // SF/day
+  flagstoneConcreteLab: { dbName: 'Flagstone Steppers - Concrete Labor' }, // SF/day
+  precastPerTon: { dbName: 'Precast Steppers' }, // $/ton default
+  precastSoilLab: { dbName: 'Precast Steppers - Soil Labor' }, // SF/day
+  precastConcreteLab: { dbName: 'Precast Steppers - Concrete Labor' }, // SF/day
 
   // ── Decomposed Granite ─────────────────────────────────────────────────────
-  dgPerTon: { dbName: 'Decomposed Granite', fallback: 50.0 }, // $/ton
-  dgCementPerTon: { dbName: 'DG Cement Mix', fallback: 20.0 }, // $/ton add-on
-  dgHandLab: { dbName: 'DG - Hand Labor Rate', fallback: 0.5 }, // CY/hr (labor_rates)
-  dgMachineLab: { dbName: 'DG - Machine Labor Rate', fallback: 12 }, // CY/day (labor_rates)
+  dgPerTon: { dbName: 'Decomposed Granite' }, // $/ton
+  dgCementPerTon: { dbName: 'DG Cement Mix' }, // $/ton add-on
+  dgHandLab: { dbName: 'DG - Hand Labor Rate' }, // CY/hr (labor_rates)
+  dgMachineLab: { dbName: 'DG - Machine Labor Rate' }, // CY/day (labor_rates)
 
   // ── Gravel ─────────────────────────────────────────────────────────────────
-  gravelFabricMat: { dbName: 'Gravel Fabric', fallback: 0.1 }, // $/SF
-  gravelFabricLab: { dbName: 'Gravel Fabric - Labor Rate', fallback: 0.024 }, // hrs/SF
-  gravelMachineLab: { dbName: 'Gravel - Machine Labor Rate', fallback: 12 }, // CY/day (labor_rates)
-  gravelHandLab: { dbName: 'Gravel - Hand Labor Rate', fallback: 4 }, // CY/day (labor_rates)
+  gravelFabricMat: { dbName: 'Gravel Fabric' }, // $/SF
+  gravelFabricLab: { dbName: 'Gravel Fabric - Labor Rate' }, // hrs/SF
+  gravelMachineLab: { dbName: 'Gravel - Machine Labor Rate' }, // CY/day (labor_rates)
+  gravelHandLab: { dbName: 'Gravel - Hand Labor Rate' }, // CY/day (labor_rates)
 }
 
 // Gravel material types — each drives its own $/CY (material_rates). Pricing TBD
 // (all default 130) until real per-type prices are entered via RateEditPopover.
 const GRAVEL_TYPES = [
-  { label: 'Crushed Pea Gravel', dbName: 'Gravel - Crushed Pea Gravel', fallback: 130 },
-  { label: '3/4" Crushed Gravel', dbName: 'Gravel - 3/4" Crushed Gravel', fallback: 130 },
-  { label: 'Del Rio', dbName: 'Gravel - Del Rio', fallback: 130 },
-  { label: 'Black River Rock 1" minus', dbName: 'Gravel - Black River Rock 1in minus', fallback: 130 },
-  { label: 'Black River Rock 1"-2"', dbName: 'Gravel - Black River Rock 1in-2in', fallback: 130 },
-  { label: 'Black River Rock 2" to 3"', dbName: 'Gravel - Black River Rock 2in-3in', fallback: 130 },
-  { label: '3/8" Crushed Pea Gravel', dbName: 'Gravel - 3/8in Crushed Pea Gravel', fallback: 89 },
-  { label: '1 1/2" Crushed Gravel',   dbName: 'Gravel - 1.5in Crushed Gravel',     fallback: 85 },
-  { label: 'Misc Aggregate (3/4")',   dbName: 'Gravel - Misc Aggregate',           fallback: 40 },
-  { label: 'Black Lava',              dbName: 'Gravel - Black Lava',                fallback: 165 },
-  { label: 'Burgundy Lava 3/8"',      dbName: 'Gravel - Burgundy Lava 3/8in',      fallback: 180 },
-  { label: 'Burgundy Lava 3/4"',      dbName: 'Gravel - Burgundy Lava 3/4in',      fallback: 165 },
-  { label: 'California Gold 3/8"',    dbName: 'Gravel - California Gold 3/8in',     fallback: 250 },
-  { label: 'California Gold 3/4"',    dbName: 'Gravel - California Gold 3/4in',     fallback: 300 },
-  { label: 'Eagle Mountain',          dbName: 'Gravel - Eagle Mountain',           fallback: 165 },
-  { label: 'Honey Quartz',            dbName: 'Gravel - Honey Quartz',             fallback: 200 },
-  { label: 'Las Vegas Rainbow',       dbName: 'Gravel - Las Vegas Rainbow',        fallback: 220 },
-  { label: 'Pearl White',             dbName: 'Gravel - Pearl White',              fallback: 300 },
-  { label: 'Tuscan Rose',             dbName: 'Gravel - Tuscan Rose',              fallback: 220 },
+  { label: 'Crushed Pea Gravel', dbName: 'Gravel - Crushed Pea Gravel' },
+  { label: '3/4" Crushed Gravel', dbName: 'Gravel - 3/4" Crushed Gravel' },
+  { label: 'Del Rio', dbName: 'Gravel - Del Rio' },
+  { label: 'Black River Rock 1" minus', dbName: 'Gravel - Black River Rock 1in minus' },
+  { label: 'Black River Rock 1"-2"', dbName: 'Gravel - Black River Rock 1in-2in' },
+  { label: 'Black River Rock 2" to 3"', dbName: 'Gravel - Black River Rock 2in-3in' },
+  { label: '3/8" Crushed Pea Gravel', dbName: 'Gravel - 3/8in Crushed Pea Gravel' },
+  { label: '1 1/2" Crushed Gravel',   dbName: 'Gravel - 1.5in Crushed Gravel' },
+  { label: 'Misc Aggregate (3/4")',   dbName: 'Gravel - Misc Aggregate' },
+  { label: 'Black Lava',              dbName: 'Gravel - Black Lava' },
+  { label: 'Burgundy Lava 3/8"',      dbName: 'Gravel - Burgundy Lava 3/8in' },
+  { label: 'Burgundy Lava 3/4"',      dbName: 'Gravel - Burgundy Lava 3/4in' },
+  { label: 'California Gold 3/8"',    dbName: 'Gravel - California Gold 3/8in' },
+  { label: 'California Gold 3/4"',    dbName: 'Gravel - California Gold 3/4in' },
+  { label: 'Eagle Mountain',          dbName: 'Gravel - Eagle Mountain' },
+  { label: 'Honey Quartz',            dbName: 'Gravel - Honey Quartz' },
+  { label: 'Las Vegas Rainbow',       dbName: 'Gravel - Las Vegas Rainbow' },
+  { label: 'Pearl White',             dbName: 'Gravel - Pearl White' },
+  { label: 'Tuscan Rose',             dbName: 'Gravel - Tuscan Rose' },
 ]
 
 // Pebble material types — each drives its own $/CY (material_rates). Reuses the
 // same labor + fabric rates as Gravel; only the material Type list differs.
 const PEBBLE_TYPES = [
-  { label: 'Arizona River Rock', dbName: 'Pebble - Arizona River Rock', fallback: 300 },
-  { label: 'Cinnamon',           dbName: 'Pebble - Cinnamon',           fallback: 320 },
-  { label: 'Del Rio Pebble',     dbName: 'Pebble - Del Rio',            fallback: 200 },
-  { label: 'Leopard Granite',    dbName: 'Pebble - Leopard Granite',    fallback: 150 },
-  { label: 'White River Pebble', dbName: 'Pebble - White River',        fallback: 150 },
-  { label: 'Yosemite',           dbName: 'Pebble - Yosemite',           fallback: 295 },
-  { label: 'Yuba (Salt & Pepper)', dbName: 'Pebble - Yuba',             fallback: 450 },
-  { label: 'Baja (Beach)',       dbName: 'Pebble - Baja',               fallback: 660 },
-  { label: 'Black (Beach)',      dbName: 'Pebble - Black',              fallback: 660 },
-  { label: 'Buff (Beach)',       dbName: 'Pebble - Buff',               fallback: 690 },
-  { label: 'Mixed (Beach)',      dbName: 'Pebble - Mixed',              fallback: 660 },
-  { label: 'Red (Beach)',        dbName: 'Pebble - Red',               fallback: 690 },
-  { label: 'Sonora (Beach)',     dbName: 'Pebble - Sonora',             fallback: 660 },
+  { label: 'Arizona River Rock', dbName: 'Pebble - Arizona River Rock' },
+  { label: 'Cinnamon',           dbName: 'Pebble - Cinnamon' },
+  { label: 'Del Rio Pebble',     dbName: 'Pebble - Del Rio' },
+  { label: 'Leopard Granite',    dbName: 'Pebble - Leopard Granite' },
+  { label: 'White River Pebble', dbName: 'Pebble - White River' },
+  { label: 'Yosemite',           dbName: 'Pebble - Yosemite' },
+  { label: 'Yuba (Salt & Pepper)', dbName: 'Pebble - Yuba' },
+  { label: 'Baja (Beach)',       dbName: 'Pebble - Baja' },
+  { label: 'Black (Beach)',      dbName: 'Pebble - Black' },
+  { label: 'Buff (Beach)',       dbName: 'Pebble - Buff' },
+  { label: 'Mixed (Beach)',      dbName: 'Pebble - Mixed' },
+  { label: 'Red (Beach)',        dbName: 'Pebble - Red' },
+  { label: 'Sonora (Beach)',     dbName: 'Pebble - Sonora' },
 ]
 
 // Cobbles & Boulders material types — same calc/labor as Gravel; type list only.
 const COBBLE_TYPES = [
-  { label: 'Granite River Rock', dbName: 'Cobble - Granite River Rock', fallback: 308 },
-  { label: 'Arizona',            dbName: 'Cobble - Arizona',            fallback: 420 },
-  { label: 'Auburn Brown',       dbName: 'Cobble - Auburn Brown',       fallback: 644 },
-  { label: 'Cresta',             dbName: 'Cobble - Cresta',             fallback: 700 },
-  { label: 'Las Vegas Rainbow',  dbName: 'Cobble - Las Vegas Rainbow',  fallback: 588 },
-  { label: 'Miners Gold',        dbName: 'Cobble - Miners Gold',        fallback: 252 },
-  { label: 'Miners Pink',        dbName: 'Cobble - Miners Pink',        fallback: 252 },
+  { label: 'Granite River Rock', dbName: 'Cobble - Granite River Rock' },
+  { label: 'Arizona',            dbName: 'Cobble - Arizona' },
+  { label: 'Auburn Brown',       dbName: 'Cobble - Auburn Brown' },
+  { label: 'Cresta',             dbName: 'Cobble - Cresta' },
+  { label: 'Las Vegas Rainbow',  dbName: 'Cobble - Las Vegas Rainbow' },
+  { label: 'Miners Gold',        dbName: 'Cobble - Miners Gold' },
+  { label: 'Miners Pink',        dbName: 'Cobble - Miners Pink' },
 ]
 
 // Mulch product types (material_rates, $/CY). Type drives material cost only.
 const MULCH_TYPES = [
-  { label: 'Premium Mulch', dbName: 'Mulch - Premium', fallback: 20 },
-  { label: 'Brown Shredded', dbName: 'Mulch - Brown Shredded', fallback: 20 },
-  { label: 'Flower Bed Mulch', dbName: 'Mulch - Flower Bed', fallback: 28 },
-  { label: 'Shredded Cedar / Gorilla Hair', dbName: 'Mulch - Shredded Cedar', fallback: 80 },
-  { label: 'Forest Moss', dbName: 'Mulch - Forest Moss', fallback: 80 },
-  { label: 'Black Dyed Chips', dbName: 'Mulch - Black Dyed Chips', fallback: 32 },
-  { label: 'Brown Dyed Chips', dbName: 'Mulch - Brown Dyed Chips', fallback: 32 },
-  { label: 'Red Dyed Chips', dbName: 'Mulch - Red Dyed Chips', fallback: 32 },
-  { label: 'Playground Chips', dbName: 'Mulch - Playground Chips', fallback: 60 },
-  { label: 'Walk On Bark', dbName: 'Mulch - Walk On Bark', fallback: 85 },
-  { label: 'Small Bark Nugget', dbName: 'Mulch - Small Bark Nugget', fallback: 85 },
-  { label: 'Medium Bark Nugget', dbName: 'Mulch - Medium Bark Nugget', fallback: 85 },
+  { label: 'Premium Mulch', dbName: 'Mulch - Premium' },
+  { label: 'Brown Shredded', dbName: 'Mulch - Brown Shredded' },
+  { label: 'Flower Bed Mulch', dbName: 'Mulch - Flower Bed' },
+  { label: 'Shredded Cedar / Gorilla Hair', dbName: 'Mulch - Shredded Cedar' },
+  { label: 'Forest Moss', dbName: 'Mulch - Forest Moss' },
+  { label: 'Black Dyed Chips', dbName: 'Mulch - Black Dyed Chips' },
+  { label: 'Brown Dyed Chips', dbName: 'Mulch - Brown Dyed Chips' },
+  { label: 'Red Dyed Chips', dbName: 'Mulch - Red Dyed Chips' },
+  { label: 'Playground Chips', dbName: 'Mulch - Playground Chips' },
+  { label: 'Walk On Bark', dbName: 'Mulch - Walk On Bark' },
+  { label: 'Small Bark Nugget', dbName: 'Mulch - Small Bark Nugget' },
+  { label: 'Medium Bark Nugget', dbName: 'Mulch - Medium Bark Nugget' },
 ]
 
 // D.G. product types (material_rates, per TON — matches the existing per-ton DG
 // material calc). Default 'Decomposed Granite' keeps existing estimates unchanged.
 const DG_TYPES = [
-  { label: 'Decomposed Granite', dbName: 'Decomposed Granite', fallback: 50 }, // C&M $50/CY
-  { label: 'Stabilized DG', dbName: 'DG - Stabilized', fallback: 75 }, // C&M $75/CY
-  { label: 'Rock Dust - Grey', dbName: 'DG - Rock Dust Grey', fallback: 120 }, // C&M $120/CY
-  { label: 'Grey Stabilized Rock Dust', dbName: 'DG - Grey Stabilized Rock Dust', fallback: 145 }, // C&M $145/CY
+  { label: 'Decomposed Granite', dbName: 'Decomposed Granite' }, // C&M $50/CY
+  { label: 'Stabilized DG', dbName: 'DG - Stabilized' }, // C&M $75/CY
+  { label: 'Rock Dust - Grey', dbName: 'DG - Rock Dust Grey' }, // C&M $120/CY
+  { label: 'Grey Stabilized Rock Dust', dbName: 'DG - Grey Stabilized Rock Dust' }, // C&M $145/CY
 ]
 
 // Stepper stone types (material_rates, per TON). Standard defaults keep existing
 // estimates unchanged (Flagstone / Precast). Vendor rows filter to sub_category
 // 'Steppers'. Labor stays per-line (Soil vs Concrete SF/day), not from the type.
 const STEPPER_TYPES = [
-  { label: 'Flagstone', dbName: 'Flagstone Steppers', fallback: 500 },
-  { label: 'Precast',   dbName: 'Precast Steppers',   fallback: 200 },
+  { label: 'Flagstone', dbName: 'Flagstone Steppers' },
+  { label: 'Precast',   dbName: 'Precast Steppers' },
 ]
 // Edging types (material_rates, per LF). Standard defaults keep existing estimates
 // unchanged (Plastic / Metal). Vendor rows filter to sub_category 'Edging'.
 const EDGING_TYPES = [
-  { label: 'Plastic', dbName: 'Plastic Edging', fallback: 1.2 },
-  { label: 'Metal',   dbName: 'Metal Edging',   fallback: 4.0 },
+  { label: 'Plastic', dbName: 'Plastic Edging' },
+  { label: 'Metal',   dbName: 'Metal Edging' },
 ]
 
 const DEFAULTS = {
@@ -195,46 +195,46 @@ const DEFAULTS = {
 
 // Sod varieties — Southland Sod Farms wholesale, Zone 2 delivered $/SF (material_rates).
 const SOD_TYPES = [
-  { label: 'Marathon', dbName: 'Sod - Marathon', fallback: 1.0 },
-  { label: 'Marathon II', dbName: 'Sod - Marathon II', fallback: 1.01 },
-  { label: 'Marathon Lite', dbName: 'Sod - Marathon Lite', fallback: 1.16 },
-  { label: 'Marathon II Lite', dbName: 'Sod - Marathon II Lite', fallback: 1.17 },
-  { label: 'PureBlue Lite', dbName: 'Sod - PureBlue Lite', fallback: 1.26 },
-  { label: 'GreenWave Lite', dbName: 'Sod - GreenWave Lite', fallback: 1.26 },
-  { label: 'Hybrid Bermuda', dbName: 'Sod - Hybrid Bermuda', fallback: 1.0 },
-  { label: 'St. Augustine', dbName: 'Sod - St. Augustine', fallback: 1.73 },
+  { label: 'Marathon', dbName: 'Sod - Marathon' },
+  { label: 'Marathon II', dbName: 'Sod - Marathon II' },
+  { label: 'Marathon Lite', dbName: 'Sod - Marathon Lite' },
+  { label: 'Marathon II Lite', dbName: 'Sod - Marathon II Lite' },
+  { label: 'PureBlue Lite', dbName: 'Sod - PureBlue Lite' },
+  { label: 'GreenWave Lite', dbName: 'Sod - GreenWave Lite' },
+  { label: 'Hybrid Bermuda', dbName: 'Sod - Hybrid Bermuda' },
+  { label: 'St. Augustine', dbName: 'Sod - St. Augustine' },
 ]
 
 // Soil-prep bed material — single Standard type; vendors may supply a 'Soil Prep'
 // category so the Sod section's Soil Prep line matches the Vendor|Type format.
 const SOIL_PREP_TYPES = [
-  { label: 'Soil Prep', dbName: GT_RATES.soilPrepMat.dbName, fallback: GT_RATES.soilPrepMat.fallback },
+  { label: 'Soil Prep', dbName: GT_RATES.soilPrepMat.dbName },
 ]
 
 // Fertilizer options — Southland Sod Farms, $/18-lb bag (material_rates). Bags are
 // auto-figured from the sod SF via the SF-per-bag coverage coefficient.
 const FERTILIZER_TYPES = [
-  { label: 'None', dbName: null, fallback: 0 },
-  { label: 'Marathon All Season (24-2-4)', dbName: 'Fertilizer - Marathon All Season', fallback: 20.84 },
-  { label: 'Sod & Seed Starter (15-15-15)', dbName: 'Fertilizer - Sod Seed Starter', fallback: 20.87 },
+  { label: 'None', dbName: null },
+  { label: 'Marathon All Season (24-2-4)', dbName: 'Fertilizer - Marathon All Season' },
+  { label: 'Sod & Seed Starter (15-15-15)', dbName: 'Fertilizer - Sod Seed Starter' },
 ]
 
 // Soil products — C&M Topsoil "SOILS" section, $/CY (material_rates). Optional lines.
 const SOIL_TYPES = [
-  { label: 'Topsoil (Sandy Loam)', dbName: 'Soil - Topsoil', fallback: 20 },
-  { label: 'Compost', dbName: 'Soil - Compost', fallback: 20 },
-  { label: 'Seed Cover', dbName: 'Soil - Seed Cover', fallback: 20 },
-  { label: 'Veggie/Flower Mix', dbName: 'Soil - Veggie Flower Mix', fallback: 20 },
-  { label: '50/50 Planter Mix', dbName: 'Soil - 50-50 Planter Mix', fallback: 20 },
-  { label: '70/30 Topsoil Mix', dbName: 'Soil - 70-30 Topsoil Mix', fallback: 20 },
-  { label: '30/70 Compost Mix', dbName: 'Soil - 30-70 Compost Mix', fallback: 40 },
-  { label: 'Nursery Mix', dbName: 'Soil - Nursery Mix', fallback: 20 },
-  { label: 'Nursery Mix w/ Pumice', dbName: 'Soil - Nursery Mix Pumice', fallback: 40 },
-  { label: 'Cactus Mix', dbName: 'Soil - Cactus Mix', fallback: 40 },
-  { label: 'Can Mix', dbName: 'Soil - Can Mix', fallback: 40 },
-  { label: 'Color Mix', dbName: 'Soil - Color Mix', fallback: 40 },
-  { label: 'Bioswale Mix', dbName: 'Soil - Bioswale Mix', fallback: 40 },
-  { label: 'Pump Mix', dbName: 'Soil - Pump Mix', fallback: 40 },
+  { label: 'Topsoil (Sandy Loam)', dbName: 'Soil - Topsoil' },
+  { label: 'Compost', dbName: 'Soil - Compost' },
+  { label: 'Seed Cover', dbName: 'Soil - Seed Cover' },
+  { label: 'Veggie/Flower Mix', dbName: 'Soil - Veggie Flower Mix' },
+  { label: '50/50 Planter Mix', dbName: 'Soil - 50-50 Planter Mix' },
+  { label: '70/30 Topsoil Mix', dbName: 'Soil - 70-30 Topsoil Mix' },
+  { label: '30/70 Compost Mix', dbName: 'Soil - 30-70 Compost Mix' },
+  { label: 'Nursery Mix', dbName: 'Soil - Nursery Mix' },
+  { label: 'Nursery Mix w/ Pumice', dbName: 'Soil - Nursery Mix Pumice' },
+  { label: 'Cactus Mix', dbName: 'Soil - Cactus Mix' },
+  { label: 'Can Mix', dbName: 'Soil - Can Mix' },
+  { label: 'Color Mix', dbName: 'Soil - Color Mix' },
+  { label: 'Bioswale Mix', dbName: 'Soil - Bioswale Mix' },
+  { label: 'Pump Mix', dbName: 'Soil - Pump Mix' },
 ]
 const DG_METHODS = ['Machine', 'Hand']
 
@@ -337,20 +337,20 @@ function calcGroundTreatments(
     manualRows,
   } = state
 
-  const p = (dbName, fallback) => mp[dbName] ?? fallback
+  const p = dbName => n(mp[dbName])
 
   // ── Table-driven estimating coefficients (fall back to code constants) ──
   // Business-tunable coverage/swell/markup assumptions, surfaced as editable
   // coefficient rows in View Rates (labor_rates, category Ground Treatments).
   // Fixed unit conversions (27 cf/cy, 12 in/ft) stay as literal math.
-  const mulchCoverageSfDay = p('GT - Mulch Coverage SF/Day', 3200)
-  const stepperSfPerTon = p('GT - Steppers SF Per Ton', 80)
-  const dgTonsDenom = p('GT - DG Tons Denominator', 200)
-  const dgRemovalSwell = p('GT - DG Removal Swell', 1.62)
-  const dgCoverageSfDay = p('GT - DG Cleanup Coverage SF/Day', 1000)
-  const dgCementLaborFactor = p('GT - DG Cement Labor Factor', 1.25)
-  const dgMaterialMarkup = p('GT - DG Material Markup', 1.1)
-  const aggregateRemovalSwell = p('GT - Aggregate Removal Swell', 1.62)
+  const mulchCoverageSfDay = p('GT - Mulch Coverage SF/Day')
+  const stepperSfPerTon = p('GT - Steppers SF Per Ton')
+  const dgTonsDenom = p('GT - DG Tons Denominator')
+  const dgRemovalSwell = p('GT - DG Removal Swell')
+  const dgCoverageSfDay = p('GT - DG Cleanup Coverage SF/Day')
+  const dgCementLaborFactor = p('GT - DG Cement Labor Factor')
+  const dgMaterialMarkup = p('GT - DG Material Markup')
+  const aggregateRemovalSwell = p('GT - Aggregate Removal Swell')
 
   let totalMat = 0
 
@@ -358,7 +358,7 @@ function calcGroundTreatments(
   let mulchLab = 0,
     mulchMat = 0
   {
-    const mulchCYPerDay = p(GT_RATES.mulchLab.dbName, GT_RATES.mulchLab.fallback)
+    const mulchCYPerDay = p(GT_RATES.mulchLab.dbName)
     let anyMulch = false
     ;(mulchRows || []).forEach(r => {
       if (!(n(r.sf) > 0)) return
@@ -369,13 +369,13 @@ function calcGroundTreatments(
       mulchMat += CY * mt.fallback
       mulchLab += (CY / mulchCYPerDay) * 8 + (n(r.sf) / mulchCoverageSfDay) * 8
       if (r.weedFabric === 'Yes') {
-        mulchMat += n(r.sf) * p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)
-        mulchLab += n(r.sf) * p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
+        mulchMat += n(r.sf) * p(GT_RATES.gravelFabricMat.dbName)
+        mulchLab += n(r.sf) * p(GT_RATES.gravelFabricLab.dbName)
       }
     })
     // Flat delivery fee applied ONCE if any mulch row has area.
     if (anyMulch) {
-      mulchMat += p(GT_RATES.mulchDelivery.dbName, GT_RATES.mulchDelivery.fallback)
+      mulchMat += p(GT_RATES.mulchDelivery.dbName)
     }
   }
 
@@ -391,8 +391,8 @@ function calcGroundTreatments(
   const _edgeOpt = rowOpt('Edging', { vendor: edgingVendor, type: edgingType }, [])
   const _edgeIsMetal = /metal/i.test(edgingType || '')
   const _edgeLabRate = _edgeIsMetal
-    ? p(GT_RATES.metalEdgingLab.dbName, GT_RATES.metalEdgingLab.fallback)
-    : p(GT_RATES.plasticEdgingLab.dbName, GT_RATES.plasticEdgingLab.fallback)
+    ? p(GT_RATES.metalEdgingLab.dbName)
+    : p(GT_RATES.plasticEdgingLab.dbName)
   const edgingLab = edgingType ? _edgeLF * _edgeLabRate : 0
   const edgingMat = edgingType ? _edgeLF * _edgeOpt.fallback : 0
 
@@ -406,9 +406,9 @@ function calcGroundTreatments(
   // Tilling labor (hrs/SF) added on top of the base soil-prep labor. None = 0.
   const _tillLab = method =>
     method === 'Hand'
-      ? p(GT_RATES.tillHandLab.dbName, GT_RATES.tillHandLab.fallback)
+      ? p(GT_RATES.tillHandLab.dbName)
       : method === 'Tiller'
-        ? p(GT_RATES.tillTillerLab.dbName, GT_RATES.tillTillerLab.fallback)
+        ? p(GT_RATES.tillTillerLab.dbName)
         : 0
 
   // ── Planter Preparation (multi-row, Soils-style) ────────────────────────────
@@ -421,7 +421,7 @@ function calcGroundTreatments(
   ;(planterPrepRows || []).forEach(r => {
     const area = n(r.area)
     if (!(area > 0)) return
-    const baseLab = p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
+    const baseLab = p(GT_RATES.soilPrepLab.dbName)
     soilLab += area * (baseLab + _tillLab(r.tilling))
     if (r.type) {
       const CY = (area * (n(r.depthIn) / 12)) / 27
@@ -436,7 +436,7 @@ function calcGroundTreatments(
   ;(sodPrepRows || []).forEach(r => {
     const area = n(r.area)
     if (!(area > 0)) return
-    const baseLab = p(GT_RATES.sodPrepLab.dbName, GT_RATES.sodPrepLab.fallback)
+    const baseLab = p(GT_RATES.sodPrepLab.dbName)
     sodPrepLabHrs += area * (baseLab + _tillLab(r.tilling))
     if (r.type) {
       const CY = (area * (n(r.depthIn) / 12)) / 27
@@ -452,7 +452,7 @@ function calcGroundTreatments(
   let sodMat = 0
   ;(sodRows || []).forEach(r => {
     const sf = n(r.sf)
-    sodLab += sf * p(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback)
+    sodLab += sf * p(GT_RATES.sodLab.dbName)
     if (r.type) {
       const st = rowOpt('Sod', { vendor: r.vendor, type: r.type }, [])
       sodMat += sf * st.fallback
@@ -471,7 +471,7 @@ function calcGroundTreatments(
     const fertT = rowOpt('Fertilizer', { vendor: _fertV, type: r.fertilizer }, [])
     const _fertSF = n(r.sf) || _sodSFTotal
     if (r.fertilizer && fertT && fertT.dbName && _fertSF > 0) {
-      const sfPerBag = p(GT_RATES.fertilizerSFPerBag.dbName, GT_RATES.fertilizerSFPerBag.fallback)
+      const sfPerBag = p(GT_RATES.fertilizerSFPerBag.dbName)
       const bags = sfPerBag > 0 ? Math.ceil(_fertSF / sfPerBag) : 0
       fertMat += bags * fertT.fallback
     }
@@ -502,7 +502,7 @@ function calcGroundTreatments(
       if (!(n(ln.sf) > 0)) return
       const opt = rowOpt('Steppers', { vendor: _sv[ln.key], type: _st[ln.key] || ln.defType }, [])
       const perTon = opt.fallback
-      const sfPerDay = p(ln.labRate.dbName, ln.labRate.fallback)
+      const sfPerDay = p(ln.labRate.dbName)
       const lab = sfPerDay > 0 ? (n(ln.sf) / sfPerDay) * 8 : 0
       const mat = (n(ln.sf) / stepperSfPerTon) * perTon
       stepLab += lab
@@ -521,8 +521,8 @@ function calcGroundTreatments(
   let dgLab = 0,
     dgMat = 0
   {
-    const dgHandRate = p(GT_RATES.dgHandLab.dbName, GT_RATES.dgHandLab.fallback)
-    const dgMachineRate = p(GT_RATES.dgMachineLab.dbName, GT_RATES.dgMachineLab.fallback)
+    const dgHandRate = p(GT_RATES.dgHandLab.dbName)
+    const dgMachineRate = p(GT_RATES.dgMachineLab.dbName)
     ;(dgRows || []).forEach(r => {
       if (!(n(r.sf) > 0)) return
       if (!r.type) return
@@ -537,12 +537,12 @@ function calcGroundTreatments(
       dgMat +=
         (tons * dgt.fallback +
           (cement
-            ? tons * p(GT_RATES.dgCementPerTon.dbName, GT_RATES.dgCementPerTon.fallback)
+            ? tons * p(GT_RATES.dgCementPerTon.dbName)
             : 0)) *
         dgMaterialMarkup
       if (r.weedFabric === 'Yes') {
-        dgMat += n(r.sf) * p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)
-        dgLab += n(r.sf) * p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
+        dgMat += n(r.sf) * p(GT_RATES.gravelFabricMat.dbName)
+        dgLab += n(r.sf) * p(GT_RATES.gravelFabricLab.dbName)
       }
     })
   }
@@ -554,8 +554,8 @@ function calcGroundTreatments(
     if (!n(r.sf)) return
     if (!r.type) return
     const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
-    const machineRate = p(GT_RATES.gravelMachineLab.dbName, GT_RATES.gravelMachineLab.fallback)
-    const handRate = p(GT_RATES.gravelHandLab.dbName, GT_RATES.gravelHandLab.fallback)
+    const machineRate = p(GT_RATES.gravelMachineLab.dbName)
+    const handRate = p(GT_RATES.gravelHandLab.dbName)
     const excavLab =
       r.method === 'Machine' ? ((CY * aggregateRemovalSwell) / machineRate) * 8 : ((CY * aggregateRemovalSwell) / handRate) * 8
     // Weed barrier — same fabric material + labor rate as DG's weed barrier.
@@ -563,14 +563,14 @@ function calcGroundTreatments(
     // always included fabric are unchanged.
     const wantFabric = (r.weedFabric ?? 'Yes') === 'Yes'
     const fabricLab = wantFabric
-      ? n(r.sf) * p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
+      ? n(r.sf) * p(GT_RATES.gravelFabricLab.dbName)
       : 0
     gravelLab += excavLab + fabricLab
     const gtype = rowOpt('Gravel', r, [])
     const costPerCY = gtype.fallback
     gravelMat +=
       CY * costPerCY +
-      (wantFabric ? n(r.sf) * p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback) : 0)
+      (wantFabric ? n(r.sf) * p(GT_RATES.gravelFabricMat.dbName) : 0)
   })
 
   // ── Pebble rows (same calc/labor as Gravel; PEBBLE_TYPES material) ──────────
@@ -580,21 +580,21 @@ function calcGroundTreatments(
     if (!n(r.sf)) return
     if (!r.type) return
     const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
-    const machineRate = p(GT_RATES.gravelMachineLab.dbName, GT_RATES.gravelMachineLab.fallback)
-    const handRate = p(GT_RATES.gravelHandLab.dbName, GT_RATES.gravelHandLab.fallback)
+    const machineRate = p(GT_RATES.gravelMachineLab.dbName)
+    const handRate = p(GT_RATES.gravelHandLab.dbName)
     const excavLab =
       r.method === 'Machine' ? ((CY * aggregateRemovalSwell) / machineRate) * 8 : ((CY * aggregateRemovalSwell) / handRate) * 8
     // Weed barrier — same fabric material + labor rate as DG's weed barrier.
     const wantFabric = (r.weedFabric ?? 'Yes') === 'Yes'
     const fabricLab = wantFabric
-      ? n(r.sf) * p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
+      ? n(r.sf) * p(GT_RATES.gravelFabricLab.dbName)
       : 0
     pebbleLab += excavLab + fabricLab
     const ptype = rowOpt('Pebble', r, [])
     const costPerCY = ptype.fallback
     pebbleMat +=
       CY * costPerCY +
-      (wantFabric ? n(r.sf) * p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback) : 0)
+      (wantFabric ? n(r.sf) * p(GT_RATES.gravelFabricMat.dbName) : 0)
   })
 
   // ── Cobbles & Boulders rows (same calc/labor as Gravel; COBBLE_TYPES) ───────
@@ -604,18 +604,18 @@ function calcGroundTreatments(
     if (!n(r.sf)) return
     if (!r.type) return
     const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
-    const machineRate = p(GT_RATES.gravelMachineLab.dbName, GT_RATES.gravelMachineLab.fallback)
-    const handRate = p(GT_RATES.gravelHandLab.dbName, GT_RATES.gravelHandLab.fallback)
+    const machineRate = p(GT_RATES.gravelMachineLab.dbName)
+    const handRate = p(GT_RATES.gravelHandLab.dbName)
     const excavLab =
       r.method === 'Machine' ? ((CY * aggregateRemovalSwell) / machineRate) * 8 : ((CY * aggregateRemovalSwell) / handRate) * 8
     const fabricLab =
-      n(r.sf) * p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)
+      n(r.sf) * p(GT_RATES.gravelFabricLab.dbName)
     cobbleLab += excavLab + fabricLab
     const ctype = rowOpt('Cobbles', r, [])
     const costPerCY = ctype.fallback
     cobbleMat +=
       CY * costPerCY +
-      n(r.sf) * p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)
+      n(r.sf) * p(GT_RATES.gravelFabricMat.dbName)
   })
 
   // ── Manual ─────────────────────────────────────────────────────────────────
@@ -670,15 +670,15 @@ function calcGroundTreatments(
   const _stepSubSF =
     n(flagstoneSoilSF) + n(flagstoneConcreteSF) + n(precastSoilSF) + n(precastConcreteSF)
   const sectionSubTotal =
-    n(soilPrepSF) * p('Soil Prep Sub - $/SF', 0) +
-    n(sodSF) * p('Sod Sub - $/SF', 0) +
-    _sfSum(mulchRows) * p('Mulch Sub - $/SF', 0) +
-    _sfSum(dgRows) * p('DG Sub - $/SF', 0) +
-    _sfSum(gravelRows) * p('Gravel Sub - $/SF', 0) +
-    _sfSum(pebbleRows) * p('Pebble Sub - $/SF', 0) +
-    _sfSum(cobbleRows) * p('Cobbles Sub - $/SF', 0) +
-    (n(plasticEdgingLF) + n(metalEdgingLF)) * p('Edging Sub - $/LF', 0) +
-    _stepSubSF * p('Steppers Sub - $/SF', 0)
+    n(soilPrepSF) * p('Soil Prep Sub - $/SF') +
+    n(sodSF) * p('Sod Sub - $/SF') +
+    _sfSum(mulchRows) * p('Mulch Sub - $/SF') +
+    _sfSum(dgRows) * p('DG Sub - $/SF') +
+    _sfSum(gravelRows) * p('Gravel Sub - $/SF') +
+    _sfSum(pebbleRows) * p('Pebble Sub - $/SF') +
+    _sfSum(cobbleRows) * p('Cobbles Sub - $/SF') +
+    (n(plasticEdgingLF) + n(metalEdgingLF)) * p('Edging Sub - $/LF') +
+    _stepSubSF * p('Steppers Sub - $/SF')
   let gp, subCost, subGp, commission, price
   if (isSubTab) {
     gp = 0
@@ -1226,7 +1226,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
         }
       : calcRaw
 
-  const p = (dbName, fallback) => materialPrices[dbName] ?? fallback
+  const p = dbName => n(materialPrices[dbName])
 
   function updateSoils(i, field, val) {
     setSoilsRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
@@ -1299,7 +1299,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'hrs per Sq Ft',
-          value: p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback),
+          value: p(GT_RATES.soilPrepLab.dbName),
         },
         {
           label: 'Sod Soil Prep - Labor Rate',
@@ -1308,7 +1308,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'hrs per Sq Ft',
-          value: p(GT_RATES.sodPrepLab.dbName, GT_RATES.sodPrepLab.fallback),
+          value: p(GT_RATES.sodPrepLab.dbName),
         },
         {
           label: 'Soil Prep - Hand Add',
@@ -1317,7 +1317,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'hrs per Sq Ft',
-          value: p(GT_RATES.soilPrepHandAdd.dbName, GT_RATES.soilPrepHandAdd.fallback),
+          value: p(GT_RATES.soilPrepHandAdd.dbName),
         },
         {
           label: 'Tilling - Hand Labor Rate',
@@ -1326,7 +1326,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'hrs per Sq Ft',
-          value: p(GT_RATES.tillHandLab.dbName, GT_RATES.tillHandLab.fallback),
+          value: p(GT_RATES.tillHandLab.dbName),
         },
         {
           label: 'Tilling - Tiller Labor Rate',
@@ -1335,7 +1335,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'hrs per Sq Ft',
-          value: p(GT_RATES.tillTillerLab.dbName, GT_RATES.tillTillerLab.fallback),
+          value: p(GT_RATES.tillTillerLab.dbName),
         },
       ],
     },
@@ -1349,7 +1349,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'hrs per Sq Ft',
-          value: p(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback),
+          value: p(GT_RATES.sodLab.dbName),
         },
         {
           label: 'Fertilizer - SF Per Bag',
@@ -1358,7 +1358,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'Sq Ft per bag',
-          value: p(GT_RATES.fertilizerSFPerBag.dbName, GT_RATES.fertilizerSFPerBag.fallback),
+          value: p(GT_RATES.fertilizerSFPerBag.dbName),
         },
       ],
     },
@@ -1372,7 +1372,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'hrs per Sq Ft per in',
-          value: p('Soils Install Labor', 0.002),
+          value: p('Soils Install Labor'),
         },
       ],
     },
@@ -1386,7 +1386,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'Cu Yd per day',
-          value: p(GT_RATES.mulchLab.dbName, GT_RATES.mulchLab.fallback),
+          value: p(GT_RATES.mulchLab.dbName),
         },
         {
           label: 'Mulch Delivery Fee',
@@ -1395,7 +1395,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'currency',
           unitLabel: 'flat',
-          value: p(GT_RATES.mulchDelivery.dbName, GT_RATES.mulchDelivery.fallback),
+          value: p(GT_RATES.mulchDelivery.dbName),
         },
         {
           label: 'Mulch Coverage SF/Day',
@@ -1404,7 +1404,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'Sq Ft per day',
-          value: p('GT - Mulch Coverage SF/Day', 3200),
+          value: p('GT - Mulch Coverage SF/Day'),
         },
       ],
     },
@@ -1418,7 +1418,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'hrs per Sq Ft',
-          value: p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback),
+          value: p(GT_RATES.gravelFabricLab.dbName),
         },
       ],
     },
@@ -1432,7 +1432,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'Cu Yd per hr',
-          value: p(GT_RATES.dgHandLab.dbName, GT_RATES.dgHandLab.fallback),
+          value: p(GT_RATES.dgHandLab.dbName),
         },
         {
           label: 'DG - Machine Labor Rate',
@@ -1441,7 +1441,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'Cu Yd per day',
-          value: p(GT_RATES.dgMachineLab.dbName, GT_RATES.dgMachineLab.fallback),
+          value: p(GT_RATES.dgMachineLab.dbName),
         },
         {
           label: 'DG - Tons Denominator',
@@ -1450,7 +1450,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'Sq Ft per in per Tons',
-          value: p('GT - DG Tons Denominator', 200),
+          value: p('GT - DG Tons Denominator'),
         },
         {
           label: 'DG - Removal Swell',
@@ -1459,7 +1459,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: '×',
-          value: p('GT - DG Removal Swell', 1.62),
+          value: p('GT - DG Removal Swell'),
         },
         {
           label: 'DG - Cleanup Coverage SF/Day',
@@ -1468,7 +1468,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'Sq Ft per day',
-          value: p('GT - DG Cleanup Coverage SF/Day', 1000),
+          value: p('GT - DG Cleanup Coverage SF/Day'),
         },
         {
           label: 'DG - Cement Labor Factor',
@@ -1477,7 +1477,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'hrs per Tons',
-          value: p('GT - DG Cement Labor Factor', 1.25),
+          value: p('GT - DG Cement Labor Factor'),
         },
         {
           label: 'DG - Material Markup',
@@ -1486,7 +1486,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: '×',
-          value: p('GT - DG Material Markup', 1.1),
+          value: p('GT - DG Material Markup'),
         },
       ],
     },
@@ -1500,7 +1500,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'Cu Yd per day',
-          value: p(GT_RATES.gravelMachineLab.dbName, GT_RATES.gravelMachineLab.fallback),
+          value: p(GT_RATES.gravelMachineLab.dbName),
         },
         {
           label: 'Gravel - Hand Labor Rate',
@@ -1509,7 +1509,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'Cu Yd per day',
-          value: p(GT_RATES.gravelHandLab.dbName, GT_RATES.gravelHandLab.fallback),
+          value: p(GT_RATES.gravelHandLab.dbName),
         },
         {
           label: 'Aggregate - Removal Swell',
@@ -1518,7 +1518,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: '×',
-          value: p('GT - Aggregate Removal Swell', 1.62),
+          value: p('GT - Aggregate Removal Swell'),
         },
       ],
     },
@@ -1532,7 +1532,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'hrs per Ln Ft',
-          value: p(GT_RATES.plasticEdgingLab.dbName, GT_RATES.plasticEdgingLab.fallback),
+          value: p(GT_RATES.plasticEdgingLab.dbName),
         },
         {
           label: 'Metal Edging - Labor Rate',
@@ -1541,7 +1541,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'hrs per Ln Ft',
-          value: p(GT_RATES.metalEdgingLab.dbName, GT_RATES.metalEdgingLab.fallback),
+          value: p(GT_RATES.metalEdgingLab.dbName),
         },
       ],
     },
@@ -1555,7 +1555,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'Sq Ft per day',
-          value: p(GT_RATES.flagstoneSoilLab.dbName, GT_RATES.flagstoneSoilLab.fallback),
+          value: p(GT_RATES.flagstoneSoilLab.dbName),
         },
         {
           label: 'Flagstone Steppers - Concrete Labor',
@@ -1564,7 +1564,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'Sq Ft per day',
-          value: p(GT_RATES.flagstoneConcreteLab.dbName, GT_RATES.flagstoneConcreteLab.fallback),
+          value: p(GT_RATES.flagstoneConcreteLab.dbName),
         },
         {
           label: 'Precast Steppers - Soil Labor',
@@ -1573,7 +1573,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'Sq Ft per day',
-          value: p(GT_RATES.precastSoilLab.dbName, GT_RATES.precastSoilLab.fallback),
+          value: p(GT_RATES.precastSoilLab.dbName),
         },
         {
           label: 'Precast Steppers - Concrete Labor',
@@ -1582,7 +1582,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'Sq Ft per day',
-          value: p(GT_RATES.precastConcreteLab.dbName, GT_RATES.precastConcreteLab.fallback),
+          value: p(GT_RATES.precastConcreteLab.dbName),
         },
         {
           label: 'Steppers - SF Per Ton',
@@ -1591,7 +1591,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'coefficient',
           unitLabel: 'Sq Ft per Tons',
-          value: p('GT - Steppers SF Per Ton', 80),
+          value: p('GT - Steppers SF Per Ton'),
         },
       ],
     },
@@ -1605,7 +1605,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'currency',
           unitLabel: 'Sq Ft',
-          value: p('Soil Prep Sub - $/SF', 0),
+          value: p('Soil Prep Sub - $/SF'),
         },
         {
           label: 'Sod Sub - $/SF',
@@ -1614,7 +1614,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'currency',
           unitLabel: 'Sq Ft',
-          value: p('Sod Sub - $/SF', 0),
+          value: p('Sod Sub - $/SF'),
         },
         {
           label: 'Mulch Sub - $/SF',
@@ -1623,7 +1623,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'currency',
           unitLabel: 'Sq Ft',
-          value: p('Mulch Sub - $/SF', 0),
+          value: p('Mulch Sub - $/SF'),
         },
         {
           label: 'DG Sub - $/SF',
@@ -1632,7 +1632,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'currency',
           unitLabel: 'Sq Ft',
-          value: p('DG Sub - $/SF', 0),
+          value: p('DG Sub - $/SF'),
         },
         {
           label: 'Gravel Sub - $/SF',
@@ -1641,7 +1641,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'currency',
           unitLabel: 'Sq Ft',
-          value: p('Gravel Sub - $/SF', 0),
+          value: p('Gravel Sub - $/SF'),
         },
         {
           label: 'Pebble Sub - $/SF',
@@ -1650,7 +1650,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'currency',
           unitLabel: 'Sq Ft',
-          value: p('Pebble Sub - $/SF', 0),
+          value: p('Pebble Sub - $/SF'),
         },
         {
           label: 'Cobbles Sub - $/SF',
@@ -1659,7 +1659,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'currency',
           unitLabel: 'Sq Ft',
-          value: p('Cobbles Sub - $/SF', 0),
+          value: p('Cobbles Sub - $/SF'),
         },
         {
           label: 'Edging Sub - $/LF',
@@ -1668,7 +1668,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'currency',
           unitLabel: 'Ln Ft',
-          value: p('Edging Sub - $/LF', 0),
+          value: p('Edging Sub - $/LF'),
         },
         {
           label: 'Steppers Sub - $/SF',
@@ -1677,7 +1677,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           category: 'Ground Treatments',
           mode: 'currency',
           unitLabel: 'Sq Ft',
-          value: p('Steppers Sub - $/SF', 0),
+          value: p('Steppers Sub - $/SF'),
         },
       ],
     },
@@ -1912,9 +1912,9 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
         const isSubTab = subType === 'Subcontractor'
         const tillHrs = method =>
           method === 'Hand'
-            ? p(GT_RATES.tillHandLab.dbName, GT_RATES.tillHandLab.fallback)
+            ? p(GT_RATES.tillHandLab.dbName)
             : method === 'Tiller'
-              ? p(GT_RATES.tillTillerLab.dbName, GT_RATES.tillTillerLab.fallback)
+              ? p(GT_RATES.tillTillerLab.dbName)
               : 0
         // Multi-row Soils-style prep renderer. Each row is Vendor + Soil/Amendment
         // Type + Area + Depth + Tilling; a "+ Add Row" appends another row and a
@@ -1947,7 +1947,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       const mat = row.type ? CY * typeCost : 0
                       const handAdd =
                         row.tilling === 'Hand' && !isSubTab
-                          ? p(GT_RATES.soilPrepHandAdd.dbName, GT_RATES.soilPrepHandAdd.fallback)
+                          ? p(GT_RATES.soilPrepHandAdd.dbName)
                           : 0
                       const hrs =
                         n(row.area) > 0 ? n(row.area) * (baseLabRate + handAdd + tillHrs(row.tilling)) : 0
@@ -2063,13 +2063,13 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               title: 'Planter Preparation',
               rows: planterPrepRows,
               setRows: setPlanterPrepRows,
-              baseLabRate: p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback),
+              baseLabRate: p(GT_RATES.soilPrepLab.dbName),
             })}
             {prepSection({
               title: 'Sod Preparation',
               rows: sodPrepRows,
               setRows: setSodPrepRows,
-              baseLabRate: p(GT_RATES.sodPrepLab.dbName, GT_RATES.sodPrepLab.fallback),
+              baseLabRate: p(GT_RATES.sodPrepLab.dbName),
             })}
           </>
         )
@@ -2191,10 +2191,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             </thead>
             <tbody>
               {(() => {
-                const sfPerBag = p(
-                  GT_RATES.fertilizerSFPerBag.dbName,
-                  GT_RATES.fertilizerSFPerBag.fallback
-                )
+                const sfPerBag = p(GT_RATES.fertilizerSFPerBag.dbName)
                 // Rows with no explicit SF fall back to the total sod SF (sum of
                 // sodRows) — mirror of the calc's single-row legacy default.
                 const sodSFTotal = (sodRows || []).reduce((a, r) => a + n(r.sf), 0)
@@ -2692,7 +2689,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 const gtype = resolveType(row.type, sectionOptions('Gravel', row.vendor, []), [])
                 const mat =
                   CY * gtype.fallback +
-                  ((row.weedFabric ?? 'Yes') === 'Yes' ? n(row.sf) * p(GT_RATES.gravelFabricMat.dbName, 0.1) : 0)
+                  ((row.weedFabric ?? 'Yes') === 'Yes' ? n(row.sf) * p(GT_RATES.gravelFabricMat.dbName) : 0)
                 return (
                   <span key={i} className="text-xs text-gray-400">
                     #{i + 1}: {CY.toFixed(2)} Cu Yd · ${mat.toFixed(2)} mat
@@ -2828,7 +2825,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 const ptype = resolveType(row.type, sectionOptions('Pebble', row.vendor, []), [])
                 const mat =
                   CY * ptype.fallback +
-                  ((row.weedFabric ?? 'Yes') === 'Yes' ? n(row.sf) * p(GT_RATES.gravelFabricMat.dbName, 0.1) : 0)
+                  ((row.weedFabric ?? 'Yes') === 'Yes' ? n(row.sf) * p(GT_RATES.gravelFabricMat.dbName) : 0)
                 return (
                   <span key={i} className="text-xs text-gray-400">
                     #{i + 1}: {CY.toFixed(2)} Cu Yd · ${mat.toFixed(2)} mat
@@ -2952,7 +2949,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 const ctype = resolveType(row.type, sectionOptions('Cobbles', row.vendor, []), [])
                 const mat =
                   CY * ctype.fallback +
-                  n(row.sf) * p(GT_RATES.gravelFabricMat.dbName, 0.1)
+                  n(row.sf) * p(GT_RATES.gravelFabricMat.dbName)
                 return (
                   <span key={i} className="text-xs text-gray-400">
                     #{i + 1}: {CY.toFixed(2)} Cu Yd · ${mat.toFixed(2)} mat
@@ -3092,7 +3089,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               ].map(row => {
                 const rowOpts = sectionOptions('Steppers', stepperVendor[row.key], [])
                 const st = resolveType(stepperType[row.key], rowOpts, [])
-                const sfPerDay = p(row.labRate.dbName, row.labRate.fallback)
+                const sfPerDay = p(row.labRate.dbName)
                 const perTon = st.fallback
                 const sfN = n(row.sf)
                 const tons = sfN / 80

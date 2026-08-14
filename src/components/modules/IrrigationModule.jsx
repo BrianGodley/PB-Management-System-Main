@@ -46,72 +46,50 @@ const ZONE_TYPES = [
     label: 'Planter Spray Heads',
     defaultMode: 'Hand',
     matKey: 'Irrigation Zone - Planter Spray',
-    matFallback: 345,
   },
   {
     key: 'lawn',
     label: 'Lawn Zone (≤ 1,000 Sq Ft)',
     defaultMode: 'Trench',
     matKey: 'Irrigation Zone - Lawn',
-    matFallback: 345,
   },
   {
     key: 'hillside',
     label: 'Hillside Zone (≤ 6 big heads)',
     defaultMode: 'Hand',
     matKey: 'Irrigation Zone - Hillside',
-    matFallback: 345,
   },
   {
     key: 'dripPlant',
     label: 'Drip per Plant (≤ 50 emitters)',
     defaultMode: 'Trench',
     matKey: 'Irrigation Zone - Drip per Plant',
-    matFallback: 230,
   },
   {
     key: 'dripline',
     label: 'Planter Dripline (≤ 700 Sq Ft)',
     defaultMode: 'Trench',
     matKey: 'Irrigation Zone - Planter Dripline',
-    matFallback: 345,
   },
 ]
 
 // ── Timer definitions ─────────────────────────────────────────────────────────
 const TIMER_TYPES = [
-  { key: 'timer4', label: '4 Station', matKey: 'Irrigation Timer - 4 Station', matFallback: 69.0 },
-  { key: 'timer6', label: '6 Station', matKey: 'Irrigation Timer - 6 Station', matFallback: 138.0 },
-  { key: 'timer9', label: '9 Station', matKey: 'Irrigation Timer - 9 Station', matFallback: 184.0 },
-  {
-    key: 'timer12',
-    label: '12 Station',
-    matKey: 'Irrigation Timer - 12 Station',
-    matFallback: 270.25,
-  },
-  {
-    key: 'timer15',
-    label: '15 Station',
-    matKey: 'Irrigation Timer - 15 Station',
-    matFallback: 322.0,
-  },
-  {
-    key: 'timer18',
-    label: '18 Station',
-    matKey: 'Irrigation Timer - 18 Station',
-    matFallback: 402.5,
-  },
+  { key: 'timer4', label: '4 Station', matKey: 'Irrigation Timer - 4 Station' },
+  { key: 'timer6', label: '6 Station', matKey: 'Irrigation Timer - 6 Station' },
+  { key: 'timer9', label: '9 Station', matKey: 'Irrigation Timer - 9 Station' },
+  { key: 'timer12', label: '12 Station', matKey: 'Irrigation Timer - 12 Station' },
+  { key: 'timer15', label: '15 Station', matKey: 'Irrigation Timer - 15 Station' },
+  { key: 'timer18', label: '18 Station', matKey: 'Irrigation Timer - 18 Station' },
   {
     key: 'timerICC8',
     label: 'Hunter ICC 8 Station',
     matKey: 'Irrigation Timer - Hunter ICC 8 Station',
-    matFallback: 345.0,
   },
   {
     key: 'timerAdd8',
     label: 'Additional 8 Station Module',
     matKey: 'Irrigation Timer - Additional 8 Station Module',
-    matFallback: 115.0,
   },
 ]
 
@@ -122,11 +100,12 @@ const timerMeta = key => TIMER_BY_KEY[key] || TIMER_TYPES[0]
 const ZONE_OPTIONS = ZONE_TYPES.map(z => ({ value: z.key, label: z.label }))
 const TIMER_OPTIONS = TIMER_TYPES.map(t => ({ value: t.key, label: t.label }))
 
-// ── Rate fallbacks (used when DB row not found) ───────────────────────────────
+// ── Estimate-config defaults ──────────────────────────────────────────────────
+// Only company/estimate-config defaults live here. Per-zone / per-timer labor
+// coefficients and material prices are read live from the rate tables — no
+// hardcoded rate fallbacks. Missing rates are guaranteed by
+// supabase-irrigation-fallbacks-seed.sql.
 const RATE_DEFAULTS = {
-  handRate: 16, // hrs/zone — 'Irrigation - Hand Zone'   (Excel VLOOKUP: Hand = 16)
-  trenchRate: 12.5, // hrs/zone — 'Irrigation - Trench Zone' (Excel VLOOKUP: Trench = 12.5)
-  timerHrs: 0.5, // hrs/ea  — 'Irrigation - Timer Install'
   salesTax: 0.095, // 9.5% — company_settings key 'sales_tax_rate'
 }
 
@@ -162,7 +141,7 @@ function computeZoneRow(row, handRate, trenchRate, materialPrices, materialRows)
   const mode = row.mode || z.defaultMode
   const rate = mode === 'Hand' ? handRate : trenchRate
   const hrs = qty > 0 ? qty * rate : 0
-  const unitPrice = irrMatPrice(z.matKey, row.vendor, materialRows, materialPrices, z.matFallback)
+  const unitPrice = irrMatPrice(z.matKey, row.vendor, materialRows, materialPrices)
   const mat = qty * unitPrice
   const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : unitPrice
   const subMat = qty > 0 ? qty * subEach : 0
@@ -178,7 +157,7 @@ function computeTimerRow(row, timerHrs, materialPrices, materialRows) {
   const t = timerMeta(row.type)
   const qty = n(row.qty)
   const hrs = qty * timerHrs
-  const unitPrice = irrMatPrice(t.matKey, row.vendor, materialRows, materialPrices, t.matFallback)
+  const unitPrice = irrMatPrice(t.matKey, row.vendor, materialRows, materialPrices)
   const mat = qty * unitPrice
   const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : unitPrice
   const subMat = qty * subEach
@@ -210,9 +189,9 @@ function calcIrrigation(
   // Rates from DB with fallbacks
   // NOTE: handRate / trenchRate are hrs/zone (not zones/hr).
   // Excel formula: =Vlookup(mode, rateTable, 2) * qty  →  rate × qty = hrs
-  const handRate = lr['Irrigation - Hand Zone'] ?? RATE_DEFAULTS.handRate
-  const trenchRate = lr['Irrigation - Trench Zone'] ?? RATE_DEFAULTS.trenchRate
-  const timerHrs = lr['Irrigation - Timer Install'] ?? RATE_DEFAULTS.timerHrs
+  const handRate = n(lr['Irrigation - Hand Zone'])
+  const trenchRate = n(lr['Irrigation - Trench Zone'])
+  const timerHrs = n(lr['Irrigation - Timer Install'])
 
   // ── Zone labor + material (pre-tax) ─────────────────────────────────────
   let zoneHrs = 0,
@@ -591,7 +570,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
         const next = { ...r, [field]: val }
         if ((field === 'type' || field === 'vendor') && isSub) {
           const z = zoneMeta(next.type)
-          const unit = irrMatPrice(z.matKey, next.vendor, materialRows, materialPrices, z.matFallback)
+          const unit = irrMatPrice(z.matKey, next.vendor, materialRows, materialPrices)
           next.subEach = String(r2(unit))
         }
         return next
@@ -605,7 +584,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
         const next = { ...r, [field]: val }
         if ((field === 'type' || field === 'vendor') && isSub) {
           const t = timerMeta(next.type)
-          const unit = irrMatPrice(t.matKey, next.vendor, materialRows, materialPrices, t.matFallback)
+          const unit = irrMatPrice(t.matKey, next.vendor, materialRows, materialPrices)
           next.subEach = String(r2(unit))
         }
         return next
@@ -723,7 +702,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
           value: calc.trenchRate,
         },
         ...ZONE_TYPES.flatMap(z =>
-          matRows(z.matKey, 'ea', materialPrices[z.matKey] ?? z.matFallback)
+          matRows(z.matKey, 'ea', materialPrices[z.matKey])
         ),
       ],
     },
@@ -740,7 +719,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
           value: calc.timerHrs,
         },
         ...TIMER_TYPES.flatMap(t =>
-          matRows(t.matKey, 'ea', materialPrices[t.matKey] ?? t.matFallback)
+          matRows(t.matKey, 'ea', materialPrices[t.matKey])
         ),
       ],
     },
@@ -851,7 +830,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
               const c = calc.zoneCalc[i] || computeZoneRow(row, calc.handRate, calc.trenchRate, materialPrices, materialRows)
               const z = zoneMeta(row.type)
               const isStandard = !row.vendor || row.vendor === 'Standard'
-              const masterMat = materialPrices[z.matKey] ?? z.matFallback
+              const masterMat = n(materialPrices[z.matKey])
               return (
                 <tr key={i}>
                   <td className={td}>
@@ -945,7 +924,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
               const c = calc.timerCalc[i] || computeTimerRow(row, calc.timerHrs, materialPrices, materialRows)
               const t = timerMeta(row.type)
               const isStandard = !row.vendor || row.vendor === 'Standard'
-              const masterMat = materialPrices[t.matKey] ?? t.matFallback
+              const masterMat = n(materialPrices[t.matKey])
               return (
                 <tr key={i}>
                   <td className={td}>

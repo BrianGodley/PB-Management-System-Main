@@ -23,86 +23,65 @@ import { groutCyPerBlock } from '../../lib/cmuGrout'
 // mortar) resolve ONLY from the catalog — no hardcoded $ fallback.
 const FINISH_TYPES = {
   'Sand Stucco': {
-    costPerSF: 0,
     unit: 'SF',
     dbName: 'Sand Stucco',
     laborDbName: 'Sand Stucco - Labor Rate',
-    laborHrsPerSF: 0.05,
     subDbName: 'Sand Stucco - Sub SF',
-    subFallback: 0,
   },
   'Smooth Stucco': {
-    costPerSF: 0,
     unit: 'SF',
     dbName: 'Smooth Stucco',
     laborDbName: 'Smooth Stucco - Labor Rate',
-    laborHrsPerSF: 0.05,
     subDbName: 'Smooth Stucco - Sub SF',
-    subFallback: 0,
   },
   'Ledgerstone Veneer Panels': {
-    costPerSF: 10.0,
     unit: 'SF',
     dbName: 'Ledgerstone Veneer Panels',
     laborDbName: 'Ledgerstone Veneer Panels - Labor Rate',
-    laborHrsPerSF: 0.1,
     subDbName: 'Ledgerstone Veneer Panels - Sub SF',
-    subFallback: 0,
   },
   'Stacked Stone Veneer': {
-    costPerSF: 10.0,
     unit: 'SF',
     dbName: 'Stacked Stone Veneer',
     laborDbName: 'Stacked Stone Veneer - Labor Rate',
-    laborHrsPerSF: 0.1,
     subDbName: 'Stacked Stone Veneer - Sub SF',
-    subFallback: 0,
   },
   Tile: {
-    costPerSF: 6.5,
     unit: 'SF',
     dbName: 'Tile - Columns',
     laborDbName: 'Tile - Columns - Labor Rate',
-    laborHrsPerSF: 0.125,
     subDbName: 'Tile - Columns - Sub SF',
-    subFallback: 0,
   },
   'Real Flagstone, Flat': {
-    costPerTon: 400.0,
     unit: 'ton',
     dbName: 'Real Flagstone Flat',
     laborDbName: 'Real Flagstone Flat - Labor Rate',
-    laborHrsPer: 0.5,
     subDbName: 'Real Flagstone Flat - Sub SF',
-    subFallback: 0,
   },
   'Real Stone': {
-    costPerTon: 400.0,
     unit: 'ton',
     dbName: 'Real Stone - Columns',
     laborDbName: 'Real Stone - Columns - Labor Rate',
-    laborHrsPer: 0.5,
     subDbName: 'Real Stone - Columns - Sub SF',
-    subFallback: 0,
   },
 }
 
 const BLOCK_RATES = {
-  blockMatCost: { dbName: 'CMU Block', fallback: 2.5 }, // $/block (CMU fallback when no block picked)
-  rebarMatCost: { dbName: 'Rebar', fallback: 1.388 }, // $/LF (Basic Materials)
-  faceBlockMat: { dbName: 'Face Block', fallback: 3.0 },
+  blockMatCost: { dbName: 'CMU Block' }, // $/block (CMU fallback when no block picked)
+  rebarMatCost: { dbName: 'Rebar' }, // $/LF (Basic Materials)
+  faceBlockMat: { dbName: 'Face Block' },
   // Labor rates (fallbacks OK)
-  installLaborHrs: { dbName: 'CMU Install Labor', fallback: 0.083 }, // hrs per block
-  excavateLaborHrs: { dbName: 'Excavate Footing Labor', fallback: 0.5 }, // hrs per column
-  pourLaborHrs: { dbName: 'Pour Footing Labor', fallback: 0.25 }, // hrs per column
-  fillLaborHrs: { dbName: 'Fill Labor', fallback: 0.05 }, // hrs per block
+  installLaborHrs: { dbName: 'CMU Install Labor' }, // hrs per block
+  excavateLaborHrs: { dbName: 'Excavate Footing Labor' }, // hrs per column
+  pourLaborHrs: { dbName: 'Pour Footing Labor' }, // hrs per column
+  fillLaborHrs: { dbName: 'Fill Labor' }, // hrs per block
 }
 
 // New per-type LABOR coefficients (fallbacks OK). Brick laying mirrors Walls'
 // brickLayLab (1.75 hr/SF); PIP form + pour mirror ConcreteModule-style rates.
-const BRICK_LAY = { dbName: 'Column Brick Lay Labor', fallback: 1.75 } // hrs / SF of brick face
-const PIP_FORM_LAB = { dbName: 'Column Form Labor', fallback: 0.08 } // hrs / SF of form
-const PIP_POUR_LAB = { dbName: 'Column Pour Labor', fallback: 1.5 } // hrs / CY poured
+const BRICK_LAY = { dbName: 'Column Brick Lay Labor' } // hrs / SF of brick face
+const PIP_FORM_LAB = { dbName: 'Column Form Labor' } // hrs / SF of form
+const PIP_POUR_LAB = { dbName: 'Column Pour Labor' } // hrs / CY poured
 
 // Catalog NAMES for optional (catalog-only) materials — $0 until seeded so no
 // hardcoded material price ever beats the catalog.
@@ -150,7 +129,7 @@ const BASIC_CATEGORY = 'Basic Materials'
 const WALLS_CATEGORY = 'Walls'
 const CONCRETE_CATEGORY = 'Concrete'
 // Grout fill priced at the concrete ready-mix rate (shared Basic Materials).
-const GROUT_CONCRETE = { dbName: 'Concrete - Ready Mix (Truck)', fallback: 185 } // $/CY
+const GROUT_CONCRETE = { dbName: 'Concrete - Ready Mix (Truck)' } // $/CY
 
 const colMatPrice = resolveMaterialPrice
 
@@ -238,8 +217,8 @@ function labelWithDims(row) {
 
 // ── Per-column-row calculators (pure; shared shape used by module + summary) ──
 function pxHelpers(materialPrices, materialRows) {
-  const mp = (db, fb) => (materialPrices[db] != null ? materialPrices[db] : fb)
-  const matP = (db, fb, v) => colMatPrice(db, v, materialRows, materialPrices, fb)
+  const mp = db => n(materialPrices[db])
+  const matP = (db, _fb, v) => colMatPrice(db, v, materialRows, materialPrices)
   return { mp, matP }
 }
 const rowHasGeo = c => n(c.qty) > 0 && n(c.heightIn) > 0 && n(c.widthIn) > 0
@@ -733,8 +712,8 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
   const modularVendorOptions = subcatVendorOptions(materialRows, MODULAR_SUBCAT, vendorNames)
   const brickVendorOptions = subcatVendorOptions(materialRows, BRICK_SUBCAT, vendorNames)
   const concMixVendorOptions = subcatVendorOptions(materialRows, CONC_MIX_SUBCAT, vendorNames)
-  const colMat = (dbName, vendorId, fallback) =>
-    colMatPrice(dbName, vendorId, materialRows, materialPrices, fallback)
+  const colMat = (dbName, vendorId) =>
+    colMatPrice(dbName, vendorId, materialRows, materialPrices)
 
   const calcRaw = calcColumns(
     {
@@ -880,7 +859,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
         category,
         unitLabel: unit,
         mode: 'currency',
-        value: materialPrices[dbName] ?? fallback,
+        value: n(materialPrices[dbName]),
       },
     ]
   }
@@ -891,7 +870,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
     category: COLUMNS_CATEGORY,
     mode: 'coefficient',
     unitLabel,
-    value: materialPrices[rate.dbName] ?? rate.fallback,
+    value: n(materialPrices[rate.dbName]),
   })
   const columnsRateList = [
     {
@@ -922,7 +901,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
             category: COLUMNS_CATEGORY,
             mode: 'coefficient',
             unitLabel: `hrs/${rate.unit}`,
-            value: materialPrices[rate.laborDbName] ?? defLab ?? 0,
+            value: n(materialPrices[rate.laborDbName]),
           }
         }),
         ...Object.values(FINISH_TYPES).flatMap(rate =>

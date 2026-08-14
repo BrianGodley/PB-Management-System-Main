@@ -10,7 +10,6 @@ import { catalogItemFor } from '../../lib/materialCatalog'
 // ─────────────────────────────────────────────────────────────────────────────
 
 const LIGHT_CAT = { fixture: 'Light Fixture', transformer: 'Transformer', wire: 'Wire' }
-const MATERIAL_MARKUP = 0.15
 
 const n = v => parseFloat(v) || 0
 
@@ -111,7 +110,9 @@ export default function LightingSummary({ module }) {
   const totalWatts = n(calc.totalWatts)
   const totalVA = n(calc.totalVA)
   const rawMat = n(calc.rawMat)
-  const markedUpMat = n(calc.markedUpMat) || rawMat * (1 + MATERIAL_MARKUP)
+  // Material markup lives in the saved calc snapshot (markedUpMat). No hardcoded
+  // markup fallback — a snapshot without it shows raw (unmarked) material.
+  const markedUpMat = n(calc.markedUpMat) || rawMat
 
   const hasAnyLines =
     fixtureLines.length || transformerLines.length || wireLines.length || manualLines.length

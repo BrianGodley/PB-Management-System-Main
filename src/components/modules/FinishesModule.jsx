@@ -27,50 +27,53 @@ import { useMaterialCatalog, resolveMaterialPrice, catalogOptions } from '../../
 
 const FINISHES_CATEGORY = 'Finishes'
 
+// Identity-only: each entry carries just the DB rate name (`db`). Every price /
+// labor coefficient is read LIVE from the rate map — no hardcoded fallbacks. A
+// missing rate resolves to 0 (guaranteed present via the fallbacks-seed SQL).
 const FINISHES_RATES = {
   // ── Flatwork material costs ────────────────────────────────────────────────
-  flatTile: { db: 'Finishes Tile Flatwork', fb: 6.5 }, // $/SF
-  flatBrick: { db: 'Finishes Brick Flatwork', fb: 3.0 }, // $/brick
-  flatFlagstone: { db: 'Finishes Flagstone Flatwork', fb: 400.0 }, // $/ton
-  flatPorcelain: { db: 'Finishes Porcelain Flatwork', fb: 10.0 }, // $/SF
+  flatTile: { db: 'Finishes Tile Flatwork' }, // $/SF
+  flatBrick: { db: 'Finishes Brick Flatwork' }, // $/brick
+  flatFlagstone: { db: 'Finishes Flagstone Flatwork' }, // $/ton
+  flatPorcelain: { db: 'Finishes Porcelain Flatwork' }, // $/SF
 
   // ── Wall Caps material costs ───────────────────────────────────────────────
-  capFlagstone: { db: 'Finishes Cap Flagstone', fb: 500.0 }, // $/ton
-  capPrecast: { db: 'Finishes Cap Precast', fb: 50.0 }, // $/piece
-  capBullnose: { db: 'Finishes Cap Bullnose Brick', fb: 5.0 }, // $/LF
-  concreteTruck: { db: 'Finishes Concrete Truck', fb: 185.0 }, // $/CY (for PIP cap)
+  capFlagstone: { db: 'Finishes Cap Flagstone' }, // $/ton
+  capPrecast: { db: 'Finishes Cap Precast' }, // $/piece
+  capBullnose: { db: 'Finishes Cap Bullnose Brick' }, // $/LF
+  concreteTruck: { db: 'Finishes Concrete Truck' }, // $/CY (for PIP cap)
 
   // ── Wall Finishes material costs ───────────────────────────────────────────
-  sandStucco: { db: 'Sand Stucco - Finishes', fb: 0.0 }, // $/SF
-  smoothStucco: { db: 'Smooth Stucco - Finishes', fb: 0.0 }, // $/SF
-  ledgerstone: { db: 'Ledgerstone - Finishes', fb: 10.0 }, // $/SF
-  stackedStone: { db: 'Stacked Stone - Finishes', fb: 10.0 }, // $/SF
-  tile: { db: 'Tile - Finishes', fb: 6.5 }, // $/SF
-  realFlagstone: { db: 'Real Flagstone - Finishes', fb: 400.0 }, // $/ton
-  realStone: { db: 'Real Stone - Finishes', fb: 400.0 }, // $/ton
+  sandStucco: { db: 'Sand Stucco - Finishes' }, // $/SF
+  smoothStucco: { db: 'Smooth Stucco - Finishes' }, // $/SF
+  ledgerstone: { db: 'Ledgerstone - Finishes' }, // $/SF
+  stackedStone: { db: 'Stacked Stone - Finishes' }, // $/SF
+  tile: { db: 'Tile - Finishes' }, // $/SF
+  realFlagstone: { db: 'Real Flagstone - Finishes' }, // $/ton
+  realStone: { db: 'Real Stone - Finishes' }, // $/ton
 
   // ── Labor rates ────────────────────────────────────────────────────────────
-  flatTileLab: { db: 'Finishes Tile Flatwork Labor Rate', fb: 0.2867 }, // hrs/SF
-  flatBrickLab: { db: 'Finishes Brick Flatwork Labor Rate', fb: 0.35 }, // hrs/SF
-  flatFlagstoneLab: { db: 'Finishes Flagstone Flatwork Labor Rate', fb: 0.4487 }, // hrs/SF
-  flatPorcelainLab: { db: 'Finishes Porcelain Flatwork Labor Rate', fb: 0.267 }, // hrs/SF
-  sandStuccoLab: { db: 'Sand Stucco - Finishes Labor Rate', fb: 92 }, // SF/day
-  smoothStuccoLab: { db: 'Smooth Stucco - Finishes Labor Rate', fb: 65 }, // SF/day
-  ledgerstoneLab: { db: 'Ledgerstone - Finishes Labor Rate', fb: 24 }, // SF/day
-  stackedStoneLab: { db: 'Stacked Stone - Finishes Labor Rate', fb: 24 }, // SF/day
-  tileLab: { db: 'Tile - Finishes Labor Rate', fb: 0.2867 }, // hrs/SF
-  flagstoneLab: { db: 'Real Flagstone - Finishes Labor Rate', fb: 0.4487 }, // hrs/SF
-  realStoneLab: { db: 'Real Stone - Finishes Labor Rate', fb: 0.8954 }, // hrs/SF
+  flatTileLab: { db: 'Finishes Tile Flatwork Labor Rate' }, // hrs/SF
+  flatBrickLab: { db: 'Finishes Brick Flatwork Labor Rate' }, // hrs/SF
+  flatFlagstoneLab: { db: 'Finishes Flagstone Flatwork Labor Rate' }, // hrs/SF
+  flatPorcelainLab: { db: 'Finishes Porcelain Flatwork Labor Rate' }, // hrs/SF
+  sandStuccoLab: { db: 'Sand Stucco - Finishes Labor Rate' }, // SF/day
+  smoothStuccoLab: { db: 'Smooth Stucco - Finishes Labor Rate' }, // SF/day
+  ledgerstoneLab: { db: 'Ledgerstone - Finishes Labor Rate' }, // SF/day
+  stackedStoneLab: { db: 'Stacked Stone - Finishes Labor Rate' }, // SF/day
+  tileLab: { db: 'Tile - Finishes Labor Rate' }, // hrs/SF
+  flagstoneLab: { db: 'Real Flagstone - Finishes Labor Rate' }, // hrs/SF
+  realStoneLab: { db: 'Real Stone - Finishes Labor Rate' }, // hrs/SF
 
-  // ── Cap labor coefficients (were hardcoded) ────────────────────────────────
-  capFlagstoneLab: { db: 'Finishes Cap Flagstone Labor Rate', fb: 0.25 }, // hrs/LF
-  capPrecastLab: { db: 'Finishes Cap Precast Labor Rate', fb: 0.2 }, // hrs/ea
-  capPipLab: { db: 'Finishes Cap PIP Concrete Labor Rate', fb: 0.15 }, // hrs/LF
-  capBullnoseLab: { db: 'Finishes Cap Bullnose Labor Rate', fb: 0.08 }, // hrs/LF
+  // ── Cap labor coefficients ─────────────────────────────────────────────────
+  capFlagstoneLab: { db: 'Finishes Cap Flagstone Labor Rate' }, // hrs/LF
+  capPrecastLab: { db: 'Finishes Cap Precast Labor Rate' }, // hrs/ea
+  capPipLab: { db: 'Finishes Cap PIP Concrete Labor Rate' }, // hrs/LF
+  capBullnoseLab: { db: 'Finishes Cap Bullnose Labor Rate' }, // hrs/LF
 
-  // ── Consumable material costs (were hardcoded) ─────────────────────────────
-  stoneScrews: { db: 'Finishes Stone Screws', fb: 0.4 }, // $/SF (was (sf/5)×$2)
-  tileAdhesive: { db: 'Finishes Tile Adhesive/Grout', fb: 1.0 }, // $/SF
+  // ── Consumable material costs ──────────────────────────────────────────────
+  stoneScrews: { db: 'Finishes Stone Screws' }, // $/SF
+  tileAdhesive: { db: 'Finishes Tile Adhesive/Grout' }, // $/SF
 }
 
 const DEFAULTS = {
@@ -242,7 +245,7 @@ function finishMatPriceV(matKey, vendor, materialRows, mp) {
     const vp = resolveMaterialPrice(item, vendor, materialRows, {}, NaN)
     if (Number.isFinite(vp)) return vp
   }
-  return mp?.[spec.db] ?? spec.fb
+  return n(mp?.[spec.db])
 }
 
 // ── Vendor-catalog material price ─────────────────────────────────────────────
@@ -262,7 +265,7 @@ function computeFlatRow(row, mp, materialRows) {
   const sf = n(row.sf)
   const v = row.vendor
   const price = k => finishMatPriceV(k, v, materialRows, mp)
-  const lab = k => mp?.[FINISHES_RATES[k].db] ?? FINISHES_RATES[k].fb
+  const lab = k => n(mp?.[FINISHES_RATES[k].db])
   let mat = 0,
     hrs = 0,
     subUnit = 0,
@@ -304,7 +307,7 @@ function computeCapRow(row, mp, materialRows) {
     qty = n(row.qty)
   const v = row.vendor
   const price = k => finishMatPriceV(k, v, materialRows, mp)
-  const lab = k => mp?.[FINISHES_RATES[k].db] ?? FINISHES_RATES[k].fb
+  const lab = k => n(mp?.[FINISHES_RATES[k].db])
   let mat = 0,
     hrs = 0,
     subUnit = 0,
@@ -347,7 +350,7 @@ function computeWallRow(row, mp, materialRows) {
   const sf = n(row.sf)
   const v = row.vendor
   const price = k => finishMatPriceV(k, v, materialRows, mp)
-  const lab = k => mp?.[FINISHES_RATES[k].db] ?? FINISHES_RATES[k].fb
+  const lab = k => n(mp?.[FINISHES_RATES[k].db])
   let mat = 0,
     hrs = 0,
     subUnit = 0,
@@ -984,7 +987,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
   // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every labor
   //    coefficient that used to have an inline RateEditPopover in this module now
   //    lives here (material prices are edited in Master Material Rates).
-  const _rv = k => p(FINISHES_RATES[k].db) ?? FINISHES_RATES[k].fb
+  const _rv = k => n(p(FINISHES_RATES[k].db))
   const _laborItem = (k, unitLabel) => ({
     label: FINISHES_RATES[k].db,
     table: 'labor_rates',
@@ -1029,7 +1032,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
         category: FINISHES_CATEGORY,
         unitLabel: unit,
         mode: 'currency',
-        value: materialPrices[dbName] ?? FINISHES_RATES[k].fb,
+        value: n(materialPrices[dbName]),
       },
     ]
   }

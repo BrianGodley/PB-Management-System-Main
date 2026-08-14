@@ -22,46 +22,46 @@ const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
 
 const OK_RATES = {
   // ── Material costs ──────────────────────────────────────────────────────────
-  bbqBlock: { dbName: 'BBQ Block', fallback: 2.5 }, // $/block
-  bbqRebar: { dbName: 'BBQ Rebar', fallback: 0.4 }, // $/LF
-  bbqConcrete: { dbName: 'BBQ Concrete', fallback: 149.5 }, // $/CY (footing & counter)
-  bbqSubWallLF: { dbName: 'BBQ Sub Wall LF', fallback: 150.0 }, // $/LF flat sub price (BBQ wall)
-  bbqSubBackLF: { dbName: 'BBQ Sub Backsplash LF', fallback: 100.0 }, // $/LF flat sub price (backsplash)
-  applianceHardware: { dbName: 'BBQ Appliance Hardware', fallback: 3.0 }, // $/appliance (misc hardware)
-  gficOutlet: { dbName: 'GFIC Outlet - BBQ', fallback: 80.0 }, // $/outlet
-  sinkPlumbing: { dbName: 'Sink Plumbing - BBQ', fallback: 115.0 }, // $ flat
-  gasPipe: { dbName: 'Gas Pipe - BBQ', fallback: 3.0 }, // $/LF
-  sandStucco: { dbName: 'Sand Stucco - BBQ', fallback: 0.0 }, // $/SF
-  smoothStucco: { dbName: 'Smooth Stucco - BBQ', fallback: 0.0 }, // $/SF
-  ledgerstone: { dbName: 'Ledgerstone - BBQ', fallback: 10.0 }, // $/SF
-  stackedStone: { dbName: 'Stacked Stone - BBQ', fallback: 10.0 }, // $/SF
-  tile: { dbName: 'Tile - BBQ', fallback: 6.5 }, // $/SF
-  realFlagstone: { dbName: 'Real Flagstone - BBQ', fallback: 400.0 }, // $/ton (default editable)
-  realStone: { dbName: 'Real Stone - BBQ', fallback: 400.0 }, // $/ton (default editable)
+  bbqBlock: { dbName: 'BBQ Block' }, // $/block
+  bbqRebar: { dbName: 'BBQ Rebar' }, // $/LF
+  bbqConcrete: { dbName: 'BBQ Concrete' }, // $/CY (footing & counter)
+  bbqSubWallLF: { dbName: 'BBQ Sub Wall LF' }, // $/LF flat sub price (BBQ wall)
+  bbqSubBackLF: { dbName: 'BBQ Sub Backsplash LF' }, // $/LF flat sub price (backsplash)
+  applianceHardware: { dbName: 'BBQ Appliance Hardware' }, // $/appliance (misc hardware)
+  gficOutlet: { dbName: 'GFIC Outlet - BBQ' }, // $/outlet
+  sinkPlumbing: { dbName: 'Sink Plumbing - BBQ' }, // $ flat
+  gasPipe: { dbName: 'Gas Pipe - BBQ' }, // $/LF
+  sandStucco: { dbName: 'Sand Stucco - BBQ' }, // $/SF
+  smoothStucco: { dbName: 'Smooth Stucco - BBQ' }, // $/SF
+  ledgerstone: { dbName: 'Ledgerstone - BBQ' }, // $/SF
+  stackedStone: { dbName: 'Stacked Stone - BBQ' }, // $/SF
+  tile: { dbName: 'Tile - BBQ' }, // $/SF
+  realFlagstone: { dbName: 'Real Flagstone - BBQ' }, // $/ton (default editable)
+  realStone: { dbName: 'Real Stone - BBQ' }, // $/ton (default editable)
 
   // ── Labor productivity rates ────────────────────────────────────────────────
-  excavateLab: { dbName: 'BBQ Excavate Labor Rate', fallback: 5 }, // CF/hr
-  rebarLab: { dbName: 'BBQ Rebar Labor Rate', fallback: 18.25 }, // LF/hr (was 146 LF/day ÷ 8)
-  pourFootingLab: { dbName: 'BBQ Pour Footing Labor Rate', fallback: 4 }, // hrs/CY
-  installBlockLab: { dbName: 'BBQ Block Install Labor Rate', fallback: 7.5 }, // blocks/hr (was 60 blk/day ÷ 8)
-  fillBlockLab: { dbName: 'BBQ Fill Block Labor Rate', fallback: 18.25 }, // blocks/hr (was 146 blk/day ÷ 8; ×80/75 factor in calc)
-  counterFormLab: { dbName: 'BBQ Counter Form Labor Rate', fallback: 20 }, // LF of form/hr (×2 LF/SF in calc)
-  counterPourLab: { dbName: 'BBQ Counter Pour Labor Rate', fallback: 6.25 }, // SF/hr (was 50 SF/day ÷ 8)
-  counterBroomLab: { dbName: 'BBQ Counter Broom Labor Rate', fallback: 7.5 }, // SF/hr (was 60 SF/day ÷ 8)
-  counterPolishLab: { dbName: 'BBQ Counter Polish Labor Rate', fallback: 2.25 }, // SF/hr (was 18 SF/day ÷ 8)
-  counterTrowelLab: { dbName: 'BBQ Counter Trowel Labor Rate', fallback: 5.625 }, // SF/hr (45 SF/day ÷ 8)
-  applianceLab: { dbName: 'BBQ Appliance Labor Rate', fallback: 2.75 }, // appliances/day (legacy)
-  applianceInstallHrs: { dbName: 'BBQ Appliance Install Hrs', fallback: 2.9 }, // hrs per appliance (install labor coefficient)
-  gficLab: { dbName: 'BBQ GFIC Labor Rate', fallback: 2 }, // hrs/unit
-  sinkLab: { dbName: 'BBQ Sink Labor Rate', fallback: 4 }, // hrs flat
-  gasTrenchLab: { dbName: 'BBQ Gas Trench Labor Rate', fallback: 35 }, // LF/day
-  sandStuccoLab: { dbName: 'Sand Stucco - BBQ Labor Rate', fallback: 92 }, // SF/day
-  smoothStuccoLab: { dbName: 'Smooth Stucco - BBQ Labor Rate', fallback: 65 }, // SF/day
-  ledgerstoneLab: { dbName: 'Ledgerstone - BBQ Labor Rate', fallback: 24 }, // SF/day
-  stackedStoneLab: { dbName: 'Stacked Stone - BBQ Labor Rate', fallback: 24 }, // SF/day
-  tileLab: { dbName: 'Tile - BBQ Labor Rate', fallback: 0.2867 }, // hrs/SF (layout+install combined)
-  flagstoneLab: { dbName: 'Real Flagstone - BBQ Labor Rate', fallback: 0.4487 }, // hrs/SF (delivery+install+seal)
-  realStoneLab: { dbName: 'Real Stone - BBQ Labor Rate', fallback: 0.8954 }, // hrs/SF (transport+install+seal)
+  excavateLab: { dbName: 'BBQ Excavate Labor Rate' }, // CF/hr
+  rebarLab: { dbName: 'BBQ Rebar Labor Rate' }, // LF/hr (was 146 LF/day ÷ 8)
+  pourFootingLab: { dbName: 'BBQ Pour Footing Labor Rate' }, // hrs/CY
+  installBlockLab: { dbName: 'BBQ Block Install Labor Rate' }, // blocks/hr (was 60 blk/day ÷ 8)
+  fillBlockLab: { dbName: 'BBQ Fill Block Labor Rate' }, // blocks/hr (was 146 blk/day ÷ 8; ×80/75 factor in calc)
+  counterFormLab: { dbName: 'BBQ Counter Form Labor Rate' }, // LF of form/hr (×2 LF/SF in calc)
+  counterPourLab: { dbName: 'BBQ Counter Pour Labor Rate' }, // SF/hr (was 50 SF/day ÷ 8)
+  counterBroomLab: { dbName: 'BBQ Counter Broom Labor Rate' }, // SF/hr (was 60 SF/day ÷ 8)
+  counterPolishLab: { dbName: 'BBQ Counter Polish Labor Rate' }, // SF/hr (was 18 SF/day ÷ 8)
+  counterTrowelLab: { dbName: 'BBQ Counter Trowel Labor Rate' }, // SF/hr (45 SF/day ÷ 8)
+  applianceLab: { dbName: 'BBQ Appliance Labor Rate' }, // appliances/day (legacy)
+  applianceInstallHrs: { dbName: 'BBQ Appliance Install Hrs' }, // hrs per appliance (install labor coefficient)
+  gficLab: { dbName: 'BBQ GFIC Labor Rate' }, // hrs/unit
+  sinkLab: { dbName: 'BBQ Sink Labor Rate' }, // hrs flat
+  gasTrenchLab: { dbName: 'BBQ Gas Trench Labor Rate' }, // LF/day
+  sandStuccoLab: { dbName: 'Sand Stucco - BBQ Labor Rate' }, // SF/day
+  smoothStuccoLab: { dbName: 'Smooth Stucco - BBQ Labor Rate' }, // SF/day
+  ledgerstoneLab: { dbName: 'Ledgerstone - BBQ Labor Rate' }, // SF/day
+  stackedStoneLab: { dbName: 'Stacked Stone - BBQ Labor Rate' }, // SF/day
+  tileLab: { dbName: 'Tile - BBQ Labor Rate' }, // hrs/SF (layout+install combined)
+  flagstoneLab: { dbName: 'Real Flagstone - BBQ Labor Rate' }, // hrs/SF (delivery+install+seal)
+  realStoneLab: { dbName: 'Real Stone - BBQ Labor Rate' }, // hrs/SF (transport+install+seal)
 }
 
 const DEFAULTS = {
@@ -258,38 +258,37 @@ function masterWallOptions(cat, builtInList, materialRows, category = null, vend
 // below are used only when the DB row is absent. A vendor overrides ONLY the
 // material price for the selected item; labor always comes from the built-in.
 const UTILITY_LINE_TYPES = {
-  'PVC Conduit with Electrical': { costPerLF: 1.92, dbName: 'PVC Conduit with Electrical', laborPerLF: 0.05, laborDbName: 'PVC Conduit with Electrical - Labor Rate' },
-  '1-1/2" Poly Gas Pipe': { costPerLF: 4.25, dbName: '1-1/2" Poly Gas Pipe', laborPerLF: 0.05, laborDbName: '1-1/2" Poly Gas Pipe - Labor Rate' },
-  '1" Black Iron Gas Pipe': { costPerLF: 2.76, dbName: '1" Black Iron Gas Pipe', laborPerLF: 0.15, laborDbName: '1" Black Iron Gas Pipe - Labor Rate' },
-  '1-1/2" Black Iron Gas Pipe': { costPerLF: 4.23, dbName: '1-1/2" Black Iron Gas Pipe', laborPerLF: 0.2, laborDbName: '1-1/2" Black Iron Gas Pipe - Labor Rate' },
-  '2" Black Iron Gas Pipe': { costPerLF: 5.72, dbName: '2" Black Iron Gas Pipe', laborPerLF: 0.25, laborDbName: '2" Black Iron Gas Pipe - Labor Rate' },
+  'PVC Conduit with Electrical': { dbName: 'PVC Conduit with Electrical', laborDbName: 'PVC Conduit with Electrical - Labor Rate' },
+  '1-1/2" Poly Gas Pipe': { dbName: '1-1/2" Poly Gas Pipe', laborDbName: '1-1/2" Poly Gas Pipe - Labor Rate' },
+  '1" Black Iron Gas Pipe': { dbName: '1" Black Iron Gas Pipe', laborDbName: '1" Black Iron Gas Pipe - Labor Rate' },
+  '1-1/2" Black Iron Gas Pipe': { dbName: '1-1/2" Black Iron Gas Pipe', laborDbName: '1-1/2" Black Iron Gas Pipe - Labor Rate' },
+  '2" Black Iron Gas Pipe': { dbName: '2" Black Iron Gas Pipe', laborDbName: '2" Black Iron Gas Pipe - Labor Rate' },
 }
 const GAS_FIXTURE_TYPES = {
-  '12" Single Gas Ring': { cost: 61.75, dbName: '12" Single Gas Ring', laborHrs: 2, laborDbName: '12" Single Gas Ring - Labor Rate' },
-  '18" Single Gas Ring': { cost: 84.75, dbName: '18" Single Gas Ring', laborHrs: 2, laborDbName: '18" Single Gas Ring - Labor Rate' },
-  '24" Single Gas Ring': { cost: 107.75, dbName: '24" Single Gas Ring', laborHrs: 2, laborDbName: '24" Single Gas Ring - Labor Rate' },
-  '24" Double Gas Ring': { cost: 163.25, dbName: '24" Double Gas Ring', laborHrs: 2, laborDbName: '24" Double Gas Ring - Labor Rate' },
-  "2' Straight Gas Bar": { cost: 35.5, dbName: "2' Straight Gas Bar", laborHrs: 2, laborDbName: "2' Straight Gas Bar - Labor Rate" },
-  "3' Straight Gas Bar": { cost: 56.0, dbName: "3' Straight Gas Bar", laborHrs: 2.5, laborDbName: "3' Straight Gas Bar - Labor Rate" },
-  "4' Straight Gas Bar": { cost: 68.5, dbName: "4' Straight Gas Bar", laborHrs: 3, laborDbName: "4' Straight Gas Bar - Labor Rate" },
-  'Gas Shut-Off Valve': { cost: 89.7, dbName: 'Gas Shut-Off Valve', laborHrs: 2, laborDbName: 'Gas Shut-Off Valve - Labor Rate' },
+  '12" Single Gas Ring': { dbName: '12" Single Gas Ring', laborDbName: '12" Single Gas Ring - Labor Rate' },
+  '18" Single Gas Ring': { dbName: '18" Single Gas Ring', laborDbName: '18" Single Gas Ring - Labor Rate' },
+  '24" Single Gas Ring': { dbName: '24" Single Gas Ring', laborDbName: '24" Single Gas Ring - Labor Rate' },
+  '24" Double Gas Ring': { dbName: '24" Double Gas Ring', laborDbName: '24" Double Gas Ring - Labor Rate' },
+  "2' Straight Gas Bar": { dbName: "2' Straight Gas Bar", laborDbName: "2' Straight Gas Bar - Labor Rate" },
+  "3' Straight Gas Bar": { dbName: "3' Straight Gas Bar", laborDbName: "3' Straight Gas Bar - Labor Rate" },
+  "4' Straight Gas Bar": { dbName: "4' Straight Gas Bar", laborDbName: "4' Straight Gas Bar - Labor Rate" },
+  'Gas Shut-Off Valve': { dbName: 'Gas Shut-Off Valve', laborDbName: 'Gas Shut-Off Valve - Labor Rate' },
 }
 const ELECTRICAL_FIXTURE_TYPES = {
-  'Electric Sub-panel': { cost: 300, dbName: 'Electric Sub-panel', laborHrs: 4.5, laborDbName: 'Electric Sub-panel - Labor Rate' },
-  'Electric Disconnect': { cost: 150, dbName: 'Electric Disconnect', laborHrs: 2.5, laborDbName: 'Electric Disconnect - Labor Rate' },
-  'GFCI Protected Receptacles': { cost: 86.25, dbName: 'GFCI Protected Receptacles', laborHrs: 2, laborDbName: 'GFCI Protected Receptacles - Labor Rate' },
-  'Bubble Covers for Receptacles': { cost: 19.19, dbName: 'Bubble Covers for Receptacles', laborHrs: 0.25, laborDbName: 'Bubble Covers for Receptacles - Labor Rate' },
-  'Infratech W2024SS 2000W 240V Heater (Stainless)': { cost: 725.22, dbName: 'Infratech W2024SS 2000W 240V Heater (Stainless)', laborHrs: 6, laborDbName: 'Infratech W2024SS 2000W 240V Heater (Stainless) - Labor Rate' },
-  'Infratech W39 Flush Mount Frame': { cost: 572.26, dbName: 'Infratech W39 Flush Mount Frame', laborHrs: 2, laborDbName: 'Infratech W39 Flush Mount Frame - Labor Rate' },
-  'Infratech Single Duplex Switch in Surface Mount Gang Box': { cost: 206.11, dbName: 'Infratech Single Duplex Switch in Surface Mount Gang Box', laborHrs: 2, laborDbName: 'Infratech Single Duplex Switch in Surface Mount Gang Box - Labor Rate' },
+  'Electric Sub-panel': { dbName: 'Electric Sub-panel', laborDbName: 'Electric Sub-panel - Labor Rate' },
+  'Electric Disconnect': { dbName: 'Electric Disconnect', laborDbName: 'Electric Disconnect - Labor Rate' },
+  'GFCI Protected Receptacles': { dbName: 'GFCI Protected Receptacles', laborDbName: 'GFCI Protected Receptacles - Labor Rate' },
+  'Bubble Covers for Receptacles': { dbName: 'Bubble Covers for Receptacles', laborDbName: 'Bubble Covers for Receptacles - Labor Rate' },
+  'Infratech W2024SS 2000W 240V Heater (Stainless)': { dbName: 'Infratech W2024SS 2000W 240V Heater (Stainless)', laborDbName: 'Infratech W2024SS 2000W 240V Heater (Stainless) - Labor Rate' },
+  'Infratech W39 Flush Mount Frame': { dbName: 'Infratech W39 Flush Mount Frame', laborDbName: 'Infratech W39 Flush Mount Frame - Labor Rate' },
+  'Infratech Single Duplex Switch in Surface Mount Gang Box': { dbName: 'Infratech Single Duplex Switch in Surface Mount Gang Box', laborDbName: 'Infratech Single Duplex Switch in Surface Mount Gang Box - Labor Rate' },
 }
-const LINE_TYPE_ARR = Object.entries(UTILITY_LINE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, fallback: t.costPerLF, laborDbName: t.laborDbName, laborFallback: t.laborPerLF }))
-const GAS_TYPE_ARR = Object.entries(GAS_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, fallback: t.cost, laborDbName: t.laborDbName, laborFallback: t.laborHrs }))
-const ELEC_TYPE_ARR = Object.entries(ELECTRICAL_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, fallback: t.cost, laborDbName: t.laborDbName, laborFallback: t.laborHrs }))
+const LINE_TYPE_ARR = Object.entries(UTILITY_LINE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, laborDbName: t.laborDbName }))
+const GAS_TYPE_ARR = Object.entries(GAS_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, laborDbName: t.laborDbName }))
+const ELEC_TYPE_ARR = Object.entries(ELECTRICAL_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, laborDbName: t.laborDbName }))
 const UTIL_CAT = { line: 'Utility Lines', gas: 'Gas Fixtures', elec: 'Electrical Fixtures' }
 // Trenching for utility lines (machine trench, min/cf; from the Utilities schedule).
 const OK_TRENCH_RATE_NAME = 'Utilities Trench Excavation'
-const OK_TRENCH_FALLBACK_MIN_PER_CF = 10
 // Vendor-first Type list: Standard/unset → null-vendor Items merged with built-ins;
 // a real vendor → ONLY that vendor's Items (built-ins fall away).
 function mergedUtilTypes(cat, builtInArr, materialRows, vendorSel = 'Standard') {
@@ -316,7 +315,7 @@ function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
   const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : 'Standard'
   const merged = mergedUtilTypes(cat, houseArr, materialRows, vsel)
   const builtIn = merged.find(o => o.label === row.type) || merged[0]
-  const laborVal = mp[builtIn?.laborDbName] ?? builtIn?.laborFallback ?? 0
+  const laborVal = n(mp[builtIn?.laborDbName])
   let matDbName = builtIn?.dbName
   let matFallback = builtIn?.fallback ?? 0
   const vrow = catalogItemFor(materialRows, cat, vsel, builtIn?.label, {
@@ -502,7 +501,7 @@ function calcOutdoorKitchen(
   // a 6" wide × 24" deep trench (per LF) using the Utilities trench excavation
   // rate (min/cf). 6"×24" = 1.0 cf per LF.
   const TRENCH_CF_PER_LF = (6 / 12) * (24 / 12) // = 1.0
-  const trenchMinsPerCF = mp[OK_TRENCH_RATE_NAME] ?? OK_TRENCH_FALLBACK_MIN_PER_CF
+  const trenchMinsPerCF = n(mp[OK_TRENCH_RATE_NAME])
   let epHrs = 0
   let epMat = 0
   ;(epLineRows || []).forEach(r => {
@@ -526,7 +525,7 @@ function calcOutdoorKitchen(
     })
   })
 
-  const p = (dbName, fallback) => mp[dbName] ?? fallback
+  const p = dbName => n(mp[dbName])
   // Wall finish per-row calc: material (vendor-overridable unit) + labor by type.
   const finishRowCalc = row => {
     const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, 'Outdoor Kitchen')
@@ -1017,7 +1016,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
         }
       : calcRaw
 
-  const p = (dbName, fallback) => materialPrices[dbName] ?? fallback
+  const p = dbName => n(materialPrices[dbName])
 
   function updateManual(i, field, val) {
     setManualRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))

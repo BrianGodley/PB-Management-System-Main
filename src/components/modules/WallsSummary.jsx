@@ -17,28 +17,28 @@ const fmt = v =>
 
 // Rate metadata mirrored from WallsModule (finish + cap + wp material/labor).
 const WALL_RATES = {
-  concreteTruck: { db: 'Concrete - Ready Mix (Truck)', fb: 185.0 }, // shared Basic Materials
-  sandStucco: { db: 'Sand Stucco - Wall', fb: 0.0 },
-  smoothStucco: { db: 'Smooth Stucco - Wall', fb: 0.0 },
-  ledgerstone: { db: 'Ledgerstone - Wall', fb: 10.0 },
-  stackedStone: { db: 'Stacked Stone - Wall', fb: 10.0 },
-  tile: { db: 'Tile - Wall', fb: 6.5 },
-  flagstone: { db: 'Real Flagstone - Wall', fb: 400.0 },
-  realStone: { db: 'Real Stone - Wall', fb: 400.0 },
-  sandStuccoLab: { db: 'Sand Stucco - Wall Labor Rate', fb: 92 },
-  smoothStuccoLab: { db: 'Smooth Stucco - Wall Labor Rate', fb: 65 },
-  ledgerstoneLab: { db: 'Ledgerstone - Wall Labor Rate', fb: 24 },
-  stackedStoneLab: { db: 'Stacked Stone - Wall Labor Rate', fb: 24 },
-  tileLab: { db: 'Tile - Wall Labor Rate', fb: 0.2867 },
-  flagstoneLab: { db: 'Real Flagstone - Wall Labor Rate', fb: 0.4487 },
-  realStoneLab: { db: 'Real Stone - Wall Labor Rate', fb: 0.8954 },
-  capFlagstone: { db: 'Wall Cap Flagstone', fb: 500.0 },
-  capPrecast: { db: 'Wall Cap Precast', fb: 50.0 },
-  capBullnose: { db: 'Wall Cap Bullnose Brick', fb: 5.0 },
-  wpPrimerMembrane: { db: 'Wall WP Primer Membrane', fb: 1.8 },
-  wp3CoatRollOn: { db: 'Wall WP 3 Coat Roll On', fb: 1.2 },
-  wpThoroseal: { db: 'Wall WP Thoroseal Roll On', fb: 1.5 },
-  wpDimpleMembrane: { db: 'Wall WP Dimple Membrane', fb: 2.1 },
+  concreteTruck: { db: 'Concrete - Ready Mix (Truck)' }, // shared Basic Materials
+  sandStucco: { db: 'Sand Stucco - Wall' },
+  smoothStucco: { db: 'Smooth Stucco - Wall' },
+  ledgerstone: { db: 'Ledgerstone - Wall' },
+  stackedStone: { db: 'Stacked Stone - Wall' },
+  tile: { db: 'Tile - Wall' },
+  flagstone: { db: 'Real Flagstone - Wall' },
+  realStone: { db: 'Real Stone - Wall' },
+  sandStuccoLab: { db: 'Sand Stucco - Wall Labor Rate' },
+  smoothStuccoLab: { db: 'Smooth Stucco - Wall Labor Rate' },
+  ledgerstoneLab: { db: 'Ledgerstone - Wall Labor Rate' },
+  stackedStoneLab: { db: 'Stacked Stone - Wall Labor Rate' },
+  tileLab: { db: 'Tile - Wall Labor Rate' },
+  flagstoneLab: { db: 'Real Flagstone - Wall Labor Rate' },
+  realStoneLab: { db: 'Real Stone - Wall Labor Rate' },
+  capFlagstone: { db: 'Wall Cap Flagstone' },
+  capPrecast: { db: 'Wall Cap Precast' },
+  capBullnose: { db: 'Wall Cap Bullnose Brick' },
+  wpPrimerMembrane: { db: 'Wall WP Primer Membrane' },
+  wp3CoatRollOn: { db: 'Wall WP 3 Coat Roll On' },
+  wpThoroseal: { db: 'Wall WP Thoroseal Roll On' },
+  wpDimpleMembrane: { db: 'Wall WP Dimple Membrane' },
 }
 const WP_KEY = {
   'Primer & Membrane': 'wpPrimerMembrane',
@@ -52,8 +52,8 @@ const wallMatPrice = resolveMaterialPrice
 function computeWallFinishRow(row, mp, materialRows) {
   const sf = n(row.sf)
   const v = row.vendor
-  const price = k => wallMatPrice(WALL_RATES[k].db, v, materialRows, mp, WALL_RATES[k].fb)
-  const lab = k => mp?.[WALL_RATES[k].db] ?? WALL_RATES[k].fb
+  const price = k => wallMatPrice(WALL_RATES[k].db, v, materialRows, mp)
+  const lab = k => n(mp?.[WALL_RATES[k].db])
   const ovr = (input, k) => {
     const x = parseFloat(input)
     return Number.isFinite(x) && x > 0 ? x : price(k)
@@ -123,7 +123,7 @@ function computeCapRow(row, mp, materialRows) {
     widthIn = n(row.widthIn),
     qty = n(row.qty)
   const v = row.vendor
-  const price = k => wallMatPrice(WALL_RATES[k].db, v, materialRows, mp, WALL_RATES[k].fb)
+  const price = k => wallMatPrice(WALL_RATES[k].db, v, materialRows, mp)
   let mat = 0,
     hrs = 0,
     subUnit = 0,
@@ -173,7 +173,7 @@ function computeWpRow(row, mp, materialRows) {
     hrs = 0,
     subUnit = 0
   if (sf > 0 && k) {
-    const pr = wallMatPrice(WALL_RATES[k].db, row.vendor, materialRows, mp, WALL_RATES[k].fb)
+    const pr = wallMatPrice(WALL_RATES[k].db, row.vendor, materialRows, mp)
     mat = sf * pr
     hrs = sf / 200
     subUnit = pr

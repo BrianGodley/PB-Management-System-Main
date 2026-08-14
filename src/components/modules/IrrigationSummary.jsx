@@ -12,70 +12,28 @@ import FinancialSummaryList from './FinancialSummaryList'
 import { resolveMaterialPrice } from '../../lib/materialCatalog'
 
 const ZONE_TYPES = [
-  {
-    key: 'planterSpray',
-    label: 'Planter Spray Heads',
-    defaultMode: 'Hand',
-    matKey: 'Irrigation Zone - Planter Spray',
-    matFallback: 345,
-  },
-  {
-    key: 'lawn',
-    label: 'Lawn Zone (≤ 1,000 Sq Ft)',
-    defaultMode: 'Trench',
-    matKey: 'Irrigation Zone - Lawn',
-    matFallback: 345,
-  },
-  {
-    key: 'hillside',
-    label: 'Hillside Zone (≤ 6 big heads)',
-    defaultMode: 'Hand',
-    matKey: 'Irrigation Zone - Hillside',
-    matFallback: 345,
-  },
-  {
-    key: 'dripPlant',
-    label: 'Drip per Plant (≤ 50 emitters)',
-    defaultMode: 'Trench',
-    matKey: 'Irrigation Zone - Drip per Plant',
-    matFallback: 230,
-  },
-  {
-    key: 'dripline',
-    label: 'Planter Dripline (≤ 700 Sq Ft)',
-    defaultMode: 'Trench',
-    matKey: 'Irrigation Zone - Planter Dripline',
-    matFallback: 345,
-  },
+  { key: 'planterSpray', label: 'Planter Spray Heads', defaultMode: 'Hand', matKey: 'Irrigation Zone - Planter Spray' },
+  { key: 'lawn', label: 'Lawn Zone (≤ 1,000 Sq Ft)', defaultMode: 'Trench', matKey: 'Irrigation Zone - Lawn' },
+  { key: 'hillside', label: 'Hillside Zone (≤ 6 big heads)', defaultMode: 'Hand', matKey: 'Irrigation Zone - Hillside' },
+  { key: 'dripPlant', label: 'Drip per Plant (≤ 50 emitters)', defaultMode: 'Trench', matKey: 'Irrigation Zone - Drip per Plant' },
+  { key: 'dripline', label: 'Planter Dripline (≤ 700 Sq Ft)', defaultMode: 'Trench', matKey: 'Irrigation Zone - Planter Dripline' },
 ]
 
 const TIMER_TYPES = [
-  { key: 'timer4', label: '4 Station', matKey: 'Irrigation Timer - 4 Station', matFallback: 69.0 },
-  { key: 'timer6', label: '6 Station', matKey: 'Irrigation Timer - 6 Station', matFallback: 138.0 },
-  { key: 'timer9', label: '9 Station', matKey: 'Irrigation Timer - 9 Station', matFallback: 184.0 },
-  { key: 'timer12', label: '12 Station', matKey: 'Irrigation Timer - 12 Station', matFallback: 270.25 },
-  { key: 'timer15', label: '15 Station', matKey: 'Irrigation Timer - 15 Station', matFallback: 322.0 },
-  { key: 'timer18', label: '18 Station', matKey: 'Irrigation Timer - 18 Station', matFallback: 402.5 },
-  {
-    key: 'timerICC8',
-    label: 'Hunter ICC 8 Station',
-    matKey: 'Irrigation Timer - Hunter ICC 8 Station',
-    matFallback: 345.0,
-  },
-  {
-    key: 'timerAdd8',
-    label: 'Additional 8 Station Module',
-    matKey: 'Irrigation Timer - Additional 8 Station Module',
-    matFallback: 115.0,
-  },
+  { key: 'timer4', label: '4 Station', matKey: 'Irrigation Timer - 4 Station' },
+  { key: 'timer6', label: '6 Station', matKey: 'Irrigation Timer - 6 Station' },
+  { key: 'timer9', label: '9 Station', matKey: 'Irrigation Timer - 9 Station' },
+  { key: 'timer12', label: '12 Station', matKey: 'Irrigation Timer - 12 Station' },
+  { key: 'timer15', label: '15 Station', matKey: 'Irrigation Timer - 15 Station' },
+  { key: 'timer18', label: '18 Station', matKey: 'Irrigation Timer - 18 Station' },
+  { key: 'timerICC8', label: 'Hunter ICC 8 Station', matKey: 'Irrigation Timer - Hunter ICC 8 Station' },
+  { key: 'timerAdd8', label: 'Additional 8 Station Module', matKey: 'Irrigation Timer - Additional 8 Station Module' },
 ]
 
 const ZONE_BY_KEY = Object.fromEntries(ZONE_TYPES.map(z => [z.key, z]))
 const TIMER_BY_KEY = Object.fromEntries(TIMER_TYPES.map(t => [t.key, t]))
 const zoneMeta = key => ZONE_BY_KEY[key] || ZONE_TYPES[0]
 const timerMeta = key => TIMER_BY_KEY[key] || TIMER_TYPES[0]
-
-const RATE_DEFAULTS = { handRate: 16, trenchRate: 12.5, timerHrs: 0.5, salesTax: 0.095 }
 
 const n = v => parseFloat(v) || 0
 
@@ -127,9 +85,9 @@ export default function IrrigationSummary({ module }) {
   const vendorNames = data.vendorNames || {}
   const savedCalc = data.calc || {}
 
-  const handRate = lr['Irrigation - Hand Zone'] ?? RATE_DEFAULTS.handRate
-  const trenchRate = lr['Irrigation - Trench Zone'] ?? RATE_DEFAULTS.trenchRate
-  const timerHrs = lr['Irrigation - Timer Install'] ?? RATE_DEFAULTS.timerHrs
+  const handRate = n(lr['Irrigation - Hand Zone'])
+  const trenchRate = n(lr['Irrigation - Trench Zone'])
+  const timerHrs = n(lr['Irrigation - Timer Install'])
 
   const zoneRows = tab.zoneRows || legacyZoneRows(tab)
   const timerRows = tab.timerRows || legacyTimerRows(tab)
@@ -149,7 +107,7 @@ export default function IrrigationSummary({ module }) {
       const mode = r.mode || z.defaultMode
       const rate = mode === 'Hand' ? handRate : trenchRate
       const hrs = qty > 0 ? qty * rate : 0
-      const unitPrice = irrMatPrice(z.matKey, r.vendor, materialRows, mp, z.matFallback)
+      const unitPrice = irrMatPrice(z.matKey, r.vendor, materialRows, mp)
       const subEach = r.subEach !== '' && r.subEach != null ? n(r.subEach) : unitPrice
       const material = isSub ? qty * subEach : qty * unitPrice
       return {
@@ -167,7 +125,7 @@ export default function IrrigationSummary({ module }) {
       const t = timerMeta(r.type)
       const qty = n(r.qty)
       const hrs = qty * timerHrs
-      const unitPrice = irrMatPrice(t.matKey, r.vendor, materialRows, mp, t.matFallback)
+      const unitPrice = irrMatPrice(t.matKey, r.vendor, materialRows, mp)
       const subEach = r.subEach !== '' && r.subEach != null ? n(r.subEach) : unitPrice
       const material = isSub ? qty * subEach : qty * unitPrice
       return {

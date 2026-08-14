@@ -28,17 +28,10 @@ import ModuleHeaderSlot from './ModuleHeaderSlot'
 const n = v => parseFloat(v) || 0
 const R = { laborRatePerHour: 35, laborBurdenPct: 0.29, gpmd: 425, commissionRate: 0.12 }
 
-// In-House labor / material coefficients. These are FALLBACKS ONLY — the
-// operative values come from the price list: labor_rates for the hour
-// coefficients and material_rates for the per-1,000-SF material cost
-// (all category 'Weed Abatement'). The fallback is used solely when the DB
-// row is absent.
-const WEED_RATE_FB = {
-  travelHrsPerVisit: 2, // labor_rates 'Weed Abatement - Travel hr/visit'
-  flatHrsPer1k: 0.5, // labor_rates 'Weed Abatement - Flat hr/1k SF'
-  hillHrsPer1k: 1.0, // labor_rates 'Weed Abatement - Hillside hr/1k SF'
-  materialPer1k: 2, // material_rates 'Weed Abatement - Material $/1k SF'
-}
+// In-House labor / material coefficient names. Every value is read live from the
+// price list — labor_rates for the hour coefficients and misc_rates for the
+// per-1,000-SF material cost (all category 'Weed Abatement'). No hardcoded
+// fallbacks: a missing DB row contributes 0.
 const WEED_RATE_NAMES = {
   travelHrsPerVisit: 'Weed Abatement - Travel hr/visit',
   flatHrsPer1k: 'Weed Abatement - Flat hr/1k SF',
@@ -73,13 +66,13 @@ function calcWeed(
   const hillSF = mode === 'flat' ? 0 : n(state.hillSF)
   const subMarkup = n(state.subGpMarkupRate) || 0.2
 
-  // Price-list coefficients (labor hrs + material $/1k SF). state.rates carries
-  // the DB values; each falls back to WEED_RATE_FB only when the row is missing.
+  // Price-list coefficients (labor hrs + material $/1k SF), read live from
+  // state.rates (the DB values). A missing row contributes 0 — no fallback.
   const rt = state.rates || {}
-  const travelPerVisit = rt.travelHrsPerVisit != null ? n(rt.travelHrsPerVisit) : WEED_RATE_FB.travelHrsPerVisit
-  const flatPer1k = rt.flatHrsPer1k != null ? n(rt.flatHrsPer1k) : WEED_RATE_FB.flatHrsPer1k
-  const hillPer1k = rt.hillHrsPer1k != null ? n(rt.hillHrsPer1k) : WEED_RATE_FB.hillHrsPer1k
-  const materialPer1k = rt.materialPer1k != null ? n(rt.materialPer1k) : WEED_RATE_FB.materialPer1k
+  const travelPerVisit = n(rt.travelHrsPerVisit)
+  const flatPer1k = n(rt.flatHrsPer1k)
+  const hillPer1k = n(rt.hillHrsPer1k)
+  const materialPer1k = n(rt.materialPer1k)
 
   if (isSub) {
     // Sub tab: STRICT price per square foot — no labor hours. subCost is purely
@@ -231,7 +224,7 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
   }
 
   // Effective In-House coefficients for display + popover current values.
-  const effRate = k => (rateMap[k] != null ? rateMap[k] : WEED_RATE_FB[k])
+  const effRate = k => n(rateMap[k])
   const fmt = v => `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
   const lbl = 'block text-sm font-medium text-gray-700 mb-1'

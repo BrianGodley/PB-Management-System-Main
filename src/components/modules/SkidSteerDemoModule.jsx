@@ -39,45 +39,13 @@ const DEMO_TYPES = ['In-House', 'Subcontractor']
 // Default rates — DB values (lr[]) take precedence at calc time
 const STUB_HEIGHT_MODS = { '0-1': 0.75, '1-2': 1, '2-3': 1.5, '3-4': 2, '4-5': 2.5 }
 
-const RATE_DEFAULTS = {
-  concrete: 2.0, // 'Demo - Skid Steer Concrete/Dirt'
-  grass: 2.1, // 'Demo - Skid Steer Grass'
-  importBase: 10.0, // 'Demo - Skid Steer Import Base'
-  jj: 1.75, // 'Demo - Skid JJ Compaction'
-  ssCompact: 7.0, // 'Demo - Skid SS Compaction'
-  rebarMin: 0.05, // 'Demo - Skid Rebar'  (min/SF)
-  shrub: 0.75, // 'Demo - Skid Shrub'
-  stumpFst: 2.5, // 'Demo - Skid Stump 1st'
-  stumpAdd: 0.75, // 'Demo - Skid Stump Additional'
-  treeSmall: 0.1, // 'Demo - Skid Tree Small'
-  treeMed: 0.15, // 'Demo - Skid Tree Medium'
-  treeLarge: 0.2, // 'Demo - Skid Tree Large'
-}
 
 // Sub Haul (Dump Type = Subcontractor, Demo Type = In-House)
 // Labor unchanged; dump fees replaced by per-1.5-ton sub haul charges
-const SUB_HAUL_DEFAULTS = {
-  concrete: 85, // $/1.5T — concrete, misc flat/vert, footing
-  dirt: 95, // $/1.5T — dirt/rock, grade cut
-  grass: 120, // $/1.5T — grass/sod
-}
 
 // Subcontractor Demo rates — concrete/dirt/misc/footing/gradeCut billed per ton removed
 // grass and import base remain per SF
-const SUB_RATES = {
-  concrete: 175, // $/ton  (concrete demo removal)
-  dirt: 135, // $/ton  (dirt/rock removal)
-  importBase: 1.5, // $/SF   (unchanged)
-  grass: 1.75, // $/SF   (unchanged)
-  miscFlat: 175, // $/ton  (same as concrete)
-  gradeCut: 135, // $/ton  (same as dirt)
-}
 
-const DUMP_FEE_DEFAULTS = {
-  'Demo - Skid Dump - Concrete': 36.21,
-  'Demo - Skid Dump - Dirt': 36.21,
-  'Demo - Skid Dump - Green Waste': 72.19,
-}
 
 // ── Calculation engine ────────────────────────────────────────────────────────
 
@@ -86,9 +54,6 @@ const sfToTons = (sf, depthIn) => (n(sf) / 200) * n(depthIn)
 
 // Container-based removal: SF -> CF (x depth/12) -> CY (/27) -> x swell,
 // billed at a flat rate per low-boy container (per material, rounded up).
-const CONTAINER_COST = 770
-const CONTAINER_CY = 10
-const SWELL = 1.2
 
 function calcDemo(
   state,
@@ -108,10 +73,10 @@ function calcDemo(
   // Business-tunable assumptions, surfaced as editable coefficient rows in View
   // Rates (labor_rates, category Demo). Fixed unit conversions (27 cf/cy,
   // 12 in/ft, 2000 lb/ton, 60 min/hr) stay as literal math.
-  const tonsSfInDenom = lr['Demo - Skid Tons SF-in Denominator'] ?? 200
-  const concreteWeightLbCf = lr['Demo - Skid Concrete Weight lb/cf'] ?? 150
-  const importBaseLaborMult = lr['Demo - Skid Import Base Labor Mult'] ?? 0.5
-  const treeTonnageFactor = lr['Demo - Skid Tree Tonnage Factor'] ?? 0.25
+  const tonsSfInDenom = n(lr['Demo - Skid Tons SF-in Denominator'])
+  const concreteWeightLbCf = n(lr['Demo - Skid Concrete Weight lb/cf'])
+  const importBaseLaborMult = n(lr['Demo - Skid Import Base Labor Mult'])
+  const treeTonnageFactor = n(lr['Demo - Skid Tree Tonnage Factor'])
   // Local sfToTons shadows the module helper so the tons denominator is editable.
   const sfToTons = (sf, depthIn) => (n(sf) / tonsSfInDenom) * n(depthIn)
   // Subcontractor rates: a one-off adjustment saved on THIS estimate
@@ -124,38 +89,38 @@ function calcDemo(
   const isSub = state.dumpType === 'Subcontractor' // Demo Type = Sub
   const isDumpSub = false // disposal follows the In House/Sub toggle
   const lrph = n(laborRatePerHour) || 35
-  const difficultyRatio = lr['Demo - Skid Difficulty Ratio'] ?? 1
+  const difficultyRatio = n(lr['Demo - Skid Difficulty Ratio'])
   const diff = 1 + (n(state.difficulty) / 100) * difficultyRatio
   const hrsAdj = n(state.hoursAdj)
 
   // ── Pull rates from DB (lr) with fallbacks ────────────────────────────────
-  const laborConc = lr['Demo - Skid - Concrete SF'] ?? 1
-  const laborDirt = lr['Demo - Skid - Dirt SF'] ?? 1
-  const laborGrass = lr['Demo - Skid - Grass SF'] ?? 1
+  const laborConc = n(lr['Demo - Skid - Concrete SF'])
+  const laborDirt = n(lr['Demo - Skid - Dirt SF'])
+  const laborGrass = n(lr['Demo - Skid - Grass SF'])
   // Misc Flat matches Hand Demo: square-foot labour (hr per 100sf·in)
   // plus container disposal, rather than the tons ÷ t/hr model.
-  const laborMiscFlat = lr['Demo - Skid - Misc Flat SF'] ?? 1
-  const laborMiscVert = lr['Demo - Skid - Misc Vert SF'] ?? 1
-  const laborFooting = lr['Demo - Skid - Footing SF'] ?? 1
-  const laborGradeCut = lr['Demo - Skid - Grade Cut SF'] ?? 1
-  const rateGrass = lr['Demo - Skid Steer Grass'] ?? RATE_DEFAULTS.grass
-  const laborBase = lr['Demo - Skid - Import Base SF'] ?? 1
-  const laborGradeFill = lr['Demo - Skid - Grade Fill SF'] ?? 1
-  const laborJJ = lr['Demo - Skid - JJ SF'] ?? 1
-  const laborSS = lr['Demo - Skid - SS Compact SF'] ?? 1
-  const rebarMinPerSF = lr['Demo - Skid Rebar'] ?? RATE_DEFAULTS.rebarMin
-  const shrubRate = lr['Demo - Skid Shrub'] ?? RATE_DEFAULTS.shrub
-  const stumpSmallRate = lr['Demo - Skid Stump Small'] ?? 1.25
-  const stumpMedRate = lr['Demo - Skid Stump Medium'] ?? 2.5
-  const stumpLargeRate = lr['Demo - Skid Stump Large'] ?? 3.75
-  const stumpXLRate = lr['Demo - Skid Stump XL'] ?? 5
-  const treeSmall = lr['Demo - Skid Tree Small'] ?? RATE_DEFAULTS.treeSmall
-  const treeMed = lr['Demo - Skid Tree Medium'] ?? RATE_DEFAULTS.treeMed
-  const treeLarge = lr['Demo - Skid Tree Large'] ?? RATE_DEFAULTS.treeLarge
+  const laborMiscFlat = n(lr['Demo - Skid - Misc Flat SF'])
+  const laborMiscVert = n(lr['Demo - Skid - Misc Vert SF'])
+  const laborFooting = n(lr['Demo - Skid - Footing SF'])
+  const laborGradeCut = n(lr['Demo - Skid - Grade Cut SF'])
+  const rateGrass = n(lr['Demo - Skid Steer Grass'])
+  const laborBase = n(lr['Demo - Skid - Import Base SF'])
+  const laborGradeFill = n(lr['Demo - Skid - Grade Fill SF'])
+  const laborJJ = n(lr['Demo - Skid - JJ SF'])
+  const laborSS = n(lr['Demo - Skid - SS Compact SF'])
+  const rebarMinPerSF = n(lr['Demo - Skid Rebar'])
+  const shrubRate = n(lr['Demo - Skid Shrub'])
+  const stumpSmallRate = n(lr['Demo - Skid Stump Small'])
+  const stumpMedRate = n(lr['Demo - Skid Stump Medium'])
+  const stumpLargeRate = n(lr['Demo - Skid Stump Large'])
+  const stumpXLRate = n(lr['Demo - Skid Stump XL'])
+  const treeSmall = n(lr['Demo - Skid Tree Small'])
+  const treeMed = n(lr['Demo - Skid Tree Medium'])
+  const treeLarge = n(lr['Demo - Skid Tree Large'])
 
-  const dumpConc = mp['Demo - Skid Dump - Concrete'] ?? DUMP_FEE_DEFAULTS['Demo - Skid Dump - Concrete']
-  const dumpDirt = mp['Demo - Skid Dump - Dirt'] ?? DUMP_FEE_DEFAULTS['Demo - Skid Dump - Dirt']
-  const dumpGreen = mp['Demo - Skid Dump - Green Waste'] ?? DUMP_FEE_DEFAULTS['Demo - Skid Dump - Green Waste']
+  const dumpConc = n(mp['Demo - Skid Dump - Concrete'])
+  const dumpDirt = n(mp['Demo - Skid Dump - Dirt'])
+  const dumpGreen = n(mp['Demo - Skid Dump - Green Waste'])
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   // Flat: SF × Depth → tons → hours = tons / (baseRate × access)
@@ -178,9 +143,9 @@ function calcDemo(
   }
 
   // Editable container disposal rates (Master Rates -> Materials, category Demo).
-  const containerPrice = mp['Demo - Skid Container (Low-Boy)'] ?? CONTAINER_COST
-  const containerCy = mp['Demo - Skid Container Capacity (CY)'] ?? CONTAINER_CY
-  const swellFactor = mp['Demo - Skid Removal Swell'] ?? SWELL
+  const containerPrice = n(mp['Demo - Skid Container (Low-Boy)'])
+  const containerCy = n(mp['Demo - Skid Container Capacity (CY)'])
+  const swellFactor = n(mp['Demo - Skid Removal Swell'])
   const removalYards = (sf, depthIn) => ((n(sf) * (n(depthIn) / 12)) / 27) * swellFactor
   const removalContainers = (sf, depthIn) => Math.ceil(removalYards(sf, depthIn) / containerCy)
   const containerCost = (sf, depthIn) =>
@@ -188,12 +153,12 @@ function calcDemo(
   const sfLaborHrs = (sf, depthIn, rate) => (n(sf) / 100) * n(depthIn) * rate
   const cfLaborHrs = (cf, rate) => (n(cf) * 12 / 100) * rate
   const flatCf = (sf, depthIn) => n(sf) * (n(depthIn) / 12)
-  const baseMatPer10Cy = mp['Demo - Skid Import Base $/10cy'] ?? 150
+  const baseMatPer10Cy = n(mp['Demo - Skid Import Base $/10cy'])
   const containerCostCf = cf =>
     Math.ceil(((n(cf) / 27) * swellFactor) / containerCy) * containerPrice
   // Editable hauling coefficients (Master Rates -> Labor, category Demo).
-  const haulSecPerFt = lr['Demo - Skid Steer Haul Sec/Ft'] ?? 0.25
-  const haulLoadCy = lr['Demo - Skid Steer Load (CY)'] ?? 0.75
+  const haulSecPerFt = n(lr['Demo - Skid Steer Haul Sec/Ft'])
+  const haulLoadCy = n(lr['Demo - Skid Steer Load (CY)'])
 
   // ── Demo rows ────────────────────────────────────────────────────────────
   const conc = flat(state.concSF, state.concDepth || 4, laborConc, 0)
@@ -284,12 +249,12 @@ function calcDemo(
 
   // ── Sub rates — DB values take precedence over hardcoded fallbacks ───────────
   // Concrete/dirt/misc/footing/gradeCut → $/CY  |  grass/base → $/SF
-  const srConc = sr['Demo - Skid Sub Demo - Concrete'] ?? SUB_RATES.concrete
-  const srDirt = sr['Demo - Skid Sub Demo - Dirt/Rock'] ?? SUB_RATES.dirt
-  const srBase = sr['Demo - Skid Sub Demo - Import Base'] ?? SUB_RATES.importBase
-  const srGrass = sr['Demo - Skid Sub Demo - Grass/Sod'] ?? SUB_RATES.grass
-  const srMiscFlat = sr['Demo - Skid Sub Demo - Misc Flat'] ?? SUB_RATES.miscFlat
-  const srGradeCut = sr['Demo - Skid Sub Demo - Grade Cut'] ?? SUB_RATES.gradeCut
+  const srConc = n(sr['Demo - Skid Sub Demo - Concrete'])
+  const srDirt = n(sr['Demo - Skid Sub Demo - Dirt/Rock'])
+  const srBase = n(sr['Demo - Skid Sub Demo - Import Base'])
+  const srGrass = n(sr['Demo - Skid Sub Demo - Grass/Sod'])
+  const srMiscFlat = n(sr['Demo - Skid Sub Demo - Misc Flat'])
+  const srGradeCut = n(sr['Demo - Skid Sub Demo - Grade Cut'])
 
   // ── Subcontractor cost (ton-based for concrete & dirt items) ─────────────────
   const subDumpCost = isSub
@@ -321,9 +286,9 @@ function calcDemo(
   // ── Sub Haul cost (Dump Type = Subcontractor, Demo Type = In-House) ──────────
   // Labor unchanged; dump fees zeroed; per-1.5-ton sub haul charges applied
   // DB values (subcontractor_rates category='Sub Haul') take precedence over defaults
-  const shConc = sr['Demo - Skid Sub Haul - Concrete'] ?? SUB_HAUL_DEFAULTS.concrete
-  const shDirt = sr['Demo - Skid Sub Haul - Dirt'] ?? SUB_HAUL_DEFAULTS.dirt
-  const shGrass = sr['Demo - Skid Sub Haul - Grass'] ?? SUB_HAUL_DEFAULTS.grass
+  const shConc = n(sr['Demo - Skid Sub Haul - Concrete'])
+  const shDirt = n(sr['Demo - Skid Sub Haul - Dirt'])
+  const shGrass = n(sr['Demo - Skid Sub Haul - Grass'])
   const tonsPerCharge = 1.5
   const subHaulCost = isDumpSub
     ? (conc.tons / tonsPerCharge) * shConc +
@@ -392,37 +357,37 @@ function calcDemo(
   const burden = laborCost * (n(laborBurdenPct) || 0.29)
   // GP = labor component + Universal Sub Markup % on all sub costs
   // Hauling (Subcontractor) — 12-yard loads × per-load rate (sub cost, pre-GP markup).
-  const haulTrashRate = sr['Demo - Skid Sub Haul - Trash 12yd'] ?? 850
-  const haulConcreteRate = sr['Demo - Skid Sub Haul - Concrete 12yd'] ?? 800
-  const haulSoilRate = sr['Demo - Skid Sub Haul - Soil 12yd'] ?? 650
-  const haulBaseRate = sr['Demo - Skid Sub Haul - Import Base 12yd'] ?? 350
+  const haulTrashRate = n(sr['Demo - Skid Sub Haul - Trash 12yd'])
+  const haulConcreteRate = n(sr['Demo - Skid Sub Haul - Concrete 12yd'])
+  const haulSoilRate = n(sr['Demo - Skid Sub Haul - Soil 12yd'])
+  const haulBaseRate = n(sr['Demo - Skid Sub Haul - Import Base 12yd'])
   const haulCost =
     n(state.haulTrashLoads) * haulTrashRate +
     n(state.haulConcreteLoads) * haulConcreteRate +
     n(state.haulSoilLoads) * haulSoilRate +
     n(state.haulBaseLoads) * haulBaseRate
   // Subcontractor combined demo line: SF × tiered $/sf by depth (concrete/dirt/rock/paver).
-  const skidRateDeep = sr['Sub Demo - Skid 5-7in'] ?? 2.0
-  const skidRateMid = sr['Sub Demo - Skid 2-4in'] ?? 1.75
-  const skidRateShallow = sr['Sub Demo - Skid 1-2in'] ?? 1.5
+  const skidRateDeep = n(sr['Sub Demo - Skid 5-7in'])
+  const skidRateMid = n(sr['Sub Demo - Skid 2-4in'])
+  const skidRateShallow = n(sr['Sub Demo - Skid 1-2in'])
   const skidSubRate = d => {
     const x = n(d)
     return x >= 5 ? skidRateDeep : x >= 2 ? skidRateMid : skidRateShallow
   }
   const subDemoCost = n(state.subDemoSF) * skidSubRate(state.subDemoDepth || 7)
-  const skidMiscFlatSubRate = sr['Sub Demo - Skid Misc Flat'] ?? 2.0
+  const skidMiscFlatSubRate = n(sr['Sub Demo - Skid Misc Flat'])
   const miscFlatSubCost = (state.subMiscFlatRows || [])
     .slice(0, 2)
     .reduce((sum, r) => sum + n(r.sf) * skidMiscFlatSubRate, 0)
   const skidSubDemo = subDemoCost + miscFlatSubCost
 
   // ── Subcontractor fixed unit pricing: Grading ($/sf), Stump & Tree ($/ea) ──
-  const sgCut = sr['Sub Grade - Skid Cut SF'] ?? 0
-  const sgFill = sr['Sub Grade - Skid Fill SF'] ?? 0
-  const sgJJ = sr['Sub Grade - Skid JJ SF'] ?? 0
-  const sgSheep = sr['Sub Grade - Skid Sheepsfoot SF'] ?? 0
-  const sgRoll = sr['Sub Grade - Skid Roll SF'] ?? 0
-  const sgSS = sr['Sub Grade - Skid SS Compact SF'] ?? 0
+  const sgCut = n(sr['Sub Grade - Skid Cut SF'])
+  const sgFill = n(sr['Sub Grade - Skid Fill SF'])
+  const sgJJ = n(sr['Sub Grade - Skid JJ SF'])
+  const sgSheep = n(sr['Sub Grade - Skid Sheepsfoot SF'])
+  const sgRoll = n(sr['Sub Grade - Skid Roll SF'])
+  const sgSS = n(sr['Sub Grade - Skid SS Compact SF'])
   const subGradingCost =
     n(state.subGradeCutSF) * sgCut +
     n(state.subGradeFillSF) * sgFill +
@@ -431,19 +396,19 @@ function calcDemo(
     n(state.rollCompSF) * sgRoll +
     n(state.subSsCmpSF) * sgSS
 
-  const ssSmall = sr['Sub Stump - Skid Small'] ?? 0
-  const ssMed = sr['Sub Stump - Skid Medium'] ?? 0
-  const ssLarge = sr['Sub Stump - Skid Large'] ?? 0
-  const ssXL = sr['Sub Stump - Skid XL'] ?? 0
+  const ssSmall = n(sr['Sub Stump - Skid Small'])
+  const ssMed = n(sr['Sub Stump - Skid Medium'])
+  const ssLarge = n(sr['Sub Stump - Skid Large'])
+  const ssXL = n(sr['Sub Stump - Skid XL'])
   const subStumpCost =
     n(state.stumpSmallQty) * ssSmall +
     n(state.stumpMedQty) * ssMed +
     n(state.stumpLargeQty) * ssLarge +
     n(state.stumpXLQty) * ssXL
 
-  const stSmall = sr['Sub Tree - Skid Small'] ?? 0
-  const stMed = sr['Sub Tree - Skid Medium'] ?? 0
-  const stLarge = sr['Sub Tree - Skid Large'] ?? 0
+  const stSmall = n(sr['Sub Tree - Skid Small'])
+  const stMed = n(sr['Sub Tree - Skid Medium'])
+  const stLarge = n(sr['Sub Tree - Skid Large'])
   const subTreeRateFor = size =>
     size === 'Large' || size === '18" - 24"'
       ? stLarge
@@ -908,10 +873,10 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
   const isDumpSub = false
   const isSelf = !isDemoSub && !isDumpSub
 
-  const dumpConc = materialPrices['Demo - Skid Dump - Concrete'] ?? DUMP_FEE_DEFAULTS['Demo - Skid Dump - Concrete']
-  const dumpDirt = materialPrices['Demo - Skid Dump - Dirt'] ?? DUMP_FEE_DEFAULTS['Demo - Skid Dump - Dirt']
+  const dumpConc = n(materialPrices['Demo - Skid Dump - Concrete'])
+  const dumpDirt = n(materialPrices['Demo - Skid Dump - Dirt'])
   const dumpGreen =
-    materialPrices['Demo - Skid Dump - Green Waste'] ?? DUMP_FEE_DEFAULTS['Demo - Skid Dump - Green Waste']
+    n(materialPrices['Demo - Skid Dump - Green Waste'])
 
   const td = 'py-1 pr-2 align-top'
   const num = 'py-1 pr-2 text-gray-600 tabular-nums text-xs'
@@ -997,7 +962,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           category: 'Demo',
           mode: 'currency',
           unitLabel: 'Tons',
-          value: materialPrices['Demo - Skid Dump - Concrete'] ?? DUMP_FEE_DEFAULTS['Demo - Skid Dump - Concrete'],
+          value: n(materialPrices['Demo - Skid Dump - Concrete']),
         },
         {
           label: 'Dump - Dirt',
@@ -1006,7 +971,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           category: 'Demo',
           mode: 'currency',
           unitLabel: 'Tons',
-          value: materialPrices['Demo - Skid Dump - Dirt'] ?? DUMP_FEE_DEFAULTS['Demo - Skid Dump - Dirt'],
+          value: n(materialPrices['Demo - Skid Dump - Dirt']),
         },
         {
           label: 'Dump - Green Waste',
@@ -1015,7 +980,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           category: 'Demo',
           mode: 'currency',
           unitLabel: 'Tons',
-          value: materialPrices['Demo - Skid Dump - Green Waste'] ?? DUMP_FEE_DEFAULTS['Demo - Skid Dump - Green Waste'],
+          value: n(materialPrices['Demo - Skid Dump - Green Waste']),
         },
         {
           label: 'Container (Low-Boy)',
@@ -1024,7 +989,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           category: 'Demo',
           mode: 'currency',
           unitLabel: 'container',
-          value: materialPrices['Demo - Skid Container (Low-Boy)'] ?? CONTAINER_COST,
+          value: n(materialPrices['Demo - Skid Container (Low-Boy)']),
         },
         {
           label: 'Container Capacity',
@@ -1033,7 +998,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           category: 'Demo',
           mode: 'coefficient',
           unitLabel: 'Cu Yd',
-          value: materialPrices['Demo - Skid Container Capacity (CY)'] ?? CONTAINER_CY,
+          value: n(materialPrices['Demo - Skid Container Capacity (CY)']),
         },
         {
           label: 'Removal Swell',
@@ -1042,7 +1007,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           category: 'Demo',
           mode: 'coefficient',
           unitLabel: '×',
-          value: materialPrices['Demo - Skid Removal Swell'] ?? SWELL,
+          value: n(materialPrices['Demo - Skid Removal Swell']),
         },
       ],
     },
@@ -1156,7 +1121,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           category: 'Demo',
           mode: 'currency',
           unitLabel: '10 Cu Yd',
-          value: materialPrices['Demo - Skid Import Base $/10cy'] ?? 150,
+          value: n(materialPrices['Demo - Skid Import Base $/10cy']),
         },
       ],
     },

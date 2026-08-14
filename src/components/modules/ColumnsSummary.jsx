@@ -7,81 +7,60 @@ import { ROW_CALC } from './ColumnsModule'
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Grout fill is priced at the concrete ready-mix rate (shared Basic Materials).
-const GROUT_CONCRETE = { dbName: 'Concrete - Ready Mix (Truck)', fallback: 185 }
+const GROUT_CONCRETE = { dbName: 'Concrete - Ready Mix (Truck)' }
 
 const FINISH_TYPES = {
   'Sand Stucco': {
-    costPerSF: 0,
     unit: 'SF',
     dbName: 'Sand Stucco',
     laborDbName: 'Sand Stucco - Labor Rate',
-    laborHrsPerSF: 0.05,
     subDbName: 'Sand Stucco - Sub SF',
-    subFallback: 0,
   },
   'Smooth Stucco': {
-    costPerSF: 0,
     unit: 'SF',
     dbName: 'Smooth Stucco',
     laborDbName: 'Smooth Stucco - Labor Rate',
-    laborHrsPerSF: 0.05,
     subDbName: 'Smooth Stucco - Sub SF',
-    subFallback: 0,
   },
   'Ledgerstone Veneer Panels': {
-    costPerSF: 10.0,
     unit: 'SF',
     dbName: 'Ledgerstone Veneer Panels',
     laborDbName: 'Ledgerstone Veneer Panels - Labor Rate',
-    laborHrsPerSF: 0.1,
     subDbName: 'Ledgerstone Veneer Panels - Sub SF',
-    subFallback: 0,
   },
   'Stacked Stone Veneer': {
-    costPerSF: 10.0,
     unit: 'SF',
     dbName: 'Stacked Stone Veneer',
     laborDbName: 'Stacked Stone Veneer - Labor Rate',
-    laborHrsPerSF: 0.1,
     subDbName: 'Stacked Stone Veneer - Sub SF',
-    subFallback: 0,
   },
   Tile: {
-    costPerSF: 6.5,
     unit: 'SF',
     dbName: 'Tile - Columns',
     laborDbName: 'Tile - Columns - Labor Rate',
-    laborHrsPerSF: 0.125,
     subDbName: 'Tile - Columns - Sub SF',
-    subFallback: 0,
   },
   'Real Flagstone, Flat': {
-    costPerTon: 400.0,
     unit: 'ton',
     dbName: 'Real Flagstone Flat',
     laborDbName: 'Real Flagstone Flat - Labor Rate',
-    laborHrsPer: 0.5,
     subDbName: 'Real Flagstone Flat - Sub SF',
-    subFallback: 0,
   },
   'Real Stone': {
-    costPerTon: 400.0,
     unit: 'ton',
     dbName: 'Real Stone - Columns',
     laborDbName: 'Real Stone - Columns - Labor Rate',
-    laborHrsPer: 0.5,
     subDbName: 'Real Stone - Columns - Sub SF',
-    subFallback: 0,
   },
 }
 
 const BLOCK_RATES = {
-  blockMatCost: { dbName: 'CMU Block', fallback: 2.5 },
-  rebarMatCost: { dbName: 'Rebar', fallback: 1.388 }, // shared Basic Materials rebar
-  installLaborHrs: { dbName: 'CMU Install Labor', fallback: 0.083 },
-  excavateLaborHrs: { dbName: 'Excavate Footing Labor', fallback: 0.5 },
-  pourLaborHrs: { dbName: 'Pour Footing Labor', fallback: 0.25 },
-  fillLaborHrs: { dbName: 'Fill Labor', fallback: 0.05 },
+  blockMatCost: { dbName: 'CMU Block' },
+  rebarMatCost: { dbName: 'Rebar' }, // shared Basic Materials rebar
+  installLaborHrs: { dbName: 'CMU Install Labor' },
+  excavateLaborHrs: { dbName: 'Excavate Footing Labor' },
+  pourLaborHrs: { dbName: 'Pour Footing Labor' },
+  fillLaborHrs: { dbName: 'Fill Labor' },
 }
 
 function columnGeometry(heightIn, widthIn) {
@@ -150,11 +129,10 @@ export default function ColumnsSummary({ module }) {
   const isSub = subType === 'Subcontractor'
 
   // Labor / non-vendor prices stay Standard name-keyed.
-  const price = (dbName, fallback) =>
-    materialPrices[dbName] != null ? materialPrices[dbName] : fallback
+  const price = dbName => n(materialPrices[dbName])
   // Material prices resolve through the saved Vendor selection.
-  const matPrice = (dbName, fallback, vendorId) =>
-    colMatPrice(dbName, vendorId, materialRows, materialPrices, fallback)
+  const matPrice = (dbName, _fallback, vendorId) =>
+    colMatPrice(dbName, vendorId, materialRows, materialPrices)
   const vendorLabel = v => (!v || v === 'Standard' ? 'Standard' : vendorNames[v] || 'Vendor')
 
   const fmt2 = v =>

@@ -57,7 +57,7 @@ const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
 const n = v => parseFloat(v) || 0
 // Base-rock tonnage density (SF·inch per ton). The 200 divisor is a tunable
 // estimating coefficient — callers pass the DB-editable value.
-const sfToTons = (sf, depthIn, divisor = 200) => (n(sf) / (n(divisor) || 200)) * n(depthIn)
+const sfToTons = (sf, depthIn, divisor) => (n(divisor) > 0 ? (n(sf) / n(divisor)) * n(depthIn) : 0)
 
 const BASE_METHODS = ['Skid Good', 'Skid OK', 'Mini Skid', 'Hand']
 
@@ -70,42 +70,10 @@ const BASE_METHOD_LABOR_NAME = {
   Hand: 'Paver - Base Hand',
 }
 
-// ── Fallback constants (matched to seed SQL) ──────────────────────────────────
-const LABOR_DEFAULTS = {
-  install: 20,
-  straightCut: 70,
-  curvedCut: 30,
-  restraints: 22,
-  sleeves: 10,
-  vertSoldier: 8,
-  sealer: 200,
-  add80mm: 0.15,
-  addStone: 0.05,
-  addColor: 0.05,
-  polySandSpread: 0.004, // Poly Sand New labor coefficient (hrs/SF)
-  polySandExistingSpread: 0.0075, // Poly Sand Existing labor coefficient (hrs/SF)
-  baseBobcatGood: 10,
-  baseBobcatOK: 7.5,
-  baseMiniBobcat: 5,
-  baseHand: 2.5,
-}
-
-const MAT_DEFAULTS = {
-  baseRock: 7.5,
-  beddingSand: 25.3,
-  jointSand: 0.05,
-  polySandMat: 0.56,
-  // Existing pavers cost 50% more to re-sand (extra prep, more product
-  // consumed by old joints). Default = polySandMat × 1.5.
-  polySandExistingMat: 0.84,
-  sealerMat: 0.63,
-  restraintConcr: 1.38,
-  sleevesMat: 0.46,
-  palletCharge: 51.75,
-  delivery: 442.75,
-}
-
 // ── Calculation engine ────────────────────────────────────────────────────────
+// Every rate/coefficient below is read live from the rate maps (labor_rates,
+// material catalog / misc_rates) with NO hardcoded fallback. The old values are
+// guaranteed to exist in the tables via supabase-paver-fallbacks-seed.sql.
 // ── Vendor catalog (subs_vendors + material_rates) ───────────────────────────
 const PAVER_CAT = { paver: 'Paver Material', base: 'Base Material' }
 
@@ -144,40 +112,39 @@ function calcPaver(
     parseFloat(walkAccess?.paceLfPerMin) ??
     DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
 
-  // Labor rates
-  const installRate = lr['Paver - Install'] ?? LABOR_DEFAULTS.install
-  const straightCutRate = lr['Paver - Straight Cut'] ?? LABOR_DEFAULTS.straightCut
-  const curvedCutRate = lr['Paver - Curved Cut'] ?? LABOR_DEFAULTS.curvedCut
-  const restraintRate = lr['Paver - Restraints'] ?? LABOR_DEFAULTS.restraints
-  const sleevesRate = lr['Paver - Sleeves'] ?? LABOR_DEFAULTS.sleeves
-  const vertSoldierRate = lr['Paver - Vertical Soldier'] ?? LABOR_DEFAULTS.vertSoldier
-  const sealerRate = lr['Paver - Sealer'] ?? LABOR_DEFAULTS.sealer
-  const add80mmMult = lr['Paver - 80mm Add'] ?? LABOR_DEFAULTS.add80mm
-  const addStonePer = lr['Paver - Stone Add'] ?? LABOR_DEFAULTS.addStone
-  const addColorPer = lr['Paver - Color Add'] ?? LABOR_DEFAULTS.addColor
+  // Labor rates — live from labor_rates, no hardcoded fallback.
+  const installRate = n(lr['Paver - Install'])
+  const straightCutRate = n(lr['Paver - Straight Cut'])
+  const curvedCutRate = n(lr['Paver - Curved Cut'])
+  const restraintRate = n(lr['Paver - Restraints'])
+  const sleevesRate = n(lr['Paver - Sleeves'])
+  const vertSoldierRate = n(lr['Paver - Vertical Soldier'])
+  const sealerRate = n(lr['Paver - Sealer'])
+  const add80mmMult = n(lr['Paver - 80mm Add'])
+  const addStonePer = n(lr['Paver - Stone Add'])
+  const addColorPer = n(lr['Paver - Color Add'])
   // Poly Sand labor coefficients — New and Existing are now independent rates.
-  const polySandNewSpread = lr['Paver - Poly Sand New'] ?? LABOR_DEFAULTS.polySandSpread
-  const polySandExistingSpread =
-    lr['Paver - Poly Sand Existing'] ?? LABOR_DEFAULTS.polySandExistingSpread
-  const baseBobcatGood = lr['Paver - Base Skid Steer Good'] ?? LABOR_DEFAULTS.baseBobcatGood
-  const baseBobcatOK = lr['Paver - Base Skid Steer OK'] ?? LABOR_DEFAULTS.baseBobcatOK
-  const baseMiniBobcat = lr['Paver - Base Mini Skid Steer'] ?? LABOR_DEFAULTS.baseMiniBobcat
-  const baseHand = lr['Paver - Base Hand'] ?? LABOR_DEFAULTS.baseHand
+  const polySandNewSpread = n(lr['Paver - Poly Sand New'])
+  const polySandExistingSpread = n(lr['Paver - Poly Sand Existing'])
+  const baseBobcatGood = n(lr['Paver - Base Skid Steer Good'])
+  const baseBobcatOK = n(lr['Paver - Base Skid Steer OK'])
+  const baseMiniBobcat = n(lr['Paver - Base Mini Skid Steer'])
+  const baseHand = n(lr['Paver - Base Hand'])
 
-  // Material rates
-  const baseRockPerTon = mr['Paver - Base Rock'] ?? MAT_DEFAULTS.baseRock
-  const beddingSandPerTon = mr['Bedding Sand'] ?? MAT_DEFAULTS.beddingSand // shared Basic Materials
-  const jointSandPerSF = mr['Paver - Joint Sand'] ?? MAT_DEFAULTS.jointSand
+  // Material rates — live from the catalog / misc_rates, no hardcoded fallback.
+  const baseRockPerTon = n(mr['Paver - Base Rock'])
+  const beddingSandPerTon = n(mr['Bedding Sand']) // shared Basic Materials
+  const jointSandPerSF = n(mr['Paver - Joint Sand'])
   // Single poly-sand MATERIAL rate used for BOTH New and Existing pavers.
-  const polySandPerSF = mr['Paver - Poly Sand'] ?? MAT_DEFAULTS.polySandMat
-  const sealerMatPerSF = mr['Paver - Sealer'] ?? MAT_DEFAULTS.sealerMat
-  const restraintConcrLF = mr['Paver - Restraint Concrete'] ?? MAT_DEFAULTS.restraintConcr
-  const sleevesMatLF = mr['Paver - Sleeves'] ?? MAT_DEFAULTS.sleevesMat
-  const palletCharge = mr['Paver - Pallet Charge'] ?? MAT_DEFAULTS.palletCharge
-  const deliveryFlat = mr['Paver - Delivery'] ?? MAT_DEFAULTS.delivery
+  const polySandPerSF = n(mr['Paver - Poly Sand'])
+  const sealerMatPerSF = n(mr['Paver - Sealer'])
+  const restraintConcrLF = n(mr['Paver - Restraint Concrete'])
+  const sleevesMatLF = n(mr['Paver - Sleeves'])
+  const palletCharge = n(mr['Paver - Pallet Charge'])
+  const deliveryFlat = n(mr['Paver - Delivery'])
   // Tunable estimating coefficients (DB-editable via misc_rates).
-  const tonsDivisor = mr['Paver - Tons Divisor'] ?? 200 // SF·inch per ton (base rock density)
-  const deliverySFPerIncrement = mr['Paver - Delivery SF Increment'] ?? 900 // SF per delivery charge
+  const tonsDivisor = n(mr['Paver - Tons Divisor']) // SF·inch per ton (base rock density)
+  const deliverySFPerIncrement = n(mr['Paver - Delivery SF Increment']) // SF per delivery charge
 
   const BASE_RATE_MAP = {
     'Skid Good': baseBobcatGood,
@@ -402,7 +369,8 @@ function calcPaver(
   // in material_rates as "Paver - Delivery" and represents the per-increment
   // fee, not a one-time flat charge.
   const paverSelected = matInstallSF > 0
-  const deliveryIncrements = paverSelected ? Math.ceil(matInstallSF / deliverySFPerIncrement) : 0
+  const deliveryIncrements =
+    paverSelected && deliverySFPerIncrement > 0 ? Math.ceil(matInstallSF / deliverySFPerIncrement) : 0
   const deliveryCost = deliveryIncrements * deliveryFlat
   const shipping = isSubTab ? 0 : n(state.shippingCharge)
   const salesTaxRate = n(state.salesTax) / 100
@@ -876,19 +844,19 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   // Sub install is a FIXED set of line items — each has its own SF input, $/SF
   // rate, and cost. The two surcharge lines sit at the bottom.
   const SUB_INSTALL_LINES = [
-    { key: 'handDemo', label: 'Paver with Hand Demo', name: 'Paver Sub - Hand Demo', def: 8 },
-    { key: 'bobcatDemo', label: 'Paver with Bobcat Demo', name: 'Paver Sub - Bobcat Demo', def: 7 },
-    { key: 'noDemo', label: 'Paver No Demo', name: 'Paver Sub - No Demo', def: 6.25 },
-    { key: 'noDemoBase', label: 'Paver No Demo/Base', name: 'Paver Sub - No Demo/Base', def: 5.5 },
-    { key: 'tileConcrete', label: 'Tile Paver in Concrete', name: 'Paver Sub - Tile in Concrete', def: 12 },
-    { key: 'permeable', label: 'Permeable Paver', name: 'Paver Sub - Permeable', def: 11 },
+    { key: 'handDemo', label: 'Paver with Hand Demo', name: 'Paver Sub - Hand Demo' },
+    { key: 'bobcatDemo', label: 'Paver with Bobcat Demo', name: 'Paver Sub - Bobcat Demo' },
+    { key: 'noDemo', label: 'Paver No Demo', name: 'Paver Sub - No Demo' },
+    { key: 'noDemoBase', label: 'Paver No Demo/Base', name: 'Paver Sub - No Demo/Base' },
+    { key: 'tileConcrete', label: 'Tile Paver in Concrete', name: 'Paver Sub - Tile in Concrete' },
+    { key: 'permeable', label: 'Permeable Paver', name: 'Paver Sub - Permeable' },
   ]
   const SUB_SURCHARGE_LINES = [
-    { key: 'largeFormat', label: 'Large Format Paver', name: 'Paver Sub - Large Format Add', def: 1.5 },
-    { key: 'under500', label: 'Less than 500 SF', name: 'Paver Sub - Under 500 Add', def: 1.0 },
+    { key: 'largeFormat', label: 'Large Format Paver', name: 'Paver Sub - Large Format Add' },
+    { key: 'under500', label: 'Less than 500 SF', name: 'Paver Sub - Under 500 Add' },
   ]
-  const subRateFor = ln => laborRates[ln.name] ?? ln.def
-  const sleevesSubRate = laborRates['Paver Sub - Sleeves LF'] ?? 12
+  const subRateFor = ln => n(laborRates[ln.name])
+  const sleevesSubRate = n(laborRates['Paver Sub - Sleeves LF'])
   const subInstall = state.subInstall || {}
 
   // ── Vendor catalog helpers (per-row Vendor/Type pickers) ─────────────────
@@ -1177,7 +1145,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           category: 'Paver',
           mode: 'coefficient',
           unitLabel: '× Sq Ft per install',
-          value: laborRates['Paver - 80mm Add'] ?? LABOR_DEFAULTS.add80mm,
+          value: n(laborRates['Paver - 80mm Add']),
         },
         {
           label: 'Paver - Straight Cut',
@@ -1222,7 +1190,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           category: 'Paver',
           mode: 'coefficient',
           unitLabel: 'hrs per Each',
-          value: laborRates['Paver - Stone Add'] ?? LABOR_DEFAULTS.addStone,
+          value: n(laborRates['Paver - Stone Add']),
         },
         {
           label: 'Paver - Color Add',
@@ -1231,7 +1199,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           category: 'Paver',
           mode: 'coefficient',
           unitLabel: 'hrs per Each',
-          value: laborRates['Paver - Color Add'] ?? LABOR_DEFAULTS.addColor,
+          value: n(laborRates['Paver - Color Add']),
         },
         {
           label: 'Poly Sand New',
@@ -1240,7 +1208,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           category: 'Paver',
           mode: 'coefficient',
           unitLabel: 'hrs per Sq Ft',
-          value: laborRates['Paver - Poly Sand New'] ?? LABOR_DEFAULTS.polySandSpread,
+          value: n(laborRates['Paver - Poly Sand New']),
         },
         {
           label: 'Poly Sand Existing',
@@ -1249,9 +1217,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           category: 'Paver',
           mode: 'coefficient',
           unitLabel: 'hrs per Sq Ft',
-          value:
-            laborRates['Paver - Poly Sand Existing'] ??
-            LABOR_DEFAULTS.polySandExistingSpread,
+          value: n(laborRates['Paver - Poly Sand Existing']),
         },
         {
           label: 'Paver - Sealer',
@@ -1743,7 +1709,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                 <span className="inline-flex items-center gap-1 flex-wrap">
                   Poly Sand New{' '}
                   <span className="text-gray-400 font-normal">
-                    ({laborRates['Paver - Poly Sand New'] ?? LABOR_DEFAULTS.polySandSpread}{' '}
+                    ({n(laborRates['Paver - Poly Sand New'])}{' '}
                     hrs/SF)
                   </span>
                   <span className="text-gray-400 font-normal">· ${calc.polySandPerSF} per Sq Ft mat</span>
@@ -1764,8 +1730,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                 <span className="inline-flex items-center gap-1 flex-wrap">
                   Poly Sand Existing{' '}
                   <span className="text-gray-400 font-normal">
-                    ({laborRates['Paver - Poly Sand Existing'] ??
-                      LABOR_DEFAULTS.polySandExistingSpread}{' '}
+                    ({n(laborRates['Paver - Poly Sand Existing'])}{' '}
                     hrs/SF)
                   </span>
                   <span className="text-gray-400 font-normal">
@@ -1788,7 +1753,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                 <span className="inline-flex items-center gap-1 flex-wrap">
                   80mm{' '}
                   <span className="text-gray-400 font-normal">
-                    (+{Math.round((laborRates['Paver - 80mm Add'] ?? LABOR_DEFAULTS.add80mm) * 100)}%
+                    (+{Math.round(n(laborRates['Paver - 80mm Add']) * 100)}%
                     labor)
                   </span>
                 </span>
@@ -1875,7 +1840,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                 <span className="inline-flex items-center gap-1">
                   Stones{' '}
                   <span className="text-gray-400 font-normal">
-                    ({laborRates['Paver - Stone Add'] ?? LABOR_DEFAULTS.addStone} hrs/ea)
+                    ({n(laborRates['Paver - Stone Add'])} hrs/ea)
                   </span>
                 </span>
               </td>
@@ -1894,7 +1859,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                 <span className="inline-flex items-center gap-1">
                   Colors{' '}
                   <span className="text-gray-400 font-normal">
-                    ({laborRates['Paver - Color Add'] ?? LABOR_DEFAULTS.addColor} hrs/ea)
+                    ({n(laborRates['Paver - Color Add'])} hrs/ea)
                   </span>
                 </span>
               </td>

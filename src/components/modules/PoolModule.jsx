@@ -21,17 +21,16 @@ const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
 const LABOR_BURDEN = 0.29
 const COMMISSION_RATE = 0.12
 
-// ── Tile install rates (hrs/LF) — from Master Rates labor_rates ───────────
-const TILE_INSTALL_DEFAULTS = {
-  '6" Squares': 0.356,
-  '3" Squares': 0.4,
-  '2" Squares': 0.421,
-  '1" Squares': 0.457,
-  Segmental: 0.533,
-  'Multi-Piece': 0.457,
-  'Glass Tile': 0.533,
-}
-const TILE_INSTALL_TYPES = Object.keys(TILE_INSTALL_DEFAULTS)
+// ── Tile install types — labor hrs/LF live in labor_rates as 'Tile - <type>' ─
+const TILE_INSTALL_TYPES = [
+  '6" Squares',
+  '3" Squares',
+  '2" Squares',
+  '1" Squares',
+  'Segmental',
+  'Multi-Piece',
+  'Glass Tile',
+]
 
 // ── Tile material price options ($/SF) ───────────────────────────────────────
 const TILE_MAT_OPTIONS = [
@@ -48,63 +47,44 @@ const TILE_MAT_OPTIONS = [
   '20.00',
 ]
 
-// ── Coping defaults (mat $/LF, hrs/LF) ──────────────────────────────────────
-const COPING_DEFAULTS = {
-  'Paver Bullnose': { mat: 8.5, hrs: 0.4 },
-  'Travertine 12"x12"': { mat: 13.0, hrs: 0.444 },
-  'Precast Concrete': { mat: 50.0, hrs: 0.444 },
-  'Arizona Flagstone Eased': { mat: 13.0, hrs: 0.5 },
-  'Other Flagstone': { mat: 18.0, hrs: 0.533 },
-  'Pacific Clay': { mat: 12.0, hrs: 0.41 },
-  'Pour In Place Sand Finish': { mat: 7.5, hrs: 0.727 },
-}
-const COPING_TYPES = Object.keys(COPING_DEFAULTS)
+// ── Coping types — labor ('Coping - <type>' in labor_rates) + material
+//    ('Coping Mat - <type>' in misc_rates) read live from the rate maps.
+const COPING_TYPES = [
+  'Paver Bullnose',
+  'Travertine 12"x12"',
+  'Precast Concrete',
+  'Arizona Flagstone Eased',
+  'Other Flagstone',
+  'Pacific Clay',
+  'Pour In Place Sand Finish',
+]
 
-// ── Spillway defaults (mat $/LF, hrs/LF) ─────────────────────────────────────
-const SPILLWAY_DEFAULTS = {
-  TILE: { mat: 30.0, hrs: 1.25 },
-  FLAGSTONE: { mat: 24.0, hrs: 0.5 },
-}
-const SPILLWAY_TYPES = Object.keys(SPILLWAY_DEFAULTS)
+// ── Spillway types — labor ('Spillway - <type>') + material ('Spillway <type>')
+const SPILLWAY_TYPES = ['TILE', 'FLAGSTONE']
 
-// ── Interior finish defaults ($/SF — sub cost) ───────────────────────────────
-const INTERIOR_DEFAULTS = {
-  'White Plaster': 45,
-  Quartzscapes: 87,
-  Stonescapes: 83,
-}
-const INTERIOR_TYPES = Object.keys(INTERIOR_DEFAULTS)
+// ── Interior finish types ($/SF sub — 'Interior Finish - <type>' in subs) ────
+const INTERIOR_TYPES = ['White Plaster', 'Quartzscapes', 'Stonescapes']
 
-// ── Raised surface defaults (mat $/SF, flat hrs/SF) ─────────────────────────
-const RAISED_SURFACE_DEFAULTS = {
-  '6" Square Tile': { mat: 6.5, hrs: 0.356 },
-  '3" Square Tile': { mat: 6.5, hrs: 0.4 },
-  '2" Square Tile': { mat: 6.5, hrs: 0.421 },
-  '1" Square Tile': { mat: 6.5, hrs: 0.457 },
-  'Segmental Tile': { mat: 6.5, hrs: 0.533 },
-  'Multi-Piece Tile': { mat: 6.5, hrs: 0.457 },
-  'Glass Tile': { mat: 12.0, hrs: 0.533 },
-  'MSI Ledgerstone': { mat: 5.5, hrs: 0.2 },
-  'Flat Flagstone Arizona': { mat: 4.5, hrs: 0.22 },
-  'Flat Flagstone Other': { mat: 6.0, hrs: 0.22 },
-  Stucco: { mat: 0.5, hrs: 0.1 },
-  'Integral Color Stucco': { mat: 0.75, hrs: 0.11 },
-}
-const RAISED_SURFACE_TYPES = Object.keys(RAISED_SURFACE_DEFAULTS)
+// ── Raised surface types — labor ('Raised - <type>') + material
+//    ('Raised Mat - <type>') read live from the rate maps.
+const RAISED_SURFACE_TYPES = [
+  '6" Square Tile',
+  '3" Square Tile',
+  '2" Square Tile',
+  '1" Square Tile',
+  'Segmental Tile',
+  'Multi-Piece Tile',
+  'Glass Tile',
+  'MSI Ledgerstone',
+  'Flat Flagstone Arizona',
+  'Flat Flagstone Other',
+  'Stucco',
+  'Integral Color Stucco',
+]
 
-// ── Excavation equipment rates (CY/hr net) ───────────────────────────────────
-// Each entry maps to a labor_rates row so the inline calculator icon next to
-// the equipment dropdown can edit the CY/hr rate. Names match seed SQL.
-const EXCAVATION_RATES = {
-  'IH - Bobcat 72"': 7.33,
-  'IH - Bobcat 64"': 7.14,
-  'Rental 48"': 7.33,
-  'Rental 42"': 7.33,
-  'Medium Excavator': 29.75,
-  'Large Excavator': 25.5,
-  'Hand Dig': 0.5,
-  'Sub Bobcat / Mini Bob': 0,
-}
+// ── Excavation equipment — CY/hr net rate lives in labor_rates keyed by the
+//    EXCAVATION_LABOR_NAME below (read live; no hardcoded rate). 'Sub Bobcat /
+//    Mini Bob' is a sub cost, not a labor rate (null name).
 const EXCAVATION_LABOR_NAME = {
   'IH - Bobcat 72"': 'Excavation - IH Bobcat 72',
   'IH - Bobcat 64"': 'Excavation - IH Bobcat 64',
@@ -115,71 +95,49 @@ const EXCAVATION_LABOR_NAME = {
   'Hand Dig': 'Excavation - Hand Dig',
   'Sub Bobcat / Mini Bob': null, // sub cost, not a labor rate
 }
-const EXCAVATION_TYPES = Object.keys(EXCAVATION_RATES)
+const EXCAVATION_TYPES = Object.keys(EXCAVATION_LABOR_NAME)
 
-// ── Shotcrete defaults ────────────────────────────────────────────────────────
-const SHOTCRETE_MAT_PER_CY = 200
-const SHOTCRETE_LABOR_PER_CY = 85
-const SHOTCRETE_LABOR_MIN = 3500
+// ── Plumbing base configuration types — flat sub cost lives in
+//    subcontractor_rates keyed by 'Plumbing <type>' (read live).
+const PLUMBING_BASE_TYPES = ['Pool Only', 'Pool + Spa']
 
-// ── Plumbing defaults ─────────────────────────────────────────────────────────
-const PLUMBING_BASES = { 'Pool Only': 4500, 'Pool + Spa': 6000 }
-
-// ── Equipment catalog ─────────────────────────────────────────────────────────
+// ── Equipment catalog — identity only. Each model's unit price is read live
+//    from materialPrices[model] (misc_rates, category 'Pool'); no hardcoded
+//    price. 'Other' is a manual-entry placeholder.
 const EQUIPMENT_CATALOG = {
-  Pump: [
-    { model: 'VSHP270AUT', price: 1498 },
-    { model: 'VSHP33AUT', price: 1650 },
-    { model: 'Other', price: 0 },
-  ],
-  Filter: [
-    { model: 'CV340', price: 1139 },
-    { model: 'CV460', price: 1259 },
-    { model: 'CV580', price: 1462 },
-    { model: 'Other', price: 0 },
-  ],
-  Heater: [
-    { model: 'VersaTemp', price: 4180 },
-    { model: 'JXi400N', price: 2980 },
-    { model: 'Other', price: 0 },
-  ],
-  'Salt Sanitizer': [
-    { model: 'APUREM', price: 2047 },
-    { model: 'Other', price: 0 },
-  ],
+  Pump: [{ model: 'VSHP270AUT' }, { model: 'VSHP33AUT' }, { model: 'Other' }],
+  Filter: [{ model: 'CV340' }, { model: 'CV460' }, { model: 'CV580' }, { model: 'Other' }],
+  Heater: [{ model: 'VersaTemp' }, { model: 'JXi400N' }, { model: 'Other' }],
+  'Salt Sanitizer': [{ model: 'APUREM' }, { model: 'Other' }],
   'Sheer Descent': [
-    { model: '1\' - 1" Lip', price: 289 },
-    { model: '2\' - 1" Lip', price: 349 },
-    { model: '3\' - 1" Lip', price: 429 },
-    { model: '4\' - 1" Lip', price: 559 },
-    { model: '5\' - 1" Lip', price: 699 },
-    { model: '6\' - 1" Lip', price: 899 },
-    { model: '1\' - 6" Lip', price: 329 },
-    { model: '2\' - 6" Lip', price: 399 },
-    { model: '3\' - 6" Lip', price: 479 },
-    { model: '4\' - 6" Lip', price: 609 },
-    { model: '5\' - 6" Lip', price: 749 },
-    { model: '6\' - 6" Lip', price: 949 },
-    { model: '1\' - 12" Lip', price: 369 },
-    { model: '2\' - 12" Lip', price: 449 },
-    { model: '3\' - 12" Lip', price: 529 },
-    { model: '4\' - 12" Lip', price: 659 },
-    { model: '5\' - 12" Lip', price: 799 },
-    { model: '6\' - 12" Lip', price: 999 },
-    { model: 'Other', price: 0 },
+    { model: '1\' - 1" Lip' },
+    { model: '2\' - 1" Lip' },
+    { model: '3\' - 1" Lip' },
+    { model: '4\' - 1" Lip' },
+    { model: '5\' - 1" Lip' },
+    { model: '6\' - 1" Lip' },
+    { model: '1\' - 6" Lip' },
+    { model: '2\' - 6" Lip' },
+    { model: '3\' - 6" Lip' },
+    { model: '4\' - 6" Lip' },
+    { model: '5\' - 6" Lip' },
+    { model: '6\' - 6" Lip' },
+    { model: '1\' - 12" Lip' },
+    { model: '2\' - 12" Lip' },
+    { model: '3\' - 12" Lip' },
+    { model: '4\' - 12" Lip' },
+    { model: '5\' - 12" Lip' },
+    { model: '6\' - 12" Lip' },
+    { model: 'Other' },
   ],
-  Lighting: [
-    { model: "RGBW 50'", price: 634 },
-    { model: "RGBW 100'", price: 743 },
-    { model: 'Other', price: 0 },
-  ],
+  Lighting: [{ model: "RGBW 50'" }, { model: "RGBW 100'" }, { model: 'Other' }],
   Automation: [
-    { model: 'RS-P4', price: 2113 },
-    { model: 'RS-PS4', price: 2024 },
-    { model: 'RS-P6', price: 3048 },
-    { model: 'RS-PS6', price: 3048 },
-    { model: 'RS-PS8', price: 3853 },
-    { model: 'Other', price: 0 },
+    { model: 'RS-P4' },
+    { model: 'RS-PS4' },
+    { model: 'RS-P6' },
+    { model: 'RS-PS6' },
+    { model: 'RS-PS8' },
+    { model: 'Other' },
   ],
 }
 const EQUIPMENT_CATEGORIES = Object.keys(EQUIPMENT_CATALOG)
@@ -188,39 +146,40 @@ const n = v => parseFloat(v) || 0
 
 
 // ── Electrical & Plumbing catalog (ported from the Utilities module) ──────────
-// Rates live in material_rates / labor_rates under category 'Utilities' so they
-// stay a single source of truth shared with the Utilities module. Fallbacks
-// below are used only when the DB row is absent. A vendor overrides ONLY the
-// material price for the selected item; labor always comes from the built-in.
+// Rates live in the catalog / labor_rates / misc_rates under category
+// 'Utilities' so they stay a single source of truth shared with the Utilities
+// module. Identity only here (dbName + laborDbName) — every price/coefficient is
+// read live from the rate maps, no hardcoded fallback. A vendor overrides ONLY
+// the material price for the selected item; labor always comes from laborDbName.
 const UTILITY_LINE_TYPES = {
-  'PVC Conduit with Electrical': { costPerLF: 1.92, dbName: 'PVC Conduit with Electrical', laborPerLF: 0.05, laborDbName: 'PVC Conduit with Electrical - Labor Rate' },
-  '1-1/2" Poly Gas Pipe': { costPerLF: 4.25, dbName: '1-1/2" Poly Gas Pipe', laborPerLF: 0.05, laborDbName: '1-1/2" Poly Gas Pipe - Labor Rate' },
-  '1" Black Iron Gas Pipe': { costPerLF: 2.76, dbName: '1" Black Iron Gas Pipe', laborPerLF: 0.15, laborDbName: '1" Black Iron Gas Pipe - Labor Rate' },
-  '1-1/2" Black Iron Gas Pipe': { costPerLF: 4.23, dbName: '1-1/2" Black Iron Gas Pipe', laborPerLF: 0.2, laborDbName: '1-1/2" Black Iron Gas Pipe - Labor Rate' },
-  '2" Black Iron Gas Pipe': { costPerLF: 5.72, dbName: '2" Black Iron Gas Pipe', laborPerLF: 0.25, laborDbName: '2" Black Iron Gas Pipe - Labor Rate' },
+  'PVC Conduit with Electrical': { dbName: 'PVC Conduit with Electrical', laborDbName: 'PVC Conduit with Electrical - Labor Rate' },
+  '1-1/2" Poly Gas Pipe': { dbName: '1-1/2" Poly Gas Pipe', laborDbName: '1-1/2" Poly Gas Pipe - Labor Rate' },
+  '1" Black Iron Gas Pipe': { dbName: '1" Black Iron Gas Pipe', laborDbName: '1" Black Iron Gas Pipe - Labor Rate' },
+  '1-1/2" Black Iron Gas Pipe': { dbName: '1-1/2" Black Iron Gas Pipe', laborDbName: '1-1/2" Black Iron Gas Pipe - Labor Rate' },
+  '2" Black Iron Gas Pipe': { dbName: '2" Black Iron Gas Pipe', laborDbName: '2" Black Iron Gas Pipe - Labor Rate' },
 }
 const GAS_FIXTURE_TYPES = {
-  '12" Single Gas Ring': { cost: 61.75, dbName: '12" Single Gas Ring', laborHrs: 2, laborDbName: '12" Single Gas Ring - Labor Rate' },
-  '18" Single Gas Ring': { cost: 84.75, dbName: '18" Single Gas Ring', laborHrs: 2, laborDbName: '18" Single Gas Ring - Labor Rate' },
-  '24" Single Gas Ring': { cost: 107.75, dbName: '24" Single Gas Ring', laborHrs: 2, laborDbName: '24" Single Gas Ring - Labor Rate' },
-  '24" Double Gas Ring': { cost: 163.25, dbName: '24" Double Gas Ring', laborHrs: 2, laborDbName: '24" Double Gas Ring - Labor Rate' },
-  "2' Straight Gas Bar": { cost: 35.5, dbName: "2' Straight Gas Bar", laborHrs: 2, laborDbName: "2' Straight Gas Bar - Labor Rate" },
-  "3' Straight Gas Bar": { cost: 56.0, dbName: "3' Straight Gas Bar", laborHrs: 2.5, laborDbName: "3' Straight Gas Bar - Labor Rate" },
-  "4' Straight Gas Bar": { cost: 68.5, dbName: "4' Straight Gas Bar", laborHrs: 3, laborDbName: "4' Straight Gas Bar - Labor Rate" },
-  'Gas Shut-Off Valve': { cost: 89.7, dbName: 'Gas Shut-Off Valve', laborHrs: 2, laborDbName: 'Gas Shut-Off Valve - Labor Rate' },
+  '12" Single Gas Ring': { dbName: '12" Single Gas Ring', laborDbName: '12" Single Gas Ring - Labor Rate' },
+  '18" Single Gas Ring': { dbName: '18" Single Gas Ring', laborDbName: '18" Single Gas Ring - Labor Rate' },
+  '24" Single Gas Ring': { dbName: '24" Single Gas Ring', laborDbName: '24" Single Gas Ring - Labor Rate' },
+  '24" Double Gas Ring': { dbName: '24" Double Gas Ring', laborDbName: '24" Double Gas Ring - Labor Rate' },
+  "2' Straight Gas Bar": { dbName: "2' Straight Gas Bar", laborDbName: "2' Straight Gas Bar - Labor Rate" },
+  "3' Straight Gas Bar": { dbName: "3' Straight Gas Bar", laborDbName: "3' Straight Gas Bar - Labor Rate" },
+  "4' Straight Gas Bar": { dbName: "4' Straight Gas Bar", laborDbName: "4' Straight Gas Bar - Labor Rate" },
+  'Gas Shut-Off Valve': { dbName: 'Gas Shut-Off Valve', laborDbName: 'Gas Shut-Off Valve - Labor Rate' },
 }
 const ELECTRICAL_FIXTURE_TYPES = {
-  'Electric Sub-panel': { cost: 300, dbName: 'Electric Sub-panel', laborHrs: 4.5, laborDbName: 'Electric Sub-panel - Labor Rate' },
-  'Electric Disconnect': { cost: 150, dbName: 'Electric Disconnect', laborHrs: 2.5, laborDbName: 'Electric Disconnect - Labor Rate' },
-  'GFCI Protected Receptacles': { cost: 86.25, dbName: 'GFCI Protected Receptacles', laborHrs: 2, laborDbName: 'GFCI Protected Receptacles - Labor Rate' },
-  'Bubble Covers for Receptacles': { cost: 19.19, dbName: 'Bubble Covers for Receptacles', laborHrs: 0.25, laborDbName: 'Bubble Covers for Receptacles - Labor Rate' },
-  'Infratech W2024SS 2000W 240V Heater (Stainless)': { cost: 725.22, dbName: 'Infratech W2024SS 2000W 240V Heater (Stainless)', laborHrs: 6, laborDbName: 'Infratech W2024SS 2000W 240V Heater (Stainless) - Labor Rate' },
-  'Infratech W39 Flush Mount Frame': { cost: 572.26, dbName: 'Infratech W39 Flush Mount Frame', laborHrs: 2, laborDbName: 'Infratech W39 Flush Mount Frame - Labor Rate' },
-  'Infratech Single Duplex Switch in Surface Mount Gang Box': { cost: 206.11, dbName: 'Infratech Single Duplex Switch in Surface Mount Gang Box', laborHrs: 2, laborDbName: 'Infratech Single Duplex Switch in Surface Mount Gang Box - Labor Rate' },
+  'Electric Sub-panel': { dbName: 'Electric Sub-panel', laborDbName: 'Electric Sub-panel - Labor Rate' },
+  'Electric Disconnect': { dbName: 'Electric Disconnect', laborDbName: 'Electric Disconnect - Labor Rate' },
+  'GFCI Protected Receptacles': { dbName: 'GFCI Protected Receptacles', laborDbName: 'GFCI Protected Receptacles - Labor Rate' },
+  'Bubble Covers for Receptacles': { dbName: 'Bubble Covers for Receptacles', laborDbName: 'Bubble Covers for Receptacles - Labor Rate' },
+  'Infratech W2024SS 2000W 240V Heater (Stainless)': { dbName: 'Infratech W2024SS 2000W 240V Heater (Stainless)', laborDbName: 'Infratech W2024SS 2000W 240V Heater (Stainless) - Labor Rate' },
+  'Infratech W39 Flush Mount Frame': { dbName: 'Infratech W39 Flush Mount Frame', laborDbName: 'Infratech W39 Flush Mount Frame - Labor Rate' },
+  'Infratech Single Duplex Switch in Surface Mount Gang Box': { dbName: 'Infratech Single Duplex Switch in Surface Mount Gang Box', laborDbName: 'Infratech Single Duplex Switch in Surface Mount Gang Box - Labor Rate' },
 }
-const LINE_TYPE_ARR = Object.entries(UTILITY_LINE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, fallback: t.costPerLF, laborDbName: t.laborDbName, laborFallback: t.laborPerLF }))
-const GAS_TYPE_ARR = Object.entries(GAS_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, fallback: t.cost, laborDbName: t.laborDbName, laborFallback: t.laborHrs }))
-const ELEC_TYPE_ARR = Object.entries(ELECTRICAL_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, fallback: t.cost, laborDbName: t.laborDbName, laborFallback: t.laborHrs }))
+const LINE_TYPE_ARR = Object.entries(UTILITY_LINE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, laborDbName: t.laborDbName }))
+const GAS_TYPE_ARR = Object.entries(GAS_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, laborDbName: t.laborDbName }))
+const ELEC_TYPE_ARR = Object.entries(ELECTRICAL_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, laborDbName: t.laborDbName }))
 const UTIL_CAT = { line: 'Utility Lines', gas: 'Gas Fixtures', elec: 'Electrical Fixtures' }
 // Vendor-first Type list: Standard/unset → null-vendor Items merged with built-ins;
 // a real vendor → ONLY that vendor's Items (built-ins fall away).
@@ -237,9 +196,11 @@ function mergedUtilTypes(cat, builtInArr, materialRows, vendorSel = 'Standard') 
     return {
       label: o.label,
       dbName: o.row.name,
-      fallback: n(o.row.unit_cost),
+      // Catalog unit_cost for this Standard/vendor option (DB-sourced, not a
+      // hardcoded fallback) — used as the material price when the standard rate
+      // map has no entry for the item.
+      matCatalog: n(o.row.unit_cost),
       laborDbName: bi?.laborDbName ?? `${o.label} - Labor Rate`,
-      laborFallback: bi?.laborFallback ?? 0,
       fromMaster: !bi,
     }
   })
@@ -248,21 +209,22 @@ function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
   const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : 'Standard'
   const merged = mergedUtilTypes(cat, houseArr, materialRows, vsel)
   const builtIn = merged.find(o => o.label === row.type) || merged[0]
-  const laborVal = mp[builtIn?.laborDbName] ?? builtIn?.laborFallback ?? 0
+  // Labor comes live from the rate map only — no hardcoded fallback.
+  const laborVal = n(mp[builtIn?.laborDbName])
   let matDbName = builtIn?.dbName
-  let matFallback = builtIn?.fallback ?? 0
+  let matCatalog = builtIn?.matCatalog ?? 0
   const vrow = catalogItemFor(materialRows, cat, vsel, builtIn?.label, {
     ...CATALOG_OPTS,
     fallbackFirst: false,
   })
   if (vrow) {
     matDbName = vrow.name
-    matFallback = n(vrow.unit_cost)
+    matCatalog = n(vrow.unit_cost)
   }
-  // Selected vendor's catalog row wins; only fall back to the Standard name-map (mp)
-  // when there is no catalog row for the selection.
-  const matCost = vrow ? n(vrow.unit_cost) : (mp[matDbName] ?? matFallback)
-  const matOpt = { label: builtIn?.label, dbName: matDbName, fallback: matFallback }
+  // Selected vendor's catalog row wins; else the Standard name-map (mp) price,
+  // else the item's own catalog unit_cost (both DB-sourced).
+  const matCost = vrow ? n(vrow.unit_cost) : (mp[matDbName] ?? matCatalog)
+  const matOpt = { label: builtIn?.label, dbName: matDbName, matCatalog }
   return { opts: merged, matOpt, matCost, laborVal, laborBuiltIn: builtIn }
 }
 const EP_LINE_ROW = () => ({ type: '', lf: '', vendor: 'Standard' })
@@ -558,12 +520,13 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
 
   // ─ Volume helpers ─
   // Tunable estimating coefficients — table-driven via the merged rate map
-  // (misc_rates), read by name with the literal only as a fallback. The fixed
-  // 27 cu-ft/cu-yd conversions below are math-invariant and stay inline.
-  const avgDepthRatio = materialPrices['Pool Avg Depth Ratio'] ?? 2 / 3
-  const excavSwell = materialPrices['Pool Excavation Swell Factor'] ?? 1.07
-  const shotShellFt = materialPrices['Pool Shotcrete Shell Thickness'] ?? 0.5
-  const shotSwell = materialPrices['Pool Shotcrete Swell Factor'] ?? 1.07
+  // (misc_rates), read live by name with NO hardcoded fallback (seeded by
+  // supabase-pool-fallbacks-seed.sql). The fixed 27 cu-ft/cu-yd conversions
+  // below are math-invariant and stay inline.
+  const avgDepthRatio = n(materialPrices['Pool Avg Depth Ratio'])
+  const excavSwell = n(materialPrices['Pool Excavation Swell Factor'])
+  const shotShellFt = n(materialPrices['Pool Shotcrete Shell Thickness'])
+  const shotSwell = n(materialPrices['Pool Shotcrete Swell Factor'])
   function avgDepth(s) {
     return n(s.maxDepth) * avgDepthRatio
   }
@@ -585,10 +548,9 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
 
   // ─ Excavation ─
   const isSubExcav = excavation.mode === 'Sub'
-  // DB value via labor_rates['Excavation - ...'] takes precedence over hardcoded fallback
+  // CY/hr rate read live from labor_rates['Excavation - ...'] — no fallback.
   const excavLaborName = EXCAVATION_LABOR_NAME[excavation.equipment]
-  const equipRate =
-    (excavLaborName && laborRates[excavLaborName]) ?? EXCAVATION_RATES[excavation.equipment] ?? 7.33
+  const equipRate = n(excavLaborName && laborRates[excavLaborName])
   const excavHrs = !isSubExcav && equipRate > 0 ? totalExcavCY / equipRate : 0
   // Sub cost: auto-fill from the chosen sub's stored rate (per-CY rates are
   // multiplied by dug volume; flat/lump rates used as-is), overridable by a
@@ -605,9 +567,9 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   const isSubTab = state.subType === 'Subcontractor'
 
   // ─ Shotcrete sub (rates from subcontractor_rates, category='Pool') ─
-  const shotMatCY = subRates['Shotcrete Material'] ?? SHOTCRETE_MAT_PER_CY
-  const shotLabCY = subRates['Shotcrete Labor'] ?? SHOTCRETE_LABOR_PER_CY
-  const shotMin = subRates['Shotcrete Minimum Labor'] ?? SHOTCRETE_LABOR_MIN
+  const shotMatCY = n(subRates['Shotcrete Material'])
+  const shotLabCY = n(subRates['Shotcrete Labor'])
+  const shotMin = n(subRates['Shotcrete Minimum Labor'])
   // An override counts only when the user actually typed a value — '' means
   // "use auto", but a typed 0 is a real override that removes the auto sub.
   const hasOverride = v => v !== '' && v != null && !isNaN(parseFloat(v))
@@ -623,13 +585,12 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   let tileHrs = 0,
     tileMat = 0
   // Tile coverage (SF of tile per LF of waterline) — table-driven coefficient.
-  const tileSfPerLf = materialPrices['Pool Tile SF per LF'] ?? 0.5
+  const tileSfPerLf = n(materialPrices['Pool Tile SF per LF'])
   activeStructs.forEach(({ tileKey }) => {
     const t = tile[tileKey] || {}
     const lf = n(t.lf)
     if (!lf) return
-    const installRate =
-      laborRates[`Tile - ${t.installType}`] ?? TILE_INSTALL_DEFAULTS[t.installType] ?? 0.356
+    const installRate = n(laborRates[`Tile - ${t.installType}`])
     // tile mat = LF × (SF/LF coverage) × price/SF (waterline tile width ~6")
     const matPriceSF = n(t.matPricePerSF)
     tileHrs += lf * installRate
@@ -645,9 +606,8 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     const lf = n(sw.lf)
     if (!qty || !lf) return
     const totalLF = qty * lf
-    const def = SPILLWAY_DEFAULTS[sw.type] || { mat: 24, hrs: 0.5 }
-    const matRate = materialPrices[`Spillway ${sw.type}`] ?? def.mat
-    const labRate = laborRates[`Spillway - ${sw.type}`] ?? def.hrs
+    const matRate = n(materialPrices[`Spillway ${sw.type}`])
+    const labRate = n(laborRates[`Spillway - ${sw.type}`])
     spillwayHrs += totalLF * labRate
     spillwayMat += totalLF * matRate
   })
@@ -660,11 +620,10 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     const lf = n(cr.lf)
     if (!lf) return
     const sided = cr.sided === 'double' ? 2 : 1
-    const def = COPING_DEFAULTS[cr.type] || { mat: 8.5, hrs: 0.4 }
     // Coping MATERIAL rate is keyed distinctly from the same-named labor rate so
     // the two don't collide in the merged rate map (misc_rates vs labor_rates).
-    const matRate = materialPrices[`Coping Mat - ${cr.type}`] ?? def.mat
-    const labRate = laborRates[`Coping - ${cr.type}`] ?? def.hrs
+    const matRate = n(materialPrices[`Coping Mat - ${cr.type}`])
+    const labRate = n(laborRates[`Coping - ${cr.type}`])
     copingHrs += lf * sided * labRate
     copingMat += lf * sided * matRate
   })
@@ -673,20 +632,19 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   let raisedHrs = 0,
     raisedMat = 0
   // Per-corner labor add and per-corner material factor — table-driven coefficients.
-  const raisedCornerHrs = materialPrices['Pool Raised Corner Labor'] ?? 0.5
-  const raisedCornerMatFactor = materialPrices['Pool Raised Corner Mat Factor'] ?? 0.2
+  const raisedCornerHrs = n(materialPrices['Pool Raised Corner Labor'])
+  const raisedCornerMatFactor = n(materialPrices['Pool Raised Corner Mat Factor'])
   raisedSurfaces.forEach(rs => {
     if (!rs.matType) return
     const sqft = n(rs.sqft)
     const corners = n(rs.corners)
     if (!sqft) return
-    const def = RAISED_SURFACE_DEFAULTS[rs.matType] || { mat: 6.5, hrs: 0.356 }
     // Raised MATERIAL rate is keyed distinctly from the same-named labor rate.
-    const matRate = materialPrices[`Raised Mat - ${rs.matType}`] ?? def.mat
-    const labRate = laborRates[`Raised - ${rs.matType}`] ?? def.hrs
+    const matRate = n(materialPrices[`Raised Mat - ${rs.matType}`])
+    const labRate = n(laborRates[`Raised - ${rs.matType}`])
     const curveMult = 1 + n(rs.curvePct) / 100
     raisedHrs += sqft * labRate * curveMult + corners * raisedCornerHrs
-    raisedMat += sqft * matRate + corners * (def.mat * raisedCornerMatFactor)
+    raisedMat += sqft * matRate + corners * (matRate * raisedCornerMatFactor)
   })
 
   // ─ Interior Finish (rates from subcontractor_rates, category='Pool') ─
@@ -698,7 +656,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
       interiorSub += manSub
     } else if (isSubTab && fin.type) {
       const sf = n(s.waterSF)
-      const priceSF = subRates[`Interior Finish - ${fin.type}`] ?? INTERIOR_DEFAULTS[fin.type] ?? 45
+      const priceSF = n(subRates[`Interior Finish - ${fin.type}`])
       interiorSub += sf * priceSF
     }
   })
@@ -711,15 +669,14 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   equipment.forEach(eq => {
     const qty = n(eq.qty)
     if (!qty) return
-    const unitCost = n(eq.unitCost) || (materialPrices[eq.model] ?? 0)
-    const labHrsEa = laborRates[`Equip Labor - ${eq.model}`] ?? 0
+    const unitCost = n(eq.unitCost) || n(materialPrices[eq.model])
+    const labHrsEa = n(laborRates[`Equip Labor - ${eq.model}`])
     equipmentSub += qty * unitCost
     equipmentHrs += qty * labHrsEa
   })
 
   // ─ Plumbing (rates from subcontractor_rates, category='Pool') ─
-  const plumbBaseRate =
-    subRates[`Plumbing ${plumbing.baseType}`] ?? PLUMBING_BASES[plumbing.baseType] ?? 4500
+  const plumbBaseRate = n(subRates[`Plumbing ${plumbing.baseType}`])
   let plumbSub
   if (hasOverride(plumbing.manualSubCost)) {
     plumbSub = n(plumbing.manualSubCost)
@@ -728,10 +685,10 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     // and only on the Sub tab (In-House does plumbing in-house).
     plumbSub =
       plumbBaseRate +
-      (plumbing.over20ft ? (subRates['Plumbing Over 20ft Add'] ?? 300) : 0) +
-      (plumbing.remodel ? (subRates['Plumbing Remodel Add'] ?? 200) : 0) +
-      n(plumbing.extraLights) * (subRates['Plumbing Extra Light'] ?? 150) +
-      n(plumbing.sheerDescents) * (subRates['Plumbing Sheer Descent'] ?? 450)
+      (plumbing.over20ft ? n(subRates['Plumbing Over 20ft Add']) : 0) +
+      (plumbing.remodel ? n(subRates['Plumbing Remodel Add']) : 0) +
+      n(plumbing.extraLights) * n(subRates['Plumbing Extra Light']) +
+      n(plumbing.sheerDescents) * n(subRates['Plumbing Sheer Descent'])
   } else {
     plumbSub = 0
   }
@@ -743,8 +700,8 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   } else {
     // Steel is qty-driven (perimeter + spa). Auto-sub on the Sub tab only.
     const poolPerim = n(pool.perimLF)
-    const steelPerLF = subRates['Steel Per LF'] ?? 8
-    const steelSpaBonus = subRates['Steel Spa Bonus'] ?? 200
+    const steelPerLF = n(subRates['Steel Per LF'])
+    const steelSpaBonus = n(subRates['Steel Spa Bonus'])
     steelSub = isSubTab ? poolPerim * steelPerLF + (spa.enabled ? steelSpaBonus : 0) : 0
   }
 
@@ -789,8 +746,8 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   // its fields stay blank on the Sub tab and the DB default must not silently
   // add cost there. A typed value overrides the DB default; a typed 0 => 0.
   const plumbIH = state.plumbingIH || {}
-  const plumbHrsDefault = laborRates['Pool Plumbing - Base Hours'] ?? 16
-  const plumbMatDefault = materialPrices['Pool Plumbing - Materials'] ?? 350
+  const plumbHrsDefault = n(laborRates['Pool Plumbing - Base Hours'])
+  const plumbMatDefault = n(materialPrices['Pool Plumbing - Materials'])
   const plumbHrsIH = isSubTab ? 0 : hasOverride(plumbIH.hours) ? n(plumbIH.hours) : plumbHrsDefault
   const plumbMatIH = isSubTab
     ? 0
@@ -1216,16 +1173,16 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
     arr[i] = { ...arr[i], [key]: val }
     // Auto-fill price when model changes
     if (key === 'model') {
-      const models = EQUIPMENT_CATALOG[arr[i].category] || []
-      const found = models.find(m => m.model === val)
+      // Auto-fill the unit cost from the live rate map only (no hardcoded price);
+      // blank when unpriced so the user can enter it (or price it in Master Rates).
       const dbPrice = materialPrices[val]
-      arr[i].unitCost = (dbPrice ?? found?.price ?? '').toString()
+      arr[i].unitCost = (dbPrice ?? '').toString()
     }
     if (key === 'category') {
       const models = EQUIPMENT_CATALOG[val] || []
       arr[i].model = models[0]?.model || ''
       const dbPrice = materialPrices[arr[i].model]
-      arr[i].unitCost = (dbPrice ?? models[0]?.price ?? '').toString()
+      arr[i].unitCost = (dbPrice ?? '').toString()
     }
     upd('equipment', arr)
   }
@@ -1266,7 +1223,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
   // Plumbing section resolves its line/gas/electrical MATERIAL prices from this
   // catalog, so surface every vendor price alongside the labor rates.
   const vendorNames = Object.fromEntries((vendors || []).map(v => [v.id, v.name]))
-  const matRows = (dbName, unit, fallback) => {
+  const matRows = (dbName, unit) => {
     const rows = (materialRows || []).filter(r0 => r0.name === dbName)
     if (rows.length) {
       return rows
@@ -1288,7 +1245,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         }))
     }
     return [
-      { label: `Standard — ${dbName}`, table: 'material_price', name: dbName, category: 'Utilities', unitLabel: unit, mode: 'currency', value: materialPrices[dbName] ?? fallback },
+      { label: `Standard — ${dbName}`, table: 'material_price', name: dbName, category: 'Utilities', unitLabel: unit, mode: 'currency', value: materialPrices[dbName] },
     ]
   }
   const poolRateList = [
@@ -1301,7 +1258,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         category: 'Pool',
         mode: 'coefficient',
         unitLabel: 'Cu Yd per hr',
-        value: laborRates[EXCAVATION_LABOR_NAME[t]] ?? EXCAVATION_RATES[t],
+        value: laborRates[EXCAVATION_LABOR_NAME[t]],
       })),
     },
     {
@@ -1314,7 +1271,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'currency',
           unitLabel: 'Cu Yd',
-          value: subRates['Shotcrete Material'] ?? SHOTCRETE_MAT_PER_CY,
+          value: subRates['Shotcrete Material'],
         },
         {
           label: 'Shotcrete Labor',
@@ -1323,7 +1280,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'currency',
           unitLabel: 'Cu Yd',
-          value: subRates['Shotcrete Labor'] ?? SHOTCRETE_LABOR_PER_CY,
+          value: subRates['Shotcrete Labor'],
           section: 'labor',
         },
         {
@@ -1333,7 +1290,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'currency',
           unitLabel: 'flat',
-          value: subRates['Shotcrete Minimum Labor'] ?? SHOTCRETE_LABOR_MIN,
+          value: subRates['Shotcrete Minimum Labor'],
           section: 'labor',
         },
       ],
@@ -1347,7 +1304,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         category: 'Pool',
         mode: 'coefficient',
         unitLabel: 'hrs per Ln Ft',
-        value: laborRates[`Tile - ${t}`] ?? TILE_INSTALL_DEFAULTS[t],
+        value: laborRates[`Tile - ${t}`],
       })),
     },
     {
@@ -1360,7 +1317,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'coefficient',
           unitLabel: 'hrs per Ln Ft',
-          value: laborRates[`Spillway - ${t}`] ?? SPILLWAY_DEFAULTS[t]?.hrs,
+          value: laborRates[`Spillway - ${t}`],
         })),
         ...SPILLWAY_TYPES.map(t => ({
           label: `Spillway Material - ${t}`,
@@ -1369,7 +1326,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'currency',
           unitLabel: 'Ln Ft',
-          value: materialPrices[`Spillway ${t}`] ?? SPILLWAY_DEFAULTS[t]?.mat,
+          value: materialPrices[`Spillway ${t}`],
         })),
       ],
     },
@@ -1383,7 +1340,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'coefficient',
           unitLabel: 'hrs per Ln Ft',
-          value: laborRates[`Coping - ${t}`] ?? COPING_DEFAULTS[t]?.hrs,
+          value: laborRates[`Coping - ${t}`],
         })),
         ...COPING_TYPES.map(t => ({
           label: `Coping Material - ${t}`,
@@ -1392,7 +1349,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'currency',
           unitLabel: 'Ln Ft',
-          value: materialPrices[`Coping Mat - ${t}`] ?? COPING_DEFAULTS[t]?.mat,
+          value: materialPrices[`Coping Mat - ${t}`],
         })),
       ],
     },
@@ -1406,7 +1363,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'coefficient',
           unitLabel: 'hrs per Sq Ft',
-          value: laborRates[`Raised - ${t}`] ?? RAISED_SURFACE_DEFAULTS[t]?.hrs,
+          value: laborRates[`Raised - ${t}`],
         })),
         ...RAISED_SURFACE_TYPES.map(t => ({
           label: `Raised Material - ${t}`,
@@ -1415,7 +1372,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'currency',
           unitLabel: 'Sq Ft',
-          value: materialPrices[`Raised Mat - ${t}`] ?? RAISED_SURFACE_DEFAULTS[t]?.mat,
+          value: materialPrices[`Raised Mat - ${t}`],
         })),
       ],
     },
@@ -1428,7 +1385,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         category: 'Pool',
         mode: 'currency',
         unitLabel: 'Sq Ft',
-        value: subRates[`Interior Finish - ${t}`] ?? INTERIOR_DEFAULTS[t],
+        value: subRates[`Interior Finish - ${t}`],
       })),
     },
     {
@@ -1443,7 +1400,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'coefficient',
           unitLabel: 'hrs per Each',
-          value: laborRates[`Equip Labor - ${model}`] ?? 0,
+          value: laborRates[`Equip Labor - ${model}`],
         })),
         // Equipment unit prices — the calc reads materialPrices[model] when a
         // row leaves its unit-cost blank. Surface each real model (skip the
@@ -1458,21 +1415,21 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             category: 'Pool',
             mode: 'currency',
             unitLabel: 'Each',
-            value: materialPrices[m.model] ?? m.price,
+            value: materialPrices[m.model],
           })),
       ],
     },
     {
       group: 'Plumbing (Sub)',
       items: [
-        ...Object.keys(PLUMBING_BASES).map(k => ({
+        ...PLUMBING_BASE_TYPES.map(k => ({
           label: `Plumbing ${k}`,
           table: 'subcontractor_rates',
           name: `Plumbing ${k}`,
           category: 'Pool',
           mode: 'currency',
           unitLabel: 'flat',
-          value: subRates[`Plumbing ${k}`] ?? PLUMBING_BASES[k],
+          value: subRates[`Plumbing ${k}`],
         })),
         {
           label: 'Plumbing Extra Light',
@@ -1481,7 +1438,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'currency',
           unitLabel: 'Each',
-          value: subRates['Plumbing Extra Light'] ?? 150,
+          value: subRates['Plumbing Extra Light'],
         },
         {
           label: 'Plumbing Sheer Descent',
@@ -1490,7 +1447,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'currency',
           unitLabel: 'Each',
-          value: subRates['Plumbing Sheer Descent'] ?? 450,
+          value: subRates['Plumbing Sheer Descent'],
         },
         {
           label: 'Plumbing Over 20ft Add',
@@ -1499,7 +1456,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'currency',
           unitLabel: 'flat',
-          value: subRates['Plumbing Over 20ft Add'] ?? 300,
+          value: subRates['Plumbing Over 20ft Add'],
         },
         {
           label: 'Plumbing Remodel Add',
@@ -1508,7 +1465,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'currency',
           unitLabel: 'flat',
-          value: subRates['Plumbing Remodel Add'] ?? 200,
+          value: subRates['Plumbing Remodel Add'],
         },
       ],
     },
@@ -1522,7 +1479,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'currency',
           unitLabel: 'Ln Ft',
-          value: subRates['Steel Per LF'] ?? 8,
+          value: subRates['Steel Per LF'],
         },
         {
           label: 'Steel Spa Bonus',
@@ -1531,7 +1488,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'currency',
           unitLabel: 'flat',
-          value: subRates['Steel Spa Bonus'] ?? 200,
+          value: subRates['Steel Spa Bonus'],
         },
       ],
     },
@@ -1545,7 +1502,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Utilities',
           mode: 'coefficient',
           unitLabel: 'hrs per Ln Ft',
-          value: materialPrices[t.laborDbName] ?? t.laborFallback,
+          value: materialPrices[t.laborDbName],
         })),
         ...GAS_TYPE_ARR.map(t => ({
           label: t.laborDbName,
@@ -1554,7 +1511,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Utilities',
           mode: 'coefficient',
           unitLabel: 'hrs per Each',
-          value: materialPrices[t.laborDbName] ?? t.laborFallback,
+          value: materialPrices[t.laborDbName],
         })),
         ...ELEC_TYPE_ARR.map(t => ({
           label: t.laborDbName,
@@ -1563,13 +1520,13 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Utilities',
           mode: 'coefficient',
           unitLabel: 'hrs per Each',
-          value: materialPrices[t.laborDbName] ?? t.laborFallback,
+          value: materialPrices[t.laborDbName],
         })),
         // Material prices (per vendor, Standard first) for each line/fixture,
         // sourced from the shared Utilities catalog.
-        ...LINE_TYPE_ARR.flatMap(t => matRows(t.dbName, 'LF', t.fallback)),
-        ...GAS_TYPE_ARR.flatMap(t => matRows(t.dbName, 'ea', t.fallback)),
-        ...ELEC_TYPE_ARR.flatMap(t => matRows(t.dbName, 'ea', t.fallback)),
+        ...LINE_TYPE_ARR.flatMap(t => matRows(t.dbName, 'LF')),
+        ...GAS_TYPE_ARR.flatMap(t => matRows(t.dbName, 'ea')),
+        ...ELEC_TYPE_ARR.flatMap(t => matRows(t.dbName, 'ea')),
       ],
     },
     {
@@ -1582,7 +1539,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'coefficient',
           unitLabel: 'hrs',
-          value: laborRates['Pool Plumbing - Base Hours'] ?? 16,
+          value: laborRates['Pool Plumbing - Base Hours'],
         },
         {
           label: 'Pool Plumbing - Materials',
@@ -1591,7 +1548,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'currency',
           unitLabel: 'flat',
-          value: materialPrices['Pool Plumbing - Materials'] ?? 350,
+          value: materialPrices['Pool Plumbing - Materials'],
         },
       ],
     },
@@ -1605,7 +1562,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'coefficient',
           unitLabel: '× max',
-          value: materialPrices['Pool Avg Depth Ratio'] ?? 2 / 3,
+          value: materialPrices['Pool Avg Depth Ratio'],
         },
         {
           label: 'Pool Excavation Swell Factor',
@@ -1614,7 +1571,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'coefficient',
           unitLabel: '×',
-          value: materialPrices['Pool Excavation Swell Factor'] ?? 1.07,
+          value: materialPrices['Pool Excavation Swell Factor'],
         },
         {
           label: 'Pool Shotcrete Shell Thickness',
@@ -1623,7 +1580,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'coefficient',
           unitLabel: 'ft',
-          value: materialPrices['Pool Shotcrete Shell Thickness'] ?? 0.5,
+          value: materialPrices['Pool Shotcrete Shell Thickness'],
         },
         {
           label: 'Pool Shotcrete Swell Factor',
@@ -1632,7 +1589,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'coefficient',
           unitLabel: '×',
-          value: materialPrices['Pool Shotcrete Swell Factor'] ?? 1.07,
+          value: materialPrices['Pool Shotcrete Swell Factor'],
         },
         {
           label: 'Pool Tile SF per LF',
@@ -1641,7 +1598,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'coefficient',
           unitLabel: 'Sq Ft per Ln Ft',
-          value: materialPrices['Pool Tile SF per LF'] ?? 0.5,
+          value: materialPrices['Pool Tile SF per LF'],
         },
         {
           label: 'Pool Raised Corner Labor',
@@ -1650,7 +1607,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'coefficient',
           unitLabel: 'hrs per corner',
-          value: materialPrices['Pool Raised Corner Labor'] ?? 0.5,
+          value: materialPrices['Pool Raised Corner Labor'],
         },
         {
           label: 'Pool Raised Corner Mat Factor',
@@ -1659,7 +1616,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           category: 'Pool',
           mode: 'coefficient',
           unitLabel: '×',
-          value: materialPrices['Pool Raised Corner Mat Factor'] ?? 0.2,
+          value: materialPrices['Pool Raised Corner Mat Factor'],
         },
       ],
     },
@@ -1902,7 +1859,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         )}
         {calc.excavHrs > 0 && (
           <p className="text-xs text-gray-500 mt-2 px-1">
-            {EXCAVATION_RATES[T.excavation.equipment] ?? '—'} Cu Yd/hr →{' '}
+            {calc.equipRate || '—'} Cu Yd/hr →{' '}
             <strong>{calc.excavHrs.toFixed(1)} hrs</strong>
           </p>
         )}
@@ -1936,9 +1893,9 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           <div className="flex items-end pb-1">
             <p className="text-xs text-gray-400 inline-flex items-center flex-wrap gap-x-1">
               {calc.totalShotCY.toFixed(1)} Cu Yd × $
-              {subRates['Shotcrete Material'] ?? SHOTCRETE_MAT_PER_CY}/CY mat + max($
-              {(subRates['Shotcrete Minimum Labor'] ?? SHOTCRETE_LABOR_MIN).toLocaleString()}, CY × $
-              {subRates['Shotcrete Labor'] ?? SHOTCRETE_LABOR_PER_CY}/CY lab)
+              {n(subRates['Shotcrete Material'])}/CY mat + max($
+              {n(subRates['Shotcrete Minimum Labor']).toLocaleString()}, CY × $
+              {n(subRates['Shotcrete Labor'])}/CY lab)
             </p>
           </div>
         </div>
@@ -2024,8 +1981,8 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                   </div>
                   {n(t.lf) > 0 && (
                     <p className="text-xs text-gray-400 mt-1">
-                      {(TILE_INSTALL_DEFAULTS[t.installType] ?? 0.356).toFixed(3)} hrs/LF →{' '}
-                      {(n(t.lf) * (TILE_INSTALL_DEFAULTS[t.installType] ?? 0.356)).toFixed(1)} hrs
+                      {n(laborRates[`Tile - ${t.installType}`]).toFixed(3)} hrs/LF →{' '}
+                      {(n(t.lf) * n(laborRates[`Tile - ${t.installType}`])).toFixed(1)} hrs
                     </p>
                   )}
                 </div>
@@ -2245,8 +2202,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             .filter(([, s]) => s && s.enabled)
             .map(([k, s]) => {
               const fin = T.interiorFinish[k] || defaultInteriorStruct()
-              const priceSF =
-                subRates[`Interior Finish - ${fin.type}`] ?? INTERIOR_DEFAULTS[fin.type] ?? 45
+              const priceSF = n(subRates[`Interior Finish - ${fin.type}`])
               const autoSub = n(s.waterSF) * priceSF
               return (
                 <div key={k} className="border border-gray-200 rounded-lg p-3">
@@ -2314,9 +2270,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         <div className="space-y-2">
           {T.equipment.map((eq, i) => {
             const models = EQUIPMENT_CATALOG[eq.category] || []
-            const catalogPrice = models.find(m => m.model === eq.model)?.price ?? 0
-            const matRate = materialPrices[eq.model] ?? catalogPrice
-            const labRate = laborRates[`Equip Labor - ${eq.model}`] ?? 0
             return (
               <div key={i} className="grid grid-cols-6 gap-2 items-end">
                 <div className="col-span-2">
@@ -2403,7 +2356,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                 value={T.plumbing.baseType}
                 onChange={e => upd('plumbing', { ...T.plumbing, baseType: e.target.value })}
               >
-                {Object.keys(PLUMBING_BASES).map(k => (
+                {PLUMBING_BASE_TYPES.map(k => (
                   <option key={k}>{k}</option>
                 ))}
               </select>
@@ -2436,7 +2389,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                 className="rounded"
               />
               <span className="text-xs text-gray-600">
-                &gt;20ft from equipment (+${subRates['Plumbing Over 20ft Add'] ?? 300})
+                &gt;20ft from equipment (+${n(subRates['Plumbing Over 20ft Add'])})
               </span>
             </label>
             <label className="flex items-center gap-1.5 cursor-pointer">
@@ -2447,7 +2400,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                 className="rounded"
               />
               <span className="text-xs text-gray-600">
-                Remodel (+${subRates['Plumbing Remodel Add'] ?? 200})
+                Remodel (+${n(subRates['Plumbing Remodel Add'])})
               </span>
             </label>
           </div>
@@ -2470,11 +2423,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
               Auto: {fmt2(calc.plumbSub)}
               <br />
               Base: $
-              {(
-                subRates[`Plumbing ${T.plumbing.baseType}`] ??
-                PLUMBING_BASES[T.plumbing.baseType] ??
-                4500
-              ).toLocaleString()}
+              {n(subRates[`Plumbing ${T.plumbing.baseType}`]).toLocaleString()}
             </p>
           </div>
         </div>
@@ -2507,8 +2456,8 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           </div>
           <div className="flex items-end pb-1">
             <p className="text-xs text-gray-400 inline-flex items-center flex-wrap gap-1">
-              Auto: pool perimeter × ${subRates['Steel Per LF'] ?? 8}/LF
-              {T.spa.enabled && <> + ${subRates['Steel Spa Bonus'] ?? 200} spa</>}
+              Auto: pool perimeter × ${n(subRates['Steel Per LF'])}/LF
+              {T.spa.enabled && <> + ${n(subRates['Steel Spa Bonus'])} spa</>}
             </p>
           </div>
         </div>
@@ -2577,13 +2526,13 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                 <NumInput
                   value={T.plumbingIH?.hours ?? ''}
                   onChange={v => upd('plumbingIH', { ...(T.plumbingIH || {}), hours: v })}
-                  placeholder={`default ${laborRates['Pool Plumbing - Base Hours'] ?? 16}`}
+                  placeholder={`default ${n(laborRates['Pool Plumbing - Base Hours'])}`}
                   className="flex-1 min-w-0"
                 />
               </div>
               {(T.plumbingIH?.hours ?? '') === '' && (
                 <p className="text-[10px] text-gray-400 mt-0.5">
-                  default {laborRates['Pool Plumbing - Base Hours'] ?? 16} hrs
+                  default {n(laborRates['Pool Plumbing - Base Hours'])} hrs
                 </p>
               )}
             </div>
@@ -2597,14 +2546,14 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                   <NumInput
                     value={T.plumbingIH?.materials ?? ''}
                     onChange={v => upd('plumbingIH', { ...(T.plumbingIH || {}), materials: v })}
-                    placeholder={`default ${materialPrices['Pool Plumbing - Materials'] ?? 350}`}
+                    placeholder={`default ${n(materialPrices['Pool Plumbing - Materials'])}`}
                     className="pl-6"
                   />
                 </div>
               </div>
               {(T.plumbingIH?.materials ?? '') === '' && (
                 <p className="text-[10px] text-gray-400 mt-0.5">
-                  default $ {materialPrices['Pool Plumbing - Materials'] ?? 350}
+                  default $ {n(materialPrices['Pool Plumbing - Materials'])}
                 </p>
               )}
             </div>

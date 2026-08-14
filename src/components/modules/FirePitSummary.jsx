@@ -31,37 +31,37 @@ function masterFinishMeta(cat, typeLabel, materialRows) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const FP_RATES = {
-  fpBlock: { dbName: 'FP Block', fallback: 2.5 },
-  fpRebar: { dbName: 'FP Rebar', fallback: 0.5 },
-  fpConcrete: { dbName: 'FP Concrete', fallback: 149.5 },
-  fpGroutPump: { dbName: 'FP Grout Pump Setup', fallback: 150.0 },
-  capFlagstone: { dbName: 'FP Cap Flagstone', fallback: 18.0 },
-  capPrecast: { dbName: 'FP Cap Precast', fallback: 12.0 },
-  capPipConcrete: { dbName: 'FP Cap PIP Concrete', fallback: 10.0 },
-  capBullnose: { dbName: 'FP Cap Bullnose Brick', fallback: 5.0 },
-  sandStucco: { dbName: 'Sand Stucco - FP', fallback: 0.0 },
-  smoothStucco: { dbName: 'Smooth Stucco - FP', fallback: 0.0 },
-  ledgerstone: { dbName: 'Ledgerstone - FP', fallback: 10.0 },
-  stackedStone: { dbName: 'Stacked Stone - FP', fallback: 10.0 },
-  tile: { dbName: 'Tile - FP', fallback: 6.5 },
-  realFlagstone: { dbName: 'Real Flagstone - FP', fallback: 400.0 },
-  realStone: { dbName: 'Real Stone - FP', fallback: 400.0 },
-  digLab: { dbName: 'FP Dig Footing Labor Rate', fallback: 4.0 },
-  rebarLab: { dbName: 'FP Set Rebar Labor Rate', fallback: 35.0 },
-  blockLab: { dbName: 'FP Set Blocks Labor Rate', fallback: 10.4 },
-  handGroutLab: { dbName: 'FP Hand Grout Labor Rate', fallback: 5.5 },
-  pumpGroutLab: { dbName: 'FP Pump Grout Labor Rate', fallback: 81.0 },
-  capFlagstoneLab: { dbName: 'FP Cap Flagstone Labor Rate', fallback: 0.25 },
-  capPrecastLab: { dbName: 'FP Cap Precast Labor Rate', fallback: 0.2 },
-  capPipConcreteLab: { dbName: 'FP Cap PIP Concrete Labor Rate', fallback: 0.15 },
-  capBullnoseLab: { dbName: 'FP Cap Bullnose Brick Labor Rate', fallback: 0.08 },
-  sandStuccoLab: { dbName: 'Sand Stucco - FP Labor Rate', fallback: 92 },
-  smoothStuccoLab: { dbName: 'Smooth Stucco - FP Labor Rate', fallback: 65 },
-  ledgerstoneLab: { dbName: 'Ledgerstone - FP Labor Rate', fallback: 24 },
-  stackedStoneLab: { dbName: 'Stacked Stone - FP Labor Rate', fallback: 24 },
-  tileLab: { dbName: 'Tile - FP Labor Rate', fallback: 0.2867 },
-  flagstoneLab: { dbName: 'Real Flagstone - FP Labor Rate', fallback: 0.4487 },
-  realStoneLab: { dbName: 'Real Stone - FP Labor Rate', fallback: 0.8954 },
+  fpBlock: { dbName: 'FP Block' },
+  fpRebar: { dbName: 'FP Rebar' },
+  fpConcrete: { dbName: 'FP Concrete' },
+  fpGroutPump: { dbName: 'FP Grout Pump Setup' },
+  capFlagstone: { dbName: 'FP Cap Flagstone' },
+  capPrecast: { dbName: 'FP Cap Precast' },
+  capPipConcrete: { dbName: 'FP Cap PIP Concrete' },
+  capBullnose: { dbName: 'FP Cap Bullnose Brick' },
+  sandStucco: { dbName: 'Sand Stucco - FP' },
+  smoothStucco: { dbName: 'Smooth Stucco - FP' },
+  ledgerstone: { dbName: 'Ledgerstone - FP' },
+  stackedStone: { dbName: 'Stacked Stone - FP' },
+  tile: { dbName: 'Tile - FP' },
+  realFlagstone: { dbName: 'Real Flagstone - FP' },
+  realStone: { dbName: 'Real Stone - FP' },
+  digLab: { dbName: 'FP Dig Footing Labor Rate' },
+  rebarLab: { dbName: 'FP Set Rebar Labor Rate' },
+  blockLab: { dbName: 'FP Set Blocks Labor Rate' },
+  handGroutLab: { dbName: 'FP Hand Grout Labor Rate' },
+  pumpGroutLab: { dbName: 'FP Pump Grout Labor Rate' },
+  capFlagstoneLab: { dbName: 'FP Cap Flagstone Labor Rate' },
+  capPrecastLab: { dbName: 'FP Cap Precast Labor Rate' },
+  capPipConcreteLab: { dbName: 'FP Cap PIP Concrete Labor Rate' },
+  capBullnoseLab: { dbName: 'FP Cap Bullnose Brick Labor Rate' },
+  sandStuccoLab: { dbName: 'Sand Stucco - FP Labor Rate' },
+  smoothStuccoLab: { dbName: 'Smooth Stucco - FP Labor Rate' },
+  ledgerstoneLab: { dbName: 'Ledgerstone - FP Labor Rate' },
+  stackedStoneLab: { dbName: 'Stacked Stone - FP Labor Rate' },
+  tileLab: { dbName: 'Tile - FP Labor Rate' },
+  flagstoneLab: { dbName: 'Real Flagstone - FP Labor Rate' },
+  realStoneLab: { dbName: 'Real Stone - FP Labor Rate' },
 }
 
 const CAP_META = {
@@ -83,40 +83,8 @@ const WF_META = {
 }
 
 // Gas line + gas fixture labor fallbacks (Utilities catalog, hrs per unit).
-const GAS_LINE_LAB_FALLBACK = {
-  '1-1/2" Poly Gas Pipe': 0.05,
-  '1" Black Iron Gas Pipe': 0.15,
-  '1-1/2" Black Iron Gas Pipe': 0.2,
-  '2" Black Iron Gas Pipe': 0.25,
-}
-const GAS_FIXTURE_LAB_FALLBACK = {
-  '12" Single Gas Ring': 2,
-  '18" Single Gas Ring': 2,
-  '24" Single Gas Ring': 2,
-  '24" Double Gas Ring': 2,
-  "2' Straight Gas Bar": 2,
-  "3' Straight Gas Bar": 2.5,
-  "4' Straight Gas Bar": 3,
-  'Gas Shut-Off Valve': 2,
-}
 
 // Gas fixture + gas line material fallbacks (Utilities catalog).
-const GAS_FIXTURE_FALLBACK = {
-  '12" Single Gas Ring': 61.75,
-  '18" Single Gas Ring': 84.75,
-  '24" Single Gas Ring': 107.75,
-  '24" Double Gas Ring': 163.25,
-  "2' Straight Gas Bar": 35.5,
-  "3' Straight Gas Bar": 56.0,
-  "4' Straight Gas Bar": 68.5,
-  'Gas Shut-Off Valve': 89.7,
-}
-const GAS_LINE_FALLBACK = {
-  '1-1/2" Poly Gas Pipe': 4.25,
-  '1" Black Iron Gas Pipe': 2.76,
-  '1-1/2" Black Iron Gas Pipe': 4.23,
-  '2" Black Iron Gas Pipe': 5.72,
-}
 
 const DEFAULTS = { laborRatePerHour: 35, laborBurdenPct: 0.29, gpmd: 425, commissionRate: 0.12 }
 
@@ -176,7 +144,7 @@ export default function FirePitSummary({ module }) {
   // Reference the Sub record so it is available for future breakdown use.
   void sub
 
-  const mp = (dbName, fallback) => materialPrices[dbName] ?? fallback
+  const mp = dbName => n(materialPrices[dbName])
 
   // ── Structure — reuse the module's exported per-type calculators so every
   //    structure type (CMU/PIP/Modular/Brick) reprices from a single source of
@@ -262,8 +230,8 @@ export default function FirePitSummary({ module }) {
     .map(r => {
       const lf = n(r.lf)
       if (lf <= 0) return null
-      const unit = mp(r.type, GAS_LINE_FALLBACK[r.type] ?? 0)
-      const labCoef = mp(`${r.type} - Labor Rate`, GAS_LINE_LAB_FALLBACK[r.type] ?? 0)
+      const unit = mp(r.type)
+      const labCoef = mp(`${r.type} - Labor Rate`)
       return { label: r.type, qty: `${lf} Ln Ft`, mat: lf * unit, hrs: lf * labCoef }
     })
     .filter(Boolean)
@@ -271,8 +239,8 @@ export default function FirePitSummary({ module }) {
     .map(r => {
       const qty = n(r.qty)
       if (qty <= 0) return null
-      const unit = mp(r.type, GAS_FIXTURE_FALLBACK[r.type] ?? 0)
-      const labCoef = mp(`${r.type} - Labor Rate`, GAS_FIXTURE_LAB_FALLBACK[r.type] ?? 0)
+      const unit = mp(r.type)
+      const labCoef = mp(`${r.type} - Labor Rate`)
       return { label: r.type, qty: `${qty} Each`, mat: qty * unit, hrs: qty * labCoef }
     })
     .filter(Boolean)

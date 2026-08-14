@@ -38,11 +38,10 @@ const CATALOG_OPTS = { standardRows: 'null-vendor', stripPrefix: false }
 const LIGHTING_CATEGORY = 'Lighting'
 const LIGHT_CAT = { fixture: 'Light Fixture', transformer: 'Transformer', wire: 'Wire' }
 
-// Material markup applied to all fixture / transformer / wire materials.
-// FALLBACK ONLY — the operative value comes from the price list
-// (misc_rates 'Lighting - Material Markup', category 'Lighting'), stored as a
-// fraction (0.15 = 15%). Used solely when the DB row is absent.
-const MATERIAL_MARKUP_FB = 0.15
+// Material markup applied to all fixture / transformer / wire materials. Read
+// live from the price list (misc_rates 'Lighting - Material Markup', category
+// 'Lighting'), stored as a fraction (0.15 = 15%). No hardcoded fallback: a
+// missing row means no markup (0).
 const MATERIAL_MARKUP_NAME = 'Lighting - Material Markup'
 
 const DEFAULTS = {
@@ -116,7 +115,7 @@ function calcLighting(
   walkAccess = null,
   laborBurdenPct = DEFAULTS.laborBurdenPct,
   priceOf = item => n(item.unit_cost),
-  materialMarkup = MATERIAL_MARKUP_FB
+  materialMarkup = null
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const { difficulty, hoursAdj, fixtureRows, transformerRows, wireRows, manualRows, distanceLF } =
@@ -131,7 +130,7 @@ function calcLighting(
   const totalWatts = fx.watts + xf.watts + wr.watts
   const totalVA = fx.va + xf.va + wr.va
 
-  const _markup = materialMarkup != null ? n(materialMarkup) : MATERIAL_MARKUP_FB
+  const _markup = n(materialMarkup)
   const rawMat = fx.mat + xf.mat + wr.mat
   const markedUpMat = rawMat * (1 + _markup)
 
@@ -690,7 +689,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
           category: LIGHTING_CATEGORY,
           mode: 'coefficient',
           unitLabel: 'fraction',
-          value: materialMarkup != null ? materialMarkup : MATERIAL_MARKUP_FB,
+          value: n(materialMarkup),
           section: 'material',
         },
       ],
@@ -844,8 +843,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
       {!isSub && calc.rawMat > 0 && (
         <p className="text-xs text-gray-400 -mt-2 px-1 flex items-center gap-1">
           Raw materials {fmt2(calc.rawMat)} +{' '}
-          {(((materialMarkup != null ? materialMarkup : MATERIAL_MARKUP_FB) * 100)
-            .toFixed(0))}% markup ={' '}
+          {((n(materialMarkup) * 100).toFixed(0))}% markup ={' '}
           <span className="text-gray-600 font-medium">{fmt2(calc.markedUpMat)}</span>
         </p>
       )}

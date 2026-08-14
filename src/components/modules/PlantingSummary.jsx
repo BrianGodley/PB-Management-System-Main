@@ -12,67 +12,8 @@
 import FinancialSummaryList from './FinancialSummaryList'
 import { resolveMaterialPrice } from '../../lib/materialCatalog'
 
-// perDay is a per-HOUR rate (plants/hr = old plants/day ÷ 8). Price unchanged.
-const SMALL_PLANT_DEFAULTS = {
-  'Flats of Groundcover': { perDay: 3.125, price: 18.0 },
-  'Flats of 4" pots': { perDay: 2.5, price: 20.0 },
-  '4" pots standard': { perDay: 35, price: 0.0 },
-  '4" pots succulents': { perDay: 35, price: 7.0 },
-  '6" pots standard': { perDay: 22.5, price: 0.0 },
-  '6" pots succulents': { perDay: 22.5, price: 12.0 },
-  '1 gallon standard': { perDay: 8.75, price: 6.5 },
-  '1 gallon premium': { perDay: 8.75, price: 8.0 },
-  '1 gallon succulents': { perDay: 8.75, price: 18.0 },
-  '3 gallon standard': { perDay: 8.75, price: 7.0 },
-  '5 gallon standard': { perDay: 5, price: 17.0 },
-  '5 gallon premium': { perDay: 5, price: 35.0 },
-  '5 gallon succulents': { perDay: 5, price: 39.0 },
-  '5 gallon bamboo': { perDay: 5, price: 40.0 },
-  '5 gallon palm': { perDay: 5, price: 50.0 },
-}
-
-const LARGE_PLANT_DEFAULTS = {
-  '15 gallon standard': { perDay: 1.875, price: 52.0 },
-  '15 gallon premium': { perDay: 1.875, price: 90.0 },
-  '15 gallon succulents': { perDay: 1.875, price: 225.0 },
-  '15 gallon fruit': { perDay: 1.875, price: 145.0 },
-  '15 gallon palms': { perDay: 1.875, price: 175.0 },
-  '24" box standard': { perDay: 0.5, price: 185.0 },
-  '24" box premium': { perDay: 0.5, price: 250.0 },
-  '24" box fruit': { perDay: 0.5, price: 0.0 },
-  '24" box palm': { perDay: 0.5, price: 0.0 },
-  '36" box standard': { perDay: 0.09375, price: 450.0 },
-  '36" box premium': { perDay: 0.09375, price: 600.0 },
-  '36" box fruit': { perDay: 0.09375, price: 0.0 },
-  '36" box palm': { perDay: 0.09375, price: 0.0 },
-  '48" box standard': { perDay: 0.0375, price: 800.0 },
-  '48" box premium': { perDay: 0.0375, price: 0.0 },
-  '48" box fruit': { perDay: 0.0375, price: 0.0 },
-  '48" box palm': { perDay: 0.0375, price: 0.0 },
-}
-
-const LABOR_DEFAULTS = {
-  'Till - Soil Move Rate': 39,
-  'Till - Tilling Rate': 3600,
-  'Till - Amend Rate': 900,
-  'Tree Stakes - Install Rate': 3,
-  'Root Barrier - Install Rate': 20,
-  'Gopher Basket - Install Rate': 2,
-  'Mesh Flat - Install Rate': 0.7,
-  'Jute Fabric - Install Rate': 1.1,
-}
-
-const ADDON_MAT_DEFAULTS = {
-  'Tree Stake': 8.5,
-  'Root Barrier 12in': 5.0,
-  'Root Barrier 24in': 7.0,
-  'Gopher Basket 1 Gal': 3.42,
-  'Gopher Basket 5 Gal': 7.78,
-  'Gopher Basket 15 Gal': 10.5,
-  'Mesh Flat': 1.0,
-  'Jute Fabric': 0.4,
-}
-
+// All plant per-hour install rates + unit prices are read live from the saved
+// rate snapshots (laborRates / materialPrices) — no hardcoded fallbacks.
 const ADDON_META = {
   'Tree Stake': { matKey: 'Tree Stake', labKey: 'Tree Stakes - Install Rate', mode: 'perDay', unit: 'ea' },
   'Root Barrier 12"': { matKey: 'Root Barrier 12in', labKey: 'Root Barrier - Install Rate', mode: 'perMin', unit: 'LF' },
@@ -97,7 +38,7 @@ const LEGACY_ADDON_MAP = [
 ]
 
 const n = v => parseFloat(v) || 0
-const lr = (rates, key) => rates[key] ?? LABOR_DEFAULTS[key] ?? 0
+const lr = (rates, key) => n(rates[key])
 
 const plantMatPrice = resolveMaterialPrice
 
@@ -164,12 +105,12 @@ export default function PlantingSummary({ module }) {
   const vendorLabel = v => (!v || v === 'Standard' ? 'Standard' : vendorNames[v] || 'Vendor')
 
   // Plant lines
-  function plantLines(rows, defaultsMap) {
+  function plantLines(rows) {
     return rows
       .filter(r => n(r.qty) > 0)
       .map((r, i) => {
         const qty = n(r.qty)
-        const perDay = laborRates[r.type] ?? defaultsMap[r.type]?.perDay ?? 0
+        const perDay = n(laborRates[r.type])
         const unitPrice = n(r.price)
         const hrs = perDay > 0 ? qty / perDay : 0 // perDay is now per-HOUR
         const subEach = r.subEach !== '' && r.subEach != null ? n(r.subEach) : unitPrice
@@ -190,8 +131,8 @@ export default function PlantingSummary({ module }) {
       })
   }
 
-  const smallLines = plantLines(smallPlantRows, SMALL_PLANT_DEFAULTS)
-  const largeLines = plantLines(largePlantRows, LARGE_PLANT_DEFAULTS)
+  const smallLines = plantLines(smallPlantRows)
+  const largeLines = plantLines(largePlantRows)
 
   // Add-on lines
   const addonLines = (addonRows || [])
@@ -200,13 +141,7 @@ export default function PlantingSummary({ module }) {
       const meta = ADDON_META[r.type] || {}
       const qty = n(r.qty)
       const rate = lr(laborRates, meta.labKey)
-      const unitPrice = plantMatPrice(
-        meta.matKey,
-        r.vendor,
-        materialRows,
-        materialPrices,
-        ADDON_MAT_DEFAULTS[meta.matKey] ?? 0
-      )
+      const unitPrice = plantMatPrice(meta.matKey, r.vendor, materialRows, materialPrices)
       let hrs = 0
       if (meta.mode === 'perDay') hrs = rate > 0 ? qty / rate : 0 // rate is now per-HOUR
       else if (meta.mode === 'perMin') hrs = (qty * rate) / 60
