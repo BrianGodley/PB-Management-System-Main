@@ -602,7 +602,7 @@ export default function MasterRates({ only } = {}) {
       fetchAllMaterialsAdmin(),
       supabase.from('labor_rates').select('*').order('name'),
       supabase.from('subcontractor_rates').select('*').order('company_name'),
-      supabase.from('subs_vendors').select('id, company_name, type').order('company_name'),
+      supabase.from('subs_vendors').select('id, company_name, type, divisions').order('company_name'),
       // Taxonomy tables (may not exist yet → data null → [] → codes fall back to slug)
       supabase.from('labor_category').select('id, code, name'),
       supabase.from('labor_subcategory').select('id, code, name, category_id'),
@@ -830,7 +830,7 @@ export default function MasterRates({ only } = {}) {
   // Real companies to assign a rate to (excludes the Standard/Unspecified stand-in).
   const subVendorOptions = vendors
     .filter(v => !['unspecified', 'standard'].includes((v.company_name || '').trim().toLowerCase()))
-    .map(v => ({ id: v.id, company_name: v.company_name }))
+    .map(v => ({ id: v.id, company_name: v.company_name, divisions: v.divisions || [] }))
     .sort((a, b) => a.company_name.localeCompare(b.company_name))
   // Category / Sub-Category dropdown options = managed taxonomy (from the new
   // Categories tabs) merged with the built-in defaults and any value already on
@@ -1154,6 +1154,7 @@ export default function MasterRates({ only } = {}) {
           row={detailSub}
           code={subCodeMap.get(detailSub.id)}
           subs={subVendorOptions}
+          category={detailSub.category}
           onClose={() => setDetailSub(null)}
           onSaved={reloadSubs}
           onDeleted={reloadSubs}

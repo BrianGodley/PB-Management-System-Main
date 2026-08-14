@@ -6,11 +6,30 @@ import { supabase } from '../lib/supabase'
 //   row  — a subcontractor_rates row (id, vendor_id, company_name, category,
 //          sub_category, trade, unit, rate) + optional `code` for the header.
 //   subs — list of subs to choose from ({ id, company_name }).
-export default function SubRateDetailModal({ row, code, subs = [], onClose, onSaved, onDeleted }) {
+export default function SubRateDetailModal({ row, code, subs = [], category, onClose, onSaved, onDeleted }) {
   const [vendorId, setVendorId] = useState(row.vendor_id || '')
   const [rate, setRate] = useState(row.rate ?? '')
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
+  const [showAll, setShowAll] = useState(false)
+
+  // Subs whose trades (divisions) cover this rate's category — lenient match.
+  const cat = (category || '').trim().toLowerCase()
+  const coversCat = s =>
+    !cat ||
+    (s.divisions || []).some(d => {
+      const x = (d || '').trim().toLowerCase()
+      return x === cat || x.includes(cat) || cat.includes(x)
+    })
+  const matched = subs.filter(coversCat)
+  // Show category-matched subs by default; fall back to all if none match or the
+  // user asks. Always include the currently-assigned sub so it stays selectable.
+  const pickList = (showAll || matched.length === 0 ? subs : matched).slice()
+  if (vendorId && !pickList.some(s => s.id === vendorId)) {
+    const cur = subs.find(s => s.id === vendorId)
+    if (cur) pickList.unshift(cur)
+  }
+  const filtering = !showAll && matched.length > 0 && matched.length < subs.length
 
   async function save() {
     setSaving(true)
@@ -73,17 +92,30 @@ export default function SubRateDetailModal({ row, code, subs = [], onClose, onSa
         </div>
 
         <div className="mt-4">
-          <label className="block text-xs font-medium text-gray-600 mb-1">Subcontractor</label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs font-medium text-gray-600">Subcontractor</label>
+            {(filtering || showAll) && (
+              <button
+                type="button"
+                onClick={() => setShowAll(v => !v)}
+                className="text-[11px] text-green-700 hover:underline"
+              >
+                {showAll ? `Only ${category} subs` : 'Show all subs'}
+              </button>
+            )}
+          </div>
           <select className={field} value={vendorId} onChange={e => setVendorId(e.target.value)}>
             <option value="">Unassigned</option>
-            {subs.map(s => (
+            {pickList.map(s => (
               <option key={s.id} value={s.id}>
                 {s.company_name}
               </option>
             ))}
           </select>
           <p className="text-[11px] text-gray-400 mt-1">
-            More than one sub can price the same item — add another row for each in Master Rates.
+            {filtering
+              ? `Showing subs whose trades cover ${category}. More than one sub can price the same item.`
+              : 'More than one sub can price the same item — add another row for each in Master Rates.'}
           </p>
         </div>
 
