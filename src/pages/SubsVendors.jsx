@@ -1766,18 +1766,43 @@ function SubModal({
   generalCategories = [],
 }) {
   const [customInput, setCustomInput] = useState('')
-  const [stab, setStab] = useState('details') // 'details' | 'materials' | 'pricing' | 'quotes' | 'contracts'
+  const [stab, setStab] = useState('details') // 'details' | 'items' | 'materials' | 'pricing' | 'quotes' | 'contracts'
+  // Subcontractor rate items assigned to this record (matched on company_name).
+  const [assignedItems, setAssignedItems] = useState([])
+  useEffect(() => {
+    const name = (form.company_name || '').trim()
+    if (!recordId || !name) {
+      setAssignedItems([])
+      return
+    }
+    let gone = false
+    supabase
+      .from('subcontractor_rates')
+      .select('id, category, sub_category, trade, rate, unit')
+      .eq('company_name', name)
+      .order('category')
+      .order('sub_category')
+      .order('trade')
+      .then(({ data }) => {
+        if (!gone) setAssignedItems(data || [])
+      })
+    return () => {
+      gone = true
+    }
+  }, [recordId, form.company_name])
   // View vs edit: existing records open read-only; a new record opens editable.
   const [editing, setEditing] = useState(!isEdit)
   // Subs get Details + Contracts; vendors get Details + Quotes.
   const partyTabs = (mode === 'sub'
     ? [
         { k: 'details', l: 'Details' },
+        { k: 'items', l: 'Items' },
         { k: 'pricing', l: 'Pricing' },
         { k: 'contracts', l: 'Contracts' },
       ]
     : [
         { k: 'details', l: 'Details' },
+        { k: 'items', l: 'Items' },
         { k: 'general', l: 'General' },
         { k: 'materials', l: 'Materials' },
         { k: 'pricing', l: 'Pricing' },
@@ -1785,7 +1810,7 @@ function SubModal({
         { k: 'catalogs', l: 'Catalogs' },
       ]
   ).filter(t =>
-    t.k === 'quotes' || t.k === 'contracts' || t.k === 'catalogs' ? recordId : true
+    t.k === 'quotes' || t.k === 'contracts' || t.k === 'catalogs' || t.k === 'items' ? recordId : true
   )
   // Never leave the active tab on a kind that's hidden for this mode.
   useEffect(() => {
@@ -1920,10 +1945,48 @@ function SubModal({
         {/* Body — form controls are disabled in view mode via the fieldset. */}
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-5">
           <fieldset
-            disabled={!editing && stab !== 'quotes' && stab !== 'contracts' && stab !== 'catalogs'}
+            disabled={!editing && stab !== 'quotes' && stab !== 'contracts' && stab !== 'catalogs' && stab !== 'items'}
             className="space-y-4 border-0 p-0 m-0 min-w-0 disabled:opacity-90"
           >
-          {stab === 'quotes' ? (
+          {stab === 'items' ? (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800 mb-1">Assigned Rate Items</h3>
+              <p className="text-xs text-gray-500 mb-3">
+                Subcontractor rate items assigned to {form.company_name || 'this record'}. Edit the rates in
+                Master Rates → Subcontractors.
+              </p>
+              {assignedItems.length === 0 ? (
+                <div className="text-sm text-gray-400 italic py-6 text-center">
+                  No rate items are assigned to this {mode === 'sub' ? 'sub' : 'vendor'} yet.
+                </div>
+              ) : (
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-gray-500 border-b border-gray-200">
+                      <th className="text-left pb-1 pr-2 font-medium">Category</th>
+                      <th className="text-left pb-1 pr-2 font-medium">Sub-Category</th>
+                      <th className="text-left pb-1 pr-2 font-medium">Item</th>
+                      <th className="text-right pb-1 pr-2 font-medium">Rate</th>
+                      <th className="text-left pb-1 font-medium">Unit</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {assignedItems.map(it => (
+                      <tr key={it.id}>
+                        <td className="py-1.5 pr-2 text-gray-700">{it.category}</td>
+                        <td className="py-1.5 pr-2 text-gray-700">{it.sub_category || '—'}</td>
+                        <td className="py-1.5 pr-2 text-gray-800">{it.trade || '—'}</td>
+                        <td className="py-1.5 pr-2 text-right tabular-nums text-gray-800">
+                          {it.rate != null ? `$${Number(it.rate).toLocaleString()}` : '—'}
+                        </td>
+                        <td className="py-1.5 text-gray-500">{it.unit || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          ) : stab === 'quotes' ? (
             <PartyHistory partyId={recordId} kind="quotes" />
           ) : stab === 'contracts' ? (
             <PartyHistory partyId={recordId} kind="contracts" />
