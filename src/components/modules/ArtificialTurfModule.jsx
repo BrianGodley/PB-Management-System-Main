@@ -681,10 +681,12 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
   const [baseDefaults, setBaseDefaults] = useState(null)
   const [showBaseDefaults, setShowBaseDefaults] = useState(false)
   const [defDraft, setDefDraft] = useState({})
-  // On a NEW module, pre-fill each base row's Vendor + Type from the saved
-  // defaults (only rows the user hasn't already set), for both tabs.
+  // Pre-fill each base row's Vendor + Type from the saved defaults. Only touches
+  // rows the user hasn't set yet (empty Type, vendor still Standard/unset), so it
+  // never overrides a real selection — applies on a fresh module and fills any
+  // still-empty rows after defaults are (re)saved.
   useEffect(() => {
-    if (!baseDefaults || initialData) return
+    if (!baseDefaults) return
     setState(p => {
       const patch = tab => {
         if (!tab?.baseRows) return tab
@@ -701,7 +703,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       }
       return { ...p, ihData: patch(p.ihData), subData: patch(p.subData) }
     })
-  }, [baseDefaults, initialData])
+  }, [baseDefaults])
   // Saves the defaults straight to company_settings — independent of the estimate
   // Save button. Surfaces any failure (e.g. the turf_base_defaults column not yet
   // added) instead of silently doing nothing.
