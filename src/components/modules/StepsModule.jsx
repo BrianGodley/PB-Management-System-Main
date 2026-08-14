@@ -51,6 +51,11 @@ const PAVER_STEP_CAT = 'Paver Material' // shared Paver catalog sub_category
 const CONC_VENDOR_CAT = 'Concrete Mix' // catalog sub_category for concrete vendors
 const STEP_FORMS = ['Straight', 'Curved']
 const CONC_TYPES = ['Standard', 'Standard Colored', 'Cantilevered', 'Cantilevered Colored']
+// Colored only affects material, not labor — so LABOR is keyed by the base type
+// (Standard / Cantilevered). This keeps the View Rates labor list free of the
+// duplicate "… Colored Labor" lines.
+const CONC_BASE_TYPES = ['Standard', 'Cantilevered']
+const concBaseType = t => (t || '').replace(/\s*Colored$/i, '')
 const CONC_FINISHES = ['Smooth', 'Broom', 'Sanded', 'Salted', 'Exposed Aggregate']
 
 // ── Rate-key builders (category 'Steps') ─────────────────────────────────────
@@ -119,16 +124,18 @@ function matStepRowCalc(r, laborRates, materialRows, cat = PAVER_STEP_CAT, price
 
 function concRowCalc(r, laborRates, materialRates) {
   // Unselected concrete step (no Type) contributes nothing (no crash, no fallback).
-  if (!r.type) return { sf: n(r.sf), hrs: 0, mat: 0 }
-  const sf = n(r.sf)
-  const typeHrs = n(laborRates[kConcTypeHrs(r.type)])
+  if (!r.type) return { lf: n(r.sf), hrs: 0, mat: 0 }
+  // Quantity is linear feet; every rate is per Ln Ft. Labor is keyed by the base
+  // type (color only changes material), so it stays a single per-type rate.
+  const lf = n(r.sf)
+  const typeHrs = n(laborRates[kConcTypeHrs(concBaseType(r.type))])
   const finishHrs = n(laborRates[kFinishHrs(r.finish)])
   const formMult = n(laborRates[kConcForm(r.form)])
-  const hrs = sf * (typeHrs + finishHrs) * formMult
+  const hrs = lf * (typeHrs + finishHrs) * formMult
   const typeMat = n(materialRates[kConcTypeMat(r.type)])
   const finishMat = n(materialRates[kFinishMat(r.finish)])
-  const mat = sf * (typeMat + finishMat)
-  return { sf, hrs, mat }
+  const mat = lf * (typeMat + finishMat)
+  return { lf, hrs, mat }
 }
 
 // Sub rows are unit priced per LF: rate = base + applicable per-LF modifiers.
@@ -461,15 +468,23 @@ function StepsRatesModal({ open, onClose, onSaved, isSub = false }) {
                 <thead>
                   <tr className="text-gray-400 border-b border-gray-200">
                     <th className="text-left pb-1 font-medium">Type</th>
-                    <th className="text-right pb-1 font-medium">Labor (hrs per Sq Ft)</th>
-                    <th className="text-right pb-1 font-medium">Material ($ per Sq Ft)</th>
+                    <th className="text-right pb-1 font-medium">Labor (hrs per Ln Ft)</th>
+                    <th className="text-right pb-1 font-medium">Material ($ per Ln Ft)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {CONC_TYPES.map(t => (
                     <tr key={t} className="border-b border-gray-50">
                       <td className="py-1 text-gray-700">{t}</td>
-                      <td className="py-1 text-right">{numCell('typeHrs', t)}</td>
+                      {/* Labor is per base type (color = material only), so colored
+                          rows inherit the base type's labor rather than duplicate it. */}
+                      <td className="py-1 text-right">
+                        {concBaseType(t) === t ? (
+                          numCell('typeHrs', t)
+                        ) : (
+                          <span className="text-gray-300">= {concBaseType(t)}</span>
+                        )}
+                      </td>
                       <td className="py-1 text-right">{numCell('typeMat', t)}</td>
                     </tr>
                   ))}
@@ -486,8 +501,8 @@ function StepsRatesModal({ open, onClose, onSaved, isSub = false }) {
                 <thead>
                   <tr className="text-gray-400 border-b border-gray-200">
                     <th className="text-left pb-1 font-medium">Finish</th>
-                    <th className="text-right pb-1 font-medium">+Labor (hrs per Sq Ft)</th>
-                    <th className="text-right pb-1 font-medium">+Material ($ per Sq Ft)</th>
+                    <th className="text-right pb-1 font-medium">+Labor (hrs per Ln Ft)</th>
+                    <th className="text-right pb-1 font-medium">+Material ($ per Ln Ft)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -689,7 +704,7 @@ function MaterialStepSection({
             <th className="text-center pb-1 pr-2 font-medium w-40">Vendor</th>
             <th className="text-center pb-1 pr-2 font-medium">{`${matWord} Type`}</th>
             <th className="text-center pb-1 pr-2 font-medium w-24">Form</th>
-            <th className="text-center pb-1 pr-2 font-medium w-20">{isSub ? 'LF' : 'SF'}</th>
+            <th className="text-center pb-1 pr-2 font-medium w-20">LF</th>
             <th className="text-center pb-1 pr-2 font-medium w-24">Grouted?</th>
             <th className="text-center pb-1 pr-2 font-medium w-28">{isSub ? 'Sub $' : 'Hrs · Mat'}</th>
             <th className="w-6"></th>
@@ -1119,13 +1134,15 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
     {
       group: 'Concrete Steps',
       items: [
-        ...CONC_TYPES.map(t => ({
+        // Labor is per base type only (colored variants share the same labor),
+        // so the list shows one line per base type — no duplicates.
+        ...CONC_BASE_TYPES.map(t => ({
           label: `${t} Labor`,
           table: 'labor_rates',
           name: kConcTypeHrs(t),
           category: 'Steps',
           mode: 'coefficient',
-          unitLabel: 'hr per Sq Ft',
+          unitLabel: 'hr per Ln Ft',
           value: laborRates[kConcTypeHrs(t)],
         })),
         ...STEP_FORMS.map(f => ({
@@ -1143,7 +1160,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           name: kFinishHrs(f),
           category: 'Steps',
           mode: 'coefficient',
-          unitLabel: 'hr per Sq Ft',
+          unitLabel: 'hr per Ln Ft',
           value: laborRates[kFinishHrs(f)],
         })),
         // Per-vendor concrete-mix catalog products.
@@ -1155,7 +1172,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           name: kConcTypeMat(t),
           category: 'Steps',
           mode: 'currency',
-          unitLabel: 'Sq Ft',
+          unitLabel: 'Ln Ft',
           value: materialRates[kConcTypeMat(t)],
         })),
         ...CONC_FINISHES.map(f => ({
@@ -1164,7 +1181,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           name: kFinishMat(f),
           category: 'Steps',
           mode: 'currency',
-          unitLabel: 'Sq Ft',
+          unitLabel: 'Ln Ft',
           value: materialRates[kFinishMat(f)],
         })),
       ],
@@ -1340,7 +1357,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
               <th className="text-center pb-1 pr-2 font-medium w-40">Vendor</th>
               <th className="text-center pb-1 pr-2 font-medium">Concrete Type</th>
               <th className="text-center pb-1 pr-2 font-medium w-24">Form</th>
-              <th className="text-center pb-1 pr-2 font-medium w-20">{isSub ? 'LF' : 'SF'}</th>
+              <th className="text-center pb-1 pr-2 font-medium w-20">LF</th>
               <th className="text-center pb-1 pr-2 font-medium">Finish</th>
               <th className="text-center pb-1 pr-2 font-medium w-28">{isSub ? 'Sub $' : 'Hrs · Mat'}</th>
               <th className="w-6"></th>

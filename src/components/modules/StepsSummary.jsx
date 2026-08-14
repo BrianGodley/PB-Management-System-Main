@@ -86,7 +86,7 @@ export default function StepsSummary({ module }) {
               label={[r.type || sec.title.replace(' Steps', ''), r.form, r.grouted ? 'grouted' : null]
                 .filter(Boolean)
                 .join(' · ')}
-              value={`${n(r.sf)} ${isSub ? 'LF' : 'SF'}`}
+              value={`${n(r.sf)} LF`}
             />
           ))}
         </div>
@@ -100,7 +100,7 @@ export default function StepsSummary({ module }) {
             <LineRow
               key={i}
               label={[r.type, r.finish, r.form].filter(Boolean).join(' · ')}
-              value={`${n(r.sf)} ${isSub ? 'LF' : 'SF'}`}
+              value={`${n(r.sf)} LF`}
             />
           ))}
         </>
