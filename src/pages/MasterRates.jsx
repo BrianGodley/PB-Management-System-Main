@@ -7,6 +7,7 @@ import VendorCatalogImportModal from '../components/VendorCatalogImportModal'
 import MergeDuplicatesModal from '../components/MergeDuplicatesModal'
 import { fetchProductTypes, validateCalcMeta, indexProductTypes } from '../lib/productTypes'
 import TaxonomyManager from '../components/TaxonomyManager'
+import SubRateDetailModal from '../components/SubRateDetailModal'
 
 // ── Identity code per labor / subcontractor rate (generated on the fly, never
 // stored — mirrors the material + misc-rate codes). Format:
@@ -563,6 +564,7 @@ export default function MasterRates({ only } = {}) {
   const [labor, setLabor] = useState([])
   const [subs, setSubs] = useState([])
   const [vendors, setVendors] = useState([])
+  const [detailSub, setDetailSub] = useState(null) // subcontractor_rates row open in the detail modal
   // Labor / subcontractor taxonomy (for generated codes; tables may not exist yet)
   const [laborCats, setLaborCats] = useState([])
   const [laborSubcats, setLaborSubcats] = useState([])
@@ -806,6 +808,30 @@ export default function MasterRates({ only } = {}) {
   const codeCell = map => r => (
     <span className="font-mono text-xs text-gray-500">{map.get(r.id) || '—'}</span>
   )
+  // Subcontractor Code is a link that opens the rate detail modal (assign a sub,
+  // edit the rate, delete) — mirrors the material Code link.
+  const subCodeCell = r => {
+    const code = subCodeMap.get(r.id) || '—'
+    if (code === '—') return <span className="font-mono text-xs text-gray-400">—</span>
+    return (
+      <button
+        type="button"
+        onClick={() => setDetailSub(r)}
+        className="font-mono text-xs text-green-700 font-semibold hover:underline"
+      >
+        {code}
+      </button>
+    )
+  }
+  const reloadSubs = async () => {
+    const { data } = await supabase.from('subcontractor_rates').select('*').order('company_name')
+    if (data) setSubs(data)
+  }
+  // Real companies to assign a rate to (excludes the Standard/Unspecified stand-in).
+  const subVendorOptions = vendors
+    .filter(v => !['unspecified', 'standard'].includes((v.company_name || '').trim().toLowerCase()))
+    .map(v => ({ id: v.id, company_name: v.company_name }))
+    .sort((a, b) => a.company_name.localeCompare(b.company_name))
   // Category / Sub-Category dropdown options = managed taxonomy (from the new
   // Categories tabs) merged with the built-in defaults and any value already on
   // a row, so nothing existing disappears and newly-added categories show up.
@@ -842,8 +868,13 @@ export default function MasterRates({ only } = {}) {
     },
   ]
   const subColumns = [
-    { key: 'code', label: 'Code', editable: false, render: codeCell(subCodeMap) },
-    { key: 'company_name', label: 'Subcontractor', placeholder: 'e.g. ABC Concrete Co.' },
+    { key: 'code', label: 'Code', editable: false, render: subCodeCell },
+    {
+      key: 'company_name',
+      label: 'Subcontractor',
+      editable: false,
+      render: r => r.company_name || <span className="text-gray-400 italic">Unassigned</span>,
+    },
     { key: 'category', label: 'Category', type: 'select', options: subCatOptions },
     { key: 'sub_category', label: 'Sub Category', type: 'select', options: subSubOptions, placeholder: 'describe…' },
     { key: 'trade', label: 'Item', bold: true, stripCat: true, placeholder: 'e.g. Flatwork Pour' },
@@ -1117,6 +1148,17 @@ export default function MasterRates({ only } = {}) {
       {/* Subcontractor taxonomy — Categories and Sub-Categories as independent tabs. */}
       {activeTab === 'sub_cat' && <TaxonomyManager scope="sub" kind="category" />}
       {activeTab === 'sub_sub' && <TaxonomyManager scope="sub" kind="subcategory" />}
+
+      {detailSub && (
+        <SubRateDetailModal
+          row={detailSub}
+          code={subCodeMap.get(detailSub.id)}
+          subs={subVendorOptions}
+          onClose={() => setDetailSub(null)}
+          onSaved={reloadSubs}
+          onDeleted={reloadSubs}
+        />
+      )}
     </div>
   )
 }
