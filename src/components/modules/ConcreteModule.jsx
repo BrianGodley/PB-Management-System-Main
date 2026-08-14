@@ -69,7 +69,6 @@ const SUB_FINISH_RATES = {
     mat: { name: 'Concrete Sub - Seeded Aggregate Mat Per SF' },
   },
 }
-const SEALER_TYPES = ['Natural', 'Wet-Look']
 
 // In-House pour+finish is priced by job-size tier — each tier has its own
 // SF/hr labour rate (editable via labor_rates, category 'Concrete').
@@ -139,6 +138,22 @@ function calcConcrete(
     }).map(o => ({ label: o.label, dbName: o.row.name, fallback: n(o.row.unit_cost) }))
     return resolveType(row.type, opts)
   }
+  // Vendor-catalog MATERIAL resolver (sealer / vapor / finish material). Resolves
+  // a picked Vendor+Item against the catalog and returns its unit price + coverage
+  // + coats from calc_meta. 'Standard'/'auto' → the null-vendor rows. No hardcoded
+  // fallback — an unmatched pick returns null (row books $0).
+  const catItem = (subcat, vendor, itemName) => {
+    if (!vendor || !itemName) return null
+    const isStd = vendor === 'Standard' || vendor === 'auto'
+    const opts = catalogOptions(materialRows, subcat, isStd ? 'Standard' : vendor, {
+      standardRows: 'null-vendor',
+      stripPrefix: true,
+    })
+    const o = opts.find(x => x.label === itemName)
+    if (!o) return null
+    const meta = o.row.calc_meta || {}
+    return { price: n(o.row.unit_cost), coverage: n(meta.coverageSqFt), coats: n(meta.coats) }
+  }
   // Subcontractor rates: a one-off adjustment saved on THIS estimate
   // (state.rateOverrides) takes precedence over the master rate.
   sr = { ...(sr || {}) }
@@ -197,12 +212,7 @@ function calcConcrete(
   const formMaterialPerLF = P.price('Concrete - Form Lumber LF', { category: 'Concrete', unit: 'LF' })
   const sleevePer10LF = P.price('Concrete - Sleeve Per 10LF', { category: 'Concrete', unit: '10LF' })
   const colorCostPerCY = P.price('Concrete - Color Per CY', { category: 'Concrete', unit: 'CY' })
-  const sealerNatural5g = P.price('Concrete - Sealer Natural 5gal', { category: 'Concrete', unit: '5gal' })
-  const sealerWet5g = P.price('Concrete - Sealer Wet 5gal', { category: 'Concrete', unit: '5gal' })
-  const vaporBarrierPerSF = P.price('Concrete - Vapor Barrier SF', { category: 'Concrete', unit: 'SF' })
   const costBase = n(mr['Base - Class II Roadbase']) // display-only; Base prices per-row from the catalog (bt.fallback)
-  // Sealer coverage (SF per gallon) — DB-editable coefficient (misc_rates).
-  const sealerSFPerGal = n(mr['Concrete - Sealer SF/gal'])
 
   // ── Sub / equipment costs (subcontractor_rates) ──────────────────────────
   const pumpFeeFlat = n(sr['Concrete - Pump Flat Fee'])
@@ -220,7 +230,6 @@ function calcConcrete(
   const isIH = state.finishingType !== 'Sub'
   const vaporSF = n(state.vaporBarrierSF)
   const sealerSF = n(state.sealerSF)
-  const sealerType = state.sealerType || 'Natural'
   const hoursAdj = n(state.hoursAdj)
 
   // ── Base ────────────────────────────────────────────────────────────────
@@ -335,19 +344,29 @@ function calcConcrete(
   const pumpMat = pumpAuto && concreteCY > 0 ? pumpFeeFlat + pumpFeePerCY * Math.ceil(concreteCY) : 0
 
   // ── Vapor barrier ────────────────────────────────────────────────────────
-  const vaporHrs = vaporSF > 0 ? vaporSF / vaporBarrierSFPerHr : 0
-  const vaporMat = vaporSF * vaporBarrierPerSF
+  // Labor SF/hr (guarded); material = SF × the picked catalog item's $/SF.
+  const vaporHrs = vaporSF > 0 && vaporBarrierSFPerHr > 0 ? vaporSF / vaporBarrierSFPerHr : 0
+  const vap = catItem('Vapor Barrier', state.vaporVendor, state.vaporItem)
+  const vaporMat = vap ? vaporSF * vap.price : 0
 
   // ── Sealer ───────────────────────────────────────────────────────────────
-  let sealerHrs = 0,
-    sealerMat = 0
+  // Labor by item name (wet → Wet-Look SF/hr, else Natural SF/hr; guarded).
+  // Material = ceil(SF ÷ coverage) × the picked catalog item's $/gal. Coats are
+  // display-only and NOT part of the math.
+  const seal = catItem('Concrete Sealer', state.sealerVendor, state.sealerItem)
+  let sealerHrs = 0
   if (sealerSF > 0) {
-    const sealerGals = Math.ceil(sealerSF / sealerSFPerGal)
-    const price5g = sealerType === 'Natural' ? sealerNatural5g : sealerWet5g
-    sealerMat = sealerGals * (price5g / 5)
-    const sealSFPerHr = sealerType === 'Natural' ? sealerNaturalSFPerHr : sealerWetSFPerHr
-    sealerHrs = sealerSF / sealSFPerHr
+    const sealSFPerHr = /wet/i.test(state.sealerItem || '') ? sealerWetSFPerHr : sealerNaturalSFPerHr
+    sealerHrs = sealSFPerHr > 0 ? sealerSF / sealSFPerHr : 0
   }
+  const sealerMat = seal && seal.coverage > 0 ? Math.ceil(sealerSF / seal.coverage) * seal.price : 0
+  const sealerCoats = seal ? seal.coats : 0
+
+  // ── Finish material (in-house — products for finishes that have them, e.g.
+  //    Sand Finish). Whole gallons: ceil(SF ÷ coverage) × the item's $/gal. ──
+  const finMatSF = n(state.finishMatSF)
+  const fin = catItem('Concrete Finish Material', state.finishMatVendor, state.finishMatItem)
+  const finishMat = fin && fin.coverage > 0 ? Math.ceil(finMatSF / fin.coverage) * fin.price : 0
 
   // ── Manual ───────────────────────────────────────────────────────────────
   let manHrs = 0,
@@ -383,6 +402,7 @@ function calcConcrete(
     pumpMat +
     vaporMat +
     sealerMat +
+    finishMat +
     manMat
   const laborCost = totalHrs * lrph
   const burden = laborCost * n(laborBurdenPct)
@@ -426,6 +446,14 @@ function calcConcrete(
     pumpMat,
     vaporMat,
     sealerMat,
+    finishMat,
+    sealerCoats,
+    // Per-section resolved catalog unit price/coverage (display convenience).
+    sealerUnitPrice: seal ? seal.price : 0,
+    sealerCoverage: seal ? seal.coverage : 0,
+    vaporUnitPrice: vap ? vap.price : 0,
+    finishMatUnitPrice: fin ? fin.price : 0,
+    finishMatCoverage: fin ? fin.coverage : 0,
     finishSubCost,
     // Resolved rates — exposed so the inline calculator icons can show + edit them
     concreteSFPerHr,
@@ -440,13 +468,9 @@ function calcConcrete(
     rebarPerLF,
     rebarLfPerSf,
     rebarLfPerSfBySpacing,
-    sealerSFPerGal,
     formMaterialPerLF,
     sleevePer10LF,
     colorCostPerCY,
-    sealerNatural5g,
-    sealerWet5g,
-    vaporBarrierPerSF,
     costBase,
     pumpFeeFlat,
     pumpFeePerCY,
@@ -576,7 +600,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
       supabase.from('labor_rates').select('name, rate').eq('category', 'Concrete'),
       fetchStandardRateMap(['Concrete', 'Basic Materials']),
       supabase.from('subcontractor_rates').select('company_name, rate').eq('category', 'Concrete'),
-      fetchModuleCatalog(['Concrete']),
+      fetchModuleCatalog(['Concrete', 'Basic Materials']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
@@ -625,7 +649,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   useEffect(() => {
     let alive = true
     Promise.all([
-      fetchModuleCatalog(['Concrete']),
+      fetchModuleCatalog(['Concrete', 'Basic Materials']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
@@ -679,8 +703,14 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const [colorYes, setColorYes] = useState(initialData?.colorYes ?? false)
   const [pumpYes, setPumpYes] = useState(initialData?.pumpYes ?? false)
   const [vaporBarrierSF, setVaporBarrierSF] = useState(initialData?.vaporBarrierSF ?? '')
+  const [vaporVendor, setVaporVendor] = useState(initialData?.vaporVendor ?? '')
+  const [vaporItem, setVaporItem] = useState(initialData?.vaporItem ?? '')
   const [sealerSF, setSealerSF] = useState(initialData?.sealerSF ?? '')
-  const [sealerType, setSealerType] = useState(initialData?.sealerType ?? 'Natural')
+  const [sealerVendor, setSealerVendor] = useState(initialData?.sealerVendor ?? '')
+  const [sealerItem, setSealerItem] = useState(initialData?.sealerItem ?? '')
+  const [finishMatVendor, setFinishMatVendor] = useState(initialData?.finishMatVendor ?? '')
+  const [finishMatItem, setFinishMatItem] = useState(initialData?.finishMatItem ?? '')
+  const [finishMatSF, setFinishMatSF] = useState(initialData?.finishMatSF ?? '')
 
   // Multi-row sections
   const [baseRows, setBaseRows] = useState(initialData?.baseRows ?? DEFAULT_BASE_ROWS)
@@ -701,8 +731,14 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const [subColorYes, setSubColorYes] = useState(initialData?.subColorYes ?? false)
   const [subPumpYes, setSubPumpYes] = useState(initialData?.subPumpYes ?? false)
   const [subVaporBarrierSF, setSubVaporBarrierSF] = useState(initialData?.subVaporBarrierSF ?? '')
+  const [subVaporVendor, setSubVaporVendor] = useState(initialData?.subVaporVendor ?? '')
+  const [subVaporItem, setSubVaporItem] = useState(initialData?.subVaporItem ?? '')
   const [subSealerSF, setSubSealerSF] = useState(initialData?.subSealerSF ?? '')
-  const [subSealerType, setSubSealerType] = useState(initialData?.subSealerType ?? 'Natural')
+  const [subSealerVendor, setSubSealerVendor] = useState(initialData?.subSealerVendor ?? '')
+  const [subSealerItem, setSubSealerItem] = useState(initialData?.subSealerItem ?? '')
+  const [subFinishMatVendor, setSubFinishMatVendor] = useState(initialData?.subFinishMatVendor ?? '')
+  const [subFinishMatItem, setSubFinishMatItem] = useState(initialData?.subFinishMatItem ?? '')
+  const [subFinishMatSF, setSubFinishMatSF] = useState(initialData?.subFinishMatSF ?? '')
   const [subBaseRows, setSubBaseRows] = useState(initialData?.subBaseRows ?? DEFAULT_BASE_ROWS)
   const [subManualRows, setSubManualRows] = useState(
     initialData?.subManualRows ?? DEFAULT_MANUAL_ROWS
@@ -747,8 +783,14 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     colorYes,
     pumpYes,
     vaporBarrierSF,
+    vaporVendor,
+    vaporItem,
     sealerSF,
-    sealerType,
+    sealerVendor,
+    sealerItem,
+    finishMatVendor,
+    finishMatItem,
+    finishMatSF,
     baseRows,
     manualRows,
   }
@@ -813,10 +855,22 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const setActivePumpYes = isSub ? setSubPumpYes : setPumpYes
   const activeVaporBarrierSF = isSub ? subVaporBarrierSF : vaporBarrierSF
   const setActiveVaporBarrierSF = isSub ? setSubVaporBarrierSF : setVaporBarrierSF
+  const activeVaporVendor = isSub ? subVaporVendor : vaporVendor
+  const setActiveVaporVendor = isSub ? setSubVaporVendor : setVaporVendor
+  const activeVaporItem = isSub ? subVaporItem : vaporItem
+  const setActiveVaporItem = isSub ? setSubVaporItem : setVaporItem
   const activeSealerSF = isSub ? subSealerSF : sealerSF
   const setActiveSealerSF = isSub ? setSubSealerSF : setSealerSF
-  const activeSealerType = isSub ? subSealerType : sealerType
-  const setActiveSealerType = isSub ? setSubSealerType : setSealerType
+  const activeSealerVendor = isSub ? subSealerVendor : sealerVendor
+  const setActiveSealerVendor = isSub ? setSubSealerVendor : setSealerVendor
+  const activeSealerItem = isSub ? subSealerItem : sealerItem
+  const setActiveSealerItem = isSub ? setSubSealerItem : setSealerItem
+  const activeFinishMatVendor = isSub ? subFinishMatVendor : finishMatVendor
+  const setActiveFinishMatVendor = isSub ? setSubFinishMatVendor : setFinishMatVendor
+  const activeFinishMatItem = isSub ? subFinishMatItem : finishMatItem
+  const setActiveFinishMatItem = isSub ? setSubFinishMatItem : setFinishMatItem
+  const activeFinishMatSF = isSub ? subFinishMatSF : finishMatSF
+  const setActiveFinishMatSF = isSub ? setSubFinishMatSF : setFinishMatSF
   const activeBaseRows = isSub ? subBaseRows : baseRows
   const setActiveBaseRows = isSub ? setSubBaseRows : setBaseRows
   const activeManualRows = isSub ? subManualRows : manualRows
@@ -880,11 +934,8 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     pumpFeeFlat,
     pumpFeePerCY,
     vaporBarrierSFPerHr,
-    vaporBarrierPerSF,
     sealerNaturalSFPerHr,
     sealerWetSFPerHr,
-    sealerNatural5g,
-    sealerWet5g,
     costBase,
   } = inHouse
   const _subDepth = n(subDepthIn) || 4
@@ -990,8 +1041,14 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
         subColorYes,
         subPumpYes,
         subVaporBarrierSF,
+        subVaporVendor,
+        subVaporItem,
         subSealerSF,
-        subSealerType,
+        subSealerVendor,
+        subSealerItem,
+        subFinishMatVendor,
+        subFinishMatItem,
+        subFinishMatSF,
         subBaseRows,
         subManualRows,
         walkAccess: effWalkAccess,
@@ -1040,6 +1097,16 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
       .filter(r0 => r0.vendor_id == null || vendorNames[r0.vendor_id])
       .sort(catalogSort)
       .map(catalogRowToItem)
+  // Which finish types have finish-material PRODUCTS (i.e. appear as
+  // calc_meta.finish on a 'Concrete Finish Material' catalog row). Used to
+  // enable/disable the Finish material pickers per selected finish.
+  const finishMatFinishes = new Set(
+    (materialRows || [])
+      .filter(r0 => r0.sub_category === 'Concrete Finish Material')
+      .map(r0 => (r0.calc_meta && r0.calc_meta.finish) || '')
+      .filter(Boolean)
+  )
+  const finishHasProducts = finishMatFinishes.has(activeFinishType)
   // Named materials (Rebar, Form Lumber, …): matched by exact catalog name.
   const materialRateRows = dbName =>
     (materialRows || [])
@@ -1275,15 +1342,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           value: calc.sealerWetSFPerHr,
         },
         {
-          label: 'Sealer Coverage (SF/gal)',
-          table: 'misc_rates',
-          name: 'Concrete - Sealer SF/gal',
-          category: 'Concrete',
-          mode: 'coefficient',
-          unitLabel: 'Sq Ft per gal',
-          value: calc.sealerSFPerGal,
-        },
-        {
           label: 'Concrete - Sand Finish 400SF',
           table: 'subcontractor_rates',
           name: 'Concrete - Sand Finish 400SF',
@@ -1310,10 +1368,11 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           unitLabel: 'Cu Yd',
           value: calc.stampSubPerCY,
         },
-        // Finish material catalog (sealers, vapor barrier).
-        ...materialRateRows('Concrete - Sealer Natural 5gal'),
-        ...materialRateRows('Concrete - Sealer Wet 5gal'),
-        ...materialRateRows('Concrete - Vapor Barrier SF'),
+        // Finish material catalog (vendor-supplied sealer / vapor barrier /
+        // finish-material products) — surfaced here, globally editable.
+        ...catalogBlockItems('Concrete Sealer'),
+        ...catalogBlockItems('Vapor Barrier'),
+        ...catalogBlockItems('Concrete Finish Material'),
       ],
     },
     {
@@ -1901,23 +1960,192 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
               <span className="text-gray-700">Color Hardener (${calc.colorCostPerCY} per Cu Yd)</span>
             </label>
           </div>
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Vapor Barrier (Sq Ft)</label>
-            <NumInput value={activeVaporBarrierSF} onChange={setActiveVaporBarrierSF} />
+          {/* ── Sealer: Vendor | Item | Sq Ft | Coats | Material ── */}
+          <div className="col-span-2">
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_5rem_4rem_6rem] gap-2 items-end">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Sealer Vendor</label>
+                <select
+                  className="input text-sm py-1.5 w-full min-w-0"
+                  value={activeSealerVendor || ''}
+                  onChange={e => {
+                    setActiveSealerVendor(e.target.value)
+                    setActiveSealerItem('')
+                  }}
+                  title="Sealer vendor"
+                >
+                  {!activeSealerVendor && <option value="">Select</option>}
+                  {vendorsForCategory('Concrete Sealer').map(v => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}
+                    </option>
+                  ))}
+                  <option value="Standard">Standard</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Item</label>
+                <select
+                  className="input text-sm py-1.5 w-full min-w-0"
+                  value={activeSealerItem || ''}
+                  onChange={e => setActiveSealerItem(e.target.value)}
+                >
+                  {!activeSealerItem && <option value="">Select item</option>}
+                  {activeSealerItem &&
+                    !sectionOptions('Concrete Sealer', activeSealerVendor).some(o => o.label === activeSealerItem) && (
+                      <option value={activeSealerItem}>{activeSealerItem}</option>
+                    )}
+                  {sectionOptions('Concrete Sealer', activeSealerVendor).map(o => (
+                    <option key={o.label} value={o.label}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Sq Ft</label>
+                <NumInput value={activeSealerSF} onChange={setActiveSealerSF} className="w-full text-center" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Coats</label>
+                <input
+                  className="input text-sm py-1.5 w-full text-center bg-gray-50 text-gray-500"
+                  value={calc.sealerCoats > 0 ? calc.sealerCoats : '—'}
+                  readOnly
+                  tabIndex={-1}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Material</label>
+                <div className="input text-sm py-1.5 w-full text-right bg-gray-50 text-gray-600">
+                  {fmt2(calc.sealerMat)}
+                </div>
+              </div>
+            </div>
           </div>
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Sealer (Sq Ft)</label>
-            <div className="flex gap-2">
-              <NumInput value={activeSealerSF} onChange={setActiveSealerSF} className="flex-1" />
-              <select
-                className="input text-sm py-1.5 w-28"
-                value={activeSealerType}
-                onChange={e => setActiveSealerType(e.target.value)}
-              >
-                {SEALER_TYPES.map(t => (
-                  <option key={t}>{t}</option>
-                ))}
-              </select>
+          {/* ── Vapor Barrier: Vendor | Item | Sq Ft | Material ── */}
+          <div className="col-span-2">
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_5rem_6rem] gap-2 items-end">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Vapor Barrier Vendor</label>
+                <select
+                  className="input text-sm py-1.5 w-full min-w-0"
+                  value={activeVaporVendor || ''}
+                  onChange={e => {
+                    setActiveVaporVendor(e.target.value)
+                    setActiveVaporItem('')
+                  }}
+                  title="Vapor barrier vendor"
+                >
+                  {!activeVaporVendor && <option value="">Select</option>}
+                  {vendorsForCategory('Vapor Barrier').map(v => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}
+                    </option>
+                  ))}
+                  <option value="Standard">Standard</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Item</label>
+                <select
+                  className="input text-sm py-1.5 w-full min-w-0"
+                  value={activeVaporItem || ''}
+                  onChange={e => setActiveVaporItem(e.target.value)}
+                >
+                  {!activeVaporItem && <option value="">Select item</option>}
+                  {activeVaporItem &&
+                    !sectionOptions('Vapor Barrier', activeVaporVendor).some(o => o.label === activeVaporItem) && (
+                      <option value={activeVaporItem}>{activeVaporItem}</option>
+                    )}
+                  {sectionOptions('Vapor Barrier', activeVaporVendor).map(o => (
+                    <option key={o.label} value={o.label}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Sq Ft</label>
+                <NumInput value={activeVaporBarrierSF} onChange={setActiveVaporBarrierSF} className="w-full text-center" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Material</label>
+                <div className="input text-sm py-1.5 w-full text-right bg-gray-50 text-gray-600">
+                  {fmt2(calc.vaporMat)}
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* ── Finish material: Finish | Vendor | Item | Sq Ft | Material ──
+              Disabled unless the selected finish has products (e.g. Sand Finish). */}
+          <div className="col-span-2">
+            <div className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1.4fr)_5rem_6rem] gap-2 items-end">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Finish</label>
+                <input
+                  className="input text-sm py-1.5 w-full bg-gray-50 text-gray-500"
+                  value={activeFinishType}
+                  readOnly
+                  tabIndex={-1}
+                  title="From Finish Type above"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Finish Vendor</label>
+                <select
+                  className={`input text-sm py-1.5 w-full min-w-0 ${finishHasProducts ? '' : 'bg-gray-100 text-gray-400'}`}
+                  value={activeFinishMatVendor || ''}
+                  onChange={e => {
+                    setActiveFinishMatVendor(e.target.value)
+                    setActiveFinishMatItem('')
+                  }}
+                  disabled={!finishHasProducts}
+                  title={finishHasProducts ? 'Finish material vendor' : 'No products for this finish'}
+                >
+                  {!activeFinishMatVendor && <option value="">Select</option>}
+                  {vendorsForCategory('Concrete Finish Material').map(v => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}
+                    </option>
+                  ))}
+                  <option value="Standard">Standard</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Item</label>
+                <select
+                  className={`input text-sm py-1.5 w-full min-w-0 ${finishHasProducts ? '' : 'bg-gray-100 text-gray-400'}`}
+                  value={activeFinishMatItem || ''}
+                  onChange={e => setActiveFinishMatItem(e.target.value)}
+                  disabled={!finishHasProducts}
+                >
+                  {!activeFinishMatItem && <option value="">Select item</option>}
+                  {activeFinishMatItem &&
+                    !sectionOptions('Concrete Finish Material', activeFinishMatVendor).some(o => o.label === activeFinishMatItem) && (
+                      <option value={activeFinishMatItem}>{activeFinishMatItem}</option>
+                    )}
+                  {sectionOptions('Concrete Finish Material', activeFinishMatVendor).map(o => (
+                    <option key={o.label} value={o.label}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Sq Ft</label>
+                <NumInput
+                  value={activeFinishMatSF}
+                  onChange={setActiveFinishMatSF}
+                  className="w-full text-center"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Material</label>
+                <div className="input text-sm py-1.5 w-full text-right bg-gray-50 text-gray-600">
+                  {fmt2(calc.finishMat)}
+                </div>
+              </div>
             </div>
           </div>
         </div>
