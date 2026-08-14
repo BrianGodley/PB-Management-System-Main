@@ -78,6 +78,21 @@ const firstDefinedRate = (m, keys) => {
   for (const k of keys) if (m && m[k] != null) return m[k]
   return undefined
 }
+// Resolve a shared base material price (Class II / DG / Weed) for the chosen
+// vendor from the SHARED catalog rows (Concrete / Basic Materials / Ground
+// Treatments), since those items no longer live in the Artificial Turf catalog.
+// Vendor pick → that vendor's open price for the item; else the Standard
+// (null-vendor) price; else the name-keyed Standard fallback from the map.
+const sharedBasePrice = (sharedRows, names, vendorSel, stdFallback) => {
+  const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
+  if (!isStd) {
+    const vrow = (sharedRows || []).find(r => names.includes(r.name) && r.vendor_id === vendorSel)
+    if (vrow && n(vrow.unit_cost) > 0) return n(vrow.unit_cost)
+  }
+  const srow = (sharedRows || []).find(r => names.includes(r.name) && r.vendor_id == null)
+  if (srow != null) return n(srow.unit_cost)
+  return n(stdFallback)
+}
 // Base-install material picker options. Each computes qty differently:
 // Gravel/DG are priced per ton, Weed per roll. Vendor overrides material price
 // only (matched by label); labor is per-material preset math.
@@ -179,7 +194,8 @@ function calcTurf(
   subRates = {},
   materialRows = [],
   catDefaults = {},
-  commissionRate
+  commissionRate,
+  sharedBaseRows = []
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const mp = materialPrices || {}
@@ -269,17 +285,23 @@ function calcTurf(
       catDefaults,
       mp
     ).price
-    // Standard/default base MATERIAL price for the two prep bases comes from the
-    // SHARED catalog items other modules use (DG ↔ Ground Treatments 'Decomposed
-    // Granite', Class II ↔ the Concrete base item), so the rate stays in sync. A
-    // real vendor pick keeps its own catalog price (already resolved above); only
-    // the Standard/default price is repointed. Weed is untouched. Qty math below
-    // is unchanged — only the per-unit price source moves.
-    const isStdBaseVendor = !row.vendor || row.vendor === 'Standard' || row.vendor === 'auto'
-    if (isStdBaseVendor) {
-      if (def.key === 'DG') price = n(mp[SHARED_DG_NAME])
-      else if (def.key === 'Gravel') price = n(mp[SHARED_CLASS2_KEY])
-      else if (def.key === 'Weed') price = n(mp[SHARED_WEED_NAME])
+    // Base MATERIAL prices for all three prep bases come from the SHARED catalog
+    // items other modules use — Class II ↔ Concrete/Basic Materials base, DG ↔
+    // Basic Materials 'Decomposed Granite', Weed ↔ Basic Materials 'Weed Fabric'.
+    // Those items no longer live in the Artificial Turf catalog, so resolve the
+    // chosen vendor's price straight from the shared rows (vendor-aware), falling
+    // back to the shared Standard price. Qty math below is unchanged.
+    const sharedNames =
+      def.key === 'DG' ? [SHARED_DG_NAME]
+      : def.key === 'Gravel' ? SHARED_CLASS2_NAMES
+      : def.key === 'Weed' ? SHARED_WEED_NAMES
+      : null
+    if (sharedNames) {
+      const stdFallback =
+        def.key === 'DG' ? mp[SHARED_DG_NAME]
+        : def.key === 'Gravel' ? mp[SHARED_CLASS2_KEY]
+        : mp[SHARED_WEED_NAME]
+      price = sharedBasePrice(sharedBaseRows, sharedNames, row.vendor, stdFallback)
     }
     // Class II and DG are priced by the cubic yard (matching the master rates,
     // now per Cu Yd). Volume = SF × depth/12 ÷ 27, with DB-editable install
@@ -949,7 +971,8 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
     subRates,
     materialRows,
     catDefaults,
-    commissionRate
+    commissionRate,
+    sharedBaseRows
   )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
