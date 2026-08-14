@@ -3513,7 +3513,7 @@ function JobScheduleSettings({
           { key: 'templates', label: '📋 Job Templates' },
           { key: 'email-templates', label: '✉️ E-Mail Templates' },
           { key: 'crews', label: '👷 Master Crews' },
-          { key: 'labor-rates', label: '📊 Master Labor Rates' },
+          { key: 'labor-rates', label: '🏷️ Master Labor Rates' },
         ].map(t => (
           <button
             key={t.key}

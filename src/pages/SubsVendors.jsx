@@ -908,13 +908,13 @@ export default function SubsVendors({ mode = 'sub' }) {
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              🧱 Master Material Rates
+              🏷️ Master Material Rates
             </button>
           )}
 
           {[
             ...(mode === 'sub' ? [{ key: 'contracts', label: '📑 Contracts' }] : []),
-            ...(mode === 'sub' ? [{ key: 'subRates', label: '📊 Master Subcontractor Rates' }] : []),
+            ...(mode === 'sub' ? [{ key: 'subRates', label: '🏷️ Master Subcontractor Rates' }] : []),
             { key: 'settings', label: '⚙️ Settings', mobileHide: true },
           ].map(t => (
             <button
