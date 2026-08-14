@@ -71,7 +71,11 @@ export default function TaxonomyDetailModal({
     setBusy(true)
     const table = isCat ? cfg.catTable : cfg.subTable
     const payload = isCat
-      ? { code: form.code, name: form.name }
+      ? {
+          code: form.code,
+          name: form.name,
+          ...(cfg.hasVendor ? { default_vendor_id: form.default_vendor_id || null } : {}),
+        }
       : {
           category_id: form.category_id,
           code: form.code,
@@ -130,7 +134,7 @@ export default function TaxonomyDetailModal({
               {!isCat && <Field label="Category" value={catName(row.category_id)} />}
               <Field label="Code" value={row.code} />
               <Field label="Name" value={row.name} />
-              {!isCat && cfg.hasVendor && <Field label="Default Vendor" value={row.default_vendor_id ? vendName(row.default_vendor_id) : 'Standard'} />}
+              {cfg.hasVendor && <Field label="Default Vendor" value={row.default_vendor_id ? vendName(row.default_vendor_id) : 'Standard'} />}
               {cfg.hasMaterials && <Field label="Items" value={String(itemCount)} />}
               {isCat && <Field label="Sub-Categories" value={String(subCnt)} />}
             </>
@@ -171,7 +175,7 @@ export default function TaxonomyDetailModal({
                   />
                 </label>
               </div>
-              {!isCat && cfg.hasVendor && (
+              {cfg.hasVendor && (
                 <label className="block">
                   <span className="text-xs text-gray-500">Default Vendor</span>
                   <select

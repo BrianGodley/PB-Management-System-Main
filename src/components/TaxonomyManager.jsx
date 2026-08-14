@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import TaxonomyDetailModal from './TaxonomyDetailModal'
 
@@ -7,10 +8,14 @@ import TaxonomyDetailModal from './TaxonomyDetailModal'
 // 'subcategory'). Mirrors the material table: the name is a hyperlink that opens
 // a detail modal for editing / deleting (delete reassigns connected items).
 //
+// Categories table columns:   Code · Category · Sub-Categories · Items · Default Vendor
+// Sub-Categories table cols:  Code · Sub Category · Category · Items · Default Vendor
+// The Sub-Categories count (on Categories) and the Items count (both tables) are
+// clickable and open a list modal.
+//
 // scope = 'material' (default) → category / subcategory tables, tied to the
-//   material catalog (item counts, per-subcat default vendor).
-// scope = 'general'  → general_category / general_subcategory: standalone lists
-//   with no material links or default vendor.
+//   material catalog (item counts, per-cat/sub default vendor).
+// scope = 'general' | 'labor' | 'sub' → standalone lists, no material links/vendor.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SCOPES = {
@@ -21,14 +26,12 @@ const SCOPES = {
     hasMaterials: false,
     hasVendor: false,
   },
-  // In-house labor rate taxonomy (own lists, no material links / vendor).
   labor: {
     catTable: 'labor_category',
     subTable: 'labor_subcategory',
     hasMaterials: false,
     hasVendor: false,
   },
-  // Subcontractor rate taxonomy (own lists).
   sub: {
     catTable: 'subcontractor_category',
     subTable: 'subcontractor_subcategory',
@@ -46,17 +49,20 @@ export default function TaxonomyManager({ kind = 'category', scope = 'material' 
   const [vendors, setVendors] = useState([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null) // { row } | { row: null } (add)
+  const [listModal, setListModal] = useState(null) // { title, items:[{label,code}] }
 
   const load = useCallback(async () => {
     setLoading(true)
+    // Both tables carry default_vendor_id in the material scope now.
+    const catCols = cfg.hasVendor ? 'id, code, name, default_vendor_id' : 'id, code, name'
     const subCols = cfg.hasVendor
       ? 'id, code, name, category_id, default_vendor_id'
       : 'id, code, name, category_id'
     const [c, s, m, v] = await Promise.all([
-      supabase.from(cfg.catTable).select('id, code, name').order('name'),
+      supabase.from(cfg.catTable).select(catCols).order('name'),
       supabase.from(cfg.subTable).select(subCols).order('name'),
       cfg.hasMaterials
-        ? supabase.from('material').select('id, category_id, subcategory_id')
+        ? supabase.from('material').select('id, description, category_id, subcategory_id')
         : Promise.resolve({ data: [] }),
       cfg.hasVendor
         ? supabase.from('subs_vendors').select('id, company_name').order('company_name')
@@ -78,8 +84,26 @@ export default function TaxonomyManager({ kind = 'category', scope = 'material' 
     materials.filter(m => (isCat ? m.category_id : m.subcategory_id) === row.id).length
   const subCount = row => (isCat ? subs.filter(s => s.category_id === row.id).length : 0)
 
+  const openSubList = row =>
+    setListModal({
+      title: `Sub-Categories · ${row.name}`,
+      items: subs
+        .filter(s => s.category_id === row.id)
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        .map(s => ({ label: s.name, code: s.code })),
+    })
+  const openItemsList = row =>
+    setListModal({
+      title: `Items · ${row.name}`,
+      items: materials
+        .filter(m => (isCat ? m.category_id : m.subcategory_id) === row.id)
+        .sort((a, b) => (a.description || '').localeCompare(b.description || ''))
+        .map(m => ({ label: m.description })),
+    })
+
   const rows = isCat ? cats : subs
-  const colCount = 2 + (isCat ? 1 : 1) + (cfg.hasMaterials ? 1 : 0) + (!isCat && cfg.hasVendor ? 1 : 0)
+  // Code + (Category|Sub Category) + (Category on sub / Sub-Cats on cat) + Items + Vendor
+  const colCount = 3 + (cfg.hasMaterials ? 1 : 0) + (cfg.hasVendor ? 1 : 0)
 
   // ── Sorting ────────────────────────────────────────────────────────────────
   const [sortKey, setSortKey] = useState('name')
@@ -135,6 +159,18 @@ export default function TaxonomyManager({ kind = 'category', scope = 'material' 
       {arrow(k)}
     </th>
   )
+  // Clickable count cell (Sub-Categories / Items) — opens the list modal.
+  const CountCell = ({ n, onClick }) => (
+    <td className="px-3 py-1.5 text-center">
+      {n > 0 ? (
+        <button onClick={onClick} className="text-green-700 hover:text-green-900 hover:underline font-medium">
+          {n}
+        </button>
+      ) : (
+        <span className="text-gray-300">0</span>
+      )}
+    </td>
+  )
 
   return (
     <div className="mt-3">
@@ -154,12 +190,12 @@ export default function TaxonomyManager({ kind = 'category', scope = 'material' 
           <table className="w-full text-xs min-w-[560px]">
             <thead className="sticky top-0 z-10 bg-gray-50">
               <tr className="border-b border-gray-200 text-left text-gray-600 uppercase">
+                <Th k="code" label="Code" align="center" />
                 <Th k="name" label={isCat ? 'Category' : 'Sub Category'} />
-                <Th k="code" label="Code" />
+                {isCat && <Th k="subcats" label="Sub-Categories" align="center" />}
                 {!isCat && <Th k="category" label="Category" />}
-                {!isCat && cfg.hasVendor && <Th k="vendor" label="Default Vendor" />}
-                {cfg.hasMaterials && <Th k="items" label="Items" align="right" />}
-                {isCat && <Th k="subcats" label="Sub-Cats" align="right" />}
+                {cfg.hasMaterials && <Th k="items" label="Items" align="center" />}
+                {cfg.hasVendor && <Th k="vendor" label="Default Vendor" />}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -172,6 +208,7 @@ export default function TaxonomyManager({ kind = 'category', scope = 'material' 
               ) : (
                 sortedRows.map(row => (
                   <tr key={row.id} className="hover:bg-gray-50">
+                    <td className="px-3 py-1.5 font-mono text-gray-500 text-center">{row.code}</td>
                     <td className="px-3 py-1.5">
                       <button
                         onClick={() => setModal({ row })}
@@ -181,17 +218,14 @@ export default function TaxonomyManager({ kind = 'category', scope = 'material' 
                         {row.name}
                       </button>
                     </td>
-                    <td className="px-3 py-1.5 font-mono text-gray-500">{row.code}</td>
+                    {isCat && <CountCell n={subCount(row)} onClick={() => openSubList(row)} />}
                     {!isCat && <td className="px-3 py-1.5 text-gray-600">{catName(row.category_id)}</td>}
-                    {!isCat && cfg.hasVendor && (
+                    {cfg.hasMaterials && <CountCell n={itemCount(row)} onClick={() => openItemsList(row)} />}
+                    {cfg.hasVendor && (
                       <td className="px-3 py-1.5 text-gray-600">
                         {row.default_vendor_id ? vendName(row.default_vendor_id) : 'Standard'}
                       </td>
                     )}
-                    {cfg.hasMaterials && (
-                      <td className="px-3 py-1.5 text-right text-gray-500">{itemCount(row)}</td>
-                    )}
-                    {isCat && <td className="px-3 py-1.5 text-right text-gray-500">{subCount(row)}</td>}
                   </tr>
                 ))
               )}
@@ -213,6 +247,43 @@ export default function TaxonomyManager({ kind = 'category', scope = 'material' 
           onChanged={load}
         />
       )}
+
+      {listModal && <ListModal {...listModal} onClose={() => setListModal(null)} />}
     </div>
+  )
+}
+
+// Simple read-only list popup for the Sub-Categories / Items counts.
+function ListModal({ title, items, onClose }) {
+  return createPortal(
+    <div className="fixed inset-0 z-[9998] bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+          <h3 className="text-sm font-bold text-gray-900">{title}</h3>
+          <span className="ml-auto mr-3 text-xs text-gray-400">{items.length}</span>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-lg leading-none">
+            ✕
+          </button>
+        </div>
+        <div className="overflow-auto p-2">
+          {items.length === 0 ? (
+            <p className="text-sm text-gray-400 py-6 text-center">None.</p>
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {items.map((it, i) => (
+                <li key={i} className="px-3 py-1.5 text-sm text-gray-800 flex items-center gap-2">
+                  {it.code && <span className="font-mono text-[11px] text-gray-400">{it.code}</span>}
+                  <span>{it.label}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
   )
 }

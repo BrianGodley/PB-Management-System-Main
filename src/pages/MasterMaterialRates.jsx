@@ -578,6 +578,7 @@ function MiscRatesPanel() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
+  const [cat, setCat] = useState('All')
   const [editing, setEditing] = useState(null) // { id, value }
   const [saving, setSaving] = useState(false)
   const [adding, setAdding] = useState(false)
@@ -618,11 +619,20 @@ function MiscRatesPanel() {
     load()
   }, [load])
 
+  // Category dropdown options (mirrors the Vendor/Standard views' category filter).
+  const categories = useMemo(
+    () => ['All', ...Array.from(new Set(rows.map(r => r.category).filter(Boolean))).sort()],
+    [rows]
+  )
+
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
-    if (!s) return rows
-    return rows.filter(r => [r.name, r.category].filter(Boolean).some(x => x.toLowerCase().includes(s)))
-  }, [rows, q])
+    return rows.filter(r => {
+      if (cat !== 'All' && (r.category || '') !== cat) return false
+      if (s && ![r.name, r.category].filter(Boolean).some(x => x.toLowerCase().includes(s))) return false
+      return true
+    })
+  }, [rows, q, cat])
 
   const sortRows = arr =>
     [...arr].sort(
@@ -665,6 +675,17 @@ function MiscRatesPanel() {
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
       <div className="flex flex-wrap items-center gap-3 px-3 py-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
+        <select
+          className="border border-gray-200 rounded-md px-2 py-1 text-xs bg-white"
+          value={cat}
+          onChange={e => setCat(e.target.value)}
+        >
+          {categories.map(c => (
+            <option key={c} value={c}>
+              {c === 'All' ? 'All Categories' : c}
+            </option>
+          ))}
+        </select>
         <input
           className="border border-gray-200 rounded-md px-2 py-1 text-xs w-56"
           placeholder="Search name / category…"
