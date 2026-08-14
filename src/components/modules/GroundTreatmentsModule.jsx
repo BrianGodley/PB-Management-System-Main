@@ -312,9 +312,7 @@ function calcGroundTreatments(
     mulchRows,
     plasticEdgingLF,
     metalEdgingLF,
-    edgingVendor,
-    edgingType,
-    edgingLF,
+    edgingRows,
     soilPrepSF,
     prepVendor,
     prepType,
@@ -395,18 +393,23 @@ function calcGroundTreatments(
   // Labor stays per-line (unchanged). Material rate now comes from the picked
   // Type (filtered to the picked Vendor's catalog); Standard defaults to
   // Plastic/Metal so old estimates price identically.
-  // ONE combined Edging row (Vendor + Type + LF). Material from the picked Type
-  // (filtered to the Vendor's catalog). Labor rate keys off the Type: a metal-ish
-  // type uses the Metal labor rate, otherwise the Plastic labor rate. Empty
-  // (no type) → $0. Guarded so an unselected row contributes nothing.
-  const _edgeLF = n(edgingLF)
-  const _edgeOpt = rowOpt('Edging', { vendor: edgingVendor, type: edgingType }, [])
-  const _edgeIsMetal = /metal/i.test(edgingType || '')
-  const _edgeLabRate = _edgeIsMetal
-    ? p(GT_RATES.metalEdgingLab.dbName)
-    : p(GT_RATES.plasticEdgingLab.dbName)
-  const edgingLab = edgingType ? _edgeLF * _edgeLabRate : 0
-  const edgingMat = edgingType ? _edgeLF * _edgeOpt.fallback : 0
+  // Edging rows (Vendor + Type + LF). Material from the picked Type (filtered to
+  // the Vendor's catalog). Labor rate keys off the Type: a metal-ish type uses the
+  // Metal labor rate, otherwise the Plastic labor rate. Empty (no type) → $0.
+  // Guarded so an unselected row contributes nothing.
+  let edgingLab = 0,
+    edgingMat = 0
+  ;(edgingRows || []).forEach(r => {
+    if (!r.type) return
+    const lf = n(r.lf)
+    const opt = rowOpt('Edging', { vendor: r.vendor, type: r.type }, [])
+    const isMetal = /metal/i.test(r.type || '')
+    const labRate = isMetal
+      ? p(GT_RATES.metalEdgingLab.dbName)
+      : p(GT_RATES.plasticEdgingLab.dbName)
+    edgingLab += lf * labRate
+    edgingMat += lf * opt.fallback
+  })
 
   // ── Preparation (Planting Bed Prep) ─────────────────────────────────────────
   // Area = Planter → existing Soil Prep rates; Area = Sod → independent Sod Soil
@@ -626,14 +629,17 @@ function calcGroundTreatments(
     const handRate = p(GT_RATES.gravelHandLab.dbName)
     const excavLab =
       r.method === 'Machine' ? ((CY * aggregateRemovalSwell) / machineRate) * 8 : ((CY * aggregateRemovalSwell) / handRate) * 8
-    const fabricLab =
-      n(r.sf) * p(GT_RATES.gravelFabricLab.dbName)
+    // Weed barrier — same fabric material + labor rate as DG's weed barrier.
+    const wantFabric = (r.weedFabric ?? 'Yes') === 'Yes'
+    const fabricLab = wantFabric
+      ? n(r.sf) * p(GT_RATES.gravelFabricLab.dbName)
+      : 0
     cobbleLab += excavLab + fabricLab
     const ctype = rowOpt('Cobbles', r, [])
     const costPerCY = ctype.fallback
     cobbleMat +=
       CY * costPerCY +
-      n(r.sf) * p(GT_RATES.gravelFabricMat.dbName)
+      (wantFabric ? n(r.sf) * p(GT_RATES.gravelFabricMat.dbName) : 0)
   })
 
   // ── Manual ─────────────────────────────────────────────────────────────────
@@ -818,7 +824,7 @@ const DEFAULT_PEBBLE_ROWS = [
   { sf: '', method: 'Hand', type: '', depthIn: '3', weedFabric: 'Yes', vendor: '' },
 ]
 const DEFAULT_COBBLE_ROWS = [
-  { sf: '', method: 'Hand', type: '', depthIn: '3', vendor: '' },
+  { sf: '', method: 'Hand', type: '', depthIn: '3', weedFabric: 'Yes', vendor: '' },
 ]
 const DEFAULT_MULCH_ROWS = [
   { type: '', sf: '', depth: '2', weedFabric: 'No', vendor: '' },
@@ -881,11 +887,17 @@ function makeTab(src = {}) {
       src.stepperVendor ?? { flagSoil: '', flagConc: '', precSoil: '', precConc: '' },
     stepperType:
       src.stepperType ?? { flagSoil: '', flagConc: '', precSoil: '', precConc: '' },
-    // Edging — single combined row (Vendor + Type + LF). Backward-compat: old
-    // saved data stored maps for edgingVendor/edgingType; coerce to '' strings.
-    edgingVendor: typeof src.edgingVendor === 'string' ? src.edgingVendor : '',
-    edgingType: typeof src.edgingType === 'string' ? src.edgingType : '',
-    edgingLF: src.edgingLF ?? '',
+    // Edging — multi-row (Vendor + Type + LF). Backward-compat: migrate a legacy
+    // single edgingVendor/edgingType/edgingLF entry into the first row.
+    edgingRows:
+      src.edgingRows ??
+      [
+        {
+          vendor: typeof src.edgingVendor === 'string' ? src.edgingVendor : '',
+          type: typeof src.edgingType === 'string' ? src.edgingType : '',
+          lf: src.edgingLF ?? '',
+        },
+      ],
     // D.G. multi-row. Backward-compat: migrate a legacy single DG entry.
     dgRows:
       src.dgRows ??
@@ -1139,12 +1151,11 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   const setStepperVendor = setField('stepperVendor')
   const stepperType = cur.stepperType
   const setStepperType = setField('stepperType')
-  const edgingVendor = cur.edgingVendor
-  const setEdgingVendor = setField('edgingVendor')
-  const edgingType = cur.edgingType
-  const setEdgingType = setField('edgingType')
-  const edgingLF = cur.edgingLF
-  const setEdgingLF = setField('edgingLF')
+  const edgingRows = cur.edgingRows
+  const setEdgingRows = setField('edgingRows')
+  function updateEdging(i, field, val) {
+    setEdgingRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  }
   const dgRows = cur.dgRows
   const setDgRows = setField('dgRows')
   const gravelRows = cur.gravelRows
@@ -2323,8 +2334,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 <th className="text-center pb-1 pr-1 font-medium">Mulch Type</th>
                 <th className="text-center pb-1 pr-1 font-medium">Area (SF)</th>
                 <th className="text-center pb-1 pr-1 font-medium">Depth (in)</th>
-                <th className="text-center pb-1 pr-1 font-medium">$ per Cu Yd</th>
-                <th className="text-center pb-1 font-medium">Weed Fabric</th>
+                <th className="text-center pb-1 pr-1 font-medium">Weed Fabric</th>
+                <th className="text-center pb-1 font-medium">$ per Cu Yd</th>
               </tr>
             </thead>
             <tbody>
@@ -2389,20 +2400,18 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <span className="text-xs text-gray-500 flex items-center justify-center gap-1 whitespace-nowrap">
-                        ${typeCost.toFixed(2)}/CY
-                      </span>
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.weedFabric}
+                        onChange={e => updateMulch(i, 'weedFabric', e.target.value)}
+                      >
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                      </select>
                     </td>
                     <td className="py-1">
-                      <div className="flex items-center gap-1">
-                        <select
-                          className="input text-sm py-1.5"
-                          value={row.weedFabric}
-                          onChange={e => updateMulch(i, 'weedFabric', e.target.value)}
-                        >
-                          <option value="No">No</option>
-                          <option value="Yes">Yes</option>
-                        </select>
+                      <div className="flex items-center justify-center gap-1">
+                        <span className="text-xs text-gray-500 whitespace-nowrap">${typeCost.toFixed(2)}/CY</span>
                         {mulchRows.length > 1 && (
                           <button
                             type="button"
@@ -2448,12 +2457,14 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 <th className="text-center pb-1 pr-1 font-medium">Depth (in)</th>
                 <th className="text-center pb-1 pr-1 font-medium">Weed Fabric</th>
                 <th className="text-center pb-1 pr-1 font-medium">Method</th>
-                <th className="text-center pb-1 font-medium">Cement</th>
+                <th className="text-center pb-1 pr-1 font-medium">Cement</th>
+                <th className="text-center pb-1 font-medium">$ per Cu Yd</th>
               </tr>
             </thead>
             <tbody>
               {dgRows.map((row, i) => {
                 const rowOpts = sectionOptions('DG', row.vendor, [])
+                const typeCost = resolveType(row.type, rowOpts, []).fallback
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-1">
@@ -2526,17 +2537,20 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         ))}
                       </select>
                     </td>
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.cement}
+                        onChange={e => updateDg(i, 'cement', e.target.value)}
+                        title="Add Cement Mixture"
+                      >
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                      </select>
+                    </td>
                     <td className="py-1">
-                      <div className="flex items-center gap-1">
-                        <select
-                          className="input text-sm py-1.5"
-                          value={row.cement}
-                          onChange={e => updateDg(i, 'cement', e.target.value)}
-                          title="Add Cement Mixture"
-                        >
-                          <option value="No">No</option>
-                          <option value="Yes">Yes</option>
-                        </select>
+                      <div className="flex items-center justify-center gap-1">
+                        <span className="text-xs text-gray-500 whitespace-nowrap">${typeCost.toFixed(2)}/CY</span>
                         {dgRows.length > 1 && (
                           <button
                             type="button"
@@ -2854,10 +2868,11 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-center pb-1 pr-1 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-1 font-medium">Cobble Type</th>
-                <th className="text-center pb-1 pr-1 font-medium">Sq Ft</th>
+                <th className="text-center pb-1 pr-1 font-medium">Area (SF)</th>
+                <th className="text-center pb-1 pr-1 font-medium">Depth (in)</th>
+                <th className="text-center pb-1 pr-1 font-medium">Weed Fabric</th>
                 <th className="text-center pb-1 pr-1 font-medium">Method</th>
-                <th className="text-center pb-1 pr-1 font-medium">$ per Cu Yd</th>
-                <th className="text-center pb-1 font-medium">Depth (in)</th>
+                <th className="text-center pb-1 font-medium">$ per Cu Yd</th>
               </tr>
             </thead>
             <tbody>
@@ -2909,6 +2924,24 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       <NumInput value={row.sf} onChange={v => updateCobble(i, 'sf', v)} className="w-full text-center" />
                     </td>
                     <td className="py-1 pr-1">
+                      <NumInput
+                        value={row.depthIn}
+                        onChange={v => updateCobble(i, 'depthIn', v)}
+                        placeholder="3"
+                        className="w-full text-center"
+                      />
+                    </td>
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.weedFabric ?? 'Yes'}
+                        onChange={e => updateCobble(i, 'weedFabric', e.target.value)}
+                      >
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                      </select>
+                    </td>
+                    <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
                         value={row.method}
@@ -2918,18 +2951,20 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         <option>Machine</option>
                       </select>
                     </td>
-                    <td className="py-1 pr-1">
-                      <span className="text-xs text-gray-500 flex items-center justify-center gap-1 whitespace-nowrap">
-                        ${typeCost.toFixed(2)}/CY
-                      </span>
-                    </td>
                     <td className="py-1">
-                      <NumInput
-                        value={row.depthIn}
-                        onChange={v => updateCobble(i, 'depthIn', v)}
-                        placeholder="3"
-                        className="w-full text-center"
-                      />
+                      <div className="flex items-center justify-center gap-1">
+                        <span className="text-xs text-gray-500 whitespace-nowrap">${typeCost.toFixed(2)}/CY</span>
+                        {cobbleRows.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setCobbleRows(rows => rows.filter((_, idx) => idx !== i))}
+                            className="text-gray-300 hover:text-red-500 text-sm px-1"
+                            title="Remove line"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )
@@ -2942,7 +2977,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             onClick={() =>
               setCobbleRows(r => [
                 ...r,
-                { sf: '', method: 'Hand', type: '', depthIn: '3', vendor: defaultVendorFor('Cobbles') },
+                { sf: '', method: 'Hand', type: '', depthIn: '3', weedFabric: 'Yes', vendor: defaultVendorFor('Cobbles') },
               ])
             }
           >
@@ -2955,9 +2990,10 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 if (!n(row.sf) || !row.type) return null
                 const CY = (n(row.sf) * (n(row.depthIn) / 12)) / 27
                 const ctype = resolveType(row.type, sectionOptions('Cobbles', row.vendor, []), [])
+                const wantFabric = (row.weedFabric ?? 'Yes') === 'Yes'
                 const mat =
                   CY * ctype.fallback +
-                  n(row.sf) * p(GT_RATES.gravelFabricMat.dbName)
+                  (wantFabric ? n(row.sf) * p(GT_RATES.gravelFabricMat.dbName) : 0)
                 return (
                   <span key={i} className="text-xs text-gray-400">
                     #{i + 1}: {CY.toFixed(2)} Cu Yd · ${mat.toFixed(2)} mat
@@ -2984,26 +3020,26 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               </tr>
             </thead>
             <tbody>
-              {(() => {
-                // ONE combined Edging row — the Type picker lists both Plastic and
-                // Metal (plus vendor edging). Labor keys off the picked Type.
-                const opts = sectionOptions('Edging', edgingVendor, [])
-                const t = resolveType(edgingType, opts, [])
+              {edgingRows.map((row, i) => {
+                // The Type picker lists both Plastic and Metal (plus vendor edging).
+                // Labor keys off the picked Type.
+                const opts = sectionOptions('Edging', row.vendor, [])
+                const t = resolveType(row.type, opts, [])
                 const rate = t.fallback
                 return (
-                  <tr className="border-b border-gray-100">
+                  <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={edgingVendor || ''}
-                        onChange={e => setEdgingVendor(e.target.value)}
+                        value={row.vendor || ''}
+                        onChange={e => updateEdging(i, 'vendor', e.target.value)}
                         title="Vendor"
                       >
-                        {!edgingVendor && <option value="">Select</option>}
-                        {edgingVendor &&
-                          edgingVendor !== 'Standard' &&
-                          !vendorsForCategory('Edging').some(v => v.id === edgingVendor) && (
-                            <option value={edgingVendor}>{edgingVendor}</option>
+                        {!row.vendor && <option value="">Select</option>}
+                        {row.vendor &&
+                          row.vendor !== 'Standard' &&
+                          !vendorsForCategory('Edging').some(v => v.id === row.vendor) && (
+                            <option value={row.vendor}>{row.vendor}</option>
                           )}
                         {vendorsForCategory('Edging').map(v => (
                           <option key={v.id} value={v.id}>
@@ -3016,12 +3052,12 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
-                        value={edgingType || ''}
-                        onChange={e => setEdgingType(e.target.value)}
+                        value={row.type || ''}
+                        onChange={e => updateEdging(i, 'type', e.target.value)}
                       >
-                        {!edgingType && <option value="">Select edging</option>}
-                        {edgingType && !opts.some(o => o.label === edgingType) && (
-                          <option value={edgingType}>{edgingType}</option>
+                        {!row.type && <option value="">Select edging</option>}
+                        {row.type && !opts.some(o => o.label === row.type) && (
+                          <option value={row.type}>{row.type}</option>
                         )}
                         {opts.map(o => (
                           <option key={o.label} value={o.label}>
@@ -3031,19 +3067,42 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       </select>
                     </td>
                     <td className="py-1 pr-1">
-                      <NumInput value={edgingLF} onChange={setEdgingLF} placeholder="Ln Ft" className="w-full text-center" />
+                      <NumInput value={row.lf} onChange={v => updateEdging(i, 'lf', v)} placeholder="Ln Ft" className="w-full text-center" />
                     </td>
                     <td className="py-1 pr-1">
                       <span className="text-xs text-gray-500 whitespace-nowrap block text-center">${rate.toFixed(2)} per Ln Ft</span>
                     </td>
-                    <td className="py-1 text-center text-xs text-gray-600 whitespace-nowrap">
-                      {edgingType && n(edgingLF) > 0 ? `$${(n(edgingLF) * rate).toFixed(2)}` : '—'}
+                    <td className="py-1">
+                      <div className="flex items-center justify-center gap-1">
+                        <span className="text-xs text-gray-600 whitespace-nowrap">
+                          {row.type && n(row.lf) > 0 ? `$${(n(row.lf) * rate).toFixed(2)}` : '—'}
+                        </span>
+                        {edgingRows.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setEdgingRows(rows => rows.filter((_, idx) => idx !== i))}
+                            className="text-gray-300 hover:text-red-500 text-sm px-1"
+                            title="Remove line"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )
-              })()}
+              })}
             </tbody>
           </table>
+          <button
+            type="button"
+            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+            onClick={() =>
+              setEdgingRows(r => [...r, { vendor: defaultVendorFor('Edging'), type: '', lf: '' }])
+            }
+          >
+            + Add Row
+          </button>
         </div>
       </div>
 

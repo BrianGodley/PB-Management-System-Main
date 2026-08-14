@@ -605,11 +605,17 @@ export default function GroundTreatmentsSummary({ module }) {
   // a metal-ish type uses the Metal labor rate, otherwise the Plastic labor rate —
   // exactly as the module does. No type picked → no line ($0).
   const edgingLines = []
-  if (n(ih.edgingLF) > 0 && ih.edgingType) {
-    const isMetal = /metal/i.test(ih.edgingType || '')
+  // Multi-row edging. Backward-compat: fall back to the legacy single
+  // edgingVendor/edgingType/edgingLF entry when edgingRows is absent.
+  const _edgingRows =
+    ih.edgingRows ??
+    [{ vendor: ih.edgingVendor, type: ih.edgingType, lf: ih.edgingLF }]
+  ;(_edgingRows || []).forEach(r => {
+    if (!(n(r.lf) > 0 && r.type)) return
+    const isMetal = /metal/i.test(r.type || '')
     const rate = priceForRow(
       'Edging',
-      { type: ih.edgingType, vendor: ih.edgingVendor },
+      { type: r.type, vendor: r.vendor },
       EDGING_TYPES,
       isMetal
         ? mp(GT_RATES.metalEdgingMat.dbName)
@@ -618,14 +624,14 @@ export default function GroundTreatmentsSummary({ module }) {
     const labRate = isMetal
       ? mp(GT_RATES.metalEdgingLab.dbName)
       : mp(GT_RATES.plasticEdgingLab.dbName)
-    const mat = n(ih.edgingLF) * rate
-    const hrs = n(ih.edgingLF) * labRate
+    const mat = n(r.lf) * rate
+    const hrs = n(r.lf) * labRate
     edgingLines.push({
-      label: `${ih.edgingType} Edging — ${n(ih.edgingLF).toLocaleString()} Ln Ft`,
+      label: `${r.type} Edging — ${n(r.lf).toLocaleString()} Ln Ft`,
       value: fmt2(mat),
       sub: `${hrs.toFixed(2)} hrs · ${fmt2(rate)} per Ln Ft`,
     })
-  }
+  })
 
   // ── Steppers ─────────────────────────────────────────────────────────────────
   // Each stone (Flagstone / Precast) splits into a Soil Set and a Concrete Set
