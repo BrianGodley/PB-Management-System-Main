@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EstimateSettingsPanel — one consolidated home (Sales → Settings → General) for
@@ -60,12 +61,29 @@ const toStored = (kind, disp) => {
 }
 
 export default function EstimateSettingsPanel() {
+  const { user } = useAuth()
   const [form, setForm] = useState({})
   const [orig, setOrig] = useState({})
   const [rowId, setRowId] = useState(1)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
+  const [editing, setEditing] = useState(false)
+  const [canEdit, setCanEdit] = useState(false)
+
+  // Only admins may edit the company-wide estimate settings; everyone else sees
+  // a read-only view.
+  useEffect(() => {
+    if (!user?.id) return
+    supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => {
+        setCanEdit(['admin', 'super_admin'].includes(data?.role))
+      })
+  }, [user?.id])
 
   useEffect(() => {
     let alive = true
@@ -113,10 +131,17 @@ export default function EstimateSettingsPanel() {
       setMsg('error:' + error.message)
     } else {
       setOrig(form)
+      setEditing(false)
       setMsg('ok:Estimate settings saved. Newly opened estimates use these values.')
       setTimeout(() => setMsg(''), 5000)
     }
     setSaving(false)
+  }
+
+  const cancel = () => {
+    setForm(orig)
+    setEditing(false)
+    setMsg('')
   }
 
   return (
@@ -136,13 +161,33 @@ export default function EstimateSettingsPanel() {
                 {msg.slice(msg.indexOf(':') + 1)}
               </span>
             )}
-            <button
-              onClick={save}
-              disabled={!dirty || saving}
-              className="text-sm font-semibold text-white bg-green-700 hover:bg-green-800 disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2 rounded-lg transition-colors"
-            >
-              {saving ? 'Saving…' : 'Save'}
-            </button>
+            {!editing ? (
+              <button
+                onClick={() => setEditing(true)}
+                disabled={!canEdit || loading}
+                title={canEdit ? 'Edit settings' : 'Admins only'}
+                className="text-sm font-semibold text-green-700 border border-green-600 hover:bg-green-50 disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2 rounded-lg transition-colors"
+              >
+                Edit
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={cancel}
+                  disabled={saving}
+                  className="text-sm font-medium text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={save}
+                  disabled={saving || !dirty}
+                  className="text-sm font-semibold text-white bg-green-700 hover:bg-green-800 disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2 rounded-lg transition-colors"
+                >
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+              </>
+            )}
           </div>
         </div>
         <p className="text-sm text-gray-500 mb-5">
@@ -176,7 +221,8 @@ export default function EstimateSettingsPanel() {
                           min="0"
                           value={form[key] ?? ''}
                           onChange={e => setField(key, e.target.value)}
-                          className={`w-full min-w-0 text-sm border border-gray-300 px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 ${
+                          disabled={!editing}
+                          className={`w-full min-w-0 text-sm border border-gray-300 px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-600 ${
                             kind === 'money' ? '' : 'rounded-l-lg'
                           } ${kind === 'pct' || suffix ? '' : 'rounded-r-lg'}`}
                         />
