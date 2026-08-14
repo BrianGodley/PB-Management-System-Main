@@ -8,6 +8,7 @@ import MergeDuplicatesModal from '../components/MergeDuplicatesModal'
 import { fetchProductTypes, validateCalcMeta, indexProductTypes } from '../lib/productTypes'
 import TaxonomyManager from '../components/TaxonomyManager'
 import SubRateDetailModal from '../components/SubRateDetailModal'
+import LaborRateDetailModal from '../components/LaborRateDetailModal'
 
 // ── Identity code per labor / subcontractor rate (generated on the fly, never
 // stored — mirrors the material + misc-rate codes). Format:
@@ -565,6 +566,7 @@ export default function MasterRates({ only } = {}) {
   const [subs, setSubs] = useState([])
   const [vendors, setVendors] = useState([])
   const [detailSub, setDetailSub] = useState(null) // subcontractor_rates row open in the detail modal
+  const [detailLabor, setDetailLabor] = useState(null) // labor_rates row open in the detail modal
   // Labor / subcontractor taxonomy (for generated codes; tables may not exist yet)
   const [laborCats, setLaborCats] = useState([])
   const [laborSubcats, setLaborSubcats] = useState([])
@@ -808,6 +810,25 @@ export default function MasterRates({ only } = {}) {
   const codeCell = map => r => (
     <span className="font-mono text-xs text-gray-500">{map.get(r.id) || '—'}</span>
   )
+  // Labor Code is a link that opens the labor rate detail modal (edit the item,
+  // category, sub-category, unit, rate) — mirrors the material Code link.
+  const laborCodeCell = r => {
+    const code = laborCodeMap.get(r.id) || '—'
+    if (code === '—') return <span className="font-mono text-xs text-gray-400">—</span>
+    return (
+      <button
+        type="button"
+        onClick={() => setDetailLabor(r)}
+        className="font-mono text-xs text-green-700 font-semibold hover:underline"
+      >
+        {code}
+      </button>
+    )
+  }
+  const reloadLabor = async () => {
+    const { data } = await supabase.from('labor_rates').select('*').order('name')
+    if (data) setLabor(data)
+  }
   // Subcontractor Code is a link that opens the rate detail modal (assign a sub,
   // edit the rate, delete) — mirrors the material Code link.
   const subCodeCell = r => {
@@ -853,13 +874,13 @@ export default function MasterRates({ only } = {}) {
     [subTaxSubcats, subs]
   )
   const laborColumns = [
-    { key: 'code', label: 'Code', editable: false, render: codeCell(laborCodeMap) },
-    { key: 'category', label: 'Category', type: 'select', options: laborCatOptions },
-    { key: 'sub_category', label: 'Sub Category', type: 'select', options: laborSubOptions, placeholder: 'describe…' },
-    { key: 'name', label: 'Item', bold: true, stripCat: true, placeholder: 'e.g. Demo - Tree Small' },
-    { key: 'notes', label: 'Labor Description', placeholder: 'Optional notes' },
-    { key: 'unit', label: 'Unit', type: 'select', options: LABOR_UNIT_OPTIONS },
-    { key: 'rate', label: 'Rate', type: 'number', step: '0.0001' },
+    { key: 'code', label: 'Code', editable: false, width: '9rem', render: laborCodeCell },
+    { key: 'category', label: 'Category', type: 'select', options: laborCatOptions, width: '11rem' },
+    { key: 'sub_category', label: 'Sub Category', type: 'select', options: laborSubOptions, placeholder: 'describe…', width: '12rem' },
+    { key: 'name', label: 'Item', bold: true, stripCat: true, placeholder: 'e.g. Demo - Tree Small', width: '16rem' },
+    { key: 'notes', label: 'Labor Description', placeholder: 'Optional notes', width: '14rem' },
+    { key: 'unit', label: 'Unit', type: 'select', options: LABOR_UNIT_OPTIONS, width: '8rem' },
+    { key: 'rate', label: 'Rate', type: 'number', step: '0.0001', width: '7rem' },
     {
       key: '__modules',
       label: 'Estimate Module',
@@ -1097,7 +1118,7 @@ export default function MasterRates({ only } = {}) {
       {showRateTable && activeTab === 'subs' && (
         <div>
           <RateTable
-            addLabel="Add Subcontractor"
+            addLabel="Add Subcontractor Rate"
             count={visibleSubs.length}
             filters={
               <>
@@ -1158,6 +1179,19 @@ export default function MasterRates({ only } = {}) {
           onClose={() => setDetailSub(null)}
           onSaved={reloadSubs}
           onDeleted={reloadSubs}
+        />
+      )}
+
+      {detailLabor && (
+        <LaborRateDetailModal
+          row={detailLabor}
+          code={laborCodeMap.get(detailLabor.id)}
+          catOptions={laborCatOptions}
+          subOptions={laborSubOptions}
+          unitOptions={LABOR_UNIT_OPTIONS}
+          onClose={() => setDetailLabor(null)}
+          onSaved={reloadLabor}
+          onDeleted={reloadLabor}
         />
       )}
     </div>
