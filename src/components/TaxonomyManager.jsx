@@ -187,7 +187,16 @@ export default function TaxonomyManager({ kind = 'category', scope = 'material' 
         </div>
 
         <div className="overflow-auto max-h-[calc(100vh-16rem)]">
-          <table className="w-full text-xs min-w-[560px]">
+          <table className="w-full text-xs min-w-[560px] table-fixed">
+            {/* Shared column-width template so Categories + Sub-Categories line up
+                and the Items count sits evenly between the 3rd column and Vendor. */}
+            <colgroup>
+              <col style={{ width: cfg.hasMaterials ? '12%' : '16%' }} />
+              <col style={{ width: cfg.hasMaterials ? '30%' : '52%' }} />
+              <col style={{ width: cfg.hasMaterials ? '22%' : '32%' }} />
+              {cfg.hasMaterials && <col style={{ width: '16%' }} />}
+              {cfg.hasVendor && <col style={{ width: '20%' }} />}
+            </colgroup>
             <thead className="sticky top-0 z-10 bg-gray-50">
               <tr className="border-b border-gray-200 text-left text-gray-600 uppercase">
                 <Th k="code" label="Code" align="center" />
