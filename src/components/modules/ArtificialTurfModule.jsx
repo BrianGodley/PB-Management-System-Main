@@ -344,7 +344,10 @@ function calcTurf(
   // hrs = SF/TurfSFHr * TurfPH = SF/20 * 0.5
   const turfSFHr = n(lr['Turf - Turf Install SF/hr'])
   // Turf roll width (ft) — DB-editable product spec.
-  const rollWidthFt = n(mp['Turf - Roll Width FT'])
+  // Roll width is a fixed physical spec (15' wide rolls); the misc_rates value is
+  // editable but falls back to 15 so the section never silently zeroes if the
+  // rate row is missing (allowed coefficient fallback).
+  const rollWidthFt = n(mp['Turf - Roll Width FT']) || 15
   let turfHrs = 0,
     turfMat = 0,
     totalEdgeLF = 0,
