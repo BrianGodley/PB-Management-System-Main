@@ -361,13 +361,25 @@ function calcTurf(
   let turfHrs = 0,
     turfMat = 0,
     totalEdgeLF = 0,
-    subTurfCost = 0
+    subTurfCost = 0,
+    cutHrs = 0,
+    cutMat = 0,
+    subCutMat = 0,
+    infillMat = 0
+  // Cut/Staple/Seam + Pet-Odor Infill are now PER-TURF (each roll is its own
+  // group). Coefficients are DB-editable (misc_rates); each roll bills off its
+  // own Edge LF (cut/seam) and its own installed SF (infill).
+  const installMatPerLF = n(mp['Turf - Install Materials'])
+  const cutSFHr = n(mp['Turf - Cut/Staple/Seam LF/hr'])
+  const infillSFPerBag = n(mp['Turf - Infill SF per Bag'])
+  const zeoPerBag = n(mp['Turf - Infill ZeoFill'])
+  const durafillPerSF = n(mp['Turf - Infill Durafill'])
 
   const rollCalc = state.rolls.map(roll => {
-    // Unselected turf roll (no brand) contributes nothing — no labor, no material,
-    // and its edge LF is excluded from cut/seam totals (no crash, no fallback).
+    const useZeo = !!roll.useZeoFill
+    // Unselected turf roll (no brand) contributes nothing (no crash, no fallback).
     if (!roll.brand)
-      return { edgeLF: n(roll.edgeLF), installSF: n(roll.installSF), sf: 0, brand: '', pricePerSF: 0, hrs: 0, mat: 0, rowSubCost: 0 }
+      return { edgeLF: n(roll.edgeLF), installSF: n(roll.installSF), sf: 0, brand: '', pricePerSF: 0, hrs: 0, mat: 0, rowSubCost: 0, cutHrs: 0, cutMat: 0, subCutMat: 0, infillMat: 0, infillSF: 0, useZeoFill: useZeo }
     const edgeLF = n(roll.edgeLF)
     const installSF = n(roll.installSF)
     const brandRow = turfBrandRow(materialRows, roll.vendor, roll.brand)
@@ -379,12 +391,31 @@ function calcTurf(
     const mat = isSub ? 0 : sf * pricePerSF
     // All-in sub cost for this roll: (sub install $/SF + material $/SF) × SF.
     const rowSubCost = installSF * (subInstallPerSF + pricePerSF)
+    // Cut, Staple & Seam for THIS turf's edge.
+    const rCutHrs = !isSub && edgeLF > 0 && cutSFHr > 0 ? edgeLF / cutSFHr : 0
+    const rSubCutMat = installMatPerLF * edgeLF
+    const rCutMat = isSub ? 0 : installMatPerLF * edgeLF
+    // Pet-odor (ZeoFill) or standard (Durafill) infill for THIS turf's SF.
+    let rInfillMat = 0
+    if (!isSub && sf > 0) {
+      if (useZeo) {
+        const bags = infillSFPerBag > 0 ? Math.ceil(sf / infillSFPerBag) : 0
+        rInfillMat = bags * zeoPerBag
+      } else {
+        rInfillMat = sf * durafillPerSF
+      }
+    }
     turfHrs += hrs
     turfMat += mat
     totalEdgeLF += edgeLF
     subTurfCost += rowSubCost
-    return { edgeLF, installSF, sf, brand: roll.brand, pricePerSF, hrs, mat, rowSubCost }
+    cutHrs += rCutHrs
+    cutMat += rCutMat
+    subCutMat += rSubCutMat
+    infillMat += rInfillMat
+    return { edgeLF, installSF, sf, brand: roll.brand, pricePerSF, hrs, mat, rowSubCost, cutHrs: rCutHrs, cutMat: rCutMat, subCutMat: rSubCutMat, infillMat: rInfillMat, infillSF: sf, useZeoFill: useZeo }
   })
+  const infillAreaSF = rollCalc.reduce((s, r) => s + (r.infillSF || 0), 0)
 
   // ── Turf Strips (row 20-21) ───────────────────────────────────────────────
   // Narrow/custom cut strips — separate from the 15' wide rolls.
@@ -413,39 +444,6 @@ function calcTurf(
     subStripsCost += rowSubCost
     return { lf, widthIn, price, sf, hrs, mat, rowSubCost }
   })
-
-  // ── Cut, Staple & Seam ────────────────────────────────────────────────────
-  // hrs = (totalLF / TurfCutSfHr) * TurfCutRate = (totalLF/100)*1.0
-  // mat = installMaterials ($/LF) × totalLF  — matches Excel S18=O18*Q18
-  const installMatPerLF = n(mp['Turf - Install Materials'])
-  // Cut/staple/seam labor coefficients are DB-editable (labor_rates).
-  const cutSFHr = n(mp['Turf - Cut/Staple/Seam LF/hr'])
-  const cutHrs =
-    !isSub && totalEdgeLF > 0 && cutSFHr > 0 ? totalEdgeLF / cutSFHr : 0
-  // On the Sub tab cut/seam material rolls into the sub cost bucket instead of
-  // in-house material.
-  const subCutMat = installMatPerLF * totalEdgeLF
-  const cutMat = isSub ? 0 : installMatPerLF * totalEdgeLF
-
-  // ── Infill ────────────────────────────────────────────────────────────────
-  // Excel uses K8 (base gravel SF) directly for infill quantity — NOT the demo SF.
-  // When no demo rows are entered, turfAreaSF = 0 but infill still applies to the
-  // installed base area. Fall back to base SF so infill always calculates.
-  // ZeoFill (pet): $30/bag, bags=ceil(SF/30)
-  // Standard Durafill: $0.62/SF
-  const infillAreaSF =
-    turfAreaSF || (state.baseRows || []).reduce((m, r) => Math.max(m, n(r.sf)), 0)
-  // ZeoFill coverage (SF per bag) — DB-editable product spec.
-  const infillSFPerBag = n(mp['Turf - Infill SF per Bag'])
-  let infillMat = 0
-  if (!isSub && infillAreaSF > 0) {
-    if (state.useZeoFill) {
-      const bags = infillSFPerBag > 0 ? Math.ceil(infillAreaSF / infillSFPerBag) : 0
-      infillMat = bags * n(mp['Turf - Infill ZeoFill'])
-    } else {
-      infillMat = infillAreaSF * n(mp['Turf - Infill Durafill'])
-    }
-  }
 
   // ── Manual entry ─────────────────────────────────────────────────────────
   const manualFiltered = (state.manualRows || []).filter(
@@ -538,7 +536,7 @@ const DEFAULT_STATE = {
     { material: 'Weed', type: '', sf: '', vendor: 'Standard' },
   ],
   useZeoFill: false,
-  rolls: [{ brand: '', edgeLF: '', vendor: '' }],
+  rolls: [{ brand: '', edgeLF: '', vendor: '', useZeoFill: false }],
   stripRows: [{ lf: '', widthIn: '12', brand: '', vendor: '' }],
   manualRows: [{ label: '', hours: '', materials: '', subCost: '' }],
 }
@@ -951,8 +949,17 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         const cur = p[k]
         return {
           ...p,
-          [k]: { ...cur, rolls: [...(cur.rolls || []), { brand: '', edgeLF: '', vendor: '' }] },
+          [k]: { ...cur, rolls: [...(cur.rolls || []), { brand: '', edgeLF: '', vendor: '', useZeoFill: false }] },
         }
+      }),
+    []
+  )
+  const removeRoll = useCallback(
+    i =>
+      setState(p => {
+        const k = tabKey(p)
+        const cur = p[k]
+        return { ...p, [k]: { ...cur, rolls: (cur.rolls || []).filter((_, idx) => idx !== i) } }
       }),
     []
   )
@@ -1511,177 +1518,157 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       {/* Turf Installation */}
       <div>
         <SecHdr title="Turf Installation (15' Wide Rolls)" />
-        <table className="w-full text-xs">
-          <TH
-            cols={
-              calc.isSub
-                ? [
-                    { label: 'Vendor', w: 'w-40' },
-                    { label: 'Turf Type', w: 'w-32' },
-                    { label: 'Install SF', w: 'w-24' },
-                    { label: 'Edge LF', w: 'w-20' },
-                    { label: 'Material', w: 'w-24' },
-                  ]
-                : [
-                    { label: 'Vendor', w: 'w-40' },
-                    { label: 'Turf Type', w: 'w-32' },
-                    { label: 'Edge LF', w: 'w-20' },
-                    { label: 'Sq Ft', w: 'w-20' },
-                    { label: 'Hrs', w: 'w-16' },
-                    { label: 'Material', w: 'w-24' },
-                  ]
-            }
-          />
-          <tbody className="divide-y divide-gray-50">
-            {T.rolls.map((roll, i) => {
-              const cr = calc.rollCalc[i]
-              // Only resolve a brand row when one is selected — an empty picker
-              // must not auto-fill the first turf.
-              const brandRow = roll.brand ? turfBrandRow(materialRows, roll.vendor, roll.brand) : null
-              const rollBrandOpts = turfBrandOptions(materialRows, roll.vendor)
-              return (
-                <tr key={i}>
-                  <td className={td}>
-                    <select
-                      className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
-                      value={roll.vendor || ''}
-                      onChange={e => setRoll(i, 'vendor', e.target.value)}
-                      title="Vendor"
-                    >
-                      <option value="">Select</option>
-                      <option value="Standard">Standard</option>
-                      {vendorsSupplyingMarker(TURF_CAT.turf).map(v => (
-                        <option key={v.id} value={v.id}>
-                          {v.name}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className={td}>
-                    <Sel
-                      value={roll.brand ? (brandRow?.id || roll.brand) : ''}
-                      onChange={e => setRoll(i, 'brand', e.target.value)}
-                      options={rollBrandOpts.map(o => o.id)}
-                      optionLabels={rollBrandOpts.map(o => o.label)}
-                      placeholder="Select turf"
-                    />
-                  </td>
-                  {calc.isSub ? (
+        {T.rolls.map((roll, i) => {
+          const cr = calc.rollCalc[i] || {}
+          // Only resolve a brand row when one is selected — an empty picker
+          // must not auto-fill the first turf.
+          const brandRow = roll.brand ? turfBrandRow(materialRows, roll.vendor, roll.brand) : null
+          const rollBrandOpts = turfBrandOptions(materialRows, roll.vendor)
+          return (
+            <div key={i} className="mb-4 border border-gray-100 rounded-lg p-2">
+              <table className="w-full text-xs">
+                <TH
+                  cols={
+                    calc.isSub
+                      ? [
+                          { label: 'Vendor', w: 'w-40' },
+                          { label: 'Turf Type', w: 'w-32' },
+                          { label: 'Install SF', w: 'w-24' },
+                          { label: 'Edge LF', w: 'w-20' },
+                          { label: 'Material', w: 'w-24' },
+                        ]
+                      : [
+                          { label: 'Vendor', w: 'w-40' },
+                          { label: 'Turf Type', w: 'w-32' },
+                          { label: 'Edge LF', w: 'w-20' },
+                          { label: 'Sq Ft', w: 'w-20' },
+                          { label: 'Hrs', w: 'w-16' },
+                          { label: 'Material', w: 'w-24' },
+                        ]
+                  }
+                />
+                <tbody>
+                  <tr>
+                    <td className={td}>
+                      <select
+                        className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white"
+                        value={roll.vendor || ''}
+                        onChange={e => setRoll(i, 'vendor', e.target.value)}
+                        title="Vendor"
+                      >
+                        <option value="">Select</option>
+                        <option value="Standard">Standard</option>
+                        {vendorsSupplyingMarker(TURF_CAT.turf).map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className={td}>
+                      <Sel
+                        value={roll.brand ? (brandRow?.id || roll.brand) : ''}
+                        onChange={e => setRoll(i, 'brand', e.target.value)}
+                        options={rollBrandOpts.map(o => o.id)}
+                        optionLabels={rollBrandOpts.map(o => o.label)}
+                        placeholder="Select turf"
+                      />
+                    </td>
+                    {calc.isSub ? (
+                      <>
+                        <td className={td}>
+                          <Inp
+                            value={roll.installSF || ''}
+                            onChange={e => setRoll(i, 'installSF', e.target.value)}
+                            className="text-center"
+                          />
+                        </td>
+                        <td className={td}>
+                          <Inp
+                            value={roll.edgeLF}
+                            onChange={e => setRoll(i, 'edgeLF', e.target.value)}
+                            className="text-center"
+                          />
+                        </td>
+                        <td className={num}>{cr.rowSubCost > 0 ? fmt2(cr.rowSubCost) : '—'}</td>
+                      </>
+                    ) : (
+                      <>
+                        <td className={td}>
+                          <Inp
+                            value={roll.edgeLF}
+                            onChange={e => setRoll(i, 'edgeLF', e.target.value)}
+                            className="text-center"
+                          />
+                        </td>
+                        <td className={num}>{cr.sf > 0 ? cr.sf.toLocaleString() : '—'}</td>
+                        <td className={num}>{fh(cr.hrs)}</td>
+                        <td className={num}>{cr.mat > 0 ? fmt2(cr.mat) : '—'}</td>
+                      </>
+                    )}
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* Cut, Staple & Seam for this turf — always shown */}
+              <div className="mt-2 bg-gray-50 rounded-lg px-3 py-2 text-xs flex justify-between">
+                <span className="text-gray-600 font-medium inline-flex items-center gap-1">
+                  Cut, Staple &amp; Seam
+                  <span className="text-gray-400 font-normal ml-1">({n(cr.edgeLF) || 0} Ln Ft)</span>
+                </span>
+                <div className="flex gap-4">
+                  {!calc.isSub && <span className="text-gray-700">{fh(cr.cutHrs || 0)} hrs</span>}
+                  <span className="text-gray-700">
+                    {fmt2(calc.isSub ? cr.subCutMat || 0 : cr.cutMat || 0)} {calc.isSub ? 'sub' : 'mat'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Pet-odor infill for this turf */}
+              <div className="mt-1 flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <Toggle
+                  checked={!!roll.useZeoFill}
+                  onChange={v => setRoll(i, 'useZeoFill', v)}
+                  label="ZeoFill Pet Odor Infill (upgrade)"
+                />
+                <span className="text-xs text-amber-700 ml-auto inline-flex items-center gap-1">
+                  {roll.useZeoFill ? (
                     <>
-                      <td className={td}>
-                        <Inp
-                          value={roll.installSF || ''}
-                          onChange={e => setRoll(i, 'installSF', e.target.value)}
-                          className="text-center"
-                        />
-                      </td>
-                      <td className={td}>
-                        <Inp
-                          value={roll.edgeLF}
-                          onChange={e => setRoll(i, 'edgeLF', e.target.value)}
-                          className="text-center"
-                        />
-                      </td>
-                      <td className={num}>{cr.rowSubCost > 0 ? fmt2(cr.rowSubCost) : '—'}</td>
+                      {calc.infillSFPerBag > 0 ? Math.ceil((cr.infillSF || 0) / calc.infillSFPerBag) : 0} bags @ $
+                      {n(materialPrices['Turf - Infill ZeoFill']).toFixed(2)}/bag · {fmt2(cr.infillMat || 0)}
                     </>
                   ) : (
                     <>
-                      <td className={td}>
-                        <Inp
-                          value={roll.edgeLF}
-                          onChange={e => setRoll(i, 'edgeLF', e.target.value)}
-                          className="text-center"
-                        />
-                      </td>
-                      <td className={num}>{cr.sf > 0 ? cr.sf.toLocaleString() : '—'}</td>
-                      <td className={num}>{fh(cr.hrs)}</td>
-                      <td className={num}>{cr.mat > 0 ? fmt2(cr.mat) : '—'}</td>
+                      Durafill @ ${n(materialPrices['Turf - Infill Durafill']).toFixed(2)}/SF · {fmt2(cr.infillMat || 0)}
                     </>
                   )}
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+                </span>
+                {T.rolls.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeRoll(i)}
+                    className="text-gray-300 hover:text-red-500 text-sm px-1"
+                    title="Remove turf"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })}
         <button
           type="button"
           onClick={addRoll}
-          className="mt-2 text-xs text-blue-600 hover:text-blue-700 font-medium"
+          className="mt-1 text-xs text-blue-600 hover:text-blue-700 font-medium"
         >
-          ＋ Add row
+          ＋ Add Turf
         </button>
-
-        {/* Pet-odor infill upgrade — sits under the turf install rows. */}
-        <div className="mt-3 flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-          <Toggle
-            checked={T.useZeoFill}
-            onChange={v => setT('useZeoFill', v)}
-            label="ZeoFill Pet Odor Infill (upgrade)"
-          />
-          <span className="text-xs text-amber-700 ml-auto inline-flex items-center gap-1">
-            {T.useZeoFill ? (
-              <>
-                {calc.infillSFPerBag > 0 ? Math.ceil(calc.infillAreaSF / calc.infillSFPerBag) : 0} bags @ $
-                {n(materialPrices['Turf - Infill ZeoFill']).toFixed(2)}
-                /bag
-              </>
-            ) : (
-              <>
-                Durafill @ $
-                {n(materialPrices['Turf - Infill Durafill']).toFixed(2)}
-                /SF
-              </>
-            )}
-          </span>
-        </div>
-
-        {/* Cut, Staple & Seam — auto-calculated */}
-        {calc.totalEdgeLF > 0 && (
-          <div className="mt-2 bg-gray-50 rounded-lg px-3 py-2 text-xs flex justify-between">
-            <span className="text-gray-600 font-medium inline-flex items-center gap-1">
-              Cut, Staple &amp; Seam
-              <span className="text-gray-400 font-normal ml-1">({calc.totalEdgeLF} Ln Ft total)</span>
-            </span>
-            <div className="flex gap-4">
-              {!calc.isSub && <span className="text-gray-700">{fh(calc.cutHrs)} hrs</span>}
-              <span className="text-gray-700">
-                {fmt2(calc.isSub ? calc.subCutMat : calc.cutMat)} {calc.isSub ? 'sub' : 'mat'}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Infill — auto-calculated from base area */}
-        {calc.infillAreaSF > 0 && (
-          <div className="mt-1 bg-gray-50 rounded-lg px-3 py-2 text-xs flex justify-between">
-            <span className="text-gray-600 font-medium">
-              {T.useZeoFill ? 'ZeoFill Pet Infill' : 'Durafill Infill'}
-              <span className="text-gray-400 font-normal ml-2">
-                ({calc.infillAreaSF.toLocaleString()} Sq Ft)
-              </span>
-            </span>
-            <span className="text-gray-700">{fmt2(calc.infillMat)}</span>
-          </div>
-        )}
       </div>
 
       {/* Turf Strips */}
       <div>
-        <SecHdr title="Turf Strips (Narrow / Custom Cuts)" />
-        <div className="text-xs text-gray-500 mb-2 italic">
-          {calc.isSub ? (
-            <>
-              For narrow strips that don't come off a standard 15' roll. Flat subcontractor rate:{' '}
-              <span className="text-gray-600">${calc.subStripPerLF} per Ln Ft</span> + brand material ($ per Sq Ft).
-            </>
-          ) : (
-            <>
-              For narrow strips that don't come off a standard 15' roll. Row edits both rates:{' '}
-              <span className="text-gray-600">material</span> ($ per Sq Ft, per brand) and{' '}
-              <span className="text-gray-600">install labor</span> ({calc.stripLFHr} Ln Ft/hr).
-            </>
-          )}
-        </div>
+        <SecHdr title="Turf Strips" />
         <table className="w-full text-xs">
           <TH
             cols={
