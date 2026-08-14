@@ -65,7 +65,7 @@ const TURF_CAT = { base: 'Turf Base', turf: 'Turf Material' }
 // vendor/catalog price lookups key off `dbName`, while labor/qty coefficients
 // still key off `key` (Gravel/DG/Weed).
 const BASE_MATERIALS = [
-  { key: 'Gravel', label: 'Class II', dbName: 'Gravel Base', matKey: 'Turf - Gravel Base', qtyUnit: 't' },
+  { key: 'Gravel', label: 'Class II Roadbase', dbName: 'Gravel Base', matKey: 'Turf - Gravel Base', qtyUnit: 't' },
   { key: 'DG', label: 'DG', dbName: 'DG Base', matKey: 'Turf - DG Base', qtyUnit: 't' },
   { key: 'Weed', label: 'Weed Barrier', dbName: 'Weed Barrier Fabric', matKey: 'Turf - Weed Barrier Fabric', qtyUnit: 'roll' },
 ]
@@ -1331,7 +1331,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                               o.key === row.material ||
                               o.dbName === row.material ||
                               o.label === row.material
-                          ) && <option value={row.material}>{row.material}</option>}
+                          ) && <option value={row.material}>{def.label || row.material}</option>}
                         {baseOpts.map(o => (
                           <option key={o.dbName || o.value} value={o.value}>
                             {o.label}
