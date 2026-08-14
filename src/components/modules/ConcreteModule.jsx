@@ -185,6 +185,7 @@ function calcConcrete(
   const saltFinishSFPerHr = n(lr['Concrete - Salt Finish SF/hr'])
   const exposedAggSFPerHr = n(lr['Concrete - Exposed Aggregate SF/hr'])
   const seededAggSFPerHr = n(lr['Concrete - Seeded Aggregate SF/hr'])
+  const stampedSFPerHr = n(lr['Concrete - Stamped Finish SF/hr'])
   // Hand Mix takes more labor to produce than truck-delivered mix. Applied as a
   // % uplift to that tier's pour & finish hours. Tunable coefficient — lives in
   // labor_rates (View Rates), read live with no hardcoded fallback.
@@ -326,6 +327,7 @@ function calcConcrete(
   } else if (finishType === 'Seeded Aggregate') {
     finishHrs = seededAggSFPerHr > 0 ? installSF / seededAggSFPerHr : 0
   } else if (finishType === 'Stamped') {
+    finishHrs = stampedSFPerHr > 0 ? installSF / stampedSFPerHr : 0
     finishSubCost = isIH ? stampSubFlat : concreteCY * stampSubPerCY
   }
   if (colorYes && concreteCY > 0) {
@@ -479,6 +481,7 @@ function calcConcrete(
     stampSubPerCY,
     sandFinishSFPerHr,
     saltFinishSFPerHr,
+    stampedSFPerHr,
     exposedAggSFPerHr,
     seededAggSFPerHr,
     pumpAuto,
@@ -1315,6 +1318,15 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           value: calc.seededAggSFPerHr,
         },
         {
+          label: 'Concrete - Stamped Finish SF/hr',
+          table: 'labor_rates',
+          name: 'Concrete - Stamped Finish SF/hr',
+          category: 'Concrete',
+          mode: 'coefficient',
+          unitLabel: 'Sq Ft per hr',
+          value: calc.stampedSFPerHr,
+        },
+        {
           label: 'Concrete - Vapor Barrier',
           table: 'labor_rates',
           name: 'Concrete - Vapor Barrier',
@@ -1845,6 +1857,11 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             </div>
           )}
           {!isSub && (
+            <div className="col-span-2">
+              <p className="text-[11px] text-gray-700 uppercase tracking-wide mb-1">Forming</p>
+            </div>
+          )}
+          {!isSub && (
           <div>
             <label className="text-xs text-gray-500 block mb-1">Form Edging (Ln Ft)</label>
             <NumInput value={activeFormLF} onChange={setActiveFormLF} />
@@ -1887,6 +1904,61 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           <div className="col-span-2">
             <label className="text-xs text-gray-500 block mb-1">Layout Time (hrs)</label>
             <NumInput value={layoutHrs} onChange={setLayoutHrs} placeholder="0" />
+          </div>
+          {/* ── Vapor Barrier ── */}
+          <div className="col-span-2">
+            <p className="text-[11px] text-gray-700 uppercase tracking-wide mb-1">Vapor Barrier</p>
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_5rem_6rem] gap-2 items-end">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1 text-center">Vendor</label>
+                <select
+                  className="input text-sm py-1.5 w-full min-w-0"
+                  value={activeVaporVendor || ''}
+                  onChange={e => {
+                    setActiveVaporVendor(e.target.value)
+                    setActiveVaporItem('')
+                  }}
+                  title="Vapor barrier vendor"
+                >
+                  {!activeVaporVendor && <option value="">Select</option>}
+                  {vendorsForCategory('Vapor Barrier').map(v => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}
+                    </option>
+                  ))}
+                  <option value="Standard">Standard</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1 text-center">Item</label>
+                <select
+                  className="input text-sm py-1.5 w-full min-w-0"
+                  value={activeVaporItem || ''}
+                  onChange={e => setActiveVaporItem(e.target.value)}
+                >
+                  {!activeVaporItem && <option value="">Select item</option>}
+                  {activeVaporItem &&
+                    !sectionOptions('Vapor Barrier', activeVaporVendor).some(o => o.label === activeVaporItem) && (
+                      <option value={activeVaporItem}>{activeVaporItem}</option>
+                    )}
+                  {sectionOptions('Vapor Barrier', activeVaporVendor).map(o => (
+                    <option key={o.label} value={o.label}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1 text-center">Sq Ft</label>
+                <NumInput value={activeVaporBarrierSF} onChange={setActiveVaporBarrierSF} className="w-full text-center" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1 text-center">Material</label>
+                <div className="input text-sm py-1.5 w-full text-right bg-gray-50 text-gray-600">
+                  {fmt2(calc.vaporMat)}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -2020,61 +2092,6 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 <label className="text-xs text-gray-500 block mb-1 text-center">Material</label>
                 <div className="input text-sm py-1.5 w-full text-right bg-gray-50 text-gray-600">
                   {fmt2(calc.sealerMat)}
-                </div>
-              </div>
-            </div>
-          </div>
-          {/* ── Vapor Barrier ── */}
-          <div className="col-span-2">
-            <p className="text-[11px] text-gray-700 uppercase tracking-wide mb-1">Vapor Barrier</p>
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_5rem_6rem] gap-2 items-end">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1 text-center">Vendor</label>
-                <select
-                  className="input text-sm py-1.5 w-full min-w-0"
-                  value={activeVaporVendor || ''}
-                  onChange={e => {
-                    setActiveVaporVendor(e.target.value)
-                    setActiveVaporItem('')
-                  }}
-                  title="Vapor barrier vendor"
-                >
-                  {!activeVaporVendor && <option value="">Select</option>}
-                  {vendorsForCategory('Vapor Barrier').map(v => (
-                    <option key={v.id} value={v.id}>
-                      {v.name}
-                    </option>
-                  ))}
-                  <option value="Standard">Standard</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1 text-center">Item</label>
-                <select
-                  className="input text-sm py-1.5 w-full min-w-0"
-                  value={activeVaporItem || ''}
-                  onChange={e => setActiveVaporItem(e.target.value)}
-                >
-                  {!activeVaporItem && <option value="">Select item</option>}
-                  {activeVaporItem &&
-                    !sectionOptions('Vapor Barrier', activeVaporVendor).some(o => o.label === activeVaporItem) && (
-                      <option value={activeVaporItem}>{activeVaporItem}</option>
-                    )}
-                  {sectionOptions('Vapor Barrier', activeVaporVendor).map(o => (
-                    <option key={o.label} value={o.label}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1 text-center">Sq Ft</label>
-                <NumInput value={activeVaporBarrierSF} onChange={setActiveVaporBarrierSF} className="w-full text-center" />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1 text-center">Material</label>
-                <div className="input text-sm py-1.5 w-full text-right bg-gray-50 text-gray-600">
-                  {fmt2(calc.vaporMat)}
                 </div>
               </div>
             </div>

@@ -538,9 +538,11 @@ function ModuleTags({ modules }) {
 const TABS = [
   { key: 'materials', label: 'Materials' },
   { key: 'labor', label: 'Labor Rates' },
-  { key: 'labor_tax', label: 'Labor Categories' },
+  { key: 'labor_cat', label: 'Labor Categories' },
+  { key: 'labor_sub', label: 'Labor Sub-Cats' },
   { key: 'subs', label: 'Subcontractors' },
-  { key: 'sub_tax', label: 'Sub Categories' },
+  { key: 'sub_cat', label: 'Sub Categories' },
+  { key: 'sub_sub', label: 'Sub Sub-Cats' },
 ]
 
 export default function MasterRates({ only } = {}) {
@@ -946,7 +948,8 @@ export default function MasterRates({ only } = {}) {
         <div className="flex gap-1 border-b border-gray-200 mb-3">
           {[
             { key: 'rates', label: only === 'labor' ? 'Labor Rates' : 'Subcontractor Rates' },
-            { key: 'tax', label: 'Categories' },
+            { key: 'cat', label: 'Categories' },
+            { key: 'sub', label: 'Sub-Categories' },
           ].map(t => (
             <button
               key={t.key}
@@ -963,12 +966,12 @@ export default function MasterRates({ only } = {}) {
         </div>
       )}
 
-      {/* Embedded taxonomy (Categories + Sub-Categories for the scoped table) */}
-      {only && embedScope && embeddedView === 'tax' && (
-        <div>
-          <TaxonomyManager scope={embedScope} kind="category" />
-          <TaxonomyManager scope={embedScope} kind="subcategory" />
-        </div>
+      {/* Embedded taxonomy — Categories and Sub-Categories are independent tabs. */}
+      {only && embedScope && embeddedView === 'cat' && (
+        <TaxonomyManager scope={embedScope} kind="category" />
+      )}
+      {only && embedScope && embeddedView === 'sub' && (
+        <TaxonomyManager scope={embedScope} kind="subcategory" />
       )}
 
       {/* Materials */}
@@ -1107,29 +1110,13 @@ export default function MasterRates({ only } = {}) {
         </div>
       )}
 
-      {/* Labor taxonomy (Categories + Sub-Categories) */}
-      {activeTab === 'labor_tax' && (
-        <div>
-          <p className="text-xs text-gray-500 mb-1">
-            Master Category &amp; Sub-Category lists for In-House Labor Rates. Drive the codes
-            shown on the Labor Rates tab.
-          </p>
-          <TaxonomyManager scope="labor" kind="category" />
-          <TaxonomyManager scope="labor" kind="subcategory" />
-        </div>
-      )}
+      {/* Labor taxonomy — Categories and Sub-Categories as independent tabs. */}
+      {activeTab === 'labor_cat' && <TaxonomyManager scope="labor" kind="category" />}
+      {activeTab === 'labor_sub' && <TaxonomyManager scope="labor" kind="subcategory" />}
 
-      {/* Subcontractor taxonomy (Categories + Sub-Categories) */}
-      {activeTab === 'sub_tax' && (
-        <div>
-          <p className="text-xs text-gray-500 mb-1">
-            Master Category &amp; Sub-Category lists for Subcontractor Rates. Drive the codes
-            shown on the Subcontractors tab.
-          </p>
-          <TaxonomyManager scope="sub" kind="category" />
-          <TaxonomyManager scope="sub" kind="subcategory" />
-        </div>
-      )}
+      {/* Subcontractor taxonomy — Categories and Sub-Categories as independent tabs. */}
+      {activeTab === 'sub_cat' && <TaxonomyManager scope="sub" kind="category" />}
+      {activeTab === 'sub_sub' && <TaxonomyManager scope="sub" kind="subcategory" />}
     </div>
   )
 }
