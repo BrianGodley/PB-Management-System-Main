@@ -314,20 +314,24 @@ function calcConcrete(
     layoutHrs + travelHrs + baseHrsTot + installHrs + rebarHrs + formHrs + sleeveHrs
 
   // ── Finish add-ons ───────────────────────────────────────────────────────
+  // Finish labor is driven by the finish area entered in the Finish row (Sq Ft).
+  // If that's left blank, it falls back to the full poured area (install tiers)
+  // so the whole slab gets finished — matching the original behavior.
+  const finishSF = n(state.finishMatSF) > 0 ? n(state.finishMatSF) : installSF
   let finishHrs = 0,
     finishSubCost = 0,
     colorMat = 0
   if (finishType === 'Sand Finish') {
-    finishHrs = sandFinishSFPerHr > 0 ? installSF / sandFinishSFPerHr : 0
-    if (isIH) finishSubCost = Math.ceil(installSF / 400) * sandFinishPer400SF
+    finishHrs = sandFinishSFPerHr > 0 ? finishSF / sandFinishSFPerHr : 0
+    if (isIH) finishSubCost = Math.ceil(finishSF / 400) * sandFinishPer400SF
   } else if (finishType === 'Salt Finish') {
-    finishHrs = saltFinishSFPerHr > 0 ? installSF / saltFinishSFPerHr : 0
+    finishHrs = saltFinishSFPerHr > 0 ? finishSF / saltFinishSFPerHr : 0
   } else if (finishType === 'Exposed Aggregate') {
-    finishHrs = exposedAggSFPerHr > 0 ? installSF / exposedAggSFPerHr : 0
+    finishHrs = exposedAggSFPerHr > 0 ? finishSF / exposedAggSFPerHr : 0
   } else if (finishType === 'Seeded Aggregate') {
-    finishHrs = seededAggSFPerHr > 0 ? installSF / seededAggSFPerHr : 0
+    finishHrs = seededAggSFPerHr > 0 ? finishSF / seededAggSFPerHr : 0
   } else if (finishType === 'Stamped') {
-    finishHrs = stampedSFPerHr > 0 ? installSF / stampedSFPerHr : 0
+    finishHrs = stampedSFPerHr > 0 ? finishSF / stampedSFPerHr : 0
     finishSubCost = isIH ? stampSubFlat : concreteCY * stampSubPerCY
   }
   if (colorYes && concreteCY > 0) {
