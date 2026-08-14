@@ -239,9 +239,6 @@ export default function MasterMaterialRates() {
       ) : (
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
         <div className="flex flex-wrap items-center gap-3 px-3 py-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
-          <h3 className="text-sm font-semibold text-gray-700 whitespace-nowrap">
-            {isArchivedView ? 'Archived' : isVendorView ? 'Vendor Rates' : 'Standard Rates'}
-          </h3>
           <select
             className="border border-gray-200 rounded-md px-2 py-1 text-xs bg-white"
             value={cat}
@@ -277,19 +274,13 @@ export default function MasterMaterialRates() {
             <thead className="sticky top-0 z-10">
               <tr className="bg-gray-50 border-b border-gray-200 text-left text-gray-600 uppercase">
                 <Th k="code" sort={sort} onSort={toggleSort}>Code</Th>
-                {isVendorView && <Th k="vendor" sort={sort} onSort={toggleSort}>Vendor</Th>}
+                {!isArchivedView && <Th k="vendor" sort={sort} onSort={toggleSort}>Vendor</Th>}
                 <Th k="category" sort={sort} onSort={toggleSort}>Category</Th>
                 <Th k="subcat" sort={sort} onSort={toggleSort}>Sub-Category</Th>
                 <Th k="description" sort={sort} onSort={toggleSort}>Description</Th>
                 <Th k="unit" sort={sort} onSort={toggleSort}>Unit</Th>
                 <Th k="price" sort={sort} onSort={toggleSort} align="right">Price</Th>
-                {!isVendorView && !isArchivedView && (
-                  <th className="px-3 py-2 font-semibold text-center">Default</th>
-                )}
-                {/* Greedy trailing column soaks up extra width so Code…Price pack
-                    to the left (moves the Unit column left instead of stretching
-                    the Description column). */}
-                <th className="px-3 py-2 w-full" />
+                <th className="px-3 py-2 w-36" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -319,8 +310,10 @@ export default function MasterMaterialRates() {
                           {r.code}
                         </span>
                       </td>
-                      {isVendorView && (
-                        <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">{r.vName}</td>
+                      {!isArchivedView && (
+                        <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                          {isVendorView ? r.vName : 'Standard'}
+                        </td>
                       )}
                       <td className="px-3 py-1.5 text-gray-600 whitespace-nowrap">
                         {r.m.category?.name || '—'}
@@ -328,7 +321,7 @@ export default function MasterMaterialRates() {
                       <td className="px-3 py-1.5 text-gray-600 whitespace-nowrap">
                         {r.m.subcategory?.name || '—'}
                       </td>
-                      <td className="px-3 py-1.5 text-gray-900 font-medium max-w-[22rem]">
+                      <td className="px-3 py-1.5 text-gray-900 font-medium">
                         {r.m.description}
                         {r.m.collection && (
                           <span className="ml-1.5 text-[10px] px-1 py-0.5 rounded bg-gray-100 text-gray-500">
@@ -342,20 +335,6 @@ export default function MasterMaterialRates() {
                           {money(r.price)}
                         </span>
                       </td>
-                      {!isVendorView && !isArchivedView && (
-                        <td className="px-3 py-1.5 text-center">
-                          <button
-                            title={r.m.is_default ? 'Default for its sub-category' : 'Set as sub-category default'}
-                            onClick={e => {
-                              e.stopPropagation()
-                              setDefault(r.m)
-                            }}
-                            className={r.m.is_default ? 'text-amber-500' : 'text-gray-300 hover:text-amber-400'}
-                          >
-                            ★
-                          </button>
-                        </td>
-                      )}
                       <td className="px-3 py-1.5 text-right whitespace-nowrap">
                         {isArchivedView ? (
                           <button
@@ -679,7 +658,6 @@ function MiscRatesPanel() {
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
       <div className="flex flex-wrap items-center gap-3 px-3 py-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
-        <h3 className="text-sm font-semibold text-gray-700 whitespace-nowrap">Misc Rates</h3>
         <select
           className="border border-gray-200 rounded-md px-2 py-1 text-xs bg-white"
           value={cat}

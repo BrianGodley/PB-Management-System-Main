@@ -189,9 +189,6 @@ export default function TaxonomyManager({ kind = 'category', scope = 'material' 
     <div>
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="flex flex-wrap items-center gap-3 px-3 py-2 bg-gray-50 border-b border-gray-200">
-          <h3 className="text-sm font-semibold text-gray-700 whitespace-nowrap">
-            {isCat ? 'Categories' : 'Sub-Categories'}
-          </h3>
           <input
             className="border border-gray-200 rounded-md px-2 py-1 text-xs w-56"
             placeholder={isCat ? 'Search name / code…' : 'Search name / code / category…'}
