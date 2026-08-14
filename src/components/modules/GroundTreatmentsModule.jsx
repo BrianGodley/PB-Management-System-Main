@@ -2577,7 +2577,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
         </div>
       </div>
 
-      {/* ── Gravel ── */}
+      {/* ── Gravel (mirrors D.G. layout: Vendor | Type | Area | Depth | Weed Fabric | Method | Cement) ── */}
       <div>
         <SectionHeader title="Gravel" />
         <div className="overflow-x-auto">
@@ -2586,18 +2586,17 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-center pb-1 pr-1 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-1 font-medium">Gravel Type</th>
-                <th className="text-center pb-1 pr-1 font-medium">Sq Ft</th>
+                <th className="text-center pb-1 pr-1 font-medium">Area (SF)</th>
+                <th className="text-center pb-1 pr-1 font-medium">Depth (in)</th>
+                <th className="text-center pb-1 pr-1 font-medium">Weed Fabric</th>
                 <th className="text-center pb-1 pr-1 font-medium">Method</th>
-                <th className="text-center pb-1 pr-1 font-medium">$ per Cu Yd</th>
-                <th className="text-center pb-1 pr-1 font-medium">Weed Barrier</th>
-                <th className="text-center pb-1 font-medium">Depth (in)</th>
+                <th className="text-center pb-1 font-medium">$ per Cu Yd</th>
               </tr>
             </thead>
             <tbody>
               {gravelRows.map((row, i) => {
                 const rowOpts = sectionOptions('Gravel', row.vendor, [])
-                const gtype = resolveType(row.type, rowOpts, [])
-                const typeCost = gtype.fallback
+                const typeCost = resolveType(row.type, rowOpts, []).fallback
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-1">
@@ -2642,39 +2641,37 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       <NumInput value={row.sf} onChange={v => updateGravel(i, 'sf', v)} className="w-full text-center" />
                     </td>
                     <td className="py-1 pr-1">
-                      <select
-                        className="input text-sm py-1.5"
-                        value={row.method}
-                        onChange={e => updateGravel(i, 'method', e.target.value)}
-                      >
-                        <option>Hand</option>
-                        <option>Machine</option>
-                      </select>
-                    </td>
-                    <td className="py-1 pr-1">
-                      <span className="text-xs text-gray-500 flex items-center justify-center gap-1 whitespace-nowrap">
-                        ${typeCost.toFixed(2)}/CY
-                      </span>
+                      <NumInput
+                        value={row.depthIn}
+                        onChange={v => updateGravel(i, 'depthIn', v)}
+                        placeholder="3"
+                        className="w-full text-center"
+                      />
                     </td>
                     <td className="py-1 pr-1">
                       <select
                         className="input text-sm py-1.5"
                         value={row.weedFabric ?? 'Yes'}
                         onChange={e => updateGravel(i, 'weedFabric', e.target.value)}
-                        title="Weed Barrier fabric"
                       >
                         <option value="No">No</option>
                         <option value="Yes">Yes</option>
                       </select>
                     </td>
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.method}
+                        onChange={e => updateGravel(i, 'method', e.target.value)}
+                      >
+                        {DG_METHODS.map(m => (
+                          <option key={m}>{m}</option>
+                        ))}
+                      </select>
+                    </td>
                     <td className="py-1">
-                      <div className="flex items-center gap-1">
-                        <NumInput
-                          value={row.depthIn}
-                          onChange={v => updateGravel(i, 'depthIn', v)}
-                          placeholder="3"
-                          className="w-full text-center"
-                        />
+                      <div className="flex items-center justify-center gap-1">
+                        <span className="text-xs text-gray-500 whitespace-nowrap">${typeCost.toFixed(2)}/CY</span>
                         {gravelRows.length > 1 && (
                           <button
                             type="button"
@@ -2698,34 +2695,23 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             onClick={() =>
               setGravelRows(r => [
                 ...r,
-                { sf: '', method: 'Hand', type: '', depthIn: '3', weedFabric: 'Yes', vendor: defaultVendorFor('Gravel') },
+                {
+                  sf: '',
+                  method: 'Hand',
+                  type: '',
+                  depthIn: '3',
+                  weedFabric: 'Yes',
+                  vendor: defaultVendorFor('Gravel'),
+                },
               ])
             }
           >
             + Add Row
           </button>
-          {/* Show CY / material preview below table */}
-          {gravelRows.some(r => n(r.sf) > 0) && (
-            <div className="mt-1 flex gap-4 flex-wrap">
-              {gravelRows.map((row, i) => {
-                if (!n(row.sf) || !row.type) return null
-                const CY = (n(row.sf) * (n(row.depthIn) / 12)) / 27
-                const gtype = resolveType(row.type, sectionOptions('Gravel', row.vendor, []), [])
-                const mat =
-                  CY * gtype.fallback +
-                  ((row.weedFabric ?? 'Yes') === 'Yes' ? n(row.sf) * p(GT_RATES.gravelFabricMat.dbName) : 0)
-                return (
-                  <span key={i} className="text-xs text-gray-400">
-                    #{i + 1}: {CY.toFixed(2)} Cu Yd · ${mat.toFixed(2)} mat
-                  </span>
-                )
-              })}
-            </div>
-          )}
         </div>
       </div>
 
-      {/* ── Pebble ── */}
+      {/* ── Pebble (mirrors D.G. layout: Vendor | Type | Area | Depth | Weed Fabric | Method | Cement) ── */}
       <div>
         <SectionHeader title="Pebble" />
         <div className="overflow-x-auto">
@@ -2734,18 +2720,17 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-center pb-1 pr-1 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-1 font-medium">Pebble Type</th>
-                <th className="text-center pb-1 pr-1 font-medium">Sq Ft</th>
+                <th className="text-center pb-1 pr-1 font-medium">Area (SF)</th>
+                <th className="text-center pb-1 pr-1 font-medium">Depth (in)</th>
+                <th className="text-center pb-1 pr-1 font-medium">Weed Fabric</th>
                 <th className="text-center pb-1 pr-1 font-medium">Method</th>
-                <th className="text-center pb-1 pr-1 font-medium">$ per Cu Yd</th>
-                <th className="text-center pb-1 pr-1 font-medium">Weed Barrier</th>
-                <th className="text-center pb-1 font-medium">Depth (in)</th>
+                <th className="text-center pb-1 font-medium">$ per Cu Yd</th>
               </tr>
             </thead>
             <tbody>
               {pebbleRows.map((row, i) => {
                 const rowOpts = sectionOptions('Pebble', row.vendor, [])
-                const ptype = resolveType(row.type, rowOpts, [])
-                const typeCost = ptype.fallback
+                const typeCost = resolveType(row.type, rowOpts, []).fallback
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-1">
@@ -2790,38 +2775,48 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                       <NumInput value={row.sf} onChange={v => updatePebble(i, 'sf', v)} className="w-full text-center" />
                     </td>
                     <td className="py-1 pr-1">
-                      <select
-                        className="input text-sm py-1.5"
-                        value={row.method}
-                        onChange={e => updatePebble(i, 'method', e.target.value)}
-                      >
-                        <option>Hand</option>
-                        <option>Machine</option>
-                      </select>
-                    </td>
-                    <td className="py-1 pr-1">
-                      <span className="text-xs text-gray-500 flex items-center justify-center gap-1 whitespace-nowrap">
-                        ${typeCost.toFixed(2)}/CY
-                      </span>
-                    </td>
-                    <td className="py-1 pr-1">
-                      <select
-                        className="input text-sm py-1.5"
-                        value={row.weedFabric ?? 'Yes'}
-                        onChange={e => updatePebble(i, 'weedFabric', e.target.value)}
-                        title="Weed Barrier fabric"
-                      >
-                        <option value="No">No</option>
-                        <option value="Yes">Yes</option>
-                      </select>
-                    </td>
-                    <td className="py-1">
                       <NumInput
                         value={row.depthIn}
                         onChange={v => updatePebble(i, 'depthIn', v)}
                         placeholder="3"
                         className="w-full text-center"
                       />
+                    </td>
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.weedFabric ?? 'Yes'}
+                        onChange={e => updatePebble(i, 'weedFabric', e.target.value)}
+                      >
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                      </select>
+                    </td>
+                    <td className="py-1 pr-1">
+                      <select
+                        className="input text-sm py-1.5"
+                        value={row.method}
+                        onChange={e => updatePebble(i, 'method', e.target.value)}
+                      >
+                        {DG_METHODS.map(m => (
+                          <option key={m}>{m}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1">
+                      <div className="flex items-center justify-center gap-1">
+                        <span className="text-xs text-gray-500 whitespace-nowrap">${typeCost.toFixed(2)}/CY</span>
+                        {pebbleRows.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setPebbleRows(rows => rows.filter((_, idx) => idx !== i))}
+                            className="text-gray-300 hover:text-red-500 text-sm px-1"
+                            title="Remove line"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )
@@ -2834,30 +2829,19 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             onClick={() =>
               setPebbleRows(r => [
                 ...r,
-                { sf: '', method: 'Hand', type: '', depthIn: '3', weedFabric: 'Yes', vendor: defaultVendorFor('Pebble') },
+                {
+                  sf: '',
+                  method: 'Hand',
+                  type: '',
+                  depthIn: '3',
+                  weedFabric: 'Yes',
+                  vendor: defaultVendorFor('Pebble'),
+                },
               ])
             }
           >
             + Add Row
           </button>
-          {/* Show CY / material preview below table */}
-          {pebbleRows.some(r => n(r.sf) > 0) && (
-            <div className="mt-1 flex gap-4 flex-wrap">
-              {pebbleRows.map((row, i) => {
-                if (!n(row.sf) || !row.type) return null
-                const CY = (n(row.sf) * (n(row.depthIn) / 12)) / 27
-                const ptype = resolveType(row.type, sectionOptions('Pebble', row.vendor, []), [])
-                const mat =
-                  CY * ptype.fallback +
-                  ((row.weedFabric ?? 'Yes') === 'Yes' ? n(row.sf) * p(GT_RATES.gravelFabricMat.dbName) : 0)
-                return (
-                  <span key={i} className="text-xs text-gray-400">
-                    #{i + 1}: {CY.toFixed(2)} Cu Yd · ${mat.toFixed(2)} mat
-                  </span>
-                )
-              })}
-            </div>
-          )}
         </div>
       </div>
 

@@ -521,19 +521,19 @@ export default function GroundTreatmentsSummary({ module }) {
       // New modules store row.type (drives $/CY via material_rates); legacy
       // modules store a manual row.costPerCY — fall back to that.
       const costPerCY = priceForRow('Gravel', r, GRAVEL_TYPES, n(r.costPerCY))
+      const fabric = (r.weedFabric ?? 'Yes') === 'Yes'
       const mat =
         CY * costPerCY +
-        n(r.sf) * mp(GT_RATES.gravelFabricMat.dbName)
+        (fabric ? n(r.sf) * mp(GT_RATES.gravelFabricMat.dbName) : 0)
       const machineRate = mp(GT_RATES.gravelMachineLab.dbName)
       const handRate = mp(GT_RATES.gravelHandLab.dbName)
       const excavLab =
         r.method === 'Machine' ? ((CY * 1.62) / machineRate) * 8 : ((CY * 1.62) / handRate) * 8
-      const fabricLab =
-        n(r.sf) * mp(GT_RATES.gravelFabricLab.dbName)
+      const fabricLab = fabric ? n(r.sf) * mp(GT_RATES.gravelFabricLab.dbName) : 0
       const hrs = excavLab + fabricLab
       return {
         key: i,
-        label: `Gravel #${i + 1}${r.type ? ` (${r.type})` : ''} — ${n(r.sf).toLocaleString()} Sq Ft × ${n(r.depthIn)}" (${r.method})`,
+        label: `Gravel #${i + 1}${r.type ? ` (${r.type})` : ''} — ${n(r.sf).toLocaleString()} Sq Ft × ${n(r.depthIn)}" (${r.method}${fabric ? ', fabric' : ''})`,
         value: fmt2(mat),
         sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} Cu Yd · $${costPerCY.toFixed ? costPerCY.toFixed(2) : costPerCY} per Cu Yd`,
       }
@@ -551,19 +551,19 @@ export default function GroundTreatmentsSummary({ module }) {
         PEBBLE_TYPES,
         n(r.costPerCY)
       )
+      const fabric = (r.weedFabric ?? 'Yes') === 'Yes'
       const mat =
         CY * costPerCY +
-        n(r.sf) * mp(GT_RATES.gravelFabricMat.dbName)
+        (fabric ? n(r.sf) * mp(GT_RATES.gravelFabricMat.dbName) : 0)
       const machineRate = mp(GT_RATES.gravelMachineLab.dbName)
       const handRate = mp(GT_RATES.gravelHandLab.dbName)
       const excavLab =
         r.method === 'Machine' ? ((CY * 1.62) / machineRate) * 8 : ((CY * 1.62) / handRate) * 8
-      const fabricLab =
-        n(r.sf) * mp(GT_RATES.gravelFabricLab.dbName)
+      const fabricLab = fabric ? n(r.sf) * mp(GT_RATES.gravelFabricLab.dbName) : 0
       const hrs = excavLab + fabricLab
       return {
         key: i,
-        label: `Pebble #${i + 1}${r.type ? ` (${r.type})` : ''} — ${n(r.sf).toLocaleString()} Sq Ft × ${n(r.depthIn)}" (${r.method})`,
+        label: `Pebble #${i + 1}${r.type ? ` (${r.type})` : ''} — ${n(r.sf).toLocaleString()} Sq Ft × ${n(r.depthIn)}" (${r.method}${fabric ? ', fabric' : ''})`,
         value: fmt2(mat),
         sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} Cu Yd · $${costPerCY.toFixed ? costPerCY.toFixed(2) : costPerCY} per Cu Yd`,
       }
