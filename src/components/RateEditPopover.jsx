@@ -84,6 +84,11 @@ export default function RateEditPopover({
   // When true, the edit control shows even if the global inline toggle is OFF.
   // Used by the View Rates popup, which is always editable.
   forceShow = false,
+  // When true, a material_price pencil edits THIS single product×vendor price
+  // inline (same small popover + instant save as labor/sub rates) instead of
+  // opening the full MaterialFieldRatesModal list. Used by the View Rates popup
+  // so every row — including catalog materials — behaves identically.
+  inlineMaterialPrice = false,
 }) {
   const field = valueField || DEFAULT_VALUE_FIELD[table] || 'unit_cost'
   const nameCol = NAME_COLUMN[table] || 'name'
@@ -390,7 +395,7 @@ export default function RateEditPopover({
 
       {/* Material pencil → full editable list of every material + price for this
           field (Standard + vendors). Applies to every material_price pencil. */}
-      {open && table === 'material_price' && (
+      {open && table === 'material_price' && !inlineMaterialPrice && (
         <MaterialFieldRatesModal
           materialId={materialId}
           onClose={() => setOpen(false)}
@@ -398,7 +403,7 @@ export default function RateEditPopover({
         />
       )}
 
-      {open && table !== 'material_price' &&
+      {open && (table !== 'material_price' || inlineMaterialPrice) &&
         createPortal(
           <div
             className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"

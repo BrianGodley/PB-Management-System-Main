@@ -64,7 +64,7 @@ function calcDemo(
   const tonsSfInDenom = n(lr['Demo - Hand Tons SF-in Denominator'])
   const concreteWeightLbCf = n(lr['Demo - Hand Concrete Weight lb/cf'])
   const importBaseLaborMult = n(lr['Demo - Hand Import Base Labor Mult'])
-  const treeTonnageFactor = n(lr['Demo - Hand Tree Tonnage Factor'])
+  const treeCyFactor = n(lr['Demo - Hand Tree CY Factor'])
   const bucketLaborMult = n(lr['Demo - Hand Bucket Labor Mult'])
   // Local sfToTons shadows the module helper so the tons denominator is editable.
   const sfToTons = (sf, depthIn) => (n(sf) / tonsSfInDenom) * n(depthIn)
@@ -104,23 +104,29 @@ function calcDemo(
   const dumpTree = n(mp['Demo - Hand Dump - Tree/Stump'])
 
   // ── Helpers ───────────────────────────────────────────────────────────────
+  // Bank (in-place) cubic yards — the volume shown to the user. 27 cf/cy and
+  // 12 in/ft are fixed unit conversions. cy = sf × depthFt / 27.
   function flat(sf, depthIn, baseRate, dumpFeePerTon = 0) {
     const tons = sfToTons(sf, depthIn)
-    if (!tons) return { tons: 0, hours: 0, dumpFee: 0 }
+    const cy = (n(sf) * (n(depthIn) / 12)) / 27
+    if (!tons) return { tons: 0, cy: 0, hours: 0, dumpFee: 0 }
     return {
       tons,
+      cy,
       hours: tons / (baseRate * access), // labor always calculated
       dumpFee: tons * dumpFeePerTon,
     }
   }
 
-  // Vertical: LF × Height(in) × Width(in) → CF → tons (concrete 150 lb/cf)
+  // Vertical: LF × Height(in) × Width(in) → CF → CY (bank) and tons.
   function vert(lf, heightIn, widthIn, baseRate, dumpFeePerTon = 0) {
     const cf = n(lf) * (n(heightIn) / 12) * (n(widthIn) / 12)
     const tons = (cf * concreteWeightLbCf) / 2000
-    if (!tons) return { tons: 0, cf: 0, hours: 0, dumpFee: 0 }
+    const cy = cf / 27
+    if (!tons) return { tons: 0, cy: 0, cf: 0, hours: 0, dumpFee: 0 }
     return {
       tons,
+      cy,
       cf,
       hours: tons / (baseRate * access), // labor always calculated
       dumpFee: tons * dumpFeePerTon,
@@ -239,9 +245,10 @@ function calcDemo(
           ? treeMed
           : treeSmall
     const hrs = qty * ht * access * mult
-    const tons = qty * (ht / 10) * treeTonnageFactor
-    const dumpFee = tons * dumpTree
-    return { hrs, tons, dumpFee }
+    // Green-waste volume in cubic yards; dump billed per CY.
+    const cy = qty * (ht / 10) * treeCyFactor
+    const dumpFee = cy * dumpTree
+    return { hrs, cy, dumpFee }
   })
 
   // ── Manual entry ─────────────────────────────────────────────────────────
@@ -256,24 +263,23 @@ function calcDemo(
   const manualSub = subManualEntries.reduce((s, r) => s + n(r.subCost), 0)
   const subManualMat = subManualEntries.reduce((s, r) => s + n(r.materials), 0)
 
-  // ── Sub Haul cost — per 1.5 tons, goes into subCost (not materials) ──────────
+  // ── Sub Haul cost — per cubic yard removed, goes into subCost (not materials) ─
   // DB values (subcontractor_rates category='Sub Haul') take precedence over defaults
-  const shConc = n(sr['Demo - Hand Sub Haul - Concrete'])
-  const shDirt = n(sr['Demo - Hand Sub Haul - Dirt'])
-  const shGrass = n(sr['Demo - Hand Sub Haul - Grass'])
-  const tonsPerCharge = 1.5
+  const shConc = n(sr['Demo - Hand Sub Haul CY - Concrete'])
+  const shDirt = n(sr['Demo - Hand Sub Haul CY - Dirt'])
+  const shGrass = n(sr['Demo - Hand Sub Haul CY - Grass'])
 
   const subHaulCost =
     isSub || isDumpSub
-      ? (conc.tons / tonsPerCharge) * shConc +
-        (dirt.tons / tonsPerCharge) * shDirt +
-        (grass.tons / tonsPerCharge) * shGrass +
-        miscFlatCalc.reduce((s, r) => s + (r.tons / tonsPerCharge) * shConc, 0) +
-        miscVertCalc.reduce((s, r) => s + (r.tons / tonsPerCharge) * shConc, 0) +
-        footingCalc.reduce((s, r) => s + (r.tons / tonsPerCharge) * shConc, 0) +
-        bucketCalc.reduce((s, r) => s + (r.tons / tonsPerCharge) * shDirt, 0) +
-        (gradeCut.tons / tonsPerCharge) * shDirt +
-        treeCalc.reduce((s, r) => s + (r.tons / tonsPerCharge) * shGrass, 0)
+      ? conc.cy * shConc +
+        dirt.cy * shDirt +
+        grass.cy * shGrass +
+        miscFlatCalc.reduce((s, r) => s + r.cy * shConc, 0) +
+        miscVertCalc.reduce((s, r) => s + r.cy * shConc, 0) +
+        footingCalc.reduce((s, r) => s + r.cy * shConc, 0) +
+        bucketCalc.reduce((s, r) => s + r.cy * shDirt, 0) +
+        gradeCut.cy * shDirt +
+        treeCalc.reduce((s, r) => s + r.cy * shGrass, 0)
       : 0
 
   // ── Hour aggregation — labor same in both modes ───────────────────────────
@@ -427,7 +433,7 @@ function calcDemo(
     tonsSfInDenom,
     concreteWeightLbCf,
     importBaseLaborMult,
-    treeTonnageFactor,
+    treeCyFactor,
     bucketLaborMult,
     laborConc,
     laborDirt,
@@ -916,7 +922,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
         matRate('Dump - Concrete', 'Demo - Hand Dump - Concrete', 'ton'),
         matRate('Dump - Dirt', 'Demo - Hand Dump - Dirt', 'ton'),
         matRate('Dump - Green Waste', 'Demo - Hand Dump - Green Waste', 'ton'),
-        matRate('Dump - Tree/Stump', 'Demo - Hand Dump - Tree/Stump', 'ton'),
+        matRate('Dump - Tree/Stump', 'Demo - Hand Dump - Tree/Stump', 'cy'),
         matRate('Container (Low-Boy)', 'Demo - Hand Container (Low-Boy)', 'container'),
         matRate('Container Capacity', 'Demo - Hand Container Capacity (CY)', 'cy', 'coefficient'),
         matRate('Removal Swell', 'Demo - Hand Removal Swell', '×', 'coefficient'),
@@ -929,7 +935,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
         coefRate('Concrete Weight', 'Demo - Hand Concrete Weight lb/cf', calc.concreteWeightLbCf, 'lb/cf'),
         coefRate('Import Base Labor Mult', 'Demo - Hand Import Base Labor Mult', calc.importBaseLaborMult, '×'),
         coefRate('Bucket Labor Mult', 'Demo - Hand Bucket Labor Mult', calc.bucketLaborMult, '×'),
-        coefRate('Tree Tonnage Factor', 'Demo - Hand Tree Tonnage Factor', calc.treeTonnageFactor, 'ton/10ft-ea'),
+        coefRate('Tree CY Factor', 'Demo - Hand Tree CY Factor', calc.treeCyFactor, 'cy/10ft-ea'),
       ],
     },
     {
@@ -994,6 +1000,9 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
         subcRate('Concrete (12yd load)', 'Demo - Hand Sub Haul - Concrete 12yd', calc.haulConcreteRate, 'load'),
         subcRate('Soil (12yd load)', 'Demo - Hand Sub Haul - Soil 12yd', calc.haulSoilRate, 'load'),
         subcRate('Import Base (12yd load)', 'Demo - Hand Sub Haul - Import Base 12yd', calc.haulBaseRate, 'load'),
+        subcRate('Haul — Concrete', 'Demo - Hand Sub Haul CY - Concrete', calc.shConc, 'cy'),
+        subcRate('Haul — Dirt', 'Demo - Hand Sub Haul CY - Dirt', calc.shDirt, 'cy'),
+        subcRate('Haul — Grass', 'Demo - Hand Sub Haul CY - Grass', calc.shGrass, 'cy'),
       ],
     },
     {
@@ -1190,7 +1199,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                     { label: '', w: 'w-32' },
                     { label: 'SF', w: 'w-24' },
                     { label: 'Depth (in)', w: 'w-20' },
-                    { label: 'Tons', w: 'w-16' },
+                    { label: 'Cu Yd', w: 'w-16' },
                     { label: 'Dump Fee', w: 'w-24' },
                     { label: 'Labor Hrs', w: 'w-20' },
                   ]
@@ -1275,7 +1284,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                     placeholder={String(dep)}
                   />
                 </td>
-                <td className={num}>{row.tons > 0 ? row.tons.toFixed(1) : '—'}</td>
+                <td className={num}>{row.cy > 0 ? row.cy.toFixed(2) : '—'}</td>
                 {isSelf && <td className={num}>{row.dumpFee > 0 ? fmt2(row.dumpFee) : '—'}</td>}
                 <td className={num}>{fh(row.hours)}</td>
               </tr>
@@ -1328,7 +1337,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
               { label: '', w: 'w-40' },
               { label: 'SF', w: 'w-24' },
               { label: 'Depth (in)', w: 'w-20' },
-              { label: 'Tons', w: 'w-16' },
+              { label: 'Cu Yd', w: 'w-16' },
               { label: 'Labor Hrs', w: 'w-20' },
             ]}
           />
@@ -1339,7 +1348,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 sfK: 'baseSF',
                 dK: 'baseDepth',
                 dep: 4,
-                tons: calc.base.tons,
+                tons: calc.base.cy,
                 hrs: calc.base.hours,
                 note: `½ × ${calc.laborBase} hr/100 Sq Ft per in deep`,
               },
@@ -1348,7 +1357,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 sfK: 'gradeFillSF',
                 dK: 'gradeFillDepth',
                 dep: 4,
-                tons: calc.gradeFill.tons,
+                tons: calc.gradeFill.cy,
                 hrs: calc.gradeFill.hours,
                 note: `${calc.laborGradeFill} hr/100 Sq Ft per in deep`,
               },
@@ -1370,7 +1379,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                     placeholder={String(dep)}
                   />
                 </td>
-                <td className={num}>{tons > 0 ? tons.toFixed(1) : '—'}</td>
+                <td className={num}>{tons > 0 ? tons.toFixed(2) : '—'}</td>
                 <td className={num}>{fh(hrs)}</td>
               </tr>
             ))}
@@ -1391,7 +1400,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
               { label: '', w: 'w-40' },
               { label: 'SF', w: 'w-24' },
               { label: 'Depth (in)', w: 'w-20' },
-              { label: 'Tons', w: 'w-16' },
+              { label: 'Cu Yd', w: 'w-16' },
               { label: 'Labor Hrs', w: 'w-20' },
             ]}
           />
@@ -1489,13 +1498,13 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
               { label: 'LF', w: 'w-20' },
               { label: 'H (in)', w: 'w-18' },
               { label: 'W (in)', w: 'w-18' },
-              { label: 'Tons', w: 'w-16' },
+              { label: 'Cu Yd', w: 'w-16' },
               { label: 'Labor Hrs', w: 'w-20' },
             ]}
           />
           <tbody className="divide-y divide-gray-50">
             {state.miscVertRows.map((r, i) => {
-              const cr = calc.miscVertCalc[i] || { tons: 0, hours: 0, cf: 0 }
+              const cr = calc.miscVertCalc[i] || { tons: 0, cy: 0, hours: 0, cf: 0 }
               return (
                 <tr key={i}>
                   <td className={td}>
@@ -1526,7 +1535,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                       placeholder="8"
                     />
                   </td>
-                  <td className={num}>{cr.tons > 0 ? cr.tons.toFixed(2) : '—'}</td>
+                  <td className={num}>{cr.cy > 0 ? cr.cy.toFixed(2) : '—'}</td>
                   <td className={num}>{fh(cr.hours)}</td>
                 </tr>
               )
@@ -1554,13 +1563,13 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
               { label: 'LF', w: 'w-20' },
               { label: 'H (in)', w: 'w-18' },
               { label: 'W (in)', w: 'w-18' },
-              { label: 'Tons', w: 'w-16' },
+              { label: 'Cu Yd', w: 'w-16' },
               { label: 'Labor Hrs', w: 'w-20' },
             ]}
           />
           <tbody className="divide-y divide-gray-50">
             {state.footingRows.map((r, i) => {
-              const cr = calc.footingCalc[i] || { tons: 0, hours: 0, cf: 0 }
+              const cr = calc.footingCalc[i] || { tons: 0, cy: 0, hours: 0, cf: 0 }
               return (
                 <tr key={i}>
                   <td className={td}>
@@ -1591,7 +1600,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                       placeholder="8"
                     />
                   </td>
-                  <td className={num}>{cr.tons > 0 ? cr.tons.toFixed(2) : '—'}</td>
+                  <td className={num}>{cr.cy > 0 ? cr.cy.toFixed(2) : '—'}</td>
                   <td className={num}>{fh(cr.hours)}</td>
                 </tr>
               )
@@ -1618,14 +1627,14 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
               { label: 'Description' },
               { label: 'SF', w: 'w-24' },
               { label: 'Depth (in)', w: 'w-20' },
-              { label: 'Tons', w: 'w-16' },
+              { label: 'Cu Yd', w: 'w-16' },
               ...(isSelf ? [{ label: 'Dump Fee', w: 'w-24' }] : []),
               { label: 'Labor Hrs', w: 'w-20' },
             ]}
           />
           <tbody className="divide-y divide-gray-50">
             {state.bucketRows.map((r, i) => {
-              const cr = calc.bucketCalc[i] || { tons: 0, hours: 0, dumpFee: 0 }
+              const cr = calc.bucketCalc[i] || { tons: 0, cy: 0, hours: 0, dumpFee: 0 }
               return (
                 <tr key={i}>
                   <td className={td}>
@@ -1649,7 +1658,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                       placeholder="4"
                     />
                   </td>
-                  <td className={num}>{cr.tons > 0 ? cr.tons.toFixed(1) : '—'}</td>
+                  <td className={num}>{cr.cy > 0 ? cr.cy.toFixed(2) : '—'}</td>
                   {isSelf && <td className={num}>{cr.dumpFee > 0 ? fmt2(cr.dumpFee) : '—'}</td>}
                   <td className={num}>{fh(cr.hours)}</td>
                 </tr>

@@ -49,6 +49,7 @@ function Row({ it, i, refreshAllRates }) {
       </span>
       <RateEditPopover
         forceShow
+        inlineMaterialPrice
         table={it.table}
         name={it.name}
         category={it.category}

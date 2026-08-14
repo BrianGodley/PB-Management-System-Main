@@ -77,7 +77,7 @@ function calcDemo(
   const tonsSfInDenom = n(lr['Demo - Skid Tons SF-in Denominator'])
   const concreteWeightLbCf = n(lr['Demo - Skid Concrete Weight lb/cf'])
   const importBaseLaborMult = n(lr['Demo - Skid Import Base Labor Mult'])
-  const treeTonnageFactor = n(lr['Demo - Skid Tree Tonnage Factor'])
+  const treeCyFactor = n(lr['Demo - Skid Tree CY Factor'])
   // Local sfToTons shadows the module helper so the tons denominator is editable.
   const sfToTons = (sf, depthIn) => (n(sf) / tonsSfInDenom) * n(depthIn)
   // Subcontractor rates: a one-off adjustment saved on THIS estimate
@@ -127,20 +127,24 @@ function calcDemo(
   // Flat: SF × Depth → tons → hours = tons / (baseRate × access)
   function flat(sf, depthIn, baseRate, dumpFeePerTon = 0) {
     const tons = sfToTons(sf, depthIn)
-    if (!tons) return { tons: 0, hours: 0, dumpFee: 0 }
+    // Bank (in-place) cubic yards — the volume shown to the user. 27 cf/cy and
+    // 12 in/ft are fixed unit conversions. cy = sf × depthFt / 27.
+    const cy = (n(sf) * (n(depthIn) / 12)) / 27
+    if (!tons) return { tons: 0, cy: 0, hours: 0, dumpFee: 0 }
     const hours = tons / (baseRate * access)
     const dumpFee = tons * dumpFeePerTon
-    return { tons, hours, dumpFee }
+    return { tons, cy, hours, dumpFee }
   }
 
   // Vertical: LF × Height(in) × Width(in) → CF → tons (concrete 150 lb/cf)
   function vert(lf, heightIn, widthIn, baseRate, dumpFeePerTon = 0) {
     const cf = n(lf) * (n(heightIn) / 12) * (n(widthIn) / 12)
     const tons = (cf * concreteWeightLbCf) / 2000
-    if (!tons) return { tons: 0, cf: 0, hours: 0, dumpFee: 0 }
+    const cy = cf / 27
+    if (!tons) return { tons: 0, cy: 0, cf: 0, hours: 0, dumpFee: 0 }
     const hours = tons / (baseRate * access)
     const dumpFee = tons * dumpFeePerTon
-    return { tons, cf, hours, dumpFee }
+    return { tons, cy, cf, hours, dumpFee }
   }
 
   // Editable container disposal rates (Master Rates -> Materials, category Demo).
@@ -208,6 +212,9 @@ function calcDemo(
 
   const jjTons = sfToTons(state.jjSF, state.jjDepth || 4)
   const ssCmpTons = sfToTons(state.ssCmpSF, state.ssCmpDepth || 4)
+  // Bank cubic yards for compaction display (volume shown to user).
+  const jjCy = (n(state.jjSF) * (n(state.jjDepth || 4) / 12)) / 27
+  const ssCmpCy = (n(state.ssCmpSF) * (n(state.ssCmpDepth || 4) / 12)) / 27
   const jjHrs = sfLaborHrs(state.jjSF, state.jjDepth || 4, laborJJ) // no access mod
   const ssCmpHrs = sfLaborHrs(state.ssCmpSF, state.ssCmpDepth || 4, laborSS) // no access mod
 
@@ -231,9 +238,10 @@ function calcDemo(
       ht = n(r.height) || 10
     const mult = r.size === 'Large' ? treeLarge : r.size === 'Medium' ? treeMed : treeSmall
     const hrs = qty * ht * access * mult
-    const tons = qty * (ht / 10) * treeTonnageFactor
-    const dumpFee = tons * dumpGreen
-    return { hrs, tons, dumpFee }
+    // Green-waste volume in cubic yards; dump billed per CY.
+    const cy = qty * (ht / 10) * treeCyFactor
+    const dumpFee = cy * dumpGreen
+    return { hrs, cy, dumpFee }
   })
 
   // ── Manual entry ─────────────────────────────────────────────────────────
@@ -287,19 +295,18 @@ function calcDemo(
   // ── Sub Haul cost (Dump Type = Subcontractor, Demo Type = In-House) ──────────
   // Labor unchanged; dump fees zeroed; per-1.5-ton sub haul charges applied
   // DB values (subcontractor_rates category='Sub Haul') take precedence over defaults
-  const shConc = n(sr['Demo - Skid Sub Haul - Concrete'])
-  const shDirt = n(sr['Demo - Skid Sub Haul - Dirt'])
-  const shGrass = n(sr['Demo - Skid Sub Haul - Grass'])
-  const tonsPerCharge = 1.5
+  const shConc = n(sr['Demo - Skid Sub Haul CY - Concrete'])
+  const shDirt = n(sr['Demo - Skid Sub Haul CY - Dirt'])
+  const shGrass = n(sr['Demo - Skid Sub Haul CY - Grass'])
   const subHaulCost = isDumpSub
-    ? (conc.tons / tonsPerCharge) * shConc +
-      (dirt.tons / tonsPerCharge) * shDirt +
-      (grass.tons / tonsPerCharge) * shGrass +
-      miscFlatCalc.reduce((s, r) => s + (r.tons / tonsPerCharge) * shConc, 0) +
-      miscVertCalc.reduce((s, r) => s + (r.tons / tonsPerCharge) * shConc, 0) +
-      footingCalc.reduce((s, r) => s + (r.tons / tonsPerCharge) * shConc, 0) +
-      (gradeCut.tons / tonsPerCharge) * shDirt +
-      treeCalc.reduce((s, r) => s + (r.tons / tonsPerCharge) * shGrass, 0)
+    ? conc.cy * shConc +
+      dirt.cy * shDirt +
+      grass.cy * shGrass +
+      miscFlatCalc.reduce((s, r) => s + r.cy * shConc, 0) +
+      miscVertCalc.reduce((s, r) => s + r.cy * shConc, 0) +
+      footingCalc.reduce((s, r) => s + r.cy * shConc, 0) +
+      gradeCut.cy * shDirt +
+      treeCalc.reduce((s, r) => s + r.cy * shGrass, 0)
     : 0
 
   // ── Hour aggregation ──────────────────────────────────────────────────────
@@ -327,8 +334,7 @@ function calcDemo(
       miscFlatCalc.reduce((s, r) => s + r.tons, 0) +
       miscVertCalc.reduce((s, r) => s + r.tons, 0) +
       footingCalc.reduce((s, r) => s + r.tons, 0) +
-      gradeCut.tons +
-      treeCalc.reduce((s, r) => s + r.tons, 0)
+      gradeCut.tons
   const haulYards =
     removalYards(state.concSF, state.concDepth || 4) +
     removalYards(state.dirtSF, state.dirtDepth || 4) +
@@ -453,7 +459,7 @@ function calcDemo(
     tonsSfInDenom,
     concreteWeightLbCf,
     importBaseLaborMult,
-    treeTonnageFactor,
+    treeCyFactor,
     difficultyRatio,
     haulSecPerFt,
     haulLoadCy,
@@ -469,6 +475,8 @@ function calcDemo(
     gradeFill,
     jjTons,
     ssCmpTons,
+    jjCy,
+    ssCmpCy,
     jjHrs,
     ssCmpHrs,
     rebarHrs,
@@ -1015,7 +1023,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           name: 'Demo - Skid Dump - Green Waste',
           category: 'Demo',
           mode: 'currency',
-          unitLabel: 'Tons',
+          unitLabel: 'Cu Yd',
           value: n(materialPrices['Demo - Skid Dump - Green Waste']),
         },
         {
@@ -1078,13 +1086,13 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           value: calc.importBaseLaborMult,
         },
         {
-          label: 'Tree Tonnage Factor',
+          label: 'Tree CY Factor',
           table: 'labor_rates',
-          name: 'Demo - Skid Tree Tonnage Factor',
+          name: 'Demo - Skid Tree CY Factor',
           category: 'Demo',
           mode: 'coefficient',
-          unitLabel: 'Tons per 10ft per Each',
-          value: calc.treeTonnageFactor,
+          unitLabel: 'Cu Yd per 10ft per Each',
+          value: calc.treeCyFactor,
         },
       ],
     },
@@ -1502,30 +1510,30 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
       ],
     },
     {
-      group: 'Subcontractor — Sub Haul (per 1.5T)',
+      group: 'Subcontractor — Sub Haul (per Cu Yd)',
       items: [
         {
-          label: 'Sub Haul Concrete',
+          label: 'Haul — Concrete',
           table: 'subcontractor_rates',
-          name: 'Demo - Skid Sub Haul - Concrete',
+          name: 'Demo - Skid Sub Haul CY - Concrete',
           mode: 'currency',
-          unitLabel: '1.5T',
+          unitLabel: 'Cu Yd',
           value: calc.shConc,
         },
         {
-          label: 'Sub Haul Dirt',
+          label: 'Haul — Dirt',
           table: 'subcontractor_rates',
-          name: 'Demo - Skid Sub Haul - Dirt',
+          name: 'Demo - Skid Sub Haul CY - Dirt',
           mode: 'currency',
-          unitLabel: '1.5T',
+          unitLabel: 'Cu Yd',
           value: calc.shDirt,
         },
         {
-          label: 'Sub Haul Grass',
+          label: 'Haul — Grass',
           table: 'subcontractor_rates',
-          name: 'Demo - Skid Sub Haul - Grass',
+          name: 'Demo - Skid Sub Haul CY - Grass',
           mode: 'currency',
-          unitLabel: '1.5T',
+          unitLabel: 'Cu Yd',
           value: calc.shGrass,
         },
       ],
@@ -1691,7 +1699,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                     { label: '', w: 'w-32' },
                     { label: 'SF', w: 'w-24' },
                     { label: 'Depth (in)', w: 'w-20' },
-                    { label: 'Tons', w: 'w-16' },
+                    { label: 'Cu Yd', w: 'w-16' },
                     { label: 'Dump Fee', w: 'w-24' },
                     { label: 'Labor Hrs', w: 'w-20' },
                   ]
@@ -1774,7 +1782,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                     placeholder={String(dep)}
                   />
                 </td>
-                <td className={num}>{row.tons > 0 ? row.tons.toFixed(1) : '—'}</td>
+                <td className={num}>{row.cy > 0 ? row.cy.toFixed(2) : '—'}</td>
                 {isSelf && <td className={num}>{row.dumpFee > 0 ? fmt2(row.dumpFee) : '—'}</td>}
                 <td className={num}>{fh(row.hours)}</td>
               </tr>
@@ -1827,7 +1835,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
               { label: 'Item', w: 'w-36' },
               { label: 'SF', w: 'w-24' },
               { label: 'Depth (in)', w: 'w-20' },
-              { label: 'Tons', w: 'w-16' },
+              { label: 'Cu Yd', w: 'w-16' },
               { label: 'Labor Hrs', w: 'w-20' },
             ]}
           />
@@ -1838,7 +1846,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 sfK: 'baseSF',
                 dK: 'baseDepth',
                 dep: 4,
-                tons: calc.base.tons,
+                tons: calc.base.cy,
                 hrs: calc.base.hours,
                 note: `½ × ${calc.laborBase} hr/100 Sq Ft per in deep`,
               },
@@ -1847,7 +1855,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 sfK: 'gradeFillSF',
                 dK: 'gradeFillDepth',
                 dep: 4,
-                tons: calc.gradeFill.tons,
+                tons: calc.gradeFill.cy,
                 hrs: calc.gradeFill.hours,
                 note: `${calc.laborGradeFill} hr/100 Sq Ft per in deep`,
               },
@@ -1869,7 +1877,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                     placeholder={String(dep)}
                   />
                 </td>
-                <td className={num}>{tons > 0 ? tons.toFixed(1) : '—'}</td>
+                <td className={num}>{tons > 0 ? tons.toFixed(2) : '—'}</td>
                 <td className={num}>{fh(hrs)}</td>
               </tr>
             ))}
@@ -1890,7 +1898,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
               { label: '', w: 'w-36' },
               { label: 'SF', w: 'w-24' },
               { label: 'Depth (in)', w: 'w-20' },
-              { label: 'Tons', w: 'w-16' },
+              { label: 'Cu Yd', w: 'w-16' },
               { label: 'Labor Hrs', w: 'w-20' },
             ]}
           />
@@ -1901,7 +1909,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 sfK: 'jjSF',
                 dK: 'jjDepth',
                 dep: 4,
-                tons: calc.jjTons,
+                tons: calc.jjCy,
                 hrs: calc.jjHrs,
                 note: `${calc.laborJJ} hr/100 Sq Ft per in deep`,
                 rate: calc.laborJJ,
@@ -1913,7 +1921,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 sfK: 'ssCmpSF',
                 dK: 'ssCmpDepth',
                 dep: 4,
-                tons: calc.ssCmpTons,
+                tons: calc.ssCmpCy,
                 hrs: calc.ssCmpHrs,
                 note: `${calc.laborSS} hr/100 Sq Ft per in deep`,
                 rate: calc.laborSS,
@@ -1938,7 +1946,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                     placeholder={String(dep)}
                   />
                 </td>
-                <td className={num}>{tons > 0 ? tons.toFixed(1) : '—'}</td>
+                <td className={num}>{tons > 0 ? tons.toFixed(2) : '—'}</td>
                 <td className={num}>{fh(hrs)}</td>
               </tr>
             ))}
@@ -1992,13 +2000,13 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
               { label: 'LF', w: 'w-20' },
               { label: 'H (in)', w: 'w-18' },
               { label: 'W (in)', w: 'w-18' },
-              { label: 'Tons', w: 'w-16' },
+              { label: 'Cu Yd', w: 'w-16' },
               { label: 'Labor Hrs', w: 'w-20' },
             ]}
           />
           <tbody className="divide-y divide-gray-50">
             {state.miscVertRows.map((r, i) => {
-              const cr = calc.miscVertCalc[i] || { tons: 0, hours: 0, cf: 0 }
+              const cr = calc.miscVertCalc[i] || { tons: 0, cy: 0, hours: 0, cf: 0 }
               return (
                 <tr key={i}>
                   <td className={td}>
@@ -2029,7 +2037,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                       placeholder="8"
                     />
                   </td>
-                  <td className={num}>{cr.tons > 0 ? cr.tons.toFixed(2) : '—'}</td>
+                  <td className={num}>{cr.cy > 0 ? cr.cy.toFixed(2) : '—'}</td>
                   <td className={num}>{fh(cr.hours)}</td>
                 </tr>
               )
@@ -2057,13 +2065,13 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
               { label: 'LF', w: 'w-20' },
               { label: 'H (in)', w: 'w-18' },
               { label: 'W (in)', w: 'w-18' },
-              { label: 'Tons', w: 'w-16' },
+              { label: 'Cu Yd', w: 'w-16' },
               { label: 'Labor Hrs', w: 'w-20' },
             ]}
           />
           <tbody className="divide-y divide-gray-50">
             {state.footingRows.map((r, i) => {
-              const cr = calc.footingCalc[i] || { tons: 0, hours: 0 }
+              const cr = calc.footingCalc[i] || { tons: 0, cy: 0, hours: 0 }
               return (
                 <tr key={i}>
                   <td className={td}>
@@ -2093,7 +2101,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                       placeholder="8"
                     />
                   </td>
-                  <td className={num}>{cr.tons > 0 ? cr.tons.toFixed(2) : '—'}</td>
+                  <td className={num}>{cr.cy > 0 ? cr.cy.toFixed(2) : '—'}</td>
                   <td className={num}>{fh(cr.hours)}</td>
                 </tr>
               )

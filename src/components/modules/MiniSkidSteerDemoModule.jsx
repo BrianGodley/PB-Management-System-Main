@@ -82,7 +82,7 @@ function calcDemo(
   const tonsSfInDenom = n(lr['Demo - Mini Tons SF-in Denominator'])
   const concreteWeightLbCf = n(lr['Demo - Mini Concrete Weight lb/cf'])
   const importBaseLaborMult = n(lr['Demo - Mini Import Base Labor Mult'])
-  const treeTonnageFactor = n(lr['Demo - Mini Tree Tonnage Factor'])
+  const treeCyFactor = n(lr['Demo - Mini Tree CY Factor'])
   // Local sfToTons shadows the module helper so the tons denominator is editable.
   const sfToTons = (sf, depthIn) => (n(sf) / tonsSfInDenom) * n(depthIn)
   // Subcontractor rates: a one-off adjustment saved on THIS estimate
@@ -141,9 +141,11 @@ function calcDemo(
   // dump fees zero out (replaced by per-1.5T sub haul charges in subCost)
   function flat(sf, depthIn, baseRate, dumpFeePerTon = 0, accessLevel = accessNonBob) {
     const tons = sfToTons(sf, depthIn)
-    if (!tons) return { tons: 0, hours: 0, dumpFee: 0 }
+    const cy = (n(sf) * (n(depthIn) / 12)) / 27
+    if (!tons) return { tons: 0, cy: 0, hours: 0, dumpFee: 0 }
     return {
       tons,
+      cy,
       hours: tons / (baseRate * accessLevel),
       dumpFee: tons * dumpFeePerTon,
     }
@@ -152,9 +154,11 @@ function calcDemo(
   function vert(lf, heightIn, widthIn, baseRate, dumpFeePerTon = 0, accessLevel = accessNonBob) {
     const cf = n(lf) * (n(heightIn) / 12) * (n(widthIn) / 12)
     const tons = (cf * concreteWeightLbCf) / 2000
-    if (!tons) return { tons: 0, cf: 0, hours: 0, dumpFee: 0 }
+    const cy = cf / 27
+    if (!tons) return { tons: 0, cy: 0, cf: 0, hours: 0, dumpFee: 0 }
     return {
       tons,
+      cy,
       cf,
       hours: tons / (baseRate * accessLevel),
       dumpFee: tons * dumpFeePerTon,
@@ -232,6 +236,8 @@ function calcDemo(
 
   const jjTons = sfToTons(state.jjSF, state.jjDepth || 4)
   const ssCmpTons = sfToTons(state.ssCmpSF, state.ssCmpDepth || 4)
+  const jjCy = (n(state.jjSF) * (n(state.jjDepth || 4) / 12)) / 27
+  const ssCmpCy = (n(state.ssCmpSF) * (n(state.ssCmpDepth || 4) / 12)) / 27
   const jjHrs = sfLaborHrs(state.jjSF, state.jjDepth || 4, laborJJ)
   const ssCmpHrs = sfLaborHrs(state.ssCmpSF, state.ssCmpDepth || 4, laborSS)
 
@@ -255,9 +261,9 @@ function calcDemo(
       ht = n(r.height) || 10
     const mult = r.size === 'Large' ? treeLarge : r.size === 'Medium' ? treeMed : treeSmall
     const hrs = qty * ht * accessBobcat * mult
-    const tons = qty * (ht / 10) * treeTonnageFactor
-    const dumpFee = tons * dumpTreeStump // Mini: $125.33/ton
-    return { hrs, tons, dumpFee }
+    const cy = qty * (ht / 10) * treeCyFactor
+    const dumpFee = cy * dumpTreeStump // Mini: green-waste dump billed per CY
+    return { hrs, cy, dumpFee }
   })
 
   // ── Manual ────────────────────────────────────────────────────────────────
@@ -274,13 +280,20 @@ function calcDemo(
 
   // ── Sub Haul cost — per 1.5 tons, goes into subCost (not materials) ──────────
   // DB values (subcontractor_rates category='Sub Haul') take precedence over defaults
-  const shConc = n(sr['Demo - Mini Sub Haul - Concrete'])
-  const shDirt = n(sr['Demo - Mini Sub Haul - Dirt'])
-  const shGrass = n(sr['Demo - Mini Sub Haul - Grass'])
+  const shConc = n(sr['Demo - Mini Sub Haul CY - Concrete'])
+  const shDirt = n(sr['Demo - Mini Sub Haul CY - Dirt'])
+  const shGrass = n(sr['Demo - Mini Sub Haul CY - Grass'])
 
-  const tonsPerCharge = 1.5 // billing increment
-
-  const subHaulCost = 0 // legacy per-ton sub-haul — superseded by Hauling section
+  const subHaulCost = isDumpSub
+    ? conc.cy * shConc +
+      dirt.cy * shDirt +
+      grass.cy * shGrass +
+      miscFlatCalc.reduce((s, r) => s + r.cy * shConc, 0) +
+      miscVertCalc.reduce((s, r) => s + r.cy * shConc, 0) +
+      footingCalc.reduce((s, r) => s + r.cy * shConc, 0) +
+      gradeCut.cy * shDirt +
+      treeCalc.reduce((s, r) => s + r.cy * shGrass, 0)
+    : 0 // per-CY sub-haul — active only when disposal follows the Sub toggle
 
   // ── Hour aggregation — labor is the same in both modes ────────────────────
   const crewDemoHrs =
@@ -307,8 +320,7 @@ function calcDemo(
     miscFlatCalc.reduce((s, r) => s + r.tons, 0) +
     miscVertCalc.reduce((s, r) => s + r.tons, 0) +
     footingCalc.reduce((s, r) => s + r.tons, 0) +
-    gradeCut.tons +
-    treeCalc.reduce((s, r) => s + r.tons, 0)
+    gradeCut.tons
   const haulYards =
     removalYards(state.concSF, state.concDepth || 4) +
     removalYards(state.dirtSF, state.dirtDepth || 4) +
@@ -456,7 +468,7 @@ function calcDemo(
     tonsSfInDenom,
     concreteWeightLbCf,
     importBaseLaborMult,
-    treeTonnageFactor,
+    treeCyFactor,
     difficultyRatio,
     haulSecPerFt,
     haulLoadCy,
@@ -472,6 +484,8 @@ function calcDemo(
     gradeFill,
     jjTons,
     ssCmpTons,
+    jjCy,
+    ssCmpCy,
     jjHrs,
     ssCmpHrs,
     rebarHrs,
@@ -522,7 +536,6 @@ function calcDemo(
     shConc,
     shDirt,
     shGrass,
-    tonsPerCharge,
   }
 }
 
@@ -937,7 +950,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
         { label: 'Dump - Concrete', table: 'misc_rates', name: 'Demo - Mini Dump - Concrete', category: 'Demo', mode: 'currency', unitLabel: 'Tons', value: n(materialPrices['Demo - Mini Dump - Concrete']) },
         { label: 'Dump - Dirt', table: 'misc_rates', name: 'Demo - Mini Dump - Dirt', category: 'Demo', mode: 'currency', unitLabel: 'Tons', value: n(materialPrices['Demo - Mini Dump - Dirt']) },
         { label: 'Dump - Green Waste', table: 'misc_rates', name: 'Demo - Mini Dump - Green Waste', category: 'Demo', mode: 'currency', unitLabel: 'Tons', value: n(materialPrices['Demo - Mini Dump - Green Waste']) },
-        { label: 'Dump - Tree/Stump', table: 'misc_rates', name: 'Demo - Mini Dump - Tree/Stump', category: 'Demo', mode: 'currency', unitLabel: 'Tons', value: n(materialPrices['Demo - Mini Dump - Tree/Stump']) },
+        { label: 'Dump - Tree/Stump', table: 'misc_rates', name: 'Demo - Mini Dump - Tree/Stump', category: 'Demo', mode: 'currency', unitLabel: 'Cu Yd', value: n(materialPrices['Demo - Mini Dump - Tree/Stump']) },
         { label: 'Dump - Import Base', table: 'misc_rates', name: 'Demo - Mini Dump - Import Base', category: 'Demo', mode: 'currency', unitLabel: 'Tons', value: n(materialPrices['Demo - Mini Dump - Import Base']) },
         { label: 'Container (Low-Boy)', table: 'misc_rates', name: 'Demo - Mini Container (Low-Boy)', category: 'Demo', mode: 'currency', unitLabel: 'container', value: n(materialPrices['Demo - Mini Container (Low-Boy)']) },
         { label: 'Container Capacity', table: 'misc_rates', name: 'Demo - Mini Container Capacity (CY)', category: 'Demo', mode: 'coefficient', unitLabel: 'Cu Yd', value: n(materialPrices['Demo - Mini Container Capacity (CY)']) },
@@ -950,7 +963,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
         { label: 'Tons SF-in Denominator', table: 'labor_rates', name: 'Demo - Mini Tons SF-in Denominator', category: 'Demo', mode: 'coefficient', unitLabel: 'Sq Ft per in per Tons', value: calc.tonsSfInDenom },
         { label: 'Concrete Weight', table: 'labor_rates', name: 'Demo - Mini Concrete Weight lb/cf', category: 'Demo', mode: 'coefficient', unitLabel: 'lb per Cu Ft', value: calc.concreteWeightLbCf },
         { label: 'Import Base Labor Mult', table: 'labor_rates', name: 'Demo - Mini Import Base Labor Mult', category: 'Demo', mode: 'coefficient', unitLabel: '×', value: calc.importBaseLaborMult },
-        { label: 'Tree Tonnage Factor', table: 'labor_rates', name: 'Demo - Mini Tree Tonnage Factor', category: 'Demo', mode: 'coefficient', unitLabel: 'Tons per 10ft per Each', value: calc.treeTonnageFactor },
+        { label: 'Tree CY Factor', table: 'labor_rates', name: 'Demo - Mini Tree CY Factor', category: 'Demo', mode: 'coefficient', unitLabel: 'cy/10ft-ea', value: calc.treeCyFactor },
       ],
     },
     {
@@ -1038,9 +1051,9 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
     {
       group: 'Subcontractor — Sub Haul',
       items: [
-        { label: 'Demo - Mini Sub Haul - Concrete', table: 'subcontractor_rates', name: 'Demo - Mini Sub Haul - Concrete', mode: 'currency', unitLabel: '1.5T', value: calc.shConc },
-        { label: 'Demo - Mini Sub Haul - Dirt', table: 'subcontractor_rates', name: 'Demo - Mini Sub Haul - Dirt', mode: 'currency', unitLabel: '1.5T', value: calc.shDirt },
-        { label: 'Demo - Mini Sub Haul - Grass', table: 'subcontractor_rates', name: 'Demo - Mini Sub Haul - Grass', mode: 'currency', unitLabel: '1.5T', value: calc.shGrass },
+        { label: 'Demo - Mini Sub Haul CY - Concrete', table: 'subcontractor_rates', name: 'Demo - Mini Sub Haul CY - Concrete', mode: 'currency', unitLabel: 'Cu Yd', value: calc.shConc },
+        { label: 'Demo - Mini Sub Haul CY - Dirt', table: 'subcontractor_rates', name: 'Demo - Mini Sub Haul CY - Dirt', mode: 'currency', unitLabel: 'Cu Yd', value: calc.shDirt },
+        { label: 'Demo - Mini Sub Haul CY - Grass', table: 'subcontractor_rates', name: 'Demo - Mini Sub Haul CY - Grass', mode: 'currency', unitLabel: 'Cu Yd', value: calc.shGrass },
         { label: 'Demo - Mini Sub Haul - Trash 12yd', table: 'subcontractor_rates', name: 'Demo - Mini Sub Haul - Trash 12yd', mode: 'currency', unitLabel: 'load', value: calc.haulTrashRate },
         { label: 'Demo - Mini Sub Haul - Concrete 12yd', table: 'subcontractor_rates', name: 'Demo - Mini Sub Haul - Concrete 12yd', mode: 'currency', unitLabel: 'load', value: calc.haulConcreteRate },
         { label: 'Demo - Mini Sub Haul - Soil 12yd', table: 'subcontractor_rates', name: 'Demo - Mini Sub Haul - Soil 12yd', mode: 'currency', unitLabel: 'load', value: calc.haulSoilRate },
@@ -1213,7 +1226,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                     { label: '', w: 'w-32' },
                     { label: 'SF', w: 'w-24' },
                     { label: 'Depth (in)', w: 'w-20' },
-                    { label: 'Tons', w: 'w-16' },
+                    { label: 'Cu Yd', w: 'w-16' },
                     { label: 'Dump Fee', w: 'w-24' },
                     { label: 'Labor Hrs', w: 'w-20' },
                   ]
@@ -1296,7 +1309,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                     placeholder={String(dep)}
                   />
                 </td>
-                <td className={num}>{row.tons > 0 ? row.tons.toFixed(1) : '—'}</td>
+                <td className={num}>{row.cy > 0 ? row.cy.toFixed(2) : '—'}</td>
                 {isSelf && <td className={num}>{row.dumpFee > 0 ? fmt2(row.dumpFee) : '—'}</td>}
                 <td className={num}>{fh(row.hours)}</td>
               </tr>
@@ -1347,7 +1360,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
               { label: '', w: 'w-32' },
               { label: 'SF', w: 'w-24' },
               { label: 'Depth (in)', w: 'w-20' },
-              { label: 'Tons', w: 'w-16' },
+              { label: 'Cu Yd', w: 'w-16' },
               { label: 'Dump Fee', w: 'w-24' },
               { label: 'Labor Hrs', w: 'w-20' },
             ]}
@@ -1388,7 +1401,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                     placeholder={String(dep)}
                   />
                 </td>
-                <td className={num}>{row.tons > 0 ? row.tons.toFixed(1) : '—'}</td>
+                <td className={num}>{row.cy > 0 ? row.cy.toFixed(2) : '—'}</td>
                 <td className={num}>{row.dumpFee > 0 ? fmt2(row.dumpFee) : '—'}</td>
                 <td className={num}>{fh(row.hours)}</td>
               </tr>
@@ -1410,7 +1423,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
               { label: '', w: 'w-44' },
               { label: 'SF', w: 'w-24' },
               { label: 'Depth (in)', w: 'w-20' },
-              { label: 'Tons', w: 'w-16' },
+              { label: 'Cu Yd', w: 'w-16' },
               { label: 'Labor Hrs', w: 'w-20' },
             ]}
           />
@@ -1421,7 +1434,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 sfK: 'jjSF',
                 dK: 'jjDepth',
                 dep: 4,
-                tons: calc.jjTons,
+                tons: calc.jjCy,
                 hrs: calc.jjHrs,
                 note: `${calc.laborJJ} hr/100 Sq Ft per in deep`,
                 rate: calc.laborJJ,
@@ -1433,7 +1446,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 sfK: 'ssCmpSF',
                 dK: 'ssCmpDepth',
                 dep: 4,
-                tons: calc.ssCmpTons,
+                tons: calc.ssCmpCy,
                 hrs: calc.ssCmpHrs,
                 note: `${calc.laborSS} hr/100 Sq Ft per in deep`,
                 rate: calc.laborSS,
@@ -1458,7 +1471,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                     placeholder={String(dep)}
                   />
                 </td>
-                <td className={num}>{tons > 0 ? tons.toFixed(1) : '—'}</td>
+                <td className={num}>{tons > 0 ? tons.toFixed(2) : '—'}</td>
                 <td className={num}>{fh(hrs)}</td>
               </tr>
             ))}
@@ -1512,14 +1525,14 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
               { label: 'LF', w: 'w-20' },
               { label: 'H (in)', w: 'w-18' },
               { label: 'W (in)', w: 'w-18' },
-              { label: 'Tons', w: 'w-16' },
+              { label: 'Cu Yd', w: 'w-16' },
               ...(isSelf ? [{ label: 'Dump Fee', w: 'w-24' }] : []),
               { label: 'Labor Hrs', w: 'w-20' },
             ]}
           />
           <tbody className="divide-y divide-gray-50">
             {state.miscVertRows.map((r, i) => {
-              const cr = calc.miscVertCalc[i] || { tons: 0, hours: 0, cf: 0, dumpFee: 0 }
+              const cr = calc.miscVertCalc[i] || { tons: 0, cy: 0, hours: 0, cf: 0, dumpFee: 0 }
               return (
                 <tr key={i}>
                   <td className={td}>
@@ -1550,7 +1563,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                       placeholder="8"
                     />
                   </td>
-                  <td className={num}>{cr.tons > 0 ? cr.tons.toFixed(2) : '—'}</td>
+                  <td className={num}>{cr.cy > 0 ? cr.cy.toFixed(2) : '—'}</td>
                   {isSelf && <td className={num}>{cr.dumpFee > 0 ? fmt2(cr.dumpFee) : '—'}</td>}
                   <td className={num}>{fh(cr.hours)}</td>
                 </tr>
@@ -1579,14 +1592,14 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
               { label: 'LF', w: 'w-20' },
               { label: 'H (in)', w: 'w-18' },
               { label: 'W (in)', w: 'w-18' },
-              { label: 'Tons', w: 'w-16' },
+              { label: 'Cu Yd', w: 'w-16' },
               ...(isSelf ? [{ label: 'Disposal', w: 'w-24' }] : []),
               { label: 'Labor Hrs', w: 'w-20' },
             ]}
           />
           <tbody className="divide-y divide-gray-50">
             {state.footingRows.map((r, i) => {
-              const cr = calc.footingCalc[i] || { tons: 0, hours: 0, dumpFee: 0 }
+              const cr = calc.footingCalc[i] || { tons: 0, cy: 0, hours: 0, dumpFee: 0 }
               return (
                 <tr key={i}>
                   <td className={td}>
@@ -1616,7 +1629,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                       placeholder="8"
                     />
                   </td>
-                  <td className={num}>{cr.tons > 0 ? cr.tons.toFixed(2) : '—'}</td>
+                  <td className={num}>{cr.cy > 0 ? cr.cy.toFixed(2) : '—'}</td>
                   {isSelf && <td className={num}>{cr.dumpFee > 0 ? fmt2(cr.dumpFee) : '—'}</td>}
                   <td className={num}>{fh(cr.hours)}</td>
                 </tr>
