@@ -702,10 +702,23 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       return { ...p, ihData: patch(p.ihData), subData: patch(p.subData) }
     })
   }, [baseDefaults, initialData])
+  // Saves the defaults straight to company_settings — independent of the estimate
+  // Save button. Surfaces any failure (e.g. the turf_base_defaults column not yet
+  // added) instead of silently doing nothing.
   const saveBaseDefaults = useCallback(async () => {
-    const { data: row } = await supabase.from('company_settings').select('id').maybeSingle()
+    const { data: row } = await supabase.from('company_settings').select('id').limit(1).maybeSingle()
+    let error
     if (row?.id) {
-      await supabase.from('company_settings').update({ turf_base_defaults: defDraft }).eq('id', row.id)
+      ;({ error } = await supabase
+        .from('company_settings')
+        .update({ turf_base_defaults: defDraft })
+        .eq('id', row.id))
+    } else {
+      ;({ error } = await supabase.from('company_settings').insert({ turf_base_defaults: defDraft }))
+    }
+    if (error) {
+      alert('Could not save Turf Prep defaults: ' + error.message)
+      return
     }
     setBaseDefaults(defDraft)
     setShowBaseDefaults(false)
@@ -1423,7 +1436,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
               { label: '', w: 'w-20' },
               { label: 'Vendor', w: 'w-32' },
               { label: 'Type' },
-              { label: 'Sq Ft', w: 'w-14' },
+              { label: 'Sq Ft', w: 'w-20' },
               { label: 'Qty', w: 'w-14' },
               { label: 'Hrs', w: 'w-12' },
               { label: 'Material', w: 'w-20' },
