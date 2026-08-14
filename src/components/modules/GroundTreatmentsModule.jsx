@@ -26,8 +26,14 @@ async function fetchGtRows() {
     fetchModuleCatalog(['Ground Treatments']),
     fetchModuleCatalog(['Basic Materials']),
   ])
-  const dgFromBasic = (basicRows || []).filter(r => r.sub_category === 'Decomposed Granite')
-  return [...(gtRows || []), ...dgFromBasic].map(r => ({
+  // Also merge the canonical 'Weed Fabric' (Basic Materials → 'Barriers'), the
+  // company-wide weed-fabric material every module now shares (like Class II /
+  // Decomposed Granite). 'Barriers' isn't a GT section sub-category, so it never
+  // leaks into a section picker — it just lands in the price map by name.
+  const sharedFromBasic = (basicRows || []).filter(
+    r => r.sub_category === 'Decomposed Granite' || r.sub_category === 'Barriers'
+  )
+  return [...(gtRows || []), ...sharedFromBasic].map(r => ({
     ...r,
     sub_category: GT_MARKER_REMAP[r.sub_category] || r.sub_category,
   }))
@@ -102,7 +108,9 @@ const GT_RATES = {
   dgMachineLab: { dbName: 'DG - Machine Labor Rate' }, // CY/day (labor_rates)
 
   // ── Gravel ─────────────────────────────────────────────────────────────────
-  gravelFabricMat: { dbName: 'Gravel Fabric' }, // $/SF
+  // Weed fabric material is the company-wide shared 'Weed Fabric' record
+  // (Basic Materials → Barriers, $/SF). Labor stays a GT labor coefficient.
+  gravelFabricMat: { dbName: 'Weed Fabric' }, // $/SF (shared Basic Materials → Barriers)
   gravelFabricLab: { dbName: 'Gravel Fabric - Labor Rate' }, // hrs/SF
   gravelMachineLab: { dbName: 'Gravel - Machine Labor Rate' }, // CY/day (labor_rates)
   gravelHandLab: { dbName: 'Gravel - Hand Labor Rate' }, // CY/day (labor_rates)
@@ -1261,7 +1269,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
         }
       : calcRaw
 
-  const p = dbName => n(materialPrices[dbName])
+  const p = dbName =>
+    n(materialPrices[dbName] ?? (dbName === 'Weed Fabric' ? materialPrices['Gravel Fabric'] : undefined))
 
   function updateSoils(i, field, val) {
     setSoilsRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))

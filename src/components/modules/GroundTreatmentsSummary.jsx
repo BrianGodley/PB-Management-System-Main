@@ -50,7 +50,7 @@ const GT_RATES = {
   dgCementPerTon: { dbName: 'DG Cement Mix' },
   dgHandLab: { dbName: 'DG - Hand Labor Rate' },
   dgMachineLab: { dbName: 'DG - Machine Labor Rate' },
-  gravelFabricMat: { dbName: 'Gravel Fabric' },
+  gravelFabricMat: { dbName: 'Weed Fabric' }, // shared Basic Materials → Barriers ($/SF)
   gravelFabricLab: { dbName: 'Gravel Fabric - Labor Rate' },
   gravelMachineLab: { dbName: 'Gravel - Machine Labor Rate' },
   gravelHandLab: { dbName: 'Gravel - Hand Labor Rate' },
@@ -246,7 +246,8 @@ export default function GroundTreatmentsSummary({ module }) {
   // Shared fields (not per-tab) — always read from the top-level saved data.
   const { laborRatePerHour = 35, materialPrices = {}, calc = null } = data
 
-  const mp = dbName => n(materialPrices[dbName])
+  const mp = dbName =>
+    n(materialPrices[dbName] ?? (dbName === 'Weed Fabric' ? materialPrices['Gravel Fabric'] : undefined))
 
   // Resolve a section product's saved per-unit price. Vendor products are stored
   // on the row by their (possibly prefix-stripped) LABEL, while the saved

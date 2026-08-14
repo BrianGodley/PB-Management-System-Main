@@ -69,6 +69,10 @@ const TURF_CAT = { base: 'Turf Base', turf: 'Turf Material' }
 const SHARED_DG_NAME = 'Decomposed Granite'
 const SHARED_CLASS2_NAMES = ['Class II Roadbase', 'Base - Class II Roadbase']
 const SHARED_CLASS2_KEY = 'Turf Prep — Class II Base (shared)'
+// Weed fabric is now the company-wide shared 'Weed Fabric' record (Basic
+// Materials → Barriers, priced per Sq Ft) — same pattern as Class II / DG.
+const SHARED_WEED_NAME = 'Weed Fabric'
+const SHARED_WEED_NAMES = ['Weed Fabric', 'Weed Barrier Fabric', 'Turf - Weed Barrier Fabric']
 // First key with a defined value wins (no hardcoded price fallback).
 const firstDefinedRate = (m, keys) => {
   for (const k of keys) if (m && m[k] != null) return m[k]
@@ -85,7 +89,7 @@ const firstDefinedRate = (m, keys) => {
 const BASE_MATERIALS = [
   { key: 'Gravel', label: 'Class II Roadbase', dbName: 'Gravel Base', matKey: 'Turf - Gravel Base', qtyUnit: 'cy' },
   { key: 'DG', label: 'DG', dbName: 'DG Base', matKey: 'Turf - DG Base', qtyUnit: 'cy' },
-  { key: 'Weed', label: 'Weed Barrier', dbName: 'Weed Barrier Fabric', matKey: 'Turf - Weed Barrier Fabric', qtyUnit: 'roll' },
+  { key: 'Weed', label: 'Weed Barrier', dbName: 'Weed Barrier Fabric', matKey: SHARED_WEED_NAME, qtyUnit: 'sf' },
 ]
 // Vendor-first Base-material picker options (mirrors UtilitiesModule.mergedUtilTypes
 // and the turf-brand picker above). Standard/unset → the null-vendor 'Turf Base'
@@ -275,13 +279,15 @@ function calcTurf(
     if (isStdBaseVendor) {
       if (def.key === 'DG') price = n(mp[SHARED_DG_NAME])
       else if (def.key === 'Gravel') price = n(mp[SHARED_CLASS2_KEY])
+      else if (def.key === 'Weed') price = n(mp[SHARED_WEED_NAME])
     }
     // Class II and DG are priced by the cubic yard (matching the master rates,
     // now per Cu Yd). Volume = SF × depth/12 ÷ 27, with DB-editable install
-    // depths (misc_rates). Weed stays per roll.
+    // depths (misc_rates). Weed is now the shared 'Weed Fabric' record priced
+    // per Sq Ft — billed SF × $/SF (company-wide consolidation).
     const classIIDepthIn = n(mp['Turf - Class II Depth In'])
     const dgDepthIn = n(mp['Turf - DG Depth In'])
-    let qty = 0, // display quantity (Cu Yd for Class II/DG, rolls for Weed)
+    let qty = 0, // display quantity (Cu Yd for Class II/DG, Sq Ft for Weed)
       hrs = 0
     if (def.key === 'Gravel') {
       const baseSFPerHr = n(mp['Turf - Base Install SF/hr'])
@@ -292,12 +298,13 @@ function calcTurf(
       qty = sf > 0 && dgDepthIn > 0 ? (sf * (dgDepthIn / 12)) / 27 : 0 // Cu Yd
       hrs = sf > 0 && dgSFPerHr > 0 ? sf / dgSFPerHr : 0
     } else {
-      // Weed-fabric install labor — DB-editable production rate (SF/hr).
+      // Weed fabric: billed by the Sq Ft off the shared 'Weed Fabric' rate.
+      // Install labor — DB-editable production rate (SF/hr).
       const weedSFPerHr = n(mp['Turf - Weed Fabric Install SF/hr'])
-      qty = sf > 0 && weedFabricSFPerRoll > 0 ? Math.ceil(sf / weedFabricSFPerRoll) : 0
+      qty = sf // Sq Ft
       hrs = sf > 0 && weedSFPerHr > 0 ? sf / weedSFPerHr : 0
     }
-    // Class II / DG bill per Cu Yd; Weed bills per roll. Both are qty × price.
+    // Class II / DG bill per Cu Yd; Weed bills per Sq Ft. All are qty × price.
     const mat = qty * price
     baseHrs += hrs
     baseMat += mat
@@ -703,6 +710,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       ...matMap,
       [SHARED_DG_NAME]: firstDefinedRate(sharedMap, [SHARED_DG_NAME]),
       [SHARED_CLASS2_KEY]: firstDefinedRate(sharedMap, SHARED_CLASS2_NAMES),
+      [SHARED_WEED_NAME]: firstDefinedRate(sharedMap, SHARED_WEED_NAMES),
     })
     if (labRes.data) {
       const m = {}
@@ -1089,10 +1097,11 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         // surfaced here so Turf Prep has its own editable Materials sub-section.
         // Class II + DG price off the SHARED items (Concrete base / GT Decomposed
         // Granite) at their real per-ton rate — not the Turf Base catalog's
-        // per-each rows. Weed Barrier stays a Turf-catalog material.
+        // per-each rows. Weed Barrier now shares the 'Weed Fabric' record
+        // (Basic Materials → Barriers, $/SF) — same as Class II / DG.
         ...sharedMatRows(SHARED_CLASS2_NAMES),
         ...sharedMatRows([SHARED_DG_NAME]),
-        ...materialRateRows('Turf - Weed Barrier Fabric'),
+        ...sharedMatRows(SHARED_WEED_NAMES),
       ],
     },
     {
