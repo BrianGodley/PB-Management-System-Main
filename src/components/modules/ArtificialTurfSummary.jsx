@@ -98,7 +98,7 @@ export default function ArtificialTurfSummary({ module }) {
 
   const inHouseSections = [
     { title: 'Turf Prep (Demo)', rows: demoRows },
-    { title: 'Base Installation', rows: baseRows },
+    { title: 'Turf Prep', rows: baseRows },
     { title: 'Turf Installation', rows: rollInHouse },
     { title: 'Turf Strips', rows: stripRows },
     { title: 'Manual Entry', rows: manualRows },

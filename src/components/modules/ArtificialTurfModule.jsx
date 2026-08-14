@@ -256,8 +256,10 @@ function calcTurf(
       qty = sf > 0 && gravelBaseTonsDivisor > 0 ? (sf / gravelBaseTonsDivisor) * 2 : 0
       hrs = sf > 0 && baseSFPerHr > 0 ? (sf / baseSFPerHr) * baseInstallPH : 0
     } else if (def.key === 'DG') {
+      // DG base install has its own DB-editable labor rate (SF/hr).
+      const dgSFPerHr = n(mp['Turf - DG Base Install SF/hr'])
       qty = sf > 0 ? (sf * (1 / 12)) / 27 : 0
-      hrs = 0
+      hrs = sf > 0 && dgSFPerHr > 0 ? sf / dgSFPerHr : 0
     } else {
       // Weed-fabric install labor is DB-editable (hrs per 1000 SF).
       const weedHrPer1kSF = n(mp['Turf - Weed Fabric Install hrs/1kSF'])
@@ -995,10 +997,10 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
   //    that used to have an inline RateEditPopover in this module now lives here.
   const turfRateList = [
     {
-      group: 'Base Installation',
+      group: 'Turf Prep',
       items: [
         {
-          label: 'Base Install',
+          label: 'Class II Base Install',
           table: 'labor_rates',
           name: 'Turf - Base Install SF/hr',
           category: 'Artificial Turf',
@@ -1007,13 +1009,13 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           value: materialPrices['Turf - Base Install SF/hr'],
         },
         {
-          label: 'Base Install',
+          label: 'DG Base Install',
           table: 'labor_rates',
-          name: 'Turf - Base Install PH',
+          name: 'Turf - DG Base Install SF/hr',
           category: 'Artificial Turf',
           mode: 'coefficient',
-          unitLabel: 'PH',
-          value: materialPrices['Turf - Base Install PH'],
+          unitLabel: 'Sq Ft per hr',
+          value: materialPrices['Turf - DG Base Install SF/hr'],
         },
         {
           label: 'Weed Fabric Install',
@@ -1255,7 +1257,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       {/* Base Installation — In-House only (hidden on Sub tab) */}
       {state.subType !== 'Subcontractor' && (
       <div>
-        <SecHdr title="Base Installation" />
+        <SecHdr title="Turf Prep" />
         {/* Master area — fills every base row's Sq Ft automatically. */}
         <div className="flex flex-col items-center mb-3">
           <label className="text-xs font-medium text-gray-600 mb-1 text-center">Square Footage</label>
