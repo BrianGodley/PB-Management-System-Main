@@ -3738,7 +3738,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
               { label: 'Timber Wall Crew Type', value: timberCrewType, onChange: setTimberCrewType },
             ]}
             title="Walls"
-            rates={wallRateList}
+            moduleType="Walls"
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
           />

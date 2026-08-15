@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useRateIcons } from '../../contexts/RateIconsContext'
 import ViewRatesModal from './ViewRatesModal'
+import { buildViewRates, fetchHiddenKeys, setHidden } from '../../lib/viewRates'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CrewTypeBar — shared bar that used to be a copy-pasted "Crew Type" select in
@@ -38,10 +39,37 @@ export default function CrewTypeBar({
   // Optional element rendered centered in the bar (e.g. the demo modules'
   // "Change Demo Module" switcher). No surrounding label.
   centerSlot = null,
+  // When set, View Rates is generated live from the module→category map
+  // (data-driven), with hide/unhide, instead of the static `rates` prop.
+  moduleType = null,
 }) {
   const { showRateIcons, toggleRateIcons, canAccessRates } = useRateIcons()
   const [showRates, setShowRates] = useState(false)
-  const hasRates = Array.isArray(rates) && rates.length > 0
+  const [dynRates, setDynRates] = useState([])
+  const [hiddenSet, setHiddenSet] = useState(() => new Set())
+  const hasRates = !!moduleType || (Array.isArray(rates) && rates.length > 0)
+
+  const loadDyn = useCallback(async () => {
+    if (!moduleType) return
+    const [built, hidden] = await Promise.all([buildViewRates(moduleType), fetchHiddenKeys(moduleType)])
+    setDynRates(built.groups || [])
+    setHiddenSet(hidden)
+  }, [moduleType])
+
+  const toggleHide = async key => {
+    const willHide = !hiddenSet.has(key)
+    setHiddenSet(prev => {
+      const n = new Set(prev)
+      willHide ? n.add(key) : n.delete(key)
+      return n
+    })
+    await setHidden(moduleType, key, willHide)
+  }
+
+  const openRates = () => {
+    setShowRates(true)
+    if (moduleType) loadDyn()
+  }
 
   return (
     <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200 flex-nowrap overflow-x-auto">
@@ -106,7 +134,7 @@ export default function CrewTypeBar({
         {canAccessRates && hasRates && (
           <button
             type="button"
-            onClick={() => setShowRates(true)}
+            onClick={openRates}
             className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 underline underline-offset-2"
           >
             View Rates
@@ -117,9 +145,14 @@ export default function CrewTypeBar({
       {showRates && (
         <ViewRatesModal
           title={title}
-          rates={rates}
-          refreshAllRates={refreshAllRates}
+          rates={moduleType ? dynRates : rates}
+          refreshAllRates={async () => {
+            await refreshAllRates?.()
+            if (moduleType) loadDyn()
+          }}
           onClose={() => setShowRates(false)}
+          hidden={moduleType ? hiddenSet : null}
+          onToggleHide={moduleType ? toggleHide : null}
         />
       )}
     </div>
