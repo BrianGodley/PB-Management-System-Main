@@ -18,6 +18,30 @@ const GS = '' // group separator inside hide keys
 
 export const subcatHideKey = (category, sub) => `subcat:${category}${GS}${sub}`
 
+// Unit measures baked into item names are redundant in View Rates (the unit
+// already shows in the value column), so strip them from the DISPLAY label only.
+// The underlying name/rate is untouched — still the estimator's lookup key.
+const UNIT_STRIP = [
+  /\(\s*(?:SF|CY)\s*\)/gi, // (SF) (CY)
+  /\bSF\s*\/\s*hr\b/gi, // SF/hr
+  /\bt\s*\/\s*hr\b/gi, // t/hr
+  /\bHrs?\s*\/?\s*SF\b/gi, // Hrs/SF, Hr SF, Hr/SF
+  /\$\s*\/\s*SF\b/gi, // $/SF, $/Sf
+  /\bPer\s+(?:CY|SF)\b/gi, // Per CY, Per SF
+  /\bSec\s*\/\s*Ft\b/gi, // Sec/Ft
+  /\bCY\b/gi, // CY
+  /\bSF\b/gi, // SF
+]
+export function cleanLabel(s) {
+  let out = String(s || '')
+  for (const re of UNIT_STRIP) out = out.replace(re, ' ')
+  return out
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+    .replace(/[\s\-–/]+$/, '')
+    .trim()
+}
+
 export async function fetchModuleCategories(moduleType) {
   const { data } = await supabase
     .from('module_category_map')
@@ -54,7 +78,7 @@ export async function buildViewRates(moduleType) {
   ;(matRows || []).forEach(r => {
     const g = ensure(r.category, r.sub_category)
     g.items.push({
-      label: `${r.vendor_id ? vendorName(r.vendor_id) : 'Standard'} — ${r.name}`,
+      label: `${r.vendor_id ? vendorName(r.vendor_id) : 'Standard'} — ${cleanLabel(r.name)}`,
       table: 'material_price',
       materialId: r.id,
       vendorId: r.vendor_id || undefined,
@@ -71,7 +95,7 @@ export async function buildViewRates(moduleType) {
   ;(labRes.data || []).forEach(r => {
     const g = ensure(r.category, r.sub_category)
     g.items.push({
-      label: r.name,
+      label: cleanLabel(r.name),
       table: 'labor_rates',
       name: r.name,
       category: r.category,
@@ -87,7 +111,7 @@ export async function buildViewRates(moduleType) {
   ;(subRes.data || []).forEach(r => {
     const g = ensure(r.category, r.sub_category)
     g.items.push({
-      label: `${r.company_name || 'Unassigned'} — ${r.trade || r.item_key || 'Rate'}`,
+      label: `${r.company_name || 'Unassigned'} — ${cleanLabel(r.trade || r.item_key || 'Rate')}`,
       table: 'subcontractor_rates',
       name: r.item_key,
       category: r.category,
