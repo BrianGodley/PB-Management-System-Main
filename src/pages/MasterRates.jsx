@@ -10,6 +10,7 @@ import TaxonomyManager from '../components/TaxonomyManager'
 import SubRateDetailModal from '../components/SubRateDetailModal'
 import LaborRateDetailModal from '../components/LaborRateDetailModal'
 import CategorySyncBanner from '../components/CategorySyncBanner'
+import ModuleCategoryMap from '../components/ModuleCategoryMap'
 
 // ── Identity code per labor / subcontractor rate (generated on the fly, never
 // stored — mirrors the material + misc-rate codes). Format:
@@ -546,6 +547,7 @@ const TABS = [
   { key: 'subs', label: 'Subcontractors' },
   { key: 'sub_cat', label: 'Sub Categories' },
   { key: 'sub_sub', label: 'Sub Sub-Cats' },
+  { key: 'modmap', label: 'Module Mapping' },
 ]
 
 export default function MasterRates({ only } = {}) {
@@ -1172,6 +1174,13 @@ export default function MasterRates({ only } = {}) {
       {/* Subcontractor taxonomy — Categories and Sub-Categories as independent tabs. */}
       {activeTab === 'sub_cat' && <TaxonomyManager scope="sub" kind="category" />}
       {activeTab === 'sub_sub' && <TaxonomyManager scope="sub" kind="subcategory" />}
+
+      {/* Module → Category mapping (drives data-driven View Rates). */}
+      {activeTab === 'modmap' && (
+        <div className="mt-3">
+          <ModuleCategoryMap />
+        </div>
+      )}
 
       {detailSub && (
         <SubRateDetailModal

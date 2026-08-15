@@ -6,6 +6,7 @@ import {
   renameCategoryEverywhere,
   deleteCategoryEverywhere,
 } from '../lib/categorySync'
+import { MODULE_TYPES } from './ModuleCategoryMap'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TaxonomyDetailModal — view / edit / add / delete a Category or Sub-Category,
@@ -57,6 +58,8 @@ export default function TaxonomyDetailModal({
   const [busy, setBusy] = useState(false)
   const [del, setDel] = useState(false) // delete/reassign overlay
   const [targetId, setTargetId] = useState('')
+  const [assignName, setAssignName] = useState('') // newly-added category → assign-to-module overlay
+  const [assignSel, setAssignSel] = useState(() => new Set())
   const [form, setForm] = useState(
     adding
       ? { category_id: cats[0]?.id || '', code: '', name: '', default_vendor_id: '' }
@@ -89,9 +92,29 @@ export default function TaxonomyDetailModal({
     // Category is a shared namespace — propagate add/rename to material/labor/sub.
     if (sharedCat) {
       if (row && row.name !== form.name) await renameCategoryEverywhere(row.name, form.name)
-      else if (!row) await ensureCategoryEverywhere(form.name)
+      else if (!row) {
+        await ensureCategoryEverywhere(form.name)
+        // Prompt to map the brand-new category to a module before closing.
+        setBusy(false)
+        setAssignName(form.name)
+        return
+      }
     }
     setBusy(false)
+    onChanged?.()
+    onClose?.()
+  }
+
+  const saveAssignments = async () => {
+    setBusy(true)
+    const mods = [...assignSel]
+    if (mods.length) {
+      await supabase
+        .from('module_category_map')
+        .insert(mods.map(m => ({ module_type: m, category_name: assignName })))
+    }
+    setBusy(false)
+    setAssignName('')
     onChanged?.()
     onClose?.()
   }
@@ -222,6 +245,58 @@ export default function TaxonomyDetailModal({
           )}
         </div>
       </div>
+
+      {assignName &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-5" onClick={e => e.stopPropagation()}>
+              <h4 className="font-bold text-gray-900 mb-1">Assign “{assignName}” to modules</h4>
+              <p className="text-sm text-gray-600 mb-3">
+                Pick the estimator module(s) whose View Rates should include this category. You can change this later
+                under <b>Module Mapping</b>.
+              </p>
+              <div className="max-h-64 overflow-auto border border-gray-200 rounded-lg divide-y divide-gray-100 mb-4">
+                {MODULE_TYPES.map(m => (
+                  <label key={m} className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={assignSel.has(m)}
+                      onChange={e =>
+                        setAssignSel(prev => {
+                          const n = new Set(prev)
+                          if (e.target.checked) n.add(m)
+                          else n.delete(m)
+                          return n
+                        })
+                      }
+                    />
+                    <span className="text-gray-800">{m}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    setAssignName('')
+                    onChanged?.()
+                    onClose?.()
+                  }}
+                  className="text-sm text-gray-500 px-3 py-1.5"
+                >
+                  Skip
+                </button>
+                <button
+                  onClick={saveAssignments}
+                  disabled={busy}
+                  className="text-sm bg-green-700 text-white px-4 py-1.5 rounded-lg font-semibold disabled:opacity-50"
+                >
+                  {busy ? 'Saving…' : 'Assign'}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {del &&
         createPortal(

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import TaxonomyDetailModal from './TaxonomyDetailModal'
+import CategorySyncBanner from './CategorySyncBanner'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TaxonomyManager — Category or Sub-Category table (kind = 'category' |
@@ -187,6 +188,10 @@ export default function TaxonomyManager({ kind = 'category', scope = 'material' 
 
   return (
     <div>
+      {/* Category drift banner — shown on the shared category tabs only. */}
+      {isCat && ['material', 'labor', 'sub'].includes(scope) && (
+        <CategorySyncBanner onSynced={load} />
+      )}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="flex flex-wrap items-center gap-3 px-3 py-2 bg-gray-50 border-b border-gray-200">
           <input
