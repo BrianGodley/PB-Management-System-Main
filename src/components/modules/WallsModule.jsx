@@ -546,6 +546,7 @@ const WALL_RATE_SPECS = [
   },
   {
     group: 'Finishes (all wall types)',
+    catalogSubcat: 'Wall Finish', // append per-vendor Wall Finish catalog products
     items: [
       ['sandStucco', 'Sand Stucco', 'Walls', 'SF', 'currency'],
       ['smoothStucco', 'Smooth Stucco', 'Walls', 'SF', 'currency'],
@@ -565,6 +566,7 @@ const WALL_RATE_SPECS = [
   },
   {
     group: 'Caps (all wall types)',
+    catalogSubcat: 'Wall Cap', // append per-vendor Wall Cap catalog products
     items: [
       ['capFlagstone', 'Cap — Flagstone', 'Walls', 'ton', 'currency'],
       ['capPrecast', 'Cap — Precast', 'Walls', 'ea', 'currency'],
@@ -578,6 +580,7 @@ const WALL_RATE_SPECS = [
   },
   {
     group: 'Waterproofing (all wall types)',
+    catalogSubcat: 'Waterproofing', // append per-vendor Waterproofing catalog products
     items: [
       ['wpPrimerMembrane', 'Primer + Membrane', 'Walls', 'SF', 'currency'],
       ['wp3CoatRollOn', '2 Coats Roll On', 'Walls', 'SF', 'currency'],

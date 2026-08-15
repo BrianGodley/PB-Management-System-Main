@@ -189,7 +189,11 @@ export async function fetchModuleCatalog(categories) {
   const pageAll = async withArchivedFilter => {
     const out = []
     for (let from = 0; ; from += PAGE) {
-      let q = supabase.from('material').select(sel).in('category_id', catIds)
+      // A STABLE order is required for .range() paging — without ORDER BY, Postgres
+      // may return rows in a different order per request, so rows near page
+      // boundaries get skipped or duplicated (the newest-inserted product is the
+      // one most likely to silently vanish). Order by id so paging is deterministic.
+      let q = supabase.from('material').select(sel).in('category_id', catIds).order('id')
       if (withArchivedFilter) q = q.is('archived_at', null)
       const { data: pg, error } = await q.range(from, from + PAGE - 1)
       if (error) return { error }
