@@ -5,6 +5,7 @@ import { setMaterialPrice, restoreMaterial } from '../lib/materialCatalog'
 import MaterialDetailModal, { MoveMaterialModal, CopyMaterialModal } from '../components/MaterialDetailModal'
 import TaxonomyManager from '../components/TaxonomyManager'
 import CategorySyncBanner from '../components/CategorySyncBanner'
+import ModuleCategoryMap from '../components/ModuleCategoryMap'
 import { formatUnit } from '../lib/units'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -245,6 +246,7 @@ export default function MasterMaterialRates() {
           { k: 'misc', l: 'Misc' },
           { k: 'cat', l: 'Categories' },
           { k: 'sub', l: 'Sub-Categories' },
+          { k: 'modmap', l: 'Module Mapping' },
           { k: 'archived', l: 'Archived' },
         ].map(t => (
           <button
@@ -271,6 +273,10 @@ export default function MasterMaterialRates() {
         <TaxonomyManager scope="material" kind="category" />
       ) : view === 'sub' ? (
         <TaxonomyManager scope="material" kind="subcategory" />
+      ) : view === 'modmap' ? (
+        <div className="flex-1 overflow-y-auto">
+          <ModuleCategoryMap />
+        </div>
       ) : (
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
         <div className="flex flex-wrap items-center gap-3 px-3 py-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
