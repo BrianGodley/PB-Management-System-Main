@@ -44,19 +44,33 @@ export default function MasterMaterialRates() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [matRes, venRes] = await Promise.all([
-      supabase
-        .from('material')
-        .select(
-          `id, description, unit, is_default, collection, category_id, subcategory_id, archived_at,
+    // Page through `material` — PostgREST caps a single request at ~1000 rows, so
+    // once the catalog exceeds 1000 products the newest/last-sorted rows would be
+    // silently truncated (a just-added material would never appear). Fetch in
+    // 1000-row blocks so every product shows.
+    const PAGE = 1000
+    const sel = `id, description, unit, is_default, collection, category_id, subcategory_id, archived_at,
            category:category_id ( code, name ),
            subcategory:subcategory_id ( code, name ),
            prices:material_price ( id, price, vendor_id, effective_end )`
-        )
-        .order('description'),
+    const [matData, venRes] = await Promise.all([
+      (async () => {
+        const all = []
+        for (let from = 0; ; from += PAGE) {
+          const { data, error } = await supabase
+            .from('material')
+            .select(sel)
+            .order('description')
+            .range(from, from + PAGE - 1)
+          if (error) break
+          all.push(...(data || []))
+          if (!data || data.length < PAGE) break
+        }
+        return all
+      })(),
       supabase.from('subs_vendors').select('id, company_name'),
     ])
-    setMaterials(matRes.data || [])
+    setMaterials(matData)
     setVendors(venRes.data || [])
     setLoading(false)
   }, [])
@@ -140,19 +154,37 @@ export default function MasterMaterialRates() {
           code: codeFor(m, 'Standard'),
         })
       } else {
-        opens
-          .filter(p => p.vendor_id && p.vendor_id !== standardVendorId)
-          .forEach(p =>
-            out.push({
-              key: p.id,
-              m,
-              priceId: p.id,
-              vendorId: p.vendor_id,
-              price: p.price,
-              code: codeFor(m, vendorName(p.vendor_id)),
-              vName: vendorName(p.vendor_id),
-            })
-          )
+        const vendorPrices = opens.filter(p => p.vendor_id && p.vendor_id !== standardVendorId)
+        vendorPrices.forEach(p =>
+          out.push({
+            key: p.id,
+            m,
+            priceId: p.id,
+            vendorId: p.vendor_id,
+            price: p.price,
+            code: codeFor(m, vendorName(p.vendor_id)),
+            vName: vendorName(p.vendor_id),
+            noPrice: p.price == null || p.price === '',
+          })
+        )
+        // A product with no vendor price AND no usable Standard price — easy to
+        // create with Add Material and the price left blank — is otherwise invisible.
+        // Surface it once flagged "No price", tied to its existing (empty) price row
+        // so clicking opens it ready to price.
+        const hasUsablePrice = opens.some(p => p.price != null && p.price !== '')
+        if (vendorPrices.length === 0 && !hasUsablePrice) {
+          const std = opens.find(p => p.vendor_id === standardVendorId) || null
+          out.push({
+            key: m.id,
+            m,
+            priceId: std?.id ?? null,
+            vendorId: std?.vendor_id ?? standardVendorId,
+            price: null,
+            code: codeFor(m, 'Standard'),
+            vName: vendorName(standardVendorId) || 'Standard',
+            noPrice: true,
+          })
+        }
       }
     })
     return out
@@ -331,9 +363,15 @@ export default function MasterMaterialRates() {
                       </td>
                       <td className="px-3 py-1.5 text-gray-500 whitespace-nowrap">{r.m.unit ? formatUnit(r.m.unit) : '—'}</td>
                       <td className="px-3 py-1.5 text-right whitespace-nowrap">
-                        <span className={r.price == null ? 'text-gray-300' : 'text-gray-800 font-semibold'}>
-                          {money(r.price)}
-                        </span>
+                        {r.noPrice ? (
+                          <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                            No price
+                          </span>
+                        ) : (
+                          <span className={r.price == null ? 'text-gray-300' : 'text-gray-800 font-semibold'}>
+                            {money(r.price)}
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-1.5 text-right whitespace-nowrap">
                         {isArchivedView ? (
