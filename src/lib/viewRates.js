@@ -133,7 +133,8 @@ export async function buildViewRates(moduleType) {
         a.sub.localeCompare(b.sub)
     )
     .map(g => ({
-      group: `${g.category} · ${g.sub}`,
+      // Show just the sub-category name (the category is implied by the module).
+      group: g.sub,
       hideKey: subcatHideKey(g.category, g.sub),
       items: g.items.sort((x, y) => (x._vsort || '').localeCompare(y._vsort || '') || x.label.localeCompare(y.label)),
     }))
