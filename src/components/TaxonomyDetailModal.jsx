@@ -1,6 +1,11 @@
 import { useState, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
+import {
+  ensureCategoryEverywhere,
+  renameCategoryEverywhere,
+  deleteCategoryEverywhere,
+} from '../lib/categorySync'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TaxonomyDetailModal — view / edit / add / delete a Category or Sub-Category,
@@ -44,6 +49,9 @@ export default function TaxonomyDetailModal({
 }) {
   const cfg = SCOPE_TABLES[scope] || SCOPE_TABLES.material
   const isCat = kind === 'category'
+  // Category is a shared namespace across material/labor/sub — changes propagate
+  // to all three. (general scope is standalone and does NOT participate.)
+  const sharedCat = isCat && ['material', 'labor', 'sub'].includes(scope)
   const adding = !row
   const [mode, setMode] = useState(adding ? 'edit' : 'view')
   const [busy, setBusy] = useState(false)
@@ -61,6 +69,9 @@ export default function TaxonomyDetailModal({
   const itemCount = row ? materials.filter(m => (isCat ? m.category_id : m.subcategory_id) === row.id).length : 0
   const subCnt = row && isCat ? subs.filter(s => s.category_id === row.id).length : 0
   const connected = itemCount > 0 || subCnt > 0
+  // Shared categories always require a reassign target on delete (other systems
+  // may hold items under this name that the modal can't see from here).
+  const requireTarget = connected || sharedCat
 
   const targets = useMemo(
     () => (isCat ? cats : subs).filter(t => !row || t.id !== row.id),
@@ -75,6 +86,11 @@ export default function TaxonomyDetailModal({
       : { category_id: form.category_id, code: form.code, name: form.name }
     if (row) await supabase.from(table).update(payload).eq('id', row.id)
     else await supabase.from(table).insert(payload)
+    // Category is a shared namespace — propagate add/rename to material/labor/sub.
+    if (sharedCat) {
+      if (row && row.name !== form.name) await renameCategoryEverywhere(row.name, form.name)
+      else if (!row) await ensureCategoryEverywhere(form.name)
+    }
     setBusy(false)
     onChanged?.()
     onClose?.()
@@ -82,7 +98,12 @@ export default function TaxonomyDetailModal({
 
   const doDelete = async () => {
     setBusy(true)
-    if (isCat) {
+    if (sharedCat) {
+      // Delete across all three systems, reassigning each system's contents to
+      // the chosen target category (by name) so nothing is orphaned anywhere.
+      const tgtName = (isCat ? cats : []).find(c => c.id === targetId)?.name || ''
+      await deleteCategoryEverywhere(row.name, tgtName)
+    } else if (isCat) {
       if (targetId) {
         await supabase.from(cfg.subTable).update({ category_id: targetId }).eq('category_id', row.id)
         if (cfg.hasMaterials)
@@ -210,7 +231,13 @@ export default function TaxonomyDetailModal({
                 Delete {isCat ? 'category' : 'sub-category'} “{row.name}”?
               </h4>
               <p className="text-sm text-gray-600 mb-3">
-                {connected ? (
+                {sharedCat ? (
+                  <>
+                    Categories are shared across <b>Material</b>, <b>Labor</b>, and <b>Subcontractor</b>, so this
+                    deletes “{row.name}” from all three. Everything filed under it in each system (sub-categories, items,
+                    and rates) will be moved to the category you pick.
+                  </>
+                ) : connected ? (
                   isCat ? (
                     <>
                       This category has <b>{subCnt}</b> sub-categor{subCnt === 1 ? 'y' : 'ies'} and <b>{itemCount}</b> item
@@ -226,7 +253,7 @@ export default function TaxonomyDetailModal({
                   <>Nothing is connected to it — it can be removed directly.</>
                 )}
               </p>
-              {connected && (
+              {requireTarget && (
                 <label className="block mb-4">
                   <span className="text-xs text-gray-500">Reassign to {isCat ? 'category' : 'sub-category'}</span>
                   <select
@@ -249,10 +276,10 @@ export default function TaxonomyDetailModal({
                 </button>
                 <button
                   onClick={doDelete}
-                  disabled={busy || (connected && !targetId)}
+                  disabled={busy || (requireTarget && !targetId)}
                   className="text-sm bg-red-600 text-white px-4 py-1.5 rounded-lg font-semibold disabled:opacity-50"
                 >
-                  {busy ? 'Working…' : connected ? 'Reassign & Delete' : 'Delete'}
+                  {busy ? 'Working…' : requireTarget ? 'Reassign & Delete' : 'Delete'}
                 </button>
               </div>
             </div>

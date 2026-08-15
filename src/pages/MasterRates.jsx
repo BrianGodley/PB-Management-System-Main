@@ -9,6 +9,7 @@ import { fetchProductTypes, validateCalcMeta, indexProductTypes } from '../lib/p
 import TaxonomyManager from '../components/TaxonomyManager'
 import SubRateDetailModal from '../components/SubRateDetailModal'
 import LaborRateDetailModal from '../components/LaborRateDetailModal'
+import CategorySyncBanner from '../components/CategorySyncBanner'
 
 // ── Identity code per labor / subcontractor rate (generated on the fly, never
 // stored — mirrors the material + misc-rate codes). Format:
@@ -1081,6 +1082,7 @@ export default function MasterRates({ only } = {}) {
       {/* Labor */}
       {showRateTable && activeTab === 'labor' && (
         <div>
+          <CategorySyncBanner onSynced={fetchAll} />
           <RateTable
             addLabel="Add Labor Rate"
             count={visibleLabor.length}
@@ -1117,6 +1119,7 @@ export default function MasterRates({ only } = {}) {
       {/* Subs */}
       {showRateTable && activeTab === 'subs' && (
         <div>
+          <CategorySyncBanner onSynced={fetchAll} />
           <RateTable
             addLabel="Add Subcontractor Rate"
             count={visibleSubs.length}

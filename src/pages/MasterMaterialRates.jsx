@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { setMaterialPrice, restoreMaterial } from '../lib/materialCatalog'
 import MaterialDetailModal, { MoveMaterialModal, CopyMaterialModal } from '../components/MaterialDetailModal'
 import TaxonomyManager from '../components/TaxonomyManager'
+import CategorySyncBanner from '../components/CategorySyncBanner'
 import { formatUnit } from '../lib/units'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -259,6 +260,8 @@ export default function MasterMaterialRates() {
           </button>
         ))}
       </div>
+
+      <CategorySyncBanner onSynced={load} />
 
       {view === 'misc' ? (
         <MiscRatesPanel />
