@@ -762,6 +762,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
             crewType={crewType}
             onCrewTypeChange={setCrewType}
             title="Irrigation"
+            moduleType="Irrigation"
             rates={irrigationRateList}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}

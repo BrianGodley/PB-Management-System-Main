@@ -964,6 +964,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
             crewType={crewType}
             onCrewTypeChange={setCrewType}
             title="Drainage"
+            moduleType="Drainage"
             rates={drainageRateList}
             refreshAllRates={refreshMaterialPrices}
             showInlineToggle={false}

@@ -1755,6 +1755,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             crewType={crewType}
             onCrewTypeChange={setCrewType}
             title="Ground Treatments"
+            moduleType="Ground Treatments"
             rates={groundTreatmentsRateList}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}

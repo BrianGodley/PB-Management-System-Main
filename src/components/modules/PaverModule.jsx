@@ -1347,6 +1347,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             crewType={state.crewType}
             onCrewTypeChange={v => set('crewType', v)}
             title="Pavers"
+            moduleType="Pavers"
             rates={paverRateList}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}

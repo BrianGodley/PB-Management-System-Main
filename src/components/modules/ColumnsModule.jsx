@@ -945,6 +945,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
               crewType={crewType}
               onCrewTypeChange={setCrewType}
               title="Columns"
+              moduleType="Columns"
               rates={columnsRateList}
               refreshAllRates={refreshAllRates}
               showInlineToggle={false}

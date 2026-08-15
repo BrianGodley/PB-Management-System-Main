@@ -1091,6 +1091,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             crewType={state.crewType}
             onCrewTypeChange={v => set('crewType', v)}
             title="Mini Skid Steer Demo"
+            moduleType="Mini Skid Steer Demo"
             rates={miniDemoRateList}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}

@@ -1254,6 +1254,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
             crewType={crewType}
             onCrewTypeChange={setCrewType}
             title="Outdoor Kitchen"
+            moduleType="Outdoor Kitchen"
             rates={outdoorKitchenRateList}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}

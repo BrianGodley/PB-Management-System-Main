@@ -1157,6 +1157,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
             crewType={crewType}
             onCrewTypeChange={setCrewType}
             title="Utilities"
+            moduleType="Utilities"
             rates={utilitiesRateList}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}

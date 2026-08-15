@@ -1367,6 +1367,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
             crewType={state.crewType}
             onCrewTypeChange={v => set('crewType', v)}
             title="Artificial Turf"
+            moduleType="Artificial Turf"
             rates={turfRateList}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}

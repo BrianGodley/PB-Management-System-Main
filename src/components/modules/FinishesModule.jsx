@@ -1118,6 +1118,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
             crewType={crewType}
             onCrewTypeChange={setCrewType}
             title="Finishes"
+            moduleType="Finishes"
             rates={finishesRateList}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}

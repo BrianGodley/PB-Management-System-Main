@@ -1355,6 +1355,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
             crewType={crewType}
             onCrewTypeChange={setCrewType}
             title="Fire Pit"
+            moduleType="Fire Pit"
             rates={firePitRateList}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}

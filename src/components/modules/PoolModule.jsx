@@ -1675,6 +1675,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             crewType={state.crewType}
             onCrewTypeChange={v => updShared('crewType', v)}
             title="Pool"
+            moduleType="Pool"
             rates={poolRateList}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}

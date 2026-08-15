@@ -1498,6 +1498,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             crewType={crewType}
             onCrewTypeChange={setCrewType}
             title="Concrete"
+            moduleType="Concrete"
             rates={concreteRateList}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}

@@ -1275,6 +1275,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
             crewType={crewType}
             onCrewTypeChange={setCrewType}
             title="Steps"
+            moduleType="Steps"
             rates={stepsRateList}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}

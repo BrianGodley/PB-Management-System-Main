@@ -724,6 +724,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
             crewType={crewType}
             onCrewTypeChange={setCrewType}
             title="Lighting"
+            moduleType="Lighting"
             rates={lightingRateList}
             refreshAllRates={refreshCatalog}
             showInlineToggle={false}

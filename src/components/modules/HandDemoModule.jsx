@@ -1063,6 +1063,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             crewType={state.crewType}
             onCrewTypeChange={v => set('crewType', v)}
             title="Hand Demo"
+            moduleType="Hand Demo"
             rates={handDemoRateList}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}

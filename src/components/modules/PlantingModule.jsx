@@ -1260,6 +1260,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
             crewType={crewType}
             onCrewTypeChange={setCrewType}
             title="Planting"
+            moduleType="Planting"
             rates={plantingRateList}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
