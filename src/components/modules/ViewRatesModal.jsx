@@ -173,7 +173,7 @@ export default function ViewRatesModal({
   return createPortal(
     <div className="fixed inset-0 z-[9998] bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full sm:max-w-[75rem] flex flex-col max-h-[85vh]"
+        className="bg-white rounded-2xl shadow-2xl w-full sm:max-w-[93rem] flex flex-col max-h-[85vh]"
         onClick={e => e.stopPropagation()}
       >
         <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between bg-gray-50 rounded-t-2xl">
