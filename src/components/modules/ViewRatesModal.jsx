@@ -171,7 +171,10 @@ export default function ViewRatesModal({
   const hiddenCount = hiddenSet.size
 
   return createPortal(
-    <div className="fixed inset-0 z-[9998] bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-[9998] bg-black/40 flex items-start justify-center p-4 pt-[6vh]"
+      onClick={onClose}
+    >
       <div
         className="bg-white rounded-2xl shadow-2xl w-full sm:max-w-[93rem] flex flex-col max-h-[85vh]"
         onClick={e => e.stopPropagation()}
