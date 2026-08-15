@@ -1005,6 +1005,7 @@ export default function MasterRates({ only } = {}) {
             { key: 'rates', label: only === 'labor' ? 'Labor Rates' : 'Subcontractor Rates' },
             { key: 'cat', label: 'Categories' },
             { key: 'sub', label: 'Sub-Categories' },
+            { key: 'modmap', label: 'Module Mapping' },
           ].map(t => (
             <button
               key={t.key}
@@ -1027,6 +1028,11 @@ export default function MasterRates({ only } = {}) {
       )}
       {only && embedScope && embeddedView === 'sub' && (
         <TaxonomyManager scope={embedScope} kind="subcategory" />
+      )}
+      {only && embeddedView === 'modmap' && (
+        <div className="mt-3">
+          <ModuleCategoryMap />
+        </div>
       )}
 
       {/* Materials */}
