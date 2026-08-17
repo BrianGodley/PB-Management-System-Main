@@ -14,15 +14,16 @@ import { resolveMaterialPrice, catalogOptions, fetchModuleCatalog, fetchStandard
 // Planting Module
 // Material prices  → material_rates  (category = 'Planting')  keyed by name
 // Labor rates      → labor_rates     (category = 'Planting')  keyed by name
-//   Plant types:   rate = plants per man-day
-//   Till - Soil Move Rate:           rate = CY/hour
-//   Till - Tilling Rate:             rate = sqft/hour
-//   Till - Amend Rate:               rate = sqft/hour
-//   Tree Stakes - Install Rate:      rate = stakes/day
-//   Root Barrier - Install Rate:     rate = min/LF
-//   Gopher Basket - Install Rate:    rate = min/basket
-//   Mesh Flat - Install Rate:        rate = min/sqft
-//   Jute Fabric - Install Rate:      rate = min/sqft
+// All labor rates are hours-per-unit (hrs = qty × rate):
+//   Plant types:                     rate = hrs per plant (Each)
+//   Till - Soil Move Rate:           rate = hrs per Cu Yd
+//   Till - Tilling Rate:             rate = hrs per Sq Ft
+//   Till - Amend Rate:               rate = hrs per Sq Ft
+//   Tree Stakes - Install Rate:      rate = hrs per Each
+//   Root Barrier - Install Rate:     rate = hrs per Ln Ft
+//   Gopher Basket - Install Rate:    rate = hrs per Each
+//   Mesh Flat - Install Rate:        rate = hrs per Sq Ft
+//   Jute Fabric - Install Rate:      rate = hrs per Sq Ft
 //
 // Vendor + Item catalog SELECTION
 //   Every material section (Small Plants, Large Plants, Planting Add-Ons) is an
@@ -87,7 +88,7 @@ const LARGE_PLANT_DEFAULTS = Object.fromEntries(LARGE_PLANT_TYPES.map(k => [k, {
 // ── Planting Add-On item catalog (the Item dropdown; NOT from the DB) ──────────
 // Each add-on Item carries its own labor formula + material/labor DB names. The
 // labor formula is byte-for-byte identical to the original per-item math:
-//   mode 'perDay' → hrs = qty / rate         (rate = units/HOUR, guarded > 0)
+//   mode 'perDay' → hrs = qty * rate         (rate = hours/unit, guarded > 0)
 //   mode 'perMin' → hrs = (qty * rate) / 60  (rate = minutes/unit)
 const ADDON_META = {
   'Tree Stake': {
@@ -95,56 +96,56 @@ const ADDON_META = {
     labKey: 'Tree Stakes - Install Rate',
     mode: 'perDay',
     unit: 'ea',
-    labUnit: 'Each per hour',
+    labUnit: 'hrs per Each',
   },
   'Root Barrier 12"': {
     matKey: 'Root Barrier 12in',
     labKey: 'Root Barrier - Install Rate',
     mode: 'perDay',
     unit: 'LF',
-    labUnit: 'Ln Ft per hour',
+    labUnit: 'hrs per Ln Ft',
   },
   'Root Barrier 24"': {
     matKey: 'Root Barrier 24in',
     labKey: 'Root Barrier - Install Rate',
     mode: 'perDay',
     unit: 'LF',
-    labUnit: 'Ln Ft per hour',
+    labUnit: 'hrs per Ln Ft',
   },
   'Gopher Basket 1 gal': {
     matKey: 'Gopher Basket 1 Gal',
     labKey: 'Gopher Basket - Install Rate',
     mode: 'perDay',
     unit: 'ea',
-    labUnit: 'Each per hour',
+    labUnit: 'hrs per Each',
   },
   'Gopher Basket 5 gal': {
     matKey: 'Gopher Basket 5 Gal',
     labKey: 'Gopher Basket - Install Rate',
     mode: 'perDay',
     unit: 'ea',
-    labUnit: 'Each per hour',
+    labUnit: 'hrs per Each',
   },
   'Gopher Basket 15 gal': {
     matKey: 'Gopher Basket 15 Gal',
     labKey: 'Gopher Basket - Install Rate',
     mode: 'perDay',
     unit: 'ea',
-    labUnit: 'Each per hour',
+    labUnit: 'hrs per Each',
   },
   'Mesh Flat': {
     matKey: 'Mesh Flat',
     labKey: 'Mesh Flat - Install Rate',
     mode: 'perDay',
     unit: 'SF',
-    labUnit: 'Sq Ft per hour',
+    labUnit: 'hrs per Sq Ft',
   },
   'Jute Fabric': {
     matKey: 'Jute Fabric',
     labKey: 'Jute Fabric - Install Rate',
     mode: 'perDay',
     unit: 'SF',
-    labUnit: 'Sq Ft per hour',
+    labUnit: 'hrs per Sq Ft',
   },
 }
 const ADDON_TYPES = Object.keys(ADDON_META)
@@ -233,7 +234,7 @@ function computePlantRow(row, perDay) {
   let hrs = 0,
     mat = 0
   if (qty > 0 && perDay > 0) {
-    hrs = qty / perDay // perDay is now a per-HOUR rate
+    hrs = qty * perDay // perDay is hours per plant
     mat = qty * n(row.price)
   }
   const subUnit = n(row.price)
@@ -252,7 +253,7 @@ function computeAddonRow(row, laborRates, materialPrices, materialRows) {
   const qty = n(row.qty)
   const rate = lr(laborRates, meta.labKey)
   let hrs = 0
-  if (meta.mode === 'perDay') hrs = rate > 0 ? qty / rate : 0 // rate is now per-HOUR
+  if (meta.mode === 'perDay') hrs = qty * rate // rate is hours per unit
   else if (meta.mode === 'perMin') hrs = (qty * rate) / 60
   const unitPrice = plantMatPrice(meta.matKey, row.vendor, materialRows, materialPrices)
   const mat = qty * unitPrice
@@ -295,11 +296,10 @@ function calcPlanting(
   const soilMoveRate = lr(laborRates, 'Till - Soil Move Rate')
   const tillingRate = lr(laborRates, 'Till - Tilling Rate')
   const amendRate = lr(laborRates, 'Till - Amend Rate')
-  // Till rates are now per-HOUR productivity (CY/hr, SF/hr), so hours come out
-  // directly — no man-days → ×8 step.
+  // Till rates are hours per unit (hrs/CY, hrs/SF), so hours = measure × rate.
   const tillHrs =
     sqft > 0 && soilMoveRate > 0 && tillingRate > 0 && amendRate > 0
-      ? soilCY / soilMoveRate + sqft / tillingRate + sqft / amendRate
+      ? soilCY * soilMoveRate + sqft * tillingRate + sqft * amendRate
       : 0
 
   // Small plants
@@ -1182,7 +1182,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
           name: type,
           category: 'Planting',
           mode: 'coefficient',
-          unitLabel: 'per hour',
+          unitLabel: 'hrs per Each',
           value: getSmallPerDay(laborRates, type),
         })),
         ...Object.keys(SMALL_PLANT_DEFAULTS).flatMap(type =>
@@ -1199,7 +1199,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
           name: type,
           category: 'Planting',
           mode: 'coefficient',
-          unitLabel: 'per hour',
+          unitLabel: 'hrs per Each',
           value: getLargePerDay(laborRates, type),
         })),
         ...Object.keys(LARGE_PLANT_DEFAULTS).flatMap(type =>
@@ -1211,11 +1211,11 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
       group: 'Planting Add-Ons',
       items: [
         ...[
-          { key: 'Tree Stakes - Install Rate', unit: 'stakes/day' },
-          { key: 'Root Barrier - Install Rate', unit: 'min/LF' },
-          { key: 'Gopher Basket - Install Rate', unit: 'min/basket' },
-          { key: 'Mesh Flat - Install Rate', unit: 'min/SF' },
-          { key: 'Jute Fabric - Install Rate', unit: 'min/SF' },
+          { key: 'Tree Stakes - Install Rate', unit: 'hrs per Each' },
+          { key: 'Root Barrier - Install Rate', unit: 'hrs per Ln Ft' },
+          { key: 'Gopher Basket - Install Rate', unit: 'hrs per Each' },
+          { key: 'Mesh Flat - Install Rate', unit: 'hrs per Sq Ft' },
+          { key: 'Jute Fabric - Install Rate', unit: 'hrs per Sq Ft' },
         ].map(({ key, unit }) => ({
           label: key,
           table: 'labor_rates',

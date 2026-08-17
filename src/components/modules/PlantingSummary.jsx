@@ -112,14 +112,14 @@ export default function PlantingSummary({ module }) {
         const qty = n(r.qty)
         const perDay = n(laborRates[r.type])
         const unitPrice = n(r.price)
-        const hrs = perDay > 0 ? qty / perDay : 0 // perDay is now per-HOUR
+        const hrs = perDay > 0 ? qty * perDay : 0 // perDay is hours per plant
         const subEach = r.subEach !== '' && r.subEach != null ? n(r.subEach) : unitPrice
         const material = isSub ? qty * subEach : perDay > 0 ? qty * unitPrice : 0
         const parts = []
         if (isSub) parts.push(`${fmt2(subEach)} per Each flat`)
         else {
           parts.push(`${hrs.toFixed(2)} hrs`)
-          parts.push(`${perDay < 1 ? perDay.toFixed(3) : perDay.toLocaleString()} plants/hr`)
+          parts.push(`${perDay < 1 ? perDay.toFixed(3) : perDay.toLocaleString()} hrs each`)
           parts.push(`${fmt2(unitPrice)} per Each`)
         }
         return {
@@ -143,7 +143,7 @@ export default function PlantingSummary({ module }) {
       const rate = lr(laborRates, meta.labKey)
       const unitPrice = plantMatPrice(meta.matKey, r.vendor, materialRows, materialPrices)
       let hrs = 0
-      if (meta.mode === 'perDay') hrs = rate > 0 ? qty / rate : 0 // rate is now per-HOUR
+      if (meta.mode === 'perDay') hrs = qty * rate // rate is hours per unit
       else if (meta.mode === 'perMin') hrs = (qty * rate) / 60
       const subEach = r.subEach !== '' && r.subEach != null ? n(r.subEach) : unitPrice
       const material = isSub ? qty * subEach : qty * unitPrice
