@@ -10,14 +10,7 @@
 
 import FinancialSummaryList from './FinancialSummaryList'
 import { resolveMaterialPrice } from '../../lib/materialCatalog'
-
-const ZONE_TYPES = [
-  { key: 'planterSpray', label: 'Planter Spray Heads', defaultMode: 'Hand', matKey: 'Irrigation Zone - Planter Spray' },
-  { key: 'lawn', label: 'Lawn Zone (≤ 1,000 Sq Ft)', defaultMode: 'Trench', matKey: 'Irrigation Zone - Lawn' },
-  { key: 'hillside', label: 'Hillside Zone (≤ 6 big heads)', defaultMode: 'Hand', matKey: 'Irrigation Zone - Hillside' },
-  { key: 'dripPlant', label: 'Drip per Plant (≤ 50 emitters)', defaultMode: 'Trench', matKey: 'Irrigation Zone - Drip per Plant' },
-  { key: 'dripline', label: 'Planter Dripline (≤ 700 Sq Ft)', defaultMode: 'Trench', matKey: 'Irrigation Zone - Planter Dripline' },
-]
+import { ZONE_TYPES, computeZoneRow, makeBomPrice } from '../../lib/irrigationZones'
 
 const TIMER_TYPES = [
   { key: 'timer4', label: '4 Station', matKey: 'Irrigation Timer - 4 Station' },
@@ -30,9 +23,7 @@ const TIMER_TYPES = [
   { key: 'timerAdd8', label: 'Additional 8 Station Module', matKey: 'Irrigation Timer - Additional 8 Station Module' },
 ]
 
-const ZONE_BY_KEY = Object.fromEntries(ZONE_TYPES.map(z => [z.key, z]))
 const TIMER_BY_KEY = Object.fromEntries(TIMER_TYPES.map(t => [t.key, t]))
-const zoneMeta = key => ZONE_BY_KEY[key] || ZONE_TYPES[0]
 const timerMeta = key => TIMER_BY_KEY[key] || TIMER_TYPES[0]
 
 const n = v => parseFloat(v) || 0
@@ -85,9 +76,8 @@ export default function IrrigationSummary({ module }) {
   const vendorNames = data.vendorNames || {}
   const savedCalc = data.calc || {}
 
-  const handRate = n(lr['Irrigation - Hand Zone'])
-  const trenchRate = n(lr['Irrigation - Trench Zone'])
   const timerHrs = n(lr['Irrigation - Timer Install'])
+  const bomPrice = makeBomPrice(materialRows, mp)
 
   const zoneRows = tab.zoneRows || legacyZoneRows(tab)
   const timerRows = tab.timerRows || legacyTimerRows(tab)
@@ -98,23 +88,17 @@ export default function IrrigationSummary({ module }) {
   const fh = v => (v > 0 ? `${v.toFixed(2)} hrs` : null)
   const vendorLabel = v => (!v || v === 'Standard' ? 'Standard' : vendorNames[v] || 'Vendor')
 
-  // Zone lines
+  // Zone lines — assembly (per-zone labor hours + live BOM) via the shared calc.
   const zoneLines = (zoneRows || [])
     .filter(r => n(r.qty) > 0)
     .map((r, i) => {
-      const z = zoneMeta(r.type)
-      const qty = n(r.qty)
-      const mode = r.mode || z.defaultMode
-      const rate = mode === 'Hand' ? handRate : trenchRate
-      const hrs = qty > 0 ? qty * rate : 0
-      const unitPrice = irrMatPrice(z.matKey, r.vendor, materialRows, mp)
-      const subEach = r.subEach !== '' && r.subEach != null ? n(r.subEach) : unitPrice
-      const material = isSub ? qty * subEach : qty * unitPrice
+      const c = computeZoneRow(r, lr, bomPrice)
+      const material = isSub ? c.subMat : c.mat
       return {
         key: i,
-        label: `${vendorLabel(r.vendor)} · ${z.label} × ${qty}`,
+        label: `${vendorLabel(r.vendor)} · ${c.z.label} × ${c.qty}`,
         value: material > 0 ? fmt2(material) : '—',
-        sub: isSub ? `${fmt2(subEach)}/zone flat` : `${mode}${fh(hrs) ? ` · ${fh(hrs)}` : ''}`,
+        sub: isSub ? `${fmt2(c.subEach)}/zone flat` : `${c.mode}${fh(c.hrs) ? ` · ${fh(c.hrs)}` : ''}`,
       }
     })
 

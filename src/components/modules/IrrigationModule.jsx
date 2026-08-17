@@ -35,43 +35,13 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { resolveMaterialPrice, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
+import { zoneMeta, ZONE_OPTIONS, makeBomPrice, zoneMatUnit, computeZoneRow } from '../../lib/irrigationZones'
 
 const IRRIGATION_CATEGORY = 'Irrigation'
 
 // ── Zone definitions ──────────────────────────────────────────────────────────
-// defaultMode: 'Hand' | 'Trench'  — matches Excel defaults; user can override
-const ZONE_TYPES = [
-  {
-    key: 'planterSpray',
-    label: 'Planter Spray Heads',
-    defaultMode: 'Hand',
-    matKey: 'Irrigation Zone - Planter Spray',
-  },
-  {
-    key: 'lawn',
-    label: 'Lawn Zone (≤ 1,000 Sq Ft)',
-    defaultMode: 'Trench',
-    matKey: 'Irrigation Zone - Lawn',
-  },
-  {
-    key: 'hillside',
-    label: 'Hillside Zone (≤ 6 big heads)',
-    defaultMode: 'Hand',
-    matKey: 'Irrigation Zone - Hillside',
-  },
-  {
-    key: 'dripPlant',
-    label: 'Drip per Plant (≤ 50 emitters)',
-    defaultMode: 'Trench',
-    matKey: 'Irrigation Zone - Drip per Plant',
-  },
-  {
-    key: 'dripline',
-    label: 'Planter Dripline (≤ 700 Sq Ft)',
-    defaultMode: 'Trench',
-    matKey: 'Irrigation Zone - Planter Dripline',
-  },
-]
+// Zone assemblies (labels, per-zone Trench/Hand labor keys, bill-of-materials) live
+// in src/lib/irrigationZones.js so the estimator and the summary share one source.
 
 // ── Timer definitions ─────────────────────────────────────────────────────────
 const TIMER_TYPES = [
@@ -93,11 +63,8 @@ const TIMER_TYPES = [
   },
 ]
 
-const ZONE_BY_KEY = Object.fromEntries(ZONE_TYPES.map(z => [z.key, z]))
 const TIMER_BY_KEY = Object.fromEntries(TIMER_TYPES.map(t => [t.key, t]))
-const zoneMeta = key => ZONE_BY_KEY[key] || ZONE_TYPES[0]
 const timerMeta = key => TIMER_BY_KEY[key] || TIMER_TYPES[0]
-const ZONE_OPTIONS = ZONE_TYPES.map(z => ({ value: z.key, label: z.label }))
 const TIMER_OPTIONS = TIMER_TYPES.map(t => ({ value: t.key, label: t.label }))
 
 // ── Estimate-config defaults ──────────────────────────────────────────────────
@@ -128,25 +95,8 @@ const r2 = x => Math.round(((x || 0) + Number.EPSILON) * 100) / 100
 const irrMatPrice = resolveMaterialPrice
 
 // ── Per-row calculators ───────────────────────────────────────────────────────
-// Zone row: In-House labor + material identical to the original per-zone math —
-//   hrs = qty × (mode === 'Hand' ? handRate : trenchRate)   (guarded qty > 0)
-//   mat = qty × material unit price
-// Only the material unit price source is vendor-resolved (Standard = original price).
-function computeZoneRow(row, handRate, trenchRate, materialPrices, materialRows) {
-  // Unselected zone row contributes nothing (no crash, no fallback-to-first).
-  if (!row.type)
-    return { z: zoneMeta(row.type), qty: n(row.qty), mode: row.mode, rate: 0, hrs: 0, unitPrice: 0, mat: 0, subEach: 0, subMat: 0 }
-  const z = zoneMeta(row.type)
-  const qty = n(row.qty)
-  const mode = row.mode || z.defaultMode
-  const rate = mode === 'Hand' ? handRate : trenchRate
-  const hrs = qty > 0 ? qty * rate : 0
-  const unitPrice = irrMatPrice(z.matKey, row.vendor, materialRows, materialPrices)
-  const mat = qty * unitPrice
-  const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : unitPrice
-  const subMat = qty > 0 ? qty * subEach : 0
-  return { z, qty, mode, rate, hrs, unitPrice, mat, subEach, subMat }
-}
+// computeZoneRow (zone assembly: per-zone labor hours + live BOM) is imported from
+// src/lib/irrigationZones.js. Timer rows stay module-local below.
 
 // Timer row: In-House labor + material identical to the original per-timer math —
 //   hrs = qty × timerHrs ;  mat = qty × material unit price
@@ -194,15 +144,20 @@ function calcIrrigation(
   const trenchRate = n(lr['Irrigation - Trench Zone'])
   const timerHrs = n(lr['Irrigation - Timer Install'])
 
+  // Live BOM pricing: Standard preferred, else any vendor line (Home-Depot-only items).
+  const bomPrice = makeBomPrice(materialRows, mp)
+
   // ── Zone labor + material (pre-tax) ─────────────────────────────────────
   let zoneHrs = 0,
     zoneMat = 0,
     zoneSubMat = 0
+  const zoneMissing = new Set()
   const zoneCalc = (state.zoneRows || []).map(row => {
-    const c = computeZoneRow(row, handRate, trenchRate, mp, materialRows)
+    const c = computeZoneRow(row, lr, bomPrice)
     zoneHrs += c.hrs
     zoneMat += c.mat
     zoneSubMat += c.subMat
+    ;(c.missing || []).forEach(m => zoneMissing.add(m))
     return c
   })
 
@@ -569,17 +524,18 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
   ]
 
   // ── Row helpers ─────────────────────────────────────────────────────────────
-  // Zone row update. Changing Vendor or Item (type/mode) on the Sub tab refreshes
-  // the flat $/unit default to the vendor-resolved unit price.
+  // Live BOM pricing (Standard preferred, else vendor). Per-zone material = Σ qty×price.
+  const bomPrice = makeBomPrice(materialRows, materialPrices)
+
+  // Zone row update. Changing Item (type) or Vendor on the Sub tab refreshes the flat
+  // $/zone default to the assembly's material cost.
   function zoneUpdate(i, field, val) {
     setZoneRows(rows =>
       rows.map((r, idx) => {
         if (idx !== i) return r
         const next = { ...r, [field]: val }
         if ((field === 'type' || field === 'vendor') && isSub) {
-          const z = zoneMeta(next.type)
-          const unit = irrMatPrice(z.matKey, next.vendor, materialRows, materialPrices)
-          next.subEach = String(r2(unit))
+          next.subEach = String(r2(zoneMatUnit(zoneMeta(next.type), bomPrice)))
         }
         return next
       })
@@ -837,10 +793,8 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
           />
           <tbody className="divide-y divide-gray-50">
             {zoneRows.map((row, i) => {
-              const c = calc.zoneCalc[i] || computeZoneRow(row, calc.handRate, calc.trenchRate, materialPrices, materialRows)
+              const c = calc.zoneCalc[i] || computeZoneRow(row, laborRates, bomPrice)
               const z = zoneMeta(row.type)
-              const isStandard = !row.vendor || row.vendor === 'Standard'
-              const masterMat = n(materialPrices[z.matKey])
               return (
                 <tr key={i}>
                   <td className={td}>
