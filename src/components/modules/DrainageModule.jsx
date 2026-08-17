@@ -214,6 +214,7 @@ function calcDrainage(
   const isSub = state.subType === 'Subcontractor'
   const PIPE_T = { ...PIPE_TYPES, ...masterDrainTypes(DRAIN_CAT.pipe, PIPE_TYPES, materialRows, 'laborPerLF') }
   const FIX_T = { ...FIXTURE_TYPES, ...masterDrainTypes(DRAIN_CAT.fixture, FIXTURE_TYPES, materialRows, 'laborHrs') }
+  const FRENCH_PIPE_T = { ...FRENCH_PIPE_TYPES, ...masterDrainTypes(DRAIN_CAT.french, FRENCH_PIPE_TYPES, materialRows, 'laborPerLF') }
 
   let trenchHrs = 0,
     pipeHrs = 0,
@@ -241,7 +242,8 @@ function calcDrainage(
     if (lf > 0 && rate) {
       const { cost } = drainMatCost(DRAIN_CAT.pipe, r, PIPE_T, materialRows, catDefaults, materialPrices)
       pipeMat += lf * cost
-      pipeHrs += lf * n(materialPrices[PIPE_LABOR_RATE_NAME[r.type]])
+      // Built-in per-type labor rate; catalog items carry their labor in calc_meta.laborPerLF.
+      pipeHrs += lf * (n(materialPrices[PIPE_LABOR_RATE_NAME[r.type]]) || n(rate.laborPerLF))
     }
   })
 
@@ -253,18 +255,19 @@ function calcDrainage(
     frenchHrs = 0
   ;(frenchRows || []).forEach(r => {
     const lf = n(r.lf)
-    const rate = FRENCH_PIPE_TYPES[r.type]
+    const rate = FRENCH_PIPE_T[r.type]
     if (lf > 0 && rate) {
       const { cost } = drainMatCost(
         DRAIN_CAT.french,
         r,
-        FRENCH_PIPE_TYPES,
+        FRENCH_PIPE_T,
         materialRows,
         catDefaults,
         materialPrices
       )
       frenchMat += lf * cost
-      frenchHrs += lf * n(materialPrices[FRENCH_PIPE_LABOR_RATE_NAME[r.type]])
+      // Built-in per-type labor rate; catalog items carry their labor in calc_meta.laborPerLF.
+      frenchHrs += lf * (n(materialPrices[FRENCH_PIPE_LABOR_RATE_NAME[r.type]]) || n(rate.laborPerLF))
     }
   })
   const totalFrenchLF = (frenchRows || []).reduce((s, r) => s + n(r.lf), 0)
@@ -305,7 +308,8 @@ function calcDrainage(
     if (qty > 0 && rate) {
       const { cost } = drainMatCost(DRAIN_CAT.fixture, r, FIX_T, materialRows, catDefaults, materialPrices)
       fixMat += qty * cost
-      fixHrs += qty * n(materialPrices[FIXTURE_LABOR_RATE_NAME[r.type]])
+      // Built-in per-type labor rate; catalog items carry their labor in calc_meta.laborHrs.
+      fixHrs += qty * (n(materialPrices[FIXTURE_LABOR_RATE_NAME[r.type]]) || n(rate.laborHrs))
       totalFixQty += qty
     }
   })
