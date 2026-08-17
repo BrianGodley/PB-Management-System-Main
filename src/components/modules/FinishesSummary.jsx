@@ -150,22 +150,22 @@ function computeWallRow(row, mp, materialRows) {
     subUnit = 0
   switch (row.type) {
     case 'Sand Stucco':
-      hrs = sf > 0 ? (sf / lab('sandStuccoLab')) * 8 : 0
+      hrs = sf > 0 ? sf * lab('sandStuccoLab') : 0
       mat = sf * price('sandStucco')
       subUnit = price('sandStucco')
       break
     case 'Smooth Stucco':
-      hrs = sf > 0 ? (sf / lab('smoothStuccoLab')) * 8 : 0
+      hrs = sf > 0 ? sf * lab('smoothStuccoLab') : 0
       mat = sf * price('smoothStucco')
       subUnit = price('smoothStucco')
       break
     case 'Ledgerstone':
-      hrs = sf > 0 ? (sf / lab('ledgerstoneLab')) * 8 : 0
+      hrs = sf > 0 ? sf * lab('ledgerstoneLab') : 0
       mat = sf > 0 ? sf * price('ledgerstone') * 1.1 + sf * lab('stoneScrews') : 0
       subUnit = price('ledgerstone') * 1.1 + lab('stoneScrews')
       break
     case 'Stacked Stone':
-      hrs = sf > 0 ? (sf / lab('stackedStoneLab')) * 8 : 0
+      hrs = sf > 0 ? sf * lab('stackedStoneLab') : 0
       mat = sf > 0 ? sf * price('stackedStone') * 1.1 + sf * lab('stoneScrews') : 0
       subUnit = price('stackedStone') * 1.1 + lab('stoneScrews')
       break

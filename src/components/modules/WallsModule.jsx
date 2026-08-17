@@ -390,12 +390,12 @@ function wallDemo(wall = {}, r) {
   // Dig rate depends on method (Hand vs Excavator); haul cost is the same either way.
   const footDigRate =
     (wall.demoFootMethod || 'Hand') === 'Excavator'
-      ? r('footingDigHaulExcavLab') || 25
-      : r('footingDigHaulLab') || 8
+      ? r('footingDigHaulExcavLab')
+      : r('footingDigHaulLab')
   const foot =
     footCF > 0
       ? {
-          hrs: footCF / footDigRate,
+          hrs: footCF * footDigRate, // rate is hours per Cu Ft
           tons: (footCF / 27) * r('footingSoilTonsPerCy'),
           dump: Math.ceil(footYards / footContCy) * r('footingSoilContainerPrice'),
         }
@@ -806,25 +806,25 @@ function computeWallFinishRow(row, mp, materialRows) {
     tons = 0
   switch (row.type) {
     case 'Sand Stucco': {
-      hrs = sf > 0 ? (sf / lab('sandStuccoLab')) * 8 : 0
+      hrs = sf > 0 ? sf * lab('sandStuccoLab') : 0
       mat = sf * rate
       subUnit = rate
       break
     }
     case 'Smooth Stucco': {
-      hrs = sf > 0 ? (sf / lab('smoothStuccoLab')) * 8 : 0
+      hrs = sf > 0 ? sf * lab('smoothStuccoLab') : 0
       mat = sf * rate
       subUnit = rate
       break
     }
     case 'Ledgerstone': {
-      hrs = sf > 0 ? (sf / lab('ledgerstoneLab')) * 8 : 0
+      hrs = sf > 0 ? sf * lab('ledgerstoneLab') : 0
       mat = sf > 0 ? sf * rate * lab('ledgerWaste') + (sf / lab('ledgerSetSfPerUnit')) * lab('ledgerSetUnitCost') : 0
       subUnit = rate * lab('ledgerWaste') + lab('ledgerSubExtraPerSf')
       break
     }
     case 'Stacked Stone': {
-      hrs = sf > 0 ? (sf / lab('stackedStoneLab')) * 8 : 0
+      hrs = sf > 0 ? sf * lab('stackedStoneLab') : 0
       mat = sf > 0 ? sf * rate * lab('stackedWaste') + (sf / lab('stackedSetSfPerUnit')) * lab('stackedSetUnitCost') : 0
       subUnit = rate * lab('stackedWaste') + lab('stackedSubExtraPerSf')
       break
@@ -955,7 +955,7 @@ function computeWpRow(row, mp, materialRows) {
       ? n(mp?.[WALL_RATES[labKey].db])
       : n(mp?.[WALL_RATES.wpLabor.db])
     mat = sf * pr
-    hrs = sf / wpRate
+    hrs = sf * wpRate // wpRate is hours per Sq Ft
     subUnit = pr
   }
   const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : subUnit
@@ -1215,7 +1215,7 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
   const wallVertLF = bars * (n(heightIn) / 12)
   const wallHorizLF = n(wall.wallHorizBars) * n(lf)
   const footingRebarLF = n(lf) * n(horizBars) * r('footingRebarWaste') // +10% for wraps (table-driven)
-  const rebarHrs = (wallVertLF + wallHorizLF + footingRebarLF) / r('rebarLab')
+  const rebarHrs = (wallVertLF + wallHorizLF + footingRebarLF) * r('rebarLab')
   const rebarMat =
     wallVertLF * rebarPrice(wall.wallRebarSize, r) +
     wallHorizLF * rebarPrice(wall.wallHorizRebarSize, r) +
@@ -1226,10 +1226,10 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
   // section — the footing fields here only drive install (rebar + pour) + material.
   const structBase =
     rebarHrs +
-    (footingCY > 0 ? footingCY / r(footingPump === 'Yes' ? 'footingPourPumpLab' : 'footingPourHandLab') : 0) +
-    (rawBlocks > 0 ? rawBlocks / r(installKey) : 0) +
-    (groutCF > 0 ? groutCF / groutRate : 0) +
-    n(lf) / r('setupCleanLab')
+    (footingCY > 0 ? footingCY * r(footingPump === 'Yes' ? 'footingPourPumpLab' : 'footingPourHandLab') : 0) +
+    (rawBlocks > 0 ? rawBlocks * r(installKey) : 0) +
+    (groutCF > 0 ? groutCF * groutRate : 0) +
+    n(lf) * r('setupCleanLab')
   const curveAdd = structBase * (n(pctCurved) / 100) * r('curveLab')
   const hrs = structBase + curveAdd
 
@@ -1310,9 +1310,9 @@ function calcOneBrick(wall, r, mp = {}, materialRows = []) {
   // Footing excavation moved to the Dig and Haul Footing Soil section — install
   // (rebar + pour) + material only here.
   const footingHrs =
-    (horizRebarLF > 0 ? horizRebarLF / r('rebarLab') : 0) +
+    (horizRebarLF > 0 ? horizRebarLF * r('rebarLab') : 0) +
     (footingCY > 0
-      ? footingCY / r((wall.footingPump ?? 'No') === 'Yes' ? 'footingPourPumpLab' : 'footingPourHandLab')
+      ? footingCY * r((wall.footingPump ?? 'No') === 'Yes' ? 'footingPourPumpLab' : 'footingPourHandLab')
       : 0)
   const footPrc = (wall.footingPump ?? 'No') === 'Yes' ? pm('concreteTruck') : pm('concreteHand')
   const footingMat = footingCY * footPrc + horizRebarLF * rebarPrice(wall.brickFootingRebarSize, r)
@@ -1367,7 +1367,7 @@ function calcOnePIP(wall, r, mp = {}, materialRows = []) {
   const footingRebarLF = n(lf) * n(horizBars) * r('footingRebarWaste') // +10% ONLY on footing (table-driven)
   const wallHorizLF = n(wall.pipWallHorizBars) * n(lf) // # horizontals × wall length, NO +10%
   const wallVertLF = n(wall.pipWallVertBars) * (n(heightIn) / 12) // # verticals × wall height, NO +10%
-  const rebarHrs = (footingRebarLF + wallHorizLF + wallVertLF) / r('rebarLab')
+  const rebarHrs = (footingRebarLF + wallHorizLF + wallVertLF) * r('rebarLab')
   const rebarMat =
     footingRebarLF * rebarPrice(wall.pipFootingRebarSize, r) +
     wallHorizLF * rebarPrice(wall.pipWallHorizSize, r) +
@@ -1376,7 +1376,7 @@ function calcOnePIP(wall, r, mp = {}, materialRows = []) {
   // Footing Soil section; rebar is billed separately above.
   const footingHrs =
     footingCY > 0
-      ? footingCY / r((wall.footingPump ?? 'Yes') === 'Yes' ? 'footingPourPumpLab' : 'footingPourHandLab')
+      ? footingCY * r((wall.footingPump ?? 'Yes') === 'Yes' ? 'footingPourPumpLab' : 'footingPourHandLab')
       : 0
   // Per-wall footing pump: 'Yes' = ready-mix truck (default, unchanged), 'No' =
   // hand mix. No separate pump-setup fee on PIP footings.
@@ -1527,7 +1527,7 @@ function calcWalls(
     // Footing excavation is priced in the Dig and Haul Footing Soil section —
     // install (rebar + pour) + material only here.
     const tFootingHrs =
-      (tHorizRebarLF > 0 ? tHorizRebarLF / r('rebarLab') : 0) +
+      (tHorizRebarLF > 0 ? tHorizRebarLF * r('rebarLab') : 0) +
       (tFootingCY > 0 ? tFootingCY / r(tFootPump ? 'footingPourPumpLab' : 'footingPourHandLab') : 0)
     const tFootConcPrc = tFootPump ? tpm('concreteTruck') : tpm('concreteHand')
     const tFootingMat = tFootingCY * tFootConcPrc + tHorizRebarLF * rebarPrice(wall.footingRebarSize, r)

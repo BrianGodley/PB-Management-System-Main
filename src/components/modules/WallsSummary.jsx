@@ -64,28 +64,28 @@ function computeWallFinishRow(row, mp, materialRows) {
   switch (row.type) {
     case 'Sand Stucco': {
       const rate = ovr(row.rateIn, 'sandStucco')
-      hrs = sf > 0 ? (sf / lab('sandStuccoLab')) * 8 : 0
+      hrs = sf > 0 ? sf * lab('sandStuccoLab') : 0
       mat = sf * rate
       subUnit = rate
       break
     }
     case 'Smooth Stucco': {
       const rate = ovr(row.rateIn, 'smoothStucco')
-      hrs = sf > 0 ? (sf / lab('smoothStuccoLab')) * 8 : 0
+      hrs = sf > 0 ? sf * lab('smoothStuccoLab') : 0
       mat = sf * rate
       subUnit = rate
       break
     }
     case 'Ledgerstone': {
       const rate = ovr(row.rateIn, 'ledgerstone')
-      hrs = sf > 0 ? (sf / lab('ledgerstoneLab')) * 8 : 0
+      hrs = sf > 0 ? sf * lab('ledgerstoneLab') : 0
       mat = sf > 0 ? sf * rate * 1.1 + (sf / 5) * 2 : 0
       subUnit = rate * 1.1 + 0.4
       break
     }
     case 'Stacked Stone': {
       const rate = ovr(row.rateIn, 'stackedStone')
-      hrs = sf > 0 ? (sf / lab('stackedStoneLab')) * 8 : 0
+      hrs = sf > 0 ? sf * lab('stackedStoneLab') : 0
       mat = sf > 0 ? sf * rate * 1.1 + (sf / 5) * 2 : 0
       subUnit = rate * 1.1 + 0.4
       break
