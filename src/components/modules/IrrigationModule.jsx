@@ -770,7 +770,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
       {/* Zones */}
       <div>
         <div className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-5 mb-2 flex items-center flex-wrap gap-x-2 gap-y-1">
-          <span>{subSectionTitle('Irrigation Zones', isSub)} —</span>
+          <span>{subSectionTitle('Irrigation Zones', isSub)}</span>
           <span className="inline-flex items-center gap-1">
             Hand: {calc.handRate} hrs/zone
           </span>
@@ -782,7 +782,6 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
         <table className="w-full text-xs">
           <TH
             cols={[
-              { label: 'Vendor', w: 'w-36' },
               { label: 'Zone Type' },
               { label: '# Zones', w: 'w-20' },
               { label: 'Install Mode', w: 'w-28' },
@@ -797,13 +796,6 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
               const z = zoneMeta(row.type)
               return (
                 <tr key={i}>
-                  <td className={td}>
-                    <Sel
-                      value={row.vendor || 'Standard'}
-                      onChange={e => zoneUpdate(i, 'vendor', e.target.value)}
-                      options={vendorOptions}
-                    />
-                  </td>
                   <td className={td}>
                     <div className="flex items-center gap-1">
                       <div className="flex-1">
