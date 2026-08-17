@@ -135,11 +135,11 @@ function calcLighting(
   const bistroRate = n(laborRates[BISTRO_LABOR_NAME])
   const xfRate = n(laborRates[TRANSFORMER_LABOR_NAME])
   const wireRate = n(laborRates[WIRE_LABOR_NAME])
-  const fixtureHrs = (item, qty) => {
-    const rate = isBistroItem(item) ? bistroRate : fixtureRate
-    return rate > 0 ? qty / rate : 0
-  }
-  const xfHrs = (item, qty) => (xfRate > 0 ? qty / xfRate : 0)
+  // Discrete items (fixtures, transformers) = hours per each → qty × rate.
+  // Bulk items (Bistro string light, wire) = Ln Ft per hour → qty ÷ rate.
+  const fixtureHrs = (item, qty) =>
+    isBistroItem(item) ? (bistroRate > 0 ? qty / bistroRate : 0) : qty * fixtureRate
+  const xfHrs = (item, qty) => qty * xfRate
   const wireHrs = (item, qty) => (wireRate > 0 ? qty / wireRate : 0)
 
   const fx = processSection(LIGHT_CAT.fixture, fixtureRows, materialRows, priceOf, fixtureHrs)
