@@ -473,13 +473,13 @@ function calcCmuStruct(s, mp = {}, materialRows = []) {
   const { footingCF, footingCY, totalRebarLF } = structFootingRebar(s)
   const groutCF = rawBlocks * GROUT_CF_PER_BLOCK * (n(s.pctGrouted) / 100)
   const groutCY = groutCF / 27
-  const digHrs = footingCF > 0 ? footingCF / p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
-  const rebarHrs = totalRebarLF > 0 ? totalRebarLF / p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
-  const setBlockHrs = rawBlocks > 0 ? rawBlocks / p(FP_RATES.blockLab.dbName, FP_RATES.blockLab.fallback) : 0
+  const digHrs = footingCF > 0 ? footingCF * p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
+  const rebarHrs = totalRebarLF > 0 ? totalRebarLF * p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
+  const setBlockHrs = rawBlocks > 0 ? rawBlocks * p(FP_RATES.blockLab.dbName, FP_RATES.blockLab.fallback) : 0
   const groutRate = s.useGroutPump === 'Yes'
     ? p(FP_RATES.pumpGroutLab.dbName, FP_RATES.pumpGroutLab.fallback)
     : p(FP_RATES.handGroutLab.dbName, FP_RATES.handGroutLab.fallback)
-  const groutHrs = groutCF > 0 ? groutCF / groutRate : 0
+  const groutHrs = groutCF > 0 ? groutCF * groutRate : 0
   const structuralBaseHrs = digHrs + rebarHrs + setBlockHrs + groutHrs
   const curveAddHrs = structuralBaseHrs * (n(s.pctCurved) / 100) * 0.25
   const picked = catalogRowById(materialRows, s.matType)
@@ -516,8 +516,8 @@ function calcPipStruct(s, mp = {}, materialRows = []) {
   const rebarMat = totalRebarLF * p('Rebar ' + (s.rebarSize || '#4'), FP_RATES.fpRebar.fallback)
   const footingMat = footingCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
   const mat = pourMat + formMat + rebarMat + footingMat
-  const digHrs = footingCF > 0 ? footingCF / p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
-  const rebarHrs = totalRebarLF > 0 ? totalRebarLF / p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
+  const digHrs = footingCF > 0 ? footingCF * p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
+  const rebarHrs = totalRebarLF > 0 ? totalRebarLF * p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
   const pourHrs = pourCY * p(FP_POUR_LAB.dbName, FP_POUR_LAB.fallback)
   const formHrs = formSF * p(FP_FORM_LAB.dbName, FP_FORM_LAB.fallback)
   const structuralBaseHrs = digHrs + rebarHrs + pourHrs + formHrs
@@ -545,9 +545,9 @@ function calcModularStruct(s, mp = {}, materialRows = []) {
   const rebarMat = totalRebarLF * p('Rebar ' + (s.rebarSize || '#4'), FP_RATES.fpRebar.fallback)
   const footingMat = footingCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
   const mat = blockMat + rebarMat + footingMat
-  const digHrs = footingCF > 0 ? footingCF / p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
-  const rebarHrs = totalRebarLF > 0 ? totalRebarLF / p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
-  const setBlockHrs = rawBlocks > 0 ? rawBlocks / p(FP_RATES.blockLab.dbName, FP_RATES.blockLab.fallback) : 0
+  const digHrs = footingCF > 0 ? footingCF * p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
+  const rebarHrs = totalRebarLF > 0 ? totalRebarLF * p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
+  const setBlockHrs = rawBlocks > 0 ? rawBlocks * p(FP_RATES.blockLab.dbName, FP_RATES.blockLab.fallback) : 0
   const structuralBaseHrs = digHrs + rebarHrs + setBlockHrs
   const curveAddHrs = structuralBaseHrs * (n(s.pctCurved) / 100) * 0.25
   const hrs = n(s.layoutHrs) + structuralBaseHrs + curveAddHrs
@@ -572,8 +572,8 @@ function calcBrickStruct(s, mp = {}, materialRows = []) {
   const rebarMat = totalRebarLF * p('Rebar ' + (s.rebarSize || '#4'), FP_RATES.fpRebar.fallback)
   const footingMat = footingCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
   const mat = brickMat + mortarMat + rebarMat + footingMat
-  const digHrs = footingCF > 0 ? footingCF / p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
-  const rebarHrs = totalRebarLF > 0 ? totalRebarLF / p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
+  const digHrs = footingCF > 0 ? footingCF * p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
+  const rebarHrs = totalRebarLF > 0 ? totalRebarLF * p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
   const brickHrs = faceSF * p(FP_BRICK_LAY.dbName, FP_BRICK_LAY.fallback)
   const structuralBaseHrs = digHrs + rebarHrs + brickHrs
   const curveAddHrs = structuralBaseHrs * (n(s.pctCurved) / 100) * 0.25
@@ -637,7 +637,7 @@ function calcFirePit(
     const labRate = meta.master
       ? meta.laborCoeff
       : p(FP_RATES[meta.labKey].dbName, FP_RATES[meta.labKey].fallback)
-    const hrs = meta.labMode === 'perDay' ? (labRate > 0 ? (sf / labRate) * 8 : 0) : sf * labRate
+    const hrs = sf * labRate // all finish labor is hours per Sq Ft now
     return { mat, hrs, unit }
   }
   const wallFinishCalc = (wallFinishRows || []).map(finishRowCalc)
@@ -1282,7 +1282,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
             name: FP_RATES[labKey].dbName,
             category: 'Fire Pit',
             mode: 'coefficient',
-            unitLabel: meta.labMode === 'perDay' ? 'SF/day' : 'hrs/SF',
+            unitLabel: 'hrs per Sq Ft',
             value: p(FP_RATES[labKey].dbName, FP_RATES[labKey].fallback),
           }
         }),

@@ -110,6 +110,12 @@ export default function DropdownSelect({
       ? options.filter(o => String(o.label).toLowerCase().includes(query.trim().toLowerCase()))
       : options
 
+  // Portal a fixed-positioned menu to <body> so it escapes clipping AND any
+  // transformed ancestor — a CSS transform makes position:fixed relative to that
+  // ancestor, which dropped the menu far below its trigger. Body-level = truly
+  // viewport-fixed at the measured rect.
+  const wrap = node => (portal && rect ? createPortal(node, document.body) : node)
+
   return (
     // The caller's className (width / flex-1 / the `input` visual style) lives on
     // the WRAPPER so the control grows to fill its flex row. The button is a
@@ -147,7 +153,7 @@ export default function DropdownSelect({
         </svg>
       </button>
 
-      {open && (
+      {open && wrap(
         <div
           ref={listRef}
           style={
