@@ -337,7 +337,7 @@ function calcUtilities(
       const cf = lf * (w / 12) * (d / 12)
       // min/cf read live from labor_rates['Utilities Trench/Hand Excavation'] — no fallback.
       const minsPerCF = n(materialPrices[TRENCH_LABOR_RATE_NAME[r.equipment]])
-      trenchHrs += (cf * minsPerCF) / 60
+      trenchHrs += cf * minsPerCF
     }
   })
 
@@ -1233,7 +1233,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                   d = n(row.depth)
                 const minsPerCF = n(materialPrices[TRENCH_LABOR_RATE_NAME[row.equipment]])
                 const cf = lf > 0 && w > 0 && d > 0 ? lf * (w / 12) * (d / 12) : 0
-                const hrs = cf > 0 ? (cf * minsPerCF) / 60 : 0
+                const hrs = cf > 0 ? cf * minsPerCF : 0
                 const laborName = TRENCH_LABOR_RATE_NAME[row.equipment]
                 return (
                   <tr key={i} className="border-b border-gray-100">

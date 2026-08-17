@@ -217,7 +217,7 @@ export default function FirePitSummary({ module }) {
       const labRate = meta.master
         ? meta.laborCoeff
         : mp(FP_RATES[meta.labKey].dbName, FP_RATES[meta.labKey].fallback)
-      const hrs = meta.labMode === 'perDay' ? (labRate > 0 ? (sf / labRate) * 8 : 0) : sf * labRate
+      const hrs = sf * labRate // all finish labor is hours per Sq Ft now
       return { label: r.type, sf, mat, hrs }
     })
     .filter(Boolean)
@@ -257,37 +257,13 @@ export default function FirePitSummary({ module }) {
     manSub += n(r.subCost)
   })
 
-  // Materials
-  const blockMat = totalBlocks * mp(FP_RATES.fpBlock.dbName, FP_RATES.fpBlock.fallback)
-  const rebarMat = totalRebarLF * mp('Rebar ' + (rebarSize || '#4'), FP_RATES.fpRebar.fallback)
-  const footingMat = footingCY * mp(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
-  const groutMat = groutCY * mp(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
-  const pumpSetupMat =
-    useGroutPump === 'Yes' && groutCF > 0
-      ? mp(FP_RATES.fpGroutPump.dbName, FP_RATES.fpGroutPump.fallback)
-      : 0
-
-  const baseHrs =
-    layoutHrsN +
-    structuralBaseHrs +
-    curveAddHrs +
-    capHrs +
-    finishHrs +
-    gasHrs +
-    manHrs
+  // Structure materials + hours come from the per-type STRUCT_CALC results above
+  // (single source of truth); the old CMU-only single-struct derivation is retired.
+  const baseHrs = structHrs + capHrs + finishHrs + gasHrs + manHrs
   const diffMod = 1 + n(difficulty) / 100
   const totalHrs = baseHrs * diffMod + n(hoursAdj)
   const manDays = totalHrs / 8
-  const totalMat =
-    blockMat +
-    rebarMat +
-    footingMat +
-    groutMat +
-    pumpSetupMat +
-    capMat +
-    finishMat +
-    gasMat +
-    manMat
+  const totalMat = structMat + capMat + finishMat + gasMat + manMat
   const laborCost = n(savedCalc.laborCost)
   const burden = n(savedCalc.burden)
   const gp = n(savedCalc.gp)
@@ -306,34 +282,34 @@ export default function FirePitSummary({ module }) {
 
   return (
     <div className="text-sm space-y-1">
-      {/* Structure */}
-      {n(wallLF) > 0 && (
+      {/* Structure — one block per structure type (CMU/PIP/Modular/Brick) */}
+      {structResults.length > 0 && (
         <>
           <SectionLabel title="Structure" />
-          <LineRow label="Wall Perimeter" value={`${n(wallLF)} Ln Ft × ${n(wallHeightIn)}" high`} />
-          <LineRow
-            label="Blocks"
-            value={`${totalBlocks.toFixed(0)} (${blocksPerCourse} × ${coursesCount} courses + waste)`}
-          />
-          <LineRow label="Footing" value={`${footingCY.toFixed(3)} Cu Yd`} />
-          <LineRow
-            label="Grout"
-            value={`${groutCY.toFixed(3)} Cu Yd (${pctGrouted}% filled)`}
-            sub={useGroutPump === 'Yes' ? 'Pump' : 'Hand mix'}
-          />
-          <LineRow label="Rebar" value={`${totalRebarLF.toFixed(0)} Ln Ft`} />
-          {curveAddHrs > 0 && (
-            <LineRow
-              label="Curve Add"
-              value={`${curveAddHrs.toFixed(2)} hrs`}
-              sub={`${pctCurved}% curved`}
-            />
-          )}
-          <LineRow
-            label="Structure Materials"
-            value={fmt(blockMat + rebarMat + footingMat + groutMat + pumpSetupMat)}
-            highlight
-          />
+          {structResults.map((r, i) => (
+            <div key={i}>
+              <LineRow
+                label={`${r.type} Wall`}
+                value={`${n(r.struct.wallLF)} Ln Ft × ${n(r.struct.wallHeightIn)}" high`}
+              />
+              {n(r.totalBlocks) > 0 && (
+                <LineRow label="Blocks" value={`${n(r.totalBlocks).toFixed(0)}`} />
+              )}
+              {n(r.footingCY) > 0 && (
+                <LineRow label="Footing" value={`${n(r.footingCY).toFixed(3)} Cu Yd`} />
+              )}
+              {n(r.groutCY) > 0 && (
+                <LineRow label="Grout" value={`${n(r.groutCY).toFixed(3)} Cu Yd`} />
+              )}
+              {n(r.totalRebarLF) > 0 && (
+                <LineRow label="Rebar" value={`${n(r.totalRebarLF).toFixed(0)} Ln Ft`} />
+              )}
+              {n(r.curveAddHrs) > 0 && (
+                <LineRow label="Curve Add" value={`${n(r.curveAddHrs).toFixed(2)} hrs`} />
+              )}
+            </div>
+          ))}
+          <LineRow label="Structure Materials" value={fmt(structMat)} highlight />
         </>
       )}
 

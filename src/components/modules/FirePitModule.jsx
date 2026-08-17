@@ -481,7 +481,7 @@ function calcCmuStruct(s, mp = {}, materialRows = []) {
     : p(FP_RATES.handGroutLab.dbName, FP_RATES.handGroutLab.fallback)
   const groutHrs = groutCF > 0 ? groutCF * groutRate : 0
   const structuralBaseHrs = digHrs + rebarHrs + setBlockHrs + groutHrs
-  const curveAddHrs = structuralBaseHrs * (n(s.pctCurved) / 100) * 0.25
+  const curveAddHrs = structuralBaseHrs * (n(s.pctCurved) / 100) * p('FP Curve Labor Factor')
   const picked = catalogRowById(materialRows, s.matType)
   const blockPrice = picked ? n(picked.unit_cost) : p(FP_RATES.fpBlock.dbName, FP_RATES.fpBlock.fallback)
   const blockMat = totalBlocks * blockPrice
@@ -521,7 +521,7 @@ function calcPipStruct(s, mp = {}, materialRows = []) {
   const pourHrs = pourCY * p(FP_POUR_LAB.dbName, FP_POUR_LAB.fallback)
   const formHrs = formSF * p(FP_FORM_LAB.dbName, FP_FORM_LAB.fallback)
   const structuralBaseHrs = digHrs + rebarHrs + pourHrs + formHrs
-  const curveAddHrs = structuralBaseHrs * (n(s.pctCurved) / 100) * 0.25
+  const curveAddHrs = structuralBaseHrs * (n(s.pctCurved) / 100) * p('FP Curve Labor Factor')
   const hrs = n(s.layoutHrs) + structuralBaseHrs + curveAddHrs
   return { mat, hrs, pourCY, formSF, footingCF, footingCY, totalRebarLF, curveAddHrs, pourMat, formMat, rebarMat, footingMat }
 }
@@ -549,7 +549,7 @@ function calcModularStruct(s, mp = {}, materialRows = []) {
   const rebarHrs = totalRebarLF > 0 ? totalRebarLF * p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
   const setBlockHrs = rawBlocks > 0 ? rawBlocks * p(FP_RATES.blockLab.dbName, FP_RATES.blockLab.fallback) : 0
   const structuralBaseHrs = digHrs + rebarHrs + setBlockHrs
-  const curveAddHrs = structuralBaseHrs * (n(s.pctCurved) / 100) * 0.25
+  const curveAddHrs = structuralBaseHrs * (n(s.pctCurved) / 100) * p('FP Curve Labor Factor')
   const hrs = n(s.layoutHrs) + structuralBaseHrs + curveAddHrs
   return { mat, hrs, blocksPerCourse, coursesCount, rawBlocks, totalBlocks, footingCF, footingCY, totalRebarLF, curveAddHrs, blockMat, rebarMat, footingMat }
 }
@@ -576,7 +576,7 @@ function calcBrickStruct(s, mp = {}, materialRows = []) {
   const rebarHrs = totalRebarLF > 0 ? totalRebarLF * p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
   const brickHrs = faceSF * p(FP_BRICK_LAY.dbName, FP_BRICK_LAY.fallback)
   const structuralBaseHrs = digHrs + rebarHrs + brickHrs
-  const curveAddHrs = structuralBaseHrs * (n(s.pctCurved) / 100) * 0.25
+  const curveAddHrs = structuralBaseHrs * (n(s.pctCurved) / 100) * p('FP Curve Labor Factor')
   const hrs = n(s.layoutHrs) + structuralBaseHrs + curveAddHrs
   return { mat, hrs, faceSF, bricks, footingCF, footingCY, totalRebarLF, curveAddHrs, brickMat, mortarMat, rebarMat, footingMat }
 }
@@ -668,8 +668,8 @@ function calcFirePit(
   // Gas Line = pipe labor + material PLUS trenching (6" wide × 24" deep per LF,
   // = 1.0 cf/LF at the Utilities trench excavation rate) — this replaces the old
   // separate Trench section. Vendor overrides only the material unit price.
-  const GAS_TRENCH_CF_PER_LF = (6 / 12) * (24 / 12) // = 1.0
-  const gasTrenchMinsPerCF = n(mp['Utilities Trench Excavation'])
+  const GAS_TRENCH_CF_PER_LF = n(mp['FP Gas Trench CF per LF'])
+  const gasTrenchHrsPerCF = n(mp['Utilities Trench Excavation']) // now hrs per Cu Ft
   let epHrs = 0
   let epMat = 0
   ;(epLineRows || []).forEach(r => {
@@ -679,7 +679,7 @@ function calcFirePit(
     const { matCost, laborVal } = resolveUtilRow(UTIL_CAT.line, r, LINE_TYPE_ARR, materialRows, mp)
     epMat += lf * matCost
     epHrs += lf * laborVal
-    epHrs += (lf * GAS_TRENCH_CF_PER_LF * gasTrenchMinsPerCF) / 60 // 6"×24" trenching
+    epHrs += lf * GAS_TRENCH_CF_PER_LF * gasTrenchHrsPerCF // trenching (hrs/CF × CF/LF × LF)
   })
   ;(epGasRows || []).forEach(r => {
     if (!r.type) return

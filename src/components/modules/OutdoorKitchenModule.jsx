@@ -62,6 +62,15 @@ const OK_RATES = {
   tileLab: { dbName: 'Tile - BBQ Labor Rate' }, // hrs/SF (layout+install combined)
   flagstoneLab: { dbName: 'Real Flagstone - BBQ Labor Rate' }, // hrs/SF (delivery+install+seal)
   realStoneLab: { dbName: 'Real Stone - BBQ Labor Rate' }, // hrs/SF (transport+install+seal)
+  // Material: polished-counter supply, $/SF (moved off a hardcoded $1/SF).
+  counterPolishMat: { dbName: 'BBQ Counter Polish Supply' },
+  // Tunable geometry / quantity coefficients (moved off hardcoded numbers, misc_rates).
+  fillBlockFactor: { dbName: 'BBQ Fill Block Factor' }, // was 80/75
+  counterFormLfPerSf: { dbName: 'BBQ Counter Form LF per SF' }, // was 2
+  sfPerBlock: { dbName: 'BBQ SF per Block' }, // was 0.888
+  rebarLfPerLf: { dbName: 'BBQ Rebar LF per LF' }, // was 4
+  counterThicknessFt: { dbName: 'BBQ Counter Thickness Ft' }, // was 0.33
+  gasTrenchCfPerLf: { dbName: 'BBQ Gas Trench CF per LF' }, // was (6/12)*(24/12)=1.0
 }
 
 const DEFAULTS = {
@@ -499,8 +508,8 @@ function calcOutdoorKitchen(
   // Utility Lines combine the line's install labor + material PLUS trenching for
   // a 6" wide × 24" deep trench (per LF) using the Utilities trench excavation
   // rate (min/cf). 6"×24" = 1.0 cf per LF.
-  const TRENCH_CF_PER_LF = (6 / 12) * (24 / 12) // = 1.0
-  const trenchMinsPerCF = n(mp[OK_TRENCH_RATE_NAME])
+  const TRENCH_CF_PER_LF = p(OK_RATES.gasTrenchCfPerLf.dbName)
+  const trenchHrsPerCF = n(mp[OK_TRENCH_RATE_NAME]) // Utilities Trench Excavation, now hrs/CF
   let epHrs = 0
   let epMat = 0
   ;(epLineRows || []).forEach(r => {
@@ -509,7 +518,7 @@ function calcOutdoorKitchen(
     const { matCost, laborVal } = resolveUtilRow(UTIL_CAT.line, r, LINE_TYPE_ARR, materialRows, mp)
     epMat += lf * matCost
     epHrs += lf * laborVal
-    epHrs += (lf * TRENCH_CF_PER_LF * trenchMinsPerCF) / 60 // trenching 6"×24"
+    epHrs += lf * TRENCH_CF_PER_LF * trenchHrsPerCF // trenching (hrs/CF × CF/LF × LF)
   })
   ;[
     [epGasRows, UTIL_CAT.gas, GAS_TYPE_ARR],
@@ -551,7 +560,7 @@ function calcOutdoorKitchen(
     const labRate = meta.master
       ? meta.laborCoeff
       : p(OK_RATES[meta.labKey].dbName, OK_RATES[meta.labKey].fallback)
-    const hrs = meta.labMode === 'perDay' ? (labRate > 0 ? (sf / labRate) * 8 : 0) : sf * labRate
+    const hrs = sf * labRate // all finish labor is hours per Sq Ft now
     return { mat, hrs, unit }
   }
   const wallFinishCalc = (wallFinishRows || []).map(finishRowCalc)
@@ -564,58 +573,58 @@ function calcOutdoorKitchen(
   const totalWallSF = bbqWallSF + backWallSF
   const totalLF = n(bbqLengthLF) + n(backLengthLF)
 
-  const blockRaw = totalLF > 0 ? totalWallSF / 0.888 : 0 // blocks
+  const blockRaw = totalLF > 0 ? totalWallSF / p(OK_RATES.sfPerBlock.dbName) : 0 // blocks (SF ÷ SF/block)
   const blockWaste = blockRaw * 1.1 // +10% waste (used for labor)
   const blockOrdered = blockWaste * 1.1 // +10% again for ordering material
 
   const footingAreaSF = (n(footingWidthIn) * n(footingDepthIn)) / 144 // SF cross-section
   const footingCY = (totalLF * footingAreaSF) / 27
-  const rebarLF = totalLF * 4
+  const rebarLF = totalLF * p(OK_RATES.rebarLfPerLf.dbName)
   // Grout fill = block count × cu-ft/block ÷ 27 (standardized CMU model, 8x8x16
   // = 0.5 cu ft), priced at the concrete rate below.
   const fillCY = (blockRaw * groutCuFtPerBlock(8, 8)) / 27
-  const counterCY = (n(counterSF) * 0.33) / 27
+  const counterCY = (n(counterSF) * p(OK_RATES.counterThicknessFt.dbName)) / 27
 
   // ── BBQ Install Labor Hours (all rates from DB) ──────────────────────────────
   const layoutLab = n(layoutHrs)
   const excavateHrs =
     totalLF > 0
-      ? (totalLF * footingAreaSF) / p(OK_RATES.excavateLab.dbName, OK_RATES.excavateLab.fallback)
+      ? totalLF * footingAreaSF * p(OK_RATES.excavateLab.dbName, OK_RATES.excavateLab.fallback)
       : 0
-  // Rates below are per-HOUR (LF/hr, blk/hr, SF/hr) — hours = qty / rate.
+  // All labor rates below are hours-per-unit (hrs/LF, hrs/blk, hrs/SF) — hours = qty × rate.
   const rebarHrs =
-    rebarLF > 0 ? rebarLF / p(OK_RATES.rebarLab.dbName, OK_RATES.rebarLab.fallback) : 0
+    rebarLF > 0 ? rebarLF * p(OK_RATES.rebarLab.dbName, OK_RATES.rebarLab.fallback) : 0
   const pourFootingHrs =
     footingCY > 0
       ? footingCY * p(OK_RATES.pourFootingLab.dbName, OK_RATES.pourFootingLab.fallback)
       : 0
   const installBlockHrs =
     blockWaste > 0
-      ? blockWaste / p(OK_RATES.installBlockLab.dbName, OK_RATES.installBlockLab.fallback)
+      ? blockWaste * p(OK_RATES.installBlockLab.dbName, OK_RATES.installBlockLab.fallback)
       : 0
   const fillBlockHrs =
     blockRaw > 0
-      ? ((80 / 75) * blockRaw) / p(OK_RATES.fillBlockLab.dbName, OK_RATES.fillBlockLab.fallback)
+      ? p(OK_RATES.fillBlockFactor.dbName) * blockRaw * p(OK_RATES.fillBlockLab.dbName, OK_RATES.fillBlockLab.fallback)
       : 0
   const counterFormHrs =
     n(counterSF) > 0
-      ? (n(counterSF) * 2) / p(OK_RATES.counterFormLab.dbName, OK_RATES.counterFormLab.fallback)
+      ? n(counterSF) * p(OK_RATES.counterFormLfPerSf.dbName) * p(OK_RATES.counterFormLab.dbName, OK_RATES.counterFormLab.fallback)
       : 0
   const counterPourHrs =
     n(counterSF) > 0
-      ? n(counterSF) / p(OK_RATES.counterPourLab.dbName, OK_RATES.counterPourLab.fallback)
+      ? n(counterSF) * p(OK_RATES.counterPourLab.dbName, OK_RATES.counterPourLab.fallback)
       : 0
   const counterBroomHrs =
     counterFinish === 'Broom Finish'
-      ? n(counterSF) / p(OK_RATES.counterBroomLab.dbName, OK_RATES.counterBroomLab.fallback)
+      ? n(counterSF) * p(OK_RATES.counterBroomLab.dbName, OK_RATES.counterBroomLab.fallback)
       : 0
   const counterPolishHrs =
     counterFinish === 'Polished Finish'
-      ? n(counterSF) / p(OK_RATES.counterPolishLab.dbName, OK_RATES.counterPolishLab.fallback)
+      ? n(counterSF) * p(OK_RATES.counterPolishLab.dbName, OK_RATES.counterPolishLab.fallback)
       : 0
   const counterTrowelHrs =
     counterFinish === 'Trowel Finish'
-      ? n(counterSF) / p(OK_RATES.counterTrowelLab.dbName, OK_RATES.counterTrowelLab.fallback)
+      ? n(counterSF) * p(OK_RATES.counterTrowelLab.dbName, OK_RATES.counterTrowelLab.fallback)
       : 0
   // Equipment table — per-line labor (hours entered directly, replacing the old
   // single Layout Hours field) + material from the master rate, zeroed when the
@@ -649,16 +658,11 @@ function calcOutdoorKitchen(
     sinkRowsHrs += q * hrsEa
     if (!r.clientProvided) sinkRowsMat += q * unit
   })
-  const installAppHrs =
-    n(applianceCount) > 0
-      ? (n(applianceCount) / p(OK_RATES.applianceLab.dbName, OK_RATES.applianceLab.fallback)) * 8
-      : 0
+  // Legacy per-day appliance path retired — per-row Appliance Install Hrs (equipHrs) is canonical.
+  const installAppHrs = 0
   const gficHrs = n(gficCount) * p(OK_RATES.gficLab.dbName, OK_RATES.gficLab.fallback)
   const sinkHrs = sinkYN === 'Yes' ? p(OK_RATES.sinkLab.dbName, OK_RATES.sinkLab.fallback) : 0
-  const gasHrs =
-    n(gasTrenchLF) > 0
-      ? (n(gasTrenchLF) / p(OK_RATES.gasTrenchLab.dbName, OK_RATES.gasTrenchLab.fallback)) * 8
-      : 0
+  const gasHrs = n(gasTrenchLF) * p(OK_RATES.gasTrenchLab.dbName, OK_RATES.gasTrenchLab.fallback) // hrs per Ln Ft
 
   // ── Material Costs ──────────────────────────────────────────────────────────
   const blockMat = blockOrdered * p(OK_RATES.bbqBlock.dbName, OK_RATES.bbqBlock.fallback)
@@ -666,7 +670,10 @@ function calcOutdoorKitchen(
   const footingMat = footingCY * p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)
   const fillMat = fillCY * p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)
   const counterConcMat = counterCY * p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)
-  const counterPolishMat = counterFinish === 'Polished Finish' ? n(counterSF) : 0 // $1/SF supply
+  const counterPolishMat =
+    counterFinish === 'Polished Finish'
+      ? n(counterSF) * p(OK_RATES.counterPolishMat.dbName, OK_RATES.counterPolishMat.fallback)
+      : 0
   const applianceMat =
     n(applianceCount) * p(OK_RATES.applianceHardware.dbName, OK_RATES.applianceHardware.fallback)
   const gficMat = n(gficCount) * p(OK_RATES.gficOutlet.dbName, OK_RATES.gficOutlet.fallback)
@@ -1171,7 +1178,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
             name: OK_RATES[meta.labKey].dbName,
             category: 'Outdoor Kitchen',
             mode: 'coefficient',
-            unitLabel: meta.labMode === 'perDay' ? 'SF/day' : 'hrs/SF',
+            unitLabel: 'hrs per Sq Ft',
             value: p(OK_RATES[meta.labKey].dbName, OK_RATES[meta.labKey].fallback),
           }
         }),

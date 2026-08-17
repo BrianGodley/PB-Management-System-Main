@@ -552,7 +552,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   // CY/hr rate read live from labor_rates['Excavation - ...'] — no fallback.
   const excavLaborName = EXCAVATION_LABOR_NAME[excavation.equipment]
   const equipRate = n(excavLaborName && laborRates[excavLaborName])
-  const excavHrs = !isSubExcav && equipRate > 0 ? totalExcavCY / equipRate : 0
+  const excavHrs = !isSubExcav ? totalExcavCY * equipRate : 0 // rate is hrs per Cu Yd
   // Sub cost: auto-fill from the chosen sub's stored rate (per-CY rates are
   // multiplied by dug volume; flat/lump rates used as-is), overridable by a
   // manually entered subCost on this estimate.
@@ -1877,7 +1877,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         )}
         {calc.excavHrs > 0 && (
           <p className="text-xs text-gray-500 mt-2 px-1">
-            {calc.equipRate || '—'} Cu Yd/hr →{' '}
+            {calc.equipRate || '—'} hrs per Cu Yd →{' '}
             <strong>{calc.excavHrs.toFixed(1)} hrs</strong>
           </p>
         )}
