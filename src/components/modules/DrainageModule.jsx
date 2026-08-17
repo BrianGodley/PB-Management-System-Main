@@ -88,8 +88,9 @@ const FIXTURE_LABOR_RATE_NAME = {
 // (ADD_ITEM_LABOR_RATE_NAME) and material cost from materialPrices[dbName].
 const ADD_ITEM_RATES = {
   sumpPump: { label: 'Sump Pump', dbName: 'Sump Pump' },
-  curbCore: { label: 'Curb Core *', dbName: 'Curb Core' },
-  hydrocut: { label: 'Hydrocut Under Hardscape *', dbName: 'Hydrocut Under Hardscape' },
+  // Curb Core / Hydrocut are pure labor now (2 hrs each) — no material fee.
+  curbCore: { label: 'Curb Core', dbName: 'Curb Core', laborOnly: true },
+  hydrocut: { label: 'Hydrocut Under Hardscape', dbName: 'Hydrocut Under Hardscape', laborOnly: true },
 }
 
 // Labor-coefficient lookup for Additional Items — matches names seeded in
@@ -315,7 +316,7 @@ function calcDrainage(
     const qty = n(additionalItems[`${key}Qty`])
     if (qty > 0) {
       addHrs += qty * n(materialPrices[ADD_ITEM_LABOR_RATE_NAME[key]])
-      addMat += qty * n(materialPrices[rate.dbName])
+      if (!rate.laborOnly) addMat += qty * n(materialPrices[rate.dbName])
     }
   })
 
@@ -1664,7 +1665,11 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                     </td>
                     <td className="py-1.5 text-right text-gray-600 text-xs">
                       <span className="inline-flex items-center justify-end">
-                        {qty > 0 ? `$${(qty * matCost).toLocaleString()}` : `$${matCost} / ea`}
+                        {rate.laborOnly
+                          ? '—'
+                          : qty > 0
+                            ? `$${(qty * matCost).toLocaleString()}`
+                            : `$${matCost} / ea`}
                       </span>
                     </td>
                   </tr>

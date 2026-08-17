@@ -145,15 +145,18 @@ const TRENCH_LABOR_RATE_NAME = {
 const ADD_ITEM_RATES = {
   // In-house electrical: quantity × install hours + material (NOT a sub cost).
   // Identity only — material $ + labor hrs read live from the rate tables.
+  // Curb Core / Hydrocut are pure labor now (2 hrs each) — no material fee.
   curbCore: {
     dbName: 'Curb Core',
-    label: 'Curb Core *',
+    label: 'Curb Core',
     laborDbName: 'Curb Core - Labor Rate',
+    laborOnly: true,
   },
   hydrocut: {
     dbName: 'Hydrocut Under Hardscape',
-    label: 'Hydrocut Under Hardscape *',
+    label: 'Hydrocut Under Hardscape',
     laborDbName: 'Hydrocut Under Hardscape - Labor Rate',
+    laborOnly: true,
   },
 }
 
@@ -426,7 +429,7 @@ function calcUtilities(
   Object.entries(ADD_ITEM_RATES).forEach(([key, rate]) => {
     const qty = n(additionalItems[`${key}Qty`])
     if (qty > 0) {
-      const matCost = n(materialPrices[rate.dbName])
+      const matCost = rate.laborOnly ? 0 : n(materialPrices[rate.dbName])
       const laborHrs = n(materialPrices[rate.laborDbName])
       addHrs += qty * laborHrs
       addMat += qty * matCost
@@ -857,7 +860,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   Object.entries(ADD_ITEM_RATES).forEach(([key, rate]) => {
     const qty = n(subAdditionalItems[`${key}Qty`])
     if (qty > 0) {
-      const matCost = n(materialPrices[rate.dbName])
+      const matCost = rate.laborOnly ? 0 : n(materialPrices[rate.dbName])
       const laborHrs = n(materialPrices[rate.laborDbName])
       subSideCost += qty * matCost + qty * laborHrs * laborRatePerHour
     }
@@ -1109,7 +1112,9 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
         ...Object.values(ADD_ITEM_RATES).map(rate =>
           laborRow(rate.laborDbName, 'hr/ea', materialPrices[rate.laborDbName])
         ),
-        ...Object.values(ADD_ITEM_RATES).flatMap(rate => matRows(rate.dbName, 'ea', 0)),
+        ...Object.values(ADD_ITEM_RATES)
+          .filter(rate => !rate.laborOnly)
+          .flatMap(rate => matRows(rate.dbName, 'ea', 0)),
       ],
     },
     {
@@ -1338,7 +1343,13 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                   }
                 />
                 <span className="text-xs text-gray-400 w-20 text-right">
-                  {qty > 0 ? `$${(qty * matCost).toLocaleString()} mat` : '—'}
+                  {rate.laborOnly
+                    ? qty > 0
+                      ? `${(qty * laborHrs).toFixed(1)} hrs`
+                      : `${laborHrs} hr/ea`
+                    : qty > 0
+                      ? `$${(qty * matCost).toLocaleString()} mat`
+                      : '—'}
                 </span>
               </div>
             )
