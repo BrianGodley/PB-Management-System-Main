@@ -862,7 +862,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
       {/* Timers */}
       <div>
         <div className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-5 mb-2 flex items-center gap-2">
-          <span>{subSectionTitle('Controllers / Timers', isSub)} — {calc.timerHrs} hrs install each</span>
+          <span>{subSectionTitle('Controllers', isSub)}</span>
         </div>
         <table className="w-full text-xs">
           <TH
