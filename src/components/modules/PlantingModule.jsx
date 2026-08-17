@@ -15,9 +15,9 @@ import { resolveMaterialPrice, catalogOptions, fetchModuleCatalog, fetchStandard
 // Material prices  → material_rates  (category = 'Planting')  keyed by name
 // Labor rates      → labor_rates     (category = 'Planting')  keyed by name
 //   Plant types:   rate = plants per man-day
-//   Till - Soil Move Rate:           rate = CY/day
-//   Till - Tilling Rate:             rate = sqft/day
-//   Till - Amend Rate:               rate = sqft/day
+//   Till - Soil Move Rate:           rate = CY/hour
+//   Till - Tilling Rate:             rate = sqft/hour
+//   Till - Amend Rate:               rate = sqft/hour
 //   Tree Stakes - Install Rate:      rate = stakes/day
 //   Root Barrier - Install Rate:     rate = min/LF
 //   Gopher Basket - Install Rate:    rate = min/basket
@@ -95,56 +95,56 @@ const ADDON_META = {
     labKey: 'Tree Stakes - Install Rate',
     mode: 'perDay',
     unit: 'ea',
-    labUnit: 'stakes per hr',
+    labUnit: 'Each per hour',
   },
   'Root Barrier 12"': {
     matKey: 'Root Barrier 12in',
     labKey: 'Root Barrier - Install Rate',
-    mode: 'perMin',
+    mode: 'perDay',
     unit: 'LF',
-    labUnit: 'min per Ln Ft',
+    labUnit: 'Ln Ft per hour',
   },
   'Root Barrier 24"': {
     matKey: 'Root Barrier 24in',
     labKey: 'Root Barrier - Install Rate',
-    mode: 'perMin',
+    mode: 'perDay',
     unit: 'LF',
-    labUnit: 'min per Ln Ft',
+    labUnit: 'Ln Ft per hour',
   },
   'Gopher Basket 1 gal': {
     matKey: 'Gopher Basket 1 Gal',
     labKey: 'Gopher Basket - Install Rate',
-    mode: 'perMin',
+    mode: 'perDay',
     unit: 'ea',
-    labUnit: 'min per Each',
+    labUnit: 'Each per hour',
   },
   'Gopher Basket 5 gal': {
     matKey: 'Gopher Basket 5 Gal',
     labKey: 'Gopher Basket - Install Rate',
-    mode: 'perMin',
+    mode: 'perDay',
     unit: 'ea',
-    labUnit: 'min per Each',
+    labUnit: 'Each per hour',
   },
   'Gopher Basket 15 gal': {
     matKey: 'Gopher Basket 15 Gal',
     labKey: 'Gopher Basket - Install Rate',
-    mode: 'perMin',
+    mode: 'perDay',
     unit: 'ea',
-    labUnit: 'min per Each',
+    labUnit: 'Each per hour',
   },
   'Mesh Flat': {
     matKey: 'Mesh Flat',
     labKey: 'Mesh Flat - Install Rate',
-    mode: 'perMin',
+    mode: 'perDay',
     unit: 'SF',
-    labUnit: 'min per Sq Ft',
+    labUnit: 'Sq Ft per hour',
   },
   'Jute Fabric': {
     matKey: 'Jute Fabric',
     labKey: 'Jute Fabric - Install Rate',
-    mode: 'perMin',
+    mode: 'perDay',
     unit: 'SF',
-    labUnit: 'min per Sq Ft',
+    labUnit: 'Sq Ft per hour',
   },
 }
 const ADDON_TYPES = Object.keys(ADDON_META)
@@ -295,11 +295,12 @@ function calcPlanting(
   const soilMoveRate = lr(laborRates, 'Till - Soil Move Rate')
   const tillingRate = lr(laborRates, 'Till - Tilling Rate')
   const amendRate = lr(laborRates, 'Till - Amend Rate')
-  const tillManDays =
+  // Till rates are now per-HOUR productivity (CY/hr, SF/hr), so hours come out
+  // directly — no man-days → ×8 step.
+  const tillHrs =
     sqft > 0 && soilMoveRate > 0 && tillingRate > 0 && amendRate > 0
       ? soilCY / soilMoveRate + sqft / tillingRate + sqft / amendRate
       : 0
-  const tillHrs = tillManDays * 8
 
   // Small plants
   const smalls = (smallPlantRows || []).map(r =>
