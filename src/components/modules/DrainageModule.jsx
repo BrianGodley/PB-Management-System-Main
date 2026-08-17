@@ -238,12 +238,14 @@ function calcDrainage(
 
   pipeRows.forEach(r => {
     const lf = n(r.lf)
-    const rate = PIPE_T[r.type]
-    if (lf > 0 && rate) {
+    // Gate on the selection itself (not membership in the built-in map) so a
+    // vendor-only catalog item still prices through drainMatCost.
+    if (lf > 0 && r.type) {
+      const meta = PIPE_T[r.type] || {}
       const { cost } = drainMatCost(DRAIN_CAT.pipe, r, PIPE_T, materialRows, catDefaults, materialPrices)
       pipeMat += lf * cost
       // Built-in per-type labor rate; catalog items carry their labor in calc_meta.laborPerLF.
-      pipeHrs += lf * (n(materialPrices[PIPE_LABOR_RATE_NAME[r.type]]) || n(rate.laborPerLF))
+      pipeHrs += lf * (n(materialPrices[PIPE_LABOR_RATE_NAME[r.type]]) || n(meta.laborPerLF))
     }
   })
 
@@ -255,8 +257,8 @@ function calcDrainage(
     frenchHrs = 0
   ;(frenchRows || []).forEach(r => {
     const lf = n(r.lf)
-    const rate = FRENCH_PIPE_T[r.type]
-    if (lf > 0 && rate) {
+    if (lf > 0 && r.type) {
+      const meta = FRENCH_PIPE_T[r.type] || {}
       const { cost } = drainMatCost(
         DRAIN_CAT.french,
         r,
@@ -267,7 +269,7 @@ function calcDrainage(
       )
       frenchMat += lf * cost
       // Built-in per-type labor rate; catalog items carry their labor in calc_meta.laborPerLF.
-      frenchHrs += lf * (n(materialPrices[FRENCH_PIPE_LABOR_RATE_NAME[r.type]]) || n(rate.laborPerLF))
+      frenchHrs += lf * (n(materialPrices[FRENCH_PIPE_LABOR_RATE_NAME[r.type]]) || n(meta.laborPerLF))
     }
   })
   const totalFrenchLF = (frenchRows || []).reduce((s, r) => s + n(r.lf), 0)
@@ -304,12 +306,12 @@ function calcDrainage(
   let totalFixQty = 0
   fixtureRows.forEach(r => {
     const qty = n(r.qty)
-    const rate = FIX_T[r.type]
-    if (qty > 0 && rate) {
+    if (qty > 0 && r.type) {
+      const meta = FIX_T[r.type] || {}
       const { cost } = drainMatCost(DRAIN_CAT.fixture, r, FIX_T, materialRows, catDefaults, materialPrices)
       fixMat += qty * cost
       // Built-in per-type labor rate; catalog items carry their labor in calc_meta.laborHrs.
-      fixHrs += qty * (n(materialPrices[FIXTURE_LABOR_RATE_NAME[r.type]]) || n(rate.laborHrs))
+      fixHrs += qty * (n(materialPrices[FIXTURE_LABOR_RATE_NAME[r.type]]) || n(meta.laborHrs))
       totalFixQty += qty
     }
   })
@@ -638,6 +640,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   )
   const PIPE_T = { ...PIPE_TYPES, ...masterDrainTypes(DRAIN_CAT.pipe, PIPE_TYPES, materialRows, 'laborPerLF') }
   const FIX_T = { ...FIXTURE_TYPES, ...masterDrainTypes(DRAIN_CAT.fixture, FIXTURE_TYPES, materialRows, 'laborHrs') }
+  const FRENCH_PIPE_T = { ...FRENCH_PIPE_TYPES, ...masterDrainTypes(DRAIN_CAT.french, FRENCH_PIPE_TYPES, materialRows, 'laborPerLF') }
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
@@ -1403,11 +1406,11 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
             </thead>
             <tbody>
               {frenchRows.map((row, i) => {
-                const rate = FRENCH_PIPE_TYPES[row.type]
+                const rate = FRENCH_PIPE_T[row.type]
                 const { cost } = drainMatCost(
                   DRAIN_CAT.french,
                   row,
-                  FRENCH_PIPE_TYPES,
+                  FRENCH_PIPE_T,
                   materialRows,
                   catDefaults,
                   materialPrices
