@@ -295,7 +295,7 @@ function wallDrain(wall = {}, r, lrph) {
         ? r('drainGravel24Lab')
         : 0
   const mat = dLf * pipeCost + dLf * (fabMat + grvMat)
-  const hrs = dLf * pipeLab + ((fabLab + grvLab) * dLf) / (lrph || 35) // $/ft labor → hours so GPMD applies
+  const hrs = dLf * pipeLab + (fabLab + grvLab) * dLf // fabric/gravel labor now hrs per Ln Ft
   return { hrs, mat }
 }
 
