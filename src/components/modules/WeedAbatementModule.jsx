@@ -35,8 +35,8 @@ const n = v => parseFloat(v) || 0
 // fallbacks: a missing DB row contributes 0.
 const WEED_RATE_NAMES = {
   travelHrsPerVisit: 'Weed Abatement - Travel hr/visit', // exempt: flat hrs/visit
-  flatHrsPer1k: 'Weed Abatement - Flat', // Sq Ft per hour
-  hillHrsPer1k: 'Weed Abatement - Hillside', // Sq Ft per hour
+  flatHrsPer1k: 'Weed Abatement - Flat', // hrs per Sq Ft
+  hillHrsPer1k: 'Weed Abatement - Hillside', // hrs per Sq Ft
   materialPer1k: 'Weed Abatement - Material $/1k SF',
 }
 
@@ -72,8 +72,8 @@ function calcWeed(
   // state.rates (the DB values). A missing row contributes 0 — no fallback.
   const rt = state.rates || {}
   const travelPerVisit = n(rt.travelHrsPerVisit)
-  const flatRate = n(rt.flatHrsPer1k) // now Sq Ft per hour
-  const hillRate = n(rt.hillHrsPer1k) // now Sq Ft per hour
+  const flatRate = n(rt.flatHrsPer1k) // hrs per Sq Ft
+  const hillRate = n(rt.hillHrsPer1k) // hrs per Sq Ft
   const materialPer1k = n(rt.materialPer1k)
 
   if (isSub) {
@@ -95,9 +95,9 @@ function calcWeed(
   }
 
   const travelHrs = travelPerVisit * visits
-  // Flat/Hillside rates are now Sq Ft per hour: hrs = area / rate × visits.
-  const flatHrs = flatRate > 0 ? (flatSF / flatRate) * visits : 0
-  const hillHrs = hillRate > 0 ? (hillSF / hillRate) * visits : 0
+  // Flat/Hillside rates are hours per Sq Ft: hrs = area × rate × visits.
+  const flatHrs = flatSF * flatRate * visits
+  const hillHrs = hillSF * hillRate * visits
   const laborHrs = flatHrs + hillHrs
   const totalHrs = travelHrs + laborHrs
   const manDays = totalHrs / 8
@@ -372,7 +372,7 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
             <input type="number" value={flatSF} onChange={e => setField('flatSF')(e.target.value)} placeholder="0" className={inp} />
             {!isSub && (
               <p className="text-[11px] text-gray-400 mt-1">
-                {effRate('flatHrsPer1k')} Sq Ft / hr
+                {effRate('flatHrsPer1k')} hrs per Sq Ft
               </p>
             )}
           </div>
@@ -383,7 +383,7 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
             <input type="number" value={hillSF} onChange={e => setField('hillSF')(e.target.value)} placeholder="0" className={inp} />
             {!isSub && (
               <p className="text-[11px] text-gray-400 mt-1">
-                {effRate('hillHrsPer1k')} Sq Ft / hr
+                {effRate('hillHrsPer1k')} hrs per Sq Ft
               </p>
             )}
           </div>

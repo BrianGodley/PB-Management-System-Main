@@ -129,18 +129,16 @@ function calcLighting(
     state
   const isSub = state.subType === 'Subcontractor'
 
-  // Install labor per section, read from labor_rates (Each/hr; Bistro & Wire per
-  // Ln Ft). hrs = qty / rate. A missing/0 rate contributes 0 hours.
+  // Install labor per section, read from labor_rates. Every rate is hours-per-unit
+  // (fixtures/transformers = hrs per each; Bistro/wire = hrs per Ln Ft), so the calc
+  // is uniformly hrs = qty × rate. A missing/0 rate contributes 0 hours.
   const fixtureRate = n(laborRates[FIXTURE_LABOR_NAME])
   const bistroRate = n(laborRates[BISTRO_LABOR_NAME])
   const xfRate = n(laborRates[TRANSFORMER_LABOR_NAME])
   const wireRate = n(laborRates[WIRE_LABOR_NAME])
-  // Discrete items (fixtures, transformers) = hours per each → qty × rate.
-  // Bulk items (Bistro string light, wire) = Ln Ft per hour → qty ÷ rate.
-  const fixtureHrs = (item, qty) =>
-    isBistroItem(item) ? (bistroRate > 0 ? qty / bistroRate : 0) : qty * fixtureRate
+  const fixtureHrs = (item, qty) => (isBistroItem(item) ? qty * bistroRate : qty * fixtureRate)
   const xfHrs = (item, qty) => qty * xfRate
-  const wireHrs = (item, qty) => (wireRate > 0 ? qty / wireRate : 0)
+  const wireHrs = (item, qty) => qty * wireRate
 
   const fx = processSection(LIGHT_CAT.fixture, fixtureRows, materialRows, priceOf, fixtureHrs)
   const xf = processSection(LIGHT_CAT.transformer, transformerRows, materialRows, priceOf, xfHrs)
