@@ -35,7 +35,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { resolveMaterialPrice, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
-import { zoneMeta, ZONE_OPTIONS, makeBomPrice, zoneMatUnit, computeZoneRow } from '../../lib/irrigationZones'
+import { ZONE_TYPES, zoneMeta, ZONE_OPTIONS, makeBomPrice, zoneMatUnit, computeZoneRow } from '../../lib/irrigationZones'
 
 const IRRIGATION_CATEGORY = 'Irrigation'
 
