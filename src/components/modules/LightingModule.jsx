@@ -44,6 +44,15 @@ const LIGHT_CAT = { fixture: 'Light Fixture', transformer: 'Transformer', wire: 
 // missing row means no markup (0).
 const MATERIAL_MARKUP_NAME = 'Lighting - Material Markup'
 
+// Install labor now lives in labor_rates (per section, Each per hour) — NOT on the
+// product (labor_hrs_ea is no longer read for labor). Bistro is a string light, so
+// it's priced per linear foot.
+const FIXTURE_LABOR_NAME = 'Lighting - Fixture Labor'
+const TRANSFORMER_LABOR_NAME = 'Lighting - Transformer Labor'
+const BISTRO_LABOR_NAME = 'Lighting - Bistro Labor'
+const WIRE_LABOR_NAME = 'Lighting - Wire Labor'
+const isBistroItem = it => /bistro/i.test(it?.name || it?.description || '')
+
 // Company/estimate financial settings (labor rate, burden %, GPMD, commission,
 // sub GP markup) are sourced live from company_settings — no hardcoded defaults.
 
@@ -76,7 +85,7 @@ function defaultSubEach(item) {
 // priceOf(item) resolves the item's current MATERIAL unit cost — from the price
 // ledger when available, else the row's own unit_cost. Defaults to unit_cost so
 // the calc still works when no ledger is supplied.
-function processSection(subcat, rows, materialRows, priceOf = item => n(item.unit_cost)) {
+function processSection(subcat, rows, materialRows, priceOf = item => n(item.unit_cost), laborHrsFor = () => 0) {
   let hrs = 0,
     mat = 0,
     watts = 0,
@@ -90,7 +99,7 @@ function processSection(subcat, rows, materialRows, priceOf = item => n(item.uni
     const cost = priceOf(item)
     watts += qty * n(item.watts)
     va += qty * n(item.va)
-    hrs += qty * n(item.labor_hrs_ea)
+    hrs += laborHrsFor(item, qty) // install labor from labor_rates (per section)
     mat += qty * cost
     const each =
       r.subEach !== '' && r.subEach != null
@@ -112,16 +121,30 @@ function calcLighting(
   laborBurdenPct,
   priceOf = item => n(item.unit_cost),
   materialMarkup = null,
-  commissionRate
+  commissionRate,
+  laborRates = {}
 ) {
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const { difficulty, hoursAdj, fixtureRows, transformerRows, wireRows, manualRows, distanceLF } =
     state
   const isSub = state.subType === 'Subcontractor'
 
-  const fx = processSection(LIGHT_CAT.fixture, fixtureRows, materialRows, priceOf)
-  const xf = processSection(LIGHT_CAT.transformer, transformerRows, materialRows, priceOf)
-  const wr = processSection(LIGHT_CAT.wire, wireRows, materialRows, priceOf)
+  // Install labor per section, read from labor_rates (Each/hr; Bistro & Wire per
+  // Ln Ft). hrs = qty / rate. A missing/0 rate contributes 0 hours.
+  const fixtureRate = n(laborRates[FIXTURE_LABOR_NAME])
+  const bistroRate = n(laborRates[BISTRO_LABOR_NAME])
+  const xfRate = n(laborRates[TRANSFORMER_LABOR_NAME])
+  const wireRate = n(laborRates[WIRE_LABOR_NAME])
+  const fixtureHrs = (item, qty) => {
+    const rate = isBistroItem(item) ? bistroRate : fixtureRate
+    return rate > 0 ? qty / rate : 0
+  }
+  const xfHrs = (item, qty) => (xfRate > 0 ? qty / xfRate : 0)
+  const wireHrs = (item, qty) => (wireRate > 0 ? qty / wireRate : 0)
+
+  const fx = processSection(LIGHT_CAT.fixture, fixtureRows, materialRows, priceOf, fixtureHrs)
+  const xf = processSection(LIGHT_CAT.transformer, transformerRows, materialRows, priceOf, xfHrs)
+  const wr = processSection(LIGHT_CAT.wire, wireRows, materialRows, priceOf, wireHrs)
 
   // Electrical load (fixtures) is shown on both tabs for transformer sizing.
   const totalWatts = fx.watts + xf.watts + wr.watts
@@ -247,6 +270,8 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
   const [asOfDate, setAsOfDate] = useState('')
   // Material markup coefficient from the price list (fraction). Null → fallback.
   const [materialMarkup, setMaterialMarkup] = useState(null)
+  // Per-section install labor rates (labor_rates, category Lighting).
+  const [laborRates, setLaborRates] = useState({})
 
   // Re-fetch the lighting catalog + vendor list + markup rate. Used on mount
   // and after a markup RateEditPopover save.
@@ -254,7 +279,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
     // material_rates retired: catalog (with watts/va/labor/sub-price specs) from
     // material + material_price. Subcategories (Light Fixture/Transformer/Wire)
     // are unchanged, so no remap needed.
-    const [rows, venRes, mkRes] = await Promise.all([
+    const [rows, venRes, mkRes, lrRes] = await Promise.all([
       fetchModuleCatalog([LIGHTING_CATEGORY]),
       supabase
         .from('subs_vendors')
@@ -267,9 +292,15 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
         .eq('category', LIGHTING_CATEGORY)
         .eq('name', MATERIAL_MARKUP_NAME)
         .maybeSingle(),
+      supabase.from('labor_rates').select('name, rate').eq('category', LIGHTING_CATEGORY),
     ])
     const mk = mkRes.data ? parseFloat(mkRes.data.rate) : NaN
     setMaterialMarkup(Number.isFinite(mk) ? mk : null)
+    const lrMap = {}
+    ;(lrRes.data || []).forEach(r => {
+      lrMap[r.name] = parseFloat(r.rate)
+    })
+    setLaborRates(lrMap)
     setMaterialRows(rows || [])
     setVendors(
       (venRes.data || []).map(v => ({
@@ -391,7 +422,8 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
     laborBurdenPct,
     priceOf,
     materialMarkup,
-    commissionRate
+    commissionRate,
+    laborRates
   )
   const _salesTaxAmt = (calcRaw.totalMat || 0) * (salesTaxRate || 0)
   const calc =
