@@ -88,23 +88,6 @@ const REBAR_SIZES = ['#3', '#4', '#5', '#6', '#8']
 // Fixed equipment list for the Appliances table. Each priced from an editable
 // master material rate `BBQ Equip - <type>` (category 'Outdoor Kitchen',
 // default 0). Client-provided equipment zeroes material but keeps labor.
-const APPLIANCE_TYPES = [
-  'BBQ Grill',
-  'Side Burner',
-  'Power Burner',
-  'Refrigerator',
-  'Ice Bin / Cooler',
-  'Kegerator',
-  'Access Door',
-  'Drawer Set',
-  'Trash Drawer',
-  'Sink',
-  'Vent Hood',
-  'Warming Drawer',
-  'Pizza Oven',
-  'Kamado / Egg',
-  'Other',
-]
 const applianceRateName = type => `BBQ Equip - ${type}`
 const EQUIP_ROW = () => ({ vendor: 'Standard', type: '', qty: '0', unitCost: '', clientProvided: false, hours: '' })
 const SINK_ROW = () => ({ vendor: 'Standard', type: '', qty: '0', unitCost: '', clientProvided: false, hours: '' })

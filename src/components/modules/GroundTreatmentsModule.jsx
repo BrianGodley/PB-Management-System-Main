@@ -116,113 +116,8 @@ const GT_RATES = {
   gravelHandLab: { dbName: 'Gravel - Hand Labor Rate' }, // CY/day (labor_rates)
 }
 
-// Gravel material types — each drives its own $/CY (material_rates). Pricing TBD
-// (all default 130) until real per-type prices are entered via RateEditPopover.
-const GRAVEL_TYPES = [
-  { label: 'Crushed Pea Gravel', dbName: 'Gravel - Crushed Pea Gravel' },
-  { label: '3/4" Crushed Gravel', dbName: 'Gravel - 3/4" Crushed Gravel' },
-  { label: 'Del Rio', dbName: 'Gravel - Del Rio' },
-  { label: 'Black River Rock 1" minus', dbName: 'Gravel - Black River Rock 1in minus' },
-  { label: 'Black River Rock 1"-2"', dbName: 'Gravel - Black River Rock 1in-2in' },
-  { label: 'Black River Rock 2" to 3"', dbName: 'Gravel - Black River Rock 2in-3in' },
-  { label: '3/8" Crushed Pea Gravel', dbName: 'Gravel - 3/8in Crushed Pea Gravel' },
-  { label: '1 1/2" Crushed Gravel',   dbName: 'Gravel - 1.5in Crushed Gravel' },
-  { label: 'Misc Aggregate (3/4")',   dbName: 'Gravel - Misc Aggregate' },
-  { label: 'Black Lava',              dbName: 'Gravel - Black Lava' },
-  { label: 'Burgundy Lava 3/8"',      dbName: 'Gravel - Burgundy Lava 3/8in' },
-  { label: 'Burgundy Lava 3/4"',      dbName: 'Gravel - Burgundy Lava 3/4in' },
-  { label: 'California Gold 3/8"',    dbName: 'Gravel - California Gold 3/8in' },
-  { label: 'California Gold 3/4"',    dbName: 'Gravel - California Gold 3/4in' },
-  { label: 'Eagle Mountain',          dbName: 'Gravel - Eagle Mountain' },
-  { label: 'Honey Quartz',            dbName: 'Gravel - Honey Quartz' },
-  { label: 'Las Vegas Rainbow',       dbName: 'Gravel - Las Vegas Rainbow' },
-  { label: 'Pearl White',             dbName: 'Gravel - Pearl White' },
-  { label: 'Tuscan Rose',             dbName: 'Gravel - Tuscan Rose' },
-]
-
-// Pebble material types — each drives its own $/CY (material_rates). Reuses the
-// same labor + fabric rates as Gravel; only the material Type list differs.
-const PEBBLE_TYPES = [
-  { label: 'Arizona River Rock', dbName: 'Pebble - Arizona River Rock' },
-  { label: 'Cinnamon',           dbName: 'Pebble - Cinnamon' },
-  { label: 'Del Rio Pebble',     dbName: 'Pebble - Del Rio' },
-  { label: 'Leopard Granite',    dbName: 'Pebble - Leopard Granite' },
-  { label: 'White River Pebble', dbName: 'Pebble - White River' },
-  { label: 'Yosemite',           dbName: 'Pebble - Yosemite' },
-  { label: 'Yuba (Salt & Pepper)', dbName: 'Pebble - Yuba' },
-  { label: 'Baja (Beach)',       dbName: 'Pebble - Baja' },
-  { label: 'Black (Beach)',      dbName: 'Pebble - Black' },
-  { label: 'Buff (Beach)',       dbName: 'Pebble - Buff' },
-  { label: 'Mixed (Beach)',      dbName: 'Pebble - Mixed' },
-  { label: 'Red (Beach)',        dbName: 'Pebble - Red' },
-  { label: 'Sonora (Beach)',     dbName: 'Pebble - Sonora' },
-]
-
-// Cobbles & Boulders material types — same calc/labor as Gravel; type list only.
-const COBBLE_TYPES = [
-  { label: 'Granite River Rock', dbName: 'Cobble - Granite River Rock' },
-  { label: 'Arizona',            dbName: 'Cobble - Arizona' },
-  { label: 'Auburn Brown',       dbName: 'Cobble - Auburn Brown' },
-  { label: 'Cresta',             dbName: 'Cobble - Cresta' },
-  { label: 'Las Vegas Rainbow',  dbName: 'Cobble - Las Vegas Rainbow' },
-  { label: 'Miners Gold',        dbName: 'Cobble - Miners Gold' },
-  { label: 'Miners Pink',        dbName: 'Cobble - Miners Pink' },
-]
-
-// Mulch product types (material_rates, $/CY). Type drives material cost only.
-const MULCH_TYPES = [
-  { label: 'Premium Mulch', dbName: 'Mulch - Premium' },
-  { label: 'Brown Shredded', dbName: 'Mulch - Brown Shredded' },
-  { label: 'Flower Bed Mulch', dbName: 'Mulch - Flower Bed' },
-  { label: 'Shredded Cedar / Gorilla Hair', dbName: 'Mulch - Shredded Cedar' },
-  { label: 'Forest Moss', dbName: 'Mulch - Forest Moss' },
-  { label: 'Black Dyed Chips', dbName: 'Mulch - Black Dyed Chips' },
-  { label: 'Brown Dyed Chips', dbName: 'Mulch - Brown Dyed Chips' },
-  { label: 'Red Dyed Chips', dbName: 'Mulch - Red Dyed Chips' },
-  { label: 'Playground Chips', dbName: 'Mulch - Playground Chips' },
-  { label: 'Walk On Bark', dbName: 'Mulch - Walk On Bark' },
-  { label: 'Small Bark Nugget', dbName: 'Mulch - Small Bark Nugget' },
-  { label: 'Medium Bark Nugget', dbName: 'Mulch - Medium Bark Nugget' },
-]
-
-// D.G. product types (catalog material, per CUBIC YARD — DG material is now priced
-// per Cu Yd, matching the company-wide base-aggregate change). Default
-// 'Decomposed Granite' keeps existing estimates unchanged.
-const DG_TYPES = [
-  { label: 'Decomposed Granite', dbName: 'Decomposed Granite' }, // C&M $50/CY
-  { label: 'Stabilized DG', dbName: 'DG - Stabilized' }, // C&M $75/CY
-  { label: 'Rock Dust - Grey', dbName: 'DG - Rock Dust Grey' }, // C&M $120/CY
-  { label: 'Grey Stabilized Rock Dust', dbName: 'DG - Grey Stabilized Rock Dust' }, // C&M $145/CY
-]
-
-// Stepper stone types (material_rates, per TON). Standard defaults keep existing
-// estimates unchanged (Flagstone / Precast). Vendor rows filter to sub_category
-// 'Steppers'. Labor stays per-line (Soil vs Concrete SF/day), not from the type.
-const STEPPER_TYPES = [
-  { label: 'Flagstone', dbName: 'Flagstone Steppers' },
-  { label: 'Precast',   dbName: 'Precast Steppers' },
-]
-// Edging types (material_rates, per LF). Standard defaults keep existing estimates
-// unchanged (Plastic / Metal). Vendor rows filter to sub_category 'Edging'.
-const EDGING_TYPES = [
-  { label: 'Plastic', dbName: 'Plastic Edging' },
-  { label: 'Metal',   dbName: 'Metal Edging' },
-]
-
 // Company/estimate financial settings (labor rate, burden %, GPMD, commission,
 // sub GP markup) are sourced live from company_settings — no hardcoded defaults.
-
-// Sod varieties — Southland Sod Farms wholesale, Zone 2 delivered $/SF (material_rates).
-const SOD_TYPES = [
-  { label: 'Marathon', dbName: 'Sod - Marathon' },
-  { label: 'Marathon II', dbName: 'Sod - Marathon II' },
-  { label: 'Marathon Lite', dbName: 'Sod - Marathon Lite' },
-  { label: 'Marathon II Lite', dbName: 'Sod - Marathon II Lite' },
-  { label: 'PureBlue Lite', dbName: 'Sod - PureBlue Lite' },
-  { label: 'GreenWave Lite', dbName: 'Sod - GreenWave Lite' },
-  { label: 'Hybrid Bermuda', dbName: 'Sod - Hybrid Bermuda' },
-  { label: 'St. Augustine', dbName: 'Sod - St. Augustine' },
-]
 
 // Soil-prep bed material — single Standard type; vendors may supply a 'Soil Prep'
 // category so the Sod section's Soil Prep line matches the Vendor|Type format.
@@ -230,31 +125,6 @@ const SOIL_PREP_TYPES = [
   { label: 'Soil Prep', dbName: GT_RATES.soilPrepMat.dbName },
 ]
 
-// Fertilizer options — Southland Sod Farms, $/18-lb bag (material_rates). Bags are
-// auto-figured from the sod SF via the SF-per-bag coverage coefficient.
-const FERTILIZER_TYPES = [
-  { label: 'None', dbName: null },
-  { label: 'Marathon All Season (24-2-4)', dbName: 'Fertilizer - Marathon All Season' },
-  { label: 'Sod & Seed Starter (15-15-15)', dbName: 'Fertilizer - Sod Seed Starter' },
-]
-
-// Soil products — C&M Topsoil "SOILS" section, $/CY (material_rates). Optional lines.
-const SOIL_TYPES = [
-  { label: 'Topsoil (Sandy Loam)', dbName: 'Soil - Topsoil' },
-  { label: 'Compost', dbName: 'Soil - Compost' },
-  { label: 'Seed Cover', dbName: 'Soil - Seed Cover' },
-  { label: 'Veggie/Flower Mix', dbName: 'Soil - Veggie Flower Mix' },
-  { label: '50/50 Planter Mix', dbName: 'Soil - 50-50 Planter Mix' },
-  { label: '70/30 Topsoil Mix', dbName: 'Soil - 70-30 Topsoil Mix' },
-  { label: '30/70 Compost Mix', dbName: 'Soil - 30-70 Compost Mix' },
-  { label: 'Nursery Mix', dbName: 'Soil - Nursery Mix' },
-  { label: 'Nursery Mix w/ Pumice', dbName: 'Soil - Nursery Mix Pumice' },
-  { label: 'Cactus Mix', dbName: 'Soil - Cactus Mix' },
-  { label: 'Can Mix', dbName: 'Soil - Can Mix' },
-  { label: 'Color Mix', dbName: 'Soil - Color Mix' },
-  { label: 'Bioswale Mix', dbName: 'Soil - Bioswale Mix' },
-  { label: 'Pump Mix', dbName: 'Soil - Pump Mix' },
-]
 const DG_METHODS = ['Machine', 'Hand']
 
 const n = v => parseFloat(v) || 0

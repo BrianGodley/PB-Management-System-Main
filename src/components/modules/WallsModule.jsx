@@ -712,15 +712,6 @@ const DEFAULT_TIMBER = () => ({
 // ── Fixed per-section type lists (the Item dropdown; NOT from the DB) ─────────
 // Only the Vendor changes the material price; the Item (type) drives the
 // pricing/labor FORMULA, which stays byte-for-byte identical to the original.
-const WALL_FINISH_TYPES = [
-  'Sand Stucco',
-  'Smooth Stucco',
-  'Ledgerstone',
-  'Stacked Stone',
-  'Tile',
-  'Real Flagstone',
-  'Real Stone',
-]
 const WALL_FINISH_META = {
   'Sand Stucco': { matKey: 'sandStucco', labKey: 'sandStuccoLab', matUnit: 'Sq Ft', labUnit: 'Sq Ft per day' },
   'Smooth Stucco': {
@@ -741,13 +732,6 @@ const WALL_FINISH_META = {
   'Real Stone': { matKey: 'realStone', labKey: 'realStoneLab', matUnit: 'Tons', labUnit: 'hrs per Sq Ft' },
 }
 
-const WP_TYPES = [
-  'None',
-  'Primer + Membrane',
-  '2 Coats Roll On',
-  'Thoroseal 2 Coats',
-  'Primer, Membrane + Dimple',
-]
 // Both current names AND legacy names map to the same rate key, so walls saved
 // under the old labels keep pricing after the rename.
 const WP_KEY = {

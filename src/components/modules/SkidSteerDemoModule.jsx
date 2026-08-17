@@ -27,14 +27,7 @@ import {
   DEFAULT_BOBCAT_BASELINE_LF,
 } from '../../lib/walkAccess'
 
-// Bobcat bucket capacity (lbs) — drives `trips = totalTons × 2000 / bucket`
-// for the walk-access shuttle penalty. Matches Excel master rates.
-const BOBCAT_BUCKET_LBS = 1600
-
 // ── Fallback constants (used when DB rate not yet loaded or missing) ──────────
-
-const ACCESS_LEVELS = { Poor: 0.5, OK: 0.75, Full: 1.0 }
-const DEMO_TYPES = ['In-House', 'Subcontractor']
 
 // Default rates — DB values (lr[]) take precedence at calc time
 const STUB_HEIGHT_MODS = { '0-1': 0.75, '1-2': 1, '2-3': 1.5, '3-4': 2, '4-5': 2.5 }
@@ -50,7 +43,6 @@ const STUB_HEIGHT_MODS = { '0-1': 0.75, '1-2': 1, '2-3': 1.5, '3-4': 2, '4-5': 2
 // ── Calculation engine ────────────────────────────────────────────────────────
 
 const n = v => parseFloat(v) || 0
-const sfToTons = (sf, depthIn) => (n(sf) / 200) * n(depthIn)
 
 // Container-based removal: SF -> CF (x depth/12) -> CY (/27) -> x swell,
 // billed at a flat rate per low-boy container (per material, rounded up).

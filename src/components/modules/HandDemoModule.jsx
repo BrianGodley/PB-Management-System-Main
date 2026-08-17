@@ -24,10 +24,7 @@ import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../
 
 // ── Fallback constants ────────────────────────────────────────────────────────
 
-const ACCESS_LEVELS = { Poor: 0.5, OK: 0.667, Full: 1.0 }
 const STUB_HEIGHT_MODS = { '0-1': 0.75, '1-2': 1, '2-3': 1.5, '3-4': 2, '4-5': 2.5 }
-const DUMP_TYPES = ['In-House', 'Subcontractor']
-
 
 // Sub Haul rates — billed per 1.5 tons removed (sub cost, not materials)
 // Labor is unchanged in Subcontractor mode; dump fees are replaced by these charges
@@ -37,7 +34,6 @@ const DUMP_TYPES = ['In-House', 'Subcontractor']
 // ── Calculation engine ────────────────────────────────────────────────────────
 
 const n = v => parseFloat(v) || 0
-const sfToTons = (sf, depthIn) => (n(sf) / 200) * n(depthIn)
 
 // Container-based removal: SF -> CF (x depth/12) -> CY (/27) -> x swell,
 // billed at a flat rate per low-boy container (per material, rounded up).
