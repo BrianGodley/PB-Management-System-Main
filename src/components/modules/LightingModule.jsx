@@ -44,14 +44,10 @@ const LIGHT_CAT = { fixture: 'Light Fixture', transformer: 'Transformer', wire: 
 // missing row means no markup (0).
 const MATERIAL_MARKUP_NAME = 'Lighting - Material Markup'
 
-// Install labor now lives in labor_rates (per section, Each per hour) — NOT on the
-// product (labor_hrs_ea is no longer read for labor). Bistro is a string light, so
-// it's priced per linear foot.
-const FIXTURE_LABOR_NAME = 'Lighting - Fixture Labor'
-const TRANSFORMER_LABOR_NAME = 'Lighting - Transformer Labor'
-const BISTRO_LABOR_NAME = 'Lighting - Bistro Labor'
-const WIRE_LABOR_NAME = 'Lighting - Wire Labor'
-const isBistroItem = it => /bistro/i.test(it?.name || it?.description || '')
+// Install labor is item-driven: each item points to its own labor_rates row via
+// calc_meta.labor_rate (Fixture / Transformer / Bistro / Wire Labor), resolved
+// live in processSection. No section-fixed labor names, no product labor_hrs_ea,
+// no hardcoded fallback. Bistro is a string light, priced per linear foot.
 
 // Company/estimate financial settings (labor rate, burden %, GPMD, commission,
 // sub GP markup) are sourced live from company_settings — no hardcoded defaults.
@@ -85,12 +81,13 @@ function defaultSubEach(item) {
 // priceOf(item) resolves the item's current MATERIAL unit cost — from the price
 // ledger when available, else the row's own unit_cost. Defaults to unit_cost so
 // the calc still works when no ledger is supplied.
-function processSection(subcat, rows, materialRows, priceOf = item => n(item.unit_cost), laborHrsFor = () => 0) {
+function processSection(subcat, rows, materialRows, priceOf = item => n(item.unit_cost), laborRates = {}) {
   let hrs = 0,
     mat = 0,
     watts = 0,
     va = 0,
     sub = 0
+  const laborUnset = []
   ;(rows || []).forEach(r => {
     const qty = n(r.qty)
     if (qty <= 0) return
@@ -99,7 +96,13 @@ function processSection(subcat, rows, materialRows, priceOf = item => n(item.uni
     const cost = priceOf(item)
     watts += qty * n(item.watts)
     va += qty * n(item.va)
-    hrs += laborHrsFor(item, qty) // install labor from labor_rates (per section)
+    // Install labor = the item's own default labor rate (calc_meta.labor_rate),
+    // resolved live from labor_rates. No section-fixed name, no bistro special
+    // case, no hardcoded fallback — unset ⇒ 0 hrs and the item is flagged.
+    const laborName = item.calc_meta?.labor_rate || null
+    const laborRate = n(laborRates[laborName])
+    if (laborRate <= 0) laborUnset.push(item.name || item.description)
+    hrs += qty * laborRate
     mat += qty * cost
     const each =
       r.subEach !== '' && r.subEach != null
@@ -109,7 +112,7 @@ function processSection(subcat, rows, materialRows, priceOf = item => n(item.uni
           : cost
     sub += qty * each
   })
-  return { hrs, mat, watts, va, sub }
+  return { hrs, mat, watts, va, sub, laborUnset }
 }
 
 function calcLighting(
@@ -129,20 +132,16 @@ function calcLighting(
     state
   const isSub = state.subType === 'Subcontractor'
 
-  // Install labor per section, read from labor_rates. Every rate is hours-per-unit
-  // (fixtures/transformers = hrs per each; Bistro/wire = hrs per Ln Ft), so the calc
-  // is uniformly hrs = qty × rate. A missing/0 rate contributes 0 hours.
-  const fixtureRate = n(laborRates[FIXTURE_LABOR_NAME])
-  const bistroRate = n(laborRates[BISTRO_LABOR_NAME])
-  const xfRate = n(laborRates[TRANSFORMER_LABOR_NAME])
-  const wireRate = n(laborRates[WIRE_LABOR_NAME])
-  const fixtureHrs = (item, qty) => (isBistroItem(item) ? qty * bistroRate : qty * fixtureRate)
-  const xfHrs = (item, qty) => qty * xfRate
-  const wireHrs = (item, qty) => qty * wireRate
-
-  const fx = processSection(LIGHT_CAT.fixture, fixtureRows, materialRows, priceOf, fixtureHrs)
-  const xf = processSection(LIGHT_CAT.transformer, transformerRows, materialRows, priceOf, xfHrs)
-  const wr = processSection(LIGHT_CAT.wire, wireRows, materialRows, priceOf, wireHrs)
+  // Install labor is item-driven: each item points to its own labor_rates row via
+  // calc_meta.labor_rate (fixtures → Fixture Labor, bistro → Bistro Labor, etc.),
+  // resolved live inside processSection. Every rate is hours-per-unit so the calc
+  // is uniformly hrs = qty × rate. No fallback — unset ⇒ 0 hrs and a prompt.
+  const fx = processSection(LIGHT_CAT.fixture, fixtureRows, materialRows, priceOf, laborRates)
+  const xf = processSection(LIGHT_CAT.transformer, transformerRows, materialRows, priceOf, laborRates)
+  const wr = processSection(LIGHT_CAT.wire, wireRows, materialRows, priceOf, laborRates)
+  const laborUnset = isSub
+    ? []
+    : Array.from(new Set([...fx.laborUnset, ...xf.laborUnset, ...wr.laborUnset].filter(Boolean)))
 
   // Electrical load (fixtures) is shown on both tabs for transformer sizing.
   const totalWatts = fx.watts + xf.watts + wr.watts
@@ -208,6 +207,7 @@ function calcLighting(
     subCost,
     price,
     walkHrs,
+    laborUnset,
   }
 }
 
@@ -791,6 +791,14 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
       {loading && (
         <div className="text-xs text-amber-700 bg-amber-50 rounded px-3 py-2">
           Loading lighting catalog…
+        </div>
+      )}
+
+      {!isSub && calc.laborUnset && calc.laborUnset.length > 0 && (
+        <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">
+          <span className="font-semibold">Labor rate needed:</span> set a Default
+          Labor rate in Master Material Rates for {calc.laborUnset.join(', ')}. These
+          items are contributing 0 labor hours until a labor rate is assigned.
         </div>
       )}
 
