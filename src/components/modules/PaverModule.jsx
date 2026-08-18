@@ -162,11 +162,11 @@ function calcPaver(
     // base prep beyond the pavers). Use the optional Base SF when provided;
     // otherwise fall back to the paver SF.
     const baseSf = row.baseSf !== '' && row.baseSf != null ? n(row.baseSf) : sf
-    // Base LABOR / compaction is still tonnage-based (skid-steer / hand spread
-    // rates are t/hr) — this is unchanged. Tons drive baseHrs only.
+    // Base LABOR / compaction is tonnage-based. Spread rates are hrs-per-ton
+    // (standardized 2026-08-18; were tons/hr). Tons drive baseHrs only.
     const baseTons = sfToTons(baseSf, depthIn, tonsDivisor)
     const baseRate = BASE_RATE_MAP[row.method] ?? baseBobcatOK
-    const baseHrs = baseTons > 0 ? baseTons / baseRate : 0
+    const baseHrs = baseTons * baseRate
 
     // Base MATERIAL is now priced per CUBIC YARD (company-wide move — base
     // aggregates are bought by the cubic yard). Loose volume =
@@ -261,22 +261,23 @@ function calcPaver(
 
   // ── Install labor hours ──────────────────────────────────────────────────────
   // Install SF is now entered MANUALLY (no longer auto-derived from the paver
-  // area rows). Labor = manual SF ÷ install rate.
+  // area rows). Labor = manual SF × install rate (hrs-per-SF; standardized
+  // 2026-08-18, was SF/hr).
   const installSFVal = n(state.installSF)
-  const installHrs = installSFVal > 0 ? installSFVal / installRate : 0
+  const installHrs = installSFVal * installRate
   // 80mm thickness penalty: its own SF input adds a table-driven % (Paver - 80mm
-  // Add, fallback 0.15) to the install labor for that SF.
+  // Add, a multiplier) to the install labor for that SF.
   const mm80SFVal = n(state.mm80SF)
-  const add80mmHrs = mm80SFVal > 0 ? (mm80SFVal * add80mmMult) / installRate : 0
-  const straightCutHrs = n(state.straightCutLF) > 0 ? n(state.straightCutLF) / straightCutRate : 0
-  const curvedCutHrs = n(state.curvedCutLF) > 0 ? n(state.curvedCutLF) / curvedCutRate : 0
-  const restraintsHrs = n(state.restraintsLF) > 0 ? n(state.restraintsLF) / restraintRate : 0
-  const sleevesHrs = n(state.sleevesLF) > 0 ? n(state.sleevesLF) / sleevesRate : 0
+  const add80mmHrs = mm80SFVal * add80mmMult * installRate
+  const straightCutHrs = n(state.straightCutLF) * straightCutRate
+  const curvedCutHrs = n(state.curvedCutLF) * curvedCutRate
+  const restraintsHrs = n(state.restraintsLF) * restraintRate
+  const sleevesHrs = n(state.sleevesLF) * sleevesRate
   // Vertical Soldier Course rows (In-House). LF summed across rows drives labor.
   const vertRows = Array.isArray(state.vertRows) ? state.vertRows : []
   const vertTotalLF = vertRows.reduce((s, r) => s + n(r.lf), 0)
-  const vertSoldierHrs = vertTotalLF > 0 ? vertTotalLF / vertSoldierRate : 0
-  const sealerHrs = n(state.sealerSF) > 0 ? n(state.sealerSF) / sealerRate : 0
+  const vertSoldierHrs = vertTotalLF * vertSoldierRate
+  const sealerHrs = n(state.sealerSF) * sealerRate
   // Poly Sand — New pavers: own SF input × the New poly-sand labor coefficient
   // (Paver - Poly Sand New, fallback 0.004 hrs/SF). Independent of the paver area.
   const polySandNewSFVal = n(state.polySandNewSF)
@@ -1121,7 +1122,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: BASE_METHOD_LABOR_NAME[m],
           category: 'Paver',
           mode: 'coefficient',
-          unitLabel: 't per hr',
+          unitLabel: 'Hrs per Ton',
           value:
             m === 'Skid Good'
               ? calc.baseBobcatGood
@@ -1169,7 +1170,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: 'Paver - Install',
           category: 'Paver',
           mode: 'coefficient',
-          unitLabel: 'Sq Ft per hr',
+          unitLabel: 'Hrs per Sq Ft',
           value: calc.installRate,
         },
         {
@@ -1187,7 +1188,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: 'Paver - Straight Cut',
           category: 'Paver',
           mode: 'coefficient',
-          unitLabel: 'Ln Ft per hr',
+          unitLabel: 'Hrs per Ln Ft',
           value: calc.straightCutRate,
         },
         {
@@ -1196,7 +1197,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: 'Paver - Curved Cut',
           category: 'Paver',
           mode: 'coefficient',
-          unitLabel: 'Ln Ft per hr',
+          unitLabel: 'Hrs per Ln Ft',
           value: calc.curvedCutRate,
         },
         {
@@ -1205,7 +1206,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: 'Paver - Restraints',
           category: 'Paver',
           mode: 'coefficient',
-          unitLabel: 'Ln Ft per hr',
+          unitLabel: 'Hrs per Ln Ft',
           value: calc.restraintRate,
         },
         {
@@ -1214,7 +1215,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: 'Paver - Sleeves',
           category: 'Paver',
           mode: 'coefficient',
-          unitLabel: 'Ln Ft per hr',
+          unitLabel: 'Hrs per Ln Ft',
           value: calc.sleevesRate,
         },
         {
@@ -1259,7 +1260,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: 'Paver - Sealer',
           category: 'Paver',
           mode: 'coefficient',
-          unitLabel: 'Sq Ft per hr',
+          unitLabel: 'Hrs per Sq Ft',
           value: calc.sealerRate,
         },
         {
@@ -1268,7 +1269,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           name: 'Paver - Vertical Soldier',
           category: 'Paver',
           mode: 'coefficient',
-          unitLabel: 'Ln Ft per hr',
+          unitLabel: 'Hrs per Ln Ft',
           value: calc.vertSoldierRate,
         },
         // Paver material catalog (vendor-supplied 'Paver Material' products) + the

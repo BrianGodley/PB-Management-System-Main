@@ -59,7 +59,7 @@ const concBaseType = t => (t || '').replace(/\s*Colored$/i, '')
 const CONC_FINISHES = ['Smooth', 'Broom', 'Sanded', 'Salted', 'Exposed Aggregate']
 
 // ── Rate-key builders (category 'Steps') ─────────────────────────────────────
-const kPaverForm = form => `Steps - ${form}` // labor LF/hr
+const kPaverForm = form => `Steps - ${form}` // labor hrs per Ln Ft
 const kConcTypeHrs = t => `Steps - Conc ${t} Hrs per Sq Ft` // labor hrs per Sq Ft
 const kConcTypeMat = t => `Steps - Conc ${t} $ per Sq Ft` // material $ per Sq Ft
 const kFinishHrs = f => `Steps - Finish ${f} Hrs per Sq Ft` // labor +hrs per Sq Ft
@@ -106,8 +106,9 @@ function matStepRowCalc(r, laborRates, materialRows, cat = PAVER_STEP_CAT, price
   // Unselected step (no material Type) contributes nothing (no crash, no fallback).
   if (!r.type) return { sf: n(r.sf), hrs: 0, mat: 0, price: 0, pallets: 0 }
   const sf = n(r.sf)
+  // hrs-per-unit: rate is hours per Ln Ft (was LF/hr; standardized 2026-08-18).
   const rate = n(laborRates[kPaverForm(r.form)])
-  const hrs = sf > 0 && rate > 0 ? sf / rate : 0
+  const hrs = sf * rate
   let price = 0
   let sfPerPallet = 0
   if (r.vendor && r.vendor !== 'Standard' && r.vendor !== 'Custom') {
@@ -1118,7 +1119,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           name: kPaverForm(f),
           category: 'Steps',
           mode: 'coefficient',
-          unitLabel: 'Ln Ft per hr',
+          unitLabel: 'Hrs per Ln Ft',
           value: laborRates[kPaverForm(f)],
         })),
         ...catalogBlockItems(PAVER_STEP_CAT),

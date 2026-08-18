@@ -190,12 +190,13 @@ function calcConcrete(
   const sealerWetSFPerHr = n(lr['Concrete - Sealer Wet-Look'])
   const vaporBarrierSFPerHr = n(lr['Concrete - Vapor Barrier'])
   const complexityPctPerUnit = n(lr['Concrete - Forming Complexity % Per Unit'])
-  // Finish add-on labor coefficients (SF/hr) — editable via labor_rates.
-  const sandFinishSFPerHr = n(lr['Concrete - Sand Finish SF/hr'])
-  const saltFinishSFPerHr = n(lr['Concrete - Salt Finish SF/hr'])
-  const exposedAggSFPerHr = n(lr['Concrete - Exposed Aggregate SF/hr'])
-  const seededAggSFPerHr = n(lr['Concrete - Seeded Aggregate SF/hr'])
-  const stampedSFPerHr = n(lr['Concrete - Stamped Finish SF/hr'])
+  // Finish add-on labor — hrs per Sq Ft, editable via labor_rates. (Vars keep
+  // the legacy *SFPerHr names but now hold hrs-per-SF; standardized 2026-08-18.)
+  const sandFinishSFPerHr = n(lr['Concrete - Sand Finish'])
+  const saltFinishSFPerHr = n(lr['Concrete - Salt Finish'])
+  const exposedAggSFPerHr = n(lr['Concrete - Exposed Aggregate'])
+  const seededAggSFPerHr = n(lr['Concrete - Seeded Aggregate'])
+  const stampedSFPerHr = n(lr['Concrete - Stamped Finish'])
   // Hand Mix takes more labor to produce than truck-delivered mix. Applied as a
   // % uplift to that tier's pour & finish hours. Tunable coefficient — lives in
   // labor_rates (View Rates), read live with no hardcoded fallback.
@@ -286,8 +287,9 @@ function calcConcrete(
   const installHrs = INSTALL_TIERS.reduce((s, t) => {
     const sf = n(installTiers[t.key])
     if (!sf) return s
+    // hrs-per-SF: tier rate is hours per Sq Ft (standardized 2026-08-18, was SF/hr).
     const rate = n(lr[t.rateName])
-    let hrs = rate > 0 ? sf / rate : 0
+    let hrs = sf * rate
     // Hand Mix uplift: producing mix by hand adds labor to this tier.
     if (/hand\s*mix/i.test(installTierType[t.key] || '')) hrs *= 1 + handMixUpliftPct / 100
     return s + hrs
@@ -312,14 +314,16 @@ function calcConcrete(
     return s + tierCY * mt.fallback
   }, 0)
 
-  const rebarHrs = rebarSF > 0 && rebarSFPerHr > 0 ? rebarSF / rebarSFPerHr : 0
+  // hrs-per-unit reads below (standardized 2026-08-18): rebar/form/sleeve rates
+  // are hours per Sq Ft / Ln Ft, so hours = qty × rate.
+  const rebarHrs = rebarSF * rebarSFPerHr
   const rebarMat = rebarSF * rebarLfPerSf * rebarPerLF
 
-  const formHrs = formLF > 0 ? formLF / formLFPerHr : 0
+  const formHrs = formLF * formLFPerHr
   const formMat = formLF * formMaterialPerLF
 
   const sleeveUnits = sleeveLF > 0 ? Math.ceil(sleeveLF / 10) : 0
-  const sleeveHrs = sleeveLF / sleeveLFPerHr
+  const sleeveHrs = sleeveLF * sleeveLFPerHr
   const sleeveMat = sleeveUnits * sleevePer10LF
 
   // ── Travel ───────────────────────────────────────────────────────────────
@@ -339,16 +343,16 @@ function calcConcrete(
     finishSubCost = 0,
     colorMat = 0
   if (finishType === 'Sand Finish') {
-    finishHrs = sandFinishSFPerHr > 0 ? finishSF / sandFinishSFPerHr : 0
+    finishHrs = finishSF * sandFinishSFPerHr
     if (isIH) finishSubCost = Math.ceil(finishSF / 400) * sandFinishPer400SF
   } else if (finishType === 'Salt Finish') {
-    finishHrs = saltFinishSFPerHr > 0 ? finishSF / saltFinishSFPerHr : 0
+    finishHrs = finishSF * saltFinishSFPerHr
   } else if (finishType === 'Exposed Aggregate') {
-    finishHrs = exposedAggSFPerHr > 0 ? finishSF / exposedAggSFPerHr : 0
+    finishHrs = finishSF * exposedAggSFPerHr
   } else if (finishType === 'Seeded Aggregate') {
-    finishHrs = seededAggSFPerHr > 0 ? finishSF / seededAggSFPerHr : 0
+    finishHrs = finishSF * seededAggSFPerHr
   } else if (finishType === 'Stamped') {
-    finishHrs = stampedSFPerHr > 0 ? finishSF / stampedSFPerHr : 0
+    finishHrs = finishSF * stampedSFPerHr
     finishSubCost = isIH ? stampSubFlat : concreteCY * stampSubPerCY
   }
   if (colorYes && concreteCY > 0) {
@@ -367,8 +371,8 @@ function calcConcrete(
   const pumpMat = pumpAuto && concreteCY > 0 ? pumpFeeFlat + pumpFeePerCY * Math.ceil(concreteCY) : 0
 
   // ── Vapor barrier ────────────────────────────────────────────────────────
-  // Labor SF/hr (guarded); material = SF × the picked catalog item's $/SF.
-  const vaporHrs = vaporSF > 0 && vaporBarrierSFPerHr > 0 ? vaporSF / vaporBarrierSFPerHr : 0
+  // Labor = SF × hrs-per-SF; material = SF × the picked catalog item's $/SF.
+  const vaporHrs = vaporSF * vaporBarrierSFPerHr
   const vap = catItem('Vapor Barrier', state.vaporVendor, state.vaporItem)
   const vaporMat = vap ? vaporSF * vap.price : 0
 
@@ -380,7 +384,7 @@ function calcConcrete(
   let sealerHrs = 0
   if (sealerSF > 0) {
     const sealSFPerHr = /wet/i.test(state.sealerItem || '') ? sealerWetSFPerHr : sealerNaturalSFPerHr
-    sealerHrs = sealSFPerHr > 0 ? sealerSF / sealSFPerHr : 0
+    sealerHrs = sealerSF * sealSFPerHr
   }
   const sealerMat = seal && seal.coverage > 0 ? Math.ceil(sealerSF / seal.coverage) * seal.price : 0
   const sealerCoats = seal ? seal.coats : 0
@@ -979,12 +983,12 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
       rebarSFPerHrBySpacing[subRebarSpacing] ?? rebarSFPerHrBySpacing['24" OC']
     subSideCost +=
       n(subRebarSF) * subRebarLfPerSf * rebarPerLF +
-      (subRebarSFPerHr > 0 ? n(subRebarSF) / subRebarSFPerHr : 0) * lrph
+      n(subRebarSF) * subRebarSFPerHr * lrph
   }
   // Sleeves
   if (n(subSleeveLF) > 0) {
     const units = Math.ceil(n(subSleeveLF) / 10)
-    subSideCost += units * sleevePer10LF + (n(subSleeveLF) / sleeveLFPerHr) * lrph
+    subSideCost += units * sleevePer10LF + n(subSleeveLF) * sleeveLFPerHr * lrph
   }
   // Color hardener
   if (subColorYes && subConcreteCY > 0) {
@@ -1192,7 +1196,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: t.rateName,
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'Sq Ft per hr',
+          unitLabel: 'Hrs per Sq Ft',
           value: n(laborRates[t.rateName]),
         })),
         {
@@ -1201,7 +1205,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Form Setting',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'Ln Ft per hr',
+          unitLabel: 'Hrs per Ln Ft',
           value: calc.formLFPerHr,
         },
         {
@@ -1210,7 +1214,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Sleeves',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'Ln Ft per hr',
+          unitLabel: 'Hrs per Ln Ft',
           value: calc.sleeveLFPerHr,
         },
         {
@@ -1248,7 +1252,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Rebar 24" OC',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'Sq Ft per hr',
+          unitLabel: 'Hrs per Sq Ft',
           value: calc.rebarSFPerHrBySpacing['24" OC'],
         },
         {
@@ -1257,7 +1261,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Rebar 18" OC',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'Sq Ft per hr',
+          unitLabel: 'Hrs per Sq Ft',
           value: calc.rebarSFPerHrBySpacing['18" OC'],
         },
         {
@@ -1266,7 +1270,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Rebar 12" OC',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'Sq Ft per hr',
+          unitLabel: 'Hrs per Sq Ft',
           value: calc.rebarSFPerHrBySpacing['12" OC'],
         },
         {
@@ -1305,48 +1309,48 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
       group: 'Finish Options',
       items: [
         {
-          label: 'Concrete - Sand Finish SF/hr',
+          label: 'Concrete - Sand Finish',
           table: 'labor_rates',
-          name: 'Concrete - Sand Finish SF/hr',
+          name: 'Concrete - Sand Finish',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'Sq Ft per hr',
+          unitLabel: 'Hrs per Sq Ft',
           value: calc.sandFinishSFPerHr,
         },
         {
-          label: 'Concrete - Salt Finish SF/hr',
+          label: 'Concrete - Salt Finish',
           table: 'labor_rates',
-          name: 'Concrete - Salt Finish SF/hr',
+          name: 'Concrete - Salt Finish',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'Sq Ft per hr',
+          unitLabel: 'Hrs per Sq Ft',
           value: calc.saltFinishSFPerHr,
         },
         {
-          label: 'Concrete - Exposed Aggregate SF/hr',
+          label: 'Concrete - Exposed Aggregate',
           table: 'labor_rates',
-          name: 'Concrete - Exposed Aggregate SF/hr',
+          name: 'Concrete - Exposed Aggregate',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'Sq Ft per hr',
+          unitLabel: 'Hrs per Sq Ft',
           value: calc.exposedAggSFPerHr,
         },
         {
-          label: 'Concrete - Seeded Aggregate SF/hr',
+          label: 'Concrete - Seeded Aggregate',
           table: 'labor_rates',
-          name: 'Concrete - Seeded Aggregate SF/hr',
+          name: 'Concrete - Seeded Aggregate',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'Sq Ft per hr',
+          unitLabel: 'Hrs per Sq Ft',
           value: calc.seededAggSFPerHr,
         },
         {
-          label: 'Concrete - Stamped Finish SF/hr',
+          label: 'Concrete - Stamped Finish',
           table: 'labor_rates',
-          name: 'Concrete - Stamped Finish SF/hr',
+          name: 'Concrete - Stamped Finish',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'Sq Ft per hr',
+          unitLabel: 'Hrs per Sq Ft',
           value: calc.stampedSFPerHr,
         },
         {
@@ -1355,7 +1359,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Vapor Barrier',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'Sq Ft per hr',
+          unitLabel: 'Hrs per Sq Ft',
           value: calc.vaporBarrierSFPerHr,
         },
         {
@@ -1364,7 +1368,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Sealer Natural',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'Sq Ft per hr',
+          unitLabel: 'Hrs per Sq Ft',
           value: calc.sealerNaturalSFPerHr,
         },
         {
@@ -1373,7 +1377,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
           name: 'Concrete - Sealer Wet-Look',
           category: 'Concrete',
           mode: 'coefficient',
-          unitLabel: 'Sq Ft per hr',
+          unitLabel: 'Hrs per Sq Ft',
           value: calc.sealerWetSFPerHr,
         },
         {
