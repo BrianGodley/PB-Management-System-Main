@@ -281,7 +281,9 @@ const ELECTRICAL_FIXTURE_TYPES = {
 const LINE_TYPE_ARR = Object.entries(UTILITY_LINE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, laborDbName: t.laborDbName }))
 const GAS_TYPE_ARR = Object.entries(GAS_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, laborDbName: t.laborDbName }))
 const ELEC_TYPE_ARR = Object.entries(ELECTRICAL_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, laborDbName: t.laborDbName }))
-const UTIL_CAT = { line: 'Utility Lines', gas: 'Gas Fixtures', elec: 'Electrical Fixtures' }
+// Pool Utilities sub-sections mirror the Utilities module's sub-categories so they
+// share the same master material rates items + calc_meta labor mapping.
+const UTIL_CAT = { line: 'Electrical Pipe', gasPipe: 'Gas Pipe', wire: 'Electrical Wiring', elec: 'Electrical Fixtures' }
 // Vendor-first Type list: Standard/unset → null-vendor Items merged with built-ins;
 // a real vendor → ONLY that vendor's Items (built-ins fall away).
 function mergedUtilTypes(cat, builtInArr, materialRows, vendorSel = 'Standard') {
@@ -334,9 +336,13 @@ function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
   const matOpt = { label: builtIn?.label, dbName: matDbName, matCatalog }
   return { opts: merged, matOpt, matCost, laborVal, laborName, laborBuiltIn: builtIn }
 }
-const EP_LINE_ROW = () => ({ type: '', lf: '', vendor: 'Standard' })
-const EP_GAS_ROW = () => ({ type: '', qty: '', vendor: 'Standard' })
-const EP_ELEC_ROW = () => ({ type: '', qty: '', vendor: 'Standard' })
+const EP_LINE_ROW = () => ({ type: '', lf: '', vendor: 'Standard' }) // Electrical Pipe (LF)
+const EP_GASPIPE_ROW = () => ({ type: '', lf: '', vendor: 'Standard' }) // Gas Pipe (LF)
+const EP_WIRE_ROW = () => ({ type: '', lf: '', vendor: 'Standard' }) // Electrical Wiring (LF)
+const EP_ELEC_ROW = () => ({ type: '', qty: '', vendor: 'Standard' }) // Electrical Fixtures (Each)
+// Utility trenching (mirrors the Utilities module): method → hrs per Cu Ft.
+const POOL_TRENCH_LABOR = { Trench: 'Utilities Trench Excavation', Hand: 'Utilities Hand Excavation' }
+const EP_TRENCH_ROW = () => ({ equipment: 'Trench', lf: '', width: '', depth: '' })
 
 // Reusable Electrical & Plumbing table (Utility Lines / Gas / Electrical).
 function EpTable({
@@ -559,8 +565,10 @@ function makeTab(data = {}) {
     // In-House pool plumbing — labor hours + materials $ done in-house (not a
     // sub trade). Blank strings default to the DB master rates in calcPool.
     plumbingIH: data.plumbingIH ? { hours: '', materials: '', ...data.plumbingIH } : { hours: '', materials: '' },
+    epTrenchRows: data.epTrenchRows ?? [EP_TRENCH_ROW()],
+    epGasPipeRows: data.epGasPipeRows ?? [EP_GASPIPE_ROW(), EP_GASPIPE_ROW()],
     epLineRows: data.epLineRows ?? [EP_LINE_ROW(), EP_LINE_ROW()],
-    epGasRows: data.epGasRows ?? [EP_GAS_ROW(), EP_GAS_ROW()],
+    epWireRows: data.epWireRows ?? [EP_WIRE_ROW(), EP_WIRE_ROW()],
     epElecRows: data.epElecRows ?? [EP_ELEC_ROW(), EP_ELEC_ROW()],
     manualRows: data.manualRows ?? [newManualRow()],
   }
@@ -871,34 +879,48 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     manSub += n(r.subCost)
   })
 
-  // ── Electrical & Plumbing (Utility Lines / Gas / Electrical Fixtures) ───────
+  // ── Utilities (Trenching / Gas Pipe / Electrical Pipe / Electrical Wiring /
+  //    Electrical Fixtures) — mirrors the Utilities module's mapping ────────────
   let epHrs = 0
   let epMat = 0
-  // Gas/electrical items whose picked Type has no labor rate set (calc_meta.
-  // labor_rate unset or resolves to 0). Surfaced as a prompt — never a fallback.
+  // Items whose picked Type has no labor rate set (calc_meta.labor_rate unset or
+  // resolves to 0). Surfaced as a prompt — never a fallback.
   const laborUnset = []
-  ;(state.epLineRows || []).forEach(r => {
-    if (!r.type) return
-    const lf = n(r.lf)
-    if (lf <= 0) return
-    const { matCost, laborVal } = resolveUtilRow(UTIL_CAT.line, r, LINE_TYPE_ARR, materialRows, materialPrices)
-    if (laborVal <= 0) laborUnset.push(r.type)
-    epMat += lf * matCost
-    epHrs += lf * laborVal
+  // Trenching: hrs = cf × (hrs per Cu Ft) for the chosen method (Trench / Hand).
+  ;(state.epTrenchRows || []).forEach(r => {
+    const lf = n(r.lf),
+      w = n(r.width),
+      d = n(r.depth)
+    if (lf > 0 && w > 0 && d > 0) {
+      const cf = lf * (w / 12) * (d / 12)
+      epHrs += cf * n(materialPrices[POOL_TRENCH_LABOR[r.equipment]])
+    }
   })
+  // Per-LF pipe/wire sections (Gas Pipe, Electrical Pipe, Electrical Wiring).
   ;[
-    [state.epGasRows, UTIL_CAT.gas, GAS_TYPE_ARR],
-    [state.epElecRows, UTIL_CAT.elec, ELEC_TYPE_ARR],
-  ].forEach(([rows, cat, arr]) => {
+    [state.epGasPipeRows, UTIL_CAT.gasPipe],
+    [state.epLineRows, UTIL_CAT.line],
+    [state.epWireRows, UTIL_CAT.wire],
+  ].forEach(([rows, cat]) => {
     ;(rows || []).forEach(r => {
       if (!r.type) return
-      const qty = n(r.qty)
-      if (qty <= 0) return
-      const { matCost, laborVal } = resolveUtilRow(cat, r, arr, materialRows, materialPrices)
+      const lf = n(r.lf)
+      if (lf <= 0) return
+      const { matCost, laborVal } = resolveUtilRow(cat, r, [], materialRows, materialPrices)
       if (laborVal <= 0) laborUnset.push(r.type)
-      epMat += qty * matCost
-      epHrs += qty * laborVal
+      epMat += lf * matCost
+      epHrs += lf * laborVal
     })
+  })
+  // Per-Each Electrical Fixtures.
+  ;(state.epElecRows || []).forEach(r => {
+    if (!r.type) return
+    const qty = n(r.qty)
+    if (qty <= 0) return
+    const { matCost, laborVal } = resolveUtilRow(UTIL_CAT.elec, r, [], materialRows, materialPrices)
+    if (laborVal <= 0) laborUnset.push(r.type)
+    epMat += qty * matCost
+    epHrs += qty * laborVal
   })
 
   // ── In-House Plumbing (pool plumbing done in-house) ─────────────────────────
@@ -2809,15 +2831,86 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       </div>
       {/* end Steel */}
 
-      {/* ─── Electrical & Plumbing (ported from Utilities) ─── */}
+      {/* ─── Utilities (Trenching / Gas Pipe / Electrical Pipe·Wiring·Fixtures) ─── */}
       <div>
-        <SectionHeader title="Electrical & Plumbing" />
+        <SectionHeader title="Utilities" />
         <div className="space-y-4">
+          {/* Trenching — method → hrs per Cu Ft (mirrors the Utilities module). */}
+          <div>
+            <p className="text-xs font-semibold text-gray-600 mb-1">Trenching</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-xs text-gray-500 border-b border-gray-200">
+                    <th className="text-left pb-1 pr-2 font-medium">Method</th>
+                    <th className="text-center pb-1 pr-2 font-medium">Ln Ft</th>
+                    <th className="text-center pb-1 pr-2 font-medium">Width (in)</th>
+                    <th className="text-center pb-1 pr-2 font-medium">Depth (in)</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(T.epTrenchRows || []).map((r, i) => {
+                    const setT = setEpRows('epTrenchRows')
+                    const put = (field, val) => setT(rs => rs.map((x, idx) => (idx === i ? { ...x, [field]: val } : x)))
+                    return (
+                      <tr key={i} className="border-b border-gray-100">
+                        <td className="py-1 pr-2">
+                          <select
+                            className="input text-sm py-1"
+                            value={r.equipment}
+                            onChange={e => put('equipment', e.target.value)}
+                          >
+                            <option>Trench</option>
+                            <option>Hand</option>
+                          </select>
+                        </td>
+                        <td className="py-1 pr-2"><NumInput value={r.lf} onChange={v => put('lf', v)} /></td>
+                        <td className="py-1 pr-2"><NumInput value={r.width} onChange={v => put('width', v)} /></td>
+                        <td className="py-1 pr-2"><NumInput value={r.depth} onChange={v => put('depth', v)} /></td>
+                        <td className="py-1 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setT(rs => rs.filter((_, idx) => idx !== i))}
+                            className="text-gray-500 hover:text-red-500 text-sm"
+                          >
+                            ✕
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+              <button
+                type="button"
+                onClick={() => setEpRows('epTrenchRows')(rs => [...rs, EP_TRENCH_ROW()])}
+                className="text-xs text-green-700 hover:underline mt-1"
+              >
+                + Add Trench
+              </button>
+            </div>
+          </div>
           <EpTable
-            title="Utility Lines"
+            title="Gas Pipe"
+            rows={T.epGasPipeRows || []}
+            setRows={setEpRows('epGasPipeRows')}
+            arr={[]}
+            cat={UTIL_CAT.gasPipe}
+            qtyField="lf"
+            qtyLabel="Linear Feet"
+            unitLabel="LF"
+            newRow={EP_GASPIPE_ROW}
+            materialRows={materialRows}
+            materialPrices={materialPrices}
+            refreshAllRates={refreshAllRates}
+            vendorsForCategory={vendorsForCategory}
+          />
+          <EpTable
+            title="Electrical Pipe"
             rows={T.epLineRows || []}
             setRows={setEpRows('epLineRows')}
-            arr={LINE_TYPE_ARR}
+            arr={[]}
             cat={UTIL_CAT.line}
             qtyField="lf"
             qtyLabel="Linear Feet"
@@ -2829,15 +2922,15 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             vendorsForCategory={vendorsForCategory}
           />
           <EpTable
-            title="Gas Fixtures"
-            rows={T.epGasRows || []}
-            setRows={setEpRows('epGasRows')}
-            arr={GAS_TYPE_ARR}
-            cat={UTIL_CAT.gas}
-            qtyField="qty"
-            qtyLabel="Qty"
-            unitLabel="ea"
-            newRow={EP_GAS_ROW}
+            title="Electrical Wiring"
+            rows={T.epWireRows || []}
+            setRows={setEpRows('epWireRows')}
+            arr={[]}
+            cat={UTIL_CAT.wire}
+            qtyField="lf"
+            qtyLabel="Linear Feet"
+            unitLabel="LF"
+            newRow={EP_WIRE_ROW}
             materialRows={materialRows}
             materialPrices={materialPrices}
             refreshAllRates={refreshAllRates}
@@ -2847,7 +2940,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             title="Electrical Fixtures"
             rows={T.epElecRows || []}
             setRows={setEpRows('epElecRows')}
-            arr={ELEC_TYPE_ARR}
+            arr={[]}
             cat={UTIL_CAT.elec}
             qtyField="qty"
             qtyLabel="Qty"
@@ -2864,7 +2957,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       {/* ─── In-House Plumbing (In-House tab only) ─── */}
       {subType !== 'Subcontractor' && (
         <div>
-          <SectionHeader title="In-House Plumbing" />
+          <SectionHeader title="Pool Plumbing" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label text="Labor Hours" sub="hrs" />
