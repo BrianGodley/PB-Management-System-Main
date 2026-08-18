@@ -8,7 +8,7 @@ import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { resolveMaterialPrice, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
+import { resolveMaterialPrice, catalogOptions, catalogItemFor, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Planting Module
@@ -302,18 +302,33 @@ function calcPlanting(
       ? soilCY * soilMoveRate + sqft * tillingRate + sqft * amendRate
       : 0
 
+  // Items whose picked plant has no labor rate set (calc_meta.labor_rate unset or
+  // resolves to 0). Surfaced as a prompt so the user fixes it — never a fallback.
+  const laborUnset = []
+  // Per-plant install labor is item-driven: each plant Item points to its own
+  // labor_rates row via calc_meta.labor_rate (resolved live). No name-keyed lookup,
+  // no fallback — unset ⇒ 0 hrs and the plant is flagged.
+  const plantPerDay = r => {
+    const it = catalogItemFor(materialRows, PLANTS_SUBCAT, r.vendor, r.type, {
+      standardRows: 'null-vendor',
+      stripPrefix: true,
+      category: PLANTING_CATEGORY,
+      fallbackFirst: false,
+    })
+    const laborName = it?.calc_meta?.labor_rate || null
+    const perDay = n(laborRates[laborName])
+    if (r.type && n(r.qty) > 0 && perDay <= 0) laborUnset.push(r.type)
+    return perDay
+  }
+
   // Small plants
-  const smalls = (smallPlantRows || []).map(r =>
-    computePlantRow(r, getSmallPerDay(laborRates, r.type))
-  )
+  const smalls = (smallPlantRows || []).map(r => computePlantRow(r, plantPerDay(r)))
   const smallHrs = smalls.reduce((a, x) => a + x.hrs, 0)
   const smallMat = smalls.reduce((a, x) => a + x.mat, 0)
   const smallSubMat = smalls.reduce((a, x) => a + x.subMat, 0)
 
   // Large plants
-  const larges = (largePlantRows || []).map(r =>
-    computePlantRow(r, getLargePerDay(laborRates, r.type))
-  )
+  const larges = (largePlantRows || []).map(r => computePlantRow(r, plantPerDay(r)))
   const largeHrs = larges.reduce((a, x) => a + x.hrs, 0)
   const largeMat = larges.reduce((a, x) => a + x.mat, 0)
   const largeSubMat = larges.reduce((a, x) => a + x.subMat, 0)
@@ -435,6 +450,7 @@ function calcPlanting(
     smalls,
     larges,
     addonResults,
+    laborUnset: isSubTab ? [] : Array.from(new Set(laborUnset.filter(Boolean))),
   }
 }
 
@@ -1276,6 +1292,14 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
       {pricesLoading && (
         <div className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
           Loading rates from Master Rates…
+        </div>
+      )}
+
+      {!isSub && calc.laborUnset && calc.laborUnset.length > 0 && (
+        <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">
+          <span className="font-semibold">Labor rate needed:</span> set a Default
+          Labor rate in Master Material Rates for {calc.laborUnset.join(', ')}. These
+          plants are contributing 0 labor hours until a labor rate is assigned.
         </div>
       )}
 
