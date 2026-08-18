@@ -239,7 +239,10 @@ function mergedUtilTypes(cat, builtInArr, materialRows, vendorSel = 'Standard') 
       dbName: o.row.name,
       // Catalog Standard price for this Item (DB-resolved, not a hardcoded fallback).
       catalogPrice: n(o.row.unit_cost),
-      laborDbName: bi?.laborDbName ?? `${o.label} - Labor Rate`,
+      // Labor pointer lives on the Item's calc_meta.labor_rate (an independent
+      // labor_rates row). No synthesized "<name> - Labor Rate", no built-in map,
+      // no hardcoded fallback — if it's unset the row prompts the user to fix it.
+      laborDbName: o.row.calc_meta?.labor_rate || null,
       fromMaster: !bi,
     }
   })
@@ -260,14 +263,13 @@ function resolveUtilRow(cat, row, houseArr, materialRows, catDefaults, mp) {
       matOpt: { label: row.type, dbName: undefined, fallback: 0 },
       matCost: 0,
       laborVal: 0,
+      laborName: null,
       laborBuiltIn: null,
     }
   }
   // Type options are the SELECTED VENDOR'S items (vendor-first, like Paver).
   const merged = mergedUtilTypes(cat, houseArr, materialRows, vsel)
   const builtIn = merged.find(o => o.label === row.type) || merged[0]
-  // Labor coefficient read live from labor_rates (via mp) — no hardcoded fallback.
-  const laborVal = n(mp[builtIn?.laborDbName])
   let matDbName = builtIn?.dbName
   const vrow = catalogItemFor(materialRows, cat, vsel, builtIn?.label, {
     ...CATALOG_OPTS,
@@ -276,13 +278,18 @@ function resolveUtilRow(cat, row, houseArr, materialRows, catDefaults, mp) {
   if (vrow) {
     matDbName = vrow.name
   }
+  // Labor pointer = the Item's calc_meta.labor_rate (independent labor_rates row),
+  // resolved live via mp. No synthesized name, no built-in map, no hardcoded
+  // fallback — unset ⇒ laborVal 0 and the row is flagged for the user to fix.
+  const laborName = vrow?.calc_meta?.labor_rate || builtIn?.laborDbName || null
+  const laborVal = n(mp[laborName])
   // The SELECTED vendor's catalog row (vrow) is the source of truth for its price.
   // Otherwise the name-keyed Standard map (mp) — the catalog Standard price / misc
   // rate. No hardcoded fallback: an unpriced item contributes $0.
   const matCost = vrow ? n(vrow.unit_cost) : n(mp[matDbName])
   // matOpt drives the Type dropdown value + the material rate popover target.
   const matOpt = { label: builtIn?.label, dbName: matDbName }
-  return { opts: merged, matOpt, matCost, laborVal, laborBuiltIn: builtIn }
+  return { opts: merged, matOpt, matCost, laborVal, laborName, laborBuiltIn: builtIn }
 }
 
 function calcUtilities(
@@ -329,6 +336,10 @@ function calcUtilities(
     manMat = 0,
     manSub = 0
 
+  // Items whose selected Type has no labor rate set (calc_meta.labor_rate unset or
+  // resolves to 0). Surfaced as a prompt so the user fixes it — never a fallback.
+  const laborUnset = []
+
   trenchRows.forEach(r => {
     const lf = n(r.lf),
       w = n(r.width),
@@ -345,7 +356,7 @@ function calcUtilities(
     if (!r.type) return
     const lf = n(r.lf)
     if (lf <= 0) return
-    const { matCost, laborVal } = resolveUtilRow(
+    const { matCost, laborVal, laborName } = resolveUtilRow(
       UTIL_CAT.line,
       r,
       LINE_TYPE_ARR,
@@ -353,6 +364,7 @@ function calcUtilities(
       catDefaults,
       materialPrices
     )
+    if (laborVal <= 0) laborUnset.push(r.type)
     lineMat += lf * matCost
     lineHrs += lf * laborVal
   })
@@ -369,6 +381,7 @@ function calcUtilities(
       catDefaults,
       materialPrices
     )
+    if (laborVal <= 0) laborUnset.push(r.type)
     gasPipeMat += lf * matCost
     gasPipeHrs += lf * laborVal
   })
@@ -385,6 +398,7 @@ function calcUtilities(
       catDefaults,
       materialPrices
     )
+    if (laborVal <= 0) laborUnset.push(r.type)
     wireMat += lf * matCost
     wireHrs += lf * laborVal
   })
@@ -402,6 +416,7 @@ function calcUtilities(
         catDefaults,
         materialPrices
       )
+      if (laborVal <= 0) laborUnset.push(r.type)
       fixMat += qty * matCost
       fixHrs += qty * laborVal
     })
@@ -422,6 +437,7 @@ function calcUtilities(
       catDefaults,
       materialPrices
     )
+    if (laborVal <= 0) laborUnset.push(r.type)
     sewerLineMat += lf * matCost
     sewerLineHrs += lf * laborVal
   })
@@ -482,6 +498,7 @@ function calcUtilities(
     sewerLineMat,
     addHrs,
     addMat,
+    laborUnset: Array.from(new Set(laborUnset.filter(Boolean))),
   }
 }
 
@@ -1177,6 +1194,14 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
       {pricesLoading && (
         <div className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
           Loading material prices from Master Rates…
+        </div>
+      )}
+
+      {!isSub && calc.laborUnset && calc.laborUnset.length > 0 && (
+        <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">
+          <span className="font-semibold">Labor rate needed:</span> set a Default
+          Labor rate in Master Material Rates for {calc.laborUnset.join(', ')}. These
+          items are contributing 0 labor hours until a labor rate is assigned.
         </div>
       )}
 

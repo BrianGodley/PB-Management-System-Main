@@ -35,6 +35,7 @@ export default function MasterMaterialRates() {
   const [view, setView] = useState('vendor') // 'vendor' | 'standard' | 'misc' | 'cat' | 'sub' | 'archived'
   const [materials, setMaterials] = useState([])
   const [vendors, setVendors] = useState([])
+  const [labs, setLabs] = useState([]) // labor_rates (name, category) for the inline Default Labor picker
   const [loading, setLoading] = useState(true)
   const [cat, setCat] = useState('All')
   const [q, setQ] = useState('')
@@ -51,11 +52,11 @@ export default function MasterMaterialRates() {
     // silently truncated (a just-added material would never appear). Fetch in
     // 1000-row blocks so every product shows.
     const PAGE = 1000
-    const sel = `id, description, unit, is_default, collection, category_id, subcategory_id, archived_at,
+    const sel = `id, description, unit, is_default, collection, category_id, subcategory_id, archived_at, calc_meta,
            category:category_id ( code, name ),
            subcategory:subcategory_id ( code, name ),
            prices:material_price ( id, price, vendor_id, effective_end )`
-    const [matData, venRes] = await Promise.all([
+    const [matData, venRes, labRes] = await Promise.all([
       (async () => {
         const all = []
         for (let from = 0; ; from += PAGE) {
@@ -71,9 +72,11 @@ export default function MasterMaterialRates() {
         return all
       })(),
       supabase.from('subs_vendors').select('id, company_name'),
+      supabase.from('labor_rates').select('name, category').order('name'),
     ])
     setMaterials(matData)
     setVendors(venRes.data || [])
+    setLabs(labRes.data || [])
     setLoading(false)
   }, [])
   useEffect(() => {
@@ -88,6 +91,18 @@ export default function MasterMaterialRates() {
     () => vendors.find(v => isStandardName(v.company_name))?.id || null,
     [vendors]
   )
+
+  // Labor rates available for an item's Category — the Default Labor options.
+  const laborOptsForCat = useCallback(
+    catName => labs.filter(l => l.category === catName),
+    [labs]
+  )
+  // Set (or clear) an item's default labor pointer inline, without opening the modal.
+  const saveDefaultLabor = useCallback(async (mat, name) => {
+    const next = { ...(mat.calc_meta || {}), labor_rate: name || null }
+    setMaterials(ms => ms.map(x => (x.id === mat.id ? { ...x, calc_meta: next } : x)))
+    await supabase.from('material').update({ calc_meta: next }).eq('id', mat.id)
+  }, [])
 
   // Stable per-sub-category index → the NNNN in the identity code.
   const seqOf = useMemo(() => {
@@ -321,6 +336,7 @@ export default function MasterMaterialRates() {
                 <Th k="description" sort={sort} onSort={toggleSort}>Description</Th>
                 <Th k="unit" sort={sort} onSort={toggleSort}>Unit</Th>
                 <Th k="price" sort={sort} onSort={toggleSort} align="right">Price</Th>
+                {!isArchivedView && <th className="px-3 py-2">Default Labor</th>}
                 <th className="px-3 py-2 w-36" />
               </tr>
             </thead>
@@ -382,6 +398,29 @@ export default function MasterMaterialRates() {
                           </span>
                         )}
                       </td>
+                      {!isArchivedView && (
+                        <td className="px-3 py-1.5" onClick={e => e.stopPropagation()}>
+                          <select
+                            className={`border rounded px-1.5 py-1 text-[11px] bg-white max-w-[190px] ${
+                              r.m.calc_meta?.labor_rate ? 'border-gray-200 text-gray-700' : 'border-amber-300 text-amber-700'
+                            }`}
+                            value={r.m.calc_meta?.labor_rate || ''}
+                            onChange={e => saveDefaultLabor(r.m, e.target.value)}
+                            title="Default labor rate for this item (independent of material price)"
+                          >
+                            <option value="">— set labor —</option>
+                            {r.m.calc_meta?.labor_rate &&
+                              !laborOptsForCat(r.m.category?.name).some(l => l.name === r.m.calc_meta.labor_rate) && (
+                                <option value={r.m.calc_meta.labor_rate}>{r.m.calc_meta.labor_rate}</option>
+                              )}
+                            {laborOptsForCat(r.m.category?.name).map(l => (
+                              <option key={l.name} value={l.name}>
+                                {l.name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                      )}
                       <td className="px-3 py-1.5 text-right whitespace-nowrap">
                         {isArchivedView ? (
                           <button
