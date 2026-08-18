@@ -544,7 +544,7 @@ function makeTab(data = {}) {
     },
     spillways: data.spillways ?? [newSpillway()],
     copingRows: data.copingRows ?? [newCopingRow()],
-    raisedSurfaces: data.raisedSurfaces ?? [],
+    raisedSurfaces: data.raisedSurfaces ?? [newRaisedSurface()],
     interiorFinish: migrateStructMap(data.interiorFinish) ?? {
       Pool: defaultInteriorStruct(),
       Spa: defaultInteriorStruct(),
@@ -566,10 +566,10 @@ function makeTab(data = {}) {
     // sub trade). Blank strings default to the DB master rates in calcPool.
     plumbingIH: data.plumbingIH ? { hours: '', materials: '', ...data.plumbingIH } : { hours: '', materials: '' },
     epTrenchRows: data.epTrenchRows ?? [EP_TRENCH_ROW()],
-    epGasPipeRows: data.epGasPipeRows ?? [EP_GASPIPE_ROW(), EP_GASPIPE_ROW()],
-    epLineRows: data.epLineRows ?? [EP_LINE_ROW(), EP_LINE_ROW()],
-    epWireRows: data.epWireRows ?? [EP_WIRE_ROW(), EP_WIRE_ROW()],
-    epElecRows: data.epElecRows ?? [EP_ELEC_ROW(), EP_ELEC_ROW()],
+    epGasPipeRows: data.epGasPipeRows ?? [EP_GASPIPE_ROW()],
+    epLineRows: data.epLineRows ?? [EP_LINE_ROW()],
+    epWireRows: data.epWireRows ?? [EP_WIRE_ROW()],
+    epElecRows: data.epElecRows ?? [EP_ELEC_ROW()],
     manualRows: data.manualRows ?? [newManualRow()],
   }
 }
@@ -2612,6 +2612,72 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       </div>
 
 
+      {/* ─── 7. Raised Surfaces (above Coping) ─── */}
+      <div>
+        <SectionHeader title="Raised Surfaces" />
+        <div className="space-y-2">
+          {T.raisedSurfaces.map((rs, i) => (
+            <div key={i} className="grid grid-cols-5 gap-2 items-end">
+              <div className="col-span-2">
+                <Label text="Surface Type" />
+                <div className="flex items-center gap-1">
+                  <select
+                    className="input text-sm py-1.5 flex-1 min-w-0"
+                    value={rs.matType || ''}
+                    onChange={e => updRaised(i, 'matType', e.target.value)}
+                  >
+                    {!rs.matType && <option value="">Select material</option>}
+                    {rs.matType && !poolStdOptions(materialRows, RAISED_SUBCAT).some(o => o.label === rs.matType) && (
+                      <option value={rs.matType}>{rs.matType}</option>
+                    )}
+                    {poolStdOptions(materialRows, RAISED_SUBCAT).map(o => (
+                      <option key={o.value} value={o.label}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <Label text="Sqft" />
+                <NumInput value={rs.sqft} onChange={v => updRaised(i, 'sqft', v)} />
+              </div>
+              <div>
+                <Label text="Curve %" />
+                <NumInput
+                  value={rs.curvePct}
+                  onChange={v => updRaised(i, 'curvePct', v)}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <Label text="Corners" />
+                <div className="flex items-center gap-1">
+                  <NumInput
+                    value={rs.corners}
+                    onChange={v => updRaised(i, 'corners', v)}
+                    placeholder="0"
+                    className="w-1/2 min-w-0"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeRaised(i)}
+                    className="text-gray-500 hover:text-red-500 text-sm leading-none shrink-0"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={addRaised}
+            className="text-xs text-green-700 hover:underline mt-1"
+          >
+            + Add Raised Surface
+          </button>
+        </div>
+      </div>
+
       {/* ─── 6. Coping ─── */}
       <div>
         <SectionHeader title="Coping" />
@@ -2797,68 +2863,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         </div>
       </div>
 
-      {/* ─── 7. Raised Surfaces ─── */}
-      <div>
-        <SectionHeader title="Raised Surfaces" />
-        <div className="space-y-2">
-          {T.raisedSurfaces.map((rs, i) => (
-            <div key={i} className="grid grid-cols-5 gap-2 items-end">
-              <div className="col-span-2">
-                <Label text="Surface Type" />
-                <div className="flex items-center gap-1">
-                  <select
-                    className="input text-sm py-1.5 flex-1 min-w-0"
-                    value={rs.matType || ''}
-                    onChange={e => updRaised(i, 'matType', e.target.value)}
-                  >
-                    {!rs.matType && <option value="">Select material</option>}
-                    {rs.matType && !poolStdOptions(materialRows, RAISED_SUBCAT).some(o => o.label === rs.matType) && (
-                      <option value={rs.matType}>{rs.matType}</option>
-                    )}
-                    {poolStdOptions(materialRows, RAISED_SUBCAT).map(o => (
-                      <option key={o.value} value={o.label}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <Label text="Sqft" />
-                <NumInput value={rs.sqft} onChange={v => updRaised(i, 'sqft', v)} />
-              </div>
-              <div>
-                <Label text="Curve %" />
-                <NumInput
-                  value={rs.curvePct}
-                  onChange={v => updRaised(i, 'curvePct', v)}
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <Label text="Corners" />
-                <NumInput
-                  value={rs.corners}
-                  onChange={v => updRaised(i, 'corners', v)}
-                  placeholder="0"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => removeRaised(i)}
-                className="text-gray-500 hover:text-red-500 text-sm pb-1"
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={addRaised}
-            className="text-xs text-green-700 hover:underline mt-1"
-          >
-            + Add Raised Surface
-          </button>
-        </div>
-      </div>
 
       {/* ─── 8. Interior Finish — Sub tab only ─── */}
       {isSub && (
