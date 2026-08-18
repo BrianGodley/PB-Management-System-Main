@@ -1302,7 +1302,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
             <colgroup>
               <col className="w-[120px]" />
               <col />
-              <col className="w-[150px]" />
               <col className="w-[70px]" />
               <col className="w-[76px]" />
               <col className="w-[84px]" />
@@ -1312,7 +1311,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Pipe Type</th>
-                <th className="text-center pb-1 pr-2 font-medium">Labor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Linear Feet</th>
                 <th className="text-center pb-1 pr-2 font-medium text-gray-400">$ per Ln Ft</th>
                 <th className="text-center pb-1 pr-2 font-medium text-gray-400">Material $</th>
@@ -1386,22 +1384,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                       </div>
                     </td>
                     <td className="py-1 pr-2">
-                      <select
-                        className="input text-sm py-1 w-full"
-                        value={effLabor}
-                        onChange={e => updatePipe(i, 'laborType', e.target.value)}
-                        title="Labor rate — defaults from the item, change or clear freely"
-                      >
-                        <option value="">— Labor —</option>
-                        {effLabor && !PIPE_LABOR_OPTS.some(o => o.value === effLabor) && (
-                          <option value={effLabor}>{cleanLaborLabel(effLabor)}</option>
-                        )}
-                        {PIPE_LABOR_OPTS.map(o => (
-                          <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="py-1 pr-2">
                       <NumInput value={row.lf} onChange={v => updatePipe(i, 'lf', v)} className="w-full text-center" />
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
@@ -1440,7 +1422,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
             <colgroup>
               <col className="w-[120px]" />
               <col />
-              <col className="w-[150px]" />
               <col className="w-[70px]" />
               <col className="w-[76px]" />
               <col className="w-[84px]" />
@@ -1450,7 +1431,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Pipe Type</th>
-                <th className="text-center pb-1 pr-2 font-medium">Labor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Linear Feet</th>
                 <th className="text-center pb-1 pr-2 font-medium text-gray-400">$ per Ln Ft</th>
                 <th className="text-center pb-1 pr-2 font-medium text-gray-400">Material $</th>
@@ -1524,22 +1504,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                       </div>
                     </td>
                     <td className="py-1 pr-2">
-                      <select
-                        className="input text-sm py-1 w-full"
-                        value={effLabor}
-                        onChange={e => updateFrench(i, 'laborType', e.target.value)}
-                        title="Labor rate — defaults from the item, change or clear freely"
-                      >
-                        <option value="">— Labor —</option>
-                        {effLabor && !FRENCH_LABOR_OPTS.some(o => o.value === effLabor) && (
-                          <option value={effLabor}>{cleanLaborLabel(effLabor)}</option>
-                        )}
-                        {FRENCH_LABOR_OPTS.map(o => (
-                          <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="py-1 pr-2">
                       <NumInput value={row.lf} onChange={v => updateFrench(i, 'lf', v)} className="w-full text-center" />
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
@@ -1609,7 +1573,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
             <colgroup>
               <col className="w-[120px]" />
               <col />
-              <col className="w-[150px]" />
               <col className="w-[70px]" />
               <col className="w-[76px]" />
               <col className="w-[84px]" />
@@ -1619,7 +1582,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Fixture Type</th>
-                <th className="text-center pb-1 pr-2 font-medium">Labor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Qty</th>
                 <th className="text-center pb-1 pr-2 font-medium text-gray-400">$/Ea</th>
                 <th className="text-center pb-1 pr-2 font-medium text-gray-400">Material $</th>
@@ -1691,22 +1653,6 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                           })()}
                         </select>
                       </div>
-                    </td>
-                    <td className="py-1 pr-2">
-                      <select
-                        className="input text-sm py-1 w-full"
-                        value={effLabor}
-                        onChange={e => updateFixture(i, 'laborType', e.target.value)}
-                        title="Labor rate — defaults from the item, change or clear freely"
-                      >
-                        <option value="">— Labor —</option>
-                        {effLabor && !FIX_LABOR_OPTS.some(o => o.value === effLabor) && (
-                          <option value={effLabor}>{cleanLaborLabel(effLabor)}</option>
-                        )}
-                        {FIX_LABOR_OPTS.map(o => (
-                          <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                      </select>
                     </td>
                     <td className="py-1 pr-2">
                       <NumInput value={row.qty} onChange={v => updateFixture(i, 'qty', v)} className="w-full text-center" />
