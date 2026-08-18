@@ -2630,7 +2630,8 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         </div>
       </div>
 
-      {/* ─── 10. Plumbing (Sub) ─── */}
+      {/* ─── 10. Plumbing (Sub) — Sub tab only ─── */}
+      {isSub && (
       <div>
         <SectionHeader title="Plumbing (Sub)" />
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -2714,6 +2715,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           </div>
         </div>
       </div>
+      )}
 
       {/* ─── 11. Steel ─── */}
       <div>
@@ -2805,6 +2807,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           </div>
         )}
       </div>
+      {/* end Steel */}
 
       {/* ─── Electrical & Plumbing (ported from Utilities) ─── */}
       <div>
