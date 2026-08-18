@@ -242,12 +242,13 @@ function calcDrainage(
     const lf = n(r.lf)
     // Gate on the selection itself (not membership in the built-in map) so a
     // vendor-only catalog item still prices through drainMatCost.
-    if (lf > 0 && r.type) {
+    if (lf > 0 && (r.type || r.laborType)) {
       const meta = PIPE_T[r.type] || {}
       const { cost, row: vrow } = drainMatCost(DRAIN_CAT.pipe, r, PIPE_T, materialRows, catDefaults, materialPrices)
       pipeMat += lf * cost
-      // Labor: the item's own calc_meta.labor_rate, then legacy built-in map, then coefficient.
-      const laborName = vrow?.calc_meta?.labor_rate || PIPE_LABOR_RATE_NAME[r.type]
+      // Labor is chosen independently: the row's own Labor pick wins; otherwise the
+      // material item's default (calc_meta.labor_rate); then the legacy map/coefficient.
+      const laborName = r.laborType || vrow?.calc_meta?.labor_rate || PIPE_LABOR_RATE_NAME[r.type]
       pipeHrs += lf * (n(materialPrices[laborName]) || n(meta.laborPerLF))
     }
   })
@@ -260,7 +261,7 @@ function calcDrainage(
     frenchHrs = 0
   ;(frenchRows || []).forEach(r => {
     const lf = n(r.lf)
-    if (lf > 0 && r.type) {
+    if (lf > 0 && (r.type || r.laborType)) {
       const meta = FRENCH_PIPE_T[r.type] || {}
       const { cost, row: vrow } = drainMatCost(
         DRAIN_CAT.french,
@@ -271,8 +272,8 @@ function calcDrainage(
         materialPrices
       )
       frenchMat += lf * cost
-      // Labor: the item's own calc_meta.labor_rate, then legacy built-in map, then coefficient.
-      const laborName = vrow?.calc_meta?.labor_rate || FRENCH_PIPE_LABOR_RATE_NAME[r.type]
+      // Labor chosen independently: row pick → item default → legacy.
+      const laborName = r.laborType || vrow?.calc_meta?.labor_rate || FRENCH_PIPE_LABOR_RATE_NAME[r.type]
       frenchHrs += lf * (n(materialPrices[laborName]) || n(meta.laborPerLF))
     }
   })
@@ -310,12 +311,12 @@ function calcDrainage(
   let totalFixQty = 0
   fixtureRows.forEach(r => {
     const qty = n(r.qty)
-    if (qty > 0 && r.type) {
+    if (qty > 0 && (r.type || r.laborType)) {
       const meta = FIX_T[r.type] || {}
       const { cost, row: vrow } = drainMatCost(DRAIN_CAT.fixture, r, FIX_T, materialRows, catDefaults, materialPrices)
       fixMat += qty * cost
-      // Labor: the item's own calc_meta.labor_rate, then legacy built-in map, then coefficient.
-      const laborName = vrow?.calc_meta?.labor_rate || FIXTURE_LABOR_RATE_NAME[r.type]
+      // Labor chosen independently: row pick → item default → legacy.
+      const laborName = r.laborType || vrow?.calc_meta?.labor_rate || FIXTURE_LABOR_RATE_NAME[r.type]
       fixHrs += qty * (n(materialPrices[laborName]) || n(meta.laborHrs))
       totalFixQty += qty
     }
@@ -474,6 +475,8 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   // Vendor catalog (material_rates rows with sub_category + vendor_id) + vendor list.
   const [materialRows, setMaterialRows] = useState(initialData?.materialRows ?? [])
   const [vendors, setVendors] = useState([])
+  // Drainage labor rates (independent of material) — feed the per-row Labor picker.
+  const [laborRateRows, setLaborRateRows] = useState([])
   useEffect(() => {
     let alive = true
     Promise.all([
@@ -483,9 +486,15 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         .select('id, company_name')
         .eq('type', 'vendor')
         .order('company_name'),
-    ]).then(([rows, venRes]) => {
+      supabase
+        .from('labor_rates')
+        .select('name, sub_category, rate, unit')
+        .eq('category', 'Drainage')
+        .order('name'),
+    ]).then(([rows, venRes, labRes]) => {
       if (!alive) return
       setMaterialRows(rows || [])
+      setLaborRateRows(labRes.data || [])
       setVendors(
         (venRes.data || []).map(v => ({
           id: v.id,
@@ -646,6 +655,16 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   const PIPE_T = { ...PIPE_TYPES, ...masterDrainTypes(DRAIN_CAT.pipe, PIPE_TYPES, materialRows, 'laborPerLF') }
   const FIX_T = { ...FIXTURE_TYPES, ...masterDrainTypes(DRAIN_CAT.fixture, FIXTURE_TYPES, materialRows, 'laborHrs') }
   const FRENCH_PIPE_T = { ...FRENCH_PIPE_TYPES, ...masterDrainTypes(DRAIN_CAT.french, FRENCH_PIPE_TYPES, materialRows, 'laborPerLF') }
+  // Independent Labor picker options, sourced straight from the Drainage labor_rates
+  // (by sub_category), with a readable label. Nothing links these to a material.
+  const cleanLaborLabel = name => String(name || '').replace(/^Drainage\s+/, '').replace(/\s+Labor$/, '')
+  const laborOptionsFor = sub =>
+    (laborRateRows || [])
+      .filter(r => r.sub_category === sub)
+      .map(r => ({ value: r.name, label: cleanLaborLabel(r.name) }))
+  const PIPE_LABOR_OPTS = laborOptionsFor('Pipe')
+  const FRENCH_LABOR_OPTS = laborOptionsFor('French Drain')
+  const FIX_LABOR_OPTS = laborOptionsFor('Fixtures')
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
@@ -1281,25 +1300,29 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         <div className="overflow-x-auto">
           <table className="w-full text-sm table-fixed">
             <colgroup>
-              <col className="w-[128px]" />
+              <col className="w-[120px]" />
               <col />
+              <col className="w-[150px]" />
+              <col className="w-[70px]" />
+              <col className="w-[76px]" />
               <col className="w-[84px]" />
-              <col className="w-[96px]" />
-              <col className="w-[96px]" />
+              <col className="w-[72px]" />
             </colgroup>
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Pipe Type</th>
+                <th className="text-center pb-1 pr-2 font-medium">Labor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Linear Feet</th>
                 <th className="text-center pb-1 pr-2 font-medium text-gray-400">$ per Ln Ft</th>
-                <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
+                <th className="text-center pb-1 pr-2 font-medium text-gray-400">Material $</th>
+                <th className="text-center pb-1 font-medium text-gray-400">Labor Hrs</th>
               </tr>
             </thead>
             <tbody>
               {pipeRows.map((row, i) => {
                 const rate = PIPE_T[row.type]
-                const { dbName, cost } = drainMatCost(
+                const { dbName, cost, row: vrow } = drainMatCost(
                   DRAIN_CAT.pipe,
                   row,
                   PIPE_T,
@@ -1308,6 +1331,8 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                   materialPrices
                 )
                 const mat = n(row.lf) * cost
+                const effLabor = row.laborType || vrow?.calc_meta?.labor_rate || ''
+                const laborHrs = n(row.lf) * n(materialPrices[effLabor])
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
@@ -1361,6 +1386,22 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                       </div>
                     </td>
                     <td className="py-1 pr-2">
+                      <select
+                        className="input text-sm py-1 w-full"
+                        value={effLabor}
+                        onChange={e => updatePipe(i, 'laborType', e.target.value)}
+                        title="Labor rate — defaults from the item, change or clear freely"
+                      >
+                        <option value="">— Labor —</option>
+                        {effLabor && !PIPE_LABOR_OPTS.some(o => o.value === effLabor) && (
+                          <option value={effLabor}>{cleanLaborLabel(effLabor)}</option>
+                        )}
+                        {PIPE_LABOR_OPTS.map(o => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1 pr-2">
                       <NumInput value={row.lf} onChange={v => updatePipe(i, 'lf', v)} className="w-full text-center" />
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
@@ -1368,8 +1409,11 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                         ${cost.toFixed(2)}
                       </span>
                     </td>
-                    <td className="py-1 text-center text-gray-600 text-xs">
+                    <td className="py-1 text-center text-gray-600 text-xs pr-2">
                       {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
+                    </td>
+                    <td className="py-1 text-center text-gray-600 text-xs">
+                      {laborHrs > 0 ? laborHrs.toFixed(2) : '—'}
                     </td>
                   </tr>
                 )
@@ -1394,25 +1438,29 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         <div className="overflow-x-auto">
           <table className="w-full text-sm table-fixed">
             <colgroup>
-              <col className="w-[128px]" />
+              <col className="w-[120px]" />
               <col />
+              <col className="w-[150px]" />
+              <col className="w-[70px]" />
+              <col className="w-[76px]" />
               <col className="w-[84px]" />
-              <col className="w-[96px]" />
-              <col className="w-[96px]" />
+              <col className="w-[72px]" />
             </colgroup>
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Pipe Type</th>
+                <th className="text-center pb-1 pr-2 font-medium">Labor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Linear Feet</th>
                 <th className="text-center pb-1 pr-2 font-medium text-gray-400">$ per Ln Ft</th>
-                <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
+                <th className="text-center pb-1 pr-2 font-medium text-gray-400">Material $</th>
+                <th className="text-center pb-1 font-medium text-gray-400">Labor Hrs</th>
               </tr>
             </thead>
             <tbody>
               {frenchRows.map((row, i) => {
                 const rate = FRENCH_PIPE_T[row.type]
-                const { cost } = drainMatCost(
+                const { cost, row: vrow } = drainMatCost(
                   DRAIN_CAT.french,
                   row,
                   FRENCH_PIPE_T,
@@ -1421,6 +1469,8 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                   materialPrices
                 )
                 const mat = n(row.lf) * cost
+                const effLabor = row.laborType || vrow?.calc_meta?.labor_rate || ''
+                const laborHrs = n(row.lf) * n(materialPrices[effLabor])
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
@@ -1451,15 +1501,43 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                           value={row.type || ''}
                           onChange={e => updateFrench(i, 'type', e.target.value)}
                         >
-                          {!row.type && <option value="">Select pipe</option>}
-                          {row.type && !Object.keys(FRENCH_PIPE_TYPES).includes(row.type) && (
-                            <option value={row.type}>{row.type}</option>
-                          )}
-                          {Object.keys(FRENCH_PIPE_TYPES).map(t => (
-                            <option key={t}>{t}</option>
-                          ))}
+                          {(() => {
+                            const frenchOpts = drainTypeOptions(
+                              DRAIN_CAT.french,
+                              FRENCH_PIPE_TYPES,
+                              materialRows,
+                              row.vendor
+                            )
+                            return (
+                              <>
+                                {!row.type && <option value="">Select pipe</option>}
+                                {row.type && !frenchOpts.includes(row.type) && (
+                                  <option value={row.type}>{row.type}</option>
+                                )}
+                                {frenchOpts.map(t => (
+                                  <option key={t}>{t}</option>
+                                ))}
+                              </>
+                            )
+                          })()}
                         </select>
                       </div>
+                    </td>
+                    <td className="py-1 pr-2">
+                      <select
+                        className="input text-sm py-1 w-full"
+                        value={effLabor}
+                        onChange={e => updateFrench(i, 'laborType', e.target.value)}
+                        title="Labor rate — defaults from the item, change or clear freely"
+                      >
+                        <option value="">— Labor —</option>
+                        {effLabor && !FRENCH_LABOR_OPTS.some(o => o.value === effLabor) && (
+                          <option value={effLabor}>{cleanLaborLabel(effLabor)}</option>
+                        )}
+                        {FRENCH_LABOR_OPTS.map(o => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
                     </td>
                     <td className="py-1 pr-2">
                       <NumInput value={row.lf} onChange={v => updateFrench(i, 'lf', v)} className="w-full text-center" />
@@ -1469,8 +1547,11 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                         ${cost.toFixed(2)}
                       </span>
                     </td>
-                    <td className="py-1 text-center text-gray-600 text-xs">
+                    <td className="py-1 text-center text-gray-600 text-xs pr-2">
                       {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
+                    </td>
+                    <td className="py-1 text-center text-gray-600 text-xs">
+                      {laborHrs > 0 ? laborHrs.toFixed(2) : '—'}
                     </td>
                   </tr>
                 )
@@ -1526,25 +1607,29 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         <div className="overflow-x-auto">
           <table className="w-full text-sm table-fixed">
             <colgroup>
-              <col className="w-[128px]" />
+              <col className="w-[120px]" />
               <col />
+              <col className="w-[150px]" />
+              <col className="w-[70px]" />
+              <col className="w-[76px]" />
               <col className="w-[84px]" />
-              <col className="w-[96px]" />
-              <col className="w-[96px]" />
+              <col className="w-[72px]" />
             </colgroup>
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Fixture Type</th>
+                <th className="text-center pb-1 pr-2 font-medium">Labor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Qty</th>
                 <th className="text-center pb-1 pr-2 font-medium text-gray-400">$/Ea</th>
-                <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
+                <th className="text-center pb-1 pr-2 font-medium text-gray-400">Material $</th>
+                <th className="text-center pb-1 font-medium text-gray-400">Labor Hrs</th>
               </tr>
             </thead>
             <tbody>
               {fixtureRows.map((row, i) => {
                 const rate = FIX_T[row.type]
-                const { dbName, cost } = drainMatCost(
+                const { dbName, cost, row: vrow } = drainMatCost(
                   DRAIN_CAT.fixture,
                   row,
                   FIX_T,
@@ -1553,6 +1638,8 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                   materialPrices
                 )
                 const mat = n(row.qty) * cost
+                const effLabor = row.laborType || vrow?.calc_meta?.labor_rate || ''
+                const laborHrs = n(row.qty) * n(materialPrices[effLabor])
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
@@ -1606,6 +1693,22 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                       </div>
                     </td>
                     <td className="py-1 pr-2">
+                      <select
+                        className="input text-sm py-1 w-full"
+                        value={effLabor}
+                        onChange={e => updateFixture(i, 'laborType', e.target.value)}
+                        title="Labor rate — defaults from the item, change or clear freely"
+                      >
+                        <option value="">— Labor —</option>
+                        {effLabor && !FIX_LABOR_OPTS.some(o => o.value === effLabor) && (
+                          <option value={effLabor}>{cleanLaborLabel(effLabor)}</option>
+                        )}
+                        {FIX_LABOR_OPTS.map(o => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1 pr-2">
                       <NumInput value={row.qty} onChange={v => updateFixture(i, 'qty', v)} className="w-full text-center" />
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
@@ -1613,8 +1716,11 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                         {rate ? `$${cost.toFixed(2)}` : '—'}
                       </span>
                     </td>
-                    <td className="py-1 text-center text-gray-600 text-xs">
+                    <td className="py-1 text-center text-gray-600 text-xs pr-2">
                       {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
+                    </td>
+                    <td className="py-1 text-center text-gray-600 text-xs">
+                      {laborHrs > 0 ? laborHrs.toFixed(2) : '—'}
                     </td>
                   </tr>
                 )
