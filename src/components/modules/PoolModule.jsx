@@ -205,6 +205,28 @@ function copingVendorIds(materialRows) {
   ]
 }
 
+// ── Tile / Spillway / Raised Surface now live in master material rates (Standard,
+//    no vendor picker). Each item carries its labor pointer on calc_meta.labor_rate
+//    ('Tile - <type>' / 'Spillway - <type>' / 'Raised - <type>'). Tile's material
+//    $/SF stays a per-row figure; Spillway/Raised material comes from the item.
+const TILE_SUBCAT = 'Tile'
+const SPILLWAY_SUBCAT = 'Spillway'
+const RAISED_SUBCAT = 'Raised Surface'
+function poolStdOptions(materialRows, subcat) {
+  return catalogOptions(materialRows, subcat, 'Standard', {
+    standardRows: 'null-vendor',
+    stripPrefix: true,
+    category: 'Pool',
+  })
+}
+function poolStdItem(materialRows, subcat, key) {
+  return catalogItemFor(materialRows, subcat, 'Standard', key, {
+    category: 'Pool',
+    stripPrefix: true,
+    fallbackFirst: false,
+  })
+}
+
 
 // ── Electrical & Plumbing catalog (ported from the Utilities module) ──────────
 // Rates live in the catalog / labor_rates / misc_rates under category
@@ -660,8 +682,11 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     const t = tile[tileKey] || {}
     const lf = n(t.lf)
     if (!lf) return
-    const installRate = n(laborRates[`Tile - ${t.installType}`])
-    // tile mat = LF × (SF/LF coverage) × price/SF (waterline tile width ~6")
+    // Install type is a master material rates item; labor rides on its calc_meta
+    // pointer. The material $/SF stays a per-row figure (tile product is job-specific).
+    const item = poolStdItem(materialRows, TILE_SUBCAT, t.installType)
+    const installRate = n(laborRates[item?.calc_meta?.labor_rate])
+    if (t.installType && installRate <= 0) laborUnset.push(t.installType)
     const matPriceSF = n(t.matPricePerSF)
     tileHrs += lf * installRate
     tileMat += lf * tileSfPerLf * matPriceSF
@@ -676,8 +701,12 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     const lf = n(sw.lf)
     if (!qty || !lf) return
     const totalLF = qty * lf
-    const matRate = n(materialPrices[`Spillway ${sw.type}`])
-    const labRate = n(laborRates[`Spillway - ${sw.type}`])
+    // Spillway is a master material rates item: material from the item price, labor
+    // from its calc_meta pointer ('Spillway - <type>'). No name-keyed lookups.
+    const item = poolStdItem(materialRows, SPILLWAY_SUBCAT, sw.type)
+    const matRate = item ? n(item.unit_cost) : 0
+    const labRate = n(laborRates[item?.calc_meta?.labor_rate])
+    if (labRate <= 0) laborUnset.push(sw.type)
     spillwayHrs += totalLF * labRate
     spillwayMat += totalLF * matRate
   })
@@ -716,9 +745,13 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     const sqft = n(rs.sqft)
     const corners = n(rs.corners)
     if (!sqft) return
-    // Raised MATERIAL rate is keyed distinctly from the same-named labor rate.
-    const matRate = n(materialPrices[`Raised Mat - ${rs.matType}`])
-    const labRate = n(laborRates[`Raised - ${rs.matType}`])
+    // Raised is a master material rates item: material from the item price, labor
+    // from its calc_meta pointer (tile sizes share the waterline 'Tile - <size>'
+    // rate). No name-keyed lookups, no fallback.
+    const item = poolStdItem(materialRows, RAISED_SUBCAT, rs.matType)
+    const matRate = item ? n(item.unit_cost) : 0
+    const labRate = n(laborRates[item?.calc_meta?.labor_rate])
+    if (labRate <= 0) laborUnset.push(rs.matType)
     const curveMult = 1 + n(rs.curvePct) / 100
     raisedHrs += sqft * labRate * curveMult + corners * raisedCornerHrs
     raisedMat += sqft * matRate + corners * (matRate * raisedCornerMatFactor)
@@ -1796,8 +1829,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">
           <span className="font-semibold">Labor rate needed:</span> set a Default
           Labor rate in Master Material Rates for {calc.laborUnset.join(', ')}. These
-          gas/electrical items are contributing 0 labor hours until a labor rate is
-          assigned.
+          items are contributing 0 labor hours until a labor rate is assigned.
         </div>
       )}
 
@@ -2071,8 +2103,13 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                             })
                           }
                         >
-                          {TILE_INSTALL_TYPES.map(tp => (
-                            <option key={tp}>{tp}</option>
+                          {!t.installType && <option value="">Select type</option>}
+                          {t.installType &&
+                            !poolStdOptions(materialRows, TILE_SUBCAT).some(o => o.label === t.installType) && (
+                              <option value={t.installType}>{t.installType}</option>
+                            )}
+                          {poolStdOptions(materialRows, TILE_SUBCAT).map(o => (
+                            <option key={o.value} value={o.label}>{o.label}</option>
                           ))}
                         </select>
                       </div>
@@ -2111,12 +2148,17 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                       </label>
                     </div>
                   </div>
-                  {n(t.lf) > 0 && (
-                    <p className="text-xs text-gray-400 mt-1">
-                      {n(laborRates[`Tile - ${t.installType}`]).toFixed(3)} hrs/LF →{' '}
-                      {(n(t.lf) * n(laborRates[`Tile - ${t.installType}`])).toFixed(1)} hrs
-                    </p>
-                  )}
+                  {n(t.lf) > 0 &&
+                    (() => {
+                      const rate = n(
+                        laborRates[poolStdItem(materialRows, TILE_SUBCAT, t.installType)?.calc_meta?.labor_rate]
+                      )
+                      return (
+                        <p className="text-xs text-gray-400 mt-1">
+                          {rate.toFixed(3)} hrs/LF → {(n(t.lf) * rate).toFixed(1)} hrs
+                        </p>
+                      )
+                    })()}
                 </div>
               )
             })}
@@ -2150,11 +2192,11 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                     onChange={e => updSpillway(i, 'type', e.target.value)}
                   >
                     {!sw.type && <option value="">Select type</option>}
-                    {sw.type && !SPILLWAY_TYPES.includes(sw.type) && (
+                    {sw.type && !poolStdOptions(materialRows, SPILLWAY_SUBCAT).some(o => o.label === sw.type) && (
                       <option value={sw.type}>{sw.type}</option>
                     )}
-                    {SPILLWAY_TYPES.map(t => (
-                      <option key={t}>{t}</option>
+                    {poolStdOptions(materialRows, SPILLWAY_SUBCAT).map(o => (
+                      <option key={o.value} value={o.label}>{o.label}</option>
                     ))}
                   </select>
                 </div>
@@ -2287,11 +2329,11 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                     onChange={e => updRaised(i, 'matType', e.target.value)}
                   >
                     {!rs.matType && <option value="">Select material</option>}
-                    {rs.matType && !RAISED_SURFACE_TYPES.includes(rs.matType) && (
+                    {rs.matType && !poolStdOptions(materialRows, RAISED_SUBCAT).some(o => o.label === rs.matType) && (
                       <option value={rs.matType}>{rs.matType}</option>
                     )}
-                    {RAISED_SURFACE_TYPES.map(t => (
-                      <option key={t}>{t}</option>
+                    {poolStdOptions(materialRows, RAISED_SUBCAT).map(o => (
+                      <option key={o.value} value={o.label}>{o.label}</option>
                     ))}
                   </select>
                 </div>
