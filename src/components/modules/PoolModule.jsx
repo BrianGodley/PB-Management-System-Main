@@ -2329,7 +2329,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                           <button
                             type="button"
                             onClick={() => setT(rs => rs.filter((_, idx) => idx !== i))}
-                            className="text-gray-500 hover:text-red-500 text-sm"
+                            className="text-gray-500 hover:text-red-500 text-xs"
                           >
                             ✕
                           </button>
@@ -2419,7 +2419,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             const spillOpts = poolStdOptions(materialRows, SPILLWAY_SUBCAT, sw.vendor || 'Standard')
             const spillVends = vendors.filter(v => poolSubVendorIds(materialRows, SPILLWAY_SUBCAT).includes(v.id))
             return (
-            <div key={i} className="grid grid-cols-6 gap-2 items-end">
+            <div key={i} className="grid grid-cols-5 gap-2 items-end">
               <div>
                 <Label text="Vendor" />
                 <select
@@ -2469,15 +2469,17 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
               </div>
               <div>
                 <Label text="LF each" />
-                <NumInput value={sw.lf} onChange={v => updSpillway(i, 'lf', v)} />
+                <div className="flex items-center gap-1">
+                  <NumInput value={sw.lf} onChange={v => updSpillway(i, 'lf', v)} className="flex-1 min-w-0" />
+                  <button
+                    type="button"
+                    onClick={() => removeSpillway(i)}
+                    className="text-gray-500 hover:text-red-500 text-xs leading-none shrink-0"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => removeSpillway(i)}
-                className="text-gray-500 hover:text-red-500 text-sm pb-1"
-              >
-                ✕
-              </button>
             </div>
             )
           })}
@@ -2507,7 +2509,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
               const t = T.tile[k] || defaultTileStruct()
               return (
                 <div key={k} className="border border-gray-200 rounded-lg p-3">
-                  <p className="text-xs font-semibold text-gray-700 mb-2">{k}</p>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <div>
                       <Label text="Waterline LF" />
@@ -2660,7 +2661,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                   <button
                     type="button"
                     onClick={() => removeRaised(i)}
-                    className="text-gray-500 hover:text-red-500 text-sm leading-none shrink-0"
+                    className="text-gray-500 hover:text-red-500 text-xs leading-none shrink-0"
                   >
                     ✕
                   </button>
@@ -2748,7 +2749,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
               <button
                 type="button"
                 onClick={() => removeCoping(i)}
-                className="text-gray-500 hover:text-red-500 text-sm pb-1"
+                className="text-gray-500 hover:text-red-500 text-xs pb-1"
               >
                 ✕
               </button>
@@ -2844,7 +2845,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                       type="button"
                       onClick={() => removeEquip(i)}
                       title="Remove row"
-                      className="text-gray-500 hover:text-red-500 text-sm leading-none shrink-0"
+                      className="text-gray-500 hover:text-red-500 text-xs leading-none shrink-0"
                     >
                       ✕
                     </button>
@@ -3059,7 +3060,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                       <button
                         type="button"
                         onClick={() => removeManual(i)}
-                        className="text-gray-300 hover:text-red-500 text-sm px-1"
+                        className="text-gray-300 hover:text-red-500 text-xs px-1"
                         title="Remove line"
                       >
                         ×
@@ -3081,7 +3082,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                         <button
                           type="button"
                           onClick={() => removeManual(i)}
-                          className="text-gray-300 hover:text-red-500 text-sm px-1"
+                          className="text-gray-300 hover:text-red-500 text-xs px-1"
                           title="Remove line"
                         >
                           ×
