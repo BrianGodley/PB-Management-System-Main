@@ -909,9 +909,12 @@ function computeCapRow(row, mp, materialRows) {
         ) || (materialRows || []).find(rr => rr.sub_category === WALL_CAP_SUBCAT && rr.name === row.type)
       const cm = capRow?.calc_meta || {}
       const perLf = n(cm.per_lf) || 1
-      const laborPerLf = n(cm.labor_hr_per_lf)
+      // Install labor rides on the item's calc_meta.labor_rate pointer (a master
+      // labor rate), resolved live — no embedded labor_hr_per_lf value, no bullnose
+      // fallback. Unset ⇒ 0 hrs (set the item's Default Labor in Master Rates).
+      const capLabRate = n(mp?.[cm.labor_rate])
       mat = lf * perLf * pr
-      hrs = lf * (laborPerLf || lab('capBullnoseLab'))
+      hrs = lf * capLabRate
       subUnit = perLf * pr
       subQty = lf
       break
