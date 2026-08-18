@@ -35,6 +35,7 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
   }
   const [cats, setCats] = useState([])
   const [subs, setSubs] = useState([])
+  const [labs, setLabs] = useState([]) // labor_rates rows (for the Default Labor Rate picker)
   const [mode, setMode] = useState('view') // 'view' | 'edit'
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -47,15 +48,19 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
     description: m.description || '',
     unit: m.unit || '',
     price: row.price ?? '',
+    // The item's default labor rate (a labor_rates NAME) — independent of material.
+    labor_rate: m.calc_meta?.labor_rate || '',
   })
 
   useEffect(() => {
     Promise.all([
       supabase.from('category').select('id, code, name').order('name'),
       supabase.from('subcategory').select('id, code, name, category_id').order('name'),
-    ]).then(([c, s]) => {
+      supabase.from('labor_rates').select('name, category, sub_category, rate').order('name'),
+    ]).then(([c, s, l]) => {
       setCats(c.data || [])
       setSubs(s.data || [])
+      setLabs(l.data || [])
     })
   }, [])
 
@@ -64,6 +69,11 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
     () => subs.filter(s => s.category_id === form.category_id),
     [subs, form.category_id]
   )
+  // Labor rates in this item's Category — the Default Labor Rate options.
+  const laborsForCat = useMemo(() => {
+    const cn = (cats.find(c => c.id === form.category_id) || {}).name
+    return labs.filter(l => l.category === cn)
+  }, [labs, cats, form.category_id])
 
   const save = async () => {
     setBusy(true)
@@ -76,6 +86,8 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
         subcategory_id: form.subcategory_id,
         description: form.description,
         unit: form.unit || null,
+        // Merge the default labor pointer into calc_meta (null clears it).
+        calc_meta: { ...(m.calc_meta || {}), labor_rate: form.labor_rate || null },
       })
       .eq('id', m.id)
     if (mErr) {
@@ -175,6 +187,7 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
               <Field label="Sub-Category" value={subName(m.subcategory_id)} />
               <Field label="Description" value={m.description} />
               <Field label="Unit" value={m.unit || '—'} />
+              <Field label="Default Labor Rate" value={m.calc_meta?.labor_rate || '— not set —'} />
               {row.vName && <Field label="Vendor" value={row.vName} />}
               <Field label={row.vName ? 'Vendor Price' : 'Standard Price'} value={money(row.price)} />
               {m.collection && <Field label="Collection / Style" value={m.collection} />}
@@ -248,6 +261,29 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
                   />
                 </label>
               </div>
+              <label className="block">
+                <span className="text-xs text-gray-500">Default Labor Rate</span>
+                <select
+                  className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm bg-white"
+                  value={form.labor_rate || ''}
+                  onChange={e => set('labor_rate', e.target.value)}
+                >
+                  <option value="">— none —</option>
+                  {form.labor_rate && !laborsForCat.some(l => l.name === form.labor_rate) && (
+                    <option value={form.labor_rate}>{form.labor_rate}</option>
+                  )}
+                  {laborsForCat.map(l => (
+                    <option key={l.name} value={l.name}>
+                      {l.name}
+                      {l.rate != null ? ` — ${l.rate}` : ''}
+                    </option>
+                  ))}
+                </select>
+                <span className="mt-0.5 block text-[11px] text-gray-400">
+                  The estimator uses this rate for this item's labor. If left unset (or the rate is 0),
+                  the estimate will flag it — there is no hidden fallback.
+                </span>
+              </label>
             </>
           )}
         </div>

@@ -223,6 +223,9 @@ function calcDrainage(
     pipeMat = 0
   let fixHrs = 0,
     fixMat = 0
+  // Items whose selected material has no usable labor rate (unset or 0). Surfaced
+  // as a prompt in the UI — NO hidden fallback substitutes a rate.
+  const laborUnset = []
   let manHrs = 0,
     manMat = 0,
     manSub = 0
@@ -248,8 +251,10 @@ function calcDrainage(
       pipeMat += lf * cost
       // Labor is chosen independently: the row's own Labor pick wins; otherwise the
       // material item's default (calc_meta.labor_rate); then the legacy map/coefficient.
-      const laborName = r.laborType || vrow?.calc_meta?.labor_rate || PIPE_LABOR_RATE_NAME[r.type]
-      pipeHrs += lf * (n(materialPrices[laborName]) || n(meta.laborPerLF))
+      const laborName = r.laborType || vrow?.calc_meta?.labor_rate
+      const laborRate = n(materialPrices[laborName])
+      if (r.type && laborRate <= 0) laborUnset.push(vrow?.name || r.type)
+      pipeHrs += lf * laborRate
     }
   })
 
@@ -273,8 +278,10 @@ function calcDrainage(
       )
       frenchMat += lf * cost
       // Labor chosen independently: row pick → item default → legacy.
-      const laborName = r.laborType || vrow?.calc_meta?.labor_rate || FRENCH_PIPE_LABOR_RATE_NAME[r.type]
-      frenchHrs += lf * (n(materialPrices[laborName]) || n(meta.laborPerLF))
+      const laborName = r.laborType || vrow?.calc_meta?.labor_rate
+      const laborRate = n(materialPrices[laborName])
+      if (r.type && laborRate <= 0) laborUnset.push(vrow?.name || r.type)
+      frenchHrs += lf * laborRate
     }
   })
   const totalFrenchLF = (frenchRows || []).reduce((s, r) => s + n(r.lf), 0)
@@ -316,8 +323,10 @@ function calcDrainage(
       const { cost, row: vrow } = drainMatCost(DRAIN_CAT.fixture, r, FIX_T, materialRows, catDefaults, materialPrices)
       fixMat += qty * cost
       // Labor chosen independently: row pick → item default → legacy.
-      const laborName = r.laborType || vrow?.calc_meta?.labor_rate || FIXTURE_LABOR_RATE_NAME[r.type]
-      fixHrs += qty * (n(materialPrices[laborName]) || n(meta.laborHrs))
+      const laborName = r.laborType || vrow?.calc_meta?.labor_rate
+      const laborRate = n(materialPrices[laborName])
+      if (r.type && laborRate <= 0) laborUnset.push(vrow?.name || r.type)
+      fixHrs += qty * laborRate
       totalFixQty += qty
     }
   })
@@ -381,6 +390,7 @@ function calcDrainage(
   return {
     totalHrs,
     manDays,
+    laborUnset,
     subRatePerLF,
     subLf,
     subDrainCost,
@@ -1293,6 +1303,14 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           </button>
         </div>
       </div>
+
+      {calc.laborUnset && calc.laborUnset.length > 0 && (
+        <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+          <b>Labor rate needed.</b> These selected items have no default labor rate (or it resolves to 0),
+          so their hours aren't priced: {Array.from(new Set(calc.laborUnset)).join(', ')}. Set each item's{' '}
+          <b>Default Labor Rate</b> in Master Rates → Materials, or give the pointed‑to labor rate a value.
+        </div>
+      )}
 
       {/* ── Solid Drain Pipe ── */}
       <div>
