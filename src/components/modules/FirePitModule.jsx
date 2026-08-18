@@ -279,8 +279,10 @@ function mergedUtilTypes(cat, builtInArr, materialRows, vendorSel = 'Standard') 
         label: o.label,
         dbName: o.row.name,
         fallback: n(o.row.unit_cost),
-        laborDbName: bi?.laborDbName ?? `${o.label} - Labor Rate`,
-        laborFallback: bi?.laborFallback ?? 0,
+        // Labor pointer = the Item's own calc_meta.labor_rate (independent
+        // labor_rates row). No synthesized "<name> - Labor Rate", no built-in map,
+        // no fallback — unset ⇒ the row is flagged for the user to fix.
+        laborDbName: o.row.calc_meta?.labor_rate || null,
         fromMaster: !bi,
       }
     })
@@ -290,7 +292,6 @@ function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
   // Type options are the SELECTED VENDOR'S items (vendor-first, like Paver).
   const merged = mergedUtilTypes(cat, houseArr, materialRows, vsel)
   const builtIn = merged.find(o => o.label === row.type) || merged[0]
-  const laborVal = n(mp[builtIn?.laborDbName])
   let matDbName = builtIn?.dbName
   let matFallback = builtIn?.fallback ?? 0
   const vrow = catalogItemFor(materialRows, cat, vsel, builtIn?.label, {
@@ -301,11 +302,16 @@ function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
     matDbName = vrow.name
     matFallback = n(vrow.unit_cost)
   }
+  // Labor pointer = the Item's calc_meta.labor_rate, resolved live via mp. No
+  // synthesized name, no built-in map, no fallback — unset ⇒ laborVal 0 and the
+  // row is flagged for the user to fix.
+  const laborName = vrow?.calc_meta?.labor_rate || builtIn?.laborDbName || null
+  const laborVal = n(mp[laborName])
   // Selected vendor's catalog row wins; only fall back to the Standard name-map (mp)
   // when there is no catalog row for the selection.
   const matCost = vrow ? n(vrow.unit_cost) : (mp[matDbName] ?? matFallback)
   const matOpt = { label: builtIn?.label, dbName: matDbName, fallback: matFallback }
-  return { opts: merged, matOpt, matCost, laborVal, laborBuiltIn: builtIn }
+  return { opts: merged, matOpt, matCost, laborVal, laborName, laborBuiltIn: builtIn }
 }
 const EP_LINE_ROW = () => ({ type: '', lf: '', vendor: 'Standard' })
 const EP_GAS_ROW = () => ({ type: '', qty: '', vendor: 'Standard' })
@@ -672,11 +678,15 @@ function calcFirePit(
   const gasTrenchHrsPerCF = n(mp['Utilities Trench Excavation']) // now hrs per Cu Ft
   let epHrs = 0
   let epMat = 0
+  // Gas line/fixture items whose picked Type has no labor rate set (calc_meta.
+  // labor_rate unset or resolves to 0). Surfaced as a prompt — never a fallback.
+  const laborUnset = []
   ;(epLineRows || []).forEach(r => {
     if (!r.type) return
     const lf = n(r.lf)
     if (lf <= 0) return
     const { matCost, laborVal } = resolveUtilRow(UTIL_CAT.line, r, LINE_TYPE_ARR, materialRows, mp)
+    if (laborVal <= 0) laborUnset.push(r.type)
     epMat += lf * matCost
     epHrs += lf * laborVal
     epHrs += lf * GAS_TRENCH_CF_PER_LF * gasTrenchHrsPerCF // trenching (hrs/CF × CF/LF × LF)
@@ -686,6 +696,7 @@ function calcFirePit(
     const qty = n(r.qty)
     if (qty <= 0) return
     const { matCost, laborVal } = resolveUtilRow(UTIL_CAT.gas, r, GAS_TYPE_ARR, materialRows, mp)
+    if (laborVal <= 0) laborUnset.push(r.type)
     epMat += qty * matCost
     epHrs += qty * laborVal
   })
@@ -783,6 +794,7 @@ function calcFirePit(
     epMat,
     epHrs,
     manMat,
+    laborUnset: Array.from(new Set(laborUnset.filter(Boolean))),
   }
 }
 
@@ -1390,6 +1402,15 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
       {pricesLoading && (
         <div className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
           Loading material prices from Master Rates…
+        </div>
+      )}
+
+      {calc.laborUnset && calc.laborUnset.length > 0 && (
+        <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">
+          <span className="font-semibold">Labor rate needed:</span> set a Default
+          Labor rate in Master Material Rates for {calc.laborUnset.join(', ')}. These
+          gas/electrical items are contributing 0 labor hours until a labor rate is
+          assigned.
         </div>
       )}
 
