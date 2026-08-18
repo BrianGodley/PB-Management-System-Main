@@ -666,7 +666,9 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   const totalShotCY = activeStructs.reduce((s, x) => s + shotcreteCYFn(x.s), 0)
 
   // ─ Excavation ─
-  const isSubExcav = excavation.mode === 'Sub'
+  // Excavation follows the module In-House/Sub tab (no separate toggle): In-House
+  // = equipment hours, Sub = subcontractor cost.
+  const isSubExcav = isSubTab
   // CY/hr rate read live from labor_rates['Excavation - ...'] — no fallback.
   const excavLaborName = EXCAVATION_LABOR_NAME[excavation.equipment]
   const equipRate = n(excavLaborName && laborRates[excavLaborName])
@@ -2002,26 +2004,8 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       {/* ─── 2. Excavation ─── */}
       <div>
         <SectionHeader title="Excavation" />
-        {/* Excavation-specific In-House / Sub toggle (independent of the
-            module-level tab). Sub mode shows a subcontractor picker. */}
-        <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden mb-3">
-          {['In-House', 'Sub'].map(m => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => upd('excavation', { ...T.excavation, mode: m })}
-              className={`px-4 py-1.5 text-xs font-medium ${
-                (T.excavation.mode || 'In-House') === m
-                  ? 'bg-green-600 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {m}
-            </button>
-          ))}
-        </div>
-
-        {(T.excavation.mode || 'In-House') === 'In-House' ? (
+        {/* Excavation follows the module In-House / Sub tab — no separate toggle. */}
+        {!isSub ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="sm:col-span-3">
               <Label text="Equipment" />
@@ -2087,7 +2071,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             </div>
           </div>
         )}
-        {(T.excavation.mode || 'In-House') === 'Sub' && calc.excavAutoSub > 0 && (
+        {isSub && calc.excavAutoSub > 0 && (
           <p className="text-xs text-gray-500 mt-2 px-1">
             {T.excavation.subVendor || 'Sub'} rate: ${Number(T.excavation.subRate || 0).toLocaleString()}
             {/yd/i.test(T.excavation.subRateUnit || '') ? ` per Cu Yd × ${calc.totalExcavCY.toFixed(1)}` : ''} →{' '}
@@ -2107,7 +2091,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       <div>
         <SectionHeader title="Steel" />
         {!isSub ? (
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
               <Label text="Vendor" />
               <select
@@ -2155,15 +2139,14 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
               <Label text="LF per SF" sub="rebar factor" />
               <NumInput value={T.steel.lfPerSf} onChange={v => upd('steel', { ...T.steel, lfPerSf: v })} />
             </div>
-            <div className="flex items-end pb-1">
-              <p className="text-xs text-gray-400">
-                {n(T.steel.sf) * n(T.steel.lfPerSf) > 0
-                  ? `${(n(T.steel.sf) * n(T.steel.lfPerSf)).toFixed(0)} LF → ${fmt2(calc.steelMat)} mat`
-                  : 'enter SF × LF/SF'}
-              </p>
-            </div>
           </div>
-        ) : (
+        ) : null}
+        {!isSub && n(T.steel.sf) * n(T.steel.lfPerSf) > 0 && (
+          <p className="text-xs text-gray-400 mt-2 px-1">
+            {(n(T.steel.sf) * n(T.steel.lfPerSf)).toFixed(0)} LF → {fmt2(calc.steelMat)} mat
+          </p>
+        )}
+        {isSub && (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div>
               <Label text="Auto Sub Total" />
