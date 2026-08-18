@@ -668,7 +668,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   // ─ Excavation ─
   // Excavation follows the module In-House/Sub tab (no separate toggle): In-House
   // = equipment hours, Sub = subcontractor cost.
-  const isSubExcav = isSubTab
+  const isSubExcav = state.subType === 'Subcontractor'
   // CY/hr rate read live from labor_rates['Excavation - ...'] — no fallback.
   const excavLaborName = EXCAVATION_LABOR_NAME[excavation.equipment]
   const equipRate = n(excavLaborName && laborRates[excavLaborName])
