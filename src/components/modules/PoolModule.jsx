@@ -931,12 +931,24 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   const plumbIH = state.plumbingIH || {}
   const plumbHrsDefault = n(laborRates['Pool Plumbing - Base Hours'])
   const plumbMatDefault = n(materialPrices['Pool Plumbing - Materials'])
-  const plumbHrsIH = isSubTab ? 0 : hasOverride(plumbIH.hours) ? n(plumbIH.hours) : plumbHrsDefault
+  // The DB default only kicks in once there's real pool scope (perimeter or spa) —
+  // mirrors the Sub side — so a brand-new blank estimate reads 0 until a pool is
+  // started. A typed value always applies; a typed 0 => 0.
+  const hasPoolScope = n(pool.perimLF) > 0 || spa.enabled
+  const plumbHrsIH = isSubTab
+    ? 0
+    : hasOverride(plumbIH.hours)
+      ? n(plumbIH.hours)
+      : hasPoolScope
+        ? plumbHrsDefault
+        : 0
   const plumbMatIH = isSubTab
     ? 0
     : hasOverride(plumbIH.materials)
       ? n(plumbIH.materials)
-      : plumbMatDefault
+      : hasPoolScope
+        ? plumbMatDefault
+        : 0
 
   const _preWalkHrs =
     excavHrs +
