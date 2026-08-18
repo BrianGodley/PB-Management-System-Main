@@ -183,6 +183,28 @@ function equipModels(materialRows, vendorSel, cat) {
   )
 }
 
+// ── Coping now lives in master material rates (sub-category 'Coping', category
+//    'Pool'). Precast Concrete is supplied by Bellecrete; the rest are Standard.
+//    Each item's labor rides on calc_meta.labor_rate ('Coping - <type>').
+const COPING_SUBCAT = 'Coping'
+function copingOptions(materialRows, vendorSel) {
+  return catalogOptions(materialRows, COPING_SUBCAT, vendorSel || 'Standard', {
+    standardRows: 'null-vendor',
+    stripPrefix: true,
+    category: 'Pool',
+  })
+}
+// Real vendors (non-Standard) carrying Coping items — drives the Vendor picker.
+function copingVendorIds(materialRows) {
+  return [
+    ...new Set(
+      (materialRows || [])
+        .filter(r => r.category === 'Pool' && r.sub_category === COPING_SUBCAT && r.vendor_id)
+        .map(r => r.vendor_id)
+    ),
+  ]
+}
+
 
 // ── Electrical & Plumbing catalog (ported from the Utilities module) ──────────
 // Rates live in the catalog / labor_rates / misc_rates under category
@@ -420,7 +442,7 @@ const defaultTileStruct = () => ({
 })
 const defaultInteriorStruct = () => ({ type: '', subCost: '' })
 const newSpillway = () => ({ struct: 'Pool', type: '', qty: '1', lf: '' })
-const newCopingRow = () => ({ struct: 'Pool', type: '', lf: '', sided: 'single' })
+const newCopingRow = () => ({ struct: 'Pool', vendor: 'Standard', type: '', lf: '', sided: 'single' })
 const newRaisedSurface = () => ({ matType: '', sqft: '', curvePct: '', corners: '' })
 const newEquipRow = () => ({ vendor: '', category: 'Pump', model: '', qty: '1', unitCost: '' })
 const newManualRow = () => ({ label: '', hours: '', materials: '', subCost: '' })
@@ -668,10 +690,17 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     const lf = n(cr.lf)
     if (!lf) return
     const sided = cr.sided === 'double' ? 2 : 1
-    // Coping MATERIAL rate is keyed distinctly from the same-named labor rate so
-    // the two don't collide in the merged rate map (misc_rates vs labor_rates).
-    const matRate = n(materialPrices[`Coping Mat - ${cr.type}`])
-    const labRate = n(laborRates[`Coping - ${cr.type}`])
+    // Coping is a master material rates item: material from the picked item's price
+    // (Standard, or Bellecrete for Precast Concrete), labor from its calc_meta
+    // pointer ('Coping - <type>'). No name-keyed misc/labor lookup, no fallback.
+    const item = catalogItemFor(materialRows, COPING_SUBCAT, cr.vendor || 'Standard', cr.type, {
+      category: 'Pool',
+      stripPrefix: true,
+      fallbackFirst: false,
+    })
+    const matRate = item ? n(item.unit_cost) : 0
+    const labRate = n(laborRates[item?.calc_meta?.labor_rate])
+    if (labRate <= 0) laborUnset.push(cr.type)
     copingHrs += lf * sided * labRate
     copingMat += lf * sided * matRate
   })
@@ -1226,6 +1255,8 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
   const updCoping = (i, key, val) => {
     const arr = [...T.copingRows]
     arr[i] = { ...arr[i], [key]: val }
+    // Switching vendor changes which Coping items are available — clear the type.
+    if (key === 'vendor') arr[i].type = ''
     upd('copingRows', arr)
   }
   const removeCoping = i =>
@@ -2159,8 +2190,11 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       <div>
         <SectionHeader title="Coping" />
         <div className="space-y-2">
-          {T.copingRows.map((cr, i) => (
-            <div key={i} className="grid grid-cols-5 gap-2 items-end">
+          {T.copingRows.map((cr, i) => {
+            const copingOpts = copingOptions(materialRows, cr.vendor || 'Standard')
+            const copingVends = vendors.filter(v => copingVendorIds(materialRows).includes(v.id))
+            return (
+            <div key={i} className="grid grid-cols-6 gap-2 items-end">
               <div>
                 <Label text="Structure" />
                 <select
@@ -2173,6 +2207,19 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                   ))}
                 </select>
               </div>
+              <div>
+                <Label text="Vendor" />
+                <select
+                  className="input text-sm py-1.5"
+                  value={cr.vendor || 'Standard'}
+                  onChange={e => updCoping(i, 'vendor', e.target.value)}
+                >
+                  <option value="Standard">Standard</option>
+                  {copingVends.map(v => (
+                    <option key={v.id} value={v.id}>{v.name}</option>
+                  ))}
+                </select>
+              </div>
               <div className="col-span-2">
                 <Label text="Coping Type" />
                 <div className="flex items-center gap-1">
@@ -2182,11 +2229,11 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                     onChange={e => updCoping(i, 'type', e.target.value)}
                   >
                     {!cr.type && <option value="">Select type</option>}
-                    {cr.type && !COPING_TYPES.includes(cr.type) && (
+                    {cr.type && !copingOpts.some(o => o.label === cr.type) && (
                       <option value={cr.type}>{cr.type}</option>
                     )}
-                    {COPING_TYPES.map(t => (
-                      <option key={t}>{t}</option>
+                    {copingOpts.map(o => (
+                      <option key={o.value} value={o.label}>{o.label}</option>
                     ))}
                   </select>
                 </div>
@@ -2214,7 +2261,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                 ✕
               </button>
             </div>
-          ))}
+          )})}
           <button
             type="button"
             onClick={addCoping}
