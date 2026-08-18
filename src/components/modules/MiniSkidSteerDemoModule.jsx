@@ -39,7 +39,7 @@ import {
 //   BobcatLevels — for bobcat-assisted operations (grading, footing, grass, vegetation)
 const NON_BOB_LEVELS = { Poor: 0.5, OK: 0.667, Full: 1.0 }
 const BOB_LEVELS = { Poor: 0.5, OK: 0.75, Full: 1.0 }
-const STUB_HEIGHT_MODS = { '0-1': 0.75, '1-2': 1, '2-3': 1.5, '3-4': 2, '4-5': 2.5 }
+// Shrub-height labor factor is table-driven: misc_rates 'Demo Shrub Height Factor - <bucket>'
 
 
 // Sub Haul rates — billed per 1.5 tons removed (sub cost, not materials)
@@ -240,7 +240,7 @@ function calcDemo(
   // ── Vegetation — Bobcat access ────────────────────────────────────────────
   // Shrub Demo — per-area rows: qty × shrub rate × height modifier (Hand format).
   const shrubRowsCalc = (state.shrubRows || []).map(r => ({
-    hrs: n(r.qty) * accessBobcat * shrubRate * (STUB_HEIGHT_MODS[r.height] ?? 0.75),
+    hrs: n(r.qty) * accessBobcat * shrubRate * n(lr['Demo Shrub Height Factor - ' + r.height]),
   }))
   const shrubRowsHrs = shrubRowsCalc.reduce((sum, r) => sum + r.hrs, 0)
   const stumpSmallHrs = n(state.stumpSmallQty) * accessBobcat * stumpSmallRate

@@ -24,7 +24,7 @@ import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../
 
 // ── Fallback constants ────────────────────────────────────────────────────────
 
-const STUB_HEIGHT_MODS = { '0-1': 0.75, '1-2': 1, '2-3': 1.5, '3-4': 2, '4-5': 2.5 }
+// Shrub-height labor factor is table-driven: misc_rates 'Demo Shrub Height Factor - <bucket>'
 
 // Sub Haul rates — billed per 1.5 tons removed (sub cost, not materials)
 // Labor is unchanged in Subcontractor mode; dump fees are replaced by these charges
@@ -222,7 +222,7 @@ function calcDemo(
   // ── Vegetation ───────────────────────────────────────────────────────────
   // Shrub demo: per-area rows — qty × shrub rate × shrub-height modifier.
   const shrubRowsCalc = (state.shrubRows || []).map(r => ({
-    hrs: n(r.qty) * shrubRate * (STUB_HEIGHT_MODS[r.height] ?? 0.75),
+    hrs: n(r.qty) * shrubRate * n(lr['Demo Shrub Height Factor - ' + r.height]),
   }))
   const shrubRowsHrs = shrubRowsCalc.reduce((s, r) => s + r.hrs, 0)
   const stumpSmallHrs = n(state.stumpSmallQty) * stumpSmallRate

@@ -238,6 +238,7 @@ function calcGroundTreatments(
   const dgCoverageSfDay = p('GT - DG Cleanup Coverage SF/Day')
   const dgCementLaborFactor = p('GT - DG Cement Labor Factor')
   const dgMaterialMarkup = p('GT - DG Material Markup')
+  const dgPlacementPerTon = p('GT - DG Placement Labor per Ton')
   const aggregateRemovalSwell = p('GT - Aggregate Removal Swell')
 
   let totalMat = 0
@@ -430,8 +431,8 @@ function calcGroundTreatments(
       const dgt = rowOpt('DG', r, [])
       const baseHrs =
         r.method === 'Hand'
-          ? (tons * dgRemovalSwell) / dgHandRate + (n(r.sf) / dgCoverageSfDay) * 8 + tons
-          : ((tons * dgRemovalSwell) / dgMachineRate) * 8 + (n(r.sf) / dgCoverageSfDay) * 8 + tons
+          ? (tons * dgRemovalSwell) / dgHandRate + (n(r.sf) / dgCoverageSfDay) * 8 + tons * dgPlacementPerTon
+          : ((tons * dgRemovalSwell) / dgMachineRate) * 8 + (n(r.sf) / dgCoverageSfDay) * 8 + tons * dgPlacementPerTon
       dgLab += baseHrs + (cement ? tons * dgCementLaborFactor : 0)
       dgMat +=
         (CY * dgt.fallback +

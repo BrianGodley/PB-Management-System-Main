@@ -30,7 +30,7 @@ import {
 // ── Fallback constants (used when DB rate not yet loaded or missing) ──────────
 
 // Default rates — DB values (lr[]) take precedence at calc time
-const STUB_HEIGHT_MODS = { '0-1': 0.75, '1-2': 1, '2-3': 1.5, '3-4': 2, '4-5': 2.5 }
+// Shrub-height labor factor is table-driven: misc_rates 'Demo Shrub Height Factor - <bucket>'
 
 
 // Sub Haul (Dump Type = Subcontractor, Demo Type = In-House)
@@ -216,7 +216,7 @@ function calcDemo(
   // ── Vegetation ───────────────────────────────────────────────────────────
   // Shrub Demo — per-area rows: qty × shrub rate × height modifier (Hand format).
   const shrubRowsCalc = (state.shrubRows || []).map(r => ({
-    hrs: n(r.qty) * access * shrubRate * (STUB_HEIGHT_MODS[r.height] ?? 0.75),
+    hrs: n(r.qty) * access * shrubRate * n(lr['Demo Shrub Height Factor - ' + r.height]),
   }))
   const shrubRowsHrs = shrubRowsCalc.reduce((sum, r) => sum + r.hrs, 0)
   const stumpSmallHrs = n(state.stumpSmallQty) * access * stumpSmallRate
