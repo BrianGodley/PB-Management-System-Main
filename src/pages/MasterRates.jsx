@@ -688,7 +688,7 @@ export default function MasterRates({ only } = {}) {
       .insert({
         name: form.name?.trim(),
         rate: parseFloat(form.rate) || 0,
-        unit: form.unit || 'per day',
+        unit: form.unit || 'hrs per unit',
         category: form.category?.trim() || 'General',
         rate_per_day: parseFloat(form.rate) || 0,
         notes: form.notes?.trim(),
@@ -704,7 +704,7 @@ export default function MasterRates({ only } = {}) {
       .update({
         name: form.name?.trim(),
         rate: parseFloat(form.rate) || 0,
-        unit: form.unit || 'per day',
+        unit: form.unit || 'hrs per unit',
         category: form.category?.trim() || 'General',
         rate_per_day: parseFloat(form.rate) || 0,
         notes: form.notes?.trim(),
