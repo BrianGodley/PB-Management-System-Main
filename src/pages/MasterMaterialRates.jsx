@@ -98,8 +98,12 @@ export default function MasterMaterialRates() {
     [labs]
   )
   // Set (or clear) an item's default labor pointer inline, without opening the modal.
+  // Read-modify-write against the CURRENT DB calc_meta (not the page's possibly-stale
+  // snapshot) so we only touch labor_rate and never drop other keys another process
+  // added out-of-band (e.g. pool_equip_category set by SQL after the page loaded).
   const saveDefaultLabor = useCallback(async (mat, name) => {
-    const next = { ...(mat.calc_meta || {}), labor_rate: name || null }
+    const { data: cur } = await supabase.from('material').select('calc_meta').eq('id', mat.id).single()
+    const next = { ...(cur?.calc_meta || mat.calc_meta || {}), labor_rate: name || null }
     setMaterials(ms => ms.map(x => (x.id === mat.id ? { ...x, calc_meta: next } : x)))
     await supabase.from('material').update({ calc_meta: next }).eq('id', mat.id)
   }, [])

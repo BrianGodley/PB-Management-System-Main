@@ -78,6 +78,12 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
   const save = async () => {
     setBusy(true)
     setErr('')
+    // Merge labor_rate onto the CURRENT DB calc_meta (re-read here, not the modal's
+    // possibly-stale snapshot) so we never drop other keys added out-of-band — e.g.
+    // pool_equip_category set by SQL after this page loaded. Editing an item here
+    // must only touch labor_rate, leaving the rest of calc_meta intact.
+    const { data: cur } = await supabase.from('material').select('calc_meta').eq('id', m.id).single()
+    const nextMeta = { ...(cur?.calc_meta || m.calc_meta || {}), labor_rate: form.labor_rate || null }
     // 1) product attributes
     const { error: mErr } = await supabase
       .from('material')
@@ -86,8 +92,7 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
         subcategory_id: form.subcategory_id,
         description: form.description,
         unit: form.unit || null,
-        // Merge the default labor pointer into calc_meta (null clears it).
-        calc_meta: { ...(m.calc_meta || {}), labor_rate: form.labor_rate || null },
+        calc_meta: nextMeta,
       })
       .eq('id', m.id)
     if (mErr) {
