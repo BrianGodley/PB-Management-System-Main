@@ -158,7 +158,7 @@ function calcDemo(
   const containerCostCf = cf =>
     Math.ceil(((n(cf) / 27) * swellFactor) / containerCy) * containerPrice
   const baseMatPer10Cy = n(mp['Demo - Hand Import Base $/10cy'])
-  const rebarSfPerHr = n(lr['Demo - Hand Rebar SF/hr'])
+  const rebarSfPerHr = n(lr['Demo - Hand Rebar Install'])
 
   // ── Demo rows ────────────────────────────────────────────────────────────
   const conc = flat(state.concSF, state.concDepth || 4, rateConc, 0)
@@ -217,7 +217,8 @@ function calcDemo(
   const jjHrs = sfLaborHrs(state.jjSF, state.jjDepth || 4, laborJJ)
 
   // ── Rebar add-on ─────────────────────────────────────────────────────────
-  const rebarHrs = rebarSfPerHr > 0 ? n(state.rebarSF) / rebarSfPerHr : 0
+  // hrs-per-unit: rebar rate is hours per Sq Ft (standardized 2026-08-18, was SF/hr).
+  const rebarHrs = n(state.rebarSF) * rebarSfPerHr
 
   // ── Vegetation ───────────────────────────────────────────────────────────
   // Shrub demo: per-area rows — qty × shrub rate × shrub-height modifier.
@@ -955,7 +956,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       group: 'Vertical Demo',
       items: [
         coefRate('Misc Vertical', 'Demo - Hand - Misc Vert SF', calc.laborMiscVert),
-        coefRate('Rebar', 'Demo - Hand Rebar SF/hr', calc.rebarSfPerHr, 'SF/hr'),
+        coefRate('Rebar', 'Demo - Hand Rebar Install', calc.rebarSfPerHr, 'Hrs per Sq Ft'),
       ],
     },
     {

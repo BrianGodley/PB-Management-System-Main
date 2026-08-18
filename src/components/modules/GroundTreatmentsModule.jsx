@@ -231,11 +231,11 @@ function calcGroundTreatments(
   // Business-tunable coverage/swell/markup assumptions, surfaced as editable
   // coefficient rows in View Rates (labor_rates, category Ground Treatments).
   // Fixed unit conversions (27 cf/cy, 12 in/ft) stay as literal math.
-  const mulchCoverageSfDay = p('GT - Mulch Coverage SF/Day')
+  const mulchCoverageSfDay = p('GT - Mulch Coverage')
   const stepperSfPerTon = p('GT - Steppers SF Per Ton')
   const dgTonsDenom = p('GT - DG Tons Denominator')
   const dgRemovalSwell = p('GT - DG Removal Swell')
-  const dgCoverageSfDay = p('GT - DG Cleanup Coverage SF/Day')
+  const dgCoverageSfDay = p('GT - DG Cleanup Coverage')
   const dgCementLaborFactor = p('GT - DG Cement Labor Factor')
   const dgMaterialMarkup = p('GT - DG Material Markup')
   const dgPlacementPerTon = p('GT - DG Placement Labor per Ton')
@@ -256,7 +256,8 @@ function calcGroundTreatments(
       const CY = (n(r.sf) * (n(r.depth) / 12)) / 27
       const mt = rowOpt('Mulch', r, [])
       mulchMat += CY * mt.fallback
-      mulchLab += (CY / mulchCYPerDay) * 8 + (n(r.sf) / mulchCoverageSfDay) * 8
+      // hrs-per-unit (standardized 2026-08-18): mulch labor is hrs/Cu Yd, coverage hrs/Sq Ft.
+      mulchLab += CY * mulchCYPerDay + n(r.sf) * mulchCoverageSfDay
       if (r.weedFabric === 'Yes') {
         mulchMat += n(r.sf) * p(GT_RATES.gravelFabricMat.dbName)
         mulchLab += n(r.sf) * p(GT_RATES.gravelFabricLab.dbName)
@@ -396,8 +397,9 @@ function calcGroundTreatments(
       if (!(n(ln.sf) > 0)) return
       const opt = rowOpt('Steppers', { vendor: _sv[ln.key], type: _st[ln.key] || ln.defType }, [])
       const perTon = opt.fallback
+      // hrs-per-unit: stepper labor is hrs per Sq Ft (standardized 2026-08-18, was SF/day).
       const sfPerDay = p(ln.labRate.dbName)
-      const lab = sfPerDay > 0 ? (n(ln.sf) / sfPerDay) * 8 : 0
+      const lab = n(ln.sf) * sfPerDay
       const mat = (n(ln.sf) / stepperSfPerTon) * perTon
       stepLab += lab
       stepMat += mat
@@ -431,8 +433,8 @@ function calcGroundTreatments(
       const dgt = rowOpt('DG', r, [])
       const baseHrs =
         r.method === 'Hand'
-          ? (tons * dgRemovalSwell) / dgHandRate + (n(r.sf) / dgCoverageSfDay) * 8 + tons * dgPlacementPerTon
-          : ((tons * dgRemovalSwell) / dgMachineRate) * 8 + (n(r.sf) / dgCoverageSfDay) * 8 + tons * dgPlacementPerTon
+          ? tons * dgRemovalSwell * dgHandRate + n(r.sf) * dgCoverageSfDay + tons * dgPlacementPerTon
+          : tons * dgRemovalSwell * dgMachineRate + n(r.sf) * dgCoverageSfDay + tons * dgPlacementPerTon
       dgLab += baseHrs + (cement ? tons * dgCementLaborFactor : 0)
       dgMat +=
         (CY * dgt.fallback +
@@ -457,7 +459,7 @@ function calcGroundTreatments(
     const machineRate = p(GT_RATES.gravelMachineLab.dbName)
     const handRate = p(GT_RATES.gravelHandLab.dbName)
     const excavLab =
-      r.method === 'Machine' ? ((CY * aggregateRemovalSwell) / machineRate) * 8 : ((CY * aggregateRemovalSwell) / handRate) * 8
+      r.method === 'Machine' ? CY * aggregateRemovalSwell * machineRate : CY * aggregateRemovalSwell * handRate
     // Weed barrier — same fabric material + labor rate as DG's weed barrier.
     // Legacy rows (no weedFabric field) default to Yes so prior estimates that
     // always included fabric are unchanged.
@@ -483,7 +485,7 @@ function calcGroundTreatments(
     const machineRate = p(GT_RATES.gravelMachineLab.dbName)
     const handRate = p(GT_RATES.gravelHandLab.dbName)
     const excavLab =
-      r.method === 'Machine' ? ((CY * aggregateRemovalSwell) / machineRate) * 8 : ((CY * aggregateRemovalSwell) / handRate) * 8
+      r.method === 'Machine' ? CY * aggregateRemovalSwell * machineRate : CY * aggregateRemovalSwell * handRate
     // Weed barrier — same fabric material + labor rate as DG's weed barrier.
     const wantFabric = (r.weedFabric ?? 'Yes') === 'Yes'
     const fabricLab = wantFabric
@@ -507,7 +509,7 @@ function calcGroundTreatments(
     const machineRate = p(GT_RATES.gravelMachineLab.dbName)
     const handRate = p(GT_RATES.gravelHandLab.dbName)
     const excavLab =
-      r.method === 'Machine' ? ((CY * aggregateRemovalSwell) / machineRate) * 8 : ((CY * aggregateRemovalSwell) / handRate) * 8
+      r.method === 'Machine' ? CY * aggregateRemovalSwell * machineRate : CY * aggregateRemovalSwell * handRate
     // Weed barrier — same fabric material + labor rate as DG's weed barrier.
     const wantFabric = (r.weedFabric ?? 'Yes') === 'Yes'
     const fabricLab = wantFabric
@@ -1300,7 +1302,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.mulchLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'Cu Yd per day',
+          unitLabel: 'Hrs per Cu Yd',
           value: p(GT_RATES.mulchLab.dbName),
         },
         {
@@ -1313,13 +1315,13 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           value: p(GT_RATES.mulchDelivery.dbName),
         },
         {
-          label: 'Mulch Coverage SF/Day',
+          label: 'Mulch Coverage',
           table: 'labor_rates',
-          name: 'GT - Mulch Coverage SF/Day',
+          name: 'GT - Mulch Coverage',
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'Sq Ft per day',
-          value: p('GT - Mulch Coverage SF/Day'),
+          unitLabel: 'Hrs per Sq Ft',
+          value: p('GT - Mulch Coverage'),
         },
       ],
     },
@@ -1346,7 +1348,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.dgHandLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'Cu Yd per hr',
+          unitLabel: 'Hrs per Cu Yd',
           value: p(GT_RATES.dgHandLab.dbName),
         },
         {
@@ -1355,7 +1357,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.dgMachineLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'Cu Yd per day',
+          unitLabel: 'Hrs per Cu Yd',
           value: p(GT_RATES.dgMachineLab.dbName),
         },
         {
@@ -1377,13 +1379,13 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           value: p('GT - DG Removal Swell'),
         },
         {
-          label: 'DG - Cleanup Coverage SF/Day',
+          label: 'DG - Cleanup Coverage',
           table: 'labor_rates',
-          name: 'GT - DG Cleanup Coverage SF/Day',
+          name: 'GT - DG Cleanup Coverage',
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'Sq Ft per day',
-          value: p('GT - DG Cleanup Coverage SF/Day'),
+          unitLabel: 'Hrs per Sq Ft',
+          value: p('GT - DG Cleanup Coverage'),
         },
         {
           label: 'DG - Cement Labor Factor',
@@ -1414,7 +1416,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.gravelMachineLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'Cu Yd per day',
+          unitLabel: 'Hrs per Cu Yd',
           value: p(GT_RATES.gravelMachineLab.dbName),
         },
         {
@@ -1423,7 +1425,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.gravelHandLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'Cu Yd per day',
+          unitLabel: 'Hrs per Cu Yd',
           value: p(GT_RATES.gravelHandLab.dbName),
         },
         {
@@ -1469,7 +1471,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.flagstoneSoilLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'Sq Ft per day',
+          unitLabel: 'Hrs per Sq Ft',
           value: p(GT_RATES.flagstoneSoilLab.dbName),
         },
         {
@@ -1478,7 +1480,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.flagstoneConcreteLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'Sq Ft per day',
+          unitLabel: 'Hrs per Sq Ft',
           value: p(GT_RATES.flagstoneConcreteLab.dbName),
         },
         {
@@ -1487,7 +1489,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.precastSoilLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'Sq Ft per day',
+          unitLabel: 'Hrs per Sq Ft',
           value: p(GT_RATES.precastSoilLab.dbName),
         },
         {
@@ -1496,7 +1498,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           name: GT_RATES.precastConcreteLab.dbName,
           category: 'Ground Treatments',
           mode: 'coefficient',
-          unitLabel: 'Sq Ft per day',
+          unitLabel: 'Hrs per Sq Ft',
           value: p(GT_RATES.precastConcreteLab.dbName),
         },
         {
@@ -3042,7 +3044,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 const sfN = n(row.sf)
                 const tons = sfN / 80
                 const mat = tons * perTon
-                const hrs = sfPerDay > 0 ? (sfN / sfPerDay) * 8 : 0
+                const hrs = sfN * sfPerDay // hrs-per-unit (hrs per Sq Ft)
                 return (
                   <tr key={row.key} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
@@ -3094,7 +3096,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                     </td>
                     <td className="py-1 pr-2">
                       <span className="text-xs text-gray-500 flex items-center justify-center gap-1 whitespace-nowrap">
-                        {sfPerDay} Sq Ft/day
+                        {sfPerDay} Hrs/Sq Ft
                       </span>
                     </td>
                     <td className="py-1 pr-2">
