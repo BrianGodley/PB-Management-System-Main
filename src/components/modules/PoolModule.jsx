@@ -2091,6 +2091,97 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         )}
       </div>
 
+      {/* ─── Steel (before Shotcrete) ─── */}
+      <div>
+        <SectionHeader title="Steel" />
+        {!isSub ? (
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div>
+              <Label text="Vendor" />
+              <select
+                className="input text-sm py-1.5"
+                value={T.steel.vendor || 'Standard'}
+                onChange={e => upd('steel', { ...T.steel, vendor: e.target.value, rebarSize: '' })}
+              >
+                <option value="Standard">Standard</option>
+                {vendors
+                  .filter(v =>
+                    materialRows.some(
+                      r =>
+                        r.category === BASIC_CATEGORY &&
+                        r.sub_category === REINFORCEMENT_SUBCAT &&
+                        r.vendor_id === v.id
+                    )
+                  )
+                  .map(v => (
+                    <option key={v.id} value={v.id}>{v.name}</option>
+                  ))}
+              </select>
+            </div>
+            <div>
+              <Label text="Rebar Size" />
+              <select
+                className="input text-sm py-1.5"
+                value={T.steel.rebarSize || ''}
+                onChange={e => upd('steel', { ...T.steel, rebarSize: e.target.value })}
+              >
+                <option value="">Select size</option>
+                {catalogOptions(materialRows, REINFORCEMENT_SUBCAT, T.steel.vendor || 'Standard', {
+                  standardRows: 'null-vendor',
+                  stripPrefix: true,
+                  category: BASIC_CATEGORY,
+                }).map(o => (
+                  <option key={o.value} value={o.label}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label text="Shell SF" />
+              <NumInput value={T.steel.sf} onChange={v => upd('steel', { ...T.steel, sf: v })} />
+            </div>
+            <div>
+              <Label text="LF per SF" sub="rebar factor" />
+              <NumInput value={T.steel.lfPerSf} onChange={v => upd('steel', { ...T.steel, lfPerSf: v })} />
+            </div>
+            <div className="flex items-end pb-1">
+              <p className="text-xs text-gray-400">
+                {n(T.steel.sf) * n(T.steel.lfPerSf) > 0
+                  ? `${(n(T.steel.sf) * n(T.steel.lfPerSf)).toFixed(0)} LF → ${fmt2(calc.steelMat)} mat`
+                  : 'enter SF × LF/SF'}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div>
+              <Label text="Auto Sub Total" />
+              <div className="input text-sm py-1.5 bg-gray-50 text-gray-600">
+                {fmt2(calc.steelSub)}
+                <span className="text-xs text-gray-400 ml-1">auto</span>
+              </div>
+            </div>
+            <div>
+              <Label text="Override Sub Cost" />
+              <div className="relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                <NumInput
+                  value={T.steel.manualSubCost}
+                  onChange={v => upd('steel', { ...T.steel, manualSubCost: v })}
+                  className="pl-6"
+                  placeholder="leave blank for auto"
+                />
+              </div>
+            </div>
+            <div className="flex items-end pb-1">
+              <p className="text-xs text-gray-400 inline-flex items-center flex-wrap gap-1">
+                Auto: pool perimeter × ${n(subRates['Steel Per LF'])}/LF
+                {T.spa.enabled && <> + ${n(subRates['Steel Spa Bonus'])} spa</>}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* ─── 3. Shotcrete ─── */}
       <div>
         <SectionHeader title="Shotcrete (Sub)" />
@@ -2126,6 +2217,64 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           </div>
         </div>
       </div>
+
+      {/* ─── Pool Plumbing (In-House tab only) ─── */}
+      {subType !== 'Subcontractor' && (
+        <div>
+          <SectionHeader title="Pool Plumbing" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <Label text="Labor Hours" sub="hrs" />
+              <div className="flex items-center gap-1">
+                <NumInput
+                  value={T.plumbingIH?.hours ?? ''}
+                  onChange={v => upd('plumbingIH', { ...(T.plumbingIH || {}), hours: v })}
+                  placeholder={`default ${n(laborRates['Pool Plumbing - Base Hours'])}`}
+                  className="flex-1 min-w-0"
+                />
+              </div>
+              {(T.plumbingIH?.hours ?? '') === '' && (
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  default {n(laborRates['Pool Plumbing - Base Hours'])} hrs
+                </p>
+              )}
+            </div>
+            <div>
+              <Label text="Materials" sub="$" />
+              <div className="flex items-center gap-1">
+                <div className="relative flex-1 min-w-0">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+                    $
+                  </span>
+                  <NumInput
+                    value={T.plumbingIH?.materials ?? ''}
+                    onChange={v => upd('plumbingIH', { ...(T.plumbingIH || {}), materials: v })}
+                    placeholder={`default ${n(materialPrices['Pool Plumbing - Materials'])}`}
+                    className="pl-6"
+                  />
+                </div>
+              </div>
+              {(T.plumbingIH?.materials ?? '') === '' && (
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  default $ {n(materialPrices['Pool Plumbing - Materials'])}
+                </p>
+              )}
+            </div>
+          </div>
+          {(calc.plumbHrsIH > 0 || calc.plumbMatIH > 0) && (
+            <p className="text-xs text-gray-500 mt-2 px-1">
+              {calc.plumbHrsIH.toFixed(1)} hrs × ${n(state.laborRatePerHour)}/hr ={' '}
+              <strong>{fmt2(calc.plumbHrsIH * n(state.laborRatePerHour))}</strong> labor
+              {calc.plumbMatIH > 0 && (
+                <>
+                  {' '}
+                  + <strong>{fmt2(calc.plumbMatIH)}</strong> materials
+                </>
+              )}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* ─── 4. Waterline Tile ─── */}
       <div>
@@ -2739,97 +2888,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       </div>
       )}
 
-      {/* ─── 11. Steel ─── */}
-      <div>
-        <SectionHeader title="Steel" />
-        {!isSub ? (
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <div>
-              <Label text="Vendor" />
-              <select
-                className="input text-sm py-1.5"
-                value={T.steel.vendor || 'Standard'}
-                onChange={e => upd('steel', { ...T.steel, vendor: e.target.value, rebarSize: '' })}
-              >
-                <option value="Standard">Standard</option>
-                {vendors
-                  .filter(v =>
-                    materialRows.some(
-                      r =>
-                        r.category === BASIC_CATEGORY &&
-                        r.sub_category === REINFORCEMENT_SUBCAT &&
-                        r.vendor_id === v.id
-                    )
-                  )
-                  .map(v => (
-                    <option key={v.id} value={v.id}>{v.name}</option>
-                  ))}
-              </select>
-            </div>
-            <div>
-              <Label text="Rebar Size" />
-              <select
-                className="input text-sm py-1.5"
-                value={T.steel.rebarSize || ''}
-                onChange={e => upd('steel', { ...T.steel, rebarSize: e.target.value })}
-              >
-                <option value="">Select size</option>
-                {catalogOptions(materialRows, REINFORCEMENT_SUBCAT, T.steel.vendor || 'Standard', {
-                  standardRows: 'null-vendor',
-                  stripPrefix: true,
-                  category: BASIC_CATEGORY,
-                }).map(o => (
-                  <option key={o.value} value={o.label}>{o.label}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <Label text="Shell SF" />
-              <NumInput value={T.steel.sf} onChange={v => upd('steel', { ...T.steel, sf: v })} />
-            </div>
-            <div>
-              <Label text="LF per SF" sub="rebar factor" />
-              <NumInput value={T.steel.lfPerSf} onChange={v => upd('steel', { ...T.steel, lfPerSf: v })} />
-            </div>
-            <div className="flex items-end pb-1">
-              <p className="text-xs text-gray-400">
-                {n(T.steel.sf) * n(T.steel.lfPerSf) > 0
-                  ? `${(n(T.steel.sf) * n(T.steel.lfPerSf)).toFixed(0)} LF → ${fmt2(calc.steelMat)} mat`
-                  : 'enter SF × LF/SF'}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <div>
-              <Label text="Auto Sub Total" />
-              <div className="input text-sm py-1.5 bg-gray-50 text-gray-600">
-                {fmt2(calc.steelSub)}
-                <span className="text-xs text-gray-400 ml-1">auto</span>
-              </div>
-            </div>
-            <div>
-              <Label text="Override Sub Cost" />
-              <div className="relative">
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-                <NumInput
-                  value={T.steel.manualSubCost}
-                  onChange={v => upd('steel', { ...T.steel, manualSubCost: v })}
-                  className="pl-6"
-                  placeholder="leave blank for auto"
-                />
-              </div>
-            </div>
-            <div className="flex items-end pb-1">
-              <p className="text-xs text-gray-400 inline-flex items-center flex-wrap gap-1">
-                Auto: pool perimeter × ${n(subRates['Steel Per LF'])}/LF
-                {T.spa.enabled && <> + ${n(subRates['Steel Spa Bonus'])} spa</>}
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-      {/* end Steel */}
 
       {/* ─── Utilities (Trenching / Gas Pipe / Electrical Pipe·Wiring·Fixtures) ─── */}
       <div>
@@ -2954,63 +3012,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         </div>
       </div>
 
-      {/* ─── In-House Plumbing (In-House tab only) ─── */}
-      {subType !== 'Subcontractor' && (
-        <div>
-          <SectionHeader title="Pool Plumbing" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <Label text="Labor Hours" sub="hrs" />
-              <div className="flex items-center gap-1">
-                <NumInput
-                  value={T.plumbingIH?.hours ?? ''}
-                  onChange={v => upd('plumbingIH', { ...(T.plumbingIH || {}), hours: v })}
-                  placeholder={`default ${n(laborRates['Pool Plumbing - Base Hours'])}`}
-                  className="flex-1 min-w-0"
-                />
-              </div>
-              {(T.plumbingIH?.hours ?? '') === '' && (
-                <p className="text-[10px] text-gray-400 mt-0.5">
-                  default {n(laborRates['Pool Plumbing - Base Hours'])} hrs
-                </p>
-              )}
-            </div>
-            <div>
-              <Label text="Materials" sub="$" />
-              <div className="flex items-center gap-1">
-                <div className="relative flex-1 min-w-0">
-                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-                    $
-                  </span>
-                  <NumInput
-                    value={T.plumbingIH?.materials ?? ''}
-                    onChange={v => upd('plumbingIH', { ...(T.plumbingIH || {}), materials: v })}
-                    placeholder={`default ${n(materialPrices['Pool Plumbing - Materials'])}`}
-                    className="pl-6"
-                  />
-                </div>
-              </div>
-              {(T.plumbingIH?.materials ?? '') === '' && (
-                <p className="text-[10px] text-gray-400 mt-0.5">
-                  default $ {n(materialPrices['Pool Plumbing - Materials'])}
-                </p>
-              )}
-            </div>
-          </div>
-          {(calc.plumbHrsIH > 0 || calc.plumbMatIH > 0) && (
-            <p className="text-xs text-gray-500 mt-2 px-1">
-              {calc.plumbHrsIH.toFixed(1)} hrs × ${n(state.laborRatePerHour)}/hr ={' '}
-              <strong>{fmt2(calc.plumbHrsIH * n(state.laborRatePerHour))}</strong> labor
-              {calc.plumbMatIH > 0 && (
-                <>
-                  {' '}
-                  + <strong>{fmt2(calc.plumbMatIH)}</strong> materials
-                </>
-              )}
-            </p>
-          )}
-        </div>
-      )}
 
       {/* ─── 12. Manual Entry ─── */}
       <div>
