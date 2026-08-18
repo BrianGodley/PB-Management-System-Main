@@ -136,7 +136,9 @@ function drainMatCost(cat, row, TYPES, materialRows, catDefaults, mp) {
   if (vrow) dbName = vrow.name
   // Selected vendor's catalog row wins; otherwise the Standard price by name.
   // No hardcoded fallback — an unpriced item contributes $0 (surfaced as $0).
-  return { dbName, cost: vrow ? n(vrow.unit_cost) : n(mp[dbName]) }
+  // `row` is returned so the calc can read the item's self-declared labor rate
+  // (calc_meta.labor_rate) instead of a hardcoded type→name map.
+  return { dbName, cost: vrow ? n(vrow.unit_cost) : n(mp[dbName]), row: vrow }
 }
 
 // Master-list additions for a drain section: rows tagged sub_category=cat
@@ -242,10 +244,11 @@ function calcDrainage(
     // vendor-only catalog item still prices through drainMatCost.
     if (lf > 0 && r.type) {
       const meta = PIPE_T[r.type] || {}
-      const { cost } = drainMatCost(DRAIN_CAT.pipe, r, PIPE_T, materialRows, catDefaults, materialPrices)
+      const { cost, row: vrow } = drainMatCost(DRAIN_CAT.pipe, r, PIPE_T, materialRows, catDefaults, materialPrices)
       pipeMat += lf * cost
-      // Built-in per-type labor rate; catalog items carry their labor in calc_meta.laborPerLF.
-      pipeHrs += lf * (n(materialPrices[PIPE_LABOR_RATE_NAME[r.type]]) || n(meta.laborPerLF))
+      // Labor: the item's own calc_meta.labor_rate, then legacy built-in map, then coefficient.
+      const laborName = vrow?.calc_meta?.labor_rate || PIPE_LABOR_RATE_NAME[r.type]
+      pipeHrs += lf * (n(materialPrices[laborName]) || n(meta.laborPerLF))
     }
   })
 
@@ -259,7 +262,7 @@ function calcDrainage(
     const lf = n(r.lf)
     if (lf > 0 && r.type) {
       const meta = FRENCH_PIPE_T[r.type] || {}
-      const { cost } = drainMatCost(
+      const { cost, row: vrow } = drainMatCost(
         DRAIN_CAT.french,
         r,
         FRENCH_PIPE_T,
@@ -268,8 +271,9 @@ function calcDrainage(
         materialPrices
       )
       frenchMat += lf * cost
-      // Built-in per-type labor rate; catalog items carry their labor in calc_meta.laborPerLF.
-      frenchHrs += lf * (n(materialPrices[FRENCH_PIPE_LABOR_RATE_NAME[r.type]]) || n(meta.laborPerLF))
+      // Labor: the item's own calc_meta.labor_rate, then legacy built-in map, then coefficient.
+      const laborName = vrow?.calc_meta?.labor_rate || FRENCH_PIPE_LABOR_RATE_NAME[r.type]
+      frenchHrs += lf * (n(materialPrices[laborName]) || n(meta.laborPerLF))
     }
   })
   const totalFrenchLF = (frenchRows || []).reduce((s, r) => s + n(r.lf), 0)
@@ -308,10 +312,11 @@ function calcDrainage(
     const qty = n(r.qty)
     if (qty > 0 && r.type) {
       const meta = FIX_T[r.type] || {}
-      const { cost } = drainMatCost(DRAIN_CAT.fixture, r, FIX_T, materialRows, catDefaults, materialPrices)
+      const { cost, row: vrow } = drainMatCost(DRAIN_CAT.fixture, r, FIX_T, materialRows, catDefaults, materialPrices)
       fixMat += qty * cost
-      // Built-in per-type labor rate; catalog items carry their labor in calc_meta.laborHrs.
-      fixHrs += qty * (n(materialPrices[FIXTURE_LABOR_RATE_NAME[r.type]]) || n(meta.laborHrs))
+      // Labor: the item's own calc_meta.labor_rate, then legacy built-in map, then coefficient.
+      const laborName = vrow?.calc_meta?.labor_rate || FIXTURE_LABOR_RATE_NAME[r.type]
+      fixHrs += qty * (n(materialPrices[laborName]) || n(meta.laborHrs))
       totalFixQty += qty
     }
   })
