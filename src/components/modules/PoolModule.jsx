@@ -212,19 +212,37 @@ function copingVendorIds(materialRows) {
 const TILE_SUBCAT = 'Tile'
 const SPILLWAY_SUBCAT = 'Spillway'
 const RAISED_SUBCAT = 'Raised Surface'
-function poolStdOptions(materialRows, subcat) {
-  return catalogOptions(materialRows, subcat, 'Standard', {
+// Steel = rebar picked from the shared Basic Materials → Reinforcement rows
+// ('Rebar #3'…'Rebar #8', priced per Ln Ft). In-House install labor rides on the
+// Pool 'Steel - Install' labor rate (per Ln Ft; seed empty). Rebar LF = shell SF ×
+// a per-row LF/SF factor.
+const BASIC_CATEGORY = 'Basic Materials'
+const REINFORCEMENT_SUBCAT = 'Reinforcement'
+const POOL_STEEL_LABOR = 'Steel - Install'
+function poolStdOptions(materialRows, subcat, vendorSel = 'Standard') {
+  return catalogOptions(materialRows, subcat, vendorSel, {
     standardRows: 'null-vendor',
     stripPrefix: true,
     category: 'Pool',
   })
 }
-function poolStdItem(materialRows, subcat, key) {
-  return catalogItemFor(materialRows, subcat, 'Standard', key, {
+function poolStdItem(materialRows, subcat, key, vendorSel = 'Standard') {
+  return catalogItemFor(materialRows, subcat, vendorSel, key, {
     category: 'Pool',
     stripPrefix: true,
     fallbackFirst: false,
   })
+}
+// Real vendors (non-Standard) carrying items in a Pool sub-category — drives the
+// per-row Vendor picker (Standard + whichever vendors stock that sub-category).
+function poolSubVendorIds(materialRows, subcat) {
+  return [
+    ...new Set(
+      (materialRows || [])
+        .filter(r => r.category === 'Pool' && r.sub_category === subcat && r.vendor_id)
+        .map(r => r.vendor_id)
+    ),
+  ]
 }
 
 
@@ -458,12 +476,13 @@ const defaultStruct = (enabled = false) => ({
 })
 const defaultTileStruct = () => ({
   lf: '',
+  vendor: 'Standard',
   installType: '6" Squares',
   matPricePerSF: '2.50',
   waterproof: false,
 })
 const defaultInteriorStruct = () => ({ type: '', subCost: '' })
-const newSpillway = () => ({ struct: 'Pool', type: '', qty: '1', lf: '' })
+const newSpillway = () => ({ struct: 'Pool', vendor: 'Standard', type: '', qty: '1', lf: '' })
 const newCopingRow = () => ({ struct: 'Pool', vendor: 'Standard', type: '', lf: '', sided: 'single' })
 const newRaisedSurface = () => ({ matType: '', sqft: '', curvePct: '', corners: '' })
 const newEquipRow = () => ({ vendor: '', category: 'Pump', model: '', qty: '1', unitCost: '' })
@@ -536,7 +555,7 @@ function makeTab(data = {}) {
       sheerDescents: '',
       manualSubCost: '',
     },
-    steel: data.steel ?? { manualSubCost: '' },
+    steel: data.steel ?? { vendor: 'Standard', rebarSize: '', sf: '', lfPerSf: '', manualSubCost: '' },
     // In-House pool plumbing — labor hours + materials $ done in-house (not a
     // sub trade). Blank strings default to the DB master rates in calcPool.
     plumbingIH: data.plumbingIH ? { hours: '', materials: '', ...data.plumbingIH } : { hours: '', materials: '' },
@@ -684,7 +703,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     if (!lf) return
     // Install type is a master material rates item; labor rides on its calc_meta
     // pointer. The material $/SF stays a per-row figure (tile product is job-specific).
-    const item = poolStdItem(materialRows, TILE_SUBCAT, t.installType)
+    const item = poolStdItem(materialRows, TILE_SUBCAT, t.installType, t.vendor || 'Standard')
     const installRate = n(laborRates[item?.calc_meta?.labor_rate])
     if (t.installType && installRate <= 0) laborUnset.push(t.installType)
     const matPriceSF = n(t.matPricePerSF)
@@ -703,7 +722,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     const totalLF = qty * lf
     // Spillway is a master material rates item: material from the item price, labor
     // from its calc_meta pointer ('Spillway - <type>'). No name-keyed lookups.
-    const item = poolStdItem(materialRows, SPILLWAY_SUBCAT, sw.type)
+    const item = poolStdItem(materialRows, SPILLWAY_SUBCAT, sw.type, sw.vendor || 'Standard')
     const matRate = item ? n(item.unit_cost) : 0
     const labRate = n(laborRates[item?.calc_meta?.labor_rate])
     if (labRate <= 0) laborUnset.push(sw.type)
@@ -814,12 +833,28 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     plumbSub = 0
   }
 
-  // ─ Steel (rates from subcontractor_rates, category='Pool') ─
+  // ─ Steel / Rebar ─
+  // Rebar quantity = shell SF × (LF per SF factor). In-House picks a rebar size
+  // from Basic Materials → Reinforcement (priced per Ln Ft) + the 'Steel - Install'
+  // labor rate (per Ln Ft). The Sub tab uses a flat sub cost (manual, or the legacy
+  // perimeter × 'Steel Per LF' auto-sub).
+  const steelLF = n(steel.sf) * n(steel.lfPerSf)
+  let steelMat = 0,
+    steelHrs = 0
+  if (!isSubTab && steelLF > 0) {
+    const rebarItem = catalogItemFor(materialRows, REINFORCEMENT_SUBCAT, steel.vendor || 'Standard', steel.rebarSize, {
+      category: BASIC_CATEGORY,
+      stripPrefix: true,
+      fallbackFirst: false,
+    })
+    steelMat = steelLF * (rebarItem ? n(rebarItem.unit_cost) : 0)
+    steelHrs = steelLF * n(laborRates[POOL_STEEL_LABOR])
+  }
   let steelSub
   if (hasOverride(steel.manualSubCost)) {
     steelSub = n(steel.manualSubCost)
   } else {
-    // Steel is qty-driven (perimeter + spa). Auto-sub on the Sub tab only.
+    // Legacy auto-sub: perimeter + spa on the Sub tab only.
     const poolPerim = n(pool.perimLF)
     const steelPerLF = n(subRates['Steel Per LF'])
     const steelSpaBonus = n(subRates['Steel Spa Bonus'])
@@ -889,13 +924,14 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     raisedHrs +
     equipmentHrs +
     epHrs +
+    steelHrs +
     manHrs +
     plumbHrsIH +
     (parseFloat(state.hoursAdj) || 0)
   const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
   const totalHrs = _preWalkHrs + walkHrs
   const manDays = totalHrs / 8
-  const totalMat = tileMat + spillwayMat + copingMat + raisedMat + epMat + manMat + plumbMatIH
+  const totalMat = tileMat + spillwayMat + copingMat + raisedMat + epMat + steelMat + manMat + plumbMatIH
   // Pool's genuine sub trades (excavation / shotcrete / interior / equipment /
   // plumbing / steel / manual-sub). These are sub costs on either tab.
   const subTradeCost =
@@ -952,6 +988,9 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     equipmentSub,
     plumbSub,
     steelSub,
+    steelMat,
+    steelHrs,
+    steelLF,
     plumbHrsIH, // effective in-house pool-plumbing hours (default or override)
     plumbMatIH, // effective in-house pool-plumbing materials $
     equipRate, // resolved excavation CY/hr so the icon can show + edit it
@@ -1138,7 +1177,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       fetchStandardRateMap(['Pool', 'Utilities']),
       supabase.from('labor_rates').select('name,rate').in('category', ['Pool', 'Utilities']),
       supabase.from('subcontractor_rates').select('company_name,trade,rate,unit').eq('category', 'Pool'),
-      fetchModuleCatalog(['Utilities', 'Pool']),
+      fetchModuleCatalog(['Utilities', 'Pool', 'Basic Materials']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
@@ -1275,6 +1314,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
   const updSpillway = (i, key, val) => {
     const arr = [...T.spillways]
     arr[i] = { ...arr[i], [key]: val }
+    if (key === 'vendor') arr[i].type = ''
     upd('spillways', arr)
   }
   const removeSpillway = i =>
@@ -2091,6 +2131,26 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                       />
                     </div>
                     <div>
+                      <Label text="Vendor" />
+                      <select
+                        className="input text-sm py-1.5"
+                        value={t.vendor || 'Standard'}
+                        onChange={e =>
+                          upd('tile', {
+                            ...T.tile,
+                            [k]: { ...t, vendor: e.target.value, installType: '' },
+                          })
+                        }
+                      >
+                        <option value="Standard">Standard</option>
+                        {vendors
+                          .filter(v => poolSubVendorIds(materialRows, TILE_SUBCAT).includes(v.id))
+                          .map(v => (
+                            <option key={v.id} value={v.id}>{v.name}</option>
+                          ))}
+                      </select>
+                    </div>
+                    <div>
                       <Label text="Install Type" />
                       <div className="flex items-center gap-1">
                         <select
@@ -2105,10 +2165,10 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                         >
                           {!t.installType && <option value="">Select type</option>}
                           {t.installType &&
-                            !poolStdOptions(materialRows, TILE_SUBCAT).some(o => o.label === t.installType) && (
+                            !poolStdOptions(materialRows, TILE_SUBCAT, t.vendor || 'Standard').some(o => o.label === t.installType) && (
                               <option value={t.installType}>{t.installType}</option>
                             )}
-                          {poolStdOptions(materialRows, TILE_SUBCAT).map(o => (
+                          {poolStdOptions(materialRows, TILE_SUBCAT, t.vendor || 'Standard').map(o => (
                             <option key={o.value} value={o.label}>{o.label}</option>
                           ))}
                         </select>
@@ -2151,7 +2211,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                   {n(t.lf) > 0 &&
                     (() => {
                       const rate = n(
-                        laborRates[poolStdItem(materialRows, TILE_SUBCAT, t.installType)?.calc_meta?.labor_rate]
+                        laborRates[poolStdItem(materialRows, TILE_SUBCAT, t.installType, t.vendor || 'Standard')?.calc_meta?.labor_rate]
                       )
                       return (
                         <p className="text-xs text-gray-400 mt-1">
@@ -2169,8 +2229,24 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       <div>
         <SectionHeader title="Spillways" />
         <div className="space-y-2">
-          {T.spillways.map((sw, i) => (
-            <div key={i} className="grid grid-cols-5 gap-2 items-end">
+          {T.spillways.map((sw, i) => {
+            const spillOpts = poolStdOptions(materialRows, SPILLWAY_SUBCAT, sw.vendor || 'Standard')
+            const spillVends = vendors.filter(v => poolSubVendorIds(materialRows, SPILLWAY_SUBCAT).includes(v.id))
+            return (
+            <div key={i} className="grid grid-cols-6 gap-2 items-end">
+              <div>
+                <Label text="Vendor" />
+                <select
+                  className="input text-sm py-1.5"
+                  value={sw.vendor || 'Standard'}
+                  onChange={e => updSpillway(i, 'vendor', e.target.value)}
+                >
+                  <option value="Standard">Standard</option>
+                  {spillVends.map(v => (
+                    <option key={v.id} value={v.id}>{v.name}</option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <Label text="Structure" />
                 <select
@@ -2192,10 +2268,10 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                     onChange={e => updSpillway(i, 'type', e.target.value)}
                   >
                     {!sw.type && <option value="">Select type</option>}
-                    {sw.type && !poolStdOptions(materialRows, SPILLWAY_SUBCAT).some(o => o.label === sw.type) && (
+                    {sw.type && !spillOpts.some(o => o.label === sw.type) && (
                       <option value={sw.type}>{sw.type}</option>
                     )}
-                    {poolStdOptions(materialRows, SPILLWAY_SUBCAT).map(o => (
+                    {spillOpts.map(o => (
                       <option key={o.value} value={o.label}>{o.label}</option>
                     ))}
                   </select>
@@ -2212,12 +2288,13 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
               <button
                 type="button"
                 onClick={() => removeSpillway(i)}
-                className="text-gray-300 hover:text-red-400 text-lg pb-1"
+                className="text-gray-500 hover:text-red-500 text-sm pb-1"
               >
                 ✕
               </button>
             </div>
-          ))}
+            )
+          })}
           <button
             type="button"
             onClick={addSpillway}
@@ -2236,19 +2313,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             const copingOpts = copingOptions(materialRows, cr.vendor || 'Standard')
             const copingVends = vendors.filter(v => copingVendorIds(materialRows).includes(v.id))
             return (
-            <div key={i} className="grid grid-cols-6 gap-2 items-end">
-              <div>
-                <Label text="Structure" />
-                <select
-                  className="input text-sm py-1.5"
-                  value={cr.struct}
-                  onChange={e => updCoping(i, 'struct', e.target.value)}
-                >
-                  {activeStructList.map(s => (
-                    <option key={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
+            <div key={i} className="grid grid-cols-7 gap-2 items-end">
               <div>
                 <Label text="Vendor" />
                 <select
@@ -2259,6 +2324,18 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                   <option value="Standard">Standard</option>
                   {copingVends.map(v => (
                     <option key={v.id} value={v.id}>{v.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label text="Structure" />
+                <select
+                  className="input text-sm py-1.5"
+                  value={cr.struct}
+                  onChange={e => updCoping(i, 'struct', e.target.value)}
+                >
+                  {activeStructList.map(s => (
+                    <option key={s}>{s}</option>
                   ))}
                 </select>
               </div>
@@ -2298,7 +2375,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
               <button
                 type="button"
                 onClick={() => removeCoping(i)}
-                className="text-gray-300 hover:text-red-400 text-lg pb-1"
+                className="text-gray-500 hover:text-red-500 text-sm pb-1"
               >
                 ✕
               </button>
@@ -2361,7 +2438,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
               <button
                 type="button"
                 onClick={() => removeRaised(i)}
-                className="text-gray-300 hover:text-red-400 text-lg pb-1"
+                className="text-gray-500 hover:text-red-500 text-sm pb-1"
               >
                 ✕
               </button>
@@ -2534,7 +2611,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                       type="button"
                       onClick={() => removeEquip(i)}
                       title="Remove row"
-                      className="text-gray-300 hover:text-red-400 text-lg leading-none shrink-0"
+                      className="text-gray-500 hover:text-red-500 text-sm leading-none shrink-0"
                     >
                       ✕
                     </button>
@@ -2638,38 +2715,95 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         </div>
       </div>
 
-      {/* ─── 11. Steel (Sub) ─── */}
+      {/* ─── 11. Steel ─── */}
       <div>
-        <SectionHeader title="Steel (Sub)" />
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <div>
-            <Label text="Auto Sub Total" />
-            <div className="input text-sm py-1.5 bg-gray-50 text-gray-600">
-              {fmt2(calc.steelSub)}
-              <span className="text-xs text-gray-400 ml-1">auto</span>
+        <SectionHeader title="Steel" />
+        {!isSub ? (
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div>
+              <Label text="Vendor" />
+              <select
+                className="input text-sm py-1.5"
+                value={T.steel.vendor || 'Standard'}
+                onChange={e => upd('steel', { ...T.steel, vendor: e.target.value, rebarSize: '' })}
+              >
+                <option value="Standard">Standard</option>
+                {vendors
+                  .filter(v =>
+                    materialRows.some(
+                      r =>
+                        r.category === BASIC_CATEGORY &&
+                        r.sub_category === REINFORCEMENT_SUBCAT &&
+                        r.vendor_id === v.id
+                    )
+                  )
+                  .map(v => (
+                    <option key={v.id} value={v.id}>{v.name}</option>
+                  ))}
+              </select>
+            </div>
+            <div>
+              <Label text="Rebar Size" />
+              <select
+                className="input text-sm py-1.5"
+                value={T.steel.rebarSize || ''}
+                onChange={e => upd('steel', { ...T.steel, rebarSize: e.target.value })}
+              >
+                <option value="">Select size</option>
+                {catalogOptions(materialRows, REINFORCEMENT_SUBCAT, T.steel.vendor || 'Standard', {
+                  standardRows: 'null-vendor',
+                  stripPrefix: true,
+                  category: BASIC_CATEGORY,
+                }).map(o => (
+                  <option key={o.value} value={o.label}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label text="Shell SF" />
+              <NumInput value={T.steel.sf} onChange={v => upd('steel', { ...T.steel, sf: v })} />
+            </div>
+            <div>
+              <Label text="LF per SF" sub="rebar factor" />
+              <NumInput value={T.steel.lfPerSf} onChange={v => upd('steel', { ...T.steel, lfPerSf: v })} />
+            </div>
+            <div className="flex items-end pb-1">
+              <p className="text-xs text-gray-400">
+                {n(T.steel.sf) * n(T.steel.lfPerSf) > 0
+                  ? `${(n(T.steel.sf) * n(T.steel.lfPerSf)).toFixed(0)} LF → ${fmt2(calc.steelMat)} mat`
+                  : 'enter SF × LF/SF'}
+              </p>
             </div>
           </div>
-          <div>
-            <Label text="Override Sub Cost" />
-            <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-                $
-              </span>
-              <NumInput
-                value={T.steel.manualSubCost}
-                onChange={v => upd('steel', { ...T.steel, manualSubCost: v })}
-                className="pl-6"
-                placeholder="leave blank for auto"
-              />
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div>
+              <Label text="Auto Sub Total" />
+              <div className="input text-sm py-1.5 bg-gray-50 text-gray-600">
+                {fmt2(calc.steelSub)}
+                <span className="text-xs text-gray-400 ml-1">auto</span>
+              </div>
+            </div>
+            <div>
+              <Label text="Override Sub Cost" />
+              <div className="relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                <NumInput
+                  value={T.steel.manualSubCost}
+                  onChange={v => upd('steel', { ...T.steel, manualSubCost: v })}
+                  className="pl-6"
+                  placeholder="leave blank for auto"
+                />
+              </div>
+            </div>
+            <div className="flex items-end pb-1">
+              <p className="text-xs text-gray-400 inline-flex items-center flex-wrap gap-1">
+                Auto: pool perimeter × ${n(subRates['Steel Per LF'])}/LF
+                {T.spa.enabled && <> + ${n(subRates['Steel Spa Bonus'])} spa</>}
+              </p>
             </div>
           </div>
-          <div className="flex items-end pb-1">
-            <p className="text-xs text-gray-400 inline-flex items-center flex-wrap gap-1">
-              Auto: pool perimeter × ${n(subRates['Steel Per LF'])}/LF
-              {T.spa.enabled && <> + ${n(subRates['Steel Spa Bonus'])} spa</>}
-            </p>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* ─── Electrical & Plumbing (ported from Utilities) ─── */}
