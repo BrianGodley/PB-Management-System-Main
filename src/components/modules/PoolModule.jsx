@@ -446,11 +446,11 @@ function EpTable({
                     {rows.length > 1 && (
                       <button
                         type="button"
-                        className="text-gray-300 hover:text-red-500"
+                        className="text-gray-500 hover:text-red-500 text-xs leading-none"
                         title="Remove row"
                         onClick={() => setRows(rs => rs.filter((_, idx) => idx !== i))}
                       >
-                        ×
+                        ✕
                       </button>
                     )}
                   </td>
