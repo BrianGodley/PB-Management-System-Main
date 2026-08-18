@@ -2276,6 +2276,209 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         </div>
       )}
 
+      {/* ─── Utilities (Trenching / Gas Pipe / Electrical Pipe·Wiring·Fixtures) ─── */}
+      <div>
+        <SectionHeader title="Utilities" />
+        <div className="space-y-4">
+          {/* Trenching — method → hrs per Cu Ft (mirrors the Utilities module). */}
+          <div>
+            <p className="text-xs font-semibold text-gray-600 mb-1">Trenching</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-xs text-gray-500 border-b border-gray-200">
+                    <th className="text-left pb-1 pr-2 font-medium">Method</th>
+                    <th className="text-center pb-1 pr-2 font-medium">Ln Ft</th>
+                    <th className="text-center pb-1 pr-2 font-medium">Width (in)</th>
+                    <th className="text-center pb-1 pr-2 font-medium">Depth (in)</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(T.epTrenchRows || []).map((r, i) => {
+                    const setT = setEpRows('epTrenchRows')
+                    const put = (field, val) => setT(rs => rs.map((x, idx) => (idx === i ? { ...x, [field]: val } : x)))
+                    return (
+                      <tr key={i} className="border-b border-gray-100">
+                        <td className="py-1 pr-2">
+                          <select
+                            className="input text-sm py-1"
+                            value={r.equipment}
+                            onChange={e => put('equipment', e.target.value)}
+                          >
+                            <option>Trench</option>
+                            <option>Hand</option>
+                          </select>
+                        </td>
+                        <td className="py-1 pr-2"><NumInput value={r.lf} onChange={v => put('lf', v)} /></td>
+                        <td className="py-1 pr-2"><NumInput value={r.width} onChange={v => put('width', v)} /></td>
+                        <td className="py-1 pr-2"><NumInput value={r.depth} onChange={v => put('depth', v)} /></td>
+                        <td className="py-1 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setT(rs => rs.filter((_, idx) => idx !== i))}
+                            className="text-gray-500 hover:text-red-500 text-sm"
+                          >
+                            ✕
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+              <button
+                type="button"
+                onClick={() => setEpRows('epTrenchRows')(rs => [...rs, EP_TRENCH_ROW()])}
+                className="text-xs text-green-700 hover:underline mt-1"
+              >
+                + Add Trench
+              </button>
+            </div>
+          </div>
+          <EpTable
+            title="Gas Pipe"
+            rows={T.epGasPipeRows || []}
+            setRows={setEpRows('epGasPipeRows')}
+            arr={[]}
+            cat={UTIL_CAT.gasPipe}
+            qtyField="lf"
+            qtyLabel="Linear Feet"
+            unitLabel="LF"
+            newRow={EP_GASPIPE_ROW}
+            materialRows={materialRows}
+            materialPrices={materialPrices}
+            refreshAllRates={refreshAllRates}
+            vendorsForCategory={vendorsForCategory}
+          />
+          <EpTable
+            title="Electrical Pipe"
+            rows={T.epLineRows || []}
+            setRows={setEpRows('epLineRows')}
+            arr={[]}
+            cat={UTIL_CAT.line}
+            qtyField="lf"
+            qtyLabel="Linear Feet"
+            unitLabel="LF"
+            newRow={EP_LINE_ROW}
+            materialRows={materialRows}
+            materialPrices={materialPrices}
+            refreshAllRates={refreshAllRates}
+            vendorsForCategory={vendorsForCategory}
+          />
+          <EpTable
+            title="Electrical Wiring"
+            rows={T.epWireRows || []}
+            setRows={setEpRows('epWireRows')}
+            arr={[]}
+            cat={UTIL_CAT.wire}
+            qtyField="lf"
+            qtyLabel="Linear Feet"
+            unitLabel="LF"
+            newRow={EP_WIRE_ROW}
+            materialRows={materialRows}
+            materialPrices={materialPrices}
+            refreshAllRates={refreshAllRates}
+            vendorsForCategory={vendorsForCategory}
+          />
+          <EpTable
+            title="Electrical Fixtures"
+            rows={T.epElecRows || []}
+            setRows={setEpRows('epElecRows')}
+            arr={[]}
+            cat={UTIL_CAT.elec}
+            qtyField="qty"
+            qtyLabel="Qty"
+            unitLabel="ea"
+            newRow={EP_ELEC_ROW}
+            materialRows={materialRows}
+            materialPrices={materialPrices}
+            refreshAllRates={refreshAllRates}
+            vendorsForCategory={vendorsForCategory}
+          />
+        </div>
+      </div>
+
+      {/* ─── 5. Spillways (before Waterline Tile) ─── */}
+      <div>
+        <SectionHeader title="Spillways" />
+        <div className="space-y-2">
+          {T.spillways.map((sw, i) => {
+            const spillOpts = poolStdOptions(materialRows, SPILLWAY_SUBCAT, sw.vendor || 'Standard')
+            const spillVends = vendors.filter(v => poolSubVendorIds(materialRows, SPILLWAY_SUBCAT).includes(v.id))
+            return (
+            <div key={i} className="grid grid-cols-6 gap-2 items-end">
+              <div>
+                <Label text="Vendor" />
+                <select
+                  className="input text-sm py-1.5"
+                  value={sw.vendor || 'Standard'}
+                  onChange={e => updSpillway(i, 'vendor', e.target.value)}
+                >
+                  <option value="Standard">Standard</option>
+                  {spillVends.map(v => (
+                    <option key={v.id} value={v.id}>{v.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label text="Structure" />
+                <select
+                  className="input text-sm py-1.5"
+                  value={sw.struct}
+                  onChange={e => updSpillway(i, 'struct', e.target.value)}
+                >
+                  {activeStructList.map(s => (
+                    <option key={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label text="Type" />
+                <div className="flex items-center gap-1">
+                  <select
+                    className="input text-sm py-1.5 flex-1 min-w-0"
+                    value={sw.type || ''}
+                    onChange={e => updSpillway(i, 'type', e.target.value)}
+                  >
+                    {!sw.type && <option value="">Select type</option>}
+                    {sw.type && !spillOpts.some(o => o.label === sw.type) && (
+                      <option value={sw.type}>{sw.type}</option>
+                    )}
+                    {spillOpts.map(o => (
+                      <option key={o.value} value={o.label}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <Label text="Qty" />
+                <NumInput value={sw.qty} onChange={v => updSpillway(i, 'qty', v)} />
+              </div>
+              <div>
+                <Label text="LF each" />
+                <NumInput value={sw.lf} onChange={v => updSpillway(i, 'lf', v)} />
+              </div>
+              <button
+                type="button"
+                onClick={() => removeSpillway(i)}
+                className="text-gray-500 hover:text-red-500 text-sm pb-1"
+              >
+                ✕
+              </button>
+            </div>
+            )
+          })}
+          <button
+            type="button"
+            onClick={addSpillway}
+            className="text-xs text-green-700 hover:underline mt-1"
+          >
+            + Add Spillway
+          </button>
+        </div>
+      </div>
+
       {/* ─── 4. Waterline Tile ─── */}
       <div>
         <SectionHeader title="Waterline Tile" />
@@ -2396,85 +2599,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         </div>
       </div>
 
-      {/* ─── 5. Spillways ─── */}
-      <div>
-        <SectionHeader title="Spillways" />
-        <div className="space-y-2">
-          {T.spillways.map((sw, i) => {
-            const spillOpts = poolStdOptions(materialRows, SPILLWAY_SUBCAT, sw.vendor || 'Standard')
-            const spillVends = vendors.filter(v => poolSubVendorIds(materialRows, SPILLWAY_SUBCAT).includes(v.id))
-            return (
-            <div key={i} className="grid grid-cols-6 gap-2 items-end">
-              <div>
-                <Label text="Vendor" />
-                <select
-                  className="input text-sm py-1.5"
-                  value={sw.vendor || 'Standard'}
-                  onChange={e => updSpillway(i, 'vendor', e.target.value)}
-                >
-                  <option value="Standard">Standard</option>
-                  {spillVends.map(v => (
-                    <option key={v.id} value={v.id}>{v.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <Label text="Structure" />
-                <select
-                  className="input text-sm py-1.5"
-                  value={sw.struct}
-                  onChange={e => updSpillway(i, 'struct', e.target.value)}
-                >
-                  {activeStructList.map(s => (
-                    <option key={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <Label text="Type" />
-                <div className="flex items-center gap-1">
-                  <select
-                    className="input text-sm py-1.5 flex-1 min-w-0"
-                    value={sw.type || ''}
-                    onChange={e => updSpillway(i, 'type', e.target.value)}
-                  >
-                    {!sw.type && <option value="">Select type</option>}
-                    {sw.type && !spillOpts.some(o => o.label === sw.type) && (
-                      <option value={sw.type}>{sw.type}</option>
-                    )}
-                    {spillOpts.map(o => (
-                      <option key={o.value} value={o.label}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <Label text="Qty" />
-                <NumInput value={sw.qty} onChange={v => updSpillway(i, 'qty', v)} />
-              </div>
-              <div>
-                <Label text="LF each" />
-                <NumInput value={sw.lf} onChange={v => updSpillway(i, 'lf', v)} />
-              </div>
-              <button
-                type="button"
-                onClick={() => removeSpillway(i)}
-                className="text-gray-500 hover:text-red-500 text-sm pb-1"
-              >
-                ✕
-              </button>
-            </div>
-            )
-          })}
-          <button
-            type="button"
-            onClick={addSpillway}
-            className="text-xs text-green-700 hover:underline mt-1"
-          >
-            + Add Spillway
-          </button>
-        </div>
-      </div>
 
       {/* ─── 6. Coping ─── */}
       <div>
@@ -2558,6 +2682,105 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             className="text-xs text-green-700 hover:underline mt-1"
           >
             + Add Coping Row
+          </button>
+        </div>
+      </div>
+
+      {/* ─── 9. Pool Equipment (after Coping) — "(Sub)" only on the Sub tab ─── */}
+      <div>
+        <SectionHeader title={`Pool Equipment${isSub ? ' (Sub)' : ''}`} />
+        <div className="space-y-2">
+          {T.equipment.map((eq, i) => {
+            const vsel = eq.vendor || defaultEquipVendor(materialRows)
+            const cats = equipCategories(materialRows, vsel)
+            const models = equipModels(materialRows, vsel, eq.category)
+            const equipVends = vendors.filter(v => equipVendorIds(materialRows).includes(v.id))
+            return (
+              <div key={i} className="grid grid-cols-8 gap-2 items-end">
+                <div className="col-span-2">
+                  <Label text="Vendor" />
+                  <select
+                    className="input text-sm py-1.5"
+                    value={vsel}
+                    onChange={e => updEquip(i, 'vendor', e.target.value)}
+                  >
+                    {equipVends.length === 0 && <option value={vsel}>Standard</option>}
+                    {equipVends.map(v => (
+                      <option key={v.id} value={v.id}>{v.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <Label text="Category" />
+                  <select
+                    className="input text-sm py-1.5"
+                    value={eq.category}
+                    onChange={e => updEquip(i, 'category', e.target.value)}
+                  >
+                    {eq.category && !cats.includes(eq.category) && (
+                      <option value={eq.category}>{eq.category}</option>
+                    )}
+                    {cats.map(c => (
+                      <option key={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <Label text="Model" />
+                  <div className="flex items-center gap-1">
+                    <select
+                      className="input text-sm py-1.5 flex-1 min-w-0"
+                      value={eq.model || ''}
+                      onChange={e => updEquip(i, 'model', e.target.value)}
+                    >
+                      {!eq.model && <option value="">Select model</option>}
+                      {eq.model && !models.some(m => m.label === eq.model) && (
+                        <option value={eq.model}>{eq.model}</option>
+                      )}
+                      {models.map(m => (
+                        <option key={m.value} value={m.label}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <Label text="Qty" />
+                  <NumInput value={eq.qty} onChange={v => updEquip(i, 'qty', v)} placeholder="1" />
+                </div>
+                <div>
+                  <Label text="Unit $" />
+                  <div className="flex items-center gap-1">
+                    <div className="relative flex-1 min-w-0">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                        $
+                      </span>
+                      <NumInput
+                        value={eq.unitCost}
+                        onChange={v => updEquip(i, 'unitCost', v)}
+                        className="pl-5"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeEquip(i)}
+                      title="Remove row"
+                      className="text-gray-500 hover:text-red-500 text-sm leading-none shrink-0"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+          <button
+            type="button"
+            onClick={addEquip}
+            className="text-xs text-green-700 hover:underline mt-1"
+          >
+            + Add Equipment
           </button>
         </div>
       </div>
@@ -2702,104 +2925,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       </div>
       )}
 
-      {/* ─── 9. Pool Equipment — "(Sub)" only on the Sub tab ─── */}
-      <div>
-        <SectionHeader title={`Pool Equipment${isSub ? ' (Sub)' : ''}`} />
-        <div className="space-y-2">
-          {T.equipment.map((eq, i) => {
-            const vsel = eq.vendor || defaultEquipVendor(materialRows)
-            const cats = equipCategories(materialRows, vsel)
-            const models = equipModels(materialRows, vsel, eq.category)
-            const equipVends = vendors.filter(v => equipVendorIds(materialRows).includes(v.id))
-            return (
-              <div key={i} className="grid grid-cols-8 gap-2 items-end">
-                <div className="col-span-2">
-                  <Label text="Vendor" />
-                  <select
-                    className="input text-sm py-1.5"
-                    value={vsel}
-                    onChange={e => updEquip(i, 'vendor', e.target.value)}
-                  >
-                    {equipVends.length === 0 && <option value={vsel}>Standard</option>}
-                    {equipVends.map(v => (
-                      <option key={v.id} value={v.id}>{v.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="col-span-2">
-                  <Label text="Category" />
-                  <select
-                    className="input text-sm py-1.5"
-                    value={eq.category}
-                    onChange={e => updEquip(i, 'category', e.target.value)}
-                  >
-                    {eq.category && !cats.includes(eq.category) && (
-                      <option value={eq.category}>{eq.category}</option>
-                    )}
-                    {cats.map(c => (
-                      <option key={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="col-span-2">
-                  <Label text="Model" />
-                  <div className="flex items-center gap-1">
-                    <select
-                      className="input text-sm py-1.5 flex-1 min-w-0"
-                      value={eq.model || ''}
-                      onChange={e => updEquip(i, 'model', e.target.value)}
-                    >
-                      {!eq.model && <option value="">Select model</option>}
-                      {eq.model && !models.some(m => m.label === eq.model) && (
-                        <option value={eq.model}>{eq.model}</option>
-                      )}
-                      {models.map(m => (
-                        <option key={m.value} value={m.label}>
-                          {m.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <Label text="Qty" />
-                  <NumInput value={eq.qty} onChange={v => updEquip(i, 'qty', v)} placeholder="1" />
-                </div>
-                <div>
-                  <Label text="Unit $" />
-                  <div className="flex items-center gap-1">
-                    <div className="relative flex-1 min-w-0">
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                        $
-                      </span>
-                      <NumInput
-                        value={eq.unitCost}
-                        onChange={v => updEquip(i, 'unitCost', v)}
-                        className="pl-5"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeEquip(i)}
-                      title="Remove row"
-                      className="text-gray-500 hover:text-red-500 text-sm leading-none shrink-0"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-          <button
-            type="button"
-            onClick={addEquip}
-            className="text-xs text-green-700 hover:underline mt-1"
-          >
-            + Add Equipment
-          </button>
-        </div>
-      </div>
 
       {/* ─── 10. Plumbing (Sub) — Sub tab only ─── */}
       {isSub && (
@@ -2889,128 +3014,6 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       )}
 
 
-      {/* ─── Utilities (Trenching / Gas Pipe / Electrical Pipe·Wiring·Fixtures) ─── */}
-      <div>
-        <SectionHeader title="Utilities" />
-        <div className="space-y-4">
-          {/* Trenching — method → hrs per Cu Ft (mirrors the Utilities module). */}
-          <div>
-            <p className="text-xs font-semibold text-gray-600 mb-1">Trenching</p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-xs text-gray-500 border-b border-gray-200">
-                    <th className="text-left pb-1 pr-2 font-medium">Method</th>
-                    <th className="text-center pb-1 pr-2 font-medium">Ln Ft</th>
-                    <th className="text-center pb-1 pr-2 font-medium">Width (in)</th>
-                    <th className="text-center pb-1 pr-2 font-medium">Depth (in)</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(T.epTrenchRows || []).map((r, i) => {
-                    const setT = setEpRows('epTrenchRows')
-                    const put = (field, val) => setT(rs => rs.map((x, idx) => (idx === i ? { ...x, [field]: val } : x)))
-                    return (
-                      <tr key={i} className="border-b border-gray-100">
-                        <td className="py-1 pr-2">
-                          <select
-                            className="input text-sm py-1"
-                            value={r.equipment}
-                            onChange={e => put('equipment', e.target.value)}
-                          >
-                            <option>Trench</option>
-                            <option>Hand</option>
-                          </select>
-                        </td>
-                        <td className="py-1 pr-2"><NumInput value={r.lf} onChange={v => put('lf', v)} /></td>
-                        <td className="py-1 pr-2"><NumInput value={r.width} onChange={v => put('width', v)} /></td>
-                        <td className="py-1 pr-2"><NumInput value={r.depth} onChange={v => put('depth', v)} /></td>
-                        <td className="py-1 text-right">
-                          <button
-                            type="button"
-                            onClick={() => setT(rs => rs.filter((_, idx) => idx !== i))}
-                            className="text-gray-500 hover:text-red-500 text-sm"
-                          >
-                            ✕
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-              <button
-                type="button"
-                onClick={() => setEpRows('epTrenchRows')(rs => [...rs, EP_TRENCH_ROW()])}
-                className="text-xs text-green-700 hover:underline mt-1"
-              >
-                + Add Trench
-              </button>
-            </div>
-          </div>
-          <EpTable
-            title="Gas Pipe"
-            rows={T.epGasPipeRows || []}
-            setRows={setEpRows('epGasPipeRows')}
-            arr={[]}
-            cat={UTIL_CAT.gasPipe}
-            qtyField="lf"
-            qtyLabel="Linear Feet"
-            unitLabel="LF"
-            newRow={EP_GASPIPE_ROW}
-            materialRows={materialRows}
-            materialPrices={materialPrices}
-            refreshAllRates={refreshAllRates}
-            vendorsForCategory={vendorsForCategory}
-          />
-          <EpTable
-            title="Electrical Pipe"
-            rows={T.epLineRows || []}
-            setRows={setEpRows('epLineRows')}
-            arr={[]}
-            cat={UTIL_CAT.line}
-            qtyField="lf"
-            qtyLabel="Linear Feet"
-            unitLabel="LF"
-            newRow={EP_LINE_ROW}
-            materialRows={materialRows}
-            materialPrices={materialPrices}
-            refreshAllRates={refreshAllRates}
-            vendorsForCategory={vendorsForCategory}
-          />
-          <EpTable
-            title="Electrical Wiring"
-            rows={T.epWireRows || []}
-            setRows={setEpRows('epWireRows')}
-            arr={[]}
-            cat={UTIL_CAT.wire}
-            qtyField="lf"
-            qtyLabel="Linear Feet"
-            unitLabel="LF"
-            newRow={EP_WIRE_ROW}
-            materialRows={materialRows}
-            materialPrices={materialPrices}
-            refreshAllRates={refreshAllRates}
-            vendorsForCategory={vendorsForCategory}
-          />
-          <EpTable
-            title="Electrical Fixtures"
-            rows={T.epElecRows || []}
-            setRows={setEpRows('epElecRows')}
-            arr={[]}
-            cat={UTIL_CAT.elec}
-            qtyField="qty"
-            qtyLabel="Qty"
-            unitLabel="ea"
-            newRow={EP_ELEC_ROW}
-            materialRows={materialRows}
-            materialPrices={materialPrices}
-            refreshAllRates={refreshAllRates}
-            vendorsForCategory={vendorsForCategory}
-          />
-        </div>
-      </div>
 
 
       {/* ─── 12. Manual Entry ─── */}
