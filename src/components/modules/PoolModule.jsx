@@ -1175,7 +1175,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
   const refreshAllRates = useCallback(async () => {
     const [mp, labRes, subRes, catRows, venRes, subCoRes] = await Promise.all([
       fetchStandardRateMap(['Pool', 'Utilities']),
-      supabase.from('labor_rates').select('name,rate').in('category', ['Pool', 'Utilities']),
+      supabase.from('labor_rates').select('name,rate').in('category', ['Pool', 'Utilities', 'Finishes']),
       supabase.from('subcontractor_rates').select('company_name,trade,rate,unit').eq('category', 'Pool'),
       fetchModuleCatalog(['Utilities', 'Pool', 'Basic Materials']),
       supabase
