@@ -142,6 +142,47 @@ const EQUIPMENT_CATEGORIES = Object.keys(EQUIPMENT_CATALOG)
 
 const n = v => parseFloat(v) || 0
 
+// ── Pool Equipment now lives in master material rates (sub-category 'Equipment',
+//    category 'Pool', supplied by Heritage Pools). Each item carries its equipment
+//    category + labor pointer on calc_meta ({ pool_equip_category, labor_rate }).
+//    These helpers drive the Vendor → Category → Model pickers off the material
+//    rows — no hardcoded model list, no name-keyed pricing/labor.
+const POOL_EQUIP_SUBCAT = 'Equipment'
+function equipOptions(materialRows, vendorSel) {
+  return catalogOptions(materialRows, POOL_EQUIP_SUBCAT, vendorSel || 'Standard', {
+    standardRows: 'null-vendor',
+    stripPrefix: true,
+    category: 'Pool',
+  })
+}
+// Vendors that actually carry Equipment items (drives the Vendor picker).
+function equipVendorIds(materialRows) {
+  return [
+    ...new Set(
+      (materialRows || [])
+        .filter(r => r.category === 'Pool' && r.sub_category === POOL_EQUIP_SUBCAT && r.vendor_id)
+        .map(r => r.vendor_id)
+    ),
+  ]
+}
+// Default equipment vendor (first vendor carrying Equipment items — Heritage Pools).
+function defaultEquipVendor(materialRows) {
+  return equipVendorIds(materialRows)[0] || 'Standard'
+}
+function equipCategories(materialRows, vendorSel) {
+  const seen = new Set()
+  equipOptions(materialRows, vendorSel).forEach(o => {
+    const c = o.row.calc_meta?.pool_equip_category
+    if (c) seen.add(c)
+  })
+  return [...seen].sort()
+}
+function equipModels(materialRows, vendorSel, cat) {
+  return equipOptions(materialRows, vendorSel).filter(
+    o => (o.row.calc_meta?.pool_equip_category || '') === cat
+  )
+}
+
 
 // ── Electrical & Plumbing catalog (ported from the Utilities module) ──────────
 // Rates live in the catalog / labor_rates / misc_rates under category
@@ -198,7 +239,10 @@ function mergedUtilTypes(cat, builtInArr, materialRows, vendorSel = 'Standard') 
       // hardcoded fallback) — used as the material price when the standard rate
       // map has no entry for the item.
       matCatalog: n(o.row.unit_cost),
-      laborDbName: bi?.laborDbName ?? `${o.label} - Labor Rate`,
+      // Labor pointer = the Item's own calc_meta.labor_rate (independent
+      // labor_rates row). No synthesized "<name> - Labor Rate", no built-in map,
+      // no fallback — unset ⇒ the row is flagged for the user to fix.
+      laborDbName: o.row.calc_meta?.labor_rate || null,
       fromMaster: !bi,
     }
   })
@@ -207,8 +251,6 @@ function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
   const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : 'Standard'
   const merged = mergedUtilTypes(cat, houseArr, materialRows, vsel)
   const builtIn = merged.find(o => o.label === row.type) || merged[0]
-  // Labor comes live from the rate map only — no hardcoded fallback.
-  const laborVal = n(mp[builtIn?.laborDbName])
   let matDbName = builtIn?.dbName
   let matCatalog = builtIn?.matCatalog ?? 0
   const vrow = catalogItemFor(materialRows, cat, vsel, builtIn?.label, {
@@ -219,11 +261,16 @@ function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
     matDbName = vrow.name
     matCatalog = n(vrow.unit_cost)
   }
+  // Labor pointer = the Item's calc_meta.labor_rate, resolved live via mp. No
+  // synthesized name, no built-in map, no fallback — unset ⇒ laborVal 0 and the
+  // row is flagged for the user to fix.
+  const laborName = vrow?.calc_meta?.labor_rate || builtIn?.laborDbName || null
+  const laborVal = n(mp[laborName])
   // Selected vendor's catalog row wins; else the Standard name-map (mp) price,
   // else the item's own catalog unit_cost (both DB-sourced).
   const matCost = vrow ? n(vrow.unit_cost) : (mp[matDbName] ?? matCatalog)
   const matOpt = { label: builtIn?.label, dbName: matDbName, matCatalog }
-  return { opts: merged, matOpt, matCost, laborVal, laborBuiltIn: builtIn }
+  return { opts: merged, matOpt, matCost, laborVal, laborName, laborBuiltIn: builtIn }
 }
 const EP_LINE_ROW = () => ({ type: '', lf: '', vendor: 'Standard' })
 const EP_GAS_ROW = () => ({ type: '', qty: '', vendor: 'Standard' })
@@ -375,7 +422,7 @@ const defaultInteriorStruct = () => ({ type: '', subCost: '' })
 const newSpillway = () => ({ struct: 'Pool', type: '', qty: '1', lf: '' })
 const newCopingRow = () => ({ struct: 'Pool', type: '', lf: '', sided: 'single' })
 const newRaisedSurface = () => ({ matType: '', sqft: '', curvePct: '', corners: '' })
-const newEquipRow = () => ({ category: 'Pump', model: '', qty: '1', unitCost: '' })
+const newEquipRow = () => ({ vendor: '', category: 'Pump', model: '', qty: '1', unitCost: '' })
 const newManualRow = () => ({ label: '', hours: '', materials: '', subCost: '' })
 
 // Old estimates keyed the basin's tile/interior maps under 'Infinity Basin'.
@@ -667,11 +714,22 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   // optional labor rate (in-house install hours per unit, defaults to 0).
   let equipmentSub = 0,
     equipmentHrs = 0
+  const equipDefVendor = defaultEquipVendor(materialRows)
   equipment.forEach(eq => {
     const qty = n(eq.qty)
     if (!qty) return
-    const unitCost = n(eq.unitCost) || n(materialPrices[eq.model])
-    const labHrsEa = n(laborRates[`Equip Labor - ${eq.model}`])
+    // Resolve the picked model to its master material rates item (Heritage Pools):
+    // price from the item, install labor from the item's calc_meta.labor_rate.
+    const item = catalogItemFor(materialRows, POOL_EQUIP_SUBCAT, eq.vendor || equipDefVendor, eq.model, {
+      category: 'Pool',
+      stripPrefix: true,
+      fallbackFirst: false,
+    })
+    // Manual Unit $ override wins; otherwise the item's price. No name-keyed map.
+    const unitCost = n(eq.unitCost) || (item ? n(item.unit_cost) : 0)
+    // Equipment install labor is optional (many pieces have none), so a 0 rate is
+    // not flagged — but when a rate exists it rides on the item's calc_meta pointer.
+    const labHrsEa = n(laborRates[item?.calc_meta?.labor_rate])
     equipmentSub += qty * unitCost
     equipmentHrs += qty * labHrsEa
   })
@@ -719,11 +777,15 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   // ── Electrical & Plumbing (Utility Lines / Gas / Electrical Fixtures) ───────
   let epHrs = 0
   let epMat = 0
+  // Gas/electrical items whose picked Type has no labor rate set (calc_meta.
+  // labor_rate unset or resolves to 0). Surfaced as a prompt — never a fallback.
+  const laborUnset = []
   ;(state.epLineRows || []).forEach(r => {
     if (!r.type) return
     const lf = n(r.lf)
     if (lf <= 0) return
     const { matCost, laborVal } = resolveUtilRow(UTIL_CAT.line, r, LINE_TYPE_ARR, materialRows, materialPrices)
+    if (laborVal <= 0) laborUnset.push(r.type)
     epMat += lf * matCost
     epHrs += lf * laborVal
   })
@@ -736,6 +798,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
       const qty = n(r.qty)
       if (qty <= 0) return
       const { matCost, laborVal } = resolveUtilRow(cat, r, arr, materialRows, materialPrices)
+      if (laborVal <= 0) laborUnset.push(r.type)
       epMat += qty * matCost
       epHrs += qty * laborVal
     })
@@ -830,6 +893,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     plumbHrsIH, // effective in-house pool-plumbing hours (default or override)
     plumbMatIH, // effective in-house pool-plumbing materials $
     equipRate, // resolved excavation CY/hr so the icon can show + edit it
+    laborUnset: Array.from(new Set(laborUnset.filter(Boolean))),
   }
 }
 
@@ -1012,7 +1076,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       fetchStandardRateMap(['Pool', 'Utilities']),
       supabase.from('labor_rates').select('name,rate').in('category', ['Pool', 'Utilities']),
       supabase.from('subcontractor_rates').select('company_name,trade,rate,unit').eq('category', 'Pool'),
-      fetchModuleCatalog(['Utilities']),
+      fetchModuleCatalog(['Utilities', 'Pool']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
@@ -1184,22 +1248,32 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
     )
 
   // ── Equipment helpers ─────────────────────────────────────────────────────────
+  const equipVendorSel = eq => eq.vendor || defaultEquipVendor(materialRows)
   const addEquip = () => upd('equipment', [...T.equipment, newEquipRow()])
   const updEquip = (i, key, val) => {
     const arr = [...T.equipment]
     arr[i] = { ...arr[i], [key]: val }
-    // Auto-fill price when model changes
-    if (key === 'model') {
-      // Auto-fill the unit cost from the live rate map only (no hardcoded price);
-      // blank when unpriced so the user can enter it (or price it in Master Rates).
-      const dbPrice = materialPrices[val]
-      arr[i].unitCost = (dbPrice ?? '').toString()
+    const vsel = equipVendorSel(arr[i])
+    // Auto-fill Unit $ from the selected model's master material rates item
+    // (no hardcoded price); blank when unpriced so the user can price it.
+    const autofill = model => {
+      const it = catalogItemFor(materialRows, POOL_EQUIP_SUBCAT, vsel, model, {
+        category: 'Pool',
+        stripPrefix: true,
+        fallbackFirst: false,
+      })
+      arr[i].unitCost = it && it.unit_cost != null ? String(it.unit_cost) : ''
     }
-    if (key === 'category') {
-      const models = EQUIPMENT_CATALOG[val] || []
-      arr[i].model = models[0]?.model || ''
-      const dbPrice = materialPrices[arr[i].model]
-      arr[i].unitCost = (dbPrice ?? '').toString()
+    if (key === 'vendor') {
+      const cats = equipCategories(materialRows, val)
+      arr[i].category = cats[0] || ''
+      arr[i].model = equipModels(materialRows, val, arr[i].category)[0]?.label || ''
+      autofill(arr[i].model)
+    } else if (key === 'category') {
+      arr[i].model = equipModels(materialRows, vsel, val)[0]?.label || ''
+      autofill(arr[i].model)
+    } else if (key === 'model') {
+      autofill(val)
     }
     upd('equipment', arr)
   }
@@ -1686,6 +1760,15 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       <ModuleHeaderSlot>
         <WorkTypeChooser value={subType || 'In-House'} onChange={v => updShared('subType', v)} compact />
       </ModuleHeaderSlot>
+
+      {calc.laborUnset && calc.laborUnset.length > 0 && (
+        <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">
+          <span className="font-semibold">Labor rate needed:</span> set a Default
+          Labor rate in Master Material Rates for {calc.laborUnset.join(', ')}. These
+          gas/electrical items are contributing 0 labor hours until a labor rate is
+          assigned.
+        </div>
+      )}
 
       {/* Settings — In-House tab only */}
       {subType !== 'Subcontractor' && (
@@ -2287,9 +2370,25 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         <SectionHeader title={`Pool Equipment${isSub ? ' (Sub)' : ''}`} />
         <div className="space-y-2">
           {T.equipment.map((eq, i) => {
-            const models = EQUIPMENT_CATALOG[eq.category] || []
+            const vsel = eq.vendor || defaultEquipVendor(materialRows)
+            const cats = equipCategories(materialRows, vsel)
+            const models = equipModels(materialRows, vsel, eq.category)
+            const equipVends = vendors.filter(v => equipVendorIds(materialRows).includes(v.id))
             return (
-              <div key={i} className="grid grid-cols-6 gap-2 items-end">
+              <div key={i} className="grid grid-cols-8 gap-2 items-end">
+                <div className="col-span-2">
+                  <Label text="Vendor" />
+                  <select
+                    className="input text-sm py-1.5"
+                    value={vsel}
+                    onChange={e => updEquip(i, 'vendor', e.target.value)}
+                  >
+                    {equipVends.length === 0 && <option value={vsel}>Standard</option>}
+                    {equipVends.map(v => (
+                      <option key={v.id} value={v.id}>{v.name}</option>
+                    ))}
+                  </select>
+                </div>
                 <div className="col-span-2">
                   <Label text="Category" />
                   <select
@@ -2297,7 +2396,10 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                     value={eq.category}
                     onChange={e => updEquip(i, 'category', e.target.value)}
                   >
-                    {EQUIPMENT_CATEGORIES.map(c => (
+                    {eq.category && !cats.includes(eq.category) && (
+                      <option value={eq.category}>{eq.category}</option>
+                    )}
+                    {cats.map(c => (
                       <option key={c}>{c}</option>
                     ))}
                   </select>
@@ -2311,12 +2413,12 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                       onChange={e => updEquip(i, 'model', e.target.value)}
                     >
                       {!eq.model && <option value="">Select model</option>}
-                      {eq.model && !models.some(m => m.model === eq.model) && (
+                      {eq.model && !models.some(m => m.label === eq.model) && (
                         <option value={eq.model}>{eq.model}</option>
                       )}
                       {models.map(m => (
-                        <option key={m.model} value={m.model}>
-                          {m.model}
+                        <option key={m.value} value={m.label}>
+                          {m.label}
                         </option>
                       ))}
                     </select>
