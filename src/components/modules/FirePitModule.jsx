@@ -12,7 +12,9 @@ import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMa
 import { resolveUtilRow } from '../../lib/utilRow'
 import UnpricedItemModal from '../UnpricedItemModal'
 
-const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
+// One-picker scheme: Standard sources & prices from the item's null-vendor
+// catalog record; a real vendor from its own. Matches Concrete/OK/Drainage.
+const CATALOG_OPTS = { standardRows: 'null-vendor', stripPrefix: true }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Fire Pit Module — based on Fire Pit Module tab in Excel estimator
@@ -167,7 +169,13 @@ function labelWithDims(row) {
 const WF_CAT = 'Wall Finish'
 const CAP_CAT = 'Wall Cap'
 function wfVendorPrice(vendorSel, typeLabel, materialRows, cat = WF_CAT, opts = {}) {
-  const row = catalogItemFor(materialRows, cat, vendorSel, typeLabel, { ...CATALOG_OPTS, ...opts })
+  // fallbackFirst:false so a non-matching type returns null (→ the built-in
+  // master rate) instead of mis-pricing to the first catalog option.
+  const row = catalogItemFor(materialRows, cat, vendorSel, typeLabel, {
+    ...CATALOG_OPTS,
+    fallbackFirst: false,
+    ...opts,
+  })
   return row ? n(row.unit_cost) : null
 }
 // Wall-finish master list. Each Type resolves a material unit price (FP_RATES
