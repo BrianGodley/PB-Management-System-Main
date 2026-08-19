@@ -116,10 +116,11 @@ const TYPE_LABEL = { CMU: 'Block Type', PIP: 'Concrete Mix', Modular: 'Block Typ
 // no hardcoded material fallback (mirrors Columns). Mortar + form lumber.
 const MORTAR_NAME = 'Mortar'
 const FORM_LUMBER_NAME = 'FP Form Lumber'
-// New per-type LABOR coefficients (labor fallbacks allowed). Brick laying mirrors
-// Walls' brickLayLab (1.75 hr/SF); PIP form + pour mirror the Columns PIP rates.
-const FP_BRICK_LAY = { dbName: 'FP Brick Lay Labor Rate' } // hrs / SF of brick face
-const FP_FORM_LAB = { dbName: 'FP Form Labor Rate' } // hrs / SF of form
+// Brick + PIP-form labor are SHARED with the Walls module (one rate each, edited
+// once) — Fire Pit brick laying = building a brick wall; Fire Pit PIP form =
+// poured-in-place wall install. Pour + caps stay Fire-Pit-specific.
+const FP_BRICK_LAY = { dbName: 'Wall Brick Lay Labor' } // hrs / SF of brick face (shared w/ Walls)
+const FP_FORM_LAB = { dbName: 'Wall PIP Install Labor' } // hrs / SF of form (shared w/ Walls PIP)
 const FP_POUR_LAB = { dbName: 'FP Pour Concrete Labor Rate' } // hrs / CY poured
 
 // Resolve a picked catalog product row by id (any vendor).
@@ -930,11 +931,11 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
     // catalog comes from the shared Fire Pit / Outdoor Kitchen / Walls
     // categories ('Wall Finish' and 'Wall Cap' subcategories, unchanged names).
     const [matMap, labRes, rows, venRes] = await Promise.all([
-      fetchStandardRateMap(['Fire Pit', 'Utilities', 'Basic Materials', 'Concrete']),
+      fetchStandardRateMap(['Fire Pit', 'Utilities', 'Basic Materials', 'Concrete', 'Walls']),
       supabase
         .from('labor_rates')
         .select('name, rate')
-        .in('category', ['Fire Pit', 'Utilities']),
+        .in('category', ['Fire Pit', 'Utilities', 'Walls']),
       fetchModuleCatalog(['Fire Pit', 'Walls', 'Utilities', 'Basic Materials', 'Concrete']),
       supabase
         .from('subs_vendors')
