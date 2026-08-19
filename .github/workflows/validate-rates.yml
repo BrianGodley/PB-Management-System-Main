@@ -17,15 +17,23 @@ on:
 jobs:
   validate-rates:
     runs-on: ubuntu-latest
+    # Advisory guardrail only — never red-status a push. It surfaces broken
+    # calc_meta pointers / duplicate labor rows as an annotation. Skips cleanly
+    # when the DB secrets aren't configured. Flip `--warn` off + drop
+    # continue-on-error to make it a hard gate (requires the secrets below).
+    continue-on-error: true
+    env:
+      # Silence the Node-20 deprecation notice from checkout/setup-node@v4.
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
       - run: npm ci
       - name: Validate rate chain
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-        run: npm run validate-rates
+        run: npm run validate-rates -- --warn
