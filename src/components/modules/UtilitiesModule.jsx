@@ -12,8 +12,6 @@ import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMa
 import { resolveUtilRow } from '../../lib/utilRow'
 import UnpricedItemModal from '../UnpricedItemModal'
 
-const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Utilities Module — fields and calculations from Excel estimator (Utilities Module tab)
 // Covers trenching, utility lines (gas/electrical), gas fixtures, and add-ons.
