@@ -7,11 +7,13 @@
 // value.
 //
 // Props:
-//   table         — 'material_rates' | 'labor_rates' | 'subcontractor_rates'
+//   table         — 'named_rate' | 'labor_rates' | 'subcontractor_rates' | 'misc_rates'
+//                   'named_rate' = a named material rate on the new model (the old
+//                   material_rates table is retired); it resolves to a material's
+//                   Standard price or a misc_rate via getStandardNamedRate/save.
 //   name          — the row's name column (e.g. '4" SDR 35 Pipe')
 //   category      — used on insert if the rate doesn't exist yet (e.g. 'Drainage')
-//   valueField    — column that stores the price (default 'unit_cost' for
-//                   material_rates, 'rate' for labor_rates, etc.)
+//   valueField    — column that stores the price ('rate' for labor_rates, etc.)
 //   unitLabel     — short unit hint shown in the popover (e.g. 'LF', 'ea')
 //   currentValue  — the value currently displayed in the cell
 //   onSaved       — async () => void; the host should re-fetch its rate map
@@ -140,9 +142,10 @@ export default function RateEditPopover({
       })()
       return
     }
-    // material_rates is retired: named material rates now live on the new model
-    // (a material's Standard price, or a misc_rate). Read via the shared helper.
-    if (table === 'material_rates') {
+    // 'named_rate' = a named material rate on the new model (a material's Standard
+    // price, or a misc_rate); the old material_rates table is retired. Read via the
+    // shared helper. ('material_rates' still accepted as a legacy alias.)
+    if (table === 'named_rate' || table === 'material_rates') {
       ;(async () => {
         const val = await getStandardNamedRate(name)
         setDraft(String(val ?? currentValue ?? ''))
@@ -248,9 +251,10 @@ export default function RateEditPopover({
       return
     }
 
-    // material_rates retired → save the named rate onto the new model (a
-    // material's Standard price, or a misc_rate). Keeps the same name-keyed UX.
-    if (table === 'material_rates') {
+    // 'named_rate' → save onto the new model (a material's Standard price, or a
+    // misc_rate); material_rates is retired. Keeps the same name-keyed UX.
+    // ('material_rates' still accepted as a legacy alias.)
+    if (table === 'named_rate' || table === 'material_rates') {
       try {
         await saveStandardNamedRate(name, v, category)
       } catch (e) {
