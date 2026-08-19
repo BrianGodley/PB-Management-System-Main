@@ -20,7 +20,8 @@ import { SubRateOverrideProvider } from '../SubRateOverrideContext.jsx'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
-import UnpricedItemModal, { makePriceLookup } from '../UnpricedItemModal'
+import UnpricedItemModal from '../UnpricedItemModal'
+import { makeModuleRates } from '../../lib/moduleRates'
 import NewCatalogItemModal from '../NewCatalogItemModal'
 
 // ── Rate tables (method-indexed — not in DB) ──────────────────────────────────
@@ -204,13 +205,17 @@ function calcConcrete(
 
   // ── Material unit costs (material_rates) ─────────────────────────────────
   // Material $ come ONLY from the catalog (no hardcoded fallbacks). A name with
-  // no catalog price is recorded on P.unpriced and returned so the module can
+  // no catalog price is recorded on R.unpriced and returned so the module can
   // prompt the user to price it inline — never silently defaulted.
-  const P = makePriceLookup(mr, materialRows)
+  // Unified rate reader (reference conversion). Value-identical to the old
+  // makePriceLookup — R.mat reads the same merged `mr` with the same coercion —
+  // but also records .touched (every rate this calc read), which will drive
+  // usage-based View Rates. mr holds material+misc; lr labor; sr sub.
+  const R = makeModuleRates({ material: mr, labor: lr, sub: sr, misc: mr, materialRows })
   const concretePerCY = n(mr['Concrete - Ready Mix (Truck)']) // display-only; Install prices per-row from the catalog (mt.fallback)
   // Rebar $/LF (canonical, from the shared Basic Materials 'Rebar' row) and the
   // LF-per-SF conversion factor for the chosen on-center spacing.
-  const rebarPerLF = P.price('Rebar ' + (state.rebarSize || '#4'), {
+  const rebarPerLF = R.mat('Rebar ' + (state.rebarSize || '#4'), {
     category: 'Basic Materials',
     unit: 'Ln Ft',
   })
@@ -221,9 +226,9 @@ function calcConcrete(
     '12" OC': n(mr['Concrete - Rebar LF/SF 12" OC']),
   }
   const rebarLfPerSf = rebarLfPerSfBySpacing[state.rebarSpacing] ?? rebarLfPerSfBySpacing['24" OC']
-  const formMaterialPerLF = P.price('Concrete - Form Lumber LF', { category: 'Concrete', unit: 'LF' })
-  const sleevePer10LF = P.price('Concrete - Sleeve Per 10LF', { category: 'Concrete', unit: '10LF' })
-  const colorCostPerCY = P.price('Concrete - Color Per CY', { category: 'Concrete', unit: 'CY' })
+  const formMaterialPerLF = R.mat('Concrete - Form Lumber LF', { category: 'Concrete', unit: 'LF' })
+  const sleevePer10LF = R.mat('Concrete - Sleeve Per 10LF', { category: 'Concrete', unit: '10LF' })
+  const colorCostPerCY = R.mat('Concrete - Color Per CY', { category: 'Concrete', unit: 'CY' })
   // Base Install MATERIAL price ($/Cu Yd) — the canonical Basic Materials
   // 'Class II Roadbase' Standard price, resolved by name (the old 'Concrete
   // Base' sub-category source has been consolidated/archived into this record).
@@ -439,7 +444,7 @@ function calcConcrete(
   const price = totalMat + laborCost + burden + gp + commission + subCost
 
   return {
-    unpriced: P.unpricedList,
+    unpriced: R.unpricedList,
     walkHrs,
     totalHrs,
     manDays,
