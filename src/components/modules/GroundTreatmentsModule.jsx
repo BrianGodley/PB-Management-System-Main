@@ -176,7 +176,10 @@ function calcGroundTreatments(
       return resolveType(row.type, merged, [])
     }
     // Shared row filtering (subcat + vendor); GT keeps its own label transform.
-    const opts = catalogOptions(materialRows, cat, vsel, { standardRows: 'exclude' }).map(o => ({
+    // standardRows is moot here (vsel is always a real vendor on this branch),
+    // but kept as 'null-vendor' so every catalogOptions call in this file uses
+    // the one sourcing mode — Standard elsewhere reads the same null-vendor rows.
+    const opts = catalogOptions(materialRows, cat, vsel, { standardRows: 'null-vendor' }).map(o => ({
       label: o.row.name.replace(new RegExp('^' + cat + ' - '), '').replace(/^.*? - /, ''),
       dbName: o.row.name,
       fallback: parseFloat(o.row.unit_cost) || 0,
