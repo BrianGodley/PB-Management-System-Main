@@ -237,71 +237,6 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
   const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
   const lbl = 'block text-sm font-medium text-gray-700 mb-1'
 
-  // ── Grouped rate list for the "View Rates" popup (CrewTypeBar). Every rate
-  //    that used to have an inline RateEditPopover in this module now lives here,
-  //    plus the material $ and Sub $/SF rates the calc reads from the price list.
-  const weedAbatementRateList = [
-    {
-      group: 'Labor',
-      items: [
-        {
-          label: WEED_RATE_NAMES.travelHrsPerVisit,
-          table: 'labor_rates',
-          name: WEED_RATE_NAMES.travelHrsPerVisit,
-          category: 'Weed Abatement',
-          mode: 'coefficient',
-          unitLabel: 'hr per visit',
-          value: effRate('travelHrsPerVisit'),
-        },
-        {
-          label: WEED_RATE_NAMES.flatHrsPer1k,
-          table: 'labor_rates',
-          name: WEED_RATE_NAMES.flatHrsPer1k,
-          category: 'Weed Abatement',
-          mode: 'coefficient',
-          unitLabel: 'hr per 1k Sq Ft',
-          value: effRate('flatHrsPer1k'),
-        },
-        {
-          label: WEED_RATE_NAMES.hillHrsPer1k,
-          table: 'labor_rates',
-          name: WEED_RATE_NAMES.hillHrsPer1k,
-          category: 'Weed Abatement',
-          mode: 'coefficient',
-          unitLabel: 'hr per 1k Sq Ft',
-          value: effRate('hillHrsPer1k'),
-        },
-      ],
-    },
-    {
-      group: 'Materials',
-      items: [
-        {
-          label: WEED_RATE_NAMES.materialPer1k,
-          table: 'misc_rates',
-          name: WEED_RATE_NAMES.materialPer1k,
-          category: 'Weed Abatement',
-          mode: 'currency',
-          unitLabel: '1k Sq Ft',
-          value: effRate('materialPer1k'),
-        },
-      ],
-    },
-    {
-      group: 'Subcontractor',
-      items: [
-        {
-          label: 'Weed Abatement - Sub $/SF',
-          table: 'misc_rates',
-          name: 'Weed Abatement - Sub $/SF',
-          category: 'Weed Abatement',
-          mode: 'currency',
-          unitLabel: 'Sq Ft',
-          value: subRateDefault,
-        },
-      ],
-    },
-  ]
 
   return (
     <div className="space-y-5">
@@ -332,7 +267,6 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
             onCrewTypeChange={setCrewType}
             title="Weed Abatement"
             moduleType="Weed Abatement"
-            rates={weedAbatementRateList}
             refreshAllRates={refreshRates}
             showInlineToggle={false}
           />

@@ -715,26 +715,6 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
         mode: 'currency',
         value: n(r0.unit_cost),
       }))
-  const lightingRateList = [
-    { group: 'Fixtures', items: catalogBlockItems(LIGHT_CAT.fixture) },
-    { group: 'Transformers', items: catalogBlockItems(LIGHT_CAT.transformer) },
-    { group: 'Wire', items: catalogBlockItems(LIGHT_CAT.wire) },
-    {
-      group: 'Materials',
-      items: [
-        {
-          label: MATERIAL_MARKUP_NAME,
-          table: 'misc_rates',
-          name: MATERIAL_MARKUP_NAME,
-          category: LIGHTING_CATEGORY,
-          mode: 'coefficient',
-          unitLabel: 'fraction',
-          value: n(materialMarkup),
-          section: 'material',
-        },
-      ],
-    },
-  ]
 
   return (
     <SubTabContext.Provider value={isSub}>
@@ -765,7 +745,6 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
             onCrewTypeChange={setCrewType}
             title="Lighting"
             moduleType="Lighting"
-            rates={lightingRateList}
             refreshAllRates={refreshCatalog}
             showInlineToggle={false}
           />

@@ -13,8 +13,6 @@ import { groutCyPerBlock as cmuGroutCyPerBlock } from '../../lib/cmuGrout'
 import {
   useNewMaterialCatalog,
   resolveMaterialPrice,
-  catalogOptions,
-  catalogItemFor,
 } from '../../lib/materialCatalog'
 
 const WALLS_CATEGORY = 'Walls'
@@ -968,7 +966,6 @@ function computeWallWpTotals(wall, mp, materialRows) {
 // they appear here, no code change. Dimensions (block_w/h/l_in, inches) drive the
 // block-count math; unit_cost is the per-unit price.
 const MODULAR_SUBCAT = 'Modular Wall'
-const MODULAR_CAT_OPTS = { standardRows: 'null-vendor', stripPrefix: true }
 const MODULAR_FALLBACK = { name: 'Modular Block 8x8x16', w: 8, h: 8, l: 16 }
 // Resolve the selected master-list wall product → { name, w, h, l, price }.
 // vendorSel picks the vendor's row (or the Unspecified/null-vendor row); a
@@ -3593,30 +3590,6 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
       { label: `Standard — ${label || dbName}`, table: 'material_price', name: dbName, category: 'Walls', unitLabel: unit, mode: 'currency', value },
     ]
   }
-
-  const wallRateList = WALL_RATE_SPECS.map(g => ({
-    group: g.group,
-    items: [
-      ...(g.catalogSubcat ? catalogBlockItems(g.catalogSubcat) : []),
-      ...g.items.flatMap(([key, label, category, unit, mode, tableOverride, sectionOverride]) => {
-        // 7th tuple element optionally forces the Materials/Labor section;
-        // default = coefficient → labor, currency → material.
-        const section = sectionOverride || (mode === 'coefficient' ? 'labor' : 'material')
-        return tableOverride
-          ? // Explicit table (6th tuple element) — a single shared row written
-            // straight to that table (e.g. the Drainage French-drain rows share
-            // the Drainage module's misc_rates / labor_rates rows).
-            [{ label, table: tableOverride, name: WALL_RATES[key].db, category, unitLabel: unit, mode, value: r(key), section }]
-          : mode === 'coefficient'
-            ? [{ label, table: 'labor_rates', name: WALL_RATES[key].db, category, unitLabel: unit, mode, value: r(key), section }]
-            : materialRateRows(WALL_RATES[key].db, unit, r(key), label).map(row => ({ ...row, section }))
-      }),
-    ].sort((a, b) =>
-      // Groups flagged manualOrder keep their spec order (stable sort; return 0);
-      // everything else is alphabetized within its Materials / Labor block.
-      g.manualOrder ? 0 : (a.label || '').localeCompare(b.label || '', undefined, { sensitivity: 'base' })
-    ),
-  }))
 
   // ── Vendor helpers ──────────────────────────────────────────────────────────
   const vendorOptions = vendorOptionsForCategory(WALLS_CATEGORY)

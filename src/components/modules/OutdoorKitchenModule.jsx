@@ -1085,117 +1085,6 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
         mode: 'currency',
         value: n(r0.unit_cost),
       }))
-  const outdoorKitchenRateList = [
-    {
-      group: 'BBQ Structure',
-      items: [
-        okLaborItem('excavateLab', 'CF/hr'),
-        okLaborItem('rebarLab', 'LF/hr'),
-        okLaborItem('pourFootingLab', 'hrs/CY'),
-        okLaborItem('installBlockLab', 'blk/hr'),
-        okLaborItem('fillBlockLab', 'blk/hr'),
-        ...matRows(OK_RATES.bbqBlock.dbName, 'block', p(OK_RATES.bbqBlock.dbName, OK_RATES.bbqBlock.fallback)),
-        ...matRows('Rebar ' + (rebarSize || '#4'), 'LF', p('Rebar ' + (rebarSize || '#4'), OK_RATES.bbqRebar.fallback)),
-        ...matRows(OK_RATES.bbqConcrete.dbName, 'CY', p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)),
-      ],
-    },
-    {
-      group: 'Concrete Countertop',
-      items: [
-        okLaborItem('counterFormLab', 'LF/hr'),
-        okLaborItem('counterPourLab', 'SF/hr'),
-        okLaborItem('counterBroomLab', 'SF/hr'),
-        okLaborItem('counterPolishLab', 'SF/hr'),
-        okLaborItem('counterTrowelLab', 'SF/hr'),
-        // Countertop is poured from the same concrete master rate as the footing.
-        ...matRows(OK_RATES.bbqConcrete.dbName, 'CY', p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)),
-      ],
-    },
-    {
-      group: 'Appliances',
-      items: [
-        okLaborItem('applianceInstallHrs', 'hrs/ea'),
-        // Vendor catalog appliance products + shared install hardware. The
-        // hardcoded APPLIANCE_TYPES generic rates are no longer listed — the
-        // catalog is the source of truth.
-        ...catalogBlockItems('Appliance', 'ea', 'Outdoor Kitchen'),
-        ...matRows(OK_RATES.applianceHardware.dbName, 'ea', p(OK_RATES.applianceHardware.dbName, OK_RATES.applianceHardware.fallback)),
-      ],
-    },
-    {
-      group: 'Sinks',
-      items: [
-        // Per-row install labor default + vendor catalog Sink products (the
-        // catalog is the sole source; no hardcoded generic sink rates).
-        okLaborItem('sinkLab', 'hrs/ea'),
-        ...catalogBlockItems('Sink', 'ea', 'Outdoor Kitchen'),
-      ],
-    },
-    {
-      group: 'Wall Finishes',
-      items: [
-        ...WF_LIST.map(type => {
-          const meta = WF_META[type]
-          return {
-            label: OK_RATES[meta.labKey].dbName,
-            table: 'labor_rates',
-            name: OK_RATES[meta.labKey].dbName,
-            category: 'Outdoor Kitchen',
-            mode: 'coefficient',
-            unitLabel: 'hrs per Sq Ft',
-            value: p(OK_RATES[meta.labKey].dbName, OK_RATES[meta.labKey].fallback),
-          }
-        }),
-        // Vendor catalog finish products (Wall Finish sub-category) + each
-        // built-in Standard finish material rate.
-        ...catalogBlockItems(WF_CAT, 'SF', 'Outdoor Kitchen'),
-        ...WF_LIST.flatMap(type => {
-          const meta = WF_META[type]
-          return matRows(OK_RATES[meta.key].dbName, meta.unit === 'ton' ? 'ton' : 'SF', p(OK_RATES[meta.key].dbName, OK_RATES[meta.key].fallback))
-        }),
-      ],
-    },
-    {
-      group: 'Electrical & Plumbing',
-      items: [
-        ...LINE_TYPE_ARR.map(t => ({
-          label: t.laborDbName,
-          table: 'labor_rates',
-          name: t.laborDbName,
-          category: 'Utilities',
-          mode: 'coefficient',
-          unitLabel: 'hrs per Ln Ft',
-          value: p(t.laborDbName, t.laborFallback),
-        })),
-        ...GAS_TYPE_ARR.map(t => ({
-          label: t.laborDbName,
-          table: 'labor_rates',
-          name: t.laborDbName,
-          category: 'Utilities',
-          mode: 'coefficient',
-          unitLabel: 'hrs per Each',
-          value: p(t.laborDbName, t.laborFallback),
-        })),
-        ...ELEC_TYPE_ARR.map(t => ({
-          label: t.laborDbName,
-          table: 'labor_rates',
-          name: t.laborDbName,
-          category: 'Utilities',
-          mode: 'coefficient',
-          unitLabel: 'hrs per Each',
-          value: p(t.laborDbName, t.laborFallback),
-        })),
-        // Built-in BBQ service materials + the shared utility-line / fixture
-        // catalog materials (per vendor, matched by name).
-        ...matRows(OK_RATES.gficOutlet.dbName, 'ea', p(OK_RATES.gficOutlet.dbName, OK_RATES.gficOutlet.fallback)),
-        ...matRows(OK_RATES.sinkPlumbing.dbName, 'flat', p(OK_RATES.sinkPlumbing.dbName, OK_RATES.sinkPlumbing.fallback)),
-        ...matRows(OK_RATES.gasPipe.dbName, 'LF', p(OK_RATES.gasPipe.dbName, OK_RATES.gasPipe.fallback)),
-        ...LINE_TYPE_ARR.flatMap(t => matRows(t.dbName, 'LF', p(t.dbName, t.fallback))),
-        ...GAS_TYPE_ARR.flatMap(t => matRows(t.dbName, 'ea', p(t.dbName, t.fallback))),
-        ...ELEC_TYPE_ARR.flatMap(t => matRows(t.dbName, 'ea', p(t.dbName, t.fallback))),
-      ],
-    },
-  ]
 
   return (
     <SubTabContext.Provider value={isSub}>
@@ -1226,7 +1115,6 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
             onCrewTypeChange={setCrewType}
             title="Outdoor Kitchen"
             moduleType="Outdoor Kitchen"
-            rates={outdoorKitchenRateList}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
           />

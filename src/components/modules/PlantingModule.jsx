@@ -1200,66 +1200,6 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
       { label: `Standard — ${dbName}`, table: 'material_price', name: dbName, category: 'Planting', unitLabel: unit, mode: 'currency', value: fallback },
     ]
   }
-  const plantingRateList = [
-    {
-      group: 'Small Plants',
-      items: [
-        ...Object.keys(SMALL_PLANT_DEFAULTS).map(type => ({
-          label: type,
-          table: 'labor_rates',
-          name: type,
-          category: 'Planting',
-          mode: 'coefficient',
-          unitLabel: 'hrs per Each',
-          value: getSmallPerDay(laborRates, type),
-        })),
-        ...Object.keys(SMALL_PLANT_DEFAULTS).flatMap(type =>
-          matRows(type, 'ea', materialPrices[type])
-        ),
-      ],
-    },
-    {
-      group: 'Large Plants / Trees',
-      items: [
-        ...Object.keys(LARGE_PLANT_DEFAULTS).map(type => ({
-          label: type,
-          table: 'labor_rates',
-          name: type,
-          category: 'Planting',
-          mode: 'coefficient',
-          unitLabel: 'hrs per Each',
-          value: getLargePerDay(laborRates, type),
-        })),
-        ...Object.keys(LARGE_PLANT_DEFAULTS).flatMap(type =>
-          matRows(type, 'ea', materialPrices[type])
-        ),
-      ],
-    },
-    {
-      group: 'Planting Add-Ons',
-      items: [
-        ...[
-          { key: 'Tree Stakes - Install Rate', unit: 'hrs per Each' },
-          { key: 'Root Barrier - Install Rate', unit: 'hrs per Ln Ft' },
-          { key: 'Gopher Basket - Install Rate', unit: 'hrs per Each' },
-          { key: 'Mesh Flat - Install Rate', unit: 'hrs per Sq Ft' },
-          { key: 'Jute Fabric - Install Rate', unit: 'hrs per Sq Ft' },
-        ].map(({ key, unit }) => ({
-          label: key,
-          table: 'labor_rates',
-          name: key,
-          category: 'Planting',
-          mode: 'coefficient',
-          unitLabel: unit,
-          value: lr(laborRates, key),
-        })),
-        ...ADDON_TYPES.flatMap(t => {
-          const meta = ADDON_META[t] || {}
-          return matRows(meta.matKey, meta.unit || 'ea', materialPrices[meta.matKey])
-        }),
-      ],
-    },
-  ]
 
   return (
     <SubTabContext.Provider value={isSub}>
@@ -1290,7 +1230,6 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
             onCrewTypeChange={setCrewType}
             title="Planting"
             moduleType="Planting"
-            rates={plantingRateList}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
           />

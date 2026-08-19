@@ -880,44 +880,6 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
     unitLabel,
     value: n(materialPrices[rate.dbName]),
   })
-  const columnsRateList = [
-    {
-      group: 'Column Install',
-      items: [
-        _laborItem(BLOCK_RATES.installLaborHrs, 'hrs/blk'),
-        _laborItem(BLOCK_RATES.excavateLaborHrs, 'hrs/col'),
-        _laborItem(BLOCK_RATES.pourLaborHrs, 'hrs/col'),
-        _laborItem(BLOCK_RATES.fillLaborHrs, 'hrs/blk'),
-        _laborItem(BRICK_LAY, 'hrs/SF'),
-        _laborItem(PIP_FORM_LAB, 'hrs/SF'),
-        _laborItem(PIP_POUR_LAB, 'hrs/CY'),
-        // CMU fallback block + grout concrete + rebar (all sizes).
-        ..._colMatRows(BLOCK_RATES.blockMatCost.dbName, 'block', BLOCK_RATES.blockMatCost.fallback),
-        ..._colMatRows(GROUT_CONCRETE.dbName, 'CY', GROUT_CONCRETE.fallback, BASIC_CATEGORY),
-        ...REBAR_SIZES.flatMap(s => _colMatRows(rebarNameFor(s), 'LF', BLOCK_RATES.rebarMatCost.fallback, BASIC_CATEGORY)),
-      ],
-    },
-    {
-      group: 'Finishes',
-      items: [
-        ...Object.values(FINISH_TYPES).map(rate => {
-          const defLab = rate.unit === 'ton' ? rate.laborHrsPer : rate.laborHrsPerSF
-          return {
-            label: rate.laborDbName,
-            table: 'labor_rates',
-            name: rate.laborDbName,
-            category: COLUMNS_CATEGORY,
-            mode: 'coefficient',
-            unitLabel: `hrs/${rate.unit}`,
-            value: n(materialPrices[rate.laborDbName]),
-          }
-        }),
-        ...Object.values(FINISH_TYPES).flatMap(rate =>
-          _colMatRows(rate.dbName, rate.unit, rate.unit === 'ton' ? rate.costPerTon : rate.costPerSF)
-        ),
-      ],
-    },
-  ]
 
   return (
     <SubTabContext.Provider value={isSub}>
@@ -948,7 +910,6 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
               onCrewTypeChange={setCrewType}
               title="Columns"
               moduleType="Columns"
-              rates={columnsRateList}
               refreshAllRates={refreshAllRates}
               showInlineToggle={false}
             />

@@ -989,100 +989,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   const laborRow = (name, unit, value) => ({
     label: name, table: 'labor_rates', name, category: 'Utilities', mode: 'coefficient', unitLabel: unit, value,
   })
-  const utilitiesRateList = [
-    {
-      group: 'Trenching',
-      items: [
-        laborRow(TRENCH_LABOR_RATE_NAME.Trench, 'min/cf', materialPrices[TRENCH_LABOR_RATE_NAME.Trench]),
-        laborRow(TRENCH_LABOR_RATE_NAME.Hand, 'min/cf', materialPrices[TRENCH_LABOR_RATE_NAME.Hand]),
-      ],
-    },
-    {
-      group: 'Electrical Pipe',
-      items: [
-        ...Object.values(UTILITY_LINE_TYPES).map(t =>
-          laborRow(t.laborDbName, 'hr/LF', materialPrices[t.laborDbName])
-        ),
-        ...Object.values(UTILITY_LINE_TYPES).flatMap(t => matRows(t.dbName, 'LF', 0)),
-      ],
-    },
-    {
-      group: 'Gas Pipe',
-      items: [
-        ...Object.values(GAS_PIPE_TYPES).map(t =>
-          laborRow(t.laborDbName, 'hr/LF', materialPrices[t.laborDbName])
-        ),
-        ...Object.values(GAS_PIPE_TYPES).flatMap(t => matRows(t.dbName, 'LF', 0)),
-      ],
-    },
-    {
-      // Electrical Wiring has no code built-ins — surface every catalog Item
-      // seeded under the 'Electrical Wiring' Sub-category (one block per vendor).
-      group: 'Electrical Wiring',
-      items: [
-        ...Array.from(
-          new Set(
-            (materialRows || [])
-              .filter(r0 => r0.sub_category === UTIL_CAT.wire)
-              .map(r0 => r0.name)
-          )
-        ).flatMap(name => matRows(name, 'LF', 0)),
-      ],
-    },
-    {
-      group: 'Gas Fixtures',
-      items: [
-        ...Object.values(GAS_FIXTURE_TYPES).map(t =>
-          laborRow(t.laborDbName, 'hr/ea', materialPrices[t.laborDbName])
-        ),
-        ...Object.values(GAS_FIXTURE_TYPES).flatMap(t => matRows(t.dbName, 'ea', 0)),
-      ],
-    },
-    {
-      group: 'Electrical Fixtures',
-      items: [
-        ...Object.values(ELECTRICAL_FIXTURE_TYPES).map(t =>
-          laborRow(t.laborDbName, 'hr/ea', materialPrices[t.laborDbName])
-        ),
-        ...Object.values(ELECTRICAL_FIXTURE_TYPES).flatMap(t => matRows(t.dbName, 'ea', 0)),
-      ],
-    },
-    {
-      group: 'Sewer Pipe',
-      items: [
-        ...Object.values(SEWER_LINE_TYPES).map(t =>
-          laborRow(t.laborDbName, 'hr/LF', materialPrices[t.laborDbName])
-        ),
-        ...Object.values(SEWER_LINE_TYPES).flatMap(t => matRows(t.dbName, 'LF', 0)),
-      ],
-    },
-    {
-      group: 'Additional Subgrade Work',
-      items: [
-        ...Object.values(ADD_ITEM_RATES).map(rate =>
-          laborRow(rate.laborDbName, 'hr/ea', materialPrices[rate.laborDbName])
-        ),
-        ...Object.values(ADD_ITEM_RATES)
-          .filter(rate => !rate.laborOnly)
-          .flatMap(rate => matRows(rate.dbName, 'ea', 0)),
-      ],
-    },
-    {
-      group: 'Subcontractor Trenching',
-      items: [
-        {
-          label: 'Utilities Sub Trench - Per LF',
-          table: 'misc_rates',
-          name: 'Utilities Sub Trench - Per LF',
-          category: 'Utilities',
-          mode: 'currency',
-          unitLabel: 'Ln Ft',
-          section: 'sub',
-          value: materialPrices['Utilities Sub Trench - Per LF'],
-        },
-      ],
-    },
-  ]
 
   return (
     <SubTabContext.Provider value={isSub}>
@@ -1113,7 +1019,6 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
             onCrewTypeChange={setCrewType}
             title="Utilities"
             moduleType="Utilities"
-            rates={utilitiesRateList}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
           />

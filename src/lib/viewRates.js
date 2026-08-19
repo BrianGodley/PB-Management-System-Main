@@ -54,13 +54,17 @@ export async function buildViewRates(moduleType) {
   const cats = await fetchModuleCategories(moduleType)
   if (!cats.length) return { groups: [], categories: [] }
 
-  const [matRows, labRes, subRes, venRes] = await Promise.all([
+  const [matRows, labRes, subRes, miscRes, venRes] = await Promise.all([
     fetchModuleCatalog(cats),
     supabase.from('labor_rates').select('id, category, sub_category, name, label, unit, rate').in('category', cats),
     supabase
       .from('subcontractor_rates')
       .select('id, category, sub_category, trade, item_key, unit, rate, company_name')
       .in('category', cats),
+    // Misc coefficients / named $ adders (rebar spacing factors, fabric $/ft,
+    // demo dump $/ton, etc.) — the 4th rate source, so View Rates shows every
+    // master rate the modules use (not just material/labor/sub).
+    supabase.from('misc_rates').select('id, category, name, rate').in('category', cats),
     supabase.from('subs_vendors').select('id, company_name'),
   ])
   const vendorName = id => (venRes.data || []).find(v => v.id === id)?.company_name || 'Vendor'
@@ -121,6 +125,23 @@ export async function buildViewRates(moduleType) {
       section: 'sub',
       value: n(r.rate),
       hideKey: `item:sub:${r.id}`,
+    })
+  })
+
+  // Misc coefficients / named adders — grouped under an "Adjustments" sub-section.
+  // misc_rates stores name + rate (no mode column), so these render as plain
+  // editable numbers; the name carries the unit hint (e.g. '… per Cu Yd').
+  ;(miscRes.data || []).forEach(r => {
+    const g = ensure(r.category, 'Adjustments')
+    g.items.push({
+      label: cleanLabel(r.name),
+      table: 'named_rate',
+      name: r.name,
+      category: r.category,
+      unitLabel: '',
+      mode: 'coefficient',
+      value: n(r.rate),
+      hideKey: `item:misc:${r.id}`,
     })
   })
 

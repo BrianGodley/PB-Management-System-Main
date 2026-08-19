@@ -1039,56 +1039,6 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
       },
     ]
   }
-  const finishesRateList = [
-    {
-      group: 'Flatwork Finish',
-      items: [
-        _laborItem('flatTileLab', 'hrs/SF'),
-        _laborItem('flatBrickLab', 'hrs/SF'),
-        _laborItem('flatFlagstoneLab', 'hrs/SF'),
-        _laborItem('flatPorcelainLab', 'hrs/SF'),
-        ..._matRows('flatTile', 'SF'),
-        ..._matRows('flatBrick', 'brick'),
-        ..._matRows('flatFlagstone', 'ton'),
-        ..._matRows('flatPorcelain', 'SF'),
-      ],
-    },
-    {
-      group: 'Wall Caps',
-      items: [
-        _laborItem('capFlagstoneLab', 'hrs/LF'),
-        _laborItem('capPrecastLab', 'hrs/ea'),
-        _laborItem('capPipLab', 'hrs/LF'),
-        _laborItem('capBullnoseLab', 'hrs/LF'),
-        ..._matRows('capFlagstone', 'ton'),
-        ..._matRows('capPrecast', 'ea'),
-        ..._matRows('concreteTruck', 'CY'),
-        ..._matRows('capBullnose', 'LF'),
-      ],
-    },
-    {
-      group: 'Wall Finishes',
-      items: [
-        _laborItem('sandStuccoLab', 'SF/day'),
-        _laborItem('smoothStuccoLab', 'SF/day'),
-        _laborItem('ledgerstoneLab', 'SF/day'),
-        _laborItem('stackedStoneLab', 'SF/day'),
-        _laborItem('tileLab', 'hrs/SF'),
-        _laborItem('flagstoneLab', 'hrs/SF'),
-        _laborItem('realStoneLab', 'hrs/SF'),
-        ..._matRows('sandStucco', 'SF'),
-        ..._matRows('smoothStucco', 'SF'),
-        ..._matRows('ledgerstone', 'SF'),
-        ..._matRows('stackedStone', 'SF'),
-        ..._matRows('tile', 'SF'),
-        ..._matRows('realFlagstone', 'ton'),
-        ..._matRows('realStone', 'ton'),
-        // Consumables folded into wall-finish material cost (per-SF).
-        ..._matRows('stoneScrews', 'SF'),
-        ..._matRows('tileAdhesive', 'SF'),
-      ],
-    },
-  ]
 
   return (
     <SubTabContext.Provider value={isSub}>
@@ -1119,7 +1069,6 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
             onCrewTypeChange={setCrewType}
             title="Finishes"
             moduleType="Finishes"
-            rates={finishesRateList}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
           />

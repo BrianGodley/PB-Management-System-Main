@@ -644,51 +644,6 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
       { label: `Standard — ${dbName}`, table: 'material_price', name: dbName, category: 'Irrigation', unitLabel: unit, mode: 'currency', value: fallback },
     ]
   }
-  const irrigationRateList = [
-    {
-      group: 'Irrigation Zones',
-      items: [
-        {
-          label: 'Irrigation - Hand Zone',
-          table: 'labor_rates',
-          name: 'Irrigation - Hand Zone',
-          category: 'Irrigation',
-          mode: 'coefficient',
-          unitLabel: 'hrs per zone',
-          value: calc.handRate,
-        },
-        {
-          label: 'Irrigation - Trench Zone',
-          table: 'labor_rates',
-          name: 'Irrigation - Trench Zone',
-          category: 'Irrigation',
-          mode: 'coefficient',
-          unitLabel: 'hrs per zone',
-          value: calc.trenchRate,
-        },
-        ...ZONE_TYPES.flatMap(z =>
-          matRows(z.matKey, 'ea', materialPrices[z.matKey])
-        ),
-      ],
-    },
-    {
-      group: 'Controllers / Timers',
-      items: [
-        {
-          label: 'Irrigation - Timer Install',
-          table: 'labor_rates',
-          name: 'Irrigation - Timer Install',
-          category: 'Irrigation',
-          mode: 'coefficient',
-          unitLabel: 'hrs per Each',
-          value: calc.timerHrs,
-        },
-        ...TIMER_TYPES.flatMap(t =>
-          matRows(t.matKey, 'ea', materialPrices[t.matKey])
-        ),
-      ],
-    },
-  ]
 
   return (
     <SubTabContext.Provider value={isSub}>
@@ -719,7 +674,6 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
             onCrewTypeChange={setCrewType}
             title="Irrigation"
             moduleType="Irrigation"
-            rates={irrigationRateList}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
           />
