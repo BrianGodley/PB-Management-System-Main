@@ -212,13 +212,16 @@ const CAP_ROW = () => ({ vendor: 'Standard', type: '', lf: '' })
 // finish/cap Type. Its material unit is the row's unit_cost; every other calc
 // parameter (unit mode, labMode, waste, tonPerSF, laborCoeff, …) comes from its
 // calc_meta JSON. Built-in types keep their exact WF_META/FP_RATES path unchanged.
-function masterWallMeta(cat, typeLabel, materialRows, category = null) {
-  const r = catalogItemFor(materialRows, cat, 'Standard', typeLabel, {
-    standardRows: 'null-vendor',
-    stripPrefix: true,
-    fallbackFirst: false,
-    category,
-  })
+function masterWallMeta(cat, typeLabel, materialRows, category = null, vendorSel = 'Standard') {
+  // Resolve the product row for this Type: the selected vendor's row first, else
+  // the Standard (null-vendor) row. A VENDOR-ONLY product (e.g. a Bellecrete cap
+  // with no Standard counterpart) still resolves its calc_meta + unit_cost, so it
+  // prices and computes labor instead of silently zeroing.
+  const opts = { standardRows: 'null-vendor', stripPrefix: true, fallbackFirst: false, category }
+  const r =
+    (vendorSel && vendorSel !== 'Standard' && vendorSel !== 'auto'
+      ? catalogItemFor(materialRows, cat, vendorSel, typeLabel, opts)
+      : null) || catalogItemFor(materialRows, cat, 'Standard', typeLabel, opts)
   if (!r) return null
   const m = r.calc_meta || {}
   return {
@@ -580,7 +583,7 @@ function calcFirePit(
 
   // ── Wall finish per-row calc: material (vendor-overridable unit) + labor ──────
   const finishRowCalc = row => {
-    const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, 'Fire Pit')
+    const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, 'Fire Pit', row.vendor)
     const sf = n(row.sf)
     if (!meta || sf <= 0) return { mat: 0, hrs: 0 }
     const houseUnit = meta.master
@@ -613,7 +616,7 @@ function calcFirePit(
 
   // ── Wall cap per-row calc: $/LF material (vendor-overridable) + hrs/LF labor ──
   const capRowCalc = row => {
-    const meta = CAP_META[row.type] || masterWallMeta(CAP_CAT, row.type, materialRows)
+    const meta = CAP_META[row.type] || masterWallMeta(CAP_CAT, row.type, materialRows, null, row.vendor)
     const lf = n(row.lf)
     if (!meta || lf <= 0) return { mat: 0, hrs: 0 }
     const houseUnit = meta.master
@@ -1497,7 +1500,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
             </thead>
             <tbody>
               {capRows.map((row, i) => {
-                const meta = CAP_META[row.type] || masterWallMeta(CAP_CAT, row.type, materialRows)
+                const meta = CAP_META[row.type] || masterWallMeta(CAP_CAT, row.type, materialRows, null, row.vendor)
                 const rc = calc.capCalc?.[i] || {}
                 return (
                   <tr key={i} className="border-b border-gray-100">
@@ -1644,7 +1647,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
             </thead>
             <tbody>
               {wallFinishRows.map((row, i) => {
-                const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, 'Fire Pit')
+                const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, 'Fire Pit', row.vendor)
                 const rc = calc.wallFinishCalc?.[i] || {}
                 return (
                   <tr key={i} className="border-b border-gray-100">

@@ -219,13 +219,15 @@ const WF_ROW = () => ({ vendor: 'Standard', type: 'Tile', sf: '' })
 // A material_rates row tagged sub_category='Wall Finish' (Unspecified) becomes a
 // selectable finish Type: material unit = its unit_cost; unit mode / labMode /
 // waste / tonPerSF / laborCoeff come from its calc_meta. Built-ins are unchanged.
-function masterWallMeta(cat, typeLabel, materialRows, category = null) {
-  const r = catalogItemFor(materialRows, cat, 'Standard', typeLabel, {
-    standardRows: 'null-vendor',
-    stripPrefix: true,
-    fallbackFirst: false,
-    category,
-  })
+function masterWallMeta(cat, typeLabel, materialRows, category = null, vendorSel = 'Standard') {
+  // Resolve the product row for this Type: the selected vendor's row first, else
+  // the Standard (null-vendor) row. A VENDOR-ONLY product (no Standard version)
+  // still resolves its calc_meta + unit_cost, so it prices instead of zeroing.
+  const opts = { standardRows: 'null-vendor', stripPrefix: true, fallbackFirst: false, category }
+  const r =
+    (vendorSel && vendorSel !== 'Standard' && vendorSel !== 'auto'
+      ? catalogItemFor(materialRows, cat, vendorSel, typeLabel, opts)
+      : null) || catalogItemFor(materialRows, cat, 'Standard', typeLabel, opts)
   if (!r) return null
   const m = r.calc_meta || {}
   return {
@@ -490,7 +492,7 @@ function calcOutdoorKitchen(
   const p = dbName => n(mp[dbName])
   // Wall finish per-row calc: material (vendor-overridable unit) + labor by type.
   const finishRowCalc = row => {
-    const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, 'Outdoor Kitchen')
+    const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, 'Outdoor Kitchen', row.vendor)
     const sf = n(row.sf)
     if (!meta || sf <= 0) return { mat: 0, hrs: 0 }
     const houseUnit = meta.master
@@ -1653,7 +1655,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
             </thead>
             <tbody>
               {wallFinishRows.map((row, i) => {
-                const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, 'Outdoor Kitchen')
+                const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, 'Outdoor Kitchen', row.vendor)
                 const rc = calc.wallFinishCalc?.[i] || {}
                 return (
                   <tr key={i} className="border-b border-gray-100">
