@@ -52,7 +52,9 @@ import {
   fetchStandardRateMap,
 } from '../../lib/materialCatalog'
 
-const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
+// One-picker scheme (matches Concrete/Steps): Standard sources & prices from the
+// item's null-vendor catalog record; an unset vendor shows nothing.
+const CATALOG_OPTS = { standardRows: 'null-vendor', stripPrefix: true }
 
 const n = v => parseFloat(v) || 0
 // Base-rock tonnage density (SF·inch per ton). The 200 divisor is a tunable
@@ -84,11 +86,17 @@ const PAVER_CAT = { paver: 'Paver Material', base: 'Base Material' }
 // Standard/Custom/unset vendors.
 // Vendor catalog options + row resolution now come from the shared library
 // (src/lib/materialCatalog.js) so every module resolves identically.
+// Vendor-first: an unset vendor yields no options (empty placeholder); an
+// explicit 'Standard' sources the null-vendor catalog rows; a real vendor its own.
 function paverOptions(cat, vendorSel, materialRows) {
-  return catalogOptions(materialRows, cat, vendorSel, CATALOG_OPTS)
+  if (!vendorSel || vendorSel === 'auto') return []
+  const isStd = vendorSel === 'Standard'
+  return catalogOptions(materialRows, cat, isStd ? 'Standard' : vendorSel, CATALOG_OPTS)
 }
 function paverItemFor(cat, vendorSel, key, materialRows) {
-  return catalogItemFor(materialRows, cat, vendorSel, key, CATALOG_OPTS)
+  if (!vendorSel || vendorSel === 'auto') return null
+  const isStd = vendorSel === 'Standard'
+  return catalogItemFor(materialRows, cat, isStd ? 'Standard' : vendorSel, key, CATALOG_OPTS)
 }
 
 function calcPaver(
@@ -190,12 +198,16 @@ function calcPaver(
       )
       baseCyRate = bItem ? priceOf(bItem) : baseRockPerTon
     } else {
-      // Standard / house price = canonical Basic Materials 'Class II Roadbase'.
-      baseCyRate =
-        n(mr['Class II Roadbase']) ||
-        n(mr['Base - Class II Roadbase']) ||
-        n(mr['Base Material - Class II Roadbase']) ||
-        baseRockPerTon
+      // Standard → the shared Base Material null-vendor catalog record (one
+      // record, one price). The name chain remains only as an equivalent last
+      // resort for an old estimate whose base type doesn't resolve to a record.
+      const bItem = paverItemFor(PAVER_CAT.base, 'Standard', row.baseId || row.baseType, materialRows)
+      baseCyRate = bItem
+        ? priceOf(bItem)
+        : n(mr['Class II Roadbase']) ||
+          n(mr['Base - Class II Roadbase']) ||
+          n(mr['Base Material - Class II Roadbase']) ||
+          baseRockPerTon
     }
     const baseMatCost = baseCuYd * baseCyRate
 
