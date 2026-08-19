@@ -14,8 +14,6 @@ import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMa
 import { resolveUtilRow } from '../../lib/utilRow'
 import UnpricedItemModal from '../UnpricedItemModal'
 
-const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Outdoor Kitchen (BBQ) Module — based on BBQ Module tab in Excel estimator
 // Covers: BBQ wall structure, countertop, appliances/services, wall finishes,
@@ -179,7 +177,16 @@ function sinkUnitPrice(row, materialRows, p, ignoreOverride = false) {
 // built-in per-estimate / master-rate price. Labor is never affected.
 const WF_CAT = 'Wall Finish'
 function wfVendorPrice(vendorSel, typeLabel, materialRows, opts = {}) {
-  const row = catalogItemFor(materialRows, WF_CAT, vendorSel, typeLabel, { ...CATALOG_OPTS, ...opts })
+  // One-picker scheme (matches applianceUnitPrice/sinkUnitPrice/masterWallMeta):
+  // Standard sources & prices from the finish's null-vendor catalog record; a real
+  // vendor from its own row. fallbackFirst:false so a non-matching type returns
+  // null (→ the built-in master rate) instead of mis-pricing to the first option.
+  const row = catalogItemFor(materialRows, WF_CAT, vendorSel, typeLabel, {
+    standardRows: 'null-vendor',
+    stripPrefix: true,
+    fallbackFirst: false,
+    ...opts,
+  })
   return row ? n(row.unit_cost) : null
 }
 // Type labels used to match each finish against the vendor catalog.
