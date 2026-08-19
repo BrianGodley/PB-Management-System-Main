@@ -12,8 +12,6 @@ import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMa
 import { resolveUtilRow } from '../../lib/utilRow'
 import UnpricedItemModal from '../UnpricedItemModal'
 
-const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Pool Module
 // Material prices → material_rates (category = 'Pool') keyed by name
@@ -230,6 +228,7 @@ function poolStdOptions(materialRows, subcat, vendorSel = 'Standard') {
 }
 function poolStdItem(materialRows, subcat, key, vendorSel = 'Standard') {
   return catalogItemFor(materialRows, subcat, vendorSel, key, {
+    standardRows: 'null-vendor',
     category: 'Pool',
     stripPrefix: true,
     fallbackFirst: false,
@@ -712,6 +711,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     // (Standard, or Bellecrete for Precast Concrete), labor from its calc_meta
     // pointer ('Coping - <type>'). No name-keyed misc/labor lookup, no fallback.
     const item = catalogItemFor(materialRows, COPING_SUBCAT, cr.vendor || 'Standard', cr.type, {
+      standardRows: 'null-vendor',
       category: 'Pool',
       stripPrefix: true,
       fallbackFirst: false,
@@ -774,6 +774,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     // Resolve the picked model to its master material rates item (Heritage Pools):
     // price from the item, install labor from the item's calc_meta.labor_rate.
     const item = catalogItemFor(materialRows, POOL_EQUIP_SUBCAT, eq.vendor || equipDefVendor, eq.model, {
+      standardRows: 'null-vendor',
       category: 'Pool',
       stripPrefix: true,
       fallbackFirst: false,
@@ -815,6 +816,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     steelHrs = 0
   if (!isSubTab && steelLF > 0) {
     const rebarItem = catalogItemFor(materialRows, REINFORCEMENT_SUBCAT, steel.vendor || 'Standard', steel.rebarSize, {
+      standardRows: 'null-vendor',
       category: BASIC_CATEGORY,
       stripPrefix: true,
       fallbackFirst: false,
@@ -1368,6 +1370,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
     // (no hardcoded price); blank when unpriced so the user can price it.
     const autofill = model => {
       const it = catalogItemFor(materialRows, POOL_EQUIP_SUBCAT, vsel, model, {
+        standardRows: 'null-vendor',
         category: 'Pool',
         stripPrefix: true,
         fallbackFirst: false,
