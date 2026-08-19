@@ -1,0 +1,31 @@
+name: Validate rate chain
+
+# Catches estimator rate-wiring drift before it reaches production:
+# broken calc_meta pointers and duplicate labor rows. Read-only DB check.
+#
+# Requires two repo secrets (Settings → Secrets and variables → Actions):
+#   VITE_SUPABASE_URL
+#   VITE_SUPABASE_ANON_KEY
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch: {}
+
+jobs:
+  validate-rates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Validate rate chain
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: npm run validate-rates
