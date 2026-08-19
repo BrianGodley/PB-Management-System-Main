@@ -720,7 +720,10 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     // Install type is a master material rates item; labor rides on its calc_meta
     // pointer. The material $/SF stays a per-row figure (tile product is job-specific).
     const item = poolStdItem(materialRows, TILE_SUBCAT, t.installType, t.vendor || 'Standard')
-    const installRate = n(laborRates[item?.calc_meta?.labor_rate])
+    // Labor: prefer the item's calc_meta pointer; if unset, resolve by the
+    // documented naming convention 'Tile - <type>' (same row View Rates shows).
+    const installRate =
+      n(laborRates[item?.calc_meta?.labor_rate]) || n(laborRates[`Tile - ${t.installType}`])
     if (t.installType && installRate <= 0) laborUnset.push(t.installType)
     const matPriceSF = n(t.matPricePerSF)
     tileHrs += lf * installRate
@@ -740,7 +743,8 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     // from its calc_meta pointer ('Spillway - <type>'). No name-keyed lookups.
     const item = poolStdItem(materialRows, SPILLWAY_SUBCAT, sw.type, sw.vendor || 'Standard')
     const matRate = item ? n(item.unit_cost) : 0
-    const labRate = n(laborRates[item?.calc_meta?.labor_rate])
+    const labRate =
+      n(laborRates[item?.calc_meta?.labor_rate]) || n(laborRates[`Spillway - ${sw.type}`])
     if (labRate <= 0) laborUnset.push(sw.type)
     spillwayHrs += totalLF * labRate
     spillwayMat += totalLF * matRate
@@ -763,7 +767,8 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
       fallbackFirst: false,
     })
     const matRate = item ? n(item.unit_cost) : 0
-    const labRate = n(laborRates[item?.calc_meta?.labor_rate])
+    const labRate =
+      n(laborRates[item?.calc_meta?.labor_rate]) || n(laborRates[`Coping - ${cr.type}`])
     if (labRate <= 0) laborUnset.push(cr.type)
     copingHrs += lf * sided * labRate
     copingMat += lf * sided * matRate
@@ -785,7 +790,8 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     // rate). No name-keyed lookups, no fallback.
     const item = poolStdItem(materialRows, RAISED_SUBCAT, rs.matType)
     const matRate = item ? n(item.unit_cost) : 0
-    const labRate = n(laborRates[item?.calc_meta?.labor_rate])
+    const labRate =
+      n(laborRates[item?.calc_meta?.labor_rate]) || n(laborRates[`Raised - ${rs.matType}`])
     if (labRate <= 0) laborUnset.push(rs.matType)
     const curveMult = 1 + n(rs.curvePct) / 100
     raisedHrs += sqft * labRate * curveMult + corners * raisedCornerHrs
