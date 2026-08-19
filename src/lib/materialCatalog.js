@@ -367,6 +367,23 @@ export async function saveStandardNamedRate(name, price, category = null) {
   }
 }
 
+// Set a labor rate by name (frozen key). The row almost always exists (labor
+// names are stable keys), so this updates it; if somehow missing it inserts.
+// Used by UnpricedItemModal in labor mode so an unpriced labor item can be
+// priced inline, exactly like an unpriced material.
+export async function saveLaborRate(name, rate, category = null) {
+  const val = typeof rate === 'number' ? rate : parseFloat(rate)
+  const v = Number.isFinite(val) ? val : 0
+  const { data: ex } = await supabase.from('labor_rates').select('id').eq('name', name).limit(1)
+  if (ex && ex.length) {
+    await supabase.from('labor_rates').update({ rate: v }).eq('id', ex[0].id)
+  } else {
+    const row = { name, rate: v }
+    if (category) row.category = category
+    await supabase.from('labor_rates').insert(row)
+  }
+}
+
 // Create a new catalog item (material) under a Category → Sub-category and set
 // its Standard (or picked-vendor) price. Used by the inline "add item" flow when
 // a picker's sub-category is an empty set. Mirrors SelectionsBrowser's create

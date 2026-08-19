@@ -9,6 +9,7 @@ import { SubRateOverrideProvider } from '../SubRateOverrideContext.jsx'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
+import UnpricedItemModal from '../UnpricedItemModal'
 
 const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
 
@@ -723,7 +724,8 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     // Labor rides on the item's calc_meta pointer (single source). Unset/0 → the
     // item is surfaced as unpriced (prompt) — no by-name fallback.
     const installRate = n(laborRates[item?.calc_meta?.labor_rate])
-    if (t.installType && installRate <= 0) laborUnset.push(t.installType)
+    if (t.installType && installRate <= 0)
+      laborUnset.push({ kind: 'labor', name: item?.calc_meta?.labor_rate || null, label: t.installType, category: 'Pool', unit: 'Hrs per Ln Ft' })
     const matPriceSF = n(t.matPricePerSF)
     tileHrs += lf * installRate
     tileMat += lf * tileSfPerLf * matPriceSF
@@ -743,7 +745,8 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     const item = poolStdItem(materialRows, SPILLWAY_SUBCAT, sw.type, sw.vendor || 'Standard')
     const matRate = item ? n(item.unit_cost) : 0
     const labRate = n(laborRates[item?.calc_meta?.labor_rate])
-    if (labRate <= 0) laborUnset.push(sw.type)
+    if (labRate <= 0)
+      laborUnset.push({ kind: 'labor', name: item?.calc_meta?.labor_rate || null, label: sw.type, category: 'Pool', unit: 'Hrs per Ln Ft' })
     spillwayHrs += totalLF * labRate
     spillwayMat += totalLF * matRate
   })
@@ -766,7 +769,8 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     })
     const matRate = item ? n(item.unit_cost) : 0
     const labRate = n(laborRates[item?.calc_meta?.labor_rate])
-    if (labRate <= 0) laborUnset.push(cr.type)
+    if (labRate <= 0)
+      laborUnset.push({ kind: 'labor', name: item?.calc_meta?.labor_rate || null, label: cr.type, category: 'Pool', unit: 'Hrs per Ln Ft' })
     copingHrs += lf * sided * labRate
     copingMat += lf * sided * matRate
   })
@@ -788,7 +792,8 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     const item = poolStdItem(materialRows, RAISED_SUBCAT, rs.matType)
     const matRate = item ? n(item.unit_cost) : 0
     const labRate = n(laborRates[item?.calc_meta?.labor_rate])
-    if (labRate <= 0) laborUnset.push(rs.matType)
+    if (labRate <= 0)
+      laborUnset.push({ kind: 'labor', name: item?.calc_meta?.labor_rate || null, label: rs.matType, category: 'Pool', unit: 'Hrs per Sq Ft' })
     const curveMult = 1 + n(rs.curvePct) / 100
     raisedHrs += sqft * labRate * curveMult + corners * raisedCornerHrs
     raisedMat += sqft * matRate + corners * (matRate * raisedCornerMatFactor)
@@ -916,7 +921,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
       const lf = n(r.lf)
       if (lf <= 0) return
       const { matCost, laborVal } = resolveUtilRow(cat, r, [], materialRows, materialPrices)
-      if (laborVal <= 0) laborUnset.push(r.type)
+      if (laborVal <= 0) laborUnset.push({ kind: 'labor', name: null, label: r.type, category: 'Utilities', unit: null })
       epMat += lf * matCost
       epHrs += lf * laborVal
     })
@@ -927,7 +932,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     const qty = n(r.qty)
     if (qty <= 0) return
     const { matCost, laborVal } = resolveUtilRow(UTIL_CAT.elec, r, [], materialRows, materialPrices)
-    if (laborVal <= 0) laborUnset.push(r.type)
+    if (laborVal <= 0) laborUnset.push({ kind: 'labor', name: null, label: r.type, category: 'Utilities', unit: null })
     epMat += qty * matCost
     epHrs += qty * laborVal
   })
@@ -1037,7 +1042,15 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     plumbHrsIH, // effective in-house pool-plumbing hours (default or override)
     plumbMatIH, // effective in-house pool-plumbing materials $
     equipRate, // resolved excavation CY/hr so the icon can show + edit it
-    laborUnset: Array.from(new Set(laborUnset.filter(Boolean))),
+    laborUnset: (() => {
+      const seen = new Set()
+      return laborUnset.filter(u => {
+        const k = u && (u.name || u.label)
+        if (!k || seen.has(k)) return false
+        seen.add(k)
+        return true
+      })
+    })(),
   }
 }
 
@@ -1153,6 +1166,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
   const [notes, setNotes] = useState(initialData?.notes ?? '')
   const [materialPrices, setMaterialPrices] = useState({})
   const [laborRates, setLaborRates] = useState({})
+  const [laborModalItem, setLaborModalItem] = useState(null)
   const [subRates, setSubRates] = useState({})
   const [materialRows, setMaterialRows] = useState([])
   const [vendors, setVendors] = useState([])
@@ -1910,11 +1924,34 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
 
       {calc.laborUnset && calc.laborUnset.length > 0 && (
         <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">
-          <span className="font-semibold">Labor rate needed:</span> set a Default
-          Labor rate in Master Material Rates for {calc.laborUnset.join(', ')}. These
-          items are contributing 0 labor hours until a labor rate is assigned.
+          <span className="font-semibold">Labor rate needed</span> — these items contribute 0 labor
+          hours until a rate is set. Click one to set it inline:
+          <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
+            {calc.laborUnset.map((u, i) =>
+              u.name ? (
+                <button
+                  key={u.name || i}
+                  type="button"
+                  onClick={() => setLaborModalItem(u)}
+                  className="rounded border border-amber-400 bg-white/70 px-1.5 py-0.5 font-medium text-amber-900 hover:bg-white"
+                >
+                  {u.label} ↗
+                </button>
+              ) : (
+                <span key={(u.label || '') + i} className="px-1 py-0.5 text-amber-800">
+                  {u.label}
+                </span>
+              )
+            )}
+          </span>
         </div>
       )}
+
+      <UnpricedItemModal
+        item={laborModalItem}
+        onClose={() => setLaborModalItem(null)}
+        onSaved={refreshAllRates}
+      />
 
       {/* Settings — In-House tab only */}
       {subType !== 'Subcontractor' && (

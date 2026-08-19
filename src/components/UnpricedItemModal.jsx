@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { setMaterialPrice, saveStandardNamedRate } from '../lib/materialCatalog'
+import { setMaterialPrice, saveStandardNamedRate, saveLaborRate } from '../lib/materialCatalog'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UnpricedItemModal — shown when an estimate uses an item that has NO price in
@@ -31,17 +31,20 @@ export default function UnpricedItemModal({ item, onClose, onSaved }) {
 
   if (!item) return null
   const label = item.label || item.name
+  const isLabor = item.kind === 'labor'
+  const noun = isLabor ? 'rate' : 'price'
 
   const save = async () => {
     const v = parseFloat(String(price).replace(/[$,]/g, ''))
     if (!Number.isFinite(v) || v < 0) {
-      setErr('Enter a valid price (0 or more).')
+      setErr(`Enter a valid ${noun} (0 or more).`)
       return
     }
     setSaving(true)
     setErr('')
     try {
-      if (item.materialId) await setMaterialPrice(item.materialId, null, v)
+      if (isLabor) await saveLaborRate(item.name, v, item.category || null)
+      else if (item.materialId) await setMaterialPrice(item.materialId, null, v)
       else await saveStandardNamedRate(item.name, v, item.category || null)
       await onSaved?.()
       onClose?.()
@@ -61,21 +64,29 @@ export default function UnpricedItemModal({ item, onClose, onSaved }) {
         onClick={e => e.stopPropagation()}
       >
         <div className="border-b border-gray-200 px-5 py-3">
-          <h3 className="text-base font-semibold text-gray-900">Item not priced yet</h3>
+          <h3 className="text-base font-semibold text-gray-900">
+            {isLabor ? 'Labor rate not set' : 'Item not priced yet'}
+          </h3>
         </div>
         <div className="px-5 py-4 space-y-3">
           <p className="text-sm text-gray-600">
             <span className="font-medium text-gray-900">{label}</span>
-            {item.category ? <span className="text-gray-500"> · {item.category}</span> : null} has no
-            price in the catalog. Enter its price to use it in this estimate — it will be saved to the
-            catalog (Standard) and reused everywhere.
+            {item.category ? <span className="text-gray-500"> · {item.category}</span> : null}{' '}
+            {isLabor ? (
+              <>has no labor rate set. Enter its rate to use it in this estimate — it will be saved to
+              Master Labor Rates and reused everywhere.</>
+            ) : (
+              <>has no price in the catalog. Enter its price to use it in this estimate — it will be
+              saved to the catalog (Standard) and reused everywhere.</>
+            )}
           </p>
           <label className="block">
             <span className="text-xs font-medium text-gray-500">
-              Price{item.unit ? ` (per ${item.unit})` : ''}
+              {isLabor ? 'Rate' : 'Price'}
+              {item.unit ? ` (${isLabor ? item.unit : `per ${item.unit}`})` : ''}
             </span>
             <div className="mt-1 flex items-center rounded-md border border-gray-300 focus-within:border-blue-500">
-              <span className="pl-3 text-gray-500">$</span>
+              {!isLabor && <span className="pl-3 text-gray-500">$</span>}
               <input
                 type="text"
                 inputMode="decimal"
@@ -103,7 +114,7 @@ export default function UnpricedItemModal({ item, onClose, onSaved }) {
             onClick={save}
             disabled={saving}
           >
-            {saving ? 'Saving…' : 'Save price'}
+            {saving ? 'Saving…' : isLabor ? 'Save rate' : 'Save price'}
           </button>
         </div>
       </div>
@@ -150,6 +161,41 @@ export function makePriceLookup(rateMap = {}, materialRows = []) {
       }
       const num = typeof v === 'number' ? v : parseFloat(v)
       return Number.isFinite(num) ? num : 0
+    },
+  }
+}
+
+// Labor twin of makePriceLookup. Records labor rates that resolve to unset/0 so
+// the module can surface them and let the user set the rate inline via the modal
+// in labor mode. Pass the rate name the calc actually reads (the pointer target
+// or the by-name row) — that is what gets written back.
+//
+//   const L = makeLaborLookup(laborRates)
+//   const hrs = L.rate('Tile - 1" Squares', { category: 'Pool', unit: 'Hrs per Ln Ft' })
+//   ... L.unpricedList → [{ kind:'labor', name, label, category, unit }]
+export function makeLaborLookup(laborRates = {}) {
+  const unpriced = new Map()
+  return {
+    unpriced,
+    get unpricedList() {
+      return [...unpriced.values()]
+    },
+    rate(name, meta = {}) {
+      if (!name) return 0
+      const v = laborRates?.[name]
+      const num = typeof v === 'number' ? v : parseFloat(v)
+      if (v == null || v === '' || !Number.isFinite(num) || num <= 0) {
+        if (!unpriced.has(name))
+          unpriced.set(name, {
+            kind: 'labor',
+            name,
+            label: meta.label || name,
+            category: meta.category ?? null,
+            unit: meta.unit ?? null,
+          })
+        return 0
+      }
+      return num
     },
   }
 }
