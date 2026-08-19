@@ -11,6 +11,7 @@ import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { groutCuFtPerBlock } from '../../lib/cmuGrout'
 import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
+import { resolveUtilRow } from '../../lib/utilRow'
 import UnpricedItemModal from '../UnpricedItemModal'
 
 const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
@@ -281,55 +282,6 @@ const ELEC_TYPE_ARR = Object.entries(ELECTRICAL_FIXTURE_TYPES).map(([label, t]) 
 const UTIL_CAT = { line: 'Utility Lines', gas: 'Gas Fixtures', elec: 'Electrical Fixtures' }
 // Trenching for utility lines (machine trench, min/cf; from the Utilities schedule).
 const OK_TRENCH_RATE_NAME = 'Utilities Trench Excavation'
-// Vendor-first Type list: Standard/unset → null-vendor Items merged with built-ins;
-// a real vendor → ONLY that vendor's Items (built-ins fall away).
-function mergedUtilTypes(cat, builtInArr, materialRows, vendorSel = 'Standard') {
-  const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
-  // Catalog-only: options come solely from the catalog (single source of truth).
-  // Standard/unset → the null-vendor (Standard) catalog items; a real vendor →
-  // only that vendor's items. The built-in array is consulted ONLY for the labor
-  // db-name / labor fallback of a matching item, never to inject option rows.
-  const catRows = catalogOptions(materialRows, cat, isStd ? 'Standard' : vendorSel, { standardRows: 'null-vendor', stripPrefix: true })
-  if (!catRows.length) return []
-  return catRows.map(o => {
-    const bi = builtInArr.find(b => b.dbName === o.row.name || b.label === o.label)
-    return {
-      label: o.label,
-      dbName: o.row.name,
-      fallback: n(o.row.unit_cost),
-      // Labor pointer = the Item's own calc_meta.labor_rate (independent
-      // labor_rates row). No synthesized "<name> - Labor Rate", no built-in map,
-      // no fallback — unset ⇒ the row is flagged for the user to fix.
-      laborDbName: o.row.calc_meta?.labor_rate || null,
-      fromMaster: !bi,
-    }
-  })
-}
-function resolveUtilRow(cat, row, houseArr, materialRows, mp) {
-  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : 'Standard'
-  const merged = mergedUtilTypes(cat, houseArr, materialRows, vsel)
-  const builtIn = merged.find(o => o.label === row.type) || merged[0]
-  let matDbName = builtIn?.dbName
-  let matFallback = builtIn?.fallback ?? 0
-  const vrow = catalogItemFor(materialRows, cat, vsel, builtIn?.label, {
-    ...CATALOG_OPTS,
-    fallbackFirst: false,
-  })
-  if (vrow) {
-    matDbName = vrow.name
-    matFallback = n(vrow.unit_cost)
-  }
-  // Labor pointer = the Item's calc_meta.labor_rate, resolved live via mp. No
-  // synthesized name, no built-in map, no fallback — unset ⇒ laborVal 0 and the
-  // row is flagged for the user to fix.
-  const laborName = vrow?.calc_meta?.labor_rate || builtIn?.laborDbName || null
-  const laborVal = n(mp[laborName])
-  // Selected vendor's catalog row wins; only fall back to the Standard name-map (mp)
-  // when there is no catalog row for the selection.
-  const matCost = vrow ? n(vrow.unit_cost) : (mp[matDbName] ?? matFallback)
-  const matOpt = { label: builtIn?.label, dbName: matDbName, fallback: matFallback }
-  return { opts: merged, matOpt, matCost, laborVal, laborName, laborBuiltIn: builtIn }
-}
 const EP_LINE_ROW = () => ({ type: 'PVC Conduit with Electrical', lf: '', vendor: 'Standard' })
 const EP_GAS_ROW = () => ({ type: '12" Single Gas Ring', qty: '', vendor: 'Standard' })
 const EP_ELEC_ROW = () => ({ type: 'GFCI Protected Receptacles', qty: '', vendor: 'Standard' })

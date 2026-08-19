@@ -9,6 +9,7 @@ import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
+import { resolveUtilRow } from '../../lib/utilRow'
 import UnpricedItemModal from '../UnpricedItemModal'
 
 const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
@@ -225,74 +226,6 @@ const UTIL_CAT = {
 // catalog — when the selected vendor+sub-category has no catalog Items the list is
 // empty (the picker shows just its "Select …" placeholder). The built-in array is
 // still consulted for LABOR coefficients on catalog rows, never for options.
-function mergedUtilTypes(cat, builtInArr, materialRows, vendorSel = 'Standard') {
-  const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
-  const catRows = catalogOptions(materialRows, cat, isStd ? 'Standard' : vendorSel, {
-    standardRows: 'null-vendor',
-    stripPrefix: true,
-    category: 'Utilities',
-  })
-  if (!catRows.length) return []
-  return catRows.map(o => {
-    const bi = builtInArr.find(b => b.dbName === o.row.name || b.label === o.label)
-    return {
-      label: o.label,
-      dbName: o.row.name,
-      // Catalog Standard price for this Item (DB-resolved, not a hardcoded fallback).
-      catalogPrice: n(o.row.unit_cost),
-      // Labor pointer lives on the Item's calc_meta.labor_rate (an independent
-      // labor_rates row). No synthesized "<name> - Labor Rate", no built-in map,
-      // no hardcoded fallback — if it's unset the row prompts the user to fix it.
-      laborDbName: o.row.calc_meta?.labor_rate || null,
-      fromMaster: !bi,
-    }
-  })
-}
-
-// Resolve a row's material cost + per-unit labor.
-// The Type is a built-in item OR a master-list addition (same shape). It defines
-// the labor and the Standard material price. A vendor NEVER affects labor; it only
-// overrides the MATERIAL price for the selected item, matched by the item's name
-// in the vendor's catalog (material_rates for the category + vendor).
-function resolveUtilRow(cat, row, houseArr, materialRows, catDefaults, mp) {
-  const vsel = row.vendor && row.vendor !== 'auto' ? row.vendor : ''
-  // Unset vendor → empty Type list and no material/labor, so the row contributes
-  // $0 until a vendor (Standard or a real vendor) is chosen.
-  if (!vsel) {
-    return {
-      opts: [],
-      matOpt: { label: row.type, dbName: undefined, fallback: 0 },
-      matCost: 0,
-      laborVal: 0,
-      laborName: null,
-      laborBuiltIn: null,
-    }
-  }
-  // Type options are the SELECTED VENDOR'S items (vendor-first, like Paver).
-  const merged = mergedUtilTypes(cat, houseArr, materialRows, vsel)
-  const builtIn = merged.find(o => o.label === row.type) || merged[0]
-  let matDbName = builtIn?.dbName
-  const vrow = catalogItemFor(materialRows, cat, vsel, builtIn?.label, {
-    ...CATALOG_OPTS,
-    fallbackFirst: false,
-  })
-  if (vrow) {
-    matDbName = vrow.name
-  }
-  // Labor pointer = the Item's calc_meta.labor_rate (independent labor_rates row),
-  // resolved live via mp. No synthesized name, no built-in map, no hardcoded
-  // fallback — unset ⇒ laborVal 0 and the row is flagged for the user to fix.
-  const laborName = vrow?.calc_meta?.labor_rate || builtIn?.laborDbName || null
-  const laborVal = n(mp[laborName])
-  // The SELECTED vendor's catalog row (vrow) is the source of truth for its price.
-  // Otherwise the name-keyed Standard map (mp) — the catalog Standard price / misc
-  // rate. No hardcoded fallback: an unpriced item contributes $0.
-  const matCost = vrow ? n(vrow.unit_cost) : n(mp[matDbName])
-  // matOpt drives the Type dropdown value + the material rate popover target.
-  const matOpt = { label: builtIn?.label, dbName: matDbName }
-  return { opts: merged, matOpt, matCost, laborVal, laborName, laborBuiltIn: builtIn }
-}
-
 function calcUtilities(
   state,
   laborRatePerHour,
@@ -362,8 +295,8 @@ function calcUtilities(
       r,
       LINE_TYPE_ARR,
       materialRows,
-      catDefaults,
-      materialPrices
+      materialPrices,
+      { category: 'Utilities' }
     )
     if (laborVal <= 0) laborUnset.push({ kind: 'labor', name: laborName, label: r.type, category: 'Utilities', unit: null })
     lineMat += lf * matCost
@@ -379,8 +312,8 @@ function calcUtilities(
       r,
       GASPIPE_TYPE_ARR,
       materialRows,
-      catDefaults,
-      materialPrices
+      materialPrices,
+      { category: 'Utilities' }
     )
     if (laborVal <= 0) laborUnset.push({ kind: 'labor', name: laborName, label: r.type, category: 'Utilities', unit: null })
     gasPipeMat += lf * matCost
@@ -396,8 +329,8 @@ function calcUtilities(
       r,
       WIRE_TYPE_ARR,
       materialRows,
-      catDefaults,
-      materialPrices
+      materialPrices,
+      { category: 'Utilities' }
     )
     if (laborVal <= 0) laborUnset.push({ kind: 'labor', name: laborName, label: r.type, category: 'Utilities', unit: null })
     wireMat += lf * matCost
@@ -414,8 +347,8 @@ function calcUtilities(
         r,
         houseArr,
         materialRows,
-        catDefaults,
-        materialPrices
+        materialPrices,
+        { category: 'Utilities' }
       )
       if (laborVal <= 0) laborUnset.push({ kind: 'labor', name: laborName, label: r.type, category: 'Utilities', unit: null })
       fixMat += qty * matCost
@@ -435,8 +368,8 @@ function calcUtilities(
       r,
       SEWER_LINE_ARR,
       materialRows,
-      catDefaults,
-      materialPrices
+      materialPrices,
+      { category: 'Utilities' }
     )
     if (laborVal <= 0) laborUnset.push({ kind: 'labor', name: laborName, label: r.type, category: 'Utilities', unit: null })
     sewerLineMat += lf * matCost
@@ -811,8 +744,8 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
       r,
       LINE_TYPE_ARR,
       materialRows,
-      catDefaults,
-      materialPrices
+      materialPrices,
+      { category: 'Utilities' }
     )
     subSideCost += lf * matCost + lf * laborVal * laborRatePerHour
   })
@@ -825,8 +758,8 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
       r,
       GASPIPE_TYPE_ARR,
       materialRows,
-      catDefaults,
-      materialPrices
+      materialPrices,
+      { category: 'Utilities' }
     )
     subSideCost += lf * matCost + lf * laborVal * laborRatePerHour
   })
@@ -839,8 +772,8 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
       r,
       WIRE_TYPE_ARR,
       materialRows,
-      catDefaults,
-      materialPrices
+      materialPrices,
+      { category: 'Utilities' }
     )
     subSideCost += lf * matCost + lf * laborVal * laborRatePerHour
   })
@@ -854,8 +787,8 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
         r,
         houseArr,
         materialRows,
-        catDefaults,
-        materialPrices
+        materialPrices,
+        { category: 'Utilities' }
       )
       subSideCost += qty * matCost + qty * laborVal * laborRatePerHour
     })
@@ -871,8 +804,8 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
       r,
       SEWER_LINE_ARR,
       materialRows,
-      catDefaults,
-      materialPrices
+      materialPrices,
+      { category: 'Utilities' }
     )
     subSideCost += lf * matCost + lf * laborVal * laborRatePerHour
   })
@@ -1435,8 +1368,8 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                   row,
                   LINE_TYPE_ARR,
                   materialRows,
-                  catDefaults,
-                  materialPrices
+                  materialPrices,
+                  { category: 'Utilities' }
                 )
                 const mat = n(row.lf) * matCost
                 return (
@@ -1534,8 +1467,8 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                   row,
                   WIRE_TYPE_ARR,
                   materialRows,
-                  catDefaults,
-                  materialPrices
+                  materialPrices,
+                  { category: 'Utilities' }
                 )
                 const mat = n(row.lf) * matCost
                 return (
@@ -1633,8 +1566,8 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                   row,
                   ELEC_TYPE_ARR,
                   materialRows,
-                  catDefaults,
-                  materialPrices
+                  materialPrices,
+                  { category: 'Utilities' }
                 )
                 const mat = n(row.qty) * matCost
                 return (
@@ -1732,8 +1665,8 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                   row,
                   GASPIPE_TYPE_ARR,
                   materialRows,
-                  catDefaults,
-                  materialPrices
+                  materialPrices,
+                  { category: 'Utilities' }
                 )
                 const mat = n(row.lf) * matCost
                 return (
@@ -1831,8 +1764,8 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                   row,
                   GAS_TYPE_ARR,
                   materialRows,
-                  catDefaults,
-                  materialPrices
+                  materialPrices,
+                  { category: 'Utilities' }
                 )
                 const mat = n(row.qty) * matCost
                 return (
@@ -1930,8 +1863,8 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                   row,
                   SEWER_LINE_ARR,
                   materialRows,
-                  catDefaults,
-                  materialPrices
+                  materialPrices,
+                  { category: 'Utilities' }
                 )
                 const mat = n(row.lf) * matCost
                 return (
