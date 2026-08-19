@@ -9,6 +9,7 @@ import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { resolveMaterialPrice, catalogOptions, catalogItemFor, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
+import UnpricedItemModal from '../UnpricedItemModal'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Planting Module
@@ -317,7 +318,7 @@ function calcPlanting(
     })
     const laborName = it?.calc_meta?.labor_rate || null
     const perDay = n(laborRates[laborName])
-    if (r.type && n(r.qty) > 0 && perDay <= 0) laborUnset.push(r.type)
+    if (r.type && n(r.qty) > 0 && perDay <= 0) laborUnset.push({ kind: 'labor', name: laborName, label: r.type, category: 'Planting', unit: null })
     return perDay
   }
 
@@ -450,7 +451,17 @@ function calcPlanting(
     smalls,
     larges,
     addonResults,
-    laborUnset: isSubTab ? [] : Array.from(new Set(laborUnset.filter(Boolean))),
+    laborUnset: isSubTab
+      ? []
+      : (() => {
+          const seen = new Set()
+          return laborUnset.filter(u => {
+            const k = u && (u.name || u.label)
+            if (!k || seen.has(k)) return false
+            seen.add(k)
+            return true
+          })
+        })(),
   }
 }
 
@@ -599,6 +610,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
   const [materialRows, setMaterialRows] = useState(initialData?.materialRows || [])
   const [vendors, setVendors] = useState([])
   const [pricesLoading, setPricesLoading] = useState(!initialData?.materialPrices)
+  const [laborModalItem, setLaborModalItem] = useState(null)
 
   // Re-fetch Planting master-rate maps + vendor catalog. Called once on mount and
   // again after any RateEditPopover save so the calc reflects edits immediately.
@@ -1297,11 +1309,34 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
 
       {!isSub && calc.laborUnset && calc.laborUnset.length > 0 && (
         <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">
-          <span className="font-semibold">Labor rate needed:</span> set a Default
-          Labor rate in Master Material Rates for {calc.laborUnset.join(', ')}. These
-          plants are contributing 0 labor hours until a labor rate is assigned.
+          <span className="font-semibold">Labor rate needed</span> — these plants contribute 0 labor
+          hours until a rate is set. Click one to set it inline:
+          <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
+            {calc.laborUnset.map((u, i) =>
+              u.name ? (
+                <button
+                  key={u.name || i}
+                  type="button"
+                  onClick={() => setLaborModalItem(u)}
+                  className="rounded border border-amber-400 bg-white/70 px-1.5 py-0.5 font-medium text-amber-900 hover:bg-white"
+                >
+                  {u.label} ↗
+                </button>
+              ) : (
+                <span key={(u.label || '') + i} className="px-1 py-0.5 text-amber-800">
+                  {u.label}
+                </span>
+              )
+            )}
+          </span>
         </div>
       )}
+
+      <UnpricedItemModal
+        item={laborModalItem}
+        onClose={() => setLaborModalItem(null)}
+        onSaved={refreshAllRates}
+      />
 
       {/* Settings — In-House tab only */}
       {!isSub && (

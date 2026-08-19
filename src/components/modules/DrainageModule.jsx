@@ -9,6 +9,7 @@ import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
+import UnpricedItemModal from '../UnpricedItemModal'
 
 const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
 
@@ -253,7 +254,7 @@ function calcDrainage(
       // material item's default (calc_meta.labor_rate); then the legacy map/coefficient.
       const laborName = r.laborType || vrow?.calc_meta?.labor_rate
       const laborRate = n(materialPrices[laborName])
-      if (r.type && laborRate <= 0) laborUnset.push(vrow?.name || r.type)
+      if (r.type && laborRate <= 0) laborUnset.push({ kind: 'labor', name: laborName, label: vrow?.name || r.type, category: 'Drainage', unit: null })
       pipeHrs += lf * laborRate
     }
   })
@@ -280,7 +281,7 @@ function calcDrainage(
       // Labor chosen independently: row pick → item default → legacy.
       const laborName = r.laborType || vrow?.calc_meta?.labor_rate
       const laborRate = n(materialPrices[laborName])
-      if (r.type && laborRate <= 0) laborUnset.push(vrow?.name || r.type)
+      if (r.type && laborRate <= 0) laborUnset.push({ kind: 'labor', name: laborName, label: vrow?.name || r.type, category: 'Drainage', unit: null })
       frenchHrs += lf * laborRate
     }
   })
@@ -325,7 +326,7 @@ function calcDrainage(
       // Labor chosen independently: row pick → item default → legacy.
       const laborName = r.laborType || vrow?.calc_meta?.labor_rate
       const laborRate = n(materialPrices[laborName])
-      if (r.type && laborRate <= 0) laborUnset.push(vrow?.name || r.type)
+      if (r.type && laborRate <= 0) laborUnset.push({ kind: 'labor', name: laborName, label: vrow?.name || r.type, category: 'Drainage', unit: null })
       fixHrs += qty * laborRate
       totalFixQty += qty
     }
@@ -390,7 +391,15 @@ function calcDrainage(
   return {
     totalHrs,
     manDays,
-    laborUnset,
+    laborUnset: (() => {
+      const seen = new Set()
+      return laborUnset.filter(u => {
+        const k = u && (u.name || u.label)
+        if (!k || seen.has(k)) return false
+        seen.add(k)
+        return true
+      })
+    })(),
     subRatePerLF,
     subLf,
     subDrainCost,
@@ -487,6 +496,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   const [vendors, setVendors] = useState([])
   // Drainage labor rates (independent of material) — feed the per-row Labor picker.
   const [laborRateRows, setLaborRateRows] = useState([])
+  const [laborModalItem, setLaborModalItem] = useState(null)
   useEffect(() => {
     let alive = true
     Promise.all([
@@ -1307,10 +1317,33 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
       {calc.laborUnset && calc.laborUnset.length > 0 && (
         <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
           <b>Labor rate needed.</b> These selected items have no default labor rate (or it resolves to 0),
-          so their hours aren't priced: {Array.from(new Set(calc.laborUnset)).join(', ')}. Set each item's{' '}
-          <b>Default Labor Rate</b> in Master Rates → Materials, or give the pointed‑to labor rate a value.
+          so their hours aren't priced. Click one to set it inline:
+          <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
+            {calc.laborUnset.map((u, i) =>
+              u.name ? (
+                <button
+                  key={u.name || i}
+                  type="button"
+                  onClick={() => setLaborModalItem(u)}
+                  className="rounded border border-amber-400 bg-white/70 px-1.5 py-0.5 font-medium text-amber-900 hover:bg-white"
+                >
+                  {u.label} ↗
+                </button>
+              ) : (
+                <span key={(u.label || '') + i} className="px-1 py-0.5 text-amber-800">
+                  {u.label}
+                </span>
+              )
+            )}
+          </span>
         </div>
       )}
+
+      <UnpricedItemModal
+        item={laborModalItem}
+        onClose={() => setLaborModalItem(null)}
+        onSaved={refreshMaterialPrices}
+      />
 
       {/* ── Solid Drain Pipe ── */}
       <div>

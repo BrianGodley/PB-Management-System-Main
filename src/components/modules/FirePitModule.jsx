@@ -9,6 +9,7 @@ import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { groutCuFtPerBlock } from '../../lib/cmuGrout'
 import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
+import UnpricedItemModal from '../UnpricedItemModal'
 
 const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
 
@@ -686,8 +687,8 @@ function calcFirePit(
     if (!r.type) return
     const lf = n(r.lf)
     if (lf <= 0) return
-    const { matCost, laborVal } = resolveUtilRow(UTIL_CAT.line, r, LINE_TYPE_ARR, materialRows, mp)
-    if (laborVal <= 0) laborUnset.push(r.type)
+    const { matCost, laborVal, laborName } = resolveUtilRow(UTIL_CAT.line, r, LINE_TYPE_ARR, materialRows, mp)
+    if (laborVal <= 0) laborUnset.push({ kind: 'labor', name: laborName, label: r.type, category: 'Utilities', unit: null })
     epMat += lf * matCost
     epHrs += lf * laborVal
     epHrs += lf * GAS_TRENCH_CF_PER_LF * gasTrenchHrsPerCF // trenching (hrs/CF × CF/LF × LF)
@@ -696,8 +697,8 @@ function calcFirePit(
     if (!r.type) return
     const qty = n(r.qty)
     if (qty <= 0) return
-    const { matCost, laborVal } = resolveUtilRow(UTIL_CAT.gas, r, GAS_TYPE_ARR, materialRows, mp)
-    if (laborVal <= 0) laborUnset.push(r.type)
+    const { matCost, laborVal, laborName } = resolveUtilRow(UTIL_CAT.gas, r, GAS_TYPE_ARR, materialRows, mp)
+    if (laborVal <= 0) laborUnset.push({ kind: 'labor', name: laborName, label: r.type, category: 'Utilities', unit: null })
     epMat += qty * matCost
     epHrs += qty * laborVal
   })
@@ -795,7 +796,15 @@ function calcFirePit(
     epMat,
     epHrs,
     manMat,
-    laborUnset: Array.from(new Set(laborUnset.filter(Boolean))),
+    laborUnset: (() => {
+      const seen = new Set()
+      return laborUnset.filter(u => {
+        const k = u && (u.name || u.label)
+        if (!k || seen.has(k)) return false
+        seen.add(k)
+        return true
+      })
+    })(),
   }
 }
 
@@ -920,6 +929,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
   )
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
   const [pricesLoading, setPricesLoading] = useState(!initialData?.materialPrices)
+  const [laborModalItem, setLaborModalItem] = useState(null)
   const [materialRows, setMaterialRows] = useState(initialData?.materialRows ?? [])
   const [vendors, setVendors] = useState([])
 
@@ -1408,12 +1418,34 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
 
       {calc.laborUnset && calc.laborUnset.length > 0 && (
         <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">
-          <span className="font-semibold">Labor rate needed:</span> set a Default
-          Labor rate in Master Material Rates for {calc.laborUnset.join(', ')}. These
-          gas/electrical items are contributing 0 labor hours until a labor rate is
-          assigned.
+          <span className="font-semibold">Labor rate needed</span> — these gas/electrical items
+          contribute 0 labor hours until a rate is set. Click one to set it inline:
+          <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
+            {calc.laborUnset.map((u, i) =>
+              u.name ? (
+                <button
+                  key={u.name || i}
+                  type="button"
+                  onClick={() => setLaborModalItem(u)}
+                  className="rounded border border-amber-400 bg-white/70 px-1.5 py-0.5 font-medium text-amber-900 hover:bg-white"
+                >
+                  {u.label} ↗
+                </button>
+              ) : (
+                <span key={(u.label || '') + i} className="px-1 py-0.5 text-amber-800">
+                  {u.label}
+                </span>
+              )
+            )}
+          </span>
         </div>
       )}
+
+      <UnpricedItemModal
+        item={laborModalItem}
+        onClose={() => setLaborModalItem(null)}
+        onSaved={refreshAllRates}
+      />
 
       {/* Settings — Job Site Conditions is In-House only (hidden on Sub tab) */}
       {subType !== 'Subcontractor' && (

@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import DropdownSelect from '../DropdownSelect'
+import UnpricedItemModal from '../UnpricedItemModal'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import {
@@ -101,7 +102,7 @@ function processSection(subcat, rows, materialRows, priceOf = item => n(item.uni
     // case, no hardcoded fallback — unset ⇒ 0 hrs and the item is flagged.
     const laborName = item.calc_meta?.labor_rate || null
     const laborRate = n(laborRates[laborName])
-    if (laborRate <= 0) laborUnset.push(item.name || item.description)
+    if (laborRate <= 0) laborUnset.push({ kind: 'labor', name: laborName, label: item.name || item.description, category: 'Lighting', unit: null })
     hrs += qty * laborRate
     mat += qty * cost
     const each =
@@ -141,7 +142,15 @@ function calcLighting(
   const wr = processSection(LIGHT_CAT.wire, wireRows, materialRows, priceOf, laborRates)
   const laborUnset = isSub
     ? []
-    : Array.from(new Set([...fx.laborUnset, ...xf.laborUnset, ...wr.laborUnset].filter(Boolean)))
+    : (() => {
+        const seen = new Set()
+        return [...fx.laborUnset, ...xf.laborUnset, ...wr.laborUnset].filter(u => {
+          const k = u && (u.name || u.label)
+          if (!k || seen.has(k)) return false
+          seen.add(k)
+          return true
+        })
+      })()
 
   // Electrical load (fixtures) is shown on both tabs for transformer sizing.
   const totalWatts = fx.watts + xf.watts + wr.watts
@@ -270,6 +279,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
   const [materialMarkup, setMaterialMarkup] = useState(null)
   // Per-section install labor rates (labor_rates, category Lighting).
   const [laborRates, setLaborRates] = useState({})
+  const [laborModalItem, setLaborModalItem] = useState(null)
 
   // Re-fetch the lighting catalog + vendor list + markup rate. Used on mount
   // and after a markup RateEditPopover save.
@@ -796,11 +806,34 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
 
       {!isSub && calc.laborUnset && calc.laborUnset.length > 0 && (
         <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">
-          <span className="font-semibold">Labor rate needed:</span> set a Default
-          Labor rate in Master Material Rates for {calc.laborUnset.join(', ')}. These
-          items are contributing 0 labor hours until a labor rate is assigned.
+          <span className="font-semibold">Labor rate needed</span> — these items contribute 0 labor
+          hours until a rate is set. Click one to set it inline:
+          <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
+            {calc.laborUnset.map((u, i) =>
+              u.name ? (
+                <button
+                  key={u.name || i}
+                  type="button"
+                  onClick={() => setLaborModalItem(u)}
+                  className="rounded border border-amber-400 bg-white/70 px-1.5 py-0.5 font-medium text-amber-900 hover:bg-white"
+                >
+                  {u.label} ↗
+                </button>
+              ) : (
+                <span key={(u.label || '') + i} className="px-1 py-0.5 text-amber-800">
+                  {u.label}
+                </span>
+              )
+            )}
+          </span>
         </div>
       )}
+
+      <UnpricedItemModal
+        item={laborModalItem}
+        onClose={() => setLaborModalItem(null)}
+        onSaved={refreshCatalog}
+      />
 
       {/* Settings — Job Site Conditions is In-House only (hidden on Sub tab) */}
       {!isSub && (
