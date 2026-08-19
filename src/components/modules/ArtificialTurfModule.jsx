@@ -18,7 +18,10 @@ import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 
-const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
+// One-picker scheme: turf-brand materials price Standard from the item's
+// null-vendor catalog record (consumed by turfMatPrice, which sets
+// fallbackFirst:false). Matches the base-material pickers + sibling modules.
+const CATALOG_OPTS = { standardRows: 'null-vendor', stripPrefix: true }
 
 // ── Demo method rates (hrs per Ton) — DemoRatesTurf lookup table ────────────
 const DEMO_METHODS = [
