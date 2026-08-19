@@ -56,7 +56,7 @@ export async function buildViewRates(moduleType) {
 
   const [matRows, labRes, subRes, venRes] = await Promise.all([
     fetchModuleCatalog(cats),
-    supabase.from('labor_rates').select('id, category, sub_category, name, unit, rate').in('category', cats),
+    supabase.from('labor_rates').select('id, category, sub_category, name, label, unit, rate').in('category', cats),
     supabase
       .from('subcontractor_rates')
       .select('id, category, sub_category, trade, item_key, unit, rate, company_name')
@@ -91,11 +91,12 @@ export async function buildViewRates(moduleType) {
     })
   })
 
-  // Labor — coefficients, keyed by name.
+  // Labor — coefficients. `name` is the immutable key the modules reference;
+  // `label` is the editable display description (falls back to name).
   ;(labRes.data || []).forEach(r => {
     const g = ensure(r.category, r.sub_category)
     g.items.push({
-      label: cleanLabel(r.name),
+      label: cleanLabel(r.label || r.name),
       table: 'labor_rates',
       name: r.name,
       category: r.category,

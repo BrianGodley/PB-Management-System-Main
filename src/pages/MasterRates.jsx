@@ -687,6 +687,7 @@ export default function MasterRates({ only } = {}) {
       .from('labor_rates')
       .insert({
         name: form.name?.trim(),
+        label: form.name?.trim(), // new rate: display label starts equal to the key
         rate: parseFloat(form.rate) || 0,
         unit: form.unit || 'hrs per unit',
         category: form.category?.trim() || 'General',
@@ -699,10 +700,12 @@ export default function MasterRates({ only } = {}) {
     if (data) setLabor(p => [...p, data].sort((a, b) => a.name.localeCompare(b.name)))
   }
   async function saveLabor(form) {
+    // `name` (the code/key the estimator references) is intentionally NOT written
+    // — only the editable `label` changes. Renaming would break module pricing.
     const { data } = await supabase
       .from('labor_rates')
       .update({
-        name: form.name?.trim(),
+        label: (form.label ?? form.name)?.trim() || null,
         rate: parseFloat(form.rate) || 0,
         unit: form.unit || 'hrs per unit',
         category: form.category?.trim() || 'General',
@@ -880,8 +883,8 @@ export default function MasterRates({ only } = {}) {
     { key: 'code', label: 'Code', editable: false, width: '9rem', render: laborCodeCell },
     { key: 'category', label: 'Category', type: 'select', options: laborCatOptions, width: '11rem' },
     { key: 'sub_category', label: 'Sub Category', type: 'select', options: laborSubOptions, placeholder: 'describe…', width: '12rem' },
-    { key: 'name', label: 'Item', bold: true, stripCat: true, placeholder: 'e.g. Demo - Tree Small', width: '16rem' },
-    { key: 'notes', label: 'Labor Description', placeholder: 'Optional notes', width: '14rem' },
+    { key: 'label', label: 'Name', bold: true, stripCat: true, placeholder: 'e.g. Small Tree Removal', width: '16rem' },
+    { key: 'notes', label: 'Notes', placeholder: 'Optional notes', width: '14rem' },
     { key: 'unit', label: 'Unit', type: 'select', options: LABOR_UNIT_OPTIONS, width: '8rem' },
     { key: 'rate', label: 'Rate', type: 'number', step: '0.0001', width: '7rem' },
     {

@@ -21,7 +21,10 @@ export default function LaborRateDetailModal({
 }) {
   const [category, setCategory] = useState(row.category || '')
   const [subCategory, setSubCategory] = useState(row.sub_category || '')
-  const [name, setName] = useState(row.name || '')
+  // `name` is the immutable KEY the estimator modules reference — never edited
+  // here (renaming it would break pricing). `label` is the editable display.
+  const name = row.name || ''
+  const [desc, setDesc] = useState(row.label || row.name || '')
   const [notes, setNotes] = useState(row.notes || '')
   const [unit, setUnit] = useState(row.unit || '')
   const [rate, setRate] = useState(row.rate ?? '')
@@ -29,18 +32,20 @@ export default function LaborRateDetailModal({
   const [err, setErr] = useState('')
 
   async function save() {
-    if (!name.trim()) {
-      setErr('Item name is required.')
+    if (!desc.trim()) {
+      setErr('Description is required.')
       return
     }
     setSaving(true)
     setErr('')
+    // NOTE: `name` (the key) is intentionally NOT written — it stays frozen so
+    // the estimator modules keep resolving this rate. Only `label` is editable.
     const { error } = await supabase
       .from('labor_rates')
       .update({
         category: category.trim() || null,
         sub_category: subCategory.trim() || null,
-        name: name.trim(),
+        label: desc.trim(),
         notes: notes.trim() || null,
         unit: unit.trim() || null,
         rate: rate === '' ? null : Number(rate),
@@ -79,7 +84,7 @@ export default function LaborRateDetailModal({
       >
         <div className="flex items-center justify-between mb-1">
           <div>
-            <h3 className="text-sm font-bold text-gray-800">{name || 'Labor Rate'}</h3>
+            <h3 className="text-sm font-bold text-gray-800">{desc || name || 'Labor Rate'}</h3>
             {code && <span className="font-mono text-xs text-gray-400">{code}</span>}
           </div>
           <button
@@ -120,17 +125,24 @@ export default function LaborRateDetailModal({
         </div>
 
         <div className="mt-3">
-          <label className={label}>Item</label>
+          <label className={label}>Name</label>
           <input
             className={field}
-            value={name}
-            onChange={e => setName(e.target.value)}
-            placeholder="e.g. Demo - Tree Small"
+            value={desc}
+            onChange={e => setDesc(e.target.value)}
+            placeholder="e.g. Small Tree Removal"
           />
         </div>
 
         <div className="mt-3">
-          <label className={label}>Labor Description</label>
+          <label className={label}>
+            Code <span className="font-normal text-gray-400">(locked — the estimator's stable reference)</span>
+          </label>
+          <input className={`${field} bg-gray-50 text-gray-500`} value={name} readOnly disabled />
+        </div>
+
+        <div className="mt-3">
+          <label className={label}>Notes</label>
           <input
             className={field}
             value={notes}
