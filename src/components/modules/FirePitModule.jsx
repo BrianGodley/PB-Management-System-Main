@@ -277,6 +277,25 @@ const GAS_FIXTURE_TYPES = {
 const LINE_TYPE_ARR = Object.entries(UTILITY_LINE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, laborDbName: t.laborDbName }))
 const GAS_TYPE_ARR = Object.entries(GAS_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, laborDbName: t.laborDbName }))
 const UTIL_CAT = { line: 'Utility Lines', gas: 'Gas Fixtures' }
+
+// ── Rate scope: the ONE list of (category, sub-category) pairs Fire Pit uses ──
+// This is the single source of truth for BOTH the catalog load (pickers) and the
+// View Rates popup, so they can never drift. A bare `{ category }` = the whole
+// category (its own rates); `{ category, sub }` = a specific material sub-category
+// borrowed from another module's category (e.g. Wall Cap / Wall Block from Walls).
+const RATE_SCOPE = [
+  { category: 'Fire Pit' }, // own: Wall Finish, grout, labor, sub, misc
+  { category: 'Walls', sub: CAP_CAT }, // Wall Cap (shared, e.g. Bellecrete)
+  { category: 'Walls', sub: CMU_BLOCK_SUBCAT }, // Wall Block
+  { category: 'Walls', sub: MODULAR_SUBCAT }, // Modular Wall
+  { category: 'Walls', sub: BRICK_SUBCAT }, // Brick
+  { category: 'Concrete', sub: CONC_MIX_SUBCAT }, // Concrete Mix (PIP)
+  { category: 'Utilities', sub: UTIL_CAT.line }, // Utility Lines
+  { category: 'Utilities', sub: UTIL_CAT.gas }, // Gas Fixtures
+  { category: 'Basic Materials', sub: 'Reinforcement' }, // Rebar
+]
+const RATE_SCOPE_CATS = [...new Set(RATE_SCOPE.map(s => s.category))]
+
 const EP_LINE_ROW = () => ({ type: '', lf: '', vendor: 'Standard' })
 const EP_GAS_ROW = () => ({ type: '', qty: '', vendor: 'Standard' })
 
@@ -908,7 +927,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
         .from('labor_rates')
         .select('name, rate')
         .in('category', ['Fire Pit', 'Utilities', 'Walls']),
-      fetchModuleCatalog(['Fire Pit', 'Walls', 'Utilities', 'Basic Materials', 'Concrete']),
+      fetchModuleCatalog(RATE_SCOPE_CATS),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
@@ -1206,6 +1225,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
             onCrewTypeChange={setCrewType}
             title="Fire Pit"
             moduleType="Fire Pit"
+            rateScope={RATE_SCOPE}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
           />

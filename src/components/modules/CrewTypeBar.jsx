@@ -42,6 +42,10 @@ export default function CrewTypeBar({
   // When set, View Rates is generated live from the module→category map
   // (data-driven), with hide/unhide, instead of the static `rates` prop.
   moduleType = null,
+  // Optional (category, sub-category) scope the module declares — the SAME scheme
+  // its pickers use — so View Rates matches the pickers exactly (no drift). When
+  // omitted, falls back to the module→category map.
+  rateScope = null,
 }) {
   const { showRateIcons, toggleRateIcons, canAccessRates } = useRateIcons()
   const [showRates, setShowRates] = useState(false)
@@ -51,10 +55,13 @@ export default function CrewTypeBar({
 
   const loadDyn = useCallback(async () => {
     if (!moduleType) return
-    const [built, hidden] = await Promise.all([buildViewRates(moduleType), fetchHiddenKeys(moduleType)])
+    const [built, hidden] = await Promise.all([
+      buildViewRates(moduleType, rateScope),
+      fetchHiddenKeys(moduleType),
+    ])
     setDynRates(built.groups || [])
     setHiddenSet(hidden)
-  }, [moduleType])
+  }, [moduleType, rateScope])
 
   const toggleHide = async key => {
     const willHide = !hiddenSet.has(key)

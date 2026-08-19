@@ -50,23 +50,50 @@ export async function fetchModuleCategories(moduleType) {
   return Array.from(new Set((data || []).map(r => r.category_name).filter(Boolean)))
 }
 
-export async function buildViewRates(moduleType) {
-  const cats = await fetchModuleCategories(moduleType)
-  if (!cats.length) return { groups: [], categories: [] }
+// `scope` (optional): the module's own (category, sub-category) rate scheme — the
+// SAME list its pickers use, passed in so View Rates can't drift from the pickers.
+//   • { category: 'Fire Pit' }                → the whole category: all its material
+//       sub-categories PLUS its labor / sub / misc rates.
+//   • { category: 'Walls', sub: 'Wall Cap' }  → ONLY that material sub-category,
+//       borrowed from another category (no labor/sub/misc pulled for it).
+// When `scope` is absent, fall back to the legacy module_category_map.
+export async function buildViewRates(moduleType, scope = null) {
+  let fullCats, subScope, fetchCats
+  if (Array.isArray(scope) && scope.length) {
+    fullCats = new Set(scope.filter(s => s && s.category && !s.sub).map(s => s.category))
+    subScope = new Map()
+    for (const s of scope) {
+      if (!s || !s.category || !s.sub) continue
+      if (!subScope.has(s.category)) subScope.set(s.category, new Set())
+      subScope.get(s.category).add(s.sub)
+    }
+    fetchCats = Array.from(new Set(scope.map(s => s && s.category).filter(Boolean)))
+  } else {
+    const cats = await fetchModuleCategories(moduleType)
+    fullCats = new Set(cats)
+    subScope = new Map()
+    fetchCats = cats
+  }
+  if (!fetchCats.length) return { groups: [], categories: [] }
+  // Labor / sub / misc come only from the module's OWN (full) categories — a
+  // borrowed material sub-category never drags in another category's labor.
+  const ownCats = [...fullCats]
+  const q = (table, cols) =>
+    ownCats.length
+      ? supabase.from(table).select(cols).in('category', ownCats)
+      : Promise.resolve({ data: [] })
 
   const [matRows, labRes, subRes, miscRes, venRes] = await Promise.all([
-    fetchModuleCatalog(cats),
-    supabase.from('labor_rates').select('id, category, sub_category, name, label, unit, rate').in('category', cats),
-    supabase
-      .from('subcontractor_rates')
-      .select('id, category, sub_category, trade, item_key, unit, rate, company_name')
-      .in('category', cats),
-    // Misc coefficients / named $ adders (rebar spacing factors, fabric $/ft,
-    // demo dump $/ton, etc.) — the 4th rate source, so View Rates shows every
-    // master rate the modules use (not just material/labor/sub).
-    supabase.from('misc_rates').select('id, category, name, rate').in('category', cats),
+    fetchModuleCatalog(fetchCats),
+    q('labor_rates', 'id, category, sub_category, name, label, unit, rate'),
+    q('subcontractor_rates', 'id, category, sub_category, trade, item_key, unit, rate, company_name'),
+    // Misc coefficients / named $ adders — the 4th rate source.
+    q('misc_rates', 'id, category, name, rate'),
     supabase.from('subs_vendors').select('id, company_name'),
   ])
+  // A material row is in-scope if its category is a full category, or its exact
+  // (category, sub-category) is one of the borrowed pairs.
+  const matInScope = r => fullCats.has(r.category) || !!subScope.get(r.category)?.has(r.sub_category)
   const vendorName = id => (venRes.data || []).find(v => v.id === id)?.company_name || 'Vendor'
 
   // group map: "categorysub" -> { category, sub, items: [] }
@@ -79,7 +106,7 @@ export async function buildViewRates(moduleType) {
   }
 
   // Materials — one row per open price (Standard first, then each vendor).
-  ;(matRows || []).forEach(r => {
+  ;(matRows || []).filter(matInScope).forEach(r => {
     const g = ensure(r.category, r.sub_category)
     g.items.push({
       label: `${r.vendor_id ? vendorName(r.vendor_id) : 'Standard'} — ${cleanLabel(r.name)}`,
@@ -145,8 +172,8 @@ export async function buildViewRates(moduleType) {
     })
   })
 
-  // Order: category (map order), then sub-category alpha; items vendor-first.
-  const catOrder = new Map(cats.map((c, i) => [c, i]))
+  // Order: category (scope order), then sub-category alpha; items vendor-first.
+  const catOrder = new Map(fetchCats.map((c, i) => [c, i]))
   const out = [...groups.values()]
     .sort(
       (a, b) =>
@@ -161,7 +188,7 @@ export async function buildViewRates(moduleType) {
       items: g.items.sort((x, y) => (x._vsort || '').localeCompare(y._vsort || '') || x.label.localeCompare(y.label)),
     }))
 
-  return { groups: out, categories: cats }
+  return { groups: out, categories: fetchCats }
 }
 
 // ── Hide/unhide persistence ──────────────────────────────────────────────────
