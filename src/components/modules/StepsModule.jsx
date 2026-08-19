@@ -18,7 +18,9 @@ import {
   saveStandardNamedRate,
 } from '../../lib/materialCatalog'
 
-const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
+// One-picker scheme (matches Concrete/Turf): Standard sources the null-vendor
+// catalog rows (and prices against them); an unset vendor shows nothing.
+const CATALOG_OPTS = { standardRows: 'null-vendor', stripPrefix: true }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Steps Module
@@ -90,13 +92,19 @@ const MAT_SECTIONS = [
   { key: 'flag', title: 'Flagstone Steps', matWord: 'Flagstone', cat: 'Flagstone', rowsKey: 'flagRows', subKey: 'subFlagRows', baseKey: 'Steps - Sub Flagstone Base' },
 ]
 
-// ── Vendor-catalog helpers (same as PaverModule) ─────────────────────────────
-// Vendor catalog options + row resolution from the shared library.
+// ── Vendor-catalog helpers (mirror ConcreteModule.sectionOptions) ────────────
+// Vendor-first: an unset vendor yields no options (empty placeholder); an
+// explicit 'Standard' sources the null-vendor catalog rows; a real vendor its
+// own. Options + price both come from the same catalog record — no name fallback.
 function paverOptions(cat, vendorSel, materialRows) {
-  return catalogOptions(materialRows, cat, vendorSel, CATALOG_OPTS)
+  if (!vendorSel || vendorSel === 'auto') return []
+  const isStd = vendorSel === 'Standard'
+  return catalogOptions(materialRows, cat, isStd ? 'Standard' : vendorSel, CATALOG_OPTS)
 }
 function paverItemFor(cat, vendorSel, typeLabel, materialRows) {
-  return catalogItemFor(materialRows, cat, vendorSel, typeLabel, CATALOG_OPTS)
+  if (!vendorSel || vendorSel === 'auto') return null
+  const isStd = vendorSel === 'Standard'
+  return catalogItemFor(materialRows, cat, isStd ? 'Standard' : vendorSel, typeLabel, CATALOG_OPTS)
 }
 
 // ── Per-row calculators ──────────────────────────────────────────────────────
@@ -111,12 +119,12 @@ function matStepRowCalc(r, laborRates, materialRows, cat = PAVER_STEP_CAT, price
   const hrs = sf * rate
   let price = 0
   let sfPerPallet = 0
-  if (r.vendor && r.vendor !== 'Standard' && r.vendor !== 'Custom') {
-    const item = paverItemFor(cat, r.vendor, r.type, materialRows)
-    if (item) {
-      price = priceOf(item)
-      sfPerPallet = n(item.sf_per_pallet)
-    }
+  // Standard resolves to the item's null-vendor catalog price; a real vendor to
+  // its own. paverItemFor returns null for an unset vendor, so no hidden $0.
+  const item = paverItemFor(cat, r.vendor, r.type, materialRows)
+  if (item) {
+    price = priceOf(item)
+    sfPerPallet = n(item.sf_per_pallet)
   }
   const mat = sf * price
   const pallets = sf > 0 && sfPerPallet > 0 ? Math.ceil(sf / sfPerPallet) : 0
