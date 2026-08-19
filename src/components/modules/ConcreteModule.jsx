@@ -87,7 +87,7 @@ const INSTALL_TIERS = [
 // commission, sub GP markup, walk pace) are sourced from company_settings — no
 // hardcoded code defaults.
 
-// Base Install ('Concrete Base') and Concrete Install mix ('Concrete Mix') source
+// Base Install ('Base Material') and Concrete Install mix ('Concrete Mix') source
 // their Type options AND price/description entirely from the catalog, per vendor
 // (Standard = the null-vendor rows). No built-in product list.
 
@@ -264,11 +264,11 @@ function calcConcrete(
     // Labor rate = labor_rates['Concrete - Base ...'] (hrs per inch per 100 SF).
     const rate = n(lr[BASE_METHOD_LABOR_NAME[m]])
     const hrs = (sf / 100) * depth * rate
-    const bt = rowOpt('Concrete Base', r)
+    const bt = rowOpt('Base Material', r)
     // MATERIAL is by VOLUME, priced per CUBIC YARD. Base cubic yards =
     // SF × depth(in)/12 ÷ 27. Priced from the canonical Basic Materials
     // 'Class II Roadbase' Standard rate (costBase, $/Cu Yd); a vendor-picked
-    // 'Concrete Base' product, if any, overrides that Standard price.
+    // 'Base Material' product, if any, overrides that Standard price.
     const baseRate = bt.fallback > 0 ? bt.fallback : costBase
     const mat = sf > 0 ? (sf * (depth / 12) / 27) * baseRate : 0
     baseHrsTot += hrs
@@ -628,7 +628,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const refreshAllRates = useCallback(async () => {
     // material_rates retired: base map (incl. shared Basic Materials) from the
     // new model; vendor catalog from material + material_price. Concrete's
-    // markers ('Concrete Mix'/'Concrete Base') are unchanged, so no remap.
+    // markers ('Concrete Mix'/'Base Material') are unchanged, so no remap.
     const [lrRes, matMap, srRes, rows, venRes] = await Promise.all([
       supabase.from('labor_rates').select('name, rate').eq('category', 'Concrete'),
       fetchStandardRateMap(['Concrete', 'Basic Materials']),
@@ -831,7 +831,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
   const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
   const defaultVendorFor = cat => vendorsForCategory(cat)[0]?.id || 'Standard'
   const catDefaults = {
-    'Concrete Base': defaultVendorFor('Concrete Base'),
+    'Base Material': defaultVendorFor('Base Material'),
     'Concrete Mix': defaultVendorFor('Concrete Mix'),
   }
   // Build a section's Type option list for a given vendor selection. Options come
@@ -1188,8 +1188,8 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
         })),
         // Canonical base material — Basic Materials 'Class II Roadbase' ($/Cu Yd).
         ...materialRateRows('Class II Roadbase'),
-        // Base material catalog (any vendor-supplied 'Concrete Base' products).
-        ...catalogBlockItems('Concrete Base'),
+        // Base material catalog (any vendor-supplied 'Base Material' products).
+        ...catalogBlockItems('Base Material'),
       ],
     },
     {
@@ -1609,11 +1609,11 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                   _depth = n(row.depth) || 2
                 const _bm = normBaseMethod(row.method)
                 const methodRate = n(laborRates[BASE_METHOD_LABOR_NAME[_bm]])
-                const baseOpts = sectionOptions('Concrete Base', row.vendor)
+                const baseOpts = sectionOptions('Base Material', row.vendor)
                 const bt = resolveType(row.type, baseOpts)
                 // Base material $/Cu Yd = canonical Basic Materials 'Class II
                 // Roadbase' Standard rate (costBase), unless a vendor-picked
-                // 'Concrete Base' product overrides it.
+                // 'Base Material' product overrides it.
                 const baseRate = bt.fallback > 0 ? bt.fallback : costBase
                 const c = {
                   hrs: _sf > 0 ? (_sf / 100) * _depth * methodRate : 0,
@@ -1630,7 +1630,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                         title="Vendor"
                       >
                         {!row.vendor && <option value="">Select</option>}
-                        {vendorsForCategory('Concrete Base').map(v => (
+                        {vendorsForCategory('Base Material').map(v => (
                           <option key={v.id} value={v.id}>
                             {v.name}
                           </option>
@@ -1663,8 +1663,8 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                             onClick={() =>
                               setNewItemTarget({
                                 category: 'Concrete',
-                                subCategory: 'Concrete Base',
-                                label: 'Concrete Base',
+                                subCategory: 'Base Material',
+                                label: 'Base Material',
                                 unit: 'Cu Yd',
                                 vendorId: row.vendor !== 'Standard' ? row.vendor : null,
                               })
