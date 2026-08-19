@@ -6,9 +6,11 @@
 // Canonical behavior (decided 2026-08-19):
 //   D1  Unset vendor → the row prices $0 until a vendor (Standard or real) is
 //       chosen, so it surfaces as unpriced rather than silently defaulting.
-//   D2  Material price = the selected vendor's catalog row, else the Standard
-//       name-map (mp), else the item's own catalog unit_cost (all DB-sourced —
-//       no hardcoded constant). Labor ALWAYS rides on the item's
+//   D2  Material price = the selected vendor's catalog record (Standard resolves
+//       to the item's null-vendor record — one record, one price). The name-map
+//       (mp) is only an equivalent last resort for a type with no catalog record;
+//       it's the same category rate map, so it never diverges from the record.
+//       No hardcoded constant. Labor ALWAYS rides on the item's
 //       calc_meta.labor_rate pointer; a vendor never changes labor.
 //
 // opts.category (optional) restricts the catalog option lookup to a category
@@ -20,7 +22,10 @@ const n = v => {
   const x = typeof v === 'number' ? v : parseFloat(v)
   return Number.isFinite(x) ? x : 0
 }
-const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
+// One-picker scheme: Standard resolves the price from the item's null-vendor
+// catalog record (same rows the options come from), not a name-map. A real vendor
+// resolves its own row. Matches Concrete/Drainage/Turf/Steps.
+const CATALOG_OPTS = { standardRows: 'null-vendor', stripPrefix: true }
 
 // Catalog options for a util category, vendor-first. Built-in array supplies only
 // the labor db-name for a matching item, never option rows.
@@ -74,7 +79,9 @@ export function resolveUtilRow(cat, row, houseArr, materialRows, mp, opts = {}) 
   // unset ⇒ laborVal 0 and the row is flagged for the user to fix.
   const laborName = vrow?.calc_meta?.labor_rate || builtIn?.laborDbName || null
   const laborVal = n(mp[laborName])
-  // D2 — vendor row wins; else the Standard name-map (mp); else catalog unit_cost.
+  // D2 — the selected vendor's catalog record wins (Standard resolves its
+  // null-vendor record, so vrow is set for Standard too). mp[matDbName] is only an
+  // equivalent last resort for a type with no catalog record; matCatalog last.
   const matCatalog = builtIn?.matCatalog ?? 0
   const matCost = vrow
     ? n(vrow.unit_cost)
