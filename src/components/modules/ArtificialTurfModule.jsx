@@ -114,7 +114,11 @@ const BASE_MATERIALS = [
 //   DG Base  → Basic Materials subcategory 'Decomposed Granite'
 //   Weed Barrier → Basic Materials subcategory 'Barriers'
 const BASE_KINDS = [
-  { key: 'Gravel', label: 'Roadbase', match: r => SHARED_CLASS2_NAMES.includes(r.name) },
+  // All three layers now match by canonical Basic Materials sub-category (the one
+  // scheme). Roadbase used to match by name because Class II Roadbase lived in the
+  // mixed 'Aggregate & Concrete' sub-category; it now has its own shared
+  // 'Base Material' sub-category, so it matches like DG and Weed.
+  { key: 'Gravel', label: 'Roadbase', match: r => r.sub_category === 'Base Material' },
   { key: 'DG', label: 'DG Base', match: r => r.sub_category === 'Decomposed Granite' },
   { key: 'Weed', label: 'Weed Barrier', match: r => r.sub_category === 'Barriers' },
 ]
