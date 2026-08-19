@@ -11,7 +11,9 @@ import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 import UnpricedItemModal from '../UnpricedItemModal'
 
-const CATALOG_OPTS = { standardRows: 'exclude', stripPrefix: true }
+// One-picker scheme (matches Concrete/Turf/Steps): Standard resolves to the
+// item's null-vendor catalog record — options AND price come from the same row.
+const CATALOG_OPTS = { standardRows: 'null-vendor', stripPrefix: true }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drainage Module — fields and calculations from Excel estimator
@@ -135,10 +137,12 @@ function drainMatCost(cat, row, TYPES, materialRows, catDefaults, mp) {
     fallbackFirst: false,
   })
   if (vrow) dbName = vrow.name
-  // Selected vendor's catalog row wins; otherwise the Standard price by name.
-  // No hardcoded fallback — an unpriced item contributes $0 (surfaced as $0).
-  // `row` is returned so the calc can read the item's self-declared labor rate
-  // (calc_meta.labor_rate) instead of a hardcoded type→name map.
+  // One record, one price: the selected vendor's catalog row (or Standard's
+  // null-vendor row) sets the price. `mp[dbName]` is only a last resort for a
+  // type with no catalog record at all — it's the same category rate map, so it
+  // never diverges from the record. No hardcoded fallback; a truly unpriced item
+  // contributes $0. `row` is returned so the calc reads the item's own labor
+  // pointer (calc_meta.labor_rate) rather than a hardcoded type→name map.
   return { dbName, cost: vrow ? n(vrow.unit_cost) : n(mp[dbName]), row: vrow }
 }
 
