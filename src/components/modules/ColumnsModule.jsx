@@ -79,8 +79,10 @@ const BLOCK_RATES = {
 
 // New per-type LABOR coefficients (fallbacks OK). Brick laying mirrors Walls'
 // brickLayLab (1.75 hr/SF); PIP form + pour mirror ConcreteModule-style rates.
-const BRICK_LAY = { dbName: 'Column Brick Lay Labor' } // hrs / SF of brick face
-const PIP_FORM_LAB = { dbName: 'Column Form Labor' } // hrs / SF of form
+// Brick lay + PIP form are SHARED with the Walls module (same operation, one
+// rate each). Pour stays Columns-specific. (Columns already loads WALLS_CATEGORY.)
+const BRICK_LAY = { dbName: 'Wall Brick Lay Labor' } // hrs / SF of brick face (shared w/ Walls)
+const PIP_FORM_LAB = { dbName: 'Wall PIP Install Labor' } // hrs / SF of form (shared w/ Walls PIP)
 const PIP_POUR_LAB = { dbName: 'Column Pour Labor' } // hrs / CY poured
 
 // Catalog NAMES for optional (catalog-only) materials — $0 until seeded so no
