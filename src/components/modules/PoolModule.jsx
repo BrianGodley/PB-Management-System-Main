@@ -702,6 +702,12 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     ? n(shotcrete.manualSubCost)
     : (isSubTab ? autoShotcreteSub : 0)
 
+  // Items whose picked Type has no labor rate set (calc_meta.labor_rate unset or
+  // resolves to 0). Surfaced as a prompt — never a fallback. Declared here (above
+  // its first use in the tile/spillway/coping/raised loops below) to avoid a TDZ
+  // ReferenceError when a picked install type has no labor rate.
+  const laborUnset = []
+
   // ─ Waterline Tile ─
   let tileHrs = 0,
     tileMat = 0
@@ -885,9 +891,8 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   //    Electrical Fixtures) — mirrors the Utilities module's mapping ────────────
   let epHrs = 0
   let epMat = 0
-  // Items whose picked Type has no labor rate set (calc_meta.labor_rate unset or
-  // resolves to 0). Surfaced as a prompt — never a fallback.
-  const laborUnset = []
+  // (laborUnset is declared earlier, above the Waterline Tile section, so the
+  // tile/spillway/coping/raised loops can push to it without a TDZ error.)
   // Trenching: hrs = cf × (hrs per Cu Ft) for the chosen method (Trench / Hand).
   ;(state.epTrenchRows || []).forEach(r => {
     const lf = n(r.lf),
