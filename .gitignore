@@ -33,6 +33,15 @@ supabase_construction_subcategories.sql
 supabase_make_*.sql
 supabase_fix_tiers.sql
 
+# One-off rate seeds/migrations run manually in Supabase (not part of the app build)
+supabase-*.sql
+
+# Working reports / scoping docs / audit spreadsheets generated into the workspace
+# (deliverables, not application source)
+Rate Chain Validation*.md
+Rate Reader Consolidation*.md
+*.xlsx
+
 # Capacitor native build artifacts (the ios/ and android/ projects themselves
 # are committed, but these caches / synced web assets are regenerated)
 /ios/App/Pods/
