@@ -100,18 +100,21 @@ test.describe('Fire Pit', () => {
     const ok = await openFirePit(page)
     test.skip(!ok, 'Fire Pit editor not reachable on this estimate.')
     const trench = page.getByText(/^\s*Trenching\s*$/i).first()
-    // Method <select> (Trench/Hand) then LF/Width/Depth <input>s follow the heading.
+    // Anchor on the Method <select> (Trench/Hand); the LF/Width/Depth inputs are in
+    // its row. Inputs are readonly-until-focus, so click each before filling.
     const method = trench.locator('xpath=following::select[1]')
     await expect(method, 'No Trenching Method select').toBeVisible()
     expect(await method.locator('option').count(), 'Method options (Trench/Hand)').toBeGreaterThanOrEqual(2)
-    const lf = trench.locator('xpath=following::input[1]')
-    await lf.fill('20')
-    await trench.locator('xpath=following::input[2]').fill('6')
-    await trench.locator('xpath=following::input[3]').fill('24')
-    await expect(lf, 'LF did not accept input').toHaveValue('20')
-    // Est. Hrs cell (the td after the depth input's td) should show a decimal, not "—".
-    const hrsCell = trench.locator('xpath=following::input[3]/ancestor::td/following-sibling::td[1]')
-    await expect(hrsCell, 'Trench hours did not compute').toHaveText(/\d+\.\d{2}/)
+    const row = method.locator('xpath=ancestor::tr[1]')
+    const inputs = row.locator('input')
+    const vals = ['20', '6', '24'] // LF, Width, Depth
+    for (let i = 0; i < 3; i++) {
+      await inputs.nth(i).click().catch(() => {})
+      await inputs.nth(i).fill(vals[i])
+    }
+    await expect(inputs.nth(0), 'LF did not accept input').toHaveValue('20')
+    // Est. Hrs cell (last cell of the row) should show a decimal, not "—".
+    await expect(row.locator('td').last(), 'Trench hours did not compute').toHaveText(/\d+\.\d{2}/)
   })
 
   test('wall finishes resolve a price (no unpriced/labor-needed banner) for standard types', async ({ page }, testInfo) => {
@@ -121,11 +124,11 @@ test.describe('Fire Pit', () => {
     // that's live in View Rates must NOT trigger the unpriced / "labor rate needed"
     // fix-it banner. (This is expected to reveal the per-module duplicate-finish bug
     // until the shared-finishes consolidation lands.)
-    const wf = sectionSelects(page, 'Wall Finishes')
+    const wf = sectionSelect(page, 'Wall Finishes')
     if (await wf.count()) {
-      const opts = wf.first().locator('option')
+      const opts = wf.locator('option')
       if ((await opts.count()) > 1) {
-        await wf.first().selectOption({ index: 1 }).catch(() => {})
+        await wf.selectOption({ index: 1 }).catch(() => {})
       }
     }
     await testInfo.attach('fire-pit-finish.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
