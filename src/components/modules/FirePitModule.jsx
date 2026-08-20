@@ -641,6 +641,22 @@ function calcFirePit(
   const capRowCalc = row => {
     const meta = CAP_META[row.type] || masterWallMeta(CAP_CAT, row.type, materialRows, null, row.vendor)
     const lf = n(row.lf)
+    // TEMP DIAGNOSTIC — remove after. Logs exactly what the cap calc sees so we
+    // can find where the $0 material comes from.
+    if (row.type && typeof window !== 'undefined') {
+      // eslint-disable-next-line no-console
+      console.log('[FP CAP DEBUG]', {
+        rowType: row.type,
+        rowVendor: row.vendor,
+        metaFound: !!meta,
+        metaMaster: meta?.master,
+        houseUnit: meta ? (meta.master ? meta.matUnit : n(mp[FP_RATES[meta.matKey]?.dbName])) : 'no-meta',
+        vendorPrice: wfVendorPrice(row.vendor, row.type, materialRows, CAP_CAT),
+        wallCapCatalog: (materialRows || [])
+          .filter(r => r.sub_category === CAP_CAT)
+          .map(r => `${r.name} | vendor:${r.vendor_id || 'STD/null'} | $${r.unit_cost}`),
+      })
+    }
     if (!meta || lf <= 0) return { mat: 0, hrs: 0 }
     const houseUnit = meta.master
       ? meta.matUnit
