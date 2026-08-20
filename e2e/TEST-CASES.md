@@ -51,6 +51,20 @@ deletes, no rate edits, no SQL.
 - **Fire Pit module renders if present** — asserts the Fire Pit section shows when
   the estimate has one.
 
+### `fire-pit.spec.js` — requires `TEST_ESTIMATE_URL` (opens the module editor)
+Reproduces the bugs hand-testing caught that injected-value unit tests can't see.
+NON-DESTRUCTIVE (opens the editor, enters values, never saves). Round-1 selectors
+are text/section-based; the attached screenshots harden them after the first run.
+- **module editor opens with Gas Line + Trenching + Gas Fixtures sections** — the
+  three sections render; no console/HTTP errors.
+- **Gas Line Type dropdown is populated** — the picker has >1 option (catches the
+  empty-picker bug from the `Utility Lines` → `Gas Pipe` subcategory mismatch).
+- **Trenching row computes non-zero hours** — filling LF/Width/Depth on the new
+  Trenching section yields an Est. Hrs value (shared math with Utilities).
+- **wall finishes resolve a price** — picking a finish shows NO unpriced /
+  "labor rate needed" banner. EXPECTED RED until the shared-finishes consolidation
+  (Ledgerstone/etc. are duplicated per module today).
+
 ## Calc unit tests (`node --test`, run by Claude in seconds — no prod, no network)
 
 Run: `npm run test:unit`. These lock pure calc logic directly, sidestepping the
