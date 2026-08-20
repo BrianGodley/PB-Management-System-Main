@@ -49,8 +49,8 @@ const FINISHES_RATES = {
   ledgerstone: { db: 'Ledgerstone - Finishes' }, // $/SF
   stackedStone: { db: 'Stacked Stone - Finishes' }, // $/SF
   tile: { db: 'Tile - Finishes' }, // $/SF
-  realFlagstone: { db: 'Real Flagstone - Finishes' }, // $/ton
-  realStone: { db: 'Real Stone - Finishes' }, // $/ton
+  realFlagstone: { db: 'Real Flagstone - Finishes' }, // $/Sq Ft
+  realStone: { db: 'Real Stone - Finishes' }, // $/Sq Ft
 
   // ── Labor rates ────────────────────────────────────────────────────────────
   flatTileLab: { db: 'Finishes Tile Flatwork Labor Rate' }, // hrs/SF

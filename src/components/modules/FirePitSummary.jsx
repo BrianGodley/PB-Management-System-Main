@@ -44,8 +44,8 @@ const FP_RATES = {
   ledgerstone: { dbName: 'Ledgerstone - FP' },
   stackedStone: { dbName: 'Stacked Stone - FP' },
   tile: { dbName: 'Tile - FP' },
-  realFlagstone: { dbName: 'Real Flagstone - FP' },
-  realStone: { dbName: 'Real Stone - FP' },
+  realFlagstone: { dbName: 'Real Flagstone - Finishes' }, // shared $/Sq Ft
+  realStone: { dbName: 'Real Stone - Finishes' }, // shared $/Sq Ft
   digLab: { dbName: 'FP Dig Footing Labor Rate' },
   rebarLab: { dbName: 'FP Set Rebar Labor Rate' },
   blockLab: { dbName: 'FP Set Blocks Labor Rate' },
@@ -78,8 +78,8 @@ const WF_META = {
   'Ledgerstone Veneer': { key: 'ledgerstone', labKey: 'ledgerstoneLab', unit: 'SF', labMode: 'perDay', waste: 1.1, screwPer5: 2 },
   'Stacked Stone Veneer': { key: 'stackedStone', labKey: 'stackedStoneLab', unit: 'SF', labMode: 'perDay', waste: 1.1, screwPer5: 2 },
   Tile: { key: 'tile', labKey: 'tileLab', unit: 'SF', labMode: 'perSF', adhesivePerSF: 1 },
-  'Real Flagstone': { key: 'realFlagstone', labKey: 'flagstoneLab', unit: 'ton', tonPerSF: 80, labMode: 'perSF', delivPerTon: 80, misc: 268.75 },
-  'Real Stone': { key: 'realStone', labKey: 'realStoneLab', unit: 'ton', tonPerSF: 70, labMode: 'perSF', delivPerTon: 180, addPerSF: 1 },
+  'Real Flagstone': { key: 'realFlagstone', labKey: 'flagstoneLab', unit: 'stone', labMode: 'perSF', delivPerSF: 1, misc: 268.75 },
+  'Real Stone': { key: 'realStone', labKey: 'realStoneLab', unit: 'stone', labMode: 'perSF', delivPerSF: 2.5714, addPerSF: 1 },
 }
 
 // Gas line + gas fixture labor fallbacks (Utilities catalog, hrs per unit).
@@ -201,11 +201,11 @@ export default function FirePitSummary({ module }) {
         ? meta.matUnit
         : mp(FP_RATES[meta.key].dbName, FP_RATES[meta.key].fallback)
       let mat = 0
-      if (meta.unit === 'ton') {
-        const tons = sf / meta.tonPerSF
+      if (meta.unit === 'stone') {
+        // Material $/Sq Ft (shared Finishes rate) + delivery $/SF + flat misc + add/SF.
         mat =
-          tons * unit +
-          tons * (meta.delivPerTon || 0) +
+          sf * unit +
+          sf * (meta.delivPerSF || 0) +
           (meta.misc || 0) +
           (meta.addPerSF ? sf * meta.addPerSF : 0)
       } else {

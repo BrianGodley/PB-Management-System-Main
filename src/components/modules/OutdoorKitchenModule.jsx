@@ -36,8 +36,8 @@ const OK_RATES = {
   ledgerstone: { dbName: 'Ledgerstone - BBQ' }, // $/SF
   stackedStone: { dbName: 'Stacked Stone - BBQ' }, // $/SF
   tile: { dbName: 'Tile - BBQ' }, // $/SF
-  realFlagstone: { dbName: 'Real Flagstone - BBQ' }, // $/ton (default editable)
-  realStone: { dbName: 'Real Stone - BBQ' }, // $/ton (default editable)
+  realFlagstone: { dbName: 'Real Flagstone - Finishes' }, // shared $/Sq Ft (Finishes)
+  realStone: { dbName: 'Real Stone - Finishes' }, // shared $/Sq Ft (Finishes)
 
   // ── Labor productivity rates ────────────────────────────────────────────────
   excavateLab: { dbName: 'BBQ Excavate Labor Rate' }, // CF/hr
@@ -209,8 +209,8 @@ const WF_META = {
   'Ledgerstone Veneer': { key: 'ledgerstone', labKey: 'ledgerstoneLab', unit: 'SF', labMode: 'perDay', waste: 1.1, screwPer5: 2 },
   'Stacked Stone Veneer': { key: 'stackedStone', labKey: 'stackedStoneLab', unit: 'SF', labMode: 'perDay', waste: 1.1, screwPer5: 2 },
   Tile: { key: 'tile', labKey: 'tileLab', unit: 'SF', labMode: 'perSF', adhesivePerSF: 1 },
-  'Real Flagstone': { key: 'realFlagstone', labKey: 'flagstoneLab', unit: 'ton', tonPerSF: 80, labMode: 'perSF', delivPerTon: 80, misc: 268.75 },
-  'Real Stone': { key: 'realStone', labKey: 'realStoneLab', unit: 'ton', tonPerSF: 70, labMode: 'perSF', delivPerTon: 180, addPerSF: 1 },
+  'Real Flagstone': { key: 'realFlagstone', labKey: 'flagstoneLab', unit: 'stone', labMode: 'perSF', delivPerSF: 1, misc: 268.75 },
+  'Real Stone': { key: 'realStone', labKey: 'realStoneLab', unit: 'stone', labMode: 'perSF', delivPerSF: 2.5714, addPerSF: 1 },
 }
 const WF_LIST = Object.keys(WF_META)
 const WF_ROW = () => ({ vendor: 'Standard', type: 'Tile', sf: '' })
@@ -500,11 +500,11 @@ function calcOutdoorKitchen(
       : p(OK_RATES[meta.key].dbName, OK_RATES[meta.key].fallback)
     const unit = wfVendorPrice(row.vendor, row.type, materialRows, { category: 'Outdoor Kitchen' }) ?? houseUnit
     let mat = 0
-    if (meta.unit === 'ton') {
-      const tons = sf / meta.tonPerSF
+    if (meta.unit === 'stone') {
+      // Material $/Sq Ft (shared Finishes rate) + delivery $/SF + flat misc + add/SF.
       mat =
-        tons * unit +
-        tons * (meta.delivPerTon || 0) +
+        sf * unit +
+        sf * (meta.delivPerSF || 0) +
         (meta.misc || 0) +
         (meta.addPerSF ? sf * meta.addPerSF : 0)
     } else {
@@ -840,12 +840,12 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
     // Utility Lines/Gas/Electrical Fixtures, all unchanged names) from the shared
     // Outdoor Kitchen / Utilities / Fire Pit / Walls categories.
     const [matMap, labRes, rows, venRes] = await Promise.all([
-      fetchStandardRateMap(['Outdoor Kitchen', 'Utilities']),
+      fetchStandardRateMap(['Outdoor Kitchen', 'Utilities', 'Finishes']),
       supabase
         .from('labor_rates')
         .select('name, rate')
         .in('category', ['Outdoor Kitchen', 'Utilities']),
-      fetchModuleCatalog(['Outdoor Kitchen', 'Utilities', 'Walls']),
+      fetchModuleCatalog(['Outdoor Kitchen', 'Utilities', 'Walls', 'Finishes']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')

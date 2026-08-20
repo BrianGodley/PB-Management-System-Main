@@ -60,8 +60,8 @@ const FP_RATES = {
   ledgerstone: { dbName: 'Ledgerstone - FP' }, // $/SF panel
   stackedStone: { dbName: 'Stacked Stone - FP' }, // $/SF panel
   tile: { dbName: 'Tile - FP' }, // $/SF
-  realFlagstone: { dbName: 'Real Flagstone - FP' }, // $/ton (editable per-job)
-  realStone: { dbName: 'Real Stone - FP' }, // $/ton (editable per-job)
+  realFlagstone: { dbName: 'Real Flagstone - Finishes' }, // shared $/Sq Ft (Finishes)
+  realStone: { dbName: 'Real Stone - Finishes' }, // shared $/Sq Ft (Finishes)
 
   // ── Labor productivity rates ────────────────────────────────────────────────
   digLab: { dbName: 'FP Dig Footing Labor Rate' }, // CF/hr
@@ -188,8 +188,8 @@ const WF_META = {
   'Ledgerstone Veneer': { key: 'ledgerstone', labKey: 'ledgerstoneLab', unit: 'SF', labMode: 'perDay', waste: 1.1, screwPer5: 2 },
   'Stacked Stone Veneer': { key: 'stackedStone', labKey: 'stackedStoneLab', unit: 'SF', labMode: 'perDay', waste: 1.1, screwPer5: 2 },
   Tile: { key: 'tile', labKey: 'tileLab', unit: 'SF', labMode: 'perSF', adhesivePerSF: 1 },
-  'Real Flagstone': { key: 'realFlagstone', labKey: 'flagstoneLab', unit: 'ton', tonPerSF: 80, labMode: 'perSF', delivPerTon: 80, misc: 268.75 },
-  'Real Stone': { key: 'realStone', labKey: 'realStoneLab', unit: 'ton', tonPerSF: 70, labMode: 'perSF', delivPerTon: 180, addPerSF: 1 },
+  'Real Flagstone': { key: 'realFlagstone', labKey: 'flagstoneLab', unit: 'stone', labMode: 'perSF', delivPerSF: 1, misc: 268.75 },
+  'Real Stone': { key: 'realStone', labKey: 'realStoneLab', unit: 'stone', labMode: 'perSF', delivPerSF: 2.5714, addPerSF: 1 },
 }
 const WF_LIST = Object.keys(WF_META)
 const WF_ROW = () => ({ vendor: 'Standard', type: '', sf: '' })
@@ -610,11 +610,11 @@ function calcFirePit(
       : p(FP_RATES[meta.key].dbName, FP_RATES[meta.key].fallback)
     const unit = wfVendorPrice(row.vendor, row.type, materialRows, WF_CAT, { category: 'Fire Pit' }) ?? houseUnit
     let mat = 0
-    if (meta.unit === 'ton') {
-      const tons = sf / meta.tonPerSF
+    if (meta.unit === 'stone') {
+      // Material $/Sq Ft (shared Finishes rate) + delivery $/SF + flat misc + add/SF.
       mat =
-        tons * unit +
-        tons * (meta.delivPerTon || 0) +
+        sf * unit +
+        sf * (meta.delivPerSF || 0) +
         (meta.misc || 0) +
         (meta.addPerSF ? sf * meta.addPerSF : 0)
     } else {
@@ -922,7 +922,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
     // catalog comes from the shared Fire Pit / Outdoor Kitchen / Walls
     // categories ('Wall Finish' and 'Wall Cap' subcategories, unchanged names).
     const [matMap, labRes, rows, venRes] = await Promise.all([
-      fetchStandardRateMap(['Fire Pit', 'Utilities', 'Basic Materials', 'Concrete', 'Walls']),
+      fetchStandardRateMap(['Fire Pit', 'Utilities', 'Basic Materials', 'Concrete', 'Walls', 'Finishes']),
       supabase
         .from('labor_rates')
         .select('name, rate')
