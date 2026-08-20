@@ -3,6 +3,19 @@
 Newest first. Claude appends after each run (E2E from `test-results/results.json`,
 unit from `npm run test:unit`).
 
+## 2026-08-19 — Fire Pit structure dollar values + orphan-rate check
+- **Structure values (GOAL MET):** extracted STRUCT_CALC → React-free firePitStruct.js
+  (module imports + re-exports it; 4 old copies flagged SUPERSEDED). Value test for a
+  12 LF × 18" CMU ring (1'×1' footing, rebar @24" + 1 bond beam, 100% hand grout):
+  geometry exact (9/course × 3 = 27 blocks, 51 LF rebar, 13.5 CF grout), material =
+  $291.97, labor = 10.5 hrs; plus a View-Rates-edit-reflects check + grout-pump path.
+  `npm run test:unit` → 35/35.
+- **Orphan View Rates entries (GOAL MET):** `npm run test:firepit-orphans` extracts
+  the 58 rates the module CONSUMES and diffs against the surfaced list. Ran with the
+  live Fire Pit labor/misc names (19 rows) → **0 orphans; PASS** — every surfaced
+  rate maps to a module field. (Checked the Fire Pit category labor/misc; materials
+  are all pickable/actionable; borrowed-sub gas labor optional to add to the query.)
+
 ## 2026-08-19 — Fire Pit scenario + full material/labor coverage (GOAL MET)
 - **Scenario:** 12 LF × 18" fire pit, all 4 cap types (Flagstone/Precast/PIP/Bullnose),
   all 7 wall finishes @ 20 SF (Sand/Smooth Stucco, Ledgerstone, Stacked Stone, Tile,
