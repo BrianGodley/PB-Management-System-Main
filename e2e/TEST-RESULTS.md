@@ -249,3 +249,37 @@ C. E2E:       opens[.] dropdowns[.] every-option[.] numeric[.] sub[.] live-edit[
 D. DB:        priced[ ] no-dupes[ ] filing[ ]
 E. Loop:      red-first[x] catalogued[x] logged[x] green[ ]
 Next: extract handDemoCalc.js + unit tests (container/tons→CuYd/rebar-hrs/hauling/grading/tree-stump + In-House vs Sub independence), demo coverage+orphan scripts, DB-health SQL for Demo rates. Class: finish Hand → then Skid Steer → Mini Skid (shared pattern).
+
+## 2026-08-20 — autopilot — ee2081c — RUN ABORTED (0 tests collected)
+Playwright never collected: `SyntaxError: The requested module './helpers.js' does not
+provide an export named 'scanEveryOptionForNaN'` (stats: expected 0 / unexpected 0 /
+flaky 0, duration 0.13s). Classification: TEST-ROBUSTNESS (build/import, not product).
+Cause: ee2081c added `e2e/hand-demo.spec.js` (and earlier fire-pit/walls edits) that
+import `scanEveryOptionForNaN`, but the `e2e/helpers.js` change adding that export was
+never committed — it is still an uncommitted working-tree change on Brian's machine.
+Action: no edit needed; the fix already exists locally. `node --check` passes on
+helpers.js, hand-demo.spec.js, fire-pit.spec.js, walls.spec.js. Handed Brian the commit
+command for e2e/helpers.js + e2e/fire-pit.spec.js + e2e/walls.spec.js. Next CI run on
+that SHA should collect all specs.
+
+## 2026-08-20 — autopilot — a48570a — RUN ABORTED again (0 tests collected)
+Identical failure to ee2081c: `SyntaxError: The requested module './helpers.js' does not
+provide an export named 'scanEveryOptionForNaN'` (expected 0 / unexpected 0 / flaky 0,
+duration 0.17s). a48570a is only the CI cancel-in-progress workflow change, so the
+missing export is still missing on `master`. Classification: TEST-ROBUSTNESS (import).
+Cause unchanged: `e2e/helpers.js` (adding the export) plus the fire-pit/walls edits are
+still UNCOMMITTED in Brian's working tree. Nothing for autopilot to edit — `node --check`
+passes on helpers.js, fire-pit.spec.js, walls.spec.js, hand-demo.spec.js. Re-handed Brian
+the same commit command. CI will keep aborting until those three files are pushed.
+
+### Hand Demo — unit layer DONE (2026-08-20)
+Extracted calcDemo → src/components/modules/handDemoCalc.js (faithful, no logic change);
+module now imports it. handDemoCalc.test.mjs (5 tests, green): faithful-extraction (finite
+price, no NaN across all outputs), unset container PRICE → 0 (finite), View-Rates edit-
+reflects (concrete labor rate → price), In-House responds to concSF, Sub independent
+(subGradingCost tracks sub inputs; In-House concSF does NOT affect Sub). Full suite 111/111.
+FINDING (follow-up, not blocking): container CAPACITY (material 'Demo - Hand Container
+Capacity (CY)') is a divisor — if unset it yields Math.ceil(x/0)=Infinity → NaN price.
+Always priced in prod; consider guarding removalContainers when capacity<=0 → surface
+unpriced instead of NaN. Checklist A now: value[x] edit[x] unpriced[~] vendor[~] priority[~]
+units[~] aggregator[~] sub-indep[x] breakdown[ ] summary-parity[ ].
