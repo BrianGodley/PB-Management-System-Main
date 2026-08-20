@@ -62,8 +62,16 @@ are text/section-based; the attached screenshots harden them after the first run
 - **Trenching row computes non-zero hours** — filling LF/Width/Depth on the new
   Trenching section yields an Est. Hrs value (shared math with Utilities).
 - **wall finishes resolve a price** — picking a finish shows NO unpriced /
-  "labor rate needed" banner. EXPECTED RED until the shared-finishes consolidation
-  (Ledgerstone/etc. are duplicated per module today).
+  "labor rate needed" banner.
+- **exhaustive: every dropdown option resolves** — walks every option of every
+  `<select>` in the editor (finish types, cap types, gas pipes, gas fixtures,
+  vendors, trench method); none may trigger an unpriced prompt.
+- **exhaustive: every structure type tab** — CMU / Poured in Place / Modular /
+  Brick each price with no unpriced prompt.
+- **exhaustive: numeric fields** — fill every numeric input; a $ total renders and
+  no unpriced prompt appears.
+- **exhaustive: Subcontractor tab** — renders + prices with no unpriced prompt.
+  (All 4 core Fire Pit checks GREEN on prod 2026-08-20; exhaustive set added next.)
 
 ## Calc unit tests (`node --test`, run by Claude in seconds — no prod, no network)
 

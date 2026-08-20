@@ -137,4 +137,73 @@ test.describe('Fire Pit', () => {
       'A live-in-View-Rates finish still shows an unpriced/labor-needed banner'
     ).toHaveCount(0)
   })
+
+  // ── EXHAUSTIVE coverage — every field + every dropdown option ────────────────
+  const UNPRICED = /labor rate needed|price me|unpriced|missing price|needs? a price|set (a |the )?price/i
+
+  test('exhaustive: every dropdown option resolves without an unpriced prompt', async ({ page }, testInfo) => {
+    test.setTimeout(180000)
+    const ok = await openFirePit(page)
+    test.skip(!ok, 'Fire Pit editor not reachable on this estimate.')
+    const selects = page.locator('select')
+    const nSel = await selects.count()
+    const failures = []
+    for (let s = 0; s < nSel; s++) {
+      const sel = selects.nth(s)
+      const opts = sel.locator('option')
+      const nOpt = await opts.count()
+      for (let o = 0; o < nOpt; o++) {
+        const label = ((await opts.nth(o).textContent()) || '').trim()
+        if (!label || /^select/i.test(label)) continue // skip placeholder
+        await sel.selectOption({ index: o }).catch(() => {})
+        await page.waitForTimeout(80)
+        if ((await page.getByText(UNPRICED).count()) > 0) failures.push(`select#${s} → "${label}"`)
+      }
+    }
+    await testInfo.attach('fire-pit-exhaustive.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
+    expect(failures, `Options that triggered an unpriced prompt:\n${failures.join('\n')}`).toEqual([])
+  })
+
+  test('exhaustive: every structure type tab prices without an unpriced prompt', async ({ page }) => {
+    const ok = await openFirePit(page)
+    test.skip(!ok, 'Fire Pit editor not reachable on this estimate.')
+    const failures = []
+    for (const t of ['CMU', 'Poured in Place', 'Modular', 'Brick']) {
+      const tab = page.getByRole('button', { name: new RegExp(t, 'i') }).first()
+      if (!(await tab.count())) continue
+      await tab.click().catch(() => {})
+      await page.waitForTimeout(250)
+      if ((await page.getByText(UNPRICED).count()) > 0) failures.push(t)
+    }
+    expect(failures, `Structure types with an unpriced prompt: ${failures.join(', ')}`).toEqual([])
+  })
+
+  test('exhaustive: numeric fields accept input and the module computes a total', async ({ page }) => {
+    const ok = await openFirePit(page)
+    test.skip(!ok, 'Fire Pit editor not reachable on this estimate.')
+    // Fill every visible numeric input with a representative value (click-before-fill
+    // for readonly-until-focus fields), then assert a dollar total renders.
+    const nums = page.locator('input[type="number"], input[step]')
+    const n = Math.min(await nums.count(), 60)
+    for (let i = 0; i < n; i++) {
+      const inp = nums.nth(i)
+      if (!(await inp.isVisible().catch(() => false))) continue
+      await inp.click().catch(() => {})
+      await inp.fill('5').catch(() => {})
+    }
+    await page.waitForTimeout(300)
+    await expect(page.getByText(/\$[\d,]+/).first(), 'No dollar total after entering values').toBeVisible()
+    expect(await page.getByText(UNPRICED).count(), 'Unpriced prompt after filling fields').toBe(0)
+  })
+
+  test('exhaustive: Subcontractor tab renders and prices', async ({ page }) => {
+    const ok = await openFirePit(page)
+    test.skip(!ok, 'Fire Pit editor not reachable on this estimate.')
+    const subTab = page.getByRole('button', { name: /^subcontractor$/i }).first()
+    if (!(await subTab.count())) return
+    await subTab.click().catch(() => {})
+    await page.waitForTimeout(300)
+    await expect(page.getByText(/\$[\d,]/).first(), 'Sub tab shows no pricing').toBeVisible()
+    expect(await page.getByText(UNPRICED).count(), 'Unpriced prompt on Sub tab').toBe(0)
+  })
 })
