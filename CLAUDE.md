@@ -54,10 +54,13 @@ coding from momentum, not policy — stop and re-check.
 
 ## Git & SQL
 
-- **Do NOT auto-commit and do NOT run git from the sandbox** (the Windows mount
-  leaves stuck locks). After code edits, print the commit command for Brian to
-  run: a ` ```powershell ` fenced block, one command per block, NO `cd` line, NO
-  `+` prefix.
+- **Running git from the sandbox is allowed** (rule relaxed 2026-08-19). Read
+  freely (`git log`, `git diff`, `git status`). Watch for Windows-mount lock
+  errors; if a git write fails with a lock, back off and print the command instead.
+- **Default is still: do NOT auto-commit.** After code edits, print the commit
+  command for Brian to run — a ` ```powershell ` fenced block, one command per
+  block, NO `cd` line, NO `+` prefix — UNLESS Brian explicitly asks you to commit,
+  in which case you may run it from the sandbox.
 - **Show changed SQL as inline plain ` ```sql ` blocks** (file name bolded above),
   wrapped across short lines so it copies clean — never one giant single-line
   UPDATE (it truncates on paste). Not `present_files` thumbnails.

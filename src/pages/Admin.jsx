@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { sendWelcomeEmail, sendSMS, sendFeedbackStatusEmail } from '../lib/notify'
 import SubscriptionTab from '../components/settings/SubscriptionTab'
 import BillingTab from '../components/settings/BillingTab'
+import CodeChangesTab from '../components/admin/CodeChangesTab'
 
 const FG = '#3A5038'
 
@@ -3950,6 +3951,7 @@ export default function Admin() {
     { key: 'sms', label: '📱 SMS Settings' },
     { key: 'email', label: '✉️ Email Settings' },
     { key: 'integrations', label: '🔗 Integrations' },
+    { key: 'codechanges', label: '🧩 Code Changes' },
   ]
 
   const statCards = [
@@ -4064,6 +4066,8 @@ export default function Admin() {
           <IntegrationsSettings />
         </div>
       )}
+
+      {tab === 'codechanges' && <CodeChangesTab />}
     </div>
   )
 }
