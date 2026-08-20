@@ -108,9 +108,10 @@ function computeCapRow(row, mp, materialRows) {
     dispQty = lf
   switch (row.type) {
     case 'Flagstone':
-      mat = (((widthIn / 12) * lf * 0.0833 * 100) / 2000) * price('capFlagstone')
+      // 1 Sq Ft per Ln Ft (width averages out); rate is now $/Sq Ft, applied per LF.
+      mat = lf * price('capFlagstone')
       hrs = lf * lab('capFlagstoneLab')
-      subUnit = (((widthIn / 12) * 0.0833 * 100) / 2000) * price('capFlagstone')
+      subUnit = price('capFlagstone')
       subQty = lf
       break
     case 'Precast':

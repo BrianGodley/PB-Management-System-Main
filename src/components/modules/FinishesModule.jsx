@@ -134,7 +134,7 @@ const WALL_META = {
   },
 }
 const CAP_META = {
-  Flagstone: { matKey: 'capFlagstone', matUnit: 'Tons' },
+  Flagstone: { matKey: 'capFlagstone', matUnit: 'Sq Ft' },
   Precast: { matKey: 'capPrecast', matUnit: 'Each' },
   'PIP Concrete': { matKey: 'concreteTruck', matUnit: 'Cu Yd' },
   'Bullnose Brick': { matKey: 'capBullnose', matUnit: 'Ln Ft' },
@@ -313,9 +313,10 @@ function computeCapRow(row, mp, materialRows) {
     unit = 'LF'
   switch (row.type) {
     case 'Flagstone':
-      mat = (((widthIn / 12) * lf * 0.0833 * 100) / 2000) * price('capFlagstone')
+      // 1 Sq Ft per Ln Ft (width averages out); rate is now $/Sq Ft, applied per LF.
+      mat = lf * price('capFlagstone')
       hrs = lf * lab('capFlagstoneLab')
-      subUnit = (((widthIn / 12) * 0.0833 * 100) / 2000) * price('capFlagstone')
+      subUnit = price('capFlagstone')
       subQty = lf
       break
     case 'Precast':
