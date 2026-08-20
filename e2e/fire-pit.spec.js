@@ -33,21 +33,24 @@ async function openFirePit(page) {
     await estEdit.click().catch(() => {})
     await page.waitForLoadState('networkidle').catch(() => {})
   }
-  // Project (Panel 1) + module (Panel 2) rows are <p>Fire Pit</p>; the summary
-  // rollup uses <heading> — target <p> so we click the real rows, not the heading.
-  const fpRows = () => page.locator('p', { hasText: /^\s*Fire Pit\s*$/ })
-  if (!(await fpRows().count())) return false
+  // Three panels: Project (1) → Module (2) → "✎ Edit Module" (3). "Fire Pit" text
+  // appears in the summary heading (inert), the project row, and the module row.
+  const fp = () => page.getByText('Fire Pit', { exact: true })
+  if (!(await fp().count())) return false
   const editBtn = page.getByRole('button', { name: /edit module/i })
-  // Two passes: pass 1 selects the PROJECT (Panel 2 modules then render); pass 2
-  // clicks the MODULE row, which surfaces "✎ Edit Module" in Panel 3.
-  for (let pass = 0; pass < 2 && !(await editBtn.count()); pass++) {
-    const n = await fpRows().count()
-    for (let i = 0; i < n && !(await editBtn.count()); i++) {
-      await fpRows().nth(i).click().catch(() => {})
-      await page.waitForTimeout(250)
-    }
+  const noProject = () => page.getByText(/select a project/i)
+  // Pass 1: click Fire-Pit texts until Panel 2 stops saying "Select a project"
+  // (i.e. the PROJECT is selected and its modules render).
+  for (let i = 0, n = await fp().count(); i < n && (await noProject().count()) > 0; i++) {
+    await fp().nth(i).click().catch(() => {})
+    await page.waitForTimeout(250)
   }
-  // Open the editor.
+  // Pass 2: click Fire-Pit texts (now incl. the module row) until "✎ Edit Module"
+  // surfaces in Panel 3, then open the editor.
+  for (let i = 0, n = await fp().count(); i < n && !(await editBtn.count()); i++) {
+    await fp().nth(i).click().catch(() => {})
+    await page.waitForTimeout(250)
+  }
   if (await editBtn.count()) {
     await editBtn.first().click().catch(() => {})
     await page.waitForLoadState('networkidle').catch(() => {})
