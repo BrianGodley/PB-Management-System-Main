@@ -33,31 +33,20 @@ async function openFirePit(page) {
     await estEdit.click().catch(() => {})
     await page.waitForLoadState('networkidle').catch(() => {})
   }
-  // Three panels: Project (1) → Module (2) → "✎ Edit Module" (3).
+  // The project name paragraph is "⠿Fire Pit" (drag handle + name), so exact-text
+  // matching fails; click the actual clickable ROW divs instead. Project rows and
+  // module rows are both `div.cursor-pointer` containing "Fire Pit". Clicking the
+  // project row reveals its module row (Panel 2); clicking the module row surfaces
+  // "✎ Edit Module" (Panel 3). Loop passes until that button appears.
   const editBtn = page.getByRole('button', { name: /edit module/i })
-  const noProject = () => page.getByText(/select a project/i)
-  const fp = () => page.getByText('Fire Pit', { exact: true })
-  // Pass 1 — select the PROJECT. Prefer the Projects panel (scoped by its heading),
-  // force-click through the hover overlay; fall back to clicking every Fire-Pit text.
-  const projectsPanel = page
-    .locator('div')
-    .filter({ has: page.getByRole('heading', { name: 'Projects', exact: true }) })
-    .last()
-  const scoped = projectsPanel.getByText('Fire Pit', { exact: true })
-  if (await scoped.count()) {
-    await scoped.first().scrollIntoViewIfNeeded().catch(() => {})
-    await scoped.first().click({ force: true }).catch(() => {})
-    await page.waitForTimeout(400)
-  }
-  for (let i = 0, n = await fp().count(); i < n && (await noProject().count()) > 0; i++) {
-    await fp().nth(i).click({ force: true }).catch(() => {})
-    await page.waitForTimeout(300)
-  }
-  if ((await noProject().count()) > 0) return false // project never selected
-  // Pass 2 — select the MODULE row, then open the editor.
-  for (let i = 0, n = await fp().count(); i < n && !(await editBtn.count()); i++) {
-    await fp().nth(i).click({ force: true }).catch(() => {})
-    await page.waitForTimeout(300)
+  const rows = page.locator('div.cursor-pointer').filter({ hasText: 'Fire Pit' })
+  if (!(await rows.count())) return false
+  for (let pass = 0; pass < 3 && !(await editBtn.count()); pass++) {
+    const n = await rows.count()
+    for (let i = 0; i < n && !(await editBtn.count()); i++) {
+      await rows.nth(i).click({ force: true }).catch(() => {})
+      await page.waitForTimeout(300)
+    }
   }
   if (await editBtn.count()) {
     await editBtn.first().click().catch(() => {})
