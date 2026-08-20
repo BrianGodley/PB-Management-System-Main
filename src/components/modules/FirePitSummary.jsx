@@ -173,60 +173,18 @@ export default function FirePitSummary({ module }) {
   const structMat = structResults.reduce((s, r) => s + n(r.mat), 0)
   const structHrs = structResults.reduce((s, r) => s + n(r.hrs), 0)
 
-  // A vendor/catalog cap carries only a price; its install labor should match the
-  // built-in cap of the same TYPE (mirrors the module's capTypeLabor).
-  const capTypeLabor = typeLabel => {
-    const t = (typeLabel || '').toLowerCase()
-    const key = t.includes('flagstone')
-      ? 'capFlagstoneLab'
-      : t.includes('pip') || t.includes('concrete')
-        ? 'capPipConcreteLab'
-        : t.includes('bullnose') || t.includes('brick')
-          ? 'capBullnoseLab'
-          : 'capPrecastLab'
-    return mp(FP_RATES[key].dbName)
-  }
-
-  // Vendor/catalog finish labor → inherit the built-in finish of the nearest TYPE.
-  const finishTypeLabor = typeLabel => {
-    const t = (typeLabel || '').toLowerCase()
-    const key = t.includes('sand stucco')
-      ? 'sandStuccoLab'
-      : t.includes('stucco')
-        ? 'smoothStuccoLab'
-        : t.includes('ledger')
-          ? 'ledgerstoneLab'
-          : t.includes('stacked')
-            ? 'stackedStoneLab'
-            : t.includes('tile')
-              ? 'tileLab'
-              : t.includes('flagstone')
-                ? 'flagstoneLab'
-                : t.includes('stone')
-                  ? 'realStoneLab'
-                  : null
-    return key ? mp(FP_RATES[key].dbName) : 0
-  }
-
   // ── Wall caps ($/LF material) ────────────────────────────────────────────────
   const capLines = (capRows || [])
     .map(r => {
       const meta = CAP_META[r.type] || masterFinishMeta('Wall Cap', r.type, materialRows)
       const lf = n(r.lf)
       if (!meta || lf <= 0) return null
-      const unit = meta.master
-        ? meta.matUnit
-        : mp(FP_RATES[meta.matKey].dbName, FP_RATES[meta.matKey].fallback)
-      // Vendor/catalog cap labor: (1) numeric laborCoeff; (2) Master-Rates default
-      // labor pointer (calc_meta.labor_rate → labor_rates row); (3) inherit built-in
-      // labor for the cap's TYPE.
-      const labCoef = meta.master
-        ? n(meta.laborCoeff) > 0
-          ? n(meta.laborCoeff)
-          : meta.labor_rate && mp(meta.labor_rate) > 0
-            ? mp(meta.labor_rate)
-            : capTypeLabor(r.type)
-        : mp(FP_RATES[meta.labKey].dbName, FP_RATES[meta.labKey].fallback)
+      const unit = meta.master ? meta.matUnit : mp(FP_RATES[meta.matKey].dbName)
+      // Labor: numeric coefficient, else the Master-Rates default-labor pointer
+      // (calc_meta.labor_rate). No type fallback — an unset rate reads as 0 here
+      // (read-only view; the live module surfaces the fix-it modal).
+      const labName = meta.master ? meta.labor_rate : FP_RATES[meta.labKey].dbName
+      const labCoef = meta.master && n(meta.laborCoeff) > 0 ? n(meta.laborCoeff) : labName ? mp(labName) : 0
       return { label: r.type, lf, mat: lf * unit, hrs: lf * labCoef }
     })
     .filter(Boolean)
@@ -239,9 +197,7 @@ export default function FirePitSummary({ module }) {
       const meta = WF_META[r.type] || masterFinishMeta('Wall Finish', r.type, materialRows)
       const sf = n(r.sf)
       if (!meta || sf <= 0) return null
-      const unit = meta.master
-        ? meta.matUnit
-        : mp(FP_RATES[meta.key].dbName, FP_RATES[meta.key].fallback)
+      const unit = meta.master ? meta.matUnit : mp(FP_RATES[meta.key].dbName)
       let mat = 0
       if (meta.unit === 'stone') {
         // Material $/Sq Ft (shared Finishes rate) + delivery $/SF + flat misc + add/SF.
@@ -256,13 +212,9 @@ export default function FirePitSummary({ module }) {
           (meta.screwPer5 ? (sf / 5) * meta.screwPer5 : 0) +
           (meta.adhesivePerSF ? sf * meta.adhesivePerSF : 0)
       }
-      const labRate = meta.master
-        ? n(meta.laborCoeff) > 0
-          ? n(meta.laborCoeff)
-          : meta.labor_rate && mp(meta.labor_rate) > 0
-            ? mp(meta.labor_rate)
-            : finishTypeLabor(r.type)
-        : mp(FP_RATES[meta.labKey].dbName, FP_RATES[meta.labKey].fallback)
+      // Labor: numeric coefficient, else the default-labor pointer. No type fallback.
+      const labName = meta.master ? meta.labor_rate : FP_RATES[meta.labKey].dbName
+      const labRate = meta.master && n(meta.laborCoeff) > 0 ? n(meta.laborCoeff) : labName ? mp(labName) : 0
       const hrs = sf * labRate // all finish labor is hours per Sq Ft now
       return { label: r.type, sf, mat, hrs }
     })

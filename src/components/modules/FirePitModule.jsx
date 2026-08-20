@@ -604,36 +604,16 @@ function calcFirePit(
   const p = dbName => n(mp[dbName])
   const isSubTab = state.subType === 'Subcontractor'
 
-  // A vendor/catalog finish carries only a price; its install labor should match
-  // the built-in finish of the nearest TYPE (inferred from the name).
-  const finishTypeLabor = typeLabel => {
-    const t = (typeLabel || '').toLowerCase()
-    const key = t.includes('sand stucco')
-      ? 'sandStuccoLab'
-      : t.includes('stucco')
-        ? 'smoothStuccoLab'
-        : t.includes('ledger')
-          ? 'ledgerstoneLab'
-          : t.includes('stacked')
-            ? 'stackedStoneLab'
-            : t.includes('tile')
-              ? 'tileLab'
-              : t.includes('flagstone')
-                ? 'flagstoneLab'
-                : t.includes('stone')
-                  ? 'realStoneLab'
-                  : null
-    return key ? p(FP_RATES[key].dbName, FP_RATES[key].fallback) : 0
-  }
+  // Unpriced labor across sections — items whose picked Type has no labor rate
+  // (unset or resolves to 0). Surfaced as a fix-it modal; NEVER silently filled.
+  const laborUnset = []
 
   // ── Wall finish per-row calc: material (vendor-overridable unit) + labor ──────
   const finishRowCalc = row => {
     const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, 'Fire Pit', row.vendor)
     const sf = n(row.sf)
     if (!meta || sf <= 0) return { mat: 0, hrs: 0 }
-    const houseUnit = meta.master
-      ? meta.matUnit
-      : p(FP_RATES[meta.key].dbName, FP_RATES[meta.key].fallback)
+    const houseUnit = meta.master ? meta.matUnit : p(FP_RATES[meta.key].dbName)
     const unit = wfVendorPrice(row.vendor, row.type, materialRows, WF_CAT, { category: 'Fire Pit' }) ?? houseUnit
     let mat = 0
     if (meta.unit === 'stone') {
@@ -649,16 +629,13 @@ function calcFirePit(
         (meta.screwPer5 ? (sf / 5) * meta.screwPer5 : 0) +
         (meta.adhesivePerSF ? sf * meta.adhesivePerSF : 0)
     }
-    // Vendor/catalog finish labor, in priority order: (1) numeric laborCoeff;
-    // (2) Master-Rates default-labor pointer (calc_meta.labor_rate); (3) inherit the
-    // built-in labor for the nearest finish TYPE by name (mirrors caps).
-    const labRate = meta.master
-      ? n(meta.laborCoeff) > 0
-        ? n(meta.laborCoeff)
-        : meta.labor_rate && p(meta.labor_rate) > 0
-          ? p(meta.labor_rate)
-          : finishTypeLabor(row.type)
-      : p(FP_RATES[meta.labKey].dbName, FP_RATES[meta.labKey].fallback)
+    // Labor: a numeric coefficient on the item, else the Master-Rates default-labor
+    // pointer (calc_meta.labor_rate names a labor_rates row). NO type fallback — an
+    // unset/zero rate is pushed to laborUnset so the user fixes it via the modal.
+    const labName = meta.master ? meta.labor_rate : FP_RATES[meta.labKey].dbName
+    const labRate = meta.master && n(meta.laborCoeff) > 0 ? n(meta.laborCoeff) : labName ? p(labName) : 0
+    if (labRate <= 0)
+      laborUnset.push({ kind: 'labor', name: labName || null, label: row.type, category: 'Fire Pit', unit: null })
     const hrs = sf * labRate // all finish labor is hours per Sq Ft now
     return { mat, hrs, unit }
   }
@@ -666,41 +643,20 @@ function calcFirePit(
   const finishMat = wallFinishCalc.reduce((s, c) => s + c.mat, 0)
   const finishHrs = wallFinishCalc.reduce((s, c) => s + c.hrs, 0)
 
-  // A vendor/catalog cap carries only a price; its install labor should match the
-  // built-in cap of the same TYPE (a vendor Precast cap uses the Standard Precast
-  // labor). Infer the type from the name; default to Precast (most caps are precast).
-  const capTypeLabor = typeLabel => {
-    const t = (typeLabel || '').toLowerCase()
-    const key = t.includes('flagstone')
-      ? 'capFlagstoneLab'
-      : t.includes('pip') || t.includes('concrete')
-        ? 'capPipConcreteLab'
-        : t.includes('bullnose') || t.includes('brick')
-          ? 'capBullnoseLab'
-          : 'capPrecastLab'
-    return p(FP_RATES[key].dbName, FP_RATES[key].fallback)
-  }
-
   // ── Wall cap per-row calc: $/LF material (vendor-overridable) + hrs/LF labor ──
   const capRowCalc = row => {
     const meta = CAP_META[row.type] || masterWallMeta(CAP_CAT, row.type, materialRows, null, row.vendor)
     const lf = n(row.lf)
     if (!meta || lf <= 0) return { mat: 0, hrs: 0 }
-    const houseUnit = meta.master
-      ? meta.matUnit
-      : p(FP_RATES[meta.matKey].dbName, FP_RATES[meta.matKey].fallback)
+    const houseUnit = meta.master ? meta.matUnit : p(FP_RATES[meta.matKey].dbName)
     const unit = wfVendorPrice(row.vendor, row.type, materialRows, CAP_CAT) ?? houseUnit
-    // Vendor/catalog cap labor, in priority order: (1) numeric laborCoeff in
-    // calc_meta; (2) the Master-Rates "default labor" pointer (calc_meta.labor_rate
-    // names a labor_rates row → resolve its hrs/unit); (3) inherit the built-in
-    // labor for the cap's TYPE (a vendor Precast cap uses Standard Precast labor).
-    const labCoef = meta.master
-      ? n(meta.laborCoeff) > 0
-        ? n(meta.laborCoeff)
-        : meta.labor_rate && p(meta.labor_rate) > 0
-          ? p(meta.labor_rate)
-          : capTypeLabor(row.type)
-      : p(FP_RATES[meta.labKey].dbName, FP_RATES[meta.labKey].fallback)
+    // Labor: a numeric coefficient on the item, else the Master-Rates default-labor
+    // pointer (calc_meta.labor_rate). NO type fallback — an unset/zero rate is pushed
+    // to laborUnset so the user fixes it via the modal.
+    const labName = meta.master ? meta.labor_rate : FP_RATES[meta.labKey].dbName
+    const labCoef = meta.master && n(meta.laborCoeff) > 0 ? n(meta.laborCoeff) : labName ? p(labName) : 0
+    if (labCoef <= 0)
+      laborUnset.push({ kind: 'labor', name: labName || null, label: row.type, category: 'Fire Pit', unit: null })
     return { mat: lf * unit, hrs: lf * labCoef, unit }
   }
   const capCalc = (capRows || []).map(capRowCalc)
@@ -718,8 +674,7 @@ function calcFirePit(
   let epHrs = 0
   let epMat = 0
   // Gas line/fixture items whose picked Type has no labor rate set (calc_meta.
-  // labor_rate unset or resolves to 0). Surfaced as a prompt — never a fallback.
-  const laborUnset = []
+  // labor_rate unset or resolves to 0) are pushed to the shared laborUnset list.
   ;(epLineRows || []).forEach(r => {
     if (!r.type) return
     const lf = n(r.lf)
