@@ -18,24 +18,24 @@
     "maxFailures": 0,
     "metadata": {
       "ci": {
-        "commitHref": "https://github.com/BrianGodley/PB-Management-System-Main/commit/ee2081cf01f2a960d3572241b3b5df9a6d25cc52",
-        "commitHash": "ee2081cf01f2a960d3572241b3b5df9a6d25cc52",
-        "buildHref": "https://github.com/BrianGodley/PB-Management-System-Main/actions/runs/32411507279"
+        "commitHref": "https://github.com/BrianGodley/PB-Management-System-Main/commit/a48570aafe15b271ef3a6dea3934d7eff266153d",
+        "commitHash": "a48570aafe15b271ef3a6dea3934d7eff266153d",
+        "buildHref": "https://github.com/BrianGodley/PB-Management-System-Main/actions/runs/32411785544"
       },
       "gitCommit": {
-        "shortHash": "ee2081c",
-        "hash": "ee2081cf01f2a960d3572241b3b5df9a6d25cc52",
-        "subject": "test(hand-demo): add E2E spec (opens/dropdowns/exhaustive/numeric/sub/live-edit); open checklist sign-off",
-        "body": "test(hand-demo): add E2E spec (opens/dropdowns/exhaustive/numeric/sub/live-edit); open checklist sign-off\n",
+        "shortHash": "a48570a",
+        "hash": "a48570aafe15b271ef3a6dea3934d7eff266153d",
+        "subject": "ci(e2e): cancel-in-progress so the newest commit runs immediately (no serial backlog)",
+        "body": "ci(e2e): cancel-in-progress so the newest commit runs immediately (no serial backlog)\n",
         "author": {
           "name": "Brian",
           "email": "brian@picturebuild.com",
-          "time": 1787255819000
+          "time": 1787255998000
         },
         "committer": {
           "name": "Brian",
           "email": "brian@picturebuild.com",
-          "time": 1787255819000
+          "time": 1787255998000
         },
         "branch": "HEAD"
       }
@@ -48,24 +48,24 @@
         "retries": 1,
         "metadata": {
           "ci": {
-            "commitHref": "https://github.com/BrianGodley/PB-Management-System-Main/commit/ee2081cf01f2a960d3572241b3b5df9a6d25cc52",
-            "commitHash": "ee2081cf01f2a960d3572241b3b5df9a6d25cc52",
-            "buildHref": "https://github.com/BrianGodley/PB-Management-System-Main/actions/runs/32411507279"
+            "commitHref": "https://github.com/BrianGodley/PB-Management-System-Main/commit/a48570aafe15b271ef3a6dea3934d7eff266153d",
+            "commitHash": "a48570aafe15b271ef3a6dea3934d7eff266153d",
+            "buildHref": "https://github.com/BrianGodley/PB-Management-System-Main/actions/runs/32411785544"
           },
           "gitCommit": {
-            "shortHash": "ee2081c",
-            "hash": "ee2081cf01f2a960d3572241b3b5df9a6d25cc52",
-            "subject": "test(hand-demo): add E2E spec (opens/dropdowns/exhaustive/numeric/sub/live-edit); open checklist sign-off",
-            "body": "test(hand-demo): add E2E spec (opens/dropdowns/exhaustive/numeric/sub/live-edit); open checklist sign-off\n",
+            "shortHash": "a48570a",
+            "hash": "a48570aafe15b271ef3a6dea3934d7eff266153d",
+            "subject": "ci(e2e): cancel-in-progress so the newest commit runs immediately (no serial backlog)",
+            "body": "ci(e2e): cancel-in-progress so the newest commit runs immediately (no serial backlog)\n",
             "author": {
               "name": "Brian",
               "email": "brian@picturebuild.com",
-              "time": 1787255819000
+              "time": 1787255998000
             },
             "committer": {
               "name": "Brian",
               "email": "brian@picturebuild.com",
-              "time": 1787255819000
+              "time": 1787255998000
             },
             "branch": "HEAD"
           }
@@ -85,24 +85,24 @@
         "retries": 1,
         "metadata": {
           "ci": {
-            "commitHref": "https://github.com/BrianGodley/PB-Management-System-Main/commit/ee2081cf01f2a960d3572241b3b5df9a6d25cc52",
-            "commitHash": "ee2081cf01f2a960d3572241b3b5df9a6d25cc52",
-            "buildHref": "https://github.com/BrianGodley/PB-Management-System-Main/actions/runs/32411507279"
+            "commitHref": "https://github.com/BrianGodley/PB-Management-System-Main/commit/a48570aafe15b271ef3a6dea3934d7eff266153d",
+            "commitHash": "a48570aafe15b271ef3a6dea3934d7eff266153d",
+            "buildHref": "https://github.com/BrianGodley/PB-Management-System-Main/actions/runs/32411785544"
           },
           "gitCommit": {
-            "shortHash": "ee2081c",
-            "hash": "ee2081cf01f2a960d3572241b3b5df9a6d25cc52",
-            "subject": "test(hand-demo): add E2E spec (opens/dropdowns/exhaustive/numeric/sub/live-edit); open checklist sign-off",
-            "body": "test(hand-demo): add E2E spec (opens/dropdowns/exhaustive/numeric/sub/live-edit); open checklist sign-off\n",
+            "shortHash": "a48570a",
+            "hash": "a48570aafe15b271ef3a6dea3934d7eff266153d",
+            "subject": "ci(e2e): cancel-in-progress so the newest commit runs immediately (no serial backlog)",
+            "body": "ci(e2e): cancel-in-progress so the newest commit runs immediately (no serial backlog)\n",
             "author": {
               "name": "Brian",
               "email": "brian@picturebuild.com",
-              "time": 1787255819000
+              "time": 1787255998000
             },
             "committer": {
               "name": "Brian",
               "email": "brian@picturebuild.com",
-              "time": 1787255819000
+              "time": 1787255998000
             },
             "branch": "HEAD"
           }
@@ -156,8 +156,8 @@
     }
   ],
   "stats": {
-    "startTime": "2026-08-20T19:59:10.916Z",
-    "duration": 129.60499999999996,
+    "startTime": "2026-08-20T20:01:58.837Z",
+    "duration": 174.10000000000002,
     "expected": 0,
     "skipped": 0,
     "unexpected": 0,
