@@ -72,6 +72,42 @@ coding from momentum, not policy — stop and re-check.
 - Saved / reopened estimates are **test data** (frozen rate snapshot). Do not gate
   changes on saved-estimate parity — only fresh-estimate correctness matters.
 
+## End-to-end testing
+
+- **Every work session is goal-driven (acceptance-test loop). This is the default
+  way of working, not an optional mode:**
+  1. **Agree the goal** first — the exact fix/feature AND how we'll know it's done.
+  2. **Claude writes the acceptance test** that encodes that goal. It should FAIL
+     first (red) — the failing test proves the goal isn't met yet.
+  3. **Brian runs it** (`npm run test:e2e`, after Vercel deploys `master`).
+  4. **Claude reads `test-results/results.json`**, reports, and implements the fix.
+  5. **Claude prompts the next run.**
+  6. Repeat 3–5 until the acceptance test is GREEN. The test IS the definition of
+     done — never declare the goal met while its test is red or unwritten.
+
+- E2E lives in `e2e/` (Playwright), run with `npm run test:e2e`. Config, URL, and
+  credentials are env-driven — NOTHING sensitive in the repo: `BASE_URL`,
+  `TEST_USER_EMAIL`, `TEST_USER_PASSWORD`, optional `TEST_ESTIMATE_URL`. Never
+  hardcode a URL, password, or estimate id in a spec.
+- **Tests run on Brian's machine, not the sandbox** (the sandbox has no network
+  route to prod/Supabase). Claude authors/edits specs and asks Brian to run them,
+  then works from the pasted output / HTML report.
+- **Against live prod, stay NON-DESTRUCTIVE:** load, navigate, read, and enter
+  estimator values WITHOUT saving. Never create users (fires real welcome
+  emails/SMS), never delete, never save estimates to real jobs, never edit rates
+  or run SQL as part of a test.
+- Workflow when iterating: run → report results → fix → re-run → report, each
+  round. Harden fragile selectors only after a run reveals the real DOM
+  (screenshots are attached on the estimator specs for this reason).
+- **After EVERY code edit, write/update the matching e2e test case** (in `e2e/` and
+  catalogued in `e2e/TEST-CASES.md`), then ask Brian to run `npm run test:e2e`
+  once Vercel finishes deploying `master`. Brian runs; Claude does not (no sandbox
+  network route).
+- Results are written to **`test-results/results.json`** (git-ignored but on disk in
+  the repo, so Claude reads it directly after a run — no pasting). Claude reads it,
+  logs the outcome to `e2e/TEST-RESULTS.md`, and reports pass/fail + the failing
+  URL/assertion + the proposed next fix.
+
 ## Deploy
 
 - Prod deploys from `master` via Vercel. Two Supabase DBs (staging + prod) with
