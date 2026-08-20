@@ -54,7 +54,12 @@ jobs:
           node-version: '24'
           cache: 'npm'
 
-      - run: npm ci
+      # Use `npm install`, not `npm ci`: the committed package-lock.json is
+      # generated on Windows and omits Linux-only optional binaries (@esbuild/
+      # linux-x64, @rollup/rollup-linux-x64-gnu, …). `npm ci` hard-fails when the
+      # lockfile is missing platform packages; `npm install` fetches them.
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
 
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
