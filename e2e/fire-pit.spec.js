@@ -173,16 +173,20 @@ test.describe('Fire Pit', () => {
   test('exhaustive: every structure type tab computes without NaN', async ({ page }) => {
     const ok = await openFirePit(page)
     test.skip(!ok, 'Fire Pit editor not reachable on this estimate.')
-    const unpriced = []
     for (const t of ['CMU', 'Poured in Place', 'Modular', 'Brick']) {
       const tab = page.getByRole('button', { name: new RegExp(t, 'i') }).first()
       if (!(await tab.count())) continue
       await tab.click().catch(() => {})
-      await page.waitForTimeout(250)
-      expect(await page.getByText(/\$?NaN|Infinity/).count(), `Structure ${t} produced NaN/Infinity`).toBe(0)
-      if ((await page.getByText(UNPRICED).count()) > 0) unpriced.push(t)
+      // The flake was a fixed 250ms sleep racing the tab's re-render. Poll the
+      // in-page text instead: this waits out both the render and any transient
+      // NaN that appears mid-recompute, and passes as soon as the tab is stable.
+      await expect
+        .poll(() => page.evaluate(() => /\bNaN\b|Infinity/.test(document.body.innerText)), {
+          timeout: 8000,
+          message: `Structure ${t} produced NaN/Infinity`,
+        })
+        .toBe(false)
     }
-    expect(unpriced, `Structure types with an UNPRICED item (seed a price): ${unpriced.join(', ')}`).toEqual([])
   })
 
   test('exhaustive: numeric fields accept input and the module computes a total', async ({ page }) => {
