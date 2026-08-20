@@ -33,20 +33,21 @@ async function openFirePit(page) {
     await estEdit.click().catch(() => {})
     await page.waitForLoadState('networkidle').catch(() => {})
   }
-  // 1) Select the Fire Pit project (reveals its module list).
-  const fp = page.getByText('Fire Pit', { exact: true })
-  if (!(await fp.count())) return false
-  await fp.first().click().catch(() => {})
-  await page.waitForTimeout(200)
-  // 2) Click each "Fire Pit" (project card + module row) until "✎ Edit Module" shows.
+  // Project (Panel 1) + module (Panel 2) rows are <p>Fire Pit</p>; the summary
+  // rollup uses <heading> — target <p> so we click the real rows, not the heading.
+  const fpRows = () => page.locator('p', { hasText: /^\s*Fire Pit\s*$/ })
+  if (!(await fpRows().count())) return false
   const editBtn = page.getByRole('button', { name: /edit module/i })
-  const rows = page.getByText('Fire Pit', { exact: true })
-  const cnt = await rows.count()
-  for (let i = 0; i < cnt && !(await editBtn.count()); i++) {
-    await rows.nth(i).click().catch(() => {})
-    await page.waitForTimeout(200)
+  // Two passes: pass 1 selects the PROJECT (Panel 2 modules then render); pass 2
+  // clicks the MODULE row, which surfaces "✎ Edit Module" in Panel 3.
+  for (let pass = 0; pass < 2 && !(await editBtn.count()); pass++) {
+    const n = await fpRows().count()
+    for (let i = 0; i < n && !(await editBtn.count()); i++) {
+      await fpRows().nth(i).click().catch(() => {})
+      await page.waitForTimeout(250)
+    }
   }
-  // 3) Open the editor.
+  // Open the editor.
   if (await editBtn.count()) {
     await editBtn.first().click().catch(() => {})
     await page.waitForLoadState('networkidle').catch(() => {})
