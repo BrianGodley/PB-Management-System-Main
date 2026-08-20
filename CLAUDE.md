@@ -74,6 +74,16 @@ coding from momentum, not policy — stop and re-check.
 
 ## End-to-end testing
 
+- **Per-module definition of done = `e2e/MODULE-TEST-CHECKLIST.md`.** A module is
+  NOT "done" until every applicable item in that checklist is green (or marked N/A
+  with a reason): the full complement of unit (value / edit-reflects / unpriced /
+  vendor / priority / units / aggregator / sub-independence / breakdown / summary-
+  parity), coverage + orphan audits, the exhaustive E2E set (opens / dropdowns /
+  every-option / every-tab / numeric / price-resolve / sub / live-edit / clean), and
+  the DB-health SQL (every rate priced, no duplicate records, correct filing). Copy
+  its sign-off block into `e2e/TEST-RESULTS.md` per module and fill it in. When
+  "fully test module X", grade against this checklist — don't improvise the scope.
+
 - **Every work session is goal-driven (acceptance-test loop). This is the default
   way of working, not an optional mode:**
   1. **Agree the goal** first — the exact fix/feature AND how we'll know it's done.
