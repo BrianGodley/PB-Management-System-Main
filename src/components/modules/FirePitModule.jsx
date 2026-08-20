@@ -10,6 +10,7 @@ import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { groutCuFtPerBlock } from '../../lib/cmuGrout'
 import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 import { computeCapRow, computeFinishRow } from './firePitCalc'
+import { STRUCT_CALC } from './firePitStruct'
 import { resolveUtilRow } from '../../lib/utilRow'
 import UnpricedItemModal from '../UnpricedItemModal'
 
@@ -281,7 +282,15 @@ const GAS_FIXTURE_TYPES = {
 }
 const LINE_TYPE_ARR = Object.entries(UTILITY_LINE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, laborDbName: t.laborDbName }))
 const GAS_TYPE_ARR = Object.entries(GAS_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, laborDbName: t.laborDbName }))
-const UTIL_CAT = { line: 'Utility Lines', gas: 'Gas Fixtures' }
+// Gas pipes live under the 'Gas Pipe' sub-category (Utilities module moved them
+// there); Fire Pit's "Gas Line" picker + calc must match, or it resolves nothing.
+const UTIL_CAT = { line: 'Gas Pipe', gas: 'Gas Fixtures' }
+
+// Trenching — mirrors the Utilities module's Trenching section. Each method maps
+// to a labor_rates row (HOURS per Cu Ft); trench hrs = cf × rate. Shared rates
+// with Utilities (category 'Utilities', already in the Fire Pit rate map).
+const TRENCH_LABOR_RATE_NAME = { Trench: 'Utilities Trench Excavation', Hand: 'Utilities Hand Excavation' }
+const TRENCH_ROW = () => ({ equipment: 'Trench', lf: '', width: '', depth: '' })
 
 // ── Rate scope: the ONE list of (category, sub-category) pairs Fire Pit uses ──
 // This is the single source of truth for BOTH the catalog load (pickers) and the
@@ -295,7 +304,7 @@ const RATE_SCOPE = [
   { category: 'Walls', sub: MODULAR_SUBCAT }, // Modular Wall
   { category: 'Walls', sub: BRICK_SUBCAT }, // Brick
   { category: 'Concrete', sub: CONC_MIX_SUBCAT }, // Concrete Mix (PIP)
-  { category: 'Utilities', sub: UTIL_CAT.line }, // Utility Lines
+  { category: 'Utilities', sub: UTIL_CAT.line }, // Gas Pipe
   { category: 'Utilities', sub: UTIL_CAT.gas }, // Gas Fixtures
   { category: 'Basic Materials', sub: 'Reinforcement' }, // Rebar
   { category: 'Finishes', sub: 'Finish Material' }, // Real Flagstone / Real Stone (shared $/Sq Ft)
@@ -454,6 +463,10 @@ function structFootingRebar(s) {
   return { footingCF, footingCY, totalRebarLF }
 }
 
+// ⚠ SUPERSEDED — the LIVE STRUCT_CALC is imported from ./firePitStruct (re-exported
+// above; unit-tested in firePitStruct.test.mjs). The four local copies below are dead
+// code (unreferenced) kept only to keep this diff small — DO NOT EDIT them; change
+// firePitStruct.js instead. Safe to delete in a follow-up cleanup.
 // CMU — the EXACT legacy FP block/grout/rebar/footing math. Block price = picked
 // 'Wall Block' catalog row, else the FP Block rate (preserves legacy $).
 function calcCmuStruct(s, mp = {}, materialRows = []) {
@@ -576,9 +589,9 @@ function calcBrickStruct(s, mp = {}, materialRows = []) {
   return { mat, hrs, faceSF, bricks, footingCF, footingCY, totalRebarLF, curveAddHrs, brickMat, mortarMat, rebarMat, footingMat }
 }
 
-// Exported so FirePitSummary can reuse the SAME per-type math (single source of
-// truth) instead of recomputing with a stale CMU-only model.
-export const STRUCT_CALC = { CMU: calcCmuStruct, PIP: calcPipStruct, Modular: calcModularStruct, Brick: calcBrickStruct }
+// STRUCT_CALC now lives in the React-free ./firePitStruct (unit-tested there); it's
+// imported above and re-exported here so FirePitSummary's import keeps working.
+export { STRUCT_CALC }
 const STRUCT_TYPES = ['CMU', 'PIP', 'Modular', 'Brick']
 
 // ── Calculation engine ────────────────────────────────────────────────────────
@@ -597,6 +610,7 @@ function calcFirePit(
     structs,
     capRows,
     wallFinishRows,
+    trenchRows,
     epLineRows,
     epGasRows,
     manualRows,
@@ -638,13 +652,22 @@ function calcFirePit(
   // differs only in the financial roll-up (labor+burden become the sub cost).
   const capHrs = capCalc.reduce((s, c) => s + c.hrs, 0)
 
-  // ── Gas Line + Gas Fixtures (Utilities catalog, gas only) ─────────────────────
-  // Gas Line = pipe labor + material PLUS trenching (6" wide × 24" deep per LF,
-  // = 1.0 cf/LF at the Utilities trench excavation rate) — this replaces the old
-  // separate Trench section. Vendor overrides only the material unit price.
-  const GAS_TRENCH_CF_PER_LF = n(mp['FP Gas Trench CF per LF'])
-  const gasTrenchHrsPerCF = n(mp['Utilities Trench Excavation']) // hours per Cu Ft
-  let epHrs = 0
+  // ── Trenching (mirrors Utilities) — per-row method × dimensions → hours. Own
+  //    section now (was a per-LF coefficient baked into the gas line). ───────────
+  let trenchHrs = 0
+  ;(trenchRows || []).forEach(r => {
+    const lf = n(r.lf),
+      w = n(r.width),
+      d = n(r.depth)
+    if (lf > 0 && w > 0 && d > 0) {
+      const cf = lf * (w / 12) * (d / 12)
+      trenchHrs += cf * n(mp[TRENCH_LABOR_RATE_NAME[r.equipment]]) // rate = hrs per Cu Ft
+    }
+  })
+
+  // ── Gas Line + Gas Fixtures (Utilities catalog, gas only) — pipe labor +
+  //    material. Trenching is handled by the Trenching section above. ───────────
+  let epHrs = trenchHrs
   let epMat = 0
   // Gas line/fixture items whose picked Type has no labor rate set (calc_meta.
   // labor_rate unset or resolves to 0) are pushed to the shared laborUnset list.
@@ -656,7 +679,6 @@ function calcFirePit(
     if (laborVal <= 0) laborUnset.push({ kind: 'labor', name: laborName, label: r.type, category: 'Utilities', unit: null })
     epMat += lf * matCost
     epHrs += lf * laborVal
-    epHrs += lf * GAS_TRENCH_CF_PER_LF * gasTrenchHrsPerCF // trenching (hrs/CF × CF/LF × LF)
   })
   ;(epGasRows || []).forEach(r => {
     if (!r.type) return
@@ -865,6 +887,7 @@ function makeTab(src = {}) {
     },
     capRows: src.capRows ?? [CAP_ROW(), CAP_ROW()],
     wallFinishRows: src.wallFinishRows ?? [WF_ROW(), WF_ROW()],
+    trenchRows: src.trenchRows ?? [TRENCH_ROW()],
     epLineRows: src.epLineRows ?? [EP_LINE_ROW(), EP_LINE_ROW()],
     epGasRows: src.epGasRows ?? [EP_GAS_ROW(), EP_GAS_ROW()],
     manualRows: src.manualRows ?? DEFAULT_MANUAL_ROWS.map(r => ({ ...r })),
@@ -1032,6 +1055,10 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
   const setCapRows = setField('capRows')
   const wallFinishRows = cur.wallFinishRows
   const setWallFinishRows = setField('wallFinishRows')
+  const trenchRows = cur.trenchRows
+  const setTrenchRows = setField('trenchRows')
+  const updateTrench = (i, field, val) =>
+    setTrenchRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   const epLineRows = cur.epLineRows
   const setEpLineRows = setField('epLineRows')
   const epGasRows = cur.epGasRows
@@ -1586,6 +1613,65 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
             type="button"
             className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
             onClick={() => setCapRows(rs => [...rs, CAP_ROW()])}
+          >
+            + Add row
+          </button>
+        </div>
+      </div>
+
+      {/* ── Trenching (mirrors Utilities) ── */}
+      <div>
+        <SectionHeader title="Trenching" />
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-2 font-medium">Method</th>
+                <th className="text-left pb-1 pr-2 font-medium">Linear Feet</th>
+                <th className="text-left pb-1 pr-2 font-medium">Width (In)</th>
+                <th className="text-left pb-1 font-medium">Depth (In)</th>
+                <th className="text-right pb-1 font-medium text-gray-400">Est. Hrs</th>
+              </tr>
+            </thead>
+            <tbody>
+              {trenchRows.map((row, i) => {
+                const lf = n(row.lf),
+                  w = n(row.width),
+                  d = n(row.depth)
+                const hrsPerCF = n(materialPrices[TRENCH_LABOR_RATE_NAME[row.equipment]])
+                const cf = lf > 0 && w > 0 && d > 0 ? lf * (w / 12) * (d / 12) : 0
+                const hrs = cf > 0 ? cf * hrsPerCF : 0
+                return (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-2">
+                      <select
+                        className="input text-sm py-1 flex-1 min-w-0"
+                        value={row.equipment}
+                        onChange={e => updateTrench(i, 'equipment', e.target.value)}
+                      >
+                        <option>Trench</option>
+                        <option>Hand</option>
+                      </select>
+                    </td>
+                    <td className="py-1 pr-2">
+                      <NumInput value={row.lf} onChange={v => updateTrench(i, 'lf', v)} />
+                    </td>
+                    <td className="py-1 pr-2">
+                      <NumInput value={row.width} onChange={v => updateTrench(i, 'width', v)} />
+                    </td>
+                    <td className="py-1">
+                      <NumInput value={row.depth} onChange={v => updateTrench(i, 'depth', v)} />
+                    </td>
+                    <td className="py-1 text-right text-gray-500 text-xs pl-2">{hrs > 0 ? hrs.toFixed(2) : '—'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <button
+            type="button"
+            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+            onClick={() => setTrenchRows(r => [...r, TRENCH_ROW()])}
           >
             + Add row
           </button>
