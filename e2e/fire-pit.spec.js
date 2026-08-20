@@ -33,23 +33,31 @@ async function openFirePit(page) {
     await estEdit.click().catch(() => {})
     await page.waitForLoadState('networkidle').catch(() => {})
   }
-  // Three panels: Project (1) → Module (2) → "✎ Edit Module" (3). "Fire Pit" text
-  // appears in the summary heading (inert), the project row, and the module row.
-  const fp = () => page.getByText('Fire Pit', { exact: true })
-  if (!(await fp().count())) return false
+  // Three panels: Project (1) → Module (2) → "✎ Edit Module" (3).
   const editBtn = page.getByRole('button', { name: /edit module/i })
   const noProject = () => page.getByText(/select a project/i)
-  // Pass 1: click Fire-Pit texts until Panel 2 stops saying "Select a project"
-  // (i.e. the PROJECT is selected and its modules render).
-  for (let i = 0, n = await fp().count(); i < n && (await noProject().count()) > 0; i++) {
-    await fp().nth(i).click().catch(() => {})
-    await page.waitForTimeout(250)
+  const fp = () => page.getByText('Fire Pit', { exact: true })
+  // Pass 1 — select the PROJECT. Prefer the Projects panel (scoped by its heading),
+  // force-click through the hover overlay; fall back to clicking every Fire-Pit text.
+  const projectsPanel = page
+    .locator('div')
+    .filter({ has: page.getByRole('heading', { name: 'Projects', exact: true }) })
+    .last()
+  const scoped = projectsPanel.getByText('Fire Pit', { exact: true })
+  if (await scoped.count()) {
+    await scoped.first().scrollIntoViewIfNeeded().catch(() => {})
+    await scoped.first().click({ force: true }).catch(() => {})
+    await page.waitForTimeout(400)
   }
-  // Pass 2: click Fire-Pit texts (now incl. the module row) until "✎ Edit Module"
-  // surfaces in Panel 3, then open the editor.
+  for (let i = 0, n = await fp().count(); i < n && (await noProject().count()) > 0; i++) {
+    await fp().nth(i).click({ force: true }).catch(() => {})
+    await page.waitForTimeout(300)
+  }
+  if ((await noProject().count()) > 0) return false // project never selected
+  // Pass 2 — select the MODULE row, then open the editor.
   for (let i = 0, n = await fp().count(); i < n && !(await editBtn.count()); i++) {
-    await fp().nth(i).click().catch(() => {})
-    await page.waitForTimeout(250)
+    await fp().nth(i).click({ force: true }).catch(() => {})
+    await page.waitForTimeout(300)
   }
   if (await editBtn.count()) {
     await editBtn.first().click().catch(() => {})
