@@ -1,3 +1,39 @@
+// Open the estimate and enter a module's EDITOR by name. Generalized from the
+// hardened Fire Pit flow so every module spec reuses one nav path:
+//   1) the estimate opens VIEW-ONLY → click the top-level "✏️ Edit" (not per-module),
+//   2) click the project ROW then the module ROW (both `div.cursor-pointer` with the
+//      module name; the name <p> carries a drag handle so exact-text match fails),
+//   3) click "✎ Edit Module". Editor-open signal = the "View Rates" button every
+//      module editor renders (version-independent). Returns true once it's visible.
+export async function openModule(page, moduleName, { estimateUrl = process.env.TEST_ESTIMATE_URL, timeout = 30000 } = {}) {
+  await page.goto(estimateUrl, { waitUntil: 'domcontentloaded' })
+  await page.waitForLoadState('networkidle').catch(() => {})
+  const estEdit = page.getByRole('button', { name: /edit/i }).filter({ hasNotText: /module/i }).first()
+  if (await estEdit.count()) {
+    await estEdit.click().catch(() => {})
+    await page.waitForLoadState('networkidle').catch(() => {})
+  }
+  const editBtn = page.getByRole('button', { name: /edit module/i })
+  const rows = page.locator('div.cursor-pointer').filter({ hasText: moduleName })
+  if (!(await rows.count())) return false
+  for (let pass = 0; pass < 3 && !(await editBtn.count()); pass++) {
+    const n = await rows.count()
+    for (let i = 0; i < n && !(await editBtn.count()); i++) {
+      await rows.nth(i).click({ force: true }).catch(() => {})
+      await page.waitForTimeout(300)
+    }
+  }
+  if (await editBtn.count()) await editBtn.first().click().catch(() => {})
+  const signal = page.getByRole('button', { name: /view rates/i })
+  await signal.first().waitFor({ state: 'visible', timeout }).catch(() => {})
+  return (await signal.count()) > 0
+}
+
+// The first <select> that FOLLOWS a section's header text (robust to wrapper nesting).
+export function sectionSelect(page, title) {
+  return page.getByText(new RegExp(`^\\s*${title}\\s*$`, 'i')).first().locator('xpath=following::select[1]')
+}
+
 // Attach console/page-error collectors to a page. Returns an array that fills with
 // error strings as the page runs. Ignore benign noise (favicon, ResizeObserver).
 export function collectErrors(page) {

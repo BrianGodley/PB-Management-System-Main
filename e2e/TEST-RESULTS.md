@@ -1,5 +1,23 @@
 # Test results log
 
+## 2026-08-20 — Fire Pit E2E GREEN (4/4) — bugs verified fixed on prod
+- After iterating the spec's navigation (estimate is view-only → click ✏️ Edit →
+  project row `div.cursor-pointer` (name is "⠿Fire Pit", not exact-matchable) →
+  module row → ✎ Edit Module → wait ≤30s for the async editor), all four Fire Pit
+  checks pass against live prod:
+  1. Editor opens with Gas Line + Trenching + Gas Fixtures sections.
+  2. Gas Line Type dropdown populated (Gas Pipe subcategory fix — was empty).
+  3. Trenching row (LF/W/D, inputs readonly-until-focus → click-before-fill)
+     computes non-zero Est. Hrs (shared lib/trench math).
+  4. Wall finishes resolve a price, no unpriced/labor-needed banner (shared
+     Finishes consolidation).
+- Loop mechanics that worked: read test-results/results.json + error-context.md
+  a11y snapshots from disk each round; locate sections via `following::select/input`
+  from the header; editor-open signal = View Rates button (version-independent).
+- Next: expand Fire Pit E2E to every field + every dropdown option; then roll the
+  shared-finishes repoint to OK / Columns / Walls + retire the dup records.
+
+
 ## 2026-08-20 — Fire Pit: Gas Line/Trenching fixes + finishes → shared Finishes
 - **Gas Line** now resolves gas pipes from the `Gas Pipe` subcategory (was stale
   `Utility Lines` → empty picker; the section was dead). **Trenching** is now its
@@ -169,3 +187,39 @@ unit from `npm run test:unit`).
   JobTracker.jsx.
 - Run 2 (after fixes + deploy): **14/14 passed.** Estimator specs active
   (`TEST_ESTIMATE_URL` set).
+
+## CI run — 2026-08-20T17:19Z — commit 71e533f — GREEN (via GitHub Actions)
+First fully-automated CI loop iteration. Trigger: Vercel deploy → `.github/workflows/e2e.yml`.
+- **21 passed, 0 unexpected, 1 flaky, 0 skipped.**
+- Flaky (passed on retry): `Fire Pit › exhaustive: every structure type tab computes without NaN` — first attempt failed, retry passed. Timing on tab click/render; harden later (wait for tab-active state before NaN scan).
+- Prior run (62cded1) had 2 failures, both fixed here: exhaustive dropdown 150s timeout → replaced per-option getByText with in-page innerText scan (+180s ceiling); dashboard `net::ERR_TIMED_OUT` console flake → added transient net::ERR_ filter to helpers.collectErrors.
+- Loop mechanics proven: Claude read results.json straight from the `ci-results` branch in the mount (no pasting); Brian only pushed + ran `npm run e2e:sync`.
+
+## 2026-08-20 — autopilot (CI run, commit 4c4b18b)
+- CI updated_at: 2026-08-20T17:43:31Z | duration 106s
+- **GREEN** — 22 passed, 0 failed, 0 flaky, 0 skipped.
+- No action taken (no robustness fixes needed).
+
+## 2026-08-20 — autopilot (CI 09b9bc6)
+
+GREEN. 22 passed / 0 failed / 0 flaky / 0 skipped. Duration 106s. CI run updated 2026-08-20T18:13:39Z. No action taken.
+
+## 2026-08-20 — autopilot (CI 0d64f02)
+
+GREEN. 22 passed / 0 failed / 0 flaky / 0 skipped. Duration 106s. CI run updated 2026-08-20T18:24:12Z (results.json startTime 17:41:43Z — same suite payload as the prior run). No action taken.
+
+## Fire Pit — CLOSED 2026-08-20 (shared-finishes branch, Fire-Pit-only scope)
+- Code: module + summary already on shared '<Type> - Finishes' (material) + '- Finishes Labor Rate' (labor); Gas Line on 'Gas Pipe' subcat; Trenching on shared lib/trench (Utilities canonical). No src changes needed.
+- Cleanup: firePitCalc.test.mjs fixtures repointed '- FP' → '- Finishes' (FP Cap rates untouched); unit tests green.
+- DB verify (prod): 7 shared finish MATERIALS priced under Unspecified vendor 05a4535e (Ledgerstone 10, Real Flagstone 400, Real Stone 400, Stacked Stone 10, Tile 6.50, Smooth Stucco 1) — Sand Stucco was $0.00 GAP → seeded to $1.00. 7 shared LABOR rates all set (Surface Finishes, Hrs per Sq Ft).
+- Purge: supabase-firepit-fp-finish-purge.sql removed 14 orphans (7 '- FP' materials + 7 '- FP Labor Rate') snapshot-first (bak_fp_purge_*). Post-check: 0 orphans remain.
+- Status: code off old records, tests green, CI green, duplicates purged, all 7 finishes priced. DONE.
+
+### Walls — definition-of-done sign-off (2026-08-20)
+A. Unit:      value[x] edit[x] unpriced[x] vendor[x] priority[x] units[x] aggregator[x] sub-indep[~] breakdown[ ] summary-parity[ ]
+B. Audit:     coverage[x] orphan[x] no-fallback[x] no-hardcoded[x] imports[x]
+C. E2E:       opens[.] dropdowns[.] every-option[.] every-tab[.] numeric[.] price-resolve[.] sub[.] live-edit[.]  (walls.spec.js authored; [.] = pending first CI run)
+D. DB:        priced[ ] no-dupes[ ] filing[ ]
+E. Loop:      red-first[x] catalogued[x] logged[x] green[ ]
+N/A items + reason: —
+Open gaps: (1) WallsSummary has its own computeWallFinishRow duplicating wallsCalc → add module-vs-summary PARITY test (drift risk). (2) per-tab materials breakdown test. (3) sub-tab independence unit test (structurally present via makeTab ihTab/subTab). (4) DB-health SQL for Walls rates on prod.

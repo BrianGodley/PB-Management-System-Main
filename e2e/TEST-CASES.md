@@ -93,3 +93,14 @@ frozen-rate-snapshot ambiguity of saved-estimate E2E.
 - E2E (interactive) Fire Pit cap+finish on a BLANK estimate: Add module → pick Fire
   Pit → in the modal enter a cap + finish → the row cell shows `$… · …h`. (Brian's
   flow; needs the editor-modal DOM from a run screenshot.)
+
+### `walls.spec.js` — requires `TEST_ESTIMATE_URL` (the live-browser layer for Walls)
+Unit math is locked by wallsCalc/wallsSections/wallsStruct .test.mjs (65 tests); this
+is the exhaustive UI layer. NON-DESTRUCTIVE. Uses shared helpers.openModule/sectionSelect.
+- **editor opens with wall-type tabs** — mounts; a CMU/PIP/Modular/Brick/Timber tab renders; console/HTTP clean.
+- **every Type dropdown populated** — every `<select>` has >1 option.
+- **exhaustive: every dropdown option** — cycle every non-vendor option → no NaN/Infinity, no console/HTTP errors (in-page scan).
+- **exhaustive: every wall-type tab** — CMU/PIP/Modular/Brick/Timber each compute without NaN (poll for stable render).
+- **exhaustive: numeric fields** — fill every input → `$` total renders, no unpriced prompt.
+- **Subcontractor tab** — renders + prices, no unpriced prompt.
+- **live edit reflects** — change a field in-browser → on-page totals change (Goal 4 end-to-end).
