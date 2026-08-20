@@ -18,24 +18,24 @@
     "maxFailures": 0,
     "metadata": {
       "ci": {
-        "commitHref": "https://github.com/BrianGodley/PB-Management-System-Main/commit/71e533fe845821d12739e1d6f7a63cab5fde59f9",
-        "commitHash": "71e533fe845821d12739e1d6f7a63cab5fde59f9",
-        "buildHref": "https://github.com/BrianGodley/PB-Management-System-Main/actions/runs/32396759284"
+        "commitHref": "https://github.com/BrianGodley/PB-Management-System-Main/commit/866a4b6ff16455f52b3eac2cda2f9c4a467e1c61",
+        "commitHash": "866a4b6ff16455f52b3eac2cda2f9c4a467e1c61",
+        "buildHref": "https://github.com/BrianGodley/PB-Management-System-Main/actions/runs/32397580087"
       },
       "gitCommit": {
-        "shortHash": "71e533f",
-        "hash": "71e533fe845821d12739e1d6f7a63cab5fde59f9",
-        "subject": "e2e: speed up Fire Pit exhaustive dropdown (in-page NaN scan), ignore transient net::ERR_ resource flakes, fix e2e:sync on Windows",
-        "body": "e2e: speed up Fire Pit exhaustive dropdown (in-page NaN scan), ignore transient net::ERR_ resource flakes, fix e2e:sync on Windows\n",
+        "shortHash": "866a4b6",
+        "hash": "866a4b6ff16455f52b3eac2cda2f9c4a467e1c61",
+        "subject": "e2e: harden Fire Pit structure-tab test — poll in-page text instead of fixed sleep (kills the flake)",
+        "body": "e2e: harden Fire Pit structure-tab test — poll in-page text instead of fixed sleep (kills the flake)\n",
         "author": {
           "name": "Brian",
           "email": "brian@picturebuild.com",
-          "time": 1787246142000
+          "time": 1787246717000
         },
         "committer": {
           "name": "Brian",
           "email": "brian@picturebuild.com",
-          "time": 1787246142000
+          "time": 1787246717000
         },
         "branch": "HEAD"
       },
@@ -49,24 +49,24 @@
         "retries": 1,
         "metadata": {
           "ci": {
-            "commitHref": "https://github.com/BrianGodley/PB-Management-System-Main/commit/71e533fe845821d12739e1d6f7a63cab5fde59f9",
-            "commitHash": "71e533fe845821d12739e1d6f7a63cab5fde59f9",
-            "buildHref": "https://github.com/BrianGodley/PB-Management-System-Main/actions/runs/32396759284"
+            "commitHref": "https://github.com/BrianGodley/PB-Management-System-Main/commit/866a4b6ff16455f52b3eac2cda2f9c4a467e1c61",
+            "commitHash": "866a4b6ff16455f52b3eac2cda2f9c4a467e1c61",
+            "buildHref": "https://github.com/BrianGodley/PB-Management-System-Main/actions/runs/32397580087"
           },
           "gitCommit": {
-            "shortHash": "71e533f",
-            "hash": "71e533fe845821d12739e1d6f7a63cab5fde59f9",
-            "subject": "e2e: speed up Fire Pit exhaustive dropdown (in-page NaN scan), ignore transient net::ERR_ resource flakes, fix e2e:sync on Windows",
-            "body": "e2e: speed up Fire Pit exhaustive dropdown (in-page NaN scan), ignore transient net::ERR_ resource flakes, fix e2e:sync on Windows\n",
+            "shortHash": "866a4b6",
+            "hash": "866a4b6ff16455f52b3eac2cda2f9c4a467e1c61",
+            "subject": "e2e: harden Fire Pit structure-tab test — poll in-page text instead of fixed sleep (kills the flake)",
+            "body": "e2e: harden Fire Pit structure-tab test — poll in-page text instead of fixed sleep (kills the flake)\n",
             "author": {
               "name": "Brian",
               "email": "brian@picturebuild.com",
-              "time": 1787246142000
+              "time": 1787246717000
             },
             "committer": {
               "name": "Brian",
               "email": "brian@picturebuild.com",
-              "time": 1787246142000
+              "time": 1787246717000
             },
             "branch": "HEAD"
           },
@@ -87,24 +87,24 @@
         "retries": 1,
         "metadata": {
           "ci": {
-            "commitHref": "https://github.com/BrianGodley/PB-Management-System-Main/commit/71e533fe845821d12739e1d6f7a63cab5fde59f9",
-            "commitHash": "71e533fe845821d12739e1d6f7a63cab5fde59f9",
-            "buildHref": "https://github.com/BrianGodley/PB-Management-System-Main/actions/runs/32396759284"
+            "commitHref": "https://github.com/BrianGodley/PB-Management-System-Main/commit/866a4b6ff16455f52b3eac2cda2f9c4a467e1c61",
+            "commitHash": "866a4b6ff16455f52b3eac2cda2f9c4a467e1c61",
+            "buildHref": "https://github.com/BrianGodley/PB-Management-System-Main/actions/runs/32397580087"
           },
           "gitCommit": {
-            "shortHash": "71e533f",
-            "hash": "71e533fe845821d12739e1d6f7a63cab5fde59f9",
-            "subject": "e2e: speed up Fire Pit exhaustive dropdown (in-page NaN scan), ignore transient net::ERR_ resource flakes, fix e2e:sync on Windows",
-            "body": "e2e: speed up Fire Pit exhaustive dropdown (in-page NaN scan), ignore transient net::ERR_ resource flakes, fix e2e:sync on Windows\n",
+            "shortHash": "866a4b6",
+            "hash": "866a4b6ff16455f52b3eac2cda2f9c4a467e1c61",
+            "subject": "e2e: harden Fire Pit structure-tab test — poll in-page text instead of fixed sleep (kills the flake)",
+            "body": "e2e: harden Fire Pit structure-tab test — poll in-page text instead of fixed sleep (kills the flake)\n",
             "author": {
               "name": "Brian",
               "email": "brian@picturebuild.com",
-              "time": 1787246142000
+              "time": 1787246717000
             },
             "committer": {
               "name": "Brian",
               "email": "brian@picturebuild.com",
-              "time": 1787246142000
+              "time": 1787246717000
             },
             "branch": "HEAD"
           },
@@ -174,12 +174,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1860,
+                  "duration": 2223,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-20T17:18:03.286Z",
+                  "startTime": "2026-08-20T17:27:01.085Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -223,12 +223,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1297,
+                      "duration": 1811,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-20T17:18:06.858Z",
+                      "startTime": "2026-08-20T17:27:04.126Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -257,12 +257,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1454,
+                      "duration": 1453,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-20T17:18:08.247Z",
+                      "startTime": "2026-08-20T17:27:06.027Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -308,12 +308,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2015,
+                      "duration": 1926,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-20T17:18:09.723Z",
+                      "startTime": "2026-08-20T17:27:07.494Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -348,12 +348,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1742,
+                      "duration": 1664,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-20T17:18:11.746Z",
+                      "startTime": "2026-08-20T17:27:09.427Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -399,12 +399,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2853,
+                      "duration": 2805,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-20T17:18:13.516Z",
+                      "startTime": "2026-08-20T17:27:11.114Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -439,12 +439,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2676,
+                      "duration": 2697,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-20T17:18:16.376Z",
+                      "startTime": "2026-08-20T17:27:13.926Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -473,12 +473,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 3342,
+                      "duration": 3059,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-20T17:18:19.063Z",
+                      "startTime": "2026-08-20T17:27:16.634Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -507,12 +507,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 3081,
+                      "duration": 3083,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-20T17:18:22.414Z",
+                      "startTime": "2026-08-20T17:27:19.701Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -547,12 +547,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 3073,
+                      "duration": 2977,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-20T17:18:25.502Z",
+                      "startTime": "2026-08-20T17:27:22.794Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -586,77 +586,18 @@
                     {
                       "workerIndex": 1,
                       "parallelIndex": 0,
-                      "status": "failed",
-                      "duration": 3962,
-                      "error": {
-                        "message": "Error: Structure types with an UNPRICED item (seed a price): CMU\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 3\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"CMU\",\u001b[39m\n\u001b[31m+ ]\u001b[39m",
-                        "stack": "Error: Structure types with an UNPRICED item (seed a price): CMU\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 3\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"CMU\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at /home/runner/work/PB-Management-System-Main/PB-Management-System-Main/e2e/fire-pit.spec.js:185:102",
-                        "location": {
-                          "file": "/home/runner/work/PB-Management-System-Main/PB-Management-System-Main/e2e/fire-pit.spec.js",
-                          "column": 102,
-                          "line": 185
-                        },
-                        "snippet": "\u001b[0m \u001b[90m 183 |\u001b[39m       \u001b[36mif\u001b[39m ((\u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByText(\u001b[33mUNPRICED\u001b[39m)\u001b[33m.\u001b[39mcount()) \u001b[33m>\u001b[39m \u001b[35m0\u001b[39m) unpriced\u001b[33m.\u001b[39mpush(t)\n \u001b[90m 184 |\u001b[39m     }\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 185 |\u001b[39m     expect(unpriced\u001b[33m,\u001b[39m \u001b[32m`Structure types with an UNPRICED item (seed a price): ${unpriced.join(', ')}`\u001b[39m)\u001b[33m.\u001b[39mtoEqual([])\n \u001b[90m     |\u001b[39m                                                                                                      \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 186 |\u001b[39m   })\n \u001b[90m 187 |\u001b[39m\n \u001b[90m 188 |\u001b[39m   test(\u001b[32m'exhaustive: numeric fields accept input and the module computes a total'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\u001b[0m"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/home/runner/work/PB-Management-System-Main/PB-Management-System-Main/e2e/fire-pit.spec.js",
-                            "column": 102,
-                            "line": 185
-                          },
-                          "message": "Error: Structure types with an UNPRICED item (seed a price): CMU\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 3\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"CMU\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n  183 |       if ((await page.getByText(UNPRICED).count()) > 0) unpriced.push(t)\n  184 |     }\n> 185 |     expect(unpriced, `Structure types with an UNPRICED item (seed a price): ${unpriced.join(', ')}`).toEqual([])\n      |                                                                                                      ^\n  186 |   })\n  187 |\n  188 |   test('exhaustive: numeric fields accept input and the module computes a total', async ({ page }) => {\n    at /home/runner/work/PB-Management-System-Main/PB-Management-System-Main/e2e/fire-pit.spec.js:185:102"
-                        }
-                      ],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-08-20T17:18:28.582Z",
-                      "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "screenshot",
-                          "contentType": "image/png",
-                          "path": "/home/runner/work/PB-Management-System-Main/PB-Management-System-Main/test-results/fire-pit-Fire-Pit-exhausti-1f080-pe-tab-computes-without-NaN-chromium/test-failed-1.png"
-                        },
-                        {
-                          "name": "video",
-                          "contentType": "video/webm",
-                          "path": "/home/runner/work/PB-Management-System-Main/PB-Management-System-Main/test-results/fire-pit-Fire-Pit-exhausti-1f080-pe-tab-computes-without-NaN-chromium/video.webm"
-                        },
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/home/runner/work/PB-Management-System-Main/PB-Management-System-Main/test-results/fire-pit-Fire-Pit-exhausti-1f080-pe-tab-computes-without-NaN-chromium/error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "/home/runner/work/PB-Management-System-Main/PB-Management-System-Main/e2e/fire-pit.spec.js",
-                        "column": 102,
-                        "line": 185
-                      }
-                    },
-                    {
-                      "workerIndex": 2,
-                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 4751,
+                      "duration": 2846,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
-                      "retry": 1,
-                      "startTime": "2026-08-20T17:18:33.020Z",
+                      "retry": 0,
+                      "startTime": "2026-08-20T17:27:25.779Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "trace",
-                          "contentType": "application/zip",
-                          "path": "/home/runner/work/PB-Management-System-Main/PB-Management-System-Main/test-results/fire-pit-Fire-Pit-exhausti-1f080-pe-tab-computes-without-NaN-chromium-retry1/trace.zip"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
-                  "status": "flaky"
+                  "status": "expected"
                 }
               ],
               "id": "702421f33e73cf80204e-74e066c9c6c14682e63a",
@@ -677,15 +618,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 2,
+                      "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 4230,
+                      "duration": 4359,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-20T17:18:38.061Z",
+                      "startTime": "2026-08-20T17:27:28.635Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -695,7 +636,7 @@
               ],
               "id": "702421f33e73cf80204e-2636f2fc6fe4ce7d1739",
               "file": "fire-pit.spec.js",
-              "line": 188,
+              "line": 192,
               "column": 3
             },
             {
@@ -711,15 +652,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 2,
+                      "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2920,
+                      "duration": 3084,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-20T17:18:42.298Z",
+                      "startTime": "2026-08-20T17:27:33.005Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -729,7 +670,7 @@
               ],
               "id": "702421f33e73cf80204e-5fe6c0e5863b48000cd9",
               "file": "fire-pit.spec.js",
-              "line": 206,
+              "line": 210,
               "column": 3
             }
           ]
@@ -755,15 +696,15 @@
               "projectName": "chromium",
               "results": [
                 {
-                  "workerIndex": 2,
+                  "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2797,
+                  "duration": 2936,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-20T17:18:45.233Z",
+                  "startTime": "2026-08-20T17:27:36.104Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -789,15 +730,15 @@
               "projectName": "chromium",
               "results": [
                 {
-                  "workerIndex": 2,
+                  "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2398,
+                  "duration": 2615,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-20T17:18:48.038Z",
+                  "startTime": "2026-08-20T17:27:39.048Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -823,15 +764,15 @@
               "projectName": "chromium",
               "results": [
                 {
-                  "workerIndex": 2,
+                  "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1615,
+                  "duration": 1590,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-20T17:18:50.445Z",
+                  "startTime": "2026-08-20T17:27:41.672Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -857,15 +798,15 @@
               "projectName": "chromium",
               "results": [
                 {
-                  "workerIndex": 2,
+                  "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1555,
+                  "duration": 1786,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-20T17:18:52.083Z",
+                  "startTime": "2026-08-20T17:27:43.271Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -891,15 +832,15 @@
               "projectName": "chromium",
               "results": [
                 {
-                  "workerIndex": 2,
+                  "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1707,
+                  "duration": 1756,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-20T17:18:53.645Z",
+                  "startTime": "2026-08-20T17:27:45.065Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -925,15 +866,15 @@
               "projectName": "chromium",
               "results": [
                 {
-                  "workerIndex": 2,
+                  "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2521,
+                  "duration": 2339,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-20T17:18:55.361Z",
+                  "startTime": "2026-08-20T17:27:46.829Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -959,15 +900,15 @@
               "projectName": "chromium",
               "results": [
                 {
-                  "workerIndex": 2,
+                  "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2224,
+                  "duration": 2274,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-20T17:18:57.903Z",
+                  "startTime": "2026-08-20T17:27:49.181Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -993,15 +934,15 @@
               "projectName": "chromium",
               "results": [
                 {
-                  "workerIndex": 2,
+                  "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1439,
+                  "duration": 1500,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-20T17:19:00.137Z",
+                  "startTime": "2026-08-20T17:27:51.466Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -1035,15 +976,15 @@
               "projectName": "chromium",
               "results": [
                 {
-                  "workerIndex": 2,
+                  "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 51620,
+                  "duration": 52248,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-20T17:19:01.587Z",
+                  "startTime": "2026-08-20T17:27:52.979Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -1061,11 +1002,11 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-08-20T17:18:02.875Z",
-    "duration": 110389.794,
-    "expected": 21,
+    "startTime": "2026-08-20T17:27:00.662Z",
+    "duration": 104611.41399999999,
+    "expected": 22,
     "skipped": 0,
     "unexpected": 0,
-    "flaky": 1
+    "flaky": 0
   }
 }
