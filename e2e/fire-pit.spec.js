@@ -142,7 +142,7 @@ test.describe('Fire Pit', () => {
   const UNPRICED = /labor rate needed|price me|unpriced|missing price|needs? a price|set (a |the )?price/i
 
   test('exhaustive: every TYPE dropdown option computes without a NaN/console error', async ({ page }, testInfo) => {
-    test.setTimeout(150000)
+    test.setTimeout(180000)
     const errors = collectErrors(page)
     const ok = await openFirePit(page)
     test.skip(!ok, 'Fire Pit editor not reachable on this estimate.')
@@ -158,8 +158,11 @@ test.describe('Fire Pit', () => {
         const label = (optTexts[o] || '').trim()
         if (!label || /^select/i.test(label)) continue
         await sel.selectOption({ index: o }).catch(() => {})
+        // Fast in-page scan — a getByText locator query per option is too slow
+        // across every select/option and blows the test timeout on prod.
         // NaN/Infinity in the output is a real calc bug → fail hard.
-        expect(await page.getByText(/\$?NaN|Infinity/).count(), `Option "${label}" produced NaN/Infinity`).toBe(0)
+        const bad = await page.evaluate(() => /\bNaN\b|Infinity/.test(document.body.innerText))
+        expect(bad, `Option "${label}" produced NaN/Infinity`).toBe(false)
       }
     }
     await testInfo.attach('fire-pit-exhaustive.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })

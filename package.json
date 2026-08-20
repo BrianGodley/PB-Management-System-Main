@@ -20,7 +20,7 @@
     "test:walls-orphans": "node scripts/walls-orphan-rates.mjs",
     "test:e2e": "playwright test",
     "test:e2e:report": "playwright show-report",
-    "e2e:sync": "git fetch origin ci-results && mkdir -p test-results && git show origin/ci-results:results.json > test-results/ci-results.json && git show origin/ci-results:updated_at.txt && echo \"(pulled CI results → test-results/ci-results.json)\"",
+    "e2e:sync": "git fetch origin ci-results && node -e \"require('fs').mkdirSync('test-results',{recursive:true})\" && git show origin/ci-results:results.json > test-results/ci-results.json && git show origin/ci-results:updated_at.txt",
     "import-code-changes": "node scripts/import-code-changes.mjs",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",

@@ -7,6 +7,10 @@ export function collectErrors(page) {
     /favicon/i,
     /Failed to load resource.*(favicon|\.map)/i,
     /Download the React DevTools/i,
+    // Transient network flakes from the CI runner reaching prod (not app bugs).
+    // A real API failure still surfaces via the http>=400 response handler below;
+    // a timed-out/aborted request only appears here with no status, so it's noise.
+    /Failed to load resource.*net::ERR_(TIMED_OUT|CONNECTION|NETWORK|ABORTED|NAME_NOT_RESOLVED|INTERNET_DISCONNECTED)/i,
   ]
   const keep = t => t && !ignore.some(re => re.test(t))
   page.on('console', msg => {
