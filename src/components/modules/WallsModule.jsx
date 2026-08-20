@@ -48,9 +48,13 @@ const WALLS_RATE_SCOPE = [
   { category: 'Concrete', sub: 'Concrete Mix' }, // Poured-in-Place mix
   { category: 'Drainage', sub: 'French Drain Pipe' }, // drain pipe / sock / gravel / fabric material
   { category: 'Drainage', sub: 'French Drain' }, // drain install labor
-  { category: 'Demo', sub: 'Hand Demo' }, // slope removal / backfill — hand
-  { category: 'Demo', sub: 'Mini Skid Steer Demo' }, // — mini skid / excavator
-  { category: 'Demo', sub: 'Skid Steer Demo' }, // — skid steer
+  // Walls borrows only a handful of rates from each fat Demo method sub (Slope
+  // Removal = Dirt SF, Backfill = Grade Fill SF, Hand compaction = JJ SF). `only`
+  // surfaces JUST those in View Rates so the tree/stump/haul/grade-cut/etc. rows
+  // the module never touches don't clutter the table (walls-orphan-rates guard).
+  { category: 'Demo', sub: 'Hand Demo', only: ['Demo - Hand - Dirt SF', 'Demo - Hand - Grade Fill SF', 'Demo - Hand - JJ SF'] },
+  { category: 'Demo', sub: 'Mini Skid Steer Demo', only: ['Demo - Mini - Dirt SF', 'Demo - Mini - Grade Fill SF'] },
+  { category: 'Demo', sub: 'Skid Steer Demo', only: ['Demo - Skid - Dirt SF', 'Demo - Skid - Grade Fill SF'] },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────

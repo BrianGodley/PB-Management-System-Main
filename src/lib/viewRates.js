@@ -58,7 +58,13 @@ export async function fetchModuleCategories(moduleType) {
 //       borrowed from another category (no labor/sub/misc pulled for it).
 // When `scope` is absent, fall back to the legacy module_category_map.
 export async function buildViewRates(moduleType, scope = null) {
-  let fullCats, subScope, fetchCats
+  let fullCats, subScope, fetchCats, subOnly
+  // subOnly: `${category}${GS}${sub}` -> Set(rate names). When a borrowed pair
+  // carries `only: [...]`, ONLY those named rates (material/labor/sub) surface for
+  // that sub — so a module can borrow a fat shared sub (e.g. a whole Demo method)
+  // but expose just the handful of rows it actually consumes, keeping View Rates
+  // free of non-actionable rows.
+  subOnly = new Map()
   if (Array.isArray(scope) && scope.length) {
     fullCats = new Set(scope.filter(s => s && s.category && !s.sub).map(s => s.category))
     subScope = new Map()
@@ -66,6 +72,7 @@ export async function buildViewRates(moduleType, scope = null) {
       if (!s || !s.category || !s.sub) continue
       if (!subScope.has(s.category)) subScope.set(s.category, new Set())
       subScope.get(s.category).add(s.sub)
+      if (Array.isArray(s.only) && s.only.length) subOnly.set(`${s.category}${GS}${s.sub}`, new Set(s.only))
     }
     fetchCats = Array.from(new Set(scope.map(s => s && s.category).filter(Boolean)))
   } else {
@@ -101,6 +108,12 @@ export async function buildViewRates(moduleType, scope = null) {
   // A material row is in-scope if its category is a full category, or its exact
   // (category, sub-category) is one of the borrowed pairs.
   const matInScope = r => fullCats.has(r.category) || !!subScope.get(r.category)?.has(r.sub_category)
+  // Honor a borrowed sub's `only` allowlist: full-category rows always pass; a
+  // borrowed (category, sub) with an allowlist passes only its named rates.
+  const nameAllowed = (category, sub, name) => {
+    const set = subOnly.get(`${category}${GS}${sub}`)
+    return !set || set.has(name)
+  }
   const vendorName = id => (venRes.data || []).find(v => v.id === id)?.company_name || 'Vendor'
 
   // group map: "categorysub" -> { category, sub, items: [] }
@@ -113,7 +126,7 @@ export async function buildViewRates(moduleType, scope = null) {
   }
 
   // Materials — one row per open price (Standard first, then each vendor).
-  ;(matRows || []).filter(matInScope).forEach(r => {
+  ;(matRows || []).filter(r => matInScope(r) && nameAllowed(r.category, r.sub_category, r.name)).forEach(r => {
     const g = ensure(r.category, r.sub_category)
     g.items.push({
       label: `${r.vendor_id ? vendorName(r.vendor_id) : 'Standard'} — ${cleanLabel(r.name)}`,
@@ -131,7 +144,7 @@ export async function buildViewRates(moduleType, scope = null) {
 
   // Labor — coefficients. `name` is the immutable key the modules reference;
   // `label` is the editable display description (falls back to name).
-  ;(labRes.data || []).filter(matInScope).forEach(r => {
+  ;(labRes.data || []).filter(r => matInScope(r) && nameAllowed(r.category, r.sub_category, r.name)).forEach(r => {
     const g = ensure(r.category, r.sub_category)
     g.items.push({
       label: cleanLabel(r.label || r.name),
@@ -147,7 +160,7 @@ export async function buildViewRates(moduleType, scope = null) {
   })
 
   // Subcontractor — routed to the Sub column via section:'sub'.
-  ;(subRes.data || []).filter(matInScope).forEach(r => {
+  ;(subRes.data || []).filter(r => matInScope(r) && nameAllowed(r.category, r.sub_category, r.item_key)).forEach(r => {
     const g = ensure(r.category, r.sub_category)
     g.items.push({
       label: `${r.company_name || 'Unassigned'} — ${cleanLabel(r.trade || r.item_key || 'Rate')}`,

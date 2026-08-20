@@ -1,5 +1,25 @@
 # Test results log
 
+## 2026-08-20 — Walls View Rates orphan check: 88 → 1 (Demo GOAL MET)
+- **Finding:** `walls-orphan-rates.mjs` (new) diffed the 137 Walls-scoped rate names
+  Brian pulled against the rates WallsModule consumes → **88 non-actionable rows**.
+  87 were the entire Demo tree/stump/shrub/grade-cut/haul/etc. set: Walls borrows
+  three whole Demo method subs but its per-wall Demo section reads only 7 (Dirt SF,
+  Grade Fill SF ×3 methods, Hand JJ SF); `buildViewRates` surfaces all labor in a
+  borrowed sub, so the rest flooded in.
+- **Fix (code-only):** added an optional `only: [...]` rate-name allowlist to a
+  scope entry. `buildViewRates` now filters borrowed material/labor/sub rows by
+  name when their (category, sub) carries an allowlist. `WALLS_RATE_SCOPE`'s three
+  Demo subs now `only`-list the 7 rates Walls uses. Generalizes to any module
+  borrowing a fat shared sub.
+- **Result:** orphans **88 → 1**. `npm run test:unit` → 43/43; no-fallback guard
+  PASS; viewRates.js + WallsModule.jsx parse.
+- **Remaining 1 = decision, not a bug:** `Wall PIP Install Labor` is a SHARED form-
+  labor rate consumed by Columns + Fire Pit PIP (PIP_FORM_LAB/FP_FORM_LAB), not the
+  Walls module (Walls PIP moved to stem-LF pricing). It surfaces in Walls View Rates
+  only because it's filed under category `Walls`. Do NOT delete — relocate to a
+  shared category or leave. Pending Brian's call.
+
 ## 2026-08-20 — Walls CMU structure extracted + dollar values locked (GOAL MET)
 - **Extraction:** the CMU dollar composition (labor hrs + material $) moved out of
   `calcOneCMU` into React-free `cmuStructTotals(q, wall, {r, pm, blockPrice,

@@ -1,0 +1,54 @@
+# What Walls View Rates RENDERS = the scope query (labor: full `Walls` + borrowed
+# Demo/Drainage subs; misc: full `Walls`) AFTER the WALLS_RATE_SCOPE `only`
+# allowlist trims each fat Demo method sub to just the rows Walls consumes. Paste-
+# regenerate from the module's View Rates modal (or the scope SQL, then drop the
+# Demo rows not in the `only` lists). walls-orphan-rates.mjs diffs this vs consumed.
+Demo - Hand - Dirt SF
+Demo - Hand - Grade Fill SF
+Demo - Hand - JJ SF
+Demo - Mini - Dirt SF
+Demo - Mini - Grade Fill SF
+Demo - Skid - Dirt SF
+Demo - Skid - Grade Fill SF
+Drainage 3" Perforated Pipe Labor
+Drainage 4" Perforated Pipe Labor
+Wall Brick Lay Labor
+Wall Cap Bullnose Labor
+Wall Cap Flagstone Labor
+Wall Cap PIP Concrete Labor
+Wall Cap Precast Labor
+Wall Curve Labor Factor
+Wall Footing Rebar Waste
+Wall Footing Soil Swell
+Wall Hand Compaction Multiplier
+Ledgerstone - Wall Labor Rate
+Real Flagstone - Wall Labor Rate
+Real Stone - Wall Labor Rate
+Sand Stucco - Wall Labor Rate
+Smooth Stucco - Wall Labor Rate
+Stacked Stone - Wall Labor Rate
+Tile - Wall Labor Rate
+Wall Footing Dig+Haul Excavator Labor Rate
+Wall Footing Dig+Haul Labor Rate
+Wall PIP Install Labor
+Wall PIP Stem Added Course Labor
+Wall Hand Grout Labor Rate
+Wall Hand Pour Footing Labor Rate
+Wall Modular Install Labor Rate
+Wall Pump Footing Labor Rate
+Wall Pump Grout Labor Rate
+Wall Set Block Labor Rate
+Wall Set Rebar Labor Rate
+Wall Setup Clean Labor Rate
+Wall Timber Added Course Labor
+Wall Timber LF Labor
+Wall Timber Steel Post Labor
+Wall WP 2 Coats Roll On Labor
+Wall WP Dimple Labor
+Wall WP Install Labor
+Wall WP Primer + Membrane Labor
+Wall WP Thoroseal Labor
+Rebar #3
+Wall Timber Qty per Added Course
+Wall Timber Qty per LF
+Wall Timber Steel Post
