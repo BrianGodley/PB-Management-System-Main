@@ -223,3 +223,29 @@ D. DB:        priced[ ] no-dupes[ ] filing[ ]
 E. Loop:      red-first[x] catalogued[x] logged[x] green[ ]
 N/A items + reason: —
 Open gaps: (1) WallsSummary has its own computeWallFinishRow duplicating wallsCalc → add module-vs-summary PARITY test (drift risk). (2) per-tab materials breakdown test. (3) sub-tab independence unit test (structurally present via makeTab ihTab/subTab). (4) DB-health SQL for Walls rates on prod.
+
+## 2026-08-20 — autopilot (CI 9c987d1)
+
+GREEN. 22 passed / 0 failed / 0 flaky / 0 skipped. Duration 102s. CI updated 2026-08-20T18:59:30Z. No action taken.
+
+## 2026-08-20 — autopilot (CI 46e5ece)
+
+28 passed / 1 failed / 0 flaky / 0 skipped. Duration 500s. CI updated 2026-08-20T19:14:00Z.
+
+FAIL — `e2e/fire-pit.spec.js:144` "exhaustive: every TYPE dropdown option computes
+without a NaN/console error": "Test timeout of 180000ms exceeded" then
+`page.evaluate: Target page, context or browser has been closed` at line 164.
+Classified TEST-ROBUSTNESS, not a product bug — the NaN assertion never fired; the
+spec simply ran out of wall-clock cycling every select/option across Fire Pit's 4
+structure-type tabs (the whole file took 500s).
+
+FIX: `test.setTimeout(180000)` → `600000` in that spec. No options skipped, no
+coverage lost, no src/ change. `node --check` clean.
+
+### Hand Demo — definition-of-done sign-off (2026-08-20)
+A. Unit:      value[ ] edit[ ] unpriced[ ] vendor[ ] priority[ ] units[ ] aggregator[ ] sub-indep[ ] breakdown[ ] summary-parity[ ]   (NO handDemoCalc.js yet — extraction pending)
+B. Audit:     coverage[ ] orphan[ ] no-fallback[x] no-hardcoded[x] imports[x]   (no demo coverage/orphan scripts yet)
+C. E2E:       opens[.] dropdowns[.] every-option[.] numeric[.] sub[.] live-edit[.]  (hand-demo.spec.js authored; [.] = pending first CI run) | every-tab = N/A (demos have no type tabs)
+D. DB:        priced[ ] no-dupes[ ] filing[ ]
+E. Loop:      red-first[x] catalogued[x] logged[x] green[ ]
+Next: extract handDemoCalc.js + unit tests (container/tons→CuYd/rebar-hrs/hauling/grading/tree-stump + In-House vs Sub independence), demo coverage+orphan scripts, DB-health SQL for Demo rates. Class: finish Hand → then Skid Steer → Mini Skid (shared pattern).

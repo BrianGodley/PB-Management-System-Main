@@ -104,3 +104,13 @@ is the exhaustive UI layer. NON-DESTRUCTIVE. Uses shared helpers.openModule/sect
 - **exhaustive: numeric fields** — fill every input → `$` total renders, no unpriced prompt.
 - **Subcontractor tab** — renders + prices, no unpriced prompt.
 - **live edit reflects** — change a field in-browser → on-page totals change (Goal 4 end-to-end).
+
+### `hand-demo.spec.js` — requires `TEST_ESTIMATE_URL` (Hand Demo live-browser layer)
+Demos: few dropdowns, mostly numeric inputs + an In-House↔Subcontractor toggle (no
+type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNaN.
+- **editor opens with demo sections** — Job Site Conditions / Hauling / Shrub / Stump render; console/HTTP clean.
+- **any dropdown populated** — each `<select>` has >1 option.
+- **exhaustive: every dropdown option** — no NaN/Infinity, no console/HTTP errors.
+- **numeric fields** — fill every input → `$` total renders, no unpriced prompt.
+- **In-House and Subcontractor both price** — toggle each crew mode → no NaN, pricing shows.
+- **live edit reflects** — change a field → on-page totals change (Goal 4 end-to-end).
