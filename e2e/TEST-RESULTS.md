@@ -283,3 +283,21 @@ Capacity (CY)') is a divisor — if unset it yields Math.ceil(x/0)=Infinity → 
 Always priced in prod; consider guarding removalContainers when capacity<=0 → surface
 unpriced instead of NaN. Checklist A now: value[x] edit[x] unpriced[~] vendor[~] priority[~]
 units[~] aggregator[~] sub-indep[x] breakdown[ ] summary-parity[ ].
+
+### Autopilot — f3219ca GREEN (2026-08-20)
+CI run 2026-08-20T20:09:33Z, duration 147s: expected 35 / unexpected 0 / flaky 0 /
+skipped 0. First fully green run since the `scanEveryOptionForNaN` import break — the
+helpers.js export plus the fire-pit/walls/hand-demo specs are now on `master`, and the
+suite grew 22 → 35 passing specs. No autopilot edits needed.
+
+### Hand Demo — audits + DB-health (2026-08-20)
+Demo View Rates is DATA-DRIVEN (buildViewRates('Hand Demo') surfaces every category='Demo'
+DB row), so coverage/orphan is a DB question, not a source-literal one. Tooling:
+- scripts/hand-demo-rate-coverage.mjs → consumed-rate manifest (61 keys: 33 coef, 20 sub, 8 material).
+- supabase-hand-demo-db-health.sql → MISSING (coverage Goal 2) + ORPHAN (Goal 3) in one query.
+Checklist B: coverage[tooling] orphan[tooling] (pending Brian's SQL run to confirm 0/0).
+Checklist D: priced/no-dupes/filing → run the SQL. Remaining: module-vs-summary parity, breakdown test.
+
+### Autopilot — 4a89df8 GREEN (2026-08-20)
+CI run 2026-08-20T20:14:01Z, duration 143s: expected 35 / unexpected 0 / flaky 0 /
+skipped 0. Second consecutive green run; suite unchanged at 35 specs. No autopilot edits.
