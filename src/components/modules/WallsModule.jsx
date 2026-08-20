@@ -10,6 +10,7 @@ import MissingPriceModal from '../MissingPriceModal'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { groutCyPerBlock as cmuGroutCyPerBlock } from '../../lib/cmuGrout'
+import { cmuStructQuantities } from './wallsStruct'
 import {
   useNewMaterialCatalog,
   resolveMaterialPrice,
@@ -1221,26 +1222,30 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
   const blockPrice = blockOverride
     ? n(blockOverride.price)
     : wallMatPrice(wallBlockRateName(b.name), v, materialRows, mp)
-  const blocksPerCourse = Math.ceil((n(lf) * 12) / b.l)
-  const totalCourses = Math.ceil(n(heightIn) / b.h)
+  // Structure QUANTITIES (block count, footing, grout, rebar LF) — pure geometry,
+  // extracted to ./wallsStruct (unit-tested in wallsStruct.test.mjs). Rate-driven
+  // waste coefficients are injected so the helper stays free of the price map. Rebar
+  // is split by size below (wall verticals / wall horizontals / footing horizontals),
+  // each priced by its own size; labor for ALL rebar stays the shared rebarLab.
+  const _q = cmuStructQuantities(wall, b, {
+    blockOrderWaste: r('blockOrderWaste'),
+    footingRebarWaste: r('footingRebarWaste'),
+  })
+  const {
+    blocksPerCourse,
+    totalCourses,
+    rawBlocks,
+    orderGreyBlock,
+    footingCF,
+    footingCY,
+    groutCY,
+    groutCF,
+    bars,
+    wallVertLF,
+    wallHorizLF,
+    footingRebarLF,
+  } = _q
   const regCourses = totalCourses // every course is regular grey block (bond beam removed)
-  const rawBlocks = blocksPerCourse * totalCourses
-  const orderGreyBlock = Math.ceil(blocksPerCourse * totalCourses * r('blockOrderWaste'))
-
-  const footingCF = (n(footingWIn) / 12) * (n(footingDIn) / 12) * n(lf)
-  const footingCY = footingCF / 27
-  const groutCY = rawBlocks * groutCyPerBlock(b) * (n(pctGrouted) / 100)
-  const groutCF = groutCY * 27
-
-  // Rebar split by size: three explicit contributions, each with its own size.
-  //  - Wall verticals: spacing-based count × wall height (Wall Rebar Size)
-  //  - Wall horizontals: a count × wall length (Wall Horiz Rebar Size)
-  //  - Footing horizontals: count × length +10% wraps (Footing Rebar Size)
-  // Labor for ALL rebar stays the shared rebarLab ('Set Rebar').
-  const bars = n(rebarSpIn) > 0 ? Math.ceil((n(lf) * 12) / n(rebarSpIn)) : 0
-  const wallVertLF = bars * (n(heightIn) / 12)
-  const wallHorizLF = n(wall.wallHorizBars) * n(lf)
-  const footingRebarLF = n(lf) * n(horizBars) * r('footingRebarWaste') // +10% for wraps (table-driven)
   const rebarHrs = (wallVertLF + wallHorizLF + footingRebarLF) * r('rebarLab')
   const rebarMat =
     wallVertLF * rebarPrice(wall.wallRebarSize, r) +
