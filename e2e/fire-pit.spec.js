@@ -52,9 +52,10 @@ async function openFirePit(page) {
     await editBtn.first().click().catch(() => {})
     await page.waitForLoadState('networkidle').catch(() => {})
   }
-  // Editor-only signal: the Trenching section exists only in the editor (the summary
-  // shows Structure/Caps/Gas Line/Fixtures/Finishes but never Trenching).
-  return (await page.getByText(/trenching/i).first().count()) > 0
+  // Editor-open signal (version-independent): every module editor shows a "View
+  // Rates" button. Feature checks (Trenching/Gas Line/finishes) are asserted per
+  // test — they will fail on a stale deploy that lacks the new sections.
+  return (await page.getByRole('button', { name: /view rates/i }).count()) > 0
 }
 
 // Find the <select> elements inside the section whose header text matches `title`.
