@@ -50,12 +50,16 @@ async function openFirePit(page) {
   }
   if (await editBtn.count()) {
     await editBtn.first().click().catch(() => {})
-    await page.waitForLoadState('networkidle').catch(() => {})
   }
   // Editor-open signal (version-independent): every module editor shows a "View
-  // Rates" button. Feature checks (Trenching/Gas Line/finishes) are asserted per
-  // test — they will fail on a stale deploy that lacks the new sections.
-  return (await page.getByRole('button', { name: /view rates/i }).count()) > 0
+  // Rates" button. Wait for it to render (the editor mounts async) before deciding.
+  // The editor mounts async (fetches the catalog); can take >15s on cold prod.
+  const editorSignal = page.getByRole('button', { name: /view rates/i }).or(page.getByText(/^\s*Trenching\s*$/i))
+  await editorSignal
+    .first()
+    .waitFor({ state: 'visible', timeout: 30000 })
+    .catch(() => {})
+  return (await editorSignal.count()) > 0
 }
 
 // Find the <select> elements inside the section whose header text matches `title`.
