@@ -641,25 +641,6 @@ function calcFirePit(
   const capRowCalc = row => {
     const meta = CAP_META[row.type] || masterWallMeta(CAP_CAT, row.type, materialRows, null, row.vendor)
     const lf = n(row.lf)
-    // TEMP DIAGNOSTIC — remove after. Logs exactly what the cap calc sees so we
-    // can find where the $0 material comes from.
-    if (row.type && typeof window !== 'undefined') {
-      // eslint-disable-next-line no-console
-      console.log('[FP CAP DEBUG]', {
-        rowType: row.type,
-        rowVendor: row.vendor,
-        metaFound: !!meta,
-        metaMaster: meta?.master,
-        houseUnit: meta ? (meta.master ? meta.matUnit : n(mp[FP_RATES[meta.matKey]?.dbName])) : 'no-meta',
-        vendorPrice: wfVendorPrice(row.vendor, row.type, materialRows, CAP_CAT),
-        CAP_CAT,
-        totalMaterialRows: (materialRows || []).length,
-        distinctSubcats: [...new Set((materialRows || []).map(r => r.sub_category))],
-        anyPrecast: (materialRows || [])
-          .filter(r => (r.name || '').toLowerCase().includes('precast'))
-          .map(r => `${r.name} | cat:${r.category} | sub:${r.sub_category} | v:${r.vendor_id || 'null'} | $${r.unit_cost}`),
-      })
-    }
     if (!meta || lf <= 0) return { mat: 0, hrs: 0 }
     const houseUnit = meta.master
       ? meta.matUnit
@@ -1093,7 +1074,11 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
     }
   }, [])
 
-  const state = { crewType, subType, subGpMarkupRate, commissionRate, ...cur }
+  // materialRows MUST come from the live catalog fetch (React state), not from
+  // `cur` — the calc reads state.materialRows for all vendor/catalog prices
+  // (wall caps, finishes). Without this the catalog is empty and every
+  // catalog-priced item resolves to $0.
+  const state = { crewType, subType, subGpMarkupRate, commissionRate, ...cur, materialRows }
   const calcRaw = calcFirePit(
     state,
     laborRatePerHour,
