@@ -76,6 +76,93 @@ test('a View Rates price edit reflects in the estimate (calc consumes mp by name
   assert.equal(after.hrs, before.hrs * 2) // labor reflects the edited rate
 })
 
+// ── Scenario: 12 LF × 18" fire pit, all cap types, all wall finishes @ 20 SF ─────
+// (structure block/footing/grout for the 12 LF × 18" ring is STRUCT_CALC in the React
+//  module; this scenario locks every CAP and every FINISH type shows material + labor.)
+const RATES = {
+  capFlagstone: { dbName: 'FP Cap Flagstone' },
+  capPrecast: { dbName: 'FP Cap Precast' },
+  capPipConcrete: { dbName: 'FP Cap PIP Concrete' },
+  capBullnose: { dbName: 'FP Cap Bullnose Brick' },
+  capFlagstoneLab: { dbName: 'FP Cap Flagstone Labor Rate' },
+  capPrecastLab: { dbName: 'FP Cap Precast Labor Rate' },
+  capPipConcreteLab: { dbName: 'FP Cap PIP Concrete Labor Rate' },
+  capBullnoseLab: { dbName: 'FP Cap Bullnose Brick Labor Rate' },
+  sandStucco: { dbName: 'Sand Stucco - FP' },
+  smoothStucco: { dbName: 'Smooth Stucco - FP' },
+  ledgerstone: { dbName: 'Ledgerstone - FP' },
+  stackedStone: { dbName: 'Stacked Stone - FP' },
+  tile: { dbName: 'Tile - FP' },
+  realFlagstone: { dbName: 'Real Flagstone - Finishes' },
+  realStone: { dbName: 'Real Stone - Finishes' },
+  sandStuccoLab: { dbName: 'Sand Stucco - FP Labor Rate' },
+  smoothStuccoLab: { dbName: 'Smooth Stucco - FP Labor Rate' },
+  ledgerstoneLab: { dbName: 'Ledgerstone - FP Labor Rate' },
+  stackedStoneLab: { dbName: 'Stacked Stone - FP Labor Rate' },
+  tileLab: { dbName: 'Tile - FP Labor Rate' },
+  flagstoneLab: { dbName: 'Real Flagstone - FP Labor Rate' },
+  realStoneLab: { dbName: 'Real Stone - FP Labor Rate' },
+}
+// Every rate priced non-zero (as it would be once seeded in Master Rates).
+const MP = Object.fromEntries(Object.values(RATES).map(r => [r.dbName, /Labor Rate/.test(r.dbName) ? 0.2 : 10]))
+
+const CAP_META = {
+  Flagstone: { matKey: 'capFlagstone', labKey: 'capFlagstoneLab' },
+  Precast: { matKey: 'capPrecast', labKey: 'capPrecastLab' },
+  'PIP Concrete': { matKey: 'capPipConcrete', labKey: 'capPipConcreteLab' },
+  'Bullnose Brick': { matKey: 'capBullnose', labKey: 'capBullnoseLab' },
+}
+const WF_META = {
+  'Sand Stucco': { key: 'sandStucco', labKey: 'sandStuccoLab', unit: 'SF' },
+  'Smooth Stucco': { key: 'smoothStucco', labKey: 'smoothStuccoLab', unit: 'SF' },
+  'Ledgerstone Veneer': { key: 'ledgerstone', labKey: 'ledgerstoneLab', waste: 1.1, screwPer5: 2 },
+  'Stacked Stone Veneer': { key: 'stackedStone', labKey: 'stackedStoneLab', waste: 1.1, screwPer5: 2 },
+  Tile: { key: 'tile', labKey: 'tileLab', adhesivePerSF: 1 },
+  'Real Flagstone': { key: 'realFlagstone', labKey: 'flagstoneLab', unit: 'stone', delivPerSF: 1, misc: 268.75 },
+  'Real Stone': { key: 'realStone', labKey: 'realStoneLab', unit: 'stone', delivPerSF: 2.5714, addPerSF: 1 },
+}
+
+for (const [type, meta] of Object.entries(CAP_META)) {
+  test(`scenario cap @ 12 LF — ${type}: material AND labor > 0`, () => {
+    const r = computeCapRow({ type, lf: 12 }, { meta, vendorUnit: null, mp: MP, fpRates: RATES })
+    assert.ok(r.mat > 0, `${type} material > 0, got ${r.mat}`)
+    assert.ok(r.hrs > 0, `${type} labor > 0, got ${r.hrs}`)
+    assert.equal(r.laborUnset, null)
+  })
+}
+
+for (const [type, meta] of Object.entries(WF_META)) {
+  test(`scenario finish @ 20 SF — ${type}: material AND labor > 0`, () => {
+    const r = computeFinishRow({ type, sf: 20 }, { meta, vendorUnit: null, mp: MP, fpRates: RATES })
+    assert.ok(r.mat > 0, `${type} material > 0, got ${r.mat}`)
+    assert.ok(r.hrs > 0, `${type} labor > 0, got ${r.hrs}`)
+    assert.equal(r.laborUnset, null)
+  })
+}
+
+// Adjust each type's material price + labor rate (as a View Rates edit would) and
+// confirm the estimate reflects it — per cap type and per finish type.
+const bump = (mp, matName, labName) => ({ ...mp, [matName]: mp[matName] + 5, [labName]: mp[labName] + 0.1 })
+
+for (const [type, meta] of Object.entries(CAP_META)) {
+  test(`View Rates adjustment reflects — cap ${type}`, () => {
+    const ctx = { meta, vendorUnit: null, fpRates: RATES }
+    const before = computeCapRow({ type, lf: 12 }, { ...ctx, mp: MP })
+    const after = computeCapRow({ type, lf: 12 }, { ...ctx, mp: bump(MP, RATES[meta.matKey].dbName, RATES[meta.labKey].dbName) })
+    assert.ok(after.mat > before.mat, `${type} material should rise on a price edit`)
+    assert.ok(after.hrs > before.hrs, `${type} labor should rise on a rate edit`)
+  })
+}
+for (const [type, meta] of Object.entries(WF_META)) {
+  test(`View Rates adjustment reflects — finish ${type}`, () => {
+    const ctx = { meta, vendorUnit: null, fpRates: RATES }
+    const before = computeFinishRow({ type, sf: 20 }, { ...ctx, mp: MP })
+    const after = computeFinishRow({ type, sf: 20 }, { ...ctx, mp: bump(MP, RATES[meta.key].dbName, RATES[meta.labKey].dbName) })
+    assert.ok(after.mat > before.mat, `${type} material should rise on a price edit`)
+    assert.ok(after.hrs > before.hrs, `${type} labor should rise on a rate edit`)
+  })
+}
+
 test('resolveLabor priority: numeric coeff > pointer > 0', () => {
   assert.equal(resolveLabor({ master: true, laborCoeff: 0.5, labor_rate: 'X' }, 'X', { X: 9 }), 0.5)
   assert.equal(resolveLabor({ master: true, laborCoeff: 0, labor_rate: 'X' }, 'X', { X: 0.25 }), 0.25)

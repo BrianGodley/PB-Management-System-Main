@@ -3,6 +3,19 @@
 Newest first. Claude appends after each run (E2E from `test-results/results.json`,
 unit from `npm run test:unit`).
 
+## 2026-08-19 — Fire Pit scenario + full material/labor coverage (GOAL MET)
+- **Scenario:** 12 LF × 18" fire pit, all 4 cap types (Flagstone/Precast/PIP/Bullnose),
+  all 7 wall finishes @ 20 SF (Sand/Smooth Stucco, Ledgerstone, Stacked Stone, Tile,
+  Real Flagstone, Real Stone). Each shows material AND labor, and each reflects a
+  View Rates price/labor edit. `npm run test:unit` → 30/30.
+- **Coverage:** `npm run test:firepit-coverage` → PASS — all 17 materials + 16 labor
+  rates the module uses are surfaced/editable in Fire Pit View Rates (Fire Pit full
+  category + Finishes for real flagstone/stone material).
+- **Not yet value-tested:** the 12 LF × 18" STRUCTURE math + standard fire ring
+  (block count/footing/grout) lives in STRUCT_CALC inside the React module; its rate
+  keys are all confirmed editable, but unit-testing its VALUES needs the same pure
+  extraction we did for caps/finishes (next goal candidate).
+
 ## 2026-08-19 — Fire Pit View Rates ↔ module parity + price round-trip (GOAL MET)
 - **Goal:** Fire Pit View Rates surfaces every rate the module uses, and a View
   Rates price edit reflects in the module estimate.
