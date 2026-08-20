@@ -15,26 +15,34 @@ import { collectErrors } from './helpers.js'
 // ─────────────────────────────────────────────────────────────────────────────
 const ESTIMATE = process.env.TEST_ESTIMATE_URL
 
-// Open the estimate and enter the Fire Pit module editor. Returns true if the
-// editor opened (section headers visible), false if Fire Pit isn't reachable.
+// Open the estimate and enter the Fire Pit module EDITOR. The flow is three steps:
+// select the Fire Pit PROJECT (left list) → select the Fire Pit MODULE row (both
+// render an exact-text "Fire Pit" <p>) → click "✎ Edit Module" (COEstimatePanel
+// line ~1170) which renders the FirePitModule editor. Returns true once an editor
+// section (Gas Line / Trenching) is visible.
 async function openFirePit(page) {
   await page.goto(ESTIMATE, { waitUntil: 'domcontentloaded' })
   await page.waitForLoadState('networkidle')
-  // Enter the Fire Pit module: click an existing Fire Pit module row/tile, or the
-  // "Fire Pit" type in the add-module chooser. Try the most specific first.
-  const candidates = [
-    page.getByRole('button', { name: /fire pit/i }),
-    page.getByText(/^fire pit$/i),
-    page.getByText(/fire pit/i),
-  ]
-  for (const c of candidates) {
-    if (await c.count()) {
-      await c.first().click().catch(() => {})
-      // The editor is open once a Fire Pit section header renders.
-      if (await page.getByText(/gas line|structure|wall finishes/i).first().count()) return true
-    }
+  const editBtn = page.getByRole('button', { name: /edit module/i })
+  // 1) Select the Fire Pit project (reveals its module list).
+  const fp = page.getByText('Fire Pit', { exact: true })
+  if (!(await fp.count())) return false
+  await fp.first().click().catch(() => {})
+  await page.waitForLoadState('networkidle').catch(() => {})
+  // 2) Click each "Fire Pit" (project card + the now-visible module row) until the
+  //    "Edit Module" button appears (it only shows once a module is selected).
+  const rows = page.getByText('Fire Pit', { exact: true })
+  const cnt = await rows.count()
+  for (let i = 0; i < cnt && !(await editBtn.count()); i++) {
+    await rows.nth(i).click().catch(() => {})
+    await page.waitForTimeout(150)
   }
-  return (await page.getByText(/gas line|wall finishes/i).first().count()) > 0
+  // 3) Open the editor.
+  if (await editBtn.count()) {
+    await editBtn.first().click().catch(() => {})
+    await page.waitForLoadState('networkidle').catch(() => {})
+  }
+  return (await page.getByText(/gas line|trenching/i).first().count()) > 0
 }
 
 // Find the <select> elements inside the section whose header text matches `title`.
