@@ -76,9 +76,9 @@ function computeFlatRow(row, mp, materialRows) {
       break
     case 'Flagstone': {
       const rate = n(row.rateIn) || price('flatFlagstone')
-      mat = sf > 0 ? (sf / 80) * rate : 0
+      mat = sf > 0 ? sf * rate : 0 // now $/Sq Ft (was $/ton ÷ 80)
       hrs = sf > 0 ? sf * lab('flatFlagstoneLab') : 0
-      subUnit = rate / 80
+      subUnit = rate
       break
     }
     case 'Porcelain':
@@ -177,15 +177,15 @@ function computeWallRow(row, mp, materialRows) {
     case 'Real Flagstone': {
       const rate = n(row.rateIn) || price('realFlagstone')
       hrs = sf > 0 ? sf * lab('flagstoneLab') : 0
-      mat = sf > 0 ? (sf / 80) * rate : 0
-      subUnit = rate / 80
+      mat = sf > 0 ? sf * rate : 0 // now $/Sq Ft (was $/ton ÷ 80)
+      subUnit = rate
       break
     }
     case 'Real Stone': {
       const rate = n(row.rateIn) || price('realStone')
       hrs = sf > 0 ? sf * lab('realStoneLab') : 0
-      mat = sf > 0 ? (sf / 70) * rate : 0
-      subUnit = rate / 70
+      mat = sf > 0 ? sf * rate : 0 // now $/Sq Ft (was $/ton ÷ 70)
+      subUnit = rate
       break
     }
     default:
