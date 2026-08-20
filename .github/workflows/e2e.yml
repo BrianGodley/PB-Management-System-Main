@@ -25,10 +25,11 @@ name: E2E (Playwright)
 permissions:
   contents: write
 
-# Never run two E2E rounds against prod at once; cancel the older one.
+# Only the newest commit matters — cancel any in-progress/queued older run so rapid
+# pushes don't stack up as serial ~9-min runs and lag the latest result.
 concurrency:
   group: e2e-prod
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   e2e:
