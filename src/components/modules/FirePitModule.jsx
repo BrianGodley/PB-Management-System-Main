@@ -57,12 +57,13 @@ const FP_RATES = {
   capPipConcreteLab: { dbName: 'FP Cap PIP Concrete Labor Rate' }, // hrs/LF
   capBullnoseLab: { dbName: 'FP Cap Bullnose Brick Labor Rate' }, // hrs/LF
 
-  // ── Wall finish material costs ──────────────────────────────────────────────
-  sandStucco: { dbName: 'Sand Stucco - FP' }, // $/SF (labor only by default)
-  smoothStucco: { dbName: 'Smooth Stucco - FP' }, // $/SF
-  ledgerstone: { dbName: 'Ledgerstone - FP' }, // $/SF panel
-  stackedStone: { dbName: 'Stacked Stone - FP' }, // $/SF panel
-  tile: { dbName: 'Tile - FP' }, // $/SF
+  // ── Wall finish material costs — SHARED with the Finishes module (one record
+  //    per finish, across all modules). Canonical: '<Type> - Finishes'. ──────────
+  sandStucco: { dbName: 'Sand Stucco - Finishes' }, // $/SF
+  smoothStucco: { dbName: 'Smooth Stucco - Finishes' }, // $/SF
+  ledgerstone: { dbName: 'Ledgerstone - Finishes' }, // $/SF panel
+  stackedStone: { dbName: 'Stacked Stone - Finishes' }, // $/SF panel
+  tile: { dbName: 'Tile - Finishes' }, // $/SF
   realFlagstone: { dbName: 'Real Flagstone - Finishes' }, // shared $/Sq Ft (Finishes)
   realStone: { dbName: 'Real Stone - Finishes' }, // shared $/Sq Ft (Finishes)
 
@@ -72,13 +73,14 @@ const FP_RATES = {
   blockLab: { dbName: 'FP Set Blocks Labor Rate' }, // blocks/hr
   handGroutLab: { dbName: 'FP Hand Grout Labor Rate' }, // CF/hr
   pumpGroutLab: { dbName: 'FP Pump Grout Labor Rate' }, // CF/hr
-  sandStuccoLab: { dbName: 'Sand Stucco - FP Labor Rate' }, // SF/day
-  smoothStuccoLab: { dbName: 'Smooth Stucco - FP Labor Rate' }, // SF/day
-  ledgerstoneLab: { dbName: 'Ledgerstone - FP Labor Rate' }, // SF/day
-  stackedStoneLab: { dbName: 'Stacked Stone - FP Labor Rate' }, // SF/day
-  tileLab: { dbName: 'Tile - FP Labor Rate' }, // hrs/SF (layout+install)
-  flagstoneLab: { dbName: 'Real Flagstone - FP Labor Rate' }, // hrs/SF (delivery+install+seal)
-  realStoneLab: { dbName: 'Real Stone - FP Labor Rate' }, // hrs/SF (transport+install+seal)
+  // Finish LABOR — SHARED with Finishes (one labor rate per finish, all modules).
+  sandStuccoLab: { dbName: 'Sand Stucco - Finishes Labor Rate' }, // SF/day
+  smoothStuccoLab: { dbName: 'Smooth Stucco - Finishes Labor Rate' }, // SF/day
+  ledgerstoneLab: { dbName: 'Ledgerstone - Finishes Labor Rate' }, // SF/day
+  stackedStoneLab: { dbName: 'Stacked Stone - Finishes Labor Rate' }, // SF/day
+  tileLab: { dbName: 'Tile - Finishes Labor Rate' }, // hrs/SF
+  flagstoneLab: { dbName: 'Real Flagstone - Finishes Labor Rate' }, // hrs/SF
+  realStoneLab: { dbName: 'Real Stone - Finishes Labor Rate' }, // hrs/SF
 }
 
 const DEFAULTS = {
@@ -169,7 +171,11 @@ function labelWithDims(row) {
 // A real vendor overrides ONLY the material unit price for a finish (matched by
 // its Type label in the vendor's catalog under the given sub_category); Standard
 // keeps the built-in per-estimate / master-rate price. Labor is never affected.
-const WF_CAT = 'Wall Finish'
+// Wall finishes are now SHARED: the picker + vendor override read the canonical
+// Finishes module records (category 'Finishes', sub-category 'Finish Material'),
+// not per-module 'Wall Finish' copies. One product + one labor rate per finish.
+const WF_CAT = 'Finish Material'
+const WF_CATEGORY = 'Finishes'
 const CAP_CAT = 'Wall Cap'
 function wfVendorPrice(vendorSel, typeLabel, materialRows, cat = WF_CAT, opts = {}) {
   // fallbackFirst:false so a non-matching type returns null (→ the built-in
@@ -307,7 +313,8 @@ const RATE_SCOPE = [
   { category: 'Utilities', sub: UTIL_CAT.line }, // Gas Pipe
   { category: 'Utilities', sub: UTIL_CAT.gas }, // Gas Fixtures
   { category: 'Basic Materials', sub: 'Reinforcement' }, // Rebar
-  { category: 'Finishes', sub: 'Finish Material' }, // Real Flagstone / Real Stone (shared $/Sq Ft)
+  { category: 'Finishes', sub: 'Finish Material' }, // ALL wall finishes (shared $/Sq Ft — one record per finish)
+  { category: 'Finishes', sub: 'Surface Finishes' }, // shared finish LABOR rates (one per finish)
 ]
 const RATE_SCOPE_CATS = [...new Set(RATE_SCOPE.map(s => s.category))]
 
@@ -628,8 +635,8 @@ function calcFirePit(
   // Math lives in the pure, unit-tested firePitCalc.js; here we resolve the catalog
   // meta + vendor price and inject them, then collect any unpriced-labor flag.
   const finishRowCalc = row => {
-    const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, 'Fire Pit', row.vendor)
-    const vendorUnit = wfVendorPrice(row.vendor, row.type, materialRows, WF_CAT, { category: 'Fire Pit' })
+    const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, WF_CATEGORY, row.vendor)
+    const vendorUnit = wfVendorPrice(row.vendor, row.type, materialRows, WF_CAT, { category: WF_CATEGORY })
     const r = computeFinishRow(row, { meta, vendorUnit, mp, fpRates: FP_RATES })
     if (r.laborUnset) laborUnset.push(r.laborUnset)
     return r
@@ -1114,7 +1121,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
   const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
   // Wall-finish vendor list scoped to this module's own Category so it lists only
   // vendors that priced a Wall Finish product under 'Fire Pit' (not OK/Walls).
-  const vendorsForFinish = () => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && r.sub_category === WF_CAT && r.category === 'Fire Pit'))
+  const vendorsForFinish = () => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && r.sub_category === WF_CAT && r.category === WF_CATEGORY))
 
   function handleSave() {
     onSave({
@@ -1727,7 +1734,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
             </thead>
             <tbody>
               {wallFinishRows.map((row, i) => {
-                const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, 'Fire Pit', row.vendor)
+                const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, WF_CATEGORY, row.vendor)
                 const rc = calc.wallFinishCalc?.[i] || {}
                 return (
                   <tr key={i} className="border-b border-gray-100">
@@ -1754,10 +1761,10 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                           onChange={e => setWallFinishRow(i, 'type', e.target.value)}
                         >
                           {!row.type && <option value="">Select material</option>}
-                          {row.type && !masterWallOptions(WF_CAT, WF_LIST, materialRows, 'Fire Pit', row.vendor).includes(row.type) && (
+                          {row.type && !masterWallOptions(WF_CAT, WF_LIST, materialRows, WF_CATEGORY, row.vendor).includes(row.type) && (
                             <option value={row.type}>{row.type}</option>
                           )}
-                          {masterWallOptions(WF_CAT, WF_LIST, materialRows, 'Fire Pit', row.vendor).map(t => (
+                          {masterWallOptions(WF_CAT, WF_LIST, materialRows, WF_CATEGORY, row.vendor).map(t => (
                             <option key={t} value={t}>
                               {t}
                             </option>

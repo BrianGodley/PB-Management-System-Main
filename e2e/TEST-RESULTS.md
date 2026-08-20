@@ -1,5 +1,21 @@
 # Test results log
 
+## 2026-08-20 — Fire Pit: Gas Line/Trenching fixes + finishes → shared Finishes
+- **Gas Line** now resolves gas pipes from the `Gas Pipe` subcategory (was stale
+  `Utility Lines` → empty picker; the section was dead). **Trenching** is now its
+  own section mirroring Utilities, via the shared `lib/trench` helper (Utilities is
+  King — Fire Pit + Utilities call the identical pure fn; unit-tested, 6 cases).
+- **Finishes consolidation (Fire Pit, reference):** finish material + labor now
+  read the canonical shared records — `<Type> - Finishes` (Finishes/Finish
+  Material) + `<Type> - Finishes Labor Rate` (Finishes/Surface Finishes) — for
+  every finish, not per-module `- FP` copies. Picker + vendor override source from
+  `Finishes/Finish Material`; RATE_SCOPE borrows both shared subs. Fixes the
+  Ledgerstone-returns-null bug (was resolving a per-module dupe). Parse OK, 34/34
+  unit. Next: OK / Columns / Walls, then retire the `- FP` / `- BBQ` / etc. dupes.
+- **New E2E** (`fire-pit.spec.js`): Gas Line populates, Trenching computes, finishes
+  resolve (no unpriced banner). Run after deploy; the finish check should now pass.
+
+
 ## 2026-08-20 — Walls test battery: finish/cap/WP extraction + coverage caught a REAL bug
 - **Goals 1+4 (finish/cap/WP):** extracted computeWallFinishRow/computeCapRow/
   computeWpRow into pure wallsCalc.js (module delegates via same-signature wrappers).
