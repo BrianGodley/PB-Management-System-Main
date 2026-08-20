@@ -23,26 +23,37 @@ const ESTIMATE = process.env.TEST_ESTIMATE_URL
 async function openFirePit(page) {
   await page.goto(ESTIMATE, { waitUntil: 'domcontentloaded' })
   await page.waitForLoadState('networkidle')
-  const editBtn = page.getByRole('button', { name: /edit module/i })
+  // 0) The estimate opens VIEW-ONLY ("👁 View Module" / "Viewing only…"). Click the
+  //    estimate's top-level "✏️ Edit" (not the per-module button) to enter edit mode.
+  const estEdit = page
+    .getByRole('button', { name: /edit/i })
+    .filter({ hasNotText: /module/i })
+    .first()
+  if (await estEdit.count()) {
+    await estEdit.click().catch(() => {})
+    await page.waitForLoadState('networkidle').catch(() => {})
+  }
   // 1) Select the Fire Pit project (reveals its module list).
   const fp = page.getByText('Fire Pit', { exact: true })
   if (!(await fp.count())) return false
   await fp.first().click().catch(() => {})
-  await page.waitForLoadState('networkidle').catch(() => {})
-  // 2) Click each "Fire Pit" (project card + the now-visible module row) until the
-  //    "Edit Module" button appears (it only shows once a module is selected).
+  await page.waitForTimeout(200)
+  // 2) Click each "Fire Pit" (project card + module row) until "✎ Edit Module" shows.
+  const editBtn = page.getByRole('button', { name: /edit module/i })
   const rows = page.getByText('Fire Pit', { exact: true })
   const cnt = await rows.count()
   for (let i = 0; i < cnt && !(await editBtn.count()); i++) {
     await rows.nth(i).click().catch(() => {})
-    await page.waitForTimeout(150)
+    await page.waitForTimeout(200)
   }
   // 3) Open the editor.
   if (await editBtn.count()) {
     await editBtn.first().click().catch(() => {})
     await page.waitForLoadState('networkidle').catch(() => {})
   }
-  return (await page.getByText(/gas line|trenching/i).first().count()) > 0
+  // Editor-only signal: the Trenching section exists only in the editor (the summary
+  // shows Structure/Caps/Gas Line/Fixtures/Finishes but never Trenching).
+  return (await page.getByText(/trenching/i).first().count()) > 0
 }
 
 // Find the <select> elements inside the section whose header text matches `title`.
