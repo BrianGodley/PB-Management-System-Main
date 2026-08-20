@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "guard:rates": "node scripts/no-fallback-rates.mjs",
+    "prebuild": "node scripts/no-fallback-rates.mjs",
     "build": "vite build",
     "preview": "vite preview",
+    "audit-catalog": "node scripts/audit-catalog-pricing.mjs",
     "validate-rates": "node scripts/validate-rate-chain.mjs",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
