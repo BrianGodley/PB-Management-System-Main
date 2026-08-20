@@ -34,6 +34,39 @@ export function sectionSelect(page, title) {
   return page.getByText(new RegExp(`^\\s*${title}\\s*$`, 'i')).first().locator('xpath=following::select[1]')
 }
 
+// Exhaustively cycle every option of every non-vendor <select> and flag any that
+// produces NaN/Infinity. Uses a native DOM set + `change` dispatch instead of
+// Playwright's selectOption — the latter's per-option actionability waits blow the
+// test timeout on large editors. Reads innerText after two rAFs so React has
+// painted the recompute. Returns the list of option labels that produced NaN.
+export async function scanEveryOptionForNaN(page) {
+  const bad = []
+  const nSel = await page.locator('select').count()
+  for (let s = 0; s < nSel; s++) {
+    const optTexts = await page.locator('select').nth(s).locator('option').allTextContents()
+    if (optTexts.some(t => /^\s*standard\s*$/i.test(t))) continue // skip vendor selects
+    for (let o = 0; o < optTexts.length; o++) {
+      const label = (optTexts[o] || '').trim()
+      if (!label || /^select/i.test(label)) continue
+      const nan = await page.evaluate(
+        ({ s, o }) =>
+          new Promise(res => {
+            const el = document.querySelectorAll('select')[s]
+            if (!el) return res(false)
+            el.selectedIndex = o
+            el.dispatchEvent(new Event('change', { bubbles: true }))
+            requestAnimationFrame(() =>
+              requestAnimationFrame(() => res(/\bNaN\b|Infinity/.test(document.body.innerText)))
+            )
+          }),
+        { s, o }
+      )
+      if (nan) bad.push(label)
+    }
+  }
+  return bad
+}
+
 // Attach console/page-error collectors to a page. Returns an array that fills with
 // error strings as the page runs. Ignore benign noise (favicon, ResizeObserver).
 export function collectErrors(page) {

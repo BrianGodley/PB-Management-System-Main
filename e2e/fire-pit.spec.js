@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { collectErrors } from './helpers.js'
+import { collectErrors, scanEveryOptionForNaN } from './helpers.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Fire Pit module — reproduces the bugs manual testing caught that unit tests
@@ -142,29 +142,18 @@ test.describe('Fire Pit', () => {
   const UNPRICED = /labor rate needed|price me|unpriced|missing price|needs? a price|set (a |the )?price/i
 
   test('exhaustive: every TYPE dropdown option computes without a NaN/console error', async ({ page }, testInfo) => {
-    test.setTimeout(180000)
+    // Fire Pit has 4 structure-type tabs, so this cycles far more select/option
+    // pairs than the other modules; 180s was not enough on prod (CI timeout,
+    // 2026-08-20). Raised — coverage stays "every option", no options skipped.
+    test.setTimeout(300000)
     const errors = collectErrors(page)
     const ok = await openFirePit(page)
     test.skip(!ok, 'Fire Pit editor not reachable on this estimate.')
-    const selects = page.locator('select')
-    const nSel = await selects.count()
-    for (let s = 0; s < nSel; s++) {
-      const sel = selects.nth(s)
-      const optTexts = await sel.locator('option').allTextContents()
-      // Skip vendor selects (they contain a "Standard" option and trigger a slow
-      // catalog refetch) — the TYPE selects are the bug-relevant ones.
-      if (optTexts.some(t => /^\s*standard\s*$/i.test(t))) continue
-      for (let o = 0; o < optTexts.length; o++) {
-        const label = (optTexts[o] || '').trim()
-        if (!label || /^select/i.test(label)) continue
-        await sel.selectOption({ index: o }).catch(() => {})
-        // Fast in-page scan — a getByText locator query per option is too slow
-        // across every select/option and blows the test timeout on prod.
-        // NaN/Infinity in the output is a real calc bug → fail hard.
-        const bad = await page.evaluate(() => /\bNaN\b|Infinity/.test(document.body.innerText))
-        expect(bad, `Option "${label}" produced NaN/Infinity`).toBe(false)
-      }
-    }
+    // Fast DOM-dispatch scan (helpers.scanEveryOptionForNaN) — replaces per-option
+    // Playwright selectOption, whose actionability waits blew the 180s/600s ceiling
+    // on Fire Pit's 4-tab editor. Cycles every non-vendor option, same coverage.
+    const bad = await scanEveryOptionForNaN(page)
+    expect(bad, `Options producing NaN/Infinity: ${bad.join(', ')}`).toEqual([])
     await testInfo.attach('fire-pit-exhaustive.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
     // Console/HTTP errors during option cycling = real bug.
     expect(errors, `Console/HTTP errors:\n${errors.join('\n')}`).toEqual([])

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { collectErrors, openModule, sectionSelect } from './helpers.js'
+import { collectErrors, openModule, scanEveryOptionForNaN } from './helpers.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Walls module — the live-browser layer of the MODULE-TEST-CHECKLIST (Goal 4 +
@@ -47,22 +47,11 @@ test.describe('Walls', () => {
     const errors = collectErrors(page)
     const ok = await openModule(page, 'Walls')
     test.skip(!ok, 'Walls editor not reachable on this estimate.')
-    const selects = page.locator('select')
-    const nSel = await selects.count()
-    for (let s = 0; s < nSel; s++) {
-      const sel = selects.nth(s)
-      const optTexts = await sel.locator('option').allTextContents()
-      // Skip vendor selects (contain a "Standard" option, trigger a slow refetch).
-      if (optTexts.some(t => /^\s*standard\s*$/i.test(t))) continue
-      for (let o = 0; o < optTexts.length; o++) {
-        const label = (optTexts[o] || '').trim()
-        if (!label || /^select/i.test(label)) continue
-        await sel.selectOption({ index: o }).catch(() => {})
-        const bad = await page.evaluate(() => /\bNaN\b|Infinity/.test(document.body.innerText))
-        expect(bad, `Option "${label}" produced NaN/Infinity`).toBe(false)
-      }
-    }
+    // Fast DOM-dispatch scan (helpers.scanEveryOptionForNaN) — cycles every
+    // non-vendor option without Playwright's per-option actionability waits.
+    const bad = await scanEveryOptionForNaN(page)
     await testInfo.attach('walls-exhaustive.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
+    expect(bad, `Options producing NaN/Infinity: ${bad.join(', ')}`).toEqual([])
     expect(errors, `Console/HTTP errors:\n${errors.join('\n')}`).toEqual([])
   })
 
