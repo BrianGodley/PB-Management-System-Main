@@ -51,8 +51,23 @@ deletes, no rate edits, no SQL.
 - **Fire Pit module renders if present** — asserts the Fire Pit section shows when
   the estimate has one.
 
+## Calc unit tests (`node --test`, run by Claude in seconds — no prod, no network)
+
+Run: `npm run test:unit`. These lock pure calc logic directly, sidestepping the
+frozen-rate-snapshot ambiguity of saved-estimate E2E.
+
+### `firePitCalc.test.mjs` — LOCKED 2026-08-19 (goal met, red→green verified)
+- Built-in Precast cap → material AND labor both non-zero.
+- Vendor cap via the Master-Rates default-labor pointer → material AND labor both
+  non-zero (THE fix we chased).
+- Vendor cap with no labor configured → 0 labor + unpriced flag (never a silent
+  fallback).
+- Vendor price overrides the house unit for material.
+- Built-in Smooth Stucco finish → material AND labor both non-zero.
+- `resolveLabor` priority: numeric coeff > default-labor pointer > 0.
+
 ## Backlog (not yet written)
-- Fire Pit cap + finish: after entry, BOTH material and labor are non-zero (the fix
-  from Aug 2026) — needs interactive selectors from an estimate screenshot.
 - Walls Modular: block math renders; a dimensionless product surfaces $0, not 8x8x16.
-- Unpriced item surfaces the fix-it modal / $0, never a silent fallback.
+- E2E (interactive) Fire Pit cap+finish on a BLANK estimate: Add module → pick Fire
+  Pit → in the modal enter a cap + finish → the row cell shows `$… · …h`. (Brian's
+  flow; needs the editor-modal DOM from a run screenshot.)

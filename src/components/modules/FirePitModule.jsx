@@ -9,6 +9,7 @@ import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { groutCuFtPerBlock } from '../../lib/cmuGrout'
 import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
+import { computeCapRow, computeFinishRow } from './firePitCalc'
 import { resolveUtilRow } from '../../lib/utilRow'
 import UnpricedItemModal from '../UnpricedItemModal'
 
@@ -609,35 +610,14 @@ function calcFirePit(
   const laborUnset = []
 
   // ── Wall finish per-row calc: material (vendor-overridable unit) + labor ──────
+  // Math lives in the pure, unit-tested firePitCalc.js; here we resolve the catalog
+  // meta + vendor price and inject them, then collect any unpriced-labor flag.
   const finishRowCalc = row => {
     const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, 'Fire Pit', row.vendor)
-    const sf = n(row.sf)
-    if (!meta || sf <= 0) return { mat: 0, hrs: 0 }
-    const houseUnit = meta.master ? meta.matUnit : p(FP_RATES[meta.key].dbName)
-    const unit = wfVendorPrice(row.vendor, row.type, materialRows, WF_CAT, { category: 'Fire Pit' }) ?? houseUnit
-    let mat = 0
-    if (meta.unit === 'stone') {
-      // Material $/Sq Ft (shared Finishes rate) + delivery $/SF + flat misc + add/SF.
-      mat =
-        sf * unit +
-        sf * (meta.delivPerSF || 0) +
-        (meta.misc || 0) +
-        (meta.addPerSF ? sf * meta.addPerSF : 0)
-    } else {
-      mat =
-        sf * unit * (meta.waste || 1) +
-        (meta.screwPer5 ? (sf / 5) * meta.screwPer5 : 0) +
-        (meta.adhesivePerSF ? sf * meta.adhesivePerSF : 0)
-    }
-    // Labor: a numeric coefficient on the item, else the Master-Rates default-labor
-    // pointer (calc_meta.labor_rate names a labor_rates row). NO type fallback — an
-    // unset/zero rate is pushed to laborUnset so the user fixes it via the modal.
-    const labName = meta.master ? meta.labor_rate : FP_RATES[meta.labKey].dbName
-    const labRate = meta.master && n(meta.laborCoeff) > 0 ? n(meta.laborCoeff) : labName ? p(labName) : 0
-    if (labRate <= 0)
-      laborUnset.push({ kind: 'labor', name: labName || null, label: row.type, category: 'Fire Pit', unit: null })
-    const hrs = sf * labRate // all finish labor is hours per Sq Ft now
-    return { mat, hrs, unit }
+    const vendorUnit = wfVendorPrice(row.vendor, row.type, materialRows, WF_CAT, { category: 'Fire Pit' })
+    const r = computeFinishRow(row, { meta, vendorUnit, mp, fpRates: FP_RATES })
+    if (r.laborUnset) laborUnset.push(r.laborUnset)
+    return r
   }
   const wallFinishCalc = (wallFinishRows || []).map(finishRowCalc)
   const finishMat = wallFinishCalc.reduce((s, c) => s + c.mat, 0)
@@ -646,18 +626,10 @@ function calcFirePit(
   // ── Wall cap per-row calc: $/LF material (vendor-overridable) + hrs/LF labor ──
   const capRowCalc = row => {
     const meta = CAP_META[row.type] || masterWallMeta(CAP_CAT, row.type, materialRows, null, row.vendor)
-    const lf = n(row.lf)
-    if (!meta || lf <= 0) return { mat: 0, hrs: 0 }
-    const houseUnit = meta.master ? meta.matUnit : p(FP_RATES[meta.matKey].dbName)
-    const unit = wfVendorPrice(row.vendor, row.type, materialRows, CAP_CAT) ?? houseUnit
-    // Labor: a numeric coefficient on the item, else the Master-Rates default-labor
-    // pointer (calc_meta.labor_rate). NO type fallback — an unset/zero rate is pushed
-    // to laborUnset so the user fixes it via the modal.
-    const labName = meta.master ? meta.labor_rate : FP_RATES[meta.labKey].dbName
-    const labCoef = meta.master && n(meta.laborCoeff) > 0 ? n(meta.laborCoeff) : labName ? p(labName) : 0
-    if (labCoef <= 0)
-      laborUnset.push({ kind: 'labor', name: labName || null, label: row.type, category: 'Fire Pit', unit: null })
-    return { mat: lf * unit, hrs: lf * labCoef, unit }
+    const vendorUnit = wfVendorPrice(row.vendor, row.type, materialRows, CAP_CAT)
+    const r = computeCapRow(row, { meta, vendorUnit, mp, fpRates: FP_RATES })
+    if (r.laborUnset) laborUnset.push(r.laborUnset)
+    return r
   }
   const capCalc = (capRows || []).map(capRowCalc)
   const capMat = capCalc.reduce((s, c) => s + c.mat, 0)
