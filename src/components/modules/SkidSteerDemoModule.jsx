@@ -12,7 +12,7 @@ import ModuleHeaderSlot from './ModuleHeaderSlot'
 //   • JJ compaction: hours = tons / 1.75  (1.75 is tons/hr, not hrs/ton)
 //   • Misc Vertical: LF × Height(in) × Width(in) → CF → tons (150 lb/cf)
 //   • Footing: SF × Depth(in) → tons (same as flat)
-//   • Rebar add-on: SF × (lr['Demo - Skid Rebar'] min/SF) / 60 → hrs
+//   • Rebar add-on: SF × lr['Demo - Skid Rebar'] (hrs/SF)
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback, useContext, useRef } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
@@ -101,7 +101,7 @@ function calcDemo(
   const laborGradeFill = n(lr['Demo - Skid - Grade Fill SF'])
   const laborJJ = n(lr['Demo - Skid - JJ SF'])
   const laborSS = n(lr['Demo - Skid - SS Compact SF'])
-  const rebarMinPerSF = n(lr['Demo - Skid Rebar'])
+  const rebarHrsPerSF = n(lr['Demo - Skid Rebar'])
   const shrubRate = n(lr['Demo - Skid Shrub'])
   const stumpSmallRate = n(lr['Demo - Skid Stump Small'])
   const stumpMedRate = n(lr['Demo - Skid Stump Medium'])
@@ -211,7 +211,7 @@ function calcDemo(
   const ssCmpHrs = sfLaborHrs(state.ssCmpSF, state.ssCmpDepth || 4, laborSS) // no access mod
 
   // ── Rebar add-on ─────────────────────────────────────────────────────────
-  const rebarHrs = n(state.rebarSF) * (rebarMinPerSF / 60)
+  const rebarHrs = n(state.rebarSF) * rebarHrsPerSF // hrs-per-unit (hrs per Sq Ft)
 
   // ── Vegetation ───────────────────────────────────────────────────────────
   // Shrub Demo — per-area rows: qty × shrub rate × height modifier (Hand format).
@@ -530,7 +530,7 @@ function calcDemo(
     rateGrass,
     laborJJ,
     laborSS,
-    rebarMinPerSF,
+    rebarHrsPerSF,
     treeSmall,
     treeMed,
     treeLarge,
@@ -1221,7 +1221,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
             <p className="text-xs text-gray-500 mb-0.5 inline-flex items-center gap-1">
               Rebar SF
               <span className="text-gray-400 font-normal">
-                ({calc.rebarMinPerSF} min/SF = {(calc.rebarMinPerSF / 60).toFixed(5)} hrs/SF)
+                ({calc.rebarHrsPerSF.toFixed(5)} hrs/SF)
               </span>
             </p>
             <Inp

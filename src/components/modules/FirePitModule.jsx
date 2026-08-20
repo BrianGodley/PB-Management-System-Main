@@ -658,7 +658,7 @@ function calcFirePit(
   // = 1.0 cf/LF at the Utilities trench excavation rate) — this replaces the old
   // separate Trench section. Vendor overrides only the material unit price.
   const GAS_TRENCH_CF_PER_LF = n(mp['FP Gas Trench CF per LF'])
-  const gasTrenchMinPerCF = n(mp['Utilities Trench Excavation']) // MINUTES per Cu Ft (÷60 below)
+  const gasTrenchHrsPerCF = n(mp['Utilities Trench Excavation']) // hours per Cu Ft
   let epHrs = 0
   let epMat = 0
   // Gas line/fixture items whose picked Type has no labor rate set (calc_meta.
@@ -672,7 +672,7 @@ function calcFirePit(
     if (laborVal <= 0) laborUnset.push({ kind: 'labor', name: laborName, label: r.type, category: 'Utilities', unit: null })
     epMat += lf * matCost
     epHrs += lf * laborVal
-    epHrs += (lf * GAS_TRENCH_CF_PER_LF * gasTrenchMinPerCF) / 60 // trenching (min/CF × CF/LF × LF ÷60 → hrs)
+    epHrs += lf * GAS_TRENCH_CF_PER_LF * gasTrenchHrsPerCF // trenching (hrs/CF × CF/LF × LF)
   })
   ;(epGasRows || []).forEach(r => {
     if (!r.type) return

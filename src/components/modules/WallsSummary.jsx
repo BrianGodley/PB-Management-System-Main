@@ -39,12 +39,30 @@ const WALL_RATES = {
   wp3CoatRollOn: { db: 'Wall WP 3 Coat Roll On' },
   wpThoroseal: { db: 'Wall WP Thoroseal Roll On' },
   wpDimpleMembrane: { db: 'Wall WP Dimple Membrane' },
+  // Per-type waterproofing LABOR rates (hrs/SF) — mirror the module so the summary
+  // uses the same per-type install-labor rate instead of a hardcoded productivity.
+  wpLabor: { db: 'Wall WP Install Labor' },
+  wpLabPrimerMembrane: { db: 'Wall WP Primer + Membrane Labor' },
+  wpLab2Coat: { db: 'Wall WP 2 Coats Roll On Labor' },
+  wpLabThoroseal: { db: 'Wall WP Thoroseal Labor' },
+  wpLabDimple: { db: 'Wall WP Dimple Labor' },
 }
 const WP_KEY = {
   'Primer & Membrane': 'wpPrimerMembrane',
   '3 Coats Roll On': 'wp3CoatRollOn',
   'Thoroseal & Roll On': 'wpThoroseal',
   'Dimple Membrane': 'wpDimpleMembrane',
+}
+// Type → per-type WP labor rate key (mirrors WallsModule WP_LABOR_KEY, incl. aliases).
+const WP_LABOR_KEY = {
+  'Primer + Membrane': 'wpLabPrimerMembrane',
+  '2 Coats Roll On': 'wpLab2Coat',
+  'Thoroseal 2 Coats': 'wpLabThoroseal',
+  'Primer, Membrane + Dimple': 'wpLabDimple',
+  'Primer & Membrane': 'wpLabPrimerMembrane',
+  '3 Coats Roll On': 'wpLab2Coat',
+  'Thoroseal & Roll On': 'wpLabThoroseal',
+  'Dimple Membrane': 'wpLabDimple',
 }
 
 const wallMatPrice = resolveMaterialPrice
@@ -174,8 +192,11 @@ function computeWpRow(row, mp, materialRows) {
     subUnit = 0
   if (sf > 0 && k) {
     const pr = wallMatPrice(WALL_RATES[k].db, row.vendor, materialRows, mp)
+    // Per-type install labor (hrs/SF), matching WallsModule — no hardcoded 200.
+    const labKey = WP_LABOR_KEY[row?.type]
+    const wpRate = labKey ? n(mp?.[WALL_RATES[labKey].db]) : n(mp?.[WALL_RATES.wpLabor.db])
     mat = sf * pr
-    hrs = sf / 200
+    hrs = sf * wpRate // wpRate is hours per Sq Ft
     subUnit = pr
   }
   const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : subUnit

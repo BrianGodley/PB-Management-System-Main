@@ -460,7 +460,7 @@ function calcOutdoorKitchen(
   // a 6" wide × 24" deep trench (per LF) using the Utilities trench excavation
   // rate (min/cf). 6"×24" = 1.0 cf per LF.
   const TRENCH_CF_PER_LF = p(OK_RATES.gasTrenchCfPerLf.dbName)
-  const trenchMinPerCF = n(mp[OK_TRENCH_RATE_NAME]) // Utilities Trench Excavation — MINUTES per Cu Ft (÷60 below)
+  const trenchHrsPerCF = n(mp[OK_TRENCH_RATE_NAME]) // Utilities Trench Excavation — hours per Cu Ft
   let epHrs = 0
   let epMat = 0
   // Gas/electrical items whose picked Type has no labor rate set (calc_meta.
@@ -473,7 +473,7 @@ function calcOutdoorKitchen(
     if (laborVal <= 0) laborUnset.push({ kind: 'labor', name: laborName, label: r.type, category: 'Utilities', unit: null })
     epMat += lf * matCost
     epHrs += lf * laborVal
-    epHrs += (lf * TRENCH_CF_PER_LF * trenchMinPerCF) / 60 // trenching (min/CF × CF/LF × LF ÷60 → hrs)
+    epHrs += lf * TRENCH_CF_PER_LF * trenchHrsPerCF // trenching (hrs/CF × CF/LF × LF)
   })
   ;[
     [epGasRows, UTIL_CAT.gas, GAS_TYPE_ARR],

@@ -16,13 +16,13 @@ import { resolveMaterialPrice } from '../../lib/materialCatalog'
 // rate snapshots (laborRates / materialPrices) — no hardcoded fallbacks.
 const ADDON_META = {
   'Tree Stake': { matKey: 'Tree Stake', labKey: 'Tree Stakes - Install Rate', mode: 'perDay', unit: 'ea' },
-  'Root Barrier 12"': { matKey: 'Root Barrier 12in', labKey: 'Root Barrier - Install Rate', mode: 'perMin', unit: 'LF' },
-  'Root Barrier 24"': { matKey: 'Root Barrier 24in', labKey: 'Root Barrier - Install Rate', mode: 'perMin', unit: 'LF' },
-  'Gopher Basket 1 gal': { matKey: 'Gopher Basket 1 Gal', labKey: 'Gopher Basket - Install Rate', mode: 'perMin', unit: 'ea' },
-  'Gopher Basket 5 gal': { matKey: 'Gopher Basket 5 Gal', labKey: 'Gopher Basket - Install Rate', mode: 'perMin', unit: 'ea' },
-  'Gopher Basket 15 gal': { matKey: 'Gopher Basket 15 Gal', labKey: 'Gopher Basket - Install Rate', mode: 'perMin', unit: 'ea' },
-  'Mesh Flat': { matKey: 'Mesh Flat', labKey: 'Mesh Flat - Install Rate', mode: 'perMin', unit: 'SF' },
-  'Jute Fabric': { matKey: 'Jute Fabric', labKey: 'Jute Fabric - Install Rate', mode: 'perMin', unit: 'SF' },
+  'Root Barrier 12"': { matKey: 'Root Barrier 12in', labKey: 'Root Barrier - Install Rate', mode: 'perDay', unit: 'LF' },
+  'Root Barrier 24"': { matKey: 'Root Barrier 24in', labKey: 'Root Barrier - Install Rate', mode: 'perDay', unit: 'LF' },
+  'Gopher Basket 1 gal': { matKey: 'Gopher Basket 1 Gal', labKey: 'Gopher Basket - Install Rate', mode: 'perDay', unit: 'ea' },
+  'Gopher Basket 5 gal': { matKey: 'Gopher Basket 5 Gal', labKey: 'Gopher Basket - Install Rate', mode: 'perDay', unit: 'ea' },
+  'Gopher Basket 15 gal': { matKey: 'Gopher Basket 15 Gal', labKey: 'Gopher Basket - Install Rate', mode: 'perDay', unit: 'ea' },
+  'Mesh Flat': { matKey: 'Mesh Flat', labKey: 'Mesh Flat - Install Rate', mode: 'perDay', unit: 'SF' },
+  'Jute Fabric': { matKey: 'Jute Fabric', labKey: 'Jute Fabric - Install Rate', mode: 'perDay', unit: 'SF' },
 }
 
 // Legacy `addons` field → new Item type, for old flat saves.

@@ -241,8 +241,8 @@ function calcDrainage(
       d = n(r.depth)
     if (lf > 0 && w > 0 && d > 0) {
       const cf = lf * (w / 12) * (d / 12)
-      const minsPerCf = n(materialPrices[TRENCH_LABOR_RATE_NAME[r.equipment]])
-      trenchHrs += (cf * minsPerCf) / 60
+      const hrsPerCf = n(materialPrices[TRENCH_LABOR_RATE_NAME[r.equipment]])
+      trenchHrs += cf * hrsPerCf
     }
   })
 
@@ -265,8 +265,8 @@ function calcDrainage(
 
   // ── French Drains ────────────────────────────────────────────────────────
   // Perforated pipe (same math as solid pipe) + section-level fabric wrap and
-  // gravel bed priced $/ft on the TOTAL French-drain linear feet. Labor $/ft is
-  // converted to hours via laborRatePerHour so it flows through man-days/GPMD.
+  // gravel bed priced $/ft on the TOTAL French-drain linear feet. Fabric/gravel
+  // labor rates are hrs per Ln Ft (matches Walls) — hours = rate × LF.
   let frenchMat = 0,
     frenchHrs = 0
   ;(frenchRows || []).forEach(r => {
@@ -317,8 +317,8 @@ function calcDrainage(
         : 0
 
   frenchMat += totalFrenchLF * fabricMatPerFt + totalFrenchLF * gravelMatPerFt
-  frenchHrs += (fabricLaborPerFt * totalFrenchLF) / laborRatePerHour
-  frenchHrs += (gravelLaborPerFt * totalFrenchLF) / laborRatePerHour
+  frenchHrs += fabricLaborPerFt * totalFrenchLF
+  frenchHrs += gravelLaborPerFt * totalFrenchLF
 
   let totalFixQty = 0
   fixtureRows.forEach(r => {
@@ -1063,8 +1063,8 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                 // Use the same rate source as the calc (DB value first, hardcoded
                 // fallback second) so the row's Est. Hrs matches the GPMD total.
                 const laborName = TRENCH_LABOR_RATE_NAME[row.equipment]
-                const minsPerCf = n(materialPrices[laborName])
-                const hrs = cf > 0 ? (cf * minsPerCf) / 60 : 0
+                const hrsPerCf = n(materialPrices[laborName])
+                const hrs = cf > 0 ? cf * hrsPerCf : 0
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">

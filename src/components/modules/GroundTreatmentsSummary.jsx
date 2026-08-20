@@ -436,6 +436,18 @@ export default function GroundTreatmentsSummary({ module }) {
         ? [{ type: mulchType, sf: mulchSF, depth: mulchDepth, weedFabric: mulchWeedFabric }]
         : []
   const mulchCYPerDay = mp(GT_RATES.mulchLab.dbName)
+  // Coefficients mirrored from the module (all DB-driven, hrs-per-unit) so the
+  // summary computes labor identically to GroundTreatmentsModule — pure qty×rate,
+  // no divide-by-production-rate, no ×8, no hardcoded 200/1.62/1000/1.25/1.1.
+  const mulchCoverageSfDay = mp('GT - Mulch Coverage')
+  const dgTonsDenom = mp('GT - DG Tons Denominator')
+  const dgRemovalSwell = mp('GT - DG Removal Swell')
+  const dgCoverageSfDay = mp('GT - DG Cleanup Coverage')
+  const dgCementLaborFactor = mp('GT - DG Cement Labor Factor')
+  const dgMaterialMarkup = mp('GT - DG Material Markup')
+  const dgPlacementPerTon = mp('GT - DG Placement Labor per Ton')
+  const aggregateRemovalSwell = mp('GT - Aggregate Removal Swell')
+  const stepperSfPerTon = mp('GT - Steppers SF Per Ton')
   let _mulchDeliveryDone = false
   const mulchLines = _mulchRows
     .map((r, i) => {
@@ -447,7 +459,7 @@ export default function GroundTreatmentsSummary({ module }) {
         mat += mp(GT_RATES.mulchDelivery.dbName)
         _mulchDeliveryDone = true
       }
-      let hrs = (CY / mulchCYPerDay) * 8 + (n(r.sf) / 3200) * 8
+      let hrs = CY * mulchCYPerDay + n(r.sf) * mulchCoverageSfDay
       if (fabric) {
         mat += n(r.sf) * mp(GT_RATES.gravelFabricMat.dbName)
         hrs += n(r.sf) * mp(GT_RATES.gravelFabricLab.dbName)
@@ -484,7 +496,7 @@ export default function GroundTreatmentsSummary({ module }) {
   const dgLines = _dgRows
     .map((r, i) => {
       if (!(n(r.sf) > 0)) return null
-      const tons = (n(r.sf) * n(r.depth)) / 200
+      const tons = (n(r.sf) * n(r.depth)) / dgTonsDenom
       // DG MATERIAL priced per CUBIC YARD (mirrors the module): material $ =
       // CY × $/CY. CY = SF × depth_in / 324 (27 cf/cy × 12 in/ft). `tons` is kept
       // only for labor and the per-ton Cement Mix add-on.
@@ -495,12 +507,12 @@ export default function GroundTreatmentsSummary({ module }) {
       const matBase =
         CY * perCY +
         (cement ? tons * mp(GT_RATES.dgCementPerTon.dbName) : 0)
-      let mat = matBase * 1.1
+      let mat = matBase * dgMaterialMarkup
       const baseHrs =
         r.method === 'Hand'
-          ? (tons * 1.62) / dgHandRate + (n(r.sf) / 1000) * 8 + tons
-          : ((tons * 1.62) / dgMachineRate) * 8 + (n(r.sf) / 1000) * 8 + tons
-      let hrs = baseHrs + (cement ? tons * 1.25 : 0)
+          ? tons * dgRemovalSwell * dgHandRate + n(r.sf) * dgCoverageSfDay + tons * dgPlacementPerTon
+          : tons * dgRemovalSwell * dgMachineRate + n(r.sf) * dgCoverageSfDay + tons * dgPlacementPerTon
+      let hrs = baseHrs + (cement ? tons * dgCementLaborFactor : 0)
       if (fabric) {
         mat += n(r.sf) * mp(GT_RATES.gravelFabricMat.dbName)
         hrs += n(r.sf) * mp(GT_RATES.gravelFabricLab.dbName)
@@ -529,7 +541,7 @@ export default function GroundTreatmentsSummary({ module }) {
       const machineRate = mp(GT_RATES.gravelMachineLab.dbName)
       const handRate = mp(GT_RATES.gravelHandLab.dbName)
       const excavLab =
-        r.method === 'Machine' ? ((CY * 1.62) / machineRate) * 8 : ((CY * 1.62) / handRate) * 8
+        r.method === 'Machine' ? CY * aggregateRemovalSwell * machineRate : CY * aggregateRemovalSwell * handRate
       const fabricLab = fabric ? n(r.sf) * mp(GT_RATES.gravelFabricLab.dbName) : 0
       const hrs = excavLab + fabricLab
       return {
@@ -559,7 +571,7 @@ export default function GroundTreatmentsSummary({ module }) {
       const machineRate = mp(GT_RATES.gravelMachineLab.dbName)
       const handRate = mp(GT_RATES.gravelHandLab.dbName)
       const excavLab =
-        r.method === 'Machine' ? ((CY * 1.62) / machineRate) * 8 : ((CY * 1.62) / handRate) * 8
+        r.method === 'Machine' ? CY * aggregateRemovalSwell * machineRate : CY * aggregateRemovalSwell * handRate
       const fabricLab = fabric ? n(r.sf) * mp(GT_RATES.gravelFabricLab.dbName) : 0
       const hrs = excavLab + fabricLab
       return {
@@ -588,7 +600,7 @@ export default function GroundTreatmentsSummary({ module }) {
       const machineRate = mp(GT_RATES.gravelMachineLab.dbName)
       const handRate = mp(GT_RATES.gravelHandLab.dbName)
       const excavLab =
-        r.method === 'Machine' ? ((CY * 1.62) / machineRate) * 8 : ((CY * 1.62) / handRate) * 8
+        r.method === 'Machine' ? CY * aggregateRemovalSwell * machineRate : CY * aggregateRemovalSwell * handRate
       const fabricLab =
         n(r.sf) * mp(GT_RATES.gravelFabricLab.dbName)
       const hrs = excavLab + fabricLab
@@ -685,7 +697,7 @@ export default function GroundTreatmentsSummary({ module }) {
   ]
   stepperDefs.forEach(def => {
     if (def.sf <= 0) return
-    const tons = def.sf / 80
+    const tons = stepperSfPerTon > 0 ? def.sf / stepperSfPerTon : 0
     const savedType = _stepperType[def.key]
     const savedVendor = _stepperVendor[def.key]
     const legacyRate = n(def.matOverride) || mp(def.matRate.dbName)
@@ -697,7 +709,7 @@ export default function GroundTreatmentsSummary({ module }) {
         : legacyRate
     const sfPerDay = mp(def.labRate.dbName)
     const mat = tons * rate
-    const hrs = sfPerDay > 0 ? (def.sf / sfPerDay) * 8 : 0
+    const hrs = n(def.sf) * sfPerDay // hrs-per-unit (hrs per Sq Ft), matches module
     const typeSuffix = savedType && savedType !== def.houseType ? ` · ${savedType}` : ''
     stepperLines.push({
       label: `${def.label} — ${def.sf.toLocaleString()} Sq Ft`,

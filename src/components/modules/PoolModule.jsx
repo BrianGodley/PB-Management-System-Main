@@ -851,15 +851,15 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   let epMat = 0
   // (laborUnset is declared earlier, above the Waterline Tile section, so the
   // tile/spillway/coping/raised loops can push to it without a TDZ error.)
-  // Trenching: the Utilities Trench/Hand Excavation rate is MINUTES per Cu Ft, so
-  // hrs = cf × min/cf ÷ 60 for the chosen method (matches Drainage/Utilities).
+  // Trenching: the Utilities Trench/Hand Excavation rate is HOURS per Cu Ft, so
+  // hrs = cf × rate for the chosen method (matches Drainage/Utilities).
   ;(state.epTrenchRows || []).forEach(r => {
     const lf = n(r.lf),
       w = n(r.width),
       d = n(r.depth)
     if (lf > 0 && w > 0 && d > 0) {
       const cf = lf * (w / 12) * (d / 12)
-      epHrs += (cf * n(materialPrices[POOL_TRENCH_LABOR[r.equipment]])) / 60
+      epHrs += cf * n(materialPrices[POOL_TRENCH_LABOR[r.equipment]])
     }
   })
   // Per-LF pipe/wire sections (Gas Pipe, Electrical Pipe, Electrical Wiring).
