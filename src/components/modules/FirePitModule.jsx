@@ -652,9 +652,12 @@ function calcFirePit(
         metaMaster: meta?.master,
         houseUnit: meta ? (meta.master ? meta.matUnit : n(mp[FP_RATES[meta.matKey]?.dbName])) : 'no-meta',
         vendorPrice: wfVendorPrice(row.vendor, row.type, materialRows, CAP_CAT),
-        wallCapCatalog: (materialRows || [])
-          .filter(r => r.sub_category === CAP_CAT)
-          .map(r => `${r.name} | vendor:${r.vendor_id || 'STD/null'} | $${r.unit_cost}`),
+        CAP_CAT,
+        totalMaterialRows: (materialRows || []).length,
+        distinctSubcats: [...new Set((materialRows || []).map(r => r.sub_category))],
+        anyPrecast: (materialRows || [])
+          .filter(r => (r.name || '').toLowerCase().includes('precast'))
+          .map(r => `${r.name} | cat:${r.category} | sub:${r.sub_category} | v:${r.vendor_id || 'null'} | $${r.unit_cost}`),
       })
     }
     if (!meta || lf <= 0) return { mat: 0, hrs: 0 }
