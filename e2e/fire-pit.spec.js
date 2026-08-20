@@ -62,13 +62,13 @@ async function openFirePit(page) {
   return (await editorSignal.count()) > 0
 }
 
-// Find the <select> elements inside the section whose header text matches `title`.
-function sectionSelects(page, title) {
-  // The section is a <div> containing a SectionHeader (title text) then a table.
+// The first <select> that FOLLOWS a section's header text (robust to wrapper
+// nesting — the header + its table are siblings, so scope by document order).
+function sectionSelect(page, title) {
   return page
-    .locator('div', { has: page.getByText(new RegExp(`^\\s*${title}\\s*$`, 'i')) })
-    .last()
-    .locator('select')
+    .getByText(new RegExp(`^\\s*${title}\\s*$`, 'i'))
+    .first()
+    .locator('xpath=following::select[1]')
 }
 
 test.describe('Fire Pit', () => {
@@ -89,28 +89,29 @@ test.describe('Fire Pit', () => {
   test('Gas Line Type dropdown is populated (bug: was empty from wrong subcategory)', async ({ page }) => {
     const ok = await openFirePit(page)
     test.skip(!ok, 'Fire Pit editor not reachable on this estimate.')
-    const selects = sectionSelects(page, 'Gas Line')
-    await expect(selects.first(), 'No Type dropdown in Gas Line').toBeVisible()
+    const select = sectionSelect(page, 'Gas Line')
+    await expect(select, 'No Type dropdown in Gas Line').toBeVisible()
     // A working picker has the placeholder plus at least one real gas-pipe option.
-    const optionCount = await selects.first().locator('option').count()
+    const optionCount = await select.locator('option').count()
     expect(optionCount, 'Gas Line Type dropdown is empty — subcategory mismatch').toBeGreaterThan(1)
   })
 
   test('Trenching row with dimensions computes non-zero hours', async ({ page }) => {
     const ok = await openFirePit(page)
     test.skip(!ok, 'Fire Pit editor not reachable on this estimate.')
-    // Locate the Trenching section's numeric inputs (LF, Width, Depth) and fill them.
-    const trench = page
-      .locator('div', { has: page.getByText(/^\s*Trenching\s*$/i) })
-      .last()
-    const nums = trench.locator('input')
-    await expect(nums.first(), 'No Trenching inputs').toBeVisible()
-    // First row inputs are LF, Width, Depth (Method is a <select>).
-    await nums.nth(0).fill('20')
-    await nums.nth(1).fill('6')
-    await nums.nth(2).fill('24')
-    // Est. Hrs cell should now show a non-"—" value.
-    await expect(trench.getByText(/\d+\.\d{2}/).first(), 'Trench hours did not compute').toBeVisible()
+    const trench = page.getByText(/^\s*Trenching\s*$/i).first()
+    // Method <select> (Trench/Hand) then LF/Width/Depth <input>s follow the heading.
+    const method = trench.locator('xpath=following::select[1]')
+    await expect(method, 'No Trenching Method select').toBeVisible()
+    expect(await method.locator('option').count(), 'Method options (Trench/Hand)').toBeGreaterThanOrEqual(2)
+    const lf = trench.locator('xpath=following::input[1]')
+    await lf.fill('20')
+    await trench.locator('xpath=following::input[2]').fill('6')
+    await trench.locator('xpath=following::input[3]').fill('24')
+    await expect(lf, 'LF did not accept input').toHaveValue('20')
+    // Est. Hrs cell (the td after the depth input's td) should show a decimal, not "—".
+    const hrsCell = trench.locator('xpath=following::input[3]/ancestor::td/following-sibling::td[1]')
+    await expect(hrsCell, 'Trench hours did not compute').toHaveText(/\d+\.\d{2}/)
   })
 
   test('wall finishes resolve a price (no unpriced/labor-needed banner) for standard types', async ({ page }, testInfo) => {
