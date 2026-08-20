@@ -12,6 +12,11 @@ import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { groutCyPerBlock as cmuGroutCyPerBlock } from '../../lib/cmuGrout'
 import { cmuStructQuantities, cmuStructTotals, pipFormSf } from './wallsStruct'
 import {
+  computeWallFinishRow as _finishRow,
+  computeCapRow as _capRow,
+  computeWpRow as _wpRow,
+} from './wallsCalc'
+import {
   useNewMaterialCatalog,
   resolveMaterialPrice,
 } from '../../lib/materialCatalog'
@@ -797,178 +802,45 @@ const wallMatPrice = resolveMaterialPrice
 //    calcWalls finish math; only the material price source is vendor-resolved.
 //    Returns { mat, hrs } for In-House and { subUnit, subEach, subMat } for Sub.
 function computeWallFinishRow(row, mp, materialRows) {
-  const sf = n(row.sf)
-  const v = row.vendor
+  // Math lives in the pure, unit-tested wallsCalc.js; here we resolve the labor
+  // coefficients (WALL_RATES keys) and the vendor/catalog material $/unit.
   const lab = k => n(mp?.[WALL_RATES[k].db])
-  // Material price comes from the selected Wall Finish catalog product (per
-  // vendor); a per-estimate $/unit override still wins if entered.
-  const meta = WALL_FINISH_META[row.type] || {}
-  const matFb = 0
-  const catP = catalogItemPrice(materialRows, WALL_FINISH_SUBCAT, row.type, v, matFb)
-  const rate = n(row.rateIn) > 0 ? n(row.rateIn) : catP
-  let mat = 0,
-    hrs = 0,
-    subUnit = 0,
-    tons = 0
-  switch (row.type) {
-    case 'Sand Stucco': {
-      hrs = sf > 0 ? sf * lab('sandStuccoLab') : 0
-      mat = sf * rate
-      subUnit = rate
-      break
-    }
-    case 'Smooth Stucco': {
-      hrs = sf > 0 ? sf * lab('smoothStuccoLab') : 0
-      mat = sf * rate
-      subUnit = rate
-      break
-    }
-    case 'Ledgerstone': {
-      hrs = sf > 0 ? sf * lab('ledgerstoneLab') : 0
-      mat = sf > 0 ? sf * rate * lab('ledgerWaste') + (sf / lab('ledgerSetSfPerUnit')) * lab('ledgerSetUnitCost') : 0
-      subUnit = rate * lab('ledgerWaste') + lab('ledgerSubExtraPerSf')
-      break
-    }
-    case 'Stacked Stone': {
-      hrs = sf > 0 ? sf * lab('stackedStoneLab') : 0
-      mat = sf > 0 ? sf * rate * lab('stackedWaste') + (sf / lab('stackedSetSfPerUnit')) * lab('stackedSetUnitCost') : 0
-      subUnit = rate * lab('stackedWaste') + lab('stackedSubExtraPerSf')
-      break
-    }
-    case 'Tile': {
-      hrs = sf > 0 ? sf * lab('tileLab') : 0
-      mat = sf > 0 ? sf * rate + sf * lab('tileExtraPerSf') : 0
-      subUnit = rate + lab('tileExtraPerSf')
-      break
-    }
-    case 'Real Flagstone': {
-      hrs = sf > 0 ? sf * lab('flagstoneLab') : 0
-      mat = sf > 0 ? (sf / lab('flagstoneSfPerTon')) * rate + sf * lab('flagstoneExtraPerSf') : 0
-      subUnit = rate / lab('flagstoneSfPerTon') + lab('flagstoneExtraPerSf')
-      tons = sf / lab('flagstoneSfPerTon')
-      break
-    }
-    case 'Real Stone': {
-      hrs = sf > 0 ? sf * lab('realStoneLab') : 0
-      mat = sf > 0 ? (sf / lab('realStoneSfPerTon')) * rate + sf * lab('realStoneExtraPerSf') : 0
-      subUnit = rate / lab('realStoneSfPerTon') + lab('realStoneExtraPerSf')
-      tons = sf / lab('realStoneSfPerTon')
-      break
-    }
-    default:
-      break
-  }
-  const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : subUnit
-  return { mat, hrs, subUnit, subEach, subMat: sf * subEach, tons, unit: 'SF', qty: sf }
+  const catP = catalogItemPrice(materialRows, WALL_FINISH_SUBCAT, row.type, row.vendor, 0)
+  return _finishRow(row, { lab, catP })
 }
 
 // ── Per-row Wall Cap calculator — identical to the original cap math (incl. the
 //    Precast width factor); material price is vendor-resolved.
 function computeCapRow(row, mp, materialRows) {
-  const lf = n(row.lf),
-    widthIn = n(row.widthIn),
-    qty = n(row.qty)
+  // Math lives in the pure, unit-tested wallsCalc.js; here we resolve labor keys,
+  // the named-cap catalog price, the PIP ready-mix $/CY, and — for any catalog cap
+  // (default branch) — its calc_meta per_lf count + labor_rate pointer.
   const v = row.vendor
   const lab = k => n(mp?.[WALL_RATES[k].db])
-  // Cap material price from the Wall Cap catalog product (per vendor). PIP
-  // Concrete caps price off the concrete rate (a poured cap, not a cap product).
-  const capP = (name, fb) => catalogItemPrice(materialRows, WALL_CAP_SUBCAT, name, v, fb)
-  let mat = 0,
-    hrs = 0,
-    subUnit = 0,
-    subQty = 0,
-    unit = 'LF',
-    dispQty = lf
-  switch (row.type) {
-    case 'Flagstone': {
-      const pr = capP('Flagstone', 0)
-      mat = (((widthIn / 12) * lf * 0.0833 * 100) / 2000) * pr
-      hrs = lf * lab('capFlagstoneLab')
-      subUnit = (((widthIn / 12) * 0.0833 * 100) / 2000) * pr
-      subQty = lf
-      break
-    }
-    case 'Precast': {
-      const pr = capP('Precast', 0)
-      const widthFactor = (widthIn || 8) / 8
-      mat = qty * pr * widthFactor
-      hrs = qty * lab('capPrecastLab')
-      subUnit = pr * widthFactor
-      subQty = qty
-      unit = 'ea'
-      dispQty = qty
-      break
-    }
-    case 'PIP Concrete': {
-      const pr = wallMatPrice(WALL_RATES.concreteTruck.db, v, materialRows, mp)
-      mat = ((lf * (widthIn / 12) * 0.333) / 27) * pr
-      hrs = lf * lab('capPipLab')
-      subUnit = (((widthIn / 12) * 0.333) / 27) * pr
-      subQty = lf
-      break
-    }
-    case 'Bullnose Brick': {
-      const pr = capP('Bullnose Brick', 0)
-      mat = lf * pr
-      hrs = lf * lab('capBullnoseLab')
-      subUnit = pr
-      subQty = lf
-      break
-    }
-    default: {
-      // Any catalog Wall Cap product. Priced per LF from its own material_price
-      // for the selected vendor. calc_meta may carry a per-LF count coefficient
-      // (per_lf — e.g. 3 bricks/LF) and its own labor (labor_hr_per_lf), so each
-      // cap type supports its own price AND labor. Defaults keep prior behavior:
-      // per_lf = 1 (price is already per LF) and the standard bullnose labor.
-      const pr = capP(row.type, 0)
-      const capRow =
-        (materialRows || []).find(
-          rr =>
-            rr.sub_category === WALL_CAP_SUBCAT &&
-            rr.name === row.type &&
-            (v && v !== 'Standard' ? rr.vendor_id === v : rr.vendor_id == null)
-        ) || (materialRows || []).find(rr => rr.sub_category === WALL_CAP_SUBCAT && rr.name === row.type)
-      const cm = capRow?.calc_meta || {}
-      const perLf = n(cm.per_lf) || 1
-      // Install labor rides on the item's calc_meta.labor_rate pointer (a master
-      // labor rate), resolved live — no embedded labor_hr_per_lf value, no bullnose
-      // fallback. Unset ⇒ 0 hrs (set the item's Default Labor in Master Rates).
-      const capLabRate = n(mp?.[cm.labor_rate])
-      mat = lf * perLf * pr
-      hrs = lf * capLabRate
-      subUnit = perLf * pr
-      subQty = lf
-      break
-    }
-  }
-  const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : subUnit
-  return { mat, hrs, subUnit, subEach, subMat: subQty * subEach, unit, qty: dispQty, widthIn }
+  const capP = name => catalogItemPrice(materialRows, WALL_CAP_SUBCAT, name, v, 0)
+  const concreteTruckP = wallMatPrice(WALL_RATES.concreteTruck.db, v, materialRows, mp)
+  const capRow =
+    (materialRows || []).find(
+      rr =>
+        rr.sub_category === WALL_CAP_SUBCAT &&
+        rr.name === row.type &&
+        (v && v !== 'Standard' ? rr.vendor_id === v : rr.vendor_id == null)
+    ) || (materialRows || []).find(rr => rr.sub_category === WALL_CAP_SUBCAT && rr.name === row.type)
+  const cm = capRow?.calc_meta || {}
+  const defaultCap = { perLf: n(cm.per_lf) || 1, labRate: n(mp?.[cm.labor_rate]) }
+  return _capRow(row, { lab, capP, concreteTruckP, defaultCap })
 }
 
 // ── Per-row Waterproofing calculator — identical to the original wp math;
 //    material price is vendor-resolved.
 function computeWpRow(row, mp, materialRows) {
-  const sf = n(row?.sf)
-  const k = WP_KEY[row?.type]
-  let mat = 0,
-    hrs = 0,
-    subUnit = 0
-  if (sf > 0 && k) {
-    // Price from the Waterproofing catalog product (per vendor), not a constant.
-    const pr = catalogItemPrice(materialRows, WALL_WP_SUBCAT, row.type, row.vendor)
-    // Per-type install labor (SF/hr). Internal type strings are kept for
-    // backward-compat; WP_LABOR_KEY maps them to the per-type labor rate keys.
-    const labKey = WP_LABOR_KEY[row.type]
-    const wpRate = labKey
-      ? n(mp?.[WALL_RATES[labKey].db])
-      : n(mp?.[WALL_RATES.wpLabor.db])
-    mat = sf * pr
-    hrs = sf * wpRate // wpRate is hours per Sq Ft
-    subUnit = pr
-  }
-  const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : subUnit
-  return { mat, hrs, subUnit, subEach, subMat: sf * subEach, unit: 'SF', qty: sf }
+  // Math lives in the pure, unit-tested wallsCalc.js; here we resolve validity
+  // (type maps to a real WP key), the catalog $/SF, and the per-type install labor.
+  const valid = !!WP_KEY[row?.type]
+  const catP = catalogItemPrice(materialRows, WALL_WP_SUBCAT, row?.type, row?.vendor)
+  const labKey = WP_LABOR_KEY[row?.type]
+  const wpRate = labKey ? n(mp?.[WALL_RATES[labKey].db]) : n(mp?.[WALL_RATES.wpLabor.db])
+  return _wpRow(row, { valid, catP, wpRate })
 }
 
 // Sum a wall entry's own waterproofing rows into { wpHrs, wpMat, wpSubMat }.
