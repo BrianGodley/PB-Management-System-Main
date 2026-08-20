@@ -176,7 +176,11 @@ function wfVendorPrice(vendorSel, typeLabel, materialRows, cat = WF_CAT, opts = 
     fallbackFirst: false,
     ...opts,
   })
-  return row ? n(row.unit_cost) : null
+  // Only treat a catalog price as an override when it's a real positive number.
+  // A placeholder/null-vendor product with 0/blank unit_cost (price lives in the
+  // built-in master rate) must return null so `?? houseUnit` falls back instead of
+  // zeroing material.
+  return row && n(row.unit_cost) > 0 ? n(row.unit_cost) : null
 }
 // Wall-finish master list. Each Type resolves a material unit price (FP_RATES
 // key, vendor-overridable) + a labor rate. `unit:'SF'` prices per SF (optional

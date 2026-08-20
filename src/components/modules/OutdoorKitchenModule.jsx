@@ -187,7 +187,10 @@ function wfVendorPrice(vendorSel, typeLabel, materialRows, opts = {}) {
     fallbackFirst: false,
     ...opts,
   })
-  return row ? n(row.unit_cost) : null
+  // Only treat a catalog price as an override when it's a real positive number, so
+  // a placeholder 0/blank unit_cost falls back to the built-in master rate instead
+  // of zeroing material.
+  return row && n(row.unit_cost) > 0 ? n(row.unit_cost) : null
 }
 // Type labels used to match each finish against the vendor catalog.
 const WF_TYPE_LABEL = {
