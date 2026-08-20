@@ -13,8 +13,8 @@ import { computeCapRow, computeFinishRow, resolveLabor } from './firePitCalc.js'
 const FP_RATES = {
   capPrecast: { dbName: 'FP Cap Precast' },
   capPrecastLab: { dbName: 'FP Cap Precast Labor Rate' },
-  smoothStucco: { dbName: 'Smooth Stucco - FP' },
-  smoothStuccoLab: { dbName: 'Smooth Stucco - FP Labor Rate' },
+  smoothStucco: { dbName: 'Smooth Stucco - Finishes' },
+  smoothStuccoLab: { dbName: 'Smooth Stucco - Finishes Labor Rate' },
 }
 
 test('built-in Precast cap: material AND labor both non-zero', () => {
@@ -53,7 +53,7 @@ test('vendor price overrides the house unit for material', () => {
 
 test('built-in Smooth Stucco finish: material AND labor both non-zero', () => {
   const meta = { key: 'smoothStucco', labKey: 'smoothStuccoLab' }
-  const mp = { 'Smooth Stucco - FP': 4, 'Smooth Stucco - FP Labor Rate': 0.1 }
+  const mp = { 'Smooth Stucco - Finishes': 4, 'Smooth Stucco - Finishes Labor Rate': 0.1 }
   const r = computeFinishRow({ type: 'Smooth Stucco', sf: 20 }, { meta, vendorUnit: null, mp, fpRates: FP_RATES })
   assert.ok(r.mat > 0, `material should be > 0, got ${r.mat}`)
   assert.ok(r.hrs > 0, `labor should be > 0, got ${r.hrs}`)
@@ -88,20 +88,20 @@ const RATES = {
   capPrecastLab: { dbName: 'FP Cap Precast Labor Rate' },
   capPipConcreteLab: { dbName: 'FP Cap PIP Concrete Labor Rate' },
   capBullnoseLab: { dbName: 'FP Cap Bullnose Brick Labor Rate' },
-  sandStucco: { dbName: 'Sand Stucco - FP' },
-  smoothStucco: { dbName: 'Smooth Stucco - FP' },
-  ledgerstone: { dbName: 'Ledgerstone - FP' },
-  stackedStone: { dbName: 'Stacked Stone - FP' },
-  tile: { dbName: 'Tile - FP' },
+  sandStucco: { dbName: 'Sand Stucco - Finishes' },
+  smoothStucco: { dbName: 'Smooth Stucco - Finishes' },
+  ledgerstone: { dbName: 'Ledgerstone - Finishes' },
+  stackedStone: { dbName: 'Stacked Stone - Finishes' },
+  tile: { dbName: 'Tile - Finishes' },
   realFlagstone: { dbName: 'Real Flagstone - Finishes' },
   realStone: { dbName: 'Real Stone - Finishes' },
-  sandStuccoLab: { dbName: 'Sand Stucco - FP Labor Rate' },
-  smoothStuccoLab: { dbName: 'Smooth Stucco - FP Labor Rate' },
-  ledgerstoneLab: { dbName: 'Ledgerstone - FP Labor Rate' },
-  stackedStoneLab: { dbName: 'Stacked Stone - FP Labor Rate' },
-  tileLab: { dbName: 'Tile - FP Labor Rate' },
-  flagstoneLab: { dbName: 'Real Flagstone - FP Labor Rate' },
-  realStoneLab: { dbName: 'Real Stone - FP Labor Rate' },
+  sandStuccoLab: { dbName: 'Sand Stucco - Finishes Labor Rate' },
+  smoothStuccoLab: { dbName: 'Smooth Stucco - Finishes Labor Rate' },
+  ledgerstoneLab: { dbName: 'Ledgerstone - Finishes Labor Rate' },
+  stackedStoneLab: { dbName: 'Stacked Stone - Finishes Labor Rate' },
+  tileLab: { dbName: 'Tile - Finishes Labor Rate' },
+  flagstoneLab: { dbName: 'Real Flagstone - Finishes Labor Rate' },
+  realStoneLab: { dbName: 'Real Stone - Finishes Labor Rate' },
 }
 // Every rate priced non-zero (as it would be once seeded in Master Rates).
 const MP = Object.fromEntries(Object.values(RATES).map(r => [r.dbName, /Labor Rate/.test(r.dbName) ? 0.2 : 10]))
