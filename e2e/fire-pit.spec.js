@@ -162,7 +162,6 @@ test.describe('Fire Pit', () => {
         expect(await page.getByText(/\$?NaN|Infinity/).count(), `Option "${label}" produced NaN/Infinity`).toBe(0)
       }
     }
-    void unpriced
     await testInfo.attach('fire-pit-exhaustive.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
     // Console/HTTP errors during option cycling = real bug.
     expect(errors, `Console/HTTP errors:\n${errors.join('\n')}`).toEqual([])
