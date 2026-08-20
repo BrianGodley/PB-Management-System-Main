@@ -10,6 +10,7 @@ import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 import { resolveUtilRow } from '../../lib/utilRow'
+import { trenchHours, trenchRowHrs, TRENCH_LABOR_RATE_NAME } from '../../lib/trench'
 import UnpricedItemModal from '../UnpricedItemModal'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -135,12 +136,8 @@ const SEWER_LINE_TYPES = {
 // Combined lookup so a row of either kind resolves its rate.
 const FIXTURE_TYPES = { ...GAS_FIXTURE_TYPES, ...ELECTRICAL_FIXTURE_TYPES }
 
-// Each trench equipment maps to a labor_rates row so the inline calculator
-// icon next to the dropdown can edit the t/hr → min/cf rate.
-const TRENCH_LABOR_RATE_NAME = {
-  Trench: 'Utilities Trench Excavation',
-  Hand: 'Utilities Hand Excavation',
-}
+// TRENCH_LABOR_RATE_NAME + trench math now live in lib/trench (shared with Fire
+// Pit; Utilities is the canonical source). Imported above.
 
 const ADD_ITEM_RATES = {
   // In-house electrical: quantity × install hours + material (NOT a sub cost).
@@ -272,18 +269,8 @@ function calcUtilities(
   // resolves to 0). Surfaced as a prompt so the user fixes it — never a fallback.
   const laborUnset = []
 
-  trenchRows.forEach(r => {
-    const lf = n(r.lf),
-      w = n(r.width),
-      d = n(r.depth)
-    if (lf > 0 && w > 0 && d > 0) {
-      const cf = lf * (w / 12) * (d / 12)
-      // min/cf read live from labor_rates['Utilities Trench/Hand Excavation'] — no
-      // fallback. Value is HOURS per Cu Ft (hrs = cf × rate).
-      const hrsPerCF = n(materialPrices[TRENCH_LABOR_RATE_NAME[r.equipment]])
-      trenchHrs += cf * hrsPerCF
-    }
-  })
+  // Trench hours via the shared lib/trench helper (same math as Fire Pit).
+  trenchHrs += trenchHours(trenchRows, materialPrices)
 
   lineRows.forEach(r => {
     if (!r.type) return
@@ -1115,12 +1102,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
             </thead>
             <tbody>
               {trenchRows.map((row, i) => {
-                const lf = n(row.lf),
-                  w = n(row.width),
-                  d = n(row.depth)
-                const hrsPerCF = n(materialPrices[TRENCH_LABOR_RATE_NAME[row.equipment]])
-                const cf = lf > 0 && w > 0 && d > 0 ? lf * (w / 12) * (d / 12) : 0
-                const hrs = cf > 0 ? cf * hrsPerCF : 0
+                const hrs = trenchRowHrs(row, materialPrices).hrs
                 const laborName = TRENCH_LABOR_RATE_NAME[row.equipment]
                 return (
                   <tr key={i} className="border-b border-gray-100">

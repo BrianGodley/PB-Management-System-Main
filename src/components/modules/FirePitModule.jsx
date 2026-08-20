@@ -10,6 +10,7 @@ import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { groutCuFtPerBlock } from '../../lib/cmuGrout'
 import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 import { computeCapRow, computeFinishRow } from './firePitCalc'
+import { TRENCH_LABOR_RATE_NAME, trenchHours, trenchRowHrs } from '../../lib/trench'
 import { STRUCT_CALC } from './firePitStruct'
 import { resolveUtilRow } from '../../lib/utilRow'
 import UnpricedItemModal from '../UnpricedItemModal'
@@ -286,10 +287,9 @@ const GAS_TYPE_ARR = Object.entries(GAS_FIXTURE_TYPES).map(([label, t]) => ({ la
 // there); Fire Pit's "Gas Line" picker + calc must match, or it resolves nothing.
 const UTIL_CAT = { line: 'Gas Pipe', gas: 'Gas Fixtures' }
 
-// Trenching — mirrors the Utilities module's Trenching section. Each method maps
-// to a labor_rates row (HOURS per Cu Ft); trench hrs = cf × rate. Shared rates
-// with Utilities (category 'Utilities', already in the Fire Pit rate map).
-const TRENCH_LABOR_RATE_NAME = { Trench: 'Utilities Trench Excavation', Hand: 'Utilities Hand Excavation' }
+// Trenching — SAME section + math as the Utilities module (Utilities is the
+// canonical source). Rates + calc come from the shared lib/trench helper so Fire
+// Pit and Utilities can never drift; values match by construction.
 const TRENCH_ROW = () => ({ equipment: 'Trench', lf: '', width: '', depth: '' })
 
 // ── Rate scope: the ONE list of (category, sub-category) pairs Fire Pit uses ──
@@ -652,18 +652,9 @@ function calcFirePit(
   // differs only in the financial roll-up (labor+burden become the sub cost).
   const capHrs = capCalc.reduce((s, c) => s + c.hrs, 0)
 
-  // ── Trenching (mirrors Utilities) — per-row method × dimensions → hours. Own
-  //    section now (was a per-LF coefficient baked into the gas line). ───────────
-  let trenchHrs = 0
-  ;(trenchRows || []).forEach(r => {
-    const lf = n(r.lf),
-      w = n(r.width),
-      d = n(r.depth)
-    if (lf > 0 && w > 0 && d > 0) {
-      const cf = lf * (w / 12) * (d / 12)
-      trenchHrs += cf * n(mp[TRENCH_LABOR_RATE_NAME[r.equipment]]) // rate = hrs per Cu Ft
-    }
-  })
+  // ── Trenching (shared math with Utilities via lib/trench) — own section now
+  //    (was a per-LF coefficient baked into the gas line). ───────────────────────
+  const trenchHrs = trenchHours(trenchRows, mp)
 
   // ── Gas Line + Gas Fixtures (Utilities catalog, gas only) — pipe labor +
   //    material. Trenching is handled by the Trenching section above. ───────────
@@ -1635,12 +1626,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
             </thead>
             <tbody>
               {trenchRows.map((row, i) => {
-                const lf = n(row.lf),
-                  w = n(row.width),
-                  d = n(row.depth)
-                const hrsPerCF = n(materialPrices[TRENCH_LABOR_RATE_NAME[row.equipment]])
-                const cf = lf > 0 && w > 0 && d > 0 ? lf * (w / 12) * (d / 12) : 0
-                const hrs = cf > 0 ? cf * hrsPerCF : 0
+                const hrs = trenchRowHrs(row, materialPrices).hrs
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
