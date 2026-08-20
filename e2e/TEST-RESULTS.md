@@ -14,11 +14,24 @@
   borrowing a fat shared sub.
 - **Result:** orphans **88 → 1**. `npm run test:unit` → 43/43; no-fallback guard
   PASS; viewRates.js + WallsModule.jsx parse.
-- **Remaining 1 = decision, not a bug:** `Wall PIP Install Labor` is a SHARED form-
-  labor rate consumed by Columns + Fire Pit PIP (PIP_FORM_LAB/FP_FORM_LAB), not the
-  Walls module (Walls PIP moved to stem-LF pricing). It surfaces in Walls View Rates
-  only because it's filed under category `Walls`. Do NOT delete — relocate to a
-  shared category or leave. Pending Brian's call.
+- **Remaining 1 → resolved by PIP consolidation (below).**
+
+## 2026-08-20 — PIP install labor consolidated to one basis (GOAL MET, orphans 0)
+- **Decision (Brian):** one canonical PIP install labor rate on the per-SF-of-form
+  basis. There were two models: Walls priced PIP as `LF × courses × 'Wall PIP Stem
+  Added Course Labor'`; Columns + Fire Pit as `formSF × 'Wall PIP Install Labor'`
+  (plus a dead `'Wall PIP Stem LF Labor'` spec never used).
+- **Change:** Walls PIP labor now `pipFormSf(wall) × 'Wall PIP Install Labor'`,
+  where `pipFormSf = 2 × LF × height` (both form faces) — the SAME rate + basis
+  Columns and Fire Pit use (those two unchanged). Removed the dead `pipStemLfLab`
+  spec and the `pipStemCourseLab` labor read; kept the two Stem CY-per-LF concrete-
+  VOLUME coefficients (still used).
+- **Tests:** extracted `pipFormSf` into wallsStruct.js; added form-area + labor-
+  product tests. `npm run test:unit` → **45/45**; no-fallback guard PASS; both files
+  parse. **`walls-orphan-rates` → 0** (was 1).
+- **DB step (Brian, prod):** retire the two now-unused Walls PIP Stem LABOR rates
+  from `labor_rates` (snapshot then delete). After that runs, Walls View Rates shows
+  the one `Wall PIP Install Labor` row, actionable across all three modules.
 
 ## 2026-08-20 — Walls CMU structure extracted + dollar values locked (GOAL MET)
 - **Extraction:** the CMU dollar composition (labor hrs + material $) moved out of

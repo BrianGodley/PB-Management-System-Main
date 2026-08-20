@@ -31,7 +31,6 @@ Tile - Wall Labor Rate
 Wall Footing Dig+Haul Excavator Labor Rate
 Wall Footing Dig+Haul Labor Rate
 Wall PIP Install Labor
-Wall PIP Stem Added Course Labor
 Wall Hand Grout Labor Rate
 Wall Hand Pour Footing Labor Rate
 Wall Modular Install Labor Rate

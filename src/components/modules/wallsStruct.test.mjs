@@ -10,7 +10,7 @@
 //   footingRebarLF = 20*2*1.1 = 44
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { cmuStructQuantities, cmuStructTotals } from './wallsStruct.js'
+import { cmuStructQuantities, cmuStructTotals, pipFormSf } from './wallsStruct.js'
 
 const near = (a, b, why) => assert.ok(Math.abs(a - b) < 1e-4, `${why}: got ${a}, expected ${b}`)
 
@@ -105,4 +105,16 @@ test('grout pump path adds setup + per-CY fees and uses truck concrete', () => {
   // vs hand: + groutPumpSetup 250 + groutCY×30, and grout concrete now truck($180) not hand($150)
   const hand = cmuStructTotals(q, WALL, CTX)
   near(t.mat - hand.mat, 250 + q.groutCY * 30 + q.groutCY * (180 - 150), 'pump setup + per-CY + truck mix delta')
+})
+
+// ── PIP install labor — canonical per-SF-of-form basis (shared w/ Columns + FP) ──
+test('PIP form area = both faces (2 × LF × height)', () => {
+  near(pipFormSf({ lf: 20, heightIn: 48 }), 160, '2 × 20 LF × 4 ft')
+  near(pipFormSf({ lf: 12, heightIn: 18 }), 36, '2 × 12 LF × 1.5 ft')
+})
+
+test('PIP install hours = formSF × rate (matches Columns/FirePit basis)', () => {
+  const wall = { lf: 20, heightIn: 48 }
+  const rate = 0.1 // hr / SF of form ('Wall PIP Install Labor')
+  near(pipFormSf(wall) * rate, 16, '160 SF × 0.1')
 })

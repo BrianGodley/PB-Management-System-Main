@@ -8,6 +8,14 @@ import { groutCyPerBlock } from '../../lib/cmuGrout.js'
 
 export const n = v => parseFloat(v) || 0
 
+// Form area for a Poured-In-Place wall = both faces of the form: 2 × length ×
+// height. PIP install labor is priced per SF of form ('Wall PIP Install Labor'),
+// the SAME basis Columns + Fire Pit use — one canonical PIP labor rate across all
+// three modules (was a per-LF-per-course rate unique to Walls; consolidated).
+export function pipFormSf(wall) {
+  return 2 * n(wall.lf) * (n(wall.heightIn) / 12)
+}
+
 export function cmuStructQuantities(wall, block, { blockOrderWaste = 1, footingRebarWaste = 1 } = {}) {
   const lf = n(wall.lf)
   const heightIn = n(wall.heightIn)

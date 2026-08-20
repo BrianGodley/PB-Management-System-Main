@@ -10,7 +10,7 @@ import MissingPriceModal from '../MissingPriceModal'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { groutCyPerBlock as cmuGroutCyPerBlock } from '../../lib/cmuGrout'
-import { cmuStructQuantities, cmuStructTotals } from './wallsStruct'
+import { cmuStructQuantities, cmuStructTotals, pipFormSf } from './wallsStruct'
 import {
   useNewMaterialCatalog,
   resolveMaterialPrice,
@@ -195,8 +195,7 @@ const WALL_RATES = {
   footingSoilTonsPerCy: { db: 'Wall Footing Soil Tons per CY' }, // tons per loose CY (display)
   curveLab: { db: 'Wall Curve Labor Factor' }, // factor on struct hrs per % curved
   // Poured-In-Place stem coefficients.
-  pipStemLfLab: { db: 'Wall PIP Stem LF Labor' }, // hr / LF (base course)
-  pipStemCourseLab: { db: 'Wall PIP Stem Added Course Labor' }, // hr / LF / added course
+  pipFormLab: { db: 'Wall PIP Install Labor' }, // hr / SF of form — canonical PIP labor (shared w/ Columns + Fire Pit)
   pipStemCyPerLf: { db: 'Wall PIP Stem CY per LF' }, // CY / LF (base course)
   pipStemCyPerLfCourse: { db: 'Wall PIP Stem CY per LF per Course' }, // CY / LF / added course
   // Wall-finish material coefficients (waste / setting-bed / coverage / extras).
@@ -459,7 +458,7 @@ const WALL_RATE_SPECS = [
     items: [
       ['concreteTruck', 'Concrete — Ready Mix (Truck)', 'Basic Materials', 'CY', 'currency'],
       ['concreteHand', 'Concrete — Hand Mix', 'Basic Materials', 'CY', 'currency'],
-      ['pipStemCourseLab', 'Pour in Place Install (per 6" Height)', 'Walls', 'hr/LF', 'coefficient'],
+      ['pipFormLab', 'Pour in Place Install (per SF of form)', 'Walls', 'hr/Sq Ft', 'coefficient'],
       ['rebarLab', 'Set Rebar', 'Walls', 'LF/hr', 'coefficient'],
       ['footingRebarWaste', 'Footing Rebar Waste/Wrap', 'Walls', '×', 'coefficient'],
       ['footingPourHandLab', 'Hand Pour Footing', 'Walls', 'CY/hr', 'coefficient'],
@@ -1369,11 +1368,11 @@ function calcOnePIP(wall, r, mp = {}, materialRows = []) {
   }
   const v = wall.vendor
   const pm = key => wallMatPrice(WALL_RATES[key].db, v, materialRows, mp)
-  // Wall stem — the WHOLE wall is priced in 6" courses at one install rate (no
-  // separate base-course premium). courses = ceil(height / 6).
-  const courses = Math.max(0, Math.ceil(n(heightIn) / 6))
+  // Wall stem labor — priced per SF of form (both faces = 2 × LF × height), the
+  // canonical PIP install basis shared with Columns + Fire Pit. Concrete VOLUME is
+  // still per-LF base + added-6"-course coefficients.
   const addlCourses = Math.max(0, Math.ceil((n(heightIn) - 6) / 6)) // concrete volume still base + added
-  const wallHrs = n(lf) * courses * r('pipStemCourseLab')
+  const wallHrs = pipFormSf(wall) * r('pipFormLab')
   const wallConcCY = n(lf) * (r('pipStemCyPerLf') + addlCourses * r('pipStemCyPerLfCourse'))
 
   // Footing — same dig + rebar + pour coefficients as the CMU calc so PIP
