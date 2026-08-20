@@ -88,7 +88,7 @@ export async function buildViewRates(moduleType, scope = null) {
     q('labor_rates', 'id, category, sub_category, name, label, unit, rate'),
     q('subcontractor_rates', 'id, category, sub_category, trade, item_key, unit, rate, company_name'),
     // Misc coefficients / named $ adders — the 4th rate source.
-    q('misc_rates', 'id, category, name, rate'),
+    q('misc_rates', 'id, category, name, rate, unit'),
     supabase.from('subs_vendors').select('id, company_name'),
   ])
   // A material row is in-scope if its category is a full category, or its exact
@@ -165,7 +165,7 @@ export async function buildViewRates(moduleType, scope = null) {
       table: 'named_rate',
       name: r.name,
       category: r.category,
-      unitLabel: '',
+      unitLabel: r.unit || '',
       mode: 'coefficient',
       value: n(r.rate),
       hideKey: `item:misc:${r.id}`,

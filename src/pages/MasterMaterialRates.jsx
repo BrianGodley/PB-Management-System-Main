@@ -655,14 +655,14 @@ function MiscRatesPanel() {
   const [editing, setEditing] = useState(null) // { id, value }
   const [saving, setSaving] = useState(false)
   const [adding, setAdding] = useState(false)
-  const [draft, setDraft] = useState({ category: '', name: '', rate: '' })
+  const [draft, setDraft] = useState({ category: '', name: '', rate: '', unit: '' })
   const [moveCopy, setMoveCopy] = useState(null) // { source, mode:'move'|'copy' } → Move/Copy modal
 
   const load = useCallback(async () => {
     setLoading(true)
     const { data } = await supabase
       .from('misc_rates')
-      .select('id, name, rate, category')
+      .select('id, name, rate, category, unit')
       .order('category')
       .order('name')
     setRows(data || [])
@@ -715,8 +715,9 @@ function MiscRatesPanel() {
   const saveRate = async id => {
     setSaving(true)
     const val = n(editing.value)
-    await supabase.from('misc_rates').update({ rate: val }).eq('id', id)
-    setRows(rs => rs.map(r => (r.id === id ? { ...r, rate: val } : r)))
+    const unit = (editing.unit ?? '').trim() || null
+    await supabase.from('misc_rates').update({ rate: val, unit }).eq('id', id)
+    setRows(rs => rs.map(r => (r.id === id ? { ...r, rate: val, unit } : r)))
     setEditing(null)
     setSaving(false)
   }
@@ -725,17 +726,18 @@ function MiscRatesPanel() {
     if (!draft.name.trim()) return
     const payload = { name: draft.name.trim(), rate: n(draft.rate) ?? 0 }
     if (draft.category.trim()) payload.category = draft.category.trim()
+    if (draft.unit.trim()) payload.unit = draft.unit.trim()
     const { data, error } = await supabase
       .from('misc_rates')
       .insert(payload)
-      .select('id, name, rate, category')
+      .select('id, name, rate, category, unit')
       .single()
     if (error) {
       alert('Add failed: ' + error.message)
       return
     }
     if (data) setRows(rs => sortRows([...rs, data]))
-    setDraft({ category: '', name: '', rate: '' })
+    setDraft({ category: '', name: '', rate: '', unit: '' })
     setAdding(false)
   }
 
@@ -784,6 +786,7 @@ function MiscRatesPanel() {
               <th className="px-3 py-2 font-semibold">Category</th>
               <th className="px-3 py-2 font-semibold">Name</th>
               <th className="px-3 py-2 font-semibold text-right">Rate</th>
+              <th className="px-3 py-2 font-semibold">Unit</th>
               <th className="px-3 py-2 w-36" />
             </tr>
           </thead>
@@ -820,6 +823,14 @@ function MiscRatesPanel() {
                     }}
                   />
                 </td>
+                <td className="px-3 py-1.5">
+                  <input
+                    className="w-24 border border-gray-300 rounded px-2 py-1 text-xs"
+                    placeholder="Unit"
+                    value={draft.unit}
+                    onChange={e => setDraft({ ...draft, unit: e.target.value })}
+                  />
+                </td>
                 <td className="px-3 py-1.5 text-right">
                   <button onClick={addRow} className="text-green-700 font-semibold">
                     Save
@@ -829,13 +840,13 @@ function MiscRatesPanel() {
             )}
             {loading ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
                   Loading…
                 </td>
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
                   No misc rates.
                 </td>
               </tr>
@@ -867,6 +878,22 @@ function MiscRatesPanel() {
                         <span className="text-gray-800 font-semibold">{num4(r.rate)}</span>
                       )}
                     </td>
+                    <td className="px-3 py-1.5 text-gray-600 whitespace-nowrap">
+                      {isEd ? (
+                        <input
+                          className="w-24 border border-green-300 rounded-md px-2 py-1 text-xs"
+                          placeholder="Unit"
+                          value={editing.unit}
+                          onChange={e => setEditing({ ...editing, unit: e.target.value })}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') saveRate(r.id)
+                            if (e.key === 'Escape') setEditing(null)
+                          }}
+                        />
+                      ) : (
+                        <span className="text-gray-500">{r.unit || '—'}</span>
+                      )}
+                    </td>
                     <td className="px-3 py-1.5 text-right whitespace-nowrap">
                       {isEd ? (
                         <>
@@ -884,7 +911,7 @@ function MiscRatesPanel() {
                       ) : (
                         <span className="opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                           <button
-                            onClick={() => setEditing({ id: r.id, value: r.rate ?? '' })}
+                            onClick={() => setEditing({ id: r.id, value: r.rate ?? '', unit: r.unit ?? '' })}
                             className="text-gray-500 hover:text-gray-800 mr-2"
                           >
                             Edit
