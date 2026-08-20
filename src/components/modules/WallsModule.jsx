@@ -966,7 +966,9 @@ function computeWallWpTotals(wall, mp, materialRows) {
 // they appear here, no code change. Dimensions (block_w/h/l_in, inches) drive the
 // block-count math; unit_cost is the per-unit price.
 const MODULAR_SUBCAT = 'Modular Wall'
-const MODULAR_FALLBACK = { name: 'Modular Block 8x8x16', w: 8, h: 8, l: 16 }
+// Display-only label for the "no Modular product selected" sentinel (zero dims →
+// surfaced at $0). NOT a dimension fallback — block dims come only from the product.
+const MODULAR_UNSET_LABEL = 'Modular block (no product selected)'
 // Resolve the selected master-list wall product → { name, w, h, l, price }.
 // vendorSel picks the vendor's row (or the Unspecified/null-vendor row); a
 // missing/legacy key falls back to the first product under that marker.
@@ -975,15 +977,19 @@ function resolveMasterBlock(wall, materialRows, subcat) {
   // (Modular Wall items are vendor-priced, so a Standard-only filter is empty).
   const inSub = (materialRows || []).filter(r => r.sub_category === subcat)
   const row = inSub.find(r => r.id === wall.blockType) || inSub[0]
-  if (!row) return { ...MODULAR_FALLBACK, price: 0 }
-  // Block dims now live in the product's calc_meta (new model); fall back to the
-  // legacy columns for safety, then to the module defaults.
+  // No Modular product selected/available → zero-dim sentinel (never a fabricated
+  // 8x8x16). calcOneCMU sees the missing dims and surfaces the wall at $0 instead
+  // of inventing a block size.
+  if (!row) return { name: MODULAR_UNSET_LABEL, w: 0, h: 0, l: 0, price: 0 }
+  // Block dims come from the product's calc_meta (new model), else the legacy
+  // column for saved estimates. NO hardcoded default — a product with no dims
+  // resolves to 0 and is surfaced by calcOneCMU (unset → surface, no fallback).
   const cm = row.calc_meta || {}
   return {
     name: row.name,
-    w: n(cm.block_w_in) || n(row.block_w_in) || MODULAR_FALLBACK.w,
-    h: n(cm.block_h_in) || n(row.block_h_in) || MODULAR_FALLBACK.h,
-    l: n(cm.block_l_in) || n(row.block_l_in) || MODULAR_FALLBACK.l,
+    w: n(cm.block_w_in) || n(row.block_w_in),
+    h: n(cm.block_h_in) || n(row.block_h_in),
+    l: n(cm.block_l_in) || n(row.block_l_in),
     price: n(row.unit_cost),
   }
 }
@@ -1004,12 +1010,15 @@ function resolveCatalogBlock(wall, materialRows) {
     r => r.sub_category === WALL_BLOCK_SUBCAT && r.id === wall.blockType
   )
   if (!row) return null
+  // Dims from the product's calc_meta (new model), else the legacy column for saved
+  // estimates. NO hardcoded default — a catalog product with no dims resolves to 0
+  // and is surfaced by calcOneCMU at $0 (unset → surface, no fallback).
   const cm = row.calc_meta || {}
   return {
     name: row.name,
-    w: n(cm.block_w_in) || n(row.block_w_in) || 8,
-    h: n(cm.block_h_in) || n(row.block_h_in) || 8,
-    l: n(cm.block_l_in) || n(row.block_l_in) || 16,
+    w: n(cm.block_w_in) || n(row.block_w_in),
+    h: n(cm.block_h_in) || n(row.block_h_in),
+    l: n(cm.block_l_in) || n(row.block_l_in),
     price: n(row.unit_cost),
   }
 }
@@ -1047,8 +1056,12 @@ function resolveBrick(wall, materialRows) {
     inSub.find(r => r.id === wall.blockType) ||
     inSub.find(forVendor) ||
     inSub[0]
+  // per_sqft (bricks per Sq Ft) is a per-product coefficient in calc_meta. NO
+  // hardcoded default — a brick product with no per_sqft resolves to 0, so its
+  // material surfaces at $0 (unset → surface, no fallback) rather than silently
+  // assuming 7 bricks/Sq Ft. Labor is per face Sq Ft (a DB rate), unaffected.
   const cm = row?.calc_meta || {}
-  return { name: row?.name || 'Brick', price: n(row?.unit_cost) || 0, perSqft: n(cm.per_sqft) || 7 }
+  return { name: row?.name || 'Brick', price: n(row?.unit_cost) || 0, perSqft: n(cm.per_sqft) }
 }
 // PIP walls pour concrete — the "Concrete Vendor" picker is scoped to the
 // Concrete category's 'Concrete Mix' sub-category (loaded into the Walls catalog).
@@ -1176,6 +1189,15 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
   // and falls back to the catalog default. Falls back to the default 8x8x16
   // grey block if blockType is missing (legacy walls).
   const b = blockOverride || blockByName(blockType)
+  // A SELECTED catalog / Modular product with no dimensions is a data error. Do NOT
+  // fabricate an 8x8x16 default (silent fallback that would misprice material AND
+  // labor, or divide-by-zero the block count). Contribute a visible $0 and flag the
+  // product so the user fixes its dimensions. Legacy built-in blocks come from
+  // blockByName and always carry real dims, so this only guards catalog products.
+  if (blockOverride && (!n(b.w) || !n(b.h) || !n(b.l))) {
+    const wp0 = computeWallWpTotals(wall, mp, materialRows)
+    return { hrs: 0, mat: 0, subUnit: 0, subEach: 0, subMat: 0, ...wp0, detail: null, blockNeedsDims: b.name || 'Selected block' }
+  }
   const blockPrice = blockOverride
     ? n(blockOverride.price)
     : wallMatPrice(wallBlockRateName(b.name), v, materialRows, mp)
