@@ -22,6 +22,12 @@ export default function JobTracker() {
   const [showHistory, setShowHistory] = useState({}) // moduleId -> bool
 
   useEffect(() => {
+    // `/tracker` (no :id) renders this with id undefined — don't query jobs with
+    // id=eq.undefined (that 400s). Only fetch when a job id is present.
+    if (!id) {
+      setLoading(false)
+      return
+    }
     fetchData()
   }, [id])
 
