@@ -18,24 +18,24 @@
     "maxFailures": 0,
     "metadata": {
       "ci": {
-        "commitHref": "https://github.com/BrianGodley/PB-Management-System-Main/commit/7088e15af5ae6a6e6df2b0430f575e3aa5fde665",
-        "commitHash": "7088e15af5ae6a6e6df2b0430f575e3aa5fde665",
-        "buildHref": "https://github.com/BrianGodley/PB-Management-System-Main/actions/runs/32395049178"
+        "commitHref": "https://github.com/BrianGodley/PB-Management-System-Main/commit/62cded1a5fb0eb31bbd8e4613b729f65c1346238",
+        "commitHash": "62cded1a5fb0eb31bbd8e4613b729f65c1346238",
+        "buildHref": "https://github.com/BrianGodley/PB-Management-System-Main/actions/runs/32395663938"
       },
       "gitCommit": {
-        "shortHash": "7088e15",
-        "hash": "7088e15af5ae6a6e6df2b0430f575e3aa5fde665",
-        "subject": "chore: sync package-lock",
-        "body": "chore: sync package-lock\n",
+        "shortHash": "62cded1",
+        "hash": "62cded1a5fb0eb31bbd8e4613b729f65c1346238",
+        "subject": "ci(e2e): use npm install (Windows-generated lockfile omits Linux optional binaries)",
+        "body": "ci(e2e): use npm install (Windows-generated lockfile omits Linux optional binaries)\n",
         "author": {
           "name": "Brian",
           "email": "brian@picturebuild.com",
-          "time": 1787245090000
+          "time": 1787245475000
         },
         "committer": {
           "name": "Brian",
           "email": "brian@picturebuild.com",
-          "time": 1787245090000
+          "time": 1787245475000
         },
         "branch": "HEAD"
       },
@@ -49,24 +49,24 @@
         "retries": 1,
         "metadata": {
           "ci": {
-            "commitHref": "https://github.com/BrianGodley/PB-Management-System-Main/commit/7088e15af5ae6a6e6df2b0430f575e3aa5fde665",
-            "commitHash": "7088e15af5ae6a6e6df2b0430f575e3aa5fde665",
-            "buildHref": "https://github.com/BrianGodley/PB-Management-System-Main/actions/runs/32395049178"
+            "commitHref": "https://github.com/BrianGodley/PB-Management-System-Main/commit/62cded1a5fb0eb31bbd8e4613b729f65c1346238",
+            "commitHash": "62cded1a5fb0eb31bbd8e4613b729f65c1346238",
+            "buildHref": "https://github.com/BrianGodley/PB-Management-System-Main/actions/runs/32395663938"
           },
           "gitCommit": {
-            "shortHash": "7088e15",
-            "hash": "7088e15af5ae6a6e6df2b0430f575e3aa5fde665",
-            "subject": "chore: sync package-lock",
-            "body": "chore: sync package-lock\n",
+            "shortHash": "62cded1",
+            "hash": "62cded1a5fb0eb31bbd8e4613b729f65c1346238",
+            "subject": "ci(e2e): use npm install (Windows-generated lockfile omits Linux optional binaries)",
+            "body": "ci(e2e): use npm install (Windows-generated lockfile omits Linux optional binaries)\n",
             "author": {
               "name": "Brian",
               "email": "brian@picturebuild.com",
-              "time": 1787245090000
+              "time": 1787245475000
             },
             "committer": {
               "name": "Brian",
               "email": "brian@picturebuild.com",
-              "time": 1787245090000
+              "time": 1787245475000
             },
             "branch": "HEAD"
           },
@@ -87,24 +87,24 @@
         "retries": 1,
         "metadata": {
           "ci": {
-            "commitHref": "https://github.com/BrianGodley/PB-Management-System-Main/commit/7088e15af5ae6a6e6df2b0430f575e3aa5fde665",
-            "commitHash": "7088e15af5ae6a6e6df2b0430f575e3aa5fde665",
-            "buildHref": "https://github.com/BrianGodley/PB-Management-System-Main/actions/runs/32395049178"
+            "commitHref": "https://github.com/BrianGodley/PB-Management-System-Main/commit/62cded1a5fb0eb31bbd8e4613b729f65c1346238",
+            "commitHash": "62cded1a5fb0eb31bbd8e4613b729f65c1346238",
+            "buildHref": "https://github.com/BrianGodley/PB-Management-System-Main/actions/runs/32395663938"
           },
           "gitCommit": {
-            "shortHash": "7088e15",
-            "hash": "7088e15af5ae6a6e6df2b0430f575e3aa5fde665",
-            "subject": "chore: sync package-lock",
-            "body": "chore: sync package-lock\n",
+            "shortHash": "62cded1",
+            "hash": "62cded1a5fb0eb31bbd8e4613b729f65c1346238",
+            "subject": "ci(e2e): use npm install (Windows-generated lockfile omits Linux optional binaries)",
+            "body": "ci(e2e): use npm install (Windows-generated lockfile omits Linux optional binaries)\n",
             "author": {
               "name": "Brian",
               "email": "brian@picturebuild.com",
-              "time": 1787245090000
+              "time": 1787245475000
             },
             "committer": {
               "name": "Brian",
               "email": "brian@picturebuild.com",
-              "time": 1787245090000
+              "time": 1787245475000
             },
             "branch": "HEAD"
           },
@@ -174,12 +174,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2222,
+                  "duration": 1977,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-20T17:00:10.655Z",
+                  "startTime": "2026-08-20T17:08:53.068Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -223,12 +223,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1167,
+                      "duration": 1247,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-20T17:00:13.532Z",
+                      "startTime": "2026-08-20T17:08:55.767Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -257,12 +257,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1454,
+                      "duration": 1462,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-20T17:00:14.778Z",
+                      "startTime": "2026-08-20T17:08:57.127Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -308,12 +308,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1801,
+                      "duration": 1931,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-20T17:00:16.247Z",
+                      "startTime": "2026-08-20T17:08:58.621Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -348,12 +348,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1602,
+                      "duration": 1767,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-20T17:00:18.056Z",
+                      "startTime": "2026-08-20T17:09:00.565Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -399,12 +399,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2695,
+                      "duration": 2901,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-20T17:00:19.673Z",
+                      "startTime": "2026-08-20T17:09:02.369Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -439,12 +439,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2703,
+                      "duration": 2864,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-20T17:00:22.375Z",
+                      "startTime": "2026-08-20T17:09:05.285Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -473,12 +473,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 3003,
+                      "duration": 3521,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-20T17:00:25.086Z",
+                      "startTime": "2026-08-20T17:09:08.162Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -507,12 +507,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 3141,
+                      "duration": 3102,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-20T17:00:28.097Z",
+                      "startTime": "2026-08-20T17:09:11.696Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -547,7 +547,7 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "timedOut",
-                      "duration": 154504,
+                      "duration": 156165,
                       "error": {
                         "message": "\u001b[31mTest timeout of 150000ms exceeded.\u001b[39m",
                         "stack": "\u001b[31mTest timeout of 150000ms exceeded.\u001b[39m"
@@ -568,7 +568,7 @@
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-20T17:00:31.247Z",
+                      "startTime": "2026-08-20T17:09:14.821Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -592,7 +592,7 @@
                       "workerIndex": 2,
                       "parallelIndex": 0,
                       "status": "timedOut",
-                      "duration": 154542,
+                      "duration": 156173,
                       "error": {
                         "message": "\u001b[31mTest timeout of 150000ms exceeded.\u001b[39m",
                         "stack": "\u001b[31mTest timeout of 150000ms exceeded.\u001b[39m"
@@ -613,7 +613,7 @@
                       "stdout": [],
                       "stderr": [],
                       "retry": 1,
-                      "startTime": "2026-08-20T17:03:06.066Z",
+                      "startTime": "2026-08-20T17:11:51.459Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -663,12 +663,12 @@
                       "workerIndex": 3,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 4344,
+                      "duration": 4102,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-20T17:05:41.370Z",
+                      "startTime": "2026-08-20T17:14:28.719Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -697,12 +697,12 @@
                       "workerIndex": 3,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 3967,
+                      "duration": 4822,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-20T17:05:45.799Z",
+                      "startTime": "2026-08-20T17:14:32.926Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -731,12 +731,12 @@
                       "workerIndex": 3,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2948,
+                      "duration": 3170,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-20T17:05:49.774Z",
+                      "startTime": "2026-08-20T17:14:37.760Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -775,12 +775,12 @@
                   "workerIndex": 3,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2935,
+                  "duration": 3060,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-20T17:05:52.739Z",
+                  "startTime": "2026-08-20T17:14:40.945Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -809,12 +809,12 @@
                   "workerIndex": 3,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2145,
+                  "duration": 2543,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-20T17:05:55.681Z",
+                  "startTime": "2026-08-20T17:14:44.018Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -843,12 +843,12 @@
                   "workerIndex": 3,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1513,
+                  "duration": 1638,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-20T17:05:57.834Z",
+                  "startTime": "2026-08-20T17:14:46.571Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -877,12 +877,12 @@
                   "workerIndex": 3,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1340,
+                  "duration": 1280,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-20T17:05:59.355Z",
+                  "startTime": "2026-08-20T17:14:48.220Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -911,12 +911,12 @@
                   "workerIndex": 3,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1627,
+                  "duration": 1783,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-20T17:06:00.704Z",
+                  "startTime": "2026-08-20T17:14:49.514Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -945,12 +945,12 @@
                   "workerIndex": 3,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2024,
+                  "duration": 2612,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-20T17:06:02.340Z",
+                  "startTime": "2026-08-20T17:14:51.307Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -979,12 +979,12 @@
                   "workerIndex": 3,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 4013,
+                  "duration": 2517,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-20T17:06:04.372Z",
+                  "startTime": "2026-08-20T17:14:53.929Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -1013,12 +1013,12 @@
                   "workerIndex": 3,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1481,
+                  "duration": 1403,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-20T17:06:08.392Z",
+                  "startTime": "2026-08-20T17:14:56.472Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -1055,7 +1055,7 @@
                   "workerIndex": 3,
                   "parallelIndex": 0,
                   "status": "failed",
-                  "duration": 51584,
+                  "duration": 51569,
                   "error": {
                     "message": "Error: Console errors on load:\nconsole: Failed to load resource: net::ERR_TIMED_OUT\nconsole: Failed to load resource: net::ERR_TIMED_OUT\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"console: Failed to load resource: net::ERR_TIMED_OUT\",\u001b[39m\n\u001b[31m+   \"console: Failed to load resource: net::ERR_TIMED_OUT\",\u001b[39m\n\u001b[31m+ ]\u001b[39m",
                     "stack": "Error: Console errors on load:\nconsole: Failed to load resource: net::ERR_TIMED_OUT\nconsole: Failed to load resource: net::ERR_TIMED_OUT\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"console: Failed to load resource: net::ERR_TIMED_OUT\",\u001b[39m\n\u001b[31m+   \"console: Failed to load resource: net::ERR_TIMED_OUT\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at /home/runner/work/PB-Management-System-Main/PB-Management-System-Main/e2e/smoke.spec.js:13:67",
@@ -1079,7 +1079,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-20T17:06:09.884Z",
+                  "startTime": "2026-08-20T17:14:57.891Z",
                   "annotations": [],
                   "attachments": [
                     {
@@ -1108,7 +1108,7 @@
                   "workerIndex": 4,
                   "parallelIndex": 0,
                   "status": "failed",
-                  "duration": 52875,
+                  "duration": 53348,
                   "error": {
                     "message": "Error: Console errors on load:\nconsole: Failed to load resource: net::ERR_TIMED_OUT\nconsole: Failed to load resource: net::ERR_TIMED_OUT\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"console: Failed to load resource: net::ERR_TIMED_OUT\",\u001b[39m\n\u001b[31m+   \"console: Failed to load resource: net::ERR_TIMED_OUT\",\u001b[39m\n\u001b[31m+ ]\u001b[39m",
                     "stack": "Error: Console errors on load:\nconsole: Failed to load resource: net::ERR_TIMED_OUT\nconsole: Failed to load resource: net::ERR_TIMED_OUT\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"console: Failed to load resource: net::ERR_TIMED_OUT\",\u001b[39m\n\u001b[31m+   \"console: Failed to load resource: net::ERR_TIMED_OUT\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at /home/runner/work/PB-Management-System-Main/PB-Management-System-Main/e2e/smoke.spec.js:13:67",
@@ -1132,7 +1132,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 1,
-                  "startTime": "2026-08-20T17:07:01.789Z",
+                  "startTime": "2026-08-20T17:15:49.944Z",
                   "annotations": [],
                   "attachments": [
                     {
@@ -1176,8 +1176,8 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-08-20T17:00:10.280Z",
-    "duration": 465227.38399999996,
+    "startTime": "2026-08-20T17:08:52.524Z",
+    "duration": 471604.484,
     "expected": 20,
     "skipped": 0,
     "unexpected": 2,
