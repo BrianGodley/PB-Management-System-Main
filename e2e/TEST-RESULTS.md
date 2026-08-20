@@ -1,5 +1,19 @@
 # Test results log
 
+## 2026-08-20 — Walls CMU structure extracted + dollar values locked (GOAL MET)
+- **Extraction:** the CMU dollar composition (labor hrs + material $) moved out of
+  `calcOneCMU` into React-free `cmuStructTotals(q, wall, {r, pm, blockPrice,
+  rebarMat, footingPump, groutPump, installKey})` in `wallsStruct.js` (quantities
+  already extracted). WallsModule now imports + calls it — single source, same math.
+- **Value test (20 LF × 48" CMU, 8x8x16 block, 16"×12" footing, rebar @16" +2+2,
+  100% hand grout):** rebar 7.2 hr, labor **35.925 hr**, material **$744.35**
+  (block 285 + rebar 61.20 + footing 148.15 + grout 250). Plus a View-Rates-edit-
+  reflects check (block +$1 → mat +$95; block labor +0.1 → hrs +9) and a grout-pump
+  path (adds setup + per-CY + truck-mix delta).
+- **Result:** `npm run test:unit` → **43/43**. No-fallback guard PASS. WallsModule
+  parses (esbuild). Mirrors the Fire Pit structure lock; next Walls goals: orphan
+  View Rates check + extend value tests to PIP/Modular/Brick/Timber.
+
 ## 2026-08-19 — Walls: explicit RATE_SCOPE (uniform with Fire Pit)
 - **Finding:** Walls' old `WALL_RATE_SPECS` registry is dead code; Walls relied only
   on `module_category_map`, risking gaps for shared rates (Basic Materials concrete/

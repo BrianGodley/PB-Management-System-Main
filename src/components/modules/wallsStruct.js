@@ -41,3 +41,33 @@ export function cmuStructQuantities(wall, block, { blockOrderWaste = 1, footingR
     footingRebarLF,
   }
 }
+
+// Pure CMU dollar TOTALS from the quantities `q` plus injected rate/price lookups:
+//   r(key)  → labor coefficient (hrs per unit) for a WALL_RATES labor key
+//   pm(key) → material $/unit for a WALL_RATES material key (vendor-resolved)
+//   blockPrice → $/grey block; rebarMat → already-summed rebar $ (size-priced)
+// Same math as calcOneCMU; the React module injects its own r / pm / blockPrice /
+// rebarMat so this stays free of the price map + supabase.
+export function cmuStructTotals(q, wall, { r, pm, blockPrice, rebarMat, footingPump, groutPump, installKey }) {
+  const lf = n(wall.lf)
+  const rebarHrs = (q.wallVertLF + q.wallHorizLF + q.footingRebarLF) * r('rebarLab')
+  const groutRate = groutPump === 'Yes' ? r('pumpGroutLab') : r('handGroutLab')
+  const structBase =
+    rebarHrs +
+    (q.footingCY > 0 ? q.footingCY * r(footingPump === 'Yes' ? 'footingPourPumpLab' : 'footingPourHandLab') : 0) +
+    (q.rawBlocks > 0 ? q.rawBlocks * r(installKey) : 0) +
+    (q.groutCF > 0 ? q.groutCF * groutRate : 0) +
+    lf * r('setupCleanLab')
+  const curveAdd = structBase * (n(wall.pctCurved) / 100) * r('curveLab')
+  const hrs = structBase + curveAdd
+  const footConcrPrc = footingPump === 'Yes' ? pm('concreteTruck') : pm('concreteHand')
+  const groutConcrPrc = groutPump === 'Yes' ? pm('concreteTruck') : pm('concreteHand')
+  const mat =
+    q.orderGreyBlock * blockPrice +
+    rebarMat +
+    q.footingCY * footConcrPrc +
+    (footingPump === 'Yes' ? pm('groutPumpSetup') : 0) +
+    q.groutCY * groutConcrPrc +
+    (groutPump === 'Yes' && q.groutCY > 0 ? pm('groutPumpSetup') + q.groutCY * pm('groutPumpPerYd') : 0)
+  return { hrs, mat, curveAdd, structBase, rebarHrs }
+}

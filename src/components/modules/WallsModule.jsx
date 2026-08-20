@@ -10,7 +10,7 @@ import MissingPriceModal from '../MissingPriceModal'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { groutCyPerBlock as cmuGroutCyPerBlock } from '../../lib/cmuGrout'
-import { cmuStructQuantities } from './wallsStruct'
+import { cmuStructQuantities, cmuStructTotals } from './wallsStruct'
 import {
   useNewMaterialCatalog,
   resolveMaterialPrice,
@@ -1246,34 +1246,24 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
     footingRebarLF,
   } = _q
   const regCourses = totalCourses // every course is regular grey block (bond beam removed)
-  const rebarHrs = (wallVertLF + wallHorizLF + footingRebarLF) * r('rebarLab')
   const rebarMat =
     wallVertLF * rebarPrice(wall.wallRebarSize, r) +
     wallHorizLF * rebarPrice(wall.wallHorizRebarSize, r) +
     footingRebarLF * rebarPrice(wall.footingRebarSize, r)
 
-  const groutRate = groutPump === 'Yes' ? r('pumpGroutLab') : r('handGroutLab')
-  // Footing EXCAVATION is priced separately in the "Dig and Haul Footing Soil"
-  // section — the footing fields here only drive install (rebar + pour) + material.
-  const structBase =
-    rebarHrs +
-    (footingCY > 0 ? footingCY * r(footingPump === 'Yes' ? 'footingPourPumpLab' : 'footingPourHandLab') : 0) +
-    (rawBlocks > 0 ? rawBlocks * r(installKey) : 0) +
-    (groutCF > 0 ? groutCF * groutRate : 0) +
-    n(lf) * r('setupCleanLab')
-  const curveAdd = structBase * (n(pctCurved) / 100) * r('curveLab')
-  const hrs = structBase + curveAdd
-
-  const footConcrPrc = footingPump === 'Yes' ? pm('concreteTruck') : pm('concreteHand')
-  const groutConcrPrc = groutPump === 'Yes' ? pm('concreteTruck') : pm('concreteHand')
-  // Grey block price comes from the selected block type's catalog entry.
-  const mat =
-    orderGreyBlock * blockPrice +
-    rebarMat +
-    footingCY * footConcrPrc +
-    (footingPump === 'Yes' ? pm('groutPumpSetup') : 0) +
-    groutCY * groutConcrPrc +
-    (groutPump === 'Yes' && groutCY > 0 ? pm('groutPumpSetup') + groutCY * pm('groutPumpPerYd') : 0)
+  // Structure dollar totals (labor hrs + material $) — same math, in the pure
+  // ./wallsStruct (unit-tested). Footing EXCAVATION is priced separately in the
+  // "Dig and Haul Footing Soil" section; the footing fields here only drive install
+  // (rebar + pour) + material.
+  const { hrs, mat, curveAdd } = cmuStructTotals(_q, wall, {
+    r,
+    pm,
+    blockPrice,
+    rebarMat,
+    footingPump,
+    groutPump,
+    installKey,
+  })
 
   // Sub-tab flat pricing: default $/LF = In-House material ÷ LF; the estimator
   // can override per-wall. No labor is billed on the Sub tab.
