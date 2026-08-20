@@ -1,5 +1,21 @@
 # Test results log
 
+## 2026-08-19 — Walls: explicit RATE_SCOPE (uniform with Fire Pit)
+- **Finding:** Walls' old `WALL_RATE_SPECS` registry is dead code; Walls relied only
+  on `module_category_map`, risking gaps for shared rates (Basic Materials concrete/
+  rebar/grout, Demo, Drainage). It uses ~81 rates across Walls / Basic Materials /
+  Demo / Drainage (+ Concrete Mix for PIP).
+- **Fix:** added `WALLS_RATE_SCOPE` (full `Walls` + borrowed subs: Basic Materials
+  Aggregate&Concrete/Grout/Reinforcement, Concrete/Concrete Mix, Drainage/French
+  Drain + French Drain Pipe, Demo Hand/Mini-Skid/Skid-Steer) and passed it to the
+  Walls `CrewTypeBar` — so Walls View Rates is now scope-driven like Fire Pit.
+- **Result:** `npm run test:walls-coverage` → PASS (every consumed category covered);
+  Walls parses; no-fallback guard PASS. Grout-pump SETUP/PER-CY are Basic Materials
+  misc (no sub) — stay editable in Master Rates.
+- **Eyeball after deploy:** open Walls → View Rates, confirm concrete/rebar/grout +
+  demo + drainage rates now appear and edit; flag any surfaced row Walls doesn't use.
+
+
 Newest first. Claude appends after each run (E2E from `test-results/results.json`,
 unit from `npm run test:unit`).
 

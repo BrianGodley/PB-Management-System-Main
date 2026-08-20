@@ -32,6 +32,26 @@ const DEMO_CATEGORY = 'Demo'
 // materials never appear in them.
 const DRAINAGE_CATEGORY = 'Drainage'
 
+// Explicit View Rates scope (mirrors Fire Pit) so Walls surfaces every rate it uses
+// — not just what module_category_map happens to list. `{ category: 'Walls' }` is the
+// full own category (caps, finishes, waterproofing, install + footing + grout labor);
+// the rest are the exact BORROWED (category, sub-category) pairs the calc reads from
+// other modules, so their material AND labor are editable right here. Passed to
+// CrewTypeBar as rateScope. (Grout-pump SETUP/PER-CY are Basic Materials misc with no
+// sub-category, so they stay editable in Master Rates / Basic Materials.)
+const WALLS_RATE_SCOPE = [
+  { category: 'Walls' },
+  { category: 'Basic Materials', sub: 'Aggregate & Concrete' }, // footing / wall concrete
+  { category: 'Basic Materials', sub: 'Grout' }, // grout material
+  { category: 'Basic Materials', sub: 'Reinforcement' }, // rebar #3–#8
+  { category: 'Concrete', sub: 'Concrete Mix' }, // Poured-in-Place mix
+  { category: 'Drainage', sub: 'French Drain Pipe' }, // drain pipe / sock / gravel / fabric material
+  { category: 'Drainage', sub: 'French Drain' }, // drain install labor
+  { category: 'Demo', sub: 'Hand Demo' }, // slope removal / backfill — hand
+  { category: 'Demo', sub: 'Mini Skid Steer Demo' }, // — mini skid / excavator
+  { category: 'Demo', sub: 'Skid Steer Demo' }, // — skid steer
+]
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Walls Module — CMU Block | Poured In Place | Timber/Lumber
 // CMU and PIP support multiple wall entries that sum into module totals.
@@ -3721,6 +3741,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
             ]}
             title="Walls"
             moduleType="Walls"
+            rateScope={WALLS_RATE_SCOPE}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
           />

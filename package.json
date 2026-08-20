@@ -14,6 +14,8 @@
     "test:unit": "node --test \"src/**/*.test.mjs\"",
     "test:firepit-parity": "node scripts/firepit-rate-parity.mjs",
     "test:firepit-coverage": "node scripts/firepit-labor-coverage.mjs",
+    "test:firepit-orphans": "node scripts/firepit-orphan-rates.mjs",
+    "test:walls-coverage": "node scripts/walls-rate-coverage.mjs",
     "test:e2e": "playwright test",
     "test:e2e:report": "playwright show-report",
     "import-code-changes": "node scripts/import-code-changes.mjs",

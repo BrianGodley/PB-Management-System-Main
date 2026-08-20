@@ -42,9 +42,19 @@ for (const [cat, labels] of [...byCat.entries()].sort()) {
 console.log('\nWalls MATERIAL sub-categories (own catalog pickers):')
 ;[...subcats].sort().forEach(s => console.log(`  • ${s}`))
 
-console.log(
-  '\nProposed explicit RATE_SCOPE shape (mirrors Fire Pit): { category: "Walls" } full,\n' +
-    'plus borrowed material subs — Basic Materials (Reinforcement + concrete/grout),\n' +
-    'Concrete (Concrete Mix), Demo (slope/backfill), Drainage (French Drain), and any\n' +
-    'shared Finishes. The exact borrowed sub_category names are the one DB lookup needed.'
+// ── Coverage check: does WALLS_RATE_SCOPE cover every category the module uses? ──
+const scopeBlock = src.match(/const WALLS_RATE_SCOPE = \[([\s\S]*?)\n\]/)
+const scopeCats = new Set(
+  scopeBlock
+    ? [...scopeBlock[1].matchAll(/category:\s*'([^']+)'/g)].map(m => m[1])
+    : []
 )
+const consumedCats = [...byCat.keys()]
+const uncovered = consumedCats.filter(c => !scopeCats.has(c))
+console.log('\nWALLS_RATE_SCOPE covers categories:', [...scopeCats].sort().join(', ') || '(none — not wired yet)')
+console.log(
+  uncovered.length
+    ? `\nFAIL — categories used but NOT in WALLS_RATE_SCOPE: ${uncovered.join(', ')}`
+    : '\nPASS — every category Walls uses is in WALLS_RATE_SCOPE (View Rates will surface them).'
+)
+process.exit(uncovered.length ? 1 : 0)
