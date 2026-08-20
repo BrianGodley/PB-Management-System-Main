@@ -1,0 +1,105 @@
+name: E2E (Playwright)
+
+# Runs the end-to-end suite automatically against PROD after each Vercel deploy,
+# so nobody has to run `npm run test:e2e` by hand. Two outputs:
+#   1) A green/red status on the commit (fails the run if any spec fails).
+#   2) The machine-readable results.json pushed to a dedicated `ci-results`
+#      branch, so Claude can read the outcome from the repo (one `npm run
+#      e2e:sync` locally) and iterate — no copy/paste, no local test runs.
+#
+# Requires these repo secrets (Settings → Secrets and variables → Actions):
+#   BASE_URL            e.g. https://pbs.picturebuild.com
+#   TEST_USER_EMAIL     login email for the test run
+#   TEST_USER_PASSWORD  login password (never committed)
+#   TEST_ESTIMATE_URL   e.g. /estimates/<id>  (enables the Fire Pit / estimator specs)
+# And: Settings → Actions → General → Workflow permissions → "Read and write".
+
+"on":
+  # Fire when Vercel reports a finished Production deploy, so the suite tests the
+  # freshly deployed build (not the pre-deploy version).
+  deployment_status: {}
+  # Manual button in the Actions tab.
+  workflow_dispatch: {}
+
+# Allow the results push to the ci-results branch.
+permissions:
+  contents: write
+
+# Never run two E2E rounds against prod at once; cancel the older one.
+concurrency:
+  group: e2e-prod
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    # Only run for a SUCCESSFUL Production deployment (skip preview deploys and the
+    # ci-results branch's own deploy), or a manual dispatch.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.deployment_status.state == 'success' &&
+       github.event.deployment_status.environment == 'Production')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      BASE_URL: ${{ secrets.BASE_URL }}
+      TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+      TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+      TEST_ESTIMATE_URL: ${{ secrets.TEST_ESTIMATE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E suite
+        id: e2e
+        run: npm run test:e2e
+
+      # Always publish the browsable HTML report + raw results as artifacts, even
+      # (especially) on failure, so a human can inspect a red run from the UI.
+      - name: Upload report + results (artifact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+      # Push just the tiny results.json (+ a timestamp) to a dedicated ci-results
+      # branch. This branch is app-code-free, so Vercel won't deploy it and this
+      # push cannot re-trigger the suite (no infinite loop). Claude reads it via
+      # `npm run e2e:sync`.
+      - name: Publish results to ci-results branch
+        if: always()
+        run: |
+          set -e
+          test -f test-results/results.json || { echo "no results.json"; exit 0; }
+          cp test-results/results.json /tmp/results.json
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > /tmp/updated_at.txt
+          echo "${{ github.sha }}" > /tmp/commit.txt
+          git config user.name  "e2e-bot"
+          git config user.email "e2e-bot@users.noreply.github.com"
+          git fetch origin ci-results || true
+          if git rev-parse --verify origin/ci-results >/dev/null 2>&1; then
+            git worktree add /tmp/ci ci-results
+          else
+            git worktree add --detach /tmp/ci
+            (cd /tmp/ci && git checkout --orphan ci-results && git rm -rf . >/dev/null 2>&1 || true)
+          fi
+          cp /tmp/results.json   /tmp/ci/results.json
+          cp /tmp/updated_at.txt /tmp/ci/updated_at.txt
+          cp /tmp/commit.txt     /tmp/ci/commit.txt
+          cd /tmp/ci
+          git add -A
+          git commit -m "e2e results for ${{ github.sha }} @ $(cat updated_at.txt)" || { echo "no change"; exit 0; }
+          git push origin HEAD:ci-results
