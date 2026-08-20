@@ -37,9 +37,12 @@ for (const f of files) {
   for (const ik of src.matchAll(/installKey[:=]\s*'([^']+)'/g)) laborKeys.add(ik[1])
 }
 
-// 3) resolve to db names (only keys that are real WALL_RATES labor keys)
+// 3) resolve to db names (only keys that are real WALL_RATES labor keys). Keys
+//    ending in `Mat` are MATERIAL-price reads — they surface via the material
+//    (catalog) scope, not the labor/misc list — so exclude them from LABOR
+//    coverage (checking them here would false-flag catalog materials).
 const consumed = new Map() // db name -> key
-for (const k of laborKeys) if (keyToDb.has(k)) consumed.set(keyToDb.get(k), k)
+for (const k of laborKeys) if (keyToDb.has(k) && !/Mat$/.test(k)) consumed.set(keyToDb.get(k), k)
 
 // 4) surfaced labor/misc names (DB-scoped list)
 const surfaced = new Set(
@@ -49,7 +52,25 @@ const surfaced = new Set(
     .filter(s => s && !s.startsWith('#'))
 )
 
-const gaps = [...consumed.keys()].filter(db => !surfaced.has(db)).sort()
+// Accepted exceptions — consumed but intentionally not surfaced in WALLS View
+// Rates, and NOT a mispricing risk (each resolves to a real value):
+//   • Demo SF to Tons Denom — has an inline `|| 200` fallback in wallDemo.
+//   • Drainage *Labor — live in misc_rates/Drainage; editable from the Drainage
+//     module's View Rates (misc surfaces only from a FULL category, and Drainage
+//     is a borrowed sub in Walls). Not zero, not mispriced.
+const ACCEPTED = new Set([
+  'Demo SF to Tons Denom',
+  'Drainage Burrito Wrap Labor',
+  'Drainage Drain Sock Labor',
+  'Drainage Gravel Bed 12in Labor',
+  'Drainage Gravel Bed 24in Labor',
+])
+const gaps = [...consumed.keys()].filter(db => !surfaced.has(db) && !ACCEPTED.has(db)).sort()
+const accepted = [...consumed.keys()].filter(db => !surfaced.has(db) && ACCEPTED.has(db)).sort()
+if (accepted.length) {
+  console.log(`\nAccepted exceptions (not surfaced in Walls, but not a mispricing risk): ${accepted.length}`)
+  accepted.forEach(db => console.log(`  · ${db}`))
+}
 console.log(`Labor coefficients the calc CONSUMES: ${consumed.size}`)
 console.log(`Surfaced (scoped) labor/misc rates:  ${surfaced.size}`)
 if (gaps.length) {

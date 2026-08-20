@@ -194,3 +194,67 @@ test('WP material + labor edits reflect', () => {
   assert.ok(matUp.mat > base.mat, 'mat rises with $/SF')
   assert.ok(labUp.hrs > base.hrs, 'hrs rises with per-type WP labor')
 })
+
+// ── SEEDED COEFFICIENTS (misc_rates/Walls) — the 19 rows recovered from git and
+//    re-seeded. These tests lock the CORRECT pricing they produce AND prove the
+//    bug they fix: with the coefficient at 0 (unseeded), the coefficient finishes
+//    return NaN/Infinity. Values here mirror the seed SQL exactly. ─────────────
+const SEEDED = {
+  ledgerWaste: 1.1,
+  ledgerSetSfPerUnit: 5,
+  ledgerSetUnitCost: 2,
+  ledgerSubExtraPerSf: 0.4,
+  stackedWaste: 1.1,
+  stackedSetSfPerUnit: 5,
+  stackedSetUnitCost: 2,
+  stackedSubExtraPerSf: 0.4,
+  tileExtraPerSf: 1,
+  flagstoneSfPerTon: 80,
+  flagstoneExtraPerSf: 1.5,
+  realStoneSfPerTon: 70,
+  realStoneExtraPerSf: 2,
+  // labor keys exist in DB already; give them values so hrs is finite
+  ledgerstoneLab: 0.1,
+  stackedStoneLab: 0.12,
+  tileLab: 0.2,
+  flagstoneLab: 0.15,
+  realStoneLab: 0.18,
+}
+const labSeeded = k => SEEDED[k] ?? 0
+const finSeeded = (type, catP) => computeWallFinishRow({ type, sf: 20, vendor: 'Standard' }, { lab: labSeeded, catP })
+
+test('SEEDED: Ledgerstone @20SF prices correctly (was NaN when unseeded)', () => {
+  const r = finSeeded('Ledgerstone', 10)
+  near(r.mat, 20 * 10 * 1.1 + (20 / 5) * 2, 'sf×rate×waste + (sf/setSf)×setCost')
+  near(r.mat, 228, 'exact = 220 + 8')
+  assert.ok(Number.isFinite(r.mat), 'material is finite')
+})
+test('SEEDED: Stacked Stone @20SF = 228', () => {
+  const r = finSeeded('Stacked Stone', 10)
+  near(r.mat, 228, '220 + 8')
+  assert.ok(Number.isFinite(r.mat))
+})
+test('SEEDED: Real Flagstone @20SF = 130 (was Infinity when unseeded)', () => {
+  const r = finSeeded('Real Flagstone', 400)
+  near(r.mat, (20 / 80) * 400 + 20 * 1.5, '(sf/sfPerTon)×$ + sf×extra')
+  near(r.mat, 130, '100 + 30')
+  near(r.tons, 0.25, '20/80')
+})
+test('SEEDED: Real Stone @20SF', () => {
+  const r = finSeeded('Real Stone', 400)
+  near(r.mat, (20 / 70) * 400 + 20 * 2, 'exact')
+  assert.ok(Number.isFinite(r.mat))
+})
+test('SEEDED: Tile @20SF = 150 (rate 6.5 + $1/SF extra)', () => {
+  const r = finSeeded('Tile', 6.5)
+  near(r.mat, 20 * 6.5 + 20 * 1, '130 + 20')
+})
+
+test('BUG GUARD: unseeded (coefficient 0) breaks Ledgerstone → NaN', () => {
+  const r = computeWallFinishRow({ type: 'Ledgerstone', sf: 20, vendor: 'Standard' }, { lab: () => 0, catP: 10 })
+  assert.ok(Number.isNaN(r.mat), 'sf/0 setting term → NaN (this is what the seed prevents)')
+})
+test('BUG GUARD: unseeded (coefficient 0) breaks Real Flagstone → not finite', () => {
+  const r = computeWallFinishRow({ type: 'Real Flagstone', sf: 20, vendor: 'Standard' }, { lab: () => 0, catP: 400 })
+  assert.ok(!Number.isFinite(r.mat), 'sf/0 SF-per-ton → Infinity (seed prevents)')
+})

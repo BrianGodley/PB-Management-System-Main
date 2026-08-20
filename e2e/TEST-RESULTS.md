@@ -1,5 +1,29 @@
 # Test results log
 
+## 2026-08-20 — Walls test battery: finish/cap/WP extraction + coverage caught a REAL bug
+- **Goals 1+4 (finish/cap/WP):** extracted computeWallFinishRow/computeCapRow/
+  computeWpRow into pure wallsCalc.js (module delegates via same-signature wrappers).
+  Value tests (exact $) for all 7 finishes @20SF, 5 cap types @12LF, WP; edit-reflect
+  tests proving every material $ and labor rate moves the estimate. **86/86 unit.**
+- **Goal 2 (coverage) — caught a live mispricing bug.** New walls-labor-coverage.mjs
+  (consumed − surfaced) flagged 31 rates. Root cause: when the no-fallback rule
+  stripped the `fb:` constants off WALL_RATES, **19 Walls coefficients were never
+  seeded** → with no fallback they read 0:
+    · CMU `Wall Block Order Waste`=0 → orders 0 blocks → $0 block material
+    · PIP `Wall PIP Stem CY per LF`=0 → $0 wall concrete
+    · Ledgerstone/Stacked Stone setting-SF-per-unit=0 → NaN material
+    · Real Flagstone/Real Stone SF-per-ton=0 → Infinity material
+    · Tile missing $1/SF extra (undercount)
+  Canonical values recovered from git (commit dbd572c stripped them; parent has them),
+  re-seeded into misc_rates/Walls (19 rows). Locked with value tests (Ledgerstone
+  $228, Real Flagstone $130, …) + BUG-GUARD tests (coefficient 0 → NaN/Infinity).
+- **Result:** coverage **PASS** (5 accepted exceptions: Demo SF-to-Tons has an inline
+  ||200 fallback; 4 Drainage labor coeffs editable from the Drainage module — not a
+  mispricing risk). Orphans **0**. Guard PASS. Likely module-wide (Columns/FirePit/OK
+  finishes share the pattern) — audit those next.
+- **Still pending in battery:** extract + value/edit-test the section calcs
+  (Drainage/Backfill/Demo) and the 5 type aggregators (CMU/Modular/Brick/PIP/Timber).
+
 ## 2026-08-20 — Walls View Rates orphan check: 88 → 1 (Demo GOAL MET)
 - **Finding:** `walls-orphan-rates.mjs` (new) diffed the 137 Walls-scoped rate names
   Brian pulled against the rates WallsModule consumes → **88 non-actionable rows**.
