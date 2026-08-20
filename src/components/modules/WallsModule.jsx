@@ -10,12 +10,13 @@ import MissingPriceModal from '../MissingPriceModal'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { groutCyPerBlock as cmuGroutCyPerBlock } from '../../lib/cmuGrout'
-import { cmuStructQuantities, cmuStructTotals, pipFormSf } from './wallsStruct'
+import { cmuStructQuantities, cmuStructTotals, pipFormSf, brickCore, timberCore } from './wallsStruct'
 import {
   computeWallFinishRow as _finishRow,
   computeCapRow as _capRow,
   computeWpRow as _wpRow,
 } from './wallsCalc'
+import { wallDrain, wallBackfill, wallDemo } from './wallsSections'
 import {
   useNewMaterialCatalog,
   resolveMaterialPrice,
@@ -288,43 +289,8 @@ const DRAIN_DEFAULTS = () => ({
   drainGravel: 'None',
 })
 
-// Drainage hours + material for ONE wall's French-drain section — table-driven
-// via `r`. One perforated pipe run (+ optional fabric + gravel bed) per wall.
-// Fabric/gravel labor is quoted $/ft; divide by lrph so it lands in the hours
-// bucket (GPMD applies uniformly). In-House only. Returns { hrs, mat }.
-function wallDrain(wall = {}, r, lrph) {
-  const dLf = n(wall.drainLf)
-  if (dLf <= 0) return { hrs: 0, mat: 0 }
-  const pipeCost = wall.drainType === '3" Perforated' ? r('drainPerf3Mat') : r('drainPerf4Mat')
-  const pipeLab = wall.drainType === '3" Perforated' ? r('drainPerf3Lab') : r('drainPerf4Lab')
-  const fabMat =
-    wall.drainFabric === 'Drain Sock'
-      ? r('drainSockMat')
-      : wall.drainFabric === 'Burrito Wrap'
-        ? r('drainBurritoMat')
-        : 0
-  const fabLab =
-    wall.drainFabric === 'Drain Sock'
-      ? r('drainSockLab')
-      : wall.drainFabric === 'Burrito Wrap'
-        ? r('drainBurritoLab')
-        : 0
-  const grvMat =
-    wall.drainGravel === '12"'
-      ? r('drainGravel12Mat')
-      : wall.drainGravel === '24"'
-        ? r('drainGravel24Mat')
-        : 0
-  const grvLab =
-    wall.drainGravel === '12"'
-      ? r('drainGravel12Lab')
-      : wall.drainGravel === '24"'
-        ? r('drainGravel24Lab')
-        : 0
-  const mat = dLf * pipeCost + dLf * (fabMat + grvMat)
-  const hrs = dLf * pipeLab + (fabLab + grvLab) * dLf // fabric/gravel labor now hrs per Ln Ft
-  return { hrs, mat }
-}
+// Per-wall Drainage / Backfill / Demo section math lives in the pure, unit-tested
+// wallsSections.js (imported above). UI arrays + defaults stay here.
 
 // ── Backfilling & Compaction ── shares the Hand Demo module's Grade Fill rate
 // (per equipment; Excavator = Mini Skid) and its Jumping Jack rate. All SF-based
@@ -339,24 +305,6 @@ const BACKFILL_DEFAULTS = () => ({
   bkMethod: 'Hand',
   bkCompMethod: 'Jumping Jack',
 })
-const BACKFILL_GF_KEY = {
-  Hand: 'backfillHandGF',
-  'Mini Skid': 'backfillMiniGF',
-  'Skid Steer': 'backfillSkidGF',
-  Excavator: 'backfillMiniGF', // Excavator shares the Mini Skid Grade Fill rate
-}
-function wallBackfill(wall = {}, r) {
-  const sf = n(wall.bkLen) * (n(wall.bkWidth) / 12)
-  const depthIn = n(wall.bkDepth)
-  if (sf <= 0 || depthIn <= 0) return { hrs: 0 }
-  const gfRate = r(BACKFILL_GF_KEY[wall.bkMethod] || 'backfillHandGF')
-  const jjRate = r('compJJ')
-  const compRate = (wall.bkCompMethod || 'Jumping Jack') === 'Hand' ? r('handCompactionMult') * jjRate : jjRate
-  const backfillHrs = (sf / 100) * depthIn * gfRate
-  const compHrs = (sf / 100) * depthIn * compRate
-  return { hrs: backfillHrs + compHrs }
-}
-
 // Method pickers for the per-wall Demo section (Slope Removal has 4 options,
 // Footing Demo has 2). Kept module-level so the entry components share them.
 const DEMO_SLOPE_METHODS = ['Hand', 'Mini Skid', 'Skid Steer', 'Excavator']
@@ -383,56 +331,7 @@ const DEMO_DEFAULTS = () => ({
 //   • dump  = ceil(removalYards / containerCy) × containerPrice, where
 //             removalYards = (sf × (thickIn/12) / 27) × swell
 // Method → the Demo module rate keys it reuses (Excavator shares Mini Skid's).
-const DEMO_METHOD_KEYS = {
-  Hand: { dirt: 'demoHandDirt', cont: 'demoHandContainer', cy: 'demoHandContainerCy', swell: 'demoHandSwell' },
-  'Mini Skid': { dirt: 'demoMiniDirt', cont: 'demoMiniContainer', cy: 'demoMiniContainerCy', swell: 'demoMiniSwell' },
-  'Skid Steer': { dirt: 'demoSkidDirt', cont: 'demoSkidContainer', cy: 'demoSkidContainerCy', swell: 'demoSkidSwell' },
-  Excavator: { dirt: 'demoMiniDirt', cont: 'demoMiniContainer', cy: 'demoMiniContainerCy', swell: 'demoMiniSwell' },
-}
-function wallDemo(wall = {}, r) {
-  const denom = r('demoSfToTonsDenom') || 200
-  const part = (sf, thickIn, method) => {
-    const s = n(sf)
-    const t = n(thickIn)
-    if (s <= 0 || t <= 0) return { hrs: 0, tons: 0, dump: 0 }
-    const keys = DEMO_METHOD_KEYS[method] || DEMO_METHOD_KEYS.Hand
-    const hrs = (s / 100) * t * r(keys.dirt)
-    const tons = (s / denom) * t
-    const containerCy = r(keys.cy) || 1
-    const removalYards = ((s * (t / 12)) / 27) * r(keys.swell)
-    const containers = Math.ceil(removalYards / containerCy)
-    const dump = containers * r(keys.cont)
-    return { hrs, tons, dump }
-  }
-  // Slope Removal: sf = LF × (aveHeight/12); thickness = aveDepth (in).
-  const slopeSf = n(wall.demoSlopeLf) * (n(wall.demoSlopeH) / 12)
-  const slope = part(slopeSf, wall.demoSlopeD, wall.demoSlopeMethod || 'Hand')
-  // ── Dig and Haul Footing Soil ── excavation of NEW footing trenches. Volume in
-  // cubic feet (Length LF × Width/12 × Depth/12); labor is a flat CF/hr dig+load
-  // rate and the removed soil is hauled off by the container-load (a MATERIAL
-  // cost). Every coefficient is table-driven.
-  const footCF = n(wall.demoFootLen) * (n(wall.demoFootW) / 12) * (n(wall.demoFootD) / 12)
-  const footYards = (footCF / 27) * (r('footingSoilSwell') || 1.2)
-  const footContCy = r('footingSoilContainerCy') || 1
-  // Dig rate depends on method (Hand vs Excavator); haul cost is the same either way.
-  const footDigRate =
-    (wall.demoFootMethod || 'Hand') === 'Excavator'
-      ? r('footingDigHaulExcavLab')
-      : r('footingDigHaulLab')
-  const foot =
-    footCF > 0
-      ? {
-          hrs: footCF * footDigRate, // rate is hours per Cu Ft
-          tons: (footCF / 27) * r('footingSoilTonsPerCy'),
-          dump: Math.ceil(footYards / footContCy) * r('footingSoilContainerPrice'),
-        }
-      : { hrs: 0, tons: 0, dump: 0 }
-  return {
-    hrs: slope.hrs + foot.hrs,
-    tons: slope.tons + foot.tons,
-    dump: slope.dump + foot.dump,
-  }
-}
+// wallDemo now lives in wallsSections.js (imported above).
 
 // Rate catalog for the "View Rates" popup, BROKEN DOWN BY WALL TYPE. Each item:
 // [WALL_RATES key, label, category, unit, mode]. mode 'coefficient' → labor_rates;
@@ -1189,12 +1088,13 @@ function calcOneBrick(wall, r, mp = {}, materialRows = []) {
   const v = wall.vendor
   const pm = key => wallMatPrice(WALL_RATES[key].db, v, materialRows, mp)
 
-  // Brick material + laying labor.
-  const sqft = (heightIn / 12) * lf
+  // Brick material + laying labor (pure brickCore in wallsStruct.js).
   const brick = resolveBrick(wall, materialRows)
-  const bricks = sqft * brick.perSqft
-  const brickMat = bricks * brick.price
-  const brickHrs = sqft * r('brickLayLab')
+  const { sqft, bricks, mat: brickMat, hrs: brickHrs } = brickCore(lf, heightIn, {
+    perSqft: brick.perSqft,
+    price: brick.price,
+    brickLayLab: r('brickLayLab'),
+  })
 
   // Footing — identical dig + horizontal footing rebar + pour math to CMU / PIP.
   const fW = n(wall.footingWIn)
@@ -1393,19 +1293,22 @@ function calcWalls(
   // crew), NOT here — install stays in the Timber bucket.
   ;(state.timberWalls || []).forEach(wall => {
     if (!(n(wall.lf) > 0 || n(wall.posts) > 0)) return
-    const addlCourses = Math.max(0, Math.ceil((n(wall.heightIn) - 8) / 8))
     const postQty = n(wall.posts)
-    // Labor + post rates are table-driven (WALL_RATES → labor_rates/misc_rates).
-    // Timber labor lands in its OWN bucket so the summary can crew it independently.
-    timberHrs +=
-      n(wall.lf) * (r('timberLfLab') + addlCourses * r('timberCourseLab')) +
-      postQty * r('timberPostLab')
-    // Wood price ($/unit) from the selected type's Walls › Wood catalog entry for
-    // the chosen vendor; legacy default $50 keeps existing estimates unchanged.
+    // Timber material + labor via pure timberCore (wallsStruct.js). Wood price from
+    // the selected type's Walls › Wood catalog entry for the chosen vendor. Timber
+    // labor lands in its OWN bucket so the summary can crew it independently.
     const woodPrice = catalogItemPrice(materialRows, WOOD_SUBCAT, wall.timberType, wall.vendor)
-    const woodMat =
-      n(wall.lf) * (r('timberBdftBase') + addlCourses * r('timberBdftCourse')) * woodPrice +
-      postQty * r('timberPostMat')
+    const _tc = timberCore(wall.lf, wall.heightIn, postQty, {
+      lfLab: r('timberLfLab'),
+      courseLab: r('timberCourseLab'),
+      postLab: r('timberPostLab'),
+      bdftBase: r('timberBdftBase'),
+      bdftCourse: r('timberBdftCourse'),
+      woodPrice,
+      postMat: r('timberPostMat'),
+    })
+    timberHrs += _tc.hrs
+    const woodMat = _tc.mat
 
     // Timber footing — dig + horizontal rebar + pour + concrete, identical math
     // to brick / PIP. Footing concrete + rebar resolve at Standard (Standard) prices

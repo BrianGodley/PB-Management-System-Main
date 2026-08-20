@@ -50,6 +50,25 @@ export function cmuStructQuantities(wall, block, { blockOrderWaste = 1, footingR
   }
 }
 
+// Pure BRICK core — priced per brick, not by block dims. sqft = (height/12)×LF;
+// bricks = sqft × per-sqft count; mat = bricks × $/brick; hrs = sqft × lay labor.
+// (Footing math is the shared CMU-style footing, kept in the module.)
+export function brickCore(lf, heightIn, { perSqft, price, brickLayLab }) {
+  const sqft = (n(heightIn) / 12) * n(lf)
+  const bricks = sqft * n(perSqft)
+  return { sqft, bricks, mat: bricks * n(price), hrs: sqft * n(brickLayLab) }
+}
+
+// Pure TIMBER core — wood units + labor per LF, plus added 8" courses and steel
+// posts. addlCourses = ceil((height-8)/8). hrs = LF×(lfLab + courses×courseLab) +
+// posts×postLab ; mat = LF×(bdftBase + courses×bdftCourse)×woodPrice + posts×postMat.
+export function timberCore(lf, heightIn, postQty, { lfLab, courseLab, postLab, bdftBase, bdftCourse, woodPrice, postMat }) {
+  const addlCourses = Math.max(0, Math.ceil((n(heightIn) - 8) / 8))
+  const hrs = n(lf) * (n(lfLab) + addlCourses * n(courseLab)) + n(postQty) * n(postLab)
+  const mat = n(lf) * (n(bdftBase) + addlCourses * n(bdftCourse)) * n(woodPrice) + n(postQty) * n(postMat)
+  return { addlCourses, hrs, mat }
+}
+
 // Pure CMU dollar TOTALS from the quantities `q` plus injected rate/price lookups:
 //   r(key)  → labor coefficient (hrs per unit) for a WALL_RATES labor key
 //   pm(key) → material $/unit for a WALL_RATES material key (vendor-resolved)

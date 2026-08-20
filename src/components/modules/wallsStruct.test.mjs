@@ -10,7 +10,7 @@
 //   footingRebarLF = 20*2*1.1 = 44
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { cmuStructQuantities, cmuStructTotals, pipFormSf } from './wallsStruct.js'
+import { cmuStructQuantities, cmuStructTotals, pipFormSf, brickCore, timberCore } from './wallsStruct.js'
 
 const near = (a, b, why) => assert.ok(Math.abs(a - b) < 1e-4, `${why}: got ${a}, expected ${b}`)
 
@@ -117,4 +117,60 @@ test('PIP install hours = formSF × rate (matches Columns/FirePit basis)', () =>
   const wall = { lf: 20, heightIn: 48 }
   const rate = 0.1 // hr / SF of form ('Wall PIP Install Labor')
   near(pipFormSf(wall) * rate, 16, '160 SF × 0.1')
+})
+
+// ── MODULAR = CMU with the modular install labor key (no grout/rebar) ──────────
+test('Modular install labor rides on the modular rate, not blockLab', () => {
+  const q = cmuStructQuantities(WALL, BLOCK, COEFFS)
+  const cmu = cmuStructTotals(q, WALL, { ...CTX, installKey: 'blockLab' })
+  const modular = cmuStructTotals(q, WALL, {
+    ...CTX,
+    installKey: 'modularInstallLab',
+    r: k => (k === 'modularInstallLab' ? 0.5 : k === 'blockLab' ? 0.2 : RATE[k] || 0),
+  })
+  // modular install (0.5/blk) > CMU install (0.2/blk) → more labor hours
+  assert.ok(modular.hrs > cmu.hrs, 'modular install rate drives its own labor')
+  near(modular.hrs - cmu.hrs, q.rawBlocks * (0.5 - 0.2), 'delta = blocks × rate diff')
+})
+
+// ── BRICK — priced per brick + laying labor ───────────────────────────────────
+test('Brick core @ 20 LF × 48" — sqft, bricks, mat, hrs', () => {
+  const r = brickCore(20, 48, { perSqft: 7, price: 1.5, brickLayLab: 1.75 })
+  near(r.sqft, (48 / 12) * 20, 'sqft = 4 ft × 20 LF')
+  near(r.sqft, 80, 'exact')
+  near(r.bricks, 80 * 7, '7 bricks/SF')
+  near(r.mat, 80 * 7 * 1.5, 'bricks × $/brick')
+  near(r.mat, 840, 'exact')
+  near(r.hrs, 80 * 1.75, 'sqft × lay labor')
+})
+test('Brick — $/brick and lay-labor edits reflect', () => {
+  const base = brickCore(20, 48, { perSqft: 7, price: 1.5, brickLayLab: 1.75 })
+  const priceUp = brickCore(20, 48, { perSqft: 7, price: 2.0, brickLayLab: 1.75 })
+  const labUp = brickCore(20, 48, { perSqft: 7, price: 1.5, brickLayLab: 2.5 })
+  assert.ok(priceUp.mat > base.mat, 'mat rises with $/brick')
+  assert.ok(labUp.hrs > base.hrs, 'hrs rises with lay labor')
+})
+
+// ── TIMBER — wood units + labor per LF, added courses, steel posts ─────────────
+test('Timber core @ 20 LF × 24" with 2 posts', () => {
+  const r = timberCore(20, 24, 2, {
+    lfLab: 0.4417,
+    courseLab: 0.8,
+    postLab: 0.4667,
+    bdftBase: 0.2917,
+    bdftCourse: 0.55,
+    woodPrice: 12,
+    postMat: 100,
+  })
+  // addlCourses = ceil((24-8)/8) = 2
+  near(r.addlCourses, 2, 'added 8" courses')
+  near(r.hrs, 20 * (0.4417 + 2 * 0.8) + 2 * 0.4667, 'LF labor + posts')
+  near(r.mat, 20 * (0.2917 + 2 * 0.55) * 12 + 2 * 100, 'wood units × price + posts')
+})
+test('Timber — wood price + post + labor edits reflect', () => {
+  const opts = { lfLab: 0.44, courseLab: 0.8, postLab: 0.47, bdftBase: 0.29, bdftCourse: 0.55, woodPrice: 12, postMat: 100 }
+  const base = timberCore(20, 24, 2, opts)
+  assert.ok(timberCore(20, 24, 2, { ...opts, woodPrice: 18 }).mat > base.mat, 'mat rises with wood price')
+  assert.ok(timberCore(20, 24, 2, { ...opts, postMat: 150 }).mat > base.mat, 'mat rises with post $')
+  assert.ok(timberCore(20, 24, 2, { ...opts, lfLab: 0.7 }).hrs > base.hrs, 'hrs rises with LF labor')
 })

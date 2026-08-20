@@ -21,8 +21,12 @@
   ||200 fallback; 4 Drainage labor coeffs editable from the Drainage module — not a
   mispricing risk). Orphans **0**. Guard PASS. Likely module-wide (Columns/FirePit/OK
   finishes share the pattern) — audit those next.
-- **Still pending in battery:** extract + value/edit-test the section calcs
-  (Drainage/Backfill/Demo) and the 5 type aggregators (CMU/Modular/Brick/PIP/Timber).
+- **Battery COMPLETE:** section calcs extracted to wallsSections.js (Drainage/
+  Backfill/Demo) with value + edit-reflect tests; type aggregators covered —
+  CMU (cmuStructTotals), PIP (pipFormSf), Modular (CMU + modularInstallLab),
+  Brick (brickCore), Timber (timberCore), each value + edit-reflect tested.
+  **100/100 unit tests.** Coverage PASS, orphans 0, no-fallback guard PASS.
+  All four goals met for every Walls type + section.
 
 ## 2026-08-20 — Walls View Rates orphan check: 88 → 1 (Demo GOAL MET)
 - **Finding:** `walls-orphan-rates.mjs` (new) diffed the 137 Walls-scoped rate names
