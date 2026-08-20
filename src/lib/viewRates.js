@@ -75,18 +75,25 @@ export async function buildViewRates(moduleType, scope = null) {
     fetchCats = cats
   }
   if (!fetchCats.length) return { groups: [], categories: [] }
-  // Labor / sub / misc come only from the module's OWN (full) categories — a
-  // borrowed material sub-category never drags in another category's labor.
+  // Misc comes only from the module's OWN (full) categories (misc_rates has no
+  // sub-category to scope a borrowed pair on). Labor + sub, however, are pulled
+  // across ALL fetched categories and then filtered to full categories OR borrowed
+  // (category, sub-category) pairs (matInScope) — so a borrowed material
+  // sub-category (e.g. Utilities gas) also surfaces its OWN labor + sub for editing.
   const ownCats = [...fullCats]
   const q = (table, cols) =>
     ownCats.length
       ? supabase.from(table).select(cols).in('category', ownCats)
       : Promise.resolve({ data: [] })
+  const qAll = (table, cols) =>
+    fetchCats.length
+      ? supabase.from(table).select(cols).in('category', fetchCats)
+      : Promise.resolve({ data: [] })
 
   const [matRows, labRes, subRes, miscRes, venRes] = await Promise.all([
     fetchModuleCatalog(fetchCats),
-    q('labor_rates', 'id, category, sub_category, name, label, unit, rate'),
-    q('subcontractor_rates', 'id, category, sub_category, trade, item_key, unit, rate, company_name'),
+    qAll('labor_rates', 'id, category, sub_category, name, label, unit, rate'),
+    qAll('subcontractor_rates', 'id, category, sub_category, trade, item_key, unit, rate, company_name'),
     // Misc coefficients / named $ adders — the 4th rate source.
     q('misc_rates', 'id, category, name, rate, unit'),
     supabase.from('subs_vendors').select('id, company_name'),
@@ -124,7 +131,7 @@ export async function buildViewRates(moduleType, scope = null) {
 
   // Labor — coefficients. `name` is the immutable key the modules reference;
   // `label` is the editable display description (falls back to name).
-  ;(labRes.data || []).forEach(r => {
+  ;(labRes.data || []).filter(matInScope).forEach(r => {
     const g = ensure(r.category, r.sub_category)
     g.items.push({
       label: cleanLabel(r.label || r.name),
@@ -140,7 +147,7 @@ export async function buildViewRates(moduleType, scope = null) {
   })
 
   // Subcontractor — routed to the Sub column via section:'sub'.
-  ;(subRes.data || []).forEach(r => {
+  ;(subRes.data || []).filter(matInScope).forEach(r => {
     const g = ensure(r.category, r.sub_category)
     g.items.push({
       label: `${r.company_name || 'Unassigned'} — ${cleanLabel(r.trade || r.item_key || 'Rate')}`,

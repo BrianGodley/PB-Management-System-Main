@@ -59,6 +59,23 @@ test('built-in Smooth Stucco finish: material AND labor both non-zero', () => {
   assert.ok(r.hrs > 0, `labor should be > 0, got ${r.hrs}`)
 })
 
+test('a View Rates price edit reflects in the estimate (calc consumes mp by name)', () => {
+  // The module reads material/labor by NAME from mp; a View Rates edit writes that
+  // same name-keyed value. So changing the rate changes the estimate output.
+  const meta = { matKey: 'capPrecast', labKey: 'capPrecastLab' }
+  const before = computeCapRow({ type: 'Precast', lf: 10 }, {
+    meta, vendorUnit: null, fpRates: FP_RATES,
+    mp: { 'FP Cap Precast': 50, 'FP Cap Precast Labor Rate': 0.25 },
+  })
+  const after = computeCapRow({ type: 'Precast', lf: 10 }, {
+    meta, vendorUnit: null, fpRates: FP_RATES,
+    mp: { 'FP Cap Precast': 60, 'FP Cap Precast Labor Rate': 0.5 }, // edited in View Rates
+  })
+  assert.equal(before.mat, 500)
+  assert.equal(after.mat, 600) // material reflects the edited price
+  assert.equal(after.hrs, before.hrs * 2) // labor reflects the edited rate
+})
+
 test('resolveLabor priority: numeric coeff > pointer > 0', () => {
   assert.equal(resolveLabor({ master: true, laborCoeff: 0.5, labor_rate: 'X' }, 'X', { X: 9 }), 0.5)
   assert.equal(resolveLabor({ master: true, laborCoeff: 0, labor_rate: 'X' }, 'X', { X: 0.25 }), 0.25)

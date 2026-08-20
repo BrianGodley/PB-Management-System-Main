@@ -298,6 +298,7 @@ const RATE_SCOPE = [
   { category: 'Utilities', sub: UTIL_CAT.line }, // Utility Lines
   { category: 'Utilities', sub: UTIL_CAT.gas }, // Gas Fixtures
   { category: 'Basic Materials', sub: 'Reinforcement' }, // Rebar
+  { category: 'Finishes', sub: 'Finish Material' }, // Real Flagstone / Real Stone (shared $/Sq Ft)
 ]
 const RATE_SCOPE_CATS = [...new Set(RATE_SCOPE.map(s => s.category))]
 
