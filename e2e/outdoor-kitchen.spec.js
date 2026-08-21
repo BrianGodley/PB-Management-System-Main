@@ -17,12 +17,26 @@ const ESTIMATE = process.env.TEST_ESTIMATE_URL
 const UNPRICED = /labor rate needed|price me|unpriced|missing price|needs? a price|set (a |the )?price/i
 const FINISH = /stucco|ledgerstone|stacked stone|\btile\b|flagstone|real stone/i
 
+// Outdoor Kitchen is the heaviest editor: its catalog (appliances / sinks / finishes /
+// gas + the shared Finishes rows) is fetched async AFTER the editor mounts, so the
+// pickers are briefly empty and prices are 0 right after open. Wait for the network to
+// settle before asserting, or the finish picker / prices look empty when they're just
+// still loading.
+async function openOk(page) {
+  const ok = await openModule(page, 'Outdoor Kitchen')
+  if (ok) {
+    await page.waitForLoadState('networkidle').catch(() => {})
+    await page.waitForTimeout(1000)
+  }
+  return ok
+}
+
 test.describe('Outdoor Kitchen', () => {
   test.skip(!ESTIMATE, 'Set TEST_ESTIMATE_URL to a test estimate to enable Outdoor Kitchen checks.')
 
   test('module editor opens with the Wall Finishes section', async ({ page }, testInfo) => {
     const errors = collectErrors(page)
-    const ok = await openModule(page, 'Outdoor Kitchen')
+    const ok = await openOk(page)
     await testInfo.attach('outdoor-kitchen.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
     expect(ok, 'Could not open the Outdoor Kitchen module editor — check the add/edit flow.').toBeTruthy()
     await expect(page.getByText(/^\s*Wall Finishes\s*$/i).first(), 'Wall Finishes section missing').toBeVisible()
@@ -34,7 +48,7 @@ test.describe('Outdoor Kitchen', () => {
   //  resolve test + the vendor × item matrix below.)
 
   test('shared wall finish resolves without an unpriced banner', async ({ page }, testInfo) => {
-    const ok = await openModule(page, 'Outdoor Kitchen')
+    const ok = await openOk(page)
     test.skip(!ok, 'Outdoor Kitchen editor not reachable on this estimate.')
     const all = page.locator('select')
     const nAll = await all.count()
@@ -60,7 +74,7 @@ test.describe('Outdoor Kitchen', () => {
   test('exhaustive: every vendor × item option, both tabs, computes without NaN/console error', async ({ page }, testInfo) => {
     test.setTimeout(300000)
     const errors = collectErrors(page)
-    const ok = await openModule(page, 'Outdoor Kitchen')
+    const ok = await openOk(page)
     test.skip(!ok, 'Outdoor Kitchen editor not reachable on this estimate.')
     const bad = []
     for (const tab of ['In House', 'In-House', 'Subcontractor', 'Sub']) {
@@ -77,7 +91,7 @@ test.describe('Outdoor Kitchen', () => {
   })
 
   test('exhaustive: numeric fields accept input and the module computes a total', async ({ page }) => {
-    const ok = await openModule(page, 'Outdoor Kitchen')
+    const ok = await openOk(page)
     test.skip(!ok, 'Outdoor Kitchen editor not reachable on this estimate.')
     const nums = page.locator('input[type="number"], input[step]')
     const n = Math.min(await nums.count(), 60)
@@ -93,7 +107,7 @@ test.describe('Outdoor Kitchen', () => {
   })
 
   test('Subcontractor tab renders and prices', async ({ page }) => {
-    const ok = await openModule(page, 'Outdoor Kitchen')
+    const ok = await openOk(page)
     test.skip(!ok, 'Outdoor Kitchen editor not reachable on this estimate.')
     const subTab = page.getByRole('button', { name: /^subcontractor$/i }).first()
     if (!(await subTab.count())) return
@@ -104,7 +118,7 @@ test.describe('Outdoor Kitchen', () => {
   })
 
   test('live edit reflects: changing a field moves the total (Goal 4 in-browser)', async ({ page }) => {
-    const ok = await openModule(page, 'Outdoor Kitchen')
+    const ok = await openOk(page)
     test.skip(!ok, 'Outdoor Kitchen editor not reachable on this estimate.')
     const dollars = () => page.evaluate(() => (document.body.innerText.match(/\$[\d,]+(\.\d+)?/g) || []).join('|'))
     const nums = page.locator('input[type="number"], input[step]')
