@@ -58,13 +58,13 @@ const FINISH_TYPES = {
     subDbName: 'Tile - Columns - Sub SF',
   },
   'Real Flagstone, Flat': {
-    unit: 'ton',
+    unit: 'SF',
     dbName: 'Real Flagstone - Finishes',
     laborDbName: 'Real Flagstone - Finishes Labor Rate',
     subDbName: 'Real Flagstone Flat - Sub SF',
   },
   'Real Stone': {
-    unit: 'ton',
+    unit: 'SF',
     dbName: 'Real Stone - Finishes',
     laborDbName: 'Real Stone - Finishes Labor Rate',
     subDbName: 'Real Stone - Columns - Sub SF',

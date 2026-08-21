@@ -71,18 +71,17 @@ test('Tile @20SF — extra per SF', () => {
   near(r.mat, 170, 'mat = 20×8 + 20×0.5')
   near(r.hrs, 4.0, 'hrs')
 })
-test('Real Flagstone @20SF — priced per ton', () => {
+test('Real Flagstone @20SF — priced per Sq Ft (shared record, no ton conversion)', () => {
   const r = fin('Real Flagstone', 250)
-  near(r.mat, (20 / 40) * 250 + 20 * 0.3, 'mat')
-  near(r.mat, 131, 'mat exact')
+  near(r.mat, 20 * 250, 'mat = sf × rate')
   near(r.hrs, 3.0, 'hrs')
-  near(r.tons, 0.5, 'tons = 20/40')
+  near(r.tons, 0, 'no tons — $/SF now')
 })
-test('Real Stone @20SF — priced per ton', () => {
+test('Real Stone @20SF — priced per Sq Ft (shared record, no ton conversion)', () => {
   const r = fin('Real Stone', 300)
-  near(r.mat, (20 / 35) * 300 + 20 * 0.4, 'mat')
+  near(r.mat, 20 * 300, 'mat = sf × rate')
   near(r.hrs, 3.6, 'hrs')
-  near(r.tons, 20 / 35, 'tons')
+  near(r.tons, 0, 'no tons — $/SF now')
 })
 test('rateIn override wins over catalog price', () => {
   const r = fin('Sand Stucco', 10, { rateIn: 25 })
@@ -234,15 +233,14 @@ test('SEEDED: Stacked Stone @20SF = 228', () => {
   near(r.mat, 228, '220 + 8')
   assert.ok(Number.isFinite(r.mat))
 })
-test('SEEDED: Real Flagstone @20SF = 130 (was Infinity when unseeded)', () => {
+test('SEEDED: Real Flagstone @20SF — $/SF (sf × rate)', () => {
   const r = finSeeded('Real Flagstone', 400)
-  near(r.mat, (20 / 80) * 400 + 20 * 1.5, '(sf/sfPerTon)×$ + sf×extra')
-  near(r.mat, 130, '100 + 30')
-  near(r.tons, 0.25, '20/80')
+  near(r.mat, 20 * 400, 'sf × rate')
+  near(r.tons, 0, 'no tons — $/SF now')
 })
-test('SEEDED: Real Stone @20SF', () => {
+test('SEEDED: Real Stone @20SF — $/SF (sf × rate)', () => {
   const r = finSeeded('Real Stone', 400)
-  near(r.mat, (20 / 70) * 400 + 20 * 2, 'exact')
+  near(r.mat, 20 * 400, 'sf × rate')
   assert.ok(Number.isFinite(r.mat))
 })
 test('SEEDED: Tile @20SF = 150 (rate 6.5 + $1/SF extra)', () => {
@@ -254,7 +252,10 @@ test('BUG GUARD: unseeded (coefficient 0) breaks Ledgerstone → NaN', () => {
   const r = computeWallFinishRow({ type: 'Ledgerstone', sf: 20, vendor: 'Standard' }, { lab: () => 0, catP: 10 })
   assert.ok(Number.isNaN(r.mat), 'sf/0 setting term → NaN (this is what the seed prevents)')
 })
-test('BUG GUARD: unseeded (coefficient 0) breaks Real Flagstone → not finite', () => {
+test('Real Flagstone is $/SF now — no coefficient division, always finite', () => {
+  // Old model divided by SF-per-ton (a coefficient), so an unseeded 0 → Infinity.
+  // The $/SF model is sf × rate with no division, so it can never blow up.
   const r = computeWallFinishRow({ type: 'Real Flagstone', sf: 20, vendor: 'Standard' }, { lab: () => 0, catP: 400 })
-  assert.ok(!Number.isFinite(r.mat), 'sf/0 SF-per-ton → Infinity (seed prevents)')
+  assert.ok(Number.isFinite(r.mat), 'sf × rate is always finite')
+  near(r.mat, 20 * 400, 'mat = sf × rate')
 })

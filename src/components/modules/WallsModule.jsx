@@ -485,8 +485,8 @@ const WALL_RATE_SPECS = [
       ['ledgerstone', 'Ledgerstone', 'Walls', 'SF', 'currency'],
       ['stackedStone', 'Stacked Stone', 'Walls', 'SF', 'currency'],
       ['tile', 'Tile', 'Walls', 'SF', 'currency'],
-      ['flagstone', 'Real Flagstone', 'Walls', 'ton', 'currency'],
-      ['realStone', 'Real Stone', 'Walls', 'ton', 'currency'],
+      ['flagstone', 'Real Flagstone', 'Walls', 'SF', 'currency'],
+      ['realStone', 'Real Stone', 'Walls', 'SF', 'currency'],
       ['sandStuccoLab', 'Sand Stucco Labor', 'Walls', 'SF/day', 'coefficient'],
       ['smoothStuccoLab', 'Smooth Stucco Labor', 'Walls', 'SF/day', 'coefficient'],
       ['ledgerstoneLab', 'Ledgerstone Labor', 'Walls', 'SF/day', 'coefficient'],
@@ -660,8 +660,8 @@ const WALL_FINISH_META = {
     labUnit: 'Sq Ft per day',
   },
   Tile: { matKey: 'tile', labKey: 'tileLab', matUnit: 'Sq Ft', labUnit: 'hrs per Sq Ft' },
-  'Real Flagstone': { matKey: 'flagstone', labKey: 'flagstoneLab', matUnit: 'Tons', labUnit: 'hrs per Sq Ft' },
-  'Real Stone': { matKey: 'realStone', labKey: 'realStoneLab', matUnit: 'Tons', labUnit: 'hrs per Sq Ft' },
+  'Real Flagstone': { matKey: 'flagstone', labKey: 'flagstoneLab', matUnit: 'Sq Ft', labUnit: 'hrs per Sq Ft' },
+  'Real Stone': { matKey: 'realStone', labKey: 'realStoneLab', matUnit: 'Sq Ft', labUnit: 'hrs per Sq Ft' },
 }
 
 // Both current names AND legacy names map to the same rate key, so walls saved

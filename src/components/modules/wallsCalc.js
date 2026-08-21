@@ -44,16 +44,19 @@ export function computeWallFinishRow(row, { lab, catP }) {
       subUnit = rate + lab('tileExtraPerSf')
       break
     case 'Real Flagstone':
+      // $/Sq Ft now (shared Finishes record) — no ton conversion. Matches the
+      // Finishes module + Columns. The old SF-per-ton + extra-per-SF coefficients
+      // are retired (material rate is per Sq Ft).
       hrs = sf > 0 ? sf * lab('flagstoneLab') : 0
-      mat = sf > 0 ? (sf / lab('flagstoneSfPerTon')) * rate + sf * lab('flagstoneExtraPerSf') : 0
-      subUnit = rate / lab('flagstoneSfPerTon') + lab('flagstoneExtraPerSf')
-      tons = sf / lab('flagstoneSfPerTon')
+      mat = sf > 0 ? sf * rate : 0
+      subUnit = rate
+      tons = 0
       break
     case 'Real Stone':
       hrs = sf > 0 ? sf * lab('realStoneLab') : 0
-      mat = sf > 0 ? (sf / lab('realStoneSfPerTon')) * rate + sf * lab('realStoneExtraPerSf') : 0
-      subUnit = rate / lab('realStoneSfPerTon') + lab('realStoneExtraPerSf')
-      tons = sf / lab('realStoneSfPerTon')
+      mat = sf > 0 ? sf * rate : 0
+      subUnit = rate
+      tons = 0
       break
     default:
       break
