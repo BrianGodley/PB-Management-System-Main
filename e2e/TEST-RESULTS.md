@@ -830,3 +830,29 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
 - OPEN QUESTION for Brian: does the estimate behind `TEST_ESTIMATE_URL` actually have a
   Mini Skid Steer Demo module on it? If not, add one (or point at an estimate that has one)
   — otherwise the whole Mini Skid suite stays a silent 6-test gap.
+
+## 2026-08-21 — autopilot (ci-results 59a14e2, commit.txt = db7f85f5, updated_at 16:38Z) — STALE PAYLOAD, no action taken
+- Payload identity check FAILED. `commit.txt` = **db7f85f5**, but
+  `results.json.config.metadata.gitCommit.hash` = **a52dc5242a79651222dd8b8eed010c6548749317**
+  ("fix(outdoor-kitchen): finish TYPE dropdown = canonical WF_LIST only…"), startTime
+  **14:57:00Z** — 1h42m BEFORE the publish timestamp, and EARLIER than the payload
+  already handled last round (4b051c6 @ 16:20:05Z). The publish-step mismatch has
+  recurred and this time it regressed: results.json went BACKWARDS in time.
+- Payload stats (a52dc524, historical): 49 passed / 1 failed / 0 skipped / 0 flaky.
+  Suites present: auth.setup, code-changes, columns, estimator, fire-pit, hand-demo,
+  navigation, outdoor-kitchen, smoke, walls — no mini-skid / skid-steer specs at all,
+  consistent with a pre-4b051c6 tree.
+- The single failure — `outdoor-kitchen.spec.js:151` "live edit reflects: changing a
+  frozen-priced field moves the total (Goal 4 in-browser)", `Total did not change after
+  editing BBQ Wall Length 8 -> 40` — is SUPERSEDED: the same spec PASSED in the 4b051c6
+  run at 16:20Z. Treating it as current would re-open a closed thread against a fix that
+  already landed. NO e2e edit, NO src/ change made.
+- `.autopilot-last` advanced to db7f85f5 (won't reprocess); `.autopilot-last-payload`
+  records the real payload identity a52dc524 @ 14:57:00Z.
+- OPEN QUESTION for Brian: the CI publish step is committing a results.json that is not
+  the run it names (twice in five rounds, now serving an older artifact than the previous
+  push). Should the publish job (a) fail hard when `results.json`'s gitCommit != the SHA
+  under test, and (b) is the watch loop pushing a cached/downloaded artifact rather than
+  the fresh `test-results/results.json`? Until that is fixed every autopilot verdict is
+  unreliable. Also still open from last round: does `TEST_ESTIMATE_URL` point at an
+  estimate that has a Mini Skid Steer Demo module?
