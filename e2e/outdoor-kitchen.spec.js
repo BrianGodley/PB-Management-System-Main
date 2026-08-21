@@ -31,28 +31,34 @@ async function openOk(page) {
   return ok
 }
 
-// Select the shared wall-finish TYPE and return that row's first (SF) input.
-// This is the ONLY policy-correct way to make an OK row price: per the no-fallback
-// + empty-picker rules, a row whose type picker is still on "Select…" stays $0 and
-// an unpriced/unselected row legitimately raises the unpriced banner. So a test that
-// just fills raw quantities on unselected rows is asserting behavior the rules
-// forbid. Pick a known-priced finish first, then drive ITS quantity — the same
-// pattern the passing "shared wall finish resolves" test uses.
+// Return the FIRST row of the Wall Finishes table (type <select> + SF <input>).
+// Anchoring on the "Wall Finishes" section header is important: an earlier
+// appliance/sink dropdown elsewhere on the page can contain a finish-like token
+// (e.g. "Tile", "Real Stone"), so a naive "first select whose option matches the
+// finish regex" grabs the WRONG row and drives a field that needn't move the total.
+// The finish row's own math (sf × unit) is what we want to exercise.
+function finishRow(page) {
+  // The <tr> that contains an SF number input inside the Wall Finishes table. The
+  // section header is followed by a table whose body rows each carry the type
+  // <select> + the SF NumInput. Take the first such row after the header.
+  return page
+    .locator('table', { has: page.locator('select') })
+    .filter({ has: page.getByRole('option', { name: FINISH }) })
+    .last()
+    .locator('tbody tr')
+    .first()
+}
+
 async function selectFinishRow(page) {
-  const all = page.locator('select')
-  const nAll = await all.count()
-  for (let i = 0; i < nAll; i++) {
-    const o = await all.nth(i).locator('option').allTextContents()
-    const fi = o.findIndex(x => FINISH.test(x))
-    if (fi >= 0) {
-      const sel = all.nth(i)
-      await sel.selectOption({ index: fi })
-      await page.waitForTimeout(300)
-      const row = sel.locator('xpath=ancestor::tr[1]')
-      return row.locator('input').first()
-    }
-  }
-  return null
+  const row = finishRow(page)
+  if (!(await row.count())) return null
+  const typeSel = row.locator('select').last() // vendor select is first, type select second
+  const opts = await typeSel.locator('option').allTextContents()
+  const fi = opts.findIndex(x => FINISH.test(x))
+  if (fi < 0) return null
+  await typeSel.selectOption({ index: fi })
+  await page.waitForTimeout(300)
+  return row.locator('input[type="number"], input').first()
 }
 
 test.describe('Outdoor Kitchen', () => {
@@ -142,23 +148,28 @@ test.describe('Outdoor Kitchen', () => {
     expect(await page.getByText(UNPRICED).count(), 'Unpriced prompt on Sub tab').toBe(0)
   })
 
-  test('live edit reflects: changing the priced finish SF moves the total (Goal 4 in-browser)', async ({ page }) => {
+  test('live edit reflects: changing the priced finish SF moves its price cell (Goal 4 in-browser)', async ({ page }) => {
     const ok = await openOk(page)
     test.skip(!ok, 'Outdoor Kitchen editor not reachable on this estimate.')
-    const dollars = () => page.evaluate(() => (document.body.innerText.match(/\$[\d,]+(\.\d+)?/g) || []).join('|'))
-    // Drive a row that actually prices — the selected shared finish — not nums.first(),
-    // which is a structure/counter field on a row whose type picker is still empty (so
-    // it correctly stays $0 no matter what you type, and the total never moves).
+    // Drive the Wall Finishes row that actually prices — anchored to that section, not
+    // nums.first() (a structure/counter field on an unselected row that correctly stays
+    // $0). Assert the finish ROW's own price cell, not the whole-page dollar blob: that
+    // proves the shared finish resolves (cell shows a $, not "—") AND that SF scales it.
+    const row = finishRow(page)
+    test.skip(!(await row.count()), 'Wall Finishes row not reachable on this estimate.')
     const sf = await selectFinishRow(page)
     test.skip(!sf, 'No priced finish row to drive a live edit.')
+    const priceCell = row.locator('td').last()
     await sf.click().catch(() => {})
     await sf.fill('10').catch(() => {})
-    await page.waitForTimeout(400)
-    const before = await dollars()
+    // The finish must actually price (shared Finishes record resolved) before we can
+    // prove SF moves it — a "—" here would be a real unpriced-finish regression.
+    await expect(priceCell, 'Shared finish did not price at SF=10 (cell shows "—")').toHaveText(/\$\d/, { timeout: 8000 })
+    const before = await priceCell.textContent()
     await sf.click().catch(() => {})
     await sf.fill('99').catch(() => {})
     await expect
-      .poll(dollars, { timeout: 8000, message: 'Total did not change after editing the finish SF' })
+      .poll(() => priceCell.textContent(), { timeout: 8000, message: 'Finish price cell did not change after editing SF' })
       .not.toBe(before)
   })
 })
