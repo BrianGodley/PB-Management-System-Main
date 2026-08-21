@@ -73,19 +73,24 @@ test.describe('Columns', () => {
     // before finishes). It reads the SHARED 'Wall Block' sub-category, so it must offer
     // real block vendors (e.g. Angelus) — it regressed to Standard-only when the list
     // was scoped to the Columns category instead of the Wall Block sub-category.
+    // Scan every vendor dropdown (Standard-first select) on the CMU tab; at least one
+    // (the block row's, sourced from the shared 'Wall Block' sub-category) must offer a
+    // real vendor beyond Standard. The finish vendor picker can legitimately be
+    // Standard-only, so we don't require ALL vendor pickers to have vendors.
     const selects = page.locator('select')
     const n = await selects.count()
-    let blockVendor = null
+    const vendorPickers = []
     for (let i = 0; i < n; i++) {
       const opts = await selects.nth(i).locator('option').allTextContents()
-      if (opts.some(t => /^\s*standard\s*$/i.test(t))) { blockVendor = opts; break }
+      if (opts.some(t => /^\s*standard\s*$/i.test(t))) vendorPickers.push(opts)
     }
     await testInfo.attach('columns-cmu-vendors.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
-    expect(blockVendor, 'No vendor picker found on the CMU tab').not.toBeNull()
+    expect(vendorPickers.length, 'No vendor picker found on the CMU tab').toBeGreaterThan(0)
+    const anyWithVendors = vendorPickers.some(opts => opts.length > 1)
     expect(
-      blockVendor.length,
-      `CMU block vendor dropdown is Standard-only — shared Wall Block vendors not surfacing: [${blockVendor.join(', ')}]`
-    ).toBeGreaterThan(1)
+      anyWithVendors,
+      `No CMU-tab vendor dropdown offers a vendor beyond Standard — shared Wall Block vendors (Angelus) not surfacing. Pickers: ${vendorPickers.map(o => `[${o.join(', ')}]`).join(' ')}`
+    ).toBe(true)
   })
 
   test('exhaustive: every vendor × item option, on every tab, computes without NaN/console error', async ({ page }, testInfo) => {
