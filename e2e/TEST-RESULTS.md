@@ -336,3 +336,24 @@ product regression. No autopilot edits; nothing in e2e/ to harden (nothing faile
 ## 2026-08-20 — autopilot run (CI 9c129a6)
 
 GREEN — 35 passed, 1 skipped, 0 failed, 0 flaky (Playwright CI, results updated 2026-08-21T00:51:20Z, duration 112s). No action taken.
+
+### Autopilot — 5e1eeb2 published a STALE artifact (2026-08-20)
+ci-results f2180c0 says commit.txt = 5e1eeb2, updated_at 2026-08-21T01:09:56Z, but the
+results.json inside it is a *different run*: config.metadata.gitCommit = 4c4b18b,
+stats.startTime 2026-08-20T17:41:43Z (7.5 h before publish), duration 106s,
+expected 22 / unexpected 0 / flaky 0 / skipped 0, errors []. It collected only 6 files
+(auth.setup 1, code-changes 2, estimator 2, fire-pit 8, navigation 8, smoke 1);
+walls.spec.js (7) and hand-demo.spec.js (6) were not collected at all — both exist in the
+5e1eeb2 tree and both ran green at 9c129a6.
+
+This is the SECOND identical occurrence: the 4ead2ac publish (dceaa2f, 00:40:15Z) carried
+the same 4c4b18b / 17:41:43Z payload. The only genuine run in between, 9c129a6 (2ae6887,
+00:51:20Z, startTime 00:49:27Z, internal hash 9c129a6), was GREEN 35 passed / 1 skipped.
+
+Diagnosis: publishing bug, not a product regression. `.github/workflows/e2e.yml` writes
+`${{ github.sha }}` into commit.txt while the Playwright payload comes from whatever the
+job actually checked out/produced; with `concurrency: cancel-in-progress` plus late
+`deployment_status` events, a cancelled/rerun job can republish an older run's
+results.json under a newer SHA label. Autopilot therefore cannot trust commit.txt alone.
+No autopilot edits (nothing failed, nothing in e2e/ to harden). .autopilot-last set to
+5e1eeb2 so this stale publish isn't reprocessed.

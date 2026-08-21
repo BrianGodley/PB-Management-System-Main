@@ -144,28 +144,29 @@ test.describe('Fire Pit', () => {
   test('wall finish resolves nonzero material $ AND nonzero labor hrs', async ({ page }, testInfo) => {
     const ok = await openFirePit(page)
     test.skip(!ok, 'Fire Pit editor not reachable on this estimate.')
-    // The finish row has TWO selects: vendor (contains 'Standard') then the finish
-    // TYPE picker. Target the TYPE picker — the first non-vendor select after the header.
-    const header = page.getByText(/^\s*Wall Finishes\s*$/i).first()
-    test.skip(!(await header.count()), 'No Wall Finishes section on this estimate.')
-    const after = header.locator('xpath=following::select')
-    const nSel = await after.count()
+    // Find the finish TYPE picker by its OPTIONS (a select whose options contain a known
+    // finish name) — robust to header text / select ordering. If NO select has a finish
+    // option, that is itself a real finding (shared finishes not loading) and the skip
+    // reason says so.
+    const FINISH = /stucco|ledgerstone|stacked stone|\btile\b|flagstone|real stone/i
+    const all = page.locator('select')
+    const nAll = await all.count()
     let wf = null
-    for (let i = 0; i < Math.min(nSel, 5); i++) {
-      const o = await after.nth(i).locator('option').allTextContents()
-      if (!o.some(x => /^\s*standard\s*$/i.test(x))) { wf = after.nth(i); break }
+    let finishIdx = -1
+    for (let i = 0; i < nAll; i++) {
+      const o = await all.nth(i).locator('option').allTextContents()
+      const fi = o.findIndex(x => FINISH.test(x))
+      if (fi >= 0) { wf = all.nth(i); finishIdx = fi; break }
     }
-    test.skip(!wf, 'No finish TYPE picker found (only vendor selects).')
-    const opts = await wf.locator('option').allTextContents()
-    const idx = opts.findIndex(o => o && !/^\s*select/i.test(o.trim()))
-    test.skip(idx < 1, 'No real finish option to pick.')
-    await wf.selectOption({ index: idx })
-    // Enter SF in the finish row (the input immediately following the finish select).
-    const sf = wf.locator('xpath=following::input[1]')
+    test.skip(!wf, 'No finish TYPE picker found — no select on the page has a finish option (shared finishes not loading?).')
+    await wf.selectOption({ index: finishIdx })
+    // Enter SF in the finish row, then read that row's cells.
+    const row = wf.locator('xpath=ancestor::tr[1]')
+    const sf = row.locator('input').first()
     await sf.click().catch(() => {})
     await sf.fill('50').catch(() => {})
     await page.waitForTimeout(600)
-    const region = await wf.locator('xpath=ancestor::table[1]').innerText()
+    const region = await row.innerText()
     await testInfo.attach('fire-pit-finish-value.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
     expect(/\$\s?[1-9][\d,]*/.test(region), `finish material should be nonzero — got:\n${region.slice(0, 300)}`).toBe(true)
     expect(/\b[1-9]\d*\.\d{1,2}\b/.test(region), `finish labor hrs should be nonzero (the fetch-scope bug) — got:\n${region.slice(0, 300)}`).toBe(true)
