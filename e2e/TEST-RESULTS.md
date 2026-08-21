@@ -369,3 +369,13 @@ pattern seen at 4ead2ac / 5e1eeb2 did not recur. All 8 spec files collected —
 auth.setup 1, code-changes 2, estimator 2, fire-pit 9, hand-demo 6, navigation 8,
 smoke 1, walls 7 = 36. The single skip present at 9c129a6 is gone (fire-pit went
 8 -> 9 collected specs), so the suite is now fully exercised with no silent gaps.
+
+## 2026-08-20 — autopilot run (CI 7082f1a)
+
+GREEN — 36 passed, 0 failed, 0 flaky, 0 skipped (Playwright CI, startTime
+2026-08-21T01:26:00Z, published 01:28:43Z, duration 161s). No action taken.
+
+Artifact verified genuine: results.json `config.metadata.gitCommit.hash` ==
+commit.txt == 7082f1a, so no stale publish. Same full collection as the previous
+run — auth.setup 1, code-changes 2, estimator 2, fire-pit 9, hand-demo 6,
+navigation 8, smoke 1, walls 7 = 36. Two consecutive clean, fully-exercised runs.
