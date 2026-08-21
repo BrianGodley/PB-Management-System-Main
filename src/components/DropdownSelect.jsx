@@ -50,6 +50,16 @@ export default function DropdownSelect({
     setRect({ top: r.bottom, left: r.left, width: r.width })
   }, [])
 
+  // Open by measuring the trigger FIRST, then flipping open — both state updates
+  // batch into one render, so a portaled menu is fixed-positioned on its very first
+  // paint. Without this, the first-ever open renders one frame with rect=null: the
+  // menu falls back to normal document flow and the on-open scrollIntoView then
+  // scrolls the whole page (e.g. Lighting fixtures → jumps down to Transformer).
+  const openMenu = useCallback(() => {
+    place()
+    setOpen(true)
+  }, [place])
+
   // eslint-disable-next-line eqeqeq
   const selected = options.find(o => o.value == value)
   const label = selected ? selected.label : placeholder
@@ -124,12 +134,12 @@ export default function DropdownSelect({
       <button
         type="button"
         disabled={disabled}
-        onClick={() => !disabled && setOpen(o => !o)}
+        onClick={() => !disabled && (open ? close() : openMenu())}
         onKeyDown={e => {
           if (disabled) return
           if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
             e.preventDefault()
-            setOpen(true)
+            openMenu()
           }
         }}
         className={`w-full flex items-center justify-between text-left bg-transparent border-0 p-0 focus:outline-none ${buttonClassName} ${
