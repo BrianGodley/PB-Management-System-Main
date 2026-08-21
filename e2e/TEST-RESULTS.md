@@ -1,5 +1,43 @@
 # Test results log
 
+## 2026-08-21 — Irrigation timer/controller material bug (hand-test find) FIXED
+- Brian hand-tested controllers: **no material was being added**. Root cause (verified):
+  the timer material is an EXACT-string lookup of `TIMER_TYPES.matKey` against the Standard
+  price map, which is keyed by the catalog item's `description`. The catalog items are named
+  `Timer - N Station` (sub_category **Controllers**), but the code used `Irrigation Timer -
+  N Station` — the `Irrigation ` prefix doesn't exist in the DB, so every timer resolved to
+  $0 material, silently (zones were unaffected — they normalize names via makeBomPrice).
+  Pre-existing (not a refactor regression); the extraction carried the wrong key verbatim.
+- **Fix:** aligned `matKey` to the catalog description (`Timer - N Station`) in all three
+  copies — `irrigationCalc.js`, `IrrigationModule.jsx`, `IrrigationSummary.jsx`.
+- **Why the tests missed it:** the unit test only asserted timer LABOR, never MATERIAL; and
+  a fixture-keyed unit test can't catch a code-vs-DB naming mismatch anyway; the e2e only
+  checks "a $ appears / total moves," which zone labor already satisfies. Closed the gap:
+  added a priced-timer material test (2 × $200 = $400 raw) + a matKey contract test that
+  fails if the `Irrigation ` prefix ever returns. Suite now **192/192**. (The durable catch
+  for this class is a DB-health check that every matKey resolves to a priced Controllers
+  row — recommend adding to Irrigation Layer D.)
+
+## 2026-08-21 — CI 8f1a4ea (19:34Z) — Irrigation C GREEN; Lighting 4/5, live-edit retargeted
+- Complete run of the Lighting commit (both Irrigation + Lighting deployed): **91 passed /
+  1 failed / 0 flaky / 0 skipped** (92 specs). Not a cancellation artifact — full run.
+- **Irrigation** `irrigation.spec.js` 5/5 GREEN. C/E flip to done:
+```
+### Irrigation — C/E now green (CI 8f1a4ea)
+C. E2E: opens[x] vendor×item[x] numeric[x] sub[x] live-edit[x] clean[x]
+E. Loop: red-first[N/A] catalogued[x] logged[x] green[x]
+```
+- **Lighting** 4/5 — only `live edit reflects` failed: the spec drove `.first()` numeric
+  input, which is **Difficulty (%)** (Job Site Conditions renders before the item rows).
+  Difficulty only *scales* existing labor hours, so with no priced Lighting line items on
+  the estimate, 2→20 multiplies zero and the total can't move — a false Goal-4 failure, NOT
+  a calc bug (lightingCalc.test.mjs edit-reflects passes). **Fix:** retargeted the test to
+  drive **Hours Adj (±hrs)**, which *adds* labor hours directly and always moves the
+  In-House total independent of catalog pricing. Pending re-run to confirm green.
+- Autopilot verified the retargeted selector against `LightingModule.jsx:753` (Hours Adj
+  `<p>` + sibling `<input>`), `node --check` clean. No src/, SQL or rate changes.
+- `.autopilot-last` -> `8f1a4ea`.
+
 ## 2026-08-21 — Lighting: Layer A+B
 - **Layer A:** extracted inline `calcLighting` into pure `lightingCalc.js` (module imports
   it). Inlined the supabase-tainted `calcWalkAccessLabor` + catalog resolvers

@@ -31,22 +31,22 @@ const IRRIGATION_CATEGORY = 'Irrigation'
 // in src/lib/irrigationZones.js so the estimator and the summary share one source.
 
 // ── Timer definitions ─────────────────────────────────────────────────────────
-const TIMER_TYPES = [
-  { key: 'timer4', label: '4 Station', matKey: 'Irrigation Timer - 4 Station' },
-  { key: 'timer6', label: '6 Station', matKey: 'Irrigation Timer - 6 Station' },
-  { key: 'timer9', label: '9 Station', matKey: 'Irrigation Timer - 9 Station' },
-  { key: 'timer12', label: '12 Station', matKey: 'Irrigation Timer - 12 Station' },
-  { key: 'timer15', label: '15 Station', matKey: 'Irrigation Timer - 15 Station' },
-  { key: 'timer18', label: '18 Station', matKey: 'Irrigation Timer - 18 Station' },
+export const TIMER_TYPES = [
+  { key: 'timer4', label: '4 Station', matKey: 'Timer - 4 Station' },
+  { key: 'timer6', label: '6 Station', matKey: 'Timer - 6 Station' },
+  { key: 'timer9', label: '9 Station', matKey: 'Timer - 9 Station' },
+  { key: 'timer12', label: '12 Station', matKey: 'Timer - 12 Station' },
+  { key: 'timer15', label: '15 Station', matKey: 'Timer - 15 Station' },
+  { key: 'timer18', label: '18 Station', matKey: 'Timer - 18 Station' },
   {
     key: 'timerICC8',
     label: 'Hunter ICC 8 Station',
-    matKey: 'Irrigation Timer - Hunter ICC 8 Station',
+    matKey: 'Timer - Hunter ICC 8 Station',
   },
   {
     key: 'timerAdd8',
     label: 'Additional 8 Station Module',
-    matKey: 'Irrigation Timer - Additional 8 Station Module',
+    matKey: 'Timer - Additional 8 Station Module',
   },
 ]
 

@@ -7,7 +7,7 @@
  *                  and one Hand key per zone assembly (hrs per zone; ZONE_TYPES in
  *                  src/lib/irrigationZones.js). Unset → 0 hrs (no constant).
  *   • timer labor: labor_rates['Irrigation - Timer Install'] (hrs per timer).
- *   • timer material: material_price['Irrigation Timer - <N> Station'] (vendor-first,
+ *   • timer material: material_price['Timer - <N> Station'] (sub_category Controllers) (vendor-first,
  *                  else Standard) per TIMER_TYPES matKey.
  *   • zone material:  each zone's bill-of-materials product (IRR_PRODUCTS) priced live via
  *                  makeBomPrice (materialRows vendor line, else Standard). Missing → the
@@ -39,7 +39,7 @@ const show = (t, a) => { console.log(`\n${t} (${a.length})`); a.forEach(k => con
 const labor = uniq([...zoneLabor, ...directLabor])
 console.log(`Irrigation consumes ${labor.length} labor rates + ${timerMat.length} timer materials + ${bomMat.length} zone-BOM materials.`)
 show('labor_rates — zone (Trench/Hand per zone) + timer/config (category Irrigation)', labor)
-show('material_price — timer units (Irrigation Timer - N Station)', timerMat)
+show('material_price — timer units (Timer - N Station, sub_category Controllers)', timerMat)
 show('material_price — zone bill-of-materials products (IRR_PRODUCTS)', bomMat)
 console.log('\nAll resolve live (labor by name; material vendor-first → Standard). Unset labor → 0 hrs;')
 console.log('unpriced BOM line → row `missing` (module surfaces it) + $0. NO constants. Verify with DB-health SQL.')

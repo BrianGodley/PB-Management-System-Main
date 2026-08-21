@@ -7,7 +7,7 @@
 // Run: node --test src/components/modules/irrigationCalc.test.mjs
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { calcIrrigation } from './irrigationCalc.js'
+import { calcIrrigation, TIMER_TYPES } from './irrigationCalc.js'
 
 const LRPH = 75
 const base = { difficulty: 0, hoursAdj: 0, distanceLF: 0, zoneRows: [], timerRows: [], manualRows: [], subType: 'In House' }
@@ -47,6 +47,26 @@ test('timer labor value: hrs = qty × Timer Install rate (2 × 1.5 = 3 hrs → $
   const r = run({ timerRows: [{ type: 'timer4', qty: 2 }] }, { 'Irrigation - Timer Install': 1.5 })
   assert.equal(r.timerLaborHrs, 3, `timerLaborHrs got ${r.timerLaborHrs}`)
   assert.equal(r.laborCost, 3 * LRPH, `laborCost got ${r.laborCost}`)
+})
+
+test('timer MATERIAL value: a priced timer resolves material by its catalog description key (2 × $200 = $400 raw)', () => {
+  // Regression guard for the "controllers add no material" bug: the timer material is
+  // an exact-string lookup of matKey in the Standard price map (materialPrices), which is
+  // keyed by the catalog item's `description` = 'Timer - N Station' (sub_category
+  // Controllers) — NOT 'Irrigation Timer - N Station'. A mismatched key silently yields $0.
+  const r = run({ timerRows: [{ vendor: 'Standard', type: 'timer4', qty: 2 }] }, { 'Irrigation - Timer Install': 1 }, { 'Timer - 4 Station': 200 })
+  assert.equal(r.rawMat, 400, `timer rawMat got ${r.rawMat} — timer material did not resolve`)
+  assert.ok(r.totalMat > r.rawMat, 'sales tax is applied on top of raw timer material')
+})
+
+test('timer matKey contract: every matKey is the bare catalog form "Timer - …" (no "Irrigation " prefix)', () => {
+  // The estimator prices timers by exact match against material.description in the
+  // Controllers sub_category. If a future edit re-adds the 'Irrigation ' prefix, the
+  // lookup breaks and every controller silently prices at $0 — so lock the format here.
+  for (const t of TIMER_TYPES) {
+    assert.ok(/^Timer - /.test(t.matKey), `matKey must start with "Timer - ": ${t.matKey}`)
+    assert.ok(!/^Irrigation Timer/.test(t.matKey), `matKey must NOT carry the 'Irrigation ' prefix: ${t.matKey}`)
+  }
 })
 
 test('labor no-fallback: unset zone/timer rates → 0 hours (no hidden constant)', () => {
