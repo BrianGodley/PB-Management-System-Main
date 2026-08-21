@@ -168,3 +168,20 @@ test('resolveLabor priority: numeric coeff > pointer > 0', () => {
   assert.equal(resolveLabor({ master: true, laborCoeff: 0, labor_rate: 'X' }, 'X', { X: 0.25 }), 0.25)
   assert.equal(resolveLabor({ master: true, laborCoeff: 0, labor_rate: null }, null, {}), 0)
 })
+
+// Shared-finish labor: a master (catalog) finish whose calc_meta.labor_rate points at a
+// fetched, priced rate must resolve nonzero hrs (this is the flow the finishes
+// consolidation depends on). A NULL pointer must NOT silently pass — it resolves 0 hrs
+// AND raises laborUnset so the fix-it modal fires. Regression guard for the Fire Pit
+// wall-finish 0-hours bug (records shipped with no labor link).
+test('master finish: pointer resolves hrs; null pointer flags laborUnset', () => {
+  const meta = { master: true, key: 'x', matUnit: 5, labor_rate: 'Ledgerstone - Finishes Labor Rate' }
+  const mp = { 'Ledgerstone - Finishes Labor Rate': 0.3333 }
+  const linked = computeFinishRow({ sf: 30, type: 'Ledgerstone - Finishes' }, { meta, vendorUnit: null, mp, fpRates: {} })
+  assert.ok(Math.abs(linked.hrs - 30 * 0.3333) < 1e-9, 'linked finish should resolve nonzero hrs')
+  assert.equal(linked.laborUnset, null, 'a priced link should not flag unpriced')
+
+  const orphan = computeFinishRow({ sf: 30, type: 'Ledgerstone - Finishes' }, { meta: { ...meta, labor_rate: null }, vendorUnit: null, mp, fpRates: {} })
+  assert.equal(orphan.hrs, 0, 'null-pointer finish resolves 0 hrs')
+  assert.ok(orphan.laborUnset, 'null-pointer finish must raise laborUnset (not silently pass)')
+})

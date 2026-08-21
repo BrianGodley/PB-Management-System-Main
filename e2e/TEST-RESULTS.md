@@ -498,3 +498,10 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
 - Full collection present: auth.setup 1, code-changes 2, estimator 2,
   fire-pit 9, hand-demo 6, navigation 8, smoke 1, walls 7 = 36.
 - No edits made this run.
+
+## 2026-08-20 — CI run 4b9b8dd (autopilot)
+
+- Commit: `4b9b8dd2207e3641a3a9940594dee8d7508a69ae`
+- CI published: 2026-08-21T03:10:18Z
+- Result: **GREEN** — 22 passed, 0 failed, 0 flaky, 0 skipped (duration 106.1s)
+- Action: none required.

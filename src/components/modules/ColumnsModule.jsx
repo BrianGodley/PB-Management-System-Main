@@ -21,47 +21,52 @@ import { groutCyPerBlock } from '../../lib/cmuGrout'
 // LABOR fallbacks (allowed) or catalog-material fallbacks Brian OK'd (CMU block,
 // grout concrete, rebar). New material lines (modular block, brick, mix, forms,
 // mortar) resolve ONLY from the catalog — no hardcoded $ fallback.
+// laborDbName repointed to the SHARED finish labor rates (category 'Finishes'), so
+// Columns reads the same one-per-finish labor as Walls / Fire Pit / Outdoor Kitchen.
+// Set once in Master Rates → flows everywhere. Material (dbName) + Sub (subDbName)
+// stay Columns-specific — only LABOR is shared. Retired the '- Labor Rate'/'Veneer'/
+// '- Columns - Labor Rate' finish copies.
 const FINISH_TYPES = {
   'Sand Stucco': {
     unit: 'SF',
     dbName: 'Sand Stucco',
-    laborDbName: 'Sand Stucco - Labor Rate',
+    laborDbName: 'Sand Stucco - Finishes Labor Rate',
     subDbName: 'Sand Stucco - Sub SF',
   },
   'Smooth Stucco': {
     unit: 'SF',
     dbName: 'Smooth Stucco',
-    laborDbName: 'Smooth Stucco - Labor Rate',
+    laborDbName: 'Smooth Stucco - Finishes Labor Rate',
     subDbName: 'Smooth Stucco - Sub SF',
   },
   'Ledgerstone Veneer Panels': {
     unit: 'SF',
     dbName: 'Ledgerstone Veneer Panels',
-    laborDbName: 'Ledgerstone Veneer Panels - Labor Rate',
+    laborDbName: 'Ledgerstone - Finishes Labor Rate',
     subDbName: 'Ledgerstone Veneer Panels - Sub SF',
   },
   'Stacked Stone Veneer': {
     unit: 'SF',
     dbName: 'Stacked Stone Veneer',
-    laborDbName: 'Stacked Stone Veneer - Labor Rate',
+    laborDbName: 'Stacked Stone - Finishes Labor Rate',
     subDbName: 'Stacked Stone Veneer - Sub SF',
   },
   Tile: {
     unit: 'SF',
     dbName: 'Tile - Columns',
-    laborDbName: 'Tile - Columns - Labor Rate',
+    laborDbName: 'Tile - Finishes Labor Rate',
     subDbName: 'Tile - Columns - Sub SF',
   },
   'Real Flagstone, Flat': {
     unit: 'ton',
     dbName: 'Real Flagstone Flat',
-    laborDbName: 'Real Flagstone Flat - Labor Rate',
+    laborDbName: 'Real Flagstone - Finishes Labor Rate',
     subDbName: 'Real Flagstone Flat - Sub SF',
   },
   'Real Stone': {
     unit: 'ton',
     dbName: 'Real Stone - Columns',
-    laborDbName: 'Real Stone - Columns - Labor Rate',
+    laborDbName: 'Real Stone - Finishes Labor Rate',
     subDbName: 'Real Stone - Columns - Sub SF',
   },
 }
@@ -605,7 +610,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
     loading: pricesLoading,
     refresh: refreshAllRates,
     vendorOptionsForCategory,
-  } = useMaterialCatalog([COLUMNS_CATEGORY, BASIC_CATEGORY, WALLS_CATEGORY, CONCRETE_CATEGORY], {
+  } = useMaterialCatalog([COLUMNS_CATEGORY, BASIC_CATEGORY, WALLS_CATEGORY, CONCRETE_CATEGORY, 'Finishes'], {
     materialPrices: initialData?.materialPrices,
     materialRows: initialData?.materialRows,
   })

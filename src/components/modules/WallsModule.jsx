@@ -140,13 +140,16 @@ const WALL_RATES = {
   tile: { db: 'Tile' },
   flagstone: { db: 'Real Flagstone' },
   realStone: { db: 'Real Stone' },
-  sandStuccoLab: { db: 'Sand Stucco - Wall Labor Rate' },
-  smoothStuccoLab: { db: 'Smooth Stucco - Wall Labor Rate' },
-  ledgerstoneLab: { db: 'Ledgerstone - Wall Labor Rate' },
-  stackedStoneLab: { db: 'Stacked Stone - Wall Labor Rate' },
-  tileLab: { db: 'Tile - Wall Labor Rate' },
-  flagstoneLab: { db: 'Real Flagstone - Wall Labor Rate' },
-  realStoneLab: { db: 'Real Stone - Wall Labor Rate' },
+  // SHARED finish labor — one canonical rate per finish (category 'Finishes'),
+  // read by Walls, Fire Pit, Outdoor Kitchen, Columns. Set it once in Master Rates
+  // and it flows to every module. (Retired the per-module '- Wall Labor Rate' copies.)
+  sandStuccoLab: { db: 'Sand Stucco - Finishes Labor Rate' },
+  smoothStuccoLab: { db: 'Smooth Stucco - Finishes Labor Rate' },
+  ledgerstoneLab: { db: 'Ledgerstone - Finishes Labor Rate' },
+  stackedStoneLab: { db: 'Stacked Stone - Finishes Labor Rate' },
+  tileLab: { db: 'Tile - Finishes Labor Rate' },
+  flagstoneLab: { db: 'Real Flagstone - Finishes Labor Rate' },
+  realStoneLab: { db: 'Real Stone - Finishes Labor Rate' },
   capFlagstone: { db: 'Wall Cap Flagstone' },
   capPrecast: { db: 'Wall Cap Precast' },
   capBullnose: { db: 'Wall Cap Bullnose Brick' },
@@ -3131,7 +3134,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
     loading: pricesLoading,
     refresh: refreshAllRates,
     vendorOptionsForCategory,
-  } = useNewMaterialCatalog([WALLS_CATEGORY, BASIC_CATEGORY, CONCRETE_CATEGORY, DEMO_CATEGORY, DRAINAGE_CATEGORY], {
+  } = useNewMaterialCatalog([WALLS_CATEGORY, BASIC_CATEGORY, CONCRETE_CATEGORY, DEMO_CATEGORY, DRAINAGE_CATEGORY, 'Finishes'], {
     materialPrices: initialData?.materialPrices,
     materialRows: initialData?.materialRows,
   })

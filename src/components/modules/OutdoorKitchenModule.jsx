@@ -55,13 +55,16 @@ const OK_RATES = {
   gficLab: { dbName: 'BBQ GFIC Labor Rate' }, // hrs/unit
   sinkLab: { dbName: 'BBQ Sink Labor Rate' }, // hrs flat
   gasTrenchLab: { dbName: 'BBQ Gas Trench Labor Rate' }, // LF/day
-  sandStuccoLab: { dbName: 'Sand Stucco - BBQ Labor Rate' }, // SF/day
-  smoothStuccoLab: { dbName: 'Smooth Stucco - BBQ Labor Rate' }, // SF/day
-  ledgerstoneLab: { dbName: 'Ledgerstone - BBQ Labor Rate' }, // SF/day
-  stackedStoneLab: { dbName: 'Stacked Stone - BBQ Labor Rate' }, // SF/day
-  tileLab: { dbName: 'Tile - BBQ Labor Rate' }, // hrs/SF (layout+install combined)
-  flagstoneLab: { dbName: 'Real Flagstone - BBQ Labor Rate' }, // hrs/SF (delivery+install+seal)
-  realStoneLab: { dbName: 'Real Stone - BBQ Labor Rate' }, // hrs/SF (transport+install+seal)
+  // SHARED finish labor — one canonical rate per finish (category 'Finishes'), read by
+  // Outdoor Kitchen, Walls, Fire Pit, Columns. Set once in Master Rates → flows to all.
+  // (Retired the per-module '- BBQ Labor Rate' finish copies; all hrs/SF, multiply.)
+  sandStuccoLab: { dbName: 'Sand Stucco - Finishes Labor Rate' },
+  smoothStuccoLab: { dbName: 'Smooth Stucco - Finishes Labor Rate' },
+  ledgerstoneLab: { dbName: 'Ledgerstone - Finishes Labor Rate' },
+  stackedStoneLab: { dbName: 'Stacked Stone - Finishes Labor Rate' },
+  tileLab: { dbName: 'Tile - Finishes Labor Rate' },
+  flagstoneLab: { dbName: 'Real Flagstone - Finishes Labor Rate' },
+  realStoneLab: { dbName: 'Real Stone - Finishes Labor Rate' },
   // Material: polished-counter supply, $/SF (moved off a hardcoded $1/SF).
   counterPolishMat: { dbName: 'BBQ Counter Polish Supply' },
   // Tunable geometry / quantity coefficients (moved off hardcoded numbers, misc_rates).
@@ -847,7 +850,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
       supabase
         .from('labor_rates')
         .select('name, rate')
-        .in('category', ['Outdoor Kitchen', 'Utilities']),
+        .in('category', ['Outdoor Kitchen', 'Utilities', 'Finishes']),
       fetchModuleCatalog(['Outdoor Kitchen', 'Utilities', 'Walls', 'Finishes']),
       supabase
         .from('subs_vendors')
