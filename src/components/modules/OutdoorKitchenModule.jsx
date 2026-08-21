@@ -178,7 +178,9 @@ function sinkUnitPrice(row, materialRows, p, ignoreOverride = false) {
 // A real vendor overrides ONLY the material unit price for a finish (matched by
 // its Type label in the vendor's 'Wall Finish' catalog); Standard keeps the
 // built-in per-estimate / master-rate price. Labor is never affected.
-const WF_CAT = 'Wall Finish'
+// SHARED finish material — the Finishes module's own records (sub 'Finish Material'
+// under category 'Finishes'), same as Fire Pit / Walls / Columns. One price per finish.
+const WF_CAT = 'Finish Material'
 function wfVendorPrice(vendorSel, typeLabel, materialRows, opts = {}) {
   // One-picker scheme (matches applianceUnitPrice/sinkUnitPrice/masterWallMeta):
   // Standard sources & prices from the finish's null-vendor catalog record; a real
@@ -498,13 +500,13 @@ function calcOutdoorKitchen(
   const p = dbName => n(mp[dbName])
   // Wall finish per-row calc: material (vendor-overridable unit) + labor by type.
   const finishRowCalc = row => {
-    const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, 'Outdoor Kitchen', row.vendor)
+    const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, 'Finishes', row.vendor)
     const sf = n(row.sf)
     if (!meta || sf <= 0) return { mat: 0, hrs: 0 }
     const houseUnit = meta.master
       ? meta.matUnit
       : p(OK_RATES[meta.key].dbName, OK_RATES[meta.key].fallback)
-    const unit = wfVendorPrice(row.vendor, row.type, materialRows, { category: 'Outdoor Kitchen' }) ?? houseUnit
+    const unit = wfVendorPrice(row.vendor, row.type, materialRows, { category: 'Finishes' }) ?? houseUnit
     let mat = 0
     if (meta.unit === 'stone') {
       // Material $/Sq Ft (shared Finishes rate) + delivery $/SF + flat misc + add/SF.
@@ -1027,7 +1029,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
   const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
   // Wall-finish vendor list scoped to this module's own Category so it lists only
   // vendors that priced a Wall Finish product under 'Outdoor Kitchen' (not FP/Walls).
-  const vendorsForFinish = () => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && r.sub_category === WF_CAT && r.category === 'Outdoor Kitchen'))
+  const vendorsForFinish = () => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && r.sub_category === WF_CAT && r.category === 'Finishes'))
   const setWallFinishRow = (i, field, val) =>
     setWallFinishRows(rs => rs.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
 
@@ -1661,7 +1663,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
             </thead>
             <tbody>
               {wallFinishRows.map((row, i) => {
-                const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, 'Outdoor Kitchen', row.vendor)
+                const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, 'Finishes', row.vendor)
                 const rc = calc.wallFinishCalc?.[i] || {}
                 return (
                   <tr key={i} className="border-b border-gray-100">
@@ -1687,7 +1689,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                           value={row.type}
                           onChange={e => setWallFinishRow(i, 'type', e.target.value)}
                         >
-                          {masterWallOptions(WF_CAT, WF_LIST, materialRows, 'Outdoor Kitchen', row.vendor || 'Standard').map(t => (
+                          {masterWallOptions(WF_CAT, WF_LIST, materialRows, 'Finishes', row.vendor || 'Standard').map(t => (
                             <option key={t} value={t}>
                               {t}
                             </option>
