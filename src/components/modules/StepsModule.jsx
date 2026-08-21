@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
+import { calcSteps } from './stepsCalc'
 import {
   fetchPriceLedgerAsOf,
   ledgerPrice,
@@ -172,119 +173,6 @@ function concSubRowCalc(r, mr) {
 }
 
 // ── Calculation engine ────────────────────────────────────────────────────────
-// Labor always reads the In-House rows; MATERIAL follows the active tab so each
-// tab's Materials Breakdown is fully independent.
-function calcSteps(
-  state,
-  lrph,
-  laborRates,
-  materialRates,
-  materialRows,
-  gpmd,
-  walkAccess = null,
-  laborBurdenPct,
-  subGpMarkupRate,
-  commissionRate,
-  priceOf = item => n(item?.unit_cost)
-) {
-  const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
-  const lr = laborRates || {}
-  const mr = materialRates || {}
-  const isSub = state.subType === 'Subcontractor'
-
-  const ihConc = state.concRows || []
-
-  // ── Vendor/Type step sections (Paver/Brick/Tile/Flagstone) ───────────────
-  // Labor + In-House material from In-House rows; sub cost ($/LF) from Sub rows.
-  let laborHrs = 0
-  const matSections = MAT_SECTIONS.map(sec => {
-    let labor = 0
-    let mat = 0
-    let pallets = 0
-    ;(state[sec.rowsKey] || []).forEach(r => {
-      const c = matStepRowCalc(r, lr, materialRows, sec.cat, priceOf)
-      labor += c.hrs
-      mat += c.mat
-      pallets += c.pallets
-    })
-    let subCost = 0
-    ;(state[sec.subKey] || []).forEach(r => {
-      subCost += matStepSubRowCalc(r, mr, sec.baseKey).cost
-    })
-    laborHrs += labor
-    return { key: sec.key, title: sec.title, mat, pallets, subCost }
-  })
-  const stepMat = matSections.reduce((s, x) => s + x.mat, 0)
-  const pallets = matSections.reduce((s, x) => s + x.pallets, 0)
-  const subStepCost = matSections.reduce((s, x) => s + x.subCost, 0)
-
-  // ── Concrete steps ───────────────────────────────────────────────────────
-  let concMat = 0
-  ihConc.forEach(r => {
-    const c = concRowCalc(r, lr, mr)
-    laborHrs += c.hrs
-    concMat += c.mat
-  })
-  let subConcCost = 0
-  ;(state.subConcRows || []).forEach(r => {
-    subConcCost += concSubRowCalc(r, mr).cost
-  })
-  const subRowCost = subStepCost + subConcCost
-
-  // ── Manual entry ─────────────────────────────────────────────────────────
-  const ihManual = state.manualRows || []
-  let manHrs = 0
-  ihManual.forEach(r => {
-    manHrs += n(r.hours)
-  })
-  const manMat = ihManual.reduce((s, r) => s + n(r.materials), 0)
-  const manSub = [...(state.manualRows || []), ...(state.subManualRows || [])].reduce(
-    (s, r) => s + n(r.subCost),
-    0
-  )
-
-  const baseHrs = laborHrs + manHrs
-  const diffMod = 1 + n(state.difficulty) / 100
-  const _preWalkHrs = baseHrs * diffMod + n(state.hoursAdj)
-  const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
-  const totalHrs = _preWalkHrs + walkHrs
-  const manDays = totalHrs / 8
-  // In-House material (hourly model). Sub steps are bundled into the flat
-  // per-LF sub price, so they never contribute to material.
-  const totalMat = stepMat + concMat + manMat
-
-  const laborCost = totalHrs * n(lrph)
-  const burden = laborCost * n(laborBurdenPct)
-  const gp = manDays * gpmd
-  const subCost = subRowCost + manSub
-  const subGp = subCost * subGpMarkupRate
-  const commission = (gp + subGp) * n(commissionRate)
-  const price = totalMat + laborCost + burden + gp + subCost + subGp + commission
-
-  return {
-    walkHrs,
-    totalHrs,
-    manDays,
-    totalMat,
-    laborCost,
-    burden,
-    gp,
-    subGp,
-    commission,
-    subCost,
-    matSections,
-    stepMat,
-    subStepCost,
-    subConcCost,
-    subRowCost,
-    manSub,
-    price,
-    concMat,
-    manMat,
-    pallets,
-    isSub,
-  }
-}
 
 // ── Edit-Rates modal (Concrete Type/Finish/Form + Paver Form) ────────────────
 async function upsertRate(table, name, field, value) {

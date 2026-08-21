@@ -1,5 +1,44 @@
 # Test results log
 
+## 2026-08-21 — Steps: Layer A+B (extraction battery)
+- **Layer A:** extracted the inline `calcSteps` out of `StepsModule.jsx` into pure
+  `stepsCalc.js` (module now `import { calcSteps } from './stepsCalc'`; kept the module's own
+  helper const copies for JSX). Inlined the supabase-tainted `calcWalkAccessLabor` + catalog
+  resolvers (`catalogOptions`/`catalogItemFor` + `isStandardSel`) and carried the rate-key
+  builders (`kPaverForm`/`kConcTypeHrs`/`kConcTypeMat`/`kFinishHrs`/`kFinishMat`/`kConcForm` +
+  the sub keys) + `MAT_SECTIONS` + row calculators verbatim. `stepsCalc.test.mjs` = **7/7**:
+  paver form labor value (100 SF × 0.5 hr = 50 hrs → $3,750) + material (SF × $8 = $800, 1
+  pallet) + edit-reflects; concrete type+finish+form value (100 LF × (0.9+0.1) × 1 = 100 hrs;
+  material 100 × (5+1) = $600) + edit-reflects; material **NO-FALLBACK** (picked paver with
+  empty catalog → $0 material, labor still priced from the form rate); Sub tab flat $/LF
+  (100 × (2+0.5) = $250) with 0 In-House labor (independence); and a no-NaN populated
+  estimate. Module bundles clean (esbuild).
+- **Layer B:** `scripts/steps-rate-coverage.mjs` (`test:steps-coverage`) — Steps consumes
+  **11 labor rates** (paver/brick/tile/flag form + concrete type/finish/form), **9 concrete
+  materials** ($/Sq Ft, color-inclusive), **17 sub $/Ln Ft rates**, across **4 catalog
+  sub_categories** (Paver Material / Brick / Tile / Flagstone) for In-House step material
+  (vendor-first → Standard). Manifest derives its arrays from the calc source so it can't
+  drift. No-fallback + imports guards PASS. Full unit suite **195/195** (incl. 7 new Steps).
+- **Layer C authored, pending CI:** `e2e/steps.spec.js` (opens / vendor×Type / numeric /
+  In-House↔Sub / live-edit via Hours Adj / clean). Skips unless a Steps module is on the test
+  estimate. Catalogued in `e2e/TEST-CASES.md`.
+
+```
+### Steps — definition-of-done sign-off (2026-08-21, A+B done; C/D/E pending)
+A. Unit:      value[x] edit[x] unpriced[x] vendor[~] priority[N/A] units[x] aggregator[N/A] sub-indep[x] breakdown[N/A] summary-parity[x]
+B. Audit:     coverage[x] orphan[~] no-fallback[x] no-hardcoded[x] imports[x]
+C. E2E:       opens[ ] vendor×Type[ ] numeric[ ] sub[ ] live-edit[ ] clean[ ]  (authored; runs when a Steps module is on the test estimate)
+D. DB:        priced[ ] no-dupes[ ] filing[ ]  (Brian's SQL step — every Steps labor/concrete/sub rate priced; step catalog items priced)
+E. Loop:      red-first[N/A] catalogued[x] logged[x] green[ ]
+N/A items + reason:
+  A.priority — no numeric-coeff priority ladder; form/type/finish rates are independent name keys, unset ⇒ 0 (covered).
+  A.aggregator/breakdown — per-material-section rows (paver/brick/tile/flag/conc), In-House↔Sub toggle; PoolSummary-style per-tab breakdown N/A here.
+  A.vendor[~] — vendor override via paverItemFor→catalogItemFor (vendor_id match → Standard null-vendor); covered structurally + the NO-FALLBACK case, not a dedicated per-vendor assertion.
+  A.sub-indep[x] — Sub-tab test asserts totalHrs=0 and the flat $/LF cost routes into subCost independently of the In-House labor path.
+  A.summary-parity[x] — StepsSummary reads the saved calc snapshot; no separate summary calc to drift.
+  Layer A via stepsCalc.test.mjs (7); B via scripts/steps-rate-coverage.mjs (test:steps-coverage).
+```
+
 ## 2026-08-21 — Irrigation: surface unpriced MATERIAL (zones + timers)
 - Closes the silent-$0 material gap in Irrigation (the twin of the Lighting fix). The calc
   collected `zoneMissing` but never returned it, and timers weren't tracked — so an unpriced

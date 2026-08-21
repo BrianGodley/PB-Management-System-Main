@@ -145,3 +145,12 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
 - numeric fields → total; Sub tab prices (flat $/each); live edit moves total
 - unit layer (lightingCalc.test.mjs, 8): item-driven labor value/edit-reflects, material +
   watts/VA, 15% markup, unset-item-labor→0+laborUnset, fixture-vs-wire independence, Sub 0-labor
+
+## Steps (steps.spec.js)
+- opens with Paver / Brick / Tiled / Flagstone / Concrete Steps sections; vendor + Type pickers populated
+- exhaustive vendor × Type matrix (In-House + Sub); every-option NaN check
+- numeric fields → total; Sub tab prices (flat $/Ln Ft); live edit (Hours Adj) moves total
+- unit layer (stepsCalc.test.mjs, 7): paver form labor value/edit-reflects (SF × form rate) +
+  material (SF × item price, pallets), concrete type+finish+form value/edit-reflects, material
+  NO-FALLBACK (unresolved catalog item → $0, labor still priced), Sub flat $/LF independence, no-NaN
+- coverage manifest: `npm run test:steps-coverage` (11 labor + 9 concrete material + 17 sub $/LF + 4 catalog sub_categories)
