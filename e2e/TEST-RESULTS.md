@@ -525,3 +525,18 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
 - Full collection present: auth.setup 1, code-changes 2, estimator 2,
   fire-pit 9, hand-demo 6, navigation 8, smoke 1, walls 7 = 36.
 - No edits made this run.
+
+## 2026-08-20 — autopilot run (CI sha 084cade) — ⚠ STALE ARTIFACT, NOT A PASS
+- `commit.txt` = 084cade, `updated_at.txt` = 2026-08-21T03:33:57Z.
+- Artifact does NOT match: `config.metadata.gitCommit.hash` =
+  4c4b18b994d44e3a3a2c05e9a38915cb4253d0fd ("e2e: add local ci-results watcher"),
+  `stats.startTime` = 2026-08-20T17:41:43Z — ~10h older than the publish time.
+  This results.json is a replay of an earlier run, not a run of 084cade.
+- Reported 22 expected / 0 unexpected / 0 flaky / 0 skipped, 106.1s — but the
+  collection is SHORT by 14 vs the last three runs (36):
+  auth.setup 1, code-changes 2, estimator 2, fire-pit 8 (was 9), navigation 8,
+  smoke 1 = 22. MISSING entirely: hand-demo.spec.js (6), walls.spec.js (7),
+  plus 1 fire-pit case.
+- `e2e/hand-demo.spec.js` and `e2e/walls.spec.js` both exist at HEAD, so this is
+  a publisher/runner problem, not a deleted-spec problem.
+- No edits made this run. Not treated as green; flagged to Brian.
