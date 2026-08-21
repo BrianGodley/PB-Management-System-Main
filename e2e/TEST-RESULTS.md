@@ -439,3 +439,13 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
 - Confirms the previous round's `settle()` timing fix: no `networkidle` timeouts,
   and the suite grew 22 → 36 specs with every one passing.
 - No edits made this run.
+
+## 2026-08-20 — autopilot run (CI sha 37a29e0)
+- Result: **GREEN** — 36 expected, 0 unexpected, 0 flaky, 0 skipped
+  (CI start 2026-08-21T02:23:00Z, duration 139.3s).
+- Artifact verified genuine: results.json `config.metadata.gitCommit.hash`
+  == commit.txt == 37a29e0, so no stale publish.
+- Full collection unchanged and fully exercised — auth.setup 1,
+  code-changes 2, estimator 2, fire-pit 9, hand-demo 6, navigation 8,
+  smoke 1, walls 7 = 36. Seven consecutive clean runs.
+- No edits made this run.
