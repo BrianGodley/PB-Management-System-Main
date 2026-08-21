@@ -419,3 +419,16 @@ Artifact verified genuine: results.json `config.metadata.gitCommit.hash` ==
 commit.txt == 2c7951d, so no stale publish. Full collection unchanged —
 auth.setup 1, code-changes 2, estimator 2, fire-pit 9, hand-demo 6,
 navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs.
+
+## 2026-08-20 — autopilot — f0748f0 (CI run 2026-08-21T02:05Z)
+- 35 expected, 0 unexpected, 0 skipped, **1 flaky**.
+- FLAKY: `smoke.spec.js › dashboard loads without console errors` — attempt 0
+  timed out at 60s on `page.waitForLoadState('networkidle')` (line 12); retry
+  passed in 3.5s. Test-robustness, not a product bug: the live SPA polls
+  (weather/Supabase realtime) so networkidle may never fire, and an unbounded
+  wait consumes the whole test timeout.
+- FIX (e2e only): added `settle(page, timeout = 10000)` to `e2e/helpers.js` —
+  bounded `networkidle` + 250ms paint settle — and replaced every bare/unbounded
+  `waitForLoadState('networkidle')` in smoke, estimator, navigation, fire-pit and
+  helpers with it. `node --check` clean on all five files. No src/, SQL or rate
+  changes.

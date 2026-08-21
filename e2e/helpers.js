@@ -1,3 +1,14 @@
+// Bounded "network is quiet" wait. Against the live SPA (weather poll, Supabase
+// realtime, analytics beacons) the page can NEVER reach true networkidle, so a
+// bare waitForLoadState('networkidle') burns the ENTIRE test timeout — that is
+// exactly what made smoke.spec.js flaky (attempt 1 timed out at 60s, retry
+// passed in 3.5s). Wait at most `timeout` ms, then move on: every assertion
+// after it does its own waiting anyway.
+export async function settle(page, timeout = 10000) {
+  await page.waitForLoadState('networkidle', { timeout }).catch(() => {})
+  await page.waitForTimeout(250)
+}
+
 // Open the estimate and enter a module's EDITOR by name. Generalized from the
 // hardened Fire Pit flow so every module spec reuses one nav path:
 //   1) the estimate opens VIEW-ONLY → click the top-level "✏️ Edit" (not per-module),
@@ -7,11 +18,11 @@
 //      module editor renders (version-independent). Returns true once it's visible.
 export async function openModule(page, moduleName, { estimateUrl = process.env.TEST_ESTIMATE_URL, timeout = 30000 } = {}) {
   await page.goto(estimateUrl, { waitUntil: 'domcontentloaded' })
-  await page.waitForLoadState('networkidle').catch(() => {})
+  await settle(page)
   const estEdit = page.getByRole('button', { name: /edit/i }).filter({ hasNotText: /module/i }).first()
   if (await estEdit.count()) {
     await estEdit.click().catch(() => {})
-    await page.waitForLoadState('networkidle').catch(() => {})
+    await settle(page)
   }
   const editBtn = page.getByRole('button', { name: /edit module/i })
   const rows = page.locator('div.cursor-pointer').filter({ hasText: moduleName })

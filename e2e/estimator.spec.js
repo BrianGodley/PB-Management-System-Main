@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { collectErrors } from './helpers.js'
+import { collectErrors, settle } from './helpers.js'
 
 // Round 1 — estimator (NON-DESTRUCTIVE). Opens an existing estimate and verifies
 // it renders cleanly. Nothing is entered or saved in round 1; the deeper calc
@@ -19,7 +19,7 @@ test.describe('Estimator', () => {
     await page.goto(ESTIMATE, { waitUntil: 'domcontentloaded' })
     await expect(page).not.toHaveURL(/\/login/)
     await expect(page.getByText(/something went wrong|application error/i)).toHaveCount(0)
-    await page.waitForLoadState('networkidle')
+    await settle(page)
 
     // Capture the estimate for review (informs round-2 selector work).
     await testInfo.attach('estimate.png', {
@@ -31,7 +31,7 @@ test.describe('Estimator', () => {
 
   test('Fire Pit module renders if present', async ({ page }) => {
     await page.goto(ESTIMATE, { waitUntil: 'domcontentloaded' })
-    await page.waitForLoadState('networkidle')
+    await settle(page)
     const firePit = page.getByText(/fire pit/i).first()
     // Not every estimate has a Fire Pit; only assert when the module is present.
     if (await firePit.count()) {

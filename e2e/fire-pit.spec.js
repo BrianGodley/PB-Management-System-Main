@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { collectErrors, scanEveryOptionForNaN } from './helpers.js'
+import { collectErrors, scanEveryOptionForNaN, settle } from './helpers.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Fire Pit module — reproduces the bugs manual testing caught that unit tests
@@ -22,7 +22,7 @@ const ESTIMATE = process.env.TEST_ESTIMATE_URL
 // section (Gas Line / Trenching) is visible.
 async function openFirePit(page) {
   await page.goto(ESTIMATE, { waitUntil: 'domcontentloaded' })
-  await page.waitForLoadState('networkidle')
+  await settle(page)
   // 0) The estimate opens VIEW-ONLY ("👁 View Module" / "Viewing only…"). Click the
   //    estimate's top-level "✏️ Edit" (not the per-module button) to enter edit mode.
   const estEdit = page
@@ -31,7 +31,7 @@ async function openFirePit(page) {
     .first()
   if (await estEdit.count()) {
     await estEdit.click().catch(() => {})
-    await page.waitForLoadState('networkidle').catch(() => {})
+    await settle(page)
   }
   // The project name paragraph is "⠿Fire Pit" (drag handle + name), so exact-text
   // matching fails; click the actual clickable ROW divs instead. Project rows and

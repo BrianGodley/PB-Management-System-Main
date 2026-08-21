@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { collectErrors } from './helpers.js'
+import { collectErrors, settle } from './helpers.js'
 
 // Round 1 — navigation smoke. Visit each main authenticated route directly and
 // assert it renders without a console/page error and without showing an error
@@ -24,7 +24,7 @@ for (const route of ROUTES) {
     await expect(page).not.toHaveURL(/\/login/)
     // No visible crash / error boundary text.
     await expect(page.getByText(/something went wrong|application error|unexpected error/i)).toHaveCount(0)
-    await page.waitForLoadState('networkidle')
+    await settle(page)
     expect(errors, `Console errors on ${route.name}:\n${errors.join('\n')}`).toEqual([])
   })
 }
