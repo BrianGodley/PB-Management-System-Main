@@ -555,3 +555,24 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
 - Second consecutive publish of the same stale run ⇒ the publisher is re-pushing
   the last downloaded artifact instead of waiting for the new CI run to finish.
 - No edits made this run. Not treated as green.
+
+## 2026-08-20 — autopilot run (CI sha 9176f5f) — ⚠ STALE ARTIFACT (3rd repeat), NOT A PASS
+- `commit.txt` = 9176f5f ("auto(e2e): autopilot test fix [2026-08-21T03:48:09Z]"),
+  `updated_at.txt` = 2026-08-21T03:52:05Z.
+- results.json is the SAME artifact already flagged under 084cade and c466ba3:
+  `config.metadata.gitCommit.hash` = 4c4b18b994d44e3a3a2c05e9a38915cb4253d0fd,
+  `metadata.ci.buildHref` = actions/runs/32398956569,
+  `stats.startTime` = 2026-08-20T17:41:43Z, duration 106.1s — ~10h older than
+  the publish timestamp.
+- Reported 22 expected / 0 unexpected / 0 flaky / 0 skipped; collection still
+  SHORT by 14 vs the 4b293cf/f1a0db2 baseline (36): missing hand-demo.spec.js (6),
+  walls.spec.js (7), and 1 fire-pit case. Both spec files exist at 9176f5f
+  (`git ls-tree 9176f5f e2e/` confirms), so this is a publisher/runner problem.
+- Suspected cause (unverified — sandbox has no network, can't read Actions logs):
+  `concurrency: cancel-in-progress: true` in `.github/workflows/e2e.yml` is
+  cancelling each new run, and the publish step (`if: always()`) is copying a
+  leftover/older `test-results/results.json` rather than a fresh one. A guard
+  comparing results.json's embedded gitCommit to `github.sha` before pushing
+  would make this fail loudly instead of silently republishing.
+- No edits made this run (fix would require .github/workflows/e2e.yml — config,
+  out of autopilot bounds). Not treated as green.
