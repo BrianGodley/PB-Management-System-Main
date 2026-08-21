@@ -459,3 +459,22 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
   estimator 2, fire-pit 9, hand-demo 6, navigation 8, smoke 1, walls 7 = 36.
   Eight consecutive clean runs.
 - No edits made this run.
+
+## 2026-08-20 — autopilot run (CI sha 467e59d) — STALE ARTIFACT, NOT GRADED
+- `commit.txt` = 467e59d, `updated_at.txt` = 2026-08-21T02:43:00Z, but the
+  published `results.json` does NOT belong to that commit:
+  - `config.metadata.gitCommit.hash` = **4c4b18b** ("e2e: add local ci-results
+    watcher (npm run e2e:watch) for the autopilot loop") — an older commit.
+  - `stats.startTime` = 2026-08-20T17:41:43Z, ~9h BEFORE the previous two runs
+    (02:14 / 02:31 next-day UTC) that were correctly attributed.
+  - Collection is 22 specs, not 36: auth.setup 1, code-changes 2, estimator 2,
+    fire-pit 8, navigation 8, smoke 1. **hand-demo.spec.js (6) and
+    walls.spec.js (7) are absent entirely**, and fire-pit is 8 not 9 — yet both
+    files exist on disk in `e2e/`.
+- So the numbers ("22 expected / 0 unexpected / 0 flaky / 0 skipped") are a
+  replay of an old green run. Reporting this as a pass would mean 14 specs
+  silently not running — exactly the silent-gap failure mode.
+- **Not graded green.** No e2e/ edits made — the defect is in the publish/watch
+  path (CI artifact upload or `e2e:watch` pushing a cached results.json), which
+  is config, not test robustness, so it is Brian's call.
+- `.autopilot-last` advanced to 467e59d so the stale run is not re-processed.
