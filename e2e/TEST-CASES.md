@@ -120,3 +120,14 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   enters SF, asserts the finish table shows BOTH a nonzero `$` and a nonzero `x.xx` hrs.
   Catches the fetch-scope bug (finish labor = 0 hrs when the module omits the Finishes
   category from its labor query) that "no unpriced banner" alone missed.
+
+## Columns (columns.spec.js)
+- opens with type tabs; every picker populated
+- finishes available on CMU tab (not PIP-only) + resolve (no unpriced)
+- exhaustive vendor × item matrix on every type tab; every-tab NaN check
+- numeric fields → total; Sub tab prices; live edit moves total
+
+## Outdoor Kitchen (outdoor-kitchen.spec.js)
+- opens with Wall Finishes section; every picker populated
+- shared wall finish resolves (no unpriced)
+- exhaustive vendor × item matrix (In-House + Sub); numeric → total; Sub prices; live edit
