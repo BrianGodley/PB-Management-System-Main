@@ -767,3 +767,21 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
   BBQ Wall Length therefore remains **unverified**, not merely undecided.
 - No e2e edit, no src/ change this round. `.autopilot-last` deliberately left at
   c77dd70 so a genuine a9d66c5 run is not skipped when CI publishes it.
+
+## 2026-08-21 — autopilot (ci-results commit.txt = a9d66c5, updated_at 16:10Z) — CONFIRMED STALE, NOT PROCESSED
+- Blob-level check this round (previous round asserted this from stats alone; now proven):
+  - `a9d66c5:results.json` → startTime **2026-08-21T14:57:00.953Z**, 49 passed / 1 failed.
+  - `c77dd70:results.json` (ci-results 678762b) → startTime **2026-08-21T15:48:46.430Z**,
+    **50 passed / 0 failed / 0 flaky / 0 skipped — GREEN**.
+- The payload published under a9d66c5 STARTED ~51 min BEFORE the c77dd70 run and long
+  before a9d66c5 itself was committed (~16:0xZ). It cannot be a run of a9d66c5.
+- Correction to the entry two rounds back: the 49/1 outdoor-kitchen failure was
+  attributed to c77dd70. That is wrong — c77dd70's own published run is green. The
+  49/1 payload belongs to an earlier commit (pre-`fillField`/`toHaveValue` hardening).
+- Therefore the outstanding "BBQ Wall Length: recompute bug vs expected-$0" question is
+  based on a pre-hardening run and has **no current evidence** behind it. Latest real
+  result on record is GREEN.
+- Spec diff vs the two payloads: identical 50 specs; only
+  `outdoor-kitchen.spec.js › live edit reflects…` differs (expected → unexpected).
+- No e2e edit, no src/ change. `.autopilot-last` left at c77dd70 so a genuine a9d66c5
+  (or the newer 747363e) run is processed when CI publishes it.
