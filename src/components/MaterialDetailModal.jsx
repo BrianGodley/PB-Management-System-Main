@@ -47,6 +47,7 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
     subcategory_id: m.subcategory_id,
     description: m.description || '',
     unit: m.unit || '',
+    sku: m.sku || '',
     price: row.price ?? '',
     // The item's default labor rate (a labor_rates NAME) — independent of material.
     labor_rate: m.calc_meta?.labor_rate || '',
@@ -92,6 +93,7 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
         subcategory_id: form.subcategory_id,
         description: form.description,
         unit: form.unit || null,
+        sku: form.sku.trim() || null,
         calc_meta: nextMeta,
       })
       .eq('id', m.id)
@@ -191,6 +193,7 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
               <Field label="Category" value={catName(m.category_id)} />
               <Field label="Sub-Category" value={subName(m.subcategory_id)} />
               <Field label="Description" value={m.description} />
+              <Field label="SKU / MFG #" value={m.sku || '—'} />
               <Field label="Unit" value={m.unit || '—'} />
               <Field label="Default Labor Rate" value={m.calc_meta?.labor_rate || '— not set —'} />
               {row.vName && <Field label="Vendor" value={row.vName} />}
@@ -241,6 +244,15 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
                   className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm"
                   value={form.description}
                   onChange={e => set('description', e.target.value)}
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs text-gray-500">SKU / MFG #</span>
+                <input
+                  className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm"
+                  value={form.sku}
+                  onChange={e => set('sku', e.target.value)}
+                  placeholder="e.g. 25577-521-000"
                 />
               </label>
               <div className="grid grid-cols-2 gap-3">
