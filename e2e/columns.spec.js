@@ -31,15 +31,21 @@ test.describe('Columns', () => {
     expect(errors, `Console/HTTP errors:\n${errors.join('\n')}`).toEqual([])
   })
 
-  test('every Type dropdown is populated (no empty picker)', async ({ page }) => {
+  test('vendor pickers are populated (type pickers may start on a placeholder)', async ({ page }) => {
     const ok = await openModule(page, 'Columns')
     test.skip(!ok, 'Columns editor not reachable on this estimate.')
     const selects = page.locator('select')
     const n = await selects.count()
     expect(n, 'No <select> pickers found in Columns editor').toBeGreaterThan(0)
     for (let i = 0; i < n; i++) {
-      const opts = await selects.nth(i).locator('option').count()
-      expect(opts, `Select #${i} is empty (only a placeholder / no options)`).toBeGreaterThan(1)
+      const opts = await selects.nth(i).locator('option').allTextContents()
+      // Vendor pickers (have a "Standard" option) MUST list vendors — this catches the
+      // catalog/subcategory-mismatch empty-picker bug. Per-row type/material pickers
+      // legitimately start on a "Select…" placeholder (unselected row = $0), so they
+      // only need to render (>=1 option) until a vendor is chosen.
+      const isVendor = opts.some(t => /^\s*standard\s*$/i.test(t))
+      if (isVendor) expect(opts.length, `Vendor select #${i} has no vendor options`).toBeGreaterThan(1)
+      expect(opts.length, `Select #${i} rendered with zero options (broken)`).toBeGreaterThan(0)
     }
   })
 

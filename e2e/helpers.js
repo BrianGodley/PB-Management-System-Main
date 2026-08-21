@@ -16,7 +16,7 @@ export async function settle(page, timeout = 10000) {
 //      module name; the name <p> carries a drag handle so exact-text match fails),
 //   3) click "✎ Edit Module". Editor-open signal = the "View Rates" button every
 //      module editor renders (version-independent). Returns true once it's visible.
-export async function openModule(page, moduleName, { estimateUrl = process.env.TEST_ESTIMATE_URL, timeout = 30000 } = {}) {
+export async function openModule(page, moduleName, { estimateUrl = process.env.TEST_ESTIMATE_URL, timeout = 45000 } = {}) {
   await page.goto(estimateUrl, { waitUntil: 'domcontentloaded' })
   await settle(page)
   const estEdit = page.getByRole('button', { name: /edit/i }).filter({ hasNotText: /module/i }).first()

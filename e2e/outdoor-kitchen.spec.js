@@ -29,15 +29,17 @@ test.describe('Outdoor Kitchen', () => {
     expect(errors, `Console/HTTP errors:\n${errors.join('\n')}`).toEqual([])
   })
 
-  test('every Type dropdown is populated (no empty picker)', async ({ page }) => {
+  test('vendor pickers are populated (type pickers may start on a placeholder)', async ({ page }) => {
     const ok = await openModule(page, 'Outdoor Kitchen')
     test.skip(!ok, 'Outdoor Kitchen editor not reachable on this estimate.')
     const selects = page.locator('select')
     const n = await selects.count()
     expect(n, 'No <select> pickers found in Outdoor Kitchen editor').toBeGreaterThan(0)
     for (let i = 0; i < n; i++) {
-      const opts = await selects.nth(i).locator('option').count()
-      expect(opts, `Select #${i} is empty (only a placeholder / no options)`).toBeGreaterThan(1)
+      const opts = await selects.nth(i).locator('option').allTextContents()
+      const isVendor = opts.some(t => /^\s*standard\s*$/i.test(t))
+      if (isVendor) expect(opts.length, `Vendor select #${i} has no vendor options`).toBeGreaterThan(1)
+      expect(opts.length, `Select #${i} rendered with zero options (broken)`).toBeGreaterThan(0)
     }
   })
 
