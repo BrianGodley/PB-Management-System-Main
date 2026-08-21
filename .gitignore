@@ -40,7 +40,14 @@ supabase-*.sql
 # (deliverables, not application source)
 Rate Chain Validation*.md
 Rate Reader Consolidation*.md
+Hand Demo Rework*.md
+Labor Hours Conversion*.md
+One Picker System*.md
+Tons Rates*.md
 *.xlsx
+
+# Local build-verification output (regenerated; not source)
+dist-check/
 
 # Capacitor native build artifacts (the ios/ and android/ projects themselves
 # are committed, but these caches / synced web assets are regenerated)
