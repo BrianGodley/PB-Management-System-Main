@@ -26,6 +26,7 @@
     "test:skid-coverage": "node scripts/skid-steer-rate-coverage.mjs",
     "test:mini-coverage": "node scripts/mini-skid-rate-coverage.mjs",
     "test:concrete-coverage": "node scripts/concrete-rate-coverage.mjs",
+    "test:pavers-coverage": "node scripts/pavers-rate-coverage.mjs",
     "test:e2e": "playwright test",
     "test:e2e:report": "playwright show-report",
     "e2e:sync": "git fetch origin ci-results && node -e \"require('fs').mkdirSync('test-results',{recursive:true})\" && git show origin/ci-results:results.json > test-results/ci-results.json && git show origin/ci-results:updated_at.txt",
