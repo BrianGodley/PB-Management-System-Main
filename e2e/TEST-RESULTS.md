@@ -1,5 +1,37 @@
 # Test results log
 
+## 2026-08-21 — Pavers: Layer A+B (calc extraction + coverage)
+- **Layer A:** extracted inline `calcPaver` into pure `paverCalc.js` (module imports it;
+  inline removed). Same lib entanglement as Concrete — inlined the pure helpers
+  `catalogOptions` / `catalogItemFor` / `isStandardSel` / `paverItemFor` / `sfToTons` /
+  `calcWalkAccessLabor` (their libs import supabase). `paverCalc.test.mjs` = **6/6**:
+  value (straight-cut labor = LF×rate = $750), units (LF ×2), edit-reflects, no-fallback
+  (unset rate → 0, no constant), multi-component labor sum, and no-NaN populated estimate.
+- **Layer B:** `scripts/pavers-rate-coverage.mjs` (`test:pavers-coverage`) — 31 consumed
+  name-keyed rates (17 labor + misc), plus the note that Paver/Base MATERIAL prices come
+  from the catalog (Paver Material / Base Material sub-cats) via `paverItemFor`, not a
+  name key. No-fallback guard PASS; module + calc parse.
+- **Layer C authored, pending CI:** `e2e/pavers.spec.js` (opens / vendor×item matrix /
+  numeric / In-House↔Sub no-NaN / live-edit / clean). Skips unless a Pavers module is on
+  `TEST_ESTIMATE_URL` (the estimate already has one, per the earlier module-row list).
+
+```
+### Pavers — definition-of-done sign-off (2026-08-21, A+B done; C/D/E pending)
+A. Unit:      value[x] edit[x] unpriced[x] vendor[~] priority[N/A] units[x] aggregator[N/A] sub-indep[~] breakdown[N/A] summary-parity[x]
+B. Audit:     coverage[x] orphan[~] no-fallback[x] no-hardcoded[x] imports[x]
+C. E2E:       opens[ ] vendor×item[ ] numeric[ ] sub[ ] live-edit[ ] clean[ ]  (authored; runs when a Pavers module is on the test estimate)
+D. DB:        priced[ ] no-dupes[ ] filing[ ]  (Brian's SQL step)
+E. Loop:      red-first[N/A] catalogued[x] logged[x] green[ ]
+N/A items + reason:
+  A.unpriced[x] — Pavers has no fix-it modal (that is Concrete-specific); the no-fallback rule is honored: an unset rate reads 0 and a catalog item with no row resolves $0. Asserted.
+  A.priority — labor is a single per-item rate ladder read by name; no numeric-coeff/pointer priority to test.
+  A.aggregator/breakdown — In-House↔Sub toggle, not per-type tabs; no per-tab materials breakdown.
+  A.vendor[~] — vendor override supported via paverItemFor→catalog over materialRows; covered structurally, not yet a dedicated unit assertion.
+  A.sub-indep[~] — module runs calcPaver twice (In-House + a separate Sub engine); in-browser independence covered by Layer C; a pure IH-vs-Sub value test is a follow-up.
+  A.summary-parity[x] — PaverSummary reads the saved calc snapshot (calcPaver's own output); no separate summary calc to drift.
+  Layer A via paverCalc.test.mjs (6); B via scripts/pavers-rate-coverage.mjs (test:pavers-coverage).
+```
+
 ## 2026-08-21 — Concrete: Layer A+B (no-fallback reference module)
 - **Layer A:** extracted the inline `calcConcrete` into pure `concreteCalc.js` (module
   imports it; inline removed). More entangled than the demos — the calc depends on
