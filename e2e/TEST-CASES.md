@@ -163,3 +163,12 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   material (qty × price), add-on perDay labor + material, LABOR NO-FALLBACK (unset plant rate → 0 hrs + 0 material
   guard + laborUnset flag), till guarded (any unset till rate → 0), Sub flat $/unit independence, no-NaN
 - coverage manifest: `npm run test:planting-coverage` (8 name-keyed labor + item-driven per-plant labor + 8 add-on materials)
+
+## Weed Abatement (weed-abatement.spec.js)
+- opens with Area Type + Flat/Hillside Area + Number of Visits fields (no vendor catalog)
+- every Area Type mode (Flat/Hillside/Mixed) computes without NaN — In-House value path (ReferenceError regression guard)
+- numeric fields → total; In-House + Sub both render without NaN; live edit (Sub $/SF) moves total (DB-independent)
+- unit layer (weedCalc.test.mjs, 6): In-House value (throws-before/green-after flatPer1k/hillPer1k
+  ReferenceError fix), edit-reflects, Area-Type mode independence, unset-rate NO-FALLBACK → 0, Sub strict
+  $/SF independence, no-NaN
+- coverage manifest: `npm run test:weed-coverage` (3 labor coefficients + 1 material $/1k SF)

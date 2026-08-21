@@ -1,5 +1,45 @@
 # Test results log
 
+## 2026-08-21 — Weed Abatement: Layer A+B (extraction battery) + In-House ReferenceError FIX
+- **Bug found + fixed (red-first):** the inline `calcWeed` In-House return referenced
+  `flatPer1k`/`hillPer1k`, which were never declared (the coefficients are `flatRate`/
+  `hillRate`) — a strict-mode ESM **ReferenceError** on the In-House value path. Proven red
+  (`ReferenceError - flatPer1k is not defined`), then fixed in the extraction to expose the
+  real DB-sourced coefficients (`travelPerVisit, flatRate, hillRate, materialPer1k`). No
+  consumer read the old keys, so no downstream change. No-fallback rule preserved: rates
+  still come from `state.rates`, unset ⇒ 0, no constant.
+- **Layer A:** extracted `calcWeed` + `WEED_RATE_NAMES` into pure `weedCalc.js` (module now
+  imports both). Calc is fully pure (no supabase-tainted imports — it reads everything off
+  its args). `weedCalc.test.mjs` = **6/6**: In-House value (travel 1×2 + flat 1000×0.001×2 =
+  4 hrs → $300; material (1000/1000)×50×2 = $100) with `finiteNums` proving the
+  ReferenceError is gone; edit-reflects; Area-Type mode independence (Flat/Hillside/Mixed);
+  unset-coefficient NO-FALLBACK → 0 hrs + $0; Sub strict $/SF (1000×0.10×2 + 50 flat = $250,
+  0 labor → subCost); no-NaN. Module bundles clean (esbuild).
+- **Layer B:** `scripts/weed-rate-coverage.mjs` (`test:weed-coverage`) — Weed Abatement
+  consumes **3 labor coefficients** (Travel hr/visit, Flat, Hillside) + **1 misc material
+  rate** ($/1k SF), all category 'Weed Abatement', read live by name (unset ⇒ 0). Sub tab is
+  a strict per-estimate $/SF (no rate row). No-fallback + imports guards PASS. Full unit
+  suite **208/208** (incl. 6 new Weed).
+- **Layer C authored, pending CI:** `e2e/weed-abatement.spec.js` (opens / every Area-Type
+  mode NaN / numeric / In-House↔Sub / live-edit via Sub $/SF / clean). Skips unless a Weed
+  Abatement module is on the test estimate. Catalogued in `e2e/TEST-CASES.md`.
+
+```
+### Weed Abatement — definition-of-done sign-off (2026-08-21, A+B done; C/D/E pending)
+A. Unit:      value[x] edit[x] unpriced[x] vendor[N/A] priority[N/A] units[x] aggregator[x] sub-indep[x] breakdown[N/A] summary-parity[x]
+B. Audit:     coverage[x] orphan[~] no-fallback[x] no-hardcoded[x] imports[x]
+C. E2E:       opens[ ] modes[ ] numeric[ ] sub[ ] live-edit[ ] clean[ ]  (authored; runs when a Weed Abatement module is on the test estimate)
+D. DB:        priced[ ] no-dupes[ ] filing[ ]  (Brian's SQL step — 3 labor coefficients + Material $/1k SF priced under category 'Weed Abatement')
+E. Loop:      red-first[x] catalogued[x] logged[x] green[ ]
+N/A items + reason:
+  A.vendor/priority — no vendor catalog and no numeric-coeff priority ladder; four flat company coefficients read by name.
+  A.breakdown — single Area-Type calc + In-House↔Sub toggle; no per-tab materials breakdown.
+  A.aggregator[x] — Flat/Hillside/Mixed mode gating is the aggregation; mode-independence asserted.
+  A.summary-parity[x] — WeedAbatementSummary reads the saved calc snapshot; no separate summary calc to drift.
+  E.red-first[x] — the flatPer1k/hillPer1k ReferenceError was proven red, then fixed green.
+  Layer A via weedCalc.test.mjs (6); B via scripts/weed-rate-coverage.mjs (test:weed-coverage).
+```
+
 ## 2026-08-21 — Planting: Layer A+B (extraction battery)
 - **Layer A:** extracted the inline `calcPlanting` out of `PlantingModule.jsx` into pure
   `plantingCalc.js` (module now `import { calcPlanting } from './plantingCalc'`; kept its own
@@ -1481,3 +1521,11 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
   passes. No src/, rate, or SQL change.
 - If the re-run still fails at the same poll with height populated, the recompute/pricing
   path is the real culprit and needs Brian.
+
+### 2026-08-21 — CI run `79ddece` (autopilot)
+- 49 passed / 1 failed / 0 flaky / 0 skipped.
+- Failure: same Outdoor Kitchen "live edit reflects … (Goal 4 in-browser)" poll timeout as
+  the previous run. `79ddece` does NOT contain the BBQ Wall Height pre-fill fix — that fix
+  is still sitting UNCOMMITTED in the working tree (`e2e/outdoor-kitchen.spec.js`, +21).
+- Action: no new edit needed. `node --check` passes on the working-tree spec. Commit + push
+  it so CI picks it up; re-run then decides harness-gap vs. real recompute bug.
