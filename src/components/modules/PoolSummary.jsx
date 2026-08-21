@@ -159,25 +159,18 @@ export default function PoolSummary({ module }) {
         </>
       )}
 
-      {/* Spillways */}
-      {spillways.filter(sw => n(sw.qty) > 0 && n(sw.lf) > 0).length > 0 && (
+      {/* Spillways — from the saved calc breakdown (parity-safe) */}
+      {(savedCalc.spillwayCalc || []).length > 0 && (
         <>
           <SectionLabel title="Spillways" />
-          {spillways
-            .filter(sw => n(sw.qty) > 0 && n(sw.lf) > 0)
-            .map((sw, i) => {
-              const totalLF = n(sw.qty) * n(sw.lf)
-              const swHrs = n(laborRates[`Spillway - ${sw.type}`])
-              const swMat = n(materialPrices[`Spillway ${sw.type}`])
-              return (
-                <LineRow
-                  key={i}
-                  label={`${sw.struct} — ${sw.type} × ${sw.qty}`}
-                  value={`${totalLF} Ln Ft`}
-                  sub={`${(totalLF * swHrs).toFixed(1)} hrs · ${fmt2(totalLF * swMat)} mat`}
-                />
-              )
-            })}
+          {savedCalc.spillwayCalc.map((sw, i) => (
+            <LineRow
+              key={i}
+              label={sw.label}
+              value={sw.value}
+              sub={`${n(sw.hrs).toFixed(1)} hrs · ${fmt2(n(sw.mat))} mat`}
+            />
+          ))}
         </>
       )}
 
@@ -196,26 +189,18 @@ export default function PoolSummary({ module }) {
         </>
       )}
 
-      {/* Coping */}
-      {copingRows.filter(cr => n(cr.lf) > 0).length > 0 && (
+      {/* Coping — from the saved calc breakdown (parity-safe) */}
+      {(savedCalc.copingCalc || []).length > 0 && (
         <>
           <SectionLabel title="Coping" />
-          {copingRows
-            .filter(cr => n(cr.lf) > 0)
-            .map((cr, i) => {
-              const sided = cr.sided === 'double' ? 2 : 1
-              const crHrs = n(laborRates[`Coping - ${cr.type}`])
-              const crMat = n(materialPrices[`Coping Mat - ${cr.type}`])
-              const totalLF = n(cr.lf) * sided
-              return (
-                <LineRow
-                  key={i}
-                  label={`${cr.struct} — ${cr.type}${cr.sided === 'double' ? ' (double)' : ''}`}
-                  value={`${n(cr.lf)} Ln Ft`}
-                  sub={`${(totalLF * crHrs).toFixed(1)} hrs · ${fmt2(totalLF * crMat)} mat`}
-                />
-              )
-            })}
+          {savedCalc.copingCalc.map((cr, i) => (
+            <LineRow
+              key={i}
+              label={cr.label}
+              value={cr.value}
+              sub={`${n(cr.hrs).toFixed(1)} hrs · ${fmt2(n(cr.mat))} mat`}
+            />
+          ))}
         </>
       )}
 

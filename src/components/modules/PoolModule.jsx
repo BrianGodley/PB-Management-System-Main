@@ -705,6 +705,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   // ─ Spillways ─
   let spillwayHrs = 0,
     spillwayMat = 0
+  const spillwayCalc = []
   spillways.forEach(sw => {
     if (!sw.type) return
     const qty = n(sw.qty)
@@ -720,6 +721,12 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
       laborUnset.push({ kind: 'labor', name: item?.calc_meta?.labor_rate || null, label: sw.type, category: 'Pool', unit: 'Hrs per Ln Ft' })
     spillwayHrs += totalLF * labRate
     spillwayMat += totalLF * matRate
+    spillwayCalc.push({
+      label: `${sw.struct} — ${sw.type} × ${sw.qty}`,
+      value: `${totalLF} Ln Ft`,
+      hrs: totalLF * labRate,
+      mat: totalLF * matRate,
+    })
   })
 
   // ─ Water Features (sheer descents / waterfalls) ─
@@ -750,6 +757,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   // ─ Coping ─
   let copingHrs = 0,
     copingMat = 0
+  const copingCalc = []
   copingRows.forEach(cr => {
     if (!cr.type) return
     const lf = n(cr.lf)
@@ -770,6 +778,12 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
       laborUnset.push({ kind: 'labor', name: item?.calc_meta?.labor_rate || null, label: cr.type, category: 'Pool', unit: 'Hrs per Ln Ft' })
     copingHrs += lf * sided * labRate
     copingMat += lf * sided * matRate
+    copingCalc.push({
+      label: `${cr.struct} — ${cr.type}${cr.sided === 'double' ? ' (double)' : ''}`,
+      value: `${lf} Ln Ft`,
+      hrs: lf * sided * labRate,
+      mat: lf * sided * matRate,
+    })
   })
 
   // ─ Raised Surfaces ─
@@ -1029,10 +1043,12 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     excavAutoSub,
     tileHrs,
     spillwayHrs,
+    spillwayCalc,
     waterFeatureHrs,
     waterFeatureMat,
     waterFeatureCalc,
     copingHrs,
+    copingCalc,
     raisedHrs,
     excavSub,
     shotcreteSub,
