@@ -1,5 +1,33 @@
 # Test results log
 
+## 2026-08-21 — Lighting hand-test fixes: per-row Labor Hrs + material NO-FALLBACK surfacing
+- Two defects from Brian's hand-testing, both fixed:
+  1. **Per-row "Labor Hrs" blank** while the total priced right — the row cell read the
+     retired per-product `labor_hrs_ea` (always null now). Fixed to mirror the calc:
+     `qty × laborRates[item.calc_meta.labor_rate]`.
+  2. **Silent $0 material** (unpriced Light Craft fixtures) with NO notification — Lighting
+     only surfaced unpriced *labor*, never *material*. Added `matUnset` to the calc
+     (a picked item resolving to $0 flags itself, adds $0 — no fallback) + a "Material price
+     needed" banner wired to `UnpricedItemModal` (material mode → writes Standard price back).
+- **Red-first:** wrote the material-unpriced test, watched it fail, then implemented →
+  **193/193**. This is the guardrail that should have caught the original bug.
+- Data side (separate, Brian ran/queued): blanket $110 on unpriced Light Fixture prices;
+  added Light Craft 100W/200W transformers.
+- Lighting sign-off stays OPEN pending Brian's hand-retest + a CI cycle.
+
+## 2026-08-21 — CI b8e8da0 (20:01Z) — Lighting C GREEN, timer fix verified — 92/92
+- Complete run, **92 passed / 0 failed / 0 flaky / 0 skipped**. Covers the Irrigation timer
+  matKey fix + the Lighting live-edit retarget (drives Hours Adj). **Lighting** `lighting.spec.js`
+  now 5/5. C/E flip to done:
+```
+### Lighting — C/E now green (CI b8e8da0)
+C. E2E: opens[x] vendor×item[x] numeric[x] sub[x] live-edit[x] clean[x]
+E. Loop: red-first[x] catalogued[x] logged[x] green[x]   (live-edit went red→retarget→green)
+```
+- Not yet in a CI run: a5d565e (DropdownSelect first-open page-jump fix) — deploys + runs next cycle.
+- Extraction battery COMPLETE for: Skid, Mini, Concrete, Pavers, Utilities, Drainage, Irrigation,
+  Lighting — all Layers A/B/C green.
+
 ## 2026-08-21 — Irrigation timer/controller material bug (hand-test find) FIXED
 - Brian hand-tested controllers: **no material was being added**. Root cause (verified):
   the timer material is an EXACT-string lookup of `TIMER_TYPES.matKey` against the Standard
@@ -1314,3 +1342,11 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
   `results.json` and not a product issue. The publish-guard question below stays open.
 - No spec edits, no src/, SQL or rate changes this run.
 - `.autopilot-last` -> `28d0f0d`.
+
+## 2026-08-21 — autopilot run (CI `b8e8da0`, published 20:01:46Z)
+
+- **GREEN.** 92 expected / 0 unexpected / 0 flaky / 0 skipped (run start 19:54:48Z,
+  duration 416s). Suite grew 82 -> 92; 18 spec files, largest are fire-pit (9),
+  columns (8), navigation (8), walls (7).
+- No spec edits, no src/, SQL or rate changes this run.
+- `.autopilot-last` -> `b8e8da0`.

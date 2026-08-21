@@ -92,12 +92,18 @@ function processSection(subcat, rows, materialRows, priceOf = item => n(item.uni
     va = 0,
     sub = 0
   const laborUnset = []
+  const matUnset = []
   ;(rows || []).forEach(r => {
     const qty = n(r.qty)
     if (qty <= 0) return
     const item = lightingItemFor(subcat, r.vendor, r.itemId, materialRows)
     if (!item) return
     const cost = priceOf(item)
+    // NO-FALLBACK for material: a picked item that resolves to $0 (no catalog price for
+    // this vendor, e.g. an unpriced Light Craft fixture) must surface a fix-it prompt and
+    // add $0 — never pass silently. Mirrors the labor path below. materialId lets the
+    // UnpricedItemModal write the price straight back to the catalog.
+    if (cost <= 0) matUnset.push({ name: item.name || item.description, label: item.name || item.description, materialId: item.id ?? null, category: 'Lighting', unit: item.unit || null })
     watts += qty * n(item.watts)
     va += qty * n(item.va)
     // Install labor = the item's own default labor rate (calc_meta.labor_rate),
@@ -116,7 +122,7 @@ function processSection(subcat, rows, materialRows, priceOf = item => n(item.uni
           : cost
     sub += qty * each
   })
-  return { hrs, mat, watts, va, sub, laborUnset }
+  return { hrs, mat, watts, va, sub, laborUnset, matUnset }
 }
 
 export function calcLighting(
@@ -149,6 +155,19 @@ export function calcLighting(
         const seen = new Set()
         return [...fx.laborUnset, ...xf.laborUnset, ...wr.laborUnset].filter(u => {
           const k = u && (u.name || u.label)
+          if (!k || seen.has(k)) return false
+          seen.add(k)
+          return true
+        })
+      })()
+  // Unpriced MATERIAL — In-House only (the Sub tab prices flat per-each, not off the
+  // catalog). Deduped by materialId/name so the same item flags once.
+  const matUnset = isSub
+    ? []
+    : (() => {
+        const seen = new Set()
+        return [...fx.matUnset, ...xf.matUnset, ...wr.matUnset].filter(u => {
+          const k = u && (u.materialId || u.name)
           if (!k || seen.has(k)) return false
           seen.add(k)
           return true
@@ -220,5 +239,6 @@ export function calcLighting(
     price,
     walkHrs,
     laborUnset,
+    matUnset,
   }
 }

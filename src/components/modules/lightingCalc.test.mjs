@@ -74,6 +74,15 @@ test('section independence: fixture vs wire read their own item labor keys', () 
   assert.equal(w.totalHrs, 20, 'wire uses Wire Labor (100 × 0.2), independent')
 })
 
+test('material NO-FALLBACK: a selected item with no price surfaces in matUnset and adds $0', () => {
+  // The silent-$0 gap Brian hit with Light Craft fixtures: a picked item whose price
+  // resolves to 0 must flag itself (fix-it prompt) and add $0 — never pass silently.
+  const UNPRICED = { ...FIXTURE, id: 'fixU', name: 'Unpriced Fixture', unit_cost: 0 }
+  const r = run({ fixtureRows: [{ vendor: 'Standard', itemId: 'fixU', qty: 3 }] }, [UNPRICED], { 'Fixture Labor': 1 })
+  assert.ok((r.matUnset || []).some(u => u.materialId === 'fixU'), `expected fixU flagged in matUnset; got ${JSON.stringify(r.matUnset)}`)
+  assert.equal(r.rawMat, 0, 'unpriced material → $0 (no hidden fallback)')
+})
+
 test('sub tab: flat $/each (sub_price_ea), zero labor hours, cost routed into subCost', () => {
   const r = run({ subType: 'Subcontractor', fixtureRows: [{ vendor: 'Standard', itemId: 'fix1', qty: 3 }] }, [FIXTURE], { 'Fixture Labor': 1.5 })
   assert.equal(r.totalHrs, 0, 'sub tab has no labor hours')

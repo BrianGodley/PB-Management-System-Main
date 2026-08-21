@@ -178,6 +178,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
   // Per-section install labor rates (labor_rates, category Lighting).
   const [laborRates, setLaborRates] = useState({})
   const [laborModalItem, setLaborModalItem] = useState(null)
+  const [matModalItem, setMatModalItem] = useState(null)
 
   // Re-fetch the lighting catalog + vendor list + markup rate. Used on mount
   // and after a markup RateEditPopover save.
@@ -710,9 +711,33 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
         </div>
       )}
 
+      {!isSub && calc.matUnset && calc.matUnset.length > 0 && (
+        <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">
+          <span className="font-semibold">Material price needed</span> — these items add $0
+          material until priced. Click one to price it inline:
+          <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
+            {calc.matUnset.map((u, i) => (
+              <button
+                key={u.materialId || u.name || i}
+                type="button"
+                onClick={() => setMatModalItem(u)}
+                className="rounded border border-amber-400 bg-white/70 px-1.5 py-0.5 font-medium text-amber-900 hover:bg-white"
+              >
+                {u.label} ↗
+              </button>
+            ))}
+          </span>
+        </div>
+      )}
+
       <UnpricedItemModal
         item={laborModalItem}
         onClose={() => setLaborModalItem(null)}
+        onSaved={refreshCatalog}
+      />
+      <UnpricedItemModal
+        item={matModalItem}
+        onClose={() => setMatModalItem(null)}
         onSaved={refreshCatalog}
       />
 
