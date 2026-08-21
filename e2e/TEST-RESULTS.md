@@ -1,5 +1,60 @@
 # Test results log
 
+## 2026-08-21 — Sign-offs: Columns / Hand Demo / Outdoor Kitchen (finish-picker fix run)
+- CI on `d9baa74` (HEAD): all module specs green — columns 8/8, fire-pit 9/9,
+  hand-demo 6/6, outdoor-kitchen 6/6, walls 7/7 (+ infra). Layer A unit + Layer B
+  coverage run locally (`node --test` / `npm`), not in CI. DB-health (Layer D) is
+  Brian's SQL step — spot-checked during the finishes work (7/7 finishes priced,
+  Cap sub clean = 3 real caps), not a formal per-checklist run, so marked accordingly.
+- Real bug this loop caught (red-first): the OK/Fire-Pit finish TYPE dropdown was
+  built from raw `Finish Material` catalog names (junk + full `- Finishes` names) →
+  selecting any non-default finish dropped to `masterWallMeta` → material+labor
+  zeroed. Fixed: dropdown = canonical `WF_LIST` (OK `a52dc52`, Fire Pit `d9baa74`);
+  `okCalc`/`firePitCalc` gained finish-option **contract** tests to lock it.
+
+```
+### Columns — definition-of-done sign-off (2026-08-21)
+A. Unit:      value[x] edit[x] unpriced[x] vendor[x] priority[N/A] units[x] aggregator[x] sub-indep[x] breakdown[N/A] summary-parity[x]
+B. Audit:     coverage[x] orphan[x] no-fallback[x] no-hardcoded[x] imports[x]
+C. E2E:       opens[x] dropdowns[x] every-vendor×item-every-tab[x] every-tab[x] numeric[x] price-resolve[x] sub[x] live-edit[x] clean[x]
+D. DB:        priced[x] no-dupes[~] filing[x]
+E. Loop:      red-first[x] catalogued[x] logged[x] green[x]
+N/A items + reason:
+  A.priority — finishes use a single laborRate, no numeric-coeff/pointer ladder.
+  A.breakdown — Columns has no per-tab materials breakdown table (Installation + Finishes only).
+  D.no-dupes[~] — CMU block vendor (Angelus) surfacing verified; full duplicate-rate DB sweep is Brian's SQL step, not yet run.
+  Layer A via columnsCalc.test.mjs (6); B via scripts/columns-rate-coverage.mjs; C via e2e/columns.spec.js (8/8, incl. CMU-vendor poll + finish-on-CMU + per-tab vendor×item matrix).
+```
+
+```
+### Hand Demo — definition-of-done sign-off (2026-08-21)
+A. Unit:      value[x] edit[x] unpriced[N/A] vendor[N/A] priority[N/A] units[x] aggregator[x] sub-indep[x] breakdown[N/A] summary-parity[x]
+B. Audit:     coverage[x] orphan[x] no-fallback[x] no-hardcoded[x] imports[x]
+C. E2E:       opens[x] dropdowns[x] every-vendor×item-every-tab[x] every-tab[x] numeric[x] price-resolve[x] sub[x] live-edit[x] clean[x]
+D. DB:        priced[x] no-dupes[~] filing[x]
+E. Loop:      red-first[x] catalogued[x] logged[x] green[x]
+N/A items + reason:
+  A.unpriced/vendor — Demo rates are CF/hr labor + per-each/SF sub rates, no material vendor catalog (no per-vendor override, no unpriced-material modal path).
+  A.breakdown — Demo has no per-tab materials breakdown.
+  D.no-dupes[~] — rate keys split per-item earlier (Hand/Skid/Mini); formal duplicate DB sweep is Brian's SQL step.
+  Layer A via handDemoCalc.test.mjs (9, incl. In-House/Sub independence + CF/hr edit-reflects); B via scripts/hand-demo-rate-coverage.mjs; C via e2e/hand-demo.spec.js (6/6).
+```
+
+```
+### Outdoor Kitchen — definition-of-done sign-off (2026-08-21)
+A. Unit:      value[x] edit[x] unpriced[x] vendor[x] priority[N/A] units[x] aggregator[N/A] sub-indep[x] breakdown[x] summary-parity[x]
+B. Audit:     coverage[x] orphan[x] no-fallback[x] no-hardcoded[x] imports[x]
+C. E2E:       opens[x] dropdowns[x] every-vendor×item-every-tab[x] every-tab[x] numeric[x] price-resolve[x] sub[x] live-edit[x] clean[x]
+D. DB:        priced[x] no-dupes[~] filing[x]
+E. Loop:      red-first[x] catalogued[x] logged[x] green[x]
+N/A items + reason:
+  A.priority — finishes use a single laborRate; gas/elec lines use the Utilities calc_meta pointer (covered by the Utilities lib, not OK's finish calc).
+  A.aggregator — single BBQ layout, no per-structure-type tabs to sum.
+  A.contract — okCalc.test.mjs adds finish-option contract tests (every dropdown option resolves to a priced WF_META meta) — the guard for the $0-finish bug.
+  D.no-dupes[~] — shared-finish records confirmed priced (7/7); duplicate-material retirement SQL (task #341) still pending Brian's run.
+  Layer A via okCalc.test.mjs (9, incl. 3 contract); B via scripts/outdoor-kitchen-rate-coverage.mjs; C via e2e/outdoor-kitchen.spec.js (6/6; live-edit drives frozen-priced BBQ length — saved-estimate-safe).
+```
+
 ## 2026-08-20 — Fire Pit E2E GREEN (4/4) — bugs verified fixed on prod
 - After iterating the spec's navigation (estimate is view-only → click ✏️ Edit →
   project row `div.cursor-pointer` (name is "⠿Fire Pit", not exact-matchable) →
