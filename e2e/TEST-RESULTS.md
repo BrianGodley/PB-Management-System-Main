@@ -576,3 +576,24 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
   would make this fail loudly instead of silently republishing.
 - No edits made this run (fix would require .github/workflows/e2e.yml — config,
   out of autopilot bounds). Not treated as green.
+
+## 2026-08-21 — autopilot run (CI results sha a52dc52) — 🔴 1 FAILURE, fixed in e2e/
+- Artifact FRESH: `config.metadata.gitCommit.hash` = a52dc52 (HEAD), run
+  actions/runs/32494821019, start 2026-08-21T14:57:00Z, duration 221.7s.
+  NOTE: `commit.txt` read b92494a at the start of this run and a52dc52 a minute
+  later (branch refreshed mid-run) — commit.txt can briefly lag the artifact it
+  ships with. `.autopilot-last` = a52dc52.
+- Stats: 49 expected / 1 unexpected / 0 flaky / 0 skipped. Collection back to full
+  size (50) — the short-collection/stale-artifact problem from the prior runs is gone.
+- FAIL: outdoor-kitchen.spec.js:151 "live edit reflects: changing a frozen-priced
+  field moves the total (Goal 4 in-browser)" — "Total did not change after editing
+  BBQ Wall Length".
+- Diagnosis = TEST ROBUSTNESS, not a product bug. In OutdoorKitchenModule.jsx:1188
+  the label is `<label>BBQ Wall Length (LF)</label>` with NO htmlFor and the
+  `<NumInput>` is a SIBLING, not a child — so `page.getByLabel(/BBQ Wall Length/i)`
+  resolves to 0 elements and the test fell through to its
+  `input[type="number"]`-first-on-page fallback, driving an unrelated field. The
+  total legitimately did not move.
+- Fix (e2e only): anchor on the label text and take `xpath=following::input[1]`,
+  and hard-fail (not skip, not silently fall back) if that input is missing.
+  `node --check` clean. No src/ change.

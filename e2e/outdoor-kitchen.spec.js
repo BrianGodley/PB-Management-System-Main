@@ -160,9 +160,19 @@ test.describe('Outdoor Kitchen', () => {
     // in okCalc.test.mjs). This proves the in-browser recompute path with a field that
     // reliably prices on any estimate.
     const dollars = () => page.evaluate(() => (document.body.innerText.match(/\$[\d,]+(\.\d+)?/g) || []).join('|'))
-    const bbqLen = page.getByLabel(/BBQ Wall Length/i).first()
-    const target = (await bbqLen.count()) ? bbqLen : page.locator('input[type="number"], input[step]').first()
-    test.skip(!(await target.count()), 'No numeric input to drive a live edit.')
+    // The BBQ Structure labels are plain <label> elements with no htmlFor and the
+    // input is a SIBLING, not a child — so getByLabel() matches nothing and the old
+    // "first numeric input on the page" fallback silently drove an unrelated field
+    // (which is why the total never moved). Anchor on the label text and take the
+    // very next input in document order instead, and fail loudly if it is missing.
+    const target = page
+      .getByText(/BBQ Wall Length/i)
+      .first()
+      .locator('xpath=following::input[1]')
+    expect(
+      await target.count(),
+      'BBQ Wall Length input not found — the BBQ Structure section did not render.'
+    ).toBeGreaterThan(0)
     await target.click().catch(() => {})
     await target.fill('8').catch(() => {})
     await page.waitForTimeout(400)
