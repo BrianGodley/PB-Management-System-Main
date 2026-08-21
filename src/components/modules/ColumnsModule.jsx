@@ -1006,8 +1006,9 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
           </button>
         </div>
 
-        {/* ── Finishes — Poured In Place tab only ── */}
-        {colType === 'PIP' && (
+        {/* ── Finishes — shown on ALL column tabs (mirrors Walls: every wall type
+              can take a finish). Finish rows are tab-level and always price. ── */}
+        {(
           <div>
             <SectionHeader title="Finishes" />
             <div className="overflow-x-auto">
