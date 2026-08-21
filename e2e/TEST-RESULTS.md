@@ -785,3 +785,48 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
   `outdoor-kitchen.spec.js › live edit reflects…` differs (expected → unexpected).
 - No e2e edit, no src/ change. `.autopilot-last` left at c77dd70 so a genuine a9d66c5
   (or the newer 747363e) run is processed when CI publishes it.
+
+## 2026-08-21 — autopilot (ci-results 6c154c5, commit.txt = a9d66c5, updated_at 16:10Z) — STALE PAYLOAD, 3rd occurrence
+- Proven from the payload itself this round: `results.json.config.metadata.gitCommit.hash`
+  = **a52dc5242a79651222dd8b8eed010c6548749317** (`a52dc52`), startTime **14:57:00.953Z**,
+  buildHref = actions/runs/32494821019. So the file published under `a9d66c5` is a run of
+  `a52dc52` — an ancestor of `c77dd70`, whose own published run (678762b, 15:48Z) was GREEN
+  50/0/0/0. Stats 49/1/0/0 identical to the two rounds already logged.
+- Root cause is in the publish step, not the tests: `commit.txt` is being written with the
+  current HEAD while `results.json` is copied from an older, cached run. `commit.txt` is
+  therefore not a trustworthy run identity — `config.metadata.gitCommit.hash` is.
+- No e2e edit, no src/ change. The failing spec in that payload is the PRE-`fillField`
+  version (poll timeout 8000, no `toHaveValue` guards); the spec on disk is already hardened
+  and passed green at c77dd70.
+- Loop-break: `.autopilot-last` set to **a9d66c5** this round (previous two rounds left it at
+  c77dd70 and re-processed the same stale bytes). Payload identity also recorded in
+  `test-results/.autopilot-last-payload` so a genuine a9d66c5 run can be told apart.
+
+## 2026-08-21 — autopilot (ci-results 457b10f, commit.txt = 4b051c6, updated_at 16:24Z) — GENUINE payload, 1 failure + 5 skips
+- Payload identity verified: `results.json.config.metadata.gitCommit.hash` =
+  **4b051c67ffc1e84bae3cfca167c7dda746d3d369**, startTime 16:20:05Z — matches `commit.txt`.
+  First non-stale payload in four rounds; the publish-step mismatch did not recur.
+- Stats: **56 passed / 1 failed / 5 skipped / 0 flaky.** The hardened Outdoor Kitchen
+  live-edit spec (`fillField` + `toHaveValue` guards) PASSED — that thread is closed.
+- FAIL: `mini-skid.spec.js` › "module editor opens with demo sections" —
+  `openModule(page, 'Mini Skid Steer Demo')` returned false, i.e. no `div.cursor-pointer`
+  row on the estimate contains that text. The 5 skips are all the remaining Mini Skid
+  specs gating on the same `!ok` (Type dropdown / exhaustive options / numeric /
+  In-House vs Sub / live edit) — a silent gap, NOT a clean pass.
+- Not a product bug and not fixable from a selector guess: the module label in code is
+  exactly `'Mini Skid Steer Demo'` (ModuleCategoryMap.jsx:11, COEstimatePanel.jsx:69), so
+  either the CI estimate has no Mini Skid Steer Demo module or its row renders under
+  different markup. NO src/ change made.
+- e2e edits (this round, e2e/ only):
+  1. `helpers.js` — `openModule()` gains an optional `exclude` RegExp; `hasText` is a
+     SUBSTRING match, so `'Skid Steer Demo'` also matches a `'Mini Skid Steer Demo'` row.
+     On an estimate carrying only the Mini module the Skid Steer suite would pass while
+     driving the wrong module (false green). `skid-steer.spec.js` now passes
+     `{ exclude: /mini/i }` at all 6 call sites.
+  2. `helpers.js` — new `moduleRowTitles(page)` diagnostic; `mini-skid.spec.js` now prints
+     every module row found on the estimate in its failure message, which separates
+     "module absent from the estimate" from "row named/marked up differently" next run.
+- `node --check` clean on helpers.js, mini-skid.spec.js, skid-steer.spec.js.
+- OPEN QUESTION for Brian: does the estimate behind `TEST_ESTIMATE_URL` actually have a
+  Mini Skid Steer Demo module on it? If not, add one (or point at an estimate that has one)
+  — otherwise the whole Mini Skid suite stays a silent 6-test gap.

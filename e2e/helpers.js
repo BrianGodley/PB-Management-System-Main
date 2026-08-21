@@ -16,7 +16,12 @@ export async function settle(page, timeout = 10000) {
 //      module name; the name <p> carries a drag handle so exact-text match fails),
 //   3) click "✎ Edit Module". Editor-open signal = the "View Rates" button every
 //      module editor renders (version-independent). Returns true once it's visible.
-export async function openModule(page, moduleName, { estimateUrl = process.env.TEST_ESTIMATE_URL, timeout = 45000 } = {}) {
+// `exclude` (RegExp): drop rows whose text also matches it. `hasText` is a
+// SUBSTRING match, so "Skid Steer Demo" silently matches a "Mini Skid Steer
+// Demo" row too — on an estimate carrying only the Mini module the Skid Steer
+// spec would then pass while testing the wrong module (a false green). Specs
+// whose name is a prefix of another module's pass exclude: /mini/i.
+export async function openModule(page, moduleName, { estimateUrl = process.env.TEST_ESTIMATE_URL, timeout = 45000, exclude = null } = {}) {
   await page.goto(estimateUrl, { waitUntil: 'domcontentloaded' })
   await settle(page)
   const estEdit = page.getByRole('button', { name: /edit/i }).filter({ hasNotText: /module/i }).first()
@@ -25,7 +30,8 @@ export async function openModule(page, moduleName, { estimateUrl = process.env.T
     await settle(page)
   }
   const editBtn = page.getByRole('button', { name: /edit module/i })
-  const rows = page.locator('div.cursor-pointer').filter({ hasText: moduleName })
+  let rows = page.locator('div.cursor-pointer').filter({ hasText: moduleName })
+  if (exclude) rows = rows.filter({ hasNotText: exclude })
   if (!(await rows.count())) return false
   for (let pass = 0; pass < 3 && !(await editBtn.count()); pass++) {
     const n = await rows.count()
@@ -38,6 +44,18 @@ export async function openModule(page, moduleName, { estimateUrl = process.env.T
   const signal = page.getByRole('button', { name: /view rates/i })
   await signal.first().waitFor({ state: 'visible', timeout }).catch(() => {})
   return (await signal.count()) > 0
+}
+
+// Diagnostic: the text of every clickable module row currently on the page.
+// When openModule() returns false the only two explanations are "the module is
+// not on this estimate" and "the row is named/marked up differently" — this
+// tells the two apart in the failure message instead of guessing next round.
+export async function moduleRowTitles(page) {
+  return await page
+    .locator('div.cursor-pointer')
+    .allInnerTexts()
+    .then(t => t.map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 40))
+    .catch(() => [])
 }
 
 // The first <select> that FOLLOWS a section's header text (robust to wrapper nesting).

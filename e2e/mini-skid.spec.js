@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { collectErrors, openModule, scanEveryOptionForNaN } from './helpers.js'
+import { collectErrors, moduleRowTitles, openModule, scanEveryOptionForNaN } from './helpers.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mini Skid Steer Demo module — live-browser layer (MODULE-TEST-CHECKLIST). Demos are shaped
@@ -19,7 +19,15 @@ test.describe('Mini Skid Steer Demo', () => {
     const errors = collectErrors(page)
     const ok = await openModule(page, 'Mini Skid Steer Demo')
     await testInfo.attach('mini-skid.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
-    expect(ok, 'Could not open the Mini Skid Steer Demo module editor — check the add/edit flow.').toBeTruthy()
+    // On failure, print the module rows actually on the estimate: that separates
+    // "the estimate has no Mini Skid Steer Demo module" (fix the estimate /
+    // TEST_ESTIMATE_URL) from "the row renders under a different label or markup"
+    // (fix the selector). Without it the failure is unactionable.
+    const seen = ok ? [] : await moduleRowTitles(page)
+    expect(
+      ok,
+      `Could not open the Mini Skid Steer Demo module editor. Module rows found on this estimate:\n${seen.join('\n') || '(none)'}`
+    ).toBeTruthy()
     // At least one recognizable demo section renders.
     const anySection = page.getByText(/Job Site Conditions|Hauling|Shrub Demo|Stump Demo/i)
     expect(await anySection.count(), 'No Mini Skid Steer Demo sections rendered').toBeGreaterThan(0)

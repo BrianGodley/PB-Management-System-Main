@@ -17,7 +17,7 @@ test.describe('Skid Steer Demo', () => {
 
   test('module editor opens with demo sections', async ({ page }, testInfo) => {
     const errors = collectErrors(page)
-    const ok = await openModule(page, 'Skid Steer Demo')
+    const ok = await openModule(page, 'Skid Steer Demo', { exclude: /mini/i })
     await testInfo.attach('skid-steer.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
     expect(ok, 'Could not open the Skid Steer Demo module editor — check the add/edit flow.').toBeTruthy()
     // At least one recognizable demo section renders.
@@ -27,7 +27,7 @@ test.describe('Skid Steer Demo', () => {
   })
 
   test('any Type dropdown present is populated', async ({ page }) => {
-    const ok = await openModule(page, 'Skid Steer Demo')
+    const ok = await openModule(page, 'Skid Steer Demo', { exclude: /mini/i })
     test.skip(!ok, 'Skid Steer Demo editor not reachable on this estimate.')
     const selects = page.locator('select')
     const n = await selects.count()
@@ -40,7 +40,7 @@ test.describe('Skid Steer Demo', () => {
   test('exhaustive: every dropdown option computes without a NaN/console error', async ({ page }, testInfo) => {
     test.setTimeout(180000)
     const errors = collectErrors(page)
-    const ok = await openModule(page, 'Skid Steer Demo')
+    const ok = await openModule(page, 'Skid Steer Demo', { exclude: /mini/i })
     test.skip(!ok, 'Skid Steer Demo editor not reachable on this estimate.')
     const bad = await scanEveryOptionForNaN(page)
     await testInfo.attach('skid-steer-exhaustive.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
@@ -49,7 +49,7 @@ test.describe('Skid Steer Demo', () => {
   })
 
   test('numeric fields accept input and the module computes a total', async ({ page }) => {
-    const ok = await openModule(page, 'Skid Steer Demo')
+    const ok = await openModule(page, 'Skid Steer Demo', { exclude: /mini/i })
     test.skip(!ok, 'Skid Steer Demo editor not reachable on this estimate.')
     const nums = page.locator('input[type="number"], input[step]')
     const n = Math.min(await nums.count(), 60)
@@ -65,7 +65,7 @@ test.describe('Skid Steer Demo', () => {
   })
 
   test('In-House and Subcontractor both price without NaN', async ({ page }) => {
-    const ok = await openModule(page, 'Skid Steer Demo')
+    const ok = await openModule(page, 'Skid Steer Demo', { exclude: /mini/i })
     test.skip(!ok, 'Skid Steer Demo editor not reachable on this estimate.')
     // Demos toggle In House ↔ Subcontractor via the crew-type bar (dumpType). Both
     // modes must render pricing with no NaN.
@@ -84,7 +84,7 @@ test.describe('Skid Steer Demo', () => {
   })
 
   test('live edit reflects: changing a field moves the total (Goal 4 in-browser)', async ({ page }) => {
-    const ok = await openModule(page, 'Skid Steer Demo')
+    const ok = await openModule(page, 'Skid Steer Demo', { exclude: /mini/i })
     test.skip(!ok, 'Skid Steer Demo editor not reachable on this estimate.')
     const dollars = () => page.evaluate(() => (document.body.innerText.match(/\$[\d,]+(\.\d+)?/g) || []).join('|'))
     const target = page.locator('input[type="number"], input[step]').first()
