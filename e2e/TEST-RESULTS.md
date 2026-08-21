@@ -920,3 +920,21 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
   artifact instead of the fresh `test-results/results.json`? (2) does `TEST_ESTIMATE_URL`
   point at an estimate that has a Mini Skid Steer Demo module — if not, which estimate should
   the Mini Skid / Skid Steer suites use?
+
+## 2026-08-21 — autopilot (ci-results 03deab7, commit.txt = 59b00e0c, updated_at 17:00Z) — STALE PAYLOAD (4th), no action taken
+- Identity check FAILED again, byte-identical to the last two rounds. `commit.txt` =
+  **59b00e0c**, but `results.json.config.metadata.gitCommit.hash` =
+  **a52dc5242a79651222dd8b8eed010c6548749317** ("fix(outdoor-kitchen): finish TYPE dropdown
+  = canonical WF_LIST only…"), startTime **14:57:00.953Z** — the exact same historical
+  artifact republished under a third different SHA (5833baf7 @ 16:49Z, now 59b00e0c @ 17:00Z).
+  The publish step is not regenerating `results.json` at all; it is re-committing a cached file.
+- Payload stats (a52dc524, historical): 49 passed / 1 failed / 0 skipped / 0 flaky. Suite list
+  has no mini-skid / skid-steer specs — a pre-4b051c6 tree.
+- Its single failure — `outdoor-kitchen.spec.js:151` "live edit reflects: changing a
+  frozen-priced field moves the total", `Total did not change after editing BBQ Wall Length
+  8 -> 40` — remains SUPERSEDED (that spec PASSED in the genuine db7f85f run at 16:35Z).
+  NOT re-opened. NO e2e edit, NO src/ change.
+- `.autopilot-last` → 59b00e0c; `.autopilot-last-payload` unchanged (same real identity).
+- OPEN QUESTIONS (carried): (1) CI publish is serving a cached results.json — should it
+  hard-fail when gitCommit != the SHA under test? (2) does `TEST_ESTIMATE_URL` point at an
+  estimate containing a Mini Skid Steer Demo module?
