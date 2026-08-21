@@ -753,3 +753,17 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
       (pickers start empty, unselected rows = $0), so length x $0 never moves a total,
       making the spec's premise wrong for that estimate.
 - No src/, SQL, or rate change made. Awaiting decision.
+
+## 2026-08-21 — autopilot (ci-results commit.txt = a9d66c5, updated_at 16:10Z) — STALE RESULTS, NOT PROCESSED
+- `commit.txt` advanced to a9d66c5 but `results.json` did NOT: startTime is still
+  `2026-08-21T14:57:00.953Z` with the identical 49/1/0/0 stats already logged for the
+  previous round. The failure's stack (`poll(dollars, { timeout: 8000 })` at
+  outdoor-kitchen.spec.js:172-174) matches commit **c7d6816** — several commits BEFORE
+  the `fillField` / label-anchor / `toHaveValue` hardening landed. No commit in the
+  recent range has that code at those lines.
+- Consequence: the previous entry's claim that `toHaveValue('8')`/`toHaveValue('40')`
+  PASSED was read off this same stale payload and is NOT evidenced — the run predates
+  those assertions existing. The "recompute bug vs expected-$0" question for
+  BBQ Wall Length therefore remains **unverified**, not merely undecided.
+- No e2e edit, no src/ change this round. `.autopilot-last` deliberately left at
+  c77dd70 so a genuine a9d66c5 run is not skipped when CI publishes it.
