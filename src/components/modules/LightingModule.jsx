@@ -464,7 +464,11 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
                 const item = lightingItemFor(subcat, row.vendor, row.itemId, materialRows)
                 const qty = n(row.qty)
                 const watts = item ? qty * n(item.watts) : 0
-                const laborHrs = item ? qty * n(item.labor_hrs_ea) : 0
+                // Per-row install hours must mirror the calc (processSection): labor is
+                // item-driven via calc_meta.labor_rate, resolved live from laborRates —
+                // NOT the retired per-product labor_hrs_ea column (always null now, which
+                // left this display cell blank while the total priced correctly).
+                const laborHrs = item ? qty * n(laborRates[item.calc_meta?.labor_rate]) : 0
                 const itemCost = priceOf(item)
                 const eachSub =
                   row.subEach !== '' && row.subEach != null
