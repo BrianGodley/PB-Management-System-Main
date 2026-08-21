@@ -217,6 +217,10 @@ const RAISED_SUBCAT = 'Raised Surface'
 // labor = qty × labor_rates[item.calc_meta.labor_rate]. Extensible: any new item
 // added to the sub-category shows up here automatically with its own labor pointer.
 const WATER_FEATURE_SUBCAT = 'Water Features'
+// Fixed, ordered Type groupings within Water Features. Each catalog item is tagged
+// with one of these via calc_meta.water_feature_type; the Type dropdown filters the
+// Feature picker to that group. Add a new type here + tag items to extend.
+const WATER_FEATURE_TYPES = ['Sheer Descents', 'Fire/Water Bowls', 'Deck Jets', 'Water Slides']
 // Steel = rebar picked from the shared Basic Materials → Reinforcement rows
 // ('Rebar #3'…'Rebar #8', priced per Ln Ft). In-House install labor rides on the
 // Pool 'Steel - Install' labor rate (per Ln Ft; seed empty). Rebar LF = shell SF ×
@@ -254,6 +258,12 @@ function poolSubVendorIds(materialRows, subcat) {
 // e.g. Water Features (Heritage). Falls back to Standard if none carry it.
 function defaultSubVendor(materialRows, subcat) {
   return poolSubVendorIds(materialRows, subcat)[0] || 'Standard'
+}
+// Water Features options for a vendor, filtered to one Type group (calc_meta.water_feature_type).
+function waterFeatureOptions(materialRows, vendorSel, wfType) {
+  return poolStdOptions(materialRows, WATER_FEATURE_SUBCAT, vendorSel).filter(
+    o => (o.row.calc_meta?.water_feature_type || '') === wfType
+  )
 }
 
 
@@ -448,7 +458,7 @@ const defaultTileStruct = () => ({
 })
 const defaultInteriorStruct = () => ({ type: '', subCost: '' })
 const newSpillway = () => ({ struct: 'Pool', vendor: 'Standard', type: '', qty: '1', lf: '' })
-const newWaterFeature = () => ({ vendor: '', type: '', qty: '1' })
+const newWaterFeature = () => ({ vendor: '', wfType: WATER_FEATURE_TYPES[0], type: '', qty: '1' })
 const newCopingRow = () => ({ struct: 'Pool', vendor: 'Standard', type: '', lf: '', sided: 'single' })
 const newRaisedSurface = () => ({ matType: '', sqft: '', curvePct: '', corners: '' })
 const newEquipRow = () => ({ vendor: '', category: 'Pump', model: '', qty: '1', unitCost: '' })
@@ -1379,7 +1389,8 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
   const updWaterFeature = (i, key, val) => {
     const arr = [...T.waterFeatures]
     arr[i] = { ...arr[i], [key]: val }
-    if (key === 'vendor') arr[i].type = ''
+    // Changing vendor or Type resets the picked feature (its option list changes).
+    if (key === 'vendor' || key === 'wfType') arr[i].type = ''
     upd('waterFeatures', arr)
   }
   const removeWaterFeature = i =>
@@ -2162,10 +2173,11 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           {T.waterFeatures.map((wf, i) => {
             const wfDefVendor = defaultSubVendor(materialRows, WATER_FEATURE_SUBCAT)
             const wfVendorSel = wf.vendor || wfDefVendor
-            const wfOpts = poolStdOptions(materialRows, WATER_FEATURE_SUBCAT, wfVendorSel)
+            const wfTypeSel = wf.wfType || WATER_FEATURE_TYPES[0]
+            const wfOpts = waterFeatureOptions(materialRows, wfVendorSel, wfTypeSel)
             const wfVends = vendors.filter(v => poolSubVendorIds(materialRows, WATER_FEATURE_SUBCAT).includes(v.id))
             return (
-              <div key={i} className="grid grid-cols-3 gap-2 items-end">
+              <div key={i} className="grid grid-cols-4 gap-2 items-end">
                 <div>
                   <Label text="Vendor" />
                   <select
@@ -2176,6 +2188,18 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                     <option value="Standard">Standard</option>
                     {wfVends.map(v => (
                       <option key={v.id} value={v.id}>{v.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label text="Type" />
+                  <select
+                    className="input text-sm py-1.5 w-full"
+                    value={wfTypeSel}
+                    onChange={e => updWaterFeature(i, 'wfType', e.target.value)}
+                  >
+                    {WATER_FEATURE_TYPES.map(t => (
+                      <option key={t} value={t}>{t}</option>
                     ))}
                   </select>
                 </div>
