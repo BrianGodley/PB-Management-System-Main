@@ -1,5 +1,36 @@
 # Test results log
 
+## 2026-08-21 — Drainage: Layer A+B
+- **Layer A:** extracted inline `calcDrainage` into pure `drainageCalc.js` (module
+  imports it; inlined the catalog helpers + `calcWalkAccessLabor`, carried the module's
+  own type/rate maps + `drainMatCost`). `drainageCalc.test.mjs` = **7/7**: trench value
+  (100 LF × 6" × 24" = 100 CF × 0.1 = 10 hrs → $750), depth-doubles units, edit-reflects,
+  Trench-vs-Hand rate independence, unset-rate → 0, and the `laborUnset` fix-it flag on a
+  typed pipe row with no catalog labor. Note: pipe/french/fixture labor rides each catalog
+  item's calc_meta.labor_rate (vendor-first) — an unresolved one surfaces in laborUnset.
+- **Layer B:** `scripts/drainage-rate-coverage.mjs` (`test:drainage-coverage`) — 23
+  name-keyed rates (trench + pipe/french/fixture built-in labor names + sock/gravel) plus
+  the note that catalog material/labor resolve vendor-first. No-fallback guard PASS.
+- **Layer C authored, pending CI:** `e2e/drainage.spec.js` (opens / vendor×item / numeric /
+  In-House↔Sub / live-edit / clean). Skips unless a Drainage module is on the estimate
+  (the estimate already has one).
+
+```
+### Drainage — definition-of-done sign-off (2026-08-21, A+B done; C/D/E pending)
+A. Unit:      value[x] edit[x] unpriced[x] vendor[~] priority[N/A] units[x] aggregator[N/A] sub-indep[~] breakdown[N/A] summary-parity[x]
+B. Audit:     coverage[x] orphan[~] no-fallback[x] no-hardcoded[x] imports[x]
+C. E2E:       opens[ ] vendor×item[ ] numeric[ ] sub[ ] live-edit[ ] clean[ ]  (authored; runs when a Drainage module is on the test estimate)
+D. DB:        priced[ ] no-dupes[ ] filing[ ]  (Brian's SQL step)
+E. Loop:      red-first[N/A] catalogued[x] logged[x] green[ ]
+N/A items + reason:
+  A.priority — pipe/french/fixture labor rides the catalog calc_meta.labor_rate pointer (unset ⇒ laborUnset, covered); no numeric-coeff ladder to A/B-test.
+  A.aggregator/breakdown — In-House↔Sub toggle, not per-type tabs; no per-tab materials breakdown.
+  A.vendor[~] — vendor override supported via drainMatCost→catalog; covered structurally, not a dedicated unit assertion.
+  A.sub-indep[~] — calc branches on state.subType (isSub ? 0 : …); in-browser independence covered by Layer C; a pure IH-vs-Sub value test is a follow-up.
+  A.summary-parity[x] — DrainageSummary reads the saved calc snapshot; no separate summary calc to drift.
+  Layer A via drainageCalc.test.mjs (7); B via scripts/drainage-rate-coverage.mjs (test:drainage-coverage).
+```
+
 ## 2026-08-21 — Vercel deploy unbroken + Utilities Layer C GREEN (CI 50f75b6) — 77/77
 - **Deploy fix:** master was failing every build with `vite: command not found` (exit 127)
   — Vercel wasn't installing devDependencies. Root cause was the build env, not the code.
