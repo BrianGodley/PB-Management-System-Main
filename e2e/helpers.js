@@ -34,37 +34,70 @@ export function sectionSelect(page, title) {
   return page.getByText(new RegExp(`^\\s*${title}\\s*$`, 'i')).first().locator('xpath=following::select[1]')
 }
 
-// Exhaustively cycle every option of every non-vendor <select> and flag any that
-// produces NaN/Infinity. Uses a native DOM set + `change` dispatch instead of
-// Playwright's selectOption — the latter's per-option actionability waits blow the
-// test timeout on large editors. Reads innerText after two rAFs so React has
-// painted the recompute. Returns the list of option labels that produced NaN.
+// Exhaustively exercise EVERY select's EVERY option and flag any combination that
+// produces NaN/Infinity. Vendor selects are NO LONGER skipped — instead, within each
+// row we walk the full vendor × item matrix (every vendor AND the Standard option,
+// against every item/type option), because vendor→item is where real-DB price
+// resolution bugs live (a vendor with no material_price row resolves $0/NaN, which a
+// pure unit test can't see). Selects with no vendor/item pair in their row are cycled
+// standalone. Runs entirely in ONE in-page async evaluate (native `change` dispatch,
+// no Playwright per-option actionability waits) so the full matrix stays under the
+// timeout. Reads innerText after two rAFs so React has painted each recompute.
+// Returns the list of "vendor × item" (or single-option) labels that produced NaN.
 export async function scanEveryOptionForNaN(page) {
-  const bad = []
-  const nSel = await page.locator('select').count()
-  for (let s = 0; s < nSel; s++) {
-    const optTexts = await page.locator('select').nth(s).locator('option').allTextContents()
-    if (optTexts.some(t => /^\s*standard\s*$/i.test(t))) continue // skip vendor selects
-    for (let o = 0; o < optTexts.length; o++) {
-      const label = (optTexts[o] || '').trim()
-      if (!label || /^select/i.test(label)) continue
-      const nan = await page.evaluate(
-        ({ s, o }) =>
-          new Promise(res => {
-            const el = document.querySelectorAll('select')[s]
-            if (!el) return res(false)
-            el.selectedIndex = o
-            el.dispatchEvent(new Event('change', { bubbles: true }))
-            requestAnimationFrame(() =>
-              requestAnimationFrame(() => res(/\bNaN\b|Infinity/.test(document.body.innerText)))
-            )
-          }),
-        { s, o }
-      )
-      if (nan) bad.push(label)
+  return await page.evaluate(async () => {
+    const bad = []
+    const raf = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))
+    const isVendor = el => Array.from(el.options).some(o => /^\s*standard\s*$/i.test(o.textContent || ''))
+    const rowOf = el => el.closest('tr') || el.closest('[data-row]') || el.parentElement
+    const realOpts = el =>
+      Array.from(el.options)
+        .map((o, i) => ({ i, label: (o.textContent || '').trim() }))
+        .filter(o => o.label && !/^select/i.test(o.label)) // keep every real option incl. Standard
+    const pick = (el, i) => {
+      el.selectedIndex = i
+      el.dispatchEvent(new Event('change', { bubbles: true }))
     }
-  }
-  return bad
+    const hasNaN = () => /\bNaN\b|Infinity/.test(document.body.innerText)
+
+    // Group every select by its nearest row so vendor + item pickers pair correctly.
+    const rows = new Map()
+    for (const el of Array.from(document.querySelectorAll('select'))) {
+      const r = rowOf(el)
+      if (!rows.has(r)) rows.set(r, [])
+      rows.get(r).push(el)
+    }
+    for (const group of rows.values()) {
+      const vendors = group.filter(isVendor)
+      const items = group.filter(el => !isVendor(el))
+      if (vendors.length && items.length) {
+        // Full vendor × item matrix for this row.
+        for (const v of vendors) {
+          for (const vo of realOpts(v)) {
+            pick(v, vo.i)
+            await raf()
+            for (const it of items) {
+              for (const io of realOpts(it)) {
+                pick(it, io.i)
+                await raf()
+                if (hasNaN()) bad.push(`${vo.label} × ${io.label}`)
+              }
+            }
+          }
+        }
+      } else {
+        // No vendor/item pair — cycle each select's options on their own.
+        for (const el of group) {
+          for (const o of realOpts(el)) {
+            pick(el, o.i)
+            await raf()
+            if (hasNaN()) bad.push(o.label)
+          }
+        }
+      }
+    }
+    return bad
+  })
 }
 
 // Attach console/page-error collectors to a page. Returns an array that fills with

@@ -42,7 +42,15 @@ NON-DESTRUCTIVE: open the editor, read, enter values, **never save**.
 
 - [ ] **Editor opens** — module mounts; all expected sections render.
 - [ ] **Dropdown populated** — every picker has >1 option (catches empty-picker/subcategory bugs).
-- [ ] **Every dropdown option** — cycle every option of every non-vendor select → no NaN/Infinity, no console/HTTP errors (fast in-page scan).
+- [ ] **Every vendor × item option, on every tab** — NO STONE UNTURNED. Cycle the FULL
+      matrix: every vendor AND the Standard option, against every item/type option, for
+      every row, in every section — AND repeat on every tab (In-House/Sub × each
+      structure/type tab), because inactive tabs aren't in the DOM and would otherwise
+      go unscanned. Every combination must compute with no NaN/Infinity and no
+      console/HTTP errors. Vendor selects are NEVER skipped — vendor→item is where
+      real-DB price resolution fails (a vendor with no `material_price` row resolves
+      $0/NaN, invisible to unit tests). Fast in-page `change`-dispatch scan
+      (`scanEveryOptionForNaN`, row-aware vendor × item matrix).
 - [ ] **Every type/structure tab** — each computes without NaN (poll for stable render, not a fixed sleep).
 - [ ] **Numeric fields** — fill every input → a `$` total renders; no unpriced prompt on priced data.
 - [ ] **Live price resolution** — each live-priced type shows no unpriced / "labor rate needed" banner.
@@ -69,7 +77,7 @@ NON-DESTRUCTIVE: open the editor, read, enter values, **never save**.
 ### <Module> — definition-of-done sign-off (<date>)
 A. Unit:      value[ ] edit[ ] unpriced[ ] vendor[ ] priority[ ] units[ ] aggregator[ ] sub-indep[ ] breakdown[ ] summary-parity[ ]
 B. Audit:     coverage[ ] orphan[ ] no-fallback[ ] no-hardcoded[ ] imports[ ]
-C. E2E:       opens[ ] dropdowns[ ] every-option[ ] every-tab[ ] numeric[ ] price-resolve[ ] sub[ ] live-edit[ ] clean[ ]
+C. E2E:       opens[ ] dropdowns[ ] every-vendor×item-every-tab[ ] every-tab[ ] numeric[ ] price-resolve[ ] sub[ ] live-edit[ ] clean[ ]
 D. DB:        priced[ ] no-dupes[ ] filing[ ]
 E. Loop:      red-first[ ] catalogued[ ] logged[ ] green[ ]
 N/A items + reason:
@@ -88,3 +96,14 @@ AND nonzero labor hrs". Two required additions to the per-module DoD:
   present but unfetched.
 - **E2E value assertion (C):** picking a shared type (finish/cap) must show BOTH nonzero
   material $ AND nonzero labor hrs on that line — not merely the absence of a banner.
+
+## Addendum — vendor × item matrix, every tab (added 2026-08-20)
+The exhaustive E2E scan USED TO skip any select containing a "Standard" option (i.e.
+every vendor picker), and ran only on the active tab. Two blind spots: (1) vendor→item
+price resolution — the one thing E2E can catch that unit tests can't, since a vendor with
+no `material_price` row resolves $0/NaN only against the real DB — was never exercised;
+(2) selects on inactive tabs were never in the DOM, so never scanned. Fixed: the scan
+(`scanEveryOptionForNaN`) is now a row-aware vendor × item matrix (every vendor AND
+Standard, against every item/type option), and the Fire Pit exhaustive spec drives it
+across every In-House/Sub × structure-type tab. Definition of done: no vendor × item
+combination, in any section, on any tab, produces NaN/Infinity or a console/HTTP error.

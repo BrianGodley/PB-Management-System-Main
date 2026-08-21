@@ -175,21 +175,53 @@ test.describe('Fire Pit', () => {
   // ── EXHAUSTIVE coverage — every field + every dropdown option ────────────────
   const UNPRICED = /labor rate needed|price me|unpriced|missing price|needs? a price|set (a |the )?price/i
 
-  test('exhaustive: every TYPE dropdown option computes without a NaN/console error', async ({ page }, testInfo) => {
-    // Fire Pit has 4 structure-type tabs, so this cycles far more select/option
-    // pairs than the other modules; 180s was not enough on prod (CI timeout,
-    // 2026-08-20). Raised — coverage stays "every option", no options skipped.
-    test.setTimeout(300000)
+  test('exhaustive: every vendor × item option, on every tab, computes without a NaN/console error', async ({ page }, testInfo) => {
+    // NO STONE UNTURNED: cycle the FULL vendor × item matrix (every vendor AND the
+    // Standard option, against every item/type option) for every row — AND do it on
+    // every tab, because inactive tabs aren't in the DOM so their selects would never
+    // be scanned otherwise. Fire Pit has 4 structure tabs × In-House/Sub, so this is
+    // by far the heaviest scan; the matrix runs in-page (one evaluate per tab, no
+    // Playwright per-option waits) to stay under the ceiling. Raised to the max.
+    test.setTimeout(600000)
     const errors = collectErrors(page)
     const ok = await openFirePit(page)
     test.skip(!ok, 'Fire Pit editor not reachable on this estimate.')
-    // Fast DOM-dispatch scan (helpers.scanEveryOptionForNaN) — replaces per-option
-    // Playwright selectOption, whose actionability waits blew the 180s/600s ceiling
-    // on Fire Pit's 4-tab editor. Cycles every non-vendor option, same coverage.
-    const bad = await scanEveryOptionForNaN(page)
-    expect(bad, `Options producing NaN/Infinity: ${bad.join(', ')}`).toEqual([])
+
+    const bad = []
+    const scanCurrentView = async label => {
+      const hits = await scanEveryOptionForNaN(page)
+      for (const h of hits) bad.push(`[${label}] ${h}`)
+    }
+    // Enumerate every In-House/Sub × structure-type tab combination and scan each.
+    const outerTabs = ['In House', 'In-House', 'Subcontractor', 'Sub']
+    const structureTabs = ['CMU', 'Poured in Place', 'Modular', 'Brick']
+    const clickTab = async name => {
+      const btn = page.getByRole('button', { name: new RegExp(`^\\s*${name}\\s*$`, 'i') }).first()
+      if (!(await btn.count())) return false
+      await btn.click().catch(() => {})
+      await page.waitForTimeout(250)
+      return true
+    }
+    let scannedAny = false
+    for (const outer of outerTabs) {
+      const outerOk = await clickTab(outer)
+      // Only one of the In House / In-House synonyms (and Sub / Subcontractor) exists.
+      if (!outerOk) continue
+      for (const st of structureTabs) {
+        const stOk = await clickTab(st)
+        if (!stOk) continue
+        scannedAny = true
+        await scanCurrentView(`${outer} › ${st}`)
+      }
+      // If a tab layout has no structure sub-tabs, still scan the outer view.
+      if (!scannedAny) await scanCurrentView(outer)
+    }
+    // Fallback: if no tab buttons matched at all, scan whatever is mounted.
+    if (!scannedAny) await scanCurrentView('default view')
+
+    expect(bad, `Vendor × item combos producing NaN/Infinity:\n${bad.join('\n')}`).toEqual([])
     await testInfo.attach('fire-pit-exhaustive.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
-    // Console/HTTP errors during option cycling = real bug.
+    // Console/HTTP errors during the whole matrix cycle = real bug.
     expect(errors, `Console/HTTP errors:\n${errors.join('\n')}`).toEqual([])
   })
 
