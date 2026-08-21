@@ -25,6 +25,8 @@
     "test:e2e:report": "playwright show-report",
     "e2e:sync": "git fetch origin ci-results && node -e \"require('fs').mkdirSync('test-results',{recursive:true})\" && git show origin/ci-results:results.json > test-results/ci-results.json && git show origin/ci-results:updated_at.txt",
     "e2e:watch": "node scripts/e2e-watch.mjs",
+    "e2e:autopush": "node scripts/e2e-autopush.mjs",
+    "e2e:auto": "node scripts/e2e-auto.mjs",
     "import-code-changes": "node scripts/import-code-changes.mjs",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
