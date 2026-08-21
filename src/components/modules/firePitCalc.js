@@ -8,6 +8,31 @@
 
 export const num = v => parseFloat(v) || 0
 
+// ── Canonical wall-finish set ────────────────────────────────────────────────
+// The 7 finishes Fire Pit prices. `key`/`labKey` point at FP_RATES entries (which
+// resolve the shared '<Type> - Finishes' material + labor records). This is the
+// SINGLE source for the finish TYPE dropdown: every option MUST be a key here so it
+// resolves through WF_META → FP_RATES and prices. The dropdown used to be built from
+// raw 'Finish Material' catalog names (junk like Concrete Truck / *Flatwork + the
+// full '<Type> - Finishes' names), none of which round-trip to a WF_META key — so
+// every selectable finish dropped to masterWallMeta and zeroed material + labor.
+export const WF_META = {
+  'Sand Stucco': { key: 'sandStucco', labKey: 'sandStuccoLab', unit: 'SF', labMode: 'perDay' },
+  'Smooth Stucco': { key: 'smoothStucco', labKey: 'smoothStuccoLab', unit: 'SF', labMode: 'perDay' },
+  'Ledgerstone Veneer': { key: 'ledgerstone', labKey: 'ledgerstoneLab', unit: 'SF', labMode: 'perDay', waste: 1.1, screwPer5: 2 },
+  'Stacked Stone Veneer': { key: 'stackedStone', labKey: 'stackedStoneLab', unit: 'SF', labMode: 'perDay', waste: 1.1, screwPer5: 2 },
+  Tile: { key: 'tile', labKey: 'tileLab', unit: 'SF', labMode: 'perSF', adhesivePerSF: 1 },
+  'Real Flagstone': { key: 'realFlagstone', labKey: 'flagstoneLab', unit: 'stone', labMode: 'perSF', delivPerSF: 1, misc: 268.75 },
+  'Real Stone': { key: 'realStone', labKey: 'realStoneLab', unit: 'stone', labMode: 'perSF', delivPerSF: 2.5714, addPerSF: 1 },
+}
+export const WF_LIST = Object.keys(WF_META)
+
+// The finish TYPE dropdown option list — ALWAYS the canonical finishes, so every
+// option prices. Kept as a function so the module (and tests) share one source.
+export function fpFinishTypeOptions() {
+  return WF_LIST.slice()
+}
+
 // Cap/finish labor coefficient (hours per unit).
 //   master item: numeric laborCoeff, else the default-labor pointer (labor_rate) via mp
 //   built-in item: mp[labName]

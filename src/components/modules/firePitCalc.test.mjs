@@ -7,7 +7,14 @@
 // Run:  node --test src/components/modules/firePitCalc.test.mjs
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { computeCapRow, computeFinishRow, resolveLabor } from './firePitCalc.js'
+import {
+  computeCapRow,
+  computeFinishRow,
+  resolveLabor,
+  WF_META as CANON_WF_META,
+  WF_LIST as CANON_WF_LIST,
+  fpFinishTypeOptions,
+} from './firePitCalc.js'
 
 // Minimal FP_RATES shape the calc reads (name -> mp key).
 const FP_RATES = {
@@ -184,4 +191,37 @@ test('master finish: pointer resolves hrs; null pointer flags laborUnset', () =>
   const orphan = computeFinishRow({ sf: 30, type: 'Ledgerstone - Finishes' }, { meta: { ...meta, labor_rate: null }, vendorUnit: null, mp, fpRates: {} })
   assert.equal(orphan.hrs, 0, 'null-pointer finish resolves 0 hrs')
   assert.ok(orphan.laborUnset, 'null-pointer finish must raise laborUnset (not silently pass)')
+})
+
+// ── Finish-option CONTRACT (the "switching finish zeros out" regression) ──────
+// Fire Pit's finish TYPE dropdown must only offer options that round-trip to a
+// WF_META meta with a material key + labor key — otherwise selecting one drops to
+// masterWallMeta and zeroes material+labor. The bug: the dropdown was built from raw
+// 'Finish Material' catalog names (junk like Concrete Truck / *Flatwork + full
+// '<Type> - Finishes' names), none of which are WF_META keys. Fire Pit's default
+// finish type is empty, so NO finish priced until this was fixed. These lock it.
+test('contract: every finish dropdown option is a WF_META key', () => {
+  for (const opt of fpFinishTypeOptions()) {
+    assert.ok(CANON_WF_META[opt], `dropdown option "${opt}" is not a WF_META key → would zero out`)
+  }
+})
+
+test('contract: every WF_META finish carries a material key + labor key', () => {
+  for (const type of CANON_WF_LIST) {
+    const m = CANON_WF_META[type]
+    assert.ok(m && m.key, `${type} missing material key (FP_RATES material lookup)`)
+    assert.ok(m && m.labKey, `${type} missing labKey (FP_RATES labor lookup)`)
+  }
+})
+
+test('contract: every canonical finish prices material + labor once resolved', () => {
+  // Feed each finish a resolved master-style meta (matUnit + laborCoeff) so the calc
+  // runs its material + labor arithmetic without needing the FP_RATES table; all must
+  // produce BOTH material and hours (proving the option, once selected, prices).
+  for (const type of CANON_WF_LIST) {
+    const meta = { ...CANON_WF_META[type], master: true, matUnit: 10, laborCoeff: 0.3 }
+    const r = computeFinishRow({ sf: 20, type }, { meta, vendorUnit: null, mp: {}, fpRates: {} })
+    assert.ok(r.mat > 0, `${type}: material should be > 0 at 20 SF × $10`)
+    assert.ok(r.hrs > 0, `${type}: labor hours should be > 0 at 20 SF × 0.3 hr/SF`)
+  }
 })

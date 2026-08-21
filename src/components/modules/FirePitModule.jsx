@@ -9,7 +9,7 @@ import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { groutCuFtPerBlock } from '../../lib/cmuGrout'
 import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
-import { computeCapRow, computeFinishRow } from './firePitCalc'
+import { computeCapRow, computeFinishRow, WF_META, WF_LIST } from './firePitCalc'
 import { TRENCH_LABOR_RATE_NAME, trenchHours, trenchRowHrs } from '../../lib/trench'
 import { STRUCT_CALC } from './firePitStruct'
 import { resolveUtilRow } from '../../lib/utilRow'
@@ -192,20 +192,9 @@ function wfVendorPrice(vendorSel, typeLabel, materialRows, cat = WF_CAT, opts = 
   // zeroing material.
   return row && n(row.unit_cost) > 0 ? n(row.unit_cost) : null
 }
-// Wall-finish master list. Each Type resolves a material unit price (FP_RATES
-// key, vendor-overridable) + a labor rate. `unit:'SF'` prices per SF (optional
-// waste / screw / adhesive add-ons); `unit:'ton'` prices per ton (SF÷tonPerSF)
-// with delivery + misc. labMode 'perDay' → hrs=(SF/rate)*8, 'perSF' → hrs=SF*rate.
-const WF_META = {
-  'Sand Stucco': { key: 'sandStucco', labKey: 'sandStuccoLab', unit: 'SF', labMode: 'perDay' },
-  'Smooth Stucco': { key: 'smoothStucco', labKey: 'smoothStuccoLab', unit: 'SF', labMode: 'perDay' },
-  'Ledgerstone Veneer': { key: 'ledgerstone', labKey: 'ledgerstoneLab', unit: 'SF', labMode: 'perDay', waste: 1.1, screwPer5: 2 },
-  'Stacked Stone Veneer': { key: 'stackedStone', labKey: 'stackedStoneLab', unit: 'SF', labMode: 'perDay', waste: 1.1, screwPer5: 2 },
-  Tile: { key: 'tile', labKey: 'tileLab', unit: 'SF', labMode: 'perSF', adhesivePerSF: 1 },
-  'Real Flagstone': { key: 'realFlagstone', labKey: 'flagstoneLab', unit: 'stone', labMode: 'perSF', delivPerSF: 1, misc: 268.75 },
-  'Real Stone': { key: 'realStone', labKey: 'realStoneLab', unit: 'stone', labMode: 'perSF', delivPerSF: 2.5714, addPerSF: 1 },
-}
-const WF_LIST = Object.keys(WF_META)
+// WF_META / WF_LIST (the 7 canonical finishes + their FP_RATES material/labor keys)
+// now live in firePitCalc.js so the finish-option contract is pure-unit-testable and
+// the TYPE dropdown, the calc, and the tests all share ONE source. Imported above.
 const WF_ROW = () => ({ vendor: 'Standard', type: '', sf: '' })
 
 // ── Wall cap catalog ──────────────────────────────────────────────────────────
