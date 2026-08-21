@@ -301,3 +301,38 @@ Checklist D: priced/no-dupes/filing → run the SQL. Remaining: module-vs-summar
 ### Autopilot — 4a89df8 GREEN (2026-08-20)
 CI run 2026-08-20T20:14:01Z, duration 143s: expected 35 / unexpected 0 / flaky 0 /
 skipped 0. Second consecutive green run; suite unchanged at 35 specs. No autopilot edits.
+
+### Autopilot — b13f247 GREEN (2026-08-20)
+CI run 2026-08-20T20:22:25Z, duration 135s: expected 35 / unexpected 0 / flaky 0 /
+skipped 0. Third consecutive green run; suite unchanged at 35 specs. No autopilot edits.
+
+### Hand Demo — CF/hr model rework (2026-08-20, calc + tests done)
+Reworked handDemoCalc.js: all demo lines now hours = CF ÷ (CF/hr) [Concrete 15, Soil 10,
+Grass 12, Import Base 40, Bucket 8, Misc Flat 10, Misc Vert 10, Footing 10, Grade Cut 8,
+Grade Fill 40]; JJ compaction = jjSF ÷ 50 SF/hr; rebar toggle → concrete hrs ×1.25;
+tonnage path retired; sub grading Cut/Fill priced per CF (with new subGradeCutDepth/
+subGradeFillDepth), compaction per SF; sub rates renamed ('Sub Grade - Hand Cut' etc.).
+handDemoCalc.test.mjs rewritten — 9 tests, exact-value (concrete 300CF→20hrs→$1500,
+rebar ×1.25, grade cut/fill distinct rates, sub cut $175, roll $200, tree $5600, In-House/
+Sub independence). Full suite 115/115. Seed: supabase-hand-demo-cfhr-rates.sql (idempotent;
+sub rates keyed by item_key — the old seed used company_name, why they never resolved).
+REMAINING (UI, next): HandDemoModule.jsx — Dirt→Soil labels, rebar Yes/No toggle (replace
+rebar-SF input + state.rebar), subGradeCut/FillDepth inputs, surface stump section on Sub,
+View-Rates rows for new CF/hr + sub rates. Ship calc+UI+seed together (don't deploy half).
+
+### Autopilot — 4ead2ac GREEN, but 13 specs never ran (2026-08-20)
+CI published 2026-08-21T00:40:15Z, duration 106s: expected 22 / unexpected 0 / flaky 0 /
+skipped 0, errors []. All 22 that ran passed. BUT the suite collected only 6 files —
+auth.setup 1, code-changes 2, estimator 2, fire-pit 8, navigation 8, smoke 1 — while the
+previous run (b13f247) collected 35 across 8 files. MISSING ENTIRELY: walls.spec.js (7)
+and hand-demo.spec.js (6). Both files are present in the 4ead2ac tree, both were green at
+b13f247, and their `test.skip(!ESTIMATE)` guard would report status "skipped" (stats.skipped
+is 0), so this is non-collection, not skipping. Also odd: stats.startTime 17:41:43Z is ~3h
+BEFORE the publish time, and config.metadata.ci.commitHash is 4c4b18b (not the 4ead2ac in
+commit.txt). Best hypothesis: ci-results was overwritten by a partial/cancelled run
+(concurrency cancel-in-progress) or a stale artifact from a different checkout — not a
+product regression. No autopilot edits; nothing in e2e/ to harden (nothing failed).
+
+## 2026-08-20 — autopilot run (CI 9c129a6)
+
+GREEN — 35 passed, 1 skipped, 0 failed, 0 flaky (Playwright CI, results updated 2026-08-21T00:51:20Z, duration 112s). No action taken.
