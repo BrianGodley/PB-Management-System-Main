@@ -630,3 +630,10 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
 - Open item for Brian: several specs still do `await x.fill(v).catch(() => {})`
   (columns, fire-pit, hand-demo, walls). Under this guard a swallowed fill is a silent
   pass — those live-edit tests should move to `fillField` too.
+
+## 2026-08-21 — autopilot run, commit d9baa74 (CI 15:37Z)
+- **GREEN.** 50 passed, 0 failed, 0 flaky, 0 skipped (duration 191s).
+- Confirms the previous run's single failure (outdoor-kitchen "live edit reflects:
+  changing a frozen-priced field moves the total", 473bbd7) is resolved by the
+  `fillField` helper — the readonly-until-focus guard no longer blocks the edit.
+- No autopilot edits made this run.
