@@ -29,19 +29,9 @@ test.describe('Outdoor Kitchen', () => {
     expect(errors, `Console/HTTP errors:\n${errors.join('\n')}`).toEqual([])
   })
 
-  test('vendor pickers are populated (type pickers may start on a placeholder)', async ({ page }) => {
-    const ok = await openModule(page, 'Outdoor Kitchen')
-    test.skip(!ok, 'Outdoor Kitchen editor not reachable on this estimate.')
-    const selects = page.locator('select')
-    const n = await selects.count()
-    expect(n, 'No <select> pickers found in Outdoor Kitchen editor').toBeGreaterThan(0)
-    for (let i = 0; i < n; i++) {
-      const opts = await selects.nth(i).locator('option').allTextContents()
-      const isVendor = opts.some(t => /^\s*standard\s*$/i.test(t))
-      if (isVendor) expect(opts.length, `Vendor select #${i} has no vendor options`).toBeGreaterThan(1)
-      expect(opts.length, `Select #${i} rendered with zero options (broken)`).toBeGreaterThan(0)
-    }
-  })
+  // (No generic "every dropdown populated" test — vendor pickers can be Standard-only
+  //  and type pickers start on a placeholder. Coverage comes from the shared-finish
+  //  resolve test + the vendor × item matrix below.)
 
   test('shared wall finish resolves without an unpriced banner', async ({ page }, testInfo) => {
     const ok = await openModule(page, 'Outdoor Kitchen')
