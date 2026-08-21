@@ -138,24 +138,18 @@ export default function PoolSummary({ module }) {
         </>
       )}
 
-      {/* Waterline Tile */}
-      {activeStructs.some(([k]) => n((tile[k] || {}).lf) > 0) && (
+      {/* Waterline Tile — from the saved calc breakdown (parity-safe) */}
+      {(savedCalc.tileCalc || []).length > 0 && (
         <>
           <SectionLabel title="Waterline Tile" />
-          {activeStructs.map(([k]) => {
-            const t = tile[k] || {}
-            const lf = n(t.lf)
-            if (!lf) return null
-            const hrs = lf * n(laborRates[`Tile - ${t.installType}`])
-            return (
-              <LineRow
-                key={k}
-                label={`${k} — ${t.installType || '6" Squares'}`}
-                value={`${lf} Ln Ft`}
-                sub={`${hrs.toFixed(1)} hrs · $${n(t.matPricePerSF)} per Sq Ft mat${t.waterproof ? ' · WP' : ''}`}
-              />
-            )
-          })}
+          {savedCalc.tileCalc.map((t, i) => (
+            <LineRow
+              key={i}
+              label={t.label}
+              value={t.value}
+              sub={`${n(t.hrs).toFixed(1)} hrs · $${n(t.matPerSF)} per Sq Ft mat${t.waterproof ? ' · WP' : ''}`}
+            />
+          ))}
         </>
       )}
 

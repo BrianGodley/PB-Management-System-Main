@@ -685,6 +685,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     tileMat = 0
   // Tile coverage (SF of tile per LF of waterline) — table-driven coefficient.
   const tileSfPerLf = n(materialPrices['Pool Tile SF per LF'])
+  const tileCalc = []
   activeStructs.forEach(({ tileKey }) => {
     const t = tile[tileKey] || {}
     const lf = n(t.lf)
@@ -700,6 +701,13 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     const matPriceSF = n(t.matPricePerSF)
     tileHrs += lf * installRate
     tileMat += lf * tileSfPerLf * matPriceSF
+    tileCalc.push({
+      label: `${tileKey} — ${t.installType || '6" Squares'}`,
+      value: `${lf} Ln Ft`,
+      hrs: lf * installRate,
+      matPerSF: matPriceSF,
+      waterproof: !!t.waterproof,
+    })
   })
 
   // ─ Spillways ─
@@ -1042,6 +1050,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     excavHrs,
     excavAutoSub,
     tileHrs,
+    tileCalc,
     spillwayHrs,
     spillwayCalc,
     waterFeatureHrs,
