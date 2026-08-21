@@ -1,6 +1,7 @@
 import FinancialSummaryList from './FinancialSummaryList'
 import { resolveMaterialPrice } from '../../lib/materialCatalog'
 import { ROW_CALC } from './ColumnsModule'
+import { computeColumnFinishRow } from './columnsCalc'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ColumnsSummary — read-only detail view for a saved Columns module
@@ -188,11 +189,10 @@ export default function ColumnsSummary({ module }) {
           sub: `${fmt2(flat)} per Sq Ft flat  ·  ${vLabel}`,
         }
       }
-      const isTon = rate.unit === 'ton'
-      const cost = matPrice(rate.dbName, isTon ? rate.costPerTon : rate.costPerSF, r.vendor)
-      const labHrs = price(rate.laborDbName, isTon ? rate.laborHrsPer : rate.laborHrsPerSF)
-      const mat = n(r.qty) * cost
-      const hrs = n(r.qty) * labHrs
+      // Shared finish math (single source of truth with ColumnsModule) — all $/SF now.
+      const cost = matPrice(rate.dbName, rate.costPerSF, r.vendor)
+      const labHrs = price(rate.laborDbName, rate.laborHrsPerSF)
+      const { mat, hrs } = computeColumnFinishRow(r, { matUnit: cost, laborRate: labHrs })
       return {
         key: i,
         label: `${r.type} — ${n(r.qty)} ${rate.unit}`,

@@ -1,5 +1,6 @@
 import WorkTypeChooser from './WorkTypeChooser'
 import CrewTypeBar from './CrewTypeBar'
+import { computeColumnFinishRow } from './columnsCalc'
 import ModuleHeaderSlot from './ModuleHeaderSlot'
 import { useState, useEffect, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
@@ -388,15 +389,14 @@ function calcColumns(
     const rate = FINISH_TYPES[(opt && opt.typeKey) || r.type] || FINISH_TYPES[r.type]
     if (!rate || !n(r.qty)) return
     const priceDbName = (opt && opt.dbName) || rate.dbName
-    if (isSub) {
-      finishMat += n(r.qty) * matP(rate.subDbName, rate.subFallback || 0, r.vendor)
-    } else if (rate.unit === 'SF') {
-      finishMat += n(r.qty) * matP(priceDbName, rate.costPerSF, r.vendor)
-      finishHrs += n(r.qty) * mp(rate.laborDbName, rate.laborHrsPerSF)
-    } else {
-      finishMat += n(r.qty) * matP(priceDbName, rate.costPerTon, r.vendor)
-      finishHrs += n(r.qty) * mp(rate.laborDbName, rate.laborHrsPer)
-    }
+    // Shared finish math lives in the pure, unit-tested columnsCalc.js. All finishes
+    // are $/Sq Ft now (shared Finishes records), so there is no ton branch.
+    const matUnit = matP(priceDbName, rate.costPerSF, r.vendor)
+    const laborRate = mp(rate.laborDbName, rate.laborHrsPerSF)
+    const subUnit = matP(rate.subDbName, rate.subFallback || 0, r.vendor)
+    const fr = computeColumnFinishRow(r, { matUnit, laborRate, subUnit, isSub })
+    finishMat += fr.mat
+    finishHrs += fr.hrs
   })
 
   // Manual

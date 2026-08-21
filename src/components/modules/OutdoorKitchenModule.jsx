@@ -1,6 +1,7 @@
 import WorkTypeChooser from './WorkTypeChooser'
 import CrewTypeBar from './CrewTypeBar'
 import ModuleHeaderSlot from './ModuleHeaderSlot'
+import { computeOkFinishRow } from './okCalc'
 import { useState, useEffect, useCallback, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
@@ -507,24 +508,11 @@ function calcOutdoorKitchen(
       ? meta.matUnit
       : p(OK_RATES[meta.key].dbName, OK_RATES[meta.key].fallback)
     const unit = wfVendorPrice(row.vendor, row.type, materialRows, { category: 'Finishes' }) ?? houseUnit
-    let mat = 0
-    if (meta.unit === 'stone') {
-      // Material $/Sq Ft (shared Finishes rate) + delivery $/SF + flat misc + add/SF.
-      mat =
-        sf * unit +
-        sf * (meta.delivPerSF || 0) +
-        (meta.misc || 0) +
-        (meta.addPerSF ? sf * meta.addPerSF : 0)
-    } else {
-      mat =
-        sf * unit * (meta.waste || 1) +
-        (meta.screwPer5 ? (sf / 5) * meta.screwPer5 : 0) +
-        (meta.adhesivePerSF ? sf * meta.adhesivePerSF : 0)
-    }
     const labRate = meta.master
       ? meta.laborCoeff
       : p(OK_RATES[meta.labKey].dbName, OK_RATES[meta.labKey].fallback)
-    const hrs = sf * labRate // all finish labor is hours per Sq Ft now
+    // Shared finish math in the pure, unit-tested okCalc.js (single source of truth).
+    const { mat, hrs } = computeOkFinishRow(sf, meta, unit, labRate)
     return { mat, hrs, unit }
   }
   const wallFinishCalc = (wallFinishRows || []).map(finishRowCalc)
