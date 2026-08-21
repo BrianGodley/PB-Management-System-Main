@@ -212,6 +212,11 @@ function copingVendorIds(materialRows) {
 const TILE_SUBCAT = 'Tile'
 const SPILLWAY_SUBCAT = 'Spillway'
 const RAISED_SUBCAT = 'Raised Surface'
+// Water Features (sheer descents / curtain waterfalls, etc.) — a master material
+// rates sub-category (Pool / 'Water Features'). Each item's material = price × qty,
+// labor = qty × labor_rates[item.calc_meta.labor_rate]. Extensible: any new item
+// added to the sub-category shows up here automatically with its own labor pointer.
+const WATER_FEATURE_SUBCAT = 'Water Features'
 // Steel = rebar picked from the shared Basic Materials → Reinforcement rows
 // ('Rebar #3'…'Rebar #8', priced per Ln Ft). In-House install labor rides on the
 // Pool 'Steel - Install' labor rate (per Ln Ft; seed empty). Rebar LF = shell SF ×
@@ -244,6 +249,11 @@ function poolSubVendorIds(materialRows, subcat) {
         .map(r => r.vendor_id)
     ),
   ]
+}
+// Default vendor for a sub-category whose items are vendor-priced (not Standard) —
+// e.g. Water Features (Heritage). Falls back to Standard if none carry it.
+function defaultSubVendor(materialRows, subcat) {
+  return poolSubVendorIds(materialRows, subcat)[0] || 'Standard'
 }
 
 
@@ -438,6 +448,7 @@ const defaultTileStruct = () => ({
 })
 const defaultInteriorStruct = () => ({ type: '', subCost: '' })
 const newSpillway = () => ({ struct: 'Pool', vendor: 'Standard', type: '', qty: '1', lf: '' })
+const newWaterFeature = () => ({ vendor: '', type: '', qty: '1' })
 const newCopingRow = () => ({ struct: 'Pool', vendor: 'Standard', type: '', lf: '', sided: 'single' })
 const newRaisedSurface = () => ({ matType: '', sqft: '', curvePct: '', corners: '' })
 const newEquipRow = () => ({ vendor: '', category: 'Pump', model: '', qty: '1', unitCost: '' })
@@ -492,6 +503,7 @@ function makeTab(data = {}) {
       'Zero Edge Trough': defaultTileStruct(),
     },
     spillways: data.spillways ?? [newSpillway()],
+    waterFeatures: data.waterFeatures ?? [newWaterFeature()],
     copingRows: data.copingRows ?? [newCopingRow()],
     raisedSurfaces: data.raisedSurfaces ?? [newRaisedSurface()],
     interiorFinish: migrateStructMap(data.interiorFinish) ?? {
@@ -563,6 +575,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     shotcrete,
     tile,
     spillways,
+    waterFeatures,
     copingRows,
     raisedSurfaces,
     interiorFinish,
@@ -697,6 +710,25 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
       laborUnset.push({ kind: 'labor', name: item?.calc_meta?.labor_rate || null, label: sw.type, category: 'Pool', unit: 'Hrs per Ln Ft' })
     spillwayHrs += totalLF * labRate
     spillwayMat += totalLF * matRate
+  })
+
+  // ─ Water Features (sheer descents / waterfalls) ─
+  // Each row picks a Water Features catalog item: material = qty × item price, labor
+  // = qty × the item's own calc_meta.labor_rate (hrs per each). No name-keyed lookups.
+  let waterFeatureHrs = 0,
+    waterFeatureMat = 0
+  const wfDefVendor = defaultSubVendor(materialRows, WATER_FEATURE_SUBCAT)
+  ;(waterFeatures || []).forEach(wf => {
+    if (!wf.type) return
+    const qty = n(wf.qty)
+    if (!qty) return
+    const item = poolStdItem(materialRows, WATER_FEATURE_SUBCAT, wf.type, wf.vendor || wfDefVendor)
+    const matRate = item ? n(item.unit_cost) : 0
+    const labRate = n(laborRates[item?.calc_meta?.labor_rate])
+    if (labRate <= 0)
+      laborUnset.push({ kind: 'labor', name: item?.calc_meta?.labor_rate || null, label: wf.type, category: 'Pool', unit: 'Hrs per Each' })
+    waterFeatureHrs += qty * labRate
+    waterFeatureMat += qty * matRate
   })
 
   // ─ Coping ─
@@ -920,6 +952,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     excavHrs +
     tileHrs +
     spillwayHrs +
+    waterFeatureHrs +
     copingHrs +
     raisedHrs +
     equipmentHrs +
@@ -931,7 +964,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
   const totalHrs = _preWalkHrs + walkHrs
   const manDays = totalHrs / 8
-  const totalMat = tileMat + spillwayMat + copingMat + raisedMat + epMat + steelMat + manMat + plumbMatIH
+  const totalMat = tileMat + spillwayMat + waterFeatureMat + copingMat + raisedMat + epMat + steelMat + manMat + plumbMatIH
   // Pool's genuine sub trades (excavation / shotcrete / interior / equipment /
   // plumbing / steel / manual-sub). These are sub costs on either tab.
   const subTradeCost =
@@ -980,6 +1013,8 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     excavAutoSub,
     tileHrs,
     spillwayHrs,
+    waterFeatureHrs,
+    waterFeatureMat,
     copingHrs,
     raisedHrs,
     excavSub,
@@ -1330,6 +1365,20 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
     upd(
       'spillways',
       T.spillways.filter((_, idx) => idx !== i)
+    )
+
+  // ── Water Features helpers ──────────────────────────────────────────────────────
+  const addWaterFeature = () => upd('waterFeatures', [...T.waterFeatures, newWaterFeature()])
+  const updWaterFeature = (i, key, val) => {
+    const arr = [...T.waterFeatures]
+    arr[i] = { ...arr[i], [key]: val }
+    if (key === 'vendor') arr[i].type = ''
+    upd('waterFeatures', arr)
+  }
+  const removeWaterFeature = i =>
+    upd(
+      'waterFeatures',
+      T.waterFeatures.filter((_, idx) => idx !== i)
     )
 
   // ── Coping helpers ────────────────────────────────────────────────────────────
@@ -2095,6 +2144,72 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             className="text-xs text-green-700 hover:underline mt-1"
           >
             + Add Spillway
+          </button>
+        </div>
+      </div>
+
+      {/* ─── 5b. Water Features (sheer descents / waterfalls) ─── */}
+      <div>
+        <SectionHeader title="Water Features" />
+        <div className="space-y-2">
+          {T.waterFeatures.map((wf, i) => {
+            const wfDefVendor = defaultSubVendor(materialRows, WATER_FEATURE_SUBCAT)
+            const wfVendorSel = wf.vendor || wfDefVendor
+            const wfOpts = poolStdOptions(materialRows, WATER_FEATURE_SUBCAT, wfVendorSel)
+            const wfVends = vendors.filter(v => poolSubVendorIds(materialRows, WATER_FEATURE_SUBCAT).includes(v.id))
+            return (
+              <div key={i} className="grid grid-cols-3 gap-2 items-end">
+                <div>
+                  <Label text="Vendor" />
+                  <select
+                    className="input text-sm py-1.5"
+                    value={wfVendorSel}
+                    onChange={e => updWaterFeature(i, 'vendor', e.target.value)}
+                  >
+                    <option value="Standard">Standard</option>
+                    {wfVends.map(v => (
+                      <option key={v.id} value={v.id}>{v.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label text="Feature" />
+                  <select
+                    className="input text-sm py-1.5 w-full"
+                    value={wf.type || ''}
+                    onChange={e => updWaterFeature(i, 'type', e.target.value)}
+                  >
+                    {!wf.type && <option value="">Select feature</option>}
+                    {wf.type && !wfOpts.some(o => o.label === wf.type) && (
+                      <option value={wf.type}>{wf.type}</option>
+                    )}
+                    {wfOpts.map(o => (
+                      <option key={o.value} value={o.label}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label text="Qty" />
+                  <div className="flex items-center gap-1">
+                    <NumInput value={wf.qty} onChange={v => updWaterFeature(i, 'qty', v)} className="flex-1 min-w-0" />
+                    <button
+                      type="button"
+                      onClick={() => removeWaterFeature(i)}
+                      className="text-gray-500 hover:text-red-500 text-xs leading-none shrink-0"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+          <button
+            type="button"
+            onClick={addWaterFeature}
+            className="text-xs text-green-700 hover:underline mt-1"
+          >
+            + Add Water Feature
           </button>
         </div>
       </div>
