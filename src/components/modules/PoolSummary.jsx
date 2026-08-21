@@ -181,6 +181,21 @@ export default function PoolSummary({ module }) {
         </>
       )}
 
+      {/* Water Features — rendered from the saved calc breakdown (parity-safe) */}
+      {(savedCalc.waterFeatureCalc || []).length > 0 && (
+        <>
+          <SectionLabel title="Water Features" />
+          {savedCalc.waterFeatureCalc.map((wf, i) => (
+            <LineRow
+              key={i}
+              label={`${wf.label} × ${wf.qty}`}
+              value={`${n(wf.qty)} Each`}
+              sub={`${n(wf.hrs).toFixed(1)} hrs · ${fmt2(n(wf.mat))} mat`}
+            />
+          ))}
+        </>
+      )}
+
       {/* Coping */}
       {copingRows.filter(cr => n(cr.lf) > 0).length > 0 && (
         <>

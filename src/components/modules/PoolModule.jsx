@@ -718,6 +718,9 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   let waterFeatureHrs = 0,
     waterFeatureMat = 0
   const wfDefVendor = defaultSubVendor(materialRows, WATER_FEATURE_SUBCAT)
+  // Per-row breakdown emitted for the summary so it renders from the saved snapshot
+  // (parity-safe) instead of re-resolving the catalog with stale name keys.
+  const waterFeatureCalc = []
   ;(waterFeatures || []).forEach(wf => {
     if (!wf.type) return
     const qty = n(wf.qty)
@@ -727,8 +730,11 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     const labRate = n(laborRates[item?.calc_meta?.labor_rate])
     if (labRate <= 0)
       laborUnset.push({ kind: 'labor', name: item?.calc_meta?.labor_rate || null, label: wf.type, category: 'Pool', unit: 'Hrs per Each' })
-    waterFeatureHrs += qty * labRate
-    waterFeatureMat += qty * matRate
+    const hrs = qty * labRate
+    const mat = qty * matRate
+    waterFeatureHrs += hrs
+    waterFeatureMat += mat
+    waterFeatureCalc.push({ label: wf.type, qty, hrs, mat })
   })
 
   // ─ Coping ─
@@ -1015,6 +1021,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     spillwayHrs,
     waterFeatureHrs,
     waterFeatureMat,
+    waterFeatureCalc,
     copingHrs,
     raisedHrs,
     excavSub,
