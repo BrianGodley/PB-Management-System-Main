@@ -579,13 +579,6 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
       <div>
         <div className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-5 mb-2 flex items-center flex-wrap gap-x-2 gap-y-1">
           <span>{subSectionTitle('Irrigation Zones', isSub)}</span>
-          <span className="inline-flex items-center gap-1">
-            Hand: {calc.handRate} hrs/zone
-          </span>
-          ·
-          <span className="inline-flex items-center gap-1">
-            Trench: {calc.trenchRate} hrs/zone
-          </span>
         </div>
         <table className="w-full text-xs">
           <TH
