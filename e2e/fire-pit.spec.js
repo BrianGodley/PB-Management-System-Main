@@ -144,8 +144,18 @@ test.describe('Fire Pit', () => {
   test('wall finish resolves nonzero material $ AND nonzero labor hrs', async ({ page }, testInfo) => {
     const ok = await openFirePit(page)
     test.skip(!ok, 'Fire Pit editor not reachable on this estimate.')
-    const wf = sectionSelect(page, 'Wall Finishes')
-    test.skip(!(await wf.count()), 'No Wall Finishes picker on this estimate.')
+    // The finish row has TWO selects: vendor (contains 'Standard') then the finish
+    // TYPE picker. Target the TYPE picker — the first non-vendor select after the header.
+    const header = page.getByText(/^\s*Wall Finishes\s*$/i).first()
+    test.skip(!(await header.count()), 'No Wall Finishes section on this estimate.')
+    const after = header.locator('xpath=following::select')
+    const nSel = await after.count()
+    let wf = null
+    for (let i = 0; i < Math.min(nSel, 5); i++) {
+      const o = await after.nth(i).locator('option').allTextContents()
+      if (!o.some(x => /^\s*standard\s*$/i.test(x))) { wf = after.nth(i); break }
+    }
+    test.skip(!wf, 'No finish TYPE picker found (only vendor selects).')
     const opts = await wf.locator('option').allTextContents()
     const idx = opts.findIndex(o => o && !/^\s*select/i.test(o.trim()))
     test.skip(idx < 1, 'No real finish option to pick.')
