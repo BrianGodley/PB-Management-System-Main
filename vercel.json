@@ -1,4 +1,5 @@
 {
+  "git": { "deploymentEnabled": { "ci-results": false } },
   "installCommand": "rm -rf node_modules package-lock.json && npm install --include=dev --include=optional",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }

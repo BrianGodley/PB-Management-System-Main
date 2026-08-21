@@ -105,6 +105,13 @@ jobs:
           cp /tmp/results.json   /tmp/ci/results.json
           cp /tmp/updated_at.txt /tmp/ci/updated_at.txt
           cp /tmp/commit.txt     /tmp/ci/commit.txt
+          # Tell Vercel NOT to deploy this data-only branch. ci-results is an orphan
+          # branch (results.json only, no package.json/vite), so Vercel's git integration
+          # was failing every push with "vite: command not found" (exit 127). Vercel reads
+          # git.deploymentEnabled from the pushed branch's vercel.json, so shipping this
+          # file on ci-results makes every ci-results deploy a no-op — the app on master is
+          # unaffected. (Belt-and-suspenders with the dashboard Ignored Build Step.)
+          printf '%s\n' '{ "git": { "deploymentEnabled": { "ci-results": false } } }' > /tmp/ci/vercel.json
           cd /tmp/ci
           git add -A
           git commit -m "e2e results for ${{ github.sha }} @ $(cat updated_at.txt)" || { echo "no change"; exit 0; }
