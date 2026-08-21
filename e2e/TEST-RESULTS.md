@@ -432,3 +432,10 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
   `waitForLoadState('networkidle')` in smoke, estimator, navigation, fire-pit and
   helpers with it. `node --check` clean on all five files. No src/, SQL or rate
   changes.
+
+## 2026-08-20 — autopilot run (CI sha 3922b15)
+- Result: **GREEN** — 36 expected, 0 unexpected, 0 flaky, 0 skipped
+  (CI start 2026-08-21T02:14:26Z, duration 132.2s).
+- Confirms the previous round's `settle()` timing fix: no `networkidle` timeouts,
+  and the suite grew 22 → 36 specs with every one passing.
+- No edits made this run.
