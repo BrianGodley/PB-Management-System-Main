@@ -162,25 +162,42 @@ test.describe('Outdoor Kitchen', () => {
     const dollars = () => page.evaluate(() => (document.body.innerText.match(/\$[\d,]+(\.\d+)?/g) || []).join('|'))
     // The BBQ Structure labels are plain <label> elements with no htmlFor and the
     // input is a SIBLING, not a child — so getByLabel() matches nothing and the old
-    // "first numeric input on the page" fallback silently drove an unrelated field
-    // (which is why the total never moved). Anchor on the label text and take the
-    // very next input in document order instead, and fail loudly if it is missing.
-    const target = page
-      .getByText(/BBQ Wall Length/i)
+    // "first numeric input on the page" fallback silently drove an unrelated field.
+    // Anchor on the VISIBLE label element and take the very next input in document
+    // order. Every step below fails loudly: the previous version wrapped click/fill
+    // in .catch(() => {}), so a fill that never landed looked exactly like a total
+    // that refused to move. The toHaveValue assertions separate the two cases —
+    // if the value sticks but the total does not move, that is a product bug.
+    const label = page
+      .locator('label')
+      .filter({ hasText: /BBQ Wall Length/i })
+      .filter({ visible: true })
       .first()
-      .locator('xpath=following::input[1]')
-    expect(
-      await target.count(),
-      'BBQ Wall Length input not found — the BBQ Structure section did not render.'
-    ).toBeGreaterThan(0)
-    await target.click().catch(() => {})
-    await target.fill('8').catch(() => {})
-    await page.waitForTimeout(400)
+    await expect(
+      label,
+      'BBQ Wall Length label not found — the BBQ Structure section did not render.'
+    ).toHaveCount(1)
+    const target = label.locator('xpath=following::input[1]')
+    await expect(
+      target,
+      'No input follows the BBQ Wall Length label — the field markup changed.'
+    ).toHaveCount(1)
+    await target.scrollIntoViewIfNeeded()
+    await target.fill('8')
+    await expect(target, 'BBQ Wall Length did not accept 8').toHaveValue('8')
+    await page.waitForTimeout(600)
     const before = await dollars()
-    await target.click().catch(() => {})
-    await target.fill('40').catch(() => {})
+    await target.fill('40')
+    // Blur so any commit-on-blur handling also fires, then prove the edit landed
+    // before blaming the recompute.
+    await target.blur().catch(() => {})
+    await expect(target, 'BBQ Wall Length did not accept 40').toHaveValue('40')
+    const where = await target.evaluate(el => el.outerHTML.slice(0, 200))
     await expect
-      .poll(dollars, { timeout: 8000, message: 'Total did not change after editing BBQ Wall Length' })
+      .poll(dollars, {
+        timeout: 10000,
+        message: `Total did not change after editing BBQ Wall Length 8 -> 40 (input accepted the value, so this is a recompute/pricing issue, not a selector one). Input: ${where}`,
+      })
       .not.toBe(before)
   })
 })

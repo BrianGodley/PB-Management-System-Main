@@ -597,3 +597,18 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
 - Fix (e2e only): anchor on the label text and take `xpath=following::input[1]`,
   and hard-fail (not skip, not silently fall back) if that input is missing.
   `node --check` clean. No src/ change.
+
+## 2026-08-21 — autopilot run (CI sha 3f83c58)
+- 49 passed / 1 unexpected / 0 flaky / 0 skipped.
+- FAIL: `outdoor-kitchen.spec.js` → "live edit reflects: changing a frozen-priced
+  field moves the total (Goal 4 in-browser)" — total unchanged after BBQ Wall
+  Length 8 → 40. Second consecutive failure of this test after the previous
+  selector hardening.
+- Root-cause ambiguity: the old spec wrapped `click()`/`fill()` in
+  `.catch(() => {})`, so a fill that never landed (wrong/hidden input, detached
+  node) is indistinguishable from a total that genuinely refuses to recompute.
+- Action (e2e only, no src change): re-anchored on the VISIBLE `<label>` +
+  `following::input[1]`, removed the silent catches, added `toHaveValue('8')` /
+  `toHaveValue('40')` assertions plus a blur, and the failure message now dumps
+  the input's outerHTML. Next run is diagnostic: a `toHaveValue` failure = test
+  targeting; a poll failure = real recompute/pricing issue in the module.
