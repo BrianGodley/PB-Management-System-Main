@@ -505,3 +505,13 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
 - CI published: 2026-08-21T03:10:18Z
 - Result: **GREEN** — 22 passed, 0 failed, 0 flaky, 0 skipped (duration 106.1s)
 - Action: none required.
+
+## 2026-08-20 — autopilot run (CI sha f1a0db2) — GREEN
+- `commit.txt` = f1a0db2, `updated_at.txt` = 2026-08-21T03:18:13Z.
+- Artifact verified genuine: `config.metadata.gitCommit.hash` =
+  f1a0db2f8db2d6979fd8e7d2e1d577dfda285713 == commit.txt, `stats.startTime` =
+  2026-08-21T03:15:57Z (matches publish time). Not a stale replay.
+- 36 expected / 0 unexpected / 0 flaky / 0 skipped, 134.9s.
+- Full collection present: auth.setup 1, code-changes 2, estimator 2,
+  fire-pit 9, hand-demo 6, navigation 8, smoke 1, walls 7 = 36.
+- No edits made this run.
