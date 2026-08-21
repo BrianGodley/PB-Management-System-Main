@@ -1771,11 +1771,19 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                           value={row.type || ''}
                           onChange={e => setWallFinishRow(i, 'type', e.target.value)}
                         >
+                          {/* Options are the canonical finishes (WF_META keys), NOT raw
+                              catalog names. masterWallOptions dumped every 'Finish Material'
+                              row — junk (Concrete Truck, *Flatwork) + full '<Type> - Finishes'
+                              names — none of which round-trip to a WF_META key, so every
+                              selectable finish dropped to masterWallMeta and zeroed
+                              material+labor (Fire Pit's default type is empty, so NO finish
+                              priced). Every WF_LIST option maps to WF_META → FP_RATES (shared
+                              '- Finishes' record). Same fix as Outdoor Kitchen. */}
                           {!row.type && <option value="">Select material</option>}
-                          {row.type && !masterWallOptions(WF_CAT, WF_LIST, materialRows, WF_CATEGORY, row.vendor).includes(row.type) && (
+                          {row.type && !WF_LIST.includes(row.type) && (
                             <option value={row.type}>{row.type}</option>
                           )}
-                          {masterWallOptions(WF_CAT, WF_LIST, materialRows, WF_CATEGORY, row.vendor).map(t => (
+                          {WF_LIST.map(t => (
                             <option key={t} value={t}>
                               {t}
                             </option>
