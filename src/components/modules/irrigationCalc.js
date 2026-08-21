@@ -170,6 +170,29 @@ export function calcIrrigation(
 
   const subMarkup = n(state.subGpMarkupRate)
 
+  // ── Unpriced MATERIAL surfacing (In-House only) ─────────────────────────────
+  // Zone BOM lines with no resolvable price (zoneMissing) + any selected timer whose
+  // material resolves to $0. Name-based entries (write back via saveStandardNamedRate).
+  // The Sub tab prices flat per-unit, not off the catalog, so it never flags. NO-FALLBACK.
+  const matUnset = isSub
+    ? []
+    : (() => {
+        const seen = new Set()
+        const out = []
+        const add = (name, label) => {
+          const k = name || label
+          if (!k || seen.has(k)) return
+          seen.add(k)
+          out.push({ name, label: label || name, category: 'Irrigation', unit: null })
+        }
+        zoneMissing.forEach(nm => add(nm, nm))
+        timerCalc.forEach((c, i) => {
+          const row = (state.timerRows || [])[i]
+          if (row && row.type && n(row.qty) > 0 && c.unitPrice <= 0) add(c.t?.matKey, c.t?.label || c.t?.matKey)
+        })
+        return out
+      })()
+
   if (isSub) {
     // Sub tab: flat per-unit material only, NO labor hours. The itemized flat cost
     // (+ any manual Sub Cost) IS the subcontractor cost; profit is the markup.
@@ -201,6 +224,7 @@ export function calcIrrigation(
       trenchRate,
       timerHrs,
       salesTax: tax,
+      matUnset,
     }
   }
 
@@ -246,5 +270,6 @@ export function calcIrrigation(
     trenchRate,
     timerHrs,
     salesTax: tax,
+    matUnset,
   }
 }

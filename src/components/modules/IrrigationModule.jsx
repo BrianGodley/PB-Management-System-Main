@@ -33,6 +33,7 @@ import { useState, useEffect, useCallback, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
+import UnpricedItemModal from '../UnpricedItemModal'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { resolveMaterialPrice, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 import { ZONE_TYPES, zoneMeta, ZONE_OPTIONS, makeBomPrice, zoneMatUnit, computeZoneRow } from '../../lib/irrigationZones'
@@ -245,6 +246,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
     }
   )
   const [pricesLoading, setPricesLoading] = useState(!initialData?.materialPrices)
+  const [matModalItem, setMatModalItem] = useState(null)
   const [gpmd, setGpmd] = useState(initialData?.gpmd ?? null)
   const [commissionRate, setCommissionRate] = useState(initialData?.commissionRate ?? null)
   const [subGpMarkupRate, setSubGpMarkupRate] = useState(initialData?.subGpMarkupRate ?? null)
@@ -543,6 +545,31 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
           Loading current rates…
         </div>
       )}
+
+      {!isSub && calc.matUnset && calc.matUnset.length > 0 && (
+        <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">
+          <span className="font-semibold">Material price needed</span> — these items add $0
+          material until priced. Click one to price it inline:
+          <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
+            {calc.matUnset.map((u, i) => (
+              <button
+                key={u.name || i}
+                type="button"
+                onClick={() => setMatModalItem(u)}
+                className="rounded border border-amber-400 bg-white/70 px-1.5 py-0.5 font-medium text-amber-900 hover:bg-white"
+              >
+                {u.label} ↗
+              </button>
+            ))}
+          </span>
+        </div>
+      )}
+
+      <UnpricedItemModal
+        item={matModalItem}
+        onClose={() => setMatModalItem(null)}
+        onSaved={refreshAllRates}
+      />
 
       {/* Settings — Job Site Conditions is In-House only (hidden on Sub tab) */}
       {!isSub && (

@@ -92,6 +92,31 @@ test('sub tab: flat $/unit only, zero labor hours, cost routed into subCost', ()
   finiteNums(r)
 })
 
+test('material NO-FALLBACK surfacing: unpriced zone BOM + unpriced timer flag in matUnset (In-House)', () => {
+  // Silent-$0 twin of the Lighting fix: a picked zone with no resolvable BOM price and a
+  // selected timer with no material price both add $0 AND must surface in `matUnset` so the
+  // module can prompt (name-based → saveStandardNamedRate write-back).
+  const r = run(
+    { zoneRows: [{ type: 'lawn', qty: 1, mode: 'Trench' }], timerRows: [{ vendor: 'Standard', type: 'timer4', qty: 1 }] },
+    { 'Irrigation - Lawn Trench': 3, 'Irrigation - Timer Install': 1 },
+    {},
+    []
+  )
+  assert.ok((r.matUnset || []).length > 0, `expected matUnset entries; got ${JSON.stringify(r.matUnset)}`)
+  assert.ok(r.matUnset.some(u => u.name === 'Timer - 4 Station'), 'unpriced timer material flagged')
+  assert.ok(r.matUnset.some(u => /PIPE|VALVE|WIRE|NOZZLE/i.test(u.name || '')), 'unpriced zone BOM line flagged')
+})
+
+test('material matUnset is empty on the Sub tab (flat pricing, not catalog-resolved)', () => {
+  const r = run(
+    { subType: 'Subcontractor', zoneRows: [{ type: 'lawn', qty: 1, mode: 'Trench', subEach: 50 }], timerRows: [{ type: 'timer4', qty: 1, subEach: 100 }] },
+    { 'Irrigation - Lawn Trench': 3 },
+    {},
+    []
+  )
+  assert.deepEqual(r.matUnset || [], [], 'Sub tab does not surface material-unpriced prompts')
+})
+
 test('no NaN across a populated estimate (zones + timers + manual)', () => {
   const r = run(
     {

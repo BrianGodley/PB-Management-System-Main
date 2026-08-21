@@ -1,5 +1,16 @@
 # Test results log
 
+## 2026-08-21 — Irrigation: surface unpriced MATERIAL (zones + timers)
+- Closes the silent-$0 material gap in Irrigation (the twin of the Lighting fix). The calc
+  collected `zoneMissing` but never returned it, and timers weren't tracked — so an unpriced
+  zone BOM line or timer added $0 with no prompt. Added `matUnset` to `calcIrrigation`
+  (In-House only; Sub prices flat): unresolved zone BOM names + selected timers whose material
+  resolves to $0, deduped, name-based (write back via `saveStandardNamedRate`). Wired a
+  "Material price needed" banner + `UnpricedItemModal` into `IrrigationModule` (onSaved =
+  refreshAllRates).
+- **Red-first:** wrote the matUnset surfacing test (unpriced zone BOM + timer) — failed
+  (`matUnset` undefined) — then implemented → green. Also a Sub-tab-empty test. Suite **195/195**.
+
 ## 2026-08-21 — Lighting hand-test fixes: per-row Labor Hrs + material NO-FALLBACK surfacing
 - Two defects from Brian's hand-testing, both fixed:
   1. **Per-row "Labor Hrs" blank** while the total priced right — the row cell read the
@@ -1350,3 +1361,13 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
   columns (8), navigation (8), walls (7).
 - No spec edits, no src/, SQL or rate changes this run.
 - `.autopilot-last` -> `b8e8da0`.
+
+## 2026-08-21 — autopilot run (CI `3463215`, published 21:34:23Z)
+
+- **GREEN.** 92 expected / 0 unexpected / 0 flaky / 0 skipped (run start 21:27:29Z,
+  duration 413s). Commit under test: "feat(pool): Water Features estimator section +
+  calc-driven summary breakdown".
+- Three intermediate published runs were skipped over since the last handled SHA
+  (`a5d565e`, `8bac172`, `6b7e51d`) — all three were also 92/0/0/0, so nothing was lost.
+- No spec edits, no src/, SQL or rate changes this run.
+- `.autopilot-last` -> `3463215`.
