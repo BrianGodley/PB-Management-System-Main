@@ -1,5 +1,39 @@
 # Test results log
 
+## 2026-08-21 — Utilities: Layer A+B (the shared TRENCH "King")
+- **Layer A:** extracted inline `calcUtilities` into pure `utilitiesCalc.js` (module
+  imports it). trench.js (pure) imported with `.js`; the catalog helpers +
+  `resolveUtilRow`/`mergedUtilTypes` (whose lib imports supabase) and the built-in type
+  maps (`UTILITY_LINE_TYPES` etc. → `UTIL_CAT`) are inlined, kept in sync.
+  `utilitiesCalc.test.mjs` = **7/7** — and these lock the shared trench math ONCE for
+  every borrower (Fire Pit / OK / Pool): trench value (100 LF × 6" × 24" = 100 CF ×
+  0.1 = 10 hrs → $750), depth-doubles-CF units, edit-reflects, Trench-vs-Hand rate
+  independence, unset-rate → 0 (no fallback), and the shared `laborUnset` fix-it flag on
+  an unresolved line row.
+- **Layer B:** `scripts/utilities-rate-coverage.mjs` (`test:utilities-coverage`) — the 2
+  direct trench King rates + 14 catalog TYPE rows (line/gas/wire/fixture/sewer material +
+  per-item calc_meta labor). No-fallback guard PASS; module + calc parse.
+- **Layer C authored, pending CI:** `e2e/utilities.spec.js` (opens / vendor×item matrix /
+  numeric / In-House↔Sub no-NaN / live-edit / clean). Skips unless a Utilities module is
+  on `TEST_ESTIMATE_URL`.
+
+```
+### Utilities — definition-of-done sign-off (2026-08-21, A+B done; C/D/E pending)
+A. Unit:      value[x] edit[x] unpriced[x] vendor[~] priority[N/A] units[x] aggregator[N/A] sub-indep[~] breakdown[N/A] summary-parity[x] trench-King[x]
+B. Audit:     coverage[x] orphan[~] no-fallback[x] no-hardcoded[x] imports[x]
+C. E2E:       opens[ ] vendor×item[ ] numeric[ ] sub[ ] live-edit[ ] clean[ ]  (authored; runs when a Utilities module is on the test estimate)
+D. DB:        priced[ ] no-dupes[ ] filing[ ]  (Brian's SQL step)
+E. Loop:      red-first[N/A] catalogued[x] logged[x] green[ ]
+N/A items + reason:
+  A.trench-King[x] — the shared lib/trench math (hrs = cf × rate) is now unit-locked here; Fire Pit / OK / Pool import the same fn, so this protects all of them.
+  A.priority — labor rides each item's calc_meta.labor_rate pointer (no numeric-coeff/pointer ladder to A/B-test); unset ⇒ laborUnset, covered.
+  A.aggregator/breakdown — In-House↔Sub toggle, not per-type tabs; no per-tab materials breakdown.
+  A.vendor[~] — vendor override supported via resolveUtilRow→catalog; covered structurally, not a dedicated unit assertion.
+  A.sub-indep[~] — in-browser independence covered by Layer C; a pure IH-vs-Sub value test is a follow-up.
+  A.summary-parity[x] — UtilitiesSummary reads the saved calc snapshot; no separate summary calc to drift.
+  Layer A via utilitiesCalc.test.mjs (7); B via scripts/utilities-rate-coverage.mjs (test:utilities-coverage).
+```
+
 ## 2026-08-21 — FULL E2E SUITE GREEN on CI e3654b3 — 72 pass / 0 fail / 0 skip
 - Pavers `pavers.spec.js` 5/5 (opened by the short 'Paver' row label). No specs skipping
   anymore — every module editor on the estimate is exercised. Layer C now GREEN for all
@@ -1071,3 +1105,12 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
   the 17:33Z run at the same commit is the current published result and is clean.)
 - No spec edits this round.
 - `.autopilot-last` -> e3654b3.
+
+## 2026-08-21 — autopilot — 25a3df5 GREEN (72/72)
+
+- CI run 2026-08-21T17:47Z (published 17:52Z): expected 72, unexpected 0, flaky 0, skipped 0.
+- Commit tested: `25a3df5` (auto(e2e): autopilot test fix).
+- No skips: every meant-to-run spec actually ran, including the Pavers set and the
+  Outdoor Kitchen "live edit reflects" (Goal 4 in-browser) test.
+- No spec edits this round.
+- `.autopilot-last` -> 25a3df5.
