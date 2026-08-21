@@ -61,6 +61,33 @@ test.describe('Columns', () => {
     expect(await page.getByText(UNPRICED).count(), 'Shared finish shows an unpriced/labor-needed banner').toBe(0)
   })
 
+  test('CMU block vendor dropdown lists shared Wall Block vendors (not Standard-only)', async ({ page }, testInfo) => {
+    const ok = await openModule(page, 'Columns')
+    test.skip(!ok, 'Columns editor not reachable on this estimate.')
+    const cmu = page.getByRole('button', { name: /^\s*CMU\s*$/i }).first()
+    if (await cmu.count()) {
+      await cmu.click().catch(() => {})
+      await page.waitForTimeout(250)
+    }
+    // The FIRST vendor picker on the CMU tab is the block row's vendor (blocks render
+    // before finishes). It reads the SHARED 'Wall Block' sub-category, so it must offer
+    // real block vendors (e.g. Angelus) — it regressed to Standard-only when the list
+    // was scoped to the Columns category instead of the Wall Block sub-category.
+    const selects = page.locator('select')
+    const n = await selects.count()
+    let blockVendor = null
+    for (let i = 0; i < n; i++) {
+      const opts = await selects.nth(i).locator('option').allTextContents()
+      if (opts.some(t => /^\s*standard\s*$/i.test(t))) { blockVendor = opts; break }
+    }
+    await testInfo.attach('columns-cmu-vendors.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
+    expect(blockVendor, 'No vendor picker found on the CMU tab').not.toBeNull()
+    expect(
+      blockVendor.length,
+      `CMU block vendor dropdown is Standard-only — shared Wall Block vendors not surfacing: [${blockVendor.join(', ')}]`
+    ).toBeGreaterThan(1)
+  })
+
   test('exhaustive: every vendor × item option, on every tab, computes without NaN/console error', async ({ page }, testInfo) => {
     test.setTimeout(300000)
     const errors = collectErrors(page)
