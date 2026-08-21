@@ -1,7 +1,7 @@
 import WorkTypeChooser from './WorkTypeChooser'
 import CrewTypeBar from './CrewTypeBar'
 import ModuleHeaderSlot from './ModuleHeaderSlot'
-import { computeOkFinishRow } from './okCalc'
+import { computeOkFinishRow, WF_META, WF_LIST } from './okCalc'
 import { useState, useEffect, useCallback, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
@@ -208,20 +208,9 @@ const WF_TYPE_LABEL = {
   flagstone: 'Real Flagstone',
   realStone: 'Real Stone',
 }
-// Wall-finish master list. Each Type resolves a material unit price (OK_RATES
-// key, vendor-overridable) + a labor rate. `unit:'SF'` prices per SF (optional
-// waste / screw / adhesive add-ons); `unit:'ton'` prices per ton (SF÷tonPerSF)
-// with delivery + misc. labMode 'perDay' → hrs=(SF/rate)*8, 'perSF' → hrs=SF*rate.
-const WF_META = {
-  'Sand Stucco': { key: 'sandStucco', labKey: 'sandStuccoLab', unit: 'SF', labMode: 'perDay' },
-  'Smooth Stucco': { key: 'smoothStucco', labKey: 'smoothStuccoLab', unit: 'SF', labMode: 'perDay' },
-  'Ledgerstone Veneer': { key: 'ledgerstone', labKey: 'ledgerstoneLab', unit: 'SF', labMode: 'perDay', waste: 1.1, screwPer5: 2 },
-  'Stacked Stone Veneer': { key: 'stackedStone', labKey: 'stackedStoneLab', unit: 'SF', labMode: 'perDay', waste: 1.1, screwPer5: 2 },
-  Tile: { key: 'tile', labKey: 'tileLab', unit: 'SF', labMode: 'perSF', adhesivePerSF: 1 },
-  'Real Flagstone': { key: 'realFlagstone', labKey: 'flagstoneLab', unit: 'stone', labMode: 'perSF', delivPerSF: 1, misc: 268.75 },
-  'Real Stone': { key: 'realStone', labKey: 'realStoneLab', unit: 'stone', labMode: 'perSF', delivPerSF: 2.5714, addPerSF: 1 },
-}
-const WF_LIST = Object.keys(WF_META)
+// WF_META / WF_LIST (the 7 canonical finishes + their OK_RATES material/labor keys)
+// now live in okCalc.js so the finish-option contract is pure-unit-testable and the
+// TYPE dropdown, the calc, and the tests all share ONE source. Imported above.
 const WF_ROW = () => ({ vendor: 'Standard', type: 'Tile', sf: '' })
 
 // ── Master-list finish support ───────────────────────────────────────────────
@@ -1677,7 +1666,15 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                           value={row.type}
                           onChange={e => setWallFinishRow(i, 'type', e.target.value)}
                         >
-                          {masterWallOptions(WF_CAT, WF_LIST, materialRows, 'Finishes', row.vendor || 'Standard').map(t => (
+                          {/* Options are the canonical finishes (WF_META keys), NOT raw
+                              catalog names. masterWallOptions dumped every 'Finish Material'
+                              row — including junk (Concrete Truck, *Flatwork) and the
+                              '<Type> - Finishes' full names, none of which round-trip to a
+                              WF_META key — so switching off the default 'Tile' dropped the
+                              row to masterWallMeta and zeroed material+labor. Every WF_LIST
+                              option maps to WF_META → OK_RATES (shared '- Finishes' record),
+                              so every selectable finish prices. */}
+                          {WF_LIST.map(t => (
                             <option key={t} value={t}>
                               {t}
                             </option>

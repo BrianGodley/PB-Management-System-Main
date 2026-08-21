@@ -26,3 +26,28 @@ export function computeOkFinishRow(sf0, meta, unit, laborRate) {
   }
   return { mat, hrs: sf * num(laborRate) }
 }
+
+// ── Canonical wall-finish set ────────────────────────────────────────────────
+// The 7 finishes Outdoor Kitchen prices. `key`/`labKey` point at OK_RATES entries
+// (which resolve the shared '<Type> - Finishes' material + labor records). This is
+// the SINGLE source for the finish TYPE dropdown: every option MUST be a key here so
+// it resolves through WF_META → OK_RATES and prices. The dropdown used to be built
+// from raw 'Finish Material' catalog names (incl. junk like Concrete Truck /
+// *Flatwork and the full '<Type> - Finishes' names), none of which round-trip to a
+// WF_META key — so switching off the default zeroed material + labor.
+export const WF_META = {
+  'Sand Stucco': { key: 'sandStucco', labKey: 'sandStuccoLab', unit: 'SF', labMode: 'perDay' },
+  'Smooth Stucco': { key: 'smoothStucco', labKey: 'smoothStuccoLab', unit: 'SF', labMode: 'perDay' },
+  'Ledgerstone Veneer': { key: 'ledgerstone', labKey: 'ledgerstoneLab', unit: 'SF', labMode: 'perDay', waste: 1.1, screwPer5: 2 },
+  'Stacked Stone Veneer': { key: 'stackedStone', labKey: 'stackedStoneLab', unit: 'SF', labMode: 'perDay', waste: 1.1, screwPer5: 2 },
+  Tile: { key: 'tile', labKey: 'tileLab', unit: 'SF', labMode: 'perSF', adhesivePerSF: 1 },
+  'Real Flagstone': { key: 'realFlagstone', labKey: 'flagstoneLab', unit: 'stone', labMode: 'perSF', delivPerSF: 1, misc: 268.75 },
+  'Real Stone': { key: 'realStone', labKey: 'realStoneLab', unit: 'stone', labMode: 'perSF', delivPerSF: 2.5714, addPerSF: 1 },
+}
+export const WF_LIST = Object.keys(WF_META)
+
+// The finish TYPE dropdown option list — ALWAYS the canonical finishes, so every
+// option prices. Kept as a function so the module (and tests) share one source.
+export function okFinishTypeOptions() {
+  return WF_LIST.slice()
+}

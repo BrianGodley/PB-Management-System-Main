@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { computeOkFinishRow } from './okCalc.js'
+import { computeOkFinishRow, WF_META, WF_LIST, okFinishTypeOptions } from './okCalc.js'
 
 const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs ${b}`)
 
@@ -36,6 +36,37 @@ test('unpriced: unit 0, laborRate 0 → mat is adders-only, hrs 0', () => {
   const r = computeOkFinishRow(30, meta, 0, 0)
   near(r.mat, 0, 'no price + no adders → 0')
   near(r.hrs, 0, 'no labor rate → 0 hrs')
+})
+
+// ── Finish-option CONTRACT (the "switching finish zeros out" regression) ──────
+// The TYPE dropdown must only ever offer options that round-trip to a WF_META meta
+// with a material key + labor key — otherwise selecting one drops to masterWallMeta
+// and zeroes material+labor. The bug: the dropdown was built from raw 'Finish
+// Material' catalog names (junk like Concrete Truck / *Flatwork + full '<Type> -
+// Finishes' names), none of which are WF_META keys. These lock the contract.
+test('contract: every finish dropdown option is a WF_META key', () => {
+  for (const opt of okFinishTypeOptions()) {
+    assert.ok(WF_META[opt], `dropdown option "${opt}" is not a WF_META key → would zero out`)
+  }
+})
+
+test('contract: every WF_META finish carries a material key + labor key', () => {
+  for (const type of WF_LIST) {
+    const m = WF_META[type]
+    assert.ok(m && m.key, `${type} missing material key (OK_RATES material lookup)`)
+    assert.ok(m && m.labKey, `${type} missing labKey (OK_RATES labor lookup)`)
+  }
+})
+
+test('contract: every canonical finish prices material + labor at a positive rate', () => {
+  // Feed each finish its shared unit ($/SF or $/stone) + a labor rate; all must
+  // produce BOTH material and hours (proving the option, once selected, prices).
+  for (const type of WF_LIST) {
+    const meta = WF_META[type]
+    const r = computeOkFinishRow(20, meta, 10, 0.3)
+    assert.ok(r.mat > 0, `${type}: material should be > 0 at 20 SF × $10`)
+    assert.ok(r.hrs > 0, `${type}: labor hours should be > 0 at 20 SF × 0.3 hr/SF`)
+  }
 })
 
 // Vendor-override — a different injected unit drives a different total.
