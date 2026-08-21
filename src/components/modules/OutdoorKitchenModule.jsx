@@ -463,6 +463,7 @@ function calcOutdoorKitchen(
     epGasRows,
     epElecRows,
   } = state
+  const p = dbName => n(mp[dbName]) // price lookup — declared before first use (trench block)
 
   // ── Utility Lines / Gas / Electrical Fixtures ───────────────────────────────
   // Utility Lines combine the line's install labor + material PLUS trenching for
@@ -498,7 +499,6 @@ function calcOutdoorKitchen(
     })
   })
 
-  const p = dbName => n(mp[dbName])
   // Wall finish per-row calc: material (vendor-overridable unit) + labor by type.
   const finishRowCalc = row => {
     const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, 'Finishes', row.vendor)
