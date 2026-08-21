@@ -1,5 +1,50 @@
 # Test results log
 
+## 2026-08-21 — Skid Steer + Mini Skid Demo: Layer A+B (calc extraction + coverage)
+- **Layer A:** extracted each module's inline `calcDemo` into pure, DI-testable files
+  — `skidSteerCalc.js` / `miniSkidCalc.js` (mirrors `handDemoCalc.js`); modules now
+  import them (inline copies removed, `n` helper kept). Verbatim lift, logic identical.
+  `skidSteerCalc.test.mjs` + `miniSkidCalc.test.mjs` = **7/7 each** (value / units /
+  edit-reflects / unpriced-no-fallback / sub-value / sub-tree / sub-independence).
+  Note: demos use a MULTIPLY labor model (`hrs = SF/100 × depth × rate`) — higher rate
+  ⇒ MORE hours — opposite of Hand Demo's reworked CF÷rate model; tests assert the
+  actual formula, not Hand's values.
+- **Layer B:** `scripts/skid-steer-rate-coverage.mjs` / `mini-skid-rate-coverage.mjs`
+  (consumed-rate manifest — Skid 65 keys, Mini 61) registered as `test:skid-coverage`
+  / `test:mini-coverage`. No-fallback guard PASS across the new calcs (all `n(lr[...])`
+  / `n(mp[...])`, zero hidden constants). Both modules parse (babel).
+- **Layer C authored, pending CI:** `e2e/skid-steer.spec.js` + `e2e/mini-skid.spec.js`
+  (opens / dropdowns / numeric / In-House↔Sub no-NaN / live-edit / clean). They `skip`
+  unless the estimate has the module — to get a green run, add a Skid Steer Demo and a
+  Mini Skid Steer Demo module to `TEST_ESTIMATE_URL`, then the next CI run exercises them.
+
+```
+### Skid Steer Demo — definition-of-done sign-off (2026-08-21, A+B done; C/D/E pending)
+A. Unit:      value[x] edit[x] unpriced[x] vendor[N/A] priority[N/A] units[x] aggregator[N/A] sub-indep[x] breakdown[N/A] summary-parity[~]
+B. Audit:     coverage[x] orphan[~] no-fallback[x] no-hardcoded[x] imports[x]
+C. E2E:       opens[ ] dropdowns[ ] numeric[ ] sub[ ] live-edit[ ] clean[ ]  (authored; runs when module is on the test estimate)
+D. DB:        priced[ ] no-dupes[ ] filing[ ]  (Brian's SQL step)
+E. Loop:      red-first[N/A] catalogued[x] logged[x] green[ ]
+N/A items + reason:
+  A.vendor/priority — demos have no material vendor catalog and use a single per-item labor rate (no vendor override, no coeff/pointer ladder).
+  A.aggregator/breakdown — In-House↔Sub toggle, not per-type tabs; no per-tab materials breakdown.
+  A.summary-parity[~] — SkidSteerDemoSummary builds via demoSummaryData.js (buildDemoSummary), a SEPARATE path from calcDemo; parity not code-guaranteed — worth a follow-up unit test.
+  B.orphan[~] — coverage manifest lists all consumed keys; the DB orphan check is the SQL step.
+  E.red-first[N/A] — this was a test-scaffolding extraction, not a bug-fix loop.
+  Layer A via skidSteerCalc.test.mjs (7); B via scripts/skid-steer-rate-coverage.mjs (test:skid-coverage).
+```
+
+```
+### Mini Skid Steer Demo — definition-of-done sign-off (2026-08-21, A+B done; C/D/E pending)
+A. Unit:      value[x] edit[x] unpriced[x] vendor[N/A] priority[N/A] units[x] aggregator[N/A] sub-indep[x] breakdown[N/A] summary-parity[~]
+B. Audit:     coverage[x] orphan[~] no-fallback[x] no-hardcoded[x] imports[x]
+C. E2E:       opens[ ] dropdowns[ ] numeric[ ] sub[ ] live-edit[ ] clean[ ]  (authored; runs when module is on the test estimate)
+D. DB:        priced[ ] no-dupes[ ] filing[ ]  (Brian's SQL step)
+E. Loop:      red-first[N/A] catalogued[x] logged[x] green[ ]
+N/A items + reason: same as Skid Steer (shared demo shape).
+  Layer A via miniSkidCalc.test.mjs (7); B via scripts/mini-skid-rate-coverage.mjs (test:mini-coverage).
+```
+
 ## 2026-08-21 — Sign-offs: Columns / Hand Demo / Outdoor Kitchen (finish-picker fix run)
 - CI on `d9baa74` (HEAD): all module specs green — columns 8/8, fire-pit 9/9,
   hand-demo 6/6, outdoor-kitchen 6/6, walls 7/7 (+ infra). Layer A unit + Layer B
@@ -692,3 +737,19 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
   changing a frozen-priced field moves the total", 473bbd7) is resolved by the
   `fillField` helper — the readonly-until-focus guard no longer blocks the edit.
 - No autopilot edits made this run.
+
+## 2026-08-21 — autopilot (CI sha c77dd70, run 14:57Z)
+- 49 passed / 1 failed / 0 flaky / 0 skipped.
+- FAIL: `outdoor-kitchen.spec.js` → "live edit reflects: changing a frozen-priced
+  field moves the total (Goal 4 in-browser)". Spec is already fully hardened (two
+  prior autopilot rounds): the label anchor resolves, `fillField` lands, and both
+  `toHaveValue('8')` / `toHaveValue('40')` PASS — so the input accepted the edit and
+  the page-wide dollar snapshot still did not change within 10s.
+- Not a selector/robustness problem → no e2e edit made this round. Two candidate
+  explanations, and picking one needs Brian:
+  (a) real recompute bug — `bbqLengthLF` (OutdoorKitchenModule.jsx:1189) not feeding
+      the OK calc/summary on live edit; or
+  (b) expected-$0 — the CI estimate's BBQ block material/type picker is empty
+      (pickers start empty, unselected rows = $0), so length x $0 never moves a total,
+      making the spec's premise wrong for that estimate.
+- No src/, SQL, or rate change made. Awaiting decision.
