@@ -389,3 +389,13 @@ Artifact verified genuine: results.json `config.metadata.gitCommit.hash` ==
 commit.txt == aac2b1a, so no stale publish. Full collection unchanged —
 auth.setup 1, code-changes 2, estimator 2, fire-pit 9, hand-demo 6,
 navigation 8, smoke 1, walls 7 = 36. Three consecutive clean, fully-exercised runs.
+
+## 2026-08-20 — autopilot run (CI adbe7b5)
+
+GREEN — 36 passed, 0 failed, 0 flaky, 0 skipped (Playwright CI, startTime
+2026-08-21T01:44:06Z, published 01:46:45Z, duration 157s). No action taken.
+
+Artifact verified genuine: results.json `config.metadata.gitCommit.hash` ==
+commit.txt == adbe7b5, so no stale publish. Full collection unchanged —
+auth.setup 1, code-changes 2, estimator 2, fire-pit 9, hand-demo 6,
+navigation 8, smoke 1, walls 7 = 36. Four consecutive clean, fully-exercised runs.

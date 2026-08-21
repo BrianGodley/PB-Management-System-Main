@@ -54,6 +54,22 @@ export function calcDemo(
   const rateBucket = n(lr['Demo - Hand Bucket'])
   const rateJJ = n(lr['Demo - Hand JJ Compaction'])
   const rebarMinPerSF = n(lr['Demo - Hand Rebar'])
+  // ── CF/hr production model (2026-08-20): hours = Cu Ft ÷ (CF/hr). CF = SF×depth/12
+  //    (flat) or LF×h/12×w/12 (vert). No tonnage. Unset rate → 0 hrs (never NaN). ──
+  const cfHours = (cf, rate) => (rate > 0 ? n(cf) / rate : 0)
+  const cfhrConc = n(lr['Demo - Hand Concrete'])
+  const cfhrSoil = n(lr['Demo - Hand Soil'])
+  const cfhrGrass = n(lr['Demo - Hand Grass'])
+  const cfhrBase = n(lr['Demo - Hand Import Base'])
+  const cfhrBucket = n(lr['Demo - Hand Bucket'])
+  const cfhrMiscFlat = n(lr['Demo - Hand Misc Flat'])
+  const cfhrMiscVert = n(lr['Demo - Hand Misc Vert'])
+  const cfhrFooting = n(lr['Demo - Hand Footing'])
+  const cfhrGradeCut = n(lr['Demo - Hand Grade Cut'])
+  const cfhrGradeFill = n(lr['Demo - Hand Grade Fill'])
+  const sfhrJJ = n(lr['Demo - Hand JJ']) // SF per hour (compaction, area-based)
+  // Rebar toggle: concrete demo hours ×(1 + 25%) when rebar present.
+  const rebarFactor = state.rebar ? 1 + n(lr['Demo - Hand Rebar']) : 1
   const shrubRate = n(lr['Demo - Hand Shrub'])
   const stumpSmallRate = n(lr['Demo - Hand Stump Small'])
   const stumpMedRate = n(lr['Demo - Hand Stump Medium'])
@@ -133,7 +149,7 @@ export function calcDemo(
   const conc = flat(state.concSF, state.concDepth || 4, rateConc, 0)
   const dirt = flat(state.dirtSF, state.dirtDepth || 4, rateConc, 0)
   const base = flat(state.baseSF, state.baseDepth || 4, rateBase, 0)
-  base.hours = importBaseLaborMult * sfLaborHrs(state.baseSF, state.baseDepth || 4, laborBase)
+  base.hours = cfHours(flatCf(state.baseSF, state.baseDepth || 4), cfhrBase)
   const baseRawCy = flatCf(state.baseSF, state.baseDepth || 4) / 27
   const baseMat = Math.ceil(baseRawCy / 10) * baseMatPer10Cy
   const grass = flat(state.grassSF, state.grassDepth || 4, rateGrass, 0)
@@ -141,26 +157,26 @@ export function calcDemo(
   conc.dumpFee = containerCost(state.concSF, state.concDepth || 4)
   dirt.dumpFee = containerCost(state.dirtSF, state.dirtDepth || 4)
   grass.dumpFee = containerCost(state.grassSF, state.grassDepth || 4)
-  // Hand-demo: concrete + soils removal labor is square-foot based (not tons).
-  conc.hours = sfLaborHrs(state.concSF, state.concDepth || 4, laborConc)
-  dirt.hours = sfLaborHrs(state.dirtSF, state.dirtDepth || 4, laborDirt)
-  grass.hours = sfLaborHrs(state.grassSF, state.grassDepth || 4, laborGrass)
+  // Hand-demo removal labor: hours = Cu Ft ÷ (CF/hr). Concrete ×rebarFactor.
+  conc.hours = cfHours(flatCf(state.concSF, state.concDepth || 4), cfhrConc) * rebarFactor
+  dirt.hours = cfHours(flatCf(state.dirtSF, state.dirtDepth || 4), cfhrSoil)
+  grass.hours = cfHours(flatCf(state.grassSF, state.grassDepth || 4), cfhrGrass)
 
   const miscFlatCalc = (state.miscFlatRows || []).map(r => {
     const row = flat(r.sf, r.depth || 4, rateConc, 0)
-    row.hours = sfLaborHrs(r.sf, r.depth || 4, laborMiscFlat)
+    row.hours = cfHours(flatCf(r.sf, r.depth || 4), cfhrMiscFlat)
     row.dumpFee = containerCost(r.sf, r.depth || 4)
     return row
   })
   const miscVertCalc = (state.miscVertRows || []).map(r => {
     const row = vert(r.lf, r.heightIn || 0, r.widthIn || 8, rateConc, 0)
-    row.hours = cfLaborHrs(row.cf, laborMiscVert)
+    row.hours = cfHours(row.cf, cfhrMiscVert)
     row.dumpFee = containerCostCf(row.cf)
     return row
   })
   const footingCalc = (state.footingRows || []).map(r => {
     const row = vert(r.lf, r.heightIn || 0, r.widthIn || 8, rateConc, 0)
-    row.hours = cfLaborHrs(row.cf, laborFooting)
+    row.hours = cfHours(row.cf, cfhrFooting)
     row.dumpFee = containerCostCf(row.cf)
     return row
   })
@@ -168,10 +184,9 @@ export function calcDemo(
   // ── Hand Bucket Areas (confined-access manual work) ───────────────────────
   // Hand Bucket Areas: identical square-foot calc to Concrete demo but at
   // DOUBLE the rate (tight/confined access), and the same container disposal.
-  const laborBucket = laborConc * bucketLaborMult
   const bucketCalc = (state.bucketRows || []).map(r => {
     const row = flat(r.sf, r.depth || 4, rateConc, 0)
-    row.hours = sfLaborHrs(r.sf, r.depth || 4, laborBucket)
+    row.hours = cfHours(flatCf(r.sf, r.depth || 4), cfhrBucket)
     row.dumpFee = containerCost(r.sf, r.depth || 4)
     return row
   })
@@ -179,15 +194,15 @@ export function calcDemo(
   // ── Grading ──────────────────────────────────────────────────────────────
   const gradeCut = flat(state.gradeCutSF, state.gradeCutDepth || 4, rateConc, 0)
   gradeCut.dumpFee = containerCost(state.gradeCutSF, state.gradeCutDepth || 4)
-  gradeCut.hours = sfLaborHrs(state.gradeCutSF, state.gradeCutDepth || 4, laborGradeCut)
+  gradeCut.hours = cfHours(flatCf(state.gradeCutSF, state.gradeCutDepth || 4), cfhrGradeCut)
   const gradeFill = flat(state.gradeFillSF, state.gradeFillDepth || 4, rateBase, 0)
-  gradeFill.hours = sfLaborHrs(state.gradeFillSF, state.gradeFillDepth || 4, laborGradeFill)
+  gradeFill.hours = cfHours(flatCf(state.gradeFillSF, state.gradeFillDepth || 4), cfhrGradeFill)
 
-  const jjHrs = sfLaborHrs(state.jjSF, state.jjDepth || 4, laborJJ)
+  const jjHrs = sfhrJJ > 0 ? n(state.jjSF) / sfhrJJ : 0
 
-  // ── Rebar add-on ─────────────────────────────────────────────────────────
-  // hrs-per-unit: rebar rate is hours per Sq Ft (standardized 2026-08-18, was SF/hr).
-  const rebarHrs = n(state.rebarSF) * rebarSfPerHr
+  // ── Rebar ────────────────────────────────────────────────────────────────
+  // Rebar now multiplies the concrete demo line (rebarFactor above); no separate hrs.
+  const rebarHrs = 0
 
   // ── Vegetation ───────────────────────────────────────────────────────────
   // Shrub demo: per-area rows — qty × shrub rate × shrub-height modifier.
@@ -311,14 +326,14 @@ export function calcDemo(
   const handSubDemo = subDemoCost + miscFlatSubCost
 
   // ── Subcontractor fixed unit pricing: Grading ($/sf), Stump & Tree ($/ea) ──
-  const sgCut = n(sr['Sub Grade - Hand Cut SF'])
-  const sgFill = n(sr['Sub Grade - Hand Fill SF'])
-  const sgJJ = n(sr['Sub Grade - Hand JJ SF'])
-  const sgSheep = n(sr['Sub Grade - Hand Sheepsfoot SF'])
-  const sgRoll = n(sr['Sub Grade - Hand Roll SF'])
+  const sgCut = n(sr['Sub Grade - Hand Cut']) // $/CF
+  const sgFill = n(sr['Sub Grade - Hand Fill']) // $/CF
+  const sgJJ = n(sr['Sub Grade - Hand JJ']) // $/SF
+  const sgSheep = n(sr['Sub Grade - Hand Sheepsfoot']) // $/SF
+  const sgRoll = n(sr['Sub Grade - Hand Roll']) // $/SF
   const subGradingCost =
-    n(state.subGradeCutSF) * sgCut +
-    n(state.subGradeFillSF) * sgFill +
+    flatCf(state.subGradeCutSF, state.subGradeCutDepth || 4) * sgCut +
+    flatCf(state.subGradeFillSF, state.subGradeFillDepth || 4) * sgFill +
     n(state.subJjSF) * sgJJ +
     n(state.sheepsfootSF) * sgSheep +
     n(state.rollCompSF) * sgRoll
@@ -412,6 +427,19 @@ export function calcDemo(
     laborGradeFill,
     laborJJ,
     rebarSfPerHr,
+    // CF/hr production rates (new model) — surfaced for View Rates rows.
+    cfhrConc,
+    cfhrSoil,
+    cfhrGrass,
+    cfhrBase,
+    cfhrBucket,
+    cfhrMiscFlat,
+    cfhrMiscVert,
+    cfhrFooting,
+    cfhrGradeCut,
+    cfhrGradeFill,
+    sfhrJJ,
+    rebarFactor,
     baseMat,
     difficultyRatio,
     haulSecPerFt,
@@ -452,7 +480,6 @@ export function calcDemo(
     rateGrass,
     rateBase,
     rateBucket,
-    laborBucket,
     rateJJ,
     rebarMinPerSF,
     shrubRate,

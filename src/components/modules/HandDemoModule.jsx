@@ -58,7 +58,8 @@ const DEFAULT_STATE = {
   baseDepth: 4,
   grassSF: '',
   grassDepth: 4,
-  // Rebar add-on
+  // Rebar: Yes/No toggle — concrete demo +25% when true.
+  rebar: false,
   rebarSF: '',
   // Misc flat (SF + Depth)
   miscFlatRows: Array(3)
@@ -105,7 +106,9 @@ const DEFAULT_STATE = {
   subDemoSF: '',
   // Sub tab has its OWN grading fields — independent of In-House.
   subGradeCutSF: '',
+  subGradeCutDepth: '',
   subGradeFillSF: '',
+  subGradeFillDepth: '',
   subJjSF: '',
   subDemoDepth: 7,
   treeRows: [
@@ -634,22 +637,22 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 4,
                 row: calc.conc,
                 fee: dumpConc,
-                rate: calc.laborConc,
-                rateName: 'Demo - Hand - Concrete SF',
-                rateNote: `${calc.laborConc} hr/100 Sq Ft per in deep`,
-                rateUnit: 'hr/100 Sq Ft per in deep',
+                rate: calc.cfhrConc,
+                rateName: 'Demo - Hand Concrete',
+                rateNote: `${calc.cfhrConc} Cu Ft/hr${calc.rebarFactor > 1 ? ' ×rebar' : ''}`,
+                rateUnit: 'Cu Ft per Hour',
               },
               {
-                label: 'Dirt/Rock',
+                label: 'Soil',
                 sfK: 'dirtSF',
                 dK: 'dirtDepth',
                 dep: 4,
                 row: calc.dirt,
                 fee: dumpDirt,
-                rate: calc.laborDirt,
-                rateName: 'Demo - Hand - Dirt SF',
-                rateNote: `${calc.laborDirt} hr/100 Sq Ft per in deep`,
-                rateUnit: 'hr/100 Sq Ft per in deep',
+                rate: calc.cfhrSoil,
+                rateName: 'Demo - Hand Soil',
+                rateNote: `${calc.cfhrSoil} Cu Ft/hr`,
+                rateUnit: 'Cu Ft per Hour',
               },
               {
                 label: 'Grass/Sod',
@@ -658,10 +661,10 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 4,
                 row: calc.grass,
                 fee: dumpGreen,
-                rate: calc.laborGrass,
-                rateName: 'Demo - Hand - Grass SF',
-                rateNote: `${calc.laborGrass} hr/100 Sq Ft per in deep`,
-                rateUnit: 'hr/100 Sq Ft per in deep',
+                rate: calc.cfhrGrass,
+                rateName: 'Demo - Hand Grass',
+                rateNote: `${calc.cfhrGrass} Cu Ft/hr`,
+                rateUnit: 'Cu Ft per Hour',
               },
               {
                 label: 'Grade Cut',
@@ -670,10 +673,10 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 4,
                 row: calc.gradeCut,
                 fee: 0,
-                rate: calc.laborGradeCut,
-                rateName: 'Demo - Hand - Grade Cut SF',
-                rateNote: `${calc.laborGradeCut} hr/100 Sq Ft per in deep`,
-                rateUnit: 'hr/100 Sq Ft per in deep',
+                rate: calc.cfhrGradeCut,
+                rateName: 'Demo - Hand Grade Cut',
+                rateNote: `${calc.cfhrGradeCut} Cu Ft/hr`,
+                rateUnit: 'Cu Ft per Hour',
               },
             ].map(({ label, sfK, dK, dep, row, rate, rateName, rateNote, rateUnit, extraIcon }) => (
               <tr key={label}>
@@ -719,22 +722,18 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
 
         {isSelf && (
         <div className="mt-3 flex items-center gap-3">
-          <div className="flex-1 max-w-xs">
-            <p className="text-xs text-gray-500 mb-0.5 inline-flex items-center gap-1">
-              Rebar SF
-              <span className="text-gray-400 font-normal">
-                (1 hr per {calc.rebarSfPerHr} Sq Ft)
-              </span>
-            </p>
-            <Inp
-              value={state.rebarSF}
-              onChange={e => set('rebarSF', e.target.value)}
-              placeholder="0"
+          <label className="inline-flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!state.rebar}
+              onChange={e => set('rebar', e.target.checked)}
+              className="h-4 w-4"
             />
-          </div>
-          {calc.rebarHrs > 0 && (
-            <p className="text-xs text-gray-500 mt-4">+{calc.rebarHrs.toFixed(2)} hrs rebar</p>
-          )}
+            <span className="font-medium">Rebar in concrete</span>
+            <span className="text-gray-400 font-normal">
+              (concrete demo +{Math.round((calc.rebarFactor - 1) * 100) || 25}% slower)
+            </span>
+          </label>
         </div>
         )}
       </div>
@@ -764,7 +763,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 4,
                 tons: calc.base.cy,
                 hrs: calc.base.hours,
-                note: `½ × ${calc.laborBase} hr/100 Sq Ft per in deep`,
+                note: `${calc.cfhrBase} Cu Ft/hr`,
               },
               {
                 label: 'Grade Fill',
@@ -773,7 +772,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 4,
                 tons: calc.gradeFill.cy,
                 hrs: calc.gradeFill.hours,
-                note: `${calc.laborGradeFill} hr/100 Sq Ft per in deep`,
+                note: `${calc.cfhrGradeFill} Cu Ft/hr`,
               },
             ].map(({ label, sfK, dK, dep, tons, hrs, note }) => (
               <tr key={label}>
@@ -827,10 +826,10 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 4,
                 tons: 0,
                 hrs: calc.jjHrs,
-                note: `${calc.laborJJ} hr/100 Sq Ft per in deep`,
-                rate: calc.laborJJ,
-                rateName: 'Demo - Hand - JJ SF',
-                rateUnit: 'hr/100 Sq Ft per in deep',
+                note: `${calc.sfhrJJ} Sq Ft/hr`,
+                rate: calc.sfhrJJ,
+                rateName: 'Demo - Hand JJ',
+                rateUnit: 'Sq Ft per Hour',
               },
             ].map(({ label, sfK, dK, dep, tons, hrs, note, rate, rateName, rateUnit }) => (
               <tr key={label}>
@@ -868,30 +867,42 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
               cols={[
                 { label: '', w: 'w-48' },
                 { label: 'SF', w: 'w-24' },
+                { label: 'Depth (in)', w: 'w-20' },
                 { label: 'Cost', w: 'w-24' },
               ]}
             />
             <tbody className="divide-y divide-gray-50">
               {[
-                { label: 'Grade Cut', key: 'subGradeCutSF', rate: calc.sgCut, rateName: 'Sub Grade - Hand Cut SF' },
-                { label: 'Grade Fill', key: 'subGradeFillSF', rate: calc.sgFill, rateName: 'Sub Grade - Hand Fill SF' },
-                { label: 'Jumping Jack', key: 'subJjSF', rate: calc.sgJJ, rateName: 'Sub Grade - Hand JJ SF' },
-                { label: 'Sheepsfoot Compactor', key: 'sheepsfootSF', rate: calc.sgSheep, rateName: 'Sub Grade - Hand Sheepsfoot SF' },
-                { label: 'Roll Compactor', key: 'rollCompSF', rate: calc.sgRoll, rateName: 'Sub Grade - Hand Roll SF' },
-              ].map(({ label, key, rate, rateName }) => (
+                { label: 'Grade Cut', key: 'subGradeCutSF', depthKey: 'subGradeCutDepth', rate: calc.sgCut, rateName: 'Sub Grade - Hand Cut', perCf: true },
+                { label: 'Grade Fill', key: 'subGradeFillSF', depthKey: 'subGradeFillDepth', rate: calc.sgFill, rateName: 'Sub Grade - Hand Fill', perCf: true },
+                { label: 'Jumping Jack', key: 'subJjSF', rate: calc.sgJJ, rateName: 'Sub Grade - Hand JJ' },
+                { label: 'Sheepsfoot Compactor', key: 'sheepsfootSF', rate: calc.sgSheep, rateName: 'Sub Grade - Hand Sheepsfoot' },
+                { label: 'Roll Compactor', key: 'rollCompSF', rate: calc.sgRoll, rateName: 'Sub Grade - Hand Roll' },
+              ].map(({ label, key, depthKey, rate, perCf }) => {
+                const cf = perCf ? n(state[key]) * (n(state[depthKey] || 4) / 12) : 0
+                const cost = perCf ? cf * rate : n(state[key]) * rate
+                return (
                 <tr key={key}>
                   <td className={`${td} font-medium text-gray-700`}>
                     <span className="inline-flex items-center gap-1">
                       {label}
-                      <span className="text-gray-400 font-normal">(${rate} per Sq Ft)</span>
+                      <span className="text-gray-400 font-normal">(${rate} per {perCf ? 'Cu Ft' : 'Sq Ft'})</span>
                     </span>
                   </td>
                   <td className={td}>
                     <Inp value={state[key]} onChange={e => set(key, e.target.value)} />
                   </td>
-                  <td className={num}>{n(state[key]) > 0 ? fmt2(n(state[key]) * rate) : '—'}</td>
+                  <td className={td}>
+                    {perCf ? (
+                      <Inp value={state[depthKey]} onChange={e => set(depthKey, e.target.value)} placeholder="4" />
+                    ) : (
+                      <span className="text-gray-300">—</span>
+                    )}
+                  </td>
+                  <td className={num}>{cost > 0 ? fmt2(cost) : '—'}</td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
           <p className="text-xs text-gray-500 mt-1 italic">

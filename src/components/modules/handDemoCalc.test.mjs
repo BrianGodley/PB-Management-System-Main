@@ -1,34 +1,29 @@
-// Acceptance tests for the extracted Hand Demo calc (handDemoCalc.js). Locks:
-//   • the extraction is faithful — a representative estimate computes a finite price
-//     with NO NaN/Infinity anywhere in the result,
-//   • rate edits flow through (View Rates → estimate),
-//   • In-House and Subcontractor are independent calculators (each responds only to
-//     its own inputs).
+// Acceptance tests for the Hand Demo CF/hr model (reworked 2026-08-20):
+//   hours = Cu Ft ÷ (CF/hr), CF = SF × depth ÷ 12; no tonnage; rebar toggle ×1.25 on
+//   concrete; sub grading Cut/Fill priced per CF (with depth); In-House/Sub independent.
 // Pure calc, no network. Run: node --test src/components/modules/handDemoCalc.test.mjs
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { calcDemo } from './handDemoCalc.js'
 
-// Every Demo labor/misc coefficient the calc reads → a nonzero value (avoids
-// div-by-zero and lets each line produce hours). Denominators stay > 0.
-const RATE_KEYS = [
-  'Demo - Hand - Concrete SF', 'Demo - Hand - Dirt SF', 'Demo - Hand - Footing SF',
-  'Demo - Hand - Grade Cut SF', 'Demo - Hand - Grade Fill SF', 'Demo - Hand - Grass SF',
-  'Demo - Hand - Import Base SF', 'Demo - Hand - JJ SF', 'Demo - Hand - Misc Flat SF',
-  'Demo - Hand - Misc Vert SF', 'Demo - Hand Bucket Labor Mult', 'Demo - Hand Bucket',
-  'Demo - Hand Concrete Weight lb/cf', 'Demo - Hand Concrete/Dirt', 'Demo - Hand Difficulty Ratio',
-  'Demo - Hand Grass', 'Demo - Hand Haul Sec/Ft', 'Demo - Hand Import Base Labor Mult',
-  'Demo - Hand Import Base', 'Demo - Hand JJ Compaction', 'Demo - Hand Load (CY)',
-  'Demo - Hand Rebar Install', 'Demo - Hand Rebar', 'Demo - Hand Shrub',
-  'Demo - Hand Stump Large', 'Demo - Hand Stump Medium', 'Demo - Hand Stump Small',
-  'Demo - Hand Stump XL', 'Demo - Hand Tons SF-in Denominator', 'Demo - Hand Tree CY Factor',
-  'Demo - Hand Tree Large', 'Demo - Hand Tree Medium', 'Demo - Hand Tree Small',
-]
-const fullRates = (over = {}) => ({ ...Object.fromEntries(RATE_KEYS.map(k => [k, 1])), ...over })
-
-// Demo MATERIAL prices. Container Capacity is a divisor in the container-count math,
-// so it must be priced (> 0) — as it always is in prod. (An unset capacity making the
-// calc emit NaN is a known fragility, logged as a follow-up.)
+// CF/hr production rates (In-House labor) + JJ (SF/hr) + rebar factor.
+const fullRates = (over = {}) => ({
+  'Demo - Hand Concrete': 15,
+  'Demo - Hand Soil': 10,
+  'Demo - Hand Grass': 12,
+  'Demo - Hand Import Base': 40,
+  'Demo - Hand Bucket': 8,
+  'Demo - Hand Misc Flat': 10,
+  'Demo - Hand Misc Vert': 10,
+  'Demo - Hand Footing': 10,
+  'Demo - Hand Grade Cut': 8,
+  'Demo - Hand Grade Fill': 40,
+  'Demo - Hand JJ': 50, // SF/hr
+  'Demo - Hand Rebar': 0.25, // +25% concrete when rebar toggle on
+  'Demo - Hand Load (CY)': 1,
+  'Demo - Hand Difficulty Ratio': 1,
+  ...over,
+})
 const fullMat = (over = {}) => ({
   'Demo - Hand Container (Low-Boy)': 500,
   'Demo - Hand Container Capacity (CY)': 12,
@@ -36,64 +31,85 @@ const fullMat = (over = {}) => ({
   'Demo - Hand Import Base $/10cy': 300,
   ...over,
 })
-
-// Subcontractor rates (subcontractor_rates, category Demo) — the Sub tab's pricing.
 const fullSub = (over = {}) => ({
-  'Sub Grade - Hand Cut SF': 2,
-  'Sub Grade - Hand Fill SF': 2,
-  'Sub Grade - Hand JJ SF': 1,
-  'Sub Tree - Hand 6-12': 100,
-  'Sub Tree - Hand 12-18': 200,
+  'Sub Grade - Hand Cut': 1.75, // $/CF
+  'Sub Grade - Hand Fill': 1.5, // $/CF
+  'Sub Grade - Hand JJ': 1, // $/SF
+  'Sub Grade - Hand Roll': 4, // $/SF
+  'Sub Grade - Hand Sheepsfoot': 5, // $/SF
+  'Sub Tree - Hand 6-12': 350,
+  'Sub Tree - Hand 12-18': 1200,
+  'Sub Tree - Hand 18-24': 2800,
+  'Demo - Hand Sub Haul CY - Concrete': 80,
+  'Demo - Hand Sub Haul CY - Dirt': 80,
+  'Demo - Hand Sub Haul CY - Grass': 67,
+  'Demo - Hand Sub Haul - Trash 12yd': 850,
   ...over,
 })
-
-// calcDemo(state, laborRatePerHour, materialPrices, laborRates, subMarkupRate,
-//          subRates, gpmd, walkAccess, laborBurdenPct, commissionRate)
+const LRPH = 75
 const run = (state, lr = fullRates(), mp = fullMat(), sr = fullSub()) =>
-  calcDemo(state, 75, mp, lr, 0.35, sr, 500, null, 0.3, 0.05)
+  calcDemo({ difficulty: 0, distanceLF: 0, ...state }, LRPH, mp, lr, 0.35, sr, 500, null, 0.3, 0.05)
 
 const finiteNums = obj => {
   for (const [k, v] of Object.entries(obj)) {
-    if (typeof v === 'number') assert.ok(Number.isFinite(v), `${k} is not finite: ${v}`)
+    if (typeof v === 'number') assert.ok(Number.isFinite(v), `${k} not finite: ${v}`)
   }
 }
 
-test('extraction is faithful: a concrete-demo estimate computes a finite price, no NaN', () => {
-  const r = run({ dumpType: 'In House', concSF: 100, concDepth: 4 })
-  assert.ok(Number.isFinite(r.price), `price should be finite, got ${r.price}`)
-  assert.ok(r.price > 0, `price should be > 0, got ${r.price}`)
-  finiteNums(r) // no NaN/Infinity anywhere in the numeric outputs
+test('concrete demo: hours = CF ÷ 15 (300 SF × 12in = 300 CF → 20 hrs)', () => {
+  // Only concrete; distance 0 so no walk hours; difficulty 0 so diff = 1.
+  const r = run({ dumpType: 'In House', concSF: 300, concDepth: 12 })
+  assert.equal(r.laborCost, 20 * LRPH, `20 hrs × $${LRPH} = ${20 * LRPH}, got ${r.laborCost}`)
+  finiteNums(r)
 })
 
-test('unset container PRICE (capacity still set) → dump cost 0, finite (no NaN)', () => {
-  // With capacity priced but the container price unset, the container cost resolves
-  // to 0 — never a fallback and never NaN.
-  const mp = fullMat({ 'Demo - Hand Container (Low-Boy)': 0 })
-  const r = run({ dumpType: 'In House', concSF: 100, concDepth: 4 }, fullRates(), mp)
-  assert.ok(Number.isFinite(r.totalMat), `totalMat finite, got ${r.totalMat}`)
+test('rebar toggle adds 25% to concrete hours', () => {
+  const base = run({ dumpType: 'In House', concSF: 300, concDepth: 12 })
+  const withRebar = run({ dumpType: 'In House', concSF: 300, concDepth: 12, rebar: true })
+  assert.equal(withRebar.laborCost, base.laborCost * 1.25, 'rebar → concrete ×1.25')
 })
 
-test('View Rates edit reflects: raising the concrete labor rate raises the price', () => {
-  const state = { dumpType: 'In House', concSF: 100, concDepth: 4 }
-  const before = run(state, fullRates({ 'Demo - Hand - Concrete SF': 1 }))
-  const after = run(state, fullRates({ 'Demo - Hand - Concrete SF': 2 }))
-  assert.ok(after.laborConc > before.laborConc, 'laborConc should rise with the rate')
-  assert.ok(after.price > before.price, `price should rise; ${before.price} -> ${after.price}`)
+test('soil demo uses its own CF/hr (200 CF ÷ 10 = 20 hrs)', () => {
+  const r = run({ dumpType: 'In House', dirtSF: 200, dirtDepth: 12 })
+  assert.equal(r.laborCost, 20 * LRPH)
 })
 
-test('In-House responds to its own input (concSF)', () => {
-  const a = run({ dumpType: 'In House', concSF: 100, concDepth: 4 })
-  const b = run({ dumpType: 'In House', concSF: 200, concDepth: 4 })
-  assert.ok(b.price > a.price, 'more concrete SF → higher In-House price')
+test('grade fill uses 40 CF/hr, grade cut uses 8 CF/hr (distinct rates)', () => {
+  const cut = run({ dumpType: 'In House', gradeCutSF: 80, gradeCutDepth: 12 }) // 80 CF ÷ 8 = 10 hrs
+  const fill = run({ dumpType: 'In House', gradeFillSF: 80, gradeFillDepth: 12 }) // 80 CF ÷ 40 = 2 hrs
+  assert.equal(cut.laborCost, 10 * LRPH)
+  assert.equal(fill.laborCost, 2 * LRPH)
 })
 
-test('Subcontractor is independent: responds to its own sub inputs, not In-House concSF', () => {
-  const subBase = { dumpType: 'Subcontractor', subGradeCutSF: 100 }
-  const a = run(subBase)
-  const b = run({ ...subBase, subGradeCutSF: 200 })
-  assert.ok(b.subGradingCost > a.subGradingCost, 'sub grading cost tracks sub input')
-  assert.ok(b.price > a.price, 'Sub price tracks its own inputs')
-  // In-House concSF must NOT change the Subcontractor price path.
-  const c = run({ ...subBase, concSF: 5000, concDepth: 4 })
-  assert.equal(c.subGradingCost, a.subGradingCost, 'In-House concSF must not affect sub grading')
+test('View Rates edit reflects: raising the concrete CF/hr LOWERS hours (faster)', () => {
+  const slow = run({ dumpType: 'In House', concSF: 300, concDepth: 12 }, fullRates({ 'Demo - Hand Concrete': 15 }))
+  const fast = run({ dumpType: 'In House', concSF: 300, concDepth: 12 }, fullRates({ 'Demo - Hand Concrete': 30 }))
+  assert.ok(fast.laborCost < slow.laborCost, 'higher CF/hr → fewer hours → lower labor')
+})
+
+test('sub grading Cut is priced per CF with depth (100 SF × 12in × $1.75 = $175)', () => {
+  const r = run({ dumpType: 'Subcontractor', subGradeCutSF: 100, subGradeCutDepth: 12 })
+  assert.equal(r.subGradingCost, 175, `got ${r.subGradingCost}`)
+})
+
+test('sub compaction stays per SF (Roll 50 SF × $4 = $200)', () => {
+  const r = run({ dumpType: 'Subcontractor', rollCompSF: 50 })
+  assert.equal(r.subGradingCost, 200, `got ${r.subGradingCost}`)
+})
+
+test('sub tree priced per each by diameter (2× 18-24 @ $2800 = $5600)', () => {
+  const r = run({ dumpType: 'Subcontractor', subTreeRows: [{ qty: 2, size: '18" - 24"' }] })
+  assert.equal(r.subTreeCost, 5600, `got ${r.subTreeCost}`)
+})
+
+test('In-House and Subcontractor are independent (each responds to its own inputs)', () => {
+  const ih = run({ dumpType: 'In House', concSF: 300, concDepth: 12 })
+  const ihMore = run({ dumpType: 'In House', concSF: 600, concDepth: 12 })
+  assert.ok(ihMore.laborCost > ih.laborCost, 'In-House tracks concSF')
+  const sub = run({ dumpType: 'Subcontractor', subGradeCutSF: 100, subGradeCutDepth: 12 })
+  const subMore = run({ dumpType: 'Subcontractor', subGradeCutSF: 200, subGradeCutDepth: 12 })
+  assert.ok(subMore.subGradingCost > sub.subGradingCost, 'Sub tracks its own grade input')
+  // In-House concSF must not change sub grading.
+  const subWithConc = run({ dumpType: 'Subcontractor', subGradeCutSF: 100, subGradeCutDepth: 12, concSF: 9999, concDepth: 12 })
+  assert.equal(subWithConc.subGradingCost, sub.subGradingCost)
 })

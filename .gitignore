@@ -53,3 +53,11 @@ Rate Reader Consolidation*.md
 /android/app/src/main/assets/public/
 /android/capacitor-cordova-android-plugins/
 .fuse_hidden*
+
+# Playwright e2e
+e2e/.auth/
+playwright-report/
+test-results/
+
+# Fire Pit orphan-rate check input (pasted query output)
+scripts/firepit-surfaced-rates.txt
