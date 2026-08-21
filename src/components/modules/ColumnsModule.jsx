@@ -21,51 +21,51 @@ import { groutCyPerBlock } from '../../lib/cmuGrout'
 // LABOR fallbacks (allowed) or catalog-material fallbacks Brian OK'd (CMU block,
 // grout concrete, rebar). New material lines (modular block, brick, mix, forms,
 // mortar) resolve ONLY from the catalog — no hardcoded $ fallback.
-// laborDbName repointed to the SHARED finish labor rates (category 'Finishes'), so
-// Columns reads the same one-per-finish labor as Walls / Fire Pit / Outdoor Kitchen.
-// Set once in Master Rates → flows everywhere. Material (dbName) + Sub (subDbName)
-// stay Columns-specific — only LABOR is shared. Retired the '- Labor Rate'/'Veneer'/
-// '- Columns - Labor Rate' finish copies.
+// SHARED finish source — material dbName AND laborDbName both point at the Finishes
+// module's own records (material '<Type> - Finishes' under category 'Finishes' /
+// sub 'Finish Material'; labor '<Type> - Finishes Labor Rate'). One product + one
+// price + one labor rate drives Finishes, Fire Pit, Walls, Outdoor Kitchen, Columns.
+// Set it in Master Rates → flows everywhere. Sub (subDbName) stays Columns-specific.
 const FINISH_TYPES = {
   'Sand Stucco': {
     unit: 'SF',
-    dbName: 'Sand Stucco',
+    dbName: 'Sand Stucco - Finishes',
     laborDbName: 'Sand Stucco - Finishes Labor Rate',
     subDbName: 'Sand Stucco - Sub SF',
   },
   'Smooth Stucco': {
     unit: 'SF',
-    dbName: 'Smooth Stucco',
+    dbName: 'Smooth Stucco - Finishes',
     laborDbName: 'Smooth Stucco - Finishes Labor Rate',
     subDbName: 'Smooth Stucco - Sub SF',
   },
   'Ledgerstone Veneer Panels': {
     unit: 'SF',
-    dbName: 'Ledgerstone Veneer Panels',
+    dbName: 'Ledgerstone - Finishes',
     laborDbName: 'Ledgerstone - Finishes Labor Rate',
     subDbName: 'Ledgerstone Veneer Panels - Sub SF',
   },
   'Stacked Stone Veneer': {
     unit: 'SF',
-    dbName: 'Stacked Stone Veneer',
+    dbName: 'Stacked Stone - Finishes',
     laborDbName: 'Stacked Stone - Finishes Labor Rate',
     subDbName: 'Stacked Stone Veneer - Sub SF',
   },
   Tile: {
     unit: 'SF',
-    dbName: 'Tile - Columns',
+    dbName: 'Tile - Finishes',
     laborDbName: 'Tile - Finishes Labor Rate',
     subDbName: 'Tile - Columns - Sub SF',
   },
   'Real Flagstone, Flat': {
     unit: 'ton',
-    dbName: 'Real Flagstone Flat',
+    dbName: 'Real Flagstone - Finishes',
     laborDbName: 'Real Flagstone - Finishes Labor Rate',
     subDbName: 'Real Flagstone Flat - Sub SF',
   },
   'Real Stone': {
     unit: 'ton',
-    dbName: 'Real Stone - Columns',
+    dbName: 'Real Stone - Finishes',
     laborDbName: 'Real Stone - Finishes Labor Rate',
     subDbName: 'Real Stone - Columns - Sub SF',
   },
@@ -143,24 +143,30 @@ const colMatPrice = resolveMaterialPrice
 const COLUMN_FINISH_SUBCAT = 'Column Finish'
 function columnFinishOptions(materialRows, vendorSel = 'Standard') {
   const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
-  const catRows = catalogOptions(materialRows, COLUMN_FINISH_SUBCAT, isStd ? 'Standard' : vendorSel, {
+  // SHARED source: read the Finishes module's own records (category 'Finishes',
+  // sub 'Finish Material', named '<Type> - Finishes'), not a Columns-specific list.
+  const catRows = catalogOptions(materialRows, 'Finish Material', isStd ? 'Standard' : vendorSel, {
     standardRows: 'null-vendor',
     stripPrefix: true,
-    category: COLUMNS_CATEGORY,
+    category: 'Finishes',
   })
   if (!catRows.length) return []
-  return catRows.map(o => {
-    const typeKey = Object.keys(FINISH_TYPES).find(
-      k => FINISH_TYPES[k].dbName === o.row.name || k === o.label
-    )
-    return {
-      value: typeKey || o.row.name,
-      label: o.label,
-      typeKey,
-      dbName: o.row.name,
-      fromMaster: !typeKey,
-    }
-  })
+  return catRows
+    .map(o => {
+      const typeKey = Object.keys(FINISH_TYPES).find(
+        k => FINISH_TYPES[k].dbName === o.row.name || k === o.label
+      )
+      return {
+        value: typeKey || o.row.name,
+        label: o.label,
+        typeKey,
+        dbName: o.row.name,
+        fromMaster: !typeKey,
+      }
+    })
+    // The shared 'Finish Material' sub also holds flatwork/cap records; Columns only
+    // offers the 7 wall finishes, so keep only rows that map to a FINISH_TYPES key.
+    .filter(o => o.typeKey)
 }
 
 // ── Column geometry ───────────────────────────────────────────────────────────

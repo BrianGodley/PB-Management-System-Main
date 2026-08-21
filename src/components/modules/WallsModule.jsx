@@ -133,13 +133,16 @@ const WALL_RATES = {
   handGroutLab: { db: 'Wall Hand Grout Labor Rate' },
   pumpGroutLab: { db: 'Wall Pump Grout Labor Rate' },
   setupCleanLab: { db: 'Wall Setup Clean Labor Rate' },
-  sandStucco: { db: 'Sand Stucco' },
-  smoothStucco: { db: 'Smooth Stucco' },
-  ledgerstone: { db: 'Ledgerstone' },
-  stackedStone: { db: 'Stacked Stone' },
-  tile: { db: 'Tile' },
-  flagstone: { db: 'Real Flagstone' },
-  realStone: { db: 'Real Stone' },
+  // SHARED finish material — the Finishes module's own '<Type> - Finishes' records.
+  // Drives the View Rates display/edit so it matches the estimate (which reads the
+  // same records via catalogItemPrice on sub 'Finish Material'). Edit once → flows.
+  sandStucco: { db: 'Sand Stucco - Finishes' },
+  smoothStucco: { db: 'Smooth Stucco - Finishes' },
+  ledgerstone: { db: 'Ledgerstone - Finishes' },
+  stackedStone: { db: 'Stacked Stone - Finishes' },
+  tile: { db: 'Tile - Finishes' },
+  flagstone: { db: 'Real Flagstone - Finishes' },
+  realStone: { db: 'Real Stone - Finishes' },
   // SHARED finish labor — one canonical rate per finish (category 'Finishes'),
   // read by Walls, Fire Pit, Outdoor Kitchen, Columns. Set it once in Master Rates
   // and it flows to every module. (Retired the per-module '- Wall Labor Rate' copies.)
@@ -475,7 +478,7 @@ const WALL_RATE_SPECS = [
   },
   {
     group: 'Finishes (all wall types)',
-    catalogSubcat: 'Wall Finish', // append per-vendor Wall Finish catalog products
+    catalogSubcat: 'Finish Material', // append per-vendor SHARED finish catalog products
     items: [
       ['sandStucco', 'Sand Stucco', 'Walls', 'SF', 'currency'],
       ['smoothStucco', 'Smooth Stucco', 'Walls', 'SF', 'currency'],
@@ -707,7 +710,10 @@ function computeWallFinishRow(row, mp, materialRows) {
   // Math lives in the pure, unit-tested wallsCalc.js; here we resolve the labor
   // coefficients (WALL_RATES keys) and the vendor/catalog material $/unit.
   const lab = k => n(mp?.[WALL_RATES[k].db])
-  const catP = catalogItemPrice(materialRows, WALL_FINISH_SUBCAT, row.type, row.vendor, 0)
+  // SHARED finish material: read the Finishes module's own record ('<Type> - Finishes'
+  // under sub 'Finish Material'). row.type stays the short label (the wallsCalc switch
+  // matches on it); we only map to the shared record name for the price lookup.
+  const catP = catalogItemPrice(materialRows, 'Finish Material', `${row.type} - Finishes`, row.vendor, 0)
   return _finishRow(row, { lab, catP })
 }
 
@@ -1983,7 +1989,12 @@ function WallFinishesEditor({
           // Standard. No built-in WALL_FINISH_TYPES seed. Stale saved values not
           // in the catalog are dropped (except the currently-saved one, kept below
           // for backward-compat).
-          const shown = wallCatalogTypes(materialRows, WALL_FINISH_SUBCAT, row.vendor)
+          // SHARED source: the Finishes module's own wall-finish records
+          // ('<Type> - Finishes', sub 'Finish Material'), stripped to the short label
+          // the wallsCalc switch expects, limited to the 7 wall finishes.
+          const shown = wallCatalogTypes(materialRows, 'Finish Material', row.vendor)
+            .map(t => t.replace(/ - Finishes$/, ''))
+            .filter(t => WALL_FINISH_META[t])
           return (
             <div key={i} className="flex items-center gap-1.5">
               <DropdownSelect
@@ -1991,9 +2002,9 @@ function WallFinishesEditor({
                 value={row.vendor || 'Standard'}
                 onChange={v => {
                   onPatch(i, { vendor: v }, true)
-                  pp.check(materialRows, WALL_FINISH_SUBCAT, row.type, v)
+                  pp.check(materialRows, 'Finish Material', `${row.type} - Finishes`, v)
                 }}
-                options={vendorOptsForSub(vendorOptions, materialRows, WALL_FINISH_SUBCAT)}
+                options={vendorOptsForSub(vendorOptions, materialRows, 'Finish Material')}
               />
               <DropdownSelect
                 className="input text-sm py-1 flex-[1.5] min-w-0"
@@ -2001,7 +2012,7 @@ function WallFinishesEditor({
                 placeholder="Select finish"
                 onChange={v => {
                   onPatch(i, { type: v }, true)
-                  pp.check(materialRows, WALL_FINISH_SUBCAT, v, row.vendor)
+                  pp.check(materialRows, 'Finish Material', `${v} - Finishes`, row.vendor)
                 }}
                 options={[
                   { value: 'None', label: 'None' },
