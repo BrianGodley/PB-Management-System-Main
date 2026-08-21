@@ -220,10 +220,8 @@ const WALL_RATES = {
   stackedSetUnitCost: { db: 'Wall Stacked Stone Setting Unit Cost' }, // $ per setting unit
   stackedSubExtraPerSf: { db: 'Wall Stacked Stone Sub Extra per SF' }, // $ / SF (sub flat)
   tileExtraPerSf: { db: 'Wall Tile Extra per SF' }, // $ / SF (thinset/grout)
-  flagstoneSfPerTon: { db: 'Wall Real Flagstone SF per Ton' }, // SF coverage per ton
-  flagstoneExtraPerSf: { db: 'Wall Real Flagstone Extra per SF' }, // $ / SF (setting)
-  realStoneSfPerTon: { db: 'Wall Real Stone SF per Ton' }, // SF coverage per ton
-  realStoneExtraPerSf: { db: 'Wall Real Stone Extra per SF' }, // $ / SF (setting)
+  // (Retired: Real Flagstone/Real Stone SF-per-ton + extra-per-SF coefficients —
+  //  finishes now price $/Sq Ft from the shared record, no ton conversion.)
   // ── Per-wall Demo (Slope Removal + Footing Demo). Hours, tons and dump fees
   // reuse the referenced Demo modules' DIRT calc EXACTLY. Every coefficient is
   // table-driven (fb = the value copied from the referenced Demo module) and is

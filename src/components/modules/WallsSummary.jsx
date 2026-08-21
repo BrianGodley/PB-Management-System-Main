@@ -18,20 +18,22 @@ const fmt = v =>
 // Rate metadata mirrored from WallsModule (finish + cap + wp material/labor).
 const WALL_RATES = {
   concreteTruck: { db: 'Concrete - Ready Mix (Truck)' }, // shared Basic Materials
-  sandStucco: { db: 'Sand Stucco - Wall' },
-  smoothStucco: { db: 'Smooth Stucco - Wall' },
-  ledgerstone: { db: 'Ledgerstone - Wall' },
-  stackedStone: { db: 'Stacked Stone - Wall' },
-  tile: { db: 'Tile - Wall' },
-  flagstone: { db: 'Real Flagstone - Wall' },
-  realStone: { db: 'Real Stone - Wall' },
-  sandStuccoLab: { db: 'Sand Stucco - Wall Labor Rate' },
-  smoothStuccoLab: { db: 'Smooth Stucco - Wall Labor Rate' },
-  ledgerstoneLab: { db: 'Ledgerstone - Wall Labor Rate' },
-  stackedStoneLab: { db: 'Stacked Stone - Wall Labor Rate' },
-  tileLab: { db: 'Tile - Wall Labor Rate' },
-  flagstoneLab: { db: 'Real Flagstone - Wall Labor Rate' },
-  realStoneLab: { db: 'Real Stone - Wall Labor Rate' },
+  // SHARED finish material + labor — the Finishes module's own records, matching
+  // WallsModule (one price + one labor rate per finish, flows everywhere).
+  sandStucco: { db: 'Sand Stucco - Finishes' },
+  smoothStucco: { db: 'Smooth Stucco - Finishes' },
+  ledgerstone: { db: 'Ledgerstone - Finishes' },
+  stackedStone: { db: 'Stacked Stone - Finishes' },
+  tile: { db: 'Tile - Finishes' },
+  flagstone: { db: 'Real Flagstone - Finishes' },
+  realStone: { db: 'Real Stone - Finishes' },
+  sandStuccoLab: { db: 'Sand Stucco - Finishes Labor Rate' },
+  smoothStuccoLab: { db: 'Smooth Stucco - Finishes Labor Rate' },
+  ledgerstoneLab: { db: 'Ledgerstone - Finishes Labor Rate' },
+  stackedStoneLab: { db: 'Stacked Stone - Finishes Labor Rate' },
+  tileLab: { db: 'Tile - Finishes Labor Rate' },
+  flagstoneLab: { db: 'Real Flagstone - Finishes Labor Rate' },
+  realStoneLab: { db: 'Real Stone - Finishes Labor Rate' },
   capFlagstone: { db: 'Wall Cap Flagstone' },
   capPrecast: { db: 'Wall Cap Precast' },
   capBullnose: { db: 'Wall Cap Bullnose Brick' },
@@ -118,15 +120,15 @@ function computeWallFinishRow(row, mp, materialRows) {
     case 'Real Flagstone': {
       const rate = n(row.rateIn) || price('flagstone')
       hrs = sf > 0 ? sf * lab('flagstoneLab') : 0
-      mat = sf > 0 ? (sf / 80) * rate + sf * 1.5 : 0
-      subUnit = rate / 80 + 1.5
+      mat = sf > 0 ? sf * rate : 0 // $/SF now (shared record) — no ton conversion
+      subUnit = rate
       break
     }
     case 'Real Stone': {
       const rate = n(row.rateIn) || price('realStone')
       hrs = sf > 0 ? sf * lab('realStoneLab') : 0
-      mat = sf > 0 ? (sf / 70) * rate + sf * 2 : 0
-      subUnit = rate / 70 + 2
+      mat = sf > 0 ? sf * rate : 0 // $/SF now (shared record) — no ton conversion
+      subUnit = rate
       break
     }
     default:
