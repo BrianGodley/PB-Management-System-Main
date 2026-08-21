@@ -18,6 +18,21 @@ const UNPRICED = /labor rate needed|price me|unpriced|missing price|needs? a pri
 const COL_TYPES = ['CMU', 'Poured in Place', 'Modular', 'Brick']
 const FINISH = /stucco|ledgerstone|stacked stone|\btile\b|flagstone|real stone/i
 
+// Columns' pickers (block vendors, finishes) are fed by an async catalog fetch that
+// resolves AFTER the editor mounts — openModule returns as soon as the static "View
+// Rates" button paints, well before the fetch lands. Scanning a vendor dropdown in
+// that window sees only the static "Standard" option (a false "Standard-only" fail),
+// even though the shared Wall Block products (Angelus, etc.) are about to load. Wait
+// for the network to settle before asserting on picker contents. Same fix as openOk.
+async function openColumns(page) {
+  const ok = await openModule(page, 'Columns')
+  if (ok) {
+    await page.waitForLoadState('networkidle').catch(() => {})
+    await page.waitForTimeout(1000)
+  }
+  return ok
+}
+
 test.describe('Columns', () => {
   test.skip(!ESTIMATE, 'Set TEST_ESTIMATE_URL to a test estimate to enable Columns checks.')
 
@@ -37,7 +52,7 @@ test.describe('Columns', () => {
   //  matrix below, which exercise the pickers that actually carry options.)
 
   test('finishes are available on the CMU tab (not PIP-only) and resolve without unpriced', async ({ page }, testInfo) => {
-    const ok = await openModule(page, 'Columns')
+    const ok = await openColumns(page)
     test.skip(!ok, 'Columns editor not reachable on this estimate.')
     // Ensure we are on the CMU tab, then a finish TYPE option must be selectable.
     const cmu = page.getByRole('button', { name: /^\s*CMU\s*$/i }).first()
@@ -62,35 +77,33 @@ test.describe('Columns', () => {
   })
 
   test('CMU block vendor dropdown lists shared Wall Block vendors (not Standard-only)', async ({ page }, testInfo) => {
-    const ok = await openModule(page, 'Columns')
+    const ok = await openColumns(page)
     test.skip(!ok, 'Columns editor not reachable on this estimate.')
     const cmu = page.getByRole('button', { name: /^\s*CMU\s*$/i }).first()
     if (await cmu.count()) {
       await cmu.click().catch(() => {})
       await page.waitForTimeout(250)
     }
-    // The FIRST vendor picker on the CMU tab is the block row's vendor (blocks render
-    // before finishes). It reads the SHARED 'Wall Block' sub-category, so it must offer
-    // real block vendors (e.g. Angelus) — it regressed to Standard-only when the list
-    // was scoped to the Columns category instead of the Wall Block sub-category.
-    // Scan every vendor dropdown (Standard-first select) on the CMU tab; at least one
-    // (the block row's, sourced from the shared 'Wall Block' sub-category) must offer a
-    // real vendor beyond Standard. The finish vendor picker can legitimately be
-    // Standard-only, so we don't require ALL vendor pickers to have vendors.
-    const selects = page.locator('select')
-    const n = await selects.count()
-    const vendorPickers = []
-    for (let i = 0; i < n; i++) {
-      const opts = await selects.nth(i).locator('option').allTextContents()
-      if (opts.some(t => /^\s*standard\s*$/i.test(t))) vendorPickers.push(opts)
-    }
+    // The block row's vendor picker reads the SHARED 'Wall Block' sub-category, so it
+    // must offer real block vendors (e.g. Angelus) — it regressed to Standard-only when
+    // the list was scoped to the Columns category instead of the Wall Block sub-category.
+    // Because those options arrive via an async catalog fetch, POLL until some vendor
+    // dropdown gains a real vendor beyond Standard (rather than scanning once and racing
+    // the fetch). The finish vendor picker can legitimately stay Standard-only, so we
+    // only require that AT LEAST ONE CMU-tab vendor dropdown carries a vendor.
+    const scanVendorPickers = () =>
+      page.evaluate(() =>
+        Array.from(document.querySelectorAll('select'))
+          .map(s => Array.from(s.options).map(o => (o.textContent || '').trim()))
+          .filter(opts => opts.some(t => /^\s*standard\s*$/i.test(t)))
+      )
+    await expect
+      .poll(async () => (await scanVendorPickers()).some(opts => opts.length > 1), {
+        timeout: 12000,
+        message: 'No CMU-tab vendor dropdown offers a vendor beyond Standard — shared Wall Block vendors (Angelus) not surfacing.',
+      })
+      .toBe(true)
     await testInfo.attach('columns-cmu-vendors.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
-    expect(vendorPickers.length, 'No vendor picker found on the CMU tab').toBeGreaterThan(0)
-    const anyWithVendors = vendorPickers.some(opts => opts.length > 1)
-    expect(
-      anyWithVendors,
-      `No CMU-tab vendor dropdown offers a vendor beyond Standard — shared Wall Block vendors (Angelus) not surfacing. Pickers: ${vendorPickers.map(o => `[${o.join(', ')}]`).join(' ')}`
-    ).toBe(true)
   })
 
   test('exhaustive: every vendor × item option, on every tab, computes without NaN/console error', async ({ page }, testInfo) => {
