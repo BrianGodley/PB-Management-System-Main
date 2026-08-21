@@ -478,3 +478,13 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
   path (CI artifact upload or `e2e:watch` pushing a cached results.json), which
   is config, not test robustness, so it is Brian's call.
 - `.autopilot-last` advanced to 467e59d so the stale run is not re-processed.
+
+## 2026-08-20 — autopilot run (CI sha cba4a2a) — GREEN
+- `commit.txt` = cba4a2a, `updated_at.txt` = 2026-08-21T02:51:51Z.
+- Artifact verified genuine: `config.metadata.gitCommit.hash` = cba4a2a52ccb…
+  == commit.txt, `stats.startTime` = 2026-08-21T02:49:39Z (matches the publish
+  time). The stale-replay problem from the 467e59d run is resolved.
+- 36 expected / 0 unexpected / 0 flaky / 0 skipped, 130.9s.
+- Full collection present: auth.setup 1, code-changes 2, estimator 2,
+  fire-pit 9, hand-demo 6, navigation 8, smoke 1, walls 7 = 36.
+- No edits made this run.
