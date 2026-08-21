@@ -2201,8 +2201,13 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             const wfTypeSel = wf.wfType || WATER_FEATURE_TYPES[0]
             const wfOpts = waterFeatureOptions(materialRows, wfVendorSel, wfTypeSel)
             const wfVends = vendors.filter(v => poolSubVendorIds(materialRows, WATER_FEATURE_SUBCAT).includes(v.id))
+            // Per-row hrs + material for the end-of-row note (mirrors the calc).
+            const wfItem = poolStdItem(materialRows, WATER_FEATURE_SUBCAT, wf.type, wfVendorSel)
+            const wfQty = n(wf.qty)
+            const wfRowHrs = wfQty * n(laborRates[wfItem?.calc_meta?.labor_rate])
+            const wfRowMat = wfQty * (wfItem ? n(wfItem.unit_cost) : 0)
             return (
-              <div key={i} className="grid grid-cols-4 gap-2 items-end">
+              <div key={i} className="grid grid-cols-5 gap-2 items-end">
                 <div>
                   <Label text="Vendor" />
                   <select
@@ -2246,8 +2251,14 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                 </div>
                 <div>
                   <Label text="Qty" />
+                  <NumInput value={wf.qty} onChange={v => updWaterFeature(i, 'qty', v)} />
+                </div>
+                <div>
+                  <Label text="Est. Hrs / Materials" />
                   <div className="flex items-center gap-1">
-                    <NumInput value={wf.qty} onChange={v => updWaterFeature(i, 'qty', v)} className="flex-1 min-w-0" />
+                    <span className="text-xs text-gray-600 flex-1 min-w-0">
+                      {wf.type ? `${wfRowHrs.toFixed(1)} hrs · ${fmt2(wfRowMat)} mat` : '—'}
+                    </span>
                     <button
                       type="button"
                       onClick={() => removeWaterFeature(i)}

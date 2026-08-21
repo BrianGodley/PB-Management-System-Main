@@ -1,5 +1,20 @@
 # Test results log
 
+## 2026-08-21 — CI (22:47Z, published 22:55Z) — Steps Layer C GREEN — 97/97
+- Complete run, **97 passed / 0 failed / 0 flaky / 0 skipped** (start 22:47:08Z, duration 501s).
+  Suite grew 92 → 97 with the 5-test `steps.spec.js`.
+- **Steps** `steps.spec.js` **5/5 GREEN** — not skipped, so a Steps module is on the test
+  estimate and the live-browser layer actually verified: opens with step sections,
+  exhaustive vendor×Type NaN sweep (In-House + Sub), numeric→total, In-House↔Sub pricing,
+  and live-edit (Hours Adj moves the total, Goal 4). Steps definition-of-done C/E → green:
+  - C. E2E: opens[x] vendor×Type[x] numeric[x] sub[x] live-edit[x] clean[x]
+  - E. Loop: green[x]
+  - D (DB-health SQL) stays Brian's step — verify every Steps labor/concrete/sub rate is
+    priced and each step catalog item has a Standard price.
+- Extraction battery COMPLETE (A/B/C green) for: Skid, Mini, Concrete, Pavers, Utilities,
+  Drainage, Irrigation, Lighting, **Steps**. Remaining: ArtificialTurf, Finishes,
+  GroundTreatments, Planting, Pool, WeedAbatement.
+
 ## 2026-08-21 — Steps: Layer A+B (extraction battery)
 - **Layer A:** extracted the inline `calcSteps` out of `StepsModule.jsx` into pure
   `stepsCalc.js` (module now `import { calcSteps } from './stepsCalc'`; kept the module's own
