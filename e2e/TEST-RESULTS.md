@@ -1,5 +1,16 @@
 # Test results log
 
+## 2026-08-21 — FULL E2E SUITE GREEN on CI e3654b3 — 72 pass / 0 fail / 0 skip
+- Pavers `pavers.spec.js` 5/5 (opened by the short 'Paver' row label). No specs skipping
+  anymore — every module editor on the estimate is exercised. Layer C now GREEN for all
+  four of the batch: Skid Steer, Mini Skid, Concrete, Pavers.
+- Pavers sign-off C/E rows flip to done:
+```
+### Pavers — C/E now green (CI e3654b3)
+C. E2E: opens[x] vendor×item[x] numeric[x] sub[x] live-edit[x] clean[x]
+E. Loop: red-first[x] catalogued[x] logged[x] green[x]   (red-first: opened under the short 'Paver' row label, not the full 'Pavers' type)
+```
+
 ## 2026-08-21 — Layer C GREEN on CI 9854bc5: Skid Steer / Mini Skid / Concrete
 - Full suite **67 pass, 0 fail, 5 skip** (the 5 skips are all Pavers — see below).
 - **Skid Steer** `skid-steer.spec.js` 6/6, **Mini Skid** `mini-skid.spec.js` 6/6 (the
