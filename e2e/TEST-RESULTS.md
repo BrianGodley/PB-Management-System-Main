@@ -357,3 +357,15 @@ job actually checked out/produced; with `concurrency: cancel-in-progress` plus l
 results.json under a newer SHA label. Autopilot therefore cannot trust commit.txt alone.
 No autopilot edits (nothing failed, nothing in e2e/ to harden). .autopilot-last set to
 5e1eeb2 so this stale publish isn't reprocessed.
+
+## 2026-08-20 — autopilot run (CI a662f5d)
+
+GREEN — 36 passed, 0 failed, 0 flaky, 0 skipped (Playwright CI, startTime
+2026-08-21T01:17:22Z, published 01:19:42Z, duration 139s). No action taken.
+
+Artifact verified genuine this time: results.json `config.metadata.gitCommit.hash`
+== commit.txt == a662f5d ("auto(e2e): autopilot test fix"), so the stale-publish
+pattern seen at 4ead2ac / 5e1eeb2 did not recur. All 8 spec files collected —
+auth.setup 1, code-changes 2, estimator 2, fire-pit 9, hand-demo 6, navigation 8,
+smoke 1, walls 7 = 36. The single skip present at 9c129a6 is gone (fire-pit went
+8 -> 9 collected specs), so the suite is now fully exercised with no silent gaps.
