@@ -138,6 +138,29 @@ test.describe('Fire Pit', () => {
     ).toHaveCount(0)
   })
 
+  // Guards the fetch-scope bug (shared finish LABOR resolved to 0 hrs because the
+  // module's labor_rates query omitted category 'Finishes'). "No banner" is not
+  // enough — the finish line must show BOTH nonzero material $ AND nonzero labor hrs.
+  test('wall finish resolves nonzero material $ AND nonzero labor hrs', async ({ page }, testInfo) => {
+    const ok = await openFirePit(page)
+    test.skip(!ok, 'Fire Pit editor not reachable on this estimate.')
+    const wf = sectionSelect(page, 'Wall Finishes')
+    test.skip(!(await wf.count()), 'No Wall Finishes picker on this estimate.')
+    const opts = await wf.locator('option').allTextContents()
+    const idx = opts.findIndex(o => o && !/^\s*select/i.test(o.trim()))
+    test.skip(idx < 1, 'No real finish option to pick.')
+    await wf.selectOption({ index: idx })
+    // Enter SF in the finish row (the input immediately following the finish select).
+    const sf = wf.locator('xpath=following::input[1]')
+    await sf.click().catch(() => {})
+    await sf.fill('50').catch(() => {})
+    await page.waitForTimeout(600)
+    const region = await wf.locator('xpath=ancestor::table[1]').innerText()
+    await testInfo.attach('fire-pit-finish-value.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
+    expect(/\$\s?[1-9][\d,]*/.test(region), `finish material should be nonzero — got:\n${region.slice(0, 300)}`).toBe(true)
+    expect(/\b[1-9]\d*\.\d{1,2}\b/.test(region), `finish labor hrs should be nonzero (the fetch-scope bug) — got:\n${region.slice(0, 300)}`).toBe(true)
+  })
+
   // ── EXHAUSTIVE coverage — every field + every dropdown option ────────────────
   const UNPRICED = /labor rate needed|price me|unpriced|missing price|needs? a price|set (a |the )?price/i
 

@@ -74,3 +74,17 @@ D. DB:        priced[ ] no-dupes[ ] filing[ ]
 E. Loop:      red-first[ ] catalogued[ ] logged[ ] green[ ]
 N/A items + reason:
 ```
+
+## Addendum — fetch-scope coverage (added 2026-08-20, after the Fire Pit finish-labor miss)
+A rate can EXIST and be PRICED in the DB yet never reach the calc if the module's fetch
+query doesn't include its category. The Fire Pit wall-finish LABOR ($0 hrs) bug was this:
+the shared labor lived under category 'Finishes' but the module's labor_rates query only
+fetched ['Fire Pit','Utilities','Walls']. The E2E passed because it only checked "no NaN /
+no unpriced banner / a total renders" — never "this selected finish shows nonzero material
+AND nonzero labor hrs". Two required additions to the per-module DoD:
+- **Fetch-scope audit (B):** every category the calc consumes a rate from must be in the
+  module's fetch query (fetchStandardRateMap + the labor_rates `.in('category',[...])` +
+  fetchModuleCatalog scope). A DB-health MISSING check is not enough — the rate can be
+  present but unfetched.
+- **E2E value assertion (C):** picking a shared type (finish/cap) must show BOTH nonzero
+  material $ AND nonzero labor hrs on that line — not merely the absence of a banner.

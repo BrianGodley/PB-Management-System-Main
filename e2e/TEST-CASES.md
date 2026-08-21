@@ -114,3 +114,9 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
 - **numeric fields** — fill every input → `$` total renders, no unpriced prompt.
 - **In-House and Subcontractor both price** — toggle each crew mode → no NaN, pricing shows.
 - **live edit reflects** — change a field → on-page totals change (Goal 4 end-to-end).
+
+### fire-pit.spec.js — added guard (2026-08-20)
+- **wall finish resolves nonzero material $ AND nonzero labor hrs** — picks a real finish,
+  enters SF, asserts the finish table shows BOTH a nonzero `$` and a nonzero `x.xx` hrs.
+  Catches the fetch-scope bug (finish labor = 0 hrs when the module omits the Finishes
+  category from its labor query) that "no unpriced banner" alone missed.

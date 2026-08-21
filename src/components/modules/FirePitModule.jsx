@@ -931,7 +931,10 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
       supabase
         .from('labor_rates')
         .select('name, rate')
-        .in('category', ['Fire Pit', 'Utilities', 'Walls']),
+        // 'Finishes' is REQUIRED — the shared wall-finish labor rates
+        // ('<Type> - Finishes Labor Rate') live under category Finishes; without it
+        // every Fire Pit wall-finish resolves to 0 labor hours.
+        .in('category', ['Fire Pit', 'Utilities', 'Walls', 'Finishes']),
       fetchModuleCatalog(RATE_SCOPE_CATS),
       supabase
         .from('subs_vendors')
