@@ -100,29 +100,36 @@ test.describe('Lighting', () => {
     await expect(page.getByText(/\$[\d,]/).first(), 'No pricing rendered').toBeVisible()
   })
 
-  test('live edit reflects: changing a field moves the total (Goal 4 in-browser)', async ({ page }) => {
+  test('live edit reflects: changing Hours Adj moves the total (Goal 4 in-browser)', async ({ page }) => {
     const { ok, why } = await openLighting(page)
     test.skip(!ok, why)
     const dollars = () => page.evaluate(() => (document.body.innerText.match(/\$[\d,]+(\.\d+)?/g) || []).join('|'))
-    const target = page.locator('input[type="number"], input[step]').first()
-    // Not a skip: the editor is open by this point, so "no numeric input" means the
-    // module rendered nothing drivable — a real failure, not a reason to go quiet.
+    // Drive "Hours Adj (±hrs)" specifically, NOT the first numeric input. The module's
+    // first numeric field is Difficulty (%), which only *scales* existing labor hours —
+    // it cannot move the total when the Lighting module on this estimate has no priced
+    // line items (0 × anything = 0), which reads as a false Goal-4 failure. Hours Adj
+    // *adds* labor hours directly, so on the In-House tab its edit always moves the total,
+    // independent of catalog pricing — a valid, deterministic recompute driver. (The
+    // pure recompute is proven in lightingCalc.test.mjs's edit-reflects case.)
+    const target = page.locator('div:has(> p:has-text("Hours Adj")) input[type="number"]').first()
+    // Not a skip: In-House renders Job Site Conditions, so a missing Hours Adj field means
+    // the editor rendered wrong — a real failure, not a reason to go quiet.
     await expect(
       target,
-      'No numeric input in the open Lighting editor — the module rendered no drivable field.'
+      'Hours Adj field not found in the open Lighting editor (In-House Job Site Conditions).'
     ).toHaveCount(1)
     await fillField(target, '2')
-    await expect(target, 'Lighting field did not accept 2').toHaveValue('2')
+    await expect(target, 'Hours Adj did not accept 2').toHaveValue('2')
     await page.waitForTimeout(600)
     const before = await dollars()
     await fillField(target, '20')
     await target.blur().catch(() => {})
-    await expect(target, 'Lighting field did not accept 20').toHaveValue('20')
-    const where = await target.evaluate(el => el.outerHTML.slice(0, 200))
+    await expect(target, 'Hours Adj did not accept 20').toHaveValue('20')
     await expect
       .poll(dollars, {
         timeout: 10000,
-        message: `Total did not change after editing a Lighting field 2 -> 20 (the input accepted the value, so this is a recompute/pricing issue, not a selector one). Input: ${where}`,
+        message:
+          'Total did not change after editing Hours Adj 2 -> 20 hrs (the input accepted the value, so this is a recompute/pricing issue, not a selector one).',
       })
       .not.toBe(before)
   })
