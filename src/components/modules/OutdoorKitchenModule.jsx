@@ -31,11 +31,11 @@ const OK_RATES = {
   gficOutlet: { dbName: 'GFIC Outlet - BBQ' }, // $/outlet
   sinkPlumbing: { dbName: 'Sink Plumbing - BBQ' }, // $ flat
   gasPipe: { dbName: 'Gas Pipe - BBQ' }, // $/LF
-  sandStucco: { dbName: 'Sand Stucco - BBQ' }, // $/SF
-  smoothStucco: { dbName: 'Smooth Stucco - BBQ' }, // $/SF
-  ledgerstone: { dbName: 'Ledgerstone - BBQ' }, // $/SF
-  stackedStone: { dbName: 'Stacked Stone - BBQ' }, // $/SF
-  tile: { dbName: 'Tile - BBQ' }, // $/SF
+  sandStucco: { dbName: 'Sand Stucco - Finishes' }, // shared $/Sq Ft (Finishes)
+  smoothStucco: { dbName: 'Smooth Stucco - Finishes' }, // shared $/Sq Ft (Finishes)
+  ledgerstone: { dbName: 'Ledgerstone - Finishes' }, // shared $/Sq Ft (Finishes)
+  stackedStone: { dbName: 'Stacked Stone - Finishes' }, // shared $/Sq Ft (Finishes)
+  tile: { dbName: 'Tile - Finishes' }, // shared $/Sq Ft (Finishes)
   realFlagstone: { dbName: 'Real Flagstone - Finishes' }, // shared $/Sq Ft (Finishes)
   realStone: { dbName: 'Real Stone - Finishes' }, // shared $/Sq Ft (Finishes)
 

@@ -194,7 +194,7 @@ export default function FirePitSummary({ module }) {
   // ── Wall finishes ────────────────────────────────────────────────────────────
   const finishLines = (wallFinishRows || [])
     .map(r => {
-      const meta = WF_META[r.type] || masterFinishMeta('Wall Finish', r.type, materialRows)
+      const meta = WF_META[r.type] || masterFinishMeta('Finish Material', r.type, materialRows)
       const sf = n(r.sf)
       if (!meta || sf <= 0) return null
       const unit = meta.master ? meta.matUnit : mp(FP_RATES[meta.key].dbName)

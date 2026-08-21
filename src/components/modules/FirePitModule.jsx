@@ -69,6 +69,7 @@ const FP_RATES = {
 
   // ── Labor productivity rates ────────────────────────────────────────────────
   digLab: { dbName: 'FP Dig Footing Labor Rate' }, // CF/hr
+  footingPourLab: { dbName: 'Wall Hand Pour Footing Labor Rate' }, // CY/hr — BORROWED from Walls (hand pour footing)
   rebarLab: { dbName: 'FP Set Rebar Labor Rate' }, // LF/hr
   blockLab: { dbName: 'FP Set Blocks Labor Rate' }, // blocks/hr
   handGroutLab: { dbName: 'FP Hand Grout Labor Rate' }, // CF/hr
@@ -309,6 +310,9 @@ const RATE_SCOPE = [
   { category: 'Walls', sub: CMU_BLOCK_SUBCAT }, // Wall Block
   { category: 'Walls', sub: MODULAR_SUBCAT }, // Modular Wall
   { category: 'Walls', sub: BRICK_SUBCAT }, // Brick
+  // Borrowed footing pour labor (hand) — surfaces as one editable line; edits the
+  // same shared Walls rate. `only` keeps the rest of Walls 'Structure' out.
+  { category: 'Walls', sub: 'Structure', only: ['Wall Hand Pour Footing Labor Rate'] },
   { category: 'Concrete', sub: CONC_MIX_SUBCAT }, // Concrete Mix (PIP)
   { category: 'Utilities', sub: UTIL_CAT.line }, // Gas Pipe
   { category: 'Utilities', sub: UTIL_CAT.gas }, // Gas Fixtures
@@ -489,13 +493,14 @@ function calcCmuStruct(s, mp = {}, materialRows = []) {
   const groutCF = rawBlocks * GROUT_CF_PER_BLOCK * (n(s.pctGrouted) / 100)
   const groutCY = groutCF / 27
   const digHrs = footingCF > 0 ? footingCF * p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
+  const footingPourHrs = footingCY > 0 ? footingCY * p(FP_RATES.footingPourLab.dbName) : 0
   const rebarHrs = totalRebarLF > 0 ? totalRebarLF * p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
   const setBlockHrs = rawBlocks > 0 ? rawBlocks * p(FP_RATES.blockLab.dbName, FP_RATES.blockLab.fallback) : 0
   const groutRate = s.useGroutPump === 'Yes'
     ? p(FP_RATES.pumpGroutLab.dbName, FP_RATES.pumpGroutLab.fallback)
     : p(FP_RATES.handGroutLab.dbName, FP_RATES.handGroutLab.fallback)
   const groutHrs = groutCF > 0 ? groutCF * groutRate : 0
-  const structuralBaseHrs = digHrs + rebarHrs + setBlockHrs + groutHrs
+  const structuralBaseHrs = digHrs + footingPourHrs + rebarHrs + setBlockHrs + groutHrs
   const curveAddHrs = structuralBaseHrs * (n(s.pctCurved) / 100) * p('FP Curve Labor Factor')
   const picked = catalogRowById(materialRows, s.matType)
   const blockPrice = picked ? n(picked.unit_cost) : p(FP_RATES.fpBlock.dbName, FP_RATES.fpBlock.fallback)
@@ -532,10 +537,11 @@ function calcPipStruct(s, mp = {}, materialRows = []) {
   const footingMat = footingCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
   const mat = pourMat + formMat + rebarMat + footingMat
   const digHrs = footingCF > 0 ? footingCF * p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
+  const footingPourHrs = footingCY > 0 ? footingCY * p(FP_RATES.footingPourLab.dbName) : 0
   const rebarHrs = totalRebarLF > 0 ? totalRebarLF * p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
   const pourHrs = pourCY * p(FP_POUR_LAB.dbName, FP_POUR_LAB.fallback)
   const formHrs = formSF * p(FP_FORM_LAB.dbName, FP_FORM_LAB.fallback)
-  const structuralBaseHrs = digHrs + rebarHrs + pourHrs + formHrs
+  const structuralBaseHrs = digHrs + footingPourHrs + rebarHrs + pourHrs + formHrs
   const curveAddHrs = structuralBaseHrs * (n(s.pctCurved) / 100) * p('FP Curve Labor Factor')
   const hrs = n(s.layoutHrs) + structuralBaseHrs + curveAddHrs
   return { mat, hrs, pourCY, formSF, footingCF, footingCY, totalRebarLF, curveAddHrs, pourMat, formMat, rebarMat, footingMat }
@@ -561,9 +567,10 @@ function calcModularStruct(s, mp = {}, materialRows = []) {
   const footingMat = footingCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
   const mat = blockMat + rebarMat + footingMat
   const digHrs = footingCF > 0 ? footingCF * p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
+  const footingPourHrs = footingCY > 0 ? footingCY * p(FP_RATES.footingPourLab.dbName) : 0
   const rebarHrs = totalRebarLF > 0 ? totalRebarLF * p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
   const setBlockHrs = rawBlocks > 0 ? rawBlocks * p(FP_RATES.blockLab.dbName, FP_RATES.blockLab.fallback) : 0
-  const structuralBaseHrs = digHrs + rebarHrs + setBlockHrs
+  const structuralBaseHrs = digHrs + footingPourHrs + rebarHrs + setBlockHrs
   const curveAddHrs = structuralBaseHrs * (n(s.pctCurved) / 100) * p('FP Curve Labor Factor')
   const hrs = n(s.layoutHrs) + structuralBaseHrs + curveAddHrs
   return { mat, hrs, blocksPerCourse, coursesCount, rawBlocks, totalBlocks, footingCF, footingCY, totalRebarLF, curveAddHrs, blockMat, rebarMat, footingMat }
@@ -588,9 +595,10 @@ function calcBrickStruct(s, mp = {}, materialRows = []) {
   const footingMat = footingCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
   const mat = brickMat + mortarMat + rebarMat + footingMat
   const digHrs = footingCF > 0 ? footingCF * p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
+  const footingPourHrs = footingCY > 0 ? footingCY * p(FP_RATES.footingPourLab.dbName) : 0
   const rebarHrs = totalRebarLF > 0 ? totalRebarLF * p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
   const brickHrs = faceSF * p(FP_BRICK_LAY.dbName, FP_BRICK_LAY.fallback)
-  const structuralBaseHrs = digHrs + rebarHrs + brickHrs
+  const structuralBaseHrs = digHrs + footingPourHrs + rebarHrs + brickHrs
   const curveAddHrs = structuralBaseHrs * (n(s.pctCurved) / 100) * p('FP Curve Labor Factor')
   const hrs = n(s.layoutHrs) + structuralBaseHrs + curveAddHrs
   return { mat, hrs, faceSF, bricks, footingCF, footingCY, totalRebarLF, curveAddHrs, brickMat, mortarMat, rebarMat, footingMat }
