@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { collectErrors, openModule, scanEveryOptionForNaN } from './helpers.js'
+import { collectErrors, fillField, openModule, scanEveryOptionForNaN } from './helpers.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Outdoor Kitchen module — live-browser layer of the MODULE-TEST-CHECKLIST.
@@ -182,12 +182,14 @@ test.describe('Outdoor Kitchen', () => {
       target,
       'No input follows the BBQ Wall Length label — the field markup changed.'
     ).toHaveCount(1)
-    await target.scrollIntoViewIfNeeded()
-    await target.fill('8')
+    // fillField (not fill): Layout.jsx's autofill guard marks every input
+    // readonly until its first focus, and fill()'s editable check runs BEFORE
+    // it focuses — so a bare fill() times out on a field the user can type in.
+    await fillField(target, '8')
     await expect(target, 'BBQ Wall Length did not accept 8').toHaveValue('8')
     await page.waitForTimeout(600)
     const before = await dollars()
-    await target.fill('40')
+    await fillField(target, '40')
     // Blur so any commit-on-blur handling also fires, then prove the edit landed
     // before blaming the recompute.
     await target.blur().catch(() => {})

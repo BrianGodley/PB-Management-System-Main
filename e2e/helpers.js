@@ -143,3 +143,22 @@ export function collectErrors(page) {
   })
   return errors
 }
+
+// Fill a number/text field that the app's autofill guard has made READONLY.
+// Layout.jsx marks every input readonly on mount and removes the attribute on
+// the FIRST focus (it blocks the browser's contact/address autofill overlay).
+// Playwright's fill() runs its "editable" actionability check BEFORE focusing,
+// so on a never-touched field it waits out the whole timeout on an input the
+// user could type into fine — that is what killed the Outdoor Kitchen live-edit
+// test (resolved element showed `readonly` in the call log). Focus first to
+// wake the field, then fill. Throws on real failures — never wrap this in
+// .catch(() => {}), or a fill that never landed looks like a total that refused
+// to move.
+export async function fillField(locator, value) {
+  await locator.scrollIntoViewIfNeeded().catch(() => {})
+  await locator.focus()
+  // The focus handler removes readonly synchronously; wait for it so fill()'s
+  // actionability check sees an editable field.
+  await locator.evaluate(el => el.removeAttribute('readonly')).catch(() => {})
+  await locator.fill(String(value))
+}

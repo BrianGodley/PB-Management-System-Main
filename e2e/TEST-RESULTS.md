@@ -612,3 +612,21 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
   `toHaveValue('40')` assertions plus a blur, and the failure message now dumps
   the input's outerHTML. Next run is diagnostic: a `toHaveValue` failure = test
   targeting; a poll failure = real recompute/pricing issue in the module.
+
+## 2026-08-21 — autopilot — CI run 473bbd7 (49 passed / 1 failed / 0 flaky / 0 skipped)
+
+- FAIL: `outdoor-kitchen.spec.js` › "live edit reflects: changing a frozen-priced field
+  moves the total (Goal 4 in-browser)" — timed out (both attempts) on
+  `target.fill('8')`. Playwright's call log resolved the CORRECT input but showed it
+  carrying `readonly`.
+- Root cause (test-side, NOT a pricing bug): `src/components/Layout.jsx` autofill guard
+  sets `readonly` on every input on mount and removes it on first `focus`
+  (readonly-until-focus, to suppress the browser autofill overlay). `fill()` runs its
+  "editable" actionability check BEFORE focusing, so a never-touched field never becomes
+  fillable. The two passing OK finish tests survive only because they `click()` first.
+- Fix: new `fillField(locator, value)` in `e2e/helpers.js` (scroll → focus → strip
+  `readonly` → fill, no swallow); OK live-edit test now uses it for both 8 and 40.
+  `node --check` clean on both files. No src/ change.
+- Open item for Brian: several specs still do `await x.fill(v).catch(() => {})`
+  (columns, fire-pit, hand-demo, walls). Under this guard a swallowed fill is a silent
+  pass — those live-edit tests should move to `fillField` too.
