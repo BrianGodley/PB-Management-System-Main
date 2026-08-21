@@ -449,3 +449,13 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
   code-changes 2, estimator 2, fire-pit 9, hand-demo 6, navigation 8,
   smoke 1, walls 7 = 36. Seven consecutive clean runs.
 - No edits made this run.
+
+## 2026-08-20 — autopilot run (CI sha 73340ff)
+- Result: **GREEN** — 36 expected, 0 unexpected, 0 flaky, 0 skipped
+  (CI start 2026-08-21T02:31:47Z, duration 145.5s).
+- Artifact verified genuine: results.json `config.metadata.gitCommit.hash`
+  == commit.txt == 73340ff, so no stale publish.
+- Collection unchanged and fully exercised — auth.setup 1, code-changes 2,
+  estimator 2, fire-pit 9, hand-demo 6, navigation 8, smoke 1, walls 7 = 36.
+  Eight consecutive clean runs.
+- No edits made this run.
