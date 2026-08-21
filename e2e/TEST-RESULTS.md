@@ -1047,3 +1047,16 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
 - OPEN QUESTION (repeat): does `TEST_ESTIMATE_URL` point at an estimate that HAS a Pavers
   module (and a Mini Skid Steer Demo one)? Next run's skip reason will list the estimate's
   module rows, which answers it either way.
+
+## 2026-08-21 — autopilot — e3654b3 GREEN (72/72)
+
+- CI run 2026-08-21T17:33Z: expected 72, unexpected 0, flaky 0, skipped 0.
+- The 5 previously-skipped Pavers tests now RUN and PASS — the hardened
+  `e2e/pavers.spec.js` (fillField + toHaveValue + no silent skip) reached CI, and the
+  estimate at `TEST_ESTIMATE_URL` does carry a Pavers module. Open question from the
+  last entry is answered: no gap, no missing module.
+- Outdoor Kitchen "live edit reflects" green again. (An earlier partial read of
+  `origin/ci-results` for this same SHA showed a 14:57Z run with that test failing;
+  the 17:33Z run at the same commit is the current published result and is clean.)
+- No spec edits this round.
+- `.autopilot-last` -> e3654b3.
