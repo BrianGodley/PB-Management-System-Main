@@ -1,5 +1,45 @@
 # Test results log
 
+## 2026-08-21 — Planting: Layer A+B (extraction battery)
+- **Layer A:** extracted the inline `calcPlanting` out of `PlantingModule.jsx` into pure
+  `plantingCalc.js` (module now `import { calcPlanting } from './plantingCalc'`; kept its own
+  helper copies for JSX). Inlined the supabase-tainted `calcWalkAccessLabor` + catalog
+  resolvers (`resolveMaterialPrice`/`catalogOptions`/`catalogItemFor` + `isStandardSel`) and
+  carried `ADDON_META` + `computePlantRow`/`computeAddonRow` verbatim (exported).
+  `plantingCalc.test.mjs` = **7/7**: item-driven plant labor value (10 × 0.5 hr = 5 hrs →
+  $375) + material (10 × $18 = $180) + edit-reflects; add-on perDay labor (4 × 0.25 = 1 hr) +
+  Standard material (4 × $10 = $40); **LABOR NO-FALLBACK** (unset plant rate → 0 hrs AND the
+  perDay>0 guard also zeroes material, plus the plant surfaces in `laborUnset`); Till labor
+  formula + guard (any unset Till rate → 0 till hrs); Sub tab flat $/unit (10 × $25 = $250,
+  0 labor, cost → subCost); no-NaN populated (till + plants + add-on + manual + yard check).
+  Module bundles clean (esbuild).
+- **Layer B:** `scripts/planting-rate-coverage.mjs` (`test:planting-coverage`) — Planting
+  consumes **8 name-keyed labor rates** (3 Till + 5 add-on install) + **per-plant ITEM-DRIVEN
+  labor** via each Plants Item's `calc_meta.labor_rate` (like Lighting) + **8 add-on
+  materials** (Amendments sub_category), plus plant material from the Plants sub_category
+  (vendor-first → Standard). Because per-plant labor keys live in DB calc_meta, DB-health SQL
+  proves per-item coverage. No-fallback + imports guards PASS. Full unit suite **202/202**
+  (incl. 7 new Planting).
+- **Layer C authored, pending CI:** `e2e/planting.spec.js` (opens / vendor×Item / numeric /
+  In-House↔Sub / live-edit via Hours Adj / clean). Skips unless a Planting module is on the
+  test estimate. Catalogued in `e2e/TEST-CASES.md`.
+
+```
+### Planting — definition-of-done sign-off (2026-08-21, A+B done; C/D/E pending)
+A. Unit:      value[x] edit[x] unpriced[x] vendor[~] priority[N/A] units[x] aggregator[N/A] sub-indep[x] breakdown[N/A] summary-parity[x]
+B. Audit:     coverage[x] orphan[~] no-fallback[x] no-hardcoded[x] imports[x]
+C. E2E:       opens[ ] vendor×Item[ ] numeric[ ] sub[ ] live-edit[ ] clean[ ]  (authored; runs when a Planting module is on the test estimate)
+D. DB:        priced[ ] no-dupes[ ] filing[ ]  (Brian's SQL step — every Plants Item's calc_meta.labor_rate priced, Till + add-on rates priced, add-on materials priced)
+E. Loop:      red-first[N/A] catalogued[x] logged[x] green[ ]
+N/A items + reason:
+  A.priority — per-plant labor is item-driven (calc_meta.labor_rate), not a numeric-coeff ladder; unset ⇒ laborUnset (covered).
+  A.aggregator/breakdown — Small/Large/Add-On row sections + In-House↔Sub toggle; no per-type-tab aggregator or per-tab materials breakdown.
+  A.vendor[~] — vendor override via resolveMaterialPrice / catalogItemFor (vendor_id match → Standard null-vendor); covered structurally + the NO-FALLBACK case, not a dedicated per-vendor assertion.
+  A.sub-indep[x] — Sub-tab test asserts totalHrs=0/laborCost=0/totalMat=0 and the flat $/unit cost routes into subCost independently of the In-House labor path.
+  A.summary-parity[x] — PlantingSummary reads the saved calc snapshot; no separate summary calc to drift.
+  Layer A via plantingCalc.test.mjs (7); B via scripts/planting-rate-coverage.mjs (test:planting-coverage).
+```
+
 ## 2026-08-21 — CI (22:47Z, published 22:55Z) — Steps Layer C GREEN — 97/97
 - Complete run, **97 passed / 0 failed / 0 flaky / 0 skipped** (start 22:47:08Z, duration 501s).
   Suite grew 92 → 97 with the 5-test `steps.spec.js`.
@@ -1425,3 +1465,19 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
   (`a5d565e`, `8bac172`, `6b7e51d`) — all three were also 92/0/0/0, so nothing was lost.
 - No spec edits, no src/, SQL or rate changes this run.
 - `.autopilot-last` -> `3463215`.
+
+## 2026-08-21 — autopilot run (CI a486620)
+- Stats: 49 expected / 1 unexpected / 0 flaky / 0 skipped.
+- FAIL: `outdoor-kitchen.spec.js` › "live edit reflects: changing a frozen-priced
+  field moves the total (Goal 4 in-browser)" — input accepted 8 → 40 but the page
+  dollar string never changed.
+- Diagnosis (test-robustness, not product): `bbqWallSF = (bbqHeightIn / 12) × bbqLengthLF`
+  in `OutdoorKitchenModule.jsx:512`. The BBQ Wall Height box shows `48` only as a
+  *placeholder*, so on an estimate where height was never entered the value is '' →
+  wall SF is 0 → block/labor quantities stay 0 → changing length moves nothing. The
+  spec drove length alone, so it could never prove the recompute path.
+- Fix: spec now sets BBQ Wall Height to 48 first (only when the field is empty) before
+  driving BBQ Wall Length, and fails loudly if that fill does not land. `node --check`
+  passes. No src/, rate, or SQL change.
+- If the re-run still fails at the same poll with height populated, the recompute/pricing
+  path is the real culprit and needs Brian.

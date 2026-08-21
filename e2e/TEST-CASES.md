@@ -154,3 +154,12 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   material (SF × item price, pallets), concrete type+finish+form value/edit-reflects, material
   NO-FALLBACK (unresolved catalog item → $0, labor still priced), Sub flat $/LF independence, no-NaN
 - coverage manifest: `npm run test:steps-coverage` (11 labor + 9 concrete material + 17 sub $/LF + 4 catalog sub_categories)
+
+## Planting (planting.spec.js)
+- opens with Small Plants / Large Plants / Planting Add-Ons / Till sections; vendor + Item pickers populated
+- exhaustive vendor × Item matrix (In-House + Sub); every-option NaN check
+- numeric fields → total; Sub tab prices (flat $/unit); live edit (Hours Adj) moves total
+- unit layer (plantingCalc.test.mjs, 7): item-driven plant labor value/edit-reflects (qty × per-plant rate) +
+  material (qty × price), add-on perDay labor + material, LABOR NO-FALLBACK (unset plant rate → 0 hrs + 0 material
+  guard + laborUnset flag), till guarded (any unset till rate → 0), Sub flat $/unit independence, no-NaN
+- coverage manifest: `npm run test:planting-coverage` (8 name-keyed labor + item-driven per-plant labor + 8 add-on materials)
