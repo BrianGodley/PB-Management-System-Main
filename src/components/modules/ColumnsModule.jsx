@@ -726,6 +726,10 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
 
   // Vendor pickers.
   const vendorOptions = vendorOptionsForCategory(COLUMNS_CATEGORY)
+  // CMU block vendors come from the SHARED 'Wall Block' sub-category (same products the
+  // CMU type picker lists), so block vendors like Angelus surface here just like Walls —
+  // not the Columns-category list, which would drop them.
+  const cmuVendorOptions = subcatVendorOptions(materialRows, CMU_BLOCK_SUBCAT, vendorNames)
   const modularVendorOptions = subcatVendorOptions(materialRows, MODULAR_SUBCAT, vendorNames)
   const brickVendorOptions = subcatVendorOptions(materialRows, BRICK_SUBCAT, vendorNames)
   const concMixVendorOptions = subcatVendorOptions(materialRows, CONC_MIX_SUBCAT, vendorNames)
@@ -778,7 +782,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
       arr: cmuCols,
       setter: setCmuCols,
       blank: blankCmuCol,
-      vendorOptions,
+      vendorOptions: cmuVendorOptions,
       typeOptions: v => subcatProductOptions(materialRows, CMU_BLOCK_SUBCAT, v).map(o => ({ value: o.value, label: labelWithDims(o.row) })),
     },
     PIP: {
