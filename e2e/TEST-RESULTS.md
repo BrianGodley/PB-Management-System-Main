@@ -856,3 +856,34 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
   the fresh `test-results/results.json`? Until that is fixed every autopilot verdict is
   unreliable. Also still open from last round: does `TEST_ESTIMATE_URL` point at an
   estimate that has a Mini Skid Steer Demo module?
+
+## 2026-08-21 — autopilot (ci-results 105b554, commit.txt = 5833baf7, updated_at 16:49Z) — STALE PAYLOAD AGAIN, no action taken
+- Payload identity check FAILED for the 3rd time in six rounds, and again the payload
+  moved BACKWARDS. `commit.txt` = **5833baf7** (autopilot's own e2e fix, 16:43Z), but
+  `results.json.config.metadata.gitCommit.hash` = **a52dc5242a79651222dd8b8eed010c6548749317**
+  ("fix(outdoor-kitchen): finish TYPE dropdown = canonical WF_LIST only…"), startTime
+  **14:57:00.953Z** — 1h52m before publish and ~1h38m EARLIER than the previous published
+  payload (59a14e2 @ 16:35:05Z). Stats 49 passed / 1 failed / 0 skipped / 0 flaky, and the
+  suite list has NO mini-skid / skid-steer specs, confirming a pre-4b051c6 tree.
+- Its single failure — `outdoor-kitchen.spec.js:151` "live edit reflects…", `Total did not
+  change after editing BBQ Wall Length 8 -> 40` — is SUPERSEDED: that spec PASSED in the
+  genuine db7f85f run at 16:35Z. Not re-opened. NO e2e edit, NO src/ change.
+- CORRECTION to the previous entry: the payload published as 59a14e2 was in fact the real
+  db7f85f run (16:35:05Z, 56 passed / 1 failed / 5 skipped). Its content changed after that
+  round read it (branch amended/force-pushed), which is further evidence the publish step is
+  unstable. Re-read now, that run says:
+  - FAIL `mini-skid.spec.js` › "module editor opens with demo sections" — the editor could
+    not be opened; the error dumps the estimate's module rows (Artificial Turf, Columns,
+    Concrete, …) with no Mini Skid Steer Demo among them.
+  - SKIP ×5 (rest of the Mini Skid suite) — all "Mini Skid Steer Demo editor not reachable
+    on this estimate." These are DATA skips, not selector skips: the module is absent from
+    the estimate behind `TEST_ESTIMATE_URL`. Nothing to harden in `e2e/`; fixing this needs
+    the estimate changed, which is Brian's call (and saving to a real job is off-limits to
+    tests).
+- `.autopilot-last` → 5833baf7; `.autopilot-last-payload` records real identity a52dc524 @ 14:57:00Z.
+- OPEN QUESTIONS (both carried, both blocking): (1) the CI publish step keeps committing a
+  results.json that is not the run it names — should it hard-fail when
+  `results.json` gitCommit != the SHA under test, and is the watch loop pushing a cached
+  artifact instead of the fresh `test-results/results.json`? (2) does `TEST_ESTIMATE_URL`
+  point at an estimate that has a Mini Skid Steer Demo module — if not, which estimate should
+  the Mini Skid / Skid Steer suites use?
