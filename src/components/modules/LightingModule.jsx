@@ -17,6 +17,7 @@ import {
   catalogItemFor,
   fetchModuleCatalog,
 } from '../../lib/materialCatalog'
+import { calcLighting } from './lightingCalc'
 
 const CATALOG_OPTS = { standardRows: 'null-vendor', stripPrefix: false }
 
@@ -116,109 +117,6 @@ function processSection(subcat, rows, materialRows, priceOf = item => n(item.uni
   return { hrs, mat, watts, va, sub, laborUnset }
 }
 
-function calcLighting(
-  state,
-  laborRatePerHour,
-  materialRows = [],
-  gpmd,
-  walkAccess = null,
-  laborBurdenPct,
-  priceOf = item => n(item.unit_cost),
-  materialMarkup = null,
-  commissionRate,
-  laborRates = {}
-) {
-  const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
-  const { difficulty, hoursAdj, fixtureRows, transformerRows, wireRows, manualRows, distanceLF } =
-    state
-  const isSub = state.subType === 'Subcontractor'
-
-  // Install labor is item-driven: each item points to its own labor_rates row via
-  // calc_meta.labor_rate (fixtures → Fixture Labor, bistro → Bistro Labor, etc.),
-  // resolved live inside processSection. Every rate is hours-per-unit so the calc
-  // is uniformly hrs = qty × rate. No fallback — unset ⇒ 0 hrs and a prompt.
-  const fx = processSection(LIGHT_CAT.fixture, fixtureRows, materialRows, priceOf, laborRates)
-  const xf = processSection(LIGHT_CAT.transformer, transformerRows, materialRows, priceOf, laborRates)
-  const wr = processSection(LIGHT_CAT.wire, wireRows, materialRows, priceOf, laborRates)
-  const laborUnset = isSub
-    ? []
-    : (() => {
-        const seen = new Set()
-        return [...fx.laborUnset, ...xf.laborUnset, ...wr.laborUnset].filter(u => {
-          const k = u && (u.name || u.label)
-          if (!k || seen.has(k)) return false
-          seen.add(k)
-          return true
-        })
-      })()
-
-  // Electrical load (fixtures) is shown on both tabs for transformer sizing.
-  const totalWatts = fx.watts + xf.watts + wr.watts
-  const totalVA = fx.va + xf.va + wr.va
-
-  const _markup = n(materialMarkup)
-  const rawMat = fx.mat + xf.mat + wr.mat
-  const markedUpMat = rawMat * (1 + _markup)
-
-  let manHrs = 0,
-    manMat = 0,
-    manSub = 0
-  ;(manualRows || []).forEach(r => {
-    manHrs += n(r.hours)
-    manMat += n(r.materials)
-    manSub += n(r.subCost)
-  })
-
-  // In-House labor hours from the itemized rows (0 on the Sub tab).
-  const itemHrs = isSub ? 0 : fx.hrs + xf.hrs + wr.hrs
-  const subtotalHrs = itemHrs
-  const diffHrs = subtotalHrs * (n(difficulty) / 100)
-  const _preWalkHrs = subtotalHrs + diffHrs + (isSub ? 0 : manHrs) + (isSub ? 0 : parseFloat(hoursAdj) || 0)
-  const walkHrs = isSub ? 0 : calcWalkAccessLabor(_preWalkHrs, distanceLF, { paceLfPerMin: _pace })
-  const totalHrs = _preWalkHrs + walkHrs
-  const manDays = totalHrs / 8
-
-  const totalMat = markedUpMat + (isSub ? 0 : manMat)
-  const laborCost = totalHrs * n(laborRatePerHour)
-  const burden = laborCost * n(laborBurdenPct)
-
-  let gp, subGp, commission, subCost, price
-  if (isSub) {
-    // Sub tab: flat $/each pricing, no labor. Route the itemized cost into
-    // subCost so GpmdBar's 'sub' variant totals it (subCost + subGp + comm).
-    const itemizedSub = fx.sub + xf.sub + wr.sub
-    subCost = itemizedSub + manSub
-    gp = 0
-    subGp = subCost * n(state.subGpMarkupRate)
-    commission = subGp * n(commissionRate)
-    price = subCost + subGp + commission
-  } else {
-    gp = manDays * n(gpmd)
-    subGp = 0
-    commission = gp * n(commissionRate)
-    subCost = manSub
-    price = totalMat + laborCost + burden + gp + commission + subCost
-  }
-
-  return {
-    totalHrs,
-    manDays,
-    totalMat,
-    totalWatts,
-    totalVA,
-    rawMat,
-    markedUpMat,
-    laborCost,
-    burden,
-    gp,
-    subGp,
-    commission,
-    subCost,
-    price,
-    walkHrs,
-    laborUnset,
-  }
-}
 
 // ── Default blank state ───────────────────────────────────────────────────────
 const blankRow = () => ({ vendor: 'Standard', itemId: '', qty: '', subEach: '' })

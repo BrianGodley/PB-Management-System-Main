@@ -138,3 +138,10 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
 - numeric fields → total; Sub tab prices; live edit moves total
 - unit layer (irrigationCalc.test.mjs, 8): zone labor value/edit-reflects, Trench-vs-Hand
   independence, timer labor, unset-rate→0, unpriced-BOM→`missing`+$0, Sub-tab 0-labor
+
+## Lighting (lighting.spec.js)
+- opens with Fixture / Transformer / Wire sections; vendor + item pickers populated
+- exhaustive vendor × item matrix (In-House + Sub); every-option NaN check
+- numeric fields → total; Sub tab prices (flat $/each); live edit moves total
+- unit layer (lightingCalc.test.mjs, 8): item-driven labor value/edit-reflects, material +
+  watts/VA, 15% markup, unset-item-labor→0+laborUnset, fixture-vs-wire independence, Sub 0-labor

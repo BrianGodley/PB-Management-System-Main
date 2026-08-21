@@ -1,5 +1,40 @@
 # Test results log
 
+## 2026-08-21 — Lighting: Layer A+B
+- **Layer A:** extracted inline `calcLighting` into pure `lightingCalc.js` (module imports
+  it). Inlined the supabase-tainted `calcWalkAccessLabor` + catalog resolvers
+  (`catalogOptions`/`catalogItemFor` + `isStandardSel`); carried the module's own
+  `LIGHT_CAT` / `CATALOG_OPTS` / `MATERIAL_MARKUP_NAME` / `processSection`. `lightingCalc.
+  test.mjs` = **8/8**: item-driven labor value (3 fixtures × 1.5 hr = 4.5 hrs → $337.50),
+  material + watts/VA accumulation, edit-reflects, material markup (15% → ×1.15),
+  unset-item-labor → 0 hrs + `laborUnset` flag (NO-FALLBACK), fixture-vs-wire section
+  independence, and the Sub tab (flat $/each = sub_price_ea, 0 labor, cost → subCost).
+  Module bundles clean (esbuild).
+- **Layer B:** `scripts/lighting-rate-coverage.mjs` (`test:lighting-coverage`) — Lighting
+  is fully catalog-driven: 3 sub_categories (Light Fixture / Transformer / Wire), material
+  vendor-first→Standard, install labor ITEM-DRIVEN via each item's `calc_meta.labor_rate`
+  (Fixture / Transformer / Bistro / Wire Labor), plus the `Lighting - Material Markup` misc
+  rate. Because labor keys live in DB calc_meta, DB-health SQL proves per-item coverage.
+  No-fallback + imports guards PASS. Full unit suite **190/190** (incl. 8 new Lighting).
+- **Layer C authored, pending CI:** `e2e/lighting.spec.js` (opens / vendor×item / numeric /
+  In-House↔Sub / live-edit / clean). Skips unless a Lighting module is on the test estimate.
+
+```
+### Lighting — definition-of-done sign-off (2026-08-21, A+B done; C/D/E pending)
+A. Unit:      value[x] edit[x] unpriced[x] vendor[~] priority[N/A] units[x] aggregator[N/A] sub-indep[x] breakdown[N/A] summary-parity[x]
+B. Audit:     coverage[x] orphan[~] no-fallback[x] no-hardcoded[x] imports[x]
+C. E2E:       opens[ ] vendor×item[ ] numeric[ ] sub[ ] live-edit[ ] clean[ ]  (authored; runs when a Lighting module is on the test estimate)
+D. DB:        priced[ ] no-dupes[ ] filing[ ]  (Brian's SQL step — every Lighting item's calc_meta.labor_rate priced + markup row exists)
+E. Loop:      red-first[N/A] catalogued[x] logged[x] green[ ]
+N/A items + reason:
+  A.priority — labor is item-driven (item.calc_meta.labor_rate), not a numeric-coeff ladder; unset ⇒ laborUnset (covered).
+  A.aggregator/breakdown — In-House↔Sub toggle, not per-type tabs; no per-tab materials breakdown.
+  A.vendor[~] — vendor override via catalogItemFor (vendor_id match → Standard null-vendor); covered structurally, not a dedicated unit assertion.
+  A.sub-indep[x] — Sub-tab test asserts totalHrs=0/laborCost=0 and cost routes to subCost independently of the In-House labor path.
+  A.summary-parity[x] — LightingSummary reads the saved calc snapshot; no separate summary calc to drift.
+  Layer A via lightingCalc.test.mjs (8); B via scripts/lighting-rate-coverage.mjs (test:lighting-coverage).
+```
+
 ## 2026-08-21 — Drainage Layer C GREEN (CI 28d0f0d, 18:57Z) — 82/82
 - ci-results `commit.txt` = 28d0f0d (the Drainage commit at master HEAD), **82 passed /
   0 unexpected / 0 flaky / 0 skipped** (up from 77 — Drainage's 5 specs are live). Drainage
