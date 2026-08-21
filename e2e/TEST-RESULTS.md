@@ -1,5 +1,32 @@
 # Test results log
 
+## 2026-08-21 — Layer C GREEN on CI 9854bc5: Skid Steer / Mini Skid / Concrete
+- Full suite **67 pass, 0 fail, 5 skip** (the 5 skips are all Pavers — see below).
+- **Skid Steer** `skid-steer.spec.js` 6/6, **Mini Skid** `mini-skid.spec.js` 6/6 (the
+  `openModule('Mini Skid')` short-label fix landed), **Concrete** `concrete.spec.js` 5/5.
+  → Layer C is now GREEN for all three; their sign-off C/E rows below flip to done.
+- **Pavers** `pavers.spec.js` = 0 pass / 5 skip — the Pavers module isn't on
+  `TEST_ESTIMATE_URL`. Add a Pavers module to the estimate and the next run exercises it
+  (its `opens` test skips-if-absent, so the suite stays green in the meantime).
+- Reminder: CI runs only the Playwright E2E; Layer A unit + Layer B coverage are local.
+
+Sign-off updates (Layer C green ⇒ C row all [x], E green[x]):
+```
+### Skid Steer Demo — C/E now green (CI 9854bc5)
+C. E2E: opens[x] dropdowns[x] numeric[x] sub[x] live-edit[x] clean[x]
+E. Loop: red-first[N/A] catalogued[x] logged[x] green[x]
+```
+```
+### Mini Skid Steer Demo — C/E now green (CI 9854bc5)
+C. E2E: opens[x] dropdowns[x] numeric[x] sub[x] live-edit[x] clean[x]
+E. Loop: red-first[x] catalogued[x] logged[x] green[x]   (red-first: opened under the short 'Mini Skid' row label, not the full type)
+```
+```
+### Concrete — C/E now green (CI 9854bc5)
+C. E2E: opens[x] vendor×item[x] numeric[x] sub[x] live-edit[x] clean[x]
+E. Loop: red-first[N/A] catalogued[x] logged[x] green[x]
+```
+
 ## 2026-08-21 — Pavers: Layer A+B (calc extraction + coverage)
 - **Layer A:** extracted inline `calcPaver` into pure `paverCalc.js` (module imports it;
   inline removed). Same lib entanglement as Concrete — inlined the pure helpers
@@ -970,3 +997,53 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
 - OPEN QUESTIONS (carried): (1) CI publish is serving a cached results.json — should it
   hard-fail when gitCommit != the SHA under test? (2) does `TEST_ESTIMATE_URL` point at an
   estimate containing a Mini Skid Steer Demo module?
+
+## 2026-08-21 — autopilot (ci-results be7c799, commit.txt = 9854bc5, updated_at 17:16Z) — GENUINE RUN, GREEN-WITH-SKIPS
+- Identity check **PASSED** (first time in 5 rounds): `commit.txt` = **9854bc5** and
+  `results.json.config.metadata.gitCommit.hash` = **9854bc5e0d09** ("auto(e2e): autopilot test
+  fix [17:09:54Z]"), startTime **17:11:46Z** — published 17:16Z. The cached-payload defect from
+  rounds 1-4 did not recur; no action needed on it, but the open question stands.
+- Stats: **67 passed / 0 failed / 5 skipped / 0 flaky** (303s). Full 14-spec suite, incl.
+  mini-skid, skid-steer and pavers.
+- The outdoor-kitchen `live edit reflects: changing a frozen-priced field moves the total`
+  failure carried by the stale payload is CONFIRMED GONE — it PASSED here on a genuine run.
+  Closed; no src/ change was ever made for it.
+- **5 skips, all `pavers.spec.js`** — the entire Pavers suite (opens / exhaustive vendor x item /
+  numeric / In-House+Sub / live edit). Reason on the first: "Pavers module not on this
+  estimate."; the other four: "Pavers editor not reachable on this estimate.". `openModule`
+  returned false, i.e. no `div.cursor-pointer` row matching "Pavers". Verified in src that the
+  module row label IS exactly `Pavers` (ModuleCategoryMap.jsx:18, EstimateDetail.jsx:56/2157),
+  so this is NOT a wrong-name selector bug — the CI estimate most likely has no Pavers module.
+  This is a SILENT GAP: the newest module suite verified nothing while reporting green.
+- FIX (e2e only): `e2e/pavers.spec.js` — added `openPavers(page)` helper that, on failure, calls
+  `moduleRowTitles(page)` and skips with the list of module rows actually on the estimate. All 5
+  skip sites now use it. Next run's skip message will say outright whether Pavers is absent from
+  the estimate or the row is marked up differently. `node --check` PASS. No src/, SQL or rate change.
+- `.autopilot-last` -> 9854bc5; `.autopilot-last-payload` -> 9854bc5 (genuine).
+- OPEN QUESTION: does `TEST_ESTIMATE_URL` point at an estimate that has a **Pavers** module (and a
+  **Mini Skid Steer Demo** one, carried from last round)? If not, which estimate should CI use —
+  or should a Pavers module be added to the current one?
+
+## 2026-08-21 — autopilot round: 0526aaa (67 passed, 0 failed, **5 skipped**)
+
+- ⚠ GREEN-WITH-SKIPS, not a clean pass. All 5 skips are the new `e2e/pavers.spec.js`
+  suite: "Pavers module not on this estimate." / "Pavers editor not reachable on this
+  estimate." Those 5 tests verified NOTHING — a silent gap, not an env gate
+  (`TEST_ESTIMATE_URL` is set; the whole-suite env skip did not fire).
+- Outdoor Kitchen "live edit reflects" — PASSED this round (previous round's failure was
+  the pre-hardening spec; the fillField + toHaveValue version is green).
+- Hardened `e2e/pavers.spec.js` (test-only, no src/, SQL or rate change):
+  - `openPavers()` now reports the module rows actually present on the estimate in the
+    skip reason (tells "Pavers isn't on this estimate" apart from "the row is named
+    differently") — was already in the working tree, still unpushed, so CI ran the
+    anonymous version.
+  - numeric-fields + live-edit tests use `fillField` (Layout.jsx marks inputs readonly
+    until first focus, so a bare `fill()` silently never lands) and assert
+    `toHaveValue` — separates "edit didn't land" from "total didn't move".
+  - live-edit no longer skips when it finds no numeric input; with the editor open that
+    is a failure, and it now says so.
+- `node --check e2e/pavers.spec.js` PASS.
+- `.autopilot-last` -> 0526aaa.
+- OPEN QUESTION (repeat): does `TEST_ESTIMATE_URL` point at an estimate that HAS a Pavers
+  module (and a Mini Skid Steer Demo one)? Next run's skip reason will list the estimate's
+  module rows, which answers it either way.
