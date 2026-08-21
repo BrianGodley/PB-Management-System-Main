@@ -158,18 +158,27 @@ test.describe('Fire Pit', () => {
       const fi = o.findIndex(x => FINISH.test(x))
       if (fi >= 0) { wf = all.nth(i); finishIdx = fi; break }
     }
-    test.skip(!wf, 'No finish TYPE picker found — no select on the page has a finish option (shared finishes not loading?).')
+    // HARD FAIL (not skip) if no finish picker exists — a missing finish picker is
+    // itself the bug (shared finishes not loading), and a skip reads as green.
+    expect(wf, 'No finish TYPE picker found — no select has a finish option (shared finishes not loading?).').not.toBeNull()
     await wf.selectOption({ index: finishIdx })
-    // Enter SF in the finish row, then read that row's cells.
+    // Enter SF in the finish row, then read that row's TOTAL cell (last td) — NOT the
+    // whole row. The whole-row text lets the material price's decimals ("$150.00")
+    // satisfy a naive "any decimal" check, which is exactly how this test used to pass
+    // while labor hrs were 0. The hours token is rendered ONLY as " · N.Nh" and ONLY
+    // when hrs>0 (FirePitModule ~L1786), so we assert that token explicitly.
     const row = wf.locator('xpath=ancestor::tr[1]')
     const sf = row.locator('input').first()
     await sf.click().catch(() => {})
     await sf.fill('50').catch(() => {})
     await page.waitForTimeout(600)
-    const region = await row.innerText()
+    const totalCell = await row.locator('td').last().innerText()
     await testInfo.attach('fire-pit-finish-value.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
-    expect(/\$\s?[1-9][\d,]*/.test(region), `finish material should be nonzero — got:\n${region.slice(0, 300)}`).toBe(true)
-    expect(/\b[1-9]\d*\.\d{1,2}\b/.test(region), `finish labor hrs should be nonzero (the fetch-scope bug) — got:\n${region.slice(0, 300)}`).toBe(true)
+    // Material: a real dollar amount in the total cell.
+    expect(/\$\s?[1-9][\d,]*(\.\d{2})?/.test(totalCell), `finish MATERIAL should be nonzero — total cell was:\n${totalCell}`).toBe(true)
+    // Labor: the explicit hours token "· N.Nh" (NOT just any decimal). This is what
+    // catches the real bug — zero hrs renders no "h" at all, so this must go red.
+    expect(/·\s*[1-9]\d*(\.\d+)?\s*h\b/i.test(totalCell), `finish LABOR hrs should be nonzero — no "· N.Nh" token in total cell:\n${totalCell}`).toBe(true)
   })
 
   // ── EXHAUSTIVE coverage — every field + every dropdown option ────────────────
