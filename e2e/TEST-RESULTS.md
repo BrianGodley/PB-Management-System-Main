@@ -540,3 +540,18 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
 - `e2e/hand-demo.spec.js` and `e2e/walls.spec.js` both exist at HEAD, so this is
   a publisher/runner problem, not a deleted-spec problem.
 - No edits made this run. Not treated as green; flagged to Brian.
+
+## 2026-08-20 — autopilot run (CI sha c466ba3) — ⚠ STALE ARTIFACT (repeat), NOT A PASS
+- `commit.txt` = c466ba3 ("auto(e2e): autopilot test fix [2026-08-21T03:39:09Z]"),
+  `updated_at.txt` = 2026-08-21T03:43:02Z.
+- results.json is byte-for-byte the SAME artifact flagged under 084cade:
+  `config.metadata.gitCommit.hash` = 4c4b18b994d44e3a3a2c05e9a38915cb4253d0fd,
+  `metadata.ci.buildHref` = actions/runs/32398956569,
+  `stats.startTime` = 2026-08-20T17:41:43Z, duration 106.1s.
+  ~10h older than the publish time — a replay, not a run of c466ba3.
+- Reported 22 expected / 0 unexpected / 0 flaky / 0 skipped; collection still
+  SHORT by 14 vs the 4b293cf baseline (36): missing hand-demo.spec.js (6),
+  walls.spec.js (7), and 1 fire-pit case.
+- Second consecutive publish of the same stale run ⇒ the publisher is re-pushing
+  the last downloaded artifact instead of waiting for the new CI run to finish.
+- No edits made this run. Not treated as green.
