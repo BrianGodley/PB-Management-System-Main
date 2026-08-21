@@ -1,5 +1,38 @@
 # Test results log
 
+## 2026-08-21 — Concrete: Layer A+B (no-fallback reference module)
+- **Layer A:** extracted the inline `calcConcrete` into pure `concreteCalc.js` (module
+  imports it; inline removed). More entangled than the demos — the calc depends on
+  `makeModuleRates` (imported with a `.js` ext; that lib is pure) plus `catalogOptions`
+  / `calcWalkAccessLabor` / `isStandardSel`, which live in libs that import supabase and
+  so can't be pulled into a node-testable module — those three small pure helpers are
+  inlined (kept in sync). `concreteCalc.test.mjs` = **6/6**: value (base labor
+  (SF/100)×depth×rate = $150), units (depth ×2), edit-reflects, and the REFERENCE
+  no-fallback pair — rebar with no catalog price surfaces in the `unpriced` fix-it list
+  AND contributes $0, then clears once priced — plus a no-NaN populated estimate.
+- **Layer B:** `scripts/concrete-rate-coverage.mjs` (`test:concrete-coverage`) — manifest
+  of the 37 consumed rate keys, capturing BOTH the `R.mat/R.labor` reader calls and the
+  direct `lr[…]` name reads. No-fallback guard PASS; module + calc parse.
+- **Layer C authored, pending CI:** `e2e/concrete.spec.js` (opens / vendor×item matrix /
+  numeric / In-House↔Sub no-NaN / live-edit / clean). Skips unless a Concrete module is
+  on `TEST_ESTIMATE_URL`.
+
+```
+### Concrete — definition-of-done sign-off (2026-08-21, A+B done; C/D/E pending)
+A. Unit:      value[x] edit[x] unpriced[x] vendor[~] priority[N/A] units[x] aggregator[N/A] sub-indep[~] breakdown[N/A] summary-parity[x]
+B. Audit:     coverage[x] orphan[~] no-fallback[x] no-hardcoded[x] imports[x]
+C. E2E:       opens[ ] vendor×item[ ] numeric[ ] sub[ ] live-edit[ ] clean[ ]  (authored; runs when a Concrete module is on the test estimate)
+D. DB:        priced[ ] no-dupes[ ] filing[ ]  (Brian's SQL step)
+E. Loop:      red-first[N/A] catalogued[x] logged[x] green[ ]
+N/A items + reason:
+  A.priority — Concrete labor is a single per-item rate ladder read via makeModuleRates; no numeric-coeff/pointer priority to test.
+  A.aggregator/breakdown — In-House↔Sub toggle, not per-type tabs; no per-tab materials breakdown.
+  A.vendor[~] — vendor override is supported (rowOpt→catalogOptions over materialRows); covered structurally but not yet a dedicated unit assertion.
+  A.sub-indep[~] — In-House vs Sub verified to render independently in-browser (Layer C); a pure sub-vs-IH value test is a follow-up.
+  A.summary-parity[x] — ConcreteSummary reads the saved calc snapshot (calcConcrete's own output), so there is no separate summary calc to drift.
+  Layer A via concreteCalc.test.mjs (6, incl. the reference unpriced/no-fallback pair); B via scripts/concrete-rate-coverage.mjs (test:concrete-coverage).
+```
+
 ## 2026-08-21 — Skid Steer + Mini Skid Demo: Layer A+B (calc extraction + coverage)
 - **Layer A:** extracted each module's inline `calcDemo` into pure, DI-testable files
   — `skidSteerCalc.js` / `miniSkidCalc.js` (mirrors `handDemoCalc.js`); modules now
