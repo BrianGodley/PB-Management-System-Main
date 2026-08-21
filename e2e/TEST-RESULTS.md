@@ -488,3 +488,13 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
 - Full collection present: auth.setup 1, code-changes 2, estimator 2,
   fire-pit 9, hand-demo 6, navigation 8, smoke 1, walls 7 = 36.
 - No edits made this run.
+
+## 2026-08-20 — autopilot run (CI sha dfb9566) — GREEN
+- `commit.txt` = dfb9566, `updated_at.txt` = 2026-08-21T03:01:09Z.
+- Artifact verified genuine: `config.metadata.gitCommit.hash` =
+  dfb9566f3135a03f88aa1c2bca7752bb840dfe94 == commit.txt, `stats.startTime` =
+  2026-08-21T02:58:50Z (matches publish time). Not a stale replay.
+- 36 expected / 0 unexpected / 0 flaky / 0 skipped, 137.2s.
+- Full collection present: auth.setup 1, code-changes 2, estimator 2,
+  fire-pit 9, hand-demo 6, navigation 8, smoke 1, walls 7 = 36.
+- No edits made this run.
