@@ -131,3 +131,10 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
 - opens with Wall Finishes section; every picker populated
 - shared wall finish resolves (no unpriced)
 - exhaustive vendor × item matrix (In-House + Sub); numeric → total; Sub prices; live edit
+
+## Irrigation (irrigation.spec.js)
+- opens with Zone / Timer sections; zone + timer pickers populated
+- exhaustive zone/timer × vendor matrix (In-House + Sub); every-option NaN check
+- numeric fields → total; Sub tab prices; live edit moves total
+- unit layer (irrigationCalc.test.mjs, 8): zone labor value/edit-reflects, Trench-vs-Hand
+  independence, timer labor, unset-rate→0, unpriced-BOM→`missing`+$0, Sub-tab 0-labor

@@ -1,5 +1,54 @@
 # Test results log
 
+## 2026-08-21 — Drainage Layer C GREEN (CI 28d0f0d, 18:57Z) — 82/82
+- ci-results `commit.txt` = 28d0f0d (the Drainage commit at master HEAD), **82 passed /
+  0 unexpected / 0 flaky / 0 skipped** (up from 77 — Drainage's 5 specs are live). Drainage
+  `drainage.spec.js` opened, exercised every vendor×item combo, priced numerics, both crew
+  modes, moved the total on live edit — all clean. Drainage C/E flip to done:
+```
+### Drainage — C/E now green (CI 28d0f0d)
+C. E2E: opens[x] vendor×item[x] numeric[x] sub[x] live-edit[x] clean[x]
+E. Loop: red-first[N/A] catalogued[x] logged[x] green[x]
+```
+- **Irrigation** commit (irrigationCalc + coverage + spec) is authored and verified locally
+  (8/8 unit, 182/182 suite, guards PASS) but **not yet pushed** — it'll deploy + run on the
+  next CI cycle once the Irrigation commit lands on master.
+
+## 2026-08-21 — Irrigation: Layer A+B
+- **Layer A:** extracted inline `calcIrrigation` into pure `irrigationCalc.js` (module
+  imports it). Inlined the supabase-tainted helpers (`resolveMaterialPrice` +
+  `calcWalkAccessLabor`) and carried the module's own `TIMER_TYPES` / `RATE_DEFAULTS` /
+  `computeTimerRow`; zone helpers (`makeBomPrice`, `computeZoneRow`) import directly from
+  `lib/irrigationZones.js` (pure — no supabase). `irrigationCalc.test.mjs` = **8/8**:
+  zone labor value (2 lawn zones × 3 hrs = 6 hrs → $450), edit-reflects (rate ×2 → labor
+  ×2), Trench-vs-Hand rate independence, timer labor (2 × 1.5 = 3 hrs → $225), unset-rate
+  → 0 (no constant), unpriced-BOM → row `missing` + $0 rawMat (NO-FALLBACK), and the Sub
+  tab (flat $/unit, 0 labor hours, cost → subCost). Module bundles clean (esbuild).
+- **Layer B:** `scripts/irrigation-rate-coverage.mjs` (`test:irrigation-coverage`) —
+  manifests 14 labor rates (11 zone Trench/Hand keys + timer/config), 8 timer materials
+  (`Irrigation Timer - N Station`), and 16 zone-BOM products (`IRR_PRODUCTS`), read from
+  both `irrigationCalc.js` and `lib/irrigationZones.js`. No-fallback + imports guards PASS.
+  Full unit suite **182/182** (incl. the 8 new Irrigation tests).
+- **Layer C authored, pending CI:** `e2e/irrigation.spec.js` (opens / zone×timer vendor /
+  numeric / In-House↔Sub / live-edit / clean). Skips unless an Irrigation module is on the
+  test estimate.
+
+```
+### Irrigation — definition-of-done sign-off (2026-08-21, A+B done; C/D/E pending)
+A. Unit:      value[x] edit[x] unpriced[x] vendor[~] priority[N/A] units[x] aggregator[N/A] sub-indep[x] breakdown[N/A] summary-parity[x]
+B. Audit:     coverage[x] orphan[~] no-fallback[x] no-hardcoded[x] imports[x]
+C. E2E:       opens[ ] vendor×item[ ] numeric[ ] sub[ ] live-edit[ ] clean[ ]  (authored; runs when an Irrigation module is on the test estimate)
+D. DB:        priced[ ] no-dupes[ ] filing[ ]  (Brian's SQL step)
+E. Loop:      red-first[N/A] catalogued[x] logged[x] green[ ]
+N/A items + reason:
+  A.priority — zone labor reads one Trench + one Hand key per zone by name; timer material is vendor-first→Standard. No numeric-coeff ladder to A/B-test.
+  A.aggregator/breakdown — In-House↔Sub toggle, not per-type tabs; no per-tab materials breakdown.
+  A.vendor[~] — vendor override supported via makeBomPrice (materialRows vendor line → Standard) + irrMatPrice on timers; covered structurally, not a dedicated unit assertion.
+  A.sub-indep[x] — Sub-tab test asserts totalHrs=0/laborCost=0 and cost routes to subCost independently of the In-House labor path.
+  A.summary-parity[x] — IrrigationSummary reads the saved calc snapshot; no separate summary calc to drift.
+  Layer A via irrigationCalc.test.mjs (8); B via scripts/irrigation-rate-coverage.mjs (test:irrigation-coverage).
+```
+
 ## 2026-08-21 — Drainage: Layer A+B
 - **Layer A:** extracted inline `calcDrainage` into pure `drainageCalc.js` (module
   imports it; inlined the catalog helpers + `calcWalkAccessLabor`, carried the module's
@@ -1182,3 +1231,13 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
 - OPEN QUESTION: did the CI job for `50f75b6` actually run Playwright, or did the build
   fail? The publish step should refuse to push a `results.json` whose `startTime` is older
   than the previously published one — want me to write that guard into the workflow?
+
+## 2026-08-21 — autopilot run (CI `28d0f0d`, published 18:57:57Z)
+
+- **GREEN.** 82 expected / 0 unexpected / 0 flaky / 0 skipped (run start 18:51:33Z,
+  duration 382s). Suite grew 77 -> 82 with the Drainage Layer A+B spec from `28d0f0d`.
+- `outdoor-kitchen.spec.js:151` "live edit reflects" passed — the stale-payload failure
+  logged against `50f75b6` above did not recur, so that report was indeed a stale
+  `results.json` and not a product issue. The publish-guard question below stays open.
+- No spec edits, no src/, SQL or rate changes this run.
+- `.autopilot-last` -> `28d0f0d`.
