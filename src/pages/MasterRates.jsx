@@ -193,6 +193,9 @@ const SUB_UNIT_OPTIONS = [
 // generic category-word strip for rows without a subcategory prefix.
 function displayItem(row, v) {
   let out = v || ''
+  // Demo module rates are intentionally named '<Module> - <item>' (Hand -, Skid -,
+  // Mini -); show the full name — don't strip the module prefix or repeat-strip it.
+  if (row.category === 'Demo') return out.trim()
   const pfx = row.sub_category ? `${row.sub_category} - ` : ''
   if (pfx && out.startsWith(pfx)) out = out.slice(pfx.length)
   else out = stripCategory(out, row.category)
