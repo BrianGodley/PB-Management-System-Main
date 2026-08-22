@@ -63,6 +63,16 @@ test('concrete demo: hours = CF × 0.1 (300 SF × 12in = 300 CF → 30 hrs)', ()
   finiteNums(r)
 })
 
+test('bucket checkbox multiplies that row hours by the Bucket coefficient', () => {
+  const rates = fullRates({ 'Demo - Hand Bucket Labor Mult': 2 })
+  const base = run({ dumpType: 'In House', concSF: 300, concDepth: 12 }, rates)
+  const bucketed = run({ dumpType: 'In House', concSF: 300, concDepth: 12, concBucket: true }, rates)
+  assert.equal(bucketed.laborCost, base.laborCost * 2, 'concrete bucket → ×2')
+  // Unset coefficient ⇒ no effect (identity), never zeroes.
+  const noCoef = run({ dumpType: 'In House', concSF: 300, concDepth: 12, concBucket: true }, fullRates())
+  assert.equal(noCoef.laborCost, base.laborCost, 'no bucket coefficient → checkbox is a no-op')
+})
+
 test('rebar toggle adds 25% to concrete hours', () => {
   const base = run({ dumpType: 'In House', concSF: 300, concDepth: 12 })
   const withRebar = run({ dumpType: 'In House', concSF: 300, concDepth: 12, rebar: true })

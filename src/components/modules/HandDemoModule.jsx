@@ -616,6 +616,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                     { label: '', w: 'w-32' },
                     { label: 'SF', w: 'w-24' },
                     { label: 'Depth (in)', w: 'w-20' },
+                    { label: 'Bucket', w: 'w-16' },
                     { label: 'Cu Yd', w: 'w-16' },
                     { label: 'Dump Fee', w: 'w-24' },
                     { label: 'Labor Hrs', w: 'w-20' },
@@ -699,6 +700,15 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                     value={state[dK]}
                     onChange={e => set(dK, e.target.value)}
                     placeholder={String(dep)}
+                  />
+                </td>
+                <td className={num}>
+                  <input
+                    type="checkbox"
+                    checked={!!state[sfK.replace(/SF$/, 'Bucket')]}
+                    onChange={e => set(sfK.replace(/SF$/, 'Bucket'), e.target.checked)}
+                    className="h-4 w-4"
+                    title="Bucket (confined access)"
                   />
                 </td>
                 <td className={num}>{row.cy > 0 ? row.cy.toFixed(2) : '—'}</td>
@@ -1041,64 +1051,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
         </button>
       </div>
 
-      {/* Hand Bucket Areas */}
-      <div className={isSub ? 'hidden' : undefined}>
-        <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>{subSectionTitle('Hand Bucket Areas', isSub)}</span>
-        </div>
-        <table className="w-full text-xs">
-          <TH
-            cols={[
-              { label: 'Description' },
-              { label: 'SF', w: 'w-24' },
-              { label: 'Depth (in)', w: 'w-20' },
-              { label: 'Cu Yd', w: 'w-16' },
-              ...(isSelf ? [{ label: 'Dump Fee', w: 'w-24' }] : []),
-              { label: 'Labor Hrs', w: 'w-20' },
-            ]}
-          />
-          <tbody className="divide-y divide-gray-50">
-            {state.bucketRows.map((r, i) => {
-              const cr = calc.bucketCalc[i] || { tons: 0, cy: 0, hours: 0, dumpFee: 0 }
-              return (
-                <tr key={i}>
-                  <td className={td}>
-                    <Inp
-                      type="text"
-                      value={r.label}
-                      onChange={e => setRow('bucketRows', i, 'label', e.target.value)}
-                      placeholder={`Area ${i + 1}`}
-                    />
-                  </td>
-                  <td className={td}>
-                    <Inp
-                      value={r.sf}
-                      onChange={e => setRow('bucketRows', i, 'sf', e.target.value)}
-                    />
-                  </td>
-                  <td className={td}>
-                    <Inp
-                      value={r.depth}
-                      onChange={e => setRow('bucketRows', i, 'depth', e.target.value)}
-                      placeholder="4"
-                    />
-                  </td>
-                  <td className={num}>{cr.cy > 0 ? cr.cy.toFixed(2) : '—'}</td>
-                  {isSelf && <td className={num}>{cr.dumpFee > 0 ? fmt2(cr.dumpFee) : '—'}</td>}
-                  <td className={num}>{fh(cr.hours)}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-        <button
-          type="button"
-          onClick={() => set('bucketRows', [...state.bucketRows, { label: '', sf: '', depth: 4 }])}
-          className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
-        >
-          + Add Row
-        </button>
-      </div>
+      {/* Hand Bucket Areas removed — Bucket is now a per-row checkbox on Main Demo. */}
 
       {isSub && (
         <>

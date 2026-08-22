@@ -144,9 +144,12 @@ export function calcDemo(
   dirt.dumpFee = containerCost(state.dirtSF, state.dirtDepth || 4)
   grass.dumpFee = containerCost(state.grassSF, state.grassDepth || 4)
   // Hand-demo removal labor: hours = Cu Ft × rate. Concrete ×rebarFactor.
-  conc.hours = flatCf(state.concSF, state.concDepth || 4) * hrConc * rebarFactor
-  dirt.hours = flatCf(state.dirtSF, state.dirtDepth || 4) * hrSoil
-  grass.hours = flatCf(state.grassSF, state.grassDepth || 4) * hrGrass
+  // Bucket checkbox (confined access) multiplies a Main Demo row's hours by the
+  // Bucket coefficient. Unset coefficient ⇒ no effect (identity), never zeroes.
+  const bk = on => (on && bucketLaborMult > 0 ? bucketLaborMult : 1)
+  conc.hours = flatCf(state.concSF, state.concDepth || 4) * hrConc * rebarFactor * bk(state.concBucket)
+  dirt.hours = flatCf(state.dirtSF, state.dirtDepth || 4) * hrSoil * bk(state.dirtBucket)
+  grass.hours = flatCf(state.grassSF, state.grassDepth || 4) * hrGrass * bk(state.grassBucket)
 
   const miscFlatCalc = (state.miscFlatRows || []).map(r => {
     const row = flat(r.sf, r.depth || 4, rateConc, 0)
@@ -167,20 +170,13 @@ export function calcDemo(
     return row
   })
 
-  // ── Hand Bucket Areas (confined-access manual work) ───────────────────────
-  // Hand Bucket Areas: identical square-foot calc to Concrete demo but at
-  // DOUBLE the rate (tight/confined access), and the same container disposal.
-  const bucketCalc = (state.bucketRows || []).map(r => {
-    const row = flat(r.sf, r.depth || 4, rateConc, 0)
-    row.hours = flatCf(r.sf, r.depth || 4) * hrBucket
-    row.dumpFee = containerCost(r.sf, r.depth || 4)
-    return row
-  })
+  // Hand Bucket Areas section removed — Bucket is now a per-row checkbox (bk() above).
+  const bucketCalc = []
 
   // ── Grading ──────────────────────────────────────────────────────────────
   const gradeCut = flat(state.gradeCutSF, state.gradeCutDepth || 4, rateConc, 0)
   gradeCut.dumpFee = containerCost(state.gradeCutSF, state.gradeCutDepth || 4)
-  gradeCut.hours = flatCf(state.gradeCutSF, state.gradeCutDepth || 4) * hrGradeCut
+  gradeCut.hours = flatCf(state.gradeCutSF, state.gradeCutDepth || 4) * hrGradeCut * bk(state.gradeCutBucket)
   const gradeFill = flat(state.gradeFillSF, state.gradeFillDepth || 4, rateBase, 0)
   gradeFill.hours = flatCf(state.gradeFillSF, state.gradeFillDepth || 4) * hrGradeFill
 
