@@ -81,18 +81,10 @@ const RAISED_SURFACE_TYPES = [
   'Integral Color Stucco',
 ]
 
-// ── Excavation equipment — CY/hr net rate lives in labor_rates keyed by the
-//    EXCAVATION_LABOR_NAME below (read live; no hardcoded rate). 'Sub Bobcat /
-//    Mini Bob' is a sub cost, not a labor rate (null name).
+// ── Excavation equipment — excavation labor now maps to the Skid Steer module's
+//    shared 'Skid - Soil' rate (hrs/CY), so 'Skid Steer' is the only equipment.
 const EXCAVATION_LABOR_NAME = {
-  'IH - Bobcat 72"': 'Excavation - IH Bobcat 72',
-  'IH - Bobcat 64"': 'Excavation - IH Bobcat 64',
-  'Rental 48"': 'Excavation - Rental 48',
-  'Rental 42"': 'Excavation - Rental 42',
-  'Medium Excavator': 'Excavation - Medium Excavator',
-  'Large Excavator': 'Excavation - Large Excavator',
-  'Hand Dig': 'Excavation - Hand Dig',
-  'Sub Bobcat / Mini Bob': null, // sub cost, not a labor rate
+  'Skid Steer': 'Skid - Soil',
 }
 const EXCAVATION_TYPES = Object.keys(EXCAVATION_LABOR_NAME)
 
@@ -496,7 +488,7 @@ function makeTab(data = {}) {
     // (handled in Job Site Conditions).
     excavation: {
       mode: 'In-House',
-      equipment: 'IH - Bobcat 72"',
+      equipment: 'Skid Steer',
       toDumpMiles: '',
       subVendor: 'Our Trucking',
       subVendorId: null,

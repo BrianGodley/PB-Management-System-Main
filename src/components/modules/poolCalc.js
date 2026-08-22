@@ -69,16 +69,8 @@ function resolveUtilRow(cat, row, houseArr, materialRows, mp, opts = {}) {
 }
 
 // ── Carried module constants + helpers the calc consumes ──
-const EXCAVATION_LABOR_NAME = {
-  'IH - Bobcat 72"': 'Excavation - IH Bobcat 72',
-  'IH - Bobcat 64"': 'Excavation - IH Bobcat 64',
-  'Rental 48"': 'Excavation - Rental 48',
-  'Rental 42"': 'Excavation - Rental 42',
-  'Medium Excavator': 'Excavation - Medium Excavator',
-  'Large Excavator': 'Excavation - Large Excavator',
-  'Hand Dig': 'Excavation - Hand Dig',
-  'Sub Bobcat / Mini Bob': null, // sub cost, not a labor rate
-}
+// Excavation labor maps to the shared Skid Steer 'Skid - Soil' rate (read directly
+// in the calc below); no per-machine excavation rate map is needed anymore.
 
 export const WATER_FEATURE_SUBCAT = 'Water Features'
 const WATER_FEATURE_TYPES = ['Sheer Descents', 'Fire/Water Bowls', 'Deck Jets', 'Water Slides']
