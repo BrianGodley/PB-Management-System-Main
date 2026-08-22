@@ -202,30 +202,43 @@ export function calcPool(state, materialPrices, laborRates, subRates = {}, walkA
   // the module tab. 'Sub' greys the excavation out (a flat subcontractor cost); 'In
   // House' digs with equipment (labor hrs) AND hauls the spoil off (Containers or Sub
   // Haul, a $/Cu Yd sub cost). totalExcavCY already includes the fluff/swell factor.
-  const excMode = excavation.mode || (state.subType === 'Subcontractor' ? 'Sub' : 'In House')
+  const excMode = excavation.mode || 'In House'
   const isSubExcav = excMode === 'Sub'
   // hrs/CY rate read live from labor_rates['Excavation - ...'] — no fallback.
   const excavLaborName = EXCAVATION_LABOR_NAME[excavation.equipment]
   const equipRate = n(excavLaborName && laborRates[excavLaborName])
   const excavHrs = !isSubExcav ? totalExcavCY * equipRate : 0 // rate is hrs per Cu Yd
-  // Haul-off (In-House excavation only): $/Cu Yd × dug volume. Method rate read live
-  // from subcontractor_rates by name — unset ⇒ 0 (no hardcoded 55/70).
-  const haulRatePerCY = !isSubExcav
-    ? excavation.haulMethod === 'Containers'
-      ? n(subRates['Excavation - Container per Cu Yd'])
-      : excavation.haulMethod === 'Sub Haul'
+  // Haul-off MATERIAL (In-House excavation only). yards = totalExcavCY (SF × avg depth
+  // ÷ 27 × fluff). Sub Haul is priced BY THE YARD ($/CY × yards); roll-off Containers are
+  // priced BY THE CONTAINER (# containers = ceil(yards ÷ 10 CY capacity) × $/container).
+  // Rates read live from subcontractor_rates by name — unset ⇒ 0 (no hardcoded 55/70).
+  const ROLL_OFF_YDS_PER_CONTAINER = 10
+  const isContainerHaul = excavation.haulMethod === 'Containers'
+  const isSubHaul = excavation.haulMethod === 'Sub Haul'
+  const haulUnitRate = !isSubExcav
+    ? isContainerHaul
+      ? n(subRates['Excavation - Roll Off per Container'])
+      : isSubHaul
         ? n(subRates['Excavation - Sub Haul per Cu Yd'])
         : 0
     : 0
-  const excavHaulSub = totalExcavCY * haulRatePerCY
-  // Sub-excavation cost: auto-fill from the chosen sub's stored rate (per-CY rates ×
-  // dug volume; flat/lump used as-is), overridable by a manually entered subCost.
+  const haulContainers =
+    !isSubExcav && isContainerHaul && ROLL_OFF_YDS_PER_CONTAINER > 0
+      ? Math.ceil(totalExcavCY / ROLL_OFF_YDS_PER_CONTAINER)
+      : 0
+  const excavHaulMat = !isSubExcav
+    ? isContainerHaul
+      ? haulContainers * haulUnitRate
+      : isSubHaul
+        ? totalExcavCY * haulUnitRate
+        : 0
+    : 0
+  // Sub-excavation cost (mode Sub only): auto-fill from the chosen sub's stored rate
+  // (per-CY rates × dug volume; flat/lump used as-is), overridable by a manual subCost.
   const excavAutoSub = /yd/i.test(excavation.subRateUnit || '')
     ? n(excavation.subRate) * totalExcavCY
     : n(excavation.subRate)
-  // In-House excavation still routes its haul cost into subCost so it lands in the
-  // In-House total; a fully subbed excavation routes the subcontractor cost.
-  const excavSub = isSubExcav ? (n(excavation.subCost) || excavAutoSub) : excavHaulSub
+  const excavSub = isSubExcav ? (n(excavation.subCost) || excavAutoSub) : 0
 
   // Shotcrete / Interior Finish / Plumbing / Steel auto-subs apply on the Sub
   // tab ONLY. On the In-House tab their AUTO amount is not charged (done
@@ -590,7 +603,7 @@ export function calcPool(state, materialPrices, laborRates, subRates = {}, walkA
   const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
   const totalHrs = _preWalkHrs + walkHrs
   const manDays = totalHrs / 8
-  const totalMat = tileMat + spillwayMat + waterFeatureMat + copingMat + raisedMat + epMat + steelMat + shotcreteMat + manMat + plumbMatIH
+  const totalMat = tileMat + spillwayMat + waterFeatureMat + copingMat + raisedMat + epMat + steelMat + shotcreteMat + excavHaulMat + manMat + plumbMatIH
   // Pool's genuine sub trades (excavation / shotcrete / interior / equipment /
   // plumbing / steel / manual-sub). These are sub costs on either tab.
   const subTradeCost =
@@ -637,8 +650,11 @@ export function calcPool(state, materialPrices, laborRates, subRates = {}, walkA
     totalShotCY,
     excavHrs,
     excavAutoSub,
-    excavHaulSub,
-    haulRatePerCY,
+    excavHaulMat,
+    haulUnitRate,
+    haulContainers,
+    isContainerHaul,
+    isSubHaul,
     excMode,
     shotcreteMat,
     shotcreteHrs,

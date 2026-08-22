@@ -1206,7 +1206,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         {/* Excavation has its OWN In-House/Sub toggle (independent of the module tab):
             Sub greys out the dig; In-House shows Equipment + Haul Method. */}
         {(() => {
-          const excMode = T.excavation.mode || (isSub ? 'Sub' : 'In House')
+          const excMode = T.excavation.mode || 'In House'
           return (
             <div className="flex items-center justify-between gap-2 mb-2">
               <div className="flex-1">
@@ -1229,7 +1229,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             </div>
           )
         })()}
-        {(T.excavation.mode || (isSub ? 'Sub' : 'In House')) === 'In House' ? (
+        {(T.excavation.mode || 'In House') === 'In House' ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="sm:col-span-2">
               <Label text="Equipment" />
@@ -1323,9 +1323,11 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         )}
         {calc.excMode === 'In House' && T.excavation.haulMethod && (
           <p className="text-xs text-gray-500 mt-1 px-1">
-            {T.excavation.haulMethod}: ${calc.haulRatePerCY || '—'} per Cu Yd × {calc.totalExcavCY.toFixed(1)} →{' '}
-            <strong>${Math.round(calc.excavHaulSub).toLocaleString()}</strong> haul (sub)
-            {calc.haulRatePerCY <= 0 && ` — rate "Excavation - ${T.excavation.haulMethod === 'Containers' ? 'Container' : 'Sub Haul'} per Cu Yd" unpriced`}
+            {calc.isContainerHaul
+              ? <>Containers: {calc.haulContainers} × ${calc.haulUnitRate || '—'} per container (ceil {calc.totalExcavCY.toFixed(1)} Cu Yd ÷ 10) →{' '}</>
+              : <>Sub Haul: {calc.totalExcavCY.toFixed(1)} Cu Yd × ${calc.haulUnitRate || '—'} per Cu Yd →{' '}</>}
+            <strong>${Math.round(calc.excavHaulMat).toLocaleString()}</strong> haul (material)
+            {calc.haulUnitRate <= 0 && ` — rate "Excavation - ${calc.isContainerHaul ? 'Roll Off per Container' : 'Sub Haul per Cu Yd'}" unpriced`}
           </p>
         )}
       </div>
