@@ -2,7 +2,7 @@
 //   In-House labor model: hrs = (SF / 100) × depth_in × rate  (a MULTIPLY — higher
 //   rate ⇒ more hours; hrs-per-unit, no production-rate divide). totalHrs (diff=1,
 //   no walk) → laborCost = totalHrs × lrph. Sub grading is per-SF; sub tree per-each.
-//   Reads 'Demo - Mini …' rate keys, independent of Hand/Mini.
+//   Reads 'Mini - …' rate keys, independent of Hand/Mini.
 // Run: node --test src/components/modules/skidSteerCalc.test.mjs
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -20,26 +20,26 @@ const fullRates = (over = {}) => ({
   'Mini - Compaction': 0.0033,   // hrs / Cu Ft
   'Basic Labor - Jumping Jack': 0.04, // shared, hrs / Cu Ft
   'Basic Labor - Difficulty Ratio': 1, // shared
-  'Demo - Mini - Grass SF': 0.3, // unchanged (per 100 sf·in)
-  'Demo - Mini Skid Steer Grass': 0.3,
+  'Mini - Grass SF': 0.3, // unchanged (per 100 sf·in)
+  'Mini - Skid Steer Grass': 0.3,
   'Mini - Shrubs 0-1 ft': 0.09, 'Mini - Shrubs 1-2 ft': 0.12, 'Mini - Shrubs 2-3 ft': 0.18,
   'Mini - Shrubs 3-4 ft': 0.24, 'Mini - Shrubs 4-5 ft': 0.3,
   'Mini - Stump Small': 1, 'Mini - Stump Medium': 2, 'Mini - Stump Large': 3, 'Mini - Stump XL': 4,
   'Mini - Tree Small': 1, 'Mini - Tree Medium': 2, 'Mini - Tree Large': 3,
-  'Demo - Mini Tons SF-in Denominator': 150,
-  'Demo - Mini Concrete Weight lb/cf': 150,
-  'Demo - Mini Haul Sec/Ft': 1,
-  'Demo - Mini Load (CY)': 1,
+  'Mini - Tons SF-in Denominator': 150,
+  'Mini - Concrete Weight lb/cf': 150,
+  'Mini - Haul Sec/Ft': 1,
+  'Mini - Load (CY)': 1,
   ...over,
 })
 const fullMat = (over = {}) => ({
-  'Demo - Mini Container (Low-Boy)': 500,
-  'Demo - Mini Container Capacity (CY)': 12,
-  'Demo - Mini Removal Swell': 1.3,
-  'Demo - Mini Import Base $/10cy': 300,
-  'Demo - Mini Dump - Concrete': 0,
-  'Demo - Mini Dump - Dirt': 0,
-  'Demo - Mini Dump - Green Waste': 0,
+  'Mini - Container (Low-Boy)': 500,
+  'Mini - Container Capacity (CY)': 12,
+  'Mini - Removal Swell': 1.3,
+  'Mini - Import Base $/10cy': 300,
+  'Mini - Dump - Concrete': 0,
+  'Mini - Dump - Dirt': 0,
+  'Mini - Dump - Green Waste': 0,
   ...over,
 })
 const fullSub = (over = {}) => ({

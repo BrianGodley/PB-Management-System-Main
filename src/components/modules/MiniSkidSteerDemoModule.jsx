@@ -6,18 +6,18 @@ import ModuleHeaderSlot from './ModuleHeaderSlot'
 //
 // All labor rates pulled from labor_rates table (lr[]) with constant fallbacks.
 // Rate keys for mini-specific rates differ from full SS:
-//   'Demo - Mini Skid Steer Concrete/Dirt'   0.75 t/hr
-//   'Demo - Mini Skid Steer Grass'           0.75 t/hr
-//   'Demo - Mini Skid Steer Import Base'     5.0 t/hr
-//   'Demo - Mini SS Compaction'          1.23 t/hr
+//   'Mini - Skid Steer Concrete/Dirt'   0.75 t/hr
+//   'Mini - Skid Steer Grass'           0.75 t/hr
+//   'Mini - Skid Steer Import Base'     5.0 t/hr
+//   'Mini - SS Compaction'          1.23 t/hr
 // Shared with full SS:
-//   'Demo - Mini JJ Compaction', 'Demo - Mini Shrub', 'Demo - Stump 1st/Additional',
-//   'Demo - Tree Small/Medium/Large', 'Demo - Mini Rebar'
+//   'Mini - JJ Compaction', 'Mini - Shrub', 'Demo - Stump 1st/Additional',
+//   'Demo - Tree Small/Medium/Large', 'Mini - Rebar'
 //
 // Mini-specific dump fee differences vs full SS:
 //   • Import Base carries $7.50/ton dump fee
 //   • Misc Flat/Vert/Footing carry $36.21/ton concrete dump fee
-//   • Trees use $125.33/ton 'Demo - Mini Dump - Tree/Stump'
+//   • Trees use $125.33/ton 'Mini - Dump - Tree/Stump'
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback, useContext, useRef } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
@@ -660,7 +660,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 row: calc.grass,
                 fee: dumpGreen,
                 rate: calc.laborGrass,
-                rateName: 'Demo - Mini - Grass SF',
+                rateName: 'Mini - Grass SF',
                 rateNote: `${calc.laborGrass} hr/100 Sq Ft per in deep`,
                 rateUnit: 'hr/100 Sq Ft per in deep',
                 extraIcon: null,
@@ -1039,10 +1039,10 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
               />
               <tbody className="divide-y divide-gray-50">
                 {[
-                  { label: 'Trash Per 12 Yard Load', key: 'haulTrashLoads', rate: calc.haulTrashRate, rateName: 'Demo - Mini Sub Haul - Trash 12yd' },
-                  { label: 'Concrete Per 12 Yard Load', key: 'haulConcreteLoads', rate: calc.haulConcreteRate, rateName: 'Demo - Mini Sub Haul - Concrete 12yd' },
-                  { label: 'Soil Per 12 Yard Load', key: 'haulSoilLoads', rate: calc.haulSoilRate, rateName: 'Demo - Mini Sub Haul - Soil 12yd' },
-                  { label: 'Import Base Per 12 Yard Load', key: 'haulBaseLoads', rate: calc.haulBaseRate, rateName: 'Demo - Mini Sub Haul - Import Base 12yd' },
+                  { label: 'Trash Per 12 Yard Load', key: 'haulTrashLoads', rate: calc.haulTrashRate, rateName: 'Mini - Sub Haul - Trash 12yd' },
+                  { label: 'Concrete Per 12 Yard Load', key: 'haulConcreteLoads', rate: calc.haulConcreteRate, rateName: 'Mini - Sub Haul - Concrete 12yd' },
+                  { label: 'Soil Per 12 Yard Load', key: 'haulSoilLoads', rate: calc.haulSoilRate, rateName: 'Mini - Sub Haul - Soil 12yd' },
+                  { label: 'Import Base Per 12 Yard Load', key: 'haulBaseLoads', rate: calc.haulBaseRate, rateName: 'Mini - Sub Haul - Import Base 12yd' },
                 ].map(({ label, key, rate, rateName }) => (
                   <tr key={key}>
                     <td className={`${td} font-medium text-gray-700`}>
