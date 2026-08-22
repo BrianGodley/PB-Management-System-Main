@@ -200,3 +200,12 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   labor independence, planter prep + tilling, sod + fertilizer bags (ceil), DG Cu-Yd × markup, gravel excavation,
   material NO-FALLBACK, Sub flat $/SF-$/LF independence, no-NaN
 - coverage manifest: `npm run test:gt-coverage` (14 material + 18 labor + 9 'GT -' coeffs + 9 sub rates + 10 catalog sub_categories)
+
+## Pool (pool.spec.js)
+- opens with Structure Dimensions / Excavation / Shotcrete / Waterline Tile / Water Features / Spillways / Equipment sections; pickers populated
+- exhaustive vendor × item matrix (In-House + Sub); every-option NaN check
+- numeric fields → total; In-House + Sub both render; live edit (Hours Adj, In-House toggle) moves total
+- unit layer (poolCalc.test.mjs, 8): excavation CY volume + In-House hrs value/edit-reflects, excavation Sub ($/CY × volume),
+  water features (qty × item labor + qty × item unit_cost, vendor catalog), material NO-FALLBACK (unpriced feature → $0/0hrs),
+  excavation NO-FALLBACK (unset equip rate → 0 hrs), Sub-tab in-house hours → 0, no-NaN
+- coverage manifest: `npm run test:pool-coverage` (7 excavation labor + 8 misc coeffs + 9 sub rates + item-driven tile/coping/spillway/raised/water-feature/utilities/equipment)

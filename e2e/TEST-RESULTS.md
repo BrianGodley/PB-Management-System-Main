@@ -1,5 +1,44 @@
 # Test results log
 
+## 2026-08-22 — Pool: Layer A+B (extraction battery) — the last module
+- **Layer A:** extracted the ~516-line `calcPool` into pure `poolCalc.js` (module now
+  `import { calcPool } from './poolCalc'`). Programmatic byte-identical slice; inlined the
+  supabase-tainted `calcWalkAccessLabor` + catalog resolvers (`catalogOptions`/`catalogItemFor`)
+  + the whole `resolveUtilRow`/`mergedUtilTypes` from lib/utilRow; carried the module's
+  `poolStdItem`/`defaultSubVendor`/`defaultEquipVendor` + constants (EXCAVATION_LABOR_NAME,
+  WATER_FEATURE_SUBCAT, UTIL_CAT). `poolCalc.test.mjs` = **8/8**: excavation In-House CY volume
+  + hrs (CY × equip rate) + edit-reflects; excavation Sub ($/CY × dug volume, 0 IH hrs); water
+  features (2 × $500 = $1000 mat, 2 × 12 = 24 hrs, per-row breakdown emitted); material
+  NO-FALLBACK (unpriced feature → $0/0hrs); excavation NO-FALLBACK (unset equip rate → 0 hrs);
+  Sub-tab moves in-house hours → 0; no-NaN populated. Module bundles clean (esbuild).
+- **Layer B:** `scripts/pool-rate-coverage.mjs` (`test:pool-coverage`) — Pool consumes **7
+  excavation labor rates** (hrs/CY) + **8 tunable misc coefficients** + **9 subcontractor
+  rates** (Pool), plus ITEM-DRIVEN labor (each catalog item's calc_meta.labor_rate) for
+  Waterline Tile / Coping / Spillway / Raised Surface / Water Features / Equipment / the shared
+  Utilities lines, all vendor-first material. No-fallback + imports guards PASS. Full unit suite
+  **243/243** (incl. 8 new Pool).
+- **Layer C authored, pending CI:** `e2e/pool.spec.js` (opens / vendor×item / numeric /
+  In-House↔Sub / live-edit via Hours Adj + In-House toggle + `> p` leaf selector / clean).
+  Skips unless a Pool module is on the test estimate.
+
+```
+### Pool — definition-of-done sign-off (2026-08-22, A+B done; C/D/E pending)
+A. Unit:      value[x] edit[x] unpriced[x] vendor[x] priority[N/A] units[x] aggregator[x] sub-indep[x] breakdown[~] summary-parity[x]
+B. Audit:     coverage[x] orphan[~] no-fallback[x] no-hardcoded[~] imports[x]
+C. E2E:       opens[ ] vendor×item[ ] numeric[ ] sub[ ] live-edit[ ] clean[ ]  (authored; runs when a Pool module is on the test estimate)
+D. DB:        priced[ ] no-dupes[ ] filing[ ]  (Brian's SQL step — excavation labor + Pool coeffs + sub rates priced; every Pool catalog item's calc_meta.labor_rate priced)
+E. Loop:      red-first[N/A] catalogued[x] logged[x] green[ ]
+N/A items + reason:
+  A.priority — per-section formulas keyed by equipment/item, not a numeric-coeff priority ladder; unset ⇒ 0 (covered).
+  A.aggregator[x] — every section aggregates into totalHrs + totalMat; the populated no-NaN test exercises the aggregation.
+  A.vendor[x] — water-features test asserts the vendor catalog unit_cost drives material; excavation labor by equipment.
+  A.sub-indep[x] — Sub-tab test asserts excavHrs=0 (in-house hours move to flat sub costs).
+  A.breakdown[~] — per-row breakdowns (waterFeatureCalc/tileCalc/spillwayCalc/copingCalc) feed PoolSummary parity; asserted structurally.
+  A.summary-parity[x] — PoolSummary renders from the saved calc snapshot's per-line arrays (fixed earlier); no separate summary calc to drift.
+  B.no-hardcoded[~] — the 27 cf/cy volume conversions are math-invariant literals (allowed), not rate values.
+  Layer A via poolCalc.test.mjs (8); B via scripts/pool-rate-coverage.mjs (test:pool-coverage).
+```
+
 ## 2026-08-22 — GT run 01:50Z — 5/5 GREEN (summary guard deployed)
 - Targeted run of `ground-treatments.spec.js`: **6 expected / 0 unexpected / 0 flaky / 0
   skipped** (37s). All 5 GT tests GREEN once the DG-summary ÷0 guard (bba2e18) actually

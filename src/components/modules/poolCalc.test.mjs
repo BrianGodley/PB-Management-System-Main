@@ -1,0 +1,112 @@
+// Acceptance tests for the pure Pool calc (no network).
+//   Excavation: CY = (waterSF × avgDepth / 27) × swell; In-House hrs = CY × equip rate
+//   (labor_rates['Excavation - …']); Sub = subRate × CY (or flat). Water Features: hrs =
+//   qty × labor_rates[item.calc_meta.labor_rate]; mat = qty × item.unit_cost (vendor catalog).
+//   Coefficients (avg-depth ratio, swells, tile coverage) read live from materialPrices; NO
+//   hardcoded rate fallbacks (unset ⇒ 0). Sub tab moves the module's in-house hours to $0.
+// Run: node --test src/components/modules/poolCalc.test.mjs
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { calcPool } from './poolCalc.js'
+
+const off = () => ({ enabled: false })
+const base = () => ({
+  pool: off(), spa: off(), vault: off(), basin: off(), trough: off(),
+  excavation: {}, shotcrete: {}, tile: {}, interiorFinish: {}, plumbing: {}, steel: {},
+  spillways: [], waterFeatures: [], copingRows: [], raisedSurfaces: [], equipment: [], manualRows: [],
+  epLineRows: [], epGasRows: [], epWireRows: [], epElecRows: [], epTrenchRows: [], gasFixtureRows: [],
+  laborRatePerHour: 75, laborBurdenPct: 0.3, gpmd: 500, commissionRate: 0.05, subGpMarkupRate: 0.2,
+  subType: 'In House', rateOverrides: {},
+})
+// calcPool(state, materialPrices, laborRates, subRates, walkAccess, materialRows)
+const run = (state, mp = {}, lr = {}, subRates = {}, materialRows = []) =>
+  calcPool({ ...base(), ...state }, mp, lr, subRates, null, materialRows)
+
+const finiteNums = obj => { for (const [k, v] of Object.entries(obj)) if (typeof v === 'number') assert.ok(Number.isFinite(v), `${k} not finite: ${v}`) }
+const near = (a, b, eps = 1e-6) => assert.ok(Math.abs(a - b) < eps, `${a} !≈ ${b}`)
+
+// Coefficients used across the excavation tests.
+const EXC_MP = { 'Pool Avg Depth Ratio': 0.5, 'Pool Excavation Swell Factor': 1, 'Pool Shotcrete Shell Thickness': 0, 'Pool Shotcrete Swell Factor': 1 }
+
+test('excavation In-House: CY = (waterSF × avgDepth / 27) × swell; hrs = CY × equip rate', () => {
+  const r = run(
+    { pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' }, excavation: { equipment: 'Hand Dig' } },
+    EXC_MP, { 'Excavation - Hand Dig': 0.5 }
+  )
+  // avgDepth = 6 × 0.5 = 3; CY = (400 × 3 / 27) × 1 = 44.444…
+  near(r.totalExcavCY, (400 * 3 / 27) * 1)
+  near(r.excavHrs, ((400 * 3) / 27) * 0.5)
+  assert.ok(r.price > 0, 'a priced excavation produces a positive price')
+  finiteNums(r)
+})
+
+test('excavation edit-reflects: raising the equipment CY rate raises excavation hours', () => {
+  const a = run({ pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' }, excavation: { equipment: 'Hand Dig' } }, EXC_MP, { 'Excavation - Hand Dig': 0.5 })
+  const b = run({ pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' }, excavation: { equipment: 'Hand Dig' } }, EXC_MP, { 'Excavation - Hand Dig': 1.0 })
+  near(b.excavHrs, a.excavHrs * 2)
+})
+
+test('excavation Sub: subRate per Cu Yd × dug volume, zero In-House excavation hours', () => {
+  const r = run(
+    { subType: 'Subcontractor', pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' },
+      excavation: { equipment: 'Hand Dig', subRate: '20', subRateUnit: 'per yd' } },
+    EXC_MP, { 'Excavation - Hand Dig': 0.5 }
+  )
+  assert.equal(r.excavHrs, 0, 'sub tab has no In-House excavation hours')
+  near(r.excavAutoSub, 20 * ((400 * 3) / 27)) // $20/CY × CY
+})
+
+test('water features value: hrs = qty × item labor rate; mat = qty × item unit_cost (vendor catalog)', () => {
+  const rows = [{
+    id: 'wf1', name: 'Sheer Descent 24in', sub_category: 'Water Features', category: 'Pool',
+    vendor_id: null, unit_cost: 500, calc_meta: { water_feature_type: 'Sheer Descents', labor_rate: 'Pool - Sheer Descent Labor' },
+  }]
+  const r = run(
+    { waterFeatures: [{ vendor: 'Standard', wfType: 'Sheer Descents', type: 'Sheer Descent 24in', qty: '2' }] },
+    {}, { 'Pool - Sheer Descent Labor': 12 }, {}, rows
+  )
+  assert.equal(r.waterFeatureMat, 2 * 500, `waterFeatureMat got ${r.waterFeatureMat}`)
+  assert.equal(r.waterFeatureHrs, 2 * 12, `waterFeatureHrs got ${r.waterFeatureHrs}`)
+  assert.equal(r.waterFeatureCalc.length, 1, 'per-row breakdown emitted for the summary')
+})
+
+test('material NO-FALLBACK: an unpriced water feature (no catalog row) → $0 material, 0 labor', () => {
+  const r = run(
+    { waterFeatures: [{ vendor: 'Standard', wfType: 'Sheer Descents', type: 'Sheer Descent 24in', qty: '2' }] },
+    {}, {}, {}, [] // empty catalog
+  )
+  assert.equal(r.waterFeatureMat, 0, 'no catalog item → $0 material (no hidden constant)')
+  assert.equal(r.waterFeatureHrs, 0, 'no resolvable labor rate → 0 hours')
+})
+
+test('excavation NO-FALLBACK: unset equipment CY rate → 0 excavation hours (no constant)', () => {
+  const r = run(
+    { pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' }, excavation: { equipment: 'Hand Dig' } },
+    EXC_MP, {} // no Excavation rate
+  )
+  assert.ok(r.totalExcavCY > 0, 'volume still computes from geometry')
+  assert.equal(r.excavHrs, 0, 'unset equip rate → 0 hours')
+})
+
+test('sub tab moves in-house work off the books: total In-House hours drop to 0', () => {
+  const inhouse = run({ pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' }, excavation: { equipment: 'Hand Dig' } }, EXC_MP, { 'Excavation - Hand Dig': 0.5 })
+  const sub = run({ subType: 'Subcontractor', pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' }, excavation: { equipment: 'Hand Dig', subRate: '20', subRateUnit: 'per yd' } }, EXC_MP, { 'Excavation - Hand Dig': 0.5 })
+  assert.ok(inhouse.excavHrs > 0, 'In-House tab charges excavation hours')
+  assert.equal(sub.excavHrs, 0, 'Sub tab charges a flat sub cost, no In-House hours')
+  finiteNums(sub)
+})
+
+test('no NaN across a populated estimate (excavation + water feature + manual)', () => {
+  const rows = [{ id: 'wf1', name: 'Sheer Descent 24in', sub_category: 'Water Features', category: 'Pool', vendor_id: null, unit_cost: 500, calc_meta: { water_feature_type: 'Sheer Descents', labor_rate: 'Pool - Sheer Descent Labor' } }]
+  const r = run(
+    {
+      pool: { enabled: true, waterSF: '450', maxDepth: '6', perimLF: '90' },
+      excavation: { equipment: 'Hand Dig' },
+      waterFeatures: [{ vendor: 'Standard', wfType: 'Sheer Descents', type: 'Sheer Descent 24in', qty: '2' }],
+      manualRows: [{ hours: 4, materials: 50, subCost: 0 }],
+    },
+    { ...EXC_MP, 'Pool Shotcrete Shell Thickness': 0.5 }, { 'Excavation - Hand Dig': 0.5, 'Pool - Sheer Descent Labor': 12 }, {}, rows
+  )
+  finiteNums(r)
+  assert.ok(r.price > 0, 'price is positive with priced sections')
+})
