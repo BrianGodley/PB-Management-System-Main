@@ -1,5 +1,45 @@
 # Test results log
 
+## 2026-08-22 — Artificial Turf: Layer A+B (extraction battery)
+- **Layer A:** extracted the ~285-line `calcTurf` into pure `artificialTurfCalc.js` (module now
+  `import { calcTurf } from './artificialTurfCalc'`; keeps its own helper copies for JSX).
+  Inlined the supabase-tainted `calcWalkAccessLabor` + catalog resolvers
+  (`catalogItemFor`/`catalogOptions`) and carried the constants + `baseTypePrice`/`turfBrandRow`
+  the calc consumes. `artificialTurfCalc.test.mjs` = **8/8**: turf roll (100 LF × 15' = 1500 SF;
+  × 0.01 = 15 hrs; × $3 = $4500) + edit-reflects; demo tonnage ((1000/100)×4 = 40 T; × 0.5 =
+  20 hrs; × $10 dump = $400); base Gravel Cu-Yd qty + labor + material; vendor-first base price
+  override ($40 vendor vs $30 Standard); material NO-FALLBACK (unpriced brand → $0 mat, labor
+  still computes; unset demo divisor → 0 tons); Sub tab (roll → flat installSF×($/SF sub +
+  brand) = $5000, base suppressed, 0 labor); no-NaN populated. Fixed one test that read a
+  non-returned `baseMat` top-level key → use per-row `baseCalc[].mat`. Module bundles clean.
+- **Layer B:** `scripts/turf-rate-coverage.mjs` (`test:turf-coverage`) — Turf consumes **7 labor
+  rates** (5 demo methods hrs/Ton + turf/strip install) + **14 misc coefficients/consumables** +
+  **3 dump fees** + **2 subcontractor rates**, plus base material (Base Material / Decomposed
+  Granite / Barriers sub_categories) and turf-brand material (Turf Material), both vendor-first.
+  Roll width / base depths are documented geometry-spec fallbacks (allowed). No-fallback +
+  imports guards PASS. Full unit suite **224/224** (incl. 8 new Turf).
+- **Layer C authored, pending CI:** `e2e/artificial-turf.spec.js` (opens / vendor×Type / numeric /
+  In-House↔Sub / live-edit via Hours Adj + In-House toggle + `> p` leaf selector / clean). Matches
+  the "Turf"/"Artificial Turf" row title. Skips unless a Turf module is on the test estimate.
+
+```
+### Artificial Turf — definition-of-done sign-off (2026-08-22, A+B done; C/D/E pending)
+A. Unit:      value[x] edit[x] unpriced[x] vendor[x] priority[N/A] units[x] aggregator[x] sub-indep[x] breakdown[N/A] summary-parity[x]
+B. Audit:     coverage[x] orphan[~] no-fallback[x] no-hardcoded[~] imports[x]
+C. E2E:       opens[ ] vendor×Type[ ] numeric[ ] sub[ ] live-edit[ ] clean[ ]  (authored; runs when a Turf module is on the test estimate)
+D. DB:        priced[ ] no-dupes[ ] filing[ ]  (Brian's SQL step — 7 labor + 14 misc + 3 dump + 2 sub rates priced; base/turf catalog Items priced)
+E. Loop:      red-first[N/A] catalogued[x] logged[x] green[ ]
+N/A items + reason:
+  A.priority — per-section formulas keyed by material/method, not a numeric-coeff priority ladder; unset ⇒ 0 (covered).
+  A.breakdown — Demo/Prep/Install/Strip row sections + In-House↔Sub toggle; no per-tab materials breakdown.
+  A.aggregator[x] — demo/base/roll/strip aggregate into rawHrs + totalMat; the populated no-NaN test exercises the whole aggregation.
+  A.vendor[x] — dedicated test: a real vendor's shared base-row price overrides the Standard price.
+  A.sub-indep[x] — Sub-tab test asserts totalHrs=0/baseHrs=0 and the flat $/SF cost routes into subCost, base suppressed.
+  A.summary-parity[x] — ArtificialTurfSummary reads the saved calc snapshot; no separate summary calc to drift.
+  B.no-hardcoded[~] — roll width (15') + Class II/DG install depths are documented geometry-spec fallbacks (allowed), not rate values.
+  Layer A via artificialTurfCalc.test.mjs (8); B via scripts/turf-rate-coverage.mjs (test:turf-coverage).
+```
+
 ## 2026-08-22 — Finishes run 00:47Z — 5/5 GREEN (first try)
 - Targeted run of `finishes.spec.js`: **6 expected / 0 unexpected / 0 flaky / 0 skipped**
   (28s; 6th is auth.setup). All 5 Finishes tests GREEN on the first attempt — the In-House

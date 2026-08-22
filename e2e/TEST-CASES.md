@@ -181,3 +181,13 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   wall Ledgerstone composite (×1.1 + screws), vendor-first material override, material NO-FALLBACK,
   Sub flat $/unit independence, no-NaN
 - coverage manifest: `npm run test:finishes-coverage` (17 material/consumable + 15 labor rates)
+
+## Artificial Turf (artificial-turf.spec.js)
+- opens with Demo / Turf Prep / Turf Installation / Strips sections; vendor + Type/brand pickers populated
+- exhaustive vendor × Type matrix (In-House + Sub); every-option NaN check
+- numeric fields → total; In-House + Sub both render; live edit (Hours Adj, In-House toggle) moves total
+- unit layer (artificialTurfCalc.test.mjs, 8): turf roll value/edit-reflects (edgeLF×width×rate, ×$/SF),
+  demo tonnage (SF/divisor×in → hrs×rate, ×dump fee), base Gravel Cu-Yd qty + labor, vendor-first base
+  price override, material NO-FALLBACK (unpriced brand/unset divisor → $0), Sub flat $/SF (base suppressed,
+  0 labor) independence, no-NaN
+- coverage manifest: `npm run test:turf-coverage` (7 labor + 14 misc + 3 dump fees + 2 sub rates + base/turf catalog)
