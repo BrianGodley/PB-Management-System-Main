@@ -198,20 +198,34 @@ export function calcPool(state, materialPrices, laborRates, subRates = {}, walkA
   const totalShotCY = activeStructs.reduce((s, x) => s + shotcreteCYFn(x.s), 0)
 
   // ─ Excavation ─
-  // Excavation follows the module In-House/Sub tab (no separate toggle): In-House
-  // = equipment hours, Sub = subcontractor cost.
-  const isSubExcav = state.subType === 'Subcontractor'
-  // CY/hr rate read live from labor_rates['Excavation - ...'] — no fallback.
+  // Per-section In-House/Sub toggle (independent of the module tab). Default: follow
+  // the module tab. 'Sub' greys the excavation out (a flat subcontractor cost); 'In
+  // House' digs with equipment (labor hrs) AND hauls the spoil off (Containers or Sub
+  // Haul, a $/Cu Yd sub cost). totalExcavCY already includes the fluff/swell factor.
+  const excMode = excavation.mode || (state.subType === 'Subcontractor' ? 'Sub' : 'In House')
+  const isSubExcav = excMode === 'Sub'
+  // hrs/CY rate read live from labor_rates['Excavation - ...'] — no fallback.
   const excavLaborName = EXCAVATION_LABOR_NAME[excavation.equipment]
   const equipRate = n(excavLaborName && laborRates[excavLaborName])
   const excavHrs = !isSubExcav ? totalExcavCY * equipRate : 0 // rate is hrs per Cu Yd
-  // Sub cost: auto-fill from the chosen sub's stored rate (per-CY rates are
-  // multiplied by dug volume; flat/lump rates used as-is), overridable by a
-  // manually entered subCost on this estimate.
+  // Haul-off (In-House excavation only): $/Cu Yd × dug volume. Method rate read live
+  // from subcontractor_rates by name — unset ⇒ 0 (no hardcoded 55/70).
+  const haulRatePerCY = !isSubExcav
+    ? excavation.haulMethod === 'Containers'
+      ? n(subRates['Excavation - Container per Cu Yd'])
+      : excavation.haulMethod === 'Sub Haul'
+        ? n(subRates['Excavation - Sub Haul per Cu Yd'])
+        : 0
+    : 0
+  const excavHaulSub = totalExcavCY * haulRatePerCY
+  // Sub-excavation cost: auto-fill from the chosen sub's stored rate (per-CY rates ×
+  // dug volume; flat/lump used as-is), overridable by a manually entered subCost.
   const excavAutoSub = /yd/i.test(excavation.subRateUnit || '')
     ? n(excavation.subRate) * totalExcavCY
     : n(excavation.subRate)
-  const excavSub = isSubExcav ? (n(excavation.subCost) || excavAutoSub) : 0
+  // In-House excavation still routes its haul cost into subCost so it lands in the
+  // In-House total; a fully subbed excavation routes the subcontractor cost.
+  const excavSub = isSubExcav ? (n(excavation.subCost) || excavAutoSub) : excavHaulSub
 
   // Shotcrete / Interior Finish / Plumbing / Steel auto-subs apply on the Sub
   // tab ONLY. On the In-House tab their AUTO amount is not charged (done
@@ -609,6 +623,9 @@ export function calcPool(state, materialPrices, laborRates, subRates = {}, walkA
     totalShotCY,
     excavHrs,
     excavAutoSub,
+    excavHaulSub,
+    haulRatePerCY,
+    excMode,
     tileHrs,
     tileCalc,
     spillwayHrs,

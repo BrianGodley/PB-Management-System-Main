@@ -96,6 +96,47 @@ test('sub tab moves in-house work off the books: total In-House hours drop to 0'
   finiteNums(sub)
 })
 
+test('excavation In-House + Sub Haul: haul = CY × $/CY (55), routed into subCost; equipment hrs still charged', () => {
+  const r = run(
+    { pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' },
+      excavation: { mode: 'In House', equipment: 'Hand Dig', haulMethod: 'Sub Haul' } },
+    EXC_MP, { 'Excavation - Hand Dig': 0.5 }, { 'Excavation - Sub Haul per Cu Yd': 55 }
+  )
+  const cy = (400 * 3) / 27
+  near(r.excavHaulSub, cy * 55, 1e-6)
+  near(r.excavHrs, cy * 0.5, 1e-6) // In-House still digs (labor hours)
+  assert.ok(r.subCost >= cy * 55 - 1e-6, 'haul cost lands in subCost (In-House total)')
+})
+
+test('excavation Haul Method: Containers ($70/CY) vs Sub Haul ($55/CY) read different rates', () => {
+  const st = { pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' }, excavation: { mode: 'In House', equipment: 'Hand Dig' } }
+  const rates = { 'Excavation - Sub Haul per Cu Yd': 55, 'Excavation - Container per Cu Yd': 70 }
+  const subHaul = run({ ...st, excavation: { ...st.excavation, haulMethod: 'Sub Haul' } }, EXC_MP, { 'Excavation - Hand Dig': 0.5 }, rates)
+  const cont = run({ ...st, excavation: { ...st.excavation, haulMethod: 'Containers' } }, EXC_MP, { 'Excavation - Hand Dig': 0.5 }, rates)
+  const cy = (400 * 3) / 27
+  near(subHaul.excavHaulSub, cy * 55, 1e-6)
+  near(cont.excavHaulSub, cy * 70, 1e-6)
+})
+
+test('excavation mode "Sub" (on the In-House module tab): equipment/haul off, flat sub cost only', () => {
+  const r = run(
+    { pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' },
+      excavation: { mode: 'Sub', equipment: 'Hand Dig', haulMethod: 'Containers', subRate: '20', subRateUnit: 'per yd' } },
+    EXC_MP, { 'Excavation - Hand Dig': 0.5 }, { 'Excavation - Container per Cu Yd': 70 }
+  )
+  assert.equal(r.excavHrs, 0, 'subbed excavation charges no In-House hours')
+  assert.equal(r.excavHaulSub, 0, 'subbed excavation charges no separate haul (all-in sub)')
+  near(r.excavSub, 20 * ((400 * 3) / 27), 1e-6) // $/CY sub cost
+})
+
+test('haul NO-FALLBACK: a haul method with no seeded $/CY rate → $0 haul (no constant)', () => {
+  const r = run(
+    { pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' }, excavation: { mode: 'In House', equipment: 'Hand Dig', haulMethod: 'Sub Haul' } },
+    EXC_MP, { 'Excavation - Hand Dig': 0.5 }, {} // no haul rate seeded
+  )
+  assert.equal(r.excavHaulSub, 0, 'unset haul rate → $0 (no hidden 55/70 constant)')
+})
+
 test('no NaN across a populated estimate (excavation + water feature + manual)', () => {
   const rows = [{ id: 'wf1', name: 'Sheer Descent 24in', sub_category: 'Water Features', category: 'Pool', vendor_id: null, unit_cost: 500, calc_meta: { water_feature_type: 'Sheer Descents', labor_rate: 'Pool - Sheer Descent Labor' } }]
   const r = run(

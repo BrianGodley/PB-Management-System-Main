@@ -1203,11 +1203,35 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
 
       {/* ─── 2. Excavation ─── */}
       <div>
-        <SectionHeader title="Excavation" />
-        {/* Excavation follows the module In-House / Sub tab — no separate toggle. */}
-        {!isSub ? (
+        {/* Excavation has its OWN In-House/Sub toggle (independent of the module tab):
+            Sub greys out the dig; In-House shows Equipment + Haul Method. */}
+        {(() => {
+          const excMode = T.excavation.mode || (isSub ? 'Sub' : 'In House')
+          return (
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex-1">
+                <SectionHeader title="Excavation" />
+              </div>
+              <div className="flex rounded-lg border border-gray-200 overflow-hidden shrink-0">
+                {['In House', 'Sub'].map(m => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => upd('excavation', { ...T.excavation, mode: m })}
+                    className={`px-3 py-1.5 text-xs font-medium ${
+                      excMode === m ? 'bg-green-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
+        {(T.excavation.mode || (isSub ? 'Sub' : 'In House')) === 'In House' ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="sm:col-span-3">
+            <div className="sm:col-span-2">
               <Label text="Equipment" />
               <select
                 className="input text-sm py-1.5 w-full"
@@ -1217,6 +1241,18 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                 {EXCAVATION_TYPES.filter(t => t !== 'Sub Bobcat / Mini Bob').map(t => (
                   <option key={t}>{t}</option>
                 ))}
+              </select>
+            </div>
+            <div>
+              <Label text="Haul Method" />
+              <select
+                className="input text-sm py-1.5 w-full"
+                value={T.excavation.haulMethod || ''}
+                onChange={e => upd('excavation', { ...T.excavation, haulMethod: e.target.value })}
+              >
+                <option value="">Select…</option>
+                <option value="Containers">Containers</option>
+                <option value="Sub Haul">Sub Haul</option>
               </select>
             </div>
             <div>
@@ -1285,6 +1321,13 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             <strong>{calc.excavHrs.toFixed(1)} hrs</strong>
           </p>
         )}
+        {calc.excMode === 'In House' && T.excavation.haulMethod && (
+          <p className="text-xs text-gray-500 mt-1 px-1">
+            {T.excavation.haulMethod}: ${calc.haulRatePerCY || '—'} per Cu Yd × {calc.totalExcavCY.toFixed(1)} →{' '}
+            <strong>${Math.round(calc.excavHaulSub).toLocaleString()}</strong> haul (sub)
+            {calc.haulRatePerCY <= 0 && ` — rate "Excavation - ${T.excavation.haulMethod === 'Containers' ? 'Container' : 'Sub Haul'} per Cu Yd" unpriced`}
+          </p>
+        )}
       </div>
 
       {/* ─── Steel (before Shotcrete) ─── */}
@@ -1343,7 +1386,8 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         ) : null}
         {!isSub && n(T.steel.sf) * n(T.steel.lfPerSf) > 0 && (
           <p className="text-xs text-gray-400 mt-2 px-1">
-            {(n(T.steel.sf) * n(T.steel.lfPerSf)).toFixed(0)} LF → {fmt2(calc.steelMat)} mat
+            {(n(T.steel.sf) * n(T.steel.lfPerSf)).toFixed(0)} LF → {fmt2(calc.steelMat)} mat · {calc.steelHrs.toFixed(1)} hrs
+            {calc.steelHrs <= 0 && ` (labor rate "${POOL_STEEL_LABOR}" unpriced)`}
           </p>
         )}
         {isSub && (
