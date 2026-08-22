@@ -168,6 +168,13 @@ test.describe('Outdoor Kitchen', () => {
     // in .catch(() => {}), so a fill that never landed looked exactly like a total
     // that refused to move. The toHaveValue assertions separate the two cases —
     // if the value sticks but the total does not move, that is a product bug.
+    const fieldAfterLabel = text =>
+      page
+        .locator('label')
+        .filter({ hasText: text })
+        .filter({ visible: true })
+        .first()
+        .locator('xpath=following::input[1]')
     const label = page
       .locator('label')
       .filter({ hasText: /BBQ Wall Length/i })
@@ -182,6 +189,20 @@ test.describe('Outdoor Kitchen', () => {
       target,
       'No input follows the BBQ Wall Length label — the field markup changed.'
     ).toHaveCount(1)
+    // BBQ wall area = (height ÷ 12) × length, so with the height field left BLANK the
+    // wall SF stays 0 no matter what length we type and the total legitimately never
+    // moves — a harness gap, not a recompute bug. "48" in the height box is only a
+    // placeholder, never a value. Set the height explicitly first so the field we are
+    // driving actually has a quantity to multiply. (No dollar value is being set here —
+    // this is a dimension the user types, not a rate.)
+    const heightIn = fieldAfterLabel(/BBQ Wall Height/i)
+    if (await heightIn.count()) {
+      if (!(await heightIn.inputValue())) {
+        await fillField(heightIn, '48')
+        await expect(heightIn, 'BBQ Wall Height did not accept 48').toHaveValue('48')
+        await page.waitForTimeout(300)
+      }
+    }
     // fillField (not fill): Layout.jsx's autofill guard marks every input
     // readonly until its first focus, and fill()'s editable check runs BEFORE
     // it focuses — so a bare fill() times out on a field the user can type in.

@@ -104,6 +104,10 @@ test.describe('Planting', () => {
   test('live edit reflects: changing Hours Adj moves the total (Goal 4 in-browser)', async ({ page }) => {
     const { ok, why } = await openPlanting(page)
     test.skip(!ok, why)
+    // Ensure the In-House tab is active — the saved module can open on the Subcontractor
+    // tab, where "Job Site Conditions / Hours Adj" (In-House only) is not rendered.
+    const ihBtn = page.getByRole('button', { name: /^in.?house$/i }).first()
+    if (await ihBtn.count()) { await ihBtn.click().catch(() => {}); await page.waitForTimeout(300) }
     const dollars = () => page.evaluate(() => (document.body.innerText.match(/\$[\d,]+(\.\d+)?/g) || []).join('|'))
     // Drive "Hours Adj (±hrs)" specifically, NOT the first numeric input. The module's first
     // numeric field is Difficulty (%), which only *scales* existing labor hours — it cannot

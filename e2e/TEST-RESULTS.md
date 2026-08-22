@@ -1,5 +1,17 @@
 # Test results log
 
+## 2026-08-22 — Finishes run 00:47Z — 5/5 GREEN (first try)
+- Targeted run of `finishes.spec.js`: **6 expected / 0 unexpected / 0 flaky / 0 skipped**
+  (28s; 6th is auth.setup). All 5 Finishes tests GREEN on the first attempt — the In-House
+  toggle + `> p` direct-child leaf selector (carried over from the Planting/Weed fixes) meant
+  no live-edit iteration this time. Finishes definition-of-done C/E → green:
+  - C. E2E: opens[x] vendor×Type[x] numeric[x] sub[x] live-edit[x] clean[x]
+  - E. Loop: green[x]
+  - D (DB-health SQL) stays Brian's step (17 material + 15 labor rates priced; catalog Items per vendor).
+- Extraction battery COMPLETE (A/B/C green) for: Skid, Mini, Concrete, Pavers, Utilities,
+  Drainage, Irrigation, Lighting, Steps, Planting, Weed Abatement, **Finishes**. Remaining:
+  ArtificialTurf, GroundTreatments, Pool.
+
 ## 2026-08-22 — Finishes: Layer A+B (extraction battery)
 - **Layer A:** extracted the inline `calcFinishes` (+ its `computeFlat/Cap/WallRow` +
   `finishMatPriceV` helpers and the `FINISHES_RATES`/`FINISH_CAT_ITEM` maps it needs) into

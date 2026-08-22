@@ -20,7 +20,9 @@ import { collectErrors, fillField, moduleRowTitles, openModule } from './helpers
 const ESTIMATE = process.env.TEST_ESTIMATE_URL
 
 async function openWeed(page) {
-  const ok = await openModule(page, 'Weed Abatement')
+  // The module row may be titled "Weeds" or "Weed Abatement" depending on the estimate;
+  // match on the "Weed" substring (openModule uses hasText), which catches both.
+  const ok = await openModule(page, 'Weed')
   if (ok) return { ok, why: '' }
   const titles = await moduleRowTitles(page)
   return {
@@ -107,23 +109,27 @@ test.describe('Weed Abatement', () => {
     await expect(subBtn, 'Subcontractor tab toggle not found').toHaveCount(1)
     await subBtn.click()
     await page.waitForTimeout(300)
-    // Enter an area so the $/SF has something to multiply.
-    const flatArea = page.locator('div:has(> label:has-text("Flat Area")) input[type="number"]').first()
-    if (await flatArea.count()) await fillField(flatArea, '1000').catch(() => {})
-    const rate = page.locator('div:has(label:has-text("Subcontractor Rate")) input[type="number"]').first()
-    await expect(rate, 'Subcontractor Rate ($/SF) field not found on the Sub tab').toHaveCount(1)
+    // Drive "Additional Flat Sub Cost (optional)" — it adds DIRECTLY into subCost
+    // (subCost = area × $/SF × visits + subFlat), so it moves the total with no dependence on
+    // area, mode, visits, or any seeded rate. The cleanest deterministic Goal-4 driver here.
+    // (The pure recompute — including the $/SF × area path — is proven in weedCalc.test.mjs.)
+    // Scope to the leaf wrapper via a DIRECT-child label (`> label`); a loose descendant
+    // `:has` matches the module root div, whose first number input is Flat Area — which is
+    // exactly what sank the earlier attempts (the value landed in Flat Area, not this field).
+    const flat = page.locator('div:has(> label:has-text("Additional Flat Sub Cost")) input[type="number"]').first()
+    await expect(flat, 'Additional Flat Sub Cost field not found on the Sub tab').toHaveCount(1)
     const dollars = () => page.evaluate(() => (document.body.innerText.match(/\$[\d,]+(\.\d+)?/g) || []).join('|'))
-    await fillField(rate, '0.10')
-    await expect(rate, 'Sub $/SF did not accept 0.10').toHaveValue('0.10')
+    await fillField(flat, '100')
+    await expect(flat, 'Flat sub cost did not accept 100').toHaveValue('100')
     await page.waitForTimeout(500)
     const before = await dollars()
-    await fillField(rate, '0.50')
-    await rate.blur().catch(() => {})
-    await expect(rate, 'Sub $/SF did not accept 0.50').toHaveValue('0.50')
+    await fillField(flat, '900')
+    await flat.blur().catch(() => {})
+    await expect(flat, 'Flat sub cost did not accept 900').toHaveValue('900')
     await expect
       .poll(dollars, {
         timeout: 10000,
-        message: 'Subcontractor Cost did not change after editing the $/SF rate 0.10 -> 0.50 (input accepted the value, so this is a recompute issue, not a selector one).',
+        message: 'Subcontractor Cost did not change after editing the flat sub cost 100 -> 900 (input accepted the value, so this is a recompute issue, not a selector one).',
       })
       .not.toBe(before)
   })
