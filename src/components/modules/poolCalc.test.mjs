@@ -31,7 +31,7 @@ const EXC_MP = { 'Pool Avg Depth Ratio': 0.5, 'Pool Excavation Swell Factor': 1,
 test('excavation In-House: CY = (waterSF × avgDepth / 27) × swell; hrs = CY × equip rate', () => {
   const r = run(
     { pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' }, excavation: { equipment: 'Hand Dig' } },
-    EXC_MP, { 'Excavation - Hand Dig': 0.5 }
+    EXC_MP, { 'Skid - Soil': 0.5 }
   )
   // avgDepth = 6 × 0.5 = 3; CY = (400 × 3 / 27) × 1 = 44.444…
   near(r.totalExcavCY, (400 * 3 / 27) * 1)
@@ -41,8 +41,8 @@ test('excavation In-House: CY = (waterSF × avgDepth / 27) × swell; hrs = CY ×
 })
 
 test('excavation edit-reflects: raising the equipment CY rate raises excavation hours', () => {
-  const a = run({ pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' }, excavation: { equipment: 'Hand Dig' } }, EXC_MP, { 'Excavation - Hand Dig': 0.5 })
-  const b = run({ pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' }, excavation: { equipment: 'Hand Dig' } }, EXC_MP, { 'Excavation - Hand Dig': 1.0 })
+  const a = run({ pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' }, excavation: { equipment: 'Hand Dig' } }, EXC_MP, { 'Skid - Soil': 0.5 })
+  const b = run({ pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' }, excavation: { equipment: 'Hand Dig' } }, EXC_MP, { 'Skid - Soil': 1.0 })
   near(b.excavHrs, a.excavHrs * 2)
 })
 
@@ -50,7 +50,7 @@ test('excavation Sub: subRate per Cu Yd × dug volume, zero In-House excavation 
   const r = run(
     { pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' },
       excavation: { mode: 'Sub', equipment: 'Hand Dig', subRate: '20', subRateUnit: 'per yd' } },
-    EXC_MP, { 'Excavation - Hand Dig': 0.5 }
+    EXC_MP, { 'Skid - Soil': 0.5 }
   )
   assert.equal(r.excavHrs, 0, 'sub tab has no In-House excavation hours')
   near(r.excavAutoSub, 20 * ((400 * 3) / 27)) // $20/CY × CY
@@ -91,8 +91,8 @@ test('excavation NO-FALLBACK: unset equipment CY rate → 0 excavation hours (no
 test('excavation defaults to In-House; setting its own mode to Sub zeroes its hours', () => {
   // Excavation now DEFAULTS to In-House regardless of the module tab; only its own
   // per-section toggle (mode: 'Sub') subs it out.
-  const dflt = run({ pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' }, excavation: { equipment: 'Hand Dig' } }, EXC_MP, { 'Excavation - Hand Dig': 0.5 })
-  const sub = run({ pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' }, excavation: { mode: 'Sub', equipment: 'Hand Dig', subRate: '20', subRateUnit: 'per yd' } }, EXC_MP, { 'Excavation - Hand Dig': 0.5 })
+  const dflt = run({ pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' }, excavation: { equipment: 'Hand Dig' } }, EXC_MP, { 'Skid - Soil': 0.5 })
+  const sub = run({ pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' }, excavation: { mode: 'Sub', equipment: 'Hand Dig', subRate: '20', subRateUnit: 'per yd' } }, EXC_MP, { 'Skid - Soil': 0.5 })
   assert.equal(dflt.excMode, 'In House', 'unset excavation mode defaults to In House')
   assert.ok(dflt.excavHrs > 0, 'In-House excavation charges equipment hours')
   assert.equal(sub.excavHrs, 0, 'mode Sub charges a flat sub cost, no In-House hours')
@@ -103,7 +103,7 @@ test('excavation In-House + Sub Haul: haul = CY × $/CY (55), posts as MATERIAL;
   const r = run(
     { pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' },
       excavation: { mode: 'In House', equipment: 'Hand Dig', haulMethod: 'Sub Haul' } },
-    EXC_MP, { 'Excavation - Hand Dig': 0.5 }, { 'Excavation - Sub Haul per Cu Yd': 55 }
+    EXC_MP, { 'Skid - Soil': 0.5 }, { 'Excavation - Sub Haul per Cu Yd': 55 }
   )
   const cy = (400 * 3) / 27
   near(r.excavHaulMat, cy * 55, 1e-6) // Sub Haul priced by the yard
@@ -115,8 +115,8 @@ test('excavation In-House + Sub Haul: haul = CY × $/CY (55), posts as MATERIAL;
 test('excavation Haul Method: Sub Haul = CY × $/CY (55); Containers = ceil(CY÷10) × $/container (70)', () => {
   const st = { pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' }, excavation: { mode: 'In House', equipment: 'Hand Dig' } }
   const rates = { 'Excavation - Sub Haul per Cu Yd': 55, 'Excavation - Roll Off per Container': 70 }
-  const subHaul = run({ ...st, excavation: { ...st.excavation, haulMethod: 'Sub Haul' } }, EXC_MP, { 'Excavation - Hand Dig': 0.5 }, rates)
-  const cont = run({ ...st, excavation: { ...st.excavation, haulMethod: 'Containers' } }, EXC_MP, { 'Excavation - Hand Dig': 0.5 }, rates)
+  const subHaul = run({ ...st, excavation: { ...st.excavation, haulMethod: 'Sub Haul' } }, EXC_MP, { 'Skid - Soil': 0.5 }, rates)
+  const cont = run({ ...st, excavation: { ...st.excavation, haulMethod: 'Containers' } }, EXC_MP, { 'Skid - Soil': 0.5 }, rates)
   const cy = (400 * 3) / 27
   near(subHaul.excavHaulMat, cy * 55, 1e-6)
   assert.equal(cont.haulContainers, Math.ceil(cy / 10), 'containers = ceil(yards ÷ 10)')
@@ -127,7 +127,7 @@ test('excavation mode "Sub" (on the In-House module tab): equipment/haul off, fl
   const r = run(
     { pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' },
       excavation: { mode: 'Sub', equipment: 'Hand Dig', haulMethod: 'Containers', subRate: '20', subRateUnit: 'per yd' } },
-    EXC_MP, { 'Excavation - Hand Dig': 0.5 }, { 'Excavation - Roll Off per Container': 70 }
+    EXC_MP, { 'Skid - Soil': 0.5 }, { 'Excavation - Roll Off per Container': 70 }
   )
   assert.equal(r.excavHrs, 0, 'subbed excavation charges no In-House hours')
   assert.equal(r.excavHaulMat, 0, 'subbed excavation charges no separate haul (all-in sub)')
@@ -137,7 +137,7 @@ test('excavation mode "Sub" (on the In-House module tab): equipment/haul off, fl
 test('haul NO-FALLBACK: a haul method with no seeded rate → $0 haul (no constant)', () => {
   const r = run(
     { pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '0' }, excavation: { mode: 'In House', equipment: 'Hand Dig', haulMethod: 'Sub Haul' } },
-    EXC_MP, { 'Excavation - Hand Dig': 0.5 }, {} // no haul rate seeded
+    EXC_MP, { 'Skid - Soil': 0.5 }, {} // no haul rate seeded
   )
   assert.equal(r.excavHaulMat, 0, 'unset haul rate → $0 (no hidden 55/70 constant)')
 })
@@ -190,7 +190,7 @@ test('no NaN across a populated estimate (excavation + water feature + manual)',
       waterFeatures: [{ vendor: 'Standard', wfType: 'Sheer Descents', type: 'Sheer Descent 24in', qty: '2' }],
       manualRows: [{ hours: 4, materials: 50, subCost: 0 }],
     },
-    { ...EXC_MP, 'Pool Shotcrete Shell Thickness': 0.5 }, { 'Excavation - Hand Dig': 0.5, 'Pool - Sheer Descent Labor': 12 }, {}, rows
+    { ...EXC_MP, 'Pool Shotcrete Shell Thickness': 0.5 }, { 'Skid - Soil': 0.5, 'Pool - Sheer Descent Labor': 12 }, {}, rows
   )
   finiteNums(r)
   assert.ok(r.price > 0, 'price is positive with priced sections')

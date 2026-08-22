@@ -60,7 +60,7 @@ const WALLS_RATE_SCOPE = [
   // the module never touches don't clutter the table (walls-orphan-rates guard).
   { category: 'Demo', sub: 'Hand Demo', only: ['Demo - Hand - Dirt SF', 'Demo - Hand - Grade Fill SF', 'Demo - Hand - JJ SF'] },
   { category: 'Demo', sub: 'Mini Skid Steer Demo', only: ['Demo - Mini - Dirt SF', 'Demo - Mini - Grade Fill SF'] },
-  { category: 'Demo', sub: 'Skid Steer Demo', only: ['Demo - Skid - Dirt SF', 'Demo - Skid - Grade Fill SF'] },
+  { category: 'Demo', sub: 'Skid Steer', only: ['Skid - Soil', 'Skid - Grade Fill'] },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────

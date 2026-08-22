@@ -204,10 +204,12 @@ export function calcPool(state, materialPrices, laborRates, subRates = {}, walkA
   // Haul, a $/Cu Yd sub cost). totalExcavCY already includes the fluff/swell factor.
   const excMode = excavation.mode || 'In House'
   const isSubExcav = excMode === 'Sub'
-  // hrs/CY rate read live from labor_rates['Excavation - ...'] — no fallback.
-  const excavLaborName = EXCAVATION_LABOR_NAME[excavation.equipment]
-  const equipRate = n(excavLaborName && laborRates[excavLaborName])
-  const excavHrs = !isSubExcav ? totalExcavCY * equipRate : 0 // rate is hrs per Cu Yd
+  // Excavation labor maps to the Skid Steer module's shared Soil rate:
+  // hrs = dug Cu Yd × labor_rates['Skid - Soil'] (hrs per Cu Yd). Unset ⇒ 0
+  // (no fallback). The Equipment picker is informational — it no longer selects
+  // a separate excavation rate.
+  const equipRate = n(laborRates['Skid - Soil'])
+  const excavHrs = !isSubExcav ? totalExcavCY * equipRate : 0
   // Haul-off MATERIAL (In-House excavation only). yards = totalExcavCY (SF × avg depth
   // ÷ 27 × fluff). Sub Haul is priced BY THE YARD ($/CY × yards); roll-off Containers are
   // priced BY THE CONTAINER (# containers = ceil(yards ÷ 10 CY capacity) × $/container).
