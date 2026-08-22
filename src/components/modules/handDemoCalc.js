@@ -70,7 +70,8 @@ export function calcDemo(
   const sfhrJJ = n(lr['Demo - Hand JJ']) // SF per hour (compaction, area-based)
   // Rebar toggle: concrete demo hours ×(1 + 25%) when rebar present.
   const rebarFactor = state.rebar ? 1 + n(lr['Demo - Hand Rebar']) : 1
-  const shrubRate = n(lr['Demo - Hand Shrub'])
+  // Per-height shrub rates (Each), replacing the base rate × height factor model.
+  const shrubRateFor = h => n(lr['Hand - Shrubs ' + h + ' ft'])
   const stumpSmallRate = n(lr['Demo - Hand Stump Small'])
   const stumpMedRate = n(lr['Demo - Hand Stump Medium'])
   const stumpLargeRate = n(lr['Demo - Hand Stump Large'])
@@ -207,7 +208,7 @@ export function calcDemo(
   // ── Vegetation ───────────────────────────────────────────────────────────
   // Shrub demo: per-area rows — qty × shrub rate × shrub-height modifier.
   const shrubRowsCalc = (state.shrubRows || []).map(r => ({
-    hrs: n(r.qty) * shrubRate * n(lr['Demo Shrub Height Factor - ' + r.height]),
+    hrs: n(r.qty) * shrubRateFor(r.height),
   }))
   const shrubRowsHrs = shrubRowsCalc.reduce((s, r) => s + r.hrs, 0)
   const stumpSmallHrs = n(state.stumpSmallQty) * stumpSmallRate
@@ -482,7 +483,6 @@ export function calcDemo(
     rateBucket,
     rateJJ,
     rebarMinPerSF,
-    shrubRate,
     stumpSmallRate,
     stumpMedRate,
     stumpLargeRate,

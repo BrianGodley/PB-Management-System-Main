@@ -64,7 +64,8 @@ export function calcDemo(
   const laborJJ = n(lr['Demo - Mini - JJ SF'])
   const laborSS = n(lr['Demo - Mini - SS Compact SF'])
   const rebarHrsPerSF = n(lr['Demo - Mini Rebar'])
-  const shrubRate = n(lr['Demo - Mini Shrub'])
+  // Per-height shrub rates (Each), replacing the base rate × height factor model.
+  const shrubRateFor = h => n(lr['Mini - Shrubs ' + h + ' ft'])
   const stumpSmallRate = n(lr['Demo - Mini Stump Small'])
   const stumpMedRate = n(lr['Demo - Mini Stump Medium'])
   const stumpLargeRate = n(lr['Demo - Mini Stump Large'])
@@ -191,7 +192,7 @@ export function calcDemo(
   // ── Vegetation — Bobcat access ────────────────────────────────────────────
   // Shrub Demo — per-area rows: qty × shrub rate × height modifier (Hand format).
   const shrubRowsCalc = (state.shrubRows || []).map(r => ({
-    hrs: n(r.qty) * accessBobcat * shrubRate * n(lr['Demo Shrub Height Factor - ' + r.height]),
+    hrs: n(r.qty) * accessBobcat * shrubRateFor(r.height),
   }))
   const shrubRowsHrs = shrubRowsCalc.reduce((sum, r) => sum + r.hrs, 0)
   const stumpSmallHrs = n(state.stumpSmallQty) * accessBobcat * stumpSmallRate
@@ -438,7 +439,6 @@ export function calcDemo(
     stumpMedHrs,
     stumpLargeHrs,
     stumpXLHrs,
-    shrubRate,
     stumpSmallRate,
     stumpMedRate,
     stumpLargeRate,
