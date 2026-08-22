@@ -4,15 +4,16 @@ import ModuleHeaderSlot from './ModuleHeaderSlot'
 // ─────────────────────────────────────────────────────────────────────────────
 // SkidSteerDemoModule — Full Skid Steer Demo estimator
 //
-// All labor rates pulled from labor_rates table (lr[]) with constant fallbacks.
-// Rate keys match the 'name' column in labor_rates exactly.
+// All labor rates pulled from labor_rates (lr[]) by name; unset ⇒ 0 (no fallback).
 //
-// Key formulas:
-//   • 2.0 tons/hr for conc/dirt ALREADY includes haul — no separate haulHrs
-//   • JJ compaction: hours = tons / 1.75  (1.75 is tons/hr, not hrs/ton)
-//   • Misc Vertical: LF × Height(in) × Width(in) → CF → tons (150 lb/cf)
-//   • Footing: SF × Depth(in) → tons (same as flat)
-//   • Rebar add-on: SF × lr['Demo - Skid Rebar'] (hrs/SF)
+// In-House labor model (hrs per unit):
+//   • Concrete/Soil/Footing/Misc-Vert = hrs × Cu Yd
+//   • Misc-Flat/Compaction/Jumping-Jack = hrs × Cu Ft
+//   • Grade-Cut/Grade-Fill/Import-Base = hrs × Sq Ft
+//   • Rebar/Mesh: yes/no toggle → +30% to Skid - Concrete labor
+//   • Jumping Jack + Difficulty = shared 'Basic Labor - …' rows
+//   • Shrubs: per-height Each rates ('Skid - Shrubs <bucket> ft')
+// Sub tab is unchanged (per-ton). Tree CY Factor lives in master material rates.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback, useContext, useRef } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
@@ -68,8 +69,8 @@ const DEFAULT_STATE = {
   baseDepth: 4,
   grassSF: '',
   grassDepth: 4,
-  // Rebar add-on
-  rebarSF: '',
+  // Rebar/Mesh — yes/no toggle (+30% concrete labor)
+  rebar: false,
   // Misc flat (SF + Depth)
   miscFlatRows: Array(4)
     .fill(null)
@@ -293,7 +294,8 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
     const [matMap, lrRes, srRes] = await Promise.all([
       // material_rates retired: Demo materials from material+material_price,
       // fees from misc_rates, labor from labor_rates — all by name.
-      fetchStandardRateMap(['Demo']),
+      // Demo materials + Basic Materials (Tree CY Factor moved there) by name.
+      fetchStandardRateMap(['Demo', 'Basic Materials']),
       supabase.from('labor_rates').select('name,rate,rate_per_day'),
       supabase.from('subcontractor_rates').select('item_key,rate'),
     ])
@@ -638,7 +640,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 row: calc.conc,
                 fee: dumpConc,
                 rate: calc.laborConc,
-                rateName: 'Demo - Skid - Concrete SF',
+                rateName: 'Skid - Concrete',
                 rateNote: `${calc.laborConc} hr/100 Sq Ft per in deep`,
                 rateUnit: 'hr/100 Sq Ft per in deep',
               },
@@ -650,7 +652,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 row: calc.dirt,
                 fee: dumpDirt,
                 rate: calc.laborDirt,
-                rateName: 'Demo - Skid - Dirt SF',
+                rateName: 'Skid - Soil',
                 rateNote: `${calc.laborDirt} hr/100 Sq Ft per in deep`,
                 rateUnit: 'hr/100 Sq Ft per in deep',
               },
@@ -675,7 +677,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 row: calc.gradeCut,
                 fee: dumpDirt,
                 rate: calc.laborGradeCut,
-                rateName: 'Demo - Skid - Grade Cut SF',
+                rateName: 'Skid - Grade Cut',
                 rateNote: `${calc.laborGradeCut} hr/100 Sq Ft per in deep`,
                 rateUnit: 'hr/100 Sq Ft per in deep',
                 extraIcon: null,
@@ -720,21 +722,17 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
 
         {isSelf && (
         <div className="mt-3 flex items-center gap-3">
-          <div className="flex-1 max-w-xs">
-            <p className="text-xs text-gray-500 mb-0.5 inline-flex items-center gap-1">
-              Rebar SF
-              <span className="text-gray-400 font-normal">
-                ({calc.rebarHrsPerSF.toFixed(5)} hrs/SF)
-              </span>
-            </p>
-            <Inp
-              value={state.rebarSF}
-              onChange={e => set('rebarSF', e.target.value)}
-              placeholder="0"
+          <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!state.rebar}
+              onChange={e => set('rebar', e.target.checked)}
             />
-          </div>
-          {calc.rebarHrs > 0 && (
-            <p className="text-xs text-gray-500 mt-4">+{calc.rebarHrs.toFixed(2)} hrs rebar</p>
+            Skid Rebar/Mesh
+            <span className="text-gray-400 font-normal">(+30% concrete labor)</span>
+          </label>
+          {state.rebar && (
+            <p className="text-xs text-gray-500">Concrete labor ×1.3</p>
           )}
         </div>
         )}
@@ -830,7 +828,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 hrs: calc.jjHrs,
                 note: `${calc.laborJJ} hr/100 Sq Ft per in deep`,
                 rate: calc.laborJJ,
-                rateName: 'Demo - Skid - JJ SF',
+                rateName: 'Basic Labor - Jumping Jack',
                 rateUnit: 'hr/100 Sq Ft per in deep',
               },
               {
@@ -842,7 +840,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
                 hrs: calc.ssCmpHrs,
                 note: `${calc.laborSS} hr/100 Sq Ft per in deep`,
                 rate: calc.laborSS,
-                rateName: 'Demo - Skid - SS Compact SF',
+                rateName: 'Skid - Compaction',
                 rateUnit: 'hr/100 Sq Ft per in deep',
               },
             ].map(({ label, sfK, dK, dep, tons, hrs, note, rate, rateName, rateUnit }) => (
@@ -1137,7 +1135,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
             hrs: calc.stumpSmallHrs,
             sub: `${calc.stumpSmallRate} hrs per Each`,
             rate: calc.stumpSmallRate,
-            rateName: 'Demo - Skid Stump Small',
+            rateName: 'Skid - Stump Small',
             subRate: calc.ssSmall,
             subRateName: 'Sub Stump - Skid Small',
           },
@@ -1147,7 +1145,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
             hrs: calc.stumpMedHrs,
             sub: `${calc.stumpMedRate} hrs per Each`,
             rate: calc.stumpMedRate,
-            rateName: 'Demo - Skid Stump Medium',
+            rateName: 'Skid - Stump Medium',
             subRate: calc.ssMed,
             subRateName: 'Sub Stump - Skid Medium',
           },
@@ -1157,7 +1155,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
             hrs: calc.stumpLargeHrs,
             sub: `${calc.stumpLargeRate} hrs per Each`,
             rate: calc.stumpLargeRate,
-            rateName: 'Demo - Skid Stump Large',
+            rateName: 'Skid - Stump Large',
             subRate: calc.ssLarge,
             subRateName: 'Sub Stump - Skid Large',
           },
@@ -1167,7 +1165,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
             hrs: calc.stumpXLHrs,
             sub: `${calc.stumpXLRate} hrs per Each`,
             rate: calc.stumpXLRate,
-            rateName: 'Demo - Skid Stump XL',
+            rateName: 'Skid - Stump XL',
             subRate: calc.ssXL,
             subRateName: 'Sub Stump - Skid XL',
           },
