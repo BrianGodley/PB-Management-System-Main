@@ -172,3 +172,12 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   ReferenceError fix), edit-reflects, Area-Type mode independence, unset-rate NO-FALLBACK → 0, Sub strict
   $/SF independence, no-NaN
 - coverage manifest: `npm run test:weed-coverage` (3 labor coefficients + 1 material $/1k SF)
+
+## Finishes (finishes.spec.js)
+- opens with Flatwork / Wall Caps / Wall Finishes sections; vendor + Type pickers populated
+- exhaustive vendor × Type matrix (In-House + Sub); every-option NaN check
+- numeric fields → total; In-House + Sub both render; live edit (Hours Adj) moves total
+- unit layer (finishesCalc.test.mjs, 8): flatwork value/edit-reflects (SF × $/SF + labor), cap qty×$/ea,
+  wall Ledgerstone composite (×1.1 + screws), vendor-first material override, material NO-FALLBACK,
+  Sub flat $/unit independence, no-NaN
+- coverage manifest: `npm run test:finishes-coverage` (17 material/consumable + 15 labor rates)

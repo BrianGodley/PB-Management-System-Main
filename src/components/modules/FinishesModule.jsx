@@ -8,6 +8,7 @@ import GpmdBar from './GpmdBar'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { useMaterialCatalog, resolveMaterialPrice, catalogOptions } from '../../lib/materialCatalog'
+import { calcFinishes } from './finishesCalc'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Finishes Module — Flatwork, Wall Caps, Wall Finishes
@@ -401,103 +402,6 @@ function computeWallRow(row, mp, materialRows) {
   return { mat, hrs, subUnit, subEach, subMat: sf * subEach, tons, unit: 'SF' }
 }
 
-// ── Calculation engine ────────────────────────────────────────────────────────
-// In-House: coverage/geometry material + labor hours (all preserved exactly).
-// Sub: flat $/unit per row, NO labor hours, routed into subCost.
-function calcFinishes(
-  state,
-  lrph = DEFAULTS.laborRatePerHour,
-  mp = {},
-  gpmd = DEFAULTS.gpmd,
-  walkAccess = null,
-  laborBurdenPct = DEFAULTS.laborBurdenPct,
-  materialRows = []
-) {
-  const _pace = n(walkAccess?.paceLfPerMin)
-  const { difficulty, hoursAdj, flatworkRows, capRows, wallFinishRows, manualRows } = state
-  const isSubTab = state.subType === 'Subcontractor'
-
-  const flat = (flatworkRows || []).map(row => computeFlatRow(row, mp, materialRows))
-  const caps = (capRows || []).map(row => computeCapRow(row, mp, materialRows))
-  const walls = (wallFinishRows || []).map(row => computeWallRow(row, mp, materialRows))
-  const sum = (arr, k) => arr.reduce((a, x) => a + (x[k] || 0), 0)
-
-  // ── Manual ──────────────────────────────────────────────────────────────
-  let manHrs = 0,
-    manMat = 0,
-    manSub = 0
-  ;(manualRows || []).forEach(r => {
-    manHrs += n(r.hours)
-    manMat += n(r.materials)
-    manSub += n(r.subCost)
-  })
-
-  // ── In-House totals ───────────────────────────────────────────────────────
-  const baseHrs = sum(flat, 'hrs') + sum(caps, 'hrs') + sum(walls, 'hrs') + manHrs
-  const diffMod = 1 + n(difficulty) / 100
-  const _preWalkHrs = baseHrs * diffMod + n(hoursAdj)
-  const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
-  const totalHrsIH = _preWalkHrs + walkHrs
-
-  const totalMatIH = sum(flat, 'mat') + sum(caps, 'mat') + sum(walls, 'mat') + manMat
-  const totalSubMat = sum(flat, 'subMat') + sum(caps, 'subMat') + sum(walls, 'subMat')
-
-  const subMarkup = n(state.subGpMarkupRate)
-  let gp,
-    subCost,
-    subGp,
-    commission,
-    price,
-    totalHrs,
-    manDays,
-    totalMat,
-    laborCost,
-    burden
-  if (isSubTab) {
-    // Sub tab: flat per-unit pricing, NO labor hours. The itemized flat cost IS
-    // the subcontractor cost; profit is the markup (Sub GP).
-    totalHrs = 0
-    manDays = 0
-    laborCost = 0
-    burden = 0
-    // In-house materials are 0 on the Sub tab — sub materials live in subCost
-    // (shown under "Subs"), so they don't double-appear or pull tax in-house.
-    totalMat = 0
-    gp = 0
-    subCost = totalSubMat + manSub
-    subGp = subCost * subMarkup
-    commission = subGp * n(state.commissionRate)
-    price = subCost + subGp + commission
-  } else {
-    totalHrs = totalHrsIH
-    manDays = totalHrs / 8
-    totalMat = totalMatIH
-    laborCost = totalHrs * lrph
-    burden = laborCost * n(laborBurdenPct)
-    gp = manDays * gpmd
-    subCost = manSub
-    subGp = 0
-    commission = gp * n(state.commissionRate)
-    price = totalMat + laborCost + burden + gp + commission + subCost
-  }
-
-  return {
-    walkHrs,
-    totalHrs,
-    manDays,
-    totalMat,
-    laborCost,
-    burden,
-    gp,
-    subGp,
-    commission,
-    subCost,
-    price,
-    flat,
-    caps,
-    walls,
-  }
-}
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 function SectionHeader({ title }) {
