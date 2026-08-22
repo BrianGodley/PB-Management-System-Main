@@ -1,5 +1,53 @@
 # Test results log
 
+## 2026-08-22 — Ground Treatments: Layer A+B (extraction battery)
+- **Layer A:** extracted the ~495-line `calcGroundTreatments` into pure
+  `groundTreatmentsCalc.js` (module now `import { calcGroundTreatments } from
+  './groundTreatmentsCalc'`; keeps its own `mergedGtOpts`/`resolveType` copies for JSX).
+  Extracted programmatically (byte-identical source slices for GT_RATES + mergedGtOpts +
+  resolveType + the calc) with the supabase-tainted `catalogOptions` + `calcWalkAccessLabor`
+  inlined. `groundTreatmentsCalc.test.mjs` = **10/10**: mulch (CY × $/CY + delivery; labor CY ×
+  spread + SF × coverage) + edit-reflects; edging metal-vs-plastic labor-key independence;
+  planter prep + tilling (area × (base + till)); sod + fertilizer (bags = ceil(SF/SF-per-bag) ×
+  $/bag); DG (Cu Yd × $/CY × markup); gravel (CY × $/CY, CY × swell × machine rate); material
+  NO-FALLBACK (empty catalog → $0, labor still applies); Sub flat $/SF-$/LF (no in-house
+  hrs/mat, subCost = section sums); no-NaN populated. Module bundles clean (esbuild).
+- **Layer B:** `scripts/ground-treatments-rate-coverage.mjs` (`test:gt-coverage`) — GT consumes
+  **14 material/consumable rates + 18 labor coefficients + 9 tunable 'GT -' coefficients + 9
+  subcontractor rates**, across **10 catalog sub_categories** (Mulch/Edging/Soils/Sod/
+  Fertilizer/Steppers/DG/Gravel/Pebble/Cobbles). No-fallback + imports guards PASS. Full unit
+  suite **234/234** (incl. 10 new GT).
+- **Layer C authored, pending CI:** `e2e/ground-treatments.spec.js` (opens / vendor×Type /
+  numeric / In-House↔Sub / live-edit via Hours Adj + In-House toggle + `> p` leaf selector /
+  clean). Skips unless a Ground Treatments module is on the test estimate.
+
+```
+### Ground Treatments — definition-of-done sign-off (2026-08-22, A+B done; C/D/E pending)
+A. Unit:      value[x] edit[x] unpriced[x] vendor[x] priority[N/A] units[x] aggregator[x] sub-indep[x] breakdown[N/A] summary-parity[x]
+B. Audit:     coverage[x] orphan[~] no-fallback[x] no-hardcoded[x] imports[x]
+C. E2E:       opens[ ] vendor×Type[ ] numeric[ ] sub[ ] live-edit[ ] clean[ ]  (authored; runs when a GT module is on the test estimate)
+D. DB:        priced[ ] no-dupes[ ] filing[ ]  (Brian's SQL step — 14 material + 18 labor + 9 GT coeffs + 9 sub rates priced; catalog Items per section)
+E. Loop:      red-first[N/A] catalogued[x] logged[x] green[ ]
+N/A items + reason:
+  A.priority — per-section formulas keyed by material/method, not a numeric-coeff priority ladder; unset ⇒ 0 (covered).
+  A.breakdown — many row sections + In-House↔Sub toggle; no per-tab materials breakdown.
+  A.aggregator[x] — every section aggregates into baseHrs + totalMat; the populated no-NaN test exercises the whole aggregation.
+  A.vendor[x] — vendor override via rowOpt/catalogOptions (vendor_id match → Standard null-vendor); covered structurally + the NO-FALLBACK case.
+  A.sub-indep[x] — Sub-tab test asserts totalHrs=0/totalMat=0 and the flat $/SF-$/LF cost routes into subCost.
+  A.summary-parity[x] — GroundTreatmentsSummary reads the saved calc snapshot; no separate summary calc to drift.
+  Layer A via groundTreatmentsCalc.test.mjs (10); B via scripts/ground-treatments-rate-coverage.mjs (test:gt-coverage).
+```
+
+## 2026-08-22 — Artificial Turf run 01:01Z — 5/5 GREEN (first try)
+- Targeted run of `artificial-turf.spec.js`: **6 expected / 0 unexpected / 0 flaky / 0
+  skipped** (29s; 6th is auth.setup). All 5 Turf tests GREEN first try — the "Turf" row-title
+  match + In-House toggle + `> p` leaf selector all landed. Turf definition-of-done C/E → green:
+  - C. E2E: opens[x] vendor×Type[x] numeric[x] sub[x] live-edit[x] clean[x]
+  - E. Loop: green[x]
+  - D (DB-health SQL) stays Brian's step (7 labor + 14 misc + 3 dump + 2 sub rates; base/turf catalog Items).
+- Extraction battery COMPLETE (A/B/C green) for 18 of 20 estimator modules. Remaining:
+  Ground Treatments, Pool.
+
 ## 2026-08-22 — Artificial Turf: Layer A+B (extraction battery)
 - **Layer A:** extracted the ~285-line `calcTurf` into pure `artificialTurfCalc.js` (module now
   `import { calcTurf } from './artificialTurfCalc'`; keeps its own helper copies for JSX).

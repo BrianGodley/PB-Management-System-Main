@@ -36,6 +36,7 @@
     "test:weed-coverage": "node scripts/weed-rate-coverage.mjs",
     "test:finishes-coverage": "node scripts/finishes-rate-coverage.mjs",
     "test:turf-coverage": "node scripts/turf-rate-coverage.mjs",
+    "test:gt-coverage": "node scripts/ground-treatments-rate-coverage.mjs",
     "test:e2e": "playwright test",
     "test:e2e:report": "playwright show-report",
     "e2e:sync": "git fetch origin ci-results && node -e \"require('fs').mkdirSync('test-results',{recursive:true})\" && git show origin/ci-results:results.json > test-results/ci-results.json && git show origin/ci-results:updated_at.txt",

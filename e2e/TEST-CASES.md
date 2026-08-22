@@ -191,3 +191,12 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   price override, material NO-FALLBACK (unpriced brand/unset divisor → $0), Sub flat $/SF (base suppressed,
   0 labor) independence, no-NaN
 - coverage manifest: `npm run test:turf-coverage` (7 labor + 14 misc + 3 dump fees + 2 sub rates + base/turf catalog)
+
+## Ground Treatments (ground-treatments.spec.js)
+- opens with Mulch / Edging / Gravel / DG / Steppers / Sod / Cobbles sections; vendor + Type pickers populated
+- exhaustive vendor × Type matrix (In-House + Sub); every-option NaN check
+- numeric fields → total; In-House + Sub both render; live edit (Hours Adj, In-House toggle) moves total
+- unit layer (groundTreatmentsCalc.test.mjs, 10): mulch CY value/edit-reflects (+ delivery), edging metal-vs-plastic
+  labor independence, planter prep + tilling, sod + fertilizer bags (ceil), DG Cu-Yd × markup, gravel excavation,
+  material NO-FALLBACK, Sub flat $/SF-$/LF independence, no-NaN
+- coverage manifest: `npm run test:gt-coverage` (14 material + 18 labor + 9 'GT -' coeffs + 9 sub rates + 10 catalog sub_categories)
