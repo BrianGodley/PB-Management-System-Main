@@ -247,6 +247,19 @@ export function calcPool(state, materialPrices, laborRates, subRates = {}, walkA
   const shotcreteSub = hasOverride(shotcrete.manualSubCost)
     ? n(shotcrete.manualSubCost)
     : (isSubTab ? autoShotcreteSub : 0)
+  // ─ Shotcrete In-House (In-House tab only): a Vendor + Type row, NOT an auto sub.
+  //   Material = shotcrete CY × the picked concrete Type's $/CY (shared 'Concrete Mix'
+  //   catalog under Basic Materials; default 'Truck Mix Concrete'), vendor-first.
+  //   Labor = shotcrete CY × 'Pool - Shotcrete Labor' (hrs per Cu Yd) — live, no fallback. ─
+  const shotItem = catalogItemFor(materialRows, 'Concrete Mix', shotcrete.vendor || 'Standard', shotcrete.type || 'Truck Mix Concrete', {
+    standardRows: 'null-vendor',
+    stripPrefix: true,
+    fallbackFirst: false,
+  })
+  const shotMatRate = shotItem ? n(shotItem.unit_cost) : 0
+  const shotcreteMat = !isSubTab ? totalShotCY * shotMatRate : 0
+  const shotLabRate = n(laborRates['Pool - Shotcrete Labor'])
+  const shotcreteHrs = !isSubTab ? totalShotCY * shotLabRate : 0
 
   // Items whose picked Type has no labor rate set (calc_meta.labor_rate unset or
   // resolves to 0). Surfaced as a prompt — never a fallback. Declared here (above
@@ -570,13 +583,14 @@ export function calcPool(state, materialPrices, laborRates, subRates = {}, walkA
     equipmentHrs +
     epHrs +
     steelHrs +
+    shotcreteHrs +
     manHrs +
     plumbHrsIH +
     (parseFloat(state.hoursAdj) || 0)
   const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
   const totalHrs = _preWalkHrs + walkHrs
   const manDays = totalHrs / 8
-  const totalMat = tileMat + spillwayMat + waterFeatureMat + copingMat + raisedMat + epMat + steelMat + manMat + plumbMatIH
+  const totalMat = tileMat + spillwayMat + waterFeatureMat + copingMat + raisedMat + epMat + steelMat + shotcreteMat + manMat + plumbMatIH
   // Pool's genuine sub trades (excavation / shotcrete / interior / equipment /
   // plumbing / steel / manual-sub). These are sub costs on either tab.
   const subTradeCost =
@@ -626,6 +640,10 @@ export function calcPool(state, materialPrices, laborRates, subRates = {}, walkA
     excavHaulSub,
     haulRatePerCY,
     excMode,
+    shotcreteMat,
+    shotcreteHrs,
+    shotMatRate,
+    shotLabRate,
     tileHrs,
     tileCalc,
     spillwayHrs,

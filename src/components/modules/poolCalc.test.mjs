@@ -137,6 +137,45 @@ test('haul NO-FALLBACK: a haul method with no seeded $/CY rate → $0 haul (no c
   assert.equal(r.excavHaulSub, 0, 'unset haul rate → $0 (no hidden 55/70 constant)')
 })
 
+test('shotcrete In-House: material = CY × Type $/CY (Concrete Mix catalog) + labor = CY × 2 hrs/CY', () => {
+  const mp = { 'Pool Avg Depth Ratio': 0.5, 'Pool Shotcrete Shell Thickness': 0.5, 'Pool Shotcrete Swell Factor': 1, 'Pool Excavation Swell Factor': 1 }
+  const rows = [{ id: 'tm', name: 'Truck Mix Concrete', sub_category: 'Concrete Mix', vendor_id: null, unit_cost: 200 }]
+  const r = run(
+    { pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '80' }, shotcrete: { vendor: 'Standard', type: 'Truck Mix Concrete' } },
+    mp, { 'Pool - Shotcrete Labor': 2 }, {}, rows
+  )
+  const bot = (400 * 0.5) / 27
+  const wall = (80 * (6 * 0.5) * 0.5) / 27
+  const cy = (bot + wall) * 1
+  near(r.totalShotCY, cy, 1e-6)
+  near(r.shotcreteMat, cy * 200, 1e-4)   // vendor concrete $/CY
+  near(r.shotcreteHrs, cy * 2, 1e-6)     // 2 hrs per Cu Yd
+  assert.equal(r.shotcreteSub, 0, 'In-House tab: shotcrete is NOT an auto sub')
+})
+
+test('shotcrete edit-reflects + NO-FALLBACK: labor scales with the rate; unset rate → 0 hrs', () => {
+  const mp = { 'Pool Avg Depth Ratio': 0.5, 'Pool Shotcrete Shell Thickness': 0.5, 'Pool Shotcrete Swell Factor': 1 }
+  const rows = [{ id: 'tm', name: 'Truck Mix Concrete', sub_category: 'Concrete Mix', vendor_id: null, unit_cost: 200 }]
+  const st = { pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '80' }, shotcrete: { vendor: 'Standard', type: 'Truck Mix Concrete' } }
+  const a = run(st, mp, { 'Pool - Shotcrete Labor': 2 }, {}, rows)
+  const b = run(st, mp, { 'Pool - Shotcrete Labor': 4 }, {}, rows)
+  near(b.shotcreteHrs, a.shotcreteHrs * 2)
+  const none = run(st, mp, {}, {}, rows)
+  assert.equal(none.shotcreteHrs, 0, 'unset Pool - Shotcrete Labor → 0 hrs (no constant)')
+})
+
+test('shotcrete on the Sub tab stays an auto sub; no in-house shotcrete material/labor', () => {
+  const mp = { 'Pool Avg Depth Ratio': 0.5, 'Pool Shotcrete Shell Thickness': 0.5, 'Pool Shotcrete Swell Factor': 1 }
+  const rows = [{ id: 'tm', name: 'Truck Mix Concrete', sub_category: 'Concrete Mix', vendor_id: null, unit_cost: 200 }]
+  const r = run(
+    { subType: 'Subcontractor', pool: { enabled: true, waterSF: '400', maxDepth: '6', perimLF: '80' }, shotcrete: { vendor: 'Standard', type: 'Truck Mix Concrete' } },
+    mp, { 'Pool - Shotcrete Labor': 2 }, { 'Shotcrete Material': 100, 'Shotcrete Labor': 30, 'Shotcrete Minimum Labor': 500 }, rows
+  )
+  assert.equal(r.shotcreteMat, 0, 'Sub tab: no in-house shotcrete material')
+  assert.equal(r.shotcreteHrs, 0, 'Sub tab: no in-house shotcrete labor')
+  assert.ok(r.shotcreteSub > 0, 'Sub tab keeps the auto shotcrete sub')
+})
+
 test('no NaN across a populated estimate (excavation + water feature + manual)', () => {
   const rows = [{ id: 'wf1', name: 'Sheer Descent 24in', sub_category: 'Water Features', category: 'Pool', vendor_id: null, unit_cost: 500, calc_meta: { water_feature_type: 'Sheer Descents', labor_rate: 'Pool - Sheer Descent Labor' } }]
   const r = run(

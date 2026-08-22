@@ -1423,38 +1423,75 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
 
       {/* ─── 3. Shotcrete ─── */}
       <div>
-        <SectionHeader title="Shotcrete (Sub)" />
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <div>
-            <Label text="Auto Sub Total" />
-            <div className="input text-sm py-1.5 bg-gray-50 text-gray-600">
-              {fmt2(calcPool(eff, materialPrices, laborRates, subRates).shotcreteSub)}
-              <span className="text-xs text-gray-400 ml-1">auto</span>
+        <SectionHeader title="Shotcrete" />
+        {!isSub ? (
+          // In-House: Vendor + Type (shared 'Concrete Mix' catalog, default Truck Mix
+          // Concrete). Material = CY × Type $/CY; labor = CY × 'Pool - Shotcrete Labor'.
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label text="Vendor" />
+                <select
+                  className="input text-sm py-1.5 w-full"
+                  value={T.shotcrete.vendor || 'Standard'}
+                  onChange={e => upd('shotcrete', { ...T.shotcrete, vendor: e.target.value })}
+                >
+                  <option value="Standard">Standard</option>
+                  {vendorsForCategory('Concrete Mix').map(v => (
+                    <option key={v.id} value={v.id}>{v.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label text="Type" sub="shotcrete mix" />
+                <select
+                  className="input text-sm py-1.5 w-full"
+                  value={T.shotcrete.type || 'Truck Mix Concrete'}
+                  onChange={e => upd('shotcrete', { ...T.shotcrete, type: e.target.value })}
+                >
+                  {catalogOptions(materialRows, 'Concrete Mix', T.shotcrete.vendor || 'Standard', { standardRows: 'null-vendor', stripPrefix: true }).map(o => (
+                    <option key={o.value} value={o.stored}>{o.label}</option>
+                  ))}
+                  {!catalogOptions(materialRows, 'Concrete Mix', T.shotcrete.vendor || 'Standard', { standardRows: 'null-vendor', stripPrefix: true }).some(o => o.stored === (T.shotcrete.type || 'Truck Mix Concrete')) && (
+                    <option value={T.shotcrete.type || 'Truck Mix Concrete'}>{T.shotcrete.type || 'Truck Mix Concrete'}</option>
+                  )}
+                </select>
+              </div>
             </div>
-          </div>
-          <div>
-            <Label text="Override Sub Cost" />
-            <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-                $
-              </span>
-              <NumInput
-                value={T.shotcrete.manualSubCost}
-                onChange={v => upd('shotcrete', { ...T.shotcrete, manualSubCost: v })}
-                className="pl-6"
-                placeholder="leave blank for auto"
-              />
-            </div>
-          </div>
-          <div className="flex items-end pb-1">
-            <p className="text-xs text-gray-400 inline-flex items-center flex-wrap gap-x-1">
-              {calc.totalShotCY.toFixed(1)} Cu Yd × $
-              {n(subRates['Shotcrete Material'])}/CY mat + max($
-              {n(subRates['Shotcrete Minimum Labor']).toLocaleString()}, CY × $
-              {n(subRates['Shotcrete Labor'])}/CY lab)
+            <p className="text-xs text-gray-500 mt-2 px-1">
+              {calc.totalShotCY.toFixed(1)} Cu Yd × ${calc.shotMatRate || '—'}/CY → <strong>{fmt2(calc.shotcreteMat)}</strong> mat
+              {' · '}× {calc.shotLabRate || '—'} hrs/CY → <strong>{calc.shotcreteHrs.toFixed(1)} hrs</strong>
+              {calc.shotLabRate <= 0 && ' (labor rate "Pool - Shotcrete Labor" unpriced)'}
             </p>
+          </>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div>
+              <Label text="Auto Sub Total" />
+              <div className="input text-sm py-1.5 bg-gray-50 text-gray-600">
+                {fmt2(calc.shotcreteSub)}
+                <span className="text-xs text-gray-400 ml-1">auto</span>
+              </div>
+            </div>
+            <div>
+              <Label text="Override Sub Cost" />
+              <div className="relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                <NumInput
+                  value={T.shotcrete.manualSubCost}
+                  onChange={v => upd('shotcrete', { ...T.shotcrete, manualSubCost: v })}
+                  className="pl-6"
+                  placeholder="leave blank for auto"
+                />
+              </div>
+            </div>
+            <div className="flex items-end pb-1">
+              <p className="text-xs text-gray-400 inline-flex items-center flex-wrap gap-x-1">
+                {calc.totalShotCY.toFixed(1)} Cu Yd × ${n(subRates['Shotcrete Material'])}/CY mat + max(${n(subRates['Shotcrete Minimum Labor']).toLocaleString()}, CY × ${n(subRates['Shotcrete Labor'])}/CY lab)
+              </p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* ─── Pool Plumbing (In-House tab only) ─── */}
