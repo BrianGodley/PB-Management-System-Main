@@ -87,7 +87,9 @@ export async function scanEveryOptionForNaN(page) {
       el.selectedIndex = i
       el.dispatchEvent(new Event('change', { bubbles: true }))
     }
-    const hasNaN = () => /\bNaN\b|Infinity/.test(document.body.innerText)
+    // Exclude the legit label "Infinity Edge Basin" (Pool) — a real numeric Infinity
+    // ("Infinity hrs", "$Infinity") is never followed by " Edge", so it's still caught.
+    const hasNaN = () => /\bNaN\b|Infinity(?!\s+Edge)/.test(document.body.innerText)
 
     // Group every select by its nearest row so vendor + item pickers pair correctly.
     const rows = new Map()

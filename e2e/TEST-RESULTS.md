@@ -1,5 +1,30 @@
 # Test results log
 
+## 2026-08-22 — Pool run 07:01Z — 5/5 GREEN (false positive fixed) — ALL MODULES DONE
+- Targeted run of `pool.spec.js`: **6 expected / 0 unexpected / 0 flaky / 0 skipped** (43s).
+  All 5 Pool tests GREEN once the NaN-scan `Infinity(?!\s+Edge)` fix ignored the "Infinity Edge
+  Basin" label. Pool's calc was finite throughout — no product bug. Pool C/E → green:
+  - C. E2E: opens[x] vendor×item[x] numeric[x] sub[x] live-edit[x] clean[x]
+  - E. Loop: green[x]
+  - D (DB-health SQL) stays Brian's step.
+- 🏁 **EXTRACTION BATTERY COMPLETE FOR ALL 20 DEVELOPED ESTIMATOR MODULES** (A/B/C green):
+  Hand Demo, Skid Steer, Mini Skid, Utilities, Drainage, Concrete, Pavers, Artificial Turf,
+  Steps, Ground Treatments, Pool, Outdoor Kitchen, Fire Pit, Walls, Columns, Lighting, Finishes,
+  Irrigation, Planting, Weed Abatement. Every module: pure calc + unit tests, rate-coverage
+  manifest, Playwright e2e. Unit suite 243/243; guards green. Only Water Features remains — not
+  yet developed (no battery needed until it's built).
+
+## 2026-08-22 — Pool run 06:21Z — 3/5, NaN scan FALSE POSITIVE on "Infinity Edge Basin"
+- `pool.spec.js` opens / numeric / live-edit GREEN; the two NaN-scan tests failed. Root cause
+  is NOT a product bug: the Pool module has an **"Infinity Edge Basin"** structure, and the
+  scan regex `/\bNaN\b|Infinity/` matched the "Infinity" substring in that legitimate label.
+  The a11y snapshot's only "Infinity" hit was the `+ Add Infinity Edge Basin` button — no
+  actual NaN/Infinity number on the page.
+- Fix (test-only): tightened the check to `Infinity(?!\s+Edge)` in both `e2e/helpers.js`
+  (`scanEveryOptionForNaN`) and `pool.spec.js`'s In-House poll. A real numeric Infinity
+  ("Infinity hrs", "$Infinity") is never followed by " Edge", so it's still caught; the label
+  is ignored. Pool's calc is finite (poolCalc.test.mjs 8/8). Re-run to confirm 5/5.
+
 ## 2026-08-22 — Pool: Layer A+B (extraction battery) — the last module
 - **Layer A:** extracted the ~516-line `calcPool` into pure `poolCalc.js` (module now
   `import { calcPool } from './poolCalc'`). Programmatic byte-identical slice; inlined the

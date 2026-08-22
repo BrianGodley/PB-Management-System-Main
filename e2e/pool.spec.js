@@ -86,7 +86,7 @@ test.describe('Pool', () => {
       if (!(await btn.count())) continue
       await btn.click().catch(() => {})
       await expect
-        .poll(() => page.evaluate(() => /\bNaN\b|Infinity/.test(document.body.innerText)), {
+        .poll(() => page.evaluate(() => /\bNaN\b|Infinity(?!\s+Edge)/.test(document.body.innerText)), {
           timeout: 8000,
           message: `Pool mode ${mode} produced NaN/Infinity`,
         })
