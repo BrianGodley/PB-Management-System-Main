@@ -6,19 +6,19 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { calcDemo } from './handDemoCalc.js'
 
-// CF/hr production rates (In-House labor) + JJ (SF/hr) + rebar factor.
+// hrs-per-Cu-Ft rates (In-House labor). hours = Cu Ft × rate. JJ = shared Basic Labor.
 const fullRates = (over = {}) => ({
-  'Hand - Concrete': 15,
-  'Hand - Soil': 10,
-  'Demo - Hand Grass': 12,
-  'Demo - Hand Import Base': 40,
-  'Demo - Hand Bucket': 8,
-  'Hand - Misc Flat': 10,
-  'Hand - Misc Vertical': 10,
-  'Hand - Footing': 10,
-  'Hand - Grade Cut': 8,
-  'Hand - Grade Fill': 40,
-  'Hand - Jumping Jack': 50, // SF/hr
+  'Hand - Concrete': 0.1,   // hrs / Cu Ft
+  'Hand - Soil': 0.1,
+  'Hand - Grass': 0.1,
+  'Hand - Import Base': 0.1,
+  'Demo - Hand Bucket': 0.1,
+  'Hand - Misc Flat': 0.1,
+  'Hand - Misc Vertical': 0.1,
+  'Hand - Footing': 0.1,
+  'Hand - Grade Cut': 0.1,
+  'Hand - Grade Fill': 0.05,
+  'Basic Labor - Jumping Jack': 0.04, // shared, hrs / Cu Ft
   'Demo - Hand Rebar': 0.25, // +25% concrete when rebar toggle on
   'Demo - Hand Load (CY)': 1,
   'Demo - Hand Difficulty Ratio': 1,
@@ -56,10 +56,10 @@ const finiteNums = obj => {
   }
 }
 
-test('concrete demo: hours = CF ÷ 15 (300 SF × 12in = 300 CF → 20 hrs)', () => {
+test('concrete demo: hours = CF × 0.1 (300 SF × 12in = 300 CF → 30 hrs)', () => {
   // Only concrete; distance 0 so no walk hours; difficulty 0 so diff = 1.
   const r = run({ dumpType: 'In House', concSF: 300, concDepth: 12 })
-  assert.equal(r.laborCost, 20 * LRPH, `20 hrs × $${LRPH} = ${20 * LRPH}, got ${r.laborCost}`)
+  assert.equal(r.laborCost, 30 * LRPH, `30 hrs × $${LRPH} = ${30 * LRPH}, got ${r.laborCost}`)
   finiteNums(r)
 })
 
@@ -69,22 +69,22 @@ test('rebar toggle adds 25% to concrete hours', () => {
   assert.equal(withRebar.laborCost, base.laborCost * 1.25, 'rebar → concrete ×1.25')
 })
 
-test('soil demo uses its own CF/hr (200 CF ÷ 10 = 20 hrs)', () => {
+test('soil demo uses its own hrs/CF (200 CF × 0.1 = 20 hrs)', () => {
   const r = run({ dumpType: 'In House', dirtSF: 200, dirtDepth: 12 })
   assert.equal(r.laborCost, 20 * LRPH)
 })
 
-test('grade fill uses 40 CF/hr, grade cut uses 8 CF/hr (distinct rates)', () => {
-  const cut = run({ dumpType: 'In House', gradeCutSF: 80, gradeCutDepth: 12 }) // 80 CF ÷ 8 = 10 hrs
-  const fill = run({ dumpType: 'In House', gradeFillSF: 80, gradeFillDepth: 12 }) // 80 CF ÷ 40 = 2 hrs
-  assert.equal(cut.laborCost, 10 * LRPH)
-  assert.equal(fill.laborCost, 2 * LRPH)
+test('grade cut uses 0.1 hrs/CF, grade fill 0.05 (distinct rates)', () => {
+  const cut = run({ dumpType: 'In House', gradeCutSF: 80, gradeCutDepth: 12 }) // 80 CF × 0.1 = 8 hrs
+  const fill = run({ dumpType: 'In House', gradeFillSF: 80, gradeFillDepth: 12 }) // 80 CF × 0.05 = 4 hrs
+  assert.equal(cut.laborCost, 8 * LRPH)
+  assert.equal(fill.laborCost, 4 * LRPH)
 })
 
-test('View Rates edit reflects: raising the concrete CF/hr LOWERS hours (faster)', () => {
-  const slow = run({ dumpType: 'In House', concSF: 300, concDepth: 12 }, fullRates({ 'Hand - Concrete': 15 }))
-  const fast = run({ dumpType: 'In House', concSF: 300, concDepth: 12 }, fullRates({ 'Hand - Concrete': 30 }))
-  assert.ok(fast.laborCost < slow.laborCost, 'higher CF/hr → fewer hours → lower labor')
+test('View Rates edit reflects: raising the hrs/CF RAISES hours (multiply model)', () => {
+  const slow = run({ dumpType: 'In House', concSF: 300, concDepth: 12 }, fullRates({ 'Hand - Concrete': 0.1 }))
+  const fast = run({ dumpType: 'In House', concSF: 300, concDepth: 12 }, fullRates({ 'Hand - Concrete': 0.2 }))
+  assert.equal(fast.laborCost, slow.laborCost * 2, 'rate ×2 → hours ×2')
 })
 
 test('sub grading Cut is priced per CF with depth (100 SF × 12in × $1.75 = $175)', () => {

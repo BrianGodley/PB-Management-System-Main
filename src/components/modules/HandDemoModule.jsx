@@ -283,7 +283,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
     const [matMap, lrRes, srRes] = await Promise.all([
       // material_rates retired: Demo materials from material+material_price,
       // fees from misc_rates, labor from labor_rates — all by name.
-      fetchStandardRateMap(['Demo']),
+      fetchStandardRateMap(['Demo', 'Basic Materials']),
       supabase.from('labor_rates').select('name,rate,rate_per_day'),
       supabase.from('subcontractor_rates').select('item_key,rate'),
     ])
@@ -637,9 +637,9 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 4,
                 row: calc.conc,
                 fee: dumpConc,
-                rate: calc.cfhrConc,
+                rate: calc.hrConc,
                 rateName: 'Hand - Concrete',
-                rateNote: `${calc.cfhrConc} Cu Ft/hr${calc.rebarFactor > 1 ? ' ×rebar' : ''}`,
+                rateNote: `${calc.hrConc} hrs/Cu Ft${calc.rebarFactor > 1 ? ' ×rebar' : ''}`,
                 rateUnit: 'Cu Ft per Hour',
               },
               {
@@ -649,9 +649,9 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 4,
                 row: calc.dirt,
                 fee: dumpDirt,
-                rate: calc.cfhrSoil,
+                rate: calc.hrSoil,
                 rateName: 'Hand - Soil',
-                rateNote: `${calc.cfhrSoil} Cu Ft/hr`,
+                rateNote: `${calc.hrSoil} hrs/Cu Ft`,
                 rateUnit: 'Cu Ft per Hour',
               },
               {
@@ -661,9 +661,9 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 4,
                 row: calc.grass,
                 fee: dumpGreen,
-                rate: calc.cfhrGrass,
-                rateName: 'Demo - Hand Grass',
-                rateNote: `${calc.cfhrGrass} Cu Ft/hr`,
+                rate: calc.hrGrass,
+                rateName: 'Hand - Grass',
+                rateNote: `${calc.hrGrass} hrs/Cu Ft`,
                 rateUnit: 'Cu Ft per Hour',
               },
               {
@@ -673,9 +673,9 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 4,
                 row: calc.gradeCut,
                 fee: 0,
-                rate: calc.cfhrGradeCut,
+                rate: calc.hrGradeCut,
                 rateName: 'Hand - Grade Cut',
-                rateNote: `${calc.cfhrGradeCut} Cu Ft/hr`,
+                rateNote: `${calc.hrGradeCut} hrs/Cu Ft`,
                 rateUnit: 'Cu Ft per Hour',
               },
             ].map(({ label, sfK, dK, dep, row, rate, rateName, rateNote, rateUnit, extraIcon }) => (
@@ -763,7 +763,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 4,
                 tons: calc.base.cy,
                 hrs: calc.base.hours,
-                note: `${calc.cfhrBase} Cu Ft/hr`,
+                note: `${calc.hrBase} hrs/Cu Ft`,
               },
               {
                 label: 'Grade Fill',
@@ -772,7 +772,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 4,
                 tons: calc.gradeFill.cy,
                 hrs: calc.gradeFill.hours,
-                note: `${calc.cfhrGradeFill} Cu Ft/hr`,
+                note: `${calc.hrGradeFill} hrs/Cu Ft`,
               },
             ].map(({ label, sfK, dK, dep, tons, hrs, note }) => (
               <tr key={label}>
@@ -826,9 +826,9 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 dep: 4,
                 tons: 0,
                 hrs: calc.jjHrs,
-                note: `${calc.sfhrJJ} Sq Ft/hr`,
-                rate: calc.sfhrJJ,
-                rateName: 'Hand - Jumping Jack',
+                note: `${calc.jjRate} Sq Ft/hr`,
+                rate: calc.jjRate,
+                rateName: 'Basic Labor - Jumping Jack',
                 rateUnit: 'Sq Ft per Hour',
               },
             ].map(({ label, sfK, dK, dep, tons, hrs, note, rate, rateName, rateUnit }) => (
