@@ -73,7 +73,7 @@ const DEFAULT_STATE = {
   baseDepth: 4,
   grassSF: '',
   grassDepth: 4,
-  rebarSF: '',
+  rebar: false,
   miscFlatRows: Array(4)
     .fill(null)
     .map(() => ({ label: '', sf: '', depth: 4 })),
@@ -636,7 +636,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 row: calc.conc,
                 fee: dumpConc,
                 rate: calc.laborConc,
-                rateName: 'Demo - Mini - Concrete SF',
+                rateName: 'Mini - Concrete',
                 rateNote: `${calc.laborConc} hr/100 Sq Ft per in deep`,
                 rateUnit: 'hr/100 Sq Ft per in deep',
               },
@@ -648,7 +648,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 row: calc.dirt,
                 fee: dumpDirt,
                 rate: calc.laborDirt,
-                rateName: 'Demo - Mini - Dirt SF',
+                rateName: 'Mini - Soil',
                 rateNote: `${calc.laborDirt} hr/100 Sq Ft per in deep`,
                 rateUnit: 'hr/100 Sq Ft per in deep',
               },
@@ -673,7 +673,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 row: calc.gradeCut,
                 fee: dumpDirt,
                 rate: calc.laborGradeCut,
-                rateName: 'Demo - Mini - Grade Cut SF',
+                rateName: 'Mini - Grade Cut',
                 rateNote: `${calc.laborGradeCut} hr/100 Sq Ft per in deep`,
                 rateUnit: 'hr/100 Sq Ft per in deep',
                 extraIcon: null,
@@ -718,20 +718,15 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
 
         {isSelf && (
         <div className="mt-3 flex items-center gap-3">
-          <div className="flex-1 max-w-xs">
-            <p className="text-xs text-gray-500 mb-0.5 inline-flex items-center gap-1">
-              Rebar SF
-              <span className="text-gray-400 font-normal">({calc.rebarHrsPerSF.toFixed(5)} hrs per Sq Ft)</span>
-            </p>
-            <Inp
-              value={state.rebarSF}
-              onChange={e => set('rebarSF', e.target.value)}
-              placeholder="0"
+          <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!state.rebar}
+              onChange={e => set('rebar', e.target.checked)}
             />
-          </div>
-          {calc.rebarHrs > 0 && (
-            <p className="text-xs text-gray-500 mt-4">+{calc.rebarHrs.toFixed(2)} hrs rebar</p>
-          )}
+            Mini Rebar/Mesh
+            <span className="text-gray-400 font-normal">(+30% concrete labor)</span>
+          </label>
         </div>
         )}
       </div>
@@ -826,7 +821,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 hrs: calc.jjHrs,
                 note: `${calc.laborJJ} hr/100 Sq Ft per in deep`,
                 rate: calc.laborJJ,
-                rateName: 'Demo - Mini - JJ SF',
+                rateName: 'Basic Labor - Jumping Jack',
                 rateUnit: 'hr/100 Sq Ft per in deep',
               },
               {
@@ -838,7 +833,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 hrs: calc.ssCmpHrs,
                 note: `${calc.laborSS} hr/100 Sq Ft per in deep`,
                 rate: calc.laborSS,
-                rateName: 'Demo - Mini - SS Compact SF',
+                rateName: 'Mini - Compaction',
                 rateUnit: 'hr/100 Sq Ft per in deep',
               },
             ].map(({ label, sfK, dK, dep, tons, hrs, note, rate, rateName, rateUnit }) => (
@@ -1139,7 +1134,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             hrs: calc.stumpSmallHrs,
             sub: `${calc.stumpSmallRate} hrs per Each`,
             rate: calc.stumpSmallRate,
-            rateName: 'Demo - Mini Stump Small',
+            rateName: 'Mini - Stump Small',
             subRate: calc.ssSmall,
             subRateName: 'Sub Stump - Mini Small',
           },
@@ -1149,7 +1144,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             hrs: calc.stumpMedHrs,
             sub: `${calc.stumpMedRate} hrs per Each`,
             rate: calc.stumpMedRate,
-            rateName: 'Demo - Mini Stump Medium',
+            rateName: 'Mini - Stump Medium',
             subRate: calc.ssMed,
             subRateName: 'Sub Stump - Mini Medium',
           },
@@ -1159,7 +1154,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             hrs: calc.stumpLargeHrs,
             sub: `${calc.stumpLargeRate} hrs per Each`,
             rate: calc.stumpLargeRate,
-            rateName: 'Demo - Mini Stump Large',
+            rateName: 'Mini - Stump Large',
             subRate: calc.ssLarge,
             subRateName: 'Sub Stump - Mini Large',
           },
@@ -1169,7 +1164,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             hrs: calc.stumpXLHrs,
             sub: `${calc.stumpXLRate} hrs per Each`,
             rate: calc.stumpXLRate,
-            rateName: 'Demo - Mini Stump XL',
+            rateName: 'Mini - Stump XL',
             subRate: calc.ssXL,
             subRateName: 'Sub Stump - Mini XL',
           },

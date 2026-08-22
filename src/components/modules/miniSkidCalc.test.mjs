@@ -9,35 +9,27 @@ import assert from 'node:assert/strict'
 import { calcDemo } from './miniSkidCalc.js'
 
 const fullRates = (over = {}) => ({
-  'Demo - Mini - Concrete SF': 0.5,
-  'Demo - Mini - Dirt SF': 0.4,
-  'Demo - Mini - Grass SF': 0.3,
-  'Demo - Mini - Misc Flat SF': 0.5,
-  'Demo - Mini - Misc Vert SF': 0.5,
-  'Demo - Mini - Footing SF': 0.5,
-  'Demo - Mini - Grade Cut SF': 0.4,
-  'Demo - Mini - Grade Fill SF': 0.2,
-  'Demo - Mini - Import Base SF': 0.3,
-  'Demo - Mini - JJ SF': 0.1,
-  'Demo - Mini - SS Compact SF': 0.1,
-  'Demo - Mini Steer Grass': 0.3,
-  'Demo - Mini Rebar': 0.25,
+  'Mini - Concrete': 0.5,        // hrs / Cu Yd
+  'Mini - Soil': 0.4,            // hrs / Cu Yd
+  'Mini - Footing': 0.6,         // hrs / Cu Yd
+  'Mini - Misc Flat': 0.02,      // hrs / Cu Ft
+  'Mini - Misc Vertical': 0.65,  // hrs / Cu Yd
+  'Mini - Grade Cut': 0.015,     // hrs / Sq Ft
+  'Mini - Grade Fill': 0.018,    // hrs / Sq Ft
+  'Mini - Import Base': 0.018,   // hrs / Sq Ft
+  'Mini - Compaction': 0.0033,   // hrs / Cu Ft
+  'Basic Labor - Jumping Jack': 0.04, // shared, hrs / Cu Ft
+  'Basic Labor - Difficulty Ratio': 1, // shared
+  'Demo - Mini - Grass SF': 0.3, // unchanged (per 100 sf·in)
+  'Demo - Mini Skid Steer Grass': 0.3,
   'Mini - Shrubs 0-1 ft': 0.09, 'Mini - Shrubs 1-2 ft': 0.12, 'Mini - Shrubs 2-3 ft': 0.18,
   'Mini - Shrubs 3-4 ft': 0.24, 'Mini - Shrubs 4-5 ft': 0.3,
-  'Demo - Mini Stump Small': 1,
-  'Demo - Mini Stump Medium': 2,
-  'Demo - Mini Stump Large': 3,
-  'Demo - Mini Stump XL': 4,
-  'Demo - Mini Tree Small': 1,
-  'Demo - Mini Tree Medium': 2,
-  'Demo - Mini Tree Large': 3,
+  'Mini - Stump Small': 1, 'Mini - Stump Medium': 2, 'Mini - Stump Large': 3, 'Mini - Stump XL': 4,
+  'Mini - Tree Small': 1, 'Mini - Tree Medium': 2, 'Mini - Tree Large': 3,
   'Demo - Mini Tons SF-in Denominator': 150,
   'Demo - Mini Concrete Weight lb/cf': 150,
-  'Demo - Mini Difficulty Ratio': 1,
-  'Demo - Mini Import Base Labor Mult': 0.5,
-  'Demo - Mini Tree CY Factor': 1,
-  'Demo - Mini Steer Haul Sec/Ft': 1,
-  'Demo - Mini Steer Load (CY)': 1,
+  'Demo - Mini Haul Sec/Ft': 1,
+  'Demo - Mini Load (CY)': 1,
   ...over,
 })
 const fullMat = (over = {}) => ({
@@ -76,27 +68,27 @@ const finiteNums = obj => {
   }
 }
 
-test('value: concrete hrs = (SF/100) × depth × rate (100 SF × 4in × 0.5 = 2 hrs → $150)', () => {
-  const r = run({ dumpType: 'In House', concSF: 100, concDepth: 4 })
-  assert.equal(r.conc.hours, 2, `conc.hours got ${r.conc.hours}`)
-  assert.equal(r.laborCost, 2 * LRPH, `laborCost got ${r.laborCost}`)
+test('value: concrete hrs = Cu Yd × rate (270 SF × 12in = 10 CY × 0.5 = 5 hrs → $375)', () => {
+  const r = run({ dumpType: 'In House', concSF: 270, concDepth: 12 })
+  assert.equal(r.conc.hours, 5, `conc.hours got ${r.conc.hours}`)
+  assert.equal(r.laborCost, 5 * LRPH, `laborCost got ${r.laborCost}`)
   finiteNums(r)
 })
 
-test('units: labor is hrs-per-unit — doubling depth doubles hours (no production divide)', () => {
-  const shallow = run({ dumpType: 'In House', concSF: 100, concDepth: 4 })
-  const deep = run({ dumpType: 'In House', concSF: 100, concDepth: 8 })
-  assert.equal(deep.laborCost, shallow.laborCost * 2, 'depth 4→8 doubles hours')
+test('rebar/mesh toggle: +30% to concrete labor (5 → 6.5 hrs)', () => {
+  const off = run({ dumpType: 'In House', concSF: 270, concDepth: 12 })
+  const on = run({ dumpType: 'In House', concSF: 270, concDepth: 12, rebar: true })
+  assert.equal(on.conc.hours, 6.5, `rebar concrete hrs got ${on.conc.hours}`)
 })
 
-test('edit-reflects: raising the concrete SF rate RAISES hours (multiply model)', () => {
-  const slow = run({ dumpType: 'In House', concSF: 100, concDepth: 4 }, fullRates({ 'Demo - Mini - Concrete SF': 0.5 }))
-  const fast = run({ dumpType: 'In House', concSF: 100, concDepth: 4 }, fullRates({ 'Demo - Mini - Concrete SF': 1.0 }))
-  assert.equal(fast.laborCost, slow.laborCost * 2, 'rate ×2 → hours ×2 (opposite of a CF/hr model)')
+test('edit-reflects: raising the concrete rate RAISES hours (multiply model)', () => {
+  const slow = run({ dumpType: 'In House', concSF: 270, concDepth: 12 }, fullRates({ 'Mini - Concrete': 0.5 }))
+  const fast = run({ dumpType: 'In House', concSF: 270, concDepth: 12 }, fullRates({ 'Mini - Concrete': 1.0 }))
+  assert.equal(fast.laborCost, slow.laborCost * 2, 'rate ×2 → hours ×2')
 })
 
 test('unpriced / no-fallback: an unset labor rate resolves to 0, not a hidden constant', () => {
-  const r = run({ dumpType: 'In House', concSF: 100, concDepth: 4 }, fullRates({ 'Demo - Mini - Concrete SF': 0 }))
+  const r = run({ dumpType: 'In House', concSF: 270, concDepth: 12 }, fullRates({ 'Mini - Concrete': 0 }))
   assert.equal(r.conc.hours, 0, 'unset rate → 0 hours (no code fallback)')
   assert.equal(r.laborCost, 0, 'concrete-only with unset rate → $0 labor')
 })

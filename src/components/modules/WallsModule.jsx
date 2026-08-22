@@ -60,7 +60,7 @@ const WALLS_RATE_SCOPE = [
   // the module never touches don't clutter the table (walls-orphan-rates guard).
   { category: 'Demo', sub: 'Hand', only: ['Hand - Soil', 'Hand - Grade Fill'] },
   { category: 'Basic Labor', sub: 'Compaction', only: ['Basic Labor - Jumping Jack'] },
-  { category: 'Demo', sub: 'Mini Skid Steer', only: ['Demo - Mini - Dirt SF', 'Demo - Mini - Grade Fill SF'] },
+  { category: 'Demo', sub: 'Mini Skid Steer', only: ['Mini - Soil', 'Mini - Grade Fill'] },
   { category: 'Demo', sub: 'Skid Steer', only: ['Skid - Soil', 'Skid - Grade Fill'] },
 ]
 
@@ -234,12 +234,12 @@ const WALL_RATES = {
   //           removalYards = (sf × (thickIn/12) / 27) × swell
   // Excavator shares Mini Skid's rates; Footing Demo offers Hand + Excavator.
   demoHandDirt: { db: 'Hand - Soil' }, // repointed to renamed Hand soil row
-  demoMiniDirt: { db: 'Demo - Mini - Dirt SF' }, // Mini not yet renamed
+  demoMiniDirt: { db: 'Mini - Soil' }, // repointed to renamed Mini soil row
   demoSkidDirt: { db: 'Skid - Soil' }, // repointed to renamed Skid soil row
   // Backfilling & Compaction — SHARED with the Demo module's Grade Fill rates
   // (per equipment; Excavator uses Mini) and the shared Basic Labor Jumping Jack.
   backfillHandGF: { db: 'Hand - Grade Fill' },
-  backfillMiniGF: { db: 'Demo - Mini - Grade Fill SF' }, // Mini not yet renamed
+  backfillMiniGF: { db: 'Mini - Grade Fill' }, // repointed to renamed Mini grade-fill row
   backfillSkidGF: { db: 'Skid - Grade Fill' },
   compJJ: { db: 'Basic Labor - Jumping Jack' }, // shared JJ; Hand compaction = handCompactionMult× this
   // Hand compaction productivity relative to Jumping Jack (Hand = 3× the JJ hrs).
