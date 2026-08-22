@@ -1,5 +1,19 @@
 # Test results log
 
+## 2026-08-22 — GT run 01:14Z — 2/5, surfaced a real NaN bug (÷0) → FIXED + guarded
+- `ground-treatments.spec.js` opens + numeric-total GREEN, but 3 failed: the exhaustive scan
+  + In-House render found **NaN/Infinity** on the page, and live-edit couldn't move a NaN total.
+- Root cause (real latent bug, NOT introduced by the extraction — the calc was copied
+  byte-for-byte and had never been NaN-scanned): two tunable-coefficient divisions were
+  **unguarded against zero** — `mat = SF / stepperSfPerTon` ('GT - Steppers SF Per Ton') and
+  `tons = SF×depth / dgTonsDenom` ('GT - DG Tons Denominator'). The e2e fills stepper/DG areas;
+  if those coefficients aren't seeded on the estimate, `x/0 = Infinity` → NaN totals.
+- Fix (per the no-fallback rule: unset/zero rate ⇒ 0 contribution, never Infinity): guarded
+  both divisions (`divisor > 0 ? … : 0`), matching the existing `demoTonsDivisor`/`sfPerBag`
+  guards. Added a red-first regression test (`divisor guard`) proving finite output when either
+  coefficient is unset. GT unit tests **11/11**, full suite **235/235**, guard:rates PASS.
+  Re-run the spec to confirm 5/5.
+
 ## 2026-08-22 — Ground Treatments: Layer A+B (extraction battery)
 - **Layer A:** extracted the ~495-line `calcGroundTreatments` into pure
   `groundTreatmentsCalc.js` (module now `import { calcGroundTreatments } from

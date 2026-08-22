@@ -128,6 +128,25 @@ test('sub tab: flat $/SF (and $/LF for edging) per section, no in-house hours/ma
   finiteNums(r)
 })
 
+test('divisor guard (regression): unset "Steppers SF Per Ton" / "DG Tons Denominator" → 0, not Infinity/NaN', () => {
+  // Filling stepper/DG areas while these tunable coefficients are unset used to divide by 0
+  // and render NaN/Infinity (caught by the e2e). The guard makes an unset divisor contribute 0.
+  const step = run(
+    { flagstoneSoilSF: '100', stepperVendor: { flagSoil: 'Standard' }, stepperType: { flagSoil: 'Flagstone' } },
+    { 'Flagstone Steppers - Soil Labor': 0.1 }, // GT - Steppers SF Per Ton intentionally unset
+    [row('Flagstone', 'Steppers', 300)]
+  )
+  assert.ok(Number.isFinite(step.totalMat), `stepper totalMat must be finite; got ${step.totalMat}`)
+  assert.equal(step.flagMat, 0, 'unset Steppers SF Per Ton → $0 stepper material (no Infinity)')
+
+  const dg = run(
+    { dgRows: [{ sf: '100', depth: '2', type: 'DG Gold', method: 'Machine', cement: 'No', weedFabric: 'No' }] },
+    { 'GT - DG Material Markup': 1, 'DG - Machine Labor Rate': 0.5, 'GT - DG Cleanup Coverage': 0.01 }, // DG Tons Denominator unset
+    [row('DG Gold', 'DG', 60)]
+  )
+  assert.ok(Number.isFinite(dg.dgLab) && Number.isFinite(dg.totalMat), `DG values must be finite; got lab ${dg.dgLab}, mat ${dg.totalMat}`)
+})
+
 test('no NaN across a populated estimate (mulch + edging + prep + sod + DG + gravel + manual)', () => {
   const rows = [
     row('Standard Mulch', 'Mulch', 40), row('Metal Edging', 'Edging', 4), row('Compost', 'Soils', 45),

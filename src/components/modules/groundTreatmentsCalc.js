@@ -362,7 +362,9 @@ export function calcGroundTreatments(
       // hrs-per-unit: stepper labor is hrs per Sq Ft (standardized 2026-08-18, was SF/day).
       const sfPerDay = p(ln.labRate.dbName)
       const lab = n(ln.sf) * sfPerDay
-      const mat = (n(ln.sf) / stepperSfPerTon) * perTon
+      // Guard the divisor: an unset 'GT - Steppers SF Per Ton' ⇒ 0 material (no fallback,
+      // never Infinity). Matches the demoTonsDivisor / sfPerBag guards elsewhere.
+      const mat = stepperSfPerTon > 0 ? (n(ln.sf) / stepperSfPerTon) * perTon : 0
       stepLab += lab
       stepMat += mat
       if (ln.bucket === 'flag') {
@@ -384,7 +386,9 @@ export function calcGroundTreatments(
     ;(dgRows || []).forEach(r => {
       if (!(n(r.sf) > 0)) return
       if (!r.type) return
-      const tons = (n(r.sf) * n(r.depth)) / dgTonsDenom
+      // Guard the divisor: an unset 'GT - DG Tons Denominator' ⇒ 0 tons (no Infinity); DG
+      // labor/cement scale off tons, so an unset coefficient contributes 0, not NaN.
+      const tons = dgTonsDenom > 0 ? (n(r.sf) * n(r.depth)) / dgTonsDenom : 0
       // DG MATERIAL is now priced per CUBIC YARD (company-wide base-aggregate
       // change): material $ = CY × $/CY. Volume in CY uses the fixed unit math
       // (27 cf/cy × 12 in/ft → SF × depth_in / 324). `tons` is retained ONLY for
