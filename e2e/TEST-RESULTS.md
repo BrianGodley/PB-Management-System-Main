@@ -1,5 +1,19 @@
 # Test results log
 
+## 2026-08-22 — GT run 01:50Z — 5/5 GREEN (summary guard deployed)
+- Targeted run of `ground-treatments.spec.js`: **6 expected / 0 unexpected / 0 flaky / 0
+  skipped** (37s). All 5 GT tests GREEN once the DG-summary ÷0 guard (bba2e18) actually
+  deployed — the two prior "still NaN" reruns were deploy lag (prod was on 27422a2, one commit
+  behind). GT definition-of-done C/E → green:
+  - C. E2E: opens[x] vendor×Type[x] numeric[x] sub[x] live-edit[x] clean[x]
+  - E. Loop: red-first[x] (÷0 NaN guards) green[x]
+  - D (DB-health SQL) stays Brian's step.
+- Bugs the battery caught + fixed here: unguarded Steppers/DG divisor ÷0 in the CALC, and the
+  same DG divisor ÷0 in the SUMMARY (rendered "NaN hrs · Cu Yd" on the estimate page). Both
+  now guarded (unset coeff → 0).
+- **Extraction battery COMPLETE (A/B/C green) for all 20 developed estimator modules.**
+  Remaining work: Pool (developed, battery not yet started) + Water Features (not developed).
+
 ## 2026-08-22 — GT rerun 01:24Z — live-edit GREEN, NaN persisted → traced to the SUMMARY (÷0)
 - After the calc-side guards, live-edit passed but the NaN/Infinity scan still tripped.
   Traced via the a11y snapshot: `paragraph: NaN hrs · 10.80 Cu Yd` — the **DG line in
