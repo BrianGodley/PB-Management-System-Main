@@ -12,23 +12,23 @@ const fullRates = (over = {}) => ({
   'Hand - Soil': 0.1,
   'Hand - Grass': 0.1,
   'Hand - Import Base': 0.1,
-  'Demo - Hand Bucket': 0.1,
+  'Hand - Bucket': 0.1,
   'Hand - Misc Flat': 0.1,
   'Hand - Misc Vertical': 0.1,
   'Hand - Footing': 0.1,
   'Hand - Grade Cut': 0.1,
   'Hand - Grade Fill': 0.05,
   'Basic Labor - Jumping Jack': 0.04, // shared, hrs / Cu Ft
-  'Demo - Hand Rebar': 0.25, // +25% concrete when rebar toggle on
-  'Demo - Hand Load (CY)': 1,
-  'Demo - Hand Difficulty Ratio': 1,
+  'Hand - Rebar': 0.25, // +25% concrete when rebar toggle on
+  'Hand - Load (CY)': 1,
+  'Hand - Difficulty Ratio': 1,
   ...over,
 })
 const fullMat = (over = {}) => ({
-  'Demo - Hand Container (Low-Boy)': 500,
-  'Demo - Hand Container Capacity (CY)': 12,
-  'Demo - Hand Removal Swell': 1.25,
-  'Demo - Hand Import Base $/10cy': 300,
+  'Hand - Container (Low-Boy)': 500,
+  'Hand - Container Capacity (CY)': 12,
+  'Hand - Removal Swell': 1.25,
+  'Hand - Import Base $/10cy': 300,
   ...over,
 })
 const fullSub = (over = {}) => ({
@@ -40,10 +40,10 @@ const fullSub = (over = {}) => ({
   'Sub Tree - Hand 6-12': 350,
   'Sub Tree - Hand 12-18': 1200,
   'Sub Tree - Hand 18-24': 2800,
-  'Demo - Hand Sub Haul CY - Concrete': 80,
-  'Demo - Hand Sub Haul CY - Dirt': 80,
-  'Demo - Hand Sub Haul CY - Grass': 67,
-  'Demo - Hand Sub Haul - Trash 12yd': 850,
+  'Hand - Sub Haul CY - Concrete': 80,
+  'Hand - Sub Haul CY - Dirt': 80,
+  'Hand - Sub Haul CY - Grass': 67,
+  'Hand - Sub Haul - Trash 12yd': 850,
   ...over,
 })
 const LRPH = 75
@@ -64,7 +64,7 @@ test('concrete demo: hours = CF × 0.1 (300 SF × 12in = 300 CF → 30 hrs)', ()
 })
 
 test('bucket checkbox multiplies that row hours by the Bucket coefficient', () => {
-  const rates = fullRates({ 'Demo - Hand Bucket Labor Mult': 2 })
+  const rates = fullRates({ 'Hand - Bucket Labor Mult': 2 })
   const base = run({ dumpType: 'In House', concSF: 300, concDepth: 12 }, rates)
   const bucketed = run({ dumpType: 'In House', concSF: 300, concDepth: 12, concBucket: true }, rates)
   assert.equal(bucketed.laborCost, base.laborCost * 2, 'concrete bucket → ×2')

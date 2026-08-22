@@ -26,10 +26,10 @@ export function calcDemo(
   // Business-tunable assumptions, surfaced as editable coefficient rows in View
   // Rates (labor_rates, category Demo). Fixed unit conversions (27 cf/cy,
   // 12 in/ft, 2000 lb/ton, 60 min/hr) stay as literal math.
-  const tonsSfInDenom = n(lr['Demo - Hand Tons SF-in Denominator'])
-  const concreteWeightLbCf = n(lr['Demo - Hand Concrete Weight lb/cf'])
-  const treeCyFactor = n(mp['Demo - Hand Tree CY Factor'])
-  const bucketLaborMult = n(lr['Demo - Hand Bucket Labor Mult'])
+  const tonsSfInDenom = n(lr['Hand - Tons SF-in Denominator'])
+  const concreteWeightLbCf = n(lr['Hand - Concrete Weight lb/cf'])
+  const treeCyFactor = n(mp['Hand - Tree CY Factor'])
+  const bucketLaborMult = n(lr['Hand - Bucket Labor Mult'])
   // Local sfToTons shadows the module helper so the tons denominator is editable.
   const sfToTons = (sf, depthIn) => (n(sf) / tonsSfInDenom) * n(depthIn)
   // Subcontractor rates: a one-off adjustment saved on THIS estimate
@@ -42,24 +42,23 @@ export function calcDemo(
   const isSub = state.dumpType === 'Subcontractor'
   const isDumpSub = false // disposal follows the In House/Sub toggle
   const lrph = n(laborRatePerHour)
-  const difficultyRatio = n(lr['Demo - Hand Difficulty Ratio'])
+  const difficultyRatio = n(lr['Hand - Difficulty Ratio'])
   const diff = 1 + (n(state.difficulty) / 100) * difficultyRatio
   const hrsAdj = n(state.hoursAdj)
 
   // ── Rates from DB with fallbacks ──────────────────────────────────────────
-  const rateConc = n(lr['Demo - Hand Concrete/Dirt'])
-  const rateGrass = n(lr['Demo - Hand Grass'])
-  const rateBase = n(lr['Demo - Hand Import Base'])
-  const rateBucket = n(lr['Demo - Hand Bucket'])
-  const rateJJ = n(lr['Demo - Hand JJ Compaction'])
-  const rebarMinPerSF = n(lr['Demo - Hand Rebar'])
+  const rateConc = n(lr['Hand - Concrete/Dirt'])
+  const rateGrass = n(lr['Hand - Grass'])
+  const rateBase = n(lr['Hand - Import Base'])
+  const rateBucket = n(lr['Hand - Bucket'])
+  const rebarMinPerSF = n(lr['Hand - Rebar'])
   // ── hrs-per-Cu-Ft model: hours = Cu Ft × rate. CF = SF×depth/12 (flat) or
   //    LF×h/12×w/12 (vert). Unset rate → 0 hrs. (Multiply — higher rate ⇒ more hrs.)
   const hrConc = n(lr['Hand - Concrete'])       // hrs / Cu Ft
   const hrSoil = n(lr['Hand - Soil'])           // hrs / Cu Ft
   const hrGrass = n(lr['Hand - Grass'])         // hrs / Cu Ft
   const hrBase = n(lr['Hand - Import Base'])    // hrs / Cu Ft
-  const hrBucket = n(lr['Demo - Hand Bucket'])  // Bucket coefficient (confined access)
+  const hrBucket = n(lr['Hand - Bucket'])  // Bucket coefficient (confined access)
   const hrMiscFlat = n(lr['Hand - Misc Flat'])  // hrs / Cu Ft
   const hrMiscVert = n(lr['Hand - Misc Vertical']) // hrs / Cu Ft
   const hrFooting = n(lr['Hand - Footing'])     // hrs / Cu Ft
@@ -67,21 +66,21 @@ export function calcDemo(
   const hrGradeFill = n(lr['Hand - Grade Fill']) // hrs / Cu Ft
   const jjRate = n(lr['Basic Labor - Jumping Jack']) // shared, hrs / Cu Ft
   // Rebar toggle: concrete demo hours ×(1 + 25%) when rebar present.
-  const rebarFactor = state.rebar ? 1 + n(lr['Demo - Hand Rebar']) : 1
+  const rebarFactor = state.rebar ? 1 + n(lr['Hand - Rebar']) : 1
   // Per-height shrub rates (Each), replacing the base rate × height factor model.
   const shrubRateFor = h => n(lr['Hand - Shrubs ' + h + ' ft'])
-  const stumpSmallRate = n(lr['Demo - Hand Stump Small'])
-  const stumpMedRate = n(lr['Demo - Hand Stump Medium'])
-  const stumpLargeRate = n(lr['Demo - Hand Stump Large'])
-  const stumpXLRate = n(lr['Demo - Hand Stump XL'])
-  const treeSmall = n(lr['Demo - Hand Tree Small'])
-  const treeMed = n(lr['Demo - Hand Tree Medium'])
-  const treeLarge = n(lr['Demo - Hand Tree Large'])
+  const stumpSmallRate = n(lr['Hand - Stump Small'])
+  const stumpMedRate = n(lr['Hand - Stump Medium'])
+  const stumpLargeRate = n(lr['Hand - Stump Large'])
+  const stumpXLRate = n(lr['Hand - Stump XL'])
+  const treeSmall = n(lr['Hand - Tree Small'])
+  const treeMed = n(lr['Hand - Tree Medium'])
+  const treeLarge = n(lr['Hand - Tree Large'])
 
-  const dumpConc = n(mp['Demo - Hand Dump - Concrete'])
-  const dumpDirt = n(mp['Demo - Hand Dump - Dirt'])
-  const dumpGreen = n(mp['Demo - Hand Dump - Green Waste'])
-  const dumpTree = n(mp['Demo - Hand Dump - Tree/Stump'])
+  const dumpConc = n(mp['Hand - Dump - Concrete'])
+  const dumpDirt = n(mp['Hand - Dump - Dirt'])
+  const dumpGreen = n(mp['Hand - Dump - Green Waste'])
+  const dumpTree = n(mp['Hand - Dump - Tree/Stump'])
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   // Bank (in-place) cubic yards — the volume shown to the user. 27 cf/cy and
@@ -114,22 +113,22 @@ export function calcDemo(
   }
 
   // Editable container disposal rates (Master Rates -> Materials, category Demo).
-  const containerPrice = n(mp['Demo - Hand Container (Low-Boy)'])
-  const containerCy = n(mp['Demo - Hand Container Capacity (CY)'])
-  const swellFactor = n(mp['Demo - Hand Removal Swell'])
+  const containerPrice = n(mp['Hand - Container (Low-Boy)'])
+  const containerCy = n(mp['Hand - Container Capacity (CY)'])
+  const swellFactor = n(mp['Hand - Removal Swell'])
   const removalYards = (sf, depthIn) => ((n(sf) * (n(depthIn) / 12)) / 27) * swellFactor
   const removalContainers = (sf, depthIn) => Math.ceil(removalYards(sf, depthIn) / containerCy)
   const containerCost = (sf, depthIn) =>
     removalContainers(sf, depthIn) * containerPrice
   // Editable hauling coefficients: wheelbarrow load 1/5 cy; 4 sec/ft (covers round trip).
-  const haulSecPerFt = n(lr['Demo - Hand Haul Sec/Ft'])
-  const haulLoadCy = n(lr['Demo - Hand Load (CY)'])
+  const haulSecPerFt = n(lr['Hand - Haul Sec/Ft'])
+  const haulLoadCy = n(lr['Hand - Load (CY)'])
   // Concrete-method labor generalized to raw cubic feet (= (sf/100)*depth for flat).
   const flatCf = (sf, depthIn) => n(sf) * (n(depthIn) / 12)
   const cfLaborHrs = (cf, rate) => (n(cf) * 12 / 100) * rate
   const containerCostCf = cf =>
     Math.ceil(((n(cf) / 27) * swellFactor) / containerCy) * containerPrice
-  const baseMatPer10Cy = n(mp['Demo - Hand Import Base $/10cy'])
+  const baseMatPer10Cy = n(mp['Hand - Import Base $/10cy'])
 
   // ── Demo rows ────────────────────────────────────────────────────────────
   const conc = flat(state.concSF, state.concDepth || 4, rateConc, 0)
@@ -229,9 +228,9 @@ export function calcDemo(
 
   // ── Sub Haul cost — per cubic yard removed, goes into subCost (not materials) ─
   // DB values (subcontractor_rates category='Sub Haul') take precedence over defaults
-  const shConc = n(sr['Demo - Hand Sub Haul CY - Concrete'])
-  const shDirt = n(sr['Demo - Hand Sub Haul CY - Dirt'])
-  const shGrass = n(sr['Demo - Hand Sub Haul CY - Grass'])
+  const shConc = n(sr['Hand - Sub Haul CY - Concrete'])
+  const shDirt = n(sr['Hand - Sub Haul CY - Dirt'])
+  const shGrass = n(sr['Hand - Sub Haul CY - Grass'])
 
   const subHaulCost =
     isSub || isDumpSub
@@ -291,10 +290,10 @@ export function calcDemo(
   const laborCost = totalHrs * lrph
   const burden = laborCost * n(laborBurdenPct)
   // Hauling (Subcontractor) — 12-yard loads × per-load rate (sub cost, pre-GP markup).
-  const haulTrashRate = n(sr['Demo - Hand Sub Haul - Trash 12yd'])
-  const haulConcreteRate = n(sr['Demo - Hand Sub Haul - Concrete 12yd'])
-  const haulSoilRate = n(sr['Demo - Hand Sub Haul - Soil 12yd'])
-  const haulBaseRate = n(sr['Demo - Hand Sub Haul - Import Base 12yd'])
+  const haulTrashRate = n(sr['Hand - Sub Haul - Trash 12yd'])
+  const haulConcreteRate = n(sr['Hand - Sub Haul - Concrete 12yd'])
+  const haulSoilRate = n(sr['Hand - Sub Haul - Soil 12yd'])
+  const haulBaseRate = n(sr['Hand - Sub Haul - Import Base 12yd'])
   const haulCost =
     n(state.haulTrashLoads) * haulTrashRate +
     n(state.haulConcreteLoads) * haulConcreteRate +
@@ -451,7 +450,6 @@ export function calcDemo(
     rateGrass,
     rateBase,
     rateBucket,
-    rateJJ,
     rebarMinPerSF,
     stumpSmallRate,
     stumpMedRate,

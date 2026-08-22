@@ -389,10 +389,10 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
   const isSub = state.dumpType === 'Subcontractor'
   const isDumpSub = false // disposal follows the In House/Sub toggle
 
-  const dumpConc = n(materialPrices['Demo - Hand Dump - Concrete'])
-  const dumpDirt = n(materialPrices['Demo - Hand Dump - Dirt'])
+  const dumpConc = n(materialPrices['Hand - Dump - Concrete'])
+  const dumpDirt = n(materialPrices['Hand - Dump - Dirt'])
   const dumpGreen =
-    n(materialPrices['Demo - Hand Dump - Green Waste'])
+    n(materialPrices['Hand - Dump - Green Waste'])
 
   const td = 'py-1 pr-2 align-top'
   const num = 'py-1 pr-2 text-gray-600 tabular-nums text-xs'
@@ -1063,10 +1063,10 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
               />
               <tbody className="divide-y divide-gray-50">
                 {[
-                  { label: 'Trash Per 12 Yard Load', key: 'haulTrashLoads', rate: calc.haulTrashRate, rateName: 'Demo - Hand Sub Haul - Trash 12yd' },
-                  { label: 'Concrete Per 12 Yard Load', key: 'haulConcreteLoads', rate: calc.haulConcreteRate, rateName: 'Demo - Hand Sub Haul - Concrete 12yd' },
-                  { label: 'Soil Per 12 Yard Load', key: 'haulSoilLoads', rate: calc.haulSoilRate, rateName: 'Demo - Hand Sub Haul - Soil 12yd' },
-                  { label: 'Import Base Per 12 Yard Load', key: 'haulBaseLoads', rate: calc.haulBaseRate, rateName: 'Demo - Hand Sub Haul - Import Base 12yd' },
+                  { label: 'Trash Per 12 Yard Load', key: 'haulTrashLoads', rate: calc.haulTrashRate, rateName: 'Hand - Sub Haul - Trash 12yd' },
+                  { label: 'Concrete Per 12 Yard Load', key: 'haulConcreteLoads', rate: calc.haulConcreteRate, rateName: 'Hand - Sub Haul - Concrete 12yd' },
+                  { label: 'Soil Per 12 Yard Load', key: 'haulSoilLoads', rate: calc.haulSoilRate, rateName: 'Hand - Sub Haul - Soil 12yd' },
+                  { label: 'Import Base Per 12 Yard Load', key: 'haulBaseLoads', rate: calc.haulBaseRate, rateName: 'Hand - Sub Haul - Import Base 12yd' },
                 ].map(({ label, key, rate, rateName }) => (
                   <tr key={key}>
                     <td className={`${td} font-medium text-gray-700`}>
@@ -1158,7 +1158,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             hrs: calc.stumpSmallHrs,
             sub: `${calc.stumpSmallRate} hrs per Each`,
             rate: calc.stumpSmallRate,
-            rateName: 'Demo - Hand Stump Small',
+            rateName: 'Hand - Stump Small',
             subRate: calc.ssSmall,
             subRateName: 'Sub Stump - Hand Small',
           },
@@ -1168,7 +1168,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             hrs: calc.stumpMedHrs,
             sub: `${calc.stumpMedRate} hrs per Each`,
             rate: calc.stumpMedRate,
-            rateName: 'Demo - Hand Stump Medium',
+            rateName: 'Hand - Stump Medium',
             subRate: calc.ssMed,
             subRateName: 'Sub Stump - Hand Medium',
           },
@@ -1178,7 +1178,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             hrs: calc.stumpLargeHrs,
             sub: `${calc.stumpLargeRate} hrs per Each`,
             rate: calc.stumpLargeRate,
-            rateName: 'Demo - Hand Stump Large',
+            rateName: 'Hand - Stump Large',
             subRate: calc.ssLarge,
             subRateName: 'Sub Stump - Hand Large',
           },
@@ -1188,7 +1188,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             hrs: calc.stumpXLHrs,
             sub: `${calc.stumpXLRate} hrs per Each`,
             rate: calc.stumpXLRate,
-            rateName: 'Demo - Hand Stump XL',
+            rateName: 'Hand - Stump XL',
             subRate: calc.ssXL,
             subRateName: 'Sub Stump - Hand XL',
           },
