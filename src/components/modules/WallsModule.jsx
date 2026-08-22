@@ -58,8 +58,8 @@ const WALLS_RATE_SCOPE = [
   // Removal = Dirt SF, Backfill = Grade Fill SF, Hand compaction = JJ SF). `only`
   // surfaces JUST those in View Rates so the tree/stump/haul/grade-cut/etc. rows
   // the module never touches don't clutter the table (walls-orphan-rates guard).
-  { category: 'Demo', sub: 'Hand Demo', only: ['Demo - Hand - Dirt SF', 'Demo - Hand - Grade Fill SF', 'Demo - Hand - JJ SF'] },
-  { category: 'Demo', sub: 'Mini Skid Steer Demo', only: ['Demo - Mini - Dirt SF', 'Demo - Mini - Grade Fill SF'] },
+  { category: 'Demo', sub: 'Hand', only: ['Demo - Hand - Dirt SF', 'Demo - Hand - Grade Fill SF', 'Demo - Hand - JJ SF'] },
+  { category: 'Demo', sub: 'Mini Skid Steer', only: ['Demo - Mini - Dirt SF', 'Demo - Mini - Grade Fill SF'] },
   { category: 'Demo', sub: 'Skid Steer', only: ['Skid - Soil', 'Skid - Grade Fill'] },
 ]
 
