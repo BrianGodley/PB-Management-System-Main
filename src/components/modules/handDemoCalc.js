@@ -57,17 +57,17 @@ export function calcDemo(
   // ── CF/hr production model (2026-08-20): hours = Cu Ft ÷ (CF/hr). CF = SF×depth/12
   //    (flat) or LF×h/12×w/12 (vert). No tonnage. Unset rate → 0 hrs (never NaN). ──
   const cfHours = (cf, rate) => (rate > 0 ? n(cf) / rate : 0)
-  const cfhrConc = n(lr['Demo - Hand Concrete'])
-  const cfhrSoil = n(lr['Demo - Hand Soil'])
+  const cfhrConc = n(lr['Hand - Concrete'])
+  const cfhrSoil = n(lr['Hand - Soil'])
   const cfhrGrass = n(lr['Demo - Hand Grass'])
   const cfhrBase = n(lr['Demo - Hand Import Base'])
   const cfhrBucket = n(lr['Demo - Hand Bucket'])
-  const cfhrMiscFlat = n(lr['Demo - Hand Misc Flat'])
-  const cfhrMiscVert = n(lr['Demo - Hand Misc Vert'])
-  const cfhrFooting = n(lr['Demo - Hand Footing'])
-  const cfhrGradeCut = n(lr['Demo - Hand Grade Cut'])
-  const cfhrGradeFill = n(lr['Demo - Hand Grade Fill'])
-  const sfhrJJ = n(lr['Demo - Hand JJ']) // SF per hour (compaction, area-based)
+  const cfhrMiscFlat = n(lr['Hand - Misc Flat'])
+  const cfhrMiscVert = n(lr['Hand - Misc Vertical'])
+  const cfhrFooting = n(lr['Hand - Footing'])
+  const cfhrGradeCut = n(lr['Hand - Grade Cut'])
+  const cfhrGradeFill = n(lr['Hand - Grade Fill'])
+  const sfhrJJ = n(lr['Hand - Jumping Jack']) // SF per hour (compaction, area-based)
   // Rebar toggle: concrete demo hours ×(1 + 25%) when rebar present.
   const rebarFactor = state.rebar ? 1 + n(lr['Demo - Hand Rebar']) : 1
   // Per-height shrub rates (Each), replacing the base rate × height factor model.

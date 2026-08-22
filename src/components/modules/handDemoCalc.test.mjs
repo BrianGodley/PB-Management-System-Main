@@ -8,17 +8,17 @@ import { calcDemo } from './handDemoCalc.js'
 
 // CF/hr production rates (In-House labor) + JJ (SF/hr) + rebar factor.
 const fullRates = (over = {}) => ({
-  'Demo - Hand Concrete': 15,
-  'Demo - Hand Soil': 10,
+  'Hand - Concrete': 15,
+  'Hand - Soil': 10,
   'Demo - Hand Grass': 12,
   'Demo - Hand Import Base': 40,
   'Demo - Hand Bucket': 8,
-  'Demo - Hand Misc Flat': 10,
-  'Demo - Hand Misc Vert': 10,
-  'Demo - Hand Footing': 10,
-  'Demo - Hand Grade Cut': 8,
-  'Demo - Hand Grade Fill': 40,
-  'Demo - Hand JJ': 50, // SF/hr
+  'Hand - Misc Flat': 10,
+  'Hand - Misc Vertical': 10,
+  'Hand - Footing': 10,
+  'Hand - Grade Cut': 8,
+  'Hand - Grade Fill': 40,
+  'Hand - Jumping Jack': 50, // SF/hr
   'Demo - Hand Rebar': 0.25, // +25% concrete when rebar toggle on
   'Demo - Hand Load (CY)': 1,
   'Demo - Hand Difficulty Ratio': 1,
@@ -82,8 +82,8 @@ test('grade fill uses 40 CF/hr, grade cut uses 8 CF/hr (distinct rates)', () => 
 })
 
 test('View Rates edit reflects: raising the concrete CF/hr LOWERS hours (faster)', () => {
-  const slow = run({ dumpType: 'In House', concSF: 300, concDepth: 12 }, fullRates({ 'Demo - Hand Concrete': 15 }))
-  const fast = run({ dumpType: 'In House', concSF: 300, concDepth: 12 }, fullRates({ 'Demo - Hand Concrete': 30 }))
+  const slow = run({ dumpType: 'In House', concSF: 300, concDepth: 12 }, fullRates({ 'Hand - Concrete': 15 }))
+  const fast = run({ dumpType: 'In House', concSF: 300, concDepth: 12 }, fullRates({ 'Hand - Concrete': 30 }))
   assert.ok(fast.laborCost < slow.laborCost, 'higher CF/hr → fewer hours → lower labor')
 })
 
