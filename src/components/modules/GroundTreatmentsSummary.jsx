@@ -496,7 +496,9 @@ export default function GroundTreatmentsSummary({ module }) {
   const dgLines = _dgRows
     .map((r, i) => {
       if (!(n(r.sf) > 0)) return null
-      const tons = (n(r.sf) * n(r.depth)) / dgTonsDenom
+      // Guard the divisor: an unset 'GT - DG Tons Denominator' ⇒ 0 tons (no Infinity/NaN;
+      // Infinity × an unset coeff would otherwise render "NaN hrs"). Mirrors the calc guard.
+      const tons = dgTonsDenom > 0 ? (n(r.sf) * n(r.depth)) / dgTonsDenom : 0
       // DG MATERIAL priced per CUBIC YARD (mirrors the module): material $ =
       // CY × $/CY. CY = SF × depth_in / 324 (27 cf/cy × 12 in/ft). `tons` is kept
       // only for labor and the per-ton Cement Mix add-on.

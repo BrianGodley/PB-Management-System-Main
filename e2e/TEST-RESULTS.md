@@ -1,5 +1,16 @@
 # Test results log
 
+## 2026-08-22 — GT rerun 01:24Z — live-edit GREEN, NaN persisted → traced to the SUMMARY (÷0)
+- After the calc-side guards, live-edit passed but the NaN/Infinity scan still tripped.
+  Traced via the a11y snapshot: `paragraph: NaN hrs · 10.80 Cu Yd` — the **DG line in
+  `GroundTreatmentsSummary.jsx`** (which renders on the estimate page, so it trips the scan on
+  either tab). The Summary mirrors the calc and had the SAME unguarded division:
+  `tons = SF×depth / dgTonsDenom`. With the coefficient unset, `tons` → Infinity, then
+  `Infinity × 0` (another unset coeff) → NaN → "NaN hrs".
+- Fix: guarded the Summary's DG `tons` (`dgTonsDenom > 0 ? … : 0`), mirroring the calc + the
+  Summary's already-guarded stepper/fertilizer divisions. Both GroundTreatments module +
+  summary bundle clean; all Summary divisors now guarded. Re-run to confirm 5/5.
+
 ## 2026-08-22 — GT run 01:14Z — 2/5, surfaced a real NaN bug (÷0) → FIXED + guarded
 - `ground-treatments.spec.js` opens + numeric-total GREEN, but 3 failed: the exhaustive scan
   + In-House render found **NaN/Infinity** on the page, and live-edit couldn't move a NaN total.
