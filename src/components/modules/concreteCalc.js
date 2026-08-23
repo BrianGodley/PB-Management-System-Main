@@ -3,6 +3,7 @@
 // The small helper consts below are duplicated from the module (kept in sync); the
 // module now imports calcConcrete from here.
 import { makeModuleRates } from '../../lib/moduleRates.js'
+import { LAB } from '../../lib/laborRefs.js'
 
 // Inlined pure helpers — lib/materialCatalog + lib/walkAccess import supabase and so
 // can't be pulled into a node-testable pure module. Copies kept in sync with the libs.
@@ -30,9 +31,9 @@ function calcWalkAccessLabor(laborSubtotalHrs, distanceLF, opts = {}) {
 
 
 const BASE_METHOD_LABOR_NAME = {
-  'Skid Steer': 'Concrete - Base Skid Steer',
-  'Mini Skid Steer': 'Concrete - Base Mini Skid Steer',
-  Wheelbarrow: 'Concrete - Base Wheelbarrow',
+  'Skid Steer': LAB.CONC_BASE_SKID_STEER,
+  'Mini Skid Steer': LAB.CONC_BASE_MINI_SKID_STEER,
+  Wheelbarrow: LAB.CONC_BASE_WHEELBARROW,
 }
 
 const normBaseMethod = m =>
@@ -43,11 +44,11 @@ const normBaseMethod = m =>
       : m
 
 const INSTALL_TIERS = [
-  { key: 's100_300', label: '100–300 Sq Ft', rateName: 'Concrete - Install 100-300' },
-  { key: 's300_600', label: '300–600 Sq Ft', rateName: 'Concrete - Install 300-600' },
-  { key: 's600_1000', label: '600–1000 Sq Ft', rateName: 'Concrete - Install 600-1000' },
-  { key: 's1000_2000', label: '1000–2000 Sq Ft', rateName: 'Concrete - Install 1000-2000' },
-  { key: 's2000plus', label: '2000+ SF', rateName: 'Concrete - Install 2000+' },
+  { key: 's100_300', label: '100–300 Sq Ft', rateName: LAB.CONC_INSTALL_100_300 },
+  { key: 's300_600', label: '300–600 Sq Ft', rateName: LAB.CONC_INSTALL_300_600 },
+  { key: 's600_1000', label: '600–1000 Sq Ft', rateName: LAB.CONC_INSTALL_600_1000 },
+  { key: 's1000_2000', label: '1000–2000 Sq Ft', rateName: LAB.CONC_INSTALL_1000_2000 },
+  { key: 's2000plus', label: '2000+ SF', rateName: LAB.CONC_INSTALL_2000_PLUS },
 ]
 
 function resolveType(label, opts) {
@@ -114,33 +115,33 @@ export function calcConcrete(
   const lrph = n(laborRatePerHour)
 
   // ── Labor production rates (labor_rates) ─────────────────────────────────
-  const concreteSFPerHr = n(lr['Concrete - Pour & Finish'])
+  const concreteSFPerHr = n(lr[LAB.CONC_POUR_FINISH])
   // Rebar labor SF/hr is pattern-specific — each spacing has its own production
-  // rate row. All table-driven.
+  // rate row (read by frozen ref_key). All table-driven.
   const rebarSFPerHrBySpacing = {
-    '24" OC': n(lr['Concrete - Rebar 24" OC']),
-    '18" OC': n(lr['Concrete - Rebar 18" OC']),
-    '12" OC': n(lr['Concrete - Rebar 12" OC']),
+    '24" OC': n(lr[LAB.CONC_REBAR_24]),
+    '18" OC': n(lr[LAB.CONC_REBAR_18]),
+    '12" OC': n(lr[LAB.CONC_REBAR_12]),
   }
   const rebarSFPerHr =
-    rebarSFPerHrBySpacing[state.rebarSpacing] ?? n(lr['Concrete - Rebar 24" OC'])
-  const formLFPerHr = n(lr['Concrete - Form Setting'])
-  const sleeveLFPerHr = n(lr['Concrete - Sleeves'])
-  const sealerNaturalSFPerHr = n(lr['Concrete - Sealer Natural'])
-  const sealerWetSFPerHr = n(lr['Concrete - Sealer Wet-Look'])
-  const vaporBarrierSFPerHr = n(lr['Concrete - Vapor Barrier'])
-  const complexityPctPerUnit = n(lr['Concrete - Forming Complexity % Per Unit'])
+    rebarSFPerHrBySpacing[state.rebarSpacing] ?? n(lr[LAB.CONC_REBAR_24])
+  const formLFPerHr = n(lr[LAB.CONC_FORM_SETTING])
+  const sleeveLFPerHr = n(lr[LAB.CONC_SLEEVES])
+  const sealerNaturalSFPerHr = n(lr[LAB.CONC_SEALER_NATURAL])
+  const sealerWetSFPerHr = n(lr[LAB.CONC_SEALER_WET])
+  const vaporBarrierSFPerHr = n(lr[LAB.CONC_VAPOR_BARRIER])
+  const complexityPctPerUnit = n(lr[LAB.CONC_FORMING_COMPLEXITY])
   // Finish add-on labor — hrs per Sq Ft, editable via labor_rates. (Vars keep
   // the legacy *SFPerHr names but now hold hrs-per-SF; standardized 2026-08-18.)
-  const sandFinishSFPerHr = n(lr['Concrete - Sand Finish'])
-  const saltFinishSFPerHr = n(lr['Concrete - Salt Finish'])
-  const exposedAggSFPerHr = n(lr['Concrete - Exposed Aggregate'])
-  const seededAggSFPerHr = n(lr['Concrete - Seeded Aggregate'])
-  const stampedSFPerHr = n(lr['Concrete - Stamped Finish'])
+  const sandFinishSFPerHr = n(lr[LAB.CONC_SAND_FINISH])
+  const saltFinishSFPerHr = n(lr[LAB.CONC_SALT_FINISH])
+  const exposedAggSFPerHr = n(lr[LAB.CONC_EXPOSED_AGG])
+  const seededAggSFPerHr = n(lr[LAB.CONC_SEEDED_AGG])
+  const stampedSFPerHr = n(lr[LAB.CONC_STAMPED_FINISH])
   // Hand Mix takes more labor to produce than truck-delivered mix. Applied as a
   // % uplift to that tier's pour & finish hours. Tunable coefficient — lives in
   // labor_rates (View Rates), read live with no hardcoded fallback.
-  const handMixUpliftPct = n(lr['Concrete - Hand Mix Labor Uplift %'])
+  const handMixUpliftPct = n(lr[LAB.CONC_HAND_MIX_UPLIFT])
 
   // ── Material unit costs (material_rates) ─────────────────────────────────
   // Material $ come ONLY from the catalog (no hardcoded fallbacks). A name with

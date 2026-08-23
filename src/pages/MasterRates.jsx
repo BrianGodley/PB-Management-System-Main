@@ -1101,6 +1101,7 @@ export default function MasterRates({ only } = {}) {
         <div className="flex border border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0 rounded-xl mb-3 sticky top-0 z-20">
           {[
             { key: 'rates', label: only === 'labor' ? 'Labor Rates' : 'Subcontractor Rates' },
+            ...(only === 'labor' ? [{ key: 'basic', label: 'Basic Labor' }] : []),
             { key: 'cat', label: 'Categories' },
             { key: 'sub', label: 'Sub-Categories' },
             { key: 'modmap', label: 'Module Mapping' },
@@ -1222,8 +1223,9 @@ export default function MasterRates({ only } = {}) {
         </div>
       )}
 
-      {/* Basic Labor — own table, shared cross-module coefficients */}
-      {showRateTable && activeTab === 'basic_labor' && (
+      {/* Basic Labor — own table, shared cross-module coefficients. Reachable as a
+          top tab (full page) OR the embedded labor view's Basic Labor sub-tab. */}
+      {((!only && activeTab === 'basic_labor') || (only === 'labor' && embeddedView === 'basic')) && (
         <div>
           <RateTable
             addLabel="Add Basic Labor Rate"
