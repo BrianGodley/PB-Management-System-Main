@@ -124,9 +124,14 @@ export default function LaborRateDetailModal({
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="text-xs text-gray-500">Unit</span>
-                  <input className={inputCls} list="labor-unit-opts" value={form.unit}
-                    onChange={e => set('unit', e.target.value)} placeholder="e.g. Cu Yd, Sq Ft, Each" />
-                  <datalist id="labor-unit-opts">{unitOptions.map(u => <option key={u} value={u} />)}</datalist>
+                  <select className={inputCls} value={form.unit} onChange={e => set('unit', e.target.value)}>
+                    <option value="">Select…</option>
+                    {/* keep a legacy off-list value selectable so it isn't silently wiped */}
+                    {form.unit && !unitOptions.includes(form.unit) && (
+                      <option value={form.unit}>{form.unit} (legacy)</option>
+                    )}
+                    {unitOptions.map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
                 </label>
                 <label className="block">
                   <span className="text-xs text-gray-500">Rate</span>

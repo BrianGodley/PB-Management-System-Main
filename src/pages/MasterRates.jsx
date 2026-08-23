@@ -140,33 +140,14 @@ const LABOR_CATEGORY_OPTIONS = [
   'Utilities',
   'Walls',
 ]
+// Master Labor Rates: the ONLY allowable units (fixed picklist, 2026-08-23).
 const LABOR_UNIT_OPTIONS = [
-  'per day',
-  'per hour',
-  'per plant',
-  'hrs/ea',
-  'hrs/ft',
-  'hrs/linear ft',
-  'hrs/sq ft',
-  'hrs/ton',
-  'hrs/zone',
-  'tons/hr',
-  'min/sq ft',
-  'min/ea',
-  'min/LF',
-  'SF/hr',
-  'LF/hr',
-  'plants/day',
-  'sqft/day',
-  'CY/day',
-  '$/CY',
-  '$/SF',
-  '$/LF',
-  '$/ton',
-  '$/5gal',
-  '$/unit',
-  '$/400SF',
-  '$',
+  'Hrs per Each',
+  'Hrs per Ln Ft',
+  'Hrs per Sq Ft',
+  'Hrs per Cu Ft',
+  'Hrs per Cu Yd',
+  'Factor',
 ]
 const SUB_CATEGORY_OPTIONS = ['Concrete', 'Demo', 'General', 'Pool', 'Sub Haul']
 const SUB_UNIT_OPTIONS = [
@@ -1004,9 +985,10 @@ export default function MasterRates({ only } = {}) {
         <MergeDuplicatesModal onClose={() => setShowMerge(false)} onMerged={fetchAll} />
       )}
 
-      {/* Tabs (hidden when embedded as a single-table view) */}
+      {/* Tabs (hidden when embedded as a single-table view). Sticky so the
+          Labor Rates / Categories / … row stays reachable while scrolling. */}
       {!only && (
-        <div className="flex gap-1 border-b border-gray-200 mb-3">
+        <div className="flex gap-1 border-b border-gray-200 mb-3 sticky top-0 z-20 bg-white pt-1">
           {TABS.map(t => (
             <button
               key={t.key}
@@ -1025,7 +1007,7 @@ export default function MasterRates({ only } = {}) {
 
       {/* Embedded views (only=…) hide the tab bar — surface Categories here. */}
       {only && embedScope && (
-        <div className="flex border border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0 rounded-xl mb-3">
+        <div className="flex border border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0 rounded-xl mb-3 sticky top-0 z-20">
           {[
             { key: 'rates', label: only === 'labor' ? 'Labor Rates' : 'Subcontractor Rates' },
             { key: 'cat', label: 'Categories' },
