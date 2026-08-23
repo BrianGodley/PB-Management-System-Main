@@ -17,6 +17,7 @@ export default function LaborRateDetailModal({
   catOptions = [],
   subOptions = [],
   unitOptions = [],
+  table = 'labor_rates', // source table — 'basic_labor_rates' for the Basic Labor tab
   onClose,
   onSaved,
   onDeleted,
@@ -49,7 +50,7 @@ export default function LaborRateDetailModal({
     // `name` (the key) is intentionally NOT written — it stays frozen so the
     // estimator modules keep resolving this rate. Only `label` is editable.
     const { error } = await supabase
-      .from('labor_rates')
+      .from(table)
       .update({
         category: form.category.trim() || null,
         sub_category: form.sub_category.trim() || null,
@@ -67,7 +68,7 @@ export default function LaborRateDetailModal({
 
   async function del() {
     setBusy(true)
-    const { error } = await supabase.from('labor_rates').delete().eq('id', row.id)
+    const { error } = await supabase.from(table).delete().eq('id', row.id)
     setBusy(false)
     if (error) return setErr(error.message)
     onDeleted?.()
@@ -190,6 +191,7 @@ export default function LaborRateDetailModal({
       {moveCopy && (
         <MoveCopyLaborBody
           mode={moveCopy}
+          table={table}
           source={{ id: row.id, name, label: form.label, category: form.category, sub_category: form.sub_category, unit: form.unit, rate: form.rate }}
           catOptions={catOptions}
           subOptions={subOptions}
@@ -212,7 +214,7 @@ function Field({ label, value, mono }) {
 }
 
 // ── Move / Copy: recategorize within labor, or relocate to misc / subcontractor ──
-function MoveCopyLaborBody({ mode, source, catOptions = [], subOptions = [], onClose, onDone }) {
+function MoveCopyLaborBody({ mode, source, table = 'labor_rates', catOptions = [], subOptions = [], onClose, onDone }) {
   const [dest, setDest] = useState('labor') // 'labor' | 'misc' | 'sub'
   const [category, setCategory] = useState(source.category || '')
   const [subCategory, setSubCategory] = useState(source.sub_category || '')
@@ -232,7 +234,7 @@ function MoveCopyLaborBody({ mode, source, catOptions = [], subOptions = [], onC
     setSaving(true)
     try {
       // tenant_id from the source row so inserts satisfy RLS.
-      const { data: srcRow } = await supabase.from('labor_rates').select('tenant_id').eq('id', source.id).single()
+      const { data: srcRow } = await supabase.from(table).select('tenant_id').eq('id', source.id).single()
       const tenant_id = srcRow?.tenant_id
       const rate = source.rate === '' || source.rate == null ? null : Number(source.rate)
 
@@ -245,7 +247,7 @@ function MoveCopyLaborBody({ mode, source, catOptions = [], subOptions = [], onC
           })
           if (error) throw error
         } else {
-          const { error } = await supabase.from('labor_rates')
+          const { error } = await supabase.from(table)
             .update({ category: category.trim() || null, sub_category: subCategory.trim() || null })
             .eq('id', source.id)
           if (error) throw error
@@ -257,7 +259,7 @@ function MoveCopyLaborBody({ mode, source, catOptions = [], subOptions = [], onC
         })
         if (error) throw error
         if (!isCopy) {
-          const { error: dErr } = await supabase.from('labor_rates').delete().eq('id', source.id)
+          const { error: dErr } = await supabase.from(table).delete().eq('id', source.id)
           if (dErr) throw dErr
         }
       } else if (dest === 'sub') {
@@ -268,7 +270,7 @@ function MoveCopyLaborBody({ mode, source, catOptions = [], subOptions = [], onC
         })
         if (error) throw error
         if (!isCopy) {
-          const { error: dErr } = await supabase.from('labor_rates').delete().eq('id', source.id)
+          const { error: dErr } = await supabase.from(table).delete().eq('id', source.id)
           if (dErr) throw dErr
         }
       }

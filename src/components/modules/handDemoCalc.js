@@ -3,7 +3,7 @@
 //   calcDemo(state, laborRatePerHour, materialPrices, laborRates, subMarkupRate,
 //            subRates, gpmd, walkAccess, laborBurdenPct, commissionRate)
 // Only lifted out of the component; logic is identical.
-
+import { BAS } from '../../lib/basicLaborRefs.js'
 const n = v => parseFloat(v) || 0
 const DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN = 60
 
@@ -49,7 +49,7 @@ export function calcDemo(
   // ── Rates from DB with fallbacks ──────────────────────────────────────────
   const rateConc = n(lr['Hand - Concrete/Dirt'])
   const rateGrass = n(lr['Hand - Grass'])
-  const rateBase = n(lr['Hand - Import Base'])
+  const rateBase = n(lr[BAS.IMPORT_BASE_HAND])
   const rateBucket = n(lr['Hand - Bucket'])
   const rebarMinPerSF = n(lr['Hand - Rebar'])
   // ── hrs-per-Cu-Ft model: hours = Cu Ft × rate. CF = SF×depth/12 (flat) or
@@ -57,7 +57,7 @@ export function calcDemo(
   const hrConc = n(lr['Hand - Concrete'])       // hrs / Cu Ft
   const hrSoil = n(lr['Hand - Soil'])           // hrs / Cu Ft
   const hrGrass = n(lr['Hand - Grass'])         // hrs / Cu Ft
-  const hrBase = n(lr['Hand - Import Base'])    // hrs / Cu Ft
+  const hrBase = n(lr[BAS.IMPORT_BASE_HAND])    // hrs / Cu Ft (shared Basic Labor)
   const hrBucket = n(lr['Hand - Bucket'])  // Bucket coefficient (confined access)
   const hrMiscFlat = n(lr['Hand - Misc Flat'])  // hrs / Cu Ft
   const hrMiscVert = n(lr['Hand - Misc Vertical']) // hrs / Cu Ft

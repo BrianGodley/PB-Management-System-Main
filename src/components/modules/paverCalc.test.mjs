@@ -20,25 +20,25 @@ const finiteNums = obj => {
 }
 
 test('value: straight-cut labor = LF × rate (100 LF × 0.1 = 10 hrs → $750)', () => {
-  const r = run({ straightCutLF: 100 }, { lr: { 'Paver - Straight Cut': 0.1 } })
+  const r = run({ straightCutLF: 100 }, { lr: { 'LAB-334-paver-straight-cut': 0.1 } })
   assert.equal(r.laborCost, 10 * LRPH, `laborCost got ${r.laborCost}`)
   finiteNums(r)
 })
 
 test('units: doubling the LF doubles labor (hrs-per-unit multiply)', () => {
-  const a = run({ straightCutLF: 100 }, { lr: { 'Paver - Straight Cut': 0.1 } })
-  const b = run({ straightCutLF: 200 }, { lr: { 'Paver - Straight Cut': 0.1 } })
+  const a = run({ straightCutLF: 100 }, { lr: { 'LAB-334-paver-straight-cut': 0.1 } })
+  const b = run({ straightCutLF: 200 }, { lr: { 'LAB-334-paver-straight-cut': 0.1 } })
   assert.equal(b.laborCost, a.laborCost * 2, 'LF 100→200 doubles hours')
 })
 
 test('edit-reflects: raising the labor rate raises labor proportionally', () => {
-  const a = run({ straightCutLF: 100 }, { lr: { 'Paver - Straight Cut': 0.1 } })
-  const b = run({ straightCutLF: 100 }, { lr: { 'Paver - Straight Cut': 0.2 } })
+  const a = run({ straightCutLF: 100 }, { lr: { 'LAB-334-paver-straight-cut': 0.1 } })
+  const b = run({ straightCutLF: 100 }, { lr: { 'LAB-334-paver-straight-cut': 0.2 } })
   assert.equal(b.laborCost, a.laborCost * 2, 'rate ×2 → labor ×2')
 })
 
 test('unpriced / NO-FALLBACK: an unset labor rate reads 0 (no hidden constant)', () => {
-  // No 'Paver - Straight Cut' rate in the map → straight-cut hours resolve to 0, and
+  // No 'LAB-334-paver-straight-cut' rate in the map → straight-cut hours resolve to 0, and
   // with no other priced input the estimate labor is $0. Never a code fallback.
   const r = run({ straightCutLF: 100 }, { lr: {} })
   assert.equal(r.laborCost, 0, 'unset rate → $0 labor (no fallback)')
@@ -47,7 +47,7 @@ test('unpriced / NO-FALLBACK: an unset labor rate reads 0 (no hidden constant)',
 test('multiple labor components sum (straight + curved cuts are independent rates)', () => {
   const r = run(
     { straightCutLF: 100, curvedCutLF: 50 },
-    { lr: { 'Paver - Straight Cut': 0.1, 'Paver - Curved Cut': 0.2 } }
+    { lr: { 'LAB-334-paver-straight-cut': 0.1, 'LAB-324-paver-curved-cut': 0.2 } }
   )
   // 100×0.1 + 50×0.2 = 10 + 10 = 20 hrs → $1500
   assert.equal(r.laborCost, 20 * LRPH, `laborCost got ${r.laborCost}`)
@@ -67,10 +67,10 @@ test('no NaN across a populated estimate (install SF + cuts + restraints)', () =
     { installSF: 400, straightCutLF: 60, curvedCutLF: 30, restraintsLF: 80 },
     {
       lr: {
-        'Paver - Install': 0.05,
-        'Paver - Straight Cut': 0.1,
-        'Paver - Curved Cut': 0.2,
-        'Paver - Restraints': 0.05,
+        'LAB-325-paver-install': 0.05,
+        'LAB-334-paver-straight-cut': 0.1,
+        'LAB-324-paver-curved-cut': 0.2,
+        'LAB-328-paver-restraints': 0.05,
       },
     }
   )

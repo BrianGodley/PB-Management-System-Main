@@ -32,7 +32,7 @@ const finiteNums = obj => {
 test('paver step value: labor = SF × form rate, material = SF × item price (100 SF × 0.5 = 50 hrs; × $8 = $800)', () => {
   const r = run(
     { paverRows: [{ vendor: 'Standard', type: 'Ashlar Paver', form: 'Straight', sf: 100 }] },
-    { 'Steps - Straight': 0.5 },
+    { 'LAB-425-steps-straight': 0.5 },
     {},
     [PAVER]
   )
@@ -44,15 +44,15 @@ test('paver step value: labor = SF × form rate, material = SF × item price (10
 })
 
 test('paver edit-reflects: raising the form labor rate raises labor proportionally', () => {
-  const a = run({ paverRows: [{ vendor: 'Standard', type: 'Ashlar Paver', form: 'Straight', sf: 100 }] }, { 'Steps - Straight': 0.5 }, {}, [PAVER])
-  const b = run({ paverRows: [{ vendor: 'Standard', type: 'Ashlar Paver', form: 'Straight', sf: 100 }] }, { 'Steps - Straight': 1.0 }, {}, [PAVER])
+  const a = run({ paverRows: [{ vendor: 'Standard', type: 'Ashlar Paver', form: 'Straight', sf: 100 }] }, { 'LAB-425-steps-straight': 0.5 }, {}, [PAVER])
+  const b = run({ paverRows: [{ vendor: 'Standard', type: 'Ashlar Paver', form: 'Straight', sf: 100 }] }, { 'LAB-425-steps-straight': 1.0 }, {}, [PAVER])
   assert.equal(b.laborCost, a.laborCost * 2, 'rate ×2 → labor ×2')
 })
 
 test('concrete step value: labor = LF × (type + finish) × formMult; material = LF × (typeMat + finishMat)', () => {
   const r = run(
     { concRows: [{ type: 'Standard', form: 'Straight', sf: 100, finish: 'Smooth' }] },
-    { 'Steps - Conc Standard Hrs per Sq Ft': 0.9, 'Steps - Finish Smooth Hrs per Sq Ft': 0.1, 'Steps - Conc Form Straight': 1 },
+    { 'LAB-416-steps-conc-standard-hrs-per-sq-ft': 0.9, 'LAB-424-steps-finish-smooth-hrs-per-sq-ft': 0.1, 'LAB-414-steps-conc-form-straight': 1 },
     { 'Steps - Conc Standard $ per Sq Ft': 5, 'Steps - Finish Smooth $ per Sq Ft': 1 }
   )
   assert.equal(r.totalHrs, 100, `totalHrs got ${r.totalHrs}`) // 100 × (0.9+0.1) × 1
@@ -60,7 +60,7 @@ test('concrete step value: labor = LF × (type + finish) × formMult; material =
 })
 
 test('concrete edit-reflects: raising the finish material rate raises material', () => {
-  const rates = { 'Steps - Conc Standard Hrs per Sq Ft': 0.9, 'Steps - Finish Smooth Hrs per Sq Ft': 0.1, 'Steps - Conc Form Straight': 1 }
+  const rates = { 'LAB-416-steps-conc-standard-hrs-per-sq-ft': 0.9, 'LAB-424-steps-finish-smooth-hrs-per-sq-ft': 0.1, 'LAB-414-steps-conc-form-straight': 1 }
   const a = run({ concRows: [{ type: 'Standard', form: 'Straight', sf: 100, finish: 'Smooth' }] }, rates, { 'Steps - Conc Standard $ per Sq Ft': 5, 'Steps - Finish Smooth $ per Sq Ft': 1 })
   const b = run({ concRows: [{ type: 'Standard', form: 'Straight', sf: 100, finish: 'Smooth' }] }, rates, { 'Steps - Conc Standard $ per Sq Ft': 5, 'Steps - Finish Smooth $ per Sq Ft': 3 })
   assert.equal(b.concMat, a.concMat + 100 * 2, 'finish mat +$2/SF over 100 SF → +$200')
@@ -69,7 +69,7 @@ test('concrete edit-reflects: raising the finish material rate raises material',
 test('material NO-FALLBACK: a picked paver step with no catalog item → $0 material (labor still priced)', () => {
   const r = run(
     { paverRows: [{ vendor: 'Standard', type: 'Ashlar Paver', form: 'Straight', sf: 100 }] },
-    { 'Steps - Straight': 0.5 },
+    { 'LAB-425-steps-straight': 0.5 },
     {},
     [] // empty catalog → item doesn't resolve
   )
@@ -98,7 +98,7 @@ test('no NaN across a populated estimate (paver + concrete + sub + manual)', () 
       manualRows: [{ hours: 4, materials: 50, subCost: 0 }],
       distanceLF: 120,
     },
-    { 'Steps - Straight': 0.5, 'Steps - Conc Standard Hrs per Sq Ft': 0.9, 'Steps - Finish Broom Hrs per Sq Ft': 0.1, 'Steps - Conc Form Straight': 1 },
+    { 'LAB-425-steps-straight': 0.5, 'LAB-416-steps-conc-standard-hrs-per-sq-ft': 0.9, 'LAB-420-steps-finish-broom-hrs-per-sq-ft': 0.1, 'LAB-414-steps-conc-form-straight': 1 },
     { 'Steps - Conc Standard $ per Sq Ft': 5, 'Steps - Finish Broom $ per Sq Ft': 1, 'Steps - Sub Paver Base': 2 },
     [PAVER]
   )

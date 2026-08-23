@@ -526,6 +526,7 @@ function ModuleTags({ modules }) {
 const TABS = [
   { key: 'materials', label: 'Materials' },
   { key: 'labor', label: 'Labor Rates' },
+  { key: 'basic_labor', label: 'Basic Labor' },
   { key: 'labor_cat', label: 'Labor Categories' },
   { key: 'labor_sub', label: 'Labor Sub-Cats' },
   { key: 'subs', label: 'Subcontractors' },
@@ -550,6 +551,9 @@ export default function MasterRates({ only } = {}) {
   const [materials, setMaterials] = useState([])
   const [productTypes, setProductTypes] = useState([])
   const [labor, setLabor] = useState([])
+  const [basicLabor, setBasicLabor] = useState([]) // basic_labor_rates rows (own table)
+  const [detailBasic, setDetailBasic] = useState(null) // basic_labor_rates row open in the detail modal
+  const [basicCategory, setBasicCategory] = useState('All')
   const [subs, setSubs] = useState([])
   const [vendors, setVendors] = useState([])
   const [detailSub, setDetailSub] = useState(null) // subcontractor_rates row open in the detail modal
@@ -587,9 +591,11 @@ export default function MasterRates({ only } = {}) {
 
   async function fetchAll() {
     setLoading(true)
-    const [mats, labRes, subRes, vendorRes, lc, ls, sc, ss] = await Promise.all([
+    const [mats, labRes, basicRes, subRes, vendorRes, lc, ls, sc, ss] = await Promise.all([
       fetchAllMaterialsAdmin(),
       supabase.from('labor_rates').select('*').order('name'),
+      // Basic Labor is its own table; tolerant of it not existing yet (data null → []).
+      supabase.from('basic_labor_rates').select('*').order('name'),
       supabase.from('subcontractor_rates').select('*').order('company_name'),
       supabase.from('subs_vendors').select('id, company_name, type, divisions').order('company_name'),
       // Taxonomy tables (may not exist yet → data null → [] → codes fall back to slug)
@@ -600,6 +606,7 @@ export default function MasterRates({ only } = {}) {
     ])
     if (mats) setMaterials(mats)
     if (labRes.data) setLabor(labRes.data)
+    if (basicRes.data) setBasicLabor(basicRes.data)
     if (subRes.data) setSubs(subRes.data)
     if (vendorRes.data) setVendors(vendorRes.data)
     setLaborCats(lc.data || [])
@@ -706,6 +713,63 @@ export default function MasterRates({ only } = {}) {
     if (!confirm('Delete this labor rate?')) return
     await supabase.from('labor_rates').delete().eq('id', id)
     setLabor(p => p.filter(r => r.id !== id))
+  }
+
+  // ── Basic Labor CRUD (own table; shared cross-module coefficients) ──
+  // A new Basic Labor rate gets an auto-generated BAS ref_key from its name so it
+  // is stable and rename-safe from birth (mirrors the labor ref_key contract).
+  function nextBasicRefKey(name) {
+    const slug = (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+    const nums = basicLabor
+      .map(r => /^BAS-(\d+)-/.exec(r.ref_key || ''))
+      .filter(Boolean)
+      .map(m => parseInt(m[1], 10))
+    const next = (nums.length ? Math.max(...nums) : 0) + 1
+    return `BAS-${String(next).padStart(3, '0')}-${slug || 'rate'}`
+  }
+  async function addBasic(form) {
+    const nm = form.name?.trim()
+    if (!nm) return
+    const { data } = await supabase
+      .from('basic_labor_rates')
+      .insert({
+        name: nm,
+        label: nm,
+        rate: parseFloat(form.rate) || 0,
+        unit: form.unit || 'Hrs per Each',
+        category: 'Basic Labor',
+        rate_per_day: parseFloat(form.rate) || 0,
+        sub_category: form.sub_category?.trim() || null,
+        ref_key: nextBasicRefKey(nm),
+      })
+      .select()
+      .single()
+    if (data) setBasicLabor(p => [...p, data].sort((a, b) => a.name.localeCompare(b.name)))
+  }
+  async function saveBasic(form) {
+    // `name` (the key) stays frozen; only editable fields change.
+    const { data } = await supabase
+      .from('basic_labor_rates')
+      .update({
+        label: (form.label ?? form.name)?.trim() || null,
+        rate: parseFloat(form.rate) || 0,
+        unit: form.unit || 'Hrs per Each',
+        sub_category: form.sub_category?.trim() || null,
+        rate_per_day: parseFloat(form.rate) || 0,
+      })
+      .eq('id', form.id)
+      .select()
+      .single()
+    if (data) setBasicLabor(p => p.map(r => (r.id === data.id ? data : r)))
+  }
+  async function deleteBasic(id) {
+    if (!confirm('Delete this Basic Labor rate?')) return
+    await supabase.from('basic_labor_rates').delete().eq('id', id)
+    setBasicLabor(p => p.filter(r => r.id !== id))
+  }
+  const reloadBasic = async () => {
+    const { data } = await supabase.from('basic_labor_rates').select('*').order('name')
+    if (data) setBasicLabor(data)
   }
 
   // ── Subcontractor CRUD ──
@@ -878,6 +942,24 @@ export default function MasterRates({ only } = {}) {
       render: r => <ModuleTags modules={estimateModules(r.category)} />,
     },
   ]
+  // Basic Labor: its code IS the frozen ref_key (BAS-###). The link opens the
+  // same detail modal, pointed at the basic_labor_rates table.
+  const basicCodeCell = r => (
+    <button
+      type="button"
+      onClick={() => setDetailBasic(r)}
+      className="font-mono text-xs text-green-700 font-semibold hover:underline"
+    >
+      {r.ref_key || '—'}
+    </button>
+  )
+  const basicColumns = [
+    { key: 'code', label: 'Code', editable: false, width: '13rem', render: basicCodeCell },
+    { key: 'sub_category', label: 'Sub Category', type: 'select', options: laborSubOptions, placeholder: 'describe…', width: '12rem' },
+    { key: 'label', label: 'Description', bold: true, placeholder: 'e.g. Import Base', width: '18rem' },
+    { key: 'unit', label: 'Unit', type: 'select', options: LABOR_UNIT_OPTIONS, width: '9rem' },
+    { key: 'rate', label: 'Rate', type: 'number', step: '0.0001', width: '8rem' },
+  ]
   const subColumns = [
     { key: 'code', label: 'Code', editable: false, render: subCodeCell },
     {
@@ -907,6 +989,11 @@ export default function MasterRates({ only } = {}) {
     ...Array.from(new Set(labor.map(r => r.category).filter(Boolean).filter(c => c !== 'Archived'))).sort(),
     'Archived',
   ]
+  const basCats = [
+    'All',
+    ...Array.from(new Set(basicLabor.map(r => r.category).filter(Boolean).filter(c => c !== 'Archived'))).sort(),
+    'Archived',
+  ]
   const subCats = [
     'All',
     ...Array.from(new Set(subs.map(r => r.category).filter(Boolean).filter(c => c !== 'Archived'))).sort(),
@@ -924,6 +1011,10 @@ export default function MasterRates({ only } = {}) {
     labCategory === 'All'
       ? labor.filter(r => r.category !== 'Archived') // hide archived from the default view
       : labor.filter(r => r.category === labCategory) // selecting 'Archived' still shows them
+  const visibleBasic =
+    basicCategory === 'All'
+      ? basicLabor.filter(r => r.category !== 'Archived')
+      : basicLabor.filter(r => r.category === basicCategory)
   const visibleSubs = subs.filter(r => {
     // Archived is its own view; hide archived rows from every other category/All.
     if (subCategory === 'Archived') {
@@ -1131,6 +1222,35 @@ export default function MasterRates({ only } = {}) {
         </div>
       )}
 
+      {/* Basic Labor — own table, shared cross-module coefficients */}
+      {showRateTable && activeTab === 'basic_labor' && (
+        <div>
+          <RateTable
+            addLabel="Add Basic Labor Rate"
+            count={visibleBasic.length}
+            filters={
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs text-gray-500">Category</label>
+                <select value={basicCategory} onChange={e => setBasicCategory(e.target.value)} className={filterSelect}>
+                  {basCats.map(c => (
+                    <option key={c} value={c}>
+                      {c === 'All' ? 'All categories' : c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            }
+            columns={basicColumns}
+            rows={visibleBasic}
+            onAdd={addBasic}
+            onSave={saveBasic}
+            onDelete={deleteBasic}
+            addTemplate={() => ({ name: '', sub_category: '', unit: 'Hrs per Each', rate: '' })}
+            loading={loading}
+          />
+        </div>
+      )}
+
       {/* Subs */}
       {showRateTable && activeTab === 'subs' && (
         <div>
@@ -1220,6 +1340,20 @@ export default function MasterRates({ only } = {}) {
           onClose={() => setDetailLabor(null)}
           onSaved={reloadLabor}
           onDeleted={reloadLabor}
+        />
+      )}
+
+      {detailBasic && (
+        <LaborRateDetailModal
+          row={detailBasic}
+          code={detailBasic.ref_key}
+          table="basic_labor_rates"
+          catOptions={laborCatOptions}
+          subOptions={laborSubOptions}
+          unitOptions={LABOR_UNIT_OPTIONS}
+          onClose={() => setDetailBasic(null)}
+          onSaved={reloadBasic}
+          onDeleted={reloadBasic}
         />
       )}
     </div>

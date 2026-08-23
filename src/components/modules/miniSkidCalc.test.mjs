@@ -16,7 +16,7 @@ const fullRates = (over = {}) => ({
   'Mini - Misc Vertical': 0.845, // hrs / Cu Yd
   'Mini - Grade Cut': 0.03,      // hrs / Cu Ft
   'Mini - Grade Fill': 0.03,     // hrs / Cu Ft
-  'Mini - Import Base': 0.035,   // hrs / Cu Ft
+  'BAS-003-import-base-mini-skid-steer': 0.035,   // hrs / Cu Ft
   'Mini - Compaction': 0.01,     // hrs / Cu Ft
   'Basic Labor - Jumping Jack': 0.04, // shared, hrs / Cu Ft
   'Basic Labor - Difficulty Ratio': 1, // shared

@@ -2,6 +2,8 @@
 // without React/Supabase. Logic identical. The small pure helpers below (catalogOptions
 // / catalogItemFor / isStandardSel / paverItemFor / calcWalkAccessLabor) are inlined
 // from lib/materialCatalog + lib/walkAccess (which import supabase); kept in sync.
+import { LAB } from '../../lib/laborRefs.js'
+import { BAS } from '../../lib/basicLaborRefs.js'
 const n = v => parseFloat(v) || 0
 const DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN = 60
 const isStandardSel = v => !v || v === 'Standard'
@@ -61,30 +63,30 @@ export function calcPaver(
   const pp = paverPrices || []
   // Walk-access pace is now a Paver-specific editable labor rate (LF/min).
   const walkPace =
-    n(lr['Paver - Walk Access Pace']) ||
+    n(lr[LAB.PAVER_WALK_ACCESS_PACE]) ||
     parseFloat(walkAccess?.paceLfPerMin) ||
     0
 
-  // Labor rates — live from labor_rates, no hardcoded fallback.
-  const installRate = n(lr['Paver - Install'])
-  const straightCutRate = n(lr['Paver - Straight Cut'])
-  const curvedCutRate = n(lr['Paver - Curved Cut'])
-  const restraintRate = n(lr['Paver - Restraints'])
-  const sleevesRate = n(lr['Paver - Sleeves'])
-  const vertSoldierRate = n(lr['Paver - Vertical Soldier'])
-  const sealerRate = n(lr['Paver - Sealer'])
-  const add80mmMult = n(lr['Paver - 80mm Add'])
-  const addStonePer = n(lr['Paver - Stone Add'])
-  const addColorPer = n(lr['Paver - Color Add'])
+  // Labor rates — live from labor_rates by stable ref_key, no hardcoded fallback.
+  const installRate = n(lr[LAB.PAVER_INSTALL])
+  const straightCutRate = n(lr[LAB.PAVER_STRAIGHT_CUT])
+  const curvedCutRate = n(lr[LAB.PAVER_CURVED_CUT])
+  const restraintRate = n(lr[LAB.PAVER_RESTRAINTS])
+  const sleevesRate = n(lr[LAB.PAVER_SLEEVES])
+  const vertSoldierRate = n(lr[LAB.PAVER_VERTICAL_SOLDIER])
+  const sealerRate = n(lr[LAB.PAVER_SEALER])
+  const add80mmMult = n(lr[LAB.PAVER_80MM_ADD])
+  const addStonePer = n(lr[LAB.PAVER_STONE_ADD])
+  const addColorPer = n(lr[LAB.PAVER_COLOR_ADD])
   // Poly Sand labor coefficients — New and Existing are now independent rates.
-  const polySandNewSpread = n(lr['Paver - Poly Sand New'])
-  const polySandExistingSpread = n(lr['Paver - Poly Sand Existing'])
-  // Base prep shares the demo Import Base labor rates (one source of truth).
+  const polySandNewSpread = n(lr[LAB.PAVER_POLY_SAND_NEW])
+  const polySandExistingSpread = n(lr[LAB.PAVER_POLY_SAND_EXISTING])
+  // Base prep reads the shared Basic Labor table (one source of truth, by ref_key).
   // All hrs / Cu Ft (the demo volume basis).
-  const baseSkidGood = n(lr['Skid - Import Base Good']) // hrs / Cu Ft (Paver-added Good variant)
-  const baseSkidOK = n(lr['Skid - Import Base'])        // hrs / Cu Ft (shared w/ Skid demo)
-  const baseMiniBobcat = n(lr['Mini - Import Base'])    // hrs / Cu Ft (shared w/ Mini demo)
-  const baseHand = n(lr['Hand - Import Base'])          // hrs / Cu Ft (shared w/ Hand demo)
+  const baseSkidGood = n(lr[BAS.IMPORT_BASE_SKID_GOOD]) // hrs / Cu Ft
+  const baseSkidOK = n(lr[BAS.IMPORT_BASE_SKID_OK])     // hrs / Cu Ft
+  const baseMiniBobcat = n(lr[BAS.IMPORT_BASE_MINI])    // hrs / Cu Ft
+  const baseHand = n(lr[BAS.IMPORT_BASE_HAND])          // hrs / Cu Ft
 
   // Material rates — live from the catalog / misc_rates, no hardcoded fallback.
   const baseRockPerTon = n(mr['Paver - Base Rock'])

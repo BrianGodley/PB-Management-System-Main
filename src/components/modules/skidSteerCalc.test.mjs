@@ -19,7 +19,7 @@ const fullRates = (over = {}) => ({
   'Skid - Misc Vertical': 0.65,  // hrs / Cu Yd
   'Skid - Grade Cut': 0.015,     // hrs / Sq Ft
   'Skid - Grade Fill': 0.018,    // hrs / Sq Ft
-  'Skid - Import Base': 0.018,   // hrs / Cu Ft
+  'BAS-005-import-base-skid-steer-ok': 0.018,   // hrs / Cu Ft
   'Skid - Compaction': 0.0033,   // hrs / Cu Ft
   'Basic Labor - Jumping Jack': 0.01, // shared, hrs / Cu Ft
   'Basic Labor - Difficulty Ratio': 1, // shared

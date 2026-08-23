@@ -260,9 +260,9 @@ export default function MasterMaterialRates() {
           match Sales → Settings and the Labor / Subcontractor rate tables. */}
       <div className="flex border border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0 rounded-xl mb-3">
         {[
-          { k: 'vendor', l: 'Vendor' },
-          { k: 'standard', l: 'Standard' },
-          { k: 'misc', l: 'Misc' },
+          { k: 'vendor', l: 'Vendor Rates' },
+          { k: 'standard', l: 'Standard Rates' },
+          { k: 'misc', l: 'Misc Rates' },
           { k: 'cat', l: 'Categories' },
           { k: 'sub', l: 'Sub-Categories' },
           { k: 'modmap', l: 'Module Mapping' },

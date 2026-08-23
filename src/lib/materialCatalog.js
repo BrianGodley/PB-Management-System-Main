@@ -241,10 +241,15 @@ export async function fetchModuleCatalog(categories) {
 // map. Names not present fall back to the caller's code constant.
 export async function fetchStandardRateMap(categories) {
   const cats = Array.isArray(categories) ? categories : [categories]
-  const [rows, labRes, feeRes] = await Promise.all([
+  const [rows, labRes, feeRes, basicRes] = await Promise.all([
     fetchModuleCatalog(cats),
     supabase.from('labor_rates').select('name, ref_key, rate').in('category', cats),
     supabase.from('misc_rates').select('name, rate').in('category', cats),
+    // Basic Labor lives in its OWN table and is a small SHARED set (base prep,
+    // curb core, …) any module may read, so it's pulled in full — not filtered
+    // by the caller's categories. Tolerant of the table not existing yet (returns
+    // an error object, never rejects) so a pre-migration deploy can't break the map.
+    supabase.from('basic_labor_rates').select('name, ref_key, rate, category'),
   ])
   const map = {}
   ;(rows || []).forEach(r => {
@@ -258,6 +263,12 @@ export async function fetchStandardRateMap(categories) {
   })
   ;(feeRes.data || []).forEach(r => {
     if (r.name) map[r.name] = num(r.rate)
+  })
+  ;(basicRes?.data || []).forEach(r => {
+    if (r.category === 'Archived') return
+    // Dual-keyed by name AND ref_key (BAS-NNN-slug), same transition contract.
+    if (r.name) map[r.name] = num(r.rate)
+    if (r.ref_key) map[r.ref_key] = num(r.rate)
   })
   return map
 }

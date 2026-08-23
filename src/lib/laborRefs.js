@@ -32,4 +32,36 @@ export const LAB = {
   IRR_SUBTERRANEAN_TRENCH: 'LAB-261-irrigation-subterranean-drip-trench',
   IRR_SUBTERRANEAN_HAND: 'LAB-260-irrigation-subterranean-drip-hand',
   IRR_TIMER_INSTALL: 'LAB-262-irrigation-timer-install',
+
+  // ── Steps (enum-driven; form / conc base type / finish → hrs) ───────────────
+  // Paver-step install labor (hrs per Ln Ft), keyed by form.
+  STEPS_FORM_STRAIGHT: 'LAB-425-steps-straight',
+  STEPS_FORM_CURVED: 'LAB-419-steps-curved',
+  // Concrete step type labor (hrs per Sq Ft), keyed by BASE type (color→material only).
+  STEPS_CONC_STANDARD_HRS: 'LAB-416-steps-conc-standard-hrs-per-sq-ft',
+  STEPS_CONC_CANTILEVERED_HRS: 'LAB-412-steps-conc-cantilevered-hrs-per-sq-ft',
+  // Concrete finish labor adder (hrs per Sq Ft), keyed by finish.
+  STEPS_FINISH_SMOOTH_HRS: 'LAB-424-steps-finish-smooth-hrs-per-sq-ft',
+  STEPS_FINISH_BROOM_HRS: 'LAB-420-steps-finish-broom-hrs-per-sq-ft',
+  STEPS_FINISH_SANDED_HRS: 'LAB-423-steps-finish-sanded-hrs-per-sq-ft',
+  STEPS_FINISH_SALTED_HRS: 'LAB-422-steps-finish-salted-hrs-per-sq-ft',
+  STEPS_FINISH_EXPOSED_HRS: 'LAB-421-steps-finish-exposed-aggregate-hrs-per-sq-ft',
+  // Concrete form labor multiplier, keyed by form.
+  STEPS_CONC_FORM_STRAIGHT: 'LAB-414-steps-conc-form-straight',
+  STEPS_CONC_FORM_CURVED: 'LAB-413-steps-conc-form-curved',
+
+  // ── Pavers (fixed labor rows; import-base reads NOT yet converted — see note) ─
+  PAVER_WALK_ACCESS_PACE: 'LAB-336-paver-walk-access-pace',
+  PAVER_INSTALL: 'LAB-325-paver-install',
+  PAVER_STRAIGHT_CUT: 'LAB-334-paver-straight-cut',
+  PAVER_CURVED_CUT: 'LAB-324-paver-curved-cut',
+  PAVER_RESTRAINTS: 'LAB-328-paver-restraints',
+  PAVER_SLEEVES: 'LAB-330-paver-sleeves',
+  PAVER_VERTICAL_SOLDIER: 'LAB-335-paver-vertical-soldier',
+  PAVER_SEALER: 'LAB-329-paver-sealer',
+  PAVER_80MM_ADD: 'LAB-318-paver-80mm-add',
+  PAVER_STONE_ADD: 'LAB-333-paver-stone-add',
+  PAVER_COLOR_ADD: 'LAB-323-paver-color-add',
+  PAVER_POLY_SAND_NEW: 'LAB-327-paver-poly-sand-new',
+  PAVER_POLY_SAND_EXISTING: 'LAB-326-paver-poly-sand-existing',
 }

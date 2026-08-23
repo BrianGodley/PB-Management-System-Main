@@ -2,6 +2,7 @@
 // React/Supabase. Logic identical. calcWalkAccessLabor (lib/walkAccess) and the catalog
 // resolvers catalogOptions/catalogItemFor (lib/materialCatalog) both transitively import
 // supabase, so their pure bodies are inlined here and kept in sync.
+import { LAB } from '../../lib/laborRefs.js'
 const n = v => parseFloat(v) || 0
 const DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN = 60
 const isStandardSel = v => !v || v === 'Standard'
@@ -51,12 +52,23 @@ const concBaseType = t => (t || '').replace(/\s*Colored$/i, '')
 const CONC_FINISHES = ['Smooth', 'Broom', 'Sanded', 'Salted', 'Exposed Aggregate']
 
 // ── Rate-key builders (category 'Steps') ─────────────────────────────────────
-const kPaverForm = form => `Steps - ${form}` // labor hrs per Ln Ft
-const kConcTypeHrs = t => `Steps - Conc ${t} Hrs per Sq Ft` // labor hrs per Sq Ft
+// LABOR keys resolve to stable ref_keys (labor ID refactor) — the enum value the
+// user picks maps to a frozen LAB-NNN code, so a labor rate can be renamed in
+// Master Rates without breaking pricing. Unknown enum → '' (resolves 0, no fallback).
+const STEP_FORM_REF = { Straight: LAB.STEPS_FORM_STRAIGHT, Curved: LAB.STEPS_FORM_CURVED }
+const CONC_TYPE_HRS_REF = { Standard: LAB.STEPS_CONC_STANDARD_HRS, Cantilevered: LAB.STEPS_CONC_CANTILEVERED_HRS }
+const FINISH_HRS_REF = {
+  Smooth: LAB.STEPS_FINISH_SMOOTH_HRS, Broom: LAB.STEPS_FINISH_BROOM_HRS,
+  Sanded: LAB.STEPS_FINISH_SANDED_HRS, Salted: LAB.STEPS_FINISH_SALTED_HRS,
+  'Exposed Aggregate': LAB.STEPS_FINISH_EXPOSED_HRS,
+}
+const CONC_FORM_REF = { Straight: LAB.STEPS_CONC_FORM_STRAIGHT, Curved: LAB.STEPS_CONC_FORM_CURVED }
+const kPaverForm = form => STEP_FORM_REF[form] || '' // labor hrs per Ln Ft
+const kConcTypeHrs = t => CONC_TYPE_HRS_REF[t] || '' // labor hrs per Sq Ft (base type)
 const kConcTypeMat = t => `Steps - Conc ${t} $ per Sq Ft` // material $ per Sq Ft
-const kFinishHrs = f => `Steps - Finish ${f} Hrs per Sq Ft` // labor +hrs per Sq Ft
+const kFinishHrs = f => FINISH_HRS_REF[f] || '' // labor +hrs per Sq Ft
 const kFinishMat = f => `Steps - Finish ${f} $ per Sq Ft` // material +$ per Sq Ft
-const kConcForm = form => `Steps - Conc Form ${form}` // labor multiplier
+const kConcForm = form => CONC_FORM_REF[form] || '' // labor multiplier
 
 // Subcontractor pricing is UNIT priced per linear foot — no hourly labor. A
 // base $/LF for paver + concrete steps, plus per-LF modifiers that add to the

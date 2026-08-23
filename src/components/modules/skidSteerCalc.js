@@ -1,6 +1,7 @@
 // Pure Skid Steer Demo calc — extracted from SkidSteerDemoModule.jsx so the math is
 // unit-testable without React/Supabase. Signature unchanged (only lifted out of the
 // component; logic identical). Reads 'Demo - Skid …' rate keys.
+import { BAS } from '../../lib/basicLaborRefs.js'
 const n = v => parseFloat(v) || 0
 const DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN = 60
 
@@ -55,7 +56,7 @@ export function calcDemo(
   const laborFooting = n(lr['Skid - Footing'])        // hrs / Cu Yd
   const laborGradeCut = n(lr['Skid - Grade Cut'])     // hrs / Sq Ft
   const rateGrass = n(lr['Demo - Skid Steer Grass'])
-  const laborBase = n(lr['Skid - Import Base'])       // hrs / Cu Ft
+  const laborBase = n(lr[BAS.IMPORT_BASE_SKID_OK])    // hrs / Cu Ft (shared Basic Labor)
   const laborGradeFill = n(lr['Skid - Grade Fill'])   // hrs / Sq Ft
   const laborJJ = n(lr['Basic Labor - Jumping Jack']) // shared, hrs / Cu Ft
   const laborSS = n(lr['Skid - Compaction'])          // hrs / Cu Ft

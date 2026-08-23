@@ -11,7 +11,7 @@ const fullRates = (over = {}) => ({
   'Hand - Concrete': 0.1,   // hrs / Cu Ft
   'Hand - Soil': 0.1,
   'Hand - Grass': 0.1,
-  'Hand - Import Base': 0.1,
+  'BAS-002-import-base-hand': 0.1,
   'Hand - Bucket': 0.1,
   'Hand - Misc Flat': 0.1,
   'Hand - Misc Vertical': 0.1,

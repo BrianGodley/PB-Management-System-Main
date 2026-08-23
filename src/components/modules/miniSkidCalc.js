@@ -1,6 +1,7 @@
 // Pure Mini Skid Steer Demo calc — extracted from MiniSkidSteerDemoModule.jsx so the
 // math is unit-testable without React/Supabase. Signature unchanged (logic identical).
 // Reads 'Mini - …' rate keys, independent of Hand/Skid.
+import { BAS } from '../../lib/basicLaborRefs.js'
 const n = v => parseFloat(v) || 0
 const DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN = 60
 
@@ -58,7 +59,7 @@ export function calcDemo(
   const laborFooting = n(lr['Mini - Footing'])        // hrs / Cu Ft
   const laborGradeCut = n(lr['Mini - Grade Cut'])     // hrs / Cu Ft
   const rateGrass = n(lr['Mini - Skid Steer Grass'])
-  const laborBase = n(lr['Mini - Import Base'])       // hrs / Cu Ft
+  const laborBase = n(lr[BAS.IMPORT_BASE_MINI])       // hrs / Cu Ft (shared Basic Labor)
   const laborGradeFill = n(lr['Mini - Grade Fill'])   // hrs / Cu Ft
   const laborJJ = n(lr['Basic Labor - Jumping Jack']) // shared, hrs / Cu Ft
   const laborSS = n(lr['Mini - Compaction'])          // hrs / Cu Ft
