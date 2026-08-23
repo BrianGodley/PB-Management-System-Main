@@ -38,13 +38,13 @@ const fullRates = (over = {}) => ({
   'Skid - Tree Medium': 2,
   'Skid - Tree Large': 3,
   // Sub tab (untouched) — per-ton coefficients + shuttle still live in labor_rates
-  'Demo - Skid Tons SF-in Denominator': 150,
   'Basic Labor - Concrete Weight lb/cf': 150,
   'Demo - Skid Steer Haul Sec/Ft': 1,
   'Demo - Skid Steer Load (CY)': 1,
   ...over,
 })
 const fullMat = (over = {}) => ({
+  'Tons SF-in Denominator': 150,
   'Demo - Skid Container (Low-Boy)': 500,
   'Demo - Skid Container Capacity (CY)': 12,
   'Demo - Skid Removal Swell': 1.3,

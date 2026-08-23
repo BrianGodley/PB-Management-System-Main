@@ -23,7 +23,7 @@ export function calcDemo(
   // Business-tunable assumptions, surfaced as editable coefficient rows in View
   // Rates (labor_rates, category Demo). Fixed unit conversions (27 cf/cy,
   // 12 in/ft, 2000 lb/ton, 60 min/hr) stay as literal math.
-  const tonsSfInDenom = n(lr['Mini - Tons SF-in Denominator']) // Sub tab (per-ton) only
+  const tonsSfInDenom = n(mp['Tons SF-in Denominator']) // shared Basic Materials (Sub tab per-ton)
   const concreteWeightLbCf = n(lr['Basic Labor - Concrete Weight lb/cf']) // shared Basic Labor (Sub tab / vertical tons)
   const treeCyFactor = n(mp['Mini - Tree CY Factor']) // moved to master material rates
   // Local sfToTons shadows the module helper so the tons denominator is editable.

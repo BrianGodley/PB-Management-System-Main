@@ -290,7 +290,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
     const [matMap, lrRes, srRes] = await Promise.all([
       // material_rates retired: Demo materials from material+material_price,
       // fees from misc_rates, labor from labor_rates — all by name.
-      fetchStandardRateMap(['Demo']),
+      fetchStandardRateMap(['Demo', 'Basic Materials']),
       supabase.from('labor_rates').select('name,rate,rate_per_day'),
       supabase.from('subcontractor_rates').select('item_key,rate'),
     ])
