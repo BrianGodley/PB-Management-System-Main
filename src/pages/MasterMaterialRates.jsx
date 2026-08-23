@@ -655,14 +655,14 @@ function MiscRatesPanel() {
   const [editing, setEditing] = useState(null) // { id, value }
   const [saving, setSaving] = useState(false)
   const [adding, setAdding] = useState(false)
-  const [draft, setDraft] = useState({ category: '', name: '', rate: '', unit: '' })
+  const [draft, setDraft] = useState({ category: '', sub_category: '', name: '', rate: '', unit: '' })
   const [moveCopy, setMoveCopy] = useState(null) // { source, mode:'move'|'copy' } → Move/Copy modal
 
   const load = useCallback(async () => {
     setLoading(true)
     const { data } = await supabase
       .from('misc_rates')
-      .select('id, name, rate, category, unit')
+      .select('id, name, rate, category, sub_category, unit')
       .order('category')
       .order('name')
     setRows(data || [])
@@ -716,8 +716,9 @@ function MiscRatesPanel() {
     setSaving(true)
     const val = n(editing.value)
     const unit = (editing.unit ?? '').trim() || null
-    await supabase.from('misc_rates').update({ rate: val, unit }).eq('id', id)
-    setRows(rs => rs.map(r => (r.id === id ? { ...r, rate: val, unit } : r)))
+    const sub_category = (editing.sub_category ?? '').trim() || null
+    await supabase.from('misc_rates').update({ rate: val, unit, sub_category }).eq('id', id)
+    setRows(rs => rs.map(r => (r.id === id ? { ...r, rate: val, unit, sub_category } : r)))
     setEditing(null)
     setSaving(false)
   }
@@ -726,18 +727,19 @@ function MiscRatesPanel() {
     if (!draft.name.trim()) return
     const payload = { name: draft.name.trim(), rate: n(draft.rate) ?? 0 }
     if (draft.category.trim()) payload.category = draft.category.trim()
+    if (draft.sub_category.trim()) payload.sub_category = draft.sub_category.trim()
     if (draft.unit.trim()) payload.unit = draft.unit.trim()
     const { data, error } = await supabase
       .from('misc_rates')
       .insert(payload)
-      .select('id, name, rate, category, unit')
+      .select('id, name, rate, category, sub_category, unit')
       .single()
     if (error) {
       alert('Add failed: ' + error.message)
       return
     }
     if (data) setRows(rs => sortRows([...rs, data]))
-    setDraft({ category: '', name: '', rate: '', unit: '' })
+    setDraft({ category: '', sub_category: '', name: '', rate: '', unit: '' })
     setAdding(false)
   }
 
@@ -784,6 +786,7 @@ function MiscRatesPanel() {
             <tr className="bg-gray-50 border-b border-gray-200 text-left text-gray-600 uppercase">
               <th className="px-3 py-2 font-semibold">Code</th>
               <th className="px-3 py-2 font-semibold">Category</th>
+              <th className="px-3 py-2 font-semibold">Sub-Category</th>
               <th className="px-3 py-2 font-semibold">Name</th>
               <th className="px-3 py-2 font-semibold text-right">Rate</th>
               <th className="px-3 py-2 font-semibold">Unit</th>
@@ -800,6 +803,14 @@ function MiscRatesPanel() {
                     placeholder="Category"
                     value={draft.category}
                     onChange={e => setDraft({ ...draft, category: e.target.value })}
+                  />
+                </td>
+                <td className="px-3 py-1.5">
+                  <input
+                    className="w-32 border border-gray-300 rounded px-2 py-1 text-xs"
+                    placeholder="Sub-Category"
+                    value={draft.sub_category}
+                    onChange={e => setDraft({ ...draft, sub_category: e.target.value })}
                   />
                 </td>
                 <td className="px-3 py-1.5">
@@ -840,13 +851,13 @@ function MiscRatesPanel() {
             )}
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
                   Loading…
                 </td>
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
                   No misc rates.
                 </td>
               </tr>
@@ -859,6 +870,22 @@ function MiscRatesPanel() {
                       {miscCodeFor(r)}
                     </td>
                     <td className="px-3 py-1.5 text-gray-600 whitespace-nowrap">{r.category || '—'}</td>
+                    <td className="px-3 py-1.5 text-gray-600 whitespace-nowrap">
+                      {isEd ? (
+                        <input
+                          className="w-32 border border-green-300 rounded-md px-2 py-1 text-xs"
+                          placeholder="Sub-Category"
+                          value={editing.sub_category}
+                          onChange={e => setEditing({ ...editing, sub_category: e.target.value })}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') saveRate(r.id)
+                            if (e.key === 'Escape') setEditing(null)
+                          }}
+                        />
+                      ) : (
+                        <span className="text-gray-500">{r.sub_category || '—'}</span>
+                      )}
+                    </td>
                     <td className="px-3 py-1.5 text-gray-900 font-medium">{r.name}</td>
                     <td className="px-3 py-1.5 text-right whitespace-nowrap">
                       {isEd ? (
@@ -911,7 +938,7 @@ function MiscRatesPanel() {
                       ) : (
                         <span className="opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                           <button
-                            onClick={() => setEditing({ id: r.id, value: r.rate ?? '', unit: r.unit ?? '' })}
+                            onClick={() => setEditing({ id: r.id, value: r.rate ?? '', unit: r.unit ?? '', sub_category: r.sub_category ?? '' })}
                             className="text-gray-500 hover:text-gray-800 mr-2"
                           >
                             Edit
