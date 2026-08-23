@@ -82,8 +82,23 @@ const SUBCAT_MODULES = {
   'Gas Fixtures': ['Utilities', 'Outdoor Kitchen', 'Fire Pit'],
   'Electrical Fixtures': ['Utilities', 'Outdoor Kitchen'],
 }
-function estimateModules(category, subcategory) {
+// The three demo modules share the 'Demo' category, but each rate is specific to
+// ONE machine — encoded in the name prefix (Skid / Mini / Hand). Narrow the tags to
+// the machine(s) the name names; only a name that mentions none is treated as shared.
+function demoModulesFor(name) {
+  const s = name || ''
+  const mods = []
+  const hasMini = /\bmini\b/i.test(s)
+  const hasSkid = /\bskid\b/i.test(s)
+  const hasHand = /\bhand\b|\bwheelbarrow\b/i.test(s)
+  if (hasMini) mods.push('Mini Skid Steer Demo')
+  if (hasSkid && !hasMini) mods.push('Skid Steer Demo') // "Mini Skid Steer" is Mini, not Skid
+  if (hasHand) mods.push('Hand Demo')
+  return mods.length ? mods : CATEGORY_MODULES.Demo // no machine named → genuinely shared
+}
+function estimateModules(category, subcategory, name) {
   if (subcategory && SUBCAT_MODULES[subcategory]) return SUBCAT_MODULES[subcategory]
+  if (category === 'Demo') return demoModulesFor(name)
   if (category && CATEGORY_MODULES[category]) return CATEGORY_MODULES[category]
   return category ? [category] : []
 }
@@ -849,7 +864,7 @@ export default function MasterRates({ only } = {}) {
       key: '__modules',
       label: 'Estimate Module',
       editable: false,
-      render: r => <ModuleTags modules={estimateModules(r.category, r.sub_category)} />,
+      render: r => <ModuleTags modules={estimateModules(r.category, r.sub_category, r.name)} />,
     },
   ]
   // Generated identity codes for labor / subcontractor rows (like materials).
