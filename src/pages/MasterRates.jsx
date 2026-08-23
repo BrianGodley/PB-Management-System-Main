@@ -234,7 +234,7 @@ function parseCalcMeta(v) {
   }
 }
 
-function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loading, addLabel = 'Add Row', filters = null, count = null }) {
+function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loading, addLabel = 'Add Row', filters = null, count = null, fill = false }) {
   const [editingId, setEditingId] = useState(null)
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({})
@@ -360,8 +360,8 @@ function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loadin
   ))
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="flex flex-wrap items-center gap-3 px-3 py-2 bg-gray-50 border-b border-gray-200">
+    <div className={`bg-white rounded-xl border border-gray-200 overflow-hidden ${fill ? 'flex flex-col flex-1 min-h-0' : ''}`}>
+      <div className="flex flex-wrap items-center gap-3 px-3 py-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
         {filters}
         <div className="ml-auto flex items-center gap-3">
           {!adding && (
@@ -375,7 +375,7 @@ function RateTable({ columns, rows, onAdd, onSave, onDelete, addTemplate, loadin
           {count != null && <span className="text-xs text-gray-400">{count} items</span>}
         </div>
       </div>
-      <div className="overflow-auto max-h-[calc(100vh-15rem)]">
+      <div className={fill ? 'overflow-auto flex-1 min-h-0' : 'overflow-auto max-h-[calc(100vh-15rem)]'}>
         <table className="w-full text-xs min-w-[820px]">
           <thead className="sticky top-0 z-10">
             <tr className="bg-gray-50 border-b border-gray-200">
@@ -1030,7 +1030,7 @@ export default function MasterRates({ only } = {}) {
   const filterSelect = 'border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-green-400'
 
   return (
-    <div>
+    <div className={only ? 'flex flex-col h-full min-h-0' : ''}>
       {(!only || activeTab === 'materials') && (
         <div className="flex items-center justify-between mb-4">
           {!only ? <h1 className="text-xl font-bold text-gray-900">Master Rates</h1> : <span />}
@@ -1098,7 +1098,7 @@ export default function MasterRates({ only } = {}) {
 
       {/* Embedded views (only=…) hide the tab bar — surface Categories here. */}
       {only && embedScope && (
-        <div className="flex border border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0 rounded-xl mb-3 sticky top-0 z-20">
+        <div className="flex border border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0 rounded-xl mb-3">
           {[
             { key: 'rates', label: only === 'labor' ? 'Labor Rates' : 'Subcontractor Rates' },
             ...(only === 'labor' ? [{ key: 'basic', label: 'Basic Labor' }] : []),
@@ -1121,15 +1121,21 @@ export default function MasterRates({ only } = {}) {
         </div>
       )}
 
-      {/* Embedded taxonomy — Categories and Sub-Categories are independent tabs. */}
+      {/* Embedded taxonomy — Categories and Sub-Categories are independent tabs.
+          Each gets the single flex-1 scroll region so the panel itself doesn't
+          add a second scrollbar and content can't slide under the sub-tab bar. */}
       {only && embedScope && embeddedView === 'cat' && (
-        <TaxonomyManager scope={embedScope} kind="category" />
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <TaxonomyManager scope={embedScope} kind="category" />
+        </div>
       )}
       {only && embedScope && embeddedView === 'sub' && (
-        <TaxonomyManager scope={embedScope} kind="subcategory" />
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <TaxonomyManager scope={embedScope} kind="subcategory" />
+        </div>
       )}
       {only && embeddedView === 'modmap' && (
-        <div className="mt-3">
+        <div className="flex-1 min-h-0 overflow-y-auto mt-3">
           <ModuleCategoryMap />
         </div>
       )}
@@ -1188,9 +1194,10 @@ export default function MasterRates({ only } = {}) {
 
       {/* Labor */}
       {showRateTable && activeTab === 'labor' && (
-        <div>
+        <div className={only ? 'flex flex-col flex-1 min-h-0' : ''}>
           <CategorySyncBanner onSynced={fetchAll} />
           <RateTable
+            fill={!!only}
             addLabel="Add Labor Rate"
             count={visibleLabor.length}
             filters={
@@ -1226,8 +1233,9 @@ export default function MasterRates({ only } = {}) {
       {/* Basic Labor — own table, shared cross-module coefficients. Reachable as a
           top tab (full page) OR the embedded labor view's Basic Labor sub-tab. */}
       {((!only && activeTab === 'basic_labor') || (only === 'labor' && embeddedView === 'basic')) && (
-        <div>
+        <div className={only ? 'flex flex-col flex-1 min-h-0' : ''}>
           <RateTable
+            fill={!!only}
             addLabel="Add Basic Labor Rate"
             count={visibleBasic.length}
             filters={
@@ -1255,9 +1263,10 @@ export default function MasterRates({ only } = {}) {
 
       {/* Subs */}
       {showRateTable && activeTab === 'subs' && (
-        <div>
+        <div className={only ? 'flex flex-col flex-1 min-h-0' : ''}>
           <CategorySyncBanner onSynced={fetchAll} />
           <RateTable
+            fill={!!only}
             addLabel="Add Subcontractor Rate"
             count={visibleSubs.length}
             filters={
