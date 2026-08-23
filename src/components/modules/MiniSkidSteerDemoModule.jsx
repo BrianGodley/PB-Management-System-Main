@@ -529,7 +529,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             rateScope={[
               { category: 'Demo', sub: 'Mini Skid Steer' },
               { category: 'Demo', sub: 'Disposal' },
-              { category: 'Basic Labor' },
+              { category: 'Basic Labor', sub: 'Import Base', only: ['Basic Labor - Import Base Mini Skid Steer'] },
             ]}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}

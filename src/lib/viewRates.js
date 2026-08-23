@@ -90,9 +90,14 @@ export async function buildViewRates(moduleType, scope = null) {
       ? supabase.from(table).select(cols).in('category', fetchCats)
       : Promise.resolve({ data: [] })
 
-  const [matRows, labRes, subRes, miscRes, venRes] = await Promise.all([
+  const [matRows, labRes, basicRes, subRes, miscRes, venRes] = await Promise.all([
     fetchModuleCatalog(fetchCats),
     qAll('labor_rates', 'id, category, sub_category, name, label, unit, rate'),
+    // Basic Labor lives in its own table (shared cross-module coefficients). It's
+    // surfaced the SAME way as labor — a module scopes the 'Basic Labor' category
+    // (usually a borrowed pair with an `only` allowlist) to show just its rows.
+    // Tolerant of the table not existing yet.
+    qAll('basic_labor_rates', 'id, category, sub_category, name, label, unit, rate'),
     qAll('subcontractor_rates', 'id, category, sub_category, trade, item_key, unit, rate, company_name'),
     // Misc coefficients / named $ adders — the 4th rate source. Pulled across all
     // fetched categories, then filtered by matInScope so a borrowed (category,
@@ -152,6 +157,23 @@ export async function buildViewRates(moduleType, scope = null) {
       section: 'labor',
       value: n(r.rate),
       hideKey: `item:lab:${r.id}`,
+    })
+  })
+
+  // Basic Labor — same shape as labor, but edits write back to basic_labor_rates.
+  ;(basicRes?.data || []).filter(r => matInScope(r) && nameAllowed(r.category, r.sub_category, r.name)).forEach(r => {
+    const g = ensure(r.category, r.sub_category)
+    g.items.push({
+      label: cleanLabel(r.label || r.name),
+      table: 'basic_labor_rates',
+      name: r.name,
+      category: r.category,
+      valueField: 'rate',
+      unitLabel: r.unit || '',
+      mode: 'coefficient',
+      section: 'labor',
+      value: n(r.rate),
+      hideKey: `item:bas:${r.id}`,
     })
   })
 

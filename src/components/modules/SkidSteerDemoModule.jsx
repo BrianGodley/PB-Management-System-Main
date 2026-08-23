@@ -548,7 +548,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
             rateScope={[
               { category: 'Demo', sub: 'Skid Steer' },
               { category: 'Demo', sub: 'Disposal' },
-              { category: 'Basic Labor' },
+              { category: 'Basic Labor', sub: 'Import Base', only: ['Basic Labor - Import Base Skid Steer OK'] },
             ]}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}

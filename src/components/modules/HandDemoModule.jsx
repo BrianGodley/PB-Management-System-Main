@@ -531,7 +531,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             rateScope={[
               { category: 'Demo', sub: 'Hand' },
               { category: 'Demo', sub: 'Disposal' },
-              { category: 'Basic Labor' },
+              { category: 'Basic Labor', sub: 'Import Base', only: ['Basic Labor - Import Base Hand'] },
             ]}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}

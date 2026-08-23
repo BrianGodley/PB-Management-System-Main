@@ -35,6 +35,7 @@ import MaterialFieldRatesModal from './MaterialFieldRatesModal'
 const DEFAULT_VALUE_FIELD = {
   material_rates: 'unit_cost',
   labor_rates: 'rate',
+  basic_labor_rates: 'rate',
   subcontractor_rates: 'rate',
   material_price: 'price',
   misc_rates: 'rate',
@@ -43,6 +44,7 @@ const DEFAULT_VALUE_FIELD = {
 const SOURCE_LABEL = {
   material_rates: 'Master Material Rates',
   labor_rates: 'Master Rates → Labor',
+  basic_labor_rates: 'Master Rates → Basic Labor',
   subcontractor_rates: 'Master Rates → Subcontractors',
   material_price: 'Master Material Rates',
   misc_rates: 'Miscellaneous Rates',
