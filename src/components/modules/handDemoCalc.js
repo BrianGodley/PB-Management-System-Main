@@ -42,7 +42,7 @@ export function calcDemo(
   const isSub = state.dumpType === 'Subcontractor'
   const isDumpSub = false // disposal follows the In House/Sub toggle
   const lrph = n(laborRatePerHour)
-  const difficultyRatio = n(lr['Hand - Difficulty Ratio'])
+  const difficultyRatio = n(lr['Basic Labor - Difficulty Ratio']) // shared Basic Labor
   const diff = 1 + (n(state.difficulty) / 100) * difficultyRatio
   const hrsAdj = n(state.hoursAdj)
 

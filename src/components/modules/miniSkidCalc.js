@@ -52,14 +52,14 @@ export function calcDemo(
   // Misc-Flat/Compaction/Jumping-Jack = hrs×CF; Grade-Cut/Fill/Import-Base = hrs×SF.
   const laborConc = n(lr['Mini - Concrete'])          // hrs / Cu Yd
   const laborDirt = n(lr['Mini - Soil'])              // hrs / Cu Yd
-  const laborGrass = n(lr['Mini - Grass SF'])  // unchanged (per 100 sf·in)
+  const laborGrass = n(lr['Mini - Grass SF'])  // hrs / Cu Ft
   const laborMiscFlat = n(lr['Mini - Misc Flat'])     // hrs / Cu Yd
   const laborMiscVert = n(lr['Mini - Misc Vertical']) // hrs / Cu Yd
   const laborFooting = n(lr['Mini - Footing'])        // hrs / Cu Ft
   const laborGradeCut = n(lr['Mini - Grade Cut'])     // hrs / Cu Ft
   const rateGrass = n(lr['Mini - Skid Steer Grass'])
   const laborBase = n(lr['Mini - Import Base'])       // hrs / Cu Ft
-  const laborGradeFill = n(lr['Mini - Grade Fill'])   // hrs / Sq Ft
+  const laborGradeFill = n(lr['Mini - Grade Fill'])   // hrs / Cu Ft
   const laborJJ = n(lr['Basic Labor - Jumping Jack']) // shared, hrs / Cu Ft
   const laborSS = n(lr['Mini - Compaction'])          // hrs / Cu Ft
   const rebarMult = state.rebar ? 1.3 : 1             // Rebar/Mesh toggle: +30% concrete
@@ -139,7 +139,7 @@ export function calcDemo(
   // Grass unchanged (per 100 sf·in).
   conc.hours = conc.cy * laborConc * rebarMult
   dirt.hours = dirt.cy * laborDirt
-  grass.hours = sfLaborHrs(state.grassSF, state.grassDepth || 4, laborGrass)
+  grass.hours = flatCf(state.grassSF, state.grassDepth || 4) * laborGrass // hrs × Cu Ft
   conc.dumpFee = containerCost(state.concSF, state.concDepth || 4)
   dirt.dumpFee = containerCost(state.dirtSF, state.dirtDepth || 4)
   grass.dumpFee = containerCost(state.grassSF, state.grassDepth || 4)
@@ -174,9 +174,9 @@ export function calcDemo(
   )
   gradeCut.dumpFee = containerCost(state.gradeCutSF, state.gradeCutDepth || 4)
   const gradeFill = flat(state.gradeFillSF, state.gradeFillDepth || 4, laborGradeFill, 0, accessBobcat)
-  // Grade cut = hrs × Cu Ft (Mini); grade fill stays hrs × Sq Ft.
+  // Grade cut + grade fill = hrs × Cu Ft (Mini).
   gradeCut.hours = flatCf(state.gradeCutSF, state.gradeCutDepth || 4) * laborGradeCut
-  gradeFill.hours = n(state.gradeFillSF) * laborGradeFill
+  gradeFill.hours = flatCf(state.gradeFillSF, state.gradeFillDepth || 4) * laborGradeFill
 
   const jjTons = sfToTons(state.jjSF, state.jjDepth || 4)
   const ssCmpTons = sfToTons(state.ssCmpSF, state.ssCmpDepth || 4)

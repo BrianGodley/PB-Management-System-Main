@@ -21,7 +21,7 @@ const fullRates = (over = {}) => ({
   'Basic Labor - Jumping Jack': 0.04, // shared, hrs / Cu Ft
   'Hand - Rebar': 0.25, // +25% concrete when rebar toggle on
   'Hand - Load (CY)': 1,
-  'Hand - Difficulty Ratio': 1,
+  'Basic Labor - Difficulty Ratio': 1, // shared Basic Labor
   ...over,
 })
 const fullMat = (over = {}) => ({

@@ -15,12 +15,12 @@ const fullRates = (over = {}) => ({
   'Mini - Misc Flat': 1.25,      // hrs / Cu Yd
   'Mini - Misc Vertical': 0.845, // hrs / Cu Yd
   'Mini - Grade Cut': 0.03,      // hrs / Cu Ft
-  'Mini - Grade Fill': 0.018,    // hrs / Sq Ft
+  'Mini - Grade Fill': 0.03,     // hrs / Cu Ft
   'Mini - Import Base': 0.035,   // hrs / Cu Ft
   'Mini - Compaction': 0.01,     // hrs / Cu Ft
   'Basic Labor - Jumping Jack': 0.04, // shared, hrs / Cu Ft
   'Basic Labor - Difficulty Ratio': 1, // shared
-  'Mini - Grass SF': 0.3, // unchanged (per 100 sf·in)
+  'Mini - Grass SF': 0.02, // hrs / Cu Ft
   'Mini - Skid Steer Grass': 0.3,
   'Mini - Shrubs 0-1 ft': 0.09, 'Mini - Shrubs 1-2 ft': 0.12, 'Mini - Shrubs 2-3 ft': 0.18,
   'Mini - Shrubs 3-4 ft': 0.24, 'Mini - Shrubs 4-5 ft': 0.3,
@@ -111,6 +111,16 @@ test('value: import base hrs = Cu Ft × rate (100 SF × 12in = 100 CF × 0.035 =
 test('value: misc flat hrs = Cu Yd × rate (270 SF × 12in = 10 CY × 1.25 = 12.5 hrs)', () => {
   const r = run({ dumpType: 'In House', miscFlatRows: [{ sf: 270, depth: 12 }] })
   assert.equal(r.miscFlatCalc[0].hours, 12.5, `misc flat hours got ${r.miscFlatCalc[0].hours}`)
+})
+
+test('value: grade fill hrs = Cu Ft × rate (300 SF × 12in = 300 CF × 0.03 = 9 hrs)', () => {
+  const r = run({ dumpType: 'In House', gradeFillSF: 300, gradeFillDepth: 12 })
+  assert.equal(r.gradeFill.hours, 9, `grade fill hours got ${r.gradeFill.hours}`)
+})
+
+test('value: grass hrs = Cu Ft × rate (300 SF × 12in = 300 CF × 0.02 = 6 hrs)', () => {
+  const r = run({ dumpType: 'In House', grassSF: 300, grassDepth: 12 })
+  assert.equal(r.grass.hours, 6, `grass hours got ${r.grass.hours}`)
 })
 
 test('sub value: grading Cut is per-SF (100 SF × $1.75 = $175)', () => {
