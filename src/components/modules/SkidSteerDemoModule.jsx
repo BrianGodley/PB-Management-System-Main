@@ -296,7 +296,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
       // fees from misc_rates, labor from labor_rates — all by name.
       // Demo materials + Basic Materials (Tree CY Factor moved there) by name.
       fetchStandardRateMap(['Demo', 'Basic Materials']),
-      supabase.from('labor_rates').select('name,rate,rate_per_day'),
+      supabase.from('labor_rates').select('name,rate,rate_per_day').neq('category', 'Archived'),
       supabase.from('subcontractor_rates').select('item_key,rate'),
     ])
     setMaterialPrices(matMap)
