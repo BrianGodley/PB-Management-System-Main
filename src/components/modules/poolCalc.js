@@ -4,6 +4,7 @@
 // (lib/utilRow) all import supabase, so their pure bodies are inlined here and kept in sync.
 // The module keeps its own copies of the helpers for JSX; this file owns the copies the
 // calc consumes (poolStdItem / defaultSubVendor / constants).
+import { LAB } from '../../lib/laborRefs.js'
 const n = v => parseFloat(v) || 0
 const isStandardSel = v => !v || v === 'Standard'
 const DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN = 60
@@ -200,7 +201,7 @@ export function calcPool(state, materialPrices, laborRates, subRates = {}, walkA
   // hrs = dug Cu Yd × labor_rates['Skid - Soil'] (hrs per Cu Yd). Unset ⇒ 0
   // (no fallback). The Equipment picker is informational — it no longer selects
   // a separate excavation rate.
-  const equipRate = n(laborRates['Skid - Soil'])
+  const equipRate = n(laborRates[LAB.POOL_EXCAV_SOIL])
   const excavHrs = !isSubExcav ? totalExcavCY * equipRate : 0
   // Haul-off MATERIAL (In-House excavation only). yards = totalExcavCY (SF × avg depth
   // ÷ 27 × fluff). Sub Haul is priced BY THE YARD ($/CY × yards); roll-off Containers are
@@ -265,7 +266,7 @@ export function calcPool(state, materialPrices, laborRates, subRates = {}, walkA
   })
   const shotMatRate = shotItem ? n(shotItem.unit_cost) : 0
   const shotcreteMat = !isSubTab ? totalShotCY * shotMatRate : 0
-  const shotLabRate = n(laborRates['Pool - Shotcrete Labor'])
+  const shotLabRate = n(laborRates[LAB.POOL_SHOTCRETE_LABOR])
   const shotcreteHrs = !isSubTab ? totalShotCY * shotLabRate : 0
 
   // Items whose picked Type has no labor rate set (calc_meta.labor_rate unset or
@@ -486,7 +487,7 @@ export function calcPool(state, materialPrices, laborRates, subRates = {}, walkA
       fallbackFirst: false,
     })
     steelMat = steelLF * (rebarItem ? n(rebarItem.unit_cost) : 0)
-    steelHrs = steelLF * n(laborRates[POOL_STEEL_LABOR])
+    steelHrs = steelLF * n(laborRates[LAB.POOL_STEEL_INSTALL])
   }
   let steelSub
   if (hasOverride(steel.manualSubCost)) {
@@ -559,7 +560,7 @@ export function calcPool(state, materialPrices, laborRates, subRates = {}, walkA
   // its fields stay blank on the Sub tab and the DB default must not silently
   // add cost there. A typed value overrides the DB default; a typed 0 => 0.
   const plumbIH = state.plumbingIH || {}
-  const plumbHrsDefault = n(laborRates['Pool Plumbing - Base Hours'])
+  const plumbHrsDefault = n(laborRates[LAB.POOL_PLUMBING_BASE_HOURS])
   const plumbMatDefault = n(materialPrices['Pool Plumbing - Materials'])
   // The DB default only kicks in once there's real pool scope (perimeter or spa) —
   // mirrors the Sub side — so a brand-new blank estimate reads 0 until a pool is

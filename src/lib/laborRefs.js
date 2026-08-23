@@ -91,4 +91,10 @@ export const LAB = {
   CONC_INSTALL_600_1000: 'LAB-077-concrete-install-600-1000',
   CONC_INSTALL_1000_2000: 'LAB-074-concrete-install-1000-2000',
   CONC_INSTALL_2000_PLUS: 'LAB-075-concrete-install-2000',
+
+  // ── Pool (name-keyed reads; most Pool labor is calc_meta-driven) ────────────
+  POOL_EXCAV_SOIL: 'LAB-392-skid-soil', // shared Skid Steer soil rate (hrs per Cu Yd)
+  POOL_SHOTCRETE_LABOR: 'LAB-349-pool-shotcrete-labor',
+  POOL_STEEL_INSTALL: 'LAB-410-steel-install',
+  POOL_PLUMBING_BASE_HOURS: 'LAB-350-pool-plumbing-base-hours',
 }
