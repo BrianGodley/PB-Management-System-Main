@@ -529,7 +529,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             rateScope={[
               { category: 'Demo', sub: 'Mini Skid Steer' },
               { category: 'Demo', sub: 'Disposal' },
-              { category: 'Basic Labor', sub: 'Import Base', only: ['Basic Labor - Import Base Mini Skid Steer'] },
+              { category: 'Basic Labor', sub: 'Base Prep', only: ['Basic Labor - Import Base Mini Skid Steer'] },
               { category: 'Basic Labor', sub: 'Compaction', only: ['Basic Labor - Jumping Jack'] },
               { category: 'Basic Labor', sub: 'Coefficients', only: ['Basic Labor - Difficulty Ratio', 'Basic Labor - Concrete Weight lb/cf'] },
             ]}
@@ -759,7 +759,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       {isSelf && (
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>{subSectionTitle('IMPORT', isSub)}</span>
+          <span>{subSectionTitle('BASE PREP', isSub)}</span>
         </div>
         <table className="w-full text-xs">
           <TH

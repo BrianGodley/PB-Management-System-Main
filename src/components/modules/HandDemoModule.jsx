@@ -531,7 +531,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             rateScope={[
               { category: 'Demo', sub: 'Hand' },
               { category: 'Demo', sub: 'Disposal' },
-              { category: 'Basic Labor', sub: 'Import Base', only: ['Basic Labor - Import Base Hand'] },
+              { category: 'Basic Labor', sub: 'Base Prep', only: ['Basic Labor - Import Base Hand'] },
               { category: 'Basic Labor', sub: 'Compaction', only: ['Basic Labor - Jumping Jack'] },
               { category: 'Basic Labor', sub: 'Coefficients', only: ['Basic Labor - Difficulty Ratio', 'Basic Labor - Concrete Weight lb/cf'] },
             ]}
@@ -787,7 +787,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       {isSelf && (
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>{subSectionTitle('IMPORT', isSub)}</span>
+          <span>{subSectionTitle('BASE PREP', isSub)}</span>
         </div>
         <table className="w-full text-xs">
           <TH

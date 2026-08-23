@@ -4,6 +4,7 @@
 // module now imports calcConcrete from here.
 import { makeModuleRates } from '../../lib/moduleRates.js'
 import { LAB } from '../../lib/laborRefs.js'
+import { BAS } from '../../lib/basicLaborRefs.js'
 
 // Inlined pure helpers — lib/materialCatalog + lib/walkAccess import supabase and so
 // can't be pulled into a node-testable pure module. Copies kept in sync with the libs.
@@ -30,10 +31,11 @@ function calcWalkAccessLabor(laborSubtotalHrs, distanceLF, opts = {}) {
 }
 
 
+// Concrete base-prep labor now lives in the shared Basic Labor table (sub 'Base Prep').
 const BASE_METHOD_LABOR_NAME = {
-  'Skid Steer': LAB.CONC_BASE_SKID_STEER,
-  'Mini Skid Steer': LAB.CONC_BASE_MINI_SKID_STEER,
-  Wheelbarrow: LAB.CONC_BASE_WHEELBARROW,
+  'Skid Steer': BAS.CONC_BASE_SKID,
+  'Mini Skid Steer': BAS.CONC_BASE_MINI,
+  Wheelbarrow: BAS.CONC_BASE_WHEELBARROW,
 }
 
 const normBaseMethod = m =>

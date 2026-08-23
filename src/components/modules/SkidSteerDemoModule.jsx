@@ -548,7 +548,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
             rateScope={[
               { category: 'Demo', sub: 'Skid Steer' },
               { category: 'Demo', sub: 'Disposal' },
-              { category: 'Basic Labor', sub: 'Import Base', only: ['Basic Labor - Import Base Skid Steer OK'] },
+              { category: 'Basic Labor', sub: 'Base Prep', only: ['Basic Labor - Import Base Skid Steer OK'] },
               { category: 'Basic Labor', sub: 'Compaction', only: ['Basic Labor - Jumping Jack'] },
               { category: 'Basic Labor', sub: 'Coefficients', only: ['Basic Labor - Difficulty Ratio', 'Basic Labor - Concrete Weight lb/cf'] },
             ]}
@@ -774,7 +774,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
       {isSelf && (
       <div>
         <div className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2 flex items-center gap-2">
-          <span>{subSectionTitle('IMPORT', isDemoSub)}</span>
+          <span>{subSectionTitle('BASE PREP', isDemoSub)}</span>
         </div>
         <table className="w-full text-xs">
           <TH
