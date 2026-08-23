@@ -3,6 +3,7 @@
 // is pure and imported; the catalog helpers + resolveUtilRow/mergedUtilTypes (whose lib
 // imports supabase) are inlined here, kept in sync with lib/materialCatalog + lib/utilRow.
 import { trenchHours, trenchRowHrs, TRENCH_LABOR_RATE_NAME } from '../../lib/trench.js'
+import { BAS } from '../../lib/basicLaborRefs.js'
 
 const n = v => { const x = typeof v === 'number' ? v : parseFloat(v); return Number.isFinite(x) ? x : 0 }
 const DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN = 60
@@ -188,7 +189,7 @@ const ADD_ITEM_RATES = {
     dbName: 'Curb Core',
     label: 'Curb Core',
     // Shared Basic Labor rate (Hrs per Each) — one curb-core labor row for all modules.
-    laborDbName: 'Basic Labor - Curb Core',
+    laborDbName: BAS.CURB_CORE,
     laborOnly: true,
   },
   hydrocut: {

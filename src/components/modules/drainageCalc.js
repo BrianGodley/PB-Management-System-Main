@@ -3,6 +3,7 @@
 // (whose libs import supabase) are inlined here, kept in sync with lib/materialCatalog +
 // lib/walkAccess. The module's own type/rate maps + drainMatCost/masterDrainTypes are
 // carried below (they only need the inlined catalog fns).
+import { BAS } from '../../lib/basicLaborRefs.js'
 const n = v => parseFloat(v) || 0
 const DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN = 60
 const isStandardSel = v => !v || v === 'Standard'
@@ -124,7 +125,7 @@ const ADD_ITEM_LABOR_RATE_NAME = {
   sumpPump: 'Drainage Sump Pump Labor',
   // Curb Core labor is a SHARED Basic Labor rate (Hrs per Each) read by every
   // module that cores a curb — Drainage + Utilities. One row, one source.
-  curbCore: 'Basic Labor - Curb Core',
+  curbCore: BAS.CURB_CORE,
   hydrocut: 'Drainage Hydrocut Under Hardscape Labor',
 }
 
