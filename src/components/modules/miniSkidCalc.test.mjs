@@ -27,7 +27,7 @@ const fullRates = (over = {}) => ({
   'Mini - Stump Small': 1, 'Mini - Stump Medium': 2, 'Mini - Stump Large': 3, 'Mini - Stump XL': 4,
   'Mini - Tree Small': 1, 'Mini - Tree Medium': 2, 'Mini - Tree Large': 3,
   'Mini - Tons SF-in Denominator': 150,
-  'Mini - Concrete Weight lb/cf': 150,
+  'Basic Labor - Concrete Weight lb/cf': 150,
   'Mini - Haul Sec/Ft': 1,
   'Mini - Load (CY)': 1,
   ...over,

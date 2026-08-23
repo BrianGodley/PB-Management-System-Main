@@ -24,7 +24,7 @@ export function calcDemo(
   // Rates (labor_rates, category Demo). Fixed unit conversions (27 cf/cy,
   // 12 in/ft, 2000 lb/ton, 60 min/hr) stay as literal math.
   const tonsSfInDenom = n(lr['Demo - Skid Tons SF-in Denominator']) // Sub tab (per-ton) only
-  const concreteWeightLbCf = n(lr['Demo - Skid Concrete Weight lb/cf']) // Sub tab / vertical tons
+  const concreteWeightLbCf = n(lr['Basic Labor - Concrete Weight lb/cf']) // shared Basic Labor (Sub tab / vertical tons)
   // Tree green-waste CY factor is a material coefficient — lives in master material
   // rates (Basic Materials), read from materialPrices (mp), not labor_rates.
   const treeCyFactor = n(mp['Demo - Skid Tree CY Factor'])

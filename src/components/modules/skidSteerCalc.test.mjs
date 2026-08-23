@@ -39,7 +39,7 @@ const fullRates = (over = {}) => ({
   'Skid - Tree Large': 3,
   // Sub tab (untouched) — per-ton coefficients + shuttle still live in labor_rates
   'Demo - Skid Tons SF-in Denominator': 150,
-  'Demo - Skid Concrete Weight lb/cf': 150,
+  'Basic Labor - Concrete Weight lb/cf': 150,
   'Demo - Skid Steer Haul Sec/Ft': 1,
   'Demo - Skid Steer Load (CY)': 1,
   ...over,
