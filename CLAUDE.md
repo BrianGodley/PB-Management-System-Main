@@ -58,9 +58,10 @@ coding from momentum, not policy — stop and re-check.
   freely (`git log`, `git diff`, `git status`). Watch for Windows-mount lock
   errors; if a git write fails with a lock, back off and print the command instead.
 - **Default is still: do NOT auto-commit.** After code edits, print the commit
-  command for Brian to run — a ` ```powershell ` fenced block, one command per
-  block, NO `cd` line, NO `+` prefix — UNLESS Brian explicitly asks you to commit,
-  in which case you may run it from the sandbox.
+  command for Brian to run — a plain fenced block (NOT ```powershell; Brian runs
+  Command Prompt / cmd.exe), one command per block, NO `cd` line, NO `+` prefix,
+  NO leading `#` comment — UNLESS Brian explicitly asks you to commit, in which
+  case you may run it from the sandbox.
 - **ALWAYS show SQL inline. Every time you create OR modify a `.sql` file, paste
   its FULL contents in the same chat message as a plain ` ```sql ` block** (file
   name bolded above it) — never just reference the filename and say "run it".

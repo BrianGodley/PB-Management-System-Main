@@ -886,7 +886,7 @@ export default function MasterRates({ only } = {}) {
     { key: 'code', label: 'Code', editable: false, width: '9rem', render: laborCodeCell },
     { key: 'category', label: 'Category', type: 'select', options: laborCatOptions, width: '11rem' },
     { key: 'sub_category', label: 'Sub Category', type: 'select', options: laborSubOptions, placeholder: 'describe…', width: '12rem' },
-    { key: 'label', label: 'Name', bold: true, stripCat: true, placeholder: 'e.g. Small Tree Removal', width: '16rem' },
+    { key: 'label', label: 'Description', bold: true, placeholder: 'e.g. Small Tree Removal', width: '16rem' },
     { key: 'notes', label: 'Notes', placeholder: 'Optional notes', width: '14rem' },
     { key: 'unit', label: 'Unit', type: 'select', options: LABOR_UNIT_OPTIONS, width: '8rem' },
     { key: 'rate', label: 'Rate', type: 'number', step: '0.0001', width: '7rem' },
@@ -1219,6 +1219,9 @@ export default function MasterRates({ only } = {}) {
           code={subCodeMap.get(detailSub.id)}
           subs={subVendorOptions}
           category={detailSub.category}
+          catOptions={subCatOptions}
+          subOptions={subSubOptions}
+          unitOptions={SUB_UNIT_OPTIONS}
           onClose={() => setDetailSub(null)}
           onSaved={reloadSubs}
           onDeleted={reloadSubs}
