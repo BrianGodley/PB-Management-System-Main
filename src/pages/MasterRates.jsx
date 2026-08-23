@@ -919,8 +919,18 @@ export default function MasterRates({ only } = {}) {
   ]
 
   const matCats = ['All', ...Array.from(new Set(materials.map(m => m.category).filter(Boolean))).sort()]
-  const labCats = ['All', ...Array.from(new Set(labor.map(r => r.category).filter(Boolean))).sort()]
-  const subCats = ['All', ...Array.from(new Set(subs.map(r => r.category).filter(Boolean))).sort()]
+  // 'Archived' is always offered last as its own view (the Archived table), even
+  // when empty; real archived rows (category='Archived') are deduped out of the middle.
+  const labCats = [
+    'All',
+    ...Array.from(new Set(labor.map(r => r.category).filter(Boolean).filter(c => c !== 'Archived'))).sort(),
+    'Archived',
+  ]
+  const subCats = [
+    'All',
+    ...Array.from(new Set(subs.map(r => r.category).filter(Boolean).filter(c => c !== 'Archived'))).sort(),
+    'Archived',
+  ]
   const subCompanies = ['All', ...Array.from(new Set(subs.map(r => r.company_name).filter(Boolean))).sort()]
 
   const visibleMaterials = materials.filter(m => {
@@ -934,7 +944,13 @@ export default function MasterRates({ only } = {}) {
       ? labor.filter(r => r.category !== 'Archived') // hide archived from the default view
       : labor.filter(r => r.category === labCategory) // selecting 'Archived' still shows them
   const visibleSubs = subs.filter(r => {
-    if (subCategory !== 'All' && r.category !== subCategory) return false
+    // Archived is its own view; hide archived rows from every other category/All.
+    if (subCategory === 'Archived') {
+      if (r.category !== 'Archived') return false
+    } else {
+      if (r.category === 'Archived') return false
+      if (subCategory !== 'All' && r.category !== subCategory) return false
+    }
     if (subCompany !== 'All' && (r.company_name || '') !== subCompany) return false
     return true
   })
