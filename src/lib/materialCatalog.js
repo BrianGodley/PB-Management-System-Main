@@ -243,7 +243,7 @@ export async function fetchStandardRateMap(categories) {
   const cats = Array.isArray(categories) ? categories : [categories]
   const [rows, labRes, feeRes] = await Promise.all([
     fetchModuleCatalog(cats),
-    supabase.from('labor_rates').select('name, rate').in('category', cats),
+    supabase.from('labor_rates').select('name, ref_key, rate').in('category', cats),
     supabase.from('misc_rates').select('name, rate').in('category', cats),
   ])
   const map = {}
@@ -251,7 +251,10 @@ export async function fetchStandardRateMap(categories) {
     if (r.vendor_id == null && r.name) map[r.name] = num(r.unit_cost)
   })
   ;(labRes.data || []).forEach(r => {
+    // Key by BOTH the display name (legacy lookups) and the stable ref_key
+    // (LAB-NNN-slug), so modules can migrate to ref_key without breakage.
     if (r.name) map[r.name] = num(r.rate)
+    if (r.ref_key) map[r.ref_key] = num(r.rate)
   })
   ;(feeRes.data || []).forEach(r => {
     if (r.name) map[r.name] = num(r.rate)
