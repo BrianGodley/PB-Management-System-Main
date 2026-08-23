@@ -37,7 +37,11 @@ function fmtVal(item) {
 }
 
 const isSubItem = it => it.section === 'sub' || it.table === 'subcontractor_rates'
-const isLaborItem = it => !isSubItem(it) && (it.section === 'labor' || it.mode === 'coefficient')
+// Misc (named_rate) rows are material-side adjustments (dump/disposal fees,
+// container prices, density factors) — they belong in the Material column, not
+// Labor, even though they render as coefficients. Only labor_rates rows are Labor.
+const isLaborItem = it =>
+  !isSubItem(it) && it.table !== 'named_rate' && (it.section === 'labor' || it.mode === 'coefficient')
 const isMaterialItem = it => !isSubItem(it) && !isLaborItem(it)
 
 function HideBtn({ hidden, onClick }) {

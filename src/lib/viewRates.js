@@ -176,13 +176,17 @@ export async function buildViewRates(moduleType, scope = null) {
   // editable numbers; the name carries the unit hint (e.g. '… per Cu Yd').
   ;(miscRes.data || []).filter(r => matInScope(r) && nameAllowed(r.category, r.sub_category, r.name)).forEach(r => {
     const g = ensure(r.category, 'Adjustments')
+    // Fee / price rows (dump fees, container price, $-named items) are dollar
+    // amounts → render as currency ("$36.21 per Ton"). True coefficients (swell,
+    // capacity, density factors) stay coefficient style ("1.2 Factor").
+    const isFee = /dump|low-?boy|\$|price|fee/i.test(r.name)
     g.items.push({
       label: cleanLabel(r.name),
       table: 'named_rate',
       name: r.name,
       category: r.category,
       unitLabel: r.unit || '',
-      mode: 'coefficient',
+      mode: isFee ? 'currency' : 'coefficient',
       value: n(r.rate),
       hideKey: `item:misc:${r.id}`,
     })
