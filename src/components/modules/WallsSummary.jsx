@@ -623,7 +623,6 @@ export default function WallsSummary({ module }) {
           value={`${n(calc.demoHrs).toFixed(2)} hrs`}
           sub={
             `${fmt(n(calc.demoHrs) * lrph)}` +
-            (n(calc.demoTons) > 0 ? ` · ${n(calc.demoTons).toFixed(2)} t` : '') +
             (n(calc.demoDump) > 0 ? ` · ${fmt(n(calc.demoDump))} dump` : '')
           }
         />
