@@ -146,6 +146,38 @@ test('sub value: tree priced per each by size (2× Large @ $2800 = $5600)', () =
   assert.equal(r.subTreeCost, 5600, `subTreeCost got ${r.subTreeCost}`)
 })
 
+test('add demo: two sections sum (2 × 5 hrs concrete = 10 hrs → $750)', () => {
+  const r = run({
+    dumpType: 'In House',
+    mainDemoSections: [
+      { concSF: 270, concDepth: 12 },
+      { concSF: 270, concDepth: 12 },
+    ],
+  })
+  assert.equal(r.sectionCalcs.length, 2)
+  assert.equal(r.conc.hours, 10, `summed conc.hours got ${r.conc.hours}`)
+  assert.equal(r.laborCost, 10 * LRPH, `laborCost got ${r.laborCost}`)
+  // per-section rebar is independent
+  const r2 = run({
+    dumpType: 'In House',
+    mainDemoSections: [
+      { concSF: 270, concDepth: 12, rebar: true },
+      { concSF: 270, concDepth: 12 },
+    ],
+  })
+  assert.equal(r2.conc.hours, 6.5 + 5, `mixed-rebar conc.hours got ${r2.conc.hours}`)
+})
+
+test('add demo: flat-state fallback reproduces a single section exactly', () => {
+  const flatR = run({ dumpType: 'In House', concSF: 270, concDepth: 12, grassSF: 100, grassDepth: 4, gradeCutSF: 50 })
+  const secR = run({
+    dumpType: 'In House',
+    mainDemoSections: [{ concSF: 270, concDepth: 12, grassSF: 100, grassDepth: 4, gradeCutSF: 50 }],
+  })
+  assert.equal(secR.totalHrs, flatR.totalHrs, 'section-of-one totalHrs == flat totalHrs')
+  assert.equal(secR.price, flatR.price, 'section-of-one price == flat price')
+})
+
 test('sub-independence: In-House and Sub track only their own inputs', () => {
   const ih = run({ dumpType: 'In House', concSF: 270, concDepth: 12 })
   const ihMore = run({ dumpType: 'In House', concSF: 540, concDepth: 12 })

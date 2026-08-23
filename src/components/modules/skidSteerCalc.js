@@ -117,22 +117,60 @@ export function calcDemo(
   const haulSecPerFt = n(lr['Demo - Skid Steer Haul Sec/Ft'])
   const haulLoadCy = n(lr['Demo - Skid Steer Load (CY)'])
 
-  // ── Demo rows ────────────────────────────────────────────────────────────
-  const conc = flat(state.concSF, state.concDepth || 4, laborConc, 0)
-  const dirt = flat(state.dirtSF, state.dirtDepth || 4, laborDirt, 0)
+  // ── Import Base (single — the IMPORT section, not replicated) ──────────────
   const base = flat(state.baseSF, state.baseDepth || 4, laborBase, 0)
+  base.hours = flatCf(state.baseSF, state.baseDepth || 4) * laborBase
   const baseRawCy = flatCf(state.baseSF, state.baseDepth || 4) / 27
   const baseMat = Math.ceil(baseRawCy / 10) * baseMatPer10Cy
-  const grass = flat(state.grassSF, state.grassDepth || 4, rateGrass, 0)
-  // New model: Concrete/Soil = hrs × Cu Yd (Rebar/Mesh adds 30% to concrete);
-  // Import Base = hrs × Cu Ft; Grass unchanged (per 100 sf·in).
-  conc.hours = conc.cy * laborConc * rebarMult
-  dirt.hours = dirt.cy * laborDirt
-  base.hours = flatCf(state.baseSF, state.baseDepth || 4) * laborBase
-  grass.hours = sfLaborHrs(state.grassSF, state.grassDepth || 4, laborGrass)
-  conc.dumpFee = containerCost(state.concSF, state.concDepth || 4)
-  dirt.dumpFee = containerCost(state.dirtSF, state.dirtDepth || 4)
-  grass.dumpFee = containerCost(state.grassSF, state.grassDepth || 4)
+
+  // ── Main Demo — one or more independent sections. Each carries its own
+  // Concrete / Soil / Grass / Grade-Cut inputs + Rebar. Old estimates (flat
+  // state, no mainDemoSections) fall back to ONE section from the flat fields,
+  // reproducing prior numbers exactly. Concrete/Soil = hrs × Cu Yd (Rebar adds
+  // 30% to concrete); Grass = per-100-sf·in; Grade Cut = hrs × Sq Ft.
+  const rebarF = on => (on ? 1.3 : 1)
+  const mainSections =
+    Array.isArray(state.mainDemoSections) && state.mainDemoSections.length
+      ? state.mainDemoSections
+      : [
+          {
+            concSF: state.concSF, concDepth: state.concDepth,
+            dirtSF: state.dirtSF, dirtDepth: state.dirtDepth,
+            grassSF: state.grassSF, grassDepth: state.grassDepth,
+            gradeCutSF: state.gradeCutSF, gradeCutDepth: state.gradeCutDepth,
+            rebar: state.rebar,
+          },
+        ]
+  const sectionCalcs = mainSections.map(sec => {
+    const c = flat(sec.concSF, sec.concDepth || 4, laborConc, 0)
+    c.hours = c.cy * laborConc * rebarF(sec.rebar)
+    c.dumpFee = containerCost(sec.concSF, sec.concDepth || 4)
+    const d = flat(sec.dirtSF, sec.dirtDepth || 4, laborDirt, 0)
+    d.hours = d.cy * laborDirt
+    d.dumpFee = containerCost(sec.dirtSF, sec.dirtDepth || 4)
+    const g = flat(sec.grassSF, sec.grassDepth || 4, rateGrass, 0)
+    g.hours = sfLaborHrs(sec.grassSF, sec.grassDepth || 4, laborGrass)
+    g.dumpFee = containerCost(sec.grassSF, sec.grassDepth || 4)
+    const gc = flat(sec.gradeCutSF, sec.gradeCutDepth || 4, laborGradeCut, 0)
+    gc.hours = n(sec.gradeCutSF) * laborGradeCut
+    gc.dumpFee = containerCost(sec.gradeCutSF, sec.gradeCutDepth || 4)
+    return { conc: c, dirt: d, grass: g, gradeCut: gc }
+  })
+  const sumRows = key => {
+    const acc = { tons: 0, cy: 0, cf: 0, hours: 0, dumpFee: 0 }
+    for (const s of sectionCalcs) {
+      const r = s[key] || {}
+      acc.tons += r.tons || 0
+      acc.cy += r.cy || 0
+      acc.cf += r.cf || 0
+      acc.hours += r.hours || 0
+      acc.dumpFee += r.dumpFee || 0
+    }
+    return acc
+  }
+  const conc = sumRows('conc')
+  const dirt = sumRows('dirt')
+  const grass = sumRows('grass')
 
   // Misc rows use same base rate as concrete/dirt (no preset dump fee for full SS)
   const miscFlatCalc = (state.miscFlatRows || []).map(r => {
@@ -155,11 +193,9 @@ export function calcDemo(
   })
 
   // ── Grading ──────────────────────────────────────────────────────────────
-  const gradeCut = flat(state.gradeCutSF, state.gradeCutDepth || 4, laborGradeCut, 0)
-  gradeCut.dumpFee = containerCost(state.gradeCutSF, state.gradeCutDepth || 4)
+  const gradeCut = sumRows('gradeCut') // aggregated per Main Demo section (above)
   const gradeFill = flat(state.gradeFillSF, state.gradeFillDepth || 4, laborGradeFill, 0)
-  // New model: grade cut/fill = hrs × Sq Ft (depth still drives haul/dump volume).
-  gradeCut.hours = n(state.gradeCutSF) * laborGradeCut
+  // New model: grade fill = hrs × Sq Ft (depth still drives haul/dump volume).
   gradeFill.hours = n(state.gradeFillSF) * laborGradeFill
 
   const jjTons = sfToTons(state.jjSF, state.jjDepth || 4)
@@ -288,11 +324,15 @@ export function calcDemo(
       miscVertCalc.reduce((s, r) => s + r.tons, 0) +
       footingCalc.reduce((s, r) => s + r.tons, 0) +
       gradeCut.tons
-  const haulYards =
-    removalYards(state.concSF, state.concDepth || 4) +
-    removalYards(state.dirtSF, state.dirtDepth || 4) +
-    removalYards(state.gradeCutSF, state.gradeCutDepth || 4) +
-    removalYards(state.grassSF, state.grassDepth || 4)
+  const haulYards = mainSections.reduce(
+    (s, sec) =>
+      s +
+      removalYards(sec.concSF, sec.concDepth || 4) +
+      removalYards(sec.dirtSF, sec.dirtDepth || 4) +
+      removalYards(sec.gradeCutSF, sec.gradeCutDepth || 4) +
+      removalYards(sec.grassSF, sec.grassDepth || 4),
+    0
+  )
   const haulTrips = haulLoadCy > 0 ? haulYards / haulLoadCy : 0
   const walkHrs = (haulTrips * n(state.distanceLF) * haulSecPerFt) / 3600
 
@@ -388,6 +428,7 @@ export function calcDemo(
   const price = laborCost + burden + totalMat + gp + subGp + commission + subCost
 
   return {
+    sectionCalcs,
     walkHrs,
     totalDemoTons,
     totalHrs,
