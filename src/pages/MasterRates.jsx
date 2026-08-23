@@ -929,7 +929,10 @@ export default function MasterRates({ only } = {}) {
     if (matVendor !== 'All') return m.vendor_id === matVendor
     return true
   })
-  const visibleLabor = labCategory === 'All' ? labor : labor.filter(r => r.category === labCategory)
+  const visibleLabor =
+    labCategory === 'All'
+      ? labor.filter(r => r.category !== 'Archived') // hide archived from the default view
+      : labor.filter(r => r.category === labCategory) // selecting 'Archived' still shows them
   const visibleSubs = subs.filter(r => {
     if (subCategory !== 'All' && r.category !== subCategory) return false
     if (subCompany !== 'All' && (r.company_name || '') !== subCompany) return false
