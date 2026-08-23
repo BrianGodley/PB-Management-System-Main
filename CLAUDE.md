@@ -61,9 +61,11 @@ coding from momentum, not policy — stop and re-check.
   command for Brian to run — a ` ```powershell ` fenced block, one command per
   block, NO `cd` line, NO `+` prefix — UNLESS Brian explicitly asks you to commit,
   in which case you may run it from the sandbox.
-- **Show changed SQL as inline plain ` ```sql ` blocks** (file name bolded above),
-  wrapped across short lines so it copies clean — never one giant single-line
-  UPDATE (it truncates on paste). Not `present_files` thumbnails.
+- **ALWAYS show SQL inline. Every time you create OR modify a `.sql` file, paste
+  its FULL contents in the same chat message as a plain ` ```sql ` block** (file
+  name bolded above it) — never just reference the filename and say "run it".
+  This is a hard rule. Wrap across short lines so it copies clean — never one
+  giant single-line UPDATE (it truncates on paste). Not `present_files` thumbnails.
 - Single live prod env — Brian runs all SQL directly on prod. Still snapshot
   before irreversible ops.
 
