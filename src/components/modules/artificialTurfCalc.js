@@ -3,6 +3,7 @@
 // and the catalog resolvers catalogItemFor/catalogOptions (lib/materialCatalog) both import
 // supabase, so their pure bodies are inlined here. The module keeps its own copies of the
 // helpers for JSX; this file owns the copies the calc consumes.
+import { LAB } from '../../lib/laborRefs.js'
 const n = v => parseFloat(v) || 0
 const DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN = 60
 const isStandardSel = v => !v || v === 'Standard'
@@ -41,11 +42,11 @@ const CATALOG_OPTS = { standardRows: 'null-vendor', stripPrefix: true }
 const TURF_CAT = { base: 'Turf Base', turf: 'Turf Material' }
 
 export const DEMO_METHODS = [
-  { key: 'Skid Steer Good', label: 'Skid Steer (Good)', matKey: 'Turf - Demo Skid Steer Good' },
-  { key: 'Skid Steer OK', label: 'Skid Steer (OK)', matKey: 'Turf - Demo Skid Steer OK' },
-  { key: 'Mini Skid Steer', label: 'Mini Skid Steer', matKey: 'Turf - Demo Mini Skid Steer' },
-  { key: 'Wheelbarrow', label: 'Wheelbarrow', matKey: 'Turf - Demo Wheelbarrow' },
-  { key: 'Hand', label: 'Hand', matKey: 'Turf - Demo Hand' },
+  { key: 'Skid Steer Good', label: 'Skid Steer (Good)', matKey: LAB.TURF_DEMO_SKID_GOOD },
+  { key: 'Skid Steer OK', label: 'Skid Steer (OK)', matKey: LAB.TURF_DEMO_SKID_OK },
+  { key: 'Mini Skid Steer', label: 'Mini Skid Steer', matKey: LAB.TURF_DEMO_MINI_SKID },
+  { key: 'Wheelbarrow', label: 'Wheelbarrow', matKey: LAB.TURF_DEMO_WHEELBARROW },
+  { key: 'Hand', label: 'Hand', matKey: LAB.TURF_DEMO_HAND },
 ]
 export const DEMO_ROWS = [
   { key: 'concrete', label: 'Concrete', dumpKey: 'Dump Fee - Concrete' },
@@ -164,7 +165,7 @@ export function calcTurf(
 
   if (isSub) { baseHrs = 0; baseMat = 0 }
 
-  const turfSFHr = n(lr['Turf - Turf Install'])
+  const turfSFHr = n(lr[LAB.TURF_TURF_INSTALL])
   const rollWidthFt = n(mp['Turf - Roll Width FT']) || 15
   let turfHrs = 0, turfMat = 0, totalEdgeLF = 0, subTurfCost = 0, cutHrs = 0, cutMat = 0, subCutMat = 0, infillMat = 0
   const installMatPerLF = n(mp['Turf - Install Materials'])
@@ -203,7 +204,7 @@ export function calcTurf(
   })
   const infillAreaSF = rollCalc.reduce((s, r) => s + (r.infillSF || 0), 0)
 
-  const stripLFHr = n(lr['Turf - Strip Install'])
+  const stripLFHr = n(lr[LAB.TURF_STRIP_INSTALL])
   let stripsHrs = 0, stripsMat = 0, subStripsCost = 0
   const stripCalc = (state.stripRows || []).map(strip => {
     const lf = n(strip?.lf)

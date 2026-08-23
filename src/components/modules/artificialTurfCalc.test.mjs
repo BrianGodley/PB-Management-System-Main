@@ -36,7 +36,7 @@ const near = (a, b, eps = 1e-6) => assert.ok(Math.abs(a - b) < eps, `${a} !≈ $
 test('turf roll value: SF = edgeLF × roll width; hrs = SF × install rate; mat = SF × brand $/SF', () => {
   const r = run(
     { rolls: [{ brand: 'Emerald 80', edgeLF: '100', vendor: 'Standard', useZeoFill: false }] },
-    { 'Turf - Roll Width FT': 15 }, { 'Turf - Turf Install': 0.01 }, TURF
+    { 'Turf - Roll Width FT': 15 }, { 'LAB-451-turf-turf-install': 0.01 }, TURF
   )
   assert.equal(r.rollCalc[0].sf, 1500, `roll SF got ${r.rollCalc[0].sf}`) // 100 × 15
   assert.equal(r.turfHrs, 15, `turfHrs got ${r.turfHrs}`)                  // 1500 × 0.01
@@ -44,8 +44,8 @@ test('turf roll value: SF = edgeLF × roll width; hrs = SF × install rate; mat 
 })
 
 test('turf edit-reflects: raising the install rate raises turf labor proportionally', () => {
-  const a = run({ rolls: [{ brand: 'Emerald 80', edgeLF: '100', vendor: 'Standard' }] }, { 'Turf - Roll Width FT': 15 }, { 'Turf - Turf Install': 0.01 }, TURF)
-  const b = run({ rolls: [{ brand: 'Emerald 80', edgeLF: '100', vendor: 'Standard' }] }, { 'Turf - Roll Width FT': 15 }, { 'Turf - Turf Install': 0.02 }, TURF)
+  const a = run({ rolls: [{ brand: 'Emerald 80', edgeLF: '100', vendor: 'Standard' }] }, { 'Turf - Roll Width FT': 15 }, { 'LAB-451-turf-turf-install': 0.01 }, TURF)
+  const b = run({ rolls: [{ brand: 'Emerald 80', edgeLF: '100', vendor: 'Standard' }] }, { 'Turf - Roll Width FT': 15 }, { 'LAB-451-turf-turf-install': 0.02 }, TURF)
   assert.equal(b.turfHrs, a.turfHrs * 2, 'rate ×2 → turf hrs ×2')
 })
 
@@ -53,7 +53,7 @@ test('demo value: cy = SF × in/324; hrs = cy × method rate (hrs/CY); mat = cy 
   const r = run(
     { demo: { ...demo0, concrete: { sf: '1000', inches: '4', method: 'Skid Steer Good' } } },
     { 'Dump Fee - Concrete': 10 },
-    { 'Turf - Demo Skid Steer Good': 0.5 }
+    { 'LAB-445-turf-demo-skid-steer-good': 0.5 }
   )
   const cy = (1000 * (4 / 12)) / 27 // ≈ 12.3457 Cu Yd
   near(r.demoCalc[0].cy, cy)
@@ -86,11 +86,11 @@ test('vendor-first base: a real vendor’s shared-row price overrides the Standa
 })
 
 test('material NO-FALLBACK: an unpriced turf brand / unset demo divisor → $0 (no hidden constant)', () => {
-  const noPrice = run({ rolls: [{ brand: 'Emerald 80', edgeLF: '100', vendor: 'Standard' }] }, { 'Turf - Roll Width FT': 15 }, { 'Turf - Turf Install': 0.01 }, []) // empty catalog
+  const noPrice = run({ rolls: [{ brand: 'Emerald 80', edgeLF: '100', vendor: 'Standard' }] }, { 'Turf - Roll Width FT': 15 }, { 'LAB-451-turf-turf-install': 0.01 }, []) // empty catalog
   assert.equal(noPrice.turfMat, 0, 'no catalog price → $0 turf material')
   assert.equal(noPrice.turfHrs, 15, 'labor still computes from the geometry + rate')
   // Demo now computes Cu Yd straight from geometry (no divisor) — always finite.
-  const demoOnly = run({ demo: { ...demo0, concrete: { sf: '1000', inches: '4', method: 'Skid Steer Good' } } }, {}, { 'Turf - Demo Skid Steer Good': 0.5 })
+  const demoOnly = run({ demo: { ...demo0, concrete: { sf: '1000', inches: '4', method: 'Skid Steer Good' } } }, {}, { 'LAB-445-turf-demo-skid-steer-good': 0.5 })
   const cy = (1000 * (4 / 12)) / 27
   near(demoOnly.demoCalc[0].cy, cy)
   near(demoOnly.demoHrs, cy * 0.5)
@@ -100,7 +100,7 @@ test('sub tab: rolls price as flat $/SF sub cost, NO labor hours, base section s
   const r = run(
     { subType: 'Subcontractor', rolls: [{ brand: 'Emerald 80', installSF: '1000', edgeLF: '0', vendor: 'Standard' }],
       baseRows: [{ material: 'Gravel', type: 'Class II', vendor: 'Standard', sf: '1000' }] },
-    { 'Turf - Roll Width FT': 15, 'Turf - Base Install': 0.005 }, { 'Turf - Turf Install': 0.01 }, TURF,
+    { 'Turf - Roll Width FT': 15, 'Turf - Base Install': 0.005 }, { 'LAB-451-turf-turf-install': 0.01 }, TURF,
     { 'Turf Sub - Install Per SF': 2 }
   )
   assert.equal(r.turfHrs, 0, 'sub tab has no turf labor hours')
@@ -124,7 +124,7 @@ test('no NaN across a populated estimate (demo + base + roll + strip + manual, d
       manualRows: [{ hours: 4, materials: 50, subCost: 0 }],
     },
     { 'Turf - Roll Width FT': 15, 'Turf - Class II Depth In': 3, 'Turf - Base Install': 0.005, 'Turf - Demo Tons Divisor': 100, 'Dump Fee - Concrete': 10, 'Turf - Infill Durafill': 0.5 },
-    { 'Turf - Turf Install': 0.01, 'Turf - Strip Install': 0.08, 'Turf - Demo Hand': 1.5 },
+    { 'LAB-451-turf-turf-install': 0.01, 'LAB-450-turf-strip-install': 0.08, 'LAB-443-turf-demo-hand': 1.5 },
     TURF, {}, shared
   )
   finiteNums(r)
