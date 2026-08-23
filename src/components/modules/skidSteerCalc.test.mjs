@@ -21,8 +21,8 @@ const fullRates = (over = {}) => ({
   'Skid - Grade Fill': 0.018,    // hrs / Sq Ft
   'BAS-005-import-base-skid-steer-ok': 0.018,   // hrs / Cu Ft
   'Skid - Compaction': 0.0033,   // hrs / Cu Ft
-  'Basic Labor - Jumping Jack': 0.01, // shared, hrs / Cu Ft
-  'Basic Labor - Difficulty Ratio': 1, // shared
+  'BAS-006-jumping-jack': 0.01, // shared, hrs / Cu Ft
+  'BAS-007-difficulty-ratio': 1, // shared
   'Demo - Skid - Grass SF': 0.3, // unchanged (per 100 sf·in)
   'Demo - Skid Steer Grass': 0.3,
   'Skid - Shrubs 0-1 ft': 0.09,
@@ -38,7 +38,7 @@ const fullRates = (over = {}) => ({
   'Skid - Tree Medium': 2,
   'Skid - Tree Large': 3,
   // Sub tab (untouched) — per-ton coefficients + shuttle still live in labor_rates
-  'Basic Labor - Concrete Weight lb/cf': 150,
+  'BAS-008-concrete-weight-lb-cf': 150,
   'Demo - Skid Steer Haul Sec/Ft': 1,
   'Demo - Skid Steer Load (CY)': 1,
   ...over,
@@ -126,7 +126,7 @@ test('jumping jack: shared Basic Labor rate × Cu Ft (270 CF × 0.01 = 2.7 hrs)'
   const r = run({ dumpType: 'In House', jjSF: 270, jjDepth: 12 })
   assert.equal(r.jjHrs, 2.7, `jjHrs got ${r.jjHrs}`)
   // NO-FALLBACK: unset shared rate → 0
-  const r0 = run({ dumpType: 'In House', jjSF: 270, jjDepth: 12 }, fullRates({ 'Basic Labor - Jumping Jack': 0 }))
+  const r0 = run({ dumpType: 'In House', jjSF: 270, jjDepth: 12 }, fullRates({ 'BAS-006-jumping-jack': 0 }))
   assert.equal(r0.jjHrs, 0)
 })
 

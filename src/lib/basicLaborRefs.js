@@ -14,4 +14,9 @@ export const BAS = {
   IMPORT_BASE_MINI: 'BAS-003-import-base-mini-skid-steer',
   IMPORT_BASE_SKID_GOOD: 'BAS-004-import-base-skid-steer-good',
   IMPORT_BASE_SKID_OK: 'BAS-005-import-base-skid-steer-ok',
+
+  // Shared demo/Walls coefficients (moved out of labor_rates 'Basic Labor').
+  JUMPING_JACK: 'BAS-006-jumping-jack', // compaction, hrs / Cu Ft (Walls reads by name)
+  DIFFICULTY_RATIO: 'BAS-007-difficulty-ratio',
+  CONCRETE_WEIGHT: 'BAS-008-concrete-weight-lb-cf',
 }

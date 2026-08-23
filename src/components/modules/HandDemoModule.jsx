@@ -532,6 +532,8 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
               { category: 'Demo', sub: 'Hand' },
               { category: 'Demo', sub: 'Disposal' },
               { category: 'Basic Labor', sub: 'Import Base', only: ['Basic Labor - Import Base Hand'] },
+              { category: 'Basic Labor', sub: 'Compaction', only: ['Basic Labor - Jumping Jack'] },
+              { category: 'Basic Labor', sub: 'Coefficients', only: ['Basic Labor - Difficulty Ratio', 'Basic Labor - Concrete Weight lb/cf'] },
             ]}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}

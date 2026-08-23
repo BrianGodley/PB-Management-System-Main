@@ -25,7 +25,7 @@ export function calcDemo(
   // Rates (labor_rates, category Demo). Fixed unit conversions (27 cf/cy,
   // 12 in/ft, 2000 lb/ton, 60 min/hr) stay as literal math.
   const tonsSfInDenom = n(mp['Tons SF-in Denominator']) // shared Basic Materials (Sub tab per-ton)
-  const concreteWeightLbCf = n(lr['Basic Labor - Concrete Weight lb/cf']) // shared Basic Labor (Sub tab / vertical tons)
+  const concreteWeightLbCf = n(lr[BAS.CONCRETE_WEIGHT]) // shared Basic Labor (Sub tab / vertical tons)
   const treeCyFactor = n(mp['Tree CY Factor']) // moved to master material rates
   // Local sfToTons shadows the module helper so the tons denominator is editable.
   const sfToTons = (sf, depthIn) => (n(sf) / tonsSfInDenom) * n(depthIn)
@@ -43,7 +43,7 @@ export function calcDemo(
   const isSub = state.dumpType === 'Subcontractor'
   const isDumpSub = false // disposal follows the In House/Sub toggle
   const lrph = n(laborRatePerHour)
-  const difficultyRatio = n(lr['Basic Labor - Difficulty Ratio']) // shared Basic Labor
+  const difficultyRatio = n(lr[BAS.DIFFICULTY_RATIO]) // shared Basic Labor
   const diff = 1 + (n(state.difficulty) / 100) * difficultyRatio
   const hrsAdj = n(state.hoursAdj)
 
@@ -61,7 +61,7 @@ export function calcDemo(
   const rateGrass = n(lr['Mini - Skid Steer Grass'])
   const laborBase = n(lr[BAS.IMPORT_BASE_MINI])       // hrs / Cu Ft (shared Basic Labor)
   const laborGradeFill = n(lr['Mini - Grade Fill'])   // hrs / Cu Ft
-  const laborJJ = n(lr['Basic Labor - Jumping Jack']) // shared, hrs / Cu Ft
+  const laborJJ = n(lr[BAS.JUMPING_JACK]) // shared, hrs / Cu Ft
   const laborSS = n(lr['Mini - Compaction'])          // hrs / Cu Ft
   const rebarMult = state.rebar ? 1.3 : 1             // Rebar/Mesh toggle: +30% concrete
   // Per-height shrub rates (Each), replacing the base rate × height factor model.

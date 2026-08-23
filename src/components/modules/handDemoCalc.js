@@ -27,7 +27,7 @@ export function calcDemo(
   // Rates (labor_rates, category Demo). Fixed unit conversions (27 cf/cy,
   // 12 in/ft, 2000 lb/ton, 60 min/hr) stay as literal math.
   const tonsSfInDenom = n(mp['Tons SF-in Denominator']) // shared Basic Materials
-  const concreteWeightLbCf = n(lr['Basic Labor - Concrete Weight lb/cf']) // shared Basic Labor
+  const concreteWeightLbCf = n(lr[BAS.CONCRETE_WEIGHT]) // shared Basic Labor
   const treeCyFactor = n(mp['Tree CY Factor'])
   const bucketLaborMult = n(lr['Hand - Bucket Labor Mult'])
   // Local sfToTons shadows the module helper so the tons denominator is editable.
@@ -42,7 +42,7 @@ export function calcDemo(
   const isSub = state.dumpType === 'Subcontractor'
   const isDumpSub = false // disposal follows the In House/Sub toggle
   const lrph = n(laborRatePerHour)
-  const difficultyRatio = n(lr['Basic Labor - Difficulty Ratio']) // shared Basic Labor
+  const difficultyRatio = n(lr[BAS.DIFFICULTY_RATIO]) // shared Basic Labor
   const diff = 1 + (n(state.difficulty) / 100) * difficultyRatio
   const hrsAdj = n(state.hoursAdj)
 
@@ -64,7 +64,7 @@ export function calcDemo(
   const hrFooting = n(lr['Hand - Footing'])     // hrs / Cu Ft
   const hrGradeCut = n(lr['Hand - Grade Cut'])  // hrs / Cu Ft
   const hrGradeFill = n(lr['Hand - Grade Fill']) // hrs / Cu Ft
-  const jjRate = n(lr['Basic Labor - Jumping Jack']) // shared, hrs / Cu Ft
+  const jjRate = n(lr[BAS.JUMPING_JACK]) // shared, hrs / Cu Ft
   // Rebar toggle: concrete demo hours ×(1 + 25%) when rebar present.
   const rebarFactor = state.rebar ? 1 + n(lr['Hand - Rebar']) : 1
   // Per-height shrub rates (Each), replacing the base rate × height factor model.

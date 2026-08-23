@@ -530,6 +530,8 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
               { category: 'Demo', sub: 'Mini Skid Steer' },
               { category: 'Demo', sub: 'Disposal' },
               { category: 'Basic Labor', sub: 'Import Base', only: ['Basic Labor - Import Base Mini Skid Steer'] },
+              { category: 'Basic Labor', sub: 'Compaction', only: ['Basic Labor - Jumping Jack'] },
+              { category: 'Basic Labor', sub: 'Coefficients', only: ['Basic Labor - Difficulty Ratio', 'Basic Labor - Concrete Weight lb/cf'] },
             ]}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}

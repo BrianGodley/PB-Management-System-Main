@@ -549,6 +549,8 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
               { category: 'Demo', sub: 'Skid Steer' },
               { category: 'Demo', sub: 'Disposal' },
               { category: 'Basic Labor', sub: 'Import Base', only: ['Basic Labor - Import Base Skid Steer OK'] },
+              { category: 'Basic Labor', sub: 'Compaction', only: ['Basic Labor - Jumping Jack'] },
+              { category: 'Basic Labor', sub: 'Coefficients', only: ['Basic Labor - Difficulty Ratio', 'Basic Labor - Concrete Weight lb/cf'] },
             ]}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}

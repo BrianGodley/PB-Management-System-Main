@@ -18,15 +18,15 @@ const fullRates = (over = {}) => ({
   'Mini - Grade Fill': 0.03,     // hrs / Cu Ft
   'BAS-003-import-base-mini-skid-steer': 0.035,   // hrs / Cu Ft
   'Mini - Compaction': 0.01,     // hrs / Cu Ft
-  'Basic Labor - Jumping Jack': 0.04, // shared, hrs / Cu Ft
-  'Basic Labor - Difficulty Ratio': 1, // shared
+  'BAS-006-jumping-jack': 0.04, // shared, hrs / Cu Ft
+  'BAS-007-difficulty-ratio': 1, // shared
   'Mini - Grass SF': 0.02, // hrs / Cu Ft
   'Mini - Skid Steer Grass': 0.3,
   'Mini - Shrubs 0-1 ft': 0.09, 'Mini - Shrubs 1-2 ft': 0.12, 'Mini - Shrubs 2-3 ft': 0.18,
   'Mini - Shrubs 3-4 ft': 0.24, 'Mini - Shrubs 4-5 ft': 0.3,
   'Mini - Stump Small': 1, 'Mini - Stump Medium': 2, 'Mini - Stump Large': 3, 'Mini - Stump XL': 4,
   'Mini - Tree Small': 1, 'Mini - Tree Medium': 2, 'Mini - Tree Large': 3,
-  'Basic Labor - Concrete Weight lb/cf': 150,
+  'BAS-008-concrete-weight-lb-cf': 150,
   'Mini - Haul Sec/Ft': 1,
   'Mini - Load (CY)': 1,
   ...over,
