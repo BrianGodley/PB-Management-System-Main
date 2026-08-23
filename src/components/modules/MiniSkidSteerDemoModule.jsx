@@ -480,6 +480,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             onCrewTypeChange={v => set('crewType', v)}
             title="Mini Skid Steer Demo"
             moduleType="Mini Skid Steer Demo"
+            rateScope={[{ category: 'Demo', sub: 'Mini Skid Steer' }, { category: 'Basic Labor' }]}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
             centerSlot={onSwitchType ? (

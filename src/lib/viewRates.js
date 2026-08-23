@@ -101,8 +101,11 @@ export async function buildViewRates(moduleType, scope = null) {
     fetchModuleCatalog(fetchCats),
     qAll('labor_rates', 'id, category, sub_category, name, label, unit, rate'),
     qAll('subcontractor_rates', 'id, category, sub_category, trade, item_key, unit, rate, company_name'),
-    // Misc coefficients / named $ adders — the 4th rate source.
-    q('misc_rates', 'id, category, name, rate, unit'),
+    // Misc coefficients / named $ adders — the 4th rate source. Pulled across all
+    // fetched categories, then filtered by matInScope so a borrowed (category,
+    // sub-category) pair surfaces only ITS OWN misc coefficients (misc now carries
+    // a sub_category, so per-demo coefficients no longer bleed across demos).
+    qAll('misc_rates', 'id, category, sub_category, name, rate, unit'),
     supabase.from('subs_vendors').select('id, company_name'),
   ])
   // A material row is in-scope if its category is a full category, or its exact
@@ -178,7 +181,7 @@ export async function buildViewRates(moduleType, scope = null) {
   // Misc coefficients / named adders — grouped under an "Adjustments" sub-section.
   // misc_rates stores name + rate (no mode column), so these render as plain
   // editable numbers; the name carries the unit hint (e.g. '… per Cu Yd').
-  ;(miscRes.data || []).forEach(r => {
+  ;(miscRes.data || []).filter(r => matInScope(r) && nameAllowed(r.category, r.sub_category, r.name)).forEach(r => {
     const g = ensure(r.category, 'Adjustments')
     g.items.push({
       label: cleanLabel(r.name),
