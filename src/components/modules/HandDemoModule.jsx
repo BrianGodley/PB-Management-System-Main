@@ -42,6 +42,15 @@ const n = v => parseFloat(v) || 0
 
 // ── Default state ─────────────────────────────────────────────────────────────
 
+// A blank Main Demo section — the shape "Add Demo" appends.
+const NEW_DEMO_SECTION = {
+  concSF: '', concDepth: 4, concBucket: false,
+  dirtSF: '', dirtDepth: 4, dirtBucket: false,
+  grassSF: '', grassDepth: 4, grassBucket: false,
+  gradeCutSF: '', gradeCutDepth: 4, gradeCutBucket: false,
+  rebar: false,
+}
+
 const DEFAULT_STATE = {
   access: 'OK',
   dumpType: 'In-House',
@@ -49,7 +58,9 @@ const DEFAULT_STATE = {
   crewType: 'Demo',
   hoursAdj: 0,
   dispType: 'In-House',
-  // Demolition
+  // Demolition — Main Demo is now an array of independent sections (Add Demo).
+  // The flat fields below remain for backward-compat with saved estimates.
+  mainDemoSections: [{ ...NEW_DEMO_SECTION }],
   concSF: '',
   concDepth: 4,
   dirtSF: '',
@@ -187,7 +198,22 @@ function TH({ cols, center }) {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function HandDemoModule({ initialData, onSave, onCancel, onSwitchType }) {
-  const [state, setState] = useState(() => ({ ...DEFAULT_STATE, ...(initialData || {}) }))
+  const [state, setState] = useState(() => {
+    const init = { ...DEFAULT_STATE, ...(initialData || {}) }
+    // Migrate a saved estimate's flat Main Demo fields into a single section.
+    if (initialData && !Array.isArray(initialData.mainDemoSections)) {
+      init.mainDemoSections = [
+        {
+          concSF: initialData.concSF ?? '', concDepth: initialData.concDepth ?? 4, concBucket: !!initialData.concBucket,
+          dirtSF: initialData.dirtSF ?? '', dirtDepth: initialData.dirtDepth ?? 4, dirtBucket: !!initialData.dirtBucket,
+          grassSF: initialData.grassSF ?? '', grassDepth: initialData.grassDepth ?? 4, grassBucket: !!initialData.grassBucket,
+          gradeCutSF: initialData.gradeCutSF ?? '', gradeCutDepth: initialData.gradeCutDepth ?? 4, gradeCutBucket: !!initialData.gradeCutBucket,
+          rebar: !!initialData.rebar,
+        },
+      ]
+    }
+    return init
+  })
 
   // Free-text notes for this module — Sam writes auto-generated
   // takeoffs here via create_estimate_from_takeoff, and the user can
@@ -334,6 +360,27 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
   }, [refreshAllRates])
 
   const set = useCallback((f, v) => setState(p => ({ ...p, [f]: v })), [])
+  // Main Demo sections (Add Demo). Each section is fully independent.
+  const setSection = useCallback(
+    (i, f, v) =>
+      setState(p => ({
+        ...p,
+        mainDemoSections: (p.mainDemoSections || []).map((s, idx) => (idx === i ? { ...s, [f]: v } : s)),
+      })),
+    []
+  )
+  const addDemoSection = useCallback(
+    () => setState(p => ({ ...p, mainDemoSections: [...(p.mainDemoSections || []), { ...NEW_DEMO_SECTION }] })),
+    []
+  )
+  const removeDemoSection = useCallback(
+    i =>
+      setState(p => {
+        const secs = (p.mainDemoSections || []).filter((_, idx) => idx !== i)
+        return { ...p, mainDemoSections: secs.length ? secs : [{ ...NEW_DEMO_SECTION }] }
+      }),
+    []
+  )
   // One-off subcontractor rate for this estimate only (undefined clears it).
   const setOverride = useCallback((name, value) => {
     setState(p => {
@@ -609,114 +656,112 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           <span>{subSectionTitle('MAIN DEMO', isSub)}</span>
         </div>
-        <table className="w-full text-xs">
-          <TH
-            cols={
-              isSelf
-                ? [
-                    { label: '', w: 'w-32' },
-                    { label: 'SF', w: 'w-24' },
-                    { label: 'Depth (in)', w: 'w-20' },
-                    { label: 'Bucket', w: 'w-16' },
-                    { label: 'Cu Yd', w: 'w-16' },
-                    { label: 'Dump Fee', w: 'w-24' },
-                    { label: 'Labor Hrs', w: 'w-20' },
-                  ]
-                : [
-                    { label: '', w: 'w-40' },
-                    { label: 'SF', w: 'w-24' },
-                    { label: 'Depth (in)', w: 'w-20' },
-                    { label: 'Cost', w: 'w-24' },
-                  ]
-            }
-          />
-          <tbody className="divide-y divide-gray-50">
-            {isSelf ? [
-              {
-                label: 'Concrete',
-                sfK: 'concSF',
-                dK: 'concDepth',
-                dep: 4,
-                row: calc.conc,
-                fee: dumpConc,
-                rate: calc.hrConc,
-                rateName: 'Hand - Concrete',
-                rateNote: `${calc.hrConc} hrs/Cu Ft${calc.rebarFactor > 1 ? ' ×rebar' : ''}`,
-                rateUnit: 'Cu Ft per Hour',
-              },
-              {
-                label: 'Soil',
-                sfK: 'dirtSF',
-                dK: 'dirtDepth',
-                dep: 4,
-                row: calc.dirt,
-                fee: dumpDirt,
-                rate: calc.hrSoil,
-                rateName: 'Hand - Soil',
-                rateNote: `${calc.hrSoil} hrs/Cu Ft`,
-                rateUnit: 'Cu Ft per Hour',
-              },
-              {
-                label: 'Grass/Sod',
-                sfK: 'grassSF',
-                dK: 'grassDepth',
-                dep: 4,
-                row: calc.grass,
-                fee: dumpGreen,
-                rate: calc.hrGrass,
-                rateName: 'Hand - Grass',
-                rateNote: `${calc.hrGrass} hrs/Cu Ft`,
-                rateUnit: 'Cu Ft per Hour',
-              },
-              {
-                label: 'Grade Cut',
-                sfK: 'gradeCutSF',
-                dK: 'gradeCutDepth',
-                dep: 4,
-                row: calc.gradeCut,
-                fee: 0,
-                rate: calc.hrGradeCut,
-                rateName: 'Hand - Grade Cut',
-                rateNote: `${calc.hrGradeCut} hrs/Cu Ft`,
-                rateUnit: 'Cu Ft per Hour',
-              },
-            ].map(({ label, sfK, dK, dep, row, rate, rateName, rateNote, rateUnit, extraIcon }) => (
-              <tr key={label}>
-                <td className={`${td} font-medium text-gray-700`}>
-                  <span className="inline-flex items-center gap-1">
-                    {label}
-                    {isSelf && (
-                      <>
-                        <span className="text-gray-400 font-normal text-[10px]">({rateNote})</span>
-                        {extraIcon}
-                      </>
-                    )}
-                  </span>
-                </td>
-                <td className={td}>
-                  <Inp value={state[sfK]} onChange={e => set(sfK, e.target.value)} />
-                </td>
-                <td className={td}>
-                  <Inp
-                    value={state[dK]}
-                    onChange={e => set(dK, e.target.value)}
-                    placeholder={String(dep)}
-                  />
-                </td>
-                <td className={num}>
-                  <input
-                    type="checkbox"
-                    checked={!!state[sfK.replace(/SF$/, 'Bucket')]}
-                    onChange={e => set(sfK.replace(/SF$/, 'Bucket'), e.target.checked)}
-                    className="h-4 w-4"
-                    title="Bucket (confined access)"
-                  />
-                </td>
-                <td className={num}>{row.cy > 0 ? row.cy.toFixed(2) : '—'}</td>
-                {isSelf && <td className={num}>{row.dumpFee > 0 ? fmt2(row.dumpFee) : '—'}</td>}
-                <td className={num}>{fh(row.hours)}</td>
-              </tr>
-            )) : (
+        {isSelf ? (
+          <>
+            {(state.mainDemoSections || []).map((sec, si) => {
+              const sc = (calc.sectionCalcs && calc.sectionCalcs[si]) || {}
+              const rows = [
+                { label: 'Concrete', key: 'conc', sfK: 'concSF', dK: 'concDepth', bK: 'concBucket', rateNote: `${calc.hrConc} hrs/Cu Ft${sec.rebar ? ' ×rebar' : ''}` },
+                { label: 'Soil', key: 'dirt', sfK: 'dirtSF', dK: 'dirtDepth', bK: 'dirtBucket', rateNote: `${calc.hrSoil} hrs/Cu Ft` },
+                { label: 'Grass/Sod', key: 'grass', sfK: 'grassSF', dK: 'grassDepth', bK: 'grassBucket', rateNote: `${calc.hrGrass} hrs/Cu Ft` },
+                { label: 'Grade Cut', key: 'gradeCut', sfK: 'gradeCutSF', dK: 'gradeCutDepth', bK: 'gradeCutBucket', rateNote: `${calc.hrGradeCut} hrs/Cu Ft` },
+              ]
+              return (
+                <div key={si} className="mb-3 border border-gray-100 rounded-lg p-2">
+                  {(state.mainDemoSections || []).length > 1 && (
+                    <div className="flex items-center justify-between px-1 mb-1">
+                      <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                        Demo Area {si + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeDemoSection(si)}
+                        className="text-[11px] text-red-500 hover:text-red-700"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                  <table className="w-full text-xs">
+                    <TH
+                      cols={[
+                        { label: '', w: 'w-32' },
+                        { label: 'SF', w: 'w-24' },
+                        { label: 'Depth (in)', w: 'w-20' },
+                        { label: 'Bucket', w: 'w-16' },
+                        { label: 'Cu Yd', w: 'w-16' },
+                        { label: 'Dump Fee', w: 'w-24' },
+                        { label: 'Labor Hrs', w: 'w-20' },
+                      ]}
+                    />
+                    <tbody className="divide-y divide-gray-50">
+                      {rows.map(({ label, key, sfK, dK, bK, rateNote }) => {
+                        const row = sc[key] || {}
+                        return (
+                          <tr key={label}>
+                            <td className={`${td} font-medium text-gray-700`}>
+                              <span className="inline-flex items-center gap-1">
+                                {label}
+                                <span className="text-gray-400 font-normal text-[10px]">({rateNote})</span>
+                              </span>
+                            </td>
+                            <td className={td}>
+                              <Inp value={sec[sfK]} onChange={e => setSection(si, sfK, e.target.value)} />
+                            </td>
+                            <td className={td}>
+                              <Inp value={sec[dK]} onChange={e => setSection(si, dK, e.target.value)} placeholder="4" />
+                            </td>
+                            <td className={num}>
+                              <input
+                                type="checkbox"
+                                checked={!!sec[bK]}
+                                onChange={e => setSection(si, bK, e.target.checked)}
+                                className="h-4 w-4"
+                                title="Bucket (confined access)"
+                              />
+                            </td>
+                            <td className={num}>{row.cy > 0 ? row.cy.toFixed(2) : '—'}</td>
+                            <td className={num}>{row.dumpFee > 0 ? fmt2(row.dumpFee) : '—'}</td>
+                            <td className={num}>{fh(row.hours)}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                  <div className="mt-2 flex items-center gap-3 px-1">
+                    <label className="inline-flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!sec.rebar}
+                        onChange={e => setSection(si, 'rebar', e.target.checked)}
+                        className="h-4 w-4"
+                      />
+                      <span className="font-medium">Rebar in concrete</span>
+                      <span className="text-gray-400 font-normal">(concrete demo +25% slower)</span>
+                    </label>
+                  </div>
+                </div>
+              )
+            })}
+            <button
+              type="button"
+              onClick={addDemoSection}
+              className="text-xs text-green-700 font-semibold hover:underline mt-1"
+            >
+              + Add Demo
+            </button>
+          </>
+        ) : (
+          <table className="w-full text-xs">
+            <TH
+              cols={[
+                { label: '', w: 'w-40' },
+                { label: 'SF', w: 'w-24' },
+                { label: 'Depth (in)', w: 'w-20' },
+                { label: 'Cost', w: 'w-24' },
+              ]}
+            />
+            <tbody className="divide-y divide-gray-50">
               <tr>
                 <td className={`${td} font-medium text-gray-700`}>Concrete / Dirt / Rock / Paver</td>
                 <td className={td}>
@@ -727,25 +772,8 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
                 </td>
                 <td className={num}>{calc.subDemoCost > 0 ? fmt2(calc.subDemoCost) : '—'}</td>
               </tr>
-            )}
-          </tbody>
-        </table>
-
-        {isSelf && (
-        <div className="mt-3 flex items-center gap-3">
-          <label className="inline-flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={!!state.rebar}
-              onChange={e => set('rebar', e.target.checked)}
-              className="h-4 w-4"
-            />
-            <span className="font-medium">Rebar in concrete</span>
-            <span className="text-gray-400 font-normal">
-              (concrete demo +{Math.round((calc.rebarFactor - 1) * 100) || 25}% slower)
-            </span>
-          </label>
-        </div>
+            </tbody>
+          </table>
         )}
       </div>
 

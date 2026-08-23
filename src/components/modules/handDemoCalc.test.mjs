@@ -63,6 +63,29 @@ test('concrete demo: hours = CF × 0.1 (300 SF × 12in = 300 CF → 30 hrs)', ()
   finiteNums(r)
 })
 
+test('Add Demo: multiple Main Demo sections sum (2 × 30 hrs concrete = 60 hrs)', () => {
+  const one = run({ dumpType: 'In House', concSF: 300, concDepth: 12 })
+  const two = run({
+    dumpType: 'In House',
+    mainDemoSections: [
+      { concSF: 300, concDepth: 12 },
+      { concSF: 300, concDepth: 12 },
+    ],
+  })
+  assert.equal(two.sectionCalcs.length, 2, 'two sections computed')
+  assert.equal(two.laborCost, one.laborCost * 2, 'two sections = twice one section')
+  finiteNums(two)
+})
+
+test('Add Demo: flat state (no sections) still reproduces one-section numbers exactly', () => {
+  const flat = run({ dumpType: 'In House', concSF: 300, concDepth: 12, dirtSF: 200, dirtDepth: 12 })
+  const sectioned = run({
+    dumpType: 'In House',
+    mainDemoSections: [{ concSF: 300, concDepth: 12, dirtSF: 200, dirtDepth: 12 }],
+  })
+  assert.equal(sectioned.laborCost, flat.laborCost, 'one explicit section == flat fallback')
+})
+
 test('bucket checkbox multiplies that row hours by the Bucket coefficient', () => {
   const rates = fullRates({ 'Hand - Bucket Labor Mult': 2 })
   const base = run({ dumpType: 'In House', concSF: 300, concDepth: 12 }, rates)

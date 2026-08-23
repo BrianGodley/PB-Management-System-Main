@@ -54,11 +54,27 @@ export function buildDemoSummary(module, cfg) {
       ? { label, value: `${n(sf).toLocaleString()} Sq Ft`, sub: depth ? `${depth}"` : undefined }
       : null
 
+  // Main Demo is now an array of independent sections (Add Demo). Fall back to
+  // a single section built from the flat fields for older estimates.
+  const demoSections =
+    Array.isArray(d.mainDemoSections) && d.mainDemoSections.length
+      ? d.mainDemoSections
+      : [
+          {
+            concSF: d.concSF, concDepth: d.concDepth, dirtSF: d.dirtSF, dirtDepth: d.dirtDepth,
+            grassSF: d.grassSF, grassDepth: d.grassDepth, gradeCutSF: d.gradeCutSF, gradeCutDepth: d.gradeCutDepth,
+          },
+        ]
+  const multiDemo = demoSections.length > 1
+  const secLabel = (base, i) => (multiDemo ? `${base} (Area ${i + 1})` : base)
+
   const demoRows = [
-    qSF('Concrete', d.concSF, d.concDepth || 4),
-    qSF('Dirt / Rock', d.dirtSF, d.dirtDepth || 6),
+    ...demoSections.flatMap((s, i) => [
+      qSF(secLabel('Concrete', i), s.concSF, s.concDepth || 4),
+      qSF(secLabel('Dirt / Rock', i), s.dirtSF, s.dirtDepth || 6),
+      qSF(secLabel('Grass / Sod', i), s.grassSF, s.grassDepth || 2),
+    ]),
     qSF('Import Base', d.baseSF, d.baseDepth || 4),
-    qSF('Grass / Sod', d.grassSF, d.grassDepth || 2),
   ].filter(Boolean)
 
   const miscFlatRows = (d.miscFlatRows || [])
@@ -90,7 +106,7 @@ export function buildDemoSummary(module, cfg) {
     .filter(Boolean)
 
   const gradeRows = [
-    qSF('Grade Cut', d.gradeCutSF),
+    ...demoSections.map((s, i) => qSF(secLabel('Grade Cut', i), s.gradeCutSF, s.gradeCutDepth)),
     qSF('Grade Fill', d.gradeFillSF),
     qSF('Jumping Jack', d.jjSF),
     cfg.hasSS ? qSF('SS Compact', d.ssCmpSF) : null,
