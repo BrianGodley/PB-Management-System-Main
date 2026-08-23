@@ -3,6 +3,7 @@
 // (whose libs import supabase) are inlined here, kept in sync with lib/materialCatalog +
 // lib/walkAccess. The module's own TIMER_TYPES / RATE_DEFAULTS / computeTimerRow are
 // carried below.
+import { LAB } from '../../lib/laborRefs.js'
 const n = v => parseFloat(v) || 0
 const num = v => { const x = typeof v === 'number' ? v : parseFloat(v); return Number.isFinite(x) ? x : 0 }
 const DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN = 60
@@ -124,12 +125,9 @@ export function calcIrrigation(
   const pace = n(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const isSub = state.subType === 'Subcontractor'
 
-  // Rates from DB with fallbacks
-  // NOTE: handRate / trenchRate are hrs/zone (not zones/hr).
-  // Excel formula: =Vlookup(mode, rateTable, 2) * qty  →  rate × qty = hrs
-  const handRate = n(lr['Irrigation - Hand Zone'])
-  const trenchRate = n(lr['Irrigation - Trench Zone'])
-  const timerHrs = n(lr['Irrigation - Timer Install'])
+  // Per-zone labor (hrs/zone) lives on each ZONE_TYPE (irrigationZones.js) and is
+  // resolved by ref_key inside computeZoneRow. Timer install labor is hrs/each.
+  const timerHrs = n(lr[LAB.IRR_TIMER_INSTALL])
 
   // Live BOM pricing: Standard preferred, else any vendor line (Home-Depot-only items).
   const bomPrice = makeBomPrice(materialRows, mp)
@@ -220,8 +218,6 @@ export function calcIrrigation(
       timerLaborHrs: 0,
       manualHrs: 0,
       walkHrs: 0,
-      handRate,
-      trenchRate,
       timerHrs,
       salesTax: tax,
       matUnset,
@@ -266,8 +262,6 @@ export function calcIrrigation(
     timerLaborHrs,
     manualHrs,
     walkHrs,
-    handRate,
-    trenchRate,
     timerHrs,
     salesTax: tax,
     matUnset,

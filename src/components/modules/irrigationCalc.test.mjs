@@ -1,6 +1,6 @@
 // Acceptance tests for the pure Irrigation calc (no network).
 //   Zone labor: hrs = qty(zones) × per-zone rate (Trench vs Hand read different DB keys).
-//   Timer labor: hrs = qty × 'Irrigation - Timer Install'. All rates hrs-per-unit.
+//   Timer labor: hrs = qty × 'LAB-262-irrigation-timer-install'. All rates hrs-per-unit.
 //   Material (zone BOM + timer) resolves live (vendor-first → Standard); an unpriced
 //   BOM line surfaces in the row's `missing` list and adds $0 (NO-FALLBACK, no constant).
 //   Sub tab: flat $/unit only, zero labor hours, cost routed into subCost.
@@ -22,7 +22,7 @@ const finiteNums = obj => {
 }
 
 test('zone labor value: hrs = qty × per-zone rate (2 lawn zones × 3 hrs = 6 hrs → $450)', () => {
-  const r = run({ zoneRows: [{ type: 'lawn', qty: 2, mode: 'Trench' }] }, { 'Irrigation - Lawn Trench': 3 })
+  const r = run({ zoneRows: [{ type: 'lawn', qty: 2, mode: 'Trench' }] }, { 'LAB-253-irrigation-lawn-trench': 3 })
   assert.equal(r.zoneHrs, 6, `zoneHrs got ${r.zoneHrs}`)
   assert.equal(r.totalHrs, 6, `totalHrs got ${r.totalHrs}`)
   assert.equal(r.laborCost, 6 * LRPH, `laborCost got ${r.laborCost}`)
@@ -30,13 +30,13 @@ test('zone labor value: hrs = qty × per-zone rate (2 lawn zones × 3 hrs = 6 hr
 })
 
 test('zone edit-reflects: raising the per-zone rate raises labor proportionally', () => {
-  const a = run({ zoneRows: [{ type: 'lawn', qty: 2, mode: 'Trench' }] }, { 'Irrigation - Lawn Trench': 3 })
-  const b = run({ zoneRows: [{ type: 'lawn', qty: 2, mode: 'Trench' }] }, { 'Irrigation - Lawn Trench': 6 })
+  const a = run({ zoneRows: [{ type: 'lawn', qty: 2, mode: 'Trench' }] }, { 'LAB-253-irrigation-lawn-trench': 3 })
+  const b = run({ zoneRows: [{ type: 'lawn', qty: 2, mode: 'Trench' }] }, { 'LAB-253-irrigation-lawn-trench': 6 })
   assert.equal(b.laborCost, a.laborCost * 2, 'rate ×2 → labor ×2')
 })
 
 test('zone mode independence: Trench vs Hand read different rate keys', () => {
-  const rates = { 'Irrigation - Lawn Trench': 3, 'Irrigation - Lawn Hand': 9 }
+  const rates = { 'LAB-253-irrigation-lawn-trench': 3, 'LAB-252-irrigation-lawn-hand': 9 }
   const t = run({ zoneRows: [{ type: 'lawn', qty: 1, mode: 'Trench' }] }, rates)
   const h = run({ zoneRows: [{ type: 'lawn', qty: 1, mode: 'Hand' }] }, rates)
   assert.equal(t.zoneHrs, 3, 'Trench uses the Trench rate')
@@ -44,7 +44,7 @@ test('zone mode independence: Trench vs Hand read different rate keys', () => {
 })
 
 test('timer labor value: hrs = qty × Timer Install rate (2 × 1.5 = 3 hrs → $225)', () => {
-  const r = run({ timerRows: [{ type: 'timer4', qty: 2 }] }, { 'Irrigation - Timer Install': 1.5 })
+  const r = run({ timerRows: [{ type: 'timer4', qty: 2 }] }, { 'LAB-262-irrigation-timer-install': 1.5 })
   assert.equal(r.timerLaborHrs, 3, `timerLaborHrs got ${r.timerLaborHrs}`)
   assert.equal(r.laborCost, 3 * LRPH, `laborCost got ${r.laborCost}`)
 })
@@ -54,7 +54,7 @@ test('timer MATERIAL value: a priced timer resolves material by its catalog desc
   // an exact-string lookup of matKey in the Standard price map (materialPrices), which is
   // keyed by the catalog item's `description` = 'Timer - N Station' (sub_category
   // Controllers) — NOT 'Irrigation Timer - N Station'. A mismatched key silently yields $0.
-  const r = run({ timerRows: [{ vendor: 'Standard', type: 'timer4', qty: 2 }] }, { 'Irrigation - Timer Install': 1 }, { 'Timer - 4 Station': 200 })
+  const r = run({ timerRows: [{ vendor: 'Standard', type: 'timer4', qty: 2 }] }, { 'LAB-262-irrigation-timer-install': 1 }, { 'Timer - 4 Station': 200 })
   assert.equal(r.rawMat, 400, `timer rawMat got ${r.rawMat} — timer material did not resolve`)
   assert.ok(r.totalMat > r.rawMat, 'sales tax is applied on top of raw timer material')
 })
@@ -77,7 +77,7 @@ test('labor no-fallback: unset zone/timer rates → 0 hours (no hidden constant)
 })
 
 test('unpriced / NO-FALLBACK: a zone with no resolvable BOM prices flags every line in `missing` and adds $0', () => {
-  const r = run({ zoneRows: [{ type: 'lawn', qty: 1, mode: 'Trench' }] }, { 'Irrigation - Lawn Trench': 3 }, {}, [])
+  const r = run({ zoneRows: [{ type: 'lawn', qty: 1, mode: 'Trench' }] }, { 'LAB-253-irrigation-lawn-trench': 3 }, {}, [])
   const row = r.zoneCalc[0]
   assert.ok((row.missing || []).length > 0, `expected missing BOM lines; got ${JSON.stringify(row.missing)}`)
   assert.equal(row.unitPrice, 0, 'no resolvable price → $0 unit (no constant)')
@@ -85,7 +85,7 @@ test('unpriced / NO-FALLBACK: a zone with no resolvable BOM prices flags every l
 })
 
 test('sub tab: flat $/unit only, zero labor hours, cost routed into subCost', () => {
-  const r = run({ subType: 'Subcontractor', zoneRows: [{ type: 'lawn', qty: 2, mode: 'Trench', subEach: 100 }] }, { 'Irrigation - Lawn Trench': 3 })
+  const r = run({ subType: 'Subcontractor', zoneRows: [{ type: 'lawn', qty: 2, mode: 'Trench', subEach: 100 }] }, { 'LAB-253-irrigation-lawn-trench': 3 })
   assert.equal(r.totalHrs, 0, 'sub tab has no labor hours')
   assert.equal(r.laborCost, 0, 'sub tab has no labor cost')
   assert.equal(r.subCost, 200, `subCost = 2 × $100 = $200; got ${r.subCost}`)
@@ -98,7 +98,7 @@ test('material NO-FALLBACK surfacing: unpriced zone BOM + unpriced timer flag in
   // module can prompt (name-based → saveStandardNamedRate write-back).
   const r = run(
     { zoneRows: [{ type: 'lawn', qty: 1, mode: 'Trench' }], timerRows: [{ vendor: 'Standard', type: 'timer4', qty: 1 }] },
-    { 'Irrigation - Lawn Trench': 3, 'Irrigation - Timer Install': 1 },
+    { 'LAB-253-irrigation-lawn-trench': 3, 'LAB-262-irrigation-timer-install': 1 },
     {},
     []
   )
@@ -110,7 +110,7 @@ test('material NO-FALLBACK surfacing: unpriced zone BOM + unpriced timer flag in
 test('material matUnset is empty on the Sub tab (flat pricing, not catalog-resolved)', () => {
   const r = run(
     { subType: 'Subcontractor', zoneRows: [{ type: 'lawn', qty: 1, mode: 'Trench', subEach: 50 }], timerRows: [{ type: 'timer4', qty: 1, subEach: 100 }] },
-    { 'Irrigation - Lawn Trench': 3 },
+    { 'LAB-253-irrigation-lawn-trench': 3 },
     {},
     []
   )
@@ -125,7 +125,7 @@ test('no NaN across a populated estimate (zones + timers + manual)', () => {
       manualRows: [{ hours: 4, materials: 50, subCost: 0 }],
       distanceLF: 120,
     },
-    { 'Irrigation - Lawn Trench': 3, 'Irrigation - Timer Install': 1.5 }
+    { 'LAB-253-irrigation-lawn-trench': 3, 'LAB-262-irrigation-timer-install': 1.5 }
   )
   finiteNums(r)
   assert.ok(r.price >= 0, 'price is a non-negative number')

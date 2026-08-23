@@ -6,6 +6,7 @@
 // descriptions by a normalized (case/spacing/punctuation-insensitive) key.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { LAB } from './laborRefs.js'
 const n = v => parseFloat(v) || 0
 
 // Catalog product descriptions.
@@ -34,8 +35,8 @@ export const ZONE_TYPES = [
     key: 'planterSpray',
     label: 'Planter Spray Zone',
     defaultMode: 'Hand',
-    laborTrench: 'Irrigation - Planter Spray Trench',
-    laborHand: 'Irrigation - Planter Spray Hand',
+    laborTrench: LAB.IRR_PLANTER_SPRAY_TRENCH,
+    laborHand: LAB.IRR_PLANTER_SPRAY_HAND,
     bom: [
       { name: P.PIPE, qty: 200 }, { name: P.VALVE, qty: 1 }, { name: P.NOZZLE, qty: 16 },
       { name: P.ELBOW, qty: 20 }, { name: P.COUPLING, qty: 10 }, { name: P.SWING, qty: 14 },
@@ -46,8 +47,8 @@ export const ZONE_TYPES = [
     key: 'lawn',
     label: 'Lawn Zone (≤ 1,000 Sq Ft)',
     defaultMode: 'Trench',
-    laborTrench: 'Irrigation - Lawn Trench',
-    laborHand: 'Irrigation - Lawn Hand',
+    laborTrench: LAB.IRR_LAWN_TRENCH,
+    laborHand: LAB.IRR_LAWN_HAND,
     bom: [
       { name: P.PIPE, qty: 225 }, { name: P.VALVE, qty: 1 }, { name: P.NOZZLE, qty: 14 },
       { name: P.ELBOW, qty: 20 }, { name: P.COUPLING, qty: 10 }, { name: P.SWING, qty: 14 },
@@ -59,7 +60,7 @@ export const ZONE_TYPES = [
     label: 'Hillside Spray Zone',
     defaultMode: 'Hand',
     laborTrench: null,
-    laborHand: 'Irrigation - Hillside Hand',
+    laborHand: LAB.IRR_HILLSIDE_HAND,
     bom: [
       { name: P.PIPE, qty: 350 }, { name: P.VALVE, qty: 1 }, { name: P.ELBOW, qty: 20 },
       { name: P.COUPLING, qty: 10 }, { name: P.RISER18, qty: 6 }, { name: P.ROTATOR, qty: 8 },
@@ -70,8 +71,8 @@ export const ZONE_TYPES = [
     key: 'dripPlant',
     label: '1/8" Plant Drip Zone',
     defaultMode: 'Trench',
-    laborTrench: 'Irrigation - Plant Drip Trench',
-    laborHand: 'Irrigation - Plant Drip Hand',
+    laborTrench: LAB.IRR_PLANT_DRIP_TRENCH,
+    laborHand: LAB.IRR_PLANT_DRIP_HAND,
     bom: [
       { name: P.PIPE, qty: 100 }, { name: P.VALVE, qty: 1 }, { name: P.ELBOW, qty: 10 },
       { name: P.COUPLING, qty: 6 }, { name: P.MAINDRIP, qty: 200 }, { name: P.EMITTER, qty: 40 },
@@ -82,8 +83,8 @@ export const ZONE_TYPES = [
     key: 'dripline',
     label: 'Netafim Drip Hose Zone',
     defaultMode: 'Trench',
-    laborTrench: 'Irrigation - Netafim Drip Trench',
-    laborHand: 'Irrigation - Netafim Drip Hand',
+    laborTrench: LAB.IRR_NETAFIM_TRENCH,
+    laborHand: LAB.IRR_NETAFIM_HAND,
     bom: [
       { name: P.PIPE, qty: 100 }, { name: P.VALVE, qty: 1 }, { name: P.ELBOW, qty: 10 },
       { name: P.COUPLING, qty: 6 }, { name: P.NETAFIM, qty: 275 }, { name: P.WIRE, qty: 75 },
@@ -93,8 +94,8 @@ export const ZONE_TYPES = [
     key: 'subterranean',
     label: 'Subterranean Drip (≤ 1,000 Sq Ft)',
     defaultMode: 'Trench',
-    laborTrench: 'Irrigation - Subterranean Drip Trench',
-    laborHand: 'Irrigation - Subterranean Drip Hand',
+    laborTrench: LAB.IRR_SUBTERRANEAN_TRENCH,
+    laborHand: LAB.IRR_SUBTERRANEAN_HAND,
     bom: [
       { name: P.PIPE, qty: 100 }, { name: P.VALVE, qty: 1 }, { name: P.ELBOW, qty: 10 },
       { name: P.COUPLING, qty: 6 }, { name: P.COPPER, qty: 1050 }, { name: P.WIRE, qty: 75 },

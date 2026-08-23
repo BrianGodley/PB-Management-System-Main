@@ -71,11 +71,11 @@ test('LABOR NO-FALLBACK: a plant whose install rate is unset → 0 hrs + 0 mater
 })
 
 test('till labor: hrs = soilCY×move + sqft×till + sqft×amend, guarded (drop one rate → 0 till hrs)', () => {
-  const rates = { 'Till - Soil Move Rate': 1, 'Till - Tilling Rate': 0.1, 'Till - Amend Rate': 0.1 }
+  const rates = { 'LAB-435-till-soil-move-rate': 1, 'LAB-436-till-tilling-rate': 0.1, 'LAB-434-till-amend-rate': 0.1 }
   const full = run({ tillSqft: '100' }, rates)
   // soilCY = 100×0.167/27 = 0.6185…; hrs = 0.6185×1 + 100×0.1 + 100×0.1 ≈ 20.6185
   assert.ok(Math.abs(full.tillHrs - (((100 * 0.167) / 27) * 1 + 100 * 0.1 + 100 * 0.1)) < 1e-9, `tillHrs got ${full.tillHrs}`)
-  const missing = run({ tillSqft: '100' }, { 'Till - Soil Move Rate': 1, 'Till - Tilling Rate': 0.1 }) // amend unset
+  const missing = run({ tillSqft: '100' }, { 'LAB-435-till-soil-move-rate': 1, 'LAB-436-till-tilling-rate': 0.1 }) // amend unset
   assert.equal(missing.tillHrs, 0, 'any unset till rate → 0 till hrs (no partial fallback)')
 })
 
@@ -101,7 +101,7 @@ test('no NaN across a populated estimate (till + plants + add-on + manual + yard
       yardCheck: { enabled: true, hours: '3', pct: '2' },
       distanceLF: '120',
     },
-    { 'Plant - 5 Gallon': 0.5, 'Tree Stakes - Install Rate': 0.25, 'Till - Soil Move Rate': 1, 'Till - Tilling Rate': 0.1, 'Till - Amend Rate': 0.1 },
+    { 'Plant - 5 Gallon': 0.5, 'Tree Stakes - Install Rate': 0.25, 'LAB-435-till-soil-move-rate': 1, 'LAB-436-till-tilling-rate': 0.1, 'LAB-434-till-amend-rate': 0.1 },
     { 'Tree Stake': 10 },
     [PLANT]
   )

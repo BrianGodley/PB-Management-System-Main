@@ -2,6 +2,7 @@
 // without React/Supabase. Logic identical. calcWalkAccessLabor (lib/walkAccess) and the
 // catalog resolvers resolveMaterialPrice/catalogItemFor (lib/materialCatalog) both
 // transitively import supabase, so their pure bodies are inlined here and kept in sync.
+import { LAB } from '../../lib/laborRefs.js'
 const n = v => parseFloat(v) || 0
 const num = v => { const x = typeof v === 'number' ? v : parseFloat(v); return Number.isFinite(x) ? x : 0 }
 const DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN = 60
@@ -133,9 +134,9 @@ export function calcPlanting(
   // Till and Amend
   const sqft = n(tillSqft)
   const soilCY = (sqft * 0.167) / 27
-  const soilMoveRate = lr(laborRates, 'Till - Soil Move Rate')
-  const tillingRate = lr(laborRates, 'Till - Tilling Rate')
-  const amendRate = lr(laborRates, 'Till - Amend Rate')
+  const soilMoveRate = lr(laborRates, LAB.TILL_SOIL_MOVE)
+  const tillingRate = lr(laborRates, LAB.TILL_TILLING)
+  const amendRate = lr(laborRates, LAB.TILL_AMEND)
   // Till rates are hours per unit (hrs/CY, hrs/SF), so hours = measure × rate.
   const tillHrs =
     sqft > 0 && soilMoveRate > 0 && tillingRate > 0 && amendRate > 0

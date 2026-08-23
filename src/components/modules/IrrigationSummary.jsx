@@ -11,6 +11,7 @@
 import FinancialSummaryList from './FinancialSummaryList'
 import { resolveMaterialPrice } from '../../lib/materialCatalog'
 import { ZONE_TYPES, computeZoneRow, makeBomPrice } from '../../lib/irrigationZones'
+import { LAB } from '../../lib/laborRefs.js'
 
 const TIMER_TYPES = [
   { key: 'timer4', label: '4 Station', matKey: 'Timer - 4 Station' },
@@ -76,7 +77,7 @@ export default function IrrigationSummary({ module }) {
   const vendorNames = data.vendorNames || {}
   const savedCalc = data.calc || {}
 
-  const timerHrs = n(lr['Irrigation - Timer Install'])
+  const timerHrs = n(lr[LAB.IRR_TIMER_INSTALL])
   const bomPrice = makeBomPrice(materialRows, mp)
 
   const zoneRows = tab.zoneRows || legacyZoneRows(tab)
