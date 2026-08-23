@@ -194,13 +194,11 @@ export function calcGroundTreatments(
   // coefficient rows in View Rates (labor_rates, category Ground Treatments).
   // Fixed unit conversions (27 cf/cy, 12 in/ft) stay as literal math.
   const mulchCoverageSfDay = p('GT - Mulch Coverage')
-  const stepperSfPerTon = p('GT - Steppers SF Per Ton')
-  const dgTonsDenom = p('GT - DG Tons Denominator')
-  const dgRemovalSwell = p('GT - DG Removal Swell')
+  // Steppers + DG are now priced per Sq Ft / Cu Yd (tons removed). The DG labor +
+  // cement coefficients hold per-Cu-Yd values now; their keys are frozen so the
+  // reads are unchanged (values were converted in the tons-removal migration).
   const dgCoverageSfDay = p('GT - DG Cleanup Coverage')
-  const dgCementLaborFactor = p('GT - DG Cement Labor Factor')
-  const dgMaterialMarkup = p('GT - DG Material Markup')
-  const dgPlacementPerTon = p('GT - DG Placement Labor per Ton')
+  const dgCementLaborFactor = p('GT - DG Cement Labor Factor') // now per Cu Yd
   const aggregateRemovalSwell = p('GT - Aggregate Removal Swell')
 
   let totalMat = 0
@@ -358,13 +356,11 @@ export function calcGroundTreatments(
     stepLines.forEach(ln => {
       if (!(n(ln.sf) > 0)) return
       const opt = rowOpt('Steppers', { vendor: _sv[ln.key], type: _st[ln.key] || ln.defType }, [])
-      const perTon = opt.fallback
+      const perSf = opt.fallback // now $/Sq Ft (was $/ton ÷ SF-per-ton)
       // hrs-per-unit: stepper labor is hrs per Sq Ft (standardized 2026-08-18, was SF/day).
       const sfPerDay = p(ln.labRate.dbName)
       const lab = n(ln.sf) * sfPerDay
-      // Guard the divisor: an unset 'GT - Steppers SF Per Ton' ⇒ 0 material (no fallback,
-      // never Infinity). Matches the demoTonsDivisor / sfPerBag guards elsewhere.
-      const mat = stepperSfPerTon > 0 ? (n(ln.sf) / stepperSfPerTon) * perTon : 0
+      const mat = n(ln.sf) * perSf
       stepLab += lab
       stepMat += mat
       if (ln.bucket === 'flag') {
@@ -386,28 +382,24 @@ export function calcGroundTreatments(
     ;(dgRows || []).forEach(r => {
       if (!(n(r.sf) > 0)) return
       if (!r.type) return
-      // Guard the divisor: an unset 'GT - DG Tons Denominator' ⇒ 0 tons (no Infinity); DG
-      // labor/cement scale off tons, so an unset coefficient contributes 0, not NaN.
-      const tons = dgTonsDenom > 0 ? (n(r.sf) * n(r.depth)) / dgTonsDenom : 0
-      // DG MATERIAL is now priced per CUBIC YARD (company-wide base-aggregate
-      // change): material $ = CY × $/CY. Volume in CY uses the fixed unit math
-      // (27 cf/cy × 12 in/ft → SF × depth_in / 324). `tons` is retained ONLY for
-      // labor (excavation/placement) and the per-ton Cement Mix add-on — both
-      // unchanged — so dgTonsDenom is still in use (harmless if it were unused).
+      // DG is fully per CUBIC YARD now (tons removed). CY = SF × depth_in / 324
+      // (27 cf/cy × 12 in/ft, fixed). Excavation/placement/cement labor + the
+      // Cement Mix add-on all scale off CY — their coefficients hold per-Cu-Yd
+      // values (converted value-preserving in the tons-removal migration).
       const CY = (n(r.sf) * (n(r.depth) / 12)) / 27
       const cement = r.cement === 'Yes'
       const dgt = rowOpt('DG', r, [])
+      // DG labor = Cu Yd × method rate (Hand/Machine spread) + cleanup. One
+      // spreading line — the old Removal Swell multiplier + separate Placement
+      // line were a double-charge and have been removed.
       const baseHrs =
         r.method === 'Hand'
-          ? tons * dgRemovalSwell * dgHandRate + n(r.sf) * dgCoverageSfDay + tons * dgPlacementPerTon
-          : tons * dgRemovalSwell * dgMachineRate + n(r.sf) * dgCoverageSfDay + tons * dgPlacementPerTon
-      dgLab += baseHrs + (cement ? tons * dgCementLaborFactor : 0)
+          ? CY * dgHandRate + n(r.sf) * dgCoverageSfDay
+          : CY * dgMachineRate + n(r.sf) * dgCoverageSfDay
+      dgLab += baseHrs + (cement ? CY * dgCementLaborFactor : 0)
       dgMat +=
-        (CY * dgt.fallback +
-          (cement
-            ? tons * p(GT_RATES.dgCementPerTon.dbName)
-            : 0)) *
-        dgMaterialMarkup
+        CY * dgt.fallback +
+        (cement ? CY * p(GT_RATES.dgCementPerTon.dbName) : 0)
       if (r.weedFabric === 'Yes') {
         dgMat += n(r.sf) * p(GT_RATES.gravelFabricMat.dbName)
         dgLab += n(r.sf) * p(GT_RATES.gravelFabricLab.dbName)

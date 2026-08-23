@@ -49,16 +49,16 @@ test('turf edit-reflects: raising the install rate raises turf labor proportiona
   assert.equal(b.turfHrs, a.turfHrs * 2, 'rate ×2 → turf hrs ×2')
 })
 
-test('demo value: tons = (SF / divisor) × inches; hrs = tons × method rate; mat = tons × dump fee', () => {
+test('demo value: cy = SF × in/324; hrs = cy × method rate (hrs/CY); mat = cy × dump fee ($/CY)', () => {
   const r = run(
     { demo: { ...demo0, concrete: { sf: '1000', inches: '4', method: 'Skid Steer Good' } } },
-    { 'Turf - Demo Tons Divisor': 100, 'Dump Fee - Concrete': 10 },
+    { 'Dump Fee - Concrete': 10 },
     { 'Turf - Demo Skid Steer Good': 0.5 }
   )
-  // tons = (1000/100) × 4 = 40; hrs = 40 × 0.5 = 20; mat = 40 × 10 = 400
-  assert.equal(r.demoCalc[0].tons, 40, `demo tons got ${r.demoCalc[0].tons}`)
-  assert.equal(r.demoHrs, 20, `demoHrs got ${r.demoHrs}`)
-  assert.equal(r.demoCalc[0].mat, 400, `demo mat got ${r.demoCalc[0].mat}`)
+  const cy = (1000 * (4 / 12)) / 27 // ≈ 12.3457 Cu Yd
+  near(r.demoCalc[0].cy, cy)
+  near(r.demoHrs, cy * 0.5)
+  near(r.demoCalc[0].mat, cy * 10)
 })
 
 test('base Gravel value: qty (Cu Yd) = SF × depth/12 ÷ 27; hrs = SF × install; mat = qty × Type price', () => {
@@ -89,9 +89,11 @@ test('material NO-FALLBACK: an unpriced turf brand / unset demo divisor → $0 (
   const noPrice = run({ rolls: [{ brand: 'Emerald 80', edgeLF: '100', vendor: 'Standard' }] }, { 'Turf - Roll Width FT': 15 }, { 'Turf - Turf Install': 0.01 }, []) // empty catalog
   assert.equal(noPrice.turfMat, 0, 'no catalog price → $0 turf material')
   assert.equal(noPrice.turfHrs, 15, 'labor still computes from the geometry + rate')
-  const noDiv = run({ demo: { ...demo0, concrete: { sf: '1000', inches: '4', method: 'Skid Steer Good' } } }, {}, { 'Turf - Demo Skid Steer Good': 0.5 })
-  assert.equal(noDiv.demoCalc[0].tons, 0, 'unset demo divisor → 0 tons (no constant)')
-  assert.equal(noDiv.demoHrs, 0, 'no tons → 0 demo hours')
+  // Demo now computes Cu Yd straight from geometry (no divisor) — always finite.
+  const demoOnly = run({ demo: { ...demo0, concrete: { sf: '1000', inches: '4', method: 'Skid Steer Good' } } }, {}, { 'Turf - Demo Skid Steer Good': 0.5 })
+  const cy = (1000 * (4 / 12)) / 27
+  near(demoOnly.demoCalc[0].cy, cy)
+  near(demoOnly.demoHrs, cy * 0.5)
 })
 
 test('sub tab: rolls price as flat $/SF sub cost, NO labor hours, base section suppressed', () => {

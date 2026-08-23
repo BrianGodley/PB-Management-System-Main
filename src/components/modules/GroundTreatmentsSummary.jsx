@@ -440,14 +440,11 @@ export default function GroundTreatmentsSummary({ module }) {
   // summary computes labor identically to GroundTreatmentsModule — pure qty×rate,
   // no divide-by-production-rate, no ×8, no hardcoded 200/1.62/1000/1.25/1.1.
   const mulchCoverageSfDay = mp('GT - Mulch Coverage')
-  const dgTonsDenom = mp('GT - DG Tons Denominator')
-  const dgRemovalSwell = mp('GT - DG Removal Swell')
+  // Steppers + DG now price per Sq Ft / Cu Yd (tons removed). DG labor + cement
+  // coefficients hold per-Cu-Yd values; keys frozen (values converted in migration).
   const dgCoverageSfDay = mp('GT - DG Cleanup Coverage')
-  const dgCementLaborFactor = mp('GT - DG Cement Labor Factor')
-  const dgMaterialMarkup = mp('GT - DG Material Markup')
-  const dgPlacementPerTon = mp('GT - DG Placement Labor per Ton')
+  const dgCementLaborFactor = mp('GT - DG Cement Labor Factor') // now per Cu Yd
   const aggregateRemovalSwell = mp('GT - Aggregate Removal Swell')
-  const stepperSfPerTon = mp('GT - Steppers SF Per Ton')
   let _mulchDeliveryDone = false
   const mulchLines = _mulchRows
     .map((r, i) => {
@@ -496,25 +493,21 @@ export default function GroundTreatmentsSummary({ module }) {
   const dgLines = _dgRows
     .map((r, i) => {
       if (!(n(r.sf) > 0)) return null
-      // Guard the divisor: an unset 'GT - DG Tons Denominator' ⇒ 0 tons (no Infinity/NaN;
-      // Infinity × an unset coeff would otherwise render "NaN hrs"). Mirrors the calc guard.
-      const tons = dgTonsDenom > 0 ? (n(r.sf) * n(r.depth)) / dgTonsDenom : 0
-      // DG MATERIAL priced per CUBIC YARD (mirrors the module): material $ =
-      // CY × $/CY. CY = SF × depth_in / 324 (27 cf/cy × 12 in/ft). `tons` is kept
-      // only for labor and the per-ton Cement Mix add-on.
+      // DG fully per Cu Yd (mirrors the module; tons removed). CY = SF × depth_in /
+      // 324 (27 cf/cy × 12 in/ft). Excavation/placement/cement all scale off CY.
       const CY = (n(r.sf) * (n(r.depth) / 12)) / 27
       const cement = r.cement === 'Yes'
       const fabric = r.weedFabric === 'Yes'
       const perCY = priceForRow('DG', r, DG_TYPES, 0)
-      const matBase =
+      let mat =
         CY * perCY +
-        (cement ? tons * mp(GT_RATES.dgCementPerTon.dbName) : 0)
-      let mat = matBase * dgMaterialMarkup
+        (cement ? CY * mp(GT_RATES.dgCementPerTon.dbName) : 0)
+      // DG labor = Cu Yd × method rate + cleanup (swell + placement removed).
       const baseHrs =
         r.method === 'Hand'
-          ? tons * dgRemovalSwell * dgHandRate + n(r.sf) * dgCoverageSfDay + tons * dgPlacementPerTon
-          : tons * dgRemovalSwell * dgMachineRate + n(r.sf) * dgCoverageSfDay + tons * dgPlacementPerTon
-      let hrs = baseHrs + (cement ? tons * dgCementLaborFactor : 0)
+          ? CY * dgHandRate + n(r.sf) * dgCoverageSfDay
+          : CY * dgMachineRate + n(r.sf) * dgCoverageSfDay
+      let hrs = baseHrs + (cement ? CY * dgCementLaborFactor : 0)
       if (fabric) {
         mat += n(r.sf) * mp(GT_RATES.gravelFabricMat.dbName)
         hrs += n(r.sf) * mp(GT_RATES.gravelFabricLab.dbName)
@@ -699,24 +692,23 @@ export default function GroundTreatmentsSummary({ module }) {
   ]
   stepperDefs.forEach(def => {
     if (def.sf <= 0) return
-    const tons = stepperSfPerTon > 0 ? def.sf / stepperSfPerTon : 0
     const savedType = _stepperType[def.key]
     const savedVendor = _stepperVendor[def.key]
     const legacyRate = n(def.matOverride) || mp(def.matRate.dbName)
     // New saves resolve the picked Vendor+Type via the material_rates snapshot;
-    // Standard / old saves keep the legacy per-stone rate.
+    // Standard / old saves keep the legacy per-stone rate. Rate is now $/Sq Ft.
     const rate =
       savedType != null
         ? priceForRow('Steppers', { type: savedType, vendor: savedVendor }, STEPPER_TYPES, legacyRate)
         : legacyRate
     const sfPerDay = mp(def.labRate.dbName)
-    const mat = tons * rate
+    const mat = n(def.sf) * rate // now SF × $/Sq Ft (tons removed)
     const hrs = n(def.sf) * sfPerDay // hrs-per-unit (hrs per Sq Ft), matches module
     const typeSuffix = savedType && savedType !== def.houseType ? ` · ${savedType}` : ''
     stepperLines.push({
       label: `${def.label} — ${def.sf.toLocaleString()} Sq Ft`,
       value: fmt2(mat),
-      sub: `${hrs.toFixed(2)} hrs · ${tons.toFixed(2)} Tons · ${fmt2(rate)} per Tons${typeSuffix}`,
+      sub: `${hrs.toFixed(2)} hrs · ${def.sf.toLocaleString()} Sq Ft · ${fmt2(rate)} per Sq Ft${typeSuffix}`,
     })
   })
 

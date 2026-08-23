@@ -78,17 +78,17 @@ test('sod + fertilizer: sod mat = SF × $/SF; fertilizer bags = ceil(SF / SF-per
   assert.equal(r.fertMat ?? r.totalMat - r.sodMat, 75, `fert bags/material off (totalMat ${r.totalMat})`)
 })
 
-test('DG value: material = (CY × $/CY) × markup; labor scales with tons + coverage', () => {
+test('DG value: material = CY × $/CY; labor = CY × method rate + SF × cleanup', () => {
   const mp = {
-    'GT - DG Tons Denominator': 2000, 'GT - DG Removal Swell': 1.2, 'GT - DG Cleanup Coverage': 0.01,
-    'GT - DG Placement Labor per Ton': 0.3, 'GT - DG Material Markup': 1.1, 'DG - Machine Labor Rate': 0.5,
+    'GT - DG Cleanup Coverage': 0.01, 'DG - Machine Labor Rate': 0.5,
   }
   const r = run(
     { dgRows: [{ sf: '100', depth: '2', type: 'DG Gold', method: 'Machine', cement: 'No', weedFabric: 'No' }] },
     mp, [row('DG Gold', 'DG', 60)]
   )
-  near(r.dgMat, CY(100, 2) * 60 * 1.1) // material priced per Cu Yd × markup
-  assert.ok(r.dgLab > 0, 'DG labor computes from tons + coverage + placement')
+  const cy = CY(100, 2)
+  near(r.dgMat, cy * 60) // material priced per Cu Yd (markup removed)
+  near(r.dgLab, cy * 0.5 + 100 * 0.01) // method rate × CY + cleanup (swell + placement removed)
 })
 
 test('gravel value: material = CY × $/CY (no fabric); labor = CY × swell × machine rate', () => {
@@ -128,20 +128,20 @@ test('sub tab: flat $/SF (and $/LF for edging) per section, no in-house hours/ma
   finiteNums(r)
 })
 
-test('divisor guard (regression): unset "Steppers SF Per Ton" / "DG Tons Denominator" → 0, not Infinity/NaN', () => {
-  // Filling stepper/DG areas while these tunable coefficients are unset used to divide by 0
-  // and render NaN/Infinity (caught by the e2e). The guard makes an unset divisor contribute 0.
+test('tons removed: steppers price per Sq Ft, DG per Cu Yd (no divisor, always finite)', () => {
+  // Steppers now price SF × $/Sq Ft directly (no SF-per-ton divisor). 100 SF × $300/SF.
   const step = run(
     { flagstoneSoilSF: '100', stepperVendor: { flagSoil: 'Standard' }, stepperType: { flagSoil: 'Flagstone' } },
-    { 'Flagstone Steppers - Soil Labor': 0.1 }, // GT - Steppers SF Per Ton intentionally unset
+    { 'Flagstone Steppers - Soil Labor': 0.1 },
     [row('Flagstone', 'Steppers', 300)]
   )
   assert.ok(Number.isFinite(step.totalMat), `stepper totalMat must be finite; got ${step.totalMat}`)
-  assert.equal(step.flagMat, 0, 'unset Steppers SF Per Ton → $0 stepper material (no Infinity)')
+  assert.equal(step.flagMat, 100 * 300, `stepper material = SF × $/SF; got ${step.flagMat}`)
 
+  // DG has no tons denominator anymore; all values compute off Cu Yd and stay finite.
   const dg = run(
     { dgRows: [{ sf: '100', depth: '2', type: 'DG Gold', method: 'Machine', cement: 'No', weedFabric: 'No' }] },
-    { 'GT - DG Material Markup': 1, 'DG - Machine Labor Rate': 0.5, 'GT - DG Cleanup Coverage': 0.01 }, // DG Tons Denominator unset
+    { 'GT - DG Material Markup': 1, 'DG - Machine Labor Rate': 0.5, 'GT - DG Cleanup Coverage': 0.01 },
     [row('DG Gold', 'DG', 60)]
   )
   assert.ok(Number.isFinite(dg.dgLab) && Number.isFinite(dg.totalMat), `DG values must be finite; got lab ${dg.dgLab}, mat ${dg.totalMat}`)

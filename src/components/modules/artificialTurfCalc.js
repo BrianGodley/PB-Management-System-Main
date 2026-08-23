@@ -116,7 +116,6 @@ export function calcTurf(
     return n(lr[m?.matKey])
   }
 
-  const demoTonsDivisor = n(mp['Turf - Demo Tons Divisor'])
   let demoHrs = 0, demoMat = 0
   const demoCalc = DEMO_ROWS.map(row => {
     const sf = n(state.demo[row.key]?.sf)
@@ -124,17 +123,17 @@ export function calcTurf(
     const method = state.demo[row.key]?.method || 'Skid Steer Good'
     const rate = demoRate(method)
     const dumpRate = n(mp[row.dumpKey])
-    const tons = sf > 0 && demoTonsDivisor > 0 ? (sf / demoTonsDivisor) * inches : 0
-    const hrs = tons * rate // demo rate is hours per Ton
-    const mat = tons * dumpRate
+    // Volume in Cu Yd (tons removed): SF × depth_in / 324 (27 cf/cy × 12 in/ft).
+    const cy = sf > 0 ? (sf * (inches / 12)) / 27 : 0
+    const hrs = cy * rate // demo rate is hours per Cu Yd
+    const mat = cy * dumpRate // dump per Cu Yd
     demoHrs += hrs; demoMat += mat
-    return { sf, inches, method, rate, tons, hrs, mat, dumpRate }
+    return { sf, inches, method, rate, cy, hrs, mat, dumpRate }
   })
 
   const turfAreaSF = Math.max(...DEMO_ROWS.map(r => n(state.demo[r.key]?.sf))) || 0
 
   let baseHrs = 0, baseMat = 0
-  const gravelBaseTonsDivisor = n(mp['Turf - Gravel Base Tons Divisor'])
   const weedFabricSFPerRoll = n(mp['Turf - Weed Fabric SF per Roll'])
   const baseCalc = (state.baseRows || []).map(row => {
     if (!row.material)
@@ -247,6 +246,6 @@ export function calcTurf(
     infillAreaSF, demoCalc, turfAreaSF, baseCalc, rollCalc, totalEdgeLF, turfHrs, turfSFHr, turfMat,
     stripCalc, stripsHrs, stripLFHr, stripsMat, cutHrs, cutMat, subCutMat, infillMat, demoHrs, baseHrs,
     rawHrs, diffHrs, isSub, subTurfCost, subStripsCost, subInstallPerSF, subStripPerLF,
-    demoTonsDivisor, gravelBaseTonsDivisor, weedFabricSFPerRoll, rollWidthFt, infillSFPerBag,
+    weedFabricSFPerRoll, rollWidthFt, infillSFPerBag,
   }
 }
