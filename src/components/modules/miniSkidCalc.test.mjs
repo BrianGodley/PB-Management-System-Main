@@ -33,13 +33,13 @@ const fullRates = (over = {}) => ({
 })
 const fullMat = (over = {}) => ({
   'Tons SF-in Denominator': 150,
-  'Mini - Container (Low-Boy)': 500,
-  'Mini - Container Capacity (CY)': 12,
-  'Mini - Removal Swell': 1.3,
-  'Mini - Import Base $/10cy': 300,
-  'Mini - Dump - Concrete': 0,
-  'Mini - Dump - Dirt': 0,
-  'Mini - Dump - Green Waste': 0,
+  'Container (Low-Boy)': 500,
+  'Container Capacity (CY)': 12,
+  'Removal Swell': 1.3,
+  'Import Base $/10cy': 300,
+  'Dump Fee - Concrete': 0,
+  'Dump Fee - Dirt': 0,
+  'Dump Fee - Green Waste': 0,
   ...over,
 })
 const fullSub = (over = {}) => ({

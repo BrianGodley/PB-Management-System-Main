@@ -45,14 +45,14 @@ const fullRates = (over = {}) => ({
 })
 const fullMat = (over = {}) => ({
   'Tons SF-in Denominator': 150,
-  'Demo - Skid Container (Low-Boy)': 500,
-  'Demo - Skid Container Capacity (CY)': 12,
-  'Demo - Skid Removal Swell': 1.3,
-  'Demo - Skid Import Base $/10cy': 300,
-  'Demo - Skid Dump - Concrete': 0,
-  'Demo - Skid Dump - Dirt': 0,
-  'Demo - Skid Dump - Green Waste': 0,
-  'Demo - Skid Tree CY Factor': 1, // moved to master material rates (Basic Materials)
+  'Container (Low-Boy)': 500,
+  'Container Capacity (CY)': 12,
+  'Removal Swell': 1.3,
+  'Import Base $/10cy': 300,
+  'Dump Fee - Concrete': 0,
+  'Dump Fee - Dirt': 0,
+  'Dump Fee - Green Waste': 0,
+  'Tree CY Factor': 1, // moved to master material rates (Basic Materials)
   ...over,
 })
 const fullSub = (over = {}) => ({

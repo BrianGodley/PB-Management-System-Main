@@ -25,10 +25,10 @@ const fullRates = (over = {}) => ({
   ...over,
 })
 const fullMat = (over = {}) => ({
-  'Hand - Container (Low-Boy)': 500,
-  'Hand - Container Capacity (CY)': 12,
-  'Hand - Removal Swell': 1.25,
-  'Hand - Import Base $/10cy': 300,
+  'Container (Low-Boy)': 500,
+  'Container Capacity (CY)': 12,
+  'Removal Swell': 1.25,
+  'Import Base $/10cy': 300,
   ...over,
 })
 const fullSub = (over = {}) => ({

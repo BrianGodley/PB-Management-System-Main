@@ -489,7 +489,11 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
             onCrewTypeChange={v => set('crewType', v)}
             title="Skid Steer Demo"
             moduleType="Skid Steer Demo"
-            rateScope={[{ category: 'Demo', sub: 'Skid Steer' }, { category: 'Basic Labor' }]}
+            rateScope={[
+              { category: 'Demo', sub: 'Skid Steer' },
+              { category: 'Demo', sub: 'Disposal' },
+              { category: 'Basic Labor' },
+            ]}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
             centerSlot={

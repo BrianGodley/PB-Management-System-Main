@@ -528,7 +528,11 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             onCrewTypeChange={v => set('crewType', v)}
             title="Hand Demo"
             moduleType="Hand Demo"
-            rateScope={[{ category: 'Demo', sub: 'Hand' }, { category: 'Basic Labor' }]}
+            rateScope={[
+              { category: 'Demo', sub: 'Hand' },
+              { category: 'Demo', sub: 'Disposal' },
+              { category: 'Basic Labor' },
+            ]}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
             centerSlot={

@@ -25,7 +25,7 @@ export function calcDemo(
   // 12 in/ft, 2000 lb/ton, 60 min/hr) stay as literal math.
   const tonsSfInDenom = n(mp['Tons SF-in Denominator']) // shared Basic Materials (Sub tab per-ton)
   const concreteWeightLbCf = n(lr['Basic Labor - Concrete Weight lb/cf']) // shared Basic Labor (Sub tab / vertical tons)
-  const treeCyFactor = n(mp['Mini - Tree CY Factor']) // moved to master material rates
+  const treeCyFactor = n(mp['Tree CY Factor']) // moved to master material rates
   // Local sfToTons shadows the module helper so the tons denominator is editable.
   const sfToTons = (sf, depthIn) => (n(sf) / tonsSfInDenom) * n(depthIn)
   // Subcontractor rates: a one-off adjustment saved on THIS estimate
@@ -73,11 +73,11 @@ export function calcDemo(
   const treeMed = n(lr['Mini - Tree Medium'])
   const treeLarge = n(lr['Mini - Tree Large'])
 
-  const dumpConc = n(mp['Mini - Dump - Concrete'])
-  const dumpDirt = n(mp['Mini - Dump - Dirt'])
-  const dumpGreen = n(mp['Mini - Dump - Green Waste'])
-  const dumpTreeStump = n(mp['Mini - Dump - Tree/Stump'])
-  const dumpBase = n(mp['Mini - Dump - Import Base'])
+  const dumpConc = n(mp['Dump Fee - Concrete'])
+  const dumpDirt = n(mp['Dump Fee - Dirt'])
+  const dumpGreen = n(mp['Dump Fee - Green Waste'])
+  const dumpTreeStump = n(mp['Dump Fee - Tree/Stump'])
+  const dumpBase = n(mp['Dump Fee - Import Base'])
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   // accessLevel param lets each call site use the correct NonBob or Bobcat multiplier
@@ -110,9 +110,9 @@ export function calcDemo(
   }
 
   // Editable container disposal rates (Master Rates -> Materials, category Demo).
-  const containerPrice = n(mp['Mini - Container (Low-Boy)'])
-  const containerCy = n(mp['Mini - Container Capacity (CY)'])
-  const swellFactor = n(mp['Mini - Removal Swell'])
+  const containerPrice = n(mp['Container (Low-Boy)'])
+  const containerCy = n(mp['Container Capacity (CY)'])
+  const swellFactor = n(mp['Removal Swell'])
   const removalYards = (sf, depthIn) => ((n(sf) * (n(depthIn) / 12)) / 27) * swellFactor
   const removalContainers = (sf, depthIn) => Math.ceil(removalYards(sf, depthIn) / containerCy)
   const containerCost = (sf, depthIn) =>
@@ -120,7 +120,7 @@ export function calcDemo(
   const sfLaborHrs = (sf, depthIn, rate) => (n(sf) / 100) * n(depthIn) * rate
   const cfLaborHrs = (cf, rate) => (n(cf) * 12 / 100) * rate
   const flatCf = (sf, depthIn) => n(sf) * (n(depthIn) / 12)
-  const baseMatPer10Cy = n(mp['Mini - Import Base $/10cy'])
+  const baseMatPer10Cy = n(mp['Import Base $/10cy'])
   const containerCostCf = cf =>
     Math.ceil(((n(cf) / 27) * swellFactor) / containerCy) * containerPrice
   // Editable hauling coefficients (Master Rates -> Labor, category Demo).

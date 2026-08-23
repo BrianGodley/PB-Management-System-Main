@@ -28,7 +28,7 @@ export function calcDemo(
   // 12 in/ft, 2000 lb/ton, 60 min/hr) stay as literal math.
   const tonsSfInDenom = n(mp['Tons SF-in Denominator']) // shared Basic Materials
   const concreteWeightLbCf = n(lr['Basic Labor - Concrete Weight lb/cf']) // shared Basic Labor
-  const treeCyFactor = n(mp['Hand - Tree CY Factor'])
+  const treeCyFactor = n(mp['Tree CY Factor'])
   const bucketLaborMult = n(lr['Hand - Bucket Labor Mult'])
   // Local sfToTons shadows the module helper so the tons denominator is editable.
   const sfToTons = (sf, depthIn) => (n(sf) / tonsSfInDenom) * n(depthIn)
@@ -77,10 +77,10 @@ export function calcDemo(
   const treeMed = n(lr['Hand - Tree Medium'])
   const treeLarge = n(lr['Hand - Tree Large'])
 
-  const dumpConc = n(mp['Hand - Dump - Concrete'])
-  const dumpDirt = n(mp['Hand - Dump - Dirt'])
-  const dumpGreen = n(mp['Hand - Dump - Green Waste'])
-  const dumpTree = n(mp['Hand - Dump - Tree/Stump'])
+  const dumpConc = n(mp['Dump Fee - Concrete'])
+  const dumpDirt = n(mp['Dump Fee - Dirt'])
+  const dumpGreen = n(mp['Dump Fee - Green Waste'])
+  const dumpTree = n(mp['Dump Fee - Tree/Stump'])
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   // Bank (in-place) cubic yards — the volume shown to the user. 27 cf/cy and
@@ -113,9 +113,9 @@ export function calcDemo(
   }
 
   // Editable container disposal rates (Master Rates -> Materials, category Demo).
-  const containerPrice = n(mp['Hand - Container (Low-Boy)'])
-  const containerCy = n(mp['Hand - Container Capacity (CY)'])
-  const swellFactor = n(mp['Hand - Removal Swell'])
+  const containerPrice = n(mp['Container (Low-Boy)'])
+  const containerCy = n(mp['Container Capacity (CY)'])
+  const swellFactor = n(mp['Removal Swell'])
   const removalYards = (sf, depthIn) => ((n(sf) * (n(depthIn) / 12)) / 27) * swellFactor
   const removalContainers = (sf, depthIn) => Math.ceil(removalYards(sf, depthIn) / containerCy)
   const containerCost = (sf, depthIn) =>
@@ -128,7 +128,7 @@ export function calcDemo(
   const cfLaborHrs = (cf, rate) => (n(cf) * 12 / 100) * rate
   const containerCostCf = cf =>
     Math.ceil(((n(cf) / 27) * swellFactor) / containerCy) * containerPrice
-  const baseMatPer10Cy = n(mp['Hand - Import Base $/10cy'])
+  const baseMatPer10Cy = n(mp['Import Base $/10cy'])
 
   // ── Import Base (single — the IMPORT section, not replicated) ──────────────
   const base = flat(state.baseSF, state.baseDepth || 4, rateBase, 0)
