@@ -82,16 +82,9 @@ export async function buildViewRates(moduleType, scope = null) {
     fetchCats = cats
   }
   if (!fetchCats.length) return { groups: [], categories: [] }
-  // Misc comes only from the module's OWN (full) categories (misc_rates has no
-  // sub-category to scope a borrowed pair on). Labor + sub, however, are pulled
-  // across ALL fetched categories and then filtered to full categories OR borrowed
-  // (category, sub-category) pairs (matInScope) — so a borrowed material
-  // sub-category (e.g. Utilities gas) also surfaces its OWN labor + sub for editing.
-  const ownCats = [...fullCats]
-  const q = (table, cols) =>
-    ownCats.length
-      ? supabase.from(table).select(cols).in('category', ownCats)
-      : Promise.resolve({ data: [] })
+  // Labor, sub AND misc are pulled across ALL fetched categories, then filtered
+  // to full categories OR borrowed (category, sub-category) pairs via matInScope —
+  // so each demo surfaces only its OWN rows (misc now carries a sub_category).
   const qAll = (table, cols) =>
     fetchCats.length
       ? supabase.from(table).select(cols).in('category', fetchCats)
