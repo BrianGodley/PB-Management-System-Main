@@ -53,12 +53,12 @@ export function calcDemo(
   const laborConc = n(lr['Mini - Concrete'])          // hrs / Cu Yd
   const laborDirt = n(lr['Mini - Soil'])              // hrs / Cu Yd
   const laborGrass = n(lr['Mini - Grass SF'])  // unchanged (per 100 sf·in)
-  const laborMiscFlat = n(lr['Mini - Misc Flat'])     // hrs / Cu Ft
+  const laborMiscFlat = n(lr['Mini - Misc Flat'])     // hrs / Cu Yd
   const laborMiscVert = n(lr['Mini - Misc Vertical']) // hrs / Cu Yd
-  const laborFooting = n(lr['Mini - Footing'])        // hrs / Cu Yd
-  const laborGradeCut = n(lr['Mini - Grade Cut'])     // hrs / Sq Ft
+  const laborFooting = n(lr['Mini - Footing'])        // hrs / Cu Ft
+  const laborGradeCut = n(lr['Mini - Grade Cut'])     // hrs / Cu Ft
   const rateGrass = n(lr['Mini - Skid Steer Grass'])
-  const laborBase = n(lr['Mini - Import Base'])       // hrs / Sq Ft
+  const laborBase = n(lr['Mini - Import Base'])       // hrs / Cu Ft
   const laborGradeFill = n(lr['Mini - Grade Fill'])   // hrs / Sq Ft
   const laborJJ = n(lr['Basic Labor - Jumping Jack']) // shared, hrs / Cu Ft
   const laborSS = n(lr['Mini - Compaction'])          // hrs / Cu Ft
@@ -131,7 +131,7 @@ export function calcDemo(
   const conc = flat(state.concSF, state.concDepth || 4, laborConc, 0, accessNonBob)
   const dirt = flat(state.dirtSF, state.dirtDepth || 4, laborDirt, 0, accessNonBob)
   const base = flat(state.baseSF, state.baseDepth || 4, laborBase, 0, accessNonBob)
-  base.hours = n(state.baseSF) * laborBase // Import Base = hrs × Sq Ft
+  base.hours = flatCf(state.baseSF, state.baseDepth || 4) * laborBase // Import Base = hrs × Cu Ft
   const baseRawCy = flatCf(state.baseSF, state.baseDepth || 4) / 27
   const baseMat = Math.ceil(baseRawCy / 10) * baseMatPer10Cy
   const grass = flat(state.grassSF, state.grassDepth || 4, rateGrass, 0, accessBobcat)
@@ -147,7 +147,7 @@ export function calcDemo(
   // Mini SS: misc flat/vert carry $36.21 concrete dump fee — NonBob access
   const miscFlatCalc = (state.miscFlatRows || []).map(r => {
     const row = flat(r.sf, r.depth || 4, laborConc, 0, accessNonBob)
-    row.hours = flatCf(r.sf, r.depth || 4) * laborMiscFlat // hrs × Cu Ft
+    row.hours = row.cy * laborMiscFlat // hrs × Cu Yd
     row.dumpFee = containerCost(r.sf, r.depth || 4)
     return row
   })
@@ -159,7 +159,7 @@ export function calcDemo(
   })
   const footingCalc = (state.footingRows || []).map(r => {
     const row = vert(r.lf, r.heightIn || 0, r.widthIn || 8, laborConc, 0, accessBobcat)
-    row.hours = row.cy * laborFooting // hrs × Cu Yd
+    row.hours = row.cf * laborFooting // hrs × Cu Ft
     row.dumpFee = containerCostCf(row.cf)
     return row
   })
@@ -174,8 +174,8 @@ export function calcDemo(
   )
   gradeCut.dumpFee = containerCost(state.gradeCutSF, state.gradeCutDepth || 4)
   const gradeFill = flat(state.gradeFillSF, state.gradeFillDepth || 4, laborGradeFill, 0, accessBobcat)
-  // New model: grade cut/fill = hrs × Sq Ft (depth still drives haul/dump volume).
-  gradeCut.hours = n(state.gradeCutSF) * laborGradeCut
+  // Grade cut = hrs × Cu Ft (Mini); grade fill stays hrs × Sq Ft.
+  gradeCut.hours = flatCf(state.gradeCutSF, state.gradeCutDepth || 4) * laborGradeCut
   gradeFill.hours = n(state.gradeFillSF) * laborGradeFill
 
   const jjTons = sfToTons(state.jjSF, state.jjDepth || 4)

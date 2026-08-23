@@ -11,13 +11,13 @@ import { calcDemo } from './miniSkidCalc.js'
 const fullRates = (over = {}) => ({
   'Mini - Concrete': 0.5,        // hrs / Cu Yd
   'Mini - Soil': 0.4,            // hrs / Cu Yd
-  'Mini - Footing': 0.6,         // hrs / Cu Yd
-  'Mini - Misc Flat': 0.02,      // hrs / Cu Ft
-  'Mini - Misc Vertical': 0.65,  // hrs / Cu Yd
-  'Mini - Grade Cut': 0.015,     // hrs / Sq Ft
+  'Mini - Footing': 0.9,         // hrs / Cu Ft
+  'Mini - Misc Flat': 1.25,      // hrs / Cu Yd
+  'Mini - Misc Vertical': 0.845, // hrs / Cu Yd
+  'Mini - Grade Cut': 0.03,      // hrs / Cu Ft
   'Mini - Grade Fill': 0.018,    // hrs / Sq Ft
-  'Mini - Import Base': 0.018,   // hrs / Sq Ft
-  'Mini - Compaction': 0.0033,   // hrs / Cu Ft
+  'Mini - Import Base': 0.035,   // hrs / Cu Ft
+  'Mini - Compaction': 0.01,     // hrs / Cu Ft
   'Basic Labor - Jumping Jack': 0.04, // shared, hrs / Cu Ft
   'Basic Labor - Difficulty Ratio': 1, // shared
   'Mini - Grass SF': 0.3, // unchanged (per 100 sf·in)
@@ -91,6 +91,26 @@ test('unpriced / no-fallback: an unset labor rate resolves to 0, not a hidden co
   const r = run({ dumpType: 'In House', concSF: 270, concDepth: 12 }, fullRates({ 'Mini - Concrete': 0 }))
   assert.equal(r.conc.hours, 0, 'unset rate → 0 hours (no code fallback)')
   assert.equal(r.laborCost, 0, 'concrete-only with unset rate → $0 labor')
+})
+
+test('value: footing hrs = Cu Ft × rate (27 LF × 12in × 12in = 27 CF × 0.9 = 24.3 hrs)', () => {
+  const r = run({ dumpType: 'In House', footingRows: [{ lf: 27, heightIn: 12, widthIn: 12 }] })
+  assert.equal(r.footingCalc[0].hours, 24.3, `footing hours got ${r.footingCalc[0].hours}`)
+})
+
+test('value: grade cut hrs = Cu Ft × rate (300 SF × 12in = 300 CF × 0.03 = 9 hrs)', () => {
+  const r = run({ dumpType: 'In House', gradeCutSF: 300, gradeCutDepth: 12 })
+  assert.equal(r.gradeCut.hours, 9, `grade cut hours got ${r.gradeCut.hours}`)
+})
+
+test('value: import base hrs = Cu Ft × rate (100 SF × 12in = 100 CF × 0.035 = 3.5 hrs)', () => {
+  const r = run({ dumpType: 'In House', baseSF: 100, baseDepth: 12 })
+  assert.ok(Math.abs(r.base.hours - 3.5) < 1e-9, `import base hours got ${r.base.hours}`)
+})
+
+test('value: misc flat hrs = Cu Yd × rate (270 SF × 12in = 10 CY × 1.25 = 12.5 hrs)', () => {
+  const r = run({ dumpType: 'In House', miscFlatRows: [{ sf: 270, depth: 12 }] })
+  assert.equal(r.miscFlatCalc[0].hours, 12.5, `misc flat hours got ${r.miscFlatCalc[0].hours}`)
 })
 
 test('sub value: grading Cut is per-SF (100 SF × $1.75 = $175)', () => {
