@@ -122,7 +122,9 @@ const ADD_ITEM_RATES = {
 // supabase-drainage-labor-coefficients.sql so the popover edits the right row.
 const ADD_ITEM_LABOR_RATE_NAME = {
   sumpPump: 'Drainage Sump Pump Labor',
-  curbCore: 'Drainage Curb Core Labor',
+  // Curb Core labor is a SHARED Basic Labor rate (Hrs per Each) read by every
+  // module that cores a curb — Drainage + Utilities. One row, one source.
+  curbCore: 'Basic Labor - Curb Core',
   hydrocut: 'Drainage Hydrocut Under Hardscape Labor',
 }
 

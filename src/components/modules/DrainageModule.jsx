@@ -101,7 +101,8 @@ const ADD_ITEM_RATES = {
 // supabase-drainage-labor-coefficients.sql so the popover edits the right row.
 const ADD_ITEM_LABOR_RATE_NAME = {
   sumpPump: 'Drainage Sump Pump Labor',
-  curbCore: 'Drainage Curb Core Labor',
+  // Shared Basic Labor rate — same curb-core labor row every module uses.
+  curbCore: 'Basic Labor - Curb Core',
   hydrocut: 'Drainage Hydrocut Under Hardscape Labor',
 }
 
@@ -299,7 +300,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
     // subcategories ('Drain Pipe' / 'Drain Fixtures') already match the
     // module's markers.
     const [matMap, subRes] = await Promise.all([
-      fetchStandardRateMap(['Drainage']),
+      fetchStandardRateMap(['Drainage', 'Basic Labor']),
       supabase.from('subcontractor_rates').select('item_key, rate').eq('category', 'Drainage'),
     ])
     setMaterialPrices(initialData?.materialPrices ? { ...matMap, ...initialData.materialPrices } : matMap)

@@ -25,7 +25,7 @@ import ModuleHeaderSlot from './ModuleHeaderSlot'
 //
 // Material rates (category='Paver') from material_rates table:
 //   Paver - Base Rock           $7.50/ton
-//   Paver - Bedding Sand       $25.30/ton
+//   Paver - Bedding Sand       $/Cu Yd
 //   Paver - Joint Sand          $0.05/SF
 //   Paver - Poly Sand           $0.56/SF
 //   Paver - Sealer              $0.63/SF
@@ -61,7 +61,6 @@ const CATALOG_OPTS = { standardRows: 'null-vendor', stripPrefix: true }
 const n = v => parseFloat(v) || 0
 // Base-rock tonnage density (SF·inch per ton). The 200 divisor is a tunable
 // estimating coefficient — callers pass the DB-editable value.
-const sfToTons = (sf, depthIn, divisor) => (n(divisor) > 0 ? (n(sf) / n(divisor)) * n(depthIn) : 0)
 
 const BASE_METHODS = ['Skid Good', 'Skid OK', 'Mini Skid', 'Hand']
 
@@ -583,7 +582,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       paver: subEngine.totalPaverCost,
       vert: subEngine.vertPaverCost,
       base: subEngine.baseRockCost,
-      baseTons: subEngine.totalBaseTons,
+      baseCuYd: subEngine.totalBaseCuYd,
       bedding: subEngine.beddingSandCost,
       joint: subEngine.jointSandCost,
       poly: subEngine.polySandCost,
@@ -959,7 +958,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
               { label: 'Base SF', w: 'w-24' },
               { label: 'Base Install', w: 'w-36' },
               { label: 'Base (in)', w: 'w-14' },
-              { label: 'Tons', w: 'w-12' },
+              { label: 'Cu Yd', w: 'w-12' },
               { label: 'Hrs', w: 'w-12' },
             ]}
           />
@@ -1051,7 +1050,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                       className="text-center"
                     />
                   </td>
-                  <td className={`${num} text-center`}>{a.baseTons > 0 ? a.baseTons.toFixed(1) : '—'}</td>
+                  <td className={`${num} text-center`}>{a.baseCuYd > 0 ? a.baseCuYd.toFixed(2) : '—'}</td>
                   <td className={`${num} text-center`}>{fh(a.baseHrs)}</td>
                 </tr>
               )

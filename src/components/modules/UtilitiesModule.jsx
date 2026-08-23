@@ -147,7 +147,8 @@ const ADD_ITEM_RATES = {
   curbCore: {
     dbName: 'Curb Core',
     label: 'Curb Core',
-    laborDbName: 'Curb Core - Labor Rate',
+    // Shared Basic Labor rate — one curb-core labor row for all modules.
+    laborDbName: 'Basic Labor - Curb Core',
     laborOnly: true,
   },
   hydrocut: {
@@ -307,7 +308,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   // Called once on mount and again after any RateEditPopover save.
   const refreshAllRates = useCallback(async () => {
     const [prices, catRows, venRes] = await Promise.all([
-      fetchStandardRateMap(['Utilities']),
+      fetchStandardRateMap(['Utilities', 'Basic Labor']),
       fetchModuleCatalog(['Utilities']),
       supabase
         .from('subs_vendors')

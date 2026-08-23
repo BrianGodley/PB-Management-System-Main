@@ -187,7 +187,8 @@ const ADD_ITEM_RATES = {
   curbCore: {
     dbName: 'Curb Core',
     label: 'Curb Core',
-    laborDbName: 'Curb Core - Labor Rate',
+    // Shared Basic Labor rate (Hrs per Each) — one curb-core labor row for all modules.
+    laborDbName: 'Basic Labor - Curb Core',
     laborOnly: true,
   },
   hydrocut: {

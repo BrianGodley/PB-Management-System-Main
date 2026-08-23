@@ -53,6 +53,15 @@ test('multiple labor components sum (straight + curved cuts are independent rate
   assert.equal(r.laborCost, 20 * LRPH, `laborCost got ${r.laborCost}`)
 })
 
+test('bedding sand: priced per Cu Yd, 1in layer (324 SF = 1 CY × $30 = $30)', () => {
+  // matInstallSF = 324 → beddingCuYd = 324/324 = 1 → cost = 1 × $30/CY. No tons divisor.
+  const r = run({ areaRows: [{ sf: 324, depth: 6 }] }, { mr: { 'Bedding Sand': 30 } })
+  assert.equal(r.beddingSandCost, 30, `beddingSandCost got ${r.beddingSandCost}`)
+  // doubling area doubles bedding cost (linear in SF)
+  const r2 = run({ areaRows: [{ sf: 648, depth: 6 }] }, { mr: { 'Bedding Sand': 30 } })
+  assert.equal(r2.beddingSandCost, 60, `beddingSandCost got ${r2.beddingSandCost}`)
+})
+
 test('no NaN across a populated estimate (install SF + cuts + restraints)', () => {
   const r = run(
     { installSF: 400, straightCutLF: 60, curvedCutLF: 30, restraintsLF: 80 },

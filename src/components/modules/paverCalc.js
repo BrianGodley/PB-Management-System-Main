@@ -4,7 +4,6 @@
 // from lib/materialCatalog + lib/walkAccess (which import supabase); kept in sync.
 const n = v => parseFloat(v) || 0
 const DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN = 60
-const sfToTons = (sf, depthIn, divisor) => (n(divisor) > 0 ? (n(sf) / n(divisor)) * n(depthIn) : 0)
 const isStandardSel = v => !v || v === 'Standard'
 const CATALOG_OPTS = { standardRows: 'null-vendor', stripPrefix: true }
 const PAVER_CAT = { paver: 'Paver Material', base: 'Base Material' }
@@ -89,7 +88,7 @@ export function calcPaver(
 
   // Material rates — live from the catalog / misc_rates, no hardcoded fallback.
   const baseRockPerTon = n(mr['Paver - Base Rock'])
-  const beddingSandPerTon = n(mr['Bedding Sand']) // shared Basic Materials
+  const beddingSandPerCy = n(mr['Bedding Sand']) // shared Basic Materials, now $/Cu Yd
   const jointSandPerSF = n(mr['Paver - Joint Sand'])
   // Single poly-sand MATERIAL rate used for BOTH New and Existing pavers.
   const polySandPerSF = n(mr['Paver - Poly Sand'])
@@ -99,7 +98,6 @@ export function calcPaver(
   const palletCharge = n(mr['Paver - Pallet Charge'])
   const deliveryFlat = n(mr['Paver - Delivery'])
   // Tunable estimating coefficients (DB-editable via misc_rates).
-  const tonsDivisor = n(mr['Paver - Tons Divisor']) // SF·inch per ton (base rock density)
   const deliverySFPerIncrement = n(mr['Paver - Delivery SF Increment']) // SF per delivery charge
 
   const BASE_RATE_MAP = {
@@ -189,7 +187,6 @@ export function calcPaver(
       sf,
       baseSf,
       depthIn,
-      baseTons,
       baseCuYd,
       baseHrs,
       baseCyRate,
@@ -211,7 +208,6 @@ export function calcPaver(
 
   const totalInstallSF = areas.reduce((s, a) => s + a.sf, 0) // in-house labor SF
   const matInstallSF = matAreas.reduce((s, a) => s + a.sf, 0) // material SF (active tab)
-  const totalBaseTons = matAreas.reduce((s, a) => s + a.baseTons, 0)
   const totalBaseCuYd = matAreas.reduce((s, a) => s + (a.baseCuYd || 0), 0)
   const totalBaseHrs = areas.reduce((s, a) => s + a.baseHrs, 0)
   const totalPaverCost = matAreas.reduce((s, a) => s + a.paverCost, 0)
@@ -330,7 +326,10 @@ export function calcPaver(
   // Base rock is priced per-area (vendor/type aware) from the ACTIVE tab's rows;
   // sands/delivery follow the active tab's material SF.
   const baseRockCost = matAreas.reduce((s, a) => s + (a.baseMatCost || 0), 0)
-  const beddingSandCost = sfToTons(matInstallSF, 1, tonsDivisor) * beddingSandPerTon
+  // Bedding sand is a 1-inch layer under the pavers, now bought per Cu Yd.
+  // Loose volume = SF × (1 in / 12) / 27 = SF / 324. (27 cf/cy, 12 in/ft fixed.)
+  const beddingCuYd = matInstallSF / 324
+  const beddingSandCost = beddingCuYd * beddingSandPerCy
   const jointSandCost = matInstallSF * jointSandPerSF
   const polySandCost = mPolyNewSF > 0 ? mPolyNewSF * polySandPerSF : 0
   // Existing poly sand MATERIAL uses the SAME single rate as New (Paver - Poly Sand).
@@ -397,7 +396,6 @@ export function calcPaver(
     subAreas,
     totalInstallSF,
     matInstallSF,
-    totalBaseTons,
     totalBaseCuYd,
     totalPallets,
     totalAreaPallets,
@@ -444,7 +442,7 @@ export function calcPaver(
     baseMiniBobcat,
     baseHand,
     baseRockPerTon,
-    beddingSandPerTon,
+    beddingSandPerCy,
     jointSandPerSF,
     polySandPerSF,
     sealerMatPerSF,
@@ -452,7 +450,6 @@ export function calcPaver(
     sleevesMatLF,
     palletCharge,
     deliveryFlat,
-    tonsDivisor,
     deliverySFPerIncrement,
   }
 }
