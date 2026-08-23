@@ -55,7 +55,7 @@ export function calcDemo(
   const laborFooting = n(lr['Skid - Footing'])        // hrs / Cu Yd
   const laborGradeCut = n(lr['Skid - Grade Cut'])     // hrs / Sq Ft
   const rateGrass = n(lr['Demo - Skid Steer Grass'])
-  const laborBase = n(lr['Skid - Import Base'])       // hrs / Sq Ft
+  const laborBase = n(lr['Skid - Import Base'])       // hrs / Cu Ft
   const laborGradeFill = n(lr['Skid - Grade Fill'])   // hrs / Sq Ft
   const laborJJ = n(lr['Basic Labor - Jumping Jack']) // shared, hrs / Cu Ft
   const laborSS = n(lr['Skid - Compaction'])          // hrs / Cu Ft
@@ -125,10 +125,10 @@ export function calcDemo(
   const baseMat = Math.ceil(baseRawCy / 10) * baseMatPer10Cy
   const grass = flat(state.grassSF, state.grassDepth || 4, rateGrass, 0)
   // New model: Concrete/Soil = hrs × Cu Yd (Rebar/Mesh adds 30% to concrete);
-  // Import Base = hrs × Sq Ft; Grass unchanged (per 100 sf·in).
+  // Import Base = hrs × Cu Ft; Grass unchanged (per 100 sf·in).
   conc.hours = conc.cy * laborConc * rebarMult
   dirt.hours = dirt.cy * laborDirt
-  base.hours = n(state.baseSF) * laborBase
+  base.hours = flatCf(state.baseSF, state.baseDepth || 4) * laborBase
   grass.hours = sfLaborHrs(state.grassSF, state.grassDepth || 4, laborGrass)
   conc.dumpFee = containerCost(state.concSF, state.concDepth || 4)
   dirt.dumpFee = containerCost(state.dirtSF, state.dirtDepth || 4)

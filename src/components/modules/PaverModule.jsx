@@ -17,10 +17,11 @@ import ModuleHeaderSlot from './ModuleHeaderSlot'
 //   Paver - Color Add        0.05 hrs/ea
 //   Paver - Poly Sand New    0.004 hrs/SF
 //   Paver - Poly Sand Existing 0.0075 hrs/SF (labor)
-//   Paver - Base Skid Steer Good 10 tons/hr
-//   Paver - Base Skid Steer OK   7.5 tons/hr
-//   Paver - Base Mini Skid Steer  5 tons/hr
-//   Paver - Base Hand        2.5 tons/hr
+//   Base prep shares the demo Import Base rates (hrs / Cu Ft):
+//     Skid Good → Skid - Import Base Good
+//     Skid OK   → Skid - Import Base   (shared w/ Skid demo)
+//     Mini Skid → Mini - Import Base   (shared w/ Mini demo)
+//     Hand      → Hand - Import Base   (shared w/ Hand demo)
 //
 // Material rates (category='Paver') from material_rates table:
 //   Paver - Base Rock           $7.50/ton
@@ -64,13 +65,14 @@ const sfToTons = (sf, depthIn, divisor) => (n(divisor) > 0 ? (n(sf) / n(divisor)
 
 const BASE_METHODS = ['Skid Good', 'Skid OK', 'Mini Skid', 'Hand']
 
-// Each base-install method maps to a labor_rates row so the inline calculator
-// icon next to the method dropdown edits the correct t/hr rate.
+// Each base-install method maps to a demo Import Base labor_rates row (shared
+// source of truth) so the inline calculator icon edits the same rate the demo
+// modules use. Skid = hrs/Sq Ft; Mini + Hand = hrs/Cu Ft.
 const BASE_METHOD_LABOR_NAME = {
-  'Skid Good': 'Paver - Base Skid Steer Good',
-  'Skid OK': 'Paver - Base Skid Steer OK',
-  'Mini Skid': 'Paver - Base Mini Skid Steer',
-  Hand: 'Paver - Base Hand',
+  'Skid Good': 'Skid - Import Base Good',
+  'Skid OK': 'Skid - Import Base',
+  'Mini Skid': 'Mini - Import Base',
+  Hand: 'Hand - Import Base',
 }
 
 // ── Calculation engine ────────────────────────────────────────────────────────
@@ -333,7 +335,8 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
     // material + material_price. Subcategories ('Paver Material'/'Base Material')
     // are unchanged, so no remap needed.
     const [lrRes, matMap, rows, venRes] = await Promise.all([
-      supabase.from('labor_rates').select('name,rate').eq('category', 'Paver'),
+      // Base prep shares the demo Import Base rates, so pull 'Demo' too.
+      supabase.from('labor_rates').select('name,rate').in('category', ['Paver', 'Demo']),
       fetchStandardRateMap(['Paver', 'Basic Materials']),
       fetchModuleCatalog(['Paver', 'Basic Materials']),
       supabase

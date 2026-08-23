@@ -80,10 +80,12 @@ export function calcPaver(
   // Poly Sand labor coefficients — New and Existing are now independent rates.
   const polySandNewSpread = n(lr['Paver - Poly Sand New'])
   const polySandExistingSpread = n(lr['Paver - Poly Sand Existing'])
-  const baseBobcatGood = n(lr['Paver - Base Skid Steer Good'])
-  const baseBobcatOK = n(lr['Paver - Base Skid Steer OK'])
-  const baseMiniBobcat = n(lr['Paver - Base Mini Skid Steer'])
-  const baseHand = n(lr['Paver - Base Hand'])
+  // Base prep shares the demo Import Base labor rates (one source of truth).
+  // All hrs / Cu Ft (the demo volume basis).
+  const baseSkidGood = n(lr['Skid - Import Base Good']) // hrs / Cu Ft (Paver-added Good variant)
+  const baseSkidOK = n(lr['Skid - Import Base'])        // hrs / Cu Ft (shared w/ Skid demo)
+  const baseMiniBobcat = n(lr['Mini - Import Base'])    // hrs / Cu Ft (shared w/ Mini demo)
+  const baseHand = n(lr['Hand - Import Base'])          // hrs / Cu Ft (shared w/ Hand demo)
 
   // Material rates — live from the catalog / misc_rates, no hardcoded fallback.
   const baseRockPerTon = n(mr['Paver - Base Rock'])
@@ -101,8 +103,8 @@ export function calcPaver(
   const deliverySFPerIncrement = n(mr['Paver - Delivery SF Increment']) // SF per delivery charge
 
   const BASE_RATE_MAP = {
-    'Skid Good': baseBobcatGood,
-    'Skid OK': baseBobcatOK,
+    'Skid Good': baseSkidGood,
+    'Skid OK': baseSkidOK,
     'Mini Skid': baseMiniBobcat,
     Hand: baseHand,
   }
@@ -115,11 +117,10 @@ export function calcPaver(
     // base prep beyond the pavers). Use the optional Base SF when provided;
     // otherwise fall back to the paver SF.
     const baseSf = row.baseSf !== '' && row.baseSf != null ? n(row.baseSf) : sf
-    // Base LABOR / compaction is tonnage-based. Spread rates are hrs-per-ton
-    // (standardized 2026-08-18; were tons/hr). Tons drive baseHrs only.
-    const baseTons = sfToTons(baseSf, depthIn, tonsDivisor)
-    const baseRate = BASE_RATE_MAP[row.method] ?? baseBobcatOK
-    const baseHrs = baseTons * baseRate
+    // Base LABOR shares the demo Import Base rate — hrs × Cu Ft for every method.
+    const baseVolume = baseSf * (depthIn / 12) // Cu Ft
+    const baseRate = BASE_RATE_MAP[row.method] ?? baseSkidOK
+    const baseHrs = baseVolume * baseRate
 
     // Base MATERIAL is now priced per CUBIC YARD (company-wide move — base
     // aggregates are bought by the cubic yard). Loose volume =
@@ -438,8 +439,8 @@ export function calcPaver(
     sleevesRate,
     vertSoldierRate,
     sealerRate,
-    baseBobcatGood,
-    baseBobcatOK,
+    baseSkidGood,
+    baseSkidOK,
     baseMiniBobcat,
     baseHand,
     baseRockPerTon,
