@@ -1876,3 +1876,34 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
   has now picked up the BBQ Wall Height pre-fill fix. Harness gap closed, no product bug.
 - No edits made this pass. Marker left at 79ddece in both `test-results/.autopilot-last`
   and `e2e/.autopilot-last`.
+
+## 2026-08-24 — M7 material ref_key regression run
+- **m7-refkey.spec.js: 10/10 GREEN.** Finishes, Columns, Concrete, Planting, Drainage,
+  Ground Treatments, Outdoor Kitchen, Fire Pit, Walls, Irrigation — every module's full
+  vendor × Type matrix (Standard + every vendor × every item, both crew modes) computed
+  through the new ref_key path with zero NaN/Infinity and zero console/HTTP error.
+  Confirms the M7 name→ref_key conversion + band-aid removal did not move pricing.
+- Suite totals: 136 pass / 1 fail / 0 skip.
+- **1 failure — NOT M7:** `concrete.spec.js` "live edit reflects" — the old test edited
+  `input.first()` (a job-site/difficulty field that doesn't move the total on this
+  estimate) → false-negative. Value-identical M7 change; Concrete's own M7 matrix test
+  passed. Hardened the test to drive the first ~10 visible numeric inputs (a quantity/SF
+  is among them) instead of only the first. Re-run to confirm green.
+
+## 2026-08-24 — autopilot (CI run 79ddece, ran 2026-08-21T23:13Z)
+
+- **GREEN.** 97 expected / 0 unexpected / 0 flaky / 0 skipped. Duration 475s.
+- No robustness fixes needed; no product findings. `.autopilot-last` set to 79ddece.
+
+## 2026-08-24 (run 2) — M7 sign-off + Utilities electrical labor fix
+- **m7-refkey.spec.js: 10/10 GREEN** (2nd run confirms). M7 material ref_key conversion +
+  band-aid removal verified across every converted module — no pricing regression.
+- 1 unrelated fail: concrete.spec.js "live edit reflects" — a test-only bug in the M7 hardening
+  (looped bare `.fill()` on inputs the autofill guard marks readonly → 60s timeout). Fixed to use
+  `fillField` (focus + clear readonly). Re-run to confirm green.
+- **Utilities electrical labor (DATA fix, landed) — NOT M7.** Brian's manual testing found no labor
+  on Electrical Pipe / Electrical Wiring. Cause: those catalog items had `calc_meta.labor_rate`
+  null (the Utilities calc_meta labor rollout linked Gas but missed most electrical). Labor rides
+  ONLY on `calc_meta.labor_rate` (built-in `laborDbName` arrays are dead by design), so null → $0
+  labor (it did surface on the unpriced banner). Fixed by SQL: Electrical Pipe nulls → LAB-356
+  (shared conduit rate), all 11 Electrical Wiring gauges → LAB-357 (Pull Wiring). Code unchanged.

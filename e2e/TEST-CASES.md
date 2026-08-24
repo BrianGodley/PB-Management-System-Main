@@ -209,3 +209,15 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   water features (qty × item labor + qty × item unit_cost, vendor catalog), material NO-FALLBACK (unpriced feature → $0/0hrs),
   excavation NO-FALLBACK (unset equip rate → 0 hrs), Sub-tab in-house hours → 0, no-NaN
 - coverage manifest: `npm run test:pool-coverage` (7 excavation labor + 8 misc coeffs + 9 sub rates + item-driven tile/coping/spillway/raised/water-feature/utilities/equipment)
+
+## M7 material ref_key regression (m7-refkey.spec.js)
+- Proves the M7 change — every module reads a built-in material's Standard price by its
+  frozen ref_key (MAT-NNN) first, name fallback — did not break pricing anywhere.
+- Per converted module (Finishes, Columns, Concrete, Planting, Drainage, Ground Treatments,
+  Outdoor Kitchen, Fire Pit, Walls, Irrigation): opens the editor and walks the FULL
+  vendor × Type matrix (Standard + every real vendor × every item) in both crew modes via
+  the shared scanEveryOptionForNaN helper; asserts zero NaN/Infinity and zero console/HTTP
+  error. A mis-wired ref_key resolves undefined → the row goes $0/NaN, which this catches.
+- Modules not on TEST_ESTIMATE_URL are skipped (not failed) with a row-titles diagnostic.
+- FOLLOW-UP after run 1: harden a $0-specific View-Rates assertion from the real DOM for the
+  highest-value converted materials (rebar, concrete, the 7 shared finishes, timers).

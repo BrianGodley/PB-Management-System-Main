@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { collectErrors, openModule, scanEveryOptionForNaN } from './helpers.js'
+import { collectErrors, fillField, openModule, scanEveryOptionForNaN } from './helpers.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Concrete module — live-browser layer of the MODULE-TEST-CHECKLIST. Concrete is
@@ -86,16 +86,28 @@ test.describe('Concrete', () => {
     const ok = await openModule(page, 'Concrete')
     test.skip(!ok, 'Concrete editor not reachable on this estimate.')
     const dollars = () => page.evaluate(() => (document.body.innerText.match(/\$[\d,]+(\.\d+)?/g) || []).join('|'))
-    const target = page.locator('input[type="number"], input[step]').first()
-    test.skip(!(await target.count()), 'No numeric input to drive a live edit.')
-    await target.click().catch(() => {})
-    await target.fill('100').catch(() => {})
+    // Drive the first several VISIBLE numeric inputs, not just input.first(): the very
+    // first field is often a job-site/difficulty input that doesn't move the total on
+    // this estimate (a selector false-negative), so a single-field edit is flaky. At
+    // least one of the first handful is a quantity/SF that recomputes pricing.
+    const nums = page.locator('input[type="number"], input[step]')
+    const count = Math.min(await nums.count(), 10)
+    test.skip(!count, 'No numeric input to drive a live edit.')
+    // Use fillField (focus + clear the autofill-guard readonly) — a bare .fill() waits
+    // out its actionability timeout on a never-focused readonly input and blows the test
+    // timeout. Only fill visible fields.
+    for (let i = 0; i < count; i++) {
+      const inp = nums.nth(i)
+      if (await inp.isVisible().catch(() => false)) await fillField(inp, '100').catch(() => {})
+    }
     await page.waitForTimeout(400)
     const before = await dollars()
-    await target.click().catch(() => {})
-    await target.fill('900').catch(() => {})
+    for (let i = 0; i < count; i++) {
+      const inp = nums.nth(i)
+      if (await inp.isVisible().catch(() => false)) await fillField(inp, '900').catch(() => {})
+    }
     await expect
-      .poll(dollars, { timeout: 8000, message: 'Total did not change after editing a field' })
+      .poll(dollars, { timeout: 8000, message: 'Total did not change after editing the numeric fields' })
       .not.toBe(before)
   })
 })
