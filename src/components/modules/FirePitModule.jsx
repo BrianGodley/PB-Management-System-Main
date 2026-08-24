@@ -10,6 +10,7 @@ import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { groutCuFtPerBlock } from '../../lib/cmuGrout'
 import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 import { computeCapRow, computeFinishRow, WF_META, WF_LIST } from './firePitCalc'
+import { FINISH_TYPE_REFKEY, CAP_TYPE_REFKEY } from './finishesCalc'
 import { TRENCH_LABOR_RATE_NAME, trenchHours, trenchRowHrs } from '../../lib/trench'
 import { STRUCT_CALC } from './firePitStruct'
 import { resolveUtilRow } from '../../lib/utilRow'
@@ -185,11 +186,15 @@ const CAP_CAT = 'Wall Cap'
 function wfVendorPrice(vendorSel, typeLabel, materialRows, cat = WF_CAT, opts = {}) {
   // fallbackFirst:false so a non-matching type returns null (→ the built-in
   // master rate) instead of mis-pricing to the first catalog option.
-  const row = catalogItemFor(materialRows, cat, vendorSel, typeLabel, {
-    ...CATALOG_OPTS,
-    fallbackFirst: false,
-    ...opts,
-  })
+  const base = { ...CATALOG_OPTS, fallbackFirst: false, ...opts }
+  // Match the built-in finish/cap by its FROZEN material ref_key first (survives a
+  // catalog rename), then fall back to the TYPE label (master/unmapped types, e.g.
+  // the PIP Concrete cap which has no material record). Finish vs cap labels never
+  // collide, so a single combined lookup is safe.
+  const refKey = FINISH_TYPE_REFKEY[typeLabel] || CAP_TYPE_REFKEY[typeLabel] || null
+  const row =
+    (refKey && catalogItemFor(materialRows, cat, vendorSel, refKey, base)) ||
+    catalogItemFor(materialRows, cat, vendorSel, typeLabel, base)
   // Only treat a catalog price as an override when it's a real positive number.
   // A placeholder/null-vendor product with 0/blank unit_cost (price lives in the
   // built-in master rate) must return null so `?? houseUnit` falls back instead of

@@ -7,7 +7,7 @@
 // Run: node --test src/components/modules/finishesCalc.test.mjs
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { calcFinishes } from './finishesCalc.js'
+import { calcFinishes, FINISH_CAT_ITEM, FINISH_TYPE_REFKEY, CAP_TYPE_REFKEY } from './finishesCalc.js'
 
 const base = {
   subType: 'In House', difficulty: '', hoursAdj: '', distanceLF: '',
@@ -108,6 +108,29 @@ test('labor unpriced: an unset labor rate surfaces ONLY for an in-house section 
   // Sub tab (flat-priced, no in-house hours) → no labor surfaces at all.
   const sub = run({ subType: 'Subcontractor', flatworkRows: [{ vendor: 'Standard', type: 'Tile', sf: '100', subEach: '12' }] }, { 'Finishes Tile Flatwork': 10 })
   assert.equal(laborItems(sub).length, 0, `Sub tab surfaces no in-house labor; got ${JSON.stringify(sub.unpriced)}`)
+})
+
+test('M6 finish/cap TYPE→ref_key maps point at the canonical shared records (incl. Walls label variants)', () => {
+  // The three modules (Walls / Fire Pit / Outdoor Kitchen) match a vendor override on a
+  // built-in finish/cap by these maps, so a rename of the shared catalog record can't
+  // silently drop the override. Every value MUST equal the canonical FINISH_CAT_ITEM key.
+  assert.equal(FINISH_TYPE_REFKEY['Sand Stucco'], FINISH_CAT_ITEM.sandStucco)
+  assert.equal(FINISH_TYPE_REFKEY['Smooth Stucco'], FINISH_CAT_ITEM.smoothStucco)
+  assert.equal(FINISH_TYPE_REFKEY['Tile'], FINISH_CAT_ITEM.tile)
+  assert.equal(FINISH_TYPE_REFKEY['Real Stone'], FINISH_CAT_ITEM.realStone)
+  // Module-specific label spellings both resolve to the ONE shared record.
+  assert.equal(FINISH_TYPE_REFKEY['Ledgerstone'], FINISH_CAT_ITEM.ledgerstone) // Walls
+  assert.equal(FINISH_TYPE_REFKEY['Ledgerstone Veneer'], FINISH_CAT_ITEM.ledgerstone) // FP / OK
+  assert.equal(FINISH_TYPE_REFKEY['Stacked Stone'], FINISH_CAT_ITEM.stackedStone) // Walls
+  assert.equal(FINISH_TYPE_REFKEY['Stacked Stone Veneer'], FINISH_CAT_ITEM.stackedStone) // FP / OK
+  assert.equal(FINISH_TYPE_REFKEY['Real Flagstone'], FINISH_CAT_ITEM.realFlagstone) // Walls matKey 'flagstone' too
+  // Caps (Walls / Fire Pit share the same labels).
+  assert.equal(CAP_TYPE_REFKEY['Flagstone'], FINISH_CAT_ITEM.capFlagstone)
+  assert.equal(CAP_TYPE_REFKEY['Precast'], FINISH_CAT_ITEM.capPrecast)
+  assert.equal(CAP_TYPE_REFKEY['Bullnose Brick'], FINISH_CAT_ITEM.capBullnose)
+  // PIP Concrete cap is poured in place — no material record → intentionally unmapped so
+  // the caller keeps its name/label match (never a wrong ref_key).
+  assert.equal(CAP_TYPE_REFKEY['PIP Concrete'], undefined)
 })
 
 test('no NaN across a populated estimate (flat + cap + wall + manual, with difficulty + walk-access)', () => {

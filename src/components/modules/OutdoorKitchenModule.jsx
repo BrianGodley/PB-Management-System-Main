@@ -2,6 +2,7 @@ import WorkTypeChooser from './WorkTypeChooser'
 import CrewTypeBar from './CrewTypeBar'
 import ModuleHeaderSlot from './ModuleHeaderSlot'
 import { computeOkFinishRow, WF_META, WF_LIST } from './okCalc'
+import { FINISH_TYPE_REFKEY } from './finishesCalc'
 import { useState, useEffect, useCallback, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
@@ -189,12 +190,18 @@ function wfVendorPrice(vendorSel, typeLabel, materialRows, opts = {}) {
   // Standard sources & prices from the finish's null-vendor catalog record; a real
   // vendor from its own row. fallbackFirst:false so a non-matching type returns
   // null (→ the built-in master rate) instead of mis-pricing to the first option.
-  const row = catalogItemFor(materialRows, WF_CAT, vendorSel, typeLabel, {
+  const base = {
     standardRows: 'null-vendor',
     stripPrefix: true,
     fallbackFirst: false,
     ...opts,
-  })
+  }
+  // Match the built-in finish by its FROZEN material ref_key first (survives a
+  // catalog rename), then fall back to the TYPE label for a master/unmapped finish.
+  const refKey = FINISH_TYPE_REFKEY[typeLabel] || null
+  const row =
+    (refKey && catalogItemFor(materialRows, WF_CAT, vendorSel, refKey, base)) ||
+    catalogItemFor(materialRows, WF_CAT, vendorSel, typeLabel, base)
   // Only treat a catalog price as an override when it's a real positive number, so
   // a placeholder 0/blank unit_cost falls back to the built-in master rate instead
   // of zeroing material.

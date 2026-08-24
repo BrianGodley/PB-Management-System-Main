@@ -90,6 +90,34 @@ export const FINISH_CAT_ITEM = {
   realStone: 'MAT-102-real-stone-finishes',
 }
 
+// ── Shared finish/cap TYPE label → frozen ref_key ────────────────────────────
+// Built-in wall-finish and cap pickers (Walls / Fire Pit / Outdoor Kitchen) store
+// a fixed TYPE label ('Sand Stucco', 'Real Flagstone', 'Flagstone' cap, …). All
+// three price a real vendor's OVERRIDE by matching that label against the shared
+// Finishes-category record's editable description — so renaming the record breaks
+// the override. These maps let a module resolve the label → the record's IMMUTABLE
+// ref_key and match by ref_key first (rename-safe), falling back to the label.
+// Multiple label spellings per finish (module-specific: 'Ledgerstone' vs
+// 'Ledgerstone Veneer', 'Stacked Stone' vs 'Stacked Stone Veneer') all point at the
+// one shared record. Caps with no material record (PIP Concrete = poured in place)
+// are intentionally absent → null → the caller keeps its name/label match.
+export const FINISH_TYPE_REFKEY = {
+  'Sand Stucco': FINISH_CAT_ITEM.sandStucco,
+  'Smooth Stucco': FINISH_CAT_ITEM.smoothStucco,
+  Ledgerstone: FINISH_CAT_ITEM.ledgerstone,
+  'Ledgerstone Veneer': FINISH_CAT_ITEM.ledgerstone,
+  'Stacked Stone': FINISH_CAT_ITEM.stackedStone,
+  'Stacked Stone Veneer': FINISH_CAT_ITEM.stackedStone,
+  Tile: FINISH_CAT_ITEM.tile,
+  'Real Flagstone': FINISH_CAT_ITEM.realFlagstone,
+  'Real Stone': FINISH_CAT_ITEM.realStone,
+}
+export const CAP_TYPE_REFKEY = {
+  Flagstone: FINISH_CAT_ITEM.capFlagstone,
+  Precast: FINISH_CAT_ITEM.capPrecast,
+  'Bullnose Brick': FINISH_CAT_ITEM.capBullnose,
+}
+
 // Vendor-aware material price for a FINISHES_RATES key: a real vendor's catalog Item price
 // when that vendor carries the mapped Item; otherwise the name-keyed Standard price.
 function finishMatPriceV(matKey, vendor, materialRows, mp) {

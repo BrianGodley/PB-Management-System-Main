@@ -18,6 +18,7 @@ import {
   computeWpRow as _wpRow,
 } from './wallsCalc'
 import { wallDrain, wallBackfill, wallDemo } from './wallsSections'
+import { FINISH_TYPE_REFKEY, CAP_TYPE_REFKEY } from './finishesCalc'
 import {
   useNewMaterialCatalog,
   resolveMaterialPrice,
@@ -712,7 +713,7 @@ function computeWallFinishRow(row, mp, materialRows, R = null, rec = null) {
   // SHARED finish material: read the Finishes module's own record ('<Type> - Finishes'
   // under sub 'Finish Material'). row.type stays the short label (the wallsCalc switch
   // matches on it); we only map to the shared record name for the price lookup.
-  const catP = catalogItemPrice(materialRows, 'Finish Material', `${row.type} - Finishes`, row.vendor, 0)
+  const catP = catalogItemPrice(materialRows, 'Finish Material', `${row.type} - Finishes`, row.vendor, 0, FINISH_TYPE_REFKEY[row.type])
   if (rec && row.type && row.type !== 'None')
     rec('Finish Material', `${row.type} - Finishes`, row.vendor, { category: 'Walls', unit: 'Sq Ft', label: `${row.type} Finish` })
   return _finishRow(row, { lab, catP })
@@ -727,7 +728,7 @@ function computeCapRow(row, mp, materialRows, R = null, rec = null) {
   // routes labor keys through the shared reader R; display callers omit R.
   const v = row.vendor
   const lab = k => wallRate(R, mp, k)
-  const capP = name => catalogItemPrice(materialRows, WALL_CAP_SUBCAT, name, v, 0)
+  const capP = name => catalogItemPrice(materialRows, WALL_CAP_SUBCAT, name, v, 0, CAP_TYPE_REFKEY[name])
   const concreteTruckP = wallMatPrice(WALL_RATES.concreteTruck.db, v, materialRows, mp)
   const capRow =
     (materialRows || []).find(
@@ -930,8 +931,12 @@ function wallCatalogTypes(materialRows, subcat, vendorSel) {
 // Price of a catalog product by (sub-category, name) for the selected vendor —
 // vendor row → Standard row → fallback. This is how finish/cap/waterproofing
 // prices resolve now: from the DB product, not a hard-coded constant.
-function catalogItemPrice(materialRows, subcat, name, vendorSel, fallback = 0) {
-  const rows = (materialRows || []).filter(r => r.sub_category === subcat && r.name === name)
+function catalogItemPrice(materialRows, subcat, name, vendorSel, fallback = 0, refKey = null) {
+  const inSub = (materialRows || []).filter(r => r.sub_category === subcat)
+  // Prefer the FROZEN ref_key (survives a catalog rename); fall back to the
+  // constructed name for a master/unmapped item without one.
+  let rows = refKey ? inSub.filter(r => r.ref_key === refKey) : []
+  if (!rows.length) rows = inSub.filter(r => r.name === name)
   if (!rows.length) return fallback
   const vsel = vendorSel && vendorSel !== 'Standard' ? vendorSel : null
   const row = rows.find(r => r.vendor_id === vsel) || rows.find(r => r.vendor_id == null) || rows[0]
