@@ -867,11 +867,8 @@ export default function MasterRates({ only } = {}) {
       render: r => <ModuleTags modules={estimateModules(r.category, r.sub_category, r.name)} />,
     },
   ]
-  // Generated identity codes for labor / subcontractor rows (like materials).
-  const laborCodeMap = useMemo(
-    () => buildRateCodeMap(labor, laborCats, laborSubcats, 'LAB', 'name'),
-    [labor, laborCats, laborSubcats]
-  )
+  // Subcontractor rows still use the on-the-fly taxonomy code (no frozen ref_key
+  // column yet). Labor + Basic Labor display their real ref_key directly instead.
   const subCodeMap = useMemo(
     () => buildRateCodeMap(subs, subTaxCats, subTaxSubcats, 'SUB', 'trade'),
     [subs, subTaxCats, subTaxSubcats]
@@ -879,10 +876,12 @@ export default function MasterRates({ only } = {}) {
   const codeCell = map => r => (
     <span className="font-mono text-xs text-gray-500">{map.get(r.id) || '—'}</span>
   )
-  // Labor Code is a link that opens the labor rate detail modal (edit the item,
-  // category, sub-category, unit, rate) — mirrors the material Code link.
+  // Labor Code IS the frozen ref_key (LAB-###-slug) — the exact identifier the
+  // estimator points at and the verify SQL matches against — NOT the on-the-fly
+  // taxonomy code. Mirrors the Basic Labor table's ref_key convention. The link
+  // opens the labor rate detail modal (edit item, category, sub-category, unit, rate).
   const laborCodeCell = r => {
-    const code = laborCodeMap.get(r.id) || '—'
+    const code = r.ref_key || '—'
     if (code === '—') return <span className="font-mono text-xs text-gray-400">—</span>
     return (
       <button
@@ -943,7 +942,7 @@ export default function MasterRates({ only } = {}) {
     [subTaxSubcats, subs]
   )
   const laborColumns = [
-    { key: 'code', label: 'Code', editable: false, width: '9rem', render: laborCodeCell },
+    { key: 'code', label: 'Code', editable: false, width: '15rem', render: laborCodeCell },
     { key: 'category', label: 'Category', type: 'select', options: laborCatOptions, width: '11rem' },
     { key: 'sub_category', label: 'Sub Category', type: 'select', options: laborSubOptions, placeholder: 'describe…', width: '12rem' },
     { key: 'label', label: 'Description', bold: true, placeholder: 'e.g. Small Tree Removal', width: '16rem' },
@@ -1359,7 +1358,7 @@ export default function MasterRates({ only } = {}) {
       {detailLabor && (
         <LaborRateDetailModal
           row={detailLabor}
-          code={laborCodeMap.get(detailLabor.id)}
+          code={detailLabor.ref_key}
           catOptions={laborCatOptions}
           subOptions={laborSubOptions}
           unitOptions={LABOR_UNIT_OPTIONS}
