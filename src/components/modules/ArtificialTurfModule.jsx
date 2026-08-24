@@ -107,7 +107,9 @@ function baseTypeOptions(sharedRows, kind, vendorSel) {
     .filter(def.match)
     .filter(r => (isStd ? r.vendor_id == null : r.vendor_id === vendorSel))
     .filter(r => (seen.has(r.name) ? false : (seen.add(r.name), true)))
-    .map(r => ({ label: r.name, value: r.name, price: n(r.unit_cost) }))
+    // Option VALUE = the item's frozen ref_key (falls back to name) so the picker
+    // stores a rename-proof key; baseTypePrice matches ref_key or name.
+    .map(r => ({ label: r.name, value: r.ref_key || r.name, ref_key: r.ref_key || null, price: n(r.unit_cost) }))
 }
 // Vendors that carry any product for this layer (for the row's vendor picker).
 function baseVendorOptions(sharedRows, vendors, kind) {
@@ -333,6 +335,21 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
   const [subRates, setSubRates] = useState(initialData?.subRates || {})
   // Vendor catalog: material_rates rows (sub_category + vendor_id) + vendor list.
   const [materialRows, setMaterialRows] = useState(initialData?.materialRows || [])
+  // Resolve a stored base Type (frozen ref_key; legacy name too) to the item's name
+  // for the orphan-value fallback option. Base rows live in sharedBaseRows too, so
+  // check both. Strips the "<sub> - " prefix.
+  const matName = key => {
+    if (!key) return key
+    const pools = [materialRows, sharedBaseRows]
+    for (const pool of pools) {
+      const hit = (pool || []).find(r => r.ref_key === key || r.id === key || r.name === key)
+      if (hit) {
+        const dash = hit.name ? hit.name.indexOf(' - ') : -1
+        return dash > 0 ? hit.name.slice(dash + 3) : hit.name
+      }
+    }
+    return key
+  }
   // Shared base catalog rows (Concrete + Basic Materials + Ground Treatments) —
   // used to surface the shared Class II / DG base items in View Rates so editing
   // there edits the SAME rate the other modules use.
@@ -744,6 +761,10 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         materialPrices,
         laborRates,
         subRates,
+        // Persist the catalog snapshots so the summary can resolve each row's frozen
+        // material ref_key → name (live estimate re-fetches; a frozen bid reads these).
+        materialRows,
+        sharedBaseRows,
         calc: {
           totalHrs: calc.totalHrs,
           manDays: calc.manDays,
@@ -998,8 +1019,8 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                         title="Type"
                       >
                         {!row.type && <option value="">Select type</option>}
-                        {row.type && !typeOpts.some(o => o.value === row.type) && (
-                          <option value={row.type}>{row.type}</option>
+                        {row.type && !typeOpts.some(o => o.value === row.type || o.label === row.type) && (
+                          <option value={row.type}>{matName(row.type)}</option>
                         )}
                         {typeOpts.map(o => (
                           <option key={o.value} value={o.value}>
@@ -1091,9 +1112,9 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                     </td>
                     <td className={td}>
                       <Sel
-                        value={roll.brand ? (brandRow?.id || roll.brand) : ''}
+                        value={roll.brand ? (brandRow?.ref_key || brandRow?.id || roll.brand) : ''}
                         onChange={e => setRoll(i, 'brand', e.target.value)}
-                        options={rollBrandOpts.map(o => o.id)}
+                        options={rollBrandOpts.map(o => o.ref_key || o.id)}
                         optionLabels={rollBrandOpts.map(o => o.label)}
                         placeholder="Select turf"
                       />
@@ -1244,10 +1265,10 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                   </td>
                   <td className={td}>
                     <Sel
-                      value={strip?.brand ? (stripBrandRow?.id || strip?.brand) : ''}
+                      value={strip?.brand ? (stripBrandRow?.ref_key || stripBrandRow?.id || strip?.brand) : ''}
                       onChange={e => setStripRow(i, 'brand', e.target.value)}
                       placeholder="Select turf"
-                      options={rowStripsBrandOpts.map(o => o.id)}
+                      options={rowStripsBrandOpts.map(o => o.ref_key || o.id)}
                       optionLabels={rowStripsBrandOpts.map(o => o.label)}
                     />
                   </td>

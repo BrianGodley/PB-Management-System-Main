@@ -31,7 +31,10 @@ const fmt2 = v =>
   `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 // Resolve a saved brand selection to a display name: by row id from the saved
 // materialRows snapshot (new estimates store the id), else the legacy key map.
-const brandLabel = (rows, b) => (rows || []).find(r => r.id === b)?.name || TURF_BRANDS[b] || b || 'Turf'
+// Match by frozen ref_key first (new estimates store it), then row id, then the
+// legacy key map — resolves the saved brand to a display name, rename-proof.
+const brandLabel = (rows, b) =>
+  (rows || []).find(r => r.ref_key === b || r.id === b)?.name || TURF_BRANDS[b] || b || 'Turf'
 
 export default function ArtificialTurfSummary({ module }) {
   const d = module?.data || {}

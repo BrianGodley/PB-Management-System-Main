@@ -21,7 +21,7 @@ const base = {
   demo: demo0, baseRows: [], rolls: [{ brand: '', edgeLF: '', vendor: '', useZeoFill: false }],
   stripRows: [], manualRows: [],
 }
-const TURF = [{ id: 't1', name: 'Emerald 80', sub_category: 'Turf Material', category: 'Artificial Turf', vendor_id: null, unit_cost: 3 }]
+const TURF = [{ id: 't1', ref_key: 'MAT-451-emerald-80', name: 'Emerald 80', sub_category: 'Turf Material', category: 'Artificial Turf', vendor_id: null, unit_cost: 3 }]
 // calcTurf(state, lrph, mp, lr, gpmd, walkAccess, laborBurdenPct, subRates, materialRows, catDefaults, commissionRate, sharedBaseRows)
 const run = (state, mp = {}, lr = {}, materialRows = [], subRates = {}, sharedBaseRows = []) =>
   calcTurf({ ...base, ...state }, LRPH, mp, lr, 425, null, 0.29, subRates, materialRows, {}, 0.05, sharedBaseRows)
@@ -41,6 +41,16 @@ test('turf roll value: SF = edgeLF × roll width; hrs = SF × install rate; mat 
   assert.equal(r.rollCalc[0].sf, 1500, `roll SF got ${r.rollCalc[0].sf}`) // 100 × 15
   assert.equal(r.turfHrs, 15, `turfHrs got ${r.turfHrs}`)                  // 1500 × 0.01
   assert.equal(r.turfMat, 4500, `turfMat got ${r.turfMat}`)               // 1500 × 3
+})
+
+test('M5 ref_key parity: a turf roll picked by material ref_key resolves the same material as by name', () => {
+  const lr = { 'LAB-451-turf-turf-install': 0.01 }
+  const mp = { 'Turf - Roll Width FT': 15 }
+  const byName = run({ rolls: [{ brand: 'Emerald 80', edgeLF: '100', vendor: 'Standard' }] }, mp, lr, TURF)
+  const byRef = run({ rolls: [{ brand: 'MAT-451-emerald-80', edgeLF: '100', vendor: 'Standard' }] }, mp, lr, TURF)
+  assert.equal(byRef.turfMat, byName.turfMat, `material should match; got ${byRef.turfMat} vs ${byName.turfMat}`)
+  assert.equal(byRef.turfMat, 4500, `1500 SF × $3 = $4500; got ${byRef.turfMat}`)
+  assert.equal(byRef.turfHrs, byName.turfHrs, 'labor identical regardless of key form')
 })
 
 test('turf edit-reflects: raising the install rate raises turf labor proportionally', () => {
