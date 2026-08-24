@@ -60,6 +60,22 @@ test('unpriced / NO-FALLBACK: a typed pipe row with no resolvable labor → flag
   assert.equal(r.laborCost, 0, 'unresolved pipe labor → $0')
 })
 
+test('M5 ref_key parity: a pipe row picked by material ref_key resolves the same material + labor as by name', () => {
+  const rows = [{
+    id: 'd1', ref_key: 'MAT-410-4-sdr-35', name: '4" SDR 35',
+    sub_category: 'Drain Pipe', category: 'Drainage', vendor_id: null,
+    unit_cost: 3, calc_meta: { labor_rate: '4" SDR 35 - Labor Rate' },
+  }]
+  const mp = { '4" SDR 35 - Labor Rate': 0.2 }
+  const byName = run({ pipeRows: [{ vendor: 'Standard', type: '4" SDR 35', lf: 100 }] }, mp, rows)
+  const byRef = run({ pipeRows: [{ vendor: 'Standard', type: 'MAT-410-4-sdr-35', lf: 100 }] }, mp, rows)
+  // Only a pipe row is entered, so totalMat = pipe material, totalHrs = pipe labor.
+  assert.equal(byRef.totalMat, byName.totalMat, `material should match; got ${byRef.totalMat} vs ${byName.totalMat}`)
+  assert.equal(byRef.totalMat, 300, `100 Ln Ft × $3 = $300; got ${byRef.totalMat}`)
+  assert.equal(byRef.totalHrs, byName.totalHrs, 'labor identical regardless of key form')
+  assert.equal(byRef.totalHrs, 20, `100 × 0.2 = 20 hrs; got ${byRef.totalHrs}`)
+})
+
 test('no NaN across a populated estimate (trench + pipe)', () => {
   const r = run(
     { trenchRows: [{ lf: 80, width: 6, depth: 18, equipment: 'Trench' }], pipeRows: [{ type: '4" SDR 35', lf: 80 }] },

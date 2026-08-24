@@ -15,7 +15,7 @@ function catalogOptions(materialRows, subcategory, vendorSel, { standardRows = '
     .filter(r => r.sub_category === subcategory && (!category || r.category === category) && (isStandard ? r.vendor_id == null : r.vendor_id === vendorSel))
     .map(r => {
       const label = stripPrefix && r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name
-      return { id: r.id, value: r.id, label, stored: label, row: r }
+      return { id: r.id, value: r.id, ref_key: r.ref_key || null, label, stored: label, row: r }
     })
 }
 function catalogItemFor(materialRows, subcategory, vendorSel, key, opts = {}) {
@@ -23,6 +23,8 @@ function catalogItemFor(materialRows, subcategory, vendorSel, key, opts = {}) {
   const options = catalogOptions(materialRows, subcategory, vendorSel, rest)
   if (!options.length) return null
   if (!key) return fallbackFirst ? options[0].row : null
+  const byRef = options.find(o => o.ref_key && o.ref_key === key)
+  if (byRef) return byRef.row
   const byId = options.find(o => o.id === key)
   if (byId) return byId.row
   const byLabel = options.find(o => o.stored === key || o.label === key)
@@ -209,7 +211,9 @@ function drainTypeOptions(cat, builtIn, materialRows, vendorSel) {
       standardRows: 'null-vendor',
       stripPrefix: true,
     }) || []
-  return catRows.map(o => o.label)
+  // Option VALUE is the item's frozen ref_key (a converted picker stores it);
+  // LABEL is the live description. Rename-proof + survives a picker save.
+  return catRows.map(o => ({ value: o.ref_key || o.label, label: o.label }))
 }
 
 // materialPrices — { 'dbName': unit_cost, ... } fetched from material_rates

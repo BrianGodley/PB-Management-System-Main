@@ -20,6 +20,17 @@ const ADD_ITEMS = {
 export default function DrainageSummary({ module }) {
   const d = module?.data || {}
 
+  // A pipe/fixture row's Type is stored as a frozen material ref_key. Resolve it to
+  // the item's name via the saved catalog snapshot (live → current, frozen bid →
+  // as-bid). Legacy id/name saves still resolve; a plain label passes through.
+  const matName = key => {
+    if (!key) return key
+    const hit = (d.materialRows || []).find(r => r.ref_key === key || r.id === key || r.name === key)
+    if (!hit) return key
+    const dash = hit.name ? hit.name.indexOf(' - ') : -1
+    return dash > 0 ? hit.name.slice(dash + 3) : hit.name
+  }
+
   const manualHrsRows = (d.manualRows || [])
     .filter(r => n(r.hours) > 0 || n(r.materials) > 0 || n(r.subCost) > 0)
     .map((r, i) => ({
@@ -49,13 +60,13 @@ export default function DrainageSummary({ module }) {
       title: 'Drain Pipe',
       rows: (d.pipeRows || [])
         .filter(r => n(r.lf) > 0)
-        .map(r => ({ label: r.type, value: `${n(r.lf)} Ln Ft` })),
+        .map(r => ({ label: matName(r.type), value: `${n(r.lf)} Ln Ft` })),
     },
     {
       title: 'Drain Fixtures',
       rows: (d.fixtureRows || [])
         .filter(r => n(r.qty) > 0)
-        .map(r => ({ label: r.type, value: `× ${r.qty}` })),
+        .map(r => ({ label: matName(r.type), value: `× ${r.qty}` })),
     },
     {
       title: 'Additional Items',
@@ -79,7 +90,7 @@ export default function DrainageSummary({ module }) {
       title: 'Drain Fixtures',
       rows: (d.subFixtureRows || [])
         .filter(r => n(r.qty) > 0)
-        .map(r => ({ label: r.type, value: `${n(r.qty)} × ${fmt2(subFixtureFlat)}` })),
+        .map(r => ({ label: matName(r.type), value: `${n(r.qty)} × ${fmt2(subFixtureFlat)}` })),
     },
     {
       title: 'Additional Items',

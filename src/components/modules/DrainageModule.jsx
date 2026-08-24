@@ -187,7 +187,9 @@ function drainTypeOptions(cat, builtIn, materialRows, vendorSel) {
       standardRows: 'null-vendor',
       stripPrefix: true,
     }) || []
-  return catRows.map(o => o.label)
+  // Option VALUE = the item's frozen ref_key (picker stores it); LABEL = live
+  // description. Rename-proof and survives a saved estimate.
+  return catRows.map(o => ({ value: o.ref_key || o.label, label: o.label }))
 }
 
 // materialPrices — { 'dbName': unit_cost, ... } fetched from material_rates
@@ -397,6 +399,16 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   }, [])
 
   // ── Vendor catalog helpers (material-only, per-row Vendor picker) ────────
+  // Resolve a stored Type (frozen material ref_key; legacy id/name still work) to
+  // the item's display name via the live catalog — used only by the orphan-value
+  // fallback option so a stored key never renders raw. Strips the "<sub> - " prefix.
+  const matName = key => {
+    if (!key) return key
+    const hit = (materialRows || []).find(r => r.ref_key === key || r.id === key || r.name === key)
+    if (!hit) return key
+    const dash = hit.name ? hit.name.indexOf(' - ') : -1
+    return dash > 0 ? hit.name.slice(dash + 3) : hit.name
+  }
   const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
   const defaultVendorFor = cat => vendorsForCategory(cat)[0]?.id || 'Standard'
   const catDefaults = {
@@ -510,7 +522,9 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         commissionRate,
         walkAccess,
         materialPrices, // snapshot of prices used — so the summary always reflects save-time costs
-        // materialRows (live catalog) intentionally NOT persisted — fetched fresh on open.
+        // Persist the catalog snapshot so the summary can resolve each row's frozen
+        // material ref_key → name (live estimate re-fetches; a frozen bid reads this).
+        materialRows,
         subRates,
         calc,
       },
@@ -978,11 +992,14 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                             return (
                               <>
                                 {!row.type && <option value="">Select pipe</option>}
-                                {row.type && !pipeOpts.includes(row.type) && (
-                                  <option value={row.type}>{row.type}</option>
-                                )}
-                                {pipeOpts.map(t => (
-                                  <option key={t}>{t}</option>
+                                {row.type &&
+                                  !pipeOpts.some(o => o.value === row.type || o.label === row.type) && (
+                                    <option value={row.type}>{matName(row.type)}</option>
+                                  )}
+                                {pipeOpts.map(o => (
+                                  <option key={o.value} value={o.value}>
+                                    {o.label}
+                                  </option>
                                 ))}
                               </>
                             )
@@ -1098,11 +1115,14 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                             return (
                               <>
                                 {!row.type && <option value="">Select pipe</option>}
-                                {row.type && !frenchOpts.includes(row.type) && (
-                                  <option value={row.type}>{row.type}</option>
-                                )}
-                                {frenchOpts.map(t => (
-                                  <option key={t}>{t}</option>
+                                {row.type &&
+                                  !frenchOpts.some(o => o.value === row.type || o.label === row.type) && (
+                                    <option value={row.type}>{matName(row.type)}</option>
+                                  )}
+                                {frenchOpts.map(o => (
+                                  <option key={o.value} value={o.value}>
+                                    {o.label}
+                                  </option>
                                 ))}
                               </>
                             )
@@ -1249,11 +1269,14 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                             return (
                               <>
                                 {!row.type && <option value="">Select fixture</option>}
-                                {row.type && !fixOpts.includes(row.type) && (
-                                  <option value={row.type}>{row.type}</option>
-                                )}
-                                {fixOpts.map(t => (
-                                  <option key={t}>{t}</option>
+                                {row.type &&
+                                  !fixOpts.some(o => o.value === row.type || o.label === row.type) && (
+                                    <option value={row.type}>{matName(row.type)}</option>
+                                  )}
+                                {fixOpts.map(o => (
+                                  <option key={o.value} value={o.value}>
+                                    {o.label}
+                                  </option>
                                 ))}
                               </>
                             )
