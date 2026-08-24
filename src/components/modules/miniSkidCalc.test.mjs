@@ -7,28 +7,30 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { calcDemo } from './miniSkidCalc.js'
+import { LAB } from '../../lib/laborRefs.js'
 
+// Labor is read by frozen ref_key (LAB-NNN-slug); dead rows stay name-keyed.
 const fullRates = (over = {}) => ({
-  'Mini - Concrete': 0.5,        // hrs / Cu Yd
-  'Mini - Soil': 0.4,            // hrs / Cu Yd
-  'Mini - Footing': 0.9,         // hrs / Cu Ft
-  'Mini - Misc Flat': 1.25,      // hrs / Cu Yd
-  'Mini - Misc Vertical': 0.845, // hrs / Cu Yd
-  'Mini - Grade Cut': 0.03,      // hrs / Cu Ft
-  'Mini - Grade Fill': 0.03,     // hrs / Cu Ft
+  [LAB.MINI_CONCRETE]: 0.5,        // hrs / Cu Yd
+  [LAB.MINI_SOIL]: 0.4,            // hrs / Cu Yd
+  [LAB.MINI_FOOTING]: 0.9,         // hrs / Cu Ft
+  [LAB.MINI_MISC_FLAT]: 1.25,      // hrs / Cu Yd
+  [LAB.MINI_MISC_VERTICAL]: 0.845, // hrs / Cu Yd
+  [LAB.MINI_GRADE_CUT]: 0.03,      // hrs / Cu Ft
+  [LAB.MINI_GRADE_FILL]: 0.03,     // hrs / Cu Ft
   'BAS-003-import-base-mini-skid-steer': 0.035,   // hrs / Cu Ft
-  'Mini - Compaction': 0.01,     // hrs / Cu Ft
+  [LAB.MINI_COMPACTION]: 0.01,     // hrs / Cu Ft
   'BAS-006-jumping-jack': 0.04, // shared, hrs / Cu Ft
   'BAS-007-difficulty-ratio': 1, // shared
-  'Mini - Grass SF': 0.02, // hrs / Cu Ft
-  'Mini - Skid Steer Grass': 0.3,
-  'Mini - Shrubs 0-1 ft': 0.09, 'Mini - Shrubs 1-2 ft': 0.12, 'Mini - Shrubs 2-3 ft': 0.18,
-  'Mini - Shrubs 3-4 ft': 0.24, 'Mini - Shrubs 4-5 ft': 0.3,
-  'Mini - Stump Small': 1, 'Mini - Stump Medium': 2, 'Mini - Stump Large': 3, 'Mini - Stump XL': 4,
-  'Mini - Tree Small': 1, 'Mini - Tree Medium': 2, 'Mini - Tree Large': 3,
+  [LAB.MINI_GRASS_SF]: 0.02, // hrs / Cu Ft
+  'Mini - Skid Steer Grass': 0.3, // dead row — read by name
+  [LAB.MINI_SHRUB_0_1]: 0.09, [LAB.MINI_SHRUB_1_2]: 0.12, [LAB.MINI_SHRUB_2_3]: 0.18,
+  [LAB.MINI_SHRUB_3_4]: 0.24, [LAB.MINI_SHRUB_4_5]: 0.3,
+  [LAB.MINI_STUMP_SMALL]: 1, [LAB.MINI_STUMP_MEDIUM]: 2, [LAB.MINI_STUMP_LARGE]: 3, [LAB.MINI_STUMP_XL]: 4,
+  [LAB.MINI_TREE_SMALL]: 1, [LAB.MINI_TREE_MEDIUM]: 2, [LAB.MINI_TREE_LARGE]: 3,
   'BAS-008-concrete-weight-lb-cf': 150,
-  'Mini - Haul Sec/Ft': 1,
-  'Mini - Load (CY)': 1,
+  [LAB.MINI_HAUL_SEC_FT]: 1,
+  [LAB.MINI_LOAD_CY]: 1,
   ...over,
 })
 const fullMat = (over = {}) => ({
@@ -82,13 +84,13 @@ test('rebar/mesh toggle: +30% to concrete labor (5 → 6.5 hrs)', () => {
 })
 
 test('edit-reflects: raising the concrete rate RAISES hours (multiply model)', () => {
-  const slow = run({ dumpType: 'In House', concSF: 270, concDepth: 12 }, fullRates({ 'Mini - Concrete': 0.5 }))
-  const fast = run({ dumpType: 'In House', concSF: 270, concDepth: 12 }, fullRates({ 'Mini - Concrete': 1.0 }))
+  const slow = run({ dumpType: 'In House', concSF: 270, concDepth: 12 }, fullRates({ [LAB.MINI_CONCRETE]: 0.5 }))
+  const fast = run({ dumpType: 'In House', concSF: 270, concDepth: 12 }, fullRates({ [LAB.MINI_CONCRETE]: 1.0 }))
   assert.equal(fast.laborCost, slow.laborCost * 2, 'rate ×2 → hours ×2')
 })
 
 test('unpriced / no-fallback: an unset labor rate resolves to 0, not a hidden constant', () => {
-  const r = run({ dumpType: 'In House', concSF: 270, concDepth: 12 }, fullRates({ 'Mini - Concrete': 0 }))
+  const r = run({ dumpType: 'In House', concSF: 270, concDepth: 12 }, fullRates({ [LAB.MINI_CONCRETE]: 0 }))
   assert.equal(r.conc.hours, 0, 'unset rate → 0 hours (no code fallback)')
   assert.equal(r.laborCost, 0, 'concrete-only with unset rate → $0 labor')
 })

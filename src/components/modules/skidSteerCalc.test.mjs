@@ -10,37 +10,39 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { calcDemo } from './skidSteerCalc.js'
+import { LAB } from '../../lib/laborRefs.js'
 
+// Labor is read by frozen ref_key (LAB-NNN-slug); dead rows stay name-keyed.
 const fullRates = (over = {}) => ({
-  'Skid - Concrete': 0.5,        // hrs / Cu Yd
-  'Skid - Soil': 0.4,            // hrs / Cu Yd
-  'Skid - Footing': 0.6,         // hrs / Cu Yd
-  'Skid - Misc Flat': 0.02,      // hrs / Cu Ft
-  'Skid - Misc Vertical': 0.65,  // hrs / Cu Yd
-  'Skid - Grade Cut': 0.015,     // hrs / Sq Ft
-  'Skid - Grade Fill': 0.018,    // hrs / Sq Ft
+  [LAB.SKID_CONCRETE]: 0.5,        // hrs / Cu Yd
+  [LAB.SKID_SOIL]: 0.4,            // hrs / Cu Yd
+  [LAB.SKID_FOOTING]: 0.6,         // hrs / Cu Yd
+  [LAB.SKID_MISC_FLAT]: 0.02,      // hrs / Cu Ft
+  [LAB.SKID_MISC_VERTICAL]: 0.65,  // hrs / Cu Yd
+  [LAB.SKID_GRADE_CUT]: 0.015,     // hrs / Sq Ft
+  [LAB.SKID_GRADE_FILL]: 0.018,    // hrs / Sq Ft
   'BAS-004-import-base-skid-steer-good': 0.018,   // hrs / Cu Ft (shared Base Prep Skid)
-  'Skid - Compaction': 0.0033,   // hrs / Cu Ft
+  [LAB.SKID_COMPACTION]: 0.0033,   // hrs / Cu Ft
   'BAS-006-jumping-jack': 0.01, // shared, hrs / Cu Ft
   'BAS-007-difficulty-ratio': 1, // shared
-  'Demo - Skid - Grass SF': 0.3, // unchanged (per 100 sf·in)
-  'Demo - Skid Steer Grass': 0.3,
-  'Skid - Shrubs 0-1 ft': 0.09,
-  'Skid - Shrubs 1-2 ft': 0.012,
-  'Skid - Shrubs 2-3 ft': 0.018,
-  'Skid - Shrubs 3-4 ft': 0.24,
-  'Skid - Shrubs 4-5 ft': 0.03,
-  'Skid - Stump Small': 1,
-  'Skid - Stump Medium': 2,
-  'Skid - Stump Large': 3,
-  'Skid - Stump XL': 4,
-  'Skid - Tree Small': 1,
-  'Skid - Tree Medium': 2,
-  'Skid - Tree Large': 3,
+  [LAB.SKID_GRASS_SF]: 0.3, // unchanged (per 100 sf·in)
+  'Demo - Skid Steer Grass': 0.3, // dead row — read by name
+  [LAB.SKID_SHRUB_0_1]: 0.09,
+  [LAB.SKID_SHRUB_1_2]: 0.012,
+  [LAB.SKID_SHRUB_2_3]: 0.018,
+  [LAB.SKID_SHRUB_3_4]: 0.24,
+  [LAB.SKID_SHRUB_4_5]: 0.03,
+  [LAB.SKID_STUMP_SMALL]: 1,
+  [LAB.SKID_STUMP_MEDIUM]: 2,
+  [LAB.SKID_STUMP_LARGE]: 3,
+  [LAB.SKID_STUMP_XL]: 4,
+  [LAB.SKID_TREE_SMALL]: 1,
+  [LAB.SKID_TREE_MEDIUM]: 2,
+  [LAB.SKID_TREE_LARGE]: 3,
   // Sub tab (untouched) — per-ton coefficients + shuttle still live in labor_rates
   'BAS-008-concrete-weight-lb-cf': 150,
-  'Demo - Skid Steer Haul Sec/Ft': 1,
-  'Demo - Skid Steer Load (CY)': 1,
+  [LAB.SKID_HAUL_SEC_FT]: 1,
+  [LAB.SKID_LOAD_CY]: 1,
   ...over,
 })
 const fullMat = (over = {}) => ({
@@ -95,13 +97,13 @@ test('units: labor is hrs-per-Cu-Yd — doubling depth doubles hours', () => {
 })
 
 test('edit-reflects: raising the concrete rate RAISES hours (multiply model)', () => {
-  const slow = run({ dumpType: 'In House', concSF: 270, concDepth: 12 }, fullRates({ 'Skid - Concrete': 0.5 }))
-  const fast = run({ dumpType: 'In House', concSF: 270, concDepth: 12 }, fullRates({ 'Skid - Concrete': 1.0 }))
+  const slow = run({ dumpType: 'In House', concSF: 270, concDepth: 12 }, fullRates({ [LAB.SKID_CONCRETE]: 0.5 }))
+  const fast = run({ dumpType: 'In House', concSF: 270, concDepth: 12 }, fullRates({ [LAB.SKID_CONCRETE]: 1.0 }))
   assert.equal(fast.laborCost, slow.laborCost * 2, 'rate ×2 → hours ×2')
 })
 
 test('unpriced / no-fallback: an unset labor rate resolves to 0, not a hidden constant', () => {
-  const r = run({ dumpType: 'In House', concSF: 270, concDepth: 12 }, fullRates({ 'Skid - Concrete': 0 }))
+  const r = run({ dumpType: 'In House', concSF: 270, concDepth: 12 }, fullRates({ [LAB.SKID_CONCRETE]: 0 }))
   assert.equal(r.conc.hours, 0, 'unset rate → 0 hours (no code fallback)')
   assert.equal(r.laborCost, 0, 'concrete-only with unset rate → $0 labor')
 })

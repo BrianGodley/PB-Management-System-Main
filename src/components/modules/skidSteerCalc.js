@@ -2,9 +2,18 @@
 // unit-testable without React/Supabase. Signature unchanged (only lifted out of the
 // component; logic identical). Reads 'Demo - Skid …' rate keys.
 import { BAS } from '../../lib/basicLaborRefs.js'
+import { LAB } from '../../lib/laborRefs.js'
 import { makeModuleRates } from '../../lib/moduleRates.js'
 const n = v => parseFloat(v) || 0
 const DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN = 60
+// Per-height shrub ref_keys, keyed by the row's height bucket string.
+const SKID_SHRUB_REF = {
+  '0-1': LAB.SKID_SHRUB_0_1,
+  '1-2': LAB.SKID_SHRUB_1_2,
+  '2-3': LAB.SKID_SHRUB_2_3,
+  '3-4': LAB.SKID_SHRUB_3_4,
+  '4-5': LAB.SKID_SHRUB_4_5,
+}
 
 export function calcDemo(
   state,
@@ -52,29 +61,30 @@ export function calcDemo(
   // ── In-House labor rates (hrs per unit; unset ⇒ 0, no fallback) ───────────
   // Model: Concrete/Soil/Footing/Misc-Vert = hrs × Cu Yd; Misc-Flat/Compaction/
   // Jumping-Jack = hrs × Cu Ft; Grade-Cut/Grade-Fill/Import-Base = hrs × Sq Ft.
-  const laborConc = n(lr['Skid - Concrete'])          // hrs / Cu Yd
-  const laborDirt = n(lr['Skid - Soil'])              // hrs / Cu Yd
-  const laborGrass = n(lr['Demo - Skid - Grass SF'])  // unchanged (per 100 sf·in)
-  const laborMiscFlat = n(lr['Skid - Misc Flat'])     // hrs / Cu Ft
-  const laborMiscVert = n(lr['Skid - Misc Vertical']) // hrs / Cu Yd
-  const laborFooting = n(lr['Skid - Footing'])        // hrs / Cu Yd
-  const laborGradeCut = n(lr['Skid - Grade Cut'])     // hrs / Sq Ft
+  const laborConc = n(lr[LAB.SKID_CONCRETE])          // hrs / Cu Yd
+  const laborDirt = n(lr[LAB.SKID_SOIL])              // hrs / Cu Yd
+  const laborGrass = n(lr[LAB.SKID_GRASS_SF])  // unchanged (per 100 sf·in)
+  const laborMiscFlat = n(lr[LAB.SKID_MISC_FLAT])     // hrs / Cu Ft
+  const laborMiscVert = n(lr[LAB.SKID_MISC_VERTICAL]) // hrs / Cu Yd
+  const laborFooting = n(lr[LAB.SKID_FOOTING])        // hrs / Cu Yd
+  const laborGradeCut = n(lr[LAB.SKID_GRADE_CUT])     // hrs / Sq Ft
+  // TODO ref_key: Demo - Skid Steer Grass not in live map (likely dead) — left as name read
   const rateGrass = n(lr['Demo - Skid Steer Grass'])
   const laborBase = n(lr[BAS.BASE_PREP_SKID])    // hrs / Cu Ft (shared Basic Labor)
-  const laborGradeFill = n(lr['Skid - Grade Fill'])   // hrs / Sq Ft
+  const laborGradeFill = n(lr[LAB.SKID_GRADE_FILL])   // hrs / Sq Ft
   const laborJJ = n(lr[BAS.JUMPING_JACK]) // shared, hrs / Cu Ft
-  const laborSS = n(lr['Skid - Compaction'])          // hrs / Cu Ft
+  const laborSS = n(lr[LAB.SKID_COMPACTION])          // hrs / Cu Ft
   // Rebar/Mesh is now a yes/no toggle that adds 30% to Skid - Concrete labor.
   const rebarMult = state.rebar ? 1.3 : 1
   // Shrub labor: per-height Each rates (replaces base rate × height factor).
-  const shrubRateFor = h => n(lr['Skid - Shrubs ' + h + ' ft'])
-  const stumpSmallRate = n(lr['Skid - Stump Small'])
-  const stumpMedRate = n(lr['Skid - Stump Medium'])
-  const stumpLargeRate = n(lr['Skid - Stump Large'])
-  const stumpXLRate = n(lr['Skid - Stump XL'])
-  const treeSmall = n(lr['Skid - Tree Small'])
-  const treeMed = n(lr['Skid - Tree Medium'])
-  const treeLarge = n(lr['Skid - Tree Large'])
+  const shrubRateFor = h => n(lr[SKID_SHRUB_REF[h]])
+  const stumpSmallRate = n(lr[LAB.SKID_STUMP_SMALL])
+  const stumpMedRate = n(lr[LAB.SKID_STUMP_MEDIUM])
+  const stumpLargeRate = n(lr[LAB.SKID_STUMP_LARGE])
+  const stumpXLRate = n(lr[LAB.SKID_STUMP_XL])
+  const treeSmall = n(lr[LAB.SKID_TREE_SMALL])
+  const treeMed = n(lr[LAB.SKID_TREE_MEDIUM])
+  const treeLarge = n(lr[LAB.SKID_TREE_LARGE])
 
   // Green-waste dump (tree/stump), billed per Cu Yd.
   const dumpGreen = n(mp['Dump Fee - Green Waste'])
@@ -112,8 +122,8 @@ export function calcDemo(
   const containerCostCf = cf =>
     Math.ceil(((n(cf) / 27) * swellFactor) / containerCy) * containerPrice
   // Editable hauling coefficients (Master Rates -> Labor, category Demo).
-  const haulSecPerFt = n(lr['Demo - Skid Steer Haul Sec/Ft'])
-  const haulLoadCy = n(lr['Demo - Skid Steer Load (CY)'])
+  const haulSecPerFt = n(lr[LAB.SKID_HAUL_SEC_FT])
+  const haulLoadCy = n(lr[LAB.SKID_LOAD_CY])
 
   // ── Import Base (single — the IMPORT section, not replicated) ──────────────
   const base = flat(state.baseSF, state.baseDepth || 4, laborBase, 0)
@@ -144,19 +154,19 @@ export function calcDemo(
         ]
   const sectionCalcs = mainSections.map(sec => {
     const c = flat(sec.concSF, sec.concDepth || 4, laborConc, 0)
-    const cRate = n(sec.concSF) > 0 ? R.labor('Skid - Concrete', { category: 'Demo', unit: 'Hrs per Cu Yd', label: 'Concrete Demo' }) : 0
+    const cRate = n(sec.concSF) > 0 ? R.labor(LAB.SKID_CONCRETE, { category: 'Demo', unit: 'Hrs per Cu Yd', label: 'Concrete Demo' }) : 0
     c.hours = c.cy * cRate * rebarF(sec.rebar)
     c.dumpFee = containerCost(sec.concSF, sec.concDepth || 4)
     const d = flat(sec.dirtSF, sec.dirtDepth || 4, laborDirt, 0)
-    const dRate = n(sec.dirtSF) > 0 ? R.labor('Skid - Soil', { category: 'Demo', unit: 'Hrs per Cu Yd', label: 'Soil Demo' }) : 0
+    const dRate = n(sec.dirtSF) > 0 ? R.labor(LAB.SKID_SOIL, { category: 'Demo', unit: 'Hrs per Cu Yd', label: 'Soil Demo' }) : 0
     d.hours = d.cy * dRate
     d.dumpFee = containerCost(sec.dirtSF, sec.dirtDepth || 4)
     const g = flat(sec.grassSF, sec.grassDepth || 4, rateGrass, 0)
-    const gRate = n(sec.grassSF) > 0 ? R.labor('Demo - Skid - Grass SF', { category: 'Demo', unit: 'Hrs per Sq Ft', label: 'Grass Demo' }) : 0
+    const gRate = n(sec.grassSF) > 0 ? R.labor(LAB.SKID_GRASS_SF, { category: 'Demo', unit: 'Hrs per Sq Ft', label: 'Grass Demo' }) : 0
     g.hours = sfLaborHrs(sec.grassSF, sec.grassDepth || 4, gRate)
     g.dumpFee = containerCost(sec.grassSF, sec.grassDepth || 4)
     const gc = flat(sec.gradeCutSF, sec.gradeCutDepth || 4, laborGradeCut, 0)
-    const gcRate = n(sec.gradeCutSF) > 0 ? R.labor('Skid - Grade Cut', { category: 'Demo', unit: 'Hrs per Sq Ft', label: 'Grade Cut' }) : 0
+    const gcRate = n(sec.gradeCutSF) > 0 ? R.labor(LAB.SKID_GRADE_CUT, { category: 'Demo', unit: 'Hrs per Sq Ft', label: 'Grade Cut' }) : 0
     gc.hours = n(sec.gradeCutSF) * gcRate
     gc.dumpFee = containerCost(sec.gradeCutSF, sec.gradeCutDepth || 4)
     return { conc: c, dirt: d, grass: g, gradeCut: gc }
@@ -179,21 +189,21 @@ export function calcDemo(
   // Misc rows use same base rate as concrete/dirt (no preset dump fee for full SS)
   const miscFlatCalc = (state.miscFlatRows || []).map(r => {
     const row = flat(r.sf, r.depth || 4, laborConc, 0)
-    const rate = n(r.sf) > 0 ? R.labor('Skid - Misc Flat', { category: 'Demo', unit: 'Hrs per Cu Ft', label: 'Misc Flat Demo' }) : 0
+    const rate = n(r.sf) > 0 ? R.labor(LAB.SKID_MISC_FLAT, { category: 'Demo', unit: 'Hrs per Cu Ft', label: 'Misc Flat Demo' }) : 0
     row.hours = flatCf(r.sf, r.depth || 4) * rate // hrs × Cu Ft
     row.dumpFee = containerCost(r.sf, r.depth || 4)
     return row
   })
   const miscVertCalc = (state.miscVertRows || []).map(r => {
     const row = vert(r.lf, r.heightIn || 0, r.widthIn || 8, laborConc, 0)
-    const rate = row.cf > 0 ? R.labor('Skid - Misc Vertical', { category: 'Demo', unit: 'Hrs per Cu Yd', label: 'Misc Vertical Demo' }) : 0
+    const rate = row.cf > 0 ? R.labor(LAB.SKID_MISC_VERTICAL, { category: 'Demo', unit: 'Hrs per Cu Yd', label: 'Misc Vertical Demo' }) : 0
     row.hours = row.cy * rate // hrs × Cu Yd
     row.dumpFee = containerCostCf(row.cf)
     return row
   })
   const footingCalc = (state.footingRows || []).map(r => {
     const row = vert(r.lf, r.heightIn || 0, r.widthIn || 8, laborConc, 0)
-    const rate = row.cf > 0 ? R.labor('Skid - Footing', { category: 'Demo', unit: 'Hrs per Cu Yd', label: 'Footing Demo' }) : 0
+    const rate = row.cf > 0 ? R.labor(LAB.SKID_FOOTING, { category: 'Demo', unit: 'Hrs per Cu Yd', label: 'Footing Demo' }) : 0
     row.hours = row.cy * rate // hrs × Cu Yd
     row.dumpFee = containerCostCf(row.cf)
     return row
@@ -203,7 +213,7 @@ export function calcDemo(
   const gradeCut = sumRows('gradeCut') // aggregated per Main Demo section (above)
   const gradeFill = flat(state.gradeFillSF, state.gradeFillDepth || 4, laborGradeFill, 0)
   // New model: grade fill = hrs × Sq Ft (depth still drives haul/dump volume).
-  const gradeFillRate = n(state.gradeFillSF) > 0 ? R.labor('Skid - Grade Fill', { category: 'Demo', unit: 'Hrs per Sq Ft', label: 'Grade Fill' }) : 0
+  const gradeFillRate = n(state.gradeFillSF) > 0 ? R.labor(LAB.SKID_GRADE_FILL, { category: 'Demo', unit: 'Hrs per Sq Ft', label: 'Grade Fill' }) : 0
   gradeFill.hours = n(state.gradeFillSF) * gradeFillRate
 
   // Bank cubic yards for compaction display (volume shown to user).
@@ -212,7 +222,7 @@ export function calcDemo(
   // New model: Jumping Jack (shared Basic Labor) and Compaction = hrs × Cu Ft.
   const jjRateUse = n(state.jjSF) > 0 ? R.labor(BAS.JUMPING_JACK, { category: 'Demo', unit: 'Hrs per Cu Ft', label: 'Jumping Jack' }) : 0
   const jjHrs = flatCf(state.jjSF, state.jjDepth || 4) * jjRateUse
-  const ssCmpRate = n(state.ssCmpSF) > 0 ? R.labor('Skid - Compaction', { category: 'Demo', unit: 'Hrs per Cu Ft', label: 'Compaction' }) : 0
+  const ssCmpRate = n(state.ssCmpSF) > 0 ? R.labor(LAB.SKID_COMPACTION, { category: 'Demo', unit: 'Hrs per Cu Ft', label: 'Compaction' }) : 0
   const ssCmpHrs = flatCf(state.ssCmpSF, state.ssCmpDepth || 4) * ssCmpRate
 
   // ── Rebar/Mesh ───────────────────────────────────────────────────────────
@@ -221,22 +231,22 @@ export function calcDemo(
   // ── Vegetation ───────────────────────────────────────────────────────────
   // Shrub Demo — per-height Each rates: qty × rate for the row's height bucket.
   const shrubRowsCalc = (state.shrubRows || []).map(r => {
-    const rate = n(r.qty) > 0 ? R.labor('Skid - Shrubs ' + r.height + ' ft', { category: 'Demo', unit: 'Hrs per Each', label: 'Shrub ' + r.height + ' ft' }) : 0
+    const rate = n(r.qty) > 0 ? R.labor(SKID_SHRUB_REF[r.height], { category: 'Demo', unit: 'Hrs per Each', label: 'Shrub ' + r.height + ' ft' }) : 0
     return { hrs: n(r.qty) * rate }
   })
   const shrubRowsHrs = shrubRowsCalc.reduce((sum, r) => sum + r.hrs, 0)
-  const stumpSmallHrs = n(state.stumpSmallQty) > 0 ? n(state.stumpSmallQty) * access * R.labor('Skid - Stump Small', { category: 'Demo', unit: 'Hrs per Each', label: 'Stump Small' }) : 0
-  const stumpMedHrs = n(state.stumpMedQty) > 0 ? n(state.stumpMedQty) * access * R.labor('Skid - Stump Medium', { category: 'Demo', unit: 'Hrs per Each', label: 'Stump Medium' }) : 0
-  const stumpLargeHrs = n(state.stumpLargeQty) > 0 ? n(state.stumpLargeQty) * access * R.labor('Skid - Stump Large', { category: 'Demo', unit: 'Hrs per Each', label: 'Stump Large' }) : 0
-  const stumpXLHrs = n(state.stumpXLQty) > 0 ? n(state.stumpXLQty) * access * R.labor('Skid - Stump XL', { category: 'Demo', unit: 'Hrs per Each', label: 'Stump XL' }) : 0
+  const stumpSmallHrs = n(state.stumpSmallQty) > 0 ? n(state.stumpSmallQty) * access * R.labor(LAB.SKID_STUMP_SMALL, { category: 'Demo', unit: 'Hrs per Each', label: 'Stump Small' }) : 0
+  const stumpMedHrs = n(state.stumpMedQty) > 0 ? n(state.stumpMedQty) * access * R.labor(LAB.SKID_STUMP_MEDIUM, { category: 'Demo', unit: 'Hrs per Each', label: 'Stump Medium' }) : 0
+  const stumpLargeHrs = n(state.stumpLargeQty) > 0 ? n(state.stumpLargeQty) * access * R.labor(LAB.SKID_STUMP_LARGE, { category: 'Demo', unit: 'Hrs per Each', label: 'Stump Large' }) : 0
+  const stumpXLHrs = n(state.stumpXLQty) > 0 ? n(state.stumpXLQty) * access * R.labor(LAB.SKID_STUMP_XL, { category: 'Demo', unit: 'Hrs per Each', label: 'Stump XL' }) : 0
   const stumpHrs = stumpSmallHrs + stumpMedHrs + stumpLargeHrs + stumpXLHrs
 
   const treeCalc = (state.treeRows || []).map(r => {
     const qty = n(r.qty),
       ht = n(r.height) || 10
-    const treeName = r.size === 'Large' ? 'Skid - Tree Large' : r.size === 'Medium' ? 'Skid - Tree Medium' : 'Skid - Tree Small'
+    const treeRef = r.size === 'Large' ? LAB.SKID_TREE_LARGE : r.size === 'Medium' ? LAB.SKID_TREE_MEDIUM : LAB.SKID_TREE_SMALL
     const treeLabel = r.size === 'Large' ? 'Tree Large' : r.size === 'Medium' ? 'Tree Medium' : 'Tree Small'
-    const mult = qty > 0 ? R.labor(treeName, { category: 'Demo', unit: 'Hrs per Each', label: treeLabel }) : 0
+    const mult = qty > 0 ? R.labor(treeRef, { category: 'Demo', unit: 'Hrs per Each', label: treeLabel }) : 0
     const hrs = qty * ht * access * mult
     // Green-waste volume in cubic yards; dump billed per CY.
     const cy = qty * (ht / 10) * treeCyFactor

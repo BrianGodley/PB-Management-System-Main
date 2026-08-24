@@ -5,22 +5,24 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { calcDemo } from './handDemoCalc.js'
+import { LAB } from '../../lib/laborRefs.js'
 
 // hrs-per-Cu-Ft rates (In-House labor). hours = Cu Ft × rate. JJ = shared Basic Labor.
+// Labor is read by frozen ref_key (LAB-NNN-slug); archived/dead rows stay name-keyed.
 const fullRates = (over = {}) => ({
-  'Hand - Concrete': 0.1,   // hrs / Cu Ft
-  'Hand - Soil': 0.1,
-  'Hand - Grass': 0.1,
+  [LAB.HAND_CONCRETE]: 0.1,   // hrs / Cu Ft
+  [LAB.HAND_SOIL]: 0.1,
+  [LAB.HAND_GRASS]: 0.1,
   'BAS-002-import-base-hand': 0.1,
-  'Hand - Bucket': 0.1,
-  'Hand - Misc Flat': 0.1,
-  'Hand - Misc Vertical': 0.1,
-  'Hand - Footing': 0.1,
-  'Hand - Grade Cut': 0.1,
-  'Hand - Grade Fill': 0.05,
+  'Hand - Bucket': 0.1, // archived row — still read by name
+  [LAB.HAND_MISC_FLAT]: 0.1,
+  [LAB.HAND_MISC_VERTICAL]: 0.1,
+  [LAB.HAND_FOOTING]: 0.1,
+  [LAB.HAND_GRADE_CUT]: 0.1,
+  [LAB.HAND_GRADE_FILL]: 0.05,
   'BAS-006-jumping-jack': 0.04, // shared, hrs / Cu Ft
-  'Hand - Rebar': 0.25, // +25% concrete when rebar toggle on
-  'Hand - Load (CY)': 1,
+  'Hand - Rebar': 0.25, // archived row — read by name; +25% concrete when rebar toggle on
+  [LAB.HAND_LOAD_CY]: 1,
   'BAS-007-difficulty-ratio': 1, // shared Basic Labor
   ...over,
 })
@@ -87,7 +89,7 @@ test('Add Demo: flat state (no sections) still reproduces one-section numbers ex
 })
 
 test('bucket checkbox multiplies that row hours by the Bucket coefficient', () => {
-  const rates = fullRates({ 'Hand - Bucket Labor Mult': 2 })
+  const rates = fullRates({ [LAB.HAND_BUCKET_LABOR_MULT]: 2 })
   const base = run({ dumpType: 'In House', concSF: 300, concDepth: 12 }, rates)
   const bucketed = run({ dumpType: 'In House', concSF: 300, concDepth: 12, concBucket: true }, rates)
   assert.equal(bucketed.laborCost, base.laborCost * 2, 'concrete bucket → ×2')
@@ -115,8 +117,8 @@ test('grade cut uses 0.1 hrs/CF, grade fill 0.05 (distinct rates)', () => {
 })
 
 test('View Rates edit reflects: raising the hrs/CF RAISES hours (multiply model)', () => {
-  const slow = run({ dumpType: 'In House', concSF: 300, concDepth: 12 }, fullRates({ 'Hand - Concrete': 0.1 }))
-  const fast = run({ dumpType: 'In House', concSF: 300, concDepth: 12 }, fullRates({ 'Hand - Concrete': 0.2 }))
+  const slow = run({ dumpType: 'In House', concSF: 300, concDepth: 12 }, fullRates({ [LAB.HAND_CONCRETE]: 0.1 }))
+  const fast = run({ dumpType: 'In House', concSF: 300, concDepth: 12 }, fullRates({ [LAB.HAND_CONCRETE]: 0.2 }))
   assert.equal(fast.laborCost, slow.laborCost * 2, 'rate ×2 → hours ×2')
 })
 
