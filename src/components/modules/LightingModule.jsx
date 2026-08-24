@@ -362,7 +362,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
   function onVendorChange(subcat, rows, setRows, i, vendor) {
     const opts = lightingOptions(subcat, vendor, materialRows)
     const first = opts[0]
-    const patch = { vendor, itemId: first?.id || '', subEach: '' }
+    const patch = { vendor, itemId: first?.ref_key || first?.id || '', subEach: '' }
     if (isSub && first) patch.subEach = defaultSubEach(first.row)
     updateRow(rows, setRows, i, patch)
   }
@@ -507,11 +507,11 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
                         value={selId}
                         onChange={val => onItemChange(subcat, rows, setRows, i, row, val)}
                         options={[
-                          ...(row.itemId && !opts.some(o => o.id === row.itemId)
+                          ...(row.itemId && !opts.some(o => (o.ref_key || o.id) === row.itemId)
                             ? [{ value: row.itemId, label: item?.name || 'Saved item' }]
                             : []),
                           ...opts.map(o => ({
-                            value: o.id,
+                            value: o.ref_key || o.id,
                             label: `${o.label}${o.row.unit ? ` (${o.row.unit})` : ''}`,
                           })),
                         ]}

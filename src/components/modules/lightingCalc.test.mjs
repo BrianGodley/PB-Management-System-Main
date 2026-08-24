@@ -15,7 +15,7 @@ const LRPH = 75
 // One catalog fixture row: Standard (vendor_id null), sub_category 'Light Fixture',
 // points its install labor at the 'Fixture Labor' rate.
 const FIXTURE = {
-  id: 'fix1', name: 'Path Light', sub_category: 'Light Fixture', vendor_id: null,
+  id: 'fix1', ref_key: 'MAT-520-path-light', name: 'Path Light', sub_category: 'Light Fixture', vendor_id: null,
   unit_cost: 100, watts: 12, va: 15, sub_price_ea: 180, calc_meta: { labor_rate: 'Fixture Labor' },
 }
 const WIRE = {
@@ -45,6 +45,15 @@ test('material value: qty × unit_cost, and watts/VA accumulate (3 × $100 = $30
   assert.equal(r.rawMat, 300, `rawMat got ${r.rawMat}`)
   assert.equal(r.totalWatts, 36, `watts got ${r.totalWatts}`)
   assert.equal(r.totalVA, 45, `VA got ${r.totalVA}`)
+})
+
+test('M5 ref_key parity: picking a fixture by material ref_key resolves the same material + labor as by id', () => {
+  const byId = run({ fixtureRows: [{ vendor: 'Standard', itemId: 'fix1', qty: 3 }] }, [FIXTURE], { 'Fixture Labor': 1.5 })
+  const byRef = run({ fixtureRows: [{ vendor: 'Standard', itemId: 'MAT-520-path-light', qty: 3 }] }, [FIXTURE], { 'Fixture Labor': 1.5 })
+  assert.equal(byRef.rawMat, byId.rawMat, `material should match; got ${byRef.rawMat} vs ${byId.rawMat}`)
+  assert.equal(byRef.rawMat, 300, `3 × $100 = $300; got ${byRef.rawMat}`)
+  assert.equal(byRef.totalHrs, byId.totalHrs, 'labor identical regardless of key form')
+  assert.equal(byRef.totalHrs, 4.5, `3 × 1.5 = 4.5 hrs; got ${byRef.totalHrs}`)
 })
 
 test('edit-reflects: raising the item labor rate raises labor proportionally', () => {
