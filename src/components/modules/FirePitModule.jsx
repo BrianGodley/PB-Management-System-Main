@@ -133,9 +133,11 @@ const FP_BRICK_LAY = { dbName: 'Wall Brick Lay Labor' } // hrs / SF of brick fac
 const FP_FORM_LAB = { dbName: 'Wall PIP Install Labor' } // hrs / SF of form (shared w/ Walls PIP)
 const FP_POUR_LAB = { dbName: 'FP Pour Concrete Labor Rate' } // hrs / CY poured
 
-// Resolve a picked catalog product row by id (any vendor).
-function catalogRowById(materialRows, id) {
-  return (materialRows || []).find(r => r.id === id) || null
+// Resolve a picked catalog product row by its frozen ref_key (preferred) or id.
+// The block picker stores ref_key so a selection survives a catalog rename; a
+// legacy id-saved row still resolves.
+function catalogRowById(materialRows, key) {
+  return (materialRows || []).find(r => (r.ref_key && r.ref_key === key) || r.id === key) || null
 }
 // Block dims from a catalog row's calc_meta (fallback to legacy cols / default).
 function blockDims(row, def = { w: 8, h: 8, l: 16 }) {
@@ -161,7 +163,9 @@ function subcatProductOptions(materialRows, subcat, vendorSel) {
   const isStd = !vendorSel || vendorSel === 'Standard'
   return (materialRows || [])
     .filter(r => r.sub_category === subcat && (isStd ? r.vendor_id == null : r.vendor_id === vendorSel))
-    .map(r => ({ value: r.id, label: r.name, row: r }))
+    // Option VALUE = the item's frozen ref_key (picker stores it, rename-proof);
+    // catalogRowById resolves ref_key or a legacy id save.
+    .map(r => ({ value: r.ref_key || r.id, label: r.name, row: r }))
 }
 function labelWithDims(row) {
   const d = blockDims(row, { w: 0, h: 0, l: 0 })
@@ -332,6 +336,15 @@ function EpTable({
 }) {
   const upd = (i, field, val) =>
     setRows(rs => rs.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  // Resolve a stored ref_key (legacy id/name too) to the item's display name for the
+  // orphan-value fallback option. Strips the "<sub> - " prefix.
+  const matName = key => {
+    if (!key) return key
+    const hit = (materialRows || []).find(r => r.ref_key === key || r.id === key || r.name === key)
+    if (!hit) return key
+    const dash = hit.name ? hit.name.indexOf(' - ') : -1
+    return dash > 0 ? hit.name.slice(dash + 3) : hit.name
+  }
   return (
     <div>
       {title && <p className="text-xs font-semibold text-gray-600 mb-1">{title}</p>}
@@ -390,11 +403,11 @@ function EpTable({
                         onChange={e => upd(i, 'type', e.target.value)}
                       >
                         {!row.type && <option value="">Select type</option>}
-                        {row.type && !opts.some(o => o.label === row.type) && (
-                          <option value={row.type}>{row.type}</option>
+                        {row.type && !opts.some(o => (o.ref_key || o.label) === row.type || o.label === row.type) && (
+                          <option value={row.type}>{matName(row.type)}</option>
                         )}
                         {opts.map(o => (
-                          <option key={o.label} value={o.label}>
+                          <option key={o.label} value={o.ref_key || o.label}>
                             {o.label}
                           </option>
                         ))}
@@ -1372,7 +1385,9 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                 >
                   <option value="">{opts.length ? 'Select…' : 'No products — add in Master Rates'}</option>
                   {structMatType && !opts.some(o => o.value === structMatType) && (
-                    <option value={structMatType}>{structMatType}</option>
+                    <option value={structMatType}>
+                      {catalogRowById(materialRows, structMatType)?.name || structMatType}
+                    </option>
                   )}
                   {opts.map(o => (
                     <option key={o.value} value={o.value}>
