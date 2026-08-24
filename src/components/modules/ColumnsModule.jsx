@@ -1045,8 +1045,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
                           o.label === row.type
                       ) || finishOpts[0]
                     const rate = FINISH_TYPES[(selOpt && selOpt.typeKey) ?? row.type] ?? FINISH_TYPES[row.type]
-                    const isTon = rate?.unit === 'ton'
-                    const defCost = isTon ? rate?.costPerTon : rate?.costPerSF
+                    const defCost = rate?.costPerSF
                     const priceDbName = (selOpt && selOpt.dbName) || rate?.dbName
                     const cost = isSub
                       ? colMat(rate?.subDbName, row.vendor, rate?.subFallback ?? 0)

@@ -205,7 +205,6 @@ const WALL_RATES = {
   footingSoilSwell: { db: 'Wall Footing Soil Swell' }, // loose/broken swell factor
   footingSoilContainerCy: { db: 'Wall Footing Soil Container CY' }, // CY per haul container
   footingSoilContainerPrice: { db: 'Wall Footing Soil Container Price' }, // $ per container
-  footingSoilTonsPerCy: { db: 'Wall Footing Soil Tons per CY' }, // tons per loose CY (display)
   curveLab: { db: 'Wall Curve Labor Factor' }, // factor on struct hrs per % curved
   // Poured-In-Place stem coefficients.
   pipFormLab: { db: 'Wall PIP Install Labor' }, // hr / SF of form — canonical PIP labor (shared w/ Columns + Fire Pit)
@@ -245,7 +244,6 @@ const WALL_RATES = {
   // Hand compaction productivity relative to Jumping Jack (Hand = 3× the JJ hrs).
   // Table-driven multiplier; fb = the legacy 3 so totals are unchanged until edited.
   handCompactionMult: { db: 'Wall Hand Compaction Multiplier' }, // × (on JJ rate)
-  demoSfToTonsDenom: { db: 'Demo SF to Tons Denom' }, // sfToTons: (sf / 200) × depthIn (all Demo modules)
   // Container removal (dump) — per method (misc_rates, category Demo).
   demoHandContainer: { db: 'Demo - Hand Container (Low-Boy)' }, // $ per container
   demoHandContainerCy: { db: 'Demo - Hand Container Capacity (CY)' }, // CY per container
@@ -472,7 +470,6 @@ const WALL_RATE_SPECS = [
       ['footingSoilContainerPrice', 'Soil Haul — Container', 'Walls', 'ea', 'currency'],
       ['footingSoilContainerCy', 'Soil Haul — Container CY', 'Walls', 'CY', 'coefficient'],
       ['footingSoilSwell', 'Soil Swell Factor', 'Walls', '×', 'coefficient'],
-      ['footingSoilTonsPerCy', 'Soil Tons per CY', 'Walls', 'ton/CY', 'coefficient'],
     ],
   },
   {
@@ -1394,12 +1391,10 @@ function calcWalls(
   //    labor hours, removal tons and container dump fees. With no demo inputs
   //    entered all three are 0, so the aggregate totals are unchanged. ──
   let demoHrs = 0,
-    demoTons = 0,
     demoDump = 0
   const addDemo = w => {
     const d = wallDemo(w, r)
     demoHrs += d.hrs
-    demoTons += d.tons
     demoDump += d.dump
   }
   ;(state.cmuWalls || []).forEach(addDemo)
@@ -1518,7 +1513,6 @@ function calcWalls(
     // Three labor buckets for the summary's split lines (raw hours).
     mainInstallHrs,
     demoHrs,
-    demoTons,
     demoDump,
     timberHrs,
     structuralMat,

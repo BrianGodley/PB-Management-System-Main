@@ -43,8 +43,9 @@ export function wallBackfill(wall = {}, r) {
   return { hrs: backfillHrs + compHrs }
 }
 
-// Demo hours + tons + dump for ONE wall (Slope Removal + Dig&Haul Footing Soil).
+// Demo hours + dump for ONE wall (Slope Removal + Dig&Haul Footing Soil).
 // Reuses the Demo modules' DIRT math via r; Excavator shares Mini Skid's rates.
+// Tons removed — labor is CF-based, dump is container/CY-based.
 const DEMO_METHOD_KEYS = {
   Hand: { dirt: 'demoHandDirt', cont: 'demoHandContainer', cy: 'demoHandContainerCy', swell: 'demoHandSwell' },
   'Mini Skid': { dirt: 'demoMiniDirt', cont: 'demoMiniContainer', cy: 'demoMiniContainerCy', swell: 'demoMiniSwell' },
@@ -52,19 +53,17 @@ const DEMO_METHOD_KEYS = {
   Excavator: { dirt: 'demoMiniDirt', cont: 'demoMiniContainer', cy: 'demoMiniContainerCy', swell: 'demoMiniSwell' },
 }
 export function wallDemo(wall = {}, r) {
-  const denom = r('demoSfToTonsDenom') || 200
   const part = (sf, thickIn, method) => {
     const s = n(sf)
     const t = n(thickIn)
-    if (s <= 0 || t <= 0) return { hrs: 0, tons: 0, dump: 0 }
+    if (s <= 0 || t <= 0) return { hrs: 0, dump: 0 }
     const keys = DEMO_METHOD_KEYS[method] || DEMO_METHOD_KEYS.Hand
     const hrs = (s / 100) * t * r(keys.dirt)
-    const tons = (s / denom) * t
     const containerCy = r(keys.cy) || 1
     const removalYards = ((s * (t / 12)) / 27) * r(keys.swell)
     const containers = Math.ceil(removalYards / containerCy)
     const dump = containers * r(keys.cont)
-    return { hrs, tons, dump }
+    return { hrs, dump }
   }
   const slopeSf = n(wall.demoSlopeLf) * (n(wall.demoSlopeH) / 12)
   const slope = part(slopeSf, wall.demoSlopeD, wall.demoSlopeMethod || 'Hand')
@@ -77,13 +76,11 @@ export function wallDemo(wall = {}, r) {
     footCF > 0
       ? {
           hrs: footCF * footDigRate, // rate is hours per Cu Ft
-          tons: (footCF / 27) * r('footingSoilTonsPerCy'),
           dump: Math.ceil(footYards / footContCy) * r('footingSoilContainerPrice'),
         }
-      : { hrs: 0, tons: 0, dump: 0 }
+      : { hrs: 0, dump: 0 }
   return {
     hrs: slope.hrs + foot.hrs,
-    tons: slope.tons + foot.tons,
     dump: slope.dump + foot.dump,
   }
 }

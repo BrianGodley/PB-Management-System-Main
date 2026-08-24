@@ -25,13 +25,10 @@ export function calcDemo(
   // ── Table-driven estimating coefficients (fall back to code constants) ──
   // Business-tunable assumptions, surfaced as editable coefficient rows in View
   // Rates (labor_rates, category Demo). Fixed unit conversions (27 cf/cy,
-  // 12 in/ft, 2000 lb/ton, 60 min/hr) stay as literal math.
-  const tonsSfInDenom = n(mp['Tons SF-in Denominator']) // shared Basic Materials
-  const concreteWeightLbCf = n(lr[BAS.CONCRETE_WEIGHT]) // shared Basic Labor
+  // 12 in/ft, 60 min/hr) stay as literal math. Tons removed — every volume is
+  // Cu Yd (dump fees per container/CY, labor hrs per Cu Ft).
   const treeCyFactor = n(mp['Tree CY Factor'])
   const bucketLaborMult = n(lr['Hand - Bucket Labor Mult'])
-  // Local sfToTons shadows the module helper so the tons denominator is editable.
-  const sfToTons = (sf, depthIn) => (n(sf) / tonsSfInDenom) * n(depthIn)
   // Subcontractor rates: a one-off adjustment saved on THIS estimate
   // (state.rateOverrides) takes precedence over the master rate.
   const sr = { ...(subRates || {}) }
@@ -77,39 +74,26 @@ export function calcDemo(
   const treeMed = n(lr['Hand - Tree Medium'])
   const treeLarge = n(lr['Hand - Tree Large'])
 
-  const dumpConc = n(mp['Dump Fee - Concrete'])
-  const dumpDirt = n(mp['Dump Fee - Dirt'])
-  const dumpGreen = n(mp['Dump Fee - Green Waste'])
   const dumpTree = n(mp['Dump Fee - Tree/Stump'])
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   // Bank (in-place) cubic yards — the volume shown to the user. 27 cf/cy and
   // 12 in/ft are fixed unit conversions. cy = sf × depthFt / 27.
-  function flat(sf, depthIn, baseRate, dumpFeePerTon = 0) {
-    const tons = sfToTons(sf, depthIn)
+  // Volume in bank cubic yards — the only basis (tons removed). hours + dumpFee
+  // are always set by the caller (hrs per Cu Ft, container/CY dump); returned
+  // zero here. cy = sf × depthFt / 27.
+  function flat(sf, depthIn) {
     const cy = (n(sf) * (n(depthIn) / 12)) / 27
-    if (!tons) return { tons: 0, cy: 0, hours: 0, dumpFee: 0 }
-    return {
-      tons,
-      cy,
-      hours: tons / (baseRate * access), // labor always calculated
-      dumpFee: tons * dumpFeePerTon,
-    }
+    if (!cy) return { cy: 0, hours: 0, dumpFee: 0 }
+    return { cy, hours: 0, dumpFee: 0 }
   }
 
-  // Vertical: LF × Height(in) × Width(in) → CF → CY (bank) and tons.
-  function vert(lf, heightIn, widthIn, baseRate, dumpFeePerTon = 0) {
+  // Vertical: LF × Height(in) × Width(in) → CF → CY (bank).
+  function vert(lf, heightIn, widthIn) {
     const cf = n(lf) * (n(heightIn) / 12) * (n(widthIn) / 12)
-    const tons = (cf * concreteWeightLbCf) / 2000
     const cy = cf / 27
-    if (!tons) return { tons: 0, cy: 0, cf: 0, hours: 0, dumpFee: 0 }
-    return {
-      tons,
-      cy,
-      cf,
-      hours: tons / (baseRate * access), // labor always calculated
-      dumpFee: tons * dumpFeePerTon,
-    }
+    if (!cf) return { cy: 0, cf: 0, hours: 0, dumpFee: 0 }
+    return { cy, cf, hours: 0, dumpFee: 0 }
   }
 
   // Editable container disposal rates (Master Rates -> Materials, category Demo).
@@ -171,10 +155,9 @@ export function calcDemo(
   // Aggregate each row across sections so every downstream total (labor hours,
   // sub-haul CY, hauling, summary) works unchanged — one section = prior numbers.
   const sumRows = key => {
-    const acc = { tons: 0, cy: 0, cf: 0, hours: 0, dumpFee: 0 }
+    const acc = { cy: 0, cf: 0, hours: 0, dumpFee: 0 }
     for (const s of sectionCalcs) {
       const r = s[key] || {}
-      acc.tons += r.tons || 0
       acc.cy += r.cy || 0
       acc.cf += r.cf || 0
       acc.hours += r.hours || 0
@@ -433,8 +416,6 @@ export function calcDemo(
     containerPrice,
     containerCy,
     swellFactor,
-    tonsSfInDenom,
-    concreteWeightLbCf,
     treeCyFactor,
     bucketLaborMult,
     // hrs-per-Cu-Ft rates (new model) — surfaced for View Rates rows.

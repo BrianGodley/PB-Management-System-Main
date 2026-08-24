@@ -23,12 +23,9 @@ export function calcDemo(
   // ── Table-driven estimating coefficients (fall back to code constants) ──
   // Business-tunable assumptions, surfaced as editable coefficient rows in View
   // Rates (labor_rates, category Demo). Fixed unit conversions (27 cf/cy,
-  // 12 in/ft, 2000 lb/ton, 60 min/hr) stay as literal math.
-  const tonsSfInDenom = n(mp['Tons SF-in Denominator']) // shared Basic Materials (Sub tab per-ton)
-  const concreteWeightLbCf = n(lr[BAS.CONCRETE_WEIGHT]) // shared Basic Labor (Sub tab / vertical tons)
+  // 12 in/ft, 60 min/hr) stay as literal math. Tons removed — every volume is
+  // Cu Yd (dump fees per container/CY, labor hrs per Cu Ft/Yd).
   const treeCyFactor = n(mp['Tree CY Factor']) // moved to master material rates
-  // Local sfToTons shadows the module helper so the tons denominator is editable.
-  const sfToTons = (sf, depthIn) => (n(sf) / tonsSfInDenom) * n(depthIn)
   // Subcontractor rates: a one-off adjustment saved on THIS estimate
   // (state.rateOverrides) takes precedence over the master rate.
   const sr = { ...(subRates || {}) }
@@ -74,40 +71,25 @@ export function calcDemo(
   const treeMed = n(lr['Mini - Tree Medium'])
   const treeLarge = n(lr['Mini - Tree Large'])
 
-  const dumpConc = n(mp['Dump Fee - Concrete'])
-  const dumpDirt = n(mp['Dump Fee - Dirt'])
-  const dumpGreen = n(mp['Dump Fee - Green Waste'])
   const dumpTreeStump = n(mp['Dump Fee - Tree/Stump'])
-  const dumpBase = n(mp['Dump Fee - Import Base'])
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   // accessLevel param lets each call site use the correct NonBob or Bobcat multiplier
   // Sub Haul: labor hours are UNCHANGED — sub replaces disposal cost only
   // dump fees zero out (replaced by per-1.5T sub haul charges in subCost)
-  function flat(sf, depthIn, baseRate, dumpFeePerTon = 0, accessLevel = accessNonBob) {
-    const tons = sfToTons(sf, depthIn)
+  // Volume in bank cubic yards — the only basis (tons removed). hours + dumpFee
+  // are always set by the caller (hrs per Cu Ft/Yd, container/CY dump).
+  function flat(sf, depthIn) {
     const cy = (n(sf) * (n(depthIn) / 12)) / 27
-    if (!tons) return { tons: 0, cy: 0, hours: 0, dumpFee: 0 }
-    return {
-      tons,
-      cy,
-      hours: tons / (baseRate * accessLevel),
-      dumpFee: tons * dumpFeePerTon,
-    }
+    if (!cy) return { cy: 0, hours: 0, dumpFee: 0 }
+    return { cy, hours: 0, dumpFee: 0 }
   }
 
-  function vert(lf, heightIn, widthIn, baseRate, dumpFeePerTon = 0, accessLevel = accessNonBob) {
+  function vert(lf, heightIn, widthIn) {
     const cf = n(lf) * (n(heightIn) / 12) * (n(widthIn) / 12)
-    const tons = (cf * concreteWeightLbCf) / 2000
     const cy = cf / 27
-    if (!tons) return { tons: 0, cy: 0, cf: 0, hours: 0, dumpFee: 0 }
-    return {
-      tons,
-      cy,
-      cf,
-      hours: tons / (baseRate * accessLevel),
-      dumpFee: tons * dumpFeePerTon,
-    }
+    if (!cf) return { cy: 0, cf: 0, hours: 0, dumpFee: 0 }
+    return { cy, cf, hours: 0, dumpFee: 0 }
   }
 
   // Editable container disposal rates (Master Rates -> Materials, category Demo).
@@ -167,10 +149,9 @@ export function calcDemo(
     return { conc, dirt, grass, gradeCut }
   })
   const sumRows = key => {
-    const acc = { tons: 0, cy: 0, cf: 0, hours: 0, dumpFee: 0 }
+    const acc = { cy: 0, cf: 0, hours: 0, dumpFee: 0 }
     for (const s of sectionCalcs) {
       const r = s[key] || {}
-      acc.tons += r.tons || 0
       acc.cy += r.cy || 0
       acc.cf += r.cf || 0
       acc.hours += r.hours || 0
@@ -208,8 +189,6 @@ export function calcDemo(
   const gradeFill = flat(state.gradeFillSF, state.gradeFillDepth || 4, laborGradeFill, 0, accessBobcat)
   gradeFill.hours = flatCf(state.gradeFillSF, state.gradeFillDepth || 4) * laborGradeFill
 
-  const jjTons = sfToTons(state.jjSF, state.jjDepth || 4)
-  const ssCmpTons = sfToTons(state.ssCmpSF, state.ssCmpDepth || 4)
   const jjCy = (n(state.jjSF) * (n(state.jjDepth || 4) / 12)) / 27
   const ssCmpCy = (n(state.ssCmpSF) * (n(state.ssCmpDepth || 4) / 12)) / 27
   // New model: Jumping Jack (shared Basic Labor) and Compaction = hrs × Cu Ft.
@@ -252,7 +231,7 @@ export function calcDemo(
   const manualSub = subManualEntries.reduce((s, r) => s + n(r.subCost), 0)
   const subManualMat = subManualEntries.reduce((s, r) => s + n(r.materials), 0)
 
-  // ── Sub Haul cost — per 1.5 tons, goes into subCost (not materials) ──────────
+  // ── Sub Haul cost — per Cu Yd, goes into subCost (not materials) ──────────
   // DB values (subcontractor_rates category='Sub Haul') take precedence over defaults
   const shConc = n(sr['Mini - Sub Haul CY - Concrete'])
   const shDirt = n(sr['Mini - Sub Haul CY - Dirt'])
@@ -283,18 +262,8 @@ export function calcDemo(
   // Shrub & Stump Demo are In-House only — no labour or sub cost on Sub.
   const vegHrs = shrubRowsHrs + stumpHrs + treeCalc.reduce((s, r) => s + r.hrs, 0)
 
-  // ── Walk-access (Truck → Work Area) — trip-based for mini-skid demo ───
-  // Excel: S4 = (F6 - BobcatTravel) × N4 × 2 × (1/60/60)
-  // where N4 = total tons × 2000 / NonBobBucketSize
-  const totalDemoTons =
-    conc.tons +
-    dirt.tons +
-    base.tons +
-    grass.tons +
-    miscFlatCalc.reduce((s, r) => s + r.tons, 0) +
-    miscVertCalc.reduce((s, r) => s + r.tons, 0) +
-    footingCalc.reduce((s, r) => s + r.tons, 0) +
-    gradeCut.tons
+  // ── Walk-access (Truck → Work Area) — trip-based for mini-skid demo.
+  // Trips = removed Cu Yd ÷ load size (tons removed — CY is the basis). ───
   const haulYards = mainSections.reduce(
     (s, sec) =>
       s +
@@ -402,7 +371,6 @@ export function calcDemo(
   return {
     sectionCalcs,
     walkHrs,
-    totalDemoTons,
     totalHrs,
     manDays,
     laborCost,
@@ -444,8 +412,6 @@ export function calcDemo(
     containerPrice,
     containerCy,
     swellFactor,
-    tonsSfInDenom,
-    concreteWeightLbCf,
     treeCyFactor,
     difficultyRatio,
     haulSecPerFt,
@@ -460,8 +426,6 @@ export function calcDemo(
     footingCalc,
     gradeCut,
     gradeFill,
-    jjTons,
-    ssCmpTons,
     jjCy,
     ssCmpCy,
     jjHrs,
@@ -488,11 +452,7 @@ export function calcDemo(
     laborGrass,
     isSub,
     subHaulCost,
-    dumpConc,
-    dumpDirt,
-    dumpGreen,
     dumpTreeStump,
-    dumpBase,
     laborConc,
     laborDirt,
     laborBase,

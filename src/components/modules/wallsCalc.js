@@ -81,10 +81,11 @@ export function computeCapRow(row, { lab, capP, concreteTruckP, defaultCap }) {
     dispQty = lf
   switch (row.type) {
     case 'Flagstone': {
-      const pr = n(capP('Flagstone'))
-      mat = (((widthIn / 12) * lf * 0.0833 * 100) / 2000) * pr
+      // Priced per Sq Ft of cap surface (width_ft × LF) — tons removed.
+      const pr = n(capP('Flagstone')) // $/Sq Ft
+      mat = (widthIn / 12) * lf * pr
       hrs = lf * lab('capFlagstoneLab')
-      subUnit = (((widthIn / 12) * 0.0833 * 100) / 2000) * pr
+      subUnit = (widthIn / 12) * pr
       subQty = lf
       break
     }

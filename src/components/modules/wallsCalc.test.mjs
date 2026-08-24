@@ -117,9 +117,9 @@ for (const type of FINISHES) {
 }
 
 // ─────────────────────────── CAPS @ 12 LF (Goal 1) ───────────────────────────
-test('Flagstone cap @12LF, 12" wide', () => {
-  const r = computeCapRow({ type: 'Flagstone', lf: 12, widthIn: 12, vendor: 'Standard' }, { lab, capP: () => 200 })
-  near(r.mat, (((12 / 12) * 12 * 0.0833 * 100) / 2000) * 200, 'mat')
+test('Flagstone cap @12LF, 12" wide — priced per Sq Ft of cap surface', () => {
+  const r = computeCapRow({ type: 'Flagstone', lf: 12, widthIn: 12, vendor: 'Standard' }, { lab, capP: () => 5 })
+  near(r.mat, (12 / 12) * 12 * 5, 'mat = width_ft × LF × $/SF = 1 × 12 × 5 = 60')
   near(r.hrs, 3.6, 'hrs = 12 × 0.3')
   near(r.qty, 12, 'LF')
 })

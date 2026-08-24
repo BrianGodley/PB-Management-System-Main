@@ -446,7 +446,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
   const isSub = state.dumpType === 'Subcontractor'
   const isDumpSub = false // disposal follows the In House/Sub toggle
 
-  const { dumpConc, dumpDirt, dumpGreen, dumpTreeStump, dumpBase } = calc
+  const { dumpTreeStump } = calc
 
   const td = 'py-1 pr-2 align-top'
   const num = 'py-1 pr-2 text-gray-600 tabular-nums text-xs'
@@ -525,7 +525,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
               { category: 'Demo', sub: 'Disposal' },
               { category: 'Basic Labor', sub: 'Base Prep', only: ['Basic Labor - Import Base Mini Skid Steer'] },
               { category: 'Basic Labor', sub: 'Compaction', only: ['Basic Labor - Jumping Jack'] },
-              { category: 'Basic Labor', sub: 'Coefficients', only: ['Basic Labor - Difficulty Ratio', 'Basic Labor - Concrete Weight lb/cf'] },
+              { category: 'Basic Labor', sub: 'Coefficients', only: ['Basic Labor - Difficulty Ratio'] },
             ]}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
@@ -833,7 +833,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 sfK: 'jjSF',
                 dK: 'jjDepth',
                 dep: 4,
-                tons: calc.jjCy,
+                cy: calc.jjCy,
                 hrs: calc.jjHrs,
                 note: `${calc.laborJJ} hr/100 Sq Ft per in deep`,
                 rate: calc.laborJJ,
@@ -845,14 +845,14 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                 sfK: 'ssCmpSF',
                 dK: 'ssCmpDepth',
                 dep: 4,
-                tons: calc.ssCmpCy,
+                cy: calc.ssCmpCy,
                 hrs: calc.ssCmpHrs,
                 note: `${calc.laborSS} hr/100 Sq Ft per in deep`,
                 rate: calc.laborSS,
                 rateName: 'Mini - Compaction',
                 rateUnit: 'hr/100 Sq Ft per in deep',
               },
-            ].map(({ label, sfK, dK, dep, tons, hrs, note, rate, rateName, rateUnit }) => (
+            ].map(({ label, sfK, dK, dep, cy, hrs, note, rate, rateName, rateUnit }) => (
               <tr key={label}>
                 <td className={`${td} font-medium text-gray-700`}>
                   <span className="inline-flex items-center gap-1">
@@ -870,7 +870,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
                     placeholder={String(dep)}
                   />
                 </td>
-                <td className={num}>{tons > 0 ? tons.toFixed(2) : '—'}</td>
+                <td className={num}>{cy > 0 ? cy.toFixed(2) : '—'}</td>
                 <td className={num}>{fh(hrs)}</td>
               </tr>
             ))}
@@ -931,7 +931,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           />
           <tbody className="divide-y divide-gray-50">
             {state.miscVertRows.map((r, i) => {
-              const cr = calc.miscVertCalc[i] || { tons: 0, cy: 0, hours: 0, cf: 0, dumpFee: 0 }
+              const cr = calc.miscVertCalc[i] || { cy: 0, hours: 0, cf: 0, dumpFee: 0 }
               return (
                 <tr key={i}>
                   <td className={td}>
@@ -998,7 +998,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           />
           <tbody className="divide-y divide-gray-50">
             {state.footingRows.map((r, i) => {
-              const cr = calc.footingCalc[i] || { tons: 0, cy: 0, hours: 0, dumpFee: 0 }
+              const cr = calc.footingCalc[i] || { cy: 0, hours: 0, dumpFee: 0 }
               return (
                 <tr key={i}>
                   <td className={td}>
