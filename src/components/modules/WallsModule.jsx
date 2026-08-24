@@ -6,7 +6,8 @@ import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import DropdownSelect from '../DropdownSelect'
-import MissingPriceModal from '../MissingPriceModal'
+import UnpricedItemModal from '../UnpricedItemModal'
+import { makeModuleRates } from '../../lib/moduleRates'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { groutCyPerBlock as cmuGroutCyPerBlock } from '../../lib/cmuGrout'
@@ -702,25 +703,30 @@ const wallMatPrice = resolveMaterialPrice
 // ── Per-row Wall Finish calculator — identical formulas to the original
 //    calcWalls finish math; only the material price source is vendor-resolved.
 //    Returns { mat, hrs } for In-House and { subUnit, subEach, subMat } for Sub.
-function computeWallFinishRow(row, mp, materialRows) {
-  // Math lives in the pure, unit-tested wallsCalc.js; here we resolve the labor
-  // coefficients (WALL_RATES keys) and the vendor/catalog material $/unit.
-  const lab = k => n(mp?.[WALL_RATES[k].db])
+function computeWallFinishRow(row, mp, materialRows, R = null, rec = null) {
+  // Math lives in the pure, unit-tested wallsCalc.js; here we resolve the labor +
+  // coefficient WALL_RATES keys and the vendor/catalog material $/unit. `lab`
+  // routes labor keys through the shared reader R (unset finish labor surfaces);
+  // display callers omit R and get a plain read (no recording).
+  const lab = k => wallRate(R, mp, k)
   // SHARED finish material: read the Finishes module's own record ('<Type> - Finishes'
   // under sub 'Finish Material'). row.type stays the short label (the wallsCalc switch
   // matches on it); we only map to the shared record name for the price lookup.
   const catP = catalogItemPrice(materialRows, 'Finish Material', `${row.type} - Finishes`, row.vendor, 0)
+  if (rec && row.type && row.type !== 'None')
+    rec('Finish Material', `${row.type} - Finishes`, row.vendor, { category: 'Walls', unit: 'Sq Ft', label: `${row.type} Finish` })
   return _finishRow(row, { lab, catP })
 }
 
 // ── Per-row Wall Cap calculator — identical to the original cap math (incl. the
 //    Precast width factor); material price is vendor-resolved.
-function computeCapRow(row, mp, materialRows) {
+function computeCapRow(row, mp, materialRows, R = null, rec = null) {
   // Math lives in the pure, unit-tested wallsCalc.js; here we resolve labor keys,
   // the named-cap catalog price, the PIP ready-mix $/CY, and — for any catalog cap
-  // (default branch) — its calc_meta per_lf count + labor_rate pointer.
+  // (default branch) — its calc_meta per_lf count + labor_rate pointer. `lab`
+  // routes labor keys through the shared reader R; display callers omit R.
   const v = row.vendor
-  const lab = k => n(mp?.[WALL_RATES[k].db])
+  const lab = k => wallRate(R, mp, k)
   const capP = name => catalogItemPrice(materialRows, WALL_CAP_SUBCAT, name, v, 0)
   const concreteTruckP = wallMatPrice(WALL_RATES.concreteTruck.db, v, materialRows, mp)
   const capRow =
@@ -731,28 +737,44 @@ function computeCapRow(row, mp, materialRows) {
         (v && v !== 'Standard' ? rr.vendor_id === v : rr.vendor_id == null)
     ) || (materialRows || []).find(rr => rr.sub_category === WALL_CAP_SUBCAT && rr.name === row.type)
   const cm = capRow?.calc_meta || {}
-  const defaultCap = { perLf: n(cm.per_lf) || 1, labRate: n(mp?.[cm.labor_rate]) }
+  // Catalog-cap labor pointer (default branch) is a dynamic DB rate NAME — route it
+  // through R.labor so an unset pointer surfaces; the named-cap branches read their
+  // labor via `lab`. Value-identical to the old n(mp?.[cm.labor_rate]).
+  const capLabRate = cm.labor_rate
+    ? (R ? R.labor(cm.labor_rate, { category: 'Walls', unit: 'Hrs per Ln Ft', label: `${row.type} Cap Labor` }) : n(mp?.[cm.labor_rate]))
+    : 0
+  const defaultCap = { perLf: n(cm.per_lf) || 1, labRate: capLabRate }
+  // A SELECTED catalog cap product with no price surfaces (PIP Concrete prices off
+  // the basic ready-mix, not a Wall Cap product, so it's excluded).
+  if (rec && row.type && row.type !== 'None' && row.type !== 'PIP Concrete')
+    rec(WALL_CAP_SUBCAT, row.type, v, { category: 'Walls', unit: 'Ln Ft', label: `${row.type} Cap` })
   return _capRow(row, { lab, capP, concreteTruckP, defaultCap })
 }
 
 // ── Per-row Waterproofing calculator — identical to the original wp math;
 //    material price is vendor-resolved.
-function computeWpRow(row, mp, materialRows) {
+function computeWpRow(row, mp, materialRows, R = null, rec = null) {
   // Math lives in the pure, unit-tested wallsCalc.js; here we resolve validity
   // (type maps to a real WP key), the catalog $/SF, and the per-type install labor.
   const valid = !!WP_KEY[row?.type]
   const catP = catalogItemPrice(materialRows, WALL_WP_SUBCAT, row?.type, row?.vendor)
-  const labKey = WP_LABOR_KEY[row?.type]
-  const wpRate = labKey ? n(mp?.[WALL_RATES[labKey].db]) : n(mp?.[WALL_RATES.wpLabor.db])
+  const labKey = WP_LABOR_KEY[row?.type] || 'wpLabor'
+  const sf = n(row?.sf)
+  // Read WP labor only when the row is actually billable (valid type + SF > 0) so
+  // an unset WP labor rate surfaces ONLY for a WP section in use. When it's not
+  // billable _wpRow books 0 hrs regardless, so passing 0 is value-identical.
+  const wpRate = valid && sf > 0 ? wallRate(R, mp, labKey) : 0
+  if (rec && valid && row?.type && row.type !== 'None')
+    rec(WALL_WP_SUBCAT, row.type, row?.vendor, { category: 'Walls', unit: 'Sq Ft', label: row.type })
   return _wpRow(row, { valid, catP, wpRate })
 }
 
 // Sum a wall entry's own waterproofing rows into { wpHrs, wpMat, wpSubMat }.
-function computeWallWpTotals(wall, mp, materialRows) {
+function computeWallWpTotals(wall, mp, materialRows, R = null, rec = null) {
   const rows = Array.isArray(wall?.wpRows) ? wall.wpRows : []
   return rows.reduce(
     (a, row) => {
-      const c = computeWpRow(row, mp, materialRows)
+      const c = computeWpRow(row, mp, materialRows, R, rec)
       return { wpHrs: a.wpHrs + c.hrs, wpMat: a.wpMat + c.mat, wpSubMat: a.wpSubMat + c.subMat }
     },
     { wpHrs: 0, wpMat: 0, wpSubMat: 0 }
@@ -924,42 +946,15 @@ function wallCatalogRow(materialRows, subcat, name, vendorSel) {
   const vsel = vendorSel && vendorSel !== 'Standard' ? vendorSel : null
   return rows.find(r => r.vendor_id === vsel) || rows.find(r => r.vendor_id == null) || rows[0]
 }
-// True when a catalog row exists but carries no usable price.
+// True when a catalog row exists but carries no usable price — a SELECTED such
+// item is recorded on the calc's unpriced list and surfaced on the banner (the
+// standard UnpricedItemModal flow, replacing the old select-time MissingPriceModal).
 function isPricelessRow(row) {
   return !!(row && row.id && (row.unit_cost == null || row.unit_cost === '' || n(row.unit_cost) === 0))
 }
-// Shared "missing price" prompt: when a selected catalog item has no price, open
-// a modal so the user can enter one (written to the catalog). Used by every
-// Walls picker (caps/finishes/waterproofing/blocks).
-function usePricePrompt() {
-  const [prompt, setPrompt] = useState(null)
-  // name-keyed catalog items (caps/finishes/waterproofing)
-  const check = (materialRows, subcat, name, vendor) => {
-    const row = wallCatalogRow(materialRows, subcat, name, vendor)
-    if (isPricelessRow(row)) {
-      setPrompt({ materialId: row.id, vendorId: vendor && vendor !== 'Standard' ? vendor : null, name })
-      return true
-    }
-    return false
-  }
-  // id-keyed catalog items (block pickers select the material id directly)
-  const checkById = (materialRows, id, vendor, name) => {
-    const row = (materialRows || []).find(r => r.id === id)
-    if (isPricelessRow(row)) {
-      setPrompt({
-        materialId: row.id,
-        vendorId: vendor && vendor !== 'Standard' ? vendor : null,
-        name: name || row.name,
-      })
-      return true
-    }
-    return false
-  }
-  return { prompt, check, checkById, close: () => setPrompt(null) }
-}
 
 // ── Per-wall calculators ──────────────────────────────────────────────────────
-function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [], blockOverride = null, installKey = 'blockLab') {
+function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [], blockOverride = null, installKey = 'blockLab', R = null, rec = null) {
   const {
     blockType,
     lf,
@@ -973,7 +968,7 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
   } = wall
   if (!n(lf) || !n(heightIn)) {
     // Structural inputs blank — still bill any waterproofing entered on the wall.
-    const wp0 = computeWallWpTotals(wall, mp, materialRows)
+    const wp0 = computeWallWpTotals(wall, mp, materialRows, R, rec)
     return { hrs: 0, mat: 0, subUnit: 0, subEach: 0, subMat: 0, ...wp0, detail: null }
   }
 
@@ -995,7 +990,7 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
   // product so the user fixes its dimensions. Legacy built-in blocks come from
   // blockByName and always carry real dims, so this only guards catalog products.
   if (blockOverride && (!n(b.w) || !n(b.h) || !n(b.l))) {
-    const wp0 = computeWallWpTotals(wall, mp, materialRows)
+    const wp0 = computeWallWpTotals(wall, mp, materialRows, R, rec)
     return { hrs: 0, mat: 0, subUnit: 0, subEach: 0, subMat: 0, ...wp0, detail: null, blockNeedsDims: b.name || 'Selected block' }
   }
   const blockPrice = blockOverride
@@ -1050,7 +1045,7 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
   const subEach = wall.subEach !== '' && wall.subEach != null ? n(wall.subEach) : subUnit
   const subMat = n(lf) * subEach
 
-  const wp = computeWallWpTotals(wall, mp, materialRows)
+  const wp = computeWallWpTotals(wall, mp, materialRows, R, rec)
 
   return {
     hrs,
@@ -1075,19 +1070,19 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
 //    block isn't grouted/reinforced). Only the footing pump applies. ──────────
 // subcat present → resolve the wall product from the master list (Modular tab);
 // omitted → legacy CMU block catalog (Brick tab, unchanged).
-function calcOneModular(wall, footingPump, r, mp = {}, materialRows = [], blockOverride = null) {
+function calcOneModular(wall, footingPump, r, mp = {}, materialRows = [], blockOverride = null, R = null, rec = null) {
   const modWall = { ...wall, rebarSpIn: '0', horizBars: '0', bondBeams: '0', pctGrouted: '0' }
-  return calcOneCMU(modWall, footingPump, 'No', r, mp, materialRows, blockOverride, 'modularInstallLab')
+  return calcOneCMU(modWall, footingPump, 'No', r, mp, materialRows, blockOverride, 'modularInstallLab', R, rec)
 }
 
 // ── Brick wall — priced per brick, NOT by block dimensions. Material =
 //    face sqft × bricks/sqft (calc_meta.per_sqft, default 7) × $/brick.
 //    Labor = face sqft × brickLayLab (hr/SF, default 1.75). ────────────────────
-function calcOneBrick(wall, r, mp = {}, materialRows = []) {
+function calcOneBrick(wall, r, mp = {}, materialRows = [], R = null, rec = null) {
   const lf = n(wall.lf)
   const heightIn = n(wall.heightIn)
   if (!lf || !heightIn) {
-    const wp0 = computeWallWpTotals(wall, mp, materialRows)
+    const wp0 = computeWallWpTotals(wall, mp, materialRows, R, rec)
     return { hrs: 0, mat: 0, subUnit: 0, subEach: 0, subMat: 0, ...wp0, detail: null }
   }
   const v = wall.vendor
@@ -1125,7 +1120,7 @@ function calcOneBrick(wall, r, mp = {}, materialRows = []) {
   const subEach = wall.subEach !== '' && wall.subEach != null ? n(wall.subEach) : subUnit
   const subMat = lf * subEach
 
-  const wp = computeWallWpTotals(wall, mp, materialRows)
+  const wp = computeWallWpTotals(wall, mp, materialRows, R, rec)
   return {
     hrs,
     mat,
@@ -1137,10 +1132,10 @@ function calcOneBrick(wall, r, mp = {}, materialRows = []) {
   }
 }
 
-function calcOnePIP(wall, r, mp = {}, materialRows = []) {
+function calcOnePIP(wall, r, mp = {}, materialRows = [], R = null, rec = null) {
   const { lf, heightIn, footingWIn, footingDIn, horizBars } = wall
   if (!n(lf) || !n(heightIn)) {
-    const wp0 = computeWallWpTotals(wall, mp, materialRows)
+    const wp0 = computeWallWpTotals(wall, mp, materialRows, R, rec)
     return { hrs: 0, mat: 0, concCY: 0, subUnit: 0, subEach: 0, subMat: 0, ...wp0 }
   }
   const v = wall.vendor
@@ -1191,7 +1186,7 @@ function calcOnePIP(wall, r, mp = {}, materialRows = []) {
   const subUnit = n(lf) > 0 ? mat / n(lf) : 0
   const subEach = wall.subEach !== '' && wall.subEach != null ? n(wall.subEach) : subUnit
   const subMat = n(lf) * subEach
-  const wp = computeWallWpTotals(wall, mp, materialRows)
+  const wp = computeWallWpTotals(wall, mp, materialRows, R, rec)
   return {
     hrs,
     mat,
@@ -1205,6 +1200,55 @@ function calcOnePIP(wall, r, mp = {}, materialRows = []) {
   }
 }
 
+// Which WALL_RATES keys are true LABOR rates. These route through R.labor so an
+// unset/zero labor rate surfaces on the unpriced banner (labor previously had NO
+// surfacing — the real gap this migration closes). Everything else read via `r`
+// is a material price or a tunable COEFFICIENT (waste / setting / swell /
+// multiplier / stem-CY / per-LF qty), read plainly and never surfaced. The
+// misc_rates-stored drain fabric/gravel "labor" ($/LF) is deliberately EXCLUDED:
+// it isn't a labor_rates row, so it must not route to saveLaborRate. Only
+// labor_rates-backed labor is included.
+const WALL_LABOR_KEYS = new Set([
+  'digLab', 'rebarLab', 'blockLab', 'handGroutLab', 'pumpGroutLab', 'setupCleanLab',
+  'footingPourLab', 'footingPourHandLab', 'footingPourPumpLab', 'modularInstallLab',
+  'brickLayLab', 'pipFormLab', 'timberLfLab', 'timberCourseLab', 'timberPostLab',
+  'footingDigHaulLab', 'footingDigHaulExcavLab',
+  'capFlagstoneLab', 'capPrecastLab', 'capPipLab', 'capBullnoseLab',
+  'wpLabor', 'wpLabPrimerMembrane', 'wpLab2Coat', 'wpLabThoroseal', 'wpLabDimple',
+  'sandStuccoLab', 'smoothStuccoLab', 'ledgerstoneLab', 'stackedStoneLab',
+  'tileLab', 'flagstoneLab', 'realStoneLab',
+  'drainPerf4Lab', 'drainPerf3Lab',
+  'demoHandDirt', 'demoMiniDirt', 'demoSkidDirt',
+  'backfillHandGF', 'backfillMiniGF', 'backfillSkidGF', 'compJJ',
+])
+// Modal meta (category / unit / label) for each labor key, sourced from
+// WALL_RATE_SPECS so the unpriced prompt reads the same label the View Rates list
+// shows. (Category is display-only for the modal; saveLaborRate updates the
+// existing labor_rates row by name.)
+const WALL_LABOR_META = (() => {
+  const m = {}
+  for (const g of WALL_RATE_SPECS) {
+    for (const it of g.items || []) {
+      const [key, label, category, unit] = it
+      if (WALL_LABOR_KEYS.has(key) && !m[key]) m[key] = { category: category || 'Walls', unit: unit || null, label }
+    }
+  }
+  return m
+})()
+
+// Key-aware Walls rate read. LABOR keys route through the shared reader `R`
+// (makeModuleRates) so an unset/zero labor rate is recorded on R.unpriced and
+// surfaces on the banner; every other key (material price / tunable coefficient)
+// is read plainly. Value-identical to the old n(mp[WALL_RATES[key].db]). When `R`
+// is null (display-only callers) it degrades to a plain read with no recording.
+function wallRate(R, mp, key) {
+  const spec = WALL_RATES[key]
+  if (!spec) return 0
+  if (R && WALL_LABOR_KEYS.has(key))
+    return R.labor(spec.db, WALL_LABOR_META[key] || { category: 'Walls', label: key })
+  return n(mp?.[spec.db])
+}
+
 // ── Main calc ─────────────────────────────────────────────────────────────────
 function calcWalls(
   state,
@@ -1215,7 +1259,48 @@ function calcWalls(
   laborBurdenPct = DEFAULTS.laborBurdenPct,
   materialRows = []
 ) {
-  const r = key => n(mp[WALL_RATES[key].db])
+  // One shared rate reader (mirrors Concrete + every other module). Labor keys
+  // route through R.labor → recorded on R.unpriced when unset/0. Material prices +
+  // tunable coefficients stay plain reads, value-identical to the old
+  // n(mp[WALL_RATES[key].db]). `r` is injected into the per-type calcs and the
+  // pure wallsStruct / wallsSections helpers unchanged.
+  const R = makeModuleRates({ material: mp, labor: mp, sub: mp, misc: mp, materialRows })
+  const r = key => wallRate(R, mp, key)
+  // Catalog-material unpriced collector — a SELECTED finish / cap / waterproofing /
+  // wood / block product whose catalog row exists but carries no price books $0 AND
+  // surfaces on the banner (with its materialId so the modal writes the price back
+  // to material_price Standard). Kept local + merged into R.unpricedList on return.
+  // Blank pickers (no name / no id) record nothing; a real $0 price is left alone.
+  const matUnpriced = new Map()
+  const recordCatalogMat = (subcat, name, vendor, meta = {}) => {
+    if (!name) return
+    const row = wallCatalogRow(materialRows, subcat, name, vendor)
+    if (!isPricelessRow(row)) return
+    if (!matUnpriced.has(row.id))
+      matUnpriced.set(row.id, {
+        name: meta.label || name,
+        label: meta.label || name,
+        materialId: row.id,
+        category: meta.category || 'Walls',
+        unit: meta.unit || null,
+      })
+  }
+  const recordCatalogMatById = (id, meta = {}) => {
+    if (!id) return
+    const row = (materialRows || []).find(rr => rr.id === id)
+    if (!isPricelessRow(row)) return
+    if (!matUnpriced.has(row.id))
+      matUnpriced.set(row.id, {
+        name: meta.label || row.name,
+        label: meta.label || row.name,
+        materialId: row.id,
+        category: meta.category || 'Walls',
+        unit: meta.unit || row.unit || null,
+      })
+  }
+  // The (subcat, name, vendor, meta) recorder threaded into the per-row finish /
+  // cap / waterproofing calcs.
+  const rec = recordCatalogMat
   const _pace = n(walkAccess?.paceLfPerMin)
 
   let structuralHrs = 0,
@@ -1244,6 +1329,8 @@ function calcWalls(
   // own array and gets summed below. Vendor only changes the material $;
   // In-House labor / geometry is unchanged.
   ;(state.cmuWalls || []).forEach(wall => {
+    if (n(wall.lf) > 0 && n(wall.heightIn) > 0)
+      recordCatalogMatById(wall.blockType, { category: 'Walls', unit: 'Each', label: 'Wall Block' })
     const res = calcOneCMU(
       wall,
       wall.footingPump ?? 'No',
@@ -1251,7 +1338,10 @@ function calcWalls(
       r,
       mp,
       materialRows,
-      resolveCatalogBlock(wall, materialRows)
+      resolveCatalogBlock(wall, materialRows),
+      'blockLab',
+      R,
+      rec
     )
     structuralHrs += res.hrs
     structuralMat += res.mat
@@ -1260,7 +1350,7 @@ function calcWalls(
     cmuDetails.push(res.detail)
   })
   ;(state.pipWalls || []).forEach(wall => {
-    const res = calcOnePIP(wall, r, mp, materialRows)
+    const res = calcOnePIP(wall, r, mp, materialRows, R, rec)
     structuralHrs += res.hrs
     structuralMat += res.mat
     structuralSubMat += res.subMat
@@ -1268,13 +1358,17 @@ function calcWalls(
     pipDetails.push({ ...res, lf: wall.lf, heightIn: wall.heightIn })
   })
   ;(state.modularWalls || []).forEach(wall => {
+    if (n(wall.lf) > 0 && n(wall.heightIn) > 0)
+      recordCatalogMatById(wall.blockType, { category: 'Walls', unit: 'Each', label: 'Modular Wall block' })
     const res = calcOneModular(
       wall,
       wall.footingPump ?? 'No',
       r,
       mp,
       materialRows,
-      resolveMasterBlock(wall, materialRows, MODULAR_SUBCAT)
+      resolveMasterBlock(wall, materialRows, MODULAR_SUBCAT),
+      R,
+      rec
     )
     structuralHrs += res.hrs
     structuralMat += res.mat
@@ -1283,7 +1377,9 @@ function calcWalls(
     modularDetails.push(res.detail)
   })
   ;(state.brickWalls || []).forEach(wall => {
-    const res = calcOneBrick(wall, r, mp, materialRows)
+    if (n(wall.lf) > 0 && n(wall.heightIn) > 0)
+      recordCatalogMatById(wall.blockType, { category: 'Walls', unit: 'Each', label: 'Brick' })
+    const res = calcOneBrick(wall, r, mp, materialRows, R, rec)
     structuralHrs += res.hrs
     structuralMat += res.mat
     structuralSubMat += res.subMat
@@ -1303,6 +1399,7 @@ function calcWalls(
     // the selected type's Walls › Wood catalog entry for the chosen vendor. Timber
     // labor lands in its OWN bucket so the summary can crew it independently.
     const woodPrice = catalogItemPrice(materialRows, WOOD_SUBCAT, wall.timberType, wall.vendor)
+    recordCatalogMat(WOOD_SUBCAT, wall.timberType, wall.vendor, { category: 'Walls', unit: 'Each', label: wall.timberType || 'Timber' })
     const _tc = timberCore(wall.lf, wall.heightIn, postQty, {
       lfLab: r('timberLfLab'),
       courseLab: r('timberCourseLab'),
@@ -1357,14 +1454,14 @@ function calcWalls(
   ]
   const finishRows = allWalls
     .flatMap(w => w.finishRows || [])
-    .map(row => computeWallFinishRow(row, mp, materialRows))
+    .map(row => computeWallFinishRow(row, mp, materialRows, R, rec))
   const finishHrs = finishRows.reduce((a, x) => a + (x.hrs || 0), 0)
   const finishMat = finishRows.reduce((a, x) => a + (x.mat || 0), 0)
   const finishSubMat = finishRows.reduce((a, x) => a + (x.subMat || 0), 0)
 
   const capResults = allWalls
     .flatMap(w => w.capRows || [])
-    .map(row => computeCapRow(row, mp, materialRows))
+    .map(row => computeCapRow(row, mp, materialRows, R, rec))
   const capHrs = capResults.reduce((a, x) => a + (x.hrs || 0), 0)
   const capMat = capResults.reduce((a, x) => a + (x.mat || 0), 0)
   const capSubMat = capResults.reduce((a, x) => a + (x.subMat || 0), 0)
@@ -1495,6 +1592,10 @@ function calcWalls(
   }
 
   return {
+    // Unset/zero LABOR rates (R.unpriced) + SELECTED catalog materials with no
+    // price (matUnpriced) — surfaced on the module's unpriced banner, priced
+    // inline via UnpricedItemModal. Mirrors Concrete's `unpriced: R.unpricedList`.
+    unpriced: [...R.unpricedList, ...matUnpriced.values()],
     totalHrs,
     manDays,
     totalMat,
@@ -1874,7 +1975,6 @@ function WallWaterproofing({
   refreshAllRates,
   onWpUpdate,
 }) {
-  const pp = usePricePrompt()
   const row = (Array.isArray(wpRows) && wpRows[0]) || blankWpRow()
   const rr = key => n(materialPrices?.[WALL_RATES[key].db])
   const wpKey = WP_KEY[row.type]
@@ -1895,19 +1995,13 @@ function WallWaterproofing({
         <DropdownSelect
           className="input text-sm py-1.5 flex-1 min-w-0"
           value={row.vendor || 'Standard'}
-          onChange={v => {
-            onWpUpdate(0, 'vendor', v)
-            pp.check(materialRows, WALL_WP_SUBCAT, row.type, v)
-          }}
+          onChange={v => onWpUpdate(0, 'vendor', v)}
           options={vendorOptsForSub(vendorOptions, materialRows, WALL_WP_SUBCAT)}
         />
         <DropdownSelect
           className="input text-sm py-1.5 flex-[1.5] min-w-0"
           value={row.type || 'None'}
-          onChange={v => {
-            onWpUpdate(0, 'type', v)
-            pp.check(materialRows, WALL_WP_SUBCAT, v, row.vendor)
-          }}
+          onChange={v => onWpUpdate(0, 'type', v)}
           options={[
             { value: 'None', label: 'None' },
             ...wpShown.map(t => ({ value: t, label: t })),
@@ -1951,9 +2045,6 @@ function WallWaterproofing({
           </div>
         )}
       </div>
-      {pp.prompt && (
-        <MissingPriceModal {...pp.prompt} onClose={pp.close} onSaved={refreshAllRates} />
-      )}
     </div>
   )
 }
@@ -1971,7 +2062,6 @@ function WallFinishesEditor({
   materialRows,
   refreshAllRates,
 }) {
-  const pp = usePricePrompt()
   return (
     <div className="mt-3 border-t border-gray-100 pt-2">
       <label className="block text-xs text-gray-800 mb-1 font-medium">Finishes</label>
@@ -1993,20 +2083,14 @@ function WallFinishesEditor({
               <DropdownSelect
                 className="input text-sm py-1 flex-1 min-w-0"
                 value={row.vendor || 'Standard'}
-                onChange={v => {
-                  onPatch(i, { vendor: v }, true)
-                  pp.check(materialRows, 'Finish Material', `${row.type} - Finishes`, v)
-                }}
+                onChange={v => onPatch(i, { vendor: v }, true)}
                 options={vendorOptsForSub(vendorOptions, materialRows, 'Finish Material')}
               />
               <DropdownSelect
                 className="input text-sm py-1 flex-[1.5] min-w-0"
                 value={row.type || ''}
                 placeholder="Select finish"
-                onChange={v => {
-                  onPatch(i, { type: v }, true)
-                  pp.check(materialRows, 'Finish Material', `${v} - Finishes`, row.vendor)
-                }}
+                onChange={v => onPatch(i, { type: v }, true)}
                 options={[
                   { value: 'None', label: 'None' },
                   ...shown.map(t => ({ value: t, label: t })),
@@ -2041,9 +2125,6 @@ function WallFinishesEditor({
           + Add finish
         </button>
       </div>
-      {pp.prompt && (
-        <MissingPriceModal {...pp.prompt} onClose={pp.close} onSaved={refreshAllRates} />
-      )}
     </div>
   )
 }
@@ -2051,7 +2132,6 @@ function WallFinishesEditor({
 // ── Per-wall Caps editor ──────────────────────────────────────────────────────
 // Add / edit / remove cap rows scoped to one wall. Identical cap math.
 function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, materialRows, refreshAllRates }) {
-  const pp = usePricePrompt()
   return (
     <div className="mt-3 border-t border-gray-100 pt-2">
       <label className="block text-xs text-gray-800 mb-1 font-medium">Caps</label>
@@ -2069,20 +2149,14 @@ function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, ma
               <DropdownSelect
                 className="input text-sm py-1 flex-1 min-w-0"
                 value={row.vendor || 'Standard'}
-                onChange={v => {
-                  onPatch(i, { vendor: v }, true)
-                  pp.check(materialRows, WALL_CAP_SUBCAT, row.type, v)
-                }}
+                onChange={v => onPatch(i, { vendor: v }, true)}
                 options={vendorOptsForSub(vendorOptions, materialRows, WALL_CAP_SUBCAT)}
               />
               <DropdownSelect
                 className="input text-sm py-1 flex-[1.5] min-w-0"
                 value={row.type || ''}
                 placeholder="Select cap"
-                onChange={v => {
-                  onPatch(i, { type: v }, true)
-                  pp.check(materialRows, WALL_CAP_SUBCAT, v, row.vendor)
-                }}
+                onChange={v => onPatch(i, { type: v }, true)}
                 options={[
                   { value: 'None', label: 'None' },
                   ...shown.map(t => ({ value: t, label: t })),
@@ -2126,9 +2200,6 @@ function WallCapsEditor({ rows = [], onPatch, onAdd, onRemove, vendorOptions, ma
           + Add cap
         </button>
       </div>
-      {pp.prompt && (
-        <MissingPriceModal {...pp.prompt} onClose={pp.close} onSaved={refreshAllRates} />
-      )}
     </div>
   )
 }
@@ -2308,7 +2379,6 @@ function CmuWallEntry({
   finishHandlers,
   capHandlers,
 }) {
-  const pp = usePricePrompt()
   const set = field => val => onChange(idx, field, val)
   const hasData = n(wall.lf) > 0 && n(wall.heightIn) > 0
   // Catalog-driven Block Type: the selected vendor's "Wall Block" products.
@@ -2362,10 +2432,7 @@ function CmuWallEntry({
           <DropdownSelect
             className="input text-sm py-1.5 w-full"
             value={wall.blockType || ''}
-            onChange={v => {
-              set('blockType')(v)
-              pp.checkById(materialRows, v, wall.vendor)
-            }}
+            onChange={v => set('blockType')(v)}
             placeholder={blockOpts.length === 0 && !legacyBlock ? 'No block types for this vendor' : 'Select…'}
             options={[
               ...(legacyBlock
@@ -2525,9 +2592,6 @@ function CmuWallEntry({
         refreshAllRates={refreshAllRates}
         onWpUpdate={onWpUpdate}
       />
-      {pp.prompt && (
-        <MissingPriceModal {...pp.prompt} onClose={pp.close} onSaved={refreshAllRates} />
-      )}
     </div>
   )
 }
@@ -2739,7 +2803,6 @@ function ModularWallEntry({
   typeSource = { label: 'Block Type', master: false },
 }) {
   const set = field => val => onChange(idx, field, val)
-  const pp = usePricePrompt()
   return (
     <div className="border border-gray-200 rounded-xl p-3 mb-3 bg-white">
       <div className="flex items-center justify-between mb-2">
@@ -2798,10 +2861,7 @@ function ModularWallEntry({
                     <DropdownSelect
                       className="input text-sm py-1.5 w-full"
                       value={selRow?.id ?? ''}
-                      onChange={v => {
-                        set('blockType')(v)
-                        pp.checkById(materialRows, v, wall.vendor)
-                      }}
+                      onChange={v => set('blockType')(v)}
                       placeholder={opts.length === 0 ? 'No products — add one in Master Rates' : 'Select…'}
                       options={opts.map(o => ({
                         value: o.id,
@@ -2953,9 +3013,6 @@ function ModularWallEntry({
         refreshAllRates={refreshAllRates}
         onWpUpdate={onWpUpdate}
       />
-      {pp.prompt && (
-        <MissingPriceModal {...pp.prompt} onClose={pp.close} onSaved={refreshAllRates} />
-      )}
     </div>
   )
 }
@@ -3482,6 +3539,11 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
     })
   }
 
+  // Unpriced-item inline pricing modal (labor rate OR catalog material price) —
+  // the standard flow shared with every other module (replaces the old select-time
+  // MissingPriceModal). The banner below lists calc.unpriced; clicking one opens it.
+  const [unpricedItem, setUnpricedItem] = useState(null)
+
   const fmt2 = v =>
     `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   const p = db => materialPrices[db] ?? undefined
@@ -3560,6 +3622,27 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
       {pricesLoading && (
         <div className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
           Loading material prices from Master Rates…
+        </div>
+      )}
+
+      {!pricesLoading && calc.unpriced && calc.unpriced.length > 0 && (
+        <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3">
+          <p className="text-sm font-medium text-red-800">
+            {calc.unpriced.length} item{calc.unpriced.length > 1 ? 's have' : ' has'} no price yet —
+            click to price:
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {calc.unpriced.map(it => (
+              <button
+                key={(it.kind === 'labor' ? 'lab:' : 'mat:') + it.name}
+                type="button"
+                className="rounded-full border border-red-300 bg-white px-3 py-1 text-sm text-red-700 hover:bg-red-100"
+                onClick={() => setUnpricedItem(it)}
+              >
+                {it.label} · $0.00
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -3870,6 +3953,14 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
           {saving ? 'Saving...' : 'Save'}
         </button>
       </div>
+
+      {unpricedItem && (
+        <UnpricedItemModal
+          item={unpricedItem}
+          onClose={() => setUnpricedItem(null)}
+          onSaved={refreshAllRates}
+        />
+      )}
     </div>
     </SubTabContext.Provider>
   )
