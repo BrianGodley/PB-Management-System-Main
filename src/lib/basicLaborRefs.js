@@ -26,5 +26,5 @@ export const BAS = {
   // Shared demo/Walls coefficients (moved out of labor_rates 'Basic Labor').
   JUMPING_JACK: 'BAS-006-jumping-jack', // compaction, hrs / Cu Ft (Walls reads by name)
   DIFFICULTY_RATIO: 'BAS-007-difficulty-ratio',
-  CONCRETE_WEIGHT: 'BAS-008-concrete-weight-lb-cf',
+  // (CONCRETE_WEIGHT / BAS-008 retired — tons removed, no consumer; row archived.)
 }

@@ -119,7 +119,6 @@ export function calcConcrete(
   const lrph = n(laborRatePerHour)
 
   // ── Labor production rates (labor_rates) ─────────────────────────────────
-  const concreteSFPerHr = n(lr[LAB.CONC_POUR_FINISH])
   // Rebar labor SF/hr is pattern-specific — each spacing has its own production
   // rate row (read by frozen ref_key). All table-driven.
   const rebarSFPerHrBySpacing = {
@@ -444,7 +443,6 @@ export function calcConcrete(
     finishMatCoverage: fin ? fin.coverage : 0,
     finishSubCost,
     // Resolved rates — exposed so the inline calculator icons can show + edit them
-    concreteSFPerHr,
     rebarSFPerHr,
     rebarSFPerHrBySpacing,
     formLFPerHr,

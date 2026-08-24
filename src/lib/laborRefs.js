@@ -67,7 +67,6 @@ export const LAB = {
   // (Paver import-base prep now reads the Basic Labor table — see basicLaborRefs.js.)
 
   // ── Concrete ────────────────────────────────────────────────────────────────
-  CONC_POUR_FINISH: 'LAB-080-concrete-pour-finish',
   CONC_REBAR_24: 'LAB-085-concrete-rebar-24-oc',
   CONC_REBAR_18: 'LAB-084-concrete-rebar-18-oc',
   CONC_REBAR_12: 'LAB-083-concrete-rebar-12-oc',
@@ -83,9 +82,8 @@ export const LAB = {
   CONC_SEEDED_AGG: 'LAB-094-concrete-seeded-aggregate',
   CONC_STAMPED_FINISH: 'LAB-099-concrete-stamped-finish',
   CONC_HAND_MIX_UPLIFT: 'LAB-072-concrete-hand-mix-labor-uplift',
-  CONC_BASE_SKID_STEER: 'LAB-066-concrete-base-skid-steer',
-  CONC_BASE_MINI_SKID_STEER: 'LAB-065-concrete-base-mini-skid-steer',
-  CONC_BASE_WHEELBARROW: 'LAB-067-concrete-base-wheelbarrow',
+  // (CONC_BASE_* + CONC_POUR_FINISH retired — Concrete base now reads shared BAS
+  //  Base Prep refs; those labor_rates rows were archived. No consumers.)
   CONC_INSTALL_100_300: 'LAB-073-concrete-install-100-300',
   CONC_INSTALL_300_600: 'LAB-076-concrete-install-300-600',
   CONC_INSTALL_600_1000: 'LAB-077-concrete-install-600-1000',
