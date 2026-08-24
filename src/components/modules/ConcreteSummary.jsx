@@ -11,12 +11,23 @@ const fmt2 = v =>
 
 // Build the quantity sections for one field set (In-House or Sub).
 function buildSections(f, isSub) {
+  // Resolve a picker's stored value (material ref_key / id, or a legacy name) to
+  // the item's display name via the estimate's saved catalog snapshot. Falls back
+  // to the raw value so nothing ever renders blank. Live estimate → current name;
+  // frozen bid → as-bid name (the snapshot is captured at save).
+  const matName = key => {
+    if (!key) return key
+    const hit = (f.materialRows || []).find(
+      r => (r.ref_key && r.ref_key === key) || r.id === key || r.name === key
+    )
+    return hit ? hit.name : key
+  }
   const baseRows = (f.baseRows || [])
     .filter(r => n(r.sf) > 0)
     .map(r => ({
       label: `${r.label || 'Base'}${r.method ? ` (${r.method})` : ''}`,
       value: `${n(r.sf).toLocaleString()} Sq Ft`,
-      sub: `${r.depth || 2}"${r.type ? ` · ${r.type}` : ''}`,
+      sub: `${r.depth || 2}"${r.type ? ` · ${matName(r.type)}` : ''}`,
     }))
 
   const install = []
@@ -31,7 +42,7 @@ function buildSections(f, isSub) {
     }
     Object.entries(TIER_LABELS).forEach(([k, label]) => {
       if (n(f.installTiers[k]) > 0) {
-        const mix = (f.installTierType || {})[k]
+        const mix = matName((f.installTierType || {})[k])
         install.push({
           label: `Install (${label})`,
           value: `${n(f.installTiers[k]).toLocaleString()} Sq Ft`,
@@ -111,6 +122,7 @@ export default function ConcreteSummary({ module }) {
       sealerType: d.sealerType,
       baseRows: d.baseRows,
       manualRows: d.manualRows,
+      materialRows: d.materialRows,
     },
     false
   )
@@ -131,6 +143,7 @@ export default function ConcreteSummary({ module }) {
       sealerType: d.subSealerType,
       baseRows: d.subBaseRows,
       manualRows: d.subManualRows,
+      materialRows: d.materialRows,
     },
     true
   )

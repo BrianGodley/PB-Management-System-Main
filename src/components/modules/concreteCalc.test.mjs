@@ -20,6 +20,22 @@ const finiteNums = obj => {
   }
 }
 
+test('PARITY (M5): install-tier mix selected by material ref_key — price resolves by key AND hand-mix uplift fires via the RESOLVED name (not the raw key)', () => {
+  const stdMix = { id: 'm1', ref_key: 'MAT-050-standard-mix', name: 'Standard Mix', sub_category: 'Concrete Mix', category: 'Concrete', vendor_id: null, unit_cost: 200, calc_meta: {} }
+  const handMix = { id: 'm2', ref_key: 'MAT-051-hand-mix', name: 'Hand Mix', sub_category: 'Concrete Mix', category: 'Concrete', vendor_id: null, unit_cost: 200, calc_meta: {} }
+  const mk = mixRef =>
+    run(
+      { installTiers: { s300_600: 540 }, installTierVendor: { s300_600: 'Standard' }, installTierType: { s300_600: mixRef }, installTierDepth: { s300_600: 4 } },
+      { lr: { 'LAB-076-concrete-install-300-600': 0.1, 'LAB-072-concrete-hand-mix-labor-uplift': 15 }, materialRows: [stdMix, handMix] }
+    )
+  const std = mk('MAT-050-standard-mix')
+  const hm = mk('MAT-051-hand-mix')
+  // Material resolves by ref_key: 540 SF × 4in/12 / 27 = 6.667 CY × $200 ≈ $1333.
+  assert.ok(std.totalMat > 1300 && std.totalMat < 1367, `mix priced by ref_key; got ${std.totalMat}`)
+  // Hand-mix +15% uplift applies via the resolved item name, not the stored key.
+  assert.ok(Math.abs(hm.installHrs - std.installHrs * 1.15) < 0.001, `uplift is 15%: ${hm.installHrs} vs ${std.installHrs}×1.15`)
+})
+
 test('value: base prep labor = Cu Ft × rate (108 SF × 4in/12 = 36 Cu Ft × 0.5 = 18 hrs → $1350)', () => {
   const sf = 108, depth = 4, rate = 0.5
   const r = run({ baseRows: [{ method: 'Skid Steer', sf, depth }] }, { lr: { 'BAS-004-import-base-skid-steer-good': rate } })

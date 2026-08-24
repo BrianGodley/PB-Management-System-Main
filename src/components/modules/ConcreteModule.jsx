@@ -922,7 +922,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                               <option value={row.type}>{row.type}</option>
                             )}
                           {baseOpts.map(o => (
-                            <option key={o.id} value={o.label}>
+                            <option key={o.id} value={o.ref_key || o.id}>
                               {o.label}
                             </option>
                           ))}
@@ -1113,7 +1113,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                             o => (o.ref_key || o.id) === installTierType[t.key] || o.label === installTierType[t.key]
                           ) && <option value={installTierType[t.key]}>{installTierType[t.key]}</option>}
                         {mixOpts.map(o => (
-                          <option key={o.id} value={o.label}>
+                          <option key={o.id} value={o.ref_key || o.id}>
                             {o.label}
                           </option>
                         ))}
@@ -1252,7 +1252,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                       o => (o.ref_key || o.id) === activeVaporItem || o.label === activeVaporItem
                     ) && <option value={activeVaporItem}>{activeVaporItem}</option>}
                   {sectionOptions('Vapor Barrier', activeVaporVendor).map(o => (
-                    <option key={o.id} value={o.label}>
+                    <option key={o.id} value={o.ref_key || o.id}>
                       {o.label}
                     </option>
                   ))}
@@ -1333,7 +1333,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                       o => (o.ref_key || o.id) === activeFinishMatItem || o.label === activeFinishMatItem
                     ) && <option value={activeFinishMatItem}>{activeFinishMatItem}</option>}
                   {sectionOptions('Concrete Finish Material', activeFinishMatVendor).map(o => (
-                    <option key={o.id} value={o.label}>
+                    <option key={o.id} value={o.ref_key || o.id}>
                       {o.label}
                     </option>
                   ))}
@@ -1388,7 +1388,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                       o => (o.ref_key || o.id) === activeSealerItem || o.label === activeSealerItem
                     ) && <option value={activeSealerItem}>{activeSealerItem}</option>}
                   {sectionOptions('Concrete Sealer', activeSealerVendor).map(o => (
-                    <option key={o.id} value={o.label}>
+                    <option key={o.id} value={o.ref_key || o.id}>
                       {o.label}
                     </option>
                   ))}

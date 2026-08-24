@@ -19,7 +19,7 @@ function catalogOptions(materialRows, subcategory, vendorSel, { standardRows = '
     .filter(r => r.sub_category === subcategory && (!category || r.category === category) && (isStandard ? r.vendor_id == null : r.vendor_id === vendorSel))
     .map(r => {
       const label = stripPrefix && r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name
-      return { id: r.id, value: r.id, label, stored: label, row: r }
+      return { id: r.id, value: r.id, ref_key: r.ref_key || null, label, stored: label, row: r }
     })
 }
 function calcWalkAccessLabor(laborSubtotalHrs, distanceLF, opts = {}) {
