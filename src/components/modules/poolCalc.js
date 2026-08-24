@@ -23,7 +23,7 @@ function catalogOptions(materialRows, subcategory, vendorSel, { standardRows = '
     .filter(r => r.sub_category === subcategory && (!category || r.category === category) && (isStandard ? r.vendor_id == null : r.vendor_id === vendorSel))
     .map(r => {
       const label = stripPrefix && r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name
-      return { id: r.id, value: r.id, label, stored: label, row: r }
+      return { id: r.id, value: r.id, ref_key: r.ref_key || null, label, stored: label, row: r }
     })
 }
 function catalogItemFor(materialRows, subcategory, vendorSel, key, opts = {}) {
@@ -31,11 +31,21 @@ function catalogItemFor(materialRows, subcategory, vendorSel, key, opts = {}) {
   const options = catalogOptions(materialRows, subcategory, vendorSel, rest)
   if (!options.length) return null
   if (!key) return fallbackFirst ? options[0].row : null
+  const byRef = options.find(o => o.ref_key && o.ref_key === key)
+  if (byRef) return byRef.row
   const byId = options.find(o => o.id === key)
   if (byId) return byId.row
   const byLabel = options.find(o => o.stored === key || o.label === key)
   if (byLabel) return byLabel.row
   return fallbackFirst ? options[0].row : null
+}
+// Display name for a picked item — a row's Type/model is stored as a frozen material
+// ref_key, so resolve it to the item's name for summary labels (strip "<sub> - ").
+// Falls back to the raw stored value (e.g. a built-in like 'Truck Mix Concrete').
+function itemLabel(item, fallback) {
+  if (!item || !item.name) return fallback
+  const dash = item.name.indexOf(' - ')
+  return dash > 0 ? item.name.slice(dash + 3) : item.name
 }
 
 // ── Inlined shared util-row resolver (lib/utilRow.js, pure body) ──────────────
@@ -48,7 +58,7 @@ function mergedUtilTypes(cat, builtInArr, materialRows, vendorSel = 'Standard', 
   if (!catRows.length) return []
   return catRows.map(o => {
     const bi = (builtInArr || []).find(b => b.dbName === o.row.name || b.label === o.label)
-    return { label: o.label, dbName: o.row.name, matCatalog: n(o.row.unit_cost), catalogPrice: n(o.row.unit_cost), laborDbName: o.row.calc_meta?.labor_rate || null, fromMaster: !bi }
+    return { label: o.label, ref_key: o.ref_key || o.row?.ref_key || null, dbName: o.row.name, matCatalog: n(o.row.unit_cost), catalogPrice: n(o.row.unit_cost), laborDbName: o.row.calc_meta?.labor_rate || null, fromMaster: !bi }
   })
 }
 function resolveUtilRow(cat, row, houseArr, materialRows, mp, opts = {}) {
@@ -57,9 +67,10 @@ function resolveUtilRow(cat, row, houseArr, materialRows, mp, opts = {}) {
     return { opts: [], matOpt: { label: row.type, dbName: undefined, matCatalog: 0, fallback: 0 }, matCost: 0, laborVal: 0, laborName: null, laborBuiltIn: null }
   }
   const merged = mergedUtilTypes(cat, houseArr, materialRows, vsel, opts)
-  const builtIn = merged.find(o => o.label === row.type) || merged[0]
+  // row.type may be the frozen material ref_key (converted picker) or the legacy label.
+  const builtIn = merged.find(o => (o.ref_key && o.ref_key === row.type) || o.label === row.type) || merged[0]
   let matDbName = builtIn?.dbName
-  const vrow = catalogItemFor(materialRows, cat, vsel, builtIn?.label, { ...CATALOG_OPTS, fallbackFirst: false })
+  const vrow = catalogItemFor(materialRows, cat, vsel, builtIn?.ref_key || builtIn?.label, { ...CATALOG_OPTS, fallbackFirst: false })
   if (vrow) matDbName = vrow.name
   const laborName = vrow?.calc_meta?.labor_rate || builtIn?.laborDbName || null
   const laborVal = n(mp[laborName])
@@ -297,7 +308,7 @@ export function calcPool(state, materialPrices, laborRates, subRates = {}, walkA
     tileHrs += lf * installRate
     tileMat += lf * tileSfPerLf * matPriceSF
     tileCalc.push({
-      label: `${tileKey} — ${t.installType || '6" Squares'}`,
+      label: `${tileKey} — ${itemLabel(item, t.installType) || '6" Squares'}`,
       value: `${lf} Ln Ft`,
       hrs: lf * installRate,
       matPerSF: matPriceSF,
@@ -325,7 +336,7 @@ export function calcPool(state, materialPrices, laborRates, subRates = {}, walkA
     spillwayHrs += totalLF * labRate
     spillwayMat += totalLF * matRate
     spillwayCalc.push({
-      label: `${sw.struct} — ${sw.type} × ${sw.qty}`,
+      label: `${sw.struct} — ${itemLabel(item, sw.type)} × ${sw.qty}`,
       value: `${totalLF} Ln Ft`,
       hrs: totalLF * labRate,
       mat: totalLF * matRate,
@@ -354,7 +365,7 @@ export function calcPool(state, materialPrices, laborRates, subRates = {}, walkA
     const mat = qty * matRate
     waterFeatureHrs += hrs
     waterFeatureMat += mat
-    waterFeatureCalc.push({ label: wf.type, qty, hrs, mat })
+    waterFeatureCalc.push({ label: itemLabel(item, wf.type), qty, hrs, mat })
   })
 
   // ─ Coping ─
@@ -382,7 +393,7 @@ export function calcPool(state, materialPrices, laborRates, subRates = {}, walkA
     copingHrs += lf * sided * labRate
     copingMat += lf * sided * matRate
     copingCalc.push({
-      label: `${cr.struct} — ${cr.type}${cr.sided === 'double' ? ' (double)' : ''}`,
+      label: `${cr.struct} — ${itemLabel(item, cr.type)}${cr.sided === 'double' ? ' (double)' : ''}`,
       value: `${lf} Ln Ft`,
       hrs: lf * sided * labRate,
       mat: lf * sided * matRate,

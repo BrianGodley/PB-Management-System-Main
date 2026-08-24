@@ -324,6 +324,15 @@ function EpTable({
 }) {
   const upd = (i, field, val) =>
     setRows(rs => rs.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  // Resolve a stored ref_key (legacy id/name too) to the item's display name for the
+  // orphan-value fallback option. Strips the "<sub> - " prefix.
+  const matName = key => {
+    if (!key) return key
+    const hit = (materialRows || []).find(r => r.ref_key === key || r.id === key || r.name === key)
+    if (!hit) return key
+    const dash = hit.name ? hit.name.indexOf(' - ') : -1
+    return dash > 0 ? hit.name.slice(dash + 3) : hit.name
+  }
   return (
     <div>
       <p className="text-xs font-semibold text-gray-600 mb-1">{title}</p>
@@ -382,11 +391,11 @@ function EpTable({
                         onChange={e => upd(i, 'type', e.target.value)}
                       >
                         {!row.type && <option value="">Select type</option>}
-                        {row.type && !opts.some(o => o.label === row.type) && (
-                          <option value={row.type}>{row.type}</option>
+                        {row.type && !opts.some(o => (o.ref_key || o.label) === row.type || o.label === row.type) && (
+                          <option value={row.type}>{matName(row.type)}</option>
                         )}
                         {opts.map(o => (
-                          <option key={o.label} value={o.label}>
+                          <option key={o.label} value={o.ref_key || o.label}>
                             {o.label}
                           </option>
                         ))}
@@ -675,6 +684,16 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
   const [laborModalItem, setLaborModalItem] = useState(null)
   const [subRates, setSubRates] = useState({})
   const [materialRows, setMaterialRows] = useState([])
+  // Resolve a stored Type/model (frozen material ref_key; legacy id/name still work)
+  // to the item's display name via the live catalog — used by the orphan-value
+  // fallback options so a stored key never renders raw. Strips the "<sub> - " prefix.
+  const matName = key => {
+    if (!key) return key
+    const hit = (materialRows || []).find(r => r.ref_key === key || r.id === key || r.name === key)
+    if (!hit) return key
+    const dash = hit.name ? hit.name.indexOf(' - ') : -1
+    return dash > 0 ? hit.name.slice(dash + 3) : hit.name
+  }
   const [vendors, setVendors] = useState([])
   const [subCompanies, setSubCompanies] = useState([]) // subs_vendors type='sub'
   const [subExcavRows, setSubExcavRows] = useState([]) // subcontractor_rates (Pool) w/ company
@@ -853,6 +872,9 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       materialPrices,
       laborRates,
       subRates,
+      // Persist the catalog snapshot so the summary can resolve a row's frozen
+      // material ref_key → name (live estimate re-fetches; a frozen bid reads this).
+      materialRows,
       calc,
     }
     onSave({
@@ -947,10 +969,14 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
     if (key === 'vendor') {
       const cats = equipCategories(materialRows, val)
       arr[i].category = cats[0] || ''
-      arr[i].model = equipModels(materialRows, val, arr[i].category)[0]?.label || ''
-      autofill(arr[i].model)
+      {
+        const first = equipModels(materialRows, val, arr[i].category)[0]
+        arr[i].model = first?.ref_key || first?.label || ''
+        autofill(arr[i].model)
+      }
     } else if (key === 'category') {
-      arr[i].model = equipModels(materialRows, vsel, val)[0]?.label || ''
+      const first = equipModels(materialRows, vsel, val)[0]
+      arr[i].model = first?.ref_key || first?.label || ''
       autofill(arr[i].model)
     } else if (key === 'model') {
       autofill(val)
@@ -1361,7 +1387,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                   stripPrefix: true,
                   category: BASIC_CATEGORY,
                 }).map(o => (
-                  <option key={o.value} value={o.label}>{o.label}</option>
+                  <option key={o.value} value={o.ref_key || o.label}>{o.label}</option>
                 ))}
               </select>
             </div>
@@ -1441,10 +1467,10 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                   onChange={e => upd('shotcrete', { ...T.shotcrete, type: e.target.value })}
                 >
                   {catalogOptions(materialRows, 'Concrete Mix', T.shotcrete.vendor || 'Standard', { standardRows: 'null-vendor', stripPrefix: true }).map(o => (
-                    <option key={o.value} value={o.stored}>{o.label}</option>
+                    <option key={o.value} value={o.ref_key || o.stored}>{o.label}</option>
                   ))}
-                  {!catalogOptions(materialRows, 'Concrete Mix', T.shotcrete.vendor || 'Standard', { standardRows: 'null-vendor', stripPrefix: true }).some(o => o.stored === (T.shotcrete.type || 'Truck Mix Concrete')) && (
-                    <option value={T.shotcrete.type || 'Truck Mix Concrete'}>{T.shotcrete.type || 'Truck Mix Concrete'}</option>
+                  {!catalogOptions(materialRows, 'Concrete Mix', T.shotcrete.vendor || 'Standard', { standardRows: 'null-vendor', stripPrefix: true }).some(o => (o.ref_key || o.stored) === (T.shotcrete.type || 'Truck Mix Concrete') || o.stored === (T.shotcrete.type || 'Truck Mix Concrete')) && (
+                    <option value={T.shotcrete.type || 'Truck Mix Concrete'}>{matName(T.shotcrete.type) || 'Truck Mix Concrete'}</option>
                   )}
                 </select>
               </div>
@@ -1709,11 +1735,11 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                     onChange={e => updSpillway(i, 'type', e.target.value)}
                   >
                     {!sw.type && <option value="">Select type</option>}
-                    {sw.type && !spillOpts.some(o => o.label === sw.type) && (
-                      <option value={sw.type}>{sw.type}</option>
+                    {sw.type && !spillOpts.some(o => (o.ref_key || o.label) === sw.type || o.label === sw.type) && (
+                      <option value={sw.type}>{matName(sw.type)}</option>
                     )}
                     {spillOpts.map(o => (
-                      <option key={o.value} value={o.label}>{o.label}</option>
+                      <option key={o.value} value={o.ref_key || o.label}>{o.label}</option>
                     ))}
                   </select>
                 </div>
@@ -1798,11 +1824,11 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                     onChange={e => updWaterFeature(i, 'type', e.target.value)}
                   >
                     {!wf.type && <option value="">Select feature</option>}
-                    {wf.type && !wfOpts.some(o => o.label === wf.type) && (
-                      <option value={wf.type}>{wf.type}</option>
+                    {wf.type && !wfOpts.some(o => (o.ref_key || o.label) === wf.type || o.label === wf.type) && (
+                      <option value={wf.type}>{matName(wf.type)}</option>
                     )}
                     {wfOpts.map(o => (
-                      <option key={o.value} value={o.label}>{o.label}</option>
+                      <option key={o.value} value={o.ref_key || o.label}>{o.label}</option>
                     ))}
                   </select>
                 </div>
@@ -1897,11 +1923,11 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                         >
                           {!t.installType && <option value="">Select type</option>}
                           {t.installType &&
-                            !poolStdOptions(materialRows, TILE_SUBCAT, t.vendor || 'Standard').some(o => o.label === t.installType) && (
-                              <option value={t.installType}>{t.installType}</option>
+                            !poolStdOptions(materialRows, TILE_SUBCAT, t.vendor || 'Standard').some(o => (o.ref_key || o.label) === t.installType || o.label === t.installType) && (
+                              <option value={t.installType}>{matName(t.installType)}</option>
                             )}
                           {poolStdOptions(materialRows, TILE_SUBCAT, t.vendor || 'Standard').map(o => (
-                            <option key={o.value} value={o.label}>{o.label}</option>
+                            <option key={o.value} value={o.ref_key || o.label}>{o.label}</option>
                           ))}
                         </select>
                       </div>
@@ -1973,11 +1999,11 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                     onChange={e => updRaised(i, 'matType', e.target.value)}
                   >
                     {!rs.matType && <option value="">Select material</option>}
-                    {rs.matType && !poolStdOptions(materialRows, RAISED_SUBCAT).some(o => o.label === rs.matType) && (
-                      <option value={rs.matType}>{rs.matType}</option>
+                    {rs.matType && !poolStdOptions(materialRows, RAISED_SUBCAT).some(o => (o.ref_key || o.label) === rs.matType || o.label === rs.matType) && (
+                      <option value={rs.matType}>{matName(rs.matType)}</option>
                     )}
                     {poolStdOptions(materialRows, RAISED_SUBCAT).map(o => (
-                      <option key={o.value} value={o.label}>{o.label}</option>
+                      <option key={o.value} value={o.ref_key || o.label}>{o.label}</option>
                     ))}
                   </select>
                 </div>
@@ -2067,11 +2093,11 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                     onChange={e => updCoping(i, 'type', e.target.value)}
                   >
                     {!cr.type && <option value="">Select type</option>}
-                    {cr.type && !copingOpts.some(o => o.label === cr.type) && (
-                      <option value={cr.type}>{cr.type}</option>
+                    {cr.type && !copingOpts.some(o => (o.ref_key || o.label) === cr.type || o.label === cr.type) && (
+                      <option value={cr.type}>{matName(cr.type)}</option>
                     )}
                     {copingOpts.map(o => (
-                      <option key={o.value} value={o.label}>{o.label}</option>
+                      <option key={o.value} value={o.ref_key || o.label}>{o.label}</option>
                     ))}
                   </select>
                 </div>
@@ -2158,11 +2184,11 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                       onChange={e => updEquip(i, 'model', e.target.value)}
                     >
                       {!eq.model && <option value="">Select model</option>}
-                      {eq.model && !models.some(m => m.label === eq.model) && (
-                        <option value={eq.model}>{eq.model}</option>
+                      {eq.model && !models.some(m => (m.ref_key || m.label) === eq.model || m.label === eq.model) && (
+                        <option value={eq.model}>{matName(eq.model)}</option>
                       )}
                       {models.map(m => (
-                        <option key={m.value} value={m.label}>
+                        <option key={m.value} value={m.ref_key || m.label}>
                           {m.label}
                         </option>
                       ))}

@@ -31,6 +31,16 @@ const fmt2 = v =>
 
 export default function PoolSummary({ module }) {
   const data = module?.data || {}
+  // A row's Type/model is stored as a frozen material ref_key. Resolve it to the
+  // item's name via the saved catalog snapshot (live → current, frozen bid → as-bid).
+  // Legacy id/name saves still resolve; a plain enum/label passes through.
+  const matName = key => {
+    if (!key) return key
+    const hit = (data.materialRows || []).find(r => r.ref_key === key || r.id === key || r.name === key)
+    if (!hit) return key
+    const dash = hit.name ? hit.name.indexOf(' - ') : -1
+    return dash > 0 ? hit.name.slice(dash + 3) : hit.name
+  }
   // Rate snapshots saved with the module at save time. Line-item hrs/$ shown
   // below are recomputed from these snapshots (no hardcoded fallback), so the
   // detail view matches the numbers used when the estimate was created.
@@ -207,7 +217,7 @@ export default function PoolSummary({ module }) {
             .map((rs, i) => (
               <LineRow
                 key={i}
-                label={rs.matType}
+                label={matName(rs.matType)}
                 value={`${n(rs.sqft)} Sq Ft`}
                 sub={
                   n(rs.curvePct) > 0
@@ -259,7 +269,7 @@ export default function PoolSummary({ module }) {
             .map((eq, i) => (
               <LineRow
                 key={i}
-                label={`${eq.category} — ${eq.model}`}
+                label={`${eq.category} — ${matName(eq.model)}`}
                 value={fmt2(n(eq.qty) * n(eq.unitCost))}
                 sub={`${eq.qty} × $${n(eq.unitCost).toLocaleString()}`}
               />

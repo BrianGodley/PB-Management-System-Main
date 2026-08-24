@@ -70,6 +70,22 @@ test('water features value: hrs = qty × item labor rate; mat = qty × item unit
   assert.equal(r.waterFeatureCalc.length, 1, 'per-row breakdown emitted for the summary')
 })
 
+test('M5 ref_key parity: a water feature picked by material ref_key resolves the same material + labor as by name', () => {
+  const rows = [{
+    id: 'wf1', ref_key: 'MAT-600-sheer-descent-24in', name: 'Sheer Descent 24in',
+    sub_category: 'Water Features', category: 'Pool', vendor_id: null, unit_cost: 500,
+    calc_meta: { water_feature_type: 'Sheer Descents', labor_rate: 'Pool - Sheer Descent Labor' },
+  }]
+  const lr = { 'Pool - Sheer Descent Labor': 12 }
+  const byName = run({ waterFeatures: [{ vendor: 'Standard', wfType: 'Sheer Descents', type: 'Sheer Descent 24in', qty: '2' }] }, {}, lr, {}, rows)
+  const byRef = run({ waterFeatures: [{ vendor: 'Standard', wfType: 'Sheer Descents', type: 'MAT-600-sheer-descent-24in', qty: '2' }] }, {}, lr, {}, rows)
+  assert.equal(byRef.waterFeatureMat, byName.waterFeatureMat, `material should match; got ${byRef.waterFeatureMat} vs ${byName.waterFeatureMat}`)
+  assert.equal(byRef.waterFeatureMat, 1000, `2 × $500 = $1000; got ${byRef.waterFeatureMat}`)
+  assert.equal(byRef.waterFeatureHrs, byName.waterFeatureHrs, 'labor identical regardless of key form')
+  // The summary breakdown resolves the ref_key back to the item's name.
+  assert.equal(byRef.waterFeatureCalc[0].label, 'Sheer Descent 24in', `label resolves to name; got ${byRef.waterFeatureCalc[0].label}`)
+})
+
 test('material NO-FALLBACK: an unpriced water feature (no catalog row) → $0 material, 0 labor', () => {
   const r = run(
     { waterFeatures: [{ vendor: 'Standard', wfType: 'Sheer Descents', type: 'Sheer Descent 24in', qty: '2' }] },
