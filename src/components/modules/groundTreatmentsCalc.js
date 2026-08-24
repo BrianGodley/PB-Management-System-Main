@@ -22,7 +22,7 @@ function catalogOptions(materialRows, subcategory, vendorSel, { standardRows = '
     .filter(r => r.sub_category === subcategory && (!category || r.category === category) && (isStandard ? r.vendor_id == null : r.vendor_id === vendorSel))
     .map(r => {
       const label = stripPrefix && r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name
-      return { id: r.id, value: r.id, label, stored: label, row: r }
+      return { id: r.id, value: r.id, ref_key: r.ref_key || null, label, stored: label, row: r }
     })
 }
 
@@ -89,13 +89,14 @@ export function mergedGtOpts(cat, houseArray, materialRows) {
   // Purely table-driven: options come ONLY from the catalog for this sub-category.
   // (houseArray is ignored — no hardcoded fallback list.)
   return catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true }).map(
-    o => ({ label: o.label, dbName: o.row.name, fallback: parseFloat(o.row.unit_cost) || 0, id: o.row.id })
+    o => ({ label: o.label, ref_key: o.row.ref_key || null, dbName: o.row.name, fallback: parseFloat(o.row.unit_cost) || 0, id: o.row.id })
   )
 }
 
 export function resolveType(label, options, houseArray) {
+  // `label` may be the frozen material ref_key (converted picker) or the legacy label.
   return (
-    (options || []).find(t => t.label === label) ||
+    (options || []).find(t => (t.ref_key && t.ref_key === label) || t.label === label) ||
     (houseArray || []).find(t => t.label === label) ||
     (options && options[0]) ||
     (houseArray && houseArray[0]) ||
@@ -255,7 +256,9 @@ export function calcGroundTreatments(
     if (!r.type) return
     const lf = n(r.lf)
     const opt = rowOpt('Edging', { vendor: r.vendor, type: r.type }, [])
-    const isMetal = /metal/i.test(r.type || '')
+    // Metal vs plastic drives which labor rate applies. row.type may now be a frozen
+    // ref_key, so test the RESOLVED item's name (dbName) — falls back to the raw value.
+    const isMetal = /metal/i.test(opt.dbName || r.type || '')
     // Labor read via pLab only when this row has LF, so an unset edging labor
     // rate surfaces only for a row actually in use (value identical when lf=0).
     const labRate =

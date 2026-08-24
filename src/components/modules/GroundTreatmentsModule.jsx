@@ -49,7 +49,7 @@ function mergedGtOpts(cat, houseArray, materialRows) {
   // Purely table-driven: options come ONLY from the catalog for this sub-category.
   // (houseArray is ignored — no hardcoded fallback list.)
   return catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true }).map(
-    o => ({ label: o.label, dbName: o.row.name, fallback: parseFloat(o.row.unit_cost) || 0, id: o.row.id })
+    o => ({ label: o.label, ref_key: o.row.ref_key || null, dbName: o.row.name, fallback: parseFloat(o.row.unit_cost) || 0, id: o.row.id })
   )
 }
 
@@ -136,8 +136,9 @@ const n = v => parseFloat(v) || 0
 // hardcoded Standard array, then the first available option — so pricing never breaks
 // when a vendor is selected, a product is missing, or an old estimate is reopened.
 function resolveType(label, options, houseArray) {
+  // `label` may be the frozen material ref_key (converted picker) or the legacy label.
   return (
-    (options || []).find(t => t.label === label) ||
+    (options || []).find(t => (t.ref_key && t.ref_key === label) || t.label === label) ||
     (houseArray || []).find(t => t.label === label) ||
     (options && options[0]) ||
     (houseArray && houseArray[0]) ||
@@ -370,6 +371,15 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   // Full material_rates rows (name/unit_cost/sub_category/vendor_id) — used to build
   // vendor-filtered Type option lists. Vendors list (id/company_name) for pickers.
   const [materialRows, setMaterialRows] = useState([])
+  // Resolve a stored Type (frozen material ref_key; legacy id/name too) to the item's
+  // name for the orphan-value fallback option. Strips the "<sub> - " prefix.
+  const matName = key => {
+    if (!key) return key
+    const hit = (materialRows || []).find(r => r.ref_key === key || r.id === key || r.name === key)
+    if (!hit) return key
+    const dash = hit.name ? hit.name.indexOf(' - ') : -1
+    return dash > 0 ? hit.name.slice(dash + 3) : hit.name
+  }
   const [vendors, setVendors] = useState([])
 
   // Load the full material rows + vendors used to build vendor-filtered Type
@@ -606,7 +616,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
     const opts = catalogOptions(materialRows, subcat, vendorSel, { standardRows: 'null-vendor', stripPrefix: true })
     // Table-driven: a vendor with no catalog rows for this sub-category shows an
     // empty list (no hardcoded fallback).
-    return opts.map(o => ({ label: o.label || o.row.name, dbName: o.row.name, fallback: n(o.row.unit_cost), id: o.row.id }))
+    return opts.map(o => ({ label: o.label || o.row.name, ref_key: o.row.ref_key || null, dbName: o.row.name, fallback: n(o.row.unit_cost), id: o.row.id }))
   }
 
   // Vendors that supply a given material category — drives the per-row vendor
@@ -710,7 +720,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       notes,
       man_days: parseFloat(calc.manDays.toFixed(2)),
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
-      data: { ...state, ihData: ihTab, subData: subTab, walkAccess, laborRatePerHour, laborBurdenPct, gpmd, commissionRate, subGpMarkupRate, materialPrices, calc },
+      data: { ...state, ihData: ihTab, subData: subTab, walkAccess, laborRatePerHour, laborBurdenPct, gpmd, commissionRate, subGpMarkupRate, materialPrices, materialRows, calc },
     })
   }
 
@@ -846,11 +856,11 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         }
                       >
                         {!row.type && <option value="">Select material</option>}
-                        {row.type && !opts.some(o => o.label === row.type) && (
-                          <option value={row.type}>{row.type}</option>
+                        {row.type && !opts.some(o => (o.ref_key || o.label) === row.type || o.label === row.type) && (
+                          <option value={row.type}>{matName(row.type)}</option>
                         )}
                         {opts.map(o => (
-                          <option key={o.label} value={o.label}>
+                          <option key={o.label} value={o.ref_key || o.label}>
                             {o.label}
                           </option>
                         ))}
@@ -887,11 +897,14 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                 <span className="text-xs font-bold text-gray-600 uppercase">Sod</span>
                 <select
                   className="input text-sm py-1 flex-1 min-w-0"
-                  value={resolveType(sodType, sectionOptions('Sod', sodVendor || 'Standard', []), [])?.label || ''}
+                  value={(() => {
+                    const t = resolveType(sodType, sectionOptions('Sod', sodVendor || 'Standard', []), [])
+                    return t?.ref_key || t?.label || ''
+                  })()}
                   onChange={e => setSodType(e.target.value)}
                 >
                   {sectionOptions('Sod', sodVendor || 'Standard', []).map(o => (
-                    <option key={o.label} value={o.label}>
+                    <option key={o.label} value={o.ref_key || o.label}>
                       {o.label}
                     </option>
                   ))}
@@ -1034,11 +1047,11 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                               onChange={e => upd(i, 'type', e.target.value)}
                             >
                               {!row.type && <option value="">Select soil/amendment</option>}
-                              {row.type && !rowOpts.some(o => o.label === row.type) && (
-                                <option value={row.type}>{row.type}</option>
+                              {row.type && !rowOpts.some(o => (o.ref_key || o.label) === row.type || o.label === row.type) && (
+                                <option value={row.type}>{matName(row.type)}</option>
                               )}
                               {rowOpts.map(t => (
-                                <option key={t.label} value={t.label}>
+                                <option key={t.label} value={t.ref_key || t.label}>
                                   {t.label}
                                 </option>
                               ))}
@@ -1179,11 +1192,11 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         onChange={e => updateEdging(i, 'type', e.target.value)}
                       >
                         {!row.type && <option value="">Select edging</option>}
-                        {row.type && !opts.some(o => o.label === row.type) && (
-                          <option value={row.type}>{row.type}</option>
+                        {row.type && !opts.some(o => (o.ref_key || o.label) === row.type || o.label === row.type) && (
+                          <option value={row.type}>{matName(row.type)}</option>
                         )}
                         {opts.map(o => (
-                          <option key={o.label} value={o.label}>
+                          <option key={o.label} value={o.ref_key || o.label}>
                             {o.label}
                           </option>
                         ))}
@@ -1280,11 +1293,11 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         onChange={e => updateDg(i, 'type', e.target.value)}
                       >
                         {!row.type && <option value="">Select DG</option>}
-                        {row.type && !rowOpts.some(o => o.label === row.type) && (
-                          <option value={row.type}>{row.type}</option>
+                        {row.type && !rowOpts.some(o => (o.ref_key || o.label) === row.type || o.label === row.type) && (
+                          <option value={row.type}>{matName(row.type)}</option>
                         )}
                         {rowOpts.map(t => (
-                          <option key={t.label} value={t.label}>
+                          <option key={t.label} value={t.ref_key || t.label}>
                             {t.label}
                           </option>
                         ))}
@@ -1426,11 +1439,11 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         onChange={e => updateGravel(i, 'type', e.target.value)}
                       >
                         {!row.type && <option value="">Select Gravel</option>}
-                        {row.type && !rowOpts.some(o => o.label === row.type) && (
-                          <option value={row.type}>{row.type}</option>
+                        {row.type && !rowOpts.some(o => (o.ref_key || o.label) === row.type || o.label === row.type) && (
+                          <option value={row.type}>{matName(row.type)}</option>
                         )}
                         {rowOpts.map(t => (
-                          <option key={t.label} value={t.label}>
+                          <option key={t.label} value={t.ref_key || t.label}>
                             {t.label}
                           </option>
                         ))}
@@ -1560,11 +1573,11 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         onChange={e => updatePebble(i, 'type', e.target.value)}
                       >
                         {!row.type && <option value="">Select Pebble</option>}
-                        {row.type && !rowOpts.some(o => o.label === row.type) && (
-                          <option value={row.type}>{row.type}</option>
+                        {row.type && !rowOpts.some(o => (o.ref_key || o.label) === row.type || o.label === row.type) && (
+                          <option value={row.type}>{matName(row.type)}</option>
                         )}
                         {rowOpts.map(t => (
-                          <option key={t.label} value={t.label}>
+                          <option key={t.label} value={t.ref_key || t.label}>
                             {t.label}
                           </option>
                         ))}
@@ -1695,11 +1708,11 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         onChange={e => updateCobble(i, 'type', e.target.value)}
                       >
                         {!row.type && <option value="">Select Cobble &amp; Boulders</option>}
-                        {row.type && !rowOpts.some(o => o.label === row.type) && (
-                          <option value={row.type}>{row.type}</option>
+                        {row.type && !rowOpts.some(o => (o.ref_key || o.label) === row.type || o.label === row.type) && (
+                          <option value={row.type}>{matName(row.type)}</option>
                         )}
                         {rowOpts.map(t => (
-                          <option key={t.label} value={t.label}>
+                          <option key={t.label} value={t.ref_key || t.label}>
                             {t.label}
                           </option>
                         ))}
@@ -1840,11 +1853,11 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         onChange={e => updateMulch(i, 'type', e.target.value)}
                       >
                         {!row.type && <option value="">Select Mulch</option>}
-                        {row.type && !rowOpts.some(o => o.label === row.type) && (
-                          <option value={row.type}>{row.type}</option>
+                        {row.type && !rowOpts.some(o => (o.ref_key || o.label) === row.type || o.label === row.type) && (
+                          <option value={row.type}>{matName(row.type)}</option>
                         )}
                         {rowOpts.map(t => (
-                          <option key={t.label} value={t.label}>
+                          <option key={t.label} value={t.ref_key || t.label}>
                             {t.label}
                           </option>
                         ))}
@@ -1959,11 +1972,11 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                         onChange={e => updateSodRow(i, 'type', e.target.value)}
                       >
                         {!row.type && <option value="">Select Sod</option>}
-                        {row.type && !rowOpts.some(o => o.label === row.type) && (
-                          <option value={row.type}>{row.type}</option>
+                        {row.type && !rowOpts.some(o => (o.ref_key || o.label) === row.type || o.label === row.type) && (
+                          <option value={row.type}>{matName(row.type)}</option>
                         )}
                         {rowOpts.map(t => (
-                          <option key={t.label} value={t.label}>
+                          <option key={t.label} value={t.ref_key || t.label}>
                             {t.label}
                           </option>
                         ))}
@@ -2073,7 +2086,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                             <option value={row.fertilizer}>{row.fertilizer}</option>
                           )}
                           {fertOpts.map(t => (
-                            <option key={t.label} value={t.label}>
+                            <option key={t.label} value={t.ref_key || t.label}>
                               {t.label}
                             </option>
                           ))}
@@ -2219,7 +2232,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
                           <option value={stepperType[row.key]}>{stepperType[row.key]}</option>
                         )}
                         {rowOpts.map(o => (
-                          <option key={o.label} value={o.label}>
+                          <option key={o.label} value={o.ref_key || o.label}>
                             {o.label}
                           </option>
                         ))}

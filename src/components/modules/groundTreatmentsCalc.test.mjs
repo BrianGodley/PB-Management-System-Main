@@ -18,7 +18,7 @@ const base = {
   flagstoneSoilSF: '', flagstoneConcreteSF: '', precastSoilSF: '', precastConcreteSF: '',
   stepperVendor: {}, stepperType: {}, subGpMarkupRate: 0.2, commissionRate: 0.05,
 }
-const row = (name, sub, cost, vendor_id = null) => ({ id: name, name, sub_category: sub, category: 'Ground Treatments', vendor_id, unit_cost: cost })
+const row = (name, sub, cost, vendor_id = null, ref_key = null) => ({ id: name, ref_key, name, sub_category: sub, category: 'Ground Treatments', vendor_id, unit_cost: cost })
 // calcGroundTreatments(state, lrph, mp, gpmd, walkAccess, laborBurdenPct, opts, materialRows, catDefaults, commissionRate)
 const run = (state, mp = {}, materialRows = []) =>
   calcGroundTreatments({ ...base, ...state }, LRPH, mp, 425, null, 0.29, {}, materialRows, {}, 0.05)
@@ -41,6 +41,14 @@ test('mulch edit-reflects: raising $/CY raises mulch material (delivery fee cons
   const a = run({ mulchRows: [{ sf: '100', depth: '3', type: 'M', vendor: 'Standard', weedFabric: 'No' }] }, { 'Mulch Delivery Fee': 50 }, [row('M', 'Mulch', 40)])
   const b = run({ mulchRows: [{ sf: '100', depth: '3', type: 'M', vendor: 'Standard', weedFabric: 'No' }] }, { 'Mulch Delivery Fee': 50 }, [row('M', 'Mulch', 80)])
   near(b.mulchMat - a.mulchMat, CY(100, 3) * 40) // +$40/CY over the same CY
+})
+
+test('M5 ref_key parity: a mulch row picked by material ref_key resolves the same material as by name', () => {
+  const rows = [row('Standard Mulch', 'Mulch', 40, null, 'MAT-720-standard-mulch')]
+  const byName = run({ mulchRows: [{ sf: '100', depth: '3', type: 'Standard Mulch', vendor: 'Standard', weedFabric: 'No' }] }, { 'Mulch Delivery Fee': 50 }, rows)
+  const byRef = run({ mulchRows: [{ sf: '100', depth: '3', type: 'MAT-720-standard-mulch', vendor: 'Standard', weedFabric: 'No' }] }, { 'Mulch Delivery Fee': 50 }, rows)
+  near(byRef.mulchMat, byName.mulchMat)
+  near(byRef.mulchMat - 50, CY(100, 3) * 40) // material (minus flat delivery) = CY × $40/CY
 })
 
 test('edging: metal vs plastic read different labor rate keys (independence)', () => {

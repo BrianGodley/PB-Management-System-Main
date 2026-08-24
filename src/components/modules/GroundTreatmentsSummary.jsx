@@ -249,12 +249,25 @@ export default function GroundTreatmentsSummary({ module }) {
   const mp = dbName =>
     n(materialPrices[dbName] ?? (dbName === 'Weed Fabric' ? materialPrices['Gravel Fabric'] : undefined))
 
+  // A row's Type is stored as a frozen material ref_key. Resolve it to the item's
+  // stripped label via the saved catalog snapshot for BOTH display and the name-keyed
+  // price lookups below. Legacy label saves pass through unchanged.
+  const gtName = key => {
+    if (!key) return key
+    const hit = (data.materialRows || []).find(r => r.ref_key === key || r.id === key || r.name === key)
+    if (!hit) return key
+    const dash = hit.name ? hit.name.indexOf(' - ') : -1
+    return dash > 0 ? hit.name.slice(dash + 3) : hit.name
+  }
+
   // Resolve a section product's saved per-unit price. Vendor products are stored
   // on the row by their (possibly prefix-stripped) LABEL, while the saved
   // materialPrices snapshot is keyed by the full material_rates name (dbName).
   // Order: hardcoded Standard array match → raw label as a name → reconstructed
   // "<Subcat> - <label>" name → default.
-  const priceForType = (subcat, type, houseArray, defaultVal) => {
+  const priceForType = (subcat, type0, houseArray, defaultVal) => {
+    // Resolve a frozen ref_key to its label so name-keyed lookups below still hit.
+    const type = gtName(type0)
     const hit = type != null ? houseArray.find(t => t.label === type) : null
     if (hit) return mp(hit.dbName)
     if (type != null && materialPrices[type] != null) return materialPrices[type]
@@ -269,7 +282,7 @@ export default function GroundTreatmentsSummary({ module }) {
   // snapshotted; if that (and the raw label) miss, fall back to the Standard
   // resolution. Rows without a vendor (old saves) resolve exactly as before.
   const priceForRow = (subcat, row, houseArray, defaultVal) => {
-    const type = row?.type
+    const type = gtName(row?.type)
     const vendor = row?.vendor
     if (vendor && vendor !== 'Standard') {
       if (type != null && materialPrices[`${subcat} - ${type}`] != null)
@@ -323,7 +336,7 @@ export default function GroundTreatmentsSummary({ module }) {
       }
       return {
         key: i,
-        label: `Planter Prep${r.type ? ` (${r.type})` : ''}${tilling && tilling !== 'None' ? ` · ${tilling} till` : ''} — ${n(r.area).toLocaleString()} Sq Ft`,
+        label: `Planter Prep${r.type ? ` (${gtName(r.type)})` : ''}${tilling && tilling !== 'None' ? ` · ${tilling} till` : ''} — ${n(r.area).toLocaleString()} Sq Ft`,
         value: fmt2(mat),
         sub: `${hrs.toFixed(2)} hrs`,
       }
@@ -359,7 +372,7 @@ export default function GroundTreatmentsSummary({ module }) {
       }
       return {
         key: i,
-        label: `Sod Prep${r.type ? ` (${r.type})` : ''}${tilling && tilling !== 'None' ? ` · ${tilling} till` : ''} — ${n(r.area).toLocaleString()} Sq Ft`,
+        label: `Sod Prep${r.type ? ` (${gtName(r.type)})` : ''}${tilling && tilling !== 'None' ? ` · ${tilling} till` : ''} — ${n(r.area).toLocaleString()} Sq Ft`,
         value: fmt2(mat),
         sub: `${hrs.toFixed(2)} hrs`,
       }
@@ -381,7 +394,7 @@ export default function GroundTreatmentsSummary({ module }) {
       const hrs = n(r.sf) * mp(GT_RATES.sodLab.dbName)
       return {
         key: i,
-        label: `Sod${r.type ? ` (${r.type})` : ''} — ${n(r.sf).toLocaleString()} Sq Ft`,
+        label: `Sod${r.type ? ` (${gtName(r.type)})` : ''} — ${n(r.sf).toLocaleString()} Sq Ft`,
         value: fmt2(mat),
         sub: `${hrs.toFixed(2)} hrs · ${fmt2(rate)} per Sq Ft`,
       }
@@ -463,7 +476,7 @@ export default function GroundTreatmentsSummary({ module }) {
       }
       return {
         key: i,
-        label: `${r.type || 'Mulch'} — ${n(r.sf).toLocaleString()} Sq Ft × ${n(r.depth)}"${fabric ? ' · weed fabric' : ''}`,
+        label: `${gtName(r.type) || 'Mulch'} — ${n(r.sf).toLocaleString()} Sq Ft × ${n(r.depth)}"${fabric ? ' · weed fabric' : ''}`,
         value: fmt2(mat),
         sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} Cu Yd`,
       }
@@ -514,7 +527,7 @@ export default function GroundTreatmentsSummary({ module }) {
       }
       return {
         key: i,
-        label: `${r.type || 'D.G.'} — ${n(r.sf).toLocaleString()} Sq Ft @ ${n(r.depth)}" (${r.method}${cement ? ', cement' : ''}${fabric ? ', fabric' : ''})`,
+        label: `${gtName(r.type) || 'D.G.'} — ${n(r.sf).toLocaleString()} Sq Ft @ ${n(r.depth)}" (${r.method}${cement ? ', cement' : ''}${fabric ? ', fabric' : ''})`,
         value: fmt2(mat),
         sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} Cu Yd`,
       }
@@ -541,7 +554,7 @@ export default function GroundTreatmentsSummary({ module }) {
       const hrs = excavLab + fabricLab
       return {
         key: i,
-        label: `Gravel #${i + 1}${r.type ? ` (${r.type})` : ''} — ${n(r.sf).toLocaleString()} Sq Ft × ${n(r.depthIn)}" (${r.method}${fabric ? ', fabric' : ''})`,
+        label: `Gravel #${i + 1}${r.type ? ` (${gtName(r.type)})` : ''} — ${n(r.sf).toLocaleString()} Sq Ft × ${n(r.depthIn)}" (${r.method}${fabric ? ', fabric' : ''})`,
         value: fmt2(mat),
         sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} Cu Yd · $${costPerCY.toFixed ? costPerCY.toFixed(2) : costPerCY} per Cu Yd`,
       }
@@ -571,7 +584,7 @@ export default function GroundTreatmentsSummary({ module }) {
       const hrs = excavLab + fabricLab
       return {
         key: i,
-        label: `Pebble #${i + 1}${r.type ? ` (${r.type})` : ''} — ${n(r.sf).toLocaleString()} Sq Ft × ${n(r.depthIn)}" (${r.method}${fabric ? ', fabric' : ''})`,
+        label: `Pebble #${i + 1}${r.type ? ` (${gtName(r.type)})` : ''} — ${n(r.sf).toLocaleString()} Sq Ft × ${n(r.depthIn)}" (${r.method}${fabric ? ', fabric' : ''})`,
         value: fmt2(mat),
         sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} Cu Yd · $${costPerCY.toFixed ? costPerCY.toFixed(2) : costPerCY} per Cu Yd`,
       }
@@ -601,7 +614,7 @@ export default function GroundTreatmentsSummary({ module }) {
       const hrs = excavLab + fabricLab
       return {
         key: i,
-        label: `Cobble #${i + 1}${r.type ? ` (${r.type})` : ''} — ${n(r.sf).toLocaleString()} Sq Ft × ${n(r.depthIn)}" (${r.method})`,
+        label: `Cobble #${i + 1}${r.type ? ` (${gtName(r.type)})` : ''} — ${n(r.sf).toLocaleString()} Sq Ft × ${n(r.depthIn)}" (${r.method})`,
         value: fmt2(mat),
         sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} Cu Yd · $${costPerCY.toFixed ? costPerCY.toFixed(2) : costPerCY} per Cu Yd`,
       }
@@ -620,7 +633,7 @@ export default function GroundTreatmentsSummary({ module }) {
     [{ vendor: ih.edgingVendor, type: ih.edgingType, lf: ih.edgingLF }]
   ;(_edgingRows || []).forEach(r => {
     if (!(n(r.lf) > 0 && r.type)) return
-    const isMetal = /metal/i.test(r.type || '')
+    const isMetal = /metal/i.test(gtName(r.type) || r.type || '')
     const rate = priceForRow(
       'Edging',
       { type: r.type, vendor: r.vendor },
@@ -635,7 +648,7 @@ export default function GroundTreatmentsSummary({ module }) {
     const mat = n(r.lf) * rate
     const hrs = n(r.lf) * labRate
     edgingLines.push({
-      label: `${r.type} Edging — ${n(r.lf).toLocaleString()} Ln Ft`,
+      label: `${gtName(r.type)} Edging — ${n(r.lf).toLocaleString()} Ln Ft`,
       value: fmt2(mat),
       sub: `${hrs.toFixed(2)} hrs · ${fmt2(rate)} per Ln Ft`,
     })
