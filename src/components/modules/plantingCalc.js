@@ -74,11 +74,13 @@ export const ADDON_META = {
 export function computePlantRow(row, perDay) {
   if (!row.type) return { qty: n(row.qty), hrs: 0, mat: 0, subUnit: 0, subEach: 0, subMat: 0 }
   const qty = n(row.qty)
-  let hrs = 0, mat = 0
-  if (qty > 0 && perDay > 0) {
-    hrs = qty * perDay // perDay is hours per plant
-    mat = qty * n(row.price)
-  }
+  // Hours and material resolve INDEPENDENTLY. An unset labor rate (perDay 0) must
+  // NOT zero the material, and an unpriced plant must NOT zero the labor — each is
+  // guarded on its own value. Unpriced labor still surfaces via the module's
+  // unpriced banner (plantPerDay pushes to laborUnset); this only stops one missing
+  // rate from silently zeroing the other.
+  const hrs = qty > 0 && perDay > 0 ? qty * perDay : 0 // perDay is hours per plant
+  const mat = qty > 0 ? qty * n(row.price) : 0
   const subUnit = n(row.price)
   const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : subUnit
   const subMat = qty > 0 ? qty * subEach : 0

@@ -1,8 +1,9 @@
 // Acceptance tests for the pure Planting calc (no network).
 //   Plant labor: hrs = qty × perDay, where perDay = labor_rates[item.calc_meta.labor_rate]
 //   (hrs per plant, item-driven). Material = qty × the row's vendor-defaulted unit price.
-//   The perDay>0 guard skips BOTH hrs and material when the plant's labor rate is unset,
-//   AND the plant surfaces in `laborUnset` (NO-FALLBACK). Add-ons: hrs = qty × labor_rates
+//   Hours and material resolve INDEPENDENTLY: an unset labor rate gives 0 hrs but the
+//   material still totals off the row price, and the plant surfaces in `laborUnset`
+//   (NO-FALLBACK). Add-ons: hrs = qty × labor_rates
 //   [meta.labKey] (perDay) or ÷60 (perMin); material vendor-first → Standard. Till: hrs =
 //   soilCY×moveRate + sqft×tillRate + sqft×amendRate, guarded (all three > 0 or 0).
 //   Sub tab: flat $/unit only, zero labor hours, cost routed into subCost.
@@ -59,13 +60,13 @@ test('add-on labor (perDay): hrs = qty × labor rate (4 × 0.25 = 1 hr); materia
   assert.equal(ADDON_META['Tree Stake'].mode, 'perDay', 'Tree Stake is a perDay add-on (hrs = qty × rate)')
 })
 
-test('LABOR NO-FALLBACK: a plant whose install rate is unset → 0 hrs + 0 material (guard) AND flags in laborUnset', () => {
+test('DECOUPLED: an unset install rate → 0 hrs but material STILL totals (10 × $18 = $180) AND flags in laborUnset', () => {
   const r = run(
     { smallPlantRows: [{ vendor: 'Standard', type: '5 gallon standard', qty: '10', price: '18' }] },
     {}, {}, [PLANT] // labor rate map empty → perDay resolves 0
   )
   assert.equal(r.smallHrs, 0, 'unset rate → 0 hrs (no hidden constant)')
-  assert.equal(r.totalMat, 0, 'perDay>0 guard also skips material when labor is unset')
+  assert.equal(r.totalMat, 180, 'material is independent of labor: 10 × $18 = $180 even when labor is unset')
   assert.ok((r.laborUnset || []).length > 0, `expected laborUnset entry; got ${JSON.stringify(r.laborUnset)}`)
   assert.ok(r.laborUnset.some(u => u.label === '5 gallon standard'), 'the unpriced plant is surfaced by label')
 })

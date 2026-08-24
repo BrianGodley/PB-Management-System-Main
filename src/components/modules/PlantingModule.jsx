@@ -227,18 +227,15 @@ function plantTypeOptions(materialRows, subcat, builtInKeys, vendorSel, itemName
 
 // ── Per-row calculators ───────────────────────────────────────────────────────
 // Plant row: In-House material = qty × the row's (editable, vendor-defaulted)
-// unit price — IDENTICAL to the original `qty * n(r.price)`, including the
-// perDay > 0 guard that skips both hrs and material when the labor rate is 0.
+// unit price. Hours and material resolve INDEPENDENTLY — an unset labor rate must
+// not zero the material (unpriced labor surfaces via the banner instead), and an
+// unpriced plant must not zero the labor. Mirrors plantingCalc.computePlantRow.
 function computePlantRow(row, perDay) {
   // Unselected plant row contributes nothing (no crash, no fallback-to-first).
   if (!row.type) return { qty: n(row.qty), hrs: 0, mat: 0, subUnit: 0, subEach: 0, subMat: 0 }
   const qty = n(row.qty)
-  let hrs = 0,
-    mat = 0
-  if (qty > 0 && perDay > 0) {
-    hrs = qty * perDay // perDay is hours per plant
-    mat = qty * n(row.price)
-  }
+  const hrs = qty > 0 && perDay > 0 ? qty * perDay : 0 // perDay is hours per plant
+  const mat = qty > 0 ? qty * n(row.price) : 0
   const subUnit = n(row.price)
   const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : subUnit
   const subMat = qty > 0 ? qty * subEach : 0
