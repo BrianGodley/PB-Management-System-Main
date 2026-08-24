@@ -56,7 +56,7 @@ export function calcDemo(
   const laborFooting = n(lr['Skid - Footing'])        // hrs / Cu Yd
   const laborGradeCut = n(lr['Skid - Grade Cut'])     // hrs / Sq Ft
   const rateGrass = n(lr['Demo - Skid Steer Grass'])
-  const laborBase = n(lr[BAS.IMPORT_BASE_SKID_OK])    // hrs / Cu Ft (shared Basic Labor)
+  const laborBase = n(lr[BAS.BASE_PREP_SKID])    // hrs / Cu Ft (shared Basic Labor)
   const laborGradeFill = n(lr['Skid - Grade Fill'])   // hrs / Sq Ft
   const laborJJ = n(lr[BAS.JUMPING_JACK]) // shared, hrs / Cu Ft
   const laborSS = n(lr['Skid - Compaction'])          // hrs / Cu Ft

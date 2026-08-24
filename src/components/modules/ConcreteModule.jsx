@@ -24,27 +24,27 @@ import UnpricedItemModal from '../UnpricedItemModal'
 import { makeModuleRates } from '../../lib/moduleRates'
 import NewCatalogItemModal from '../NewCatalogItemModal'
 import { calcConcrete } from './concreteCalc'
+import { BAS } from '../../lib/basicLaborRefs'
 
 // ── Rate tables (method-indexed — not in DB) ──────────────────────────────────
 
-// Base spread labor methods. HOURS PER INCH of depth PER 100 SF of area come
-// from labor_rates (BASE_METHOD_LABOR_NAME) — identity only, no hardcoded rate.
-const METHODS = ['Skid Steer', 'Mini Skid Steer', 'Wheelbarrow']
+// Base-prep methods — the three shared Basic Labor 'Base Prep' rates (hrs per
+// Cu Ft) that Pavers + the demos also read. Skid Good/OK collapsed to one Skid.
+const METHODS = ['Skid Steer', 'Mini Skid Steer', 'Hand']
 
-// Each base-install method maps to a labor_rates row so the inline calculator
-// icon next to the method dropdown can edit the t/hr rate. Names must match
-// the seed file.
+// Each method maps to a shared Basic Labor ref_key; the module preview reads it
+// from the dual-keyed rate map (edited in Master Rates → Basic Labor).
 const BASE_METHOD_LABOR_NAME = {
-  'Skid Steer': 'Concrete - Base Skid Steer',
-  'Mini Skid Steer': 'Concrete - Base Mini Skid Steer',
-  Wheelbarrow: 'Concrete - Base Wheelbarrow',
+  'Skid Steer': BAS.BASE_PREP_SKID,
+  'Mini Skid Steer': BAS.BASE_PREP_MINI,
+  Hand: BAS.BASE_PREP_HAND,
 }
 // Map legacy saved base methods to the consolidated set.
 const normBaseMethod = m =>
   m === 'Skid Steer OK' || m === 'Skid Steer Good'
     ? 'Skid Steer'
-    : m === 'Hand'
-      ? 'Wheelbarrow'
+    : m === 'Wheelbarrow'
+      ? 'Hand'
       : m
 const FINISH_TYPES = [
   'Broom Finish',
@@ -777,7 +777,9 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             crewType={crewType}
             onCrewTypeChange={setCrewType}
             title="Concrete"
-            moduleType="Concrete"            refreshAllRates={refreshAllRates}
+            moduleType="Concrete"
+            rateScope={[{ category: 'Basic Labor', sub: 'Base Prep' }]}
+            refreshAllRates={refreshAllRates}
             showInlineToggle={false}
           />
         </div>
@@ -845,10 +847,10 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
       </div>
       )}
 
-      {/* ── Base Install — In-House only ── */}
+      {/* ── Base Prep — In-House only ── */}
       {!isSub && (
       <div>
-        <SectionHeader title="Base Install" />
+        <SectionHeader title="Base Prep" />
         <div className="overflow-x-auto">
           <table className="w-full text-sm table-fixed">
             {/* Sq Ft + Depth ~3× their prior shrunk width; the freed
@@ -884,7 +886,8 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 // 'Base Material' product overrides it.
                 const baseRate = bt.fallback > 0 ? bt.fallback : costBase
                 const c = {
-                  hrs: _sf > 0 ? (_sf / 100) * _depth * methodRate : 0,
+                  // Labor by VOLUME (Cu Ft) — mirrors Pavers; Cu Ft = SF × depth/12.
+                  hrs: _sf > 0 ? (_sf * (_depth / 12)) * methodRate : 0,
                   // Material priced per Cu Yd: SF × depth(in)/12 ÷ 27 × $/Cu Yd.
                   mat: _sf > 0 ? (_sf * (_depth / 12) / 27) * baseRate : 0,
                 }

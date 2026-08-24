@@ -1,5 +1,6 @@
 // Acceptance tests for the pure Concrete calc (no network).
-//   Base install labor = (SF/100) × depth_in × rate (hrs-per-unit multiply).
+//   Base prep labor = Cu Ft × rate = (SF × depth_in/12) × rate (mirrors Pavers;
+//   shared Basic Labor 'Base Prep' rate, hrs per Cu Ft).
 //   totalHrs (no walk) → laborCost = totalHrs × lrph. NO-FALLBACK: an item with no
 //   catalog price resolves $0 AND surfaces in the `unpriced` list (the fix-it banner),
 //   never a hidden constant. Rates resolve by NAME from the injected lr/mr/sr maps.
@@ -19,21 +20,23 @@ const finiteNums = obj => {
   }
 }
 
-test('value: base install labor = (SF/100) × depth × rate (100 SF × 4in × 0.5 = 2 hrs → $150)', () => {
-  const r = run({ baseRows: [{ method: 'Skid Steer', sf: 100, depth: 4 }] }, { lr: { 'BAS-011-concrete-base-skid-steer': 0.5 } })
-  assert.equal(r.laborCost, 2 * LRPH, `laborCost got ${r.laborCost}`)
+test('value: base prep labor = Cu Ft × rate (108 SF × 4in/12 = 36 Cu Ft × 0.5 = 18 hrs → $1350)', () => {
+  const sf = 108, depth = 4, rate = 0.5
+  const r = run({ baseRows: [{ method: 'Skid Steer', sf, depth }] }, { lr: { 'BAS-004-import-base-skid-steer-good': rate } })
+  const expHrs = sf * (depth / 12) * rate // 36 Cu Ft × 0.5 = 18 hrs
+  assert.equal(r.laborCost, expHrs * LRPH, `laborCost got ${r.laborCost}`)
   finiteNums(r)
 })
 
 test('units: doubling depth doubles base labor (hrs-per-unit multiply, no production divide)', () => {
-  const a = run({ baseRows: [{ method: 'Skid Steer', sf: 100, depth: 4 }] }, { lr: { 'BAS-011-concrete-base-skid-steer': 0.5 } })
-  const b = run({ baseRows: [{ method: 'Skid Steer', sf: 100, depth: 8 }] }, { lr: { 'BAS-011-concrete-base-skid-steer': 0.5 } })
+  const a = run({ baseRows: [{ method: 'Skid Steer', sf: 100, depth: 4 }] }, { lr: { 'BAS-004-import-base-skid-steer-good': 0.5 } })
+  const b = run({ baseRows: [{ method: 'Skid Steer', sf: 100, depth: 8 }] }, { lr: { 'BAS-004-import-base-skid-steer-good': 0.5 } })
   assert.equal(b.laborCost, a.laborCost * 2, 'depth 4→8 doubles hours')
 })
 
 test('edit-reflects: raising the base labor rate raises labor proportionally', () => {
-  const a = run({ baseRows: [{ method: 'Skid Steer', sf: 100, depth: 4 }] }, { lr: { 'BAS-011-concrete-base-skid-steer': 0.5 } })
-  const b = run({ baseRows: [{ method: 'Skid Steer', sf: 100, depth: 4 }] }, { lr: { 'BAS-011-concrete-base-skid-steer': 1.0 } })
+  const a = run({ baseRows: [{ method: 'Skid Steer', sf: 100, depth: 4 }] }, { lr: { 'BAS-004-import-base-skid-steer-good': 0.5 } })
+  const b = run({ baseRows: [{ method: 'Skid Steer', sf: 100, depth: 4 }] }, { lr: { 'BAS-004-import-base-skid-steer-good': 1.0 } })
   assert.equal(b.laborCost, a.laborCost * 2, 'rate ×2 → labor ×2')
 })
 
@@ -73,7 +76,7 @@ test('no NaN across a populated In-House estimate', () => {
       formLF: 60,
     },
     {
-      lr: { 'BAS-011-concrete-base-skid-steer': 0.5, 'LAB-076-concrete-install-300-600': 0.05, 'Concrete - Rebar Per SF': 0.02 },
+      lr: { 'BAS-004-import-base-skid-steer-good': 0.5, 'LAB-076-concrete-install-300-600': 0.05, 'Concrete - Rebar Per SF': 0.02 },
       mr: { 'Rebar #4': 0.85, 'Concrete - Form Lumber LF': 2 },
     }
   )

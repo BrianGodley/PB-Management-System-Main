@@ -82,11 +82,11 @@ export function calcPaver(
   const polySandNewSpread = n(lr[LAB.PAVER_POLY_SAND_NEW])
   const polySandExistingSpread = n(lr[LAB.PAVER_POLY_SAND_EXISTING])
   // Base prep reads the shared Basic Labor table (one source of truth, by ref_key).
-  // All hrs / Cu Ft (the demo volume basis).
-  const baseSkidGood = n(lr[BAS.IMPORT_BASE_SKID_GOOD]) // hrs / Cu Ft
-  const baseSkidOK = n(lr[BAS.IMPORT_BASE_SKID_OK])     // hrs / Cu Ft
-  const baseMiniBobcat = n(lr[BAS.IMPORT_BASE_MINI])    // hrs / Cu Ft
-  const baseHand = n(lr[BAS.IMPORT_BASE_HAND])          // hrs / Cu Ft
+  // The three canonical methods (Skid Good/OK collapsed to one Skid — difficulty %
+  // covers the variance). All hrs / Cu Ft. Concrete + the demos read the same rows.
+  const baseSkid = n(lr[BAS.BASE_PREP_SKID]) // hrs / Cu Ft
+  const baseMini = n(lr[BAS.BASE_PREP_MINI]) // hrs / Cu Ft
+  const baseHand = n(lr[BAS.BASE_PREP_HAND]) // hrs / Cu Ft
 
   // Material rates — live from the catalog / misc_rates, no hardcoded fallback.
   const baseRockPerTon = n(mr['Paver - Base Rock'])
@@ -103,10 +103,13 @@ export function calcPaver(
   const deliverySFPerIncrement = n(mr['Paver - Delivery SF Increment']) // SF per delivery charge
 
   const BASE_RATE_MAP = {
-    'Skid Good': baseSkidGood,
-    'Skid OK': baseSkidOK,
-    'Mini Skid': baseMiniBobcat,
+    'Skid Steer': baseSkid,
+    'Mini Skid Steer': baseMini,
     Hand: baseHand,
+    // Legacy saved method labels → canonical rates.
+    'Skid Good': baseSkid,
+    'Skid OK': baseSkid,
+    'Mini Skid': baseMini,
   }
 
   // ── Paver areas ─────────────────────────────────────────────────────────────
@@ -119,7 +122,7 @@ export function calcPaver(
     const baseSf = row.baseSf !== '' && row.baseSf != null ? n(row.baseSf) : sf
     // Base LABOR shares the demo Import Base rate — hrs × Cu Ft for every method.
     const baseVolume = baseSf * (depthIn / 12) // Cu Ft
-    const baseRate = BASE_RATE_MAP[row.method] ?? baseSkidOK
+    const baseRate = BASE_RATE_MAP[row.method] ?? baseSkid
     const baseHrs = baseVolume * baseRate
 
     // Base MATERIAL is now priced per CUBIC YARD (company-wide move — base
@@ -439,9 +442,8 @@ export function calcPaver(
     sleevesRate,
     vertSoldierRate,
     sealerRate,
-    baseSkidGood,
-    baseSkidOK,
-    baseMiniBobcat,
+    baseSkid,
+    baseMini,
     baseHand,
     baseRockPerTon,
     beddingSandPerCy,

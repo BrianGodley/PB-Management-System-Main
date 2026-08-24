@@ -31,18 +31,20 @@ function calcWalkAccessLabor(laborSubtotalHrs, distanceLF, opts = {}) {
 }
 
 
-// Concrete base-prep labor now lives in the shared Basic Labor table (sub 'Base Prep').
+// Concrete base-prep labor reads the SHARED Basic Labor table (sub 'Base Prep') —
+// the same three methods Pavers + the demos use, one source of truth by ref_key.
 const BASE_METHOD_LABOR_NAME = {
-  'Skid Steer': BAS.CONC_BASE_SKID,
-  'Mini Skid Steer': BAS.CONC_BASE_MINI,
-  Wheelbarrow: BAS.CONC_BASE_WHEELBARROW,
+  'Skid Steer': BAS.BASE_PREP_SKID,
+  'Mini Skid Steer': BAS.BASE_PREP_MINI,
+  Hand: BAS.BASE_PREP_HAND,
 }
 
+// Collapse legacy method labels onto the three canonical methods.
 const normBaseMethod = m =>
   m === 'Skid Steer OK' || m === 'Skid Steer Good'
     ? 'Skid Steer'
-    : m === 'Hand'
-      ? 'Wheelbarrow'
+    : m === 'Wheelbarrow'
+      ? 'Hand'
       : m
 
 const INSTALL_TIERS = [
@@ -202,10 +204,10 @@ export function calcConcrete(
       depth = n(r.depth) || 2
     if (!sf) return { hrs: 0, mat: 0 }
     const m = normBaseMethod(r.method)
-    // LABOR is by AREA: (SF ÷ 100) × depth(in) × rate.
-    // Labor rate = labor_rates['Concrete - Base ...'] (hrs per inch per 100 SF).
+    // LABOR is by VOLUME (Cu Ft) — mirrors Pavers exactly so both share the same
+    // Basic Labor 'Base Prep' rate (hrs per Cu Ft). Cu Ft = SF × depth(in)/12.
     const rate = n(lr[BASE_METHOD_LABOR_NAME[m]])
-    const hrs = (sf / 100) * depth * rate
+    const hrs = (sf * (depth / 12)) * rate
     const bt = rowOpt('Base Material', r)
     // MATERIAL is by VOLUME, priced per CUBIC YARD. Base cubic yards =
     // SF × depth(in)/12 ÷ 27. Priced from the canonical Basic Materials

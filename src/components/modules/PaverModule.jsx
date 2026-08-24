@@ -17,11 +17,11 @@ import ModuleHeaderSlot from './ModuleHeaderSlot'
 //   Paver - Color Add        0.05 hrs/ea
 //   Paver - Poly Sand New    0.004 hrs/SF
 //   Paver - Poly Sand Existing 0.0075 hrs/SF (labor)
-//   Base prep shares the demo Import Base rates (hrs / Cu Ft):
-//     Skid Good → Skid - Import Base Good
-//     Skid OK   → Skid - Import Base   (shared w/ Skid demo)
-//     Mini Skid → Mini - Import Base   (shared w/ Mini demo)
-//     Hand      → Hand - Import Base   (shared w/ Hand demo)
+//   Base prep reads the shared Basic Labor 'Base Prep' rates (hrs / Cu Ft),
+//   one source of truth Concrete + the demos also read:
+//     Skid Steer      → Basic Labor Base Prep Skid Steer
+//     Mini Skid Steer → Basic Labor Base Prep Mini Skid Steer
+//     Hand            → Basic Labor Base Prep Hand
 //
 // Material rates (category='Paver') from material_rates table:
 //   Paver - Base Rock           $7.50/ton
@@ -62,17 +62,10 @@ const n = v => parseFloat(v) || 0
 // Base-rock tonnage density (SF·inch per ton). The 200 divisor is a tunable
 // estimating coefficient — callers pass the DB-editable value.
 
-const BASE_METHODS = ['Skid Good', 'Skid OK', 'Mini Skid', 'Hand']
-
-// Each base-install method maps to a demo Import Base labor_rates row (shared
-// source of truth) so the inline calculator icon edits the same rate the demo
-// modules use. Skid = hrs/Sq Ft; Mini + Hand = hrs/Cu Ft.
-const BASE_METHOD_LABOR_NAME = {
-  'Skid Good': 'Skid - Import Base Good',
-  'Skid OK': 'Skid - Import Base',
-  'Mini Skid': 'Mini - Import Base',
-  Hand: 'Hand - Import Base',
-}
+// Base-prep methods — the three shared Basic Labor 'Base Prep' rates (hrs per
+// Cu Ft) Concrete + the demos also read. Skid Good/OK collapsed to one Skid Steer
+// (job difficulty % covers the variance). Mirrors the Concrete Base Prep section.
+const BASE_METHODS = ['Skid Steer', 'Mini Skid Steer', 'Hand']
 
 // ── Calculation engine ────────────────────────────────────────────────────────
 // Every rate/coefficient below is read live from the rate maps (labor_rates,
@@ -109,7 +102,7 @@ const DEFAULT_STATE = {
   crewType: 'Paver',
   hoursAdj: 0,
   areaRows: [
-    { label: 'Area 1', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: '', baseType: '' },
+    { label: 'Area 1', method: 'Skid Steer', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: '', baseType: '' },
   ],
   straightCutLF: '',
   curvedCutLF: '',
@@ -149,7 +142,7 @@ const DEFAULT_STATE = {
   //    are NOT mirrored. Sub cost itself uses an install-only whole-job rate
   //    (see calc below); the other mirrored fields are captured for scope.
   subAreaRows: [
-    { label: 'Area 1', method: 'Skid OK', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: '', baseType: '', installType: 'Hand Demo', largeFormat: false, under500: false },
+    { label: 'Area 1', method: 'Skid Steer', sf: '', depth: 6, paverVendor: '', paverType: '', customPricePerSF: '', baseVendor: '', baseType: '', installType: 'Hand Demo', largeFormat: false, under500: false },
   ],
   // Sub install line items — SF per install type + two surcharge lines.
   subInstall: {
@@ -450,7 +443,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
     const rows = state[kArea] || []
     const base = {
       label: `Area ${rows.length + 1}`,
-      method: 'Skid OK',
+      method: 'Skid Steer',
       sf: '',
       depth: 6,
       paverVendor: '',
@@ -724,6 +717,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             onCrewTypeChange={v => set('crewType', v)}
             title="Pavers"
             moduleType="Pavers"
+            rateScope={[{ category: 'Basic Labor', sub: 'Base Prep' }]}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
           />
@@ -938,10 +932,10 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         </div>
       </div>
 
-      {/* ── Base Material — In-House + Subcontractor ──────────────────────────── */}
+      {/* ── Base Prep — In-House + Subcontractor ──────────────────────────── */}
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>{subSectionTitle('Base Material', isSub)}</span>
+          <span>{subSectionTitle('Base Prep', isSub)}</span>
         </div>
         <table className="w-full text-xs">
           <TH

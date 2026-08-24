@@ -9,16 +9,19 @@ export const BAS = {
   // Shared with Drainage + Utilities (was labor_rates 'Basic Labor - Curb Core').
   CURB_CORE: 'BAS-001-curb-core',
 
-  // Base Prep (hrs per Cu Ft). Import-base methods shared by Pavers + Hand/Mini/Skid
-  // demos; concrete-base methods used by Concrete. All live under sub 'Base Prep'.
+  // Base Prep (hrs per Cu Ft) — ONE shared set of three methods every base-prep
+  // consumer reads: Concrete, Pavers, and the Hand/Mini/Skid demos. Skid Good/OK
+  // were collapsed into a single Skid Steer rate (job difficulty % covers the
+  // variance). The concrete-specific rows (BAS-009..012) and the OK skid row
+  // (BAS-005) were archived. All three live under sub 'Base Prep'.
+  BASE_PREP_SKID: 'BAS-004-import-base-skid-steer-good', // canonical Skid Steer
+  BASE_PREP_MINI: 'BAS-003-import-base-mini-skid-steer',
+  BASE_PREP_HAND: 'BAS-002-import-base-hand',
+
+  // Back-compat aliases (same rows) — demos still import these names.
   IMPORT_BASE_HAND: 'BAS-002-import-base-hand',
   IMPORT_BASE_MINI: 'BAS-003-import-base-mini-skid-steer',
   IMPORT_BASE_SKID_GOOD: 'BAS-004-import-base-skid-steer-good',
-  IMPORT_BASE_SKID_OK: 'BAS-005-import-base-skid-steer-ok',
-  CONC_BASE_HAND: 'BAS-009-concrete-base-hand',
-  CONC_BASE_MINI: 'BAS-010-concrete-base-mini-skid-steer',
-  CONC_BASE_SKID: 'BAS-011-concrete-base-skid-steer',
-  CONC_BASE_WHEELBARROW: 'BAS-012-concrete-base-wheelbarrow',
 
   // Shared demo/Walls coefficients (moved out of labor_rates 'Basic Labor').
   JUMPING_JACK: 'BAS-006-jumping-jack', // compaction, hrs / Cu Ft (Walls reads by name)
