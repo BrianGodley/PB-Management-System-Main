@@ -647,32 +647,16 @@ function MiscRatesPanel() {
     setLoading(true)
     const { data } = await supabase
       .from('misc_rates')
-      .select('id, name, rate, category, sub_category, unit')
+      .select('id, ref_key, name, rate, category, sub_category, unit')
       .order('category')
       .order('name')
     setRows(data || [])
     setLoading(false)
   }, [])
 
-  // Identity code per misc rate: MISC-<CAT>-NNNN, where NNNN is the row's stable
-  // index within its category (sorted by name) — mirrors the Vendor/Standard code.
-  const miscSeq = useMemo(() => {
-    const byCat = {}
-    const map = {}
-    ;[...rows]
-      .sort(
-        (a, b) =>
-          (a.category || '').localeCompare(b.category || '') || (a.name || '').localeCompare(b.name || '')
-      )
-      .forEach(r => {
-        const k = r.category || 'GEN'
-        byCat[k] = (byCat[k] || 0) + 1
-        map[r.id] = String(byCat[k]).padStart(4, '0')
-      })
-    return map
-  }, [rows])
-  const miscCatCode = c => ((c || 'GEN').replace(/[^a-z0-9]/gi, '').slice(0, 4).toUpperCase() || 'GEN')
-  const miscCodeFor = r => `MISC-${miscCatCode(r.category)}-${miscSeq[r.id] || '0000'}`
+  // Identity code per misc rate IS its frozen ref_key (MISC-NNN-slug) — the twin of
+  // MAT-/LAB-/BAS-NNN-slug. Replaces the old on-the-fly MISC-<CAT>-NNNN string.
+  const miscCodeFor = r => r.ref_key || '—'
   useEffect(() => {
     load()
   }, [load])
