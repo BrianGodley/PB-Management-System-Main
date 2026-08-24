@@ -468,6 +468,16 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
   const setActiveManualRows = isSub ? setSubManualRows : setManualRows
 
   // ── Vendor catalog helpers (per-row Vendor/Type pickers) ─────────────────
+  // Resolve a stored Type (now a frozen material ref_key; legacy id/name still work)
+  // to the item's display name via the live catalog. Used only by the orphan-value
+  // fallback option so a stored key never renders raw. Strips the "<sub> - " prefix.
+  const matName = key => {
+    if (!key) return key
+    const hit = (materialRows || []).find(r => r.ref_key === key || r.id === key || r.name === key)
+    if (!hit) return key
+    const dash = hit.name ? hit.name.indexOf(' - ') : -1
+    return dash > 0 ? hit.name.slice(dash + 3) : hit.name
+  }
   const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
   const defaultVendorFor = cat => vendorsForCategory(cat)[0]?.id || 'Standard'
   // Vendor picker is controlled by the RAW row vendor. Unset/'auto' → '' so the
@@ -716,7 +726,10 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
         laborBurdenPct,
         gpmd,
         materialPrices,
-        // materialRows (live catalog) intentionally NOT persisted — fetched fresh on open.
+        // Persist the catalog snapshot so the summary can resolve each row's frozen
+        // material ref_key → display name. A live estimate re-fetches on open (current
+        // name); a frozen bid reads this snapshot (as-bid name). Mirrors Steps/Concrete.
+        materialRows,
         calc,
       },
     })
@@ -1080,11 +1093,12 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                           onChange={e => changeRowType('line', i, e.target.value)}
                         >
                           {!row.type && <option value="">Select pipe</option>}
-                          {row.type && !opts.some(o => o.label === row.type) && (
-                            <option value={row.type}>{row.type}</option>
-                          )}
+                          {row.type &&
+                            !opts.some(o => (o.ref_key || o.label) === row.type || o.label === row.type) && (
+                              <option value={row.type}>{matName(row.type)}</option>
+                            )}
                           {opts.map(o => (
-                            <option key={o.label} value={o.label}>
+                            <option key={o.label} value={o.ref_key || o.label}>
                               {o.label}
                             </option>
                           ))}
@@ -1179,11 +1193,12 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                           onChange={e => changeRowType('wire', i, e.target.value)}
                         >
                           {!row.type && <option value="">Select wire</option>}
-                          {row.type && !opts.some(o => o.label === row.type) && (
-                            <option value={row.type}>{row.type}</option>
-                          )}
+                          {row.type &&
+                            !opts.some(o => (o.ref_key || o.label) === row.type || o.label === row.type) && (
+                              <option value={row.type}>{matName(row.type)}</option>
+                            )}
                           {opts.map(o => (
-                            <option key={o.label} value={o.label}>
+                            <option key={o.label} value={o.ref_key || o.label}>
                               {o.label}
                             </option>
                           ))}
@@ -1278,11 +1293,12 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                           onChange={e => changeRowType('elec', i, e.target.value)}
                         >
                           {!row.type && <option value="">Select fixture</option>}
-                          {row.type && !opts.some(o => o.label === row.type) && (
-                            <option value={row.type}>{row.type}</option>
-                          )}
+                          {row.type &&
+                            !opts.some(o => (o.ref_key || o.label) === row.type || o.label === row.type) && (
+                              <option value={row.type}>{matName(row.type)}</option>
+                            )}
                           {opts.map(o => (
-                            <option key={o.label} value={o.label}>
+                            <option key={o.label} value={o.ref_key || o.label}>
                               {o.label}
                             </option>
                           ))}
@@ -1377,11 +1393,12 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                           onChange={e => changeRowType('gasPipe', i, e.target.value)}
                         >
                           {!row.type && <option value="">Select pipe</option>}
-                          {row.type && !opts.some(o => o.label === row.type) && (
-                            <option value={row.type}>{row.type}</option>
-                          )}
+                          {row.type &&
+                            !opts.some(o => (o.ref_key || o.label) === row.type || o.label === row.type) && (
+                              <option value={row.type}>{matName(row.type)}</option>
+                            )}
                           {opts.map(o => (
-                            <option key={o.label} value={o.label}>
+                            <option key={o.label} value={o.ref_key || o.label}>
                               {o.label}
                             </option>
                           ))}
@@ -1476,11 +1493,12 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                           onChange={e => changeRowType('gas', i, e.target.value)}
                         >
                           {!row.type && <option value="">Select fixture</option>}
-                          {row.type && !opts.some(o => o.label === row.type) && (
-                            <option value={row.type}>{row.type}</option>
-                          )}
+                          {row.type &&
+                            !opts.some(o => (o.ref_key || o.label) === row.type || o.label === row.type) && (
+                              <option value={row.type}>{matName(row.type)}</option>
+                            )}
                           {opts.map(o => (
-                            <option key={o.label} value={o.label}>
+                            <option key={o.label} value={o.ref_key || o.label}>
                               {o.label}
                             </option>
                           ))}
@@ -1575,11 +1593,12 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
                           onChange={e => changeRowType('sewerLine', i, e.target.value)}
                         >
                           {!row.type && <option value="">Select pipe</option>}
-                          {row.type && !opts.some(o => o.label === row.type) && (
-                            <option value={row.type}>{row.type}</option>
-                          )}
+                          {row.type &&
+                            !opts.some(o => (o.ref_key || o.label) === row.type || o.label === row.type) && (
+                              <option value={row.type}>{matName(row.type)}</option>
+                            )}
                           {opts.map(o => (
-                            <option key={o.label} value={o.label}>
+                            <option key={o.label} value={o.ref_key || o.label}>
                               {o.label}
                             </option>
                           ))}

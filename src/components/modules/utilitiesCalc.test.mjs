@@ -64,6 +64,22 @@ test('unpriced / NO-FALLBACK: a line row with no resolvable labor → flagged in
   assert.equal(r.lineHrs, 0, 'unresolved line labor contributes 0 hours')
 })
 
+test('M5 ref_key parity: a line row picked by material ref_key resolves the same material + labor as by name', () => {
+  // Catalog row: Standard (null-vendor) Electrical Pipe item with a labor pointer.
+  const rows = [{
+    id: 'u1', ref_key: 'MAT-300-pvc-conduit', name: 'PVC Conduit',
+    sub_category: 'Electrical Pipe', category: 'Utilities', vendor_id: null,
+    unit_cost: 5, calc_meta: { labor_rate: 'PVC Conduit - Labor Rate' },
+  }]
+  const mp = { 'PVC Conduit - Labor Rate': 0.2 }
+  const byName = run({ lineRows: [{ vendor: 'Standard', type: 'PVC Conduit', lf: 10 }] }, mp, rows)
+  const byRef = run({ lineRows: [{ vendor: 'Standard', type: 'MAT-300-pvc-conduit', lf: 10 }] }, mp, rows)
+  assert.equal(byRef.lineMat, byName.lineMat, `material should match; got ${byRef.lineMat} vs ${byName.lineMat}`)
+  assert.equal(byRef.lineMat, 50, `10 Ln Ft × $5 = $50; got ${byRef.lineMat}`)
+  assert.equal(byRef.lineHrs, byName.lineHrs, 'labor identical regardless of key form')
+  assert.equal(byRef.lineHrs, 2, `10 × 0.2 = 2 hrs; got ${byRef.lineHrs}`)
+})
+
 test('no NaN across a populated estimate (trench + a line row)', () => {
   const r = run(
     {

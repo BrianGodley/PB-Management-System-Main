@@ -41,6 +41,9 @@ export function mergedUtilTypes(cat, builtInArr, materialRows, vendorSel = 'Stan
     const bi = (builtInArr || []).find(b => b.dbName === o.row.name || b.label === o.label)
     return {
       label: o.label,
+      // Frozen material key (MAT-NNN-slug) so a picker can store/match by ref_key and
+      // survive a catalog rename. null for a legacy row without one.
+      ref_key: o.ref_key || o.row?.ref_key || null,
       dbName: o.row.name,
       // Catalog Standard price for this Item (DB-sourced) — the D2 material fallback.
       matCatalog: n(o.row.unit_cost),
@@ -67,10 +70,15 @@ export function resolveUtilRow(cat, row, houseArr, materialRows, mp, opts = {}) 
     }
   }
   // Type options = the SELECTED VENDOR'S catalog items (vendor-first, like Paver).
+  // row.type may be the frozen material ref_key (converted pickers) or the legacy
+  // label (not-yet-converted modules) — match either (dual-key transition).
   const merged = mergedUtilTypes(cat, houseArr, materialRows, vsel, opts)
-  const builtIn = merged.find(o => o.label === row.type) || merged[0]
+  const builtIn =
+    merged.find(o => (o.ref_key && o.ref_key === row.type) || o.label === row.type) || merged[0]
   let matDbName = builtIn?.dbName
-  const vrow = catalogItemFor(materialRows, cat, vsel, builtIn?.label, {
+  // Resolve the catalog record by the option's frozen ref_key (falls back to label
+  // for a row with no ref_key) so the price survives a catalog rename.
+  const vrow = catalogItemFor(materialRows, cat, vsel, builtIn?.ref_key || builtIn?.label, {
     ...CATALOG_OPTS,
     fallbackFirst: false,
   })

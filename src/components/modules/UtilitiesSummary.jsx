@@ -15,6 +15,17 @@ const ADD_ITEMS = { curbCore: 'Curb Core', hydrocut: 'Hydrocut Under Hardscape' 
 export default function UtilitiesSummary({ module }) {
   const d = module?.data || {}
 
+  // A row's Type is stored as a frozen material ref_key. Resolve it to the item's
+  // display name via the estimate's saved catalog snapshot (live → current name,
+  // frozen bid → as-bid name). Legacy id/name saves still resolve; unknown → raw.
+  const matName = key => {
+    if (!key) return key
+    const hit = (d.materialRows || []).find(r => r.ref_key === key || r.id === key || r.name === key)
+    if (!hit) return key
+    const dash = hit.name ? hit.name.indexOf(' - ') : -1
+    return dash > 0 ? hit.name.slice(dash + 3) : hit.name
+  }
+
   const addRows = items =>
     Object.entries(ADD_ITEMS)
       .filter(([k]) => n(items?.[`${k}Qty`]) > 0)
@@ -45,31 +56,31 @@ export default function UtilitiesSummary({ module }) {
       title: 'Utility Lines',
       rows: (d.lineRows || [])
         .filter(r => n(r.lf) > 0)
-        .map(r => ({ label: r.type, value: `${n(r.lf)} Ln Ft` })),
+        .map(r => ({ label: matName(r.type), value: `${n(r.lf)} Ln Ft` })),
     },
     {
       title: 'Gas Fixtures',
       rows: (d.fixtureRows || [])
         .filter(r => n(r.qty) > 0)
-        .map(r => ({ label: r.type, value: `× ${r.qty}` })),
+        .map(r => ({ label: matName(r.type), value: `× ${r.qty}` })),
     },
     {
       title: 'Electrical Fixtures',
       rows: (d.elecFixtureRows || [])
         .filter(r => n(r.qty) > 0)
-        .map(r => ({ label: r.type, value: `× ${r.qty}` })),
+        .map(r => ({ label: matName(r.type), value: `× ${r.qty}` })),
     },
     {
       title: 'Sewer Lines',
       rows: (d.sewerLineRows || [])
         .filter(r => n(r.lf) > 0)
-        .map(r => ({ label: r.type, value: `${n(r.lf)} Ln Ft` })),
+        .map(r => ({ label: matName(r.type), value: `${n(r.lf)} Ln Ft` })),
     },
     {
       title: 'Sinks',
       rows: (d.sewerSinkRows || [])
         .filter(r => n(r.qty) > 0)
-        .map(r => ({ label: r.type, value: `× ${r.qty}` })),
+        .map(r => ({ label: matName(r.type), value: `× ${r.qty}` })),
     },
     {
       title: 'Additional Items',
@@ -95,31 +106,31 @@ export default function UtilitiesSummary({ module }) {
       title: 'Utility Lines',
       rows: (d.subLineRows || [])
         .filter(r => n(r.lf) > 0)
-        .map(r => ({ label: r.type, value: `${n(r.lf)} Ln Ft` })),
+        .map(r => ({ label: matName(r.type), value: `${n(r.lf)} Ln Ft` })),
     },
     {
       title: 'Gas Fixtures',
       rows: (d.subFixtureRows || [])
         .filter(r => n(r.qty) > 0)
-        .map(r => ({ label: r.type, value: `× ${r.qty}` })),
+        .map(r => ({ label: matName(r.type), value: `× ${r.qty}` })),
     },
     {
       title: 'Electrical Fixtures',
       rows: (d.subElecFixtureRows || [])
         .filter(r => n(r.qty) > 0)
-        .map(r => ({ label: r.type, value: `× ${r.qty}` })),
+        .map(r => ({ label: matName(r.type), value: `× ${r.qty}` })),
     },
     {
       title: 'Sewer Lines',
       rows: (d.subSewerLineRows || [])
         .filter(r => n(r.lf) > 0)
-        .map(r => ({ label: r.type, value: `${n(r.lf)} Ln Ft` })),
+        .map(r => ({ label: matName(r.type), value: `${n(r.lf)} Ln Ft` })),
     },
     {
       title: 'Sinks',
       rows: (d.subSewerSinkRows || [])
         .filter(r => n(r.qty) > 0)
-        .map(r => ({ label: r.type, value: `× ${r.qty}` })),
+        .map(r => ({ label: matName(r.type), value: `× ${r.qty}` })),
     },
     { title: 'Additional Items', rows: addRows(d.subAdditionalItems) },
     {
