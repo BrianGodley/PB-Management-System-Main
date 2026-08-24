@@ -87,7 +87,13 @@ const PAVER_CAT = { paver: 'Paver Material', base: 'Base Material' }
 function paverOptions(cat, vendorSel, materialRows) {
   if (!vendorSel || vendorSel === 'auto') return []
   const isStd = vendorSel === 'Standard'
-  return catalogOptions(materialRows, cat, isStd ? 'Standard' : vendorSel, CATALOG_OPTS)
+  // The picker stores the immutable material ref_key (MAT-NNN-slug) as its value,
+  // matching the labor/DB scheme; catalogItemFor resolves ref_key → id → name, so
+  // old id-saves still price. `id` stays available for legacy o.id display checks.
+  return catalogOptions(materialRows, cat, isStd ? 'Standard' : vendorSel, CATALOG_OPTS).map(o => ({
+    ...o,
+    value: o.ref_key || o.id,
+  }))
 }
 function paverItemFor(cat, vendorSel, key, materialRows) {
   if (!vendorSel || vendorSel === 'auto') return null
@@ -887,7 +893,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                           return
                         }
                         const id = e.target.value
-                        const opt = bOpts.find(o => o.id === id)
+                        const opt = bOpts.find(o => o.value === id || o.id === id)
                         setRow(kArea, i, 'baseId', id)
                         setRow(kArea, i, 'baseType', opt ? opt.stored : '')
                       }}
@@ -997,7 +1003,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                         value={row.paverId || ''}
                         onChange={e => {
                           const id = e.target.value
-                          const opt = pOpts.find(o => o.id === id)
+                          const opt = pOpts.find(o => o.value === id || o.id === id)
                           setRow(kArea, i, 'paverId', id)
                           setRow(kArea, i, 'paverType', opt ? opt.stored : '')
                         }}
@@ -1383,7 +1389,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                         value={row.id || ''}
                         onChange={e => {
                           const id = e.target.value
-                          const opt = vOpts.find(o => o.id === id)
+                          const opt = vOpts.find(o => o.value === id || o.id === id)
                           setRow('vertRows', i, 'id', id)
                           setRow('vertRows', i, 'type', opt ? opt.stored : '')
                         }}
