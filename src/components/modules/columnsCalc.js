@@ -12,9 +12,20 @@ export const num = v => parseFloat(v) || 0
 // One finish row → { mat, hrs }.
 //   In-House: mat = qty × $/SF material, hrs = qty × hrs/SF labor
 //   Sub:      mat = qty × sub $/SF,      hrs = 0 (labor is in the sub cost)
-export function computeColumnFinishRow(row, { matUnit, laborRate, subUnit = 0, isSub = false }) {
+//
+// Unpriced-labor surfacing (purely additive): when an `R` reader (makeModuleRates)
+// plus the finish `laborName` are injected, the in-house labor rate is read through
+// R.labor at its point of use — guarded by qty>0 AND the in-house branch — so an
+// unset finish labor rate becomes a visible fix-it prompt. R.labor returns the SAME
+// number as the injected `laborRate` (same map), so the math is unchanged. On the Sub
+// tab labor is never read (it's folded into the sub cost), so nothing surfaces there.
+export function computeColumnFinishRow(
+  row,
+  { matUnit, laborRate, subUnit = 0, isSub = false, R = null, laborName = null, laborMeta = {} }
+) {
   const qty = num(row && row.qty)
   if (qty <= 0) return { mat: 0, hrs: 0 }
   if (isSub) return { mat: qty * num(subUnit), hrs: 0 }
-  return { mat: qty * num(matUnit), hrs: qty * num(laborRate) }
+  const rate = R && laborName ? R.labor(laborName, laborMeta) : num(laborRate)
+  return { mat: qty * num(matUnit), hrs: qty * rate }
 }

@@ -3,6 +3,7 @@
 // resolvers catalogOptions/catalogItemFor (lib/materialCatalog) both transitively import
 // supabase, so their pure bodies are inlined here and kept in sync.
 import { LAB } from '../../lib/laborRefs.js'
+import { makeModuleRates } from '../../lib/moduleRates.js'
 const n = v => parseFloat(v) || 0
 const DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN = 60
 const isStandardSel = v => !v || v === 'Standard'
@@ -112,12 +113,21 @@ function paverItemFor(cat, vendorSel, typeLabel, materialRows) {
 // ── Per-row calculators ──────────────────────────────────────────────────────
 // Shared by every Vendor/Type step section (Paver/Brick/Tile/Flagstone); `cat`
 // selects which material catalog sub_category the Type options come from.
-function matStepRowCalc(r, laborRates, materialRows, cat = PAVER_STEP_CAT, priceOf = item => n(item?.unit_cost)) {
+function matStepRowCalc(r, laborRates, materialRows, cat = PAVER_STEP_CAT, priceOf = item => n(item?.unit_cost), R = null) {
   // Unselected step (no material Type) contributes nothing (no crash, no fallback).
   if (!r.type) return { sf: n(r.sf), hrs: 0, mat: 0, price: 0, pallets: 0 }
   const sf = n(r.sf)
   // hrs-per-unit: rate is hours per Ln Ft (was LF/hr; standardized 2026-08-18).
-  const rate = n(laborRates[kPaverForm(r.form)])
+  // Route through R (guarded by sf) so an unset form-labor rate surfaces in the
+  // fix-it banner only for a step row actually entered. Value identical to
+  // n(laborRates[ref]); an unknown form → kPaverForm('') = '' → R records nothing.
+  const ref = kPaverForm(r.form)
+  const rate =
+    sf > 0
+      ? R
+        ? R.labor(ref, { category: 'Steps', unit: 'Hrs per Ln Ft', label: 'Step Install — ' + (r.form || '') + ' Form' })
+        : n(laborRates[ref])
+      : 0
   const hrs = sf * rate
   let price = 0
   let sfPerPallet = 0
@@ -133,14 +143,29 @@ function matStepRowCalc(r, laborRates, materialRows, cat = PAVER_STEP_CAT, price
   return { sf, hrs, mat, price, pallets }
 }
 
-function concRowCalc(r, laborRates, materialRates) {
+function concRowCalc(r, laborRates, materialRates, R = null) {
   // Unselected concrete step (no Type) contributes nothing (no crash, no fallback).
   if (!r.type) return { lf: n(r.sf), hrs: 0, mat: 0 }
   // Quantity is linear feet; every rate is per Ln Ft. Labor is keyed by the base
   // type (color only changes material), so it stays a single per-type rate.
   const lf = n(r.sf)
-  const typeHrs = n(laborRates[kConcTypeHrs(concBaseType(r.type))])
-  const finishHrs = n(laborRates[kFinishHrs(r.finish)])
+  // Type + finish LABOR routed through R (guarded by lf) so an unset rate surfaces
+  // only for a concrete step in use. Value identical to n(laborRates[ref]). The
+  // form MULTIPLIER stays a plain coefficient (never surfaces).
+  const typeRef = kConcTypeHrs(concBaseType(r.type))
+  const finishRef = kFinishHrs(r.finish)
+  const typeHrs =
+    lf > 0
+      ? R
+        ? R.labor(typeRef, { category: 'Steps', unit: 'Hrs per Ln Ft', label: 'Concrete Step — ' + concBaseType(r.type) })
+        : n(laborRates[typeRef])
+      : 0
+  const finishHrs =
+    lf > 0
+      ? R
+        ? R.labor(finishRef, { category: 'Steps', unit: 'Hrs per Ln Ft', label: 'Concrete Finish — ' + (r.finish || '') })
+        : n(laborRates[finishRef])
+      : 0
   const formMult = n(laborRates[kConcForm(r.form)])
   const hrs = lf * (typeHrs + finishHrs) * formMult
   const typeMat = n(materialRates[kConcTypeMat(r.type)])
@@ -189,6 +214,11 @@ export function calcSteps(
   const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const lr = laborRates || {}
   const mr = materialRates || {}
+  // Unpriced-LABOR surfacing (mirrors Concrete): route in-house step labor through
+  // one shared reader so an UNSET/0 labor rate becomes a clickable fix-it prompt
+  // instead of a silent $0. R.labor returns the SAME number — no pricing-math
+  // change. Sub rows are flat $/LF (never labor), so they never surface.
+  const R = makeModuleRates({ material: mr, labor: lr, sub: {}, misc: mr, materialRows })
   const isSub = state.subType === 'Subcontractor'
 
   const ihConc = state.concRows || []
@@ -201,7 +231,7 @@ export function calcSteps(
     let mat = 0
     let pallets = 0
     ;(state[sec.rowsKey] || []).forEach(r => {
-      const c = matStepRowCalc(r, lr, materialRows, sec.cat, priceOf)
+      const c = matStepRowCalc(r, lr, materialRows, sec.cat, priceOf, R)
       labor += c.hrs
       mat += c.mat
       pallets += c.pallets
@@ -220,7 +250,7 @@ export function calcSteps(
   // ── Concrete steps ───────────────────────────────────────────────────────
   let concMat = 0
   ihConc.forEach(r => {
-    const c = concRowCalc(r, lr, mr)
+    const c = concRowCalc(r, lr, mr, R)
     laborHrs += c.hrs
     concMat += c.mat
   })
@@ -261,6 +291,10 @@ export function calcSteps(
   const price = totalMat + laborCost + burden + gp + subCost + subGp + commission
 
   return {
+    // Unpriced LABOR fix-it list (additive surfacing). In-house step labor is
+    // always part of the bid (both sides are summed), so it surfaces on either
+    // tab; sub rows are flat $/LF and never contribute labor.
+    unpriced: R.unpricedList,
     walkHrs,
     totalHrs,
     manDays,

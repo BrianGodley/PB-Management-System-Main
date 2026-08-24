@@ -89,6 +89,19 @@ test('sub tab: sub rows price flat $/LF, independent of In-House labor rows', ()
   finiteNums(r)
 })
 
+test('labor unpriced: an unset labor rate surfaces ONLY for a section in use', () => {
+  const laborItems = obj => (obj.unpriced || []).filter(u => u.kind === 'labor')
+  // Paver step entered but its form-labor rate is unset → surfaces.
+  const used = run({ paverRows: [{ vendor: 'Standard', type: 'Ashlar Paver', form: 'Straight', sf: 100 }] }, {}, {}, [PAVER])
+  assert.ok(laborItems(used).some(u => /step install|form/i.test(u.label || u.name)), 'step form labor surfaces when SF > 0')
+  // No SF → the form-labor rate is never read, so it must NOT surface.
+  const unused = run({ paverRows: [{ vendor: 'Standard', type: 'Ashlar Paver', form: 'Straight', sf: 0 }] }, {}, {}, [PAVER])
+  assert.ok(!laborItems(unused).some(u => /step install|form/i.test(u.label || u.name)), 'step form labor does NOT surface when unused')
+  // Sub tab: sub rows are flat $/LF → no in-house labor items surface.
+  const sub = run({ subType: 'Subcontractor', subPaverRows: [{ type: 'X', form: 'Straight', sf: 100 }] }, {}, { 'Steps - Sub Paver Base': 2 })
+  assert.equal(laborItems(sub).length, 0, 'no labor items surface from sub rows')
+})
+
 test('no NaN across a populated estimate (paver + concrete + sub + manual)', () => {
   const r = run(
     {

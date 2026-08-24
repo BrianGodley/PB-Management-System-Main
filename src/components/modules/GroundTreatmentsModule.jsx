@@ -9,6 +9,7 @@ import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { catalogOptions, fetchModuleCatalog } from '../../lib/materialCatalog'
 import { calcGroundTreatments } from './groundTreatmentsCalc'
+import UnpricedItemModal from '../UnpricedItemModal'
 
 // Estimator repoint: Ground Treatments material pickers now read from the rebuilt
 // catalog (material + material_price), filtered by (Ground Treatments, sub-cat).
@@ -465,6 +466,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   // ── State ──────────────────────────────────────────────────────────────────
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Landscape')
   const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
+  // Unpriced-labor fix-it modal target (mirrors Concrete's inline banner).
+  const [unpricedItem, setUnpricedItem] = useState(null)
 
   // Independent In-House vs Sub input records — each tab is its own calculator.
   const [ihTab, setIhTab] = useState(() => makeTab(initialData?.ihData || initialData))
@@ -754,6 +757,27 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
       {pricesLoading && (
         <div className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
           Loading material prices from Master Rates…
+        </div>
+      )}
+
+      {!pricesLoading && calc.unpriced && calc.unpriced.length > 0 && (
+        <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3">
+          <p className="text-sm font-medium text-red-800">
+            {calc.unpriced.length} item{calc.unpriced.length > 1 ? 's have' : ' has'} no price yet —
+            click to price:
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {calc.unpriced.map(it => (
+              <button
+                key={it.name}
+                type="button"
+                className="rounded-full border border-red-300 bg-white px-3 py-1 text-sm text-red-700 hover:bg-red-100"
+                onClick={() => setUnpricedItem(it)}
+              >
+                {it.label} · $0.00
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -2339,6 +2363,14 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
           {saving ? 'Saving...' : 'Save'}
         </button>
       </div>
+
+      {unpricedItem && (
+        <UnpricedItemModal
+          item={unpricedItem}
+          onClose={() => setUnpricedItem(null)}
+          onSaved={refreshAllRates}
+        />
+      )}
     </div>
     </SubTabContext.Provider>
   )

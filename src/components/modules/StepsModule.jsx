@@ -9,6 +9,7 @@ import GpmdBar from './GpmdBar'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { calcSteps } from './stepsCalc'
+import UnpricedItemModal from '../UnpricedItemModal'
 import {
   fetchPriceLedgerAsOf,
   ledgerPrice,
@@ -850,6 +851,8 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
   const [difficulty, setDifficulty] = useState(initialData?.difficulty ?? '')
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Masonry')
   const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
+  // Unpriced-labor fix-it modal target (mirrors Concrete's inline banner).
+  const [unpricedItem, setUnpricedItem] = useState(null)
   const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
 
   const [paverRows, setPaverRows] = useState(initialData?.paverRows ?? DEFAULT_PAVER_ROWS())
@@ -1042,6 +1045,27 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
 
       {loading && (
         <div className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">Loading rates…</div>
+      )}
+
+      {!loading && calc.unpriced && calc.unpriced.length > 0 && (
+        <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3">
+          <p className="text-sm font-medium text-red-800">
+            {calc.unpriced.length} item{calc.unpriced.length > 1 ? 's have' : ' has'} no price yet —
+            click to price:
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {calc.unpriced.map(it => (
+              <button
+                key={it.name}
+                type="button"
+                className="rounded-full border border-red-300 bg-white px-3 py-1 text-sm text-red-700 hover:bg-red-100"
+                onClick={() => setUnpricedItem(it)}
+              >
+                {it.label} · $0.00
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Settings — In-House tab only */}
@@ -1410,6 +1434,14 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         onSaved={refreshAllRates}
         isSub={isSub}
       />
+
+      {unpricedItem && (
+        <UnpricedItemModal
+          item={unpricedItem}
+          onClose={() => setUnpricedItem(null)}
+          onSaved={refreshAllRates}
+        />
+      )}
     </div>
     </SubTabContext.Provider>
   )

@@ -69,6 +69,22 @@ test('sub tab: STRICT $/SF × area × visits (+ flat add), zero labor hours, cos
   finiteNums(r)
 })
 
+test('labor unpriced: an unset labor rate surfaces ONLY for a section in use', () => {
+  const laborItems = obj => (obj.unpriced || []).filter(u => u.kind === 'labor')
+  // Flat area entered but its labor rate (Flat hrs/SF) is unset → surfaces.
+  const used = run({ mode: 'flat', flatSF: '1000', visits: '1', rates: {} })
+  assert.ok(laborItems(used).some(u => /flat/i.test(u.label || u.name)), 'flat labor surfaces when flatSF > 0')
+  // Hillside mode zeroes flatSF → the flat labor rate is never read, so it must NOT surface.
+  const unused = run({ mode: 'hillside', flatSF: '1000', hillSF: '500', visits: '1', rates: {} })
+  assert.ok(!laborItems(unused).some(u => /flat/i.test(u.label || u.name)), 'flat labor does NOT surface when unused')
+})
+
+test('labor unpriced: nothing surfaces on the flat Sub tab (labor is In-House only)', () => {
+  const r = run({ subType: 'Subcontractor', mode: 'mixed', flatSF: '600', hillSF: '400', visits: '2', subRatePerSF: '0.10', rates: {} })
+  const laborItems = (r.unpriced || []).filter(u => u.kind === 'labor')
+  assert.equal(laborItems.length, 0, 'Sub tab produces no in-house labor, so no labor rate surfaces')
+})
+
 test('no NaN across a populated In-House estimate', () => {
   const r = run({ mode: 'mixed', flatSF: '1200', hillSF: '800', visits: '3', rates: RATES })
   finiteNums(r)

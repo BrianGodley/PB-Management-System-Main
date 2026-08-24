@@ -147,6 +147,22 @@ test('tons removed: steppers price per Sq Ft, DG per Cu Yd (no divisor, always f
   assert.ok(Number.isFinite(dg.dgLab) && Number.isFinite(dg.totalMat), `DG values must be finite; got lab ${dg.dgLab}, mat ${dg.totalMat}`)
 })
 
+test('labor unpriced: an unset labor rate surfaces ONLY for a section in use', () => {
+  const laborItems = obj => (obj.unpriced || []).filter(u => u.kind === 'labor')
+  // Sod entered but its labor rate ('Sod - Labor Rate') is unset → surfaces.
+  const used = run({ sodRows: [{ sf: '1000', type: 'Marathon', vendor: 'Standard' }] }, {}, [row('Marathon', 'Sod', 0.8)])
+  assert.ok(laborItems(used).some(u => /sod/i.test(u.label || u.name)), 'sod labor surfaces when sod SF > 0')
+  // No sod SF → the sod labor rate is never read, so it must NOT surface.
+  const unused = run({ sodRows: [{ sf: '0', type: 'Marathon', vendor: 'Standard' }] }, {}, [row('Marathon', 'Sod', 0.8)])
+  assert.ok(!laborItems(unused).some(u => /sod/i.test(u.label || u.name)), 'sod labor does NOT surface when unused')
+  // Sub tab: flat $/SF pricing, so no in-house labor items surface at all.
+  const sub = run(
+    { subType: 'Subcontractor', sodSF: '1000', sodRows: [{ sf: '1000', type: 'Marathon', vendor: 'Standard' }] },
+    { 'Sod Sub - $/SF': 1.5 }, [row('Marathon', 'Sod', 0.8)]
+  )
+  assert.equal(laborItems(sub).length, 0, 'no labor items surface on the Sub tab')
+})
+
 test('no NaN across a populated estimate (mulch + edging + prep + sod + DG + gravel + manual)', () => {
   const rows = [
     row('Standard Mulch', 'Mulch', 40), row('Metal Edging', 'Edging', 4), row('Compost', 'Soils', 45),

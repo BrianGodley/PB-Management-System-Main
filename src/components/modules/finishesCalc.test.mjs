@@ -86,6 +86,20 @@ test('sub tab: flat $/unit per row, zero labor hours, cost routed into subCost',
   finiteNums(r)
 })
 
+test('labor unpriced: an unset labor rate surfaces ONLY for an in-house section in use', () => {
+  const laborItems = obj => (obj.unpriced || []).filter(u => u.kind === 'labor')
+  // In-house Tile flatwork with SF but its labor rate unset → surfaces (material priced,
+  // so only the labor item shows).
+  const used = run({ flatworkRows: [{ vendor: 'Standard', type: 'Tile', sf: '100' }] }, { 'Finishes Tile Flatwork': 10 })
+  assert.ok(laborItems(used).some(u => /tile flatwork/i.test(u.label || u.name || '')), `tile flatwork labor surfaces when SF entered; got ${JSON.stringify(used.unpriced)}`)
+  // Same row with SF 0 → labor rate never read → does NOT surface.
+  const unused = run({ flatworkRows: [{ vendor: 'Standard', type: 'Tile', sf: '0' }] }, { 'Finishes Tile Flatwork': 10 })
+  assert.ok(!laborItems(unused).some(u => /tile flatwork/i.test(u.label || u.name || '')), 'labor does NOT surface when the section has no SF')
+  // Sub tab (flat-priced, no in-house hours) → no labor surfaces at all.
+  const sub = run({ subType: 'Subcontractor', flatworkRows: [{ vendor: 'Standard', type: 'Tile', sf: '100', subEach: '12' }] }, { 'Finishes Tile Flatwork': 10 })
+  assert.equal(laborItems(sub).length, 0, `Sub tab surfaces no in-house labor; got ${JSON.stringify(sub.unpriced)}`)
+})
+
 test('no NaN across a populated estimate (flat + cap + wall + manual, with difficulty + walk-access)', () => {
   const r = run(
     {

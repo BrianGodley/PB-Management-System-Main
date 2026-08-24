@@ -5,6 +5,7 @@
 // strict-mode ESM In-House path. Fixed to expose the real DB-sourced coefficients.
 // No supabase-tainted imports — the calc reads everything off its args (state.rates,
 // which the module loads from labor_rates + misc_rates, category 'Weed Abatement').
+import { makeModuleRates } from '../../lib/moduleRates.js'
 const n = v => parseFloat(v) || 0
 
 // In-House labor / material coefficient names (category 'Weed Abatement'). Every value
@@ -33,6 +34,23 @@ export function calcWeed(state, laborRatePerHour, gpmd, laborBurdenPct, commissi
   const hillRate = n(rt.hillHrsPer1k) // hrs per Sq Ft
   const materialPer1k = n(rt.materialPer1k)
 
+  // Shared rate reader — labor reads route through R.labor so an unset labor rate
+  // surfaces in the fix-it banner (additive; R.labor returns the SAME number as the
+  // n(rt[shortKey]) reads above, so no math change). state.rates is keyed by SHORT
+  // ids; the reader's labor map is re-keyed to the real labor_rates NAMES so an
+  // unpriced item writes back to the correct row (the DB name in WEED_RATE_NAMES).
+  const R = makeModuleRates({
+    material: {},
+    sub: {},
+    misc: {},
+    materialRows: [],
+    labor: {
+      [WEED_RATE_NAMES.travelHrsPerVisit]: rt.travelHrsPerVisit,
+      [WEED_RATE_NAMES.flatHrsPer1k]: rt.flatHrsPer1k,
+      [WEED_RATE_NAMES.hillHrsPer1k]: rt.hillHrsPer1k,
+    },
+  })
+
   if (isSub) {
     // Sub tab: STRICT price per square foot — no labor hours. subCost is purely
     // $/SF × area × visits, plus an optional flat add.
@@ -47,14 +65,29 @@ export function calcWeed(state, laborRatePerHour, gpmd, laborBurdenPct, commissi
       totalMat: 0, laborCost: 0, burden: 0, gp: 0,
       subArea, subRatePerSF, subFlat: n(state.subFlat),
       subCost, subGp, commission,
+      // Sub tab produces no in-house labor hours, so R.labor is never called here
+      // and nothing surfaces (labor must not surface on the flat Sub tab).
+      unpriced: R.unpricedList,
       price: subCost + subGp + commission,
     }
   }
 
-  const travelHrs = travelPerVisit * visits
+  // Labor read via R.labor at point-of-use (guarded by the real quantity it
+  // multiplies) so an unset rate surfaces only when that section is actually used.
+  // Value is identical to the prior n(rt[key]) reads.
+  const travelHrs =
+    visits > 0
+      ? visits * R.labor(WEED_RATE_NAMES.travelHrsPerVisit, { category: 'Weed Abatement', unit: 'Hrs per Visit', label: 'Travel' })
+      : 0
   // Flat/Hillside rates are hours per Sq Ft: hrs = area × rate × visits.
-  const flatHrs = flatSF * flatRate * visits
-  const hillHrs = hillSF * hillRate * visits
+  const flatHrs =
+    flatSF > 0
+      ? flatSF * visits * R.labor(WEED_RATE_NAMES.flatHrsPer1k, { category: 'Weed Abatement', unit: 'Hrs per Sq Ft', label: 'Flat Area' })
+      : 0
+  const hillHrs =
+    hillSF > 0
+      ? hillSF * visits * R.labor(WEED_RATE_NAMES.hillHrsPer1k, { category: 'Weed Abatement', unit: 'Hrs per Sq Ft', label: 'Hillside' })
+      : 0
   const laborHrs = flatHrs + hillHrs
   const totalHrs = travelHrs + laborHrs
   const manDays = totalHrs / 8
@@ -75,5 +108,7 @@ export function calcWeed(state, laborRatePerHour, gpmd, laborBurdenPct, commissi
     // Expose the live DB coefficients (fixes the old undefined flatPer1k/hillPer1k).
     travelPerVisit, flatRate, hillRate, materialPer1k,
     totalMat, laborCost, burden, gp, commission, subCost, subGp: 0, price,
+    // Unset in-house labor rates (travel/flat/hillside) that were actually used.
+    unpriced: R.unpricedList,
   }
 }

@@ -25,6 +25,7 @@ import GpmdBar from './GpmdBar'
 import WorkTypeChooser from './WorkTypeChooser'
 import CrewTypeBar from './CrewTypeBar'
 import ModuleHeaderSlot from './ModuleHeaderSlot'
+import UnpricedItemModal from '../UnpricedItemModal'
 
 const n = v => parseFloat(v) || 0
 // Company/estimate financial settings (labor rate, burden %, GPMD, commission,
@@ -64,6 +65,11 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
   // In-House labor/material coefficients pulled from the price list. Null until
   // loaded; calc falls back to WEED_RATE_FB for any coefficient still missing.
   const [rateMap, setRateMap] = useState({})
+  // Gate the "unpriced items" banner until rates have actually loaded, so it never
+  // flashes on first open (empty rate map → every rate looks unpriced for a frame).
+  const [ratesLoaded, setRatesLoaded] = useState(false)
+  // The unset labor rate the user clicked to price inline (UnpricedItemModal).
+  const [unpricedItem, setUnpricedItem] = useState(null)
 
   // Independent In-House / Sub tabs. Legacy flat saves load into In-House.
   const [ihTab, setIhTab] = useState(() => makeTab(initialData?.ihData || initialData))
@@ -108,6 +114,7 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
       hillHrsPer1k: pickLab(WEED_RATE_NAMES.hillHrsPer1k),
       materialPer1k: pickMat(WEED_RATE_NAMES.materialPer1k),
     })
+    setRatesLoaded(true)
   }, [])
 
   useEffect(() => {
@@ -201,6 +208,28 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
           />
         </div>
       </div>
+
+      {/* Unset LABOR rates that were actually used → clickable fix-it prompts. */}
+      {ratesLoaded && calc.unpriced && calc.unpriced.length > 0 && (
+        <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3">
+          <p className="text-sm font-medium text-red-800">
+            {calc.unpriced.length} item{calc.unpriced.length > 1 ? 's have' : ' has'} no price yet —
+            click to price:
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {calc.unpriced.map(it => (
+              <button
+                key={it.name}
+                type="button"
+                className="rounded-full border border-red-300 bg-white px-3 py-1 text-sm text-red-700 hover:bg-red-100"
+                onClick={() => setUnpricedItem(it)}
+              >
+                {it.label} · $0.00
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* In-House vs Subcontractor */}
       <ModuleHeaderSlot>
@@ -342,6 +371,14 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
           {saving ? 'Saving...' : 'Save'}
         </button>
       </div>
+
+      {unpricedItem && (
+        <UnpricedItemModal
+          item={unpricedItem}
+          onClose={() => setUnpricedItem(null)}
+          onSaved={refreshRates}
+        />
+      )}
     </div>
   )
 }

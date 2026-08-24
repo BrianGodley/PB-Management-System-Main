@@ -1,6 +1,8 @@
 import WorkTypeChooser from './WorkTypeChooser'
 import CrewTypeBar from './CrewTypeBar'
 import { computeColumnFinishRow } from './columnsCalc'
+import { makeModuleRates } from '../../lib/moduleRates'
+import UnpricedItemModal from '../UnpricedItemModal'
 import ModuleHeaderSlot from './ModuleHeaderSlot'
 import { useState, useEffect, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
@@ -234,12 +236,19 @@ function pxHelpers(materialPrices, materialRows) {
   const matP = (db, _fb, v) => colMatPrice(db, v, materialRows, materialPrices)
   return { mp, matP }
 }
+// Labor read: routed through R (records an unset rate for the fix-it banner) when an
+// R reader is provided, else the plain price-map read. Same value either way — R
+// reads the SAME materialPrices map — so routing never changes the math. Called only
+// where the rate multiplies a real quantity (all Columns labor reads sit after the
+// rowHasGeo qty>0 guard, so an unset rate surfaces only for a column actually in use).
+const labReader = (mp, R) => (name, meta) => (R ? R.labor(name, meta) : mp(name))
 const rowHasGeo = c => n(c.qty) > 0 && n(c.heightIn) > 0 && n(c.widthIn) > 0
 
 // CMU column: blocks + grout fill + rebar (+ footing dig/pour labor). Block price
 // = picked catalog row, else the 'CMU Block' rate (preserves legacy CMU $).
-function calcCmuCol(c, materialPrices, materialRows) {
+function calcCmuCol(c, materialPrices, materialRows, R = null) {
   const { mp, matP } = pxHelpers(materialPrices, materialRows)
+  const lab = labReader(mp, R)
   if (!rowHasGeo(c)) return { mat: 0, hrs: 0 }
   const picked = catalogRowById(materialRows, c.blockType)
   const dims = picked ? blockDims(picked) : { w: 8, h: 8, l: 16 }
@@ -255,18 +264,19 @@ function calcCmuCol(c, materialPrices, materialRows) {
     groutCY * matP(GROUT_CONCRETE.dbName, GROUT_CONCRETE.fallback, c.vendor) +
     totalRebar * matP(rebarNameFor(c.rebarSize), BLOCK_RATES.rebarMatCost.fallback, c.vendor)
   const hrs =
-    n(c.qty) * mp(BLOCK_RATES.excavateLaborHrs.dbName, BLOCK_RATES.excavateLaborHrs.fallback) +
-    n(c.qty) * mp(BLOCK_RATES.pourLaborHrs.dbName, BLOCK_RATES.pourLaborHrs.fallback) +
-    totalBlocks * mp(BLOCK_RATES.installLaborHrs.dbName, BLOCK_RATES.installLaborHrs.fallback) +
-    totalBlocks * mp(BLOCK_RATES.fillLaborHrs.dbName, BLOCK_RATES.fillLaborHrs.fallback)
+    n(c.qty) * lab(BLOCK_RATES.excavateLaborHrs.dbName, { category: 'Columns', unit: 'Hrs per Each', label: 'Excavate Footing' }) +
+    n(c.qty) * lab(BLOCK_RATES.pourLaborHrs.dbName, { category: 'Columns', unit: 'Hrs per Each', label: 'Pour Footing' }) +
+    totalBlocks * lab(BLOCK_RATES.installLaborHrs.dbName, { category: 'Columns', unit: 'Hrs per Each', label: 'CMU Install' }) +
+    totalBlocks * lab(BLOCK_RATES.fillLaborHrs.dbName, { category: 'Columns', unit: 'Hrs per Each', label: 'Cell Fill' })
   return { mat, hrs, totalBlocks, groutCY, totalRebar, courses: geo.courses, blocksPerCourse: geo.blocksPerCourse }
 }
 
 // Modular column: block dims from the 'Modular Wall' row → solid stack × price.
 // No grout / no fill labor (mirrors Walls modular). Catalog-only block $ ($0 if
 // unpriced/unpicked).
-function calcModularCol(c, materialPrices, materialRows) {
+function calcModularCol(c, materialPrices, materialRows, R = null) {
   const { mp, matP } = pxHelpers(materialPrices, materialRows)
+  const lab = labReader(mp, R)
   if (!rowHasGeo(c)) return { mat: 0, hrs: 0 }
   const picked = catalogRowById(materialRows, c.blockType)
   const dims = picked ? blockDims(picked) : { w: 8, h: 8, l: 16 }
@@ -278,17 +288,18 @@ function calcModularCol(c, materialPrices, materialRows) {
     totalBlocks * blockPrice +
     totalRebar * matP(rebarNameFor(c.rebarSize), BLOCK_RATES.rebarMatCost.fallback, c.vendor)
   const hrs =
-    n(c.qty) * mp(BLOCK_RATES.excavateLaborHrs.dbName, BLOCK_RATES.excavateLaborHrs.fallback) +
-    n(c.qty) * mp(BLOCK_RATES.pourLaborHrs.dbName, BLOCK_RATES.pourLaborHrs.fallback) +
-    totalBlocks * mp(BLOCK_RATES.installLaborHrs.dbName, BLOCK_RATES.installLaborHrs.fallback)
+    n(c.qty) * lab(BLOCK_RATES.excavateLaborHrs.dbName, { category: 'Columns', unit: 'Hrs per Each', label: 'Excavate Footing' }) +
+    n(c.qty) * lab(BLOCK_RATES.pourLaborHrs.dbName, { category: 'Columns', unit: 'Hrs per Each', label: 'Pour Footing' }) +
+    totalBlocks * lab(BLOCK_RATES.installLaborHrs.dbName, { category: 'Columns', unit: 'Hrs per Each', label: 'CMU Install' })
   return { mat, hrs, totalBlocks, totalRebar, courses: geo.courses, blocksPerCourse: geo.blocksPerCourse }
 }
 
 // Brick column: bricks = face sqft (4 sides × height) × bricks-per-sqft (calc_meta
 // per_sqft, default 7 — includes mortar joint spacing, same as Walls brick). Brick
 // $ + optional 'Mortar' catalog line + rebar. Laying labor = face sqft × BRICK_LAY.
-function calcBrickCol(c, materialPrices, materialRows) {
+function calcBrickCol(c, materialPrices, materialRows, R = null) {
   const { mp, matP } = pxHelpers(materialPrices, materialRows)
+  const lab = labReader(mp, R)
   if (!rowHasGeo(c)) return { mat: 0, hrs: 0 }
   const picked = catalogRowById(materialRows, c.brickType)
   const perSqft = n(picked && picked.calc_meta && picked.calc_meta.per_sqft) || 7
@@ -301,17 +312,18 @@ function calcBrickCol(c, materialPrices, materialRows) {
     faceSqft * matP(MORTAR_NAME, 0, c.vendor) +
     totalRebar * matP(rebarNameFor(c.rebarSize), BLOCK_RATES.rebarMatCost.fallback, c.vendor)
   const hrs =
-    n(c.qty) * mp(BLOCK_RATES.excavateLaborHrs.dbName, BLOCK_RATES.excavateLaborHrs.fallback) +
-    n(c.qty) * mp(BLOCK_RATES.pourLaborHrs.dbName, BLOCK_RATES.pourLaborHrs.fallback) +
-    faceSqft * mp(BRICK_LAY.dbName, BRICK_LAY.fallback)
+    n(c.qty) * lab(BLOCK_RATES.excavateLaborHrs.dbName, { category: 'Columns', unit: 'Hrs per Each', label: 'Excavate Footing' }) +
+    n(c.qty) * lab(BLOCK_RATES.pourLaborHrs.dbName, { category: 'Columns', unit: 'Hrs per Each', label: 'Pour Footing' }) +
+    faceSqft * lab(BRICK_LAY.dbName, { category: 'Columns', unit: 'Hrs per Sq Ft', label: 'Brick Laying' })
   return { mat, hrs, bricks, faceSqft, totalRebar }
 }
 
 // PIP column: poured volume = footprint (w²) × height → CY × mix price. + forms
 // (4 faces × form $/SF) + rebar (+ footing dig/pour labor). Mix $ = picked
 // 'Concrete Mix' row, else the shared ready-mix concrete rate.
-function calcPipCol(c, materialPrices, materialRows) {
+function calcPipCol(c, materialPrices, materialRows, R = null) {
   const { mp, matP } = pxHelpers(materialPrices, materialRows)
+  const lab = labReader(mp, R)
   if (!rowHasGeo(c)) return { mat: 0, hrs: 0 }
   const picked = catalogRowById(materialRows, c.mixType)
   const mixPrice = picked ? n(picked.unit_cost) : matP(GROUT_CONCRETE.dbName, GROUT_CONCRETE.fallback, c.vendor)
@@ -325,10 +337,10 @@ function calcPipCol(c, materialPrices, materialRows) {
     formSF * matP(FORM_LUMBER_NAME, 0, c.vendor) +
     totalRebar * matP(rebarNameFor(c.rebarSize), BLOCK_RATES.rebarMatCost.fallback, c.vendor)
   const hrs =
-    n(c.qty) * mp(BLOCK_RATES.excavateLaborHrs.dbName, BLOCK_RATES.excavateLaborHrs.fallback) +
-    n(c.qty) * mp(BLOCK_RATES.pourLaborHrs.dbName, BLOCK_RATES.pourLaborHrs.fallback) +
-    totalCY * mp(PIP_POUR_LAB.dbName, PIP_POUR_LAB.fallback) +
-    formSF * mp(PIP_FORM_LAB.dbName, PIP_FORM_LAB.fallback)
+    n(c.qty) * lab(BLOCK_RATES.excavateLaborHrs.dbName, { category: 'Columns', unit: 'Hrs per Each', label: 'Excavate Footing' }) +
+    n(c.qty) * lab(BLOCK_RATES.pourLaborHrs.dbName, { category: 'Columns', unit: 'Hrs per Each', label: 'Pour Footing' }) +
+    totalCY * lab(PIP_POUR_LAB.dbName, { category: 'Columns', unit: 'Hrs per Cu Yd', label: 'Column Pour' }) +
+    formSF * lab(PIP_FORM_LAB.dbName, { category: 'Columns', unit: 'Hrs per Sq Ft', label: 'Form Setting' })
   return { mat, hrs, totalCY, formSF, totalRebar }
 }
 
@@ -350,28 +362,33 @@ function calcColumns(
   const { difficulty, hoursAdj, cmuCols, pipCols, modularCols, brickCols, finishRows, manualRows } = state
   const isSub = state.subType === 'Subcontractor'
   const { mp, matP } = pxHelpers(materialPrices, materialRows)
+  // ONE rate reader for this calc pass. Columns' labor rates live in the same
+  // materialPrices map (mp reads it), so route labor + misc through it; an unset
+  // labor rate is recorded on R.unpriced and surfaced in the fix-it banner. Value-
+  // identical to mp() — no math change. (Material still resolves via matP/catalog.)
+  const R = makeModuleRates({ material: materialPrices, labor: materialPrices, sub: materialPrices, misc: materialPrices, materialRows })
 
   // ── Installation — ALL column types contribute simultaneously (mirrors
   //    WallsModule: switching the visible tab never drops the other types). ──
   let installHrs = 0,
     installMat = 0
   ;(cmuCols || []).forEach(c => {
-    const r = calcCmuCol(c, materialPrices, materialRows)
+    const r = calcCmuCol(c, materialPrices, materialRows, R)
     installMat += r.mat
     installHrs += r.hrs
   })
   ;(pipCols || []).forEach(c => {
-    const r = calcPipCol(c, materialPrices, materialRows)
+    const r = calcPipCol(c, materialPrices, materialRows, R)
     installMat += r.mat
     installHrs += r.hrs
   })
   ;(modularCols || []).forEach(c => {
-    const r = calcModularCol(c, materialPrices, materialRows)
+    const r = calcModularCol(c, materialPrices, materialRows, R)
     installMat += r.mat
     installHrs += r.hrs
   })
   ;(brickCols || []).forEach(c => {
-    const r = calcBrickCol(c, materialPrices, materialRows)
+    const r = calcBrickCol(c, materialPrices, materialRows, R)
     installMat += r.mat
     installHrs += r.hrs
   })
@@ -392,9 +409,20 @@ function calcColumns(
     // Shared finish math lives in the pure, unit-tested columnsCalc.js. All finishes
     // are $/Sq Ft now (shared Finishes records), so there is no ton branch.
     const matUnit = matP(priceDbName, rate.costPerSF, r.vendor)
-    const laborRate = mp(rate.laborDbName, rate.laborHrsPerSF)
+    const laborRate = mp(rate.laborDbName)
     const subUnit = matP(rate.subDbName, rate.subFallback || 0, r.vendor)
-    const fr = computeColumnFinishRow(r, { matUnit, laborRate, subUnit, isSub })
+    // Finish labor surfaced via R inside computeColumnFinishRow — in-house only (the
+    // Sub branch never reads labor) and guarded by qty>0, so an unset finish labor
+    // rate prompts only when that finish is actually used on the In-House tab.
+    const fr = computeColumnFinishRow(r, {
+      matUnit,
+      laborRate,
+      subUnit,
+      isSub,
+      R,
+      laborName: rate.laborDbName,
+      laborMeta: { category: 'Finishes', unit: 'Hrs per Sq Ft', label: ((opt && opt.label) || r.type) + ' Finish' },
+    })
     finishMat += fr.mat
     finishHrs += fr.hrs
   })
@@ -435,6 +463,7 @@ function calcColumns(
   }
 
   return {
+    unpriced: R.unpricedList,
     totalHrs,
     manDays,
     totalMat,
@@ -651,6 +680,8 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Masonry')
   const [subType, setSubType] = useState(initialData?.subType ?? 'In-House')
   const isSub = subType === 'Subcontractor'
+  // Inline "price me" modal target for an unset labor/material rate surfaced by the calc.
+  const [unpricedItem, setUnpricedItem] = useState(null)
 
   // ── Per-tab independence — In-House / Sub keep their own takeoff inputs. Each
   //    tab now carries a per-TYPE array of column rows (mirrors WallsModule). ──
@@ -961,6 +992,27 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
           </div>
         )}
 
+        {!pricesLoading && calc.unpriced && calc.unpriced.length > 0 && (
+          <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3">
+            <p className="text-sm font-medium text-red-800">
+              {calc.unpriced.length} item{calc.unpriced.length > 1 ? 's have' : ' has'} no price yet —
+              click to price:
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {calc.unpriced.map(it => (
+                <button
+                  key={it.name}
+                  type="button"
+                  onClick={() => setUnpricedItem(it)}
+                  className="rounded-full border border-red-300 bg-white px-3 py-1 text-sm text-red-700 hover:bg-red-100"
+                >
+                  {it.label} · $0.00
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Settings — Job Site Conditions is In-House only (hidden on Sub tab) */}
         {subType !== 'Subcontractor' && (
           <>
@@ -1215,6 +1267,14 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
             {saving ? 'Saving...' : 'Save'}
           </button>
         </div>
+
+        {unpricedItem && (
+          <UnpricedItemModal
+            item={unpricedItem}
+            onClose={() => setUnpricedItem(null)}
+            onSaved={refreshAllRates}
+          />
+        )}
       </div>
     </SubTabContext.Provider>
   )

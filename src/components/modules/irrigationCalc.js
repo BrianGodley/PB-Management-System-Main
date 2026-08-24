@@ -4,6 +4,7 @@
 // lib/walkAccess. The module's own TIMER_TYPES / RATE_DEFAULTS / computeTimerRow are
 // carried below.
 import { LAB } from '../../lib/laborRefs.js'
+import { makeModuleRates } from '../../lib/moduleRates.js'
 const n = v => parseFloat(v) || 0
 const num = v => { const x = typeof v === 'number' ? v : parseFloat(v); return Number.isFinite(x) ? x : 0 }
 const DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN = 60
@@ -125,9 +126,19 @@ export function calcIrrigation(
   const pace = n(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const isSub = state.subType === 'Subcontractor'
 
+  // Unified rate reader — records labor rates that resolve to unset/0 so an unset
+  // rate surfaces in the fix-it banner (value-identical to n(lr[...])). Labor is only
+  // routed through R at point-of-use, guarded by qty, so UNUSED sections never flag.
+  const R = makeModuleRates({ material: mp, labor: lr, sub: {}, misc: mp, materialRows })
+
   // Per-zone labor (hrs/zone) lives on each ZONE_TYPE (irrigationZones.js) and is
   // resolved by ref_key inside computeZoneRow. Timer install labor is hrs/each.
-  const timerHrs = n(lr[LAB.IRR_TIMER_INSTALL])
+  // Read via R.labor only when a timer row is actually in use (In-House), so an unset
+  // timer rate surfaces only then; value is identical to n(lr[LAB.IRR_TIMER_INSTALL]).
+  const anyTimerInUse = !isSub && (state.timerRows || []).some(t => t.type && n(t.qty) > 0)
+  const timerHrs = anyTimerInUse
+    ? R.labor(LAB.IRR_TIMER_INSTALL, { category: 'Irrigation', unit: 'Hrs per Each', label: 'Timer Install' })
+    : n(lr[LAB.IRR_TIMER_INSTALL])
 
   // Live BOM pricing: Standard preferred, else any vendor line (Home-Depot-only items).
   const bomPrice = makeBomPrice(materialRows, mp)
@@ -143,6 +154,15 @@ export function calcIrrigation(
     zoneMat += c.mat
     zoneSubMat += c.subMat
     ;(c.missing || []).forEach(m => zoneMissing.add(m))
+    // Record the per-zone labor rate for unpriced surfacing — value-identical to the
+    // rate computeZoneRow already applied (c.rate); only recorded when the zone is
+    // actually in use (In-House, qty > 0) so UNUSED zones never flag.
+    if (!isSub && row && row.type && n(row.qty) > 0) {
+      const z = zoneMeta(row.type)
+      const mode = row.mode === 'Trench' && !z.laborTrench ? 'Hand' : row.mode || z.defaultMode
+      const laborKey = mode === 'Trench' ? z.laborTrench : z.laborHand
+      R.labor(laborKey, { category: 'Irrigation', unit: 'Hrs per Zone', label: `${z.label} — ${mode}` })
+    }
     return c
   })
 
@@ -191,6 +211,11 @@ export function calcIrrigation(
         return out
       })()
 
+  // Merge unpriced LABOR (recorded above via R.labor at point-of-use, guarded by qty)
+  // into the same fix-it list the banner renders. Labor entries carry kind:'labor' so
+  // the modal saves them via saveLaborRate. Sub tab reads no labor → empty.
+  const allUnset = [...matUnset, ...R.unpricedList]
+
   if (isSub) {
     // Sub tab: flat per-unit material only, NO labor hours. The itemized flat cost
     // (+ any manual Sub Cost) IS the subcontractor cost; profit is the markup.
@@ -220,7 +245,7 @@ export function calcIrrigation(
       walkHrs: 0,
       timerHrs,
       salesTax: tax,
-      matUnset,
+      matUnset: allUnset,
     }
   }
 
@@ -264,6 +289,6 @@ export function calcIrrigation(
     walkHrs,
     timerHrs,
     salesTax: tax,
-    matUnset,
+    matUnset: allUnset,
   }
 }

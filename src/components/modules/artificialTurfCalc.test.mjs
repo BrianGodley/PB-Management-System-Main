@@ -112,6 +112,22 @@ test('sub tab: rolls price as flat $/SF sub cost, NO labor hours, base section s
   finiteNums(r)
 })
 
+test('labor unpriced: an unset labor rate surfaces ONLY for a section in use (in-house)', () => {
+  const laborItems = obj => (obj.unpriced || []).filter(u => u.kind === 'labor')
+  // A turf roll with SF entered but its install labor rate unset → surfaces.
+  const used = run({ rolls: [{ brand: 'Emerald 80', edgeLF: '100', vendor: 'Standard' }] }, { 'Turf - Roll Width FT': 15 }, {}, TURF)
+  assert.ok(
+    laborItems(used).some(u => /turf install/i.test(u.label || u.name || '')),
+    `turf install labor surfaces when a roll has SF; got ${JSON.stringify(used.unpriced)}`
+  )
+  // Same roll on the Sub tab (flat-priced, no in-house hours) → labor must NOT surface.
+  const sub = run(
+    { subType: 'Subcontractor', rolls: [{ brand: 'Emerald 80', installSF: '1000', edgeLF: '0', vendor: 'Standard' }] },
+    { 'Turf - Roll Width FT': 15 }, {}, TURF, { 'Turf Sub - Install Per SF': 2 }
+  )
+  assert.equal(laborItems(sub).length, 0, `Sub tab surfaces no in-house labor; got ${JSON.stringify(sub.unpriced)}`)
+})
+
 test('no NaN across a populated estimate (demo + base + roll + strip + manual, difficulty + walk-access)', () => {
   const shared = [{ name: 'Class II', sub_category: 'Base Material', vendor_id: null, unit_cost: 30 }]
   const r = run(

@@ -32,6 +32,7 @@ import {
   DEFAULT_BOBCAT_BASELINE_LF,
 } from '../../lib/walkAccess'
 import { calcDemo } from './miniSkidCalc'
+import UnpricedItemModal from '../UnpricedItemModal'
 
 // ── Fallback constants ────────────────────────────────────────────────────────
 
@@ -309,6 +310,8 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
   }, [])
 
   const [pricesLoading, setPricesLoading] = useState(!initialData?.materialPrices)
+  // An unset labor rate the user clicked to price inline (fix-it modal).
+  const [unpricedItem, setUnpricedItem] = useState(null)
 
   // Re-fetch all master-rate maps. Called once on mount and again whenever the
   // user saves an edit from a RateEditPopover so the calc picks up the change.
@@ -612,6 +615,27 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       {pricesLoading && (
         <div className="text-xs text-amber-700 bg-amber-50 rounded px-3 py-2">
           Loading current rates…
+        </div>
+      )}
+
+      {!pricesLoading && calc.unpriced && calc.unpriced.length > 0 && (
+        <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3">
+          <p className="text-sm font-medium text-red-800">
+            {calc.unpriced.length} item{calc.unpriced.length > 1 ? 's have' : ' has'} no price yet —
+            click to price:
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {calc.unpriced.map(it => (
+              <button
+                key={it.name}
+                type="button"
+                className="rounded-full border border-red-300 bg-white px-3 py-1 text-sm text-red-700 hover:bg-red-100"
+                onClick={() => setUnpricedItem(it)}
+              >
+                {it.label} · $0.00
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -1443,6 +1467,9 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
         </button>
       </div>
     </div>
+    {unpricedItem && (
+      <UnpricedItemModal item={unpricedItem} onClose={() => setUnpricedItem(null)} onSaved={refreshAllRates} />
+    )}
     </SubRateOverrideProvider>
     </SubTabContext.Provider>
   )

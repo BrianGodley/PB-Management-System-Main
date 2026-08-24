@@ -206,7 +206,7 @@ export function calcConcrete(
     const m = normBaseMethod(r.method)
     // LABOR is by VOLUME (Cu Ft) — mirrors Pavers exactly so both share the same
     // Basic Labor 'Base Prep' rate (hrs per Cu Ft). Cu Ft = SF × depth(in)/12.
-    const rate = n(lr[BASE_METHOD_LABOR_NAME[m]])
+    const rate = R.labor(BASE_METHOD_LABOR_NAME[m], { category: 'Basic Labor', unit: 'Hrs per Cu Ft', label: 'Base Prep — ' + m })
     const hrs = (sf * (depth / 12)) * rate
     const bt = rowOpt('Base Material', r)
     // MATERIAL is by VOLUME, priced per CUBIC YARD. Base cubic yards =
@@ -237,7 +237,9 @@ export function calcConcrete(
     const sf = n(installTiers[t.key])
     if (!sf) return s
     // hrs-per-SF: tier rate is hours per Sq Ft (standardized 2026-08-18, was SF/hr).
-    const rate = n(lr[t.rateName])
+    // Read via R.labor so an unset tier rate surfaces in the unpriced-labor banner
+    // (only recorded here, where the tier actually has SF).
+    const rate = R.labor(t.rateName, { category: 'Concrete', unit: 'Hrs per Sq Ft', label: t.label + ' Install' })
     let hrs = sf * rate
     // Hand Mix uplift: producing mix by hand adds labor to this tier.
     if (/hand\s*mix/i.test(installTierType[t.key] || '')) hrs *= 1 + handMixUpliftPct / 100
@@ -265,14 +267,20 @@ export function calcConcrete(
 
   // hrs-per-unit reads below (standardized 2026-08-18): rebar/form/sleeve rates
   // are hours per Sq Ft / Ln Ft, so hours = qty × rate.
-  const rebarHrs = rebarSF * rebarSFPerHr
+  // Labor read via R.labor at point-of-use (guarded by qty) so an unset rate
+  // surfaces in the unpriced-labor banner only when that section is actually used.
+  const rebarRef =
+    { '24" OC': LAB.CONC_REBAR_24, '18" OC': LAB.CONC_REBAR_18, '12" OC': LAB.CONC_REBAR_12 }[
+      state.rebarSpacing
+    ] ?? LAB.CONC_REBAR_24
+  const rebarHrs = rebarSF > 0 ? rebarSF * R.labor(rebarRef, { category: 'Concrete', unit: 'Hrs per Sq Ft', label: 'Rebar Install' }) : 0
   const rebarMat = rebarSF * rebarLfPerSf * rebarPerLF
 
-  const formHrs = formLF * formLFPerHr
+  const formHrs = formLF > 0 ? formLF * R.labor(LAB.CONC_FORM_SETTING, { category: 'Concrete', unit: 'Hrs per Ln Ft', label: 'Form Setting' }) : 0
   const formMat = formLF * formMaterialPerLF
 
   const sleeveUnits = sleeveLF > 0 ? Math.ceil(sleeveLF / 10) : 0
-  const sleeveHrs = sleeveLF * sleeveLFPerHr
+  const sleeveHrs = sleeveLF > 0 ? sleeveLF * R.labor(LAB.CONC_SLEEVES, { category: 'Concrete', unit: 'Hrs per Ln Ft', label: 'Sleeves' }) : 0
   const sleeveMat = sleeveUnits * sleevePer10LF
 
   // ── Travel ───────────────────────────────────────────────────────────────
@@ -291,17 +299,20 @@ export function calcConcrete(
   let finishHrs = 0,
     finishSubCost = 0,
     colorMat = 0
+  // Finish labor read via R.labor (guarded by finishSF) so an unset finish rate
+  // surfaces only when that finish is selected AND has area.
+  const finLbr = (ref, fin) => (finishSF > 0 ? finishSF * R.labor(ref, { category: 'Concrete', unit: 'Hrs per Sq Ft', label: fin }) : 0)
   if (finishType === 'Sand Finish') {
-    finishHrs = finishSF * sandFinishSFPerHr
+    finishHrs = finLbr(LAB.CONC_SAND_FINISH, 'Sand Finish')
     if (isIH) finishSubCost = Math.ceil(finishSF / 400) * sandFinishPer400SF
   } else if (finishType === 'Salt Finish') {
-    finishHrs = finishSF * saltFinishSFPerHr
+    finishHrs = finLbr(LAB.CONC_SALT_FINISH, 'Salt Finish')
   } else if (finishType === 'Exposed Aggregate') {
-    finishHrs = finishSF * exposedAggSFPerHr
+    finishHrs = finLbr(LAB.CONC_EXPOSED_AGG, 'Exposed Aggregate')
   } else if (finishType === 'Seeded Aggregate') {
-    finishHrs = finishSF * seededAggSFPerHr
+    finishHrs = finLbr(LAB.CONC_SEEDED_AGG, 'Seeded Aggregate')
   } else if (finishType === 'Stamped') {
-    finishHrs = finishSF * stampedSFPerHr
+    finishHrs = finLbr(LAB.CONC_STAMPED_FINISH, 'Stamped')
     finishSubCost = isIH ? stampSubFlat : concreteCY * stampSubPerCY
   }
   if (colorYes && concreteCY > 0) {
@@ -321,7 +332,7 @@ export function calcConcrete(
 
   // ── Vapor barrier ────────────────────────────────────────────────────────
   // Labor = SF × hrs-per-SF; material = SF × the picked catalog item's $/SF.
-  const vaporHrs = vaporSF * vaporBarrierSFPerHr
+  const vaporHrs = vaporSF > 0 ? vaporSF * R.labor(LAB.CONC_VAPOR_BARRIER, { category: 'Concrete', unit: 'Hrs per Sq Ft', label: 'Vapor Barrier' }) : 0
   const vap = catItem('Vapor Barrier', state.vaporVendor, state.vaporItem)
   const vaporMat = vap ? vaporSF * vap.price : 0
 
@@ -332,8 +343,9 @@ export function calcConcrete(
   const seal = catItem('Concrete Sealer', state.sealerVendor, state.sealerItem)
   let sealerHrs = 0
   if (sealerSF > 0) {
-    const sealSFPerHr = /wet/i.test(state.sealerItem || '') ? sealerWetSFPerHr : sealerNaturalSFPerHr
-    sealerHrs = sealerSF * sealSFPerHr
+    const isWet = /wet/i.test(state.sealerItem || '')
+    const sealRef = isWet ? LAB.CONC_SEALER_WET : LAB.CONC_SEALER_NATURAL
+    sealerHrs = sealerSF * R.labor(sealRef, { category: 'Concrete', unit: 'Hrs per Sq Ft', label: isWet ? 'Sealer (Wet-Look)' : 'Sealer (Natural)' })
   }
   const sealerMat = seal && seal.coverage > 0 ? Math.ceil(sealerSF / seal.coverage) * seal.price : 0
   const sealerCoats = seal ? seal.coats : 0

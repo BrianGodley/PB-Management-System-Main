@@ -135,6 +135,22 @@ test('sub tree priced per each by diameter (2× 18-24 @ $2800 = $5600)', () => {
   assert.equal(r.subTreeCost, 5600, `got ${r.subTreeCost}`)
 })
 
+test('labor unpriced: an unset labor rate surfaces ONLY for a section in use', () => {
+  const laborItems = obj => (obj.unpriced || []).filter(u => u.kind === 'labor')
+  // Concrete SF entered but its labor rate ('Hand - Concrete') is unset → surfaces.
+  const used = run({ dumpType: 'In House', concSF: 300, concDepth: 12 }, { 'BAS-007-difficulty-ratio': 1 })
+  assert.ok(
+    laborItems(used).some(u => /concrete/i.test(u.label || u.name)),
+    `concrete labor should surface when concSF > 0; got ${JSON.stringify(used.unpriced)}`
+  )
+  // No concrete SF → the concrete labor rate is never read, so it must NOT surface.
+  const unused = run({ dumpType: 'In House', concSF: 0, concDepth: 12 }, { 'BAS-007-difficulty-ratio': 1 })
+  assert.ok(
+    !laborItems(unused).some(u => /concrete/i.test(u.label || u.name)),
+    'concrete labor must NOT surface when the section is unused'
+  )
+})
+
 test('In-House and Subcontractor are independent (each responds to its own inputs)', () => {
   const ih = run({ dumpType: 'In House', concSF: 300, concDepth: 12 })
   const ihMore = run({ dumpType: 'In House', concSF: 600, concDepth: 12 })

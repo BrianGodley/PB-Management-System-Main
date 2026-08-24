@@ -4,6 +4,7 @@
 // from lib/materialCatalog + lib/walkAccess (which import supabase); kept in sync.
 import { LAB } from '../../lib/laborRefs.js'
 import { BAS } from '../../lib/basicLaborRefs.js'
+import { makeModuleRates } from '../../lib/moduleRates.js'
 const n = v => parseFloat(v) || 0
 const DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN = 60
 const isStandardSel = v => !v || v === 'Standard'
@@ -61,6 +62,13 @@ export function calcPaver(
   const lr = laborRates || {}
   const mr = materialRates || {}
   const pp = paverPrices || []
+  // Unpriced-LABOR surfacing (mirrors Concrete): route labor reads through one
+  // shared reader so an UNSET/0 labor rate becomes a clickable fix-it prompt
+  // instead of a silent $0. R.labor returns the SAME number as n(lr[ref]) — no
+  // pricing-math change. Only actual labor hours (× a real qty, guarded) are
+  // routed; tunable multipliers (80mm add, difficulty) stay plain.
+  const R = makeModuleRates({ material: mr, labor: lr, sub: {}, misc: mr, materialRows })
+  const labH = (qty, ref, meta = {}) => (n(qty) > 0 ? n(qty) * R.labor(ref, meta) : 0)
   // Walk-access pace is now a Paver-specific editable labor rate (LF/min).
   const walkPace =
     n(lr[LAB.PAVER_WALK_ACCESS_PACE]) ||
@@ -111,9 +119,20 @@ export function calcPaver(
     'Skid OK': baseSkid,
     'Mini Skid': baseMini,
   }
+  // Ref-key twin of BASE_RATE_MAP so base-prep labor can route through R.labor
+  // (shared Basic Labor rows, hrs per Cu Ft) exactly like Concrete. Value is
+  // identical to BASE_RATE_MAP — R.labor(ref) === n(lr[ref]).
+  const BASE_METHOD_REF = {
+    'Skid Steer': BAS.BASE_PREP_SKID,
+    'Mini Skid Steer': BAS.BASE_PREP_MINI,
+    Hand: BAS.BASE_PREP_HAND,
+    'Skid Good': BAS.BASE_PREP_SKID,
+    'Skid OK': BAS.BASE_PREP_SKID,
+    'Mini Skid': BAS.BASE_PREP_MINI,
+  }
 
   // ── Paver areas ─────────────────────────────────────────────────────────────
-  const computeArea = row => {
+  const computeArea = (row, recordLabor = false) => {
     const sf = n(row.sf)
     const depthIn = n(row.depth) || 6
     // Base area can be larger than the paver field (overdig, edge transitions,
@@ -122,7 +141,17 @@ export function calcPaver(
     const baseSf = row.baseSf !== '' && row.baseSf != null ? n(row.baseSf) : sf
     // Base LABOR shares the demo Import Base rate — hrs × Cu Ft for every method.
     const baseVolume = baseSf * (depthIn / 12) // Cu Ft
-    const baseRate = BASE_RATE_MAP[row.method] ?? baseSkid
+    // Route the rate through R.labor ONLY for in-house rows with volume, so an
+    // unset base-prep rate surfaces only for a base actually poured (the Sub tab
+    // passes recordLabor=false → its base labor is discarded and must not surface).
+    const baseRate =
+      recordLabor && baseVolume > 0
+        ? R.labor(BASE_METHOD_REF[row.method] ?? BAS.BASE_PREP_SKID, {
+            category: 'Basic Labor',
+            unit: 'Hrs per Cu Ft',
+            label: 'Base Prep — ' + (row.method || 'Skid Steer'),
+          })
+        : BASE_RATE_MAP[row.method] ?? baseSkid
     const baseHrs = baseVolume * baseRate
 
     // Base MATERIAL is now priced per CUBIC YARD (company-wide move — base
@@ -206,8 +235,10 @@ export function calcPaver(
   // MATERIAL (pavers, base rock, pallets, sands, delivery) follows the ACTIVE
   // tab's rows so the Sub tab's Paver/Base Material sections price too — while
   // in-house LABOR still reads the in-house rows (0 on the Sub tab).
-  const areas = (state.areaRows || []).map(computeArea)
-  const subAreas = (state.subAreaRows || []).map(computeArea)
+  // In-house rows record base-prep labor (it surfaces in the fix-it banner);
+  // sub rows compute base MATERIAL only, so their base labor is not recorded.
+  const areas = (state.areaRows || []).map(r => computeArea(r, true))
+  const subAreas = (state.subAreaRows || []).map(r => computeArea(r, false))
   const isSubTab = state.subType === 'Subcontractor'
   const matAreas = isSubTab ? subAreas : areas
 
@@ -222,31 +253,37 @@ export function calcPaver(
   // Install SF is now entered MANUALLY (no longer auto-derived from the paver
   // area rows). Labor = manual SF × install rate (hrs-per-SF; standardized
   // 2026-08-18, was SF/hr).
+  // Labor read via R.labor at guarded points of use (qty > 0) so an unset install
+  // rate surfaces in the fix-it banner only for a section actually entered. Values
+  // are identical to n(lr[ref]) × qty — no pricing-math change.
   const installSFVal = n(state.installSF)
-  const installHrs = installSFVal * installRate
+  const installHrs = labH(installSFVal, LAB.PAVER_INSTALL, { category: 'Pavers', unit: 'Hrs per Sq Ft', label: 'Paver Install' })
   // 80mm thickness penalty: its own SF input adds a table-driven % (Paver - 80mm
-  // Add, a multiplier) to the install labor for that SF.
+  // Add, a multiplier) to the install labor for that SF. The multiplier is a
+  // coefficient (stays plain); the install labor it scales is routed.
   const mm80SFVal = n(state.mm80SF)
-  const add80mmHrs = mm80SFVal * add80mmMult * installRate
-  const straightCutHrs = n(state.straightCutLF) * straightCutRate
-  const curvedCutHrs = n(state.curvedCutLF) * curvedCutRate
-  const restraintsHrs = n(state.restraintsLF) * restraintRate
-  const sleevesHrs = n(state.sleevesLF) * sleevesRate
+  const add80mmHrs =
+    mm80SFVal > 0
+      ? mm80SFVal * add80mmMult * R.labor(LAB.PAVER_INSTALL, { category: 'Pavers', unit: 'Hrs per Sq Ft', label: 'Paver Install' })
+      : 0
+  const straightCutHrs = labH(state.straightCutLF, LAB.PAVER_STRAIGHT_CUT, { category: 'Pavers', unit: 'Hrs per Ln Ft', label: 'Straight Cuts' })
+  const curvedCutHrs = labH(state.curvedCutLF, LAB.PAVER_CURVED_CUT, { category: 'Pavers', unit: 'Hrs per Ln Ft', label: 'Curved Cuts' })
+  const restraintsHrs = labH(state.restraintsLF, LAB.PAVER_RESTRAINTS, { category: 'Pavers', unit: 'Hrs per Ln Ft', label: 'Restraints' })
+  const sleevesHrs = labH(state.sleevesLF, LAB.PAVER_SLEEVES, { category: 'Pavers', unit: 'Hrs per Ln Ft', label: 'Sleeves' })
   // Vertical Soldier Course rows (In-House). LF summed across rows drives labor.
   const vertRows = Array.isArray(state.vertRows) ? state.vertRows : []
   const vertTotalLF = vertRows.reduce((s, r) => s + n(r.lf), 0)
-  const vertSoldierHrs = vertTotalLF * vertSoldierRate
-  const sealerHrs = n(state.sealerSF) * sealerRate
-  // Poly Sand — New pavers: own SF input × the New poly-sand labor coefficient
-  // (Paver - Poly Sand New, fallback 0.004 hrs/SF). Independent of the paver area.
+  const vertSoldierHrs = labH(vertTotalLF, LAB.PAVER_VERTICAL_SOLDIER, { category: 'Pavers', unit: 'Hrs per Ln Ft', label: 'Vertical Soldier Course' })
+  const sealerHrs = labH(state.sealerSF, LAB.PAVER_SEALER, { category: 'Pavers', unit: 'Hrs per Sq Ft', label: 'Sealer' })
+  // Poly Sand — New pavers: own SF input × the New poly-sand labor rate
+  // (hrs/SF). Independent of the paver area.
   const polySandNewSFVal = n(state.polySandNewSF)
-  const polySandHrs = polySandNewSFVal * polySandNewSpread
-  // Poly Sand — Existing pavers: own SF input × its OWN Existing labor coefficient
-  // (Paver - Poly Sand Existing, fallback 0.0075 hrs/SF).
+  const polySandHrs = labH(polySandNewSFVal, LAB.PAVER_POLY_SAND_NEW, { category: 'Pavers', unit: 'Hrs per Sq Ft', label: 'Poly Sand — New' })
+  // Poly Sand — Existing pavers: own SF input × its OWN Existing labor rate (hrs/SF).
   const polySandExistingSFVal = n(state.polySandExistingSF)
-  const polySandExistingHrs = polySandExistingSFVal * polySandExistingSpread
-  const addStoneHrs = n(state.numStones) * addStonePer
-  const addColorHrs = n(state.numColors) * addColorPer
+  const polySandExistingHrs = labH(polySandExistingSFVal, LAB.PAVER_POLY_SAND_EXISTING, { category: 'Pavers', unit: 'Hrs per Sq Ft', label: 'Poly Sand — Existing' })
+  const addStoneHrs = labH(state.numStones, LAB.PAVER_STONE_ADD, { category: 'Pavers', unit: 'Hrs per Each', label: 'Add Stone' })
+  const addColorHrs = labH(state.numColors, LAB.PAVER_COLOR_ADD, { category: 'Pavers', unit: 'Hrs per Each', label: 'Add Color' })
 
   // ── Vertical soldier ─────────────────────────────────────────────────────────
   // Priced from the ACTIVE tab's fields so each tab's material is independent.
@@ -383,6 +420,12 @@ export function calcPaver(
   const price = laborCost + burden + totalMat + gp + commission + subCost
 
   return {
+    // Unpriced LABOR fix-it list (additive surfacing). The module uses the
+    // In-House engine's `unpriced` for the banner; the Sub engine's copy is
+    // ignored (only its material totals are consumed), and its base-prep labor
+    // is never recorded (computeArea recordLabor=false), so Sub inputs don't
+    // surface in-house labor.
+    unpriced: R.unpricedList,
     walkHrs,
     walkPace,
     totalHrs,

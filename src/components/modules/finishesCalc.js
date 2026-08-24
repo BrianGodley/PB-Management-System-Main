@@ -3,6 +3,7 @@
 // resolveMaterialPrice (lib/materialCatalog) both transitively import supabase, so their
 // pure bodies are inlined here and kept in sync. The module keeps its own constant copies
 // for JSX; this file owns the copies the calc consumes (FINISHES_RATES / FINISH_CAT_ITEM).
+import { makeModuleRates } from '../../lib/moduleRates.js'
 const n = v => parseFloat(v) || 0
 const num = v => { const x = typeof v === 'number' ? v : parseFloat(v); return Number.isFinite(x) ? x : 0 }
 const isStandardSel = v => !v || v === 'Standard'
@@ -94,81 +95,100 @@ function finishMatPriceV(matKey, vendor, materialRows, mp) {
 
 // ── Per-row calculators — identical formulas to the original, fed the vendor-resolved
 //    material price. subUnit = flat $/unit default for the Sub tab. ─────────────────
-export function computeFlatRow(row, mp, materialRows) {
+export function computeFlatRow(row, mp, materialRows, R = null, isSub = false) {
   const sf = n(row.sf)
   const v = row.vendor
   const price = k => finishMatPriceV(k, v, materialRows, mp)
   const lab = k => n(mp?.[FINISHES_RATES[k].db])
+  // labH: labor-hrs read routed through R (records an unset rate for the fix-it banner)
+  // only on the in-house path with a real quantity. Value-identical to lab() — R reads
+  // the same map — so no math change; Sub-tab labor never surfaces.
+  const labH = (k, qty, label) =>
+    R && !isSub && n(qty) > 0
+      ? R.labor(FINISHES_RATES[k].db, { category: 'Finishes', unit: 'Hrs per Sq Ft', label })
+      : n(mp?.[FINISHES_RATES[k].db])
   let mat = 0, hrs = 0, subUnit = 0, tons = 0
   switch (row.type) {
     case 'Tile':
-      mat = sf * price('flatTile'); hrs = sf > 0 ? sf * lab('flatTileLab') : 0; subUnit = price('flatTile'); break
+      mat = sf * price('flatTile'); hrs = sf > 0 ? sf * labH('flatTileLab', sf, 'Tile Flatwork') : 0; subUnit = price('flatTile'); break
     case 'Brick':
-      mat = sf * 2 * price('flatBrick'); hrs = sf > 0 ? sf * lab('flatBrickLab') : 0; subUnit = 2 * price('flatBrick'); break
+      mat = sf * 2 * price('flatBrick'); hrs = sf > 0 ? sf * labH('flatBrickLab', sf, 'Brick Flatwork') : 0; subUnit = 2 * price('flatBrick'); break
     case 'Flagstone': {
       const rate = n(row.rateIn) || price('flatFlagstone')
-      mat = sf > 0 ? sf * rate : 0; hrs = sf > 0 ? sf * lab('flatFlagstoneLab') : 0; subUnit = rate; break
+      mat = sf > 0 ? sf * rate : 0; hrs = sf > 0 ? sf * labH('flatFlagstoneLab', sf, 'Flagstone Flatwork') : 0; subUnit = rate; break
     }
     case 'Porcelain':
-      mat = sf * price('flatPorcelain'); hrs = sf > 0 ? sf * lab('flatPorcelainLab') : 0; subUnit = price('flatPorcelain'); break
+      mat = sf * price('flatPorcelain'); hrs = sf > 0 ? sf * labH('flatPorcelainLab', sf, 'Porcelain Flatwork') : 0; subUnit = price('flatPorcelain'); break
     default: break
   }
   const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : subUnit
   return { mat, hrs, subUnit, subEach, subMat: sf * subEach, tons, unit: 'SF' }
 }
 
-export function computeCapRow(row, mp, materialRows) {
+export function computeCapRow(row, mp, materialRows, R = null, isSub = false) {
   const lf = n(row.lf), widthIn = n(row.widthIn), qty = n(row.qty)
   const v = row.vendor
   const price = k => finishMatPriceV(k, v, materialRows, mp)
-  const lab = k => n(mp?.[FINISHES_RATES[k].db])
+  // labor-hrs read routed through R (in-house only, guarded by qty) so an unset cap
+  // labor rate surfaces in the fix-it banner; value-identical to a plain map read.
+  const labH = (k, q, label, unit) =>
+    R && !isSub && n(q) > 0
+      ? R.labor(FINISHES_RATES[k].db, { category: 'Finishes', unit, label })
+      : n(mp?.[FINISHES_RATES[k].db])
   let mat = 0, hrs = 0, subUnit = 0, subQty = 0, unit = 'LF'
   switch (row.type) {
     case 'Flagstone':
-      mat = lf * price('capFlagstone'); hrs = lf * lab('capFlagstoneLab'); subUnit = price('capFlagstone'); subQty = lf; break
+      mat = lf * price('capFlagstone'); hrs = lf * labH('capFlagstoneLab', lf, 'Cap Flagstone', 'Hrs per Ln Ft'); subUnit = price('capFlagstone'); subQty = lf; break
     case 'Precast':
-      mat = qty * price('capPrecast'); hrs = qty * lab('capPrecastLab'); subUnit = price('capPrecast'); subQty = qty; unit = 'Qty'; break
+      mat = qty * price('capPrecast'); hrs = qty * labH('capPrecastLab', qty, 'Cap Precast', 'Hrs per Each'); subUnit = price('capPrecast'); subQty = qty; unit = 'Qty'; break
     case 'PIP Concrete':
-      mat = ((lf * (widthIn / 12) * 0.333) / 27) * price('concreteTruck'); hrs = lf * lab('capPipLab')
+      mat = ((lf * (widthIn / 12) * 0.333) / 27) * price('concreteTruck'); hrs = lf * labH('capPipLab', lf, 'Cap PIP Concrete', 'Hrs per Ln Ft')
       subUnit = (((widthIn / 12) * 0.333) / 27) * price('concreteTruck'); subQty = lf; break
     case 'Bullnose Brick':
-      mat = lf * price('capBullnose'); hrs = lf * lab('capBullnoseLab'); subUnit = price('capBullnose'); subQty = lf; break
+      mat = lf * price('capBullnose'); hrs = lf * labH('capBullnoseLab', lf, 'Cap Bullnose Brick', 'Hrs per Ln Ft'); subUnit = price('capBullnose'); subQty = lf; break
     default: break
   }
   const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : subUnit
   return { mat, hrs, subUnit, subEach, subMat: subQty * subEach, unit, lf, qty, widthIn }
 }
 
-export function computeWallRow(row, mp, materialRows) {
+export function computeWallRow(row, mp, materialRows, R = null, isSub = false) {
   const sf = n(row.sf)
   const v = row.vendor
   const price = k => finishMatPriceV(k, v, materialRows, mp)
+  // lab: plain map read — used for MATERIAL consumables (stone screws, tile adhesive).
   const lab = k => n(mp?.[FINISHES_RATES[k].db])
+  // labH: labor-hrs read routed through R (in-house only, guarded by sf) so an unset
+  // wall-finish labor rate surfaces in the fix-it banner; value-identical to lab().
+  const labH = (k, qty, label) =>
+    R && !isSub && n(qty) > 0
+      ? R.labor(FINISHES_RATES[k].db, { category: 'Finishes', unit: 'Hrs per Sq Ft', label })
+      : n(mp?.[FINISHES_RATES[k].db])
   let mat = 0, hrs = 0, subUnit = 0, tons = 0
   switch (row.type) {
     case 'Sand Stucco':
-      hrs = sf > 0 ? sf * lab('sandStuccoLab') : 0; mat = sf * price('sandStucco'); subUnit = price('sandStucco'); break
+      hrs = sf > 0 ? sf * labH('sandStuccoLab', sf, 'Sand Stucco') : 0; mat = sf * price('sandStucco'); subUnit = price('sandStucco'); break
     case 'Smooth Stucco':
-      hrs = sf > 0 ? sf * lab('smoothStuccoLab') : 0; mat = sf * price('smoothStucco'); subUnit = price('smoothStucco'); break
+      hrs = sf > 0 ? sf * labH('smoothStuccoLab', sf, 'Smooth Stucco') : 0; mat = sf * price('smoothStucco'); subUnit = price('smoothStucco'); break
     case 'Ledgerstone':
-      hrs = sf > 0 ? sf * lab('ledgerstoneLab') : 0
+      hrs = sf > 0 ? sf * labH('ledgerstoneLab', sf, 'Ledgerstone') : 0
       mat = sf > 0 ? sf * price('ledgerstone') * 1.1 + sf * lab('stoneScrews') : 0
       subUnit = price('ledgerstone') * 1.1 + lab('stoneScrews'); break
     case 'Stacked Stone':
-      hrs = sf > 0 ? sf * lab('stackedStoneLab') : 0
+      hrs = sf > 0 ? sf * labH('stackedStoneLab', sf, 'Stacked Stone') : 0
       mat = sf > 0 ? sf * price('stackedStone') * 1.1 + sf * lab('stoneScrews') : 0
       subUnit = price('stackedStone') * 1.1 + lab('stoneScrews'); break
     case 'Tile':
-      hrs = sf > 0 ? sf * lab('tileLab') : 0
+      hrs = sf > 0 ? sf * labH('tileLab', sf, 'Tile') : 0
       mat = sf > 0 ? sf * price('tile') + sf * lab('tileAdhesive') : 0
       subUnit = price('tile') + lab('tileAdhesive'); break
     case 'Real Flagstone': {
       const rate = n(row.rateIn) || price('realFlagstone')
-      hrs = sf > 0 ? sf * lab('flagstoneLab') : 0; mat = sf > 0 ? sf * rate : 0; subUnit = rate; break
+      hrs = sf > 0 ? sf * labH('flagstoneLab', sf, 'Real Flagstone') : 0; mat = sf > 0 ? sf * rate : 0; subUnit = rate; break
     }
     case 'Real Stone': {
       const rate = n(row.rateIn) || price('realStone')
-      hrs = sf > 0 ? sf * lab('realStoneLab') : 0; mat = sf > 0 ? sf * rate : 0; subUnit = rate; break
+      hrs = sf > 0 ? sf * labH('realStoneLab', sf, 'Real Stone') : 0; mat = sf > 0 ? sf * rate : 0; subUnit = rate; break
     }
     default: break
   }
@@ -192,9 +212,14 @@ export function calcFinishes(
   const { difficulty, hoursAdj, flatworkRows, capRows, wallFinishRows, manualRows } = state
   const isSubTab = state.subType === 'Subcontractor'
 
-  const flat = (flatworkRows || []).map(row => computeFlatRow(row, mp, materialRows))
-  const caps = (capRows || []).map(row => computeCapRow(row, mp, materialRows))
-  const walls = (wallFinishRows || []).map(row => computeWallRow(row, mp, materialRows))
+  // ONE rate reader for this calc pass. Finishes' labor rates live in the same `mp`
+  // map, so route labor through it; an unset in-house labor rate is recorded on
+  // R.unpriced and surfaced in the fix-it banner. Value-identical to a plain map read.
+  const R = makeModuleRates({ material: mp, labor: mp, sub: mp, misc: mp, materialRows })
+
+  const flat = (flatworkRows || []).map(row => computeFlatRow(row, mp, materialRows, R, isSubTab))
+  const caps = (capRows || []).map(row => computeCapRow(row, mp, materialRows, R, isSubTab))
+  const walls = (wallFinishRows || []).map(row => computeWallRow(row, mp, materialRows, R, isSubTab))
   const sum = (arr, k) => arr.reduce((a, x) => a + (x[k] || 0), 0)
 
   let manHrs = 0, manMat = 0, manSub = 0
@@ -232,5 +257,5 @@ export function calcFinishes(
     price = totalMat + laborCost + burden + gp + commission + subCost
   }
 
-  return { walkHrs, totalHrs, manDays, totalMat, laborCost, burden, gp, subGp, commission, subCost, price, flat, caps, walls }
+  return { unpriced: R.unpricedList, walkHrs, totalHrs, manDays, totalMat, laborCost, burden, gp, subGp, commission, subCost, price, flat, caps, walls }
 }

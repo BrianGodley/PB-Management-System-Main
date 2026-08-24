@@ -117,6 +117,22 @@ test('material matUnset is empty on the Sub tab (flat pricing, not catalog-resol
   assert.deepEqual(r.matUnset || [], [], 'Sub tab does not surface material-unpriced prompts')
 })
 
+test('labor unpriced: an unset zone/timer labor rate surfaces ONLY when that section is in use (In-House)', () => {
+  const laborItems = obj => (obj.matUnset || []).filter(u => u.kind === 'labor')
+  // Zone in use but its labor rate unset → surfaces (kind:'labor').
+  const usedZone = run({ zoneRows: [{ type: 'lawn', qty: 2, mode: 'Trench' }] }, {})
+  assert.ok(laborItems(usedZone).some(u => /lawn/i.test(u.label || u.name || '')), 'zone labor surfaces when zone qty > 0')
+  // Timer in use but its labor rate unset → surfaces.
+  const usedTimer = run({ timerRows: [{ type: 'timer4', qty: 2 }] }, {})
+  assert.ok(laborItems(usedTimer).some(u => /timer/i.test(u.label || u.name || '')), 'timer labor surfaces when timer qty > 0')
+  // Nothing in use → no labor flags.
+  const none = run({}, {})
+  assert.equal(laborItems(none).length, 0, 'no labor flags when nothing is in use')
+  // Sub tab never flags labor.
+  const sub = run({ subType: 'Subcontractor', zoneRows: [{ type: 'lawn', qty: 2, mode: 'Trench' }] }, {})
+  assert.equal(laborItems(sub).length, 0, 'sub tab never flags labor')
+})
+
 test('no NaN across a populated estimate (zones + timers + manual)', () => {
   const r = run(
     {

@@ -4,6 +4,7 @@
 // supabase, so their pure bodies are inlined here. The module keeps its own copies of the
 // helpers for JSX; this file owns the copies the calc consumes.
 import { LAB } from '../../lib/laborRefs.js'
+import { makeModuleRates } from '../../lib/moduleRates.js'
 const n = v => parseFloat(v) || 0
 const DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN = 60
 const isStandardSel = v => !v || v === 'Standard'
@@ -105,6 +106,10 @@ export function calcTurf(
   const mp = materialPrices || {}
   const lr = laborRates || {}
   const lrph = n(laborRatePerHour)
+  // Unpriced-labor surfacing: read in-house labor rates through R.labor at their
+  // guarded point of use so an unset rate (still $0 in the math) becomes a visible
+  // fix-it prompt. Value-identical to n(lr[name]); purely additive.
+  const R = makeModuleRates({ material: mp, labor: lr, sub: subRates || {}, misc: mp, materialRows: materialRows || [] })
   const hrsAdj = n(state.hoursAdj)
   const distanceLF = n(state.distanceLF)
 
@@ -122,10 +127,15 @@ export function calcTurf(
     const sf = n(state.demo[row.key]?.sf)
     const inches = n(state.demo[row.key]?.inches) || 4
     const method = state.demo[row.key]?.method || 'Skid Steer Good'
-    const rate = demoRate(method)
     const dumpRate = n(mp[row.dumpKey])
     // Volume in Cu Yd (tons removed): SF × depth_in / 324 (27 cf/cy × 12 in/ft).
     const cy = sf > 0 ? (sf * (inches / 12)) / 27 : 0
+    // Demo labor (hrs per Cu Yd) read via R.labor at point-of-use, guarded by cy,
+    // so an unset method rate surfaces only when that demo row has volume.
+    const dm = DEMO_METHODS.find(x => x.key === method)
+    const rate = cy > 0
+      ? R.labor(dm?.matKey, { category: 'Artificial Turf', unit: 'Hrs per Cu Yd', label: 'Demo — ' + (dm?.label || method) })
+      : demoRate(method)
     const hrs = cy * rate // demo rate is hours per Cu Yd
     const mat = cy * dumpRate // dump per Cu Yd
     demoHrs += hrs; demoMat += mat
@@ -183,7 +193,9 @@ export function calcTurf(
     const brandRow = turfBrandRow(materialRows, roll.vendor, roll.brand)
     const pricePerSF = n(brandRow?.unit_cost)
     const sf = isSub ? installSF : edgeLF * rollWidthFt
-    const hrs = !isSub ? sf * turfSFHr : 0
+    // Turf install labor (hrs per Sq Ft) via R.labor at point-of-use — in-house only
+    // (Sub is flat-priced), guarded by sf so an unset rate surfaces only when used.
+    const hrs = (!isSub && sf > 0) ? sf * R.labor(LAB.TURF_TURF_INSTALL, { category: 'Artificial Turf', unit: 'Hrs per Sq Ft', label: 'Turf Install' }) : 0
     const mat = isSub ? 0 : sf * pricePerSF
     const rowSubCost = installSF * (subInstallPerSF + pricePerSF)
     const rCutHrs = !isSub ? edgeLF * cutSFHr : 0
@@ -213,7 +225,9 @@ export function calcTurf(
     const brandRow = has ? turfBrandRow(materialRows, strip?.vendor, strip?.brand) : null
     const price = n(brandRow?.unit_cost)
     const sf = lf * (widthIn / 12)
-    const hrs = has && !isSub ? lf * stripLFHr : 0
+    // Strip install labor (hrs per Ln Ft) via R.labor at point-of-use — in-house only,
+    // guarded by lf so an unset rate surfaces only when a strip row is actually used.
+    const hrs = (has && !isSub && lf > 0) ? lf * R.labor(LAB.TURF_STRIP_INSTALL, { category: 'Artificial Turf', unit: 'Hrs per Ln Ft', label: 'Turf Strip Install' }) : 0
     const mat = has && !isSub ? price * sf : 0
     const rowSubCost = has ? lf * subStripPerLF + price * sf : 0
     stripsHrs += hrs; stripsMat += mat; subStripsCost += rowSubCost
@@ -243,6 +257,7 @@ export function calcTurf(
   const price = laborCost + burden + totalMat + gp + commission + subCost
 
   return {
+    unpriced: R.unpricedList,
     walkHrs, totalHrs, manDays, laborCost, burden, totalMat, subCost, gp, commission, price,
     infillAreaSF, demoCalc, turfAreaSF, baseCalc, rollCalc, totalEdgeLF, turfHrs, turfSFHr, turfMat,
     stripCalc, stripsHrs, stripLFHr, stripsMat, cutHrs, cutMat, subCutMat, infillMat, demoHrs, baseHrs,

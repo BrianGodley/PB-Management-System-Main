@@ -9,6 +9,7 @@ import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { useMaterialCatalog, resolveMaterialPrice, catalogOptions } from '../../lib/materialCatalog'
 import { calcFinishes } from './finishesCalc'
+import UnpricedItemModal from '../UnpricedItemModal'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Finishes Module — Flatwork, Wall Caps, Wall Finishes
@@ -525,6 +526,8 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
   const [ihTab, setIhTab] = useState(() => makeTab(initialData?.ihData || initialData))
   const [subTab, setSubTab] = useState(() => makeTab(initialData?.subData || {}))
   const isSub = subType === 'Subcontractor'
+  // Inline "price me" modal target for an unset labor/material rate surfaced by the calc.
+  const [unpricedItem, setUnpricedItem] = useState(null)
   const cur = isSub ? subTab : ihTab
   const setCur = isSub ? setSubTab : setIhTab
   const setField = k => v =>
@@ -987,6 +990,27 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
         </div>
       )}
 
+      {!pricesLoading && calc.unpriced && calc.unpriced.length > 0 && (
+        <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3">
+          <p className="text-sm font-medium text-red-800">
+            {calc.unpriced.length} item{calc.unpriced.length > 1 ? 's have' : ' has'} no price yet —
+            click to price:
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {calc.unpriced.map(it => (
+              <button
+                key={it.name}
+                type="button"
+                onClick={() => setUnpricedItem(it)}
+                className="rounded-full border border-red-300 bg-white px-3 py-1 text-sm text-red-700 hover:bg-red-100"
+              >
+                {it.label} · $0.00
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Settings — Job Site Conditions is In-House only (hidden on Sub tab) */}
       {!isSub && (
         <>
@@ -1156,6 +1180,14 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
           {saving ? 'Saving...' : 'Save'}
         </button>
       </div>
+
+      {unpricedItem && (
+        <UnpricedItemModal
+          item={unpricedItem}
+          onClose={() => setUnpricedItem(null)}
+          onSaved={refreshAllRates}
+        />
+      )}
     </div>
     </SubTabContext.Provider>
   )

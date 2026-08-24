@@ -62,6 +62,26 @@ test('bedding sand: priced per Cu Yd, 1in layer (324 SF = 1 CY × $30 = $30)', (
   assert.equal(r2.beddingSandCost, 60, `beddingSandCost got ${r2.beddingSandCost}`)
 })
 
+test('labor unpriced: an unset labor rate surfaces ONLY for a section in use', () => {
+  const laborItems = obj => (obj.unpriced || []).filter(u => u.kind === 'labor')
+  // Straight-cut LF entered but its labor rate is unset → surfaces.
+  const used = run({ straightCutLF: 100 }, { lr: {} })
+  assert.ok(laborItems(used).some(u => /cut/i.test(u.label || u.name)), 'straight-cut labor surfaces when LF > 0')
+  // No straight-cut LF → that labor rate is never read, so it must NOT surface.
+  const unused = run({ straightCutLF: 0 }, { lr: {} })
+  assert.ok(!laborItems(unused).some(u => /cut/i.test(u.label || u.name)), 'straight-cut labor does NOT surface when unused')
+})
+
+test('labor unpriced (base prep): in-house area rows surface base labor; sub area rows do not', () => {
+  const laborItems = obj => (obj.unpriced || []).filter(u => u.kind === 'labor')
+  // In-house area row with volume + unset base-prep rate → base labor surfaces.
+  const ih = run({ subType: 'In-House', areaRows: [{ sf: 100, depth: 6, method: 'Skid Steer' }] }, { lr: {} })
+  assert.ok(laborItems(ih).some(u => /base prep/i.test(u.label || u.name)), 'in-house base prep labor surfaces')
+  // The SUB engine (forced Sub, base labor discarded) records no base labor.
+  const sub = run({ subType: 'Subcontractor', subAreaRows: [{ sf: 100, depth: 6, method: 'Skid Steer' }] }, { lr: {} })
+  assert.ok(!laborItems(sub).some(u => /base prep/i.test(u.label || u.name)), 'sub area rows do NOT surface base prep labor')
+})
+
 test('no NaN across a populated estimate (install SF + cuts + restraints)', () => {
   const r = run(
     { installSF: 400, straightCutLF: 60, curvedCutLF: 30, restraintsLF: 80 },

@@ -3,6 +3,7 @@
 // and catalogOptions (lib/materialCatalog) both import supabase, so their pure bodies are
 // inlined here. The module keeps its own copies of these helpers for JSX; this file owns the
 // copies the calc consumes (GT_RATES / mergedGtOpts / resolveType).
+import { makeModuleRates } from '../../lib/moduleRates.js'
 const n = v => parseFloat(v) || 0
 const DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN = 60
 const isStandardSel = v => !v || v === 'Standard'
@@ -189,6 +190,16 @@ export function calcGroundTreatments(
 
   const p = dbName => n(mp[dbName])
 
+  // Unpriced-LABOR surfacing (mirrors Concrete): route labor rates through one
+  // shared reader so an UNSET/0 labor rate becomes a clickable fix-it prompt
+  // instead of a silent $0. mp is a combined name→value map (labor_rates +
+  // misc_rates + Standard material prices), so pLab returns the SAME number as
+  // p(name) — no pricing-math change. Only actual labor rows are routed (tunable
+  // coefficients like coverage/swell/factor stay as plain p(...)). Reads are at
+  // guarded points-of-use so a rate only surfaces for a section actually in use.
+  const R = makeModuleRates({ material: mp, labor: mp, sub: mp, misc: mp, materialRows })
+  const pLab = (dbName, meta = {}) => R.labor(dbName, { category: 'Ground Treatments', ...meta })
+
   // ── Table-driven estimating coefficients (fall back to code constants) ──
   // Business-tunable coverage/swell/markup assumptions, surfaced as editable
   // coefficient rows in View Rates (labor_rates, category Ground Treatments).
@@ -207,7 +218,6 @@ export function calcGroundTreatments(
   let mulchLab = 0,
     mulchMat = 0
   {
-    const mulchCYPerDay = p(GT_RATES.mulchLab.dbName)
     let anyMulch = false
     ;(mulchRows || []).forEach(r => {
       if (!(n(r.sf) > 0)) return
@@ -217,10 +227,12 @@ export function calcGroundTreatments(
       const mt = rowOpt('Mulch', r, [])
       mulchMat += CY * mt.fallback
       // hrs-per-unit (standardized 2026-08-18): mulch labor is hrs/Cu Yd, coverage hrs/Sq Ft.
+      // Labor read via pLab (guarded by sf>0/type above) so an unset spread rate surfaces.
+      const mulchCYPerDay = pLab(GT_RATES.mulchLab.dbName, { unit: 'Hrs per Cu Yd', label: 'Mulch Spread' })
       mulchLab += CY * mulchCYPerDay + n(r.sf) * mulchCoverageSfDay
       if (r.weedFabric === 'Yes') {
         mulchMat += n(r.sf) * p(GT_RATES.gravelFabricMat.dbName)
-        mulchLab += n(r.sf) * p(GT_RATES.gravelFabricLab.dbName)
+        mulchLab += n(r.sf) * pLab(GT_RATES.gravelFabricLab.dbName, { unit: 'Hrs per Sq Ft', label: 'Weed Fabric Install' })
       }
     })
     // Flat delivery fee applied ONCE if any mulch row has area.
@@ -244,9 +256,14 @@ export function calcGroundTreatments(
     const lf = n(r.lf)
     const opt = rowOpt('Edging', { vendor: r.vendor, type: r.type }, [])
     const isMetal = /metal/i.test(r.type || '')
-    const labRate = isMetal
-      ? p(GT_RATES.metalEdgingLab.dbName)
-      : p(GT_RATES.plasticEdgingLab.dbName)
+    // Labor read via pLab only when this row has LF, so an unset edging labor
+    // rate surfaces only for a row actually in use (value identical when lf=0).
+    const labRate =
+      lf > 0
+        ? isMetal
+          ? pLab(GT_RATES.metalEdgingLab.dbName, { unit: 'Hrs per Ln Ft', label: 'Metal Edging Install' })
+          : pLab(GT_RATES.plasticEdgingLab.dbName, { unit: 'Hrs per Ln Ft', label: 'Plastic Edging Install' })
+        : 0
     edgingLab += lf * labRate
     edgingMat += lf * opt.fallback
   })
@@ -259,11 +276,13 @@ export function calcGroundTreatments(
   // wiring (base labor hours + total material).
   const _prepIsSub = state.subType === 'Subcontractor'
   // Tilling labor (hrs/SF) added on top of the base soil-prep labor. None = 0.
+  // Tilling labor is only ever called inside area>0 guards below, so routing it
+  // through pLab surfaces an unset tilling rate only for a prep row in use.
   const _tillLab = method =>
     method === 'Hand'
-      ? p(GT_RATES.tillHandLab.dbName)
+      ? pLab(GT_RATES.tillHandLab.dbName, { unit: 'Hrs per Sq Ft', label: 'Tilling — Hand' })
       : method === 'Tiller'
-        ? p(GT_RATES.tillTillerLab.dbName)
+        ? pLab(GT_RATES.tillTillerLab.dbName, { unit: 'Hrs per Sq Ft', label: 'Tilling — Tiller' })
         : 0
 
   // ── Planter Preparation (multi-row, Soils-style) ────────────────────────────
@@ -276,7 +295,7 @@ export function calcGroundTreatments(
   ;(planterPrepRows || []).forEach(r => {
     const area = n(r.area)
     if (!(area > 0)) return
-    const baseLab = p(GT_RATES.soilPrepLab.dbName)
+    const baseLab = pLab(GT_RATES.soilPrepLab.dbName, { unit: 'Hrs per Sq Ft', label: 'Soil Prep' })
     soilLab += area * (baseLab + _tillLab(r.tilling))
     if (r.type) {
       const CY = (area * (n(r.depthIn) / 12)) / 27
@@ -291,7 +310,7 @@ export function calcGroundTreatments(
   ;(sodPrepRows || []).forEach(r => {
     const area = n(r.area)
     if (!(area > 0)) return
-    const baseLab = p(GT_RATES.sodPrepLab.dbName)
+    const baseLab = pLab(GT_RATES.sodPrepLab.dbName, { unit: 'Hrs per Sq Ft', label: 'Sod Soil Prep' })
     sodPrepLabHrs += area * (baseLab + _tillLab(r.tilling))
     if (r.type) {
       const CY = (area * (n(r.depthIn) / 12)) / 27
@@ -307,7 +326,7 @@ export function calcGroundTreatments(
   let sodMat = 0
   ;(sodRows || []).forEach(r => {
     const sf = n(r.sf)
-    sodLab += sf * p(GT_RATES.sodLab.dbName)
+    sodLab += sf > 0 ? sf * pLab(GT_RATES.sodLab.dbName, { unit: 'Hrs per Sq Ft', label: 'Sod Install' }) : 0
     if (r.type) {
       const st = rowOpt('Sod', { vendor: r.vendor, type: r.type }, [])
       sodMat += sf * st.fallback
@@ -358,7 +377,8 @@ export function calcGroundTreatments(
       const opt = rowOpt('Steppers', { vendor: _sv[ln.key], type: _st[ln.key] || ln.defType }, [])
       const perSf = opt.fallback // now $/Sq Ft (was $/ton ÷ SF-per-ton)
       // hrs-per-unit: stepper labor is hrs per Sq Ft (standardized 2026-08-18, was SF/day).
-      const sfPerDay = p(ln.labRate.dbName)
+      // Guarded by the ln.sf>0 early-return above → surfaces only for a line in use.
+      const sfPerDay = pLab(ln.labRate.dbName, { unit: 'Hrs per Sq Ft', label: ln.labRate.dbName })
       const lab = n(ln.sf) * sfPerDay
       const mat = n(ln.sf) * perSf
       stepLab += lab
@@ -377,8 +397,6 @@ export function calcGroundTreatments(
   let dgLab = 0,
     dgMat = 0
   {
-    const dgHandRate = p(GT_RATES.dgHandLab.dbName)
-    const dgMachineRate = p(GT_RATES.dgMachineLab.dbName)
     ;(dgRows || []).forEach(r => {
       if (!(n(r.sf) > 0)) return
       if (!r.type) return
@@ -392,17 +410,20 @@ export function calcGroundTreatments(
       // DG labor = Cu Yd × method rate (Hand/Machine spread) + cleanup. One
       // spreading line — the old Removal Swell multiplier + separate Placement
       // line were a double-charge and have been removed.
-      const baseHrs =
+      // Only the chosen method's labor rate is read (value identical to before) so
+      // an unset DG spread rate surfaces only for the method actually used.
+      const dgSpreadRate =
         r.method === 'Hand'
-          ? CY * dgHandRate + n(r.sf) * dgCoverageSfDay
-          : CY * dgMachineRate + n(r.sf) * dgCoverageSfDay
+          ? pLab(GT_RATES.dgHandLab.dbName, { unit: 'Hrs per Cu Yd', label: 'DG Spread — Hand' })
+          : pLab(GT_RATES.dgMachineLab.dbName, { unit: 'Hrs per Cu Yd', label: 'DG Spread — Machine' })
+      const baseHrs = CY * dgSpreadRate + n(r.sf) * dgCoverageSfDay
       dgLab += baseHrs + (cement ? CY * dgCementLaborFactor : 0)
       dgMat +=
         CY * dgt.fallback +
         (cement ? CY * p(GT_RATES.dgCementPerTon.dbName) : 0)
       if (r.weedFabric === 'Yes') {
         dgMat += n(r.sf) * p(GT_RATES.gravelFabricMat.dbName)
-        dgLab += n(r.sf) * p(GT_RATES.gravelFabricLab.dbName)
+        dgLab += n(r.sf) * pLab(GT_RATES.gravelFabricLab.dbName, { unit: 'Hrs per Sq Ft', label: 'Weed Fabric Install' })
       }
     })
   }
@@ -414,16 +435,19 @@ export function calcGroundTreatments(
     if (!n(r.sf)) return
     if (!r.type) return
     const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
-    const machineRate = p(GT_RATES.gravelMachineLab.dbName)
-    const handRate = p(GT_RATES.gravelHandLab.dbName)
-    const excavLab =
-      r.method === 'Machine' ? CY * aggregateRemovalSwell * machineRate : CY * aggregateRemovalSwell * handRate
+    // Only the chosen method's rate is read (value identical) so an unset
+    // excavation rate surfaces only for a row in use (this loop is sf>0 guarded).
+    const excavRate =
+      r.method === 'Machine'
+        ? pLab(GT_RATES.gravelMachineLab.dbName, { unit: 'Hrs per Cu Yd', label: 'Aggregate Excavation — Machine' })
+        : pLab(GT_RATES.gravelHandLab.dbName, { unit: 'Hrs per Cu Yd', label: 'Aggregate Excavation — Hand' })
+    const excavLab = CY * aggregateRemovalSwell * excavRate
     // Weed barrier — same fabric material + labor rate as DG's weed barrier.
     // Legacy rows (no weedFabric field) default to Yes so prior estimates that
     // always included fabric are unchanged.
     const wantFabric = (r.weedFabric ?? 'Yes') === 'Yes'
     const fabricLab = wantFabric
-      ? n(r.sf) * p(GT_RATES.gravelFabricLab.dbName)
+      ? n(r.sf) * pLab(GT_RATES.gravelFabricLab.dbName, { unit: 'Hrs per Sq Ft', label: 'Weed Fabric Install' })
       : 0
     gravelLab += excavLab + fabricLab
     const gtype = rowOpt('Gravel', r, [])
@@ -440,14 +464,15 @@ export function calcGroundTreatments(
     if (!n(r.sf)) return
     if (!r.type) return
     const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
-    const machineRate = p(GT_RATES.gravelMachineLab.dbName)
-    const handRate = p(GT_RATES.gravelHandLab.dbName)
-    const excavLab =
-      r.method === 'Machine' ? CY * aggregateRemovalSwell * machineRate : CY * aggregateRemovalSwell * handRate
+    const excavRate =
+      r.method === 'Machine'
+        ? pLab(GT_RATES.gravelMachineLab.dbName, { unit: 'Hrs per Cu Yd', label: 'Aggregate Excavation — Machine' })
+        : pLab(GT_RATES.gravelHandLab.dbName, { unit: 'Hrs per Cu Yd', label: 'Aggregate Excavation — Hand' })
+    const excavLab = CY * aggregateRemovalSwell * excavRate
     // Weed barrier — same fabric material + labor rate as DG's weed barrier.
     const wantFabric = (r.weedFabric ?? 'Yes') === 'Yes'
     const fabricLab = wantFabric
-      ? n(r.sf) * p(GT_RATES.gravelFabricLab.dbName)
+      ? n(r.sf) * pLab(GT_RATES.gravelFabricLab.dbName, { unit: 'Hrs per Sq Ft', label: 'Weed Fabric Install' })
       : 0
     pebbleLab += excavLab + fabricLab
     const ptype = rowOpt('Pebble', r, [])
@@ -464,14 +489,15 @@ export function calcGroundTreatments(
     if (!n(r.sf)) return
     if (!r.type) return
     const CY = (n(r.sf) * (n(r.depthIn) / 12)) / 27
-    const machineRate = p(GT_RATES.gravelMachineLab.dbName)
-    const handRate = p(GT_RATES.gravelHandLab.dbName)
-    const excavLab =
-      r.method === 'Machine' ? CY * aggregateRemovalSwell * machineRate : CY * aggregateRemovalSwell * handRate
+    const excavRate =
+      r.method === 'Machine'
+        ? pLab(GT_RATES.gravelMachineLab.dbName, { unit: 'Hrs per Cu Yd', label: 'Aggregate Excavation — Machine' })
+        : pLab(GT_RATES.gravelHandLab.dbName, { unit: 'Hrs per Cu Yd', label: 'Aggregate Excavation — Hand' })
+    const excavLab = CY * aggregateRemovalSwell * excavRate
     // Weed barrier — same fabric material + labor rate as DG's weed barrier.
     const wantFabric = (r.weedFabric ?? 'Yes') === 'Yes'
     const fabricLab = wantFabric
-      ? n(r.sf) * p(GT_RATES.gravelFabricLab.dbName)
+      ? n(r.sf) * pLab(GT_RATES.gravelFabricLab.dbName, { unit: 'Hrs per Sq Ft', label: 'Weed Fabric Install' })
       : 0
     cobbleLab += excavLab + fabricLab
     const ctype = rowOpt('Cobbles', r, [])
@@ -558,6 +584,10 @@ export function calcGroundTreatments(
   }
 
   return {
+    // Unpriced LABOR fix-it list (additive surfacing). The in-house labor math
+    // above always runs, so on the Sub tab (flat $/SF pricing, no in-house labor)
+    // we drop labor items — they aren't used there and must not surface.
+    unpriced: isSubTab ? R.unpricedList.filter(u => u.kind !== 'labor') : R.unpricedList,
     // On the Sub tab the bid is the flat subcontractor cost only — the itemized
     // in-house hours/material/burden don't apply (and shouldn't be taxed).
     walkHrs: isSubTab ? 0 : walkHrs,

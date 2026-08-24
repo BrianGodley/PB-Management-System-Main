@@ -59,9 +59,20 @@ test('unpriced clears once the rate is provided (edit-reflects on the banner)', 
     { rebarSF: 100, rebarSize: '#4', rebarSpacing: '24" OC' },
     { lr: { 'Concrete - Rebar Per SF': 0.02 }, mr: { 'Rebar #4': 0.85 } }
   )
-  const cnt = obj => (obj.unpriced || []).filter(u => /rebar/i.test(`${u.name || ''} ${u.label || ''}`)).length
+  // Count only the MATERIAL rebar unpriced item (labor rebar is a separate kind now).
+  const cnt = obj => (obj.unpriced || []).filter(u => u.kind !== 'labor' && /rebar/i.test(`${u.name || ''} ${u.label || ''}`)).length
   assert.ok(cnt(missing) > 0, 'rebar unpriced when material absent')
   assert.equal(cnt(priced), 0, 'rebar no longer unpriced once material is priced')
+})
+
+test('labor unpriced: an unset labor rate surfaces ONLY for a section in use', () => {
+  const laborItems = obj => (obj.unpriced || []).filter(u => u.kind === 'labor')
+  // Form LF entered but its labor rate (LAB.CONC_FORM_SETTING) is unset → surfaces.
+  const used = run({ formLF: 50 }, { lr: {} })
+  assert.ok(laborItems(used).some(u => /form/i.test(u.label || u.name)), 'form labor surfaces when formLF > 0')
+  // No form LF entered → the form labor rate is never read, so it must NOT surface.
+  const unused = run({ formLF: 0 }, { lr: {} })
+  assert.ok(!laborItems(unused).some(u => /form/i.test(u.label || u.name)), 'form labor does NOT surface when unused')
 })
 
 test('no NaN across a populated In-House estimate', () => {
