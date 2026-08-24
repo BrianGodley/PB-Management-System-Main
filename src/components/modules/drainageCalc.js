@@ -4,6 +4,7 @@
 // lib/walkAccess. The module's own type/rate maps + drainMatCost/masterDrainTypes are
 // carried below (they only need the inlined catalog fns).
 import { BAS } from '../../lib/basicLaborRefs.js'
+import { MAT } from '../../lib/materialRefs.js'
 const n = v => parseFloat(v) || 0
 const DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN = 60
 const isStandardSel = v => !v || v === 'Standard'
@@ -115,7 +116,7 @@ const FIXTURE_LABOR_RATE_NAME = {
 // Additional items — identity only. Labor hours come from labor_rates
 // (ADD_ITEM_LABOR_RATE_NAME) and material cost from materialPrices[dbName].
 const ADD_ITEM_RATES = {
-  sumpPump: { label: 'Sump Pump', dbName: 'Sump Pump' },
+  sumpPump: { label: 'Sump Pump', dbName: 'Sump Pump', ref: MAT.SUMP_PUMP },
   // Curb Core / Hydrocut are pure labor now (2 hrs each) — no material fee.
   curbCore: { label: 'Curb Core', dbName: 'Curb Core', laborOnly: true },
   hydrocut: { label: 'Hydrocut Under Hardscape', dbName: 'Hydrocut Under Hardscape', laborOnly: true },
@@ -371,7 +372,7 @@ export function calcDrainage(
     const qty = n(additionalItems[`${key}Qty`])
     if (qty > 0) {
       addHrs += qty * n(materialPrices[ADD_ITEM_LABOR_RATE_NAME[key]])
-      if (!rate.laborOnly) addMat += qty * n(materialPrices[rate.dbName])
+      if (!rate.laborOnly) addMat += qty * n(materialPrices[rate.ref] ?? materialPrices[rate.dbName])
     }
   })
 

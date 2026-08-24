@@ -3,6 +3,7 @@ import CrewTypeBar from './CrewTypeBar'
 import ModuleHeaderSlot from './ModuleHeaderSlot'
 import { computeOkFinishRow, WF_META, WF_LIST } from './okCalc'
 import { FINISH_TYPE_REFKEY } from './finishesCalc'
+import { MAT } from '../../lib/materialRefs'
 import { useState, useEffect, useCallback, useContext } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
@@ -24,22 +25,25 @@ import UnpricedItemModal from '../UnpricedItemModal'
 
 const OK_RATES = {
   // ── Material costs ──────────────────────────────────────────────────────────
-  bbqBlock: { dbName: 'BBQ Block' }, // $/block
+  // `ref` = frozen material ref_key (M7): the Standard price reads by ref_key first
+  // (rename-safe), dbName as fallback. Entries without a ref (BBQ Rebar / Sink
+  // Plumbing / Gas Pipe) are misc rates, not catalog materials — they stay name-keyed.
+  bbqBlock: { dbName: 'BBQ Block', ref: MAT.BBQ_BLOCK }, // $/block
   bbqRebar: { dbName: 'BBQ Rebar' }, // $/LF
-  bbqConcrete: { dbName: 'BBQ Concrete' }, // $/CY (footing & counter)
+  bbqConcrete: { dbName: 'BBQ Concrete', ref: MAT.BBQ_CONCRETE }, // $/CY (footing & counter)
   bbqSubWallLF: { dbName: 'BBQ Sub Wall LF' }, // $/LF flat sub price (BBQ wall)
   bbqSubBackLF: { dbName: 'BBQ Sub Backsplash LF' }, // $/LF flat sub price (backsplash)
-  applianceHardware: { dbName: 'BBQ Appliance Hardware' }, // $/appliance (misc hardware)
-  gficOutlet: { dbName: 'GFIC Outlet - BBQ' }, // $/outlet
+  applianceHardware: { dbName: 'BBQ Appliance Hardware', ref: MAT.BBQ_APPLIANCE_HARDWARE }, // $/appliance (misc hardware)
+  gficOutlet: { dbName: 'GFIC Outlet - BBQ', ref: MAT.GFIC_OUTLET_BBQ }, // $/outlet
   sinkPlumbing: { dbName: 'Sink Plumbing - BBQ' }, // $ flat
   gasPipe: { dbName: 'Gas Pipe - BBQ' }, // $/LF
-  sandStucco: { dbName: 'Sand Stucco - Finishes' }, // shared $/Sq Ft (Finishes)
-  smoothStucco: { dbName: 'Smooth Stucco - Finishes' }, // shared $/Sq Ft (Finishes)
-  ledgerstone: { dbName: 'Ledgerstone - Finishes' }, // shared $/Sq Ft (Finishes)
-  stackedStone: { dbName: 'Stacked Stone - Finishes' }, // shared $/Sq Ft (Finishes)
-  tile: { dbName: 'Tile - Finishes' }, // shared $/Sq Ft (Finishes)
-  realFlagstone: { dbName: 'Real Flagstone - Finishes' }, // shared $/Sq Ft (Finishes)
-  realStone: { dbName: 'Real Stone - Finishes' }, // shared $/Sq Ft (Finishes)
+  sandStucco: { dbName: 'Sand Stucco - Finishes', ref: MAT.SAND_STUCCO }, // shared $/Sq Ft (Finishes)
+  smoothStucco: { dbName: 'Smooth Stucco - Finishes', ref: MAT.SMOOTH_STUCCO }, // shared $/Sq Ft (Finishes)
+  ledgerstone: { dbName: 'Ledgerstone - Finishes', ref: MAT.LEDGERSTONE }, // shared $/Sq Ft (Finishes)
+  stackedStone: { dbName: 'Stacked Stone - Finishes', ref: MAT.STACKED_STONE }, // shared $/Sq Ft (Finishes)
+  tile: { dbName: 'Tile - Finishes', ref: MAT.TILE_FINISH }, // shared $/Sq Ft (Finishes)
+  realFlagstone: { dbName: 'Real Flagstone - Finishes', ref: MAT.REAL_FLAGSTONE }, // shared $/Sq Ft (Finishes)
+  realStone: { dbName: 'Real Stone - Finishes', ref: MAT.REAL_STONE }, // shared $/Sq Ft (Finishes)
 
   // ── Labor productivity rates ────────────────────────────────────────────────
   excavateLab: { dbName: 'BBQ Excavate Labor Rate' }, // CF/hr
@@ -461,7 +465,11 @@ function calcOutdoorKitchen(
     epGasRows,
     epElecRows,
   } = state
-  const p = dbName => n(mp[dbName]) // price lookup — declared before first use (trench block)
+  // price lookup — declared before first use (trench block). Optional `ref` = a frozen
+  // material ref_key read first (rename-safe), dbName fallback; mp is dual-keyed by
+  // ref_key + name so this is value-identical today. Labor/coeff reads pass a numeric
+  // fallback here (no ref) which never matches a price key, so they resolve by name. (M7)
+  const p = (dbName, ref) => n(ref != null && mp[ref] != null ? mp[ref] : mp[dbName])
 
   // ── Utility Lines / Gas / Electrical Fixtures ───────────────────────────────
   // Utility Lines combine the line's install labor + material PLUS trenching for
@@ -504,7 +512,7 @@ function calcOutdoorKitchen(
     if (!meta || sf <= 0) return { mat: 0, hrs: 0 }
     const houseUnit = meta.master
       ? meta.matUnit
-      : p(OK_RATES[meta.key].dbName, OK_RATES[meta.key].fallback)
+      : p(OK_RATES[meta.key].dbName, OK_RATES[meta.key].ref)
     const unit = wfVendorPrice(row.vendor, row.type, materialRows, { category: 'Finishes' }) ?? houseUnit
     const labRate = meta.master
       ? meta.laborCoeff
@@ -615,18 +623,18 @@ function calcOutdoorKitchen(
   const gasHrs = n(gasTrenchLF) * p(OK_RATES.gasTrenchLab.dbName, OK_RATES.gasTrenchLab.fallback) // hrs per Ln Ft
 
   // ── Material Costs ──────────────────────────────────────────────────────────
-  const blockMat = blockOrdered * p(OK_RATES.bbqBlock.dbName, OK_RATES.bbqBlock.fallback)
+  const blockMat = blockOrdered * p(OK_RATES.bbqBlock.dbName, OK_RATES.bbqBlock.ref)
   const rebarMat = rebarLF * p('Rebar ' + (rebarSize || '#4'), OK_RATES.bbqRebar.fallback)
-  const footingMat = footingCY * p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)
-  const fillMat = fillCY * p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)
-  const counterConcMat = counterCY * p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)
+  const footingMat = footingCY * p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.ref)
+  const fillMat = fillCY * p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.ref)
+  const counterConcMat = counterCY * p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.ref)
   const counterPolishMat =
     counterFinish === 'Polished Finish'
       ? n(counterSF) * p(OK_RATES.counterPolishMat.dbName, OK_RATES.counterPolishMat.fallback)
       : 0
   const applianceMat =
-    n(applianceCount) * p(OK_RATES.applianceHardware.dbName, OK_RATES.applianceHardware.fallback)
-  const gficMat = n(gficCount) * p(OK_RATES.gficOutlet.dbName, OK_RATES.gficOutlet.fallback)
+    n(applianceCount) * p(OK_RATES.applianceHardware.dbName, OK_RATES.applianceHardware.ref)
+  const gficMat = n(gficCount) * p(OK_RATES.gficOutlet.dbName, OK_RATES.gficOutlet.ref)
   const sinkMat =
     sinkYN === 'Yes' ? p(OK_RATES.sinkPlumbing.dbName, OK_RATES.sinkPlumbing.fallback) : 0
   const gasMat = n(gasTrenchLF) * p(OK_RATES.gasPipe.dbName, OK_RATES.gasPipe.fallback)

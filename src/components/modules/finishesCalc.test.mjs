@@ -78,6 +78,19 @@ test('M5 ref_key: the vendor price survives a catalog rename (matched by ref_key
   assert.equal(ven.totalMat, 1500, `ref_key still resolves the vendor price after a rename; got ${ven.totalMat}`)
 })
 
+test('M7 Standard by ref_key: the Standard finish price resolves from the ref_key alone (no name key needed)', () => {
+  // Simulates the post-transition map: the material Standard price is keyed ONLY by its
+  // frozen ref_key (MAT-103), NOT by the description 'Sand Stucco - Finishes'. The
+  // Standard read must still price the wall finish — proving a catalog rename can't zero it.
+  const mp = {
+    [FINISH_CAT_ITEM.sandStucco]: 4, // ref_key key only
+    'Sand Stucco - Finishes Labor Rate': 0.15,
+  }
+  const r = run({ wallFinishRows: [{ vendor: 'Standard', type: 'Sand Stucco', sf: '50' }] }, mp)
+  assert.equal(r.totalMat, 50 * 4, `Standard resolves via ref_key; got ${r.totalMat}`)
+  assert.equal(r.totalHrs, 50 * 0.15, `labor unchanged; got ${r.totalHrs}`)
+})
+
 test('material NO-FALLBACK: an unpriced type resolves $0 material (and 0 hrs when labor unset) — no hidden constant', () => {
   const r = run({ flatworkRows: [{ vendor: 'Standard', type: 'Tile', sf: '100' }] }, {}) // empty rate map
   assert.equal(r.totalMat, 0, 'no price → $0 material (no constant)')

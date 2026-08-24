@@ -71,7 +71,9 @@ test('add-on labor (perDay): hrs = qty × labor rate (4 × 0.25 = 1 hr); materia
   const r = run(
     { addonRows: [{ vendor: 'Standard', type: 'Tree Stake', qty: '4' }] },
     { 'Tree Stakes - Install Rate': 0.25 },
-    { 'Tree Stake': 10 }
+    // Production rate map is dual-keyed by ref_key + name (M7); the add-on Standard
+    // price now reads by the frozen ref_key first.
+    { 'Tree Stake': 10, 'MAT-649-tree-stake': 10 }
   )
   assert.equal(r.addonHrs, 1, `addonHrs got ${r.addonHrs}`)
   assert.equal(r.totalMat, 40, `add-on material got ${r.totalMat}`)

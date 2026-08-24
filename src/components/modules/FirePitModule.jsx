@@ -11,6 +11,7 @@ import { groutCuFtPerBlock } from '../../lib/cmuGrout'
 import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
 import { computeCapRow, computeFinishRow, WF_META, WF_LIST } from './firePitCalc'
 import { FINISH_TYPE_REFKEY, CAP_TYPE_REFKEY } from './finishesCalc'
+import { MAT } from '../../lib/materialRefs'
 import { TRENCH_LABOR_RATE_NAME, trenchHours, trenchRowHrs } from '../../lib/trench'
 import { STRUCT_CALC } from './firePitStruct'
 import { resolveUtilRow } from '../../lib/utilRow'
@@ -35,10 +36,13 @@ const REBAR_SIZES = ['#3', '#4', '#5', '#6', '#8']
 
 const FP_RATES = {
   // ── Structural material costs ───────────────────────────────────────────────
-  fpBlock: { dbName: 'FP Block' }, // $/block
+  // `ref` = frozen material ref_key (M7): Standard price reads by ref_key first
+  // (rename-safe), dbName fallback. Caps ('FP Cap *') + FP Rebar are misc rates (not
+  // catalog materials) so they stay name-keyed.
+  fpBlock: { dbName: 'FP Block', ref: MAT.FP_BLOCK }, // $/block
   fpRebar: { dbName: 'FP Rebar' }, // $/LF (fallback price only; name now size-based)
-  fpConcrete: { dbName: 'FP Concrete' }, // $/CY (footing & grout)
-  fpGroutPump: { dbName: 'FP Grout Pump Setup' }, // flat fee when pump used
+  fpConcrete: { dbName: 'FP Concrete', ref: MAT.FP_CONCRETE }, // $/CY (footing & grout)
+  fpGroutPump: { dbName: 'FP Grout Pump Setup', ref: MAT.FP_GROUT_PUMP_SETUP }, // flat fee when pump used
 
   // ── Subcontractor flat structure rates (Sub tab only) ───────────────────────
   // On the Sub tab the itemized block/rebar/footing/grout takeoff is replaced by
@@ -60,13 +64,13 @@ const FP_RATES = {
 
   // ── Wall finish material costs — SHARED with the Finishes module (one record
   //    per finish, across all modules). Canonical: '<Type> - Finishes'. ──────────
-  sandStucco: { dbName: 'Sand Stucco - Finishes' }, // $/SF
-  smoothStucco: { dbName: 'Smooth Stucco - Finishes' }, // $/SF
-  ledgerstone: { dbName: 'Ledgerstone - Finishes' }, // $/SF panel
-  stackedStone: { dbName: 'Stacked Stone - Finishes' }, // $/SF panel
-  tile: { dbName: 'Tile - Finishes' }, // $/SF
-  realFlagstone: { dbName: 'Real Flagstone - Finishes' }, // shared $/Sq Ft (Finishes)
-  realStone: { dbName: 'Real Stone - Finishes' }, // shared $/Sq Ft (Finishes)
+  sandStucco: { dbName: 'Sand Stucco - Finishes', ref: MAT.SAND_STUCCO }, // $/SF
+  smoothStucco: { dbName: 'Smooth Stucco - Finishes', ref: MAT.SMOOTH_STUCCO }, // $/SF
+  ledgerstone: { dbName: 'Ledgerstone - Finishes', ref: MAT.LEDGERSTONE }, // $/SF panel
+  stackedStone: { dbName: 'Stacked Stone - Finishes', ref: MAT.STACKED_STONE }, // $/SF panel
+  tile: { dbName: 'Tile - Finishes', ref: MAT.TILE_FINISH }, // $/SF
+  realFlagstone: { dbName: 'Real Flagstone - Finishes', ref: MAT.REAL_FLAGSTONE }, // shared $/Sq Ft (Finishes)
+  realStone: { dbName: 'Real Stone - Finishes', ref: MAT.REAL_STONE }, // shared $/Sq Ft (Finishes)
 
   // ── Labor productivity rates ────────────────────────────────────────────────
   digLab: { dbName: 'FP Dig Footing Labor Rate' }, // CF/hr

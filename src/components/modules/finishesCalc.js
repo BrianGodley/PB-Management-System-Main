@@ -118,6 +118,19 @@ export const CAP_TYPE_REFKEY = {
   'Bullnose Brick': FINISH_CAT_ITEM.capBullnose,
 }
 
+// Shared finish RECORD NAME ('<Type> - Finishes') → frozen ref_key. Columns / Fire
+// Pit / Outdoor Kitchen read a built-in finish's Standard price by this name; this
+// lets them read by ref_key instead (rename-safe) with a name fallback. (M7)
+export const FINISH_NAME_REFKEY = {
+  'Sand Stucco - Finishes': FINISH_CAT_ITEM.sandStucco,
+  'Smooth Stucco - Finishes': FINISH_CAT_ITEM.smoothStucco,
+  'Ledgerstone - Finishes': FINISH_CAT_ITEM.ledgerstone,
+  'Stacked Stone - Finishes': FINISH_CAT_ITEM.stackedStone,
+  'Tile - Finishes': FINISH_CAT_ITEM.tile,
+  'Real Flagstone - Finishes': FINISH_CAT_ITEM.realFlagstone,
+  'Real Stone - Finishes': FINISH_CAT_ITEM.realStone,
+}
+
 // Vendor-aware material price for a FINISHES_RATES key: a real vendor's catalog Item price
 // when that vendor carries the mapped Item; otherwise the name-keyed Standard price.
 function finishMatPriceV(matKey, vendor, materialRows, mp) {
@@ -127,6 +140,12 @@ function finishMatPriceV(matKey, vendor, materialRows, mp) {
     const vp = resolveMaterialPrice(item, vendor, materialRows, {}, NaN)
     if (Number.isFinite(vp)) return vp
   }
+  // Standard price: read by the material's FROZEN ref_key first (the rate map is
+  // dual-keyed by ref_key + name, so this is value-identical today) and fall back to
+  // the DB name only for a material with no ref_key map (e.g. concreteTruck). Once
+  // the map stops name-keying materials, the ref_key read is what keeps this working —
+  // and a renamed catalog record no longer zeroes the Standard price. (M7)
+  if (item && mp?.[item] != null) return n(mp[item])
   return n(mp?.[spec.db])
 }
 

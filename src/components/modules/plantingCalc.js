@@ -3,6 +3,7 @@
 // catalog resolvers resolveMaterialPrice/catalogItemFor (lib/materialCatalog) both
 // transitively import supabase, so their pure bodies are inlined here and kept in sync.
 import { LAB } from '../../lib/laborRefs.js'
+import { MAT } from '../../lib/materialRefs.js'
 const n = v => parseFloat(v) || 0
 const num = v => { const x = typeof v === 'number' ? v : parseFloat(v); return Number.isFinite(x) ? x : 0 }
 const DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN = 60
@@ -78,15 +79,17 @@ export function plantInstallPerDay(row, materialRows, laborRates) {
 // carries its own labor formula + material/labor DB names. Exported so the
 // coverage manifest + module share one source. mode 'perDay' → hrs = qty×rate
 // (hours/unit, guarded); 'perMin' → hrs = (qty×rate)/60 (minutes/unit).
+// matRef = the add-on material's frozen ref_key (M7): the Standard price reads by
+// ref_key (rename-safe) first, matKey name as fallback.
 export const ADDON_META = {
-  'Tree Stake': { matKey: 'Tree Stake', labKey: 'Tree Stakes - Install Rate', mode: 'perDay', unit: 'ea', labUnit: 'hrs per Each' },
-  'Root Barrier 12"': { matKey: 'Root Barrier 12in', labKey: 'Root Barrier - Install Rate', mode: 'perDay', unit: 'LF', labUnit: 'hrs per Ln Ft' },
-  'Root Barrier 24"': { matKey: 'Root Barrier 24in', labKey: 'Root Barrier - Install Rate', mode: 'perDay', unit: 'LF', labUnit: 'hrs per Ln Ft' },
-  'Gopher Basket 1 gal': { matKey: 'Gopher Basket 1 Gal', labKey: 'Gopher Basket - Install Rate', mode: 'perDay', unit: 'ea', labUnit: 'hrs per Each' },
-  'Gopher Basket 5 gal': { matKey: 'Gopher Basket 5 Gal', labKey: 'Gopher Basket - Install Rate', mode: 'perDay', unit: 'ea', labUnit: 'hrs per Each' },
-  'Gopher Basket 15 gal': { matKey: 'Gopher Basket 15 Gal', labKey: 'Gopher Basket - Install Rate', mode: 'perDay', unit: 'ea', labUnit: 'hrs per Each' },
-  'Mesh Flat': { matKey: 'Mesh Flat', labKey: 'Mesh Flat - Install Rate', mode: 'perDay', unit: 'SF', labUnit: 'hrs per Sq Ft' },
-  'Jute Fabric': { matKey: 'Jute Fabric', labKey: 'Jute Fabric - Install Rate', mode: 'perDay', unit: 'SF', labUnit: 'hrs per Sq Ft' },
+  'Tree Stake': { matKey: 'Tree Stake', matRef: MAT.TREE_STAKE, labKey: 'Tree Stakes - Install Rate', mode: 'perDay', unit: 'ea', labUnit: 'hrs per Each' },
+  'Root Barrier 12"': { matKey: 'Root Barrier 12in', matRef: MAT.ROOT_BARRIER_12, labKey: 'Root Barrier - Install Rate', mode: 'perDay', unit: 'LF', labUnit: 'hrs per Ln Ft' },
+  'Root Barrier 24"': { matKey: 'Root Barrier 24in', matRef: MAT.ROOT_BARRIER_24, labKey: 'Root Barrier - Install Rate', mode: 'perDay', unit: 'LF', labUnit: 'hrs per Ln Ft' },
+  'Gopher Basket 1 gal': { matKey: 'Gopher Basket 1 Gal', matRef: MAT.GOPHER_BASKET_1, labKey: 'Gopher Basket - Install Rate', mode: 'perDay', unit: 'ea', labUnit: 'hrs per Each' },
+  'Gopher Basket 5 gal': { matKey: 'Gopher Basket 5 Gal', matRef: MAT.GOPHER_BASKET_5, labKey: 'Gopher Basket - Install Rate', mode: 'perDay', unit: 'ea', labUnit: 'hrs per Each' },
+  'Gopher Basket 15 gal': { matKey: 'Gopher Basket 15 Gal', matRef: MAT.GOPHER_BASKET_15, labKey: 'Gopher Basket - Install Rate', mode: 'perDay', unit: 'ea', labUnit: 'hrs per Each' },
+  'Mesh Flat': { matKey: 'Mesh Flat', matRef: MAT.MESH_FLAT, labKey: 'Mesh Flat - Install Rate', mode: 'perDay', unit: 'SF', labUnit: 'hrs per Sq Ft' },
+  'Jute Fabric': { matKey: 'Jute Fabric', matRef: MAT.JUTE_FABRIC, labKey: 'Jute Fabric - Install Rate', mode: 'perDay', unit: 'SF', labUnit: 'hrs per Sq Ft' },
 }
 
 // ── Per-row calculators ──────────────────────────────────────────────────────
@@ -120,7 +123,7 @@ export function computeAddonRow(row, laborRates, materialPrices, materialRows) {
   let hrs = 0
   if (meta.mode === 'perDay') hrs = qty * rate // rate is hours per unit
   else if (meta.mode === 'perMin') hrs = (qty * rate) / 60
-  const unitPrice = plantMatPrice(meta.matKey, row.vendor, materialRows, materialPrices)
+  const unitPrice = plantMatPrice(meta.matRef || meta.matKey, row.vendor, materialRows, materialPrices)
   const mat = qty * unitPrice
   const subUnit = unitPrice
   const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : subUnit

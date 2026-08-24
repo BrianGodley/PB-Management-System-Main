@@ -39,7 +39,11 @@ export function makeModuleRates(maps = {}) {
   // recorded as touched but never surfaced as unpriced.
   const read = (table, map, name, meta, priceable) => {
     if (!name) return 0
-    const raw = map?.[name]
+    // Resolve the value by the frozen ref_key first when the caller supplies one
+    // (meta.ref = a MAT-/LAB-/BAS- ref_key). The map is dual-keyed by ref_key + name,
+    // so this is value-identical today but survives a rate rename. The DISPLAY name
+    // (touched / unpriced) stays `name`, never the ref_key. (M7)
+    const raw = meta.ref != null && map?.[meta.ref] != null ? map[meta.ref] : map?.[name]
     const val = toNum(raw)
     const key = `${table}|${name}`
     if (!touched.has(key))

@@ -19,6 +19,7 @@ import {
 } from './wallsCalc'
 import { wallDrain, wallBackfill, wallDemo } from './wallsSections'
 import { FINISH_TYPE_REFKEY, CAP_TYPE_REFKEY } from './finishesCalc'
+import { MAT } from '../../lib/materialRefs'
 import {
   useNewMaterialCatalog,
   resolveMaterialPrice,
@@ -121,13 +122,13 @@ const WALL_RATES = {
   rebar: { db: 'Rebar' }, // $/LF (Basic Materials) — Brick/Timber only
   // Sized rebar material prices (per LF, Standard). CMU + PIP pick a size per
   // wall/footing; labor for ALL rebar stays the shared rebarLab ('Set Rebar').
-  rebar3Mat: { db: 'Rebar #3' },
-  rebar4Mat: { db: 'Rebar #4' },
-  rebar5Mat: { db: 'Rebar #5' },
-  rebar6Mat: { db: 'Rebar #6' },
-  rebar8Mat: { db: 'Rebar #8' },
-  concreteHand: { db: 'Concrete - Hand Mix' }, // $/CY (Basic Materials)
-  concreteTruck: { db: 'Concrete - Ready Mix (Truck)' }, // $/CY (Basic Materials)
+  rebar3Mat: { db: 'Rebar #3', ref: MAT.REBAR_3 },
+  rebar4Mat: { db: 'Rebar #4', ref: MAT.REBAR_4 },
+  rebar5Mat: { db: 'Rebar #5', ref: MAT.REBAR_5 },
+  rebar6Mat: { db: 'Rebar #6', ref: MAT.REBAR_6 },
+  rebar8Mat: { db: 'Rebar #8', ref: MAT.REBAR_8 },
+  concreteHand: { db: 'Concrete - Hand Mix', ref: MAT.CONC_HAND_MIX }, // $/CY (Basic Materials)
+  concreteTruck: { db: 'Concrete - Ready Mix (Truck)', ref: MAT.CONC_READY_MIX }, // $/CY (Basic Materials)
   groutPumpSetup: { db: 'Grout Pump - Setup' }, // Basic Materials
   groutPumpPerYd: { db: 'Grout Pump - Per CY' }, // Basic Materials
   digLab: { db: 'Wall Dig Footing Labor Rate' },
@@ -981,7 +982,7 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}, materialRows = [],
   // (r) and all geometry stay exactly as before. Vendor 'Standard' resolves to
   // the original master-rate / catalog prices, so In-House math is unchanged.
   const v = wall.vendor
-  const pm = key => wallMatPrice(WALL_RATES[key].db, v, materialRows, mp)
+  const pm = key => wallMatPrice(WALL_RATES[key].ref || WALL_RATES[key].db, v, materialRows, mp)
 
   // Selected block type drives both DIMENSIONS (how many blocks per course /
   // per wall height) and PRICE (grey block unit cost). Price prefers a
@@ -1091,7 +1092,7 @@ function calcOneBrick(wall, r, mp = {}, materialRows = [], R = null, rec = null)
     return { hrs: 0, mat: 0, subUnit: 0, subEach: 0, subMat: 0, ...wp0, detail: null }
   }
   const v = wall.vendor
-  const pm = key => wallMatPrice(WALL_RATES[key].db, v, materialRows, mp)
+  const pm = key => wallMatPrice(WALL_RATES[key].ref || WALL_RATES[key].db, v, materialRows, mp)
 
   // Brick material + laying labor (pure brickCore in wallsStruct.js).
   const brick = resolveBrick(wall, materialRows)
@@ -1144,7 +1145,7 @@ function calcOnePIP(wall, r, mp = {}, materialRows = [], R = null, rec = null) {
     return { hrs: 0, mat: 0, concCY: 0, subUnit: 0, subEach: 0, subMat: 0, ...wp0 }
   }
   const v = wall.vendor
-  const pm = key => wallMatPrice(WALL_RATES[key].db, v, materialRows, mp)
+  const pm = key => wallMatPrice(WALL_RATES[key].ref || WALL_RATES[key].db, v, materialRows, mp)
   // Wall stem labor — priced per SF of form (both faces = 2 × LF × height), the
   // canonical PIP install basis shared with Columns + Fire Pit. Concrete VOLUME is
   // still per-LF base + added-6"-course coefficients.
@@ -1251,7 +1252,8 @@ function wallRate(R, mp, key) {
   if (!spec) return 0
   if (R && WALL_LABOR_KEYS.has(key))
     return R.labor(spec.db, WALL_LABOR_META[key] || { category: 'Walls', label: key })
-  return n(mp?.[spec.db])
+  // Material: read by frozen ref_key first (rename-safe), name fallback. (M7)
+  return n(spec.ref != null && mp?.[spec.ref] != null ? mp[spec.ref] : mp?.[spec.db])
 }
 
 // ── Main calc ─────────────────────────────────────────────────────────────────
@@ -1429,7 +1431,7 @@ function calcWalls(
     const tFootingCY = tFootingCF / 27
     const tHorizRebarLF = tHb * tLF
     const tFootPump = (wall.footingPump ?? 'No') === 'Yes'
-    const tpm = key => wallMatPrice(WALL_RATES[key].db, 'Standard', materialRows, mp)
+    const tpm = key => wallMatPrice(WALL_RATES[key].ref || WALL_RATES[key].db, 'Standard', materialRows, mp)
     // Footing excavation is priced in the Dig and Haul Footing Soil section —
     // install (rebar + pour) + material only here.
     const tFootingHrs =
@@ -1981,7 +1983,7 @@ function WallWaterproofing({
   onWpUpdate,
 }) {
   const row = (Array.isArray(wpRows) && wpRows[0]) || blankWpRow()
-  const rr = key => n(materialPrices?.[WALL_RATES[key].db])
+  const rr = key => n(materialPrices?.[WALL_RATES[key].ref] ?? materialPrices?.[WALL_RATES[key].db])
   const wpKey = WP_KEY[row.type]
   const wpc = computeWpRow(row, materialPrices, materialRows)
   // Live $/SF for the selected product (per vendor) — shown next to the SF field.
@@ -3418,7 +3420,7 @@ export default function WallsModule({ onSave, onBack, saving, initialData }) {
     )
   }
 
-  const r = key => n(materialPrices[WALL_RATES[key].db])
+  const r = key => n(materialPrices[WALL_RATES[key].ref] ?? materialPrices[WALL_RATES[key].db])
 
   // Full rate list for the "View Rates" popup, broken down by wall type. Groups
   // flagged with `catalogSubcat` prepend that sub-category's actual catalog block

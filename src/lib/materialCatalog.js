@@ -303,35 +303,35 @@ export async function fetchStandardRateMap(categories) {
     supabase.from('basic_labor_rates').select('name, ref_key, rate, category'),
   ])
   const map = {}
-  // Labor / misc / basic first, THEN the material catalog LAST so a MATERIAL price
-  // always wins a name collision with a same-named labor/misc rate. This matters
-  // where a material and its install-labor deliberately share a name — e.g. Planting
-  // '5 gallon standard' is both a $17 plant AND a 0.2-hr install rate; without this,
-  // the labor rate clobbered the price and material resolved to $0.20/plant. ref_keys
-  // (LAB-/BAS-NNN-slug) are unique and never collide with material names, so labor is
-  // still fully readable by ref_key; only the by-NAME collision resolves to material.
+  // Labor / misc / basic first — recording every rate NAME as it goes. (M7: the old
+  // "material wins" band-aid — writing materials LAST so a material price clobbered a
+  // same-named labor/misc rate — is retired. Every module now reads a material's
+  // Standard price by its frozen ref_key (MAT-NNN), so on a name collision the
+  // labor/misc rate keeps the NAME key and the material is still read by ref_key.)
+  const rateNames = new Set()
   ;(labRes.data || []).forEach(r => {
-    if (r.name) map[r.name] = num(r.rate)
+    if (r.name) { map[r.name] = num(r.rate); rateNames.add(r.name) }
     if (r.ref_key) map[r.ref_key] = num(r.rate)
   })
   ;(feeRes.data || []).forEach(r => {
-    if (r.name) map[r.name] = num(r.rate)
+    if (r.name) { map[r.name] = num(r.rate); rateNames.add(r.name) }
   })
   ;(basicRes?.data || []).forEach(r => {
     if (r.category === 'Archived') return
     // Dual-keyed by name AND ref_key (BAS-NNN-slug), same transition contract.
-    if (r.name) map[r.name] = num(r.rate)
+    if (r.name) { map[r.name] = num(r.rate); rateNames.add(r.name) }
     if (r.ref_key) map[r.ref_key] = num(r.rate)
   })
   ;(rows || []).forEach(r => {
     if (r.vendor_id == null) {
-      // Dual/tri-key the Standard price by name AND the immutable material
-      // ref_key (MAT-NNN-slug) AND id, mirroring labor's dual-key map — a module
-      // can migrate its price lookup from name → ref_key with zero breakage.
+      // Key the Standard price by the immutable material ref_key (MAT-NNN-slug) AND id
+      // ALWAYS; by NAME only when it does NOT collide with a labor/misc/basic rate name
+      // (so a colliding name — Planting '5 gallon standard', 'Rebar #3' — resolves to
+      // its rate, never the material). Non-colliding names stay keyed as a safe fallback.
       const v = num(r.unit_cost)
-      if (r.name) map[r.name] = v
       if (r.ref_key) map[r.ref_key] = v
       if (r.id) map[r.id] = v
+      if (r.name && !rateNames.has(r.name)) map[r.name] = v
     }
   })
   return map
@@ -728,7 +728,15 @@ export function useMaterialCatalog(categories, initial = {}) {
     ])
     const pm = {}
     ;(rows || []).forEach(r => {
-      if (r.vendor_id == null && r.name) pm[r.name] = num(r.unit_cost)
+      // Dual/tri-key the Standard (null-vendor) price by NAME, ref_key (MAT-NNN) and
+      // id — mirroring fetchStandardRateMap — so a module can read a built-in
+      // material's Standard price by ref_key (rename-safe) as well as by name (M7).
+      if (r.vendor_id == null) {
+        const v = num(r.unit_cost)
+        if (r.name) pm[r.name] = v
+        if (r.ref_key) pm[r.ref_key] = v
+        if (r.id) pm[r.id] = v
+      }
     })
     ;(labRes.data || []).forEach(r => {
       pm[r.name] = num(r.rate)
@@ -822,9 +830,16 @@ export function useNewMaterialCatalog(categories, initial = {}) {
         .order('company_name'),
     ])
     const pm = {}
-    // Catalog Standard prices (by name), then labor + misc coefficients.
+    // Catalog Standard prices — dual/tri-keyed by NAME, ref_key (MAT-NNN) and id so a
+    // module can read a built-in material's Standard price by ref_key (rename-safe) as
+    // well as by name (M7) — then labor + misc coefficients.
     ;(rows || []).forEach(r => {
-      if (r.vendor_id == null && r.name) pm[r.name] = num(r.unit_cost)
+      if (r.vendor_id == null) {
+        const v = num(r.unit_cost)
+        if (r.name) pm[r.name] = v
+        if (r.ref_key) pm[r.ref_key] = v
+        if (r.id) pm[r.id] = v
+      }
     })
     ;(labRes.data || []).forEach(r => {
       // Dual-key: modules read labor by legacy name AND by ref_key (LAB-/BAS-).

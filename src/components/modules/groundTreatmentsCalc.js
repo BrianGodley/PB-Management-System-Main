@@ -4,6 +4,7 @@
 // inlined here. The module keeps its own copies of these helpers for JSX; this file owns the
 // copies the calc consumes (GT_RATES / mergedGtOpts / resolveType).
 import { makeModuleRates } from '../../lib/moduleRates.js'
+import { MAT } from '../../lib/materialRefs.js'
 const n = v => parseFloat(v) || 0
 const DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN = 60
 const isStandardSel = v => !v || v === 'Standard'
@@ -189,7 +190,9 @@ export function calcGroundTreatments(
     manualRows,
   } = state
 
-  const p = dbName => n(mp[dbName])
+  // Material/coeff read; optional `ref` = a frozen material ref_key read first
+  // (rename-safe), name fallback. mp is dual-keyed by ref_key + name. (M7)
+  const p = (dbName, ref) => n(ref != null && mp[ref] != null ? mp[ref] : mp[dbName])
 
   // Unpriced-LABOR surfacing (mirrors Concrete): route labor rates through one
   // shared reader so an UNSET/0 labor rate becomes a clickable fix-it prompt
@@ -232,7 +235,7 @@ export function calcGroundTreatments(
       const mulchCYPerDay = pLab(GT_RATES.mulchLab.dbName, { unit: 'Hrs per Cu Yd', label: 'Mulch Spread' })
       mulchLab += CY * mulchCYPerDay + n(r.sf) * mulchCoverageSfDay
       if (r.weedFabric === 'Yes') {
-        mulchMat += n(r.sf) * p(GT_RATES.gravelFabricMat.dbName)
+        mulchMat += n(r.sf) * p(GT_RATES.gravelFabricMat.dbName, MAT.WEED_FABRIC)
         mulchLab += n(r.sf) * pLab(GT_RATES.gravelFabricLab.dbName, { unit: 'Hrs per Sq Ft', label: 'Weed Fabric Install' })
       }
     })
@@ -423,7 +426,7 @@ export function calcGroundTreatments(
       dgLab += baseHrs + (cement ? CY * dgCementLaborFactor : 0)
       dgMat +=
         CY * dgt.fallback +
-        (cement ? CY * p(GT_RATES.dgCementPerTon.dbName) : 0)
+        (cement ? CY * p(GT_RATES.dgCementPerTon.dbName, MAT.DG_CEMENT_MIX) : 0)
       if (r.weedFabric === 'Yes') {
         dgMat += n(r.sf) * p(GT_RATES.gravelFabricMat.dbName)
         dgLab += n(r.sf) * pLab(GT_RATES.gravelFabricLab.dbName, { unit: 'Hrs per Sq Ft', label: 'Weed Fabric Install' })

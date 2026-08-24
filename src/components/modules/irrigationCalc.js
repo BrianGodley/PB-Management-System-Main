@@ -4,6 +4,7 @@
 // lib/walkAccess. The module's own TIMER_TYPES / RATE_DEFAULTS / computeTimerRow are
 // carried below.
 import { LAB } from '../../lib/laborRefs.js'
+import { MAT } from '../../lib/materialRefs.js'
 import { makeModuleRates } from '../../lib/moduleRates.js'
 const n = v => parseFloat(v) || 0
 const num = v => { const x = typeof v === 'number' ? v : parseFloat(v); return Number.isFinite(x) ? x : 0 }
@@ -33,22 +34,26 @@ const IRRIGATION_CATEGORY = 'Irrigation'
 // in src/lib/irrigationZones.js so the estimator and the summary share one source.
 
 // ── Timer definitions ─────────────────────────────────────────────────────────
+// matRef = the timer's frozen material ref_key (M7): the Standard price reads by
+// ref_key first (rename-safe), matKey name fallback.
 export const TIMER_TYPES = [
-  { key: 'timer4', label: '4 Station', matKey: 'Timer - 4 Station' },
-  { key: 'timer6', label: '6 Station', matKey: 'Timer - 6 Station' },
-  { key: 'timer9', label: '9 Station', matKey: 'Timer - 9 Station' },
-  { key: 'timer12', label: '12 Station', matKey: 'Timer - 12 Station' },
-  { key: 'timer15', label: '15 Station', matKey: 'Timer - 15 Station' },
-  { key: 'timer18', label: '18 Station', matKey: 'Timer - 18 Station' },
+  { key: 'timer4', label: '4 Station', matKey: 'Timer - 4 Station', matRef: MAT.TIMER_4 },
+  { key: 'timer6', label: '6 Station', matKey: 'Timer - 6 Station', matRef: MAT.TIMER_6 },
+  { key: 'timer9', label: '9 Station', matKey: 'Timer - 9 Station', matRef: MAT.TIMER_9 },
+  { key: 'timer12', label: '12 Station', matKey: 'Timer - 12 Station', matRef: MAT.TIMER_12 },
+  { key: 'timer15', label: '15 Station', matKey: 'Timer - 15 Station', matRef: MAT.TIMER_15 },
+  { key: 'timer18', label: '18 Station', matKey: 'Timer - 18 Station', matRef: MAT.TIMER_18 },
   {
     key: 'timerICC8',
     label: 'Hunter ICC 8 Station',
     matKey: 'Timer - Hunter ICC 8 Station',
+    matRef: MAT.TIMER_HUNTER_ICC_8,
   },
   {
     key: 'timerAdd8',
     label: 'Additional 8 Station Module',
     matKey: 'Timer - Additional 8 Station Module',
+    matRef: MAT.TIMER_ADDITIONAL_8,
   },
 ]
 
@@ -95,7 +100,7 @@ function computeTimerRow(row, timerHrs, materialPrices, materialRows) {
   const t = timerMeta(row.type)
   const qty = n(row.qty)
   const hrs = qty * timerHrs
-  const unitPrice = irrMatPrice(t.matKey, row.vendor, materialRows, materialPrices)
+  const unitPrice = irrMatPrice(t.matRef || t.matKey, row.vendor, materialRows, materialPrices)
   const mat = qty * unitPrice
   const subEach = row.subEach !== '' && row.subEach != null ? n(row.subEach) : unitPrice
   const subMat = qty * subEach

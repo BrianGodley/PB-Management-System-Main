@@ -56,7 +56,9 @@ const unpriced = (labName, label) =>
 export function computeCapRow(row, { meta, vendorUnit, mp, fpRates }) {
   const lf = num(row.lf)
   if (!meta || lf <= 0) return { mat: 0, hrs: 0, unit: 0, laborUnset: null }
-  const houseUnit = meta.master ? num(meta.matUnit) : num(mp[fpRates[meta.matKey].dbName])
+  const houseUnit = meta.master
+    ? num(meta.matUnit)
+    : num(mp[fpRates[meta.matKey].ref] ?? mp[fpRates[meta.matKey].dbName]) // ref_key first (M7)
   const unit = vendorUnit != null ? vendorUnit : houseUnit
   const labName = meta.master ? meta.labor_rate : fpRates[meta.labKey].dbName
   const labCoef = resolveLabor(meta, labName, mp)
@@ -72,7 +74,9 @@ export function computeCapRow(row, { meta, vendorUnit, mp, fpRates }) {
 export function computeFinishRow(row, { meta, vendorUnit, mp, fpRates }) {
   const sf = num(row.sf)
   if (!meta || sf <= 0) return { mat: 0, hrs: 0, unit: 0, laborUnset: null }
-  const houseUnit = meta.master ? num(meta.matUnit) : num(mp[fpRates[meta.key].dbName])
+  const houseUnit = meta.master
+    ? num(meta.matUnit)
+    : num(mp[fpRates[meta.key].ref] ?? mp[fpRates[meta.key].dbName]) // ref_key first (M7)
   const unit = vendorUnit != null ? vendorUnit : houseUnit
   let mat
   if (meta.unit === 'stone') {

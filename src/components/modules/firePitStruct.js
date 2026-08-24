@@ -2,6 +2,11 @@
 // from FirePitModule so it can be unit-tested with `node --test`. Same formulas,
 // same rate keys; the React module imports STRUCT_CALC from here (single source).
 import { groutCuFtPerBlock } from '../../lib/cmuGrout.js'
+import { MAT } from '../../lib/materialRefs.js'
+
+// Rebar size → frozen ref_key (Basic Materials), read by the size-based rebar price. (M7)
+const REBAR_SIZE_REF = { '#3': MAT.REBAR_3, '#4': MAT.REBAR_4, '#5': MAT.REBAR_5, '#6': MAT.REBAR_6, '#8': MAT.REBAR_8 }
+const rebarRef = size => REBAR_SIZE_REF[size || '#4']
 
 const n = v => parseFloat(v) || 0
 
@@ -19,10 +24,10 @@ const FP_POUR_LAB = { dbName: 'FP Pour Concrete Labor Rate' }
 
 // Rate keys (name only — no hardcoded fallback; an unset rate reads undefined).
 const FP_RATES = {
-  fpBlock: { dbName: 'FP Block' },
+  fpBlock: { dbName: 'FP Block', ref: MAT.FP_BLOCK },
   fpRebar: { dbName: 'FP Rebar' },
-  fpConcrete: { dbName: 'FP Concrete' },
-  fpGroutPump: { dbName: 'FP Grout Pump Setup' },
+  fpConcrete: { dbName: 'FP Concrete', ref: MAT.FP_CONCRETE },
+  fpGroutPump: { dbName: 'FP Grout Pump Setup', ref: MAT.FP_GROUT_PUMP_SETUP },
   digLab: { dbName: 'FP Dig Footing Labor Rate' },
   rebarLab: { dbName: 'FP Set Rebar Labor Rate' },
   blockLab: { dbName: 'FP Set Blocks Labor Rate' },
@@ -57,7 +62,7 @@ function structFootingRebar(s) {
 }
 
 function calcCmuStruct(s, mp = {}, materialRows = []) {
-  const p = (db, fb) => (mp[db] != null ? mp[db] : fb)
+  const p = (db, fb, ref) => (ref != null && mp[ref] != null ? mp[ref] : mp[db] != null ? mp[db] : fb) // ref_key first (M7)
   if (!structHasGeo(s)) return { mat: 0, hrs: 0 }
   const wallLF = n(s.wallLF)
   const wallHeightIn = n(s.wallHeightIn)
@@ -78,13 +83,13 @@ function calcCmuStruct(s, mp = {}, materialRows = []) {
   const structuralBaseHrs = digHrs + rebarHrs + setBlockHrs + groutHrs
   const curveAddHrs = structuralBaseHrs * (n(s.pctCurved) / 100) * p('FP Curve Labor Factor')
   const picked = catalogRowById(materialRows, s.matType)
-  const blockPrice = picked ? n(picked.unit_cost) : p(FP_RATES.fpBlock.dbName, FP_RATES.fpBlock.fallback)
+  const blockPrice = picked ? n(picked.unit_cost) : p(FP_RATES.fpBlock.dbName, FP_RATES.fpBlock.fallback, FP_RATES.fpBlock.ref)
   const blockMat = totalBlocks * blockPrice
-  const rebarMat = totalRebarLF * p('Rebar ' + (s.rebarSize || '#4'), FP_RATES.fpRebar.fallback)
-  const footingMat = footingCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
-  const groutMat = groutCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
+  const rebarMat = totalRebarLF * p('Rebar ' + (s.rebarSize || '#4'), FP_RATES.fpRebar.fallback, rebarRef(s.rebarSize))
+  const footingMat = footingCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback, FP_RATES.fpConcrete.ref)
+  const groutMat = groutCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback, FP_RATES.fpConcrete.ref)
   const pumpSetupMat = s.useGroutPump === 'Yes' && groutCF > 0
-    ? p(FP_RATES.fpGroutPump.dbName, FP_RATES.fpGroutPump.fallback)
+    ? p(FP_RATES.fpGroutPump.dbName, FP_RATES.fpGroutPump.fallback, FP_RATES.fpGroutPump.ref)
     : 0
   const mat = blockMat + rebarMat + footingMat + groutMat + pumpSetupMat
   const hrs = n(s.layoutHrs) + structuralBaseHrs + curveAddHrs
@@ -92,7 +97,7 @@ function calcCmuStruct(s, mp = {}, materialRows = []) {
 }
 
 function calcPipStruct(s, mp = {}, materialRows = []) {
-  const p = (db, fb) => (mp[db] != null ? mp[db] : fb)
+  const p = (db, fb, ref) => (ref != null && mp[ref] != null ? mp[ref] : mp[db] != null ? mp[db] : fb) // ref_key first (M7)
   if (!structHasGeo(s)) return { mat: 0, hrs: 0 }
   const wallLF = n(s.wallLF)
   const wallHt = n(s.wallHeightIn) / 12
@@ -102,11 +107,11 @@ function calcPipStruct(s, mp = {}, materialRows = []) {
   const formSF = 2 * wallLF * wallHt
   const { footingCF, footingCY, totalRebarLF } = structFootingRebar(s)
   const picked = catalogRowById(materialRows, s.matType)
-  const mixPrice = picked ? n(picked.unit_cost) : p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
+  const mixPrice = picked ? n(picked.unit_cost) : p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback, FP_RATES.fpConcrete.ref)
   const pourMat = pourCY * mixPrice
   const formMat = formSF * p(FORM_LUMBER_NAME, 0)
-  const rebarMat = totalRebarLF * p('Rebar ' + (s.rebarSize || '#4'), FP_RATES.fpRebar.fallback)
-  const footingMat = footingCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
+  const rebarMat = totalRebarLF * p('Rebar ' + (s.rebarSize || '#4'), FP_RATES.fpRebar.fallback, rebarRef(s.rebarSize))
+  const footingMat = footingCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback, FP_RATES.fpConcrete.ref)
   const mat = pourMat + formMat + rebarMat + footingMat
   const digHrs = footingCF > 0 ? footingCF * p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
   const rebarHrs = totalRebarLF > 0 ? totalRebarLF * p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
@@ -119,7 +124,7 @@ function calcPipStruct(s, mp = {}, materialRows = []) {
 }
 
 function calcModularStruct(s, mp = {}, materialRows = []) {
-  const p = (db, fb) => (mp[db] != null ? mp[db] : fb)
+  const p = (db, fb, ref) => (ref != null && mp[ref] != null ? mp[ref] : mp[db] != null ? mp[db] : fb) // ref_key first (M7)
   if (!structHasGeo(s)) return { mat: 0, hrs: 0 }
   const wallLF = n(s.wallLF)
   const wallHeightIn = n(s.wallHeightIn)
@@ -132,8 +137,8 @@ function calcModularStruct(s, mp = {}, materialRows = []) {
   const { footingCF, footingCY, totalRebarLF } = structFootingRebar(s)
   const blockPrice = picked ? n(picked.unit_cost) : 0
   const blockMat = totalBlocks * blockPrice
-  const rebarMat = totalRebarLF * p('Rebar ' + (s.rebarSize || '#4'), FP_RATES.fpRebar.fallback)
-  const footingMat = footingCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
+  const rebarMat = totalRebarLF * p('Rebar ' + (s.rebarSize || '#4'), FP_RATES.fpRebar.fallback, rebarRef(s.rebarSize))
+  const footingMat = footingCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback, FP_RATES.fpConcrete.ref)
   const mat = blockMat + rebarMat + footingMat
   const digHrs = footingCF > 0 ? footingCF * p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
   const rebarHrs = totalRebarLF > 0 ? totalRebarLF * p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
@@ -145,7 +150,7 @@ function calcModularStruct(s, mp = {}, materialRows = []) {
 }
 
 function calcBrickStruct(s, mp = {}, materialRows = []) {
-  const p = (db, fb) => (mp[db] != null ? mp[db] : fb)
+  const p = (db, fb, ref) => (ref != null && mp[ref] != null ? mp[ref] : mp[db] != null ? mp[db] : fb) // ref_key first (M7)
   if (!structHasGeo(s)) return { mat: 0, hrs: 0 }
   const wallLF = n(s.wallLF)
   const faceSF = wallLF * (n(s.wallHeightIn) / 12)
@@ -156,8 +161,8 @@ function calcBrickStruct(s, mp = {}, materialRows = []) {
   const { footingCF, footingCY, totalRebarLF } = structFootingRebar(s)
   const brickMat = bricks * brickPrice
   const mortarMat = faceSF * p(MORTAR_NAME, 0)
-  const rebarMat = totalRebarLF * p('Rebar ' + (s.rebarSize || '#4'), FP_RATES.fpRebar.fallback)
-  const footingMat = footingCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
+  const rebarMat = totalRebarLF * p('Rebar ' + (s.rebarSize || '#4'), FP_RATES.fpRebar.fallback, rebarRef(s.rebarSize))
+  const footingMat = footingCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback, FP_RATES.fpConcrete.ref)
   const mat = brickMat + mortarMat + rebarMat + footingMat
   const digHrs = footingCF > 0 ? footingCF * p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
   const rebarHrs = totalRebarLF > 0 ? totalRebarLF * p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0

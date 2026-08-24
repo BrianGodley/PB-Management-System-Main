@@ -54,7 +54,9 @@ test('timer MATERIAL value: a priced timer resolves material by its catalog desc
   // an exact-string lookup of matKey in the Standard price map (materialPrices), which is
   // keyed by the catalog item's `description` = 'Timer - N Station' (sub_category
   // Controllers) — NOT 'Irrigation Timer - N Station'. A mismatched key silently yields $0.
-  const r = run({ timerRows: [{ vendor: 'Standard', type: 'timer4', qty: 2 }] }, { 'LAB-262-irrigation-timer-install': 1 }, { 'Timer - 4 Station': 200 })
+  // Production price map is dual-keyed by ref_key + name (M7); the timer material now
+  // reads by its frozen ref_key first (MAT-209-timer-4-station).
+  const r = run({ timerRows: [{ vendor: 'Standard', type: 'timer4', qty: 2 }] }, { 'LAB-262-irrigation-timer-install': 1 }, { 'Timer - 4 Station': 200, 'MAT-209-timer-4-station': 200 })
   assert.equal(r.rawMat, 400, `timer rawMat got ${r.rawMat} — timer material did not resolve`)
   assert.ok(r.totalMat > r.rawMat, 'sales tax is applied on top of raw timer material')
 })

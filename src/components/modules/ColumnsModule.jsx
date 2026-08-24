@@ -11,6 +11,8 @@ import GpmdBar from './GpmdBar'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { useMaterialCatalog, resolveMaterialPrice, catalogOptions } from '../../lib/materialCatalog'
+import { MAT } from '../../lib/materialRefs'
+import { FINISH_NAME_REFKEY } from './finishesCalc'
 import { groutCyPerBlock } from '../../lib/cmuGrout'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -210,6 +212,12 @@ function blockDims(row, def = { w: 8, h: 8, l: 16 }) {
 function rebarNameFor(size) {
   return 'Rebar ' + (size || '#4')
 }
+// Rebar size → frozen ref_key (Basic Materials 'Rebar #3'…'Rebar #8'), so the
+// rebar material Standard price reads by ref_key (rename-safe) not by name. (M7)
+const REBAR_SIZE_REF = { '#3': MAT.REBAR_3, '#4': MAT.REBAR_4, '#5': MAT.REBAR_5, '#6': MAT.REBAR_6, '#8': MAT.REBAR_8 }
+function rebarRefFor(size) {
+  return REBAR_SIZE_REF[size || '#4'] || rebarNameFor(size)
+}
 // Vendor options (Standard + vendors carrying a product) for a sub-category.
 function subcatVendorOptions(materialRows, subcat, vendorNames = {}) {
   const rows = (materialRows || []).filter(r => r.sub_category === subcat)
@@ -261,12 +269,12 @@ function calcCmuCol(c, materialPrices, materialRows, R = null) {
   const totalRebar = geo.rebarLF * n(c.qty)
   const blockPrice = picked
     ? n(picked.unit_cost)
-    : matP(BLOCK_RATES.blockMatCost.dbName, BLOCK_RATES.blockMatCost.fallback, c.vendor)
+    : matP(MAT.CMU_BLOCK, BLOCK_RATES.blockMatCost.fallback, c.vendor)
   const groutCY = totalBlocks * groutCyPerBlock(dims.w, dims.h)
   const mat =
     totalBlocks * blockPrice +
     groutCY * matP(GROUT_CONCRETE.dbName, GROUT_CONCRETE.fallback, c.vendor) +
-    totalRebar * matP(rebarNameFor(c.rebarSize), BLOCK_RATES.rebarMatCost.fallback, c.vendor)
+    totalRebar * matP(rebarRefFor(c.rebarSize), BLOCK_RATES.rebarMatCost.fallback, c.vendor)
   const hrs =
     n(c.qty) * lab(BLOCK_RATES.excavateLaborHrs.dbName, { category: 'Columns', unit: 'Hrs per Each', label: 'Excavate Footing' }) +
     n(c.qty) * lab(BLOCK_RATES.pourLaborHrs.dbName, { category: 'Columns', unit: 'Hrs per Each', label: 'Pour Footing' }) +
@@ -290,7 +298,7 @@ function calcModularCol(c, materialPrices, materialRows, R = null) {
   const blockPrice = picked ? n(picked.unit_cost) : 0
   const mat =
     totalBlocks * blockPrice +
-    totalRebar * matP(rebarNameFor(c.rebarSize), BLOCK_RATES.rebarMatCost.fallback, c.vendor)
+    totalRebar * matP(rebarRefFor(c.rebarSize), BLOCK_RATES.rebarMatCost.fallback, c.vendor)
   const hrs =
     n(c.qty) * lab(BLOCK_RATES.excavateLaborHrs.dbName, { category: 'Columns', unit: 'Hrs per Each', label: 'Excavate Footing' }) +
     n(c.qty) * lab(BLOCK_RATES.pourLaborHrs.dbName, { category: 'Columns', unit: 'Hrs per Each', label: 'Pour Footing' }) +
@@ -314,7 +322,7 @@ function calcBrickCol(c, materialPrices, materialRows, R = null) {
   const mat =
     bricks * brickPrice +
     faceSqft * matP(MORTAR_NAME, 0, c.vendor) +
-    totalRebar * matP(rebarNameFor(c.rebarSize), BLOCK_RATES.rebarMatCost.fallback, c.vendor)
+    totalRebar * matP(rebarRefFor(c.rebarSize), BLOCK_RATES.rebarMatCost.fallback, c.vendor)
   const hrs =
     n(c.qty) * lab(BLOCK_RATES.excavateLaborHrs.dbName, { category: 'Columns', unit: 'Hrs per Each', label: 'Excavate Footing' }) +
     n(c.qty) * lab(BLOCK_RATES.pourLaborHrs.dbName, { category: 'Columns', unit: 'Hrs per Each', label: 'Pour Footing' }) +
@@ -339,7 +347,7 @@ function calcPipCol(c, materialPrices, materialRows, R = null) {
   const mat =
     totalCY * mixPrice +
     formSF * matP(FORM_LUMBER_NAME, 0, c.vendor) +
-    totalRebar * matP(rebarNameFor(c.rebarSize), BLOCK_RATES.rebarMatCost.fallback, c.vendor)
+    totalRebar * matP(rebarRefFor(c.rebarSize), BLOCK_RATES.rebarMatCost.fallback, c.vendor)
   const hrs =
     n(c.qty) * lab(BLOCK_RATES.excavateLaborHrs.dbName, { category: 'Columns', unit: 'Hrs per Each', label: 'Excavate Footing' }) +
     n(c.qty) * lab(BLOCK_RATES.pourLaborHrs.dbName, { category: 'Columns', unit: 'Hrs per Each', label: 'Pour Footing' }) +
@@ -412,7 +420,7 @@ function calcColumns(
     const priceDbName = (opt && opt.dbName) || rate.dbName
     // Shared finish math lives in the pure, unit-tested columnsCalc.js. All finishes
     // are $/Sq Ft now (shared Finishes records), so there is no ton branch.
-    const matUnit = matP(priceDbName, rate.costPerSF, r.vendor)
+    const matUnit = matP(FINISH_NAME_REFKEY[priceDbName] || priceDbName, rate.costPerSF, r.vendor)
     const laborRate = mp(rate.laborDbName)
     const subUnit = matP(rate.subDbName, rate.subFallback || 0, r.vendor)
     // Finish labor surfaced via R inside computeColumnFinishRow — in-house only (the

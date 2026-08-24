@@ -5,6 +5,11 @@
 import { makeModuleRates } from '../../lib/moduleRates.js'
 import { LAB } from '../../lib/laborRefs.js'
 import { BAS } from '../../lib/basicLaborRefs.js'
+import { MAT } from '../../lib/materialRefs.js'
+
+// Rebar size → frozen ref_key (Basic Materials), so the rebar material Standard price
+// reads by ref_key (rename-safe) not by 'Rebar #N' name. (M7)
+const REBAR_SIZE_REF = { '#3': MAT.REBAR_3, '#4': MAT.REBAR_4, '#5': MAT.REBAR_5, '#6': MAT.REBAR_6, '#8': MAT.REBAR_8 }
 
 // Inlined pure helpers — lib/materialCatalog + lib/walkAccess import supabase and so
 // can't be pulled into a node-testable pure module. Copies kept in sync with the libs.
@@ -166,12 +171,13 @@ export function calcConcrete(
   // but also records .touched (every rate this calc read), which will drive
   // usage-based View Rates. mr holds material+misc; lr labor; sr sub.
   const R = makeModuleRates({ material: mr, labor: lr, sub: sr, misc: mr, materialRows })
-  const concretePerCY = n(mr['Concrete - Ready Mix (Truck)']) // display-only; Install prices per-row from the catalog (mt.fallback)
+  const concretePerCY = n(mr[MAT.CONC_READY_MIX] ?? mr['Concrete - Ready Mix (Truck)']) // display-only; Install prices per-row from the catalog (mt.fallback)
   // Rebar $/LF (canonical, from the shared Basic Materials 'Rebar' row) and the
   // LF-per-SF conversion factor for the chosen on-center spacing.
   const rebarPerLF = R.mat('Rebar ' + (state.rebarSize || '#4'), {
     category: 'Basic Materials',
     unit: 'Ln Ft',
+    ref: REBAR_SIZE_REF[state.rebarSize || '#4'],
   })
   // Rebar LF-per-SF conversion by spacing — DB-editable coefficients (kept).
   const rebarLfPerSfBySpacing = {
@@ -186,7 +192,7 @@ export function calcConcrete(
   // Base Install MATERIAL price ($/Cu Yd) — the canonical Basic Materials
   // 'Class II Roadbase' Standard price, resolved by name (the old 'Concrete
   // Base' sub-category source has been consolidated/archived into this record).
-  const costBase = n(firstDefinedRate(mr, CLASS2_NAMES))
+  const costBase = n(firstDefinedRate(mr, [MAT.CLASS_II_ROADBASE, ...CLASS2_NAMES]))
 
   // ── Sub / equipment costs (subcontractor_rates) ──────────────────────────
   const pumpFeeFlat = n(sr['Concrete - Pump Flat Fee'])
