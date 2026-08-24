@@ -787,151 +787,6 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         </>
       )}
 
-      {/* ── Paver Material — In-House + Subcontractor (materials on both tabs) ──── */}
-      <div>
-        <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>{subSectionTitle('Paver Material', isSub)}</span>
-        </div>
-        <table className="w-full text-xs">
-          <TH
-            center
-            cols={[
-              { label: 'Vendor', w: 'w-40' },
-              { label: 'Paver Type' },
-              { label: 'SF', w: 'w-24' },
-              { label: '$/SF', w: 'w-12' },
-              { label: 'Pallets', w: 'w-12' },
-              { label: 'Cost', w: 'w-20' },
-            ]}
-          />
-          <tbody className="divide-y divide-gray-50">
-            {state[kArea].map((row, i) => {
-              const a = (isSub ? calc.subAreas : calc.areas)[i] || {}
-              const pOpts = paverOptions(PAVER_CAT.paver, row.paverVendor, materialRows)
-              // Empty default + "Select paver" placeholder; keep a stored id that is
-              // not in the current catalog selectable (backward-compat).
-              const paverSelOpts = !row.paverId
-                ? [{ value: '', label: 'Select paver' }, ...pOpts]
-                : pOpts.some(o => o.value === row.paverId)
-                  ? pOpts
-                  : [{ value: row.paverId, label: row.paverType || row.paverId }, ...pOpts]
-              return (
-                <tr key={i}>
-                  <td className={td}>
-                    <select
-                      className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
-                      value={row.paverVendor || ''}
-                      onChange={e => {
-                        const v = e.target.value
-                        setRow(kArea, i, 'paverVendor', v)
-                        // Reset the paver selection so the user explicitly picks
-                        // (no fallback to the vendor's first catalog item).
-                        setRow(kArea, i, 'paverId', '')
-                        setRow(kArea, i, 'paverType', '')
-                      }}
-                    >
-                      <option value="">Select</option>
-                      {vendorsForCategory(PAVER_CAT.paver).map(v => (
-                        <option key={v.id} value={v.id}>
-                          {v.name}
-                        </option>
-                      ))}
-                      <option value="Custom">Custom (inline price)</option>
-                    </select>
-                  </td>
-                  <td className={td}>
-                    {row.paverVendor === 'Custom' ? (
-                      <Inp
-                        value={row.customPricePerSF || ''}
-                        onChange={e => setRow(kArea, i, 'customPricePerSF', e.target.value)}
-                        placeholder="$/SF"
-                      />
-                    ) : (
-                      <Sel
-                        value={row.paverId || ''}
-                        onChange={e => {
-                          const id = e.target.value
-                          const opt = pOpts.find(o => o.id === id)
-                          setRow(kArea, i, 'paverId', id)
-                          setRow(kArea, i, 'paverType', opt ? opt.stored : '')
-                        }}
-                        options={paverSelOpts}
-                      />
-                    )}
-                  </td>
-                  <td className={td}>
-                    <Inp
-                      value={row.sf}
-                      onChange={e => setRow(kArea, i, 'sf', e.target.value)}
-                      placeholder="Paver SF"
-                      className="text-center"
-                    />
-                  </td>
-                  <td className={`${num} text-center`}>{a.pricePerSF > 0 ? fmt2(a.pricePerSF) : '—'}</td>
-                  <td className={`${num} text-center`}>{a.pallets > 0 ? a.pallets : '—'}</td>
-                  <td className={`${num} text-center`}>{a.paverCost > 0 ? fmt(a.paverCost) : '—'}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-        <button
-          type="button"
-          onClick={() => addAreaRow()}
-          className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
-        >
-          + Add row
-        </button>
-      </div>
-
-      {/* ── Additional Paver Costs (moved directly below Paver Material) ───────── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <SecHdr title="Additional Paver Costs" />
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Sales Tax on Pavers (%)</p>
-          <Inp
-            value={state.salesTax}
-            onChange={e => set('salesTax', e.target.value)}
-            step="0.1"
-            placeholder="0"
-          />
-          {calc.salesTaxCost > 0 && (
-            <p className="text-xs text-gray-400 mt-0.5">{fmt2(calc.salesTaxCost)} tax</p>
-          )}
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Shipping / Freight ($)</p>
-          <Inp
-            value={state.shippingCharge}
-            onChange={e => set('shippingCharge', e.target.value)}
-            step="1"
-          />
-        </div>
-        {/* Delivery — auto when any paver is selected, billed per 900 Sq Ft
-            increment. Read-only display; the per-increment rate is editable
-            via the View Rates popup. */}
-        <div>
-          <div className="flex items-center gap-1 mb-0.5">
-            <p className="text-xs text-gray-500">Delivery</p>
-          </div>
-          {calc.deliveryIncrements > 0 ? (
-            <>
-              <div className="px-2 py-1.5 rounded border border-gray-200 bg-gray-50 text-sm font-semibold text-gray-700">
-                {fmt2(calc.deliveryCost)}
-              </div>
-              <p className="text-xs text-gray-400 mt-0.5">
-                {calc.deliveryIncrements} × {fmt2(calc.deliveryFlat)} (
-                {calc.matInstallSF.toLocaleString()} Sq Ft ÷ {calc.deliverySFPerIncrement})
-              </p>
-            </>
-          ) : (
-            <div className="px-2 py-1.5 rounded border border-gray-200 bg-gray-50 text-sm text-gray-400 italic">
-              Select a paver to apply
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* ── Base Prep — In-House + Subcontractor ──────────────────────────── */}
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
@@ -1040,6 +895,103 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                   </td>
                   <td className={`${num} text-center`}>{a.baseCuYd > 0 ? a.baseCuYd.toFixed(2) : '—'}</td>
                   <td className={`${num} text-center`}>{fh(a.baseHrs)}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        <button
+          type="button"
+          onClick={() => addAreaRow()}
+          className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+        >
+          + Add row
+        </button>
+      </div>
+
+      {/* ── Paver Material — In-House + Subcontractor (materials on both tabs) ──── */}
+      <div>
+        <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
+          <span>{subSectionTitle('Paver Material', isSub)}</span>
+        </div>
+        <table className="w-full text-xs">
+          <TH
+            center
+            cols={[
+              { label: 'Vendor', w: 'w-40' },
+              { label: 'Paver Type' },
+              { label: 'SF', w: 'w-24' },
+              { label: '$/SF', w: 'w-12' },
+              { label: 'Pallets', w: 'w-12' },
+              { label: 'Cost', w: 'w-20' },
+            ]}
+          />
+          <tbody className="divide-y divide-gray-50">
+            {state[kArea].map((row, i) => {
+              const a = (isSub ? calc.subAreas : calc.areas)[i] || {}
+              const pOpts = paverOptions(PAVER_CAT.paver, row.paverVendor, materialRows)
+              // Empty default + "Select paver" placeholder; keep a stored id that is
+              // not in the current catalog selectable (backward-compat).
+              const paverSelOpts = !row.paverId
+                ? [{ value: '', label: 'Select paver' }, ...pOpts]
+                : pOpts.some(o => o.value === row.paverId)
+                  ? pOpts
+                  : [{ value: row.paverId, label: row.paverType || row.paverId }, ...pOpts]
+              return (
+                <tr key={i}>
+                  <td className={td}>
+                    <select
+                      className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      value={row.paverVendor || ''}
+                      onChange={e => {
+                        const v = e.target.value
+                        setRow(kArea, i, 'paverVendor', v)
+                        // Reset the paver selection so the user explicitly picks
+                        // (no fallback to the vendor's first catalog item).
+                        setRow(kArea, i, 'paverId', '')
+                        setRow(kArea, i, 'paverType', '')
+                      }}
+                    >
+                      <option value="">Select</option>
+                      {vendorsForCategory(PAVER_CAT.paver).map(v => (
+                        <option key={v.id} value={v.id}>
+                          {v.name}
+                        </option>
+                      ))}
+                      <option value="Custom">Custom (inline price)</option>
+                    </select>
+                  </td>
+                  <td className={td}>
+                    {row.paverVendor === 'Custom' ? (
+                      <Inp
+                        value={row.customPricePerSF || ''}
+                        onChange={e => setRow(kArea, i, 'customPricePerSF', e.target.value)}
+                        placeholder="$/SF"
+                      />
+                    ) : (
+                      <Sel
+                        value={row.paverId || ''}
+                        onChange={e => {
+                          const id = e.target.value
+                          const opt = pOpts.find(o => o.id === id)
+                          setRow(kArea, i, 'paverId', id)
+                          setRow(kArea, i, 'paverType', opt ? opt.stored : '')
+                        }}
+                        options={paverSelOpts}
+                      />
+                    )}
+                  </td>
+                  <td className={td}>
+                    <Inp
+                      value={row.sf}
+                      onChange={e => setRow(kArea, i, 'sf', e.target.value)}
+                      placeholder="Paver SF"
+                      className="text-center"
+                    />
+                  </td>
+                  <td className={`${num} text-center`}>{a.pricePerSF > 0 ? fmt2(a.pricePerSF) : '—'}</td>
+                  <td className={`${num} text-center`}>{a.pallets > 0 ? a.pallets : '—'}</td>
+                  <td className={`${num} text-center`}>{a.paverCost > 0 ? fmt(a.paverCost) : '—'}</td>
                 </tr>
               )
             })}
@@ -1443,6 +1395,54 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         </button>
       </div>
       )}
+
+      {/* ── Additional Paver Costs (moved directly below Paver Material) ───────── */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <SecHdr title="Additional Paver Costs" />
+        <div>
+          <p className="text-xs text-gray-500 mb-0.5">Sales Tax on Pavers (%)</p>
+          <Inp
+            value={state.salesTax}
+            onChange={e => set('salesTax', e.target.value)}
+            step="0.1"
+            placeholder="0"
+          />
+          {calc.salesTaxCost > 0 && (
+            <p className="text-xs text-gray-400 mt-0.5">{fmt2(calc.salesTaxCost)} tax</p>
+          )}
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 mb-0.5">Shipping / Freight ($)</p>
+          <Inp
+            value={state.shippingCharge}
+            onChange={e => set('shippingCharge', e.target.value)}
+            step="1"
+          />
+        </div>
+        {/* Delivery — auto when any paver is selected, billed per 900 Sq Ft
+            increment. Read-only display; the per-increment rate is editable
+            via the View Rates popup. */}
+        <div>
+          <div className="flex items-center gap-1 mb-0.5">
+            <p className="text-xs text-gray-500">Delivery</p>
+          </div>
+          {calc.deliveryIncrements > 0 ? (
+            <>
+              <div className="px-2 py-1.5 rounded border border-gray-200 bg-gray-50 text-sm font-semibold text-gray-700">
+                {fmt2(calc.deliveryCost)}
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {calc.deliveryIncrements} × {fmt2(calc.deliveryFlat)} (
+                {calc.matInstallSF.toLocaleString()} Sq Ft ÷ {calc.deliverySFPerIncrement})
+              </p>
+            </>
+          ) : (
+            <div className="px-2 py-1.5 rounded border border-gray-200 bg-gray-50 text-sm text-gray-400 italic">
+              Select a paver to apply
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* ── Manual Entry ──────────────────────────────────────────────────────── */}
       <div>
