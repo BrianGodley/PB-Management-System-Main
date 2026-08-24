@@ -154,50 +154,52 @@ const CAP_META = {
 // Material'; each keeps only its own Items via its type→Item map — no data split.
 const FINISH_SUBCAT = { flat: 'Finish Material', cap: 'Cap', wall: 'Finish Material' }
 
-// built-in Type → catalog Item name (per picker). Only types with a catalog Item
-// are listed; 'None' / 'PIP Concrete' have no catalog Item (built-ins only).
+// built-in Type → catalog Item frozen ref_key (per picker). Only types with a catalog
+// Item are listed; 'None' / 'PIP Concrete' have no catalog Item (built-ins only).
+// ref_key (not the editable description) so the vendor-carriage intersection survives
+// a catalog rename. finishTypeOptions still shows the item's live description as label.
 const FLAT_ITEM_BY_TYPE = {
-  Tile: 'Tile Flatwork',
-  Brick: 'Brick Flatwork',
-  Flagstone: 'Flagstone Flatwork',
-  Porcelain: 'Porcelain Flatwork',
+  Tile: 'MAT-107-tile-flatwork',
+  Brick: 'MAT-096-brick-flatwork',
+  Flagstone: 'MAT-098-flagstone-flatwork',
+  Porcelain: 'MAT-100-porcelain-flatwork',
 }
 const CAP_ITEM_BY_TYPE = {
-  Flagstone: 'Flagstone',
-  Precast: 'Precast',
-  'Bullnose Brick': 'Bullnose Brick',
+  Flagstone: 'MAT-094-flagstone',
+  Precast: 'MAT-095-precast',
+  'Bullnose Brick': 'MAT-093-bullnose-brick',
 }
 const WALL_ITEM_BY_TYPE = {
-  'Sand Stucco': 'Sand Stucco - Finishes',
-  'Smooth Stucco': 'Smooth Stucco - Finishes',
-  Ledgerstone: 'Ledgerstone - Finishes',
-  'Stacked Stone': 'Stacked Stone - Finishes',
-  Tile: 'Tile - Finishes',
-  'Real Flagstone': 'Real Flagstone - Finishes',
-  'Real Stone': 'Real Stone - Finishes',
+  'Sand Stucco': 'MAT-103-sand-stucco-finishes',
+  'Smooth Stucco': 'MAT-104-smooth-stucco-finishes',
+  Ledgerstone: 'MAT-099-ledgerstone-finishes',
+  'Stacked Stone': 'MAT-105-stacked-stone-finishes',
+  Tile: 'MAT-106-tile-finishes',
+  'Real Flagstone': 'MAT-101-real-flagstone-finishes',
+  'Real Stone': 'MAT-102-real-stone-finishes',
 }
 
-// FINISHES_RATES matKey → catalog Item name, for the vendor-aware price lookup.
-// (Wall items: Item name == the FINISHES_RATES db name. Cap/Flatwork: they differ,
-// so the vendor price must resolve on the catalog Item name, not the db name.)
+// FINISHES_RATES matKey → catalog Item frozen ref_key, for the vendor-aware price
+// lookup. Keyed by ref_key so a rename in Master Material Rates never breaks the
+// vendor price. All rows are Finishes-category records (MAT-093..107).
 const FINISH_CAT_ITEM = {
   // Wall Caps (sub_category 'Cap')
-  capFlagstone: 'Flagstone',
-  capPrecast: 'Precast',
-  capBullnose: 'Bullnose Brick',
+  capFlagstone: 'MAT-094-flagstone',
+  capPrecast: 'MAT-095-precast',
+  capBullnose: 'MAT-093-bullnose-brick',
   // Flatwork (sub_category 'Finish Material', FLAT set)
-  flatTile: 'Tile Flatwork',
-  flatBrick: 'Brick Flatwork',
-  flatFlagstone: 'Flagstone Flatwork',
-  flatPorcelain: 'Porcelain Flatwork',
+  flatTile: 'MAT-107-tile-flatwork',
+  flatBrick: 'MAT-096-brick-flatwork',
+  flatFlagstone: 'MAT-098-flagstone-flatwork',
+  flatPorcelain: 'MAT-100-porcelain-flatwork',
   // Wall Finishes (sub_category 'Finish Material', WALL set)
-  sandStucco: 'Sand Stucco - Finishes',
-  smoothStucco: 'Smooth Stucco - Finishes',
-  ledgerstone: 'Ledgerstone - Finishes',
-  stackedStone: 'Stacked Stone - Finishes',
-  tile: 'Tile - Finishes',
-  realFlagstone: 'Real Flagstone - Finishes',
-  realStone: 'Real Stone - Finishes',
+  sandStucco: 'MAT-103-sand-stucco-finishes',
+  smoothStucco: 'MAT-104-smooth-stucco-finishes',
+  ledgerstone: 'MAT-099-ledgerstone-finishes',
+  stackedStone: 'MAT-105-stacked-stone-finishes',
+  tile: 'MAT-106-tile-finishes',
+  realFlagstone: 'MAT-101-real-flagstone-finishes',
+  realStone: 'MAT-102-real-stone-finishes',
   // concreteTruck (PIP cap), stoneScrews, tileAdhesive: no catalog Item → Standard only
 }
 
@@ -208,29 +210,31 @@ const _isStd = v => !v || v === 'Standard'
 // INTERSECTED with this picker's built-in set (each mapped back to its built-in
 // Type so the option VALUE round-trips row.type and labor/geometry keep working).
 // `alwaysBuiltIn` types (None / PIP Concrete) stay selectable regardless of vendor.
-function finishTypeOptions(materialRows, subcat, builtInTypes, itemByType, vendorSel, alwaysBuiltIn = []) {
+function finishTypeOptions(materialRows, subcat, builtInTypes, itemRefByType, vendorSel, alwaysBuiltIn = []) {
   // Catalog-only, vendor-first: Standard/unset → the null-vendor (Standard) catalog
-  // Items; a real vendor → that vendor's Items. Each carried Item is intersected
-  // with this picker's built-in set (via itemByType) so the option VALUE round-trips
-  // row.type and labor/geometry keep working. The built-in Type list is NOT a
-  // wholesale option source anymore; only `alwaysBuiltIn` sentinels (None / PIP
-  // Concrete) — non-material choices, not catalog items — stay regardless of catalog.
+  // Items; a real vendor → that vendor's Items. Each carried Item is intersected with
+  // this picker's built-in set by frozen ref_key (via itemRefByType) so the option
+  // VALUE still round-trips row.type (labor/geometry keep working) AND the intersection
+  // survives a catalog rename. The displayed label is the item's LIVE description.
+  // Only `alwaysBuiltIn` sentinels (None / PIP Concrete) — non-material choices, not
+  // catalog items — stay regardless of catalog.
   const isStd = _isStd(vendorSel) || vendorSel === 'auto'
-  const carried = new Set(
-    catalogOptions(materialRows, subcat, isStd ? 'Standard' : vendorSel, {
-      standardRows: 'null-vendor',
-      stripPrefix: true,
-      category: FINISHES_CATEGORY,
-    }).map(o => o.label)
-  )
+  const carried = new Map() // ref_key → live label (description)
+  catalogOptions(materialRows, subcat, isStd ? 'Standard' : vendorSel, {
+    standardRows: 'null-vendor',
+    stripPrefix: true,
+    category: FINISHES_CATEGORY,
+  }).forEach(o => {
+    if (o.ref_key) carried.set(o.ref_key, o.label)
+  })
   const opts = []
   builtInTypes.forEach(t => {
     if (alwaysBuiltIn.includes(t)) {
       opts.push({ value: t, label: t })
       return
     }
-    const item = itemByType[t]
-    if (item && carried.has(item)) opts.push({ value: t, label: item })
+    const ref = itemRefByType[t]
+    if (ref && carried.has(ref)) opts.push({ value: t, label: carried.get(ref) })
   })
   return opts
 }

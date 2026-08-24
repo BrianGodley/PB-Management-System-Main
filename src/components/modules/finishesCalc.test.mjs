@@ -60,12 +60,22 @@ test('wall Ledgerstone composite: mat = SF × price × 1.1 + SF × screws (50 ×
 
 test('vendor-first material: a real vendor’s catalog Item price overrides the Standard price', () => {
   const mp = { 'Finishes Tile Flatwork': 10, 'Finishes Tile Flatwork Labor Rate': 0.2 }
-  const rows = [{ name: 'Tile Flatwork', vendor_id: 'v-homedepot', unit_cost: 15 }]
+  // The vendor price is matched by the item's frozen ref_key (MAT-107-tile-flatwork).
+  const rows = [{ ref_key: 'MAT-107-tile-flatwork', name: 'Tile Flatwork', vendor_id: 'v-homedepot', unit_cost: 15 }]
   const std = run({ flatworkRows: [{ vendor: 'Standard', type: 'Tile', sf: '100' }] }, mp, rows)
   const ven = run({ flatworkRows: [{ vendor: 'v-homedepot', type: 'Tile', sf: '100' }] }, mp, rows)
   assert.equal(std.totalMat, 1000, 'Standard uses the name-keyed price ($10)')
   assert.equal(ven.totalMat, 1500, 'a real vendor uses its catalog Item unit_cost ($15)')
   assert.equal(ven.totalHrs, std.totalHrs, 'labor is unchanged by vendor (same rate map)')
+})
+
+test('M5 ref_key: the vendor price survives a catalog rename (matched by ref_key, not description)', () => {
+  const mp = { 'Finishes Tile Flatwork': 10, 'Finishes Tile Flatwork Labor Rate': 0.2 }
+  // Description renamed in Master Rates, but the frozen ref_key is unchanged → the
+  // vendor price must still resolve (a name-only match would silently drop to Standard).
+  const rows = [{ ref_key: 'MAT-107-tile-flatwork', name: 'Porcelain Tile Flatwork (renamed)', vendor_id: 'v-homedepot', unit_cost: 15 }]
+  const ven = run({ flatworkRows: [{ vendor: 'v-homedepot', type: 'Tile', sf: '100' }] }, mp, rows)
+  assert.equal(ven.totalMat, 1500, `ref_key still resolves the vendor price after a rename; got ${ven.totalMat}`)
 })
 
 test('material NO-FALLBACK: an unpriced type resolves $0 material (and 0 hrs when labor unset) — no hidden constant', () => {

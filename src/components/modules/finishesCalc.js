@@ -15,12 +15,17 @@ function calcWalkAccessLabor(laborSubtotalHrs, distanceLF, opts = {}) {
   return ((hrs / 8) * (lf * 2)) / pace
 }
 // Vendor→Standard→fallback material price (mirrors lib/materialCatalog.resolveMaterialPrice).
-function resolveMaterialPrice(name, vendorId, materialRows, priceMap, fallback = 0) {
+// `key` is the immutable material ref_key (MAT-NNN-slug); id/name still resolve so a
+// legacy save keeps working. Matching by ref_key makes the vendor price survive a
+// catalog rename (the description is editable; the ref_key is frozen).
+function resolveMaterialPrice(key, vendorId, materialRows, priceMap, fallback = 0) {
   if (vendorId && !isStandardSel(vendorId)) {
-    const row = (materialRows || []).find(r => r.name === name && r.vendor_id === vendorId)
+    const row = (materialRows || []).find(
+      r => (r.ref_key === key || r.id === key || r.name === key) && r.vendor_id === vendorId
+    )
     if (row && row.unit_cost != null && row.unit_cost !== '') return num(row.unit_cost)
   }
-  const p = priceMap?.[name]
+  const p = priceMap?.[key]
   return p != null ? p : fallback
 }
 
@@ -63,22 +68,26 @@ export const FINISHES_RATES = {
   tileAdhesive: { db: 'Finishes Tile Adhesive/Grout' },
 }
 
-// FINISHES_RATES matKey → catalog Item name, for the vendor-aware price lookup.
+// FINISHES_RATES matKey → catalog Item frozen ref_key (MAT-NNN-slug), for the
+// vendor-aware price lookup. Keyed by ref_key (not the editable description) so a
+// rename in Master Material Rates never breaks the vendor price. All rows are the
+// Finishes-category records (MAT-093..107); same-named Walls/Pool items are excluded
+// by construction — the ref_key resolves exactly one row.
 export const FINISH_CAT_ITEM = {
-  capFlagstone: 'Flagstone',
-  capPrecast: 'Precast',
-  capBullnose: 'Bullnose Brick',
-  flatTile: 'Tile Flatwork',
-  flatBrick: 'Brick Flatwork',
-  flatFlagstone: 'Flagstone Flatwork',
-  flatPorcelain: 'Porcelain Flatwork',
-  sandStucco: 'Sand Stucco - Finishes',
-  smoothStucco: 'Smooth Stucco - Finishes',
-  ledgerstone: 'Ledgerstone - Finishes',
-  stackedStone: 'Stacked Stone - Finishes',
-  tile: 'Tile - Finishes',
-  realFlagstone: 'Real Flagstone - Finishes',
-  realStone: 'Real Stone - Finishes',
+  capFlagstone: 'MAT-094-flagstone',
+  capPrecast: 'MAT-095-precast',
+  capBullnose: 'MAT-093-bullnose-brick',
+  flatTile: 'MAT-107-tile-flatwork',
+  flatBrick: 'MAT-096-brick-flatwork',
+  flatFlagstone: 'MAT-098-flagstone-flatwork',
+  flatPorcelain: 'MAT-100-porcelain-flatwork',
+  sandStucco: 'MAT-103-sand-stucco-finishes',
+  smoothStucco: 'MAT-104-smooth-stucco-finishes',
+  ledgerstone: 'MAT-099-ledgerstone-finishes',
+  stackedStone: 'MAT-105-stacked-stone-finishes',
+  tile: 'MAT-106-tile-finishes',
+  realFlagstone: 'MAT-101-real-flagstone-finishes',
+  realStone: 'MAT-102-real-stone-finishes',
 }
 
 // Vendor-aware material price for a FINISHES_RATES key: a real vendor's catalog Item price
