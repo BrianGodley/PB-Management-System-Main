@@ -60,6 +60,28 @@ import UnpricedItemModal from '../UnpricedItemModal'
 const CATALOG_OPTS = { standardRows: 'null-vendor', stripPrefix: true }
 
 const n = v => parseFloat(v) || 0
+
+// View Rates scope — the module's OWN (category, sub) rate scheme, passed to
+// buildViewRates so the table shows EVERY rate Pavers consume (not just Base
+// Prep). Mirrors WALLS_RATE_SCOPE. When a non-empty scope is passed,
+// buildViewRates uses scope INSTEAD of module_category_map, so the scope must be
+// complete or rows silently drop (the Base-Prep-only regression that hid all
+// paver materials + labor).
+//   • Paver / Pavers  → full own category (paver products, vendor base items,
+//       all install/cut/restraint/sleeve/soldier/sealer/poly-sand labor, and the
+//       'Paver - *' misc material $ + coefficients). BOTH spellings are scoped
+//       because labor/misc historically seeded under 'Paver' while the calc meta
+//       labels them 'Pavers'; a category that doesn't exist simply returns nothing.
+//   • Basic Materials / Aggregate & Concrete → the two SHARED base aggregates the
+//       module borrows (Class II Roadbase base material + Bedding Sand); `only`
+//       keeps Concrete's Ready/Hand mix (same sub) out of Paver View Rates.
+//   • Basic Labor / Base Prep → the shared base-prep labor (3 methods, hrs/Cu Ft).
+const PAVER_RATE_SCOPE = [
+  { category: 'Paver' },
+  { category: 'Pavers' },
+  { category: 'Basic Materials', sub: 'Aggregate & Concrete', only: ['Class II Roadbase', 'Bedding Sand'] },
+  { category: 'Basic Labor', sub: 'Base Prep' },
+]
 // Base-rock tonnage density (SF·inch per ton). The 200 divisor is a tunable
 // estimating coefficient — callers pass the DB-editable value.
 
@@ -726,7 +748,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             onCrewTypeChange={v => set('crewType', v)}
             title="Pavers"
             moduleType="Pavers"
-            rateScope={[{ category: 'Basic Labor', sub: 'Base Prep' }]}
+            rateScope={PAVER_RATE_SCOPE}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
           />

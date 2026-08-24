@@ -82,6 +82,29 @@ test.describe('Concrete', () => {
     await expect(page.getByText(/\$[\d,]/).first(), 'No pricing rendered').toBeVisible()
   })
 
+  // View Rates COVERAGE — same regression family as Pavers: a Base-Prep-only
+  // rateScope flips buildViewRates into scope-only mode and drops the whole
+  // Concrete category (mix / rebar / finish material + all install/finish labor)
+  // while the module still prices correctly, so NaN/total-moves tests stay green.
+  // Assert the popup actually lists concrete MATERIAL + concrete LABOR.
+  test('View Rates lists concrete materials AND labor (coverage, not just Base Prep)', async ({ page }, testInfo) => {
+    const ok = await openModule(page, 'Concrete')
+    test.skip(!ok, 'Concrete editor not reachable on this estimate.')
+    await page.getByRole('button', { name: /view rates/i }).first().click()
+    const heading = page.getByText(/—\s*All Rates/i).first()
+    await expect(heading, 'View Rates popup did not open').toBeVisible({ timeout: 10000 })
+    const modal = heading.locator('xpath=ancestor::div[contains(@class,"rounded-2xl")][1]')
+    await testInfo.attach('concrete-viewrates.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
+    await expect(
+      modal.getByText(/Class II Roadbase|Ready Mix|Hand Mix|Rebar/i).first(),
+      'View Rates shows NO concrete material rows (scope dropped the material catalog).'
+    ).toBeVisible()
+    await expect(
+      modal.getByText(/Install|Rebar|Form|Sleeve|Vapor|Sealer|Finish/i).first(),
+      'View Rates shows only Base Prep — the Concrete labor category is missing.'
+    ).toBeVisible()
+  })
+
   test('live edit reflects: changing a field moves the total (Goal 4 in-browser)', async ({ page }) => {
     const ok = await openModule(page, 'Concrete')
     test.skip(!ok, 'Concrete editor not reachable on this estimate.')

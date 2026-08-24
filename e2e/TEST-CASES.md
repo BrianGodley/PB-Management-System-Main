@@ -221,3 +221,19 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
 - Modules not on TEST_ESTIMATE_URL are skipped (not failed) with a row-titles diagnostic.
 - FOLLOW-UP after run 1: harden a $0-specific View-Rates assertion from the real DOM for the
   highest-value converted materials (rebar, concrete, the 7 shared finishes, timers).
+
+## View Rates coverage (pavers.spec.js + concrete.spec.js)
+- Regression guarded: a Base-Prep-only `rateScope` flips buildViewRates into scope-only
+  mode and silently drops the module's OWN category (all materials + labor) from View
+  Rates, while the module still prices correctly (calc reads the rate map directly). Every
+  NaN / total-moves / opens test stayed green — the gap was ONLY in the View Rates popup.
+- Pavers: opens the editor, clicks "View Rates", and asserts (scoped to the popup) that a
+  paver MATERIAL row (Class II Roadbase / Bedding Sand / Base Rock) AND a paver LABOR row
+  (Install / Straight Cut / Curved Cut / Restraint / Sealer / Soldier) are present — not
+  just the borrowed Base Prep rows.
+- Concrete: same shape — asserts a concrete MATERIAL row (Class II Roadbase / Ready Mix /
+  Hand Mix / Rebar) AND a concrete LABOR row (Install / Rebar / Form / Sleeve / Vapor /
+  Sealer / Finish) show in the popup.
+- Fix: PaverModule → PAVER_RATE_SCOPE, ConcreteModule → CONCRETE_RATE_SCOPE (full own
+  category + borrowed shared subs + Base Prep), mirroring WALLS_RATE_SCOPE. FirePit + the
+  3 demos were audited and already carry complete own-category scopes.

@@ -28,6 +28,32 @@ import { BAS } from '../../lib/basicLaborRefs'
 
 // ── Rate tables (method-indexed — not in DB) ──────────────────────────────────
 
+// View Rates scope — the module's OWN (category, sub) rate scheme, passed to
+// buildViewRates so the table shows EVERY rate Concrete consumes. A non-empty
+// scope REPLACES module_category_map, so it must be complete or rows silently
+// drop (the Base-Prep-only regression that hid all concrete material + labor).
+//   • Concrete → full own category: every install-tier / rebar / form / sleeve /
+//       finish / vapor / sealer LABOR row, the Concrete Mix + Vapor Barrier +
+//       Concrete Sealer + Concrete Finish Material catalog items, the rebar-LF/SF
+//       + form / sleeve / color misc coefficients, and the pump / sand-finish /
+//       stamp SUBCONTRACTOR rates.
+//   • Basic Materials / Reinforcement → shared rebar #3–#8 (priced by ref_key).
+//   • Basic Materials / Aggregate & Concrete → the shared Class II Roadbase base
+//       material + the two concrete mixes; `only` keeps Paver's Bedding Sand
+//       (same sub) out. (The mixes also surface via the full 'Concrete' scope if
+//       they live under Concrete/Concrete Mix — listing them here is harmless.)
+//   • Basic Labor / Base Prep → the shared base-prep labor (3 methods, hrs/Cu Ft).
+const CONCRETE_RATE_SCOPE = [
+  { category: 'Concrete' },
+  { category: 'Basic Materials', sub: 'Reinforcement' },
+  {
+    category: 'Basic Materials',
+    sub: 'Aggregate & Concrete',
+    only: ['Class II Roadbase', 'Concrete - Ready Mix (Truck)', 'Concrete - Hand Mix'],
+  },
+  { category: 'Basic Labor', sub: 'Base Prep' },
+]
+
 // Base-prep methods — the three shared Basic Labor 'Base Prep' rates (hrs per
 // Cu Ft) that Pavers + the demos also read. Skid Good/OK collapsed to one Skid.
 const METHODS = ['Skid Steer', 'Mini Skid Steer', 'Hand']
@@ -778,7 +804,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             onCrewTypeChange={setCrewType}
             title="Concrete"
             moduleType="Concrete"
-            rateScope={[{ category: 'Basic Labor', sub: 'Base Prep' }]}
+            rateScope={CONCRETE_RATE_SCOPE}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
           />

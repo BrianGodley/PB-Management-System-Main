@@ -104,6 +104,35 @@ test.describe('Pavers', () => {
     await expect(page.getByText(/\$[\d,]/).first(), 'No pricing rendered').toBeVisible()
   })
 
+  // View Rates COVERAGE — the regression the NaN-scan could NOT catch: PaverModule
+  // passed rateScope=[{Basic Labor/Base Prep}] only, which flips buildViewRates into
+  // scope-only mode and drops the Paver category (all materials + labor). The module
+  // still priced fine (calc reads the rate map directly), so every NaN / total-moves
+  // test stayed green while View Rates showed ONLY Base Prep. This asserts the popup
+  // actually lists paver MATERIAL + paver LABOR, not just the borrowed base-prep rows.
+  test('View Rates lists paver materials AND labor (coverage, not just Base Prep)', async ({ page }, testInfo) => {
+    const { ok, why } = await openPavers(page)
+    test.skip(!ok, why)
+    await page.getByRole('button', { name: /view rates/i }).first().click()
+    const heading = page.getByText(/—\s*All Rates/i).first()
+    await expect(heading, 'View Rates popup did not open').toBeVisible({ timeout: 10000 })
+    // Scope every assertion to the popup so we don't match the module body behind it
+    // (which also renders "Install", "Class II Roadbase", etc.).
+    const modal = heading.locator('xpath=ancestor::div[contains(@class,"rounded-2xl")][1]')
+    await testInfo.attach('pavers-viewrates.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
+    // Material coverage — the shared base aggregates Pavers borrow (Standard rows).
+    await expect(
+      modal.getByText(/Class II Roadbase|Bedding Sand|Base Rock/i).first(),
+      'View Rates shows NO paver material rows (scope dropped the material catalog).'
+    ).toBeVisible()
+    // Labor coverage BEYOND base prep — the paver install/cut/restraint/sealer/soldier
+    // labor that lives in the Paver(s) category. If only Base Prep survived, none appear.
+    await expect(
+      modal.getByText(/Install|Straight Cut|Curved Cut|Restraint|Sealer|Soldier/i).first(),
+      'View Rates shows only Base Prep — the Paver labor category is missing.'
+    ).toBeVisible()
+  })
+
   test('live edit reflects: changing a field moves the total (Goal 4 in-browser)', async ({ page }) => {
     const { ok, why } = await openPavers(page)
     test.skip(!ok, why)
