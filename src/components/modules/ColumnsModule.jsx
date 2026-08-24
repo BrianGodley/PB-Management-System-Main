@@ -192,9 +192,11 @@ function columnGeometryDims(heightIn, widthIn, blockWIn = 8, blockHIn = 8) {
   return { courses, blocksWide, blocksPerCourse, totalBlocks, rebarLF, footingArea }
 }
 
-// Resolve a picked catalog product row by id (any vendor).
-function catalogRowById(materialRows, id) {
-  return (materialRows || []).find(r => r.id === id) || null
+// Resolve a picked catalog product row by its frozen ref_key (preferred) or id.
+// A picker stores ref_key so the selection survives a catalog rename; legacy
+// id-saved rows still resolve.
+function catalogRowById(materialRows, key) {
+  return (materialRows || []).find(r => (r.ref_key && r.ref_key === key) || r.id === key) || null
 }
 // Block dims from a catalog row's calc_meta (fallback to legacy cols / default).
 function blockDims(row, def = { w: 8, h: 8, l: 16 }) {
@@ -223,7 +225,9 @@ function subcatProductOptions(materialRows, subcat, vendorSel) {
   const isStd = !vendorSel || vendorSel === 'Standard'
   return (materialRows || [])
     .filter(r => r.sub_category === subcat && (isStd ? r.vendor_id == null : r.vendor_id === vendorSel))
-    .map(r => ({ value: r.id, label: r.name, row: r }))
+    // Option VALUE = the item's frozen ref_key (picker stores it), rename-proof;
+    // catalogRowById resolves ref_key or a legacy id save.
+    .map(r => ({ value: r.ref_key || r.id, label: r.name, row: r }))
 }
 function labelWithDims(row) {
   const d = blockDims(row, { w: 0, h: 0, l: 0 })
