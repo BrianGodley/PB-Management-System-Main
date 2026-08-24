@@ -8,7 +8,7 @@ import GpmdBar from './GpmdBar'
 import { SubRateOverrideProvider } from '../SubRateOverrideContext.jsx'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor } from '../../lib/walkAccess'
-import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
+import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap , fetchLaborRateMap } from '../../lib/materialCatalog'
 import { resolveUtilRow } from '../../lib/utilRow'
 import { calcPool } from './poolCalc'
 import UnpricedItemModal from '../UnpricedItemModal'
@@ -736,10 +736,10 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
 
   // Re-fetch all three Pool rate tables. Called on mount and after edits.
   const refreshAllRates = useCallback(async () => {
-    const [mp, labRes, subRes, catRows, venRes, subCoRes] = await Promise.all([
+    const [mp, labMap, subRes, catRows, venRes, subCoRes] = await Promise.all([
       fetchStandardRateMap(['Pool', 'Utilities']),
-      // 'Demo' included so excavation labor can read the shared 'Skid - Soil' rate.
-      supabase.from('labor_rates').select('name,rate').in('category', ['Pool', 'Utilities', 'Finishes', 'Demo']),
+      // dual-keyed (name + ref_key) + basic_labor_rates. 'Demo' for shared excavation.
+      fetchLaborRateMap(['Pool', 'Utilities', 'Finishes', 'Demo']),
       supabase.from('subcontractor_rates').select('company_name,trade,rate,unit').eq('category', 'Pool'),
       fetchModuleCatalog(['Utilities', 'Pool', 'Basic Materials']),
       supabase
@@ -753,16 +753,12 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         .eq('type', 'sub')
         .order('company_name'),
     ])
-    const lr = {}
-    ;(labRes.data || []).forEach(r => {
-      lr[r.name] = parseFloat(r.rate)
-    })
     const sr = {}
     ;(subRes.data || []).forEach(r => {
       sr[r.trade] = parseFloat(r.rate)
     })
     setMaterialPrices(mp)
-    setLaborRates(lr)
+    setLaborRates(labMap)
     setSubRates(sr)
     setSubExcavRows(subRes.data || [])
     setMaterialRows(catRows || [])

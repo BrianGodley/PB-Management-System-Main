@@ -239,6 +239,30 @@ export async function fetchModuleCatalog(categories) {
 // + misc_rates. Drop-in replacement for the legacy
 //   material_rates.select('name, unit_cost').in('category', cats)
 // map. Names not present fall back to the caller's code constant.
+// Dual-keyed labor rate map (by NAME and by ref_key) for the given labor categories,
+// PLUS the shared basic_labor_rates table. Modules read labor by ref_key (LAB-/BAS-)
+// now and by legacy name during the transition, so BOTH keys must be present — a
+// name-only map (a raw labor_rates query) makes every ref_key read resolve to 0.
+export async function fetchLaborRateMap(categories) {
+  // categories omitted → every non-archived labor row (matches the demos' old broad
+  // `neq('category','Archived')` query); otherwise scope to the given categories.
+  let laborQ = supabase.from('labor_rates').select('name, ref_key, rate, rate_per_day')
+  laborQ = categories == null
+    ? laborQ.neq('category', 'Archived')
+    : laborQ.in('category', Array.isArray(categories) ? categories : [categories])
+  const [labRes, basicRes] = await Promise.all([
+    laborQ,
+    // Basic Labor is shared across modules; always included, tolerant of the table
+    // not existing yet (returns an error object, never rejects).
+    supabase.from('basic_labor_rates').select('name, ref_key, rate, category'),
+  ])
+  const map = {}
+  const put = (r, v) => { if (r.name) map[r.name] = v; if (r.ref_key) map[r.ref_key] = v }
+  ;(labRes.data || []).forEach(r => put(r, num(r.rate ?? r.rate_per_day)))
+  ;(basicRes?.data || []).forEach(r => { if (r.category !== 'Archived') put(r, num(r.rate)) })
+  return map
+}
+
 export async function fetchStandardRateMap(categories) {
   const cats = Array.isArray(categories) ? categories : [categories]
   const [rows, labRes, feeRes, basicRes] = await Promise.all([
@@ -732,10 +756,13 @@ export function useNewMaterialCatalog(categories, initial = {}) {
     // material_rates is being retired: the base price map is built from the new
     // catalog's Standard prices (material + material_price) plus labor_rates and
     // misc_rates. Any name not found falls back to the module's code constant.
-    const [rows, labRes, feeRes, venRes] = await Promise.all([
+    const [rows, labRes, feeRes, basicRes, venRes] = await Promise.all([
       fetchModuleCatalog(catList),
-      supabase.from('labor_rates').select('name, rate').in('category', catList),
+      supabase.from('labor_rates').select('name, ref_key, rate').in('category', catList),
       supabase.from('misc_rates').select('name, rate').in('category', catList),
+      // Shared Basic Labor coefficients (Jumping Jack, base prep, curb core, …),
+      // read by name AND ref_key. Tolerant of the table not existing yet.
+      supabase.from('basic_labor_rates').select('name, ref_key, rate, category'),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
@@ -748,10 +775,17 @@ export function useNewMaterialCatalog(categories, initial = {}) {
       if (r.vendor_id == null && r.name) pm[r.name] = num(r.unit_cost)
     })
     ;(labRes.data || []).forEach(r => {
-      pm[r.name] = num(r.rate)
+      // Dual-key: modules read labor by legacy name AND by ref_key (LAB-/BAS-).
+      if (r.name) pm[r.name] = num(r.rate)
+      if (r.ref_key) pm[r.ref_key] = num(r.rate)
     })
     ;(feeRes.data || []).forEach(r => {
       pm[r.name] = num(r.rate)
+    })
+    ;(basicRes?.data || []).forEach(r => {
+      if (r.category === 'Archived') return
+      if (r.name) pm[r.name] = num(r.rate)
+      if (r.ref_key) pm[r.ref_key] = num(r.rate)
     })
     setPriceMap(pm)
     setMaterialRows(rows || [])

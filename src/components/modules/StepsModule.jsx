@@ -17,6 +17,7 @@ import {
   fetchModuleCatalog,
   fetchStandardRateMap,
   saveStandardNamedRate,
+  fetchLaborRateMap,
 } from '../../lib/materialCatalog'
 
 // One-picker scheme (matches Concrete/Turf): Standard sources the null-vendor
@@ -752,8 +753,8 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
     // material_rates retired: base map (category 'Steps') from the new model;
     // catalog from the shared Paver + Concrete categories (Steps' pickers filter
     // on 'Paver Material' / 'Concrete Mix', both unchanged names).
-    const [lrRes, matMap, rows, venRes] = await Promise.all([
-      supabase.from('labor_rates').select('name, rate').eq('category', 'Steps'),
+    const [labMap, matMap, rows, venRes] = await Promise.all([
+      fetchLaborRateMap(['Steps']),
       fetchStandardRateMap(['Steps']),
       fetchModuleCatalog(['Paver', 'Concrete']),
       supabase
@@ -762,13 +763,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         .eq('type', 'vendor')
         .order('company_name'),
     ])
-    if (lrRes.data) {
-      const m = {}
-      lrRes.data.forEach(r => {
-        m[r.name] = parseFloat(r.rate)
-      })
-      setLaborRates(m)
-    }
+    setLaborRates(labMap)
     setMaterialRates(matMap)
     setMaterialRows(rows || [])
     setVendors(

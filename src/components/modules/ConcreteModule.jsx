@@ -19,7 +19,7 @@ import RateEditPopover from '../RateEditPopover'
 import { SubRateOverrideProvider } from '../SubRateOverrideContext.jsx'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor } from '../../lib/walkAccess'
-import { catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
+import { catalogOptions, fetchModuleCatalog, fetchStandardRateMap, fetchLaborRateMap } from '../../lib/materialCatalog'
 import UnpricedItemModal from '../UnpricedItemModal'
 import { makeModuleRates } from '../../lib/moduleRates'
 import NewCatalogItemModal from '../NewCatalogItemModal'
@@ -234,8 +234,8 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
     // material_rates retired: base map (incl. shared Basic Materials) from the
     // new model; vendor catalog from material + material_price. Concrete's
     // markers ('Concrete Mix'/'Base Material') are unchanged, so no remap.
-    const [lrRes, matMap, srRes, rows, venRes] = await Promise.all([
-      supabase.from('labor_rates').select('name, rate').eq('category', 'Concrete'),
+    const [labMap, matMap, srRes, rows, venRes] = await Promise.all([
+      fetchLaborRateMap(['Concrete']), // dual-keyed (name + ref_key) + basic_labor_rates
       fetchStandardRateMap(['Concrete', 'Basic Materials']),
       supabase.from('subcontractor_rates').select('item_key, rate').eq('category', 'Concrete'),
       fetchModuleCatalog(['Concrete', 'Basic Materials']),
@@ -252,13 +252,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
         name: v.company_name,
       }))
     )
-    if (lrRes.data) {
-      const m = {}
-      lrRes.data.forEach(r => {
-        m[r.name] = r.rate
-      })
-      setLaborRates(m)
-    }
+    setLaborRates(labMap)
     setMaterialRates(matMap)
     if (srRes.data) {
       const m = {}

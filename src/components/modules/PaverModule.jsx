@@ -51,7 +51,7 @@ import {
   catalogItemFor,
   fetchModuleCatalog,
   fetchStandardRateMap,
-} from '../../lib/materialCatalog'
+ fetchLaborRateMap,} from '../../lib/materialCatalog'
 import { calcPaver } from './paverCalc'
 
 // One-picker scheme (matches Concrete/Steps): Standard sources & prices from the
@@ -333,9 +333,9 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
     // new model; Paver catalog (with pallet / vertical-LF specs) from
     // material + material_price. Subcategories ('Paver Material'/'Base Material')
     // are unchanged, so no remap needed.
-    const [lrRes, matMap, rows, venRes] = await Promise.all([
+    const [labMap, matMap, rows, venRes] = await Promise.all([
       // Base prep shares the demo Import Base rates, so pull 'Demo' too.
-      supabase.from('labor_rates').select('name,rate').in('category', ['Paver', 'Demo']),
+      fetchLaborRateMap(['Paver', 'Demo']), // dual-keyed (name + ref_key) + basic_labor_rates
       fetchStandardRateMap(['Paver', 'Basic Materials']),
       fetchModuleCatalog(['Paver', 'Basic Materials']),
       supabase
@@ -344,13 +344,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         .eq('type', 'vendor')
         .order('company_name'),
     ])
-    if (lrRes.data) {
-      const m = {}
-      lrRes.data.forEach(r => {
-        m[r.name] = parseFloat(r.rate)
-      })
-      setLaborRates(m)
-    }
+    setLaborRates(labMap)
     setMaterialRates(matMap)
     setMaterialRows(rows || [])
     setVendors(

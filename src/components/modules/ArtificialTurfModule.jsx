@@ -16,7 +16,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
+import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap, fetchLaborRateMap } from '../../lib/materialCatalog'
 import { calcTurf } from './artificialTurfCalc'
 
 // One-picker scheme: turf-brand materials price Standard from the item's
@@ -426,9 +426,9 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
     // these via sharedBaseRows and match by sub-category (the one scheme) — no name
     // map or synthetic keys.
     const SHARED_BASE_CATS = ['Basic Materials', 'Ground Treatments']
-    const [matMap, labRes, subRes, rows, venRes, sharedRows] = await Promise.all([
+    const [matMap, labMap, subRes, rows, venRes, sharedRows] = await Promise.all([
       fetchStandardRateMap(['Artificial Turf', 'Demo']),
-      supabase.from('labor_rates').select('name, rate').eq('category', 'Artificial Turf'),
+      fetchLaborRateMap(['Artificial Turf']),
       supabase
         .from('subcontractor_rates')
         .select('item_key, rate')
@@ -450,13 +450,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       }))
     )
     setMaterialPrices(matMap)
-    if (labRes.data) {
-      const m = {}
-      labRes.data.forEach(r => {
-        m[r.name] = parseFloat(r.rate)
-      })
-      setLaborRates(m)
-    }
+    setLaborRates(labMap)
     if (subRes.data) {
       const m = {}
       subRes.data.forEach(r => {

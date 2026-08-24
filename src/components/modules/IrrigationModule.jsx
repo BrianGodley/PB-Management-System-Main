@@ -35,7 +35,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import UnpricedItemModal from '../UnpricedItemModal'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { resolveMaterialPrice, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
+import { resolveMaterialPrice, fetchModuleCatalog, fetchStandardRateMap, fetchLaborRateMap } from '../../lib/materialCatalog'
 import { ZONE_TYPES, zoneMeta, ZONE_OPTIONS, makeBomPrice, zoneMatUnit, computeZoneRow } from '../../lib/irrigationZones'
 import { calcIrrigation } from './irrigationCalc'
 
@@ -285,9 +285,9 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
     // (fetchStandardRateMap = Standard + labor + misc, name-keyed); vendor
     // catalog rows from material + material_price. Irrigation resolves by name,
     // never by subcategory, so no remap is needed.
-    const [matMap, lrRes, rows, venRes] = await Promise.all([
+    const [matMap, labMap, rows, venRes] = await Promise.all([
       fetchStandardRateMap([IRRIGATION_CATEGORY]),
-      supabase.from('labor_rates').select('name, rate').eq('category', IRRIGATION_CATEGORY),
+      fetchLaborRateMap([IRRIGATION_CATEGORY]),
       fetchModuleCatalog([IRRIGATION_CATEGORY]),
       supabase
         .from('subs_vendors')
@@ -296,13 +296,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
         .order('company_name'),
     ])
     setMaterialPrices(matMap)
-    if (lrRes.data) {
-      const m = {}
-      lrRes.data.forEach(r => {
-        m[r.name] = parseFloat(r.rate)
-      })
-      setLaborRates(m)
-    }
+    setLaborRates(labMap)
     setMaterialRows(rows || [])
     setVendors(
       (venRes.data || []).map(v => ({

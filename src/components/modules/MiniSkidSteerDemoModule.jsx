@@ -22,7 +22,7 @@ import ModuleHeaderSlot from './ModuleHeaderSlot'
 import { useState, useEffect, useCallback, useContext, useRef } from 'react'
 import { SubTabContext, subSectionTitle } from './subTabContext'
 import { supabase } from '../../lib/supabase'
-import { fetchStandardRateMap } from '../../lib/materialCatalog'
+import { fetchStandardRateMap, fetchLaborRateMap } from '../../lib/materialCatalog'
 import GpmdBar from './GpmdBar'
 import { SubRateOverrideProvider } from '../SubRateOverrideContext.jsx'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
@@ -313,21 +313,15 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
   // Re-fetch all master-rate maps. Called once on mount and again whenever the
   // user saves an edit from a RateEditPopover so the calc picks up the change.
   const refreshAllRates = useCallback(async () => {
-    const [matMap, lrRes, srRes] = await Promise.all([
+    const [matMap, labMap, srRes] = await Promise.all([
       // material_rates retired: Demo materials from material+material_price,
       // fees from misc_rates, labor from labor_rates — all by name.
       fetchStandardRateMap(['Demo', 'Basic Materials']),
-      supabase.from('labor_rates').select('name,rate,rate_per_day').neq('category', 'Archived'),
+      fetchLaborRateMap(),
       supabase.from('subcontractor_rates').select('item_key,rate'),
     ])
     setMaterialPrices(matMap)
-    if (lrRes.data) {
-      const m = {}
-      lrRes.data.forEach(r => {
-        m[r.name] = parseFloat(r.rate ?? r.rate_per_day)
-      })
-      setLaborRates(m)
-    }
+    setLaborRates(labMap)
     if (srRes.data) {
       const m = {}
       srRes.data.forEach(r => {

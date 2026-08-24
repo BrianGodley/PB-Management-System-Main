@@ -8,7 +8,7 @@ import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
-import { resolveMaterialPrice, catalogOptions, catalogItemFor, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
+import { resolveMaterialPrice, catalogOptions, catalogItemFor, fetchModuleCatalog, fetchStandardRateMap, fetchLaborRateMap } from '../../lib/materialCatalog'
 import { calcPlanting } from './plantingCalc'
 import UnpricedItemModal from '../UnpricedItemModal'
 
@@ -419,9 +419,9 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
     // material_rates retired: Standard/base prices from the new model
     // (fetchStandardRateMap, name-keyed); vendor catalog rows from
     // material + material_price. Planting resolves by name, not subcategory.
-    const [matMap, labRes, rows, venRes] = await Promise.all([
+    const [matMap, labMap, rows, venRes] = await Promise.all([
       fetchStandardRateMap([PLANTING_CATEGORY]),
-      supabase.from('labor_rates').select('name, rate').eq('category', PLANTING_CATEGORY),
+      fetchLaborRateMap([PLANTING_CATEGORY]),
       fetchModuleCatalog([PLANTING_CATEGORY]),
       supabase
         .from('subs_vendors')
@@ -430,13 +430,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
         .order('company_name'),
     ])
     setMaterialPrices(matMap)
-    if (labRes.data) {
-      const l = {}
-      labRes.data.forEach(r => {
-        l[r.name] = parseFloat(r.rate) || 0
-      })
-      setLaborRates(l)
-    }
+    setLaborRates(labMap)
     setMaterialRows(rows || [])
     setVendors(
       (venRes.data || []).map(v => ({
