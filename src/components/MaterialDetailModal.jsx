@@ -57,7 +57,7 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
     Promise.all([
       supabase.from('category').select('id, code, name').order('name'),
       supabase.from('subcategory').select('id, code, name, category_id').order('name'),
-      supabase.from('labor_rates').select('name, category, sub_category, rate').order('name'),
+      supabase.from('labor_rates').select('name, ref_key, label, category, sub_category, rate').order('name'),
     ]).then(([c, s, l]) => {
       setCats(c.data || [])
       setSubs(s.data || [])
@@ -286,12 +286,16 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
                   onChange={e => set('labor_rate', e.target.value)}
                 >
                   <option value="">— none —</option>
-                  {form.labor_rate && !laborsForCat.some(l => l.name === form.labor_rate) && (
-                    <option value={form.labor_rate}>{form.labor_rate}</option>
-                  )}
+                  {form.labor_rate &&
+                    !laborsForCat.some(l => l.ref_key === form.labor_rate || l.name === form.labor_rate) && (
+                      <option value={form.labor_rate}>
+                        {(labs.find(l => l.ref_key === form.labor_rate || l.name === form.labor_rate) || {}).label ||
+                          form.labor_rate}
+                      </option>
+                    )}
                   {laborsForCat.map(l => (
-                    <option key={l.name} value={l.name}>
-                      {l.name}
+                    <option key={l.ref_key || l.name} value={l.ref_key || l.name}>
+                      {l.label || l.name}
                       {l.rate != null ? ` — ${l.rate}` : ''}
                     </option>
                   ))}

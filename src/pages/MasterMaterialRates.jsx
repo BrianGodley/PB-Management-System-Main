@@ -68,7 +68,7 @@ export default function MasterMaterialRates() {
         return all
       })(),
       supabase.from('subs_vendors').select('id, company_name'),
-      supabase.from('labor_rates').select('name, category').order('name'),
+      supabase.from('labor_rates').select('name, ref_key, label, category').order('name'),
     ])
     setMaterials(matData)
     setVendors(venRes.data || [])
@@ -94,15 +94,27 @@ export default function MasterMaterialRates() {
     [labs]
   )
   // Set (or clear) an item's default labor pointer inline, without opening the modal.
+  // Stores the labor rate's immutable ref_key (LAB-/BAS-NNN-slug) — NOT its name —
+  // so renaming a labor rate never breaks the link (the rate map is dual-keyed, so
+  // calc reads resolve either way during the transition).
   // Read-modify-write against the CURRENT DB calc_meta (not the page's possibly-stale
   // snapshot) so we only touch labor_rate and never drop other keys another process
   // added out-of-band (e.g. pool_equip_category set by SQL after the page loaded).
-  const saveDefaultLabor = useCallback(async (mat, name) => {
+  const saveDefaultLabor = useCallback(async (mat, refKey) => {
     const { data: cur } = await supabase.from('material').select('calc_meta').eq('id', mat.id).single()
-    const next = { ...(cur?.calc_meta || mat.calc_meta || {}), labor_rate: name || null }
+    const next = { ...(cur?.calc_meta || mat.calc_meta || {}), labor_rate: refKey || null }
     setMaterials(ms => ms.map(x => (x.id === mat.id ? { ...x, calc_meta: next } : x)))
     await supabase.from('material').update({ calc_meta: next }).eq('id', mat.id)
   }, [])
+  // Friendly label for a stored labor pointer (ref_key or legacy name).
+  const laborLabelFor = useCallback(
+    ptr => {
+      if (!ptr) return ''
+      const hit = labs.find(l => l.ref_key === ptr || l.name === ptr)
+      return hit ? hit.label || hit.name : ptr
+    },
+    [labs]
+  )
 
   // Identity code IS the material's frozen ref_key (MAT-NNN-slug) — the exact twin
   // of labor's LAB-/BAS-NNN-slug. One code per material, shown on every vendor-price
@@ -399,12 +411,16 @@ export default function MasterMaterialRates() {
                           >
                             <option value="">— set labor —</option>
                             {r.m.calc_meta?.labor_rate &&
-                              !laborOptsForCat(r.m.category?.name).some(l => l.name === r.m.calc_meta.labor_rate) && (
-                                <option value={r.m.calc_meta.labor_rate}>{r.m.calc_meta.labor_rate}</option>
+                              !laborOptsForCat(r.m.category?.name).some(
+                                l => l.ref_key === r.m.calc_meta.labor_rate || l.name === r.m.calc_meta.labor_rate
+                              ) && (
+                                <option value={r.m.calc_meta.labor_rate}>
+                                  {laborLabelFor(r.m.calc_meta.labor_rate)}
+                                </option>
                               )}
                             {laborOptsForCat(r.m.category?.name).map(l => (
-                              <option key={l.name} value={l.name}>
-                                {l.name}
+                              <option key={l.ref_key || l.name} value={l.ref_key || l.name}>
+                                {l.label || l.name}
                               </option>
                             ))}
                           </select>
