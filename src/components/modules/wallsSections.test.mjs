@@ -94,13 +94,11 @@ const DEMO_WALL = {
   demoFootMethod: 'Hand',
 }
 
-test('Demo — slope removal + footing dig&haul (hrs/tons/dump)', () => {
+test('Demo — slope removal + footing dig&haul (hrs/dump; tons removed)', () => {
   const r = wallDemo(DEMO_WALL, rDm)
   // slope: sf=20, t=6 → hrs (20/100)×6×0.5 = 0.6 ; footing CF=16 → hrs 16×8 = 128
   near(r.hrs, 0.6 + 128, 'slope 0.6 + footing 128')
   near(r.hrs, 128.6, 'exact')
-  // tons: slope (20/200)×6=0.6 ; footing (16/27)×1.5=0.8889
-  near(r.tons, 0.6 + (16 / 27) * 1.5, 'slope + footing tons')
   // dump: slope 1 container × 300 ; footing 1 container × 770
   near(r.dump, 300 + 770, 'slope 300 + footing 770')
 })

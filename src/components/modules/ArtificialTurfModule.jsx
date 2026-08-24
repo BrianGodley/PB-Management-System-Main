@@ -24,7 +24,7 @@ import { calcTurf } from './artificialTurfCalc'
 // fallbackFirst:false). Matches the base-material pickers + sibling modules.
 const CATALOG_OPTS = { standardRows: 'null-vendor', stripPrefix: true }
 
-// ── Demo method rates (hrs per Ton) — DemoRatesTurf lookup table ────────────
+// ── Demo method rates (hrs per Cu Yd) — DemoRatesTurf lookup table ────────────
 const DEMO_METHODS = [
   { key: 'Skid Steer Good', label: 'Skid Steer (Good)', matKey: 'Turf - Demo Skid Steer Good' },
   { key: 'Skid Steer OK', label: 'Skid Steer (OK)', matKey: 'Turf - Demo Skid Steer OK' },
