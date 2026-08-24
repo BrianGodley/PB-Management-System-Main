@@ -21,9 +21,13 @@ import { collectErrors, moduleRowTitles, openModule, scanEveryOptionForNaN } fro
 // ─────────────────────────────────────────────────────────────────────────────
 const ESTIMATE = process.env.TEST_ESTIMATE_URL
 
-// Every module whose built-in material Standard reads were repointed to ref_key in M7.
+// EVERY estimator module — not just the ones M7 rewired. The 10 with built-in material
+// Standard reads repointed to ref_key PLUS the ones that were already ref_key/id or that
+// M7's global changes (dual-keyed hooks, meta.ref reader, fetchStandardRateMap band-aid
+// removal) touch — so the standardization has full-estimator e2e coverage, not a subset.
 // `exclude` guards prefix collisions in the module-row substring match (see helpers).
 const MODULES = [
+  // M7-converted (built-in material Standard reads → ref_key)
   { name: 'Finishes' },
   { name: 'Columns' },
   { name: 'Concrete' },
@@ -34,6 +38,18 @@ const MODULES = [
   { name: 'Fire Pit' },
   { name: 'Walls' },
   { name: 'Irrigation' },
+  { name: 'Paver' }, // Bedding Sand → ref_key (M7)
+  // Already ref_key/id, or no built-in material-name reads — covered for the global changes
+  { name: 'Lighting' },
+  { name: 'Pool' },
+  { name: 'Utilities' },
+  { name: 'Steps' },
+  { name: 'Turf' },
+  // No catalog materials (misc/allowance rates only) — covered so nothing regressed
+  { name: 'Weed' },
+  { name: 'Hand Demo' },
+  { name: 'Skid Steer Demo', exclude: /mini/i },
+  { name: 'Mini Skid' },
 ]
 
 test.describe('M7 material ref_key resolution (no NaN / $0 across converted modules)', () => {

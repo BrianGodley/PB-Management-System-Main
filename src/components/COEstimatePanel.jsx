@@ -47,6 +47,8 @@ import PlantingModule from './modules/PlantingModule'
 import PlantingSummary from './modules/PlantingSummary'
 import PoolModule from './modules/PoolModule'
 import PoolSummary from './modules/PoolSummary'
+import WeedAbatementModule from './modules/WeedAbatementModule'
+import WeedAbatementSummary from './modules/WeedAbatementSummary'
 import UtilitiesModule from './modules/UtilitiesModule'
 import UtilitiesSummary from './modules/UtilitiesSummary'
 import ColumnsModule from './modules/ColumnsModule'
@@ -86,6 +88,7 @@ const MODULE_GROUPS = [
     ],
   },
   { label: 'Softscapes', items: ['Irrigation', 'Planting'] },
+  { label: 'Maintenance', items: ['Weed Abatement'] },
 ]
 
 const SPECIFIC_TYPES = new Set([
@@ -1131,6 +1134,8 @@ export default function COEstimatePanel({
                   <StepsSummary module={selectedModule} />
                 ) : selectedModule.module_type === 'Pool' ? (
                   <PoolSummary module={selectedModule} />
+                ) : selectedModule.module_type === 'Weed Abatement' ? (
+                  <WeedAbatementSummary module={selectedModule} />
                 ) : (
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
@@ -1330,6 +1335,15 @@ export default function COEstimatePanel({
                 )}
                 {selectedType === 'Pool' && (
                   <PoolModule
+                    projectName={selectedProject?.project_name}
+                    onSave={editingModule ? updateModule : saveModule}
+                    onBack={editingModule ? closeModuleFlow : () => setSelectedType(null)}
+                    saving={savingModule}
+                    initialData={moduleInitialData}
+                  />
+                )}
+                {selectedType === 'Weed Abatement' && (
+                  <WeedAbatementModule
                     projectName={selectedProject?.project_name}
                     onSave={editingModule ? updateModule : saveModule}
                     onBack={editingModule ? closeModuleFlow : () => setSelectedType(null)}

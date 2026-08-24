@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { materialUsage, archiveMaterial, restoreMaterial, setMaterialPrice } from '../lib/materialCatalog'
+import UnitSelect from './UnitSelect'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MaterialDetailModal — opened from the code hyperlink in Master Material Rates.
@@ -258,11 +259,10 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="text-xs text-gray-500">Unit</span>
-                  <input
+                  <UnitSelect
                     className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm"
                     value={form.unit}
-                    onChange={e => set('unit', e.target.value)}
-                    placeholder="e.g. sqft, LF, each"
+                    onChange={v => set('unit', v)}
                   />
                 </label>
                 <label className="block">
@@ -691,7 +691,7 @@ function MoveCopyBody({ mode, title, source, onClose, onDone }) {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Unit</label>
-                <input value={unit} onChange={e => setUnit(e.target.value)} className={inputCls} placeholder="ea / SF / LF…" />
+                <UnitSelect value={unit} onChange={setUnit} className={inputCls} />
               </div>
             </>
           )}

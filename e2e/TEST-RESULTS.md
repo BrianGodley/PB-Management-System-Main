@@ -1907,3 +1907,17 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
   ONLY on `calc_meta.labor_rate` (built-in `laborDbName` arrays are dead by design), so null → $0
   labor (it did surface on the unpriced banner). Fixed by SQL: Electrical Pipe nulls → LAB-356
   (shared conduit rate), all 11 Electrical Wiring gauges → LAB-357 (Pull Wiring). Code unchanged.
+
+## 2026-08-24 — autopilot: CI run 79ddece (2026-08-21T23:13:39Z)
+- **97/97 GREEN** — 0 unexpected, 0 flaky, 0 skipped. Duration 7m55s.
+- No action taken; no e2e files edited.
+
+## 2026-08-24 (run 3) — full estimator, all 20 modules GREEN
+- **Suite: 147 pass / 0 fail / 0 skip.** Clean sweep.
+- m7-refkey.spec.js expanded to ALL 20 built modules — every one passed: Finishes, Columns,
+  Concrete, Planting, Drainage, Ground Treatments, Outdoor Kitchen, Fire Pit, Walls, Irrigation,
+  Paver, Lighting, Pool, Utilities, Steps, Turf, Weed, Hand/Skid/Mini demos. Full vendor×Type
+  matrix through the ref_key path, no NaN / console / HTTP errors. Confirms M7 standardization
+  across the whole estimator, not a subset.
+- concrete.spec.js "live edit reflects" now GREEN (fillField fix for the readonly autofill guard).
+- Water Features NOT in the spec — it's a registered-but-unbuilt module stub (task #440).

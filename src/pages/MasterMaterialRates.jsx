@@ -7,6 +7,7 @@ import TaxonomyManager from '../components/TaxonomyManager'
 import CategorySyncBanner from '../components/CategorySyncBanner'
 import ModuleCategoryMap from '../components/ModuleCategoryMap'
 import { formatUnit } from '../lib/units'
+import UnitSelect from '../components/UnitSelect'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Master Material Rates — the two-view catalog on the NEW pricing model
@@ -600,7 +601,7 @@ function AddMaterialModal({ mode, vendors, onClose, onSaved }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">Unit</label>
-              <input value={unit} onChange={e => setUnit(e.target.value)} className={inputCls} placeholder="Each / Sq Ft / Ln Ft…" />
+              <UnitSelect value={unit} onChange={setUnit} className={inputCls} />
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">
@@ -820,11 +821,11 @@ function MiscRatesPanel() {
                   />
                 </td>
                 <td className="px-3 py-1.5">
-                  <input
+                  <UnitSelect
                     className="w-24 border border-gray-300 rounded px-2 py-1 text-xs"
                     placeholder="Unit"
                     value={draft.unit}
-                    onChange={e => setDraft({ ...draft, unit: e.target.value })}
+                    onChange={v => setDraft({ ...draft, unit: v })}
                   />
                 </td>
                 <td className="px-3 py-1.5 text-right">
@@ -892,11 +893,11 @@ function MiscRatesPanel() {
                     </td>
                     <td className="px-3 py-1.5 text-gray-600 whitespace-nowrap">
                       {isEd ? (
-                        <input
+                        <UnitSelect
                           className="w-24 border border-green-300 rounded-md px-2 py-1 text-xs"
                           placeholder="Unit"
                           value={editing.unit}
-                          onChange={e => setEditing({ ...editing, unit: e.target.value })}
+                          onChange={v => setEditing({ ...editing, unit: v })}
                           onKeyDown={e => {
                             if (e.key === 'Enter') saveRate(r.id)
                             if (e.key === 'Escape') setEditing(null)

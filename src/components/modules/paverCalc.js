@@ -4,6 +4,7 @@
 // from lib/materialCatalog + lib/walkAccess (which import supabase); kept in sync.
 import { LAB } from '../../lib/laborRefs.js'
 import { BAS } from '../../lib/basicLaborRefs.js'
+import { MAT } from '../../lib/materialRefs.js'
 import { makeModuleRates } from '../../lib/moduleRates.js'
 const n = v => parseFloat(v) || 0
 const DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN = 60
@@ -100,7 +101,7 @@ export function calcPaver(
 
   // Material rates — live from the catalog / misc_rates, no hardcoded fallback.
   const baseRockPerTon = n(mr['Paver - Base Rock'])
-  const beddingSandPerCy = n(mr['Bedding Sand']) // shared Basic Materials, now $/Cu Yd
+  const beddingSandPerCy = n(mr[MAT.BEDDING_SAND] ?? mr['Bedding Sand']) // shared Basic Materials (MAT-017), $/Cu Yd; ref_key first (M7)
   const jointSandPerSF = n(mr['Paver - Joint Sand'])
   // Single poly-sand MATERIAL rate used for BOTH New and Existing pavers.
   const polySandPerSF = n(mr['Paver - Poly Sand'])

@@ -9,6 +9,18 @@
 // column headers, breakdown text). It is idempotent, so calling it on an
 // already-normalized value is safe. Do NOT run it on rate KEY names (lookup keys).
 // ─────────────────────────────────────────────────────────────────────────────
+// Preset unit options offered in the Master Rates add/edit modals (materials +
+// misc rates). Rendered as a pick-list; custom values are still allowed (misc rates
+// use things like 'Per Visit' / 'Per Bag'). Brian's canonical set (2026-08-24).
+export const UNIT_PRESETS = [
+  'Per Each',
+  'Per Ton',
+  'Per Cu Yd',
+  'Per Sq Ft',
+  'Per Ln Ft',
+  'Per Cu Ft',
+]
+
 function normSegment(seg) {
   let s = seg
   // digit-glued forms first (100sf, 400SF, 10cy) — no word boundary before the unit.

@@ -25,6 +25,9 @@ export const MAT = {
   REBAR_8: 'MAT-033-rebar-8',
   CLASS_II_ROADBASE: 'MAT-021-class-ii-roadbase',
   WEED_FABRIC: 'MAT-020-weed-fabric',
+  // Bedding Sand: canonical shared Basic Materials record (MAT-017). A duplicate
+  // exists under the Paver category (MAT-426); Pavers reads the Basic Materials one.
+  BEDDING_SAND: 'MAT-017-bedding-sand',
 
   // ── Concrete (Concrete Mix category) ────────────────────────────────────────
   CONC_HAND_MIX: 'MAT-052-concrete-hand-mix',
