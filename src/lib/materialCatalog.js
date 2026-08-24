@@ -117,13 +117,18 @@ export async function fetchPriceLedgerAsOf(materialIds, asOfDate = null) {
       return q
     })(),
   ])
-  const stdId =
-    (vends || []).find(v => ['standard', 'unspecified'].includes((v.company_name || '').trim().toLowerCase()))
-      ?.id || null
+  // All stand-in vendors ('Standard' AND 'Unspecified') = the universal/Standard
+  // price bucket. Match every one (a lone .find picked just one, so a price filed
+  // under the other stand-in silently failed to resolve as Standard → $0).
+  const stdIds = new Set(
+    (vends || [])
+      .filter(v => ['standard', 'unspecified'].includes((v.company_name || '').trim().toLowerCase()))
+      .map(v => v.id)
+  )
   const map = {}
   const bestStart = {} // "materialId|vendorKey" → latest effective_start seen
   ;(ledRes.data || []).forEach(r => {
-    const vk = r.vendor_id == null || r.vendor_id === stdId ? STANDARD_KEY : r.vendor_id
+    const vk = r.vendor_id == null || stdIds.has(r.vendor_id) ? STANDARD_KEY : r.vendor_id
     const key = `${r.material_id}|${vk}`
     const start = r.effective_start || ''
     if (bestStart[key] == null || start >= bestStart[key]) {
@@ -168,9 +173,16 @@ export async function fetchModuleCatalog(categories) {
     supabase.from('subs_vendors').select('id, company_name'),
   ])
   const catIds = (catRows || []).map(c => c.id)
-  const stdId =
-    (vends || []).find(v => ['standard', 'unspecified'].includes((v.company_name || '').trim().toLowerCase()))
-      ?.id || null
+  // ALL stand-in vendors ('Standard' AND 'Unspecified') are the universal price
+  // bucket — a price filed under either must resolve as Standard (vendor_id null).
+  // A single .find() picked only one, so a price stored under the other stand-in
+  // (e.g. plants priced under 'Standard' while .find matched 'Unspecified') was
+  // never mapped to null → the module read $0 while View Rates showed it.
+  const stdIds = new Set(
+    (vends || [])
+      .filter(v => ['standard', 'unspecified'].includes((v.company_name || '').trim().toLowerCase()))
+      .map(v => v.id)
+  )
   if (!catIds.length) return []
   const sel = `id, description, unit, calc_meta, collection,
        watts, va, labor_hrs_ea, sub_price_ea, sf_per_pallet, price_per_lf_vert,
@@ -217,7 +229,7 @@ export async function fetchModuleCatalog(categories) {
           unit_cost: p.price,
           sub_category: m.subcategory?.name || null,
           category: m.category?.name || null,
-          vendor_id: p.vendor_id === stdId ? null : p.vendor_id,
+          vendor_id: stdIds.has(p.vendor_id) ? null : p.vendor_id,
           calc_meta: m.calc_meta || null,
           collection: m.collection || null,
           // Module-specific product specs (Lighting watts/va/labor/sub-price,
@@ -476,13 +488,18 @@ export async function fetchAllMaterialsAdmin() {
     }
     return [v, m]
   })
-  const stdId =
-    (vends || []).find(v => ['standard', 'unspecified'].includes((v.company_name || '').trim().toLowerCase()))
-      ?.id || null
+  // All stand-in vendors ('Standard' AND 'Unspecified') = the universal/Standard
+  // price bucket. Match every one (a lone .find picked just one, so a price filed
+  // under the other stand-in silently failed to resolve as Standard → $0).
+  const stdIds = new Set(
+    (vends || [])
+      .filter(v => ['standard', 'unspecified'].includes((v.company_name || '').trim().toLowerCase()))
+      .map(v => v.id)
+  )
   return (data || [])
     .map(m => {
       const open = (m.prices || []).filter(p => p.effective_end == null)
-      const std = open.find(p => p.vendor_id === stdId)
+      const std = open.find(p => stdIds.has(p.vendor_id))
       return {
         id: m.id,
         name: m.description,
@@ -542,13 +559,18 @@ export async function fetchSelections() {
     const retry = await supabase.from('material').select(selSel).eq('show_in_selections', true)
     data = retry.data
   }
-  const stdId =
-    (vends || []).find(v => ['standard', 'unspecified'].includes((v.company_name || '').trim().toLowerCase()))
-      ?.id || null
+  // All stand-in vendors ('Standard' AND 'Unspecified') = the universal/Standard
+  // price bucket. Match every one (a lone .find picked just one, so a price filed
+  // under the other stand-in silently failed to resolve as Standard → $0).
+  const stdIds = new Set(
+    (vends || [])
+      .filter(v => ['standard', 'unspecified'].includes((v.company_name || '').trim().toLowerCase()))
+      .map(v => v.id)
+  )
   return (data || [])
     .map(m => {
       const open = (m.prices || []).filter(p => p.effective_end == null)
-      const std = open.find(p => p.vendor_id === stdId)
+      const std = open.find(p => stdIds.has(p.vendor_id))
       const price = std ? num(std.price) : open.length ? Math.min(...open.map(p => num(p.price))) : null
       const attrs = m.attributes && typeof m.attributes === 'object' ? m.attributes : {}
       return {
