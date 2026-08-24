@@ -70,7 +70,8 @@ export const ADDON_META = {
 
 // ── Per-row calculators ──────────────────────────────────────────────────────
 // Plant row: In-House material = qty × the row's (editable, vendor-defaulted) unit
-// price. perDay > 0 guard skips both hrs and material when the labor rate is 0.
+// price. Hours and material are INDEPENDENT — an unset labor rate never zeroes the
+// material (and vice-versa); unpriced labor surfaces via the banner instead.
 export function computePlantRow(row, perDay) {
   if (!row.type) return { qty: n(row.qty), hrs: 0, mat: 0, subUnit: 0, subEach: 0, subMat: 0 }
   const qty = n(row.qty)
