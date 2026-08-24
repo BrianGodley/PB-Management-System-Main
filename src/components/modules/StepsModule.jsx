@@ -647,11 +647,12 @@ function MaterialStepSection({
                     disabled={!opts.length}
                   >
                     <option value="">{`Select ${matWord.toLowerCase()} type`}</option>
-                    {row.type && !opts.some(o => o.label === row.type) && (
-                      <option value={row.type}>{row.type}</option>
-                    )}
+                    {row.type &&
+                      !opts.some(o => (o.ref_key || o.id) === row.type || o.label === row.type) && (
+                        <option value={row.type}>{row.type}</option>
+                      )}
                     {opts.map(o => (
-                      <option key={o.label} value={o.label}>
+                      <option key={o.id} value={o.ref_key || o.id}>
                         {o.label}
                       </option>
                     ))}

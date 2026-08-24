@@ -122,7 +122,9 @@ function applianceTypeOptions(materialRows, vendorSel = 'Standard') {
   // Catalog-only: the catalog is the sole source of options. No built-in
   // APPLIANCE_TYPES fallback — an unseeded 'Appliance' sub-category yields an
   // empty list (each new row starts on its "Select …" placeholder = $0).
-  return catRows.map(o => ({ value: o.label, label: o.label, name: o.row.name, fromMaster: true }))
+  // Option VALUE = the item's frozen ref_key (picker stores it, rename-proof);
+  // applianceUnitPrice resolves ref_key via catalogItemFor's byRef branch.
+  return catRows.map(o => ({ value: o.ref_key || o.label, ref_key: o.ref_key || null, label: o.label, name: o.row.name, fromMaster: true }))
 }
 // Vendor-aware unit material price for an Appliance row. A per-row $/ea override
 // wins; otherwise a selected catalog Appliance Item resolves its vendor-aware
@@ -156,7 +158,7 @@ function sinkTypeOptions(materialRows, vendorSel = 'Standard') {
     stripPrefix: true,
     category: OK_APPLIANCE_CATEGORY,
   })
-  return catRows.map(o => ({ value: o.label, label: o.label, name: o.row.name, fromMaster: true }))
+  return catRows.map(o => ({ value: o.ref_key || o.label, ref_key: o.ref_key || null, label: o.label, name: o.row.name, fromMaster: true }))
 }
 // Vendor-aware unit material price for a Sink row. A per-row $/ea override wins;
 // otherwise a selected catalog Sink Item resolves its vendor-aware price
@@ -365,11 +367,11 @@ function EpTable({
                     <div className="flex items-center gap-1">
                       <select
                         className="input text-sm py-1 flex-1 min-w-0"
-                        value={matOpt?.label}
+                        value={matOpt?.ref_key || matOpt?.label}
                         onChange={e => upd(i, 'type', e.target.value)}
                       >
                         {opts.map(o => (
-                          <option key={o.label} value={o.label}>
+                          <option key={o.label} value={o.ref_key || o.label}>
                             {o.label}
                           </option>
                         ))}
@@ -950,9 +952,10 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
     }
   }, [])
 
-  // NOTE: materialRows (the live catalog) is intentionally NOT persisted — it is
-  // reference data fetched fresh on open. Freezing it into the estimate made
-  // newly-added catalog items (e.g. appliances) invisible in older estimates.
+  // NOTE: the LIVE materialRows drives pricing and is fetched fresh on open (never
+  // read from the estimate) so newly-added catalog items (e.g. appliances) stay
+  // visible. handleSave persists only a slim id/ref_key/name snapshot, read solely
+  // by the summary to resolve a stored ref_key back to the item name (rename-safe).
   const state = { crewType, subType, subGpMarkupRate, commissionRate, ...cur, rebarSize }
   const calcRaw = calcOutdoorKitchen(
     state,
@@ -998,6 +1001,15 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
         rebarSize,
         gpmd,
         materialPrices,
+        // Slim catalog snapshot: appliance/sink/gas rows store a frozen material
+        // ref_key, so the summary needs id/ref_key→name to render the item name a
+        // rename-safe way. Snapshot is read ONLY by OutdoorKitchenSummary — the live
+        // module still fetches materialRows fresh, so new catalog items stay visible.
+        materialRows: (materialRows || []).map(r => ({
+          id: r.id,
+          ref_key: r.ref_key || null,
+          name: r.name,
+        })),
         calc,
       },
     })

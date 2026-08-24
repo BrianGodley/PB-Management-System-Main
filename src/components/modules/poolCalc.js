@@ -76,7 +76,7 @@ function resolveUtilRow(cat, row, houseArr, materialRows, mp, opts = {}) {
   const laborVal = n(mp[laborName])
   const matCatalog = builtIn?.matCatalog ?? 0
   const matCost = vrow ? n(vrow.unit_cost) : mp[matDbName] != null ? n(mp[matDbName]) : matCatalog
-  const matOpt = { label: builtIn?.label, dbName: matDbName, matCatalog, fallback: matCatalog }
+  const matOpt = { label: builtIn?.label, ref_key: builtIn?.ref_key || null, dbName: matDbName, matCatalog, fallback: matCatalog }
   return { opts: merged, matOpt, matCost, laborVal, laborName, laborBuiltIn: builtIn }
 }
 

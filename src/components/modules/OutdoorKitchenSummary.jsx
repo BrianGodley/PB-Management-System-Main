@@ -11,7 +11,16 @@ const fmt2 = v =>
   `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 // Build the quantity sections for one tab record (In-House or Sub).
-function buildSections(t = {}, { sub = false } = {}) {
+// `materialRows` is the saved catalog snapshot: appliance/sink/gas rows store a
+// frozen material ref_key, so resolve it to the item's name for display.
+function buildSections(t = {}, { sub = false, materialRows = [] } = {}) {
+  const matName = key => {
+    if (!key) return key
+    const hit = (materialRows || []).find(r => r.ref_key === key || r.id === key || r.name === key)
+    if (!hit) return key
+    const dash = hit.name ? hit.name.indexOf(' - ') : -1
+    return dash > 0 ? hit.name.slice(dash + 3) : hit.name
+  }
   const structure = []
   if (n(t.bbqLengthLF) > 0)
     structure.push({ label: 'BBQ Wall', value: `${n(t.bbqLengthLF)} Ln Ft × ${n(t.bbqHeightIn) || 48}"` })
@@ -31,7 +40,7 @@ function buildSections(t = {}, { sub = false } = {}) {
   const appliances = (t.equipmentRows || [])
     .filter(r => n(r.qty) > 0)
     .map(r => ({
-      label: `${r.type || 'Equipment'}${r.clientProvided ? ' (client provided)' : ''}`,
+      label: `${matName(r.type) || 'Equipment'}${r.clientProvided ? ' (client provided)' : ''}`,
       value: `× ${n(r.qty)}`,
       sub: n(r.hours) > 0 ? `${n(r.hours)} hrs per Each` : undefined,
     }))
@@ -39,13 +48,13 @@ function buildSections(t = {}, { sub = false } = {}) {
   const ep = []
   ;(t.epLineRows || [])
     .filter(r => n(r.lf) > 0)
-    .forEach(r => ep.push({ label: r.type || 'Utility line', value: `${n(r.lf)} Ln Ft` }))
+    .forEach(r => ep.push({ label: matName(r.type) || 'Utility line', value: `${n(r.lf)} Ln Ft` }))
   ;(t.epGasRows || [])
     .filter(r => n(r.qty) > 0)
-    .forEach(r => ep.push({ label: r.type || 'Gas fixture', value: `× ${n(r.qty)}` }))
+    .forEach(r => ep.push({ label: matName(r.type) || 'Gas fixture', value: `× ${n(r.qty)}` }))
   ;(t.epElecRows || [])
     .filter(r => n(r.qty) > 0)
-    .forEach(r => ep.push({ label: r.type || 'Electrical fixture', value: `× ${n(r.qty)}` }))
+    .forEach(r => ep.push({ label: matName(r.type) || 'Electrical fixture', value: `× ${n(r.qty)}` }))
 
   const finishes = (t.wallFinishRows || [])
     .filter(r => n(r.sf) > 0)
@@ -78,8 +87,9 @@ export default function OutdoorKitchenSummary({ module }) {
   const ih = d.ihData || d // legacy estimates stored flat = In-House
   const sub = d.subData || {}
 
-  const inHouseSections = buildSections(ih, { sub: false })
-  const subSections = buildSections(sub, { sub: true })
+  const materialRows = d.materialRows || []
+  const inHouseSections = buildSections(ih, { sub: false, materialRows })
+  const subSections = buildSections(sub, { sub: true, materialRows })
 
   // ── Totals from saved calc snapshot ────────────────────────────────────────
   const c = d.calc || {}

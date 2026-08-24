@@ -11,7 +11,7 @@ import assert from 'node:assert/strict'
 import { calcSteps } from './stepsCalc.js'
 
 const LRPH = 75
-const PAVER = { id: 'p1', name: 'Ashlar Paver', sub_category: 'Paver Material', vendor_id: null, unit_cost: 8, sf_per_pallet: 120 }
+const PAVER = { id: 'p1', name: 'Ashlar Paver', sub_category: 'Paver Material', vendor_id: null, unit_cost: 8, sf_per_pallet: 120, ref_key: 'MAT-501-ashlar-paver' }
 const base = {
   subType: 'In House',
   paverRows: [], brickRows: [], tileRows: [], flagRows: [],
@@ -41,6 +41,20 @@ test('paver step value: labor = SF × form rate, material = SF × item price (10
   assert.equal(r.stepMat, 800, `stepMat got ${r.stepMat}`)
   assert.equal(r.pallets, 1, `pallets = ceil(100/120) = 1; got ${r.pallets}`)
   finiteNums(r)
+})
+
+test('M5 ref_key parity: a paver step picked by material ref_key resolves the same price as by name', () => {
+  const byName = run(
+    { paverRows: [{ vendor: 'Standard', type: 'Ashlar Paver', form: 'Straight', sf: 100 }] },
+    { 'LAB-425-steps-straight': 0.5 }, {}, [PAVER]
+  )
+  const byRef = run(
+    { paverRows: [{ vendor: 'Standard', type: 'MAT-501-ashlar-paver', form: 'Straight', sf: 100 }] },
+    { 'LAB-425-steps-straight': 0.5 }, {}, [PAVER]
+  )
+  assert.equal(byRef.stepMat, byName.stepMat, `ref_key material should match name material; got ${byRef.stepMat} vs ${byName.stepMat}`)
+  assert.equal(byRef.stepMat, 800, `100 SF × $8 = $800; got ${byRef.stepMat}`)
+  assert.equal(byRef.totalHrs, byName.totalHrs, 'labor identical regardless of key form')
 })
 
 test('paver edit-reflects: raising the form labor rate raises labor proportionally', () => {

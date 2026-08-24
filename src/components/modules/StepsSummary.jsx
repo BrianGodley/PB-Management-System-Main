@@ -43,6 +43,21 @@ export default function StepsSummary({ module }) {
   } = data
   const isSub = subType === 'Subcontractor'
 
+  // Material step Type is stored as a frozen material ref_key. Resolve it to the
+  // item's display name via the estimate's saved catalog snapshot. Falls back to
+  // the raw value so nothing renders blank. Live estimate → current name; frozen
+  // bid → as-bid name (the snapshot is captured at save).
+  const matName = key => {
+    if (!key) return key
+    const hit = (data.materialRows || []).find(
+      r => (r.ref_key && r.ref_key === key) || r.id === key || r.name === key
+    )
+    if (!hit) return key
+    // Strip the "<sub_category> - " prefix so the label matches the picker.
+    const dash = hit.name && hit.name.indexOf(' - ')
+    return dash > 0 ? hit.name.slice(dash + 3) : hit.name
+  }
+
   const MAT_SECTIONS = [
     { title: 'Paver Steps', rows: 'paverRows', sub: 'subPaverRows' },
     { title: 'Brick Steps', rows: 'brickRows', sub: 'subBrickRows' },
@@ -83,7 +98,7 @@ export default function StepsSummary({ module }) {
           {sec.rows.map((r, i) => (
             <LineRow
               key={i}
-              label={[r.type || sec.title.replace(' Steps', ''), r.form, r.grouted ? 'grouted' : null]
+              label={[matName(r.type) || sec.title.replace(' Steps', ''), r.form, r.grouted ? 'grouted' : null]
                 .filter(Boolean)
                 .join(' · ')}
               value={`${n(r.sf)} LF`}
