@@ -15,12 +15,14 @@ function calcWalkAccessLabor(laborSubtotalHrs, distanceLF, opts = {}) {
   return ((hrs / 8) * (lf * 2)) / pace
 }
 // Vendor→Standard→fallback material price (mirrors lib/materialCatalog.resolveMaterialPrice).
-function resolveMaterialPrice(name, vendorId, materialRows, priceMap, fallback = 0) {
+function resolveMaterialPrice(key, vendorId, materialRows, priceMap, fallback = 0) {
   if (vendorId && !isStandardSel(vendorId)) {
-    const row = (materialRows || []).find(r => r.name === name && r.vendor_id === vendorId)
+    const row = (materialRows || []).find(
+      r => (r.ref_key === key || r.id === key || r.name === key) && r.vendor_id === vendorId
+    )
     if (row && row.unit_cost != null && row.unit_cost !== '') return num(row.unit_cost)
   }
-  const p = priceMap?.[name]
+  const p = priceMap?.[key]
   return p != null ? p : fallback
 }
 // Catalog option/item resolvers (pure bodies mirror lib/materialCatalog).
@@ -32,7 +34,7 @@ function catalogOptions(materialRows, subcategory, vendorSel, { standardRows = '
     .filter(r => r.sub_category === subcategory && (!category || r.category === category) && (isStandard ? r.vendor_id == null : r.vendor_id === vendorSel))
     .map(r => {
       const label = stripPrefix && r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name
-      return { id: r.id, value: r.id, label, stored: label, row: r }
+      return { id: r.id, value: r.id, ref_key: r.ref_key || null, label, stored: label, row: r }
     })
 }
 function catalogItemFor(materialRows, subcategory, vendorSel, key, opts = {}) {
@@ -40,6 +42,9 @@ function catalogItemFor(materialRows, subcategory, vendorSel, key, opts = {}) {
   const options = catalogOptions(materialRows, subcategory, vendorSel, rest)
   if (!options.length) return null
   if (!key) return fallbackFirst ? options[0].row : null
+  // Immutable pointers first: material ref_key (MAT-NNN-slug) or id, then legacy label/name.
+  const byRef = options.find(o => o.ref_key && o.ref_key === key)
+  if (byRef) return byRef.row
   const byId = options.find(o => o.id === key)
   if (byId) return byId.row
   const byLabel = options.find(o => o.stored === key || o.label === key)
@@ -52,6 +57,22 @@ const PLANTING_CATEGORY = 'Planting'
 const PLANTS_SUBCAT = 'Plants'
 const plantMatPrice = resolveMaterialPrice
 const lr = (laborRates, key) => n(laborRates[key])
+
+// Resolve a plant row's install labor (hrs per plant). Resolves the picked plant
+// material (row.type may be the material ref_key, id, or legacy name — catalogItemFor
+// handles all three) and reads its Default Labor pointer (calc_meta.labor_rate, a
+// labor ref_key or legacy name — laborRates is dual-keyed). Shared by the calc AND
+// the module's live display so both always agree. Returns 0 when unset (the calc
+// surfaces that separately via laborUnset — never a hidden fallback).
+export function plantInstallPerDay(row, materialRows, laborRates) {
+  const it = catalogItemFor(materialRows, PLANTS_SUBCAT, row?.vendor, row?.type, {
+    standardRows: 'null-vendor',
+    stripPrefix: true,
+    category: PLANTING_CATEGORY,
+    fallbackFirst: false,
+  })
+  return n(laborRates?.[it?.calc_meta?.labor_rate || null])
+}
 
 // Planting Add-On item catalog (the Item dropdown; NOT from the DB). Each add-on
 // carries its own labor formula + material/labor DB names. Exported so the
@@ -157,7 +178,7 @@ export function calcPlanting(
       fallbackFirst: false,
     })
     const laborName = it?.calc_meta?.labor_rate || null
-    const perDay = n(laborRates[laborName])
+    const perDay = plantInstallPerDay(r, materialRows, laborRates)
     if (r.type && n(r.qty) > 0 && perDay <= 0) laborUnset.push({ kind: 'labor', name: laborName, label: r.type, category: 'Planting', unit: null })
     return perDay
   }

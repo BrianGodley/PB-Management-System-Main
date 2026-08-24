@@ -448,7 +448,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
       standardRows: 'null-vendor',
       stripPrefix: true,
     })
-    return opts.map(o => ({ label: o.label, dbName: o.row.name, fallback: n(o.row.unit_cost), category: 'Concrete' }))
+    return opts.map(o => ({ ref_key: o.ref_key || null, id: o.id, label: o.label, dbName: o.row.name, fallback: n(o.row.unit_cost), category: 'Concrete' }))
   }
   // Effective vendor for a stored value: 'auto'/unset/Standard → category default.
   // Honest effective vendor: only unset/'auto' falls back to the category default;
@@ -917,11 +917,12 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                           onChange={e => updateBaseRow(i, 'type', e.target.value)}
                         >
                           {!row.type && <option value="">Select type</option>}
-                          {row.type && !baseOpts.some(o => o.label === row.type) && (
-                            <option value={row.type}>{row.type}</option>
-                          )}
+                          {row.type &&
+                            !baseOpts.some(o => (o.ref_key || o.id) === row.type || o.label === row.type) && (
+                              <option value={row.type}>{row.type}</option>
+                            )}
                           {baseOpts.map(o => (
-                            <option key={o.label} value={o.label}>
+                            <option key={o.id} value={o.label}>
                               {o.label}
                             </option>
                           ))}
@@ -1107,11 +1108,12 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                         title="Mix type"
                       >
                         {!installTierType[t.key] && <option value="">Select mix</option>}
-                        {installTierType[t.key] && !mixOpts.some(o => o.label === installTierType[t.key]) && (
-                          <option value={installTierType[t.key]}>{installTierType[t.key]}</option>
-                        )}
+                        {installTierType[t.key] &&
+                          !mixOpts.some(
+                            o => (o.ref_key || o.id) === installTierType[t.key] || o.label === installTierType[t.key]
+                          ) && <option value={installTierType[t.key]}>{installTierType[t.key]}</option>}
                         {mixOpts.map(o => (
-                          <option key={o.label} value={o.label}>
+                          <option key={o.id} value={o.label}>
                             {o.label}
                           </option>
                         ))}
@@ -1246,11 +1248,11 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 >
                   {!activeVaporItem && <option value="">Select item</option>}
                   {activeVaporItem &&
-                    !sectionOptions('Vapor Barrier', activeVaporVendor).some(o => o.label === activeVaporItem) && (
-                      <option value={activeVaporItem}>{activeVaporItem}</option>
-                    )}
+                    !sectionOptions('Vapor Barrier', activeVaporVendor).some(
+                      o => (o.ref_key || o.id) === activeVaporItem || o.label === activeVaporItem
+                    ) && <option value={activeVaporItem}>{activeVaporItem}</option>}
                   {sectionOptions('Vapor Barrier', activeVaporVendor).map(o => (
-                    <option key={o.label} value={o.label}>
+                    <option key={o.id} value={o.label}>
                       {o.label}
                     </option>
                   ))}
@@ -1327,11 +1329,11 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 >
                   {!activeFinishMatItem && <option value="">Select item</option>}
                   {activeFinishMatItem &&
-                    !sectionOptions('Concrete Finish Material', activeFinishMatVendor).some(o => o.label === activeFinishMatItem) && (
-                      <option value={activeFinishMatItem}>{activeFinishMatItem}</option>
-                    )}
+                    !sectionOptions('Concrete Finish Material', activeFinishMatVendor).some(
+                      o => (o.ref_key || o.id) === activeFinishMatItem || o.label === activeFinishMatItem
+                    ) && <option value={activeFinishMatItem}>{activeFinishMatItem}</option>}
                   {sectionOptions('Concrete Finish Material', activeFinishMatVendor).map(o => (
-                    <option key={o.label} value={o.label}>
+                    <option key={o.id} value={o.label}>
                       {o.label}
                     </option>
                   ))}
@@ -1382,11 +1384,11 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
                 >
                   {!activeSealerItem && <option value="">Select item</option>}
                   {activeSealerItem &&
-                    !sectionOptions('Concrete Sealer', activeSealerVendor).some(o => o.label === activeSealerItem) && (
-                      <option value={activeSealerItem}>{activeSealerItem}</option>
-                    )}
+                    !sectionOptions('Concrete Sealer', activeSealerVendor).some(
+                      o => (o.ref_key || o.id) === activeSealerItem || o.label === activeSealerItem
+                    ) && <option value={activeSealerItem}>{activeSealerItem}</option>}
                   {sectionOptions('Concrete Sealer', activeSealerVendor).map(o => (
-                    <option key={o.label} value={o.label}>
+                    <option key={o.id} value={o.label}>
                       {o.label}
                     </option>
                   ))}

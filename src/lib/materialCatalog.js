@@ -69,6 +69,10 @@ export function catalogOptions(
     .map(r => {
       const label =
         stripPrefix && r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name
+      // Each option exposes BOTH the material id (`value`, unchanged) and its frozen
+      // ref_key (MAT-NNN-slug). Modules convert to storing `ref_key` one at a time
+      // (the labor mechanism) — the resolver (catalogItemFor) already accepts
+      // ref_key→id→name, so a converted picker and a legacy id-save both resolve.
       return { id: r.id, value: r.id, ref_key: r.ref_key || null, label, stored: label, row: r }
     })
 }

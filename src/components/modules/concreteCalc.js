@@ -55,8 +55,17 @@ const INSTALL_TIERS = [
   { key: 's2000plus', label: '2000+ SF', rateName: LAB.CONC_INSTALL_2000_PLUS },
 ]
 
-function resolveType(label, opts) {
-  return (label != null && opts.find(o => o.label === label)) || { dbName: null, fallback: 0 }
+function resolveType(key, opts) {
+  // `key` is the picker's stored value — the material ref_key (MAT-NNN-slug), or a
+  // legacy id/label. Resolve ref_key → id → label so a converted picker and old
+  // saves both resolve to the same catalog row.
+  return (
+    (key != null &&
+      opts.find(o => (o.ref_key && o.ref_key === key) || o.id === key || o.label === key)) || {
+      dbName: null,
+      fallback: 0,
+    }
+  )
 }
 
 const CLASS2_NAMES = ['Class II Roadbase', 'Base - Class II Roadbase']
@@ -90,7 +99,7 @@ export function calcConcrete(
     const opts = catalogOptions(materialRows, cat, isStd ? 'Standard' : vsel, {
       standardRows: 'null-vendor',
       stripPrefix: true,
-    }).map(o => ({ label: o.label, dbName: o.row.name, fallback: n(o.row.unit_cost) }))
+    }).map(o => ({ ref_key: o.ref_key || null, id: o.id, label: o.label, dbName: o.row.name, fallback: n(o.row.unit_cost) }))
     return resolveType(row.type, opts)
   }
   // Vendor-catalog MATERIAL resolver (sealer / vapor / finish material). Resolves
@@ -104,10 +113,12 @@ export function calcConcrete(
       standardRows: 'null-vendor',
       stripPrefix: true,
     })
-    const o = opts.find(x => x.label === itemName)
+    const o = opts.find(
+      x => (x.ref_key && x.ref_key === itemName) || x.id === itemName || x.label === itemName
+    )
     if (!o) return null
     const meta = o.row.calc_meta || {}
-    return { price: n(o.row.unit_cost), coverage: n(meta.coverageSqFt), coats: n(meta.coats) }
+    return { price: n(o.row.unit_cost), coverage: n(meta.coverageSqFt), coats: n(meta.coats), dbName: o.row.name }
   }
   // Subcontractor rates: a one-off adjustment saved on THIS estimate
   // (state.rateOverrides) takes precedence over the master rate.
@@ -240,8 +251,10 @@ export function calcConcrete(
     // (only recorded here, where the tier actually has SF).
     const rate = R.labor(t.rateName, { category: 'Concrete', unit: 'Hrs per Sq Ft', label: t.label + ' Install' })
     let hrs = sf * rate
-    // Hand Mix uplift: producing mix by hand adds labor to this tier.
-    if (/hand\s*mix/i.test(installTierType[t.key] || '')) hrs *= 1 + handMixUpliftPct / 100
+    // Hand Mix uplift: producing mix by hand adds labor to this tier. Detect from
+    // the RESOLVED mix item's name (the stored value is now a ref_key, not the name).
+    const mixItem = rowOpt('Concrete Mix', { vendor: installTierVendor[t.key], type: installTierType[t.key] })
+    if (/hand\s*mix/i.test(mixItem.dbName || '')) hrs *= 1 + handMixUpliftPct / 100
     return s + hrs
   }, 0)
   // Concrete mix material + volume — per size-tier: each tier's SF × its own
@@ -342,7 +355,7 @@ export function calcConcrete(
   const seal = catItem('Concrete Sealer', state.sealerVendor, state.sealerItem)
   let sealerHrs = 0
   if (sealerSF > 0) {
-    const isWet = /wet/i.test(state.sealerItem || '')
+    const isWet = /wet/i.test(seal?.dbName || '')
     const sealRef = isWet ? LAB.CONC_SEALER_WET : LAB.CONC_SEALER_NATURAL
     sealerHrs = sealerSF * R.labor(sealRef, { category: 'Concrete', unit: 'Hrs per Sq Ft', label: isWet ? 'Sealer (Wet-Look)' : 'Sealer (Natural)' })
   }

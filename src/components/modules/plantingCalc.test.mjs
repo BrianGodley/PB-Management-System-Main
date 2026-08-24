@@ -30,6 +30,24 @@ const finiteNums = obj => {
   }
 }
 
+test('PARITY (M4): selecting a plant by its material ref_key resolves the same as by name — 25 × $17 = $425 material, 5 hrs labor by labor ref_key', () => {
+  // Material carries a MAT-ref_key and its Default Labor pointer is a LAB-ref_key;
+  // the row stores the MAT-ref_key (not the name). catalogItemFor resolves by ref_key,
+  // laborRates is dual-keyed by ref_key → labor resolves; material = qty × row.price.
+  const PLANT_REF = {
+    id: 'pl9', ref_key: 'MAT-676-5-gallon-standard', name: '5 gallon standard',
+    sub_category: 'Plants', category: 'Planting', vendor_id: null, unit_cost: 17,
+    calc_meta: { labor_rate: 'LAB-027-5-gallon-standard' },
+  }
+  const r = run(
+    { smallPlantRows: [{ vendor: 'Standard', type: 'MAT-676-5-gallon-standard', qty: '25', price: '17' }] },
+    { 'LAB-027-5-gallon-standard': 0.2 }, {}, [PLANT_REF]
+  )
+  assert.equal(r.smallHrs, 5, `smallHrs got ${r.smallHrs}`)          // 25 × 0.2
+  assert.equal(r.totalMat, 425, `totalMat got ${r.totalMat}`)        // 25 × $17
+  assert.deepEqual(r.laborUnset, [], 'ref_key-selected priced plant does not flag as unset')
+})
+
 test('plant labor value: hrs = qty × per-plant rate (10 × 0.5 = 5 hrs → $375); material = qty × price ($180)', () => {
   const r = run(
     { smallPlantRows: [{ vendor: 'Standard', type: '5 gallon standard', qty: '10', price: '18' }] },

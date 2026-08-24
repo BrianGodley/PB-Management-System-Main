@@ -9,7 +9,7 @@ import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 import { resolveMaterialPrice, catalogOptions, catalogItemFor, fetchModuleCatalog, fetchStandardRateMap, fetchLaborRateMap } from '../../lib/materialCatalog'
-import { calcPlanting } from './plantingCalc'
+import { calcPlanting, plantInstallPerDay } from './plantingCalc'
 import UnpricedItemModal from '../UnpricedItemModal'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -220,7 +220,11 @@ function plantTypeOptions(materialRows, subcat, builtInKeys, vendorSel, itemName
   for (const k of builtInKeys) {
     const want = itemNameFor(k)
     const hit = catRows.find(o => o.label === want || o.row.name === want)
-    if (hit) out.push({ value: k, label: k, builtIn: k, dbName: hit.row.name })
+    // value = the material's immutable ref_key (MAT-NNN-slug) so a renamed plant
+    // never loses the selection; falls back to the built-in key only if the catalog
+    // row has no ref_key yet. label/builtIn stay the friendly size for display +
+    // per-day math. Old saves keyed on the name still resolve (dbName match).
+    if (hit) out.push({ value: hit.row.ref_key || k, label: k, builtIn: k, dbName: hit.row.name })
   }
   return out
 }
@@ -648,7 +652,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
             </thead>
             <tbody>
               {rows.map((row, i) => {
-                const perDay = perDayFn(laborRates, row.type)
+                const perDay = plantInstallPerDay(row, materialRows, laborRates)
                 const c = computePlantRow(row, perDay)
                 // Vendor-first Type list (mirrors Turf's baseMatOptions): the
                 // selected vendor's 'Plants' Items intersected with THIS picker's
