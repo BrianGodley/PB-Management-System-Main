@@ -27,13 +27,18 @@ const num = v => {
 // '' / null and 'Standard' both mean "use the Standard price".
 const isStandardSel = v => !v || v === 'Standard'
 
-// Name-keyed resolver (Pattern A/B modules). `vendorId` of 'Standard'/''/null → Standard price.
-export function resolveMaterialPrice(name, vendorId, materialRows, priceMap, fallback = 0) {
+// Resolver keyed by a material's identity. `key` may be the immutable material
+// ref_key (MAT-NNN-slug) or id, or the legacy name — all resolve the same row
+// (priceMap is tri-keyed by fetchStandardRateMap). `vendorId` of 'Standard'/''/null
+// → the Standard price.
+export function resolveMaterialPrice(key, vendorId, materialRows, priceMap, fallback = 0) {
   if (vendorId && !isStandardSel(vendorId)) {
-    const row = (materialRows || []).find(r => r.name === name && r.vendor_id === vendorId)
+    const row = (materialRows || []).find(
+      r => (r.ref_key === key || r.id === key || r.name === key) && r.vendor_id === vendorId
+    )
     if (row && row.unit_cost != null && row.unit_cost !== '') return num(row.unit_cost)
   }
-  const mp = priceMap?.[name]
+  const mp = priceMap?.[key]
   return mp != null ? mp : fallback
 }
 
@@ -64,7 +69,7 @@ export function catalogOptions(
     .map(r => {
       const label =
         stripPrefix && r.name && r.name.startsWith(prefix) ? r.name.slice(prefix.length) : r.name
-      return { id: r.id, value: r.id, label, stored: label, row: r }
+      return { id: r.id, value: r.id, ref_key: r.ref_key || null, label, stored: label, row: r }
     })
 }
 
@@ -77,6 +82,11 @@ export function catalogItemFor(materialRows, subcategory, vendorSel, key, opts =
   const options = catalogOptions(materialRows, subcategory, vendorSel, rest)
   if (!options.length) return null
   if (!key) return fallbackFirst ? options[0].row : null
+  // Resolve immutable pointers first: material.ref_key (MAT-NNN-slug) or id, then
+  // fall back to legacy label/name saves. ref_key is preferred so a renamed
+  // material never loses its stored selection.
+  const byRef = options.find(o => o.ref_key && o.ref_key === key)
+  if (byRef) return byRef.row
   const byId = options.find(o => o.id === key)
   if (byId) return byId.row
   const byLabel = options.find(o => o.stored === key || o.label === key)
@@ -184,7 +194,7 @@ export async function fetchModuleCatalog(categories) {
       .map(v => v.id)
   )
   if (!catIds.length) return []
-  const sel = `id, description, unit, calc_meta, collection,
+  const sel = `id, ref_key, description, unit, calc_meta, collection,
        watts, va, labor_hrs_ea, sub_price_ea, sf_per_pallet, price_per_lf_vert,
        category:category_id ( name ),
        subcategory:subcategory_id ( name ),
@@ -224,6 +234,7 @@ export async function fetchModuleCatalog(categories) {
       .forEach(p => {
         rows.push({
           id: m.id,
+          ref_key: m.ref_key || null,
           name: m.description,
           unit: m.unit || null,
           unit_cost: p.price,
@@ -309,7 +320,15 @@ export async function fetchStandardRateMap(categories) {
     if (r.ref_key) map[r.ref_key] = num(r.rate)
   })
   ;(rows || []).forEach(r => {
-    if (r.vendor_id == null && r.name) map[r.name] = num(r.unit_cost)
+    if (r.vendor_id == null) {
+      // Dual/tri-key the Standard price by name AND the immutable material
+      // ref_key (MAT-NNN-slug) AND id, mirroring labor's dual-key map — a module
+      // can migrate its price lookup from name → ref_key with zero breakage.
+      const v = num(r.unit_cost)
+      if (r.name) map[r.name] = v
+      if (r.ref_key) map[r.ref_key] = v
+      if (r.id) map[r.id] = v
+    }
   })
   return map
 }
@@ -474,7 +493,7 @@ export async function fetchAllMaterialsAdmin() {
     supabase
       .from('material')
       .select(
-        `id, description, unit, calc_meta, photo_url, sku, show_in_selections, archived_at,
+        `id, ref_key, description, unit, calc_meta, photo_url, sku, show_in_selections, archived_at,
          category:category_id ( name ),
          subcategory:subcategory_id ( name ),
          prices:material_price ( price, vendor_id, effective_end )`
@@ -507,6 +526,7 @@ export async function fetchAllMaterialsAdmin() {
       const std = open.find(p => stdIds.has(p.vendor_id))
       return {
         id: m.id,
+        ref_key: m.ref_key || null,
         name: m.description,
         unit: m.unit || null,
         unit_cost: std ? num(std.price) : open.length ? num(open[0].price) : null,
@@ -550,7 +570,7 @@ export async function getStandardNamedRate(name) {
 //   { id, category, sub_category, name, photo_url, unit, price, collection }
 // price = the Standard (universal) open price, else the lowest open vendor price.
 export async function fetchSelections() {
-  const selSel = `id, description, photo_url, unit, collection, sku, attributes,
+  const selSel = `id, ref_key, description, photo_url, unit, collection, sku, attributes,
          category:category_id ( name ),
          subcategory:subcategory_id ( name ),
          prices:material_price ( price, vendor_id, effective_end )`
@@ -580,6 +600,7 @@ export async function fetchSelections() {
       const attrs = m.attributes && typeof m.attributes === 'object' ? m.attributes : {}
       return {
         id: m.id,
+        ref_key: m.ref_key || null,
         category: m.category?.name || null,
         sub_category: m.subcategory?.name || null,
         name: m.description,
