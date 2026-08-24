@@ -27,10 +27,6 @@ const money = v =>
   v == null ? '—' : `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const isStandardName = s => ['standard', 'unspecified'].includes((s || '').trim().toLowerCase())
 
-// Short vendor code for the identity string (first 4 alphanumerics, upper).
-const vendorCode = name =>
-  isStandardName(name) ? 'STD' : (name || '').replace(/[^a-z0-9]/gi, '').slice(0, 4).toUpperCase() || 'VEN'
-
 export default function MasterMaterialRates() {
   const [view, setView] = useState('vendor') // 'vendor' | 'standard' | 'misc' | 'cat' | 'sub' | 'archived'
   const [materials, setMaterials] = useState([])
@@ -52,7 +48,7 @@ export default function MasterMaterialRates() {
     // silently truncated (a just-added material would never appear). Fetch in
     // 1000-row blocks so every product shows.
     const PAGE = 1000
-    const sel = `id, description, unit, is_default, collection, category_id, subcategory_id, archived_at, calc_meta,
+    const sel = `id, ref_key, description, unit, is_default, collection, category_id, subcategory_id, archived_at, calc_meta,
            category:category_id ( code, name ),
            subcategory:subcategory_id ( code, name ),
            prices:material_price ( id, price, vendor_id, effective_end )`
@@ -108,22 +104,11 @@ export default function MasterMaterialRates() {
     await supabase.from('material').update({ calc_meta: next }).eq('id', mat.id)
   }, [])
 
-  // Stable per-sub-category index → the NNNN in the identity code.
-  const seqOf = useMemo(() => {
-    const bySub = {}
-    const map = {}
-    ;[...materials]
-      .sort((a, b) => (a.description || '').localeCompare(b.description || ''))
-      .forEach(m => {
-        const k = m.subcategory?.code || '?'
-        bySub[k] = (bySub[k] || 0) + 1
-        map[m.id] = String(bySub[k]).padStart(4, '0')
-      })
-    return map
-  }, [materials])
-
-  const codeFor = (m, vName) =>
-    `${m.category?.code || '?'}-${m.subcategory?.code || '?'}-${vendorCode(vName)}-${seqOf[m.id] || '0000'}`
+  // Identity code IS the material's frozen ref_key (MAT-NNN-slug) — the exact twin
+  // of labor's LAB-/BAS-NNN-slug. One code per material, shown on every vendor-price
+  // row for that material (vendor is a separate column). Replaces the old on-the-fly
+  // CAT-SUB-VENDOR-NNNN string so materials match the labor scheme.
+  const codeFor = m => m.ref_key || '—'
 
   const openPrices = m => (m.prices || []).filter(p => p.effective_end == null)
 
@@ -154,7 +139,7 @@ export default function MasterMaterialRates() {
             priceId: sp?.id ?? null,
             vendorId: standardVendorId,
             price: sp?.price ?? null,
-            code: codeFor(m, 'Standard'),
+            code: codeFor(m),
             archived: true,
           })
         })
@@ -183,7 +168,7 @@ export default function MasterMaterialRates() {
             priceId: p.id,
             vendorId: p.vendor_id,
             price: p.price,
-            code: codeFor(m, vendorName(p.vendor_id)),
+            code: codeFor(m),
             vName: vendorName(p.vendor_id),
             noPrice: p.price == null || p.price === '',
           })
@@ -201,7 +186,7 @@ export default function MasterMaterialRates() {
             priceId: std?.id ?? null,
             vendorId: std?.vendor_id ?? standardVendorId,
             price: null,
-            code: codeFor(m, 'Standard'),
+            code: codeFor(m),
             vName: vendorName(standardVendorId) || 'Standard',
             noPrice: true,
           })
@@ -209,7 +194,7 @@ export default function MasterMaterialRates() {
       }
     })
     return out
-  }, [materials, view, cat, q, standardVendorId, seqOf, vendorName])
+  }, [materials, view, cat, q, standardVendorId, vendorName])
 
   // ── Sorting ────────────────────────────────────────────────────────────────
   const sortVal = (r, key) => {
