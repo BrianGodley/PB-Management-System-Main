@@ -949,12 +949,6 @@ export default function MasterRates({ only } = {}) {
     { key: 'notes', label: 'Notes', placeholder: 'Optional notes', width: '14rem' },
     { key: 'unit', label: 'Unit', type: 'select', options: LABOR_UNIT_OPTIONS, width: '8rem' },
     { key: 'rate', label: 'Rate', type: 'number', step: '0.0001', width: '7rem' },
-    {
-      key: '__modules',
-      label: 'Estimate Module',
-      editable: false,
-      render: r => <ModuleTags modules={estimateModules(r.category)} />,
-    },
   ]
   // Basic Labor: its code IS the frozen ref_key (BAS-###). The link opens the
   // same detail modal, pointed at the basic_labor_rates table.
