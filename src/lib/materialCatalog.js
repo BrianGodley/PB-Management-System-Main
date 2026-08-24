@@ -288,12 +288,14 @@ export async function fetchStandardRateMap(categories) {
     supabase.from('basic_labor_rates').select('name, ref_key, rate, category'),
   ])
   const map = {}
-  ;(rows || []).forEach(r => {
-    if (r.vendor_id == null && r.name) map[r.name] = num(r.unit_cost)
-  })
+  // Labor / misc / basic first, THEN the material catalog LAST so a MATERIAL price
+  // always wins a name collision with a same-named labor/misc rate. This matters
+  // where a material and its install-labor deliberately share a name — e.g. Planting
+  // '5 gallon standard' is both a $17 plant AND a 0.2-hr install rate; without this,
+  // the labor rate clobbered the price and material resolved to $0.20/plant. ref_keys
+  // (LAB-/BAS-NNN-slug) are unique and never collide with material names, so labor is
+  // still fully readable by ref_key; only the by-NAME collision resolves to material.
   ;(labRes.data || []).forEach(r => {
-    // Key by BOTH the display name (legacy lookups) and the stable ref_key
-    // (LAB-NNN-slug), so modules can migrate to ref_key without breakage.
     if (r.name) map[r.name] = num(r.rate)
     if (r.ref_key) map[r.ref_key] = num(r.rate)
   })
@@ -305,6 +307,9 @@ export async function fetchStandardRateMap(categories) {
     // Dual-keyed by name AND ref_key (BAS-NNN-slug), same transition contract.
     if (r.name) map[r.name] = num(r.rate)
     if (r.ref_key) map[r.ref_key] = num(r.rate)
+  })
+  ;(rows || []).forEach(r => {
+    if (r.vendor_id == null && r.name) map[r.name] = num(r.unit_cost)
   })
   return map
 }
