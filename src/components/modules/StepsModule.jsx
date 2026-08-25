@@ -61,6 +61,23 @@ const CONC_TYPES = ['Standard', 'Standard Colored', 'Cantilevered', 'Cantilevere
 // duplicate "… Colored Labor" lines.
 const CONC_BASE_TYPES = ['Standard', 'Cantilevered']
 const concBaseType = t => (t || '').replace(/\s*Colored$/i, '')
+// View Rates scope (mirrors WALLS_RATE_SCOPE): the exact (category, sub) pairs the
+// Steps calc consumes, so buildViewRates surfaces ONLY those instead of dumping the
+// whole 'Steps' category + leaking every borrowed catalog. Own category 'Steps'
+// covers all step type/finish/form-install labor + the named $/SF misc modifiers +
+// the flat $/LF subcontractor rates. Borrowed material subs come from the paver /
+// concrete / basic-materials catalogs the module fetches. Verify completeness with
+// `npm run test:steps-coverage` after any change here.
+const STEPS_RATE_SCOPE = [
+  { category: 'Steps' }, // step type/finish/form-install labor + misc $/SF + sub $/LF
+  { category: 'Paver', sub: 'Paver Material' }, // paver step catalog materials
+  { category: 'Concrete', sub: 'Concrete Mix' }, // concrete step vendor mix
+  { category: 'Basic Materials', sub: 'Brick' }, // brick step materials
+  { category: 'Basic Materials', sub: 'Tile' }, // tiled step materials
+  { category: 'Basic Materials', sub: 'Flagstone' }, // flagstone step materials
+  { category: 'Basic Materials', sub: 'Aggregate & Concrete' }, // base material (Class II / mix)
+]
+
 const CONC_FINISHES = ['Smooth', 'Broom', 'Sanded', 'Salted', 'Exposed Aggregate']
 
 // ── Rate-key builders (category 'Steps') ─────────────────────────────────────
@@ -1041,6 +1058,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
             onCrewTypeChange={setCrewType}
             title="Steps"
             moduleType="Steps"
+            rateScope={STEPS_RATE_SCOPE}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
           />
