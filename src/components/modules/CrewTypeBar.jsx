@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import { useRateIcons } from '../../contexts/RateIconsContext'
 import ViewRatesModal from './ViewRatesModal'
-import { buildViewRates, fetchHiddenKeys, setHidden } from '../../lib/viewRates'
+import { buildViewRates } from '../../lib/viewRates'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CrewTypeBar — shared bar that used to be a copy-pasted "Crew Type" select in
@@ -50,28 +50,16 @@ export default function CrewTypeBar({
   const { showRateIcons, toggleRateIcons, canAccessRates } = useRateIcons()
   const [showRates, setShowRates] = useState(false)
   const [dynRates, setDynRates] = useState([])
-  const [hiddenSet, setHiddenSet] = useState(() => new Set())
   const hasRates = !!moduleType || (Array.isArray(rates) && rates.length > 0)
 
+  // View Rates is scope-driven now (buildViewRates surfaces exactly the rates the
+  // module consumes), so the old hide/unhide mechanism is retired — every scoped
+  // rate always shows, no "Show hidden" toggle.
   const loadDyn = useCallback(async () => {
     if (!moduleType) return
-    const [built, hidden] = await Promise.all([
-      buildViewRates(moduleType, rateScope),
-      fetchHiddenKeys(moduleType),
-    ])
+    const built = await buildViewRates(moduleType, rateScope)
     setDynRates(built.groups || [])
-    setHiddenSet(hidden)
   }, [moduleType, rateScope])
-
-  const toggleHide = async key => {
-    const willHide = !hiddenSet.has(key)
-    setHiddenSet(prev => {
-      const n = new Set(prev)
-      willHide ? n.add(key) : n.delete(key)
-      return n
-    })
-    await setHidden(moduleType, key, willHide)
-  }
 
   const openRates = () => {
     setShowRates(true)
@@ -158,8 +146,6 @@ export default function CrewTypeBar({
             if (moduleType) loadDyn()
           }}
           onClose={() => setShowRates(false)}
-          hidden={moduleType ? hiddenSet : null}
-          onToggleHide={moduleType ? toggleHide : null}
         />
       )}
     </div>
