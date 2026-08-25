@@ -58,8 +58,6 @@ const COPING_TYPES = [
   'Pour In Place Sand Finish',
 ]
 
-// ── Spillway types — labor ('Spillway - <type>') + material ('Spillway <type>')
-const SPILLWAY_TYPES = ['TILE', 'FLAGSTONE']
 
 // ── Interior finish types ($/SF sub — 'Interior Finish - <type>' in subs) ────
 const INTERIOR_TYPES = ['White Plaster', 'Quartzscapes', 'Stonescapes']
