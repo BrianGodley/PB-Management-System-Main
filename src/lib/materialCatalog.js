@@ -75,6 +75,10 @@ export function catalogOptions(
       // ref_key→id→name, so a converted picker and a legacy id-save both resolve.
       return { id: r.id, value: r.id, ref_key: r.ref_key || null, label, stored: label, row: r }
     })
+    // Every module's Type/material picker lists options ALPHABETICALLY by label
+    // (numeric-aware, case-insensitive). Resolution (catalogItemFor) matches by
+    // key regardless of order, so sorting is display-only and safe.
+    .sort((a, b) => (a.label || '').localeCompare(b.label || '', undefined, { numeric: true, sensitivity: 'base' }))
 }
 
 // Resolve a stored selection key to its material_rates row: by id (new saves),
