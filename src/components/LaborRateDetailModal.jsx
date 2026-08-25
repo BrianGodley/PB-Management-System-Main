@@ -2,6 +2,49 @@ import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 
+// A real, click-to-open dropdown of existing values that ALSO lets you type a brand
+// new one (via the "＋ New…" option). Replaces the old <input list=…> datalists,
+// which didn't reliably show a dropdown. Free-text friendly (labor categories are
+// free-text), so you can move a rate into a new category like "Paver".
+function PickOrType({ value, onChange, options = [], className, placeholder = 'Select…' }) {
+  const known = value ? options.includes(value) : false
+  const [custom, setCustom] = useState(!!value && !known)
+  if (custom) {
+    return (
+      <div className="flex gap-1 items-center">
+        <input
+          className={className}
+          value={value}
+          placeholder={placeholder}
+          onChange={e => onChange(e.target.value)}
+          autoFocus
+        />
+        <button
+          type="button"
+          className="text-[11px] text-gray-400 hover:text-gray-600 px-1 whitespace-nowrap"
+          onClick={() => { setCustom(false); onChange('') }}
+        >
+          ▾ list
+        </button>
+      </div>
+    )
+  }
+  return (
+    <select
+      className={className}
+      value={known ? value : ''}
+      onChange={e => {
+        if (e.target.value === '__new__') { setCustom(true); onChange('') }
+        else onChange(e.target.value)
+      }}
+    >
+      <option value="">{placeholder}</option>
+      {options.map(o => <option key={o} value={o}>{o}</option>)}
+      <option value="__new__">＋ New…</option>
+    </select>
+  )
+}
+
 // Detail modal for a Master Labor Rates row — mirrors the Master Material Rates
 // detail modal: a view mode with labelled fields, an edit mode, Delete, and a
 // Move/Copy action that can recategorize within labor OR relocate the rate to
@@ -103,15 +146,13 @@ export default function LaborRateDetailModal({
             <>
               <label className="block">
                 <span className="text-xs text-gray-500">Category</span>
-                <input className={inputCls} list="labor-cat-opts" value={form.category}
-                  onChange={e => set('category', e.target.value)} />
-                <datalist id="labor-cat-opts">{catOptions.map(c => <option key={c} value={c} />)}</datalist>
+                <PickOrType className={inputCls} value={form.category}
+                  onChange={v => set('category', v)} options={catOptions} placeholder="Select category…" />
               </label>
               <label className="block">
                 <span className="text-xs text-gray-500">Sub-Category</span>
-                <input className={inputCls} list="labor-sub-opts" value={form.sub_category}
-                  onChange={e => set('sub_category', e.target.value)} />
-                <datalist id="labor-sub-opts">{subOptions.map(s => <option key={s} value={s} />)}</datalist>
+                <PickOrType className={inputCls} value={form.sub_category}
+                  onChange={v => set('sub_category', v)} options={subOptions} placeholder="Select sub-category…" />
               </label>
               <label className="block">
                 <span className="text-xs text-gray-500">Item (name / key) — locked</span>
@@ -301,14 +342,12 @@ function MoveCopyLaborBody({ mode, source, table = 'labor_rates', catOptions = [
           </label>
           <label className="block">
             <span className="text-xs text-gray-500">Category</span>
-            <input className={inputCls} list="mc-cat" value={category} onChange={e => setCategory(e.target.value)} />
-            <datalist id="mc-cat">{catOptions.map(c => <option key={c} value={c} />)}</datalist>
+            <PickOrType className={inputCls} value={category} onChange={setCategory} options={catOptions} placeholder="Select category…" />
           </label>
           {dest !== 'misc' && (
             <label className="block">
               <span className="text-xs text-gray-500">Sub-Category</span>
-              <input className={inputCls} list="mc-sub" value={subCategory} onChange={e => setSubCategory(e.target.value)} />
-              <datalist id="mc-sub">{subOptions.map(s => <option key={s} value={s} />)}</datalist>
+              <PickOrType className={inputCls} value={subCategory} onChange={setSubCategory} options={subOptions} placeholder="Select sub-category…" />
             </label>
           )}
           {dest === 'sub' && (
