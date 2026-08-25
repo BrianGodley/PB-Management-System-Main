@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { materialUsage, archiveMaterial, restoreMaterial, setMaterialPrice } from '../lib/materialCatalog'
 import UnitSelect from './UnitSelect'
+import PriceInput from './PriceInput'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MaterialDetailModal — opened from the code hyperlink in Master Material Rates.
@@ -269,12 +270,10 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
                   <span className="text-xs text-gray-500">
                     {row.vName ? `${row.vName} Price` : 'Standard Price'}
                   </span>
-                  <input
-                    type="number"
-                    step="0.01"
+                  <PriceInput
                     className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm"
                     value={form.price}
-                    onChange={e => set('price', e.target.value)}
+                    onChange={v => set('price', v)}
                   />
                 </label>
               </div>

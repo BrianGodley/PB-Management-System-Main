@@ -8,6 +8,7 @@ import CategorySyncBanner from '../components/CategorySyncBanner'
 import ModuleCategoryMap from '../components/ModuleCategoryMap'
 import { formatUnit } from '../lib/units'
 import UnitSelect from '../components/UnitSelect'
+import PriceInput from '../components/PriceInput'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Master Material Rates — the two-view catalog on the NEW pricing model
@@ -607,7 +608,7 @@ function AddMaterialModal({ mode, vendors, onClose, onSaved }) {
               <label className="block text-xs font-semibold text-gray-500 mb-1">
                 Price{isVendor ? '' : ' (Standard)'}
               </label>
-              <input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className={inputCls} placeholder="0.00" />
+              <PriceInput value={price} onChange={setPrice} className={inputCls} />
             </div>
           </div>
           {isVendor && (
