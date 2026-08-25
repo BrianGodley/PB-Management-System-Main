@@ -496,7 +496,7 @@ function makeTab(data = {}) {
     // older saved estimates gain the new fields. 'From Trucks' was dropped
     // (handled in Job Site Conditions).
     excavation: {
-      mode: 'In-House',
+      mode: 'In House',
       equipment: 'Skid Steer',
       toDumpMiles: '',
       subVendor: 'Our Trucking',
@@ -1221,7 +1221,10 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
         {/* Excavation has its OWN In-House/Sub toggle (independent of the module tab):
             Sub greys out the dig; In-House shows Equipment + Haul Method. */}
         {(() => {
+          // Excavation defaults to In-House: the section is In-House unless the mode
+          // is explicitly 'Sub' (robust to the 'In House'/'In-House' label variants).
           const excMode = T.excavation.mode || 'In House'
+          const isExcSub = excMode === 'Sub'
           return (
             <div className="flex items-center justify-between gap-2 mb-2">
               <div className="flex-1">
@@ -1234,7 +1237,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
                     type="button"
                     onClick={() => upd('excavation', { ...T.excavation, mode: m })}
                     className={`px-3 py-1.5 text-xs font-medium ${
-                      excMode === m ? 'bg-green-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                      (m === 'Sub' ? isExcSub : !isExcSub) ? 'bg-green-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
                     }`}
                   >
                     {m}
@@ -1244,7 +1247,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             </div>
           )
         })()}
-        {(T.excavation.mode || 'In House') === 'In House' ? (
+        {(T.excavation.mode || 'In House') !== 'Sub' ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="sm:col-span-2">
               <Label text="Equipment" />
@@ -1336,7 +1339,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             <strong>{calc.excavHrs.toFixed(1)} hrs</strong>
           </p>
         )}
-        {calc.excMode === 'In House' && T.excavation.haulMethod && (
+        {calc.excMode !== 'Sub' && T.excavation.haulMethod && (
           <p className="text-xs text-gray-500 mt-1 px-1">
             {calc.isContainerHaul
               ? <>Containers: {calc.haulContainers} × ${calc.haulUnitRate || '—'} per container (ceil {calc.totalExcavCY.toFixed(1)} Cu Yd ÷ 10) →{' '}</>
