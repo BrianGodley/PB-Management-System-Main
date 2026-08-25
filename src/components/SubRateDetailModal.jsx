@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
+import PriceInput from './PriceInput'
 
 // Detail modal for a Master Subcontractor Rates row — mirrors the Master Labor /
 // Material detail modals: a view mode with labelled fields, an edit mode, Delete,
@@ -163,8 +164,7 @@ export default function SubRateDetailModal({
                 </label>
                 <label className="block">
                   <span className="text-xs text-gray-500">Unit Price</span>
-                  <input type="number" step="0.01" className={inputCls} value={form.rate}
-                    onChange={e => set('rate', e.target.value)} />
+                  <PriceInput className={inputCls} value={form.rate} onChange={v => set('rate', v)} />
                 </label>
               </div>
             </>

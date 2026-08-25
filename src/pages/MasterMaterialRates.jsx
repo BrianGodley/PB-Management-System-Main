@@ -10,6 +10,12 @@ import { formatUnit } from '../lib/units'
 import UnitSelect from '../components/UnitSelect'
 import PriceInput from '../components/PriceInput'
 
+// A misc rate is a DOLLAR amount (dump fees, container/haul prices, $-named
+// adders) vs a COEFFICIENT (swell, density, capacity factors). Only money rows
+// get the $*.** input; coefficients stay a plain number. Mirrors the isFee test
+// buildViewRates uses so the editor and View Rates agree on what's money.
+const miscIsMoney = name => /dump|low-?boy|\$|price|fee|charge|delivery|haul/i.test(String(name || ''))
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Master Material Rates — the two-view catalog on the NEW pricing model
 // (`material` product + `material_price` per product×vendor). Replaces the old
@@ -809,17 +815,28 @@ function MiscRatesPanel() {
                   />
                 </td>
                 <td className="px-3 py-1.5 text-right">
-                  <input
-                    type="number"
-                    step="0.0001"
-                    className="w-24 border border-gray-300 rounded px-2 py-1 text-xs text-right"
-                    placeholder="0"
-                    value={draft.rate}
-                    onChange={e => setDraft({ ...draft, rate: e.target.value })}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') addRow()
-                    }}
-                  />
+                  {miscIsMoney(draft.name) ? (
+                    <PriceInput
+                      className="w-24 border border-gray-300 rounded px-2 py-1 text-xs text-right"
+                      value={draft.rate}
+                      onChange={v => setDraft({ ...draft, rate: v })}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') addRow()
+                      }}
+                    />
+                  ) : (
+                    <input
+                      type="number"
+                      step="0.0001"
+                      className="w-24 border border-gray-300 rounded px-2 py-1 text-xs text-right"
+                      placeholder="0"
+                      value={draft.rate}
+                      onChange={e => setDraft({ ...draft, rate: e.target.value })}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') addRow()
+                      }}
+                    />
+                  )}
                 </td>
                 <td className="px-3 py-1.5">
                   <UnitSelect
@@ -876,18 +893,31 @@ function MiscRatesPanel() {
                     <td className="px-3 py-1.5 text-gray-900 font-medium">{r.name}</td>
                     <td className="px-3 py-1.5 text-right whitespace-nowrap">
                       {isEd ? (
-                        <input
-                          autoFocus
-                          type="number"
-                          step="0.0001"
-                          className="w-24 border border-green-300 rounded-md px-2 py-1 text-xs text-right"
-                          value={editing.value}
-                          onChange={e => setEditing({ ...editing, value: e.target.value })}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') saveRate(r.id)
-                            if (e.key === 'Escape') setEditing(null)
-                          }}
-                        />
+                        miscIsMoney(r.name) ? (
+                          <PriceInput
+                            autoFocus
+                            className="w-24 border border-green-300 rounded-md px-2 py-1 text-xs text-right"
+                            value={editing.value}
+                            onChange={v => setEditing({ ...editing, value: v })}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') saveRate(r.id)
+                              if (e.key === 'Escape') setEditing(null)
+                            }}
+                          />
+                        ) : (
+                          <input
+                            autoFocus
+                            type="number"
+                            step="0.0001"
+                            className="w-24 border border-green-300 rounded-md px-2 py-1 text-xs text-right"
+                            value={editing.value}
+                            onChange={e => setEditing({ ...editing, value: e.target.value })}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') saveRate(r.id)
+                              if (e.key === 'Escape') setEditing(null)
+                            }}
+                          />
+                        )
                       ) : (
                         <span className="text-gray-800 font-semibold">{num4(r.rate)}</span>
                       )}
