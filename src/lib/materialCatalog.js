@@ -202,7 +202,7 @@ export async function fetchModuleCatalog(categories) {
        watts, va, labor_hrs_ea, sub_price_ea, sf_per_pallet, price_per_lf_vert,
        category:category_id ( name ),
        subcategory:subcategory_id ( name ),
-       prices:material_price ( price, vendor_id, effective_end )`
+       prices:material_price ( price, vendor_id, effective_start, effective_end )`
   // Prefer to hide archived materials, but fall back gracefully if the
   // archived_at column hasn't been migrated yet — otherwise the filter errors
   // and the estimator loses every catalog block/material.
@@ -233,30 +233,47 @@ export async function fetchModuleCatalog(categories) {
   const data = matRes.data
   const rows = []
   ;(data || []).forEach(m => {
+    // Emit ONE row per (material, vendor). A material can carry more than one OPEN
+    // (effective_end IS NULL) price for the same vendor — e.g. a price-sheet import
+    // that added a new open row without superseding the old one, or a Standard +
+    // Unspecified pair (both are the universal bucket). Left un-collapsed, each open
+    // price became its own picker option sharing the SAME ref_key, so the resolver's
+    // .find() always hit the first — selecting a different one never changed the
+    // price. Keep only the latest open price per vendor (max effective_start, mirrors
+    // fetchPriceLedgerAsOf), with both stand-in vendors folded into one Standard row.
+    const best = new Map() // vendorKey → { price, vendor_id, start }
     ;(m.prices || [])
       .filter(p => p.effective_end == null)
       .forEach(p => {
-        rows.push({
-          id: m.id,
-          ref_key: m.ref_key || null,
-          name: m.description,
-          unit: m.unit || null,
-          unit_cost: p.price,
-          sub_category: m.subcategory?.name || null,
-          category: m.category?.name || null,
-          vendor_id: stdIds.has(p.vendor_id) ? null : p.vendor_id,
-          calc_meta: m.calc_meta || null,
-          collection: m.collection || null,
-          // Module-specific product specs (Lighting watts/va/labor/sub-price,
-          // Paver/Steps pallet, etc.) — null when the product doesn't carry them.
-          watts: m.watts ?? null,
-          va: m.va ?? null,
-          labor_hrs_ea: m.labor_hrs_ea ?? null,
-          sub_price_ea: m.sub_price_ea ?? null,
-          sf_per_pallet: m.sf_per_pallet ?? null,
-          price_per_lf_vert: m.price_per_lf_vert ?? null,
-        })
+        const isStd = stdIds.has(p.vendor_id)
+        const vk = isStd ? '__std__' : p.vendor_id
+        const start = p.effective_start || ''
+        const cur = best.get(vk)
+        if (!cur || start >= cur.start)
+          best.set(vk, { price: p.price, vendor_id: isStd ? null : p.vendor_id, start })
       })
+    best.forEach(b => {
+      rows.push({
+        id: m.id,
+        ref_key: m.ref_key || null,
+        name: m.description,
+        unit: m.unit || null,
+        unit_cost: b.price,
+        sub_category: m.subcategory?.name || null,
+        category: m.category?.name || null,
+        vendor_id: b.vendor_id,
+        calc_meta: m.calc_meta || null,
+        collection: m.collection || null,
+        // Module-specific product specs (Lighting watts/va/labor/sub-price,
+        // Paver/Steps pallet, etc.) — null when the product doesn't carry them.
+        watts: m.watts ?? null,
+        va: m.va ?? null,
+        labor_hrs_ea: m.labor_hrs_ea ?? null,
+        sub_price_ea: m.sub_price_ea ?? null,
+        sf_per_pallet: m.sf_per_pallet ?? null,
+        price_per_lf_vert: m.price_per_lf_vert ?? null,
+      })
+    })
   })
   return rows
 }
