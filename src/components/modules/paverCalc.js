@@ -211,6 +211,18 @@ export function calcPaver(
       if (item) {
         pricePerSF = priceOf(item)
         sfPerPallet = n(item.sf_per_pallet)
+        // No-fallback: a selected paver whose catalog price is MISSING (null) surfaces
+        // in the fix-it banner instead of silently pricing $0. A real, present 0 is
+        // left alone (mirrors makeModuleRates' material rule).
+        if (sf > 0 && (item.unit_cost == null || item.unit_cost === '')) {
+          R.unpriced.set(`material|${item.name}`, {
+            name: item.name,
+            label: item.name,
+            materialId: item.id,
+            category: 'Paver',
+            unit: 'Sq Ft',
+          })
+        }
       }
     } else if (row.paverBrand) {
       const paverData = pp.find(p => p.brand === row.paverBrand && p.name === row.paverName)

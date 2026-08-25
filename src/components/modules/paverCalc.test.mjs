@@ -37,6 +37,17 @@ test('edit-reflects: raising the labor rate raises labor proportionally', () => 
   assert.equal(b.laborCost, a.laborCost * 2, 'rate ×2 → labor ×2')
 })
 
+test('unpriced material: a selected paver with a NULL catalog price surfaces in the fix-it banner (not silent $0)', () => {
+  const rows = [{ id: 'pv1', name: 'Courtyard 4 Stone Package', sub_category: 'Paver Material', vendor_id: null, unit_cost: null, sf_per_pallet: 100 }]
+  const r = run(
+    { areaRows: [{ sf: 1000, depth: 6, paverVendor: 'Standard', paverType: 'pv1' }] },
+    { materialRows: rows }
+  )
+  assert.equal(r.totalPaverCost ?? 0, 0, 'null-priced paver still contributes $0 material')
+  const flagged = (r.unpriced || []).some(u => u.kind !== 'labor' && /4 Stone Package/.test(u.name || u.label || ''))
+  assert.ok(flagged, 'the unpriced paver surfaces in the banner')
+})
+
 test('unpriced / NO-FALLBACK: an unset labor rate reads 0 (no hidden constant)', () => {
   // No 'LAB-334-paver-straight-cut' rate in the map → straight-cut hours resolve to 0, and
   // with no other priced input the estimate labor is $0. Never a code fallback.
