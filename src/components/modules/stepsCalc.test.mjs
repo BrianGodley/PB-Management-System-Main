@@ -66,7 +66,7 @@ test('paver edit-reflects: raising the form labor rate raises labor proportional
 test('concrete step value: labor = LF × (type + finish) × formMult; material = LF × (typeMat + finishMat)', () => {
   const r = run(
     { concRows: [{ type: 'Standard', form: 'Straight', sf: 100, finish: 'Smooth' }] },
-    { 'LAB-416-steps-conc-standard-hrs-per-sq-ft': 0.9, 'LAB-424-steps-finish-smooth-hrs-per-sq-ft': 0.1, 'LAB-414-steps-conc-form-straight': 1 },
+    { 'LAB-416-steps-conc-standard': 0.9, 'LAB-424-steps-finish-smooth-hrs-per-sq-ft': 0.1, 'LAB-414-steps-conc-form-straight': 1 },
     { 'Steps - Conc Standard $ per Sq Ft': 5, 'Steps - Finish Smooth $ per Sq Ft': 1 }
   )
   assert.equal(r.totalHrs, 100, `totalHrs got ${r.totalHrs}`) // 100 × (0.9+0.1) × 1
@@ -74,7 +74,7 @@ test('concrete step value: labor = LF × (type + finish) × formMult; material =
 })
 
 test('concrete edit-reflects: raising the finish material rate raises material', () => {
-  const rates = { 'LAB-416-steps-conc-standard-hrs-per-sq-ft': 0.9, 'LAB-424-steps-finish-smooth-hrs-per-sq-ft': 0.1, 'LAB-414-steps-conc-form-straight': 1 }
+  const rates = { 'LAB-416-steps-conc-standard': 0.9, 'LAB-424-steps-finish-smooth-hrs-per-sq-ft': 0.1, 'LAB-414-steps-conc-form-straight': 1 }
   const a = run({ concRows: [{ type: 'Standard', form: 'Straight', sf: 100, finish: 'Smooth' }] }, rates, { 'Steps - Conc Standard $ per Sq Ft': 5, 'Steps - Finish Smooth $ per Sq Ft': 1 })
   const b = run({ concRows: [{ type: 'Standard', form: 'Straight', sf: 100, finish: 'Smooth' }] }, rates, { 'Steps - Conc Standard $ per Sq Ft': 5, 'Steps - Finish Smooth $ per Sq Ft': 3 })
   assert.equal(b.concMat, a.concMat + 100 * 2, 'finish mat +$2/SF over 100 SF → +$200')
@@ -125,7 +125,7 @@ test('no NaN across a populated estimate (paver + concrete + sub + manual)', () 
       manualRows: [{ hours: 4, materials: 50, subCost: 0 }],
       distanceLF: 120,
     },
-    { 'LAB-425-steps-straight': 0.5, 'LAB-416-steps-conc-standard-hrs-per-sq-ft': 0.9, 'LAB-420-steps-finish-broom-hrs-per-sq-ft': 0.1, 'LAB-414-steps-conc-form-straight': 1 },
+    { 'LAB-425-steps-straight': 0.5, 'LAB-416-steps-conc-standard': 0.9, 'LAB-420-steps-finish-broom-hrs-per-sq-ft': 0.1, 'LAB-414-steps-conc-form-straight': 1 },
     { 'Steps - Conc Standard $ per Sq Ft': 5, 'Steps - Finish Broom $ per Sq Ft': 1, 'Steps - Sub Paver Base': 2 },
     [PAVER]
   )

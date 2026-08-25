@@ -37,9 +37,10 @@ export const LAB = {
   // Paver-step install labor (hrs per Ln Ft), keyed by form.
   STEPS_FORM_STRAIGHT: 'LAB-425-steps-straight',
   STEPS_FORM_CURVED: 'LAB-419-steps-curved',
-  // Concrete step type labor (hrs per Sq Ft), keyed by BASE type (color→material only).
-  STEPS_CONC_STANDARD_HRS: 'LAB-416-steps-conc-standard-hrs-per-sq-ft',
-  STEPS_CONC_CANTILEVERED_HRS: 'LAB-412-steps-conc-cantilevered-hrs-per-sq-ft',
+  // Concrete step type labor (hrs per Ln Ft — steps price by linear feet), keyed by
+  // BASE type (color→material only). Rows live under category 'Steps'.
+  STEPS_CONC_STANDARD_HRS: 'LAB-416-steps-conc-standard',
+  STEPS_CONC_CANTILEVERED_HRS: 'LAB-412-steps-conc-cantilevered',
   // Concrete finish labor adder (hrs per Sq Ft), keyed by finish.
   STEPS_FINISH_SMOOTH_HRS: 'LAB-424-steps-finish-smooth-hrs-per-sq-ft',
   STEPS_FINISH_BROOM_HRS: 'LAB-420-steps-finish-broom-hrs-per-sq-ft',
