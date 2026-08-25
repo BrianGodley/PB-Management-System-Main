@@ -41,12 +41,13 @@ export const LAB = {
   // BASE type (color→material only). Rows live under category 'Steps'.
   STEPS_CONC_STANDARD_HRS: 'LAB-416-steps-conc-standard',
   STEPS_CONC_CANTILEVERED_HRS: 'LAB-412-steps-conc-cantilevered',
-  // Concrete finish labor adder (hrs per Sq Ft), keyed by finish.
-  STEPS_FINISH_SMOOTH_HRS: 'LAB-424-steps-finish-smooth-hrs-per-sq-ft',
-  STEPS_FINISH_BROOM_HRS: 'LAB-420-steps-finish-broom-hrs-per-sq-ft',
-  STEPS_FINISH_SANDED_HRS: 'LAB-423-steps-finish-sanded-hrs-per-sq-ft',
-  STEPS_FINISH_SALTED_HRS: 'LAB-422-steps-finish-salted-hrs-per-sq-ft',
-  STEPS_FINISH_EXPOSED_HRS: 'LAB-421-steps-finish-exposed-aggregate-hrs-per-sq-ft',
+  // Concrete finish labor adder (hrs per Ln Ft — steps price by linear feet), keyed
+  // by finish. Rows live under category 'Steps'.
+  STEPS_FINISH_SMOOTH_HRS: 'LAB-424-steps-finish-smooth',
+  STEPS_FINISH_BROOM_HRS: 'LAB-420-steps-finish-broom',
+  STEPS_FINISH_SANDED_HRS: 'LAB-423-steps-finish-sanded',
+  STEPS_FINISH_SALTED_HRS: 'LAB-422-steps-finish-salted',
+  STEPS_FINISH_EXPOSED_HRS: 'LAB-421-steps-finish-exposed-aggregate',
   // Concrete form labor multiplier, keyed by form.
   STEPS_CONC_FORM_STRAIGHT: 'LAB-414-steps-conc-form-straight',
   STEPS_CONC_FORM_CURVED: 'LAB-413-steps-conc-form-curved',
