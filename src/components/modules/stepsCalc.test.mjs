@@ -32,7 +32,7 @@ const finiteNums = obj => {
 test('paver step value: labor = SF × form rate, material = SF × item price (100 SF × 0.5 = 50 hrs; × $8 = $800)', () => {
   const r = run(
     { paverRows: [{ vendor: 'Standard', type: 'Ashlar Paver', form: 'Straight', sf: 100 }] },
-    { 'LAB-425-steps-straight': 0.5 },
+    { 'LAB-425-steps-paver-straight': 0.5 },
     {},
     [PAVER]
   )
@@ -46,11 +46,11 @@ test('paver step value: labor = SF × form rate, material = SF × item price (10
 test('M5 ref_key parity: a paver step picked by material ref_key resolves the same price as by name', () => {
   const byName = run(
     { paverRows: [{ vendor: 'Standard', type: 'Ashlar Paver', form: 'Straight', sf: 100 }] },
-    { 'LAB-425-steps-straight': 0.5 }, {}, [PAVER]
+    { 'LAB-425-steps-paver-straight': 0.5 }, {}, [PAVER]
   )
   const byRef = run(
     { paverRows: [{ vendor: 'Standard', type: 'MAT-501-ashlar-paver', form: 'Straight', sf: 100 }] },
-    { 'LAB-425-steps-straight': 0.5 }, {}, [PAVER]
+    { 'LAB-425-steps-paver-straight': 0.5 }, {}, [PAVER]
   )
   assert.equal(byRef.stepMat, byName.stepMat, `ref_key material should match name material; got ${byRef.stepMat} vs ${byName.stepMat}`)
   assert.equal(byRef.stepMat, 800, `100 SF × $8 = $800; got ${byRef.stepMat}`)
@@ -58,8 +58,8 @@ test('M5 ref_key parity: a paver step picked by material ref_key resolves the sa
 })
 
 test('paver edit-reflects: raising the form labor rate raises labor proportionally', () => {
-  const a = run({ paverRows: [{ vendor: 'Standard', type: 'Ashlar Paver', form: 'Straight', sf: 100 }] }, { 'LAB-425-steps-straight': 0.5 }, {}, [PAVER])
-  const b = run({ paverRows: [{ vendor: 'Standard', type: 'Ashlar Paver', form: 'Straight', sf: 100 }] }, { 'LAB-425-steps-straight': 1.0 }, {}, [PAVER])
+  const a = run({ paverRows: [{ vendor: 'Standard', type: 'Ashlar Paver', form: 'Straight', sf: 100 }] }, { 'LAB-425-steps-paver-straight': 0.5 }, {}, [PAVER])
+  const b = run({ paverRows: [{ vendor: 'Standard', type: 'Ashlar Paver', form: 'Straight', sf: 100 }] }, { 'LAB-425-steps-paver-straight': 1.0 }, {}, [PAVER])
   assert.equal(b.laborCost, a.laborCost * 2, 'rate ×2 → labor ×2')
 })
 
@@ -83,7 +83,7 @@ test('concrete edit-reflects: raising the finish material rate raises material',
 test('material NO-FALLBACK: a picked paver step with no catalog item → $0 material (labor still priced)', () => {
   const r = run(
     { paverRows: [{ vendor: 'Standard', type: 'Ashlar Paver', form: 'Straight', sf: 100 }] },
-    { 'LAB-425-steps-straight': 0.5 },
+    { 'LAB-425-steps-paver-straight': 0.5 },
     {},
     [] // empty catalog → item doesn't resolve
   )
@@ -125,7 +125,7 @@ test('no NaN across a populated estimate (paver + concrete + sub + manual)', () 
       manualRows: [{ hours: 4, materials: 50, subCost: 0 }],
       distanceLF: 120,
     },
-    { 'LAB-425-steps-straight': 0.5, 'LAB-416-steps-conc-standard': 0.9, 'LAB-420-steps-finish-broom': 0.1, 'LAB-414-steps-conc-form-straight': 1 },
+    { 'LAB-425-steps-paver-straight': 0.5, 'LAB-416-steps-conc-standard': 0.9, 'LAB-420-steps-finish-broom': 0.1, 'LAB-414-steps-conc-form-straight': 1 },
     { 'Steps - Conc Standard $ per Sq Ft': 5, 'Steps - Finish Broom $ per Sq Ft': 1, 'Steps - Sub Paver Base': 2 },
     [PAVER]
   )

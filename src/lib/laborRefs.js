@@ -34,9 +34,10 @@ export const LAB = {
   IRR_TIMER_INSTALL: 'LAB-262-irrigation-timer-install',
 
   // ── Steps (enum-driven; form / conc base type / finish → hrs) ───────────────
-  // Paver-step install labor (hrs per Ln Ft), keyed by form.
-  STEPS_FORM_STRAIGHT: 'LAB-425-steps-straight',
-  STEPS_FORM_CURVED: 'LAB-419-steps-curved',
+  // Paver-step install labor (hrs per Ln Ft), keyed by form. (Flagstone steps share
+  // these same two rates via the shared formKey.)
+  STEPS_FORM_STRAIGHT: 'LAB-425-steps-paver-straight',
+  STEPS_FORM_CURVED: 'LAB-419-steps-paver-curved',
   // Concrete step type labor (hrs per Ln Ft — steps price by linear feet), keyed by
   // BASE type (color→material only). Rows live under category 'Steps'.
   STEPS_CONC_STANDARD_HRS: 'LAB-416-steps-conc-standard',
