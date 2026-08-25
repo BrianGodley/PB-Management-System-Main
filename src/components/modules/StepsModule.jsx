@@ -64,7 +64,9 @@ const concBaseType = t => (t || '').replace(/\s*Colored$/i, '')
 const CONC_FINISHES = ['Smooth', 'Broom', 'Sanded', 'Salted', 'Exposed Aggregate']
 
 // ── Rate-key builders (category 'Steps') ─────────────────────────────────────
-const kPaverForm = form => `Steps - ${form}` // labor hrs per Ln Ft
+const kPaverForm = form => `Steps - ${form}` // labor hrs per Ln Ft (Paver/Flagstone share)
+const kBrickForm = form => `Steps - Brick ${form}` // Brick step labor, hrs per Ln Ft (base 1.5)
+const kTileForm = form => `Steps - Tile ${form}` // Tiled step labor, hrs per Ln Ft (base 3)
 const kConcTypeHrs = t => `Steps - Conc ${t} Hrs per Sq Ft` // labor hrs per Sq Ft
 const kConcTypeMat = t => `Steps - Conc ${t} $ per Sq Ft` // material $ per Sq Ft
 const kFinishHrs = f => `Steps - Finish ${f} Hrs per Sq Ft` // labor +hrs per Sq Ft
@@ -89,10 +91,10 @@ const kSubFinish = f => `Steps - Sub Finish ${f}` // +$ per Ln Ft (concrete fini
 // catalog sub_category (subs_vendors + material_rates). Shape mirrors Paver
 // Steps: Vendor · Type · Form · SF · Grouted?.
 const MAT_SECTIONS = [
-  { key: 'paver', title: 'Paver Steps', matWord: 'Paver', cat: 'Paver Material', rowsKey: 'paverRows', subKey: 'subPaverRows', baseKey: kSubPaverBase },
-  { key: 'brick', title: 'Brick Steps', matWord: 'Brick', cat: 'Brick', rowsKey: 'brickRows', subKey: 'subBrickRows', baseKey: 'Steps - Sub Brick Base' },
-  { key: 'tile', title: 'Tiled Steps', matWord: 'Tile', cat: 'Tile', rowsKey: 'tileRows', subKey: 'subTileRows', baseKey: 'Steps - Sub Tile Base' },
-  { key: 'flag', title: 'Flagstone Steps', matWord: 'Flagstone', cat: 'Flagstone', rowsKey: 'flagRows', subKey: 'subFlagRows', baseKey: 'Steps - Sub Flagstone Base' },
+  { key: 'paver', title: 'Paver Steps', matWord: 'Paver', cat: 'Paver Material', rowsKey: 'paverRows', subKey: 'subPaverRows', baseKey: kSubPaverBase, formKey: kPaverForm },
+  { key: 'brick', title: 'Brick Steps', matWord: 'Brick', cat: 'Brick', rowsKey: 'brickRows', subKey: 'subBrickRows', baseKey: 'Steps - Sub Brick Base', formKey: kBrickForm },
+  { key: 'tile', title: 'Tiled Steps', matWord: 'Tile', cat: 'Tile', rowsKey: 'tileRows', subKey: 'subTileRows', baseKey: 'Steps - Sub Tile Base', formKey: kTileForm },
+  { key: 'flag', title: 'Flagstone Steps', matWord: 'Flagstone', cat: 'Flagstone', rowsKey: 'flagRows', subKey: 'subFlagRows', baseKey: 'Steps - Sub Flagstone Base', formKey: kPaverForm },
 ]
 
 // ── Vendor-catalog helpers (mirror ConcreteModule.sectionOptions) ────────────
@@ -113,12 +115,14 @@ function paverItemFor(cat, vendorSel, typeLabel, materialRows) {
 // ── Per-row calculators ──────────────────────────────────────────────────────
 // Shared by every Vendor/Type step section (Paver/Brick/Tile/Flagstone); `cat`
 // selects which material catalog sub_category the Type options come from.
-function matStepRowCalc(r, laborRates, materialRows, cat = PAVER_STEP_CAT, priceOf = item => n(item?.unit_cost)) {
+function matStepRowCalc(r, laborRates, materialRows, cat = PAVER_STEP_CAT, priceOf = item => n(item?.unit_cost), formKey = kPaverForm) {
   // Unselected step (no material Type) contributes nothing (no crash, no fallback).
   if (!r.type) return { sf: n(r.sf), hrs: 0, mat: 0, price: 0, pallets: 0 }
   const sf = n(r.sf)
   // hrs-per-unit: rate is hours per Ln Ft (was LF/hr; standardized 2026-08-18).
-  const rate = n(laborRates[kPaverForm(r.form)])
+  // formKey selects the labor rate family: Paver/Flagstone share 'Steps - <form>';
+  // Brick/Tile have their own per-form rates ('Steps - Brick/Tile <form>').
+  const rate = n(laborRates[formKey(r.form)])
   const hrs = sf * rate
   let price = 0
   let sfPerPallet = 0
@@ -590,6 +594,7 @@ function MaterialStepSection({
   laborRates,
   vendors,
   priceOf = item => n(item?.unit_cost),
+  formKey = kPaverForm,
 }) {
   const vForCat = vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
   const setRow = (i, field, val) =>
@@ -612,7 +617,7 @@ function MaterialStepSection({
         <tbody>
           {rows.map((row, i) => {
             const opts = paverOptions(cat, row.vendor, materialRows)
-            const c = matStepRowCalc(row, laborRates, materialRows, cat, priceOf)
+            const c = matStepRowCalc(row, laborRates, materialRows, cat, priceOf, formKey)
             const sc = matStepSubRowCalc(row, materialRates, baseKey)
             return (
               <tr key={i} className="border-b border-gray-50">
@@ -758,7 +763,9 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
     const [labMap, matMap, rows, venRes] = await Promise.all([
       fetchLaborRateMap(['Steps']),
       fetchStandardRateMap(['Steps']),
-      fetchModuleCatalog(['Paver', 'Concrete']),
+      // Basic Materials holds the shared Brick (moved from Walls) + Tile (moved
+      // from Pool) step materials — matched by sub_category ('Brick' / 'Tile').
+      fetchModuleCatalog(['Paver', 'Concrete', 'Basic Materials']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
@@ -1113,6 +1120,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
           laborRates={laborRates}
           vendors={vendors}
           priceOf={priceOf}
+          formKey={sec.formKey}
         />
       ))}
 
