@@ -133,6 +133,30 @@ test.describe('Pavers', () => {
     ).toBeVisible()
   })
 
+  // Sub rates belong in the SUBCONTRACTOR column, not Labor. The 'Paver Sub - *'
+  // install/surcharge/sleeves rates were mis-filed in labor_rates; they were moved
+  // to subcontractor_rates and the module repointed to read them from there. This
+  // asserts the popup now lists them under "Subcontractor Rates" and NONE remain
+  // under "Labor Rates". (Goes green once the move SQL has run on prod.)
+  test('View Rates puts paver sub-install rates in the Subcontractor column, not Labor', async ({ page }, testInfo) => {
+    const { ok, why } = await openPavers(page)
+    test.skip(!ok, why)
+    await page.getByRole('button', { name: /view rates/i }).first().click()
+    const heading = page.getByText(/—\s*All Rates/i).first()
+    await expect(heading, 'View Rates popup did not open').toBeVisible({ timeout: 10000 })
+    const laborCol = page.getByText('Labor Rates', { exact: true }).locator('xpath=ancestor::div[1]')
+    const subCol = page.getByText('Subcontractor Rates', { exact: true }).locator('xpath=ancestor::div[1]')
+    await testInfo.attach('pavers-viewrates-subcol.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
+    await expect(
+      subCol.getByText(/Sub -|Permeable|No Demo|Hand Demo/i).first(),
+      'Paver sub-install rates are not shown in the Subcontractor column'
+    ).toBeVisible()
+    await expect(
+      laborCol.getByText(/\bSub -/i),
+      'A "Sub -" subcontractor rate is still showing in the Labor column'
+    ).toHaveCount(0)
+  })
+
   test('live edit reflects: changing a field moves the total (Goal 4 in-browser)', async ({ page }) => {
     const { ok, why } = await openPavers(page)
     test.skip(!ok, why)

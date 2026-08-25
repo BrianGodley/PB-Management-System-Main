@@ -312,6 +312,11 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   const [notes, setNotes] = useState(initialData?.notes ?? '')
   const [laborRates, setLaborRates] = useState(initialData?.laborRates || {})
   const [materialRates, setMaterialRates] = useState(initialData?.materialRates || {})
+  // Subcontractor rates (subcontractor_rates, category 'Paver'), keyed by item_key.
+  // The Sub-tab install $/SF + surcharge + sleeves rates are SUBCONTRACTOR rates —
+  // they now live in subcontractor_rates (moved out of labor_rates) so View Rates
+  // shows them in the Subcontractor column, mirroring Concrete's subRates.
+  const [subRates, setSubRates] = useState(initialData?.subRates || {})
   const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? null)
   const [laborBurdenPct, setLaborBurdenPct] = useState(initialData?.laborBurdenPct ?? null)
   const [gpmd, setGpmd] = useState(initialData?.gpmd ?? null)
@@ -357,7 +362,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
     // new model; Paver catalog (with pallet / vertical-LF specs) from
     // material + material_price. Subcategories ('Paver Material'/'Base Material')
     // are unchanged, so no remap needed.
-    const [labMap, matMap, rows, venRes] = await Promise.all([
+    const [labMap, matMap, rows, venRes, subRes] = await Promise.all([
       // Base prep shares the demo Import Base rates, so pull 'Demo' too.
       fetchLaborRateMap(['Paver', 'Demo']), // dual-keyed (name + ref_key) + basic_labor_rates
       fetchStandardRateMap(['Paver', 'Basic Materials']),
@@ -367,10 +372,18 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         .select('id, company_name')
         .eq('type', 'vendor')
         .order('company_name'),
+      // Subcontractor rates (Sub-tab install $/SF + surcharges + sleeves), keyed
+      // by item_key — mirrors ConcreteModule's subRates fetch.
+      supabase.from('subcontractor_rates').select('item_key, rate').eq('category', 'Paver'),
     ])
     setLaborRates(labMap)
     setMaterialRates(matMap)
     setMaterialRows(rows || [])
+    {
+      const sm = {}
+      for (const r of subRes.data || []) if (r.item_key != null) sm[r.item_key] = r.rate
+      setSubRates(sm)
+    }
     setVendors(
       (venRes.data || []).map(v => ({
         id: v.id,
@@ -491,7 +504,8 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
 
   // ── Sub tab unit-price rates (per-SF install types + per-LF sleeves) ─────────
   // Simple $/SF install pricing keyed by install type, plus per-SF surcharges
-  // and a per-LF sleeves rate. All read from labor_rates (category 'Paver').
+  // and a per-LF sleeves rate. These are SUBCONTRACTOR rates — read from the
+  // subcontractor_rates map (category 'Paver', by item_key), NOT labor_rates.
   // Sub install is a FIXED set of line items — each has its own SF input, $/SF
   // rate, and cost. The two surcharge lines sit at the bottom.
   const SUB_INSTALL_LINES = [
@@ -506,8 +520,8 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
     { key: 'largeFormat', label: 'Large Format Paver', name: 'Paver Sub - Large Format Add' },
     { key: 'under500', label: 'Less than 500 SF', name: 'Paver Sub - Under 500 Add' },
   ]
-  const subRateFor = ln => n(laborRates[ln.name])
-  const sleevesSubRate = n(laborRates['Paver Sub - Sleeves LF'])
+  const subRateFor = ln => n(subRates[ln.name])
+  const sleevesSubRate = n(subRates['Paver Sub - Sleeves LF'])
   const subInstall = state.subInstall || {}
 
   // ── Vendor catalog helpers (per-row Vendor/Type pickers) ─────────────────
@@ -660,6 +674,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         commissionRate,
         laborRates,
         materialRates,
+        subRates,
         paverPrices,
         calc: {
           totalHrs: calc.totalHrs,
