@@ -59,6 +59,12 @@ const CONC_FINISHES = ['Smooth', 'Broom', 'Sanded', 'Salted', 'Exposed Aggregate
 // user picks maps to a frozen LAB-NNN code, so a labor rate can be renamed in
 // Master Rates without breaking pricing. Unknown enum → '' (resolves 0, no fallback).
 const STEP_FORM_REF = { Straight: LAB.STEPS_FORM_STRAIGHT, Curved: LAB.STEPS_FORM_CURVED }
+// Brick and Tile steps have their OWN form-install rates (read by code, not the
+// shared paver rate). Paver + Flagstone share STEP_FORM_REF.
+const BRICK_FORM_REF = { Straight: LAB.STEPS_BRICK_FORM_STRAIGHT, Curved: LAB.STEPS_BRICK_FORM_CURVED }
+const TILE_FORM_REF = { Straight: LAB.STEPS_TILE_FORM_STRAIGHT, Curved: LAB.STEPS_TILE_FORM_CURVED }
+const kBrickForm = form => BRICK_FORM_REF[form] || ''
+const kTileForm = form => TILE_FORM_REF[form] || ''
 const CONC_TYPE_HRS_REF = { Standard: LAB.STEPS_CONC_STANDARD_HRS, Cantilevered: LAB.STEPS_CONC_CANTILEVERED_HRS }
 const FINISH_HRS_REF = {
   Smooth: LAB.STEPS_FINISH_SMOOTH_HRS, Broom: LAB.STEPS_FINISH_BROOM_HRS,
@@ -91,10 +97,10 @@ const kSubFinish = f => `Steps - Sub Finish ${f}` // +$ per Ln Ft (concrete fini
 // catalog sub_category (subs_vendors + material_rates). Shape mirrors Paver
 // Steps: Vendor · Type · Form · SF · Grouted?.
 const MAT_SECTIONS = [
-  { key: 'paver', title: 'Paver Steps', matWord: 'Paver', cat: 'Paver Material', rowsKey: 'paverRows', subKey: 'subPaverRows', baseKey: kSubPaverBase },
-  { key: 'brick', title: 'Brick Steps', matWord: 'Brick', cat: 'Brick', rowsKey: 'brickRows', subKey: 'subBrickRows', baseKey: 'Steps - Sub Brick Base' },
-  { key: 'tile', title: 'Tiled Steps', matWord: 'Tile', cat: 'Tile', rowsKey: 'tileRows', subKey: 'subTileRows', baseKey: 'Steps - Sub Tile Base' },
-  { key: 'flag', title: 'Flagstone Steps', matWord: 'Flagstone', cat: 'Flagstone', rowsKey: 'flagRows', subKey: 'subFlagRows', baseKey: 'Steps - Sub Flagstone Base' },
+  { key: 'paver', title: 'Paver Steps', matWord: 'Paver', cat: 'Paver Material', rowsKey: 'paverRows', subKey: 'subPaverRows', baseKey: kSubPaverBase, formFn: kPaverForm },
+  { key: 'brick', title: 'Brick Steps', matWord: 'Brick', cat: 'Brick', rowsKey: 'brickRows', subKey: 'subBrickRows', baseKey: 'Steps - Sub Brick Base', formFn: kBrickForm },
+  { key: 'tile', title: 'Tiled Steps', matWord: 'Tile', cat: 'Tile', rowsKey: 'tileRows', subKey: 'subTileRows', baseKey: 'Steps - Sub Tile Base', formFn: kTileForm },
+  { key: 'flag', title: 'Flagstone Steps', matWord: 'Flagstone', cat: 'Flagstone', rowsKey: 'flagRows', subKey: 'subFlagRows', baseKey: 'Steps - Sub Flagstone Base', formFn: kPaverForm },
 ]
 
 // ── Vendor-catalog helpers (mirror ConcreteModule.sectionOptions) ────────────
@@ -115,7 +121,7 @@ function paverItemFor(cat, vendorSel, typeLabel, materialRows) {
 // ── Per-row calculators ──────────────────────────────────────────────────────
 // Shared by every Vendor/Type step section (Paver/Brick/Tile/Flagstone); `cat`
 // selects which material catalog sub_category the Type options come from.
-function matStepRowCalc(r, laborRates, materialRows, cat = PAVER_STEP_CAT, priceOf = item => n(item?.unit_cost), R = null) {
+function matStepRowCalc(r, laborRates, materialRows, cat = PAVER_STEP_CAT, priceOf = item => n(item?.unit_cost), R = null, formFn = kPaverForm) {
   // Unselected step (no material Type) contributes nothing (no crash, no fallback).
   if (!r.type) return { sf: n(r.sf), hrs: 0, mat: 0, price: 0, pallets: 0 }
   const sf = n(r.sf)
@@ -123,7 +129,7 @@ function matStepRowCalc(r, laborRates, materialRows, cat = PAVER_STEP_CAT, price
   // Route through R (guarded by sf) so an unset form-labor rate surfaces in the
   // fix-it banner only for a step row actually entered. Value identical to
   // n(laborRates[ref]); an unknown form → kPaverForm('') = '' → R records nothing.
-  const ref = kPaverForm(r.form)
+  const ref = formFn(r.form)
   const rate =
     sf > 0
       ? R
@@ -233,7 +239,7 @@ export function calcSteps(
     let mat = 0
     let pallets = 0
     ;(state[sec.rowsKey] || []).forEach(r => {
-      const c = matStepRowCalc(r, lr, materialRows, sec.cat, priceOf, R)
+      const c = matStepRowCalc(r, lr, materialRows, sec.cat, priceOf, R, sec.formFn)
       labor += c.hrs
       mat += c.mat
       pallets += c.pallets

@@ -38,6 +38,12 @@ export const LAB = {
   // these same two rates via the shared formKey.)
   STEPS_FORM_STRAIGHT: 'LAB-425-steps-paver-straight',
   STEPS_FORM_CURVED: 'LAB-419-steps-paver-curved',
+  // Brick / Tile step install labor (hrs per Ln Ft), keyed by form. Their OWN rates
+  // (Brick 1.5, Tile 3) — read by code, not the paver rate.
+  STEPS_BRICK_FORM_STRAIGHT: 'LAB-434-steps-brick-straight',
+  STEPS_BRICK_FORM_CURVED: 'LAB-435-steps-brick-curved',
+  STEPS_TILE_FORM_STRAIGHT: 'LAB-436-steps-tile-straight',
+  STEPS_TILE_FORM_CURVED: 'LAB-437-steps-tile-curved',
   // Concrete step type labor (hrs per Ln Ft — steps price by linear feet), keyed by
   // BASE type (color→material only). Rows live under category 'Steps'.
   STEPS_CONC_STANDARD_HRS: 'LAB-416-steps-conc-standard',
