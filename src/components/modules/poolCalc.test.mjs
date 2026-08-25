@@ -211,3 +211,20 @@ test('no NaN across a populated estimate (excavation + water feature + manual)',
   finiteNums(r)
   assert.ok(r.price > 0, 'price is positive with priced sections')
 })
+
+test('steel/rebar In-House: no ReferenceError; rebar mat = shell SF × LF/SF × Reinforcement $/LF; hrs = LF × steel-install rate', () => {
+  // Guards the 'REINFORCEMENT_SUBCAT is not defined' crash: entering steel SF +
+  // LF/SF invokes the Reinforcement catalog lookup, which threw because the calc
+  // referenced consts only defined in PoolModule.jsx.
+  const rows = [
+    { id: 'rb4', name: 'Rebar #4', sub_category: 'Reinforcement', category: 'Basic Materials', vendor_id: null, unit_cost: 0.9, ref_key: 'MAT-029-rebar-4' },
+  ]
+  const r = run(
+    { steel: { sf: '100', lfPerSf: '1.5', vendor: 'Standard', rebarSize: 'Rebar #4' } },
+    {}, { 'LAB-410-steel-install': 0.02 }, {}, rows
+  )
+  finiteNums(r)
+  assert.equal(r.steelLF, 150) // 100 × 1.5
+  assert.ok(Math.abs(r.steelMat - 150 * 0.9) < 1e-9, 'rebar material = LF × $/LF')
+  assert.ok(Math.abs(r.steelHrs - 150 * 0.02) < 1e-9, 'steel hours = LF × install rate')
+})

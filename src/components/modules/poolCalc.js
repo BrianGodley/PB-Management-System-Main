@@ -84,6 +84,18 @@ function resolveUtilRow(cat, row, houseArr, materialRows, mp, opts = {}) {
 // Excavation labor maps to the shared Skid Steer 'Skid - Soil' rate (read directly
 // in the calc below); no per-machine excavation rate map is needed anymore.
 
+// Sub-category / category name constants the calc resolves materials against.
+// poolCalc is a STANDALONE module (unit-tested without React) — it can't read the
+// copies defined in PoolModule.jsx, so each must be defined here too or the
+// matching section throws ReferenceError the moment it's used (the steel section
+// hit 'REINFORCEMENT_SUBCAT is not defined'; tile/spillway/coping/raised had the
+// same latent gap). Values mirror PoolModule.jsx exactly.
+const BASIC_CATEGORY = 'Basic Materials'
+const REINFORCEMENT_SUBCAT = 'Reinforcement'
+const TILE_SUBCAT = 'Tile'
+const SPILLWAY_SUBCAT = 'Spillway'
+const COPING_SUBCAT = 'Coping'
+const RAISED_SUBCAT = 'Raised Surface'
 export const WATER_FEATURE_SUBCAT = 'Water Features'
 const WATER_FEATURE_TYPES = ['Sheer Descents', 'Fire/Water Bowls', 'Deck Jets', 'Water Slides']
 const UTIL_CAT = { line: 'Electrical Pipe', gasPipe: 'Gas Pipe', wire: 'Electrical Wiring', elec: 'Electrical Fixtures' }
