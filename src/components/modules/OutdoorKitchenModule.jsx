@@ -56,6 +56,10 @@ const OK_RATES = {
   counterBroomLab: { dbName: 'BBQ Counter Broom Labor Rate' }, // SF/hr (was 60 SF/day ÷ 8)
   counterPolishLab: { dbName: 'BBQ Counter Polish Labor Rate' }, // SF/hr (was 18 SF/day ÷ 8)
   counterTrowelLab: { dbName: 'BBQ Counter Trowel Labor Rate' }, // SF/hr (45 SF/day ÷ 8)
+  // Concrete countertop INSTALL labor (Countertop → Concrete sub-tab). One rate,
+  // hrs per Sq Ft (seeded 1). The finishing labor above (form/pour/broom/polish/
+  // trowel) now lives in the Concrete Finish sub-section.
+  counterInstallLab: { dbName: 'Concrete Countertop Installation' }, // hrs per Sq Ft
   applianceLab: { dbName: 'BBQ Appliance Labor Rate' }, // appliances/day (legacy)
   applianceInstallHrs: { dbName: 'BBQ Appliance Install Hrs' }, // hrs per appliance (install labor coefficient)
   gficLab: { dbName: 'BBQ GFIC Labor Rate' }, // hrs/unit
@@ -89,6 +93,9 @@ const DEFAULTS = {
 }
 
 const COUNTER_FINISHES = ['Broom Finish', 'Polished Finish', 'Trowel Finish']
+// Countertop material sub-tabs. Only Concrete is priced today (install labor +
+// the Concrete Finish sub-section); Tile / Stone / Granite are placeholders.
+const COUNTERTOP_TYPES = ['Concrete', 'Tile', 'Stone', 'Granite']
 
 // Canonical size-based rebar catalog. Rebar is priced per Ln Ft from Basic
 // Materials → Reinforcement rows named 'Rebar #<size>'. Default #4.
@@ -450,6 +457,7 @@ function calcOutdoorKitchen(
     footingWidthIn,
     footingDepthIn,
     counterSF,
+    counterType,
     counterFinish,
     rebarSize,
     applianceCount,
@@ -564,24 +572,33 @@ function calcOutdoorKitchen(
     blockRaw > 0
       ? p(OK_RATES.fillBlockFactor.dbName) * blockRaw * p(OK_RATES.fillBlockLab.dbName, OK_RATES.fillBlockLab.fallback)
       : 0
+  // Countertop is priced only when the Concrete sub-tab is active (Tile / Stone /
+  // Granite are defined later). The Concrete tab charges ONE install labor rate
+  // (hrs/SF); the finishing labor below (form / pour / broom / polish / trowel)
+  // lives in the Concrete Finish sub-section and is likewise Concrete-only.
+  const isConcreteCounter = (counterType || 'Concrete') === 'Concrete'
+  const counterInstallHrs =
+    isConcreteCounter && n(counterSF) > 0
+      ? n(counterSF) * p(OK_RATES.counterInstallLab.dbName, OK_RATES.counterInstallLab.fallback)
+      : 0
   const counterFormHrs =
-    n(counterSF) > 0
+    isConcreteCounter && n(counterSF) > 0
       ? n(counterSF) * p(OK_RATES.counterFormLfPerSf.dbName) * p(OK_RATES.counterFormLab.dbName, OK_RATES.counterFormLab.fallback)
       : 0
   const counterPourHrs =
-    n(counterSF) > 0
+    isConcreteCounter && n(counterSF) > 0
       ? n(counterSF) * p(OK_RATES.counterPourLab.dbName, OK_RATES.counterPourLab.fallback)
       : 0
   const counterBroomHrs =
-    counterFinish === 'Broom Finish'
+    isConcreteCounter && counterFinish === 'Broom Finish'
       ? n(counterSF) * p(OK_RATES.counterBroomLab.dbName, OK_RATES.counterBroomLab.fallback)
       : 0
   const counterPolishHrs =
-    counterFinish === 'Polished Finish'
+    isConcreteCounter && counterFinish === 'Polished Finish'
       ? n(counterSF) * p(OK_RATES.counterPolishLab.dbName, OK_RATES.counterPolishLab.fallback)
       : 0
   const counterTrowelHrs =
-    counterFinish === 'Trowel Finish'
+    isConcreteCounter && counterFinish === 'Trowel Finish'
       ? n(counterSF) * p(OK_RATES.counterTrowelLab.dbName, OK_RATES.counterTrowelLab.fallback)
       : 0
   // Equipment table — per-line labor (hours entered directly, replacing the old
@@ -627,9 +644,9 @@ function calcOutdoorKitchen(
   const rebarMat = rebarLF * p('Rebar ' + (rebarSize || '#4'), OK_RATES.bbqRebar.fallback)
   const footingMat = footingCY * p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.ref)
   const fillMat = fillCY * p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.ref)
-  const counterConcMat = counterCY * p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.ref)
+  const counterConcMat = isConcreteCounter ? counterCY * p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.ref) : 0
   const counterPolishMat =
-    counterFinish === 'Polished Finish'
+    isConcreteCounter && counterFinish === 'Polished Finish'
       ? n(counterSF) * p(OK_RATES.counterPolishMat.dbName, OK_RATES.counterPolishMat.fallback)
       : 0
   const applianceMat =
@@ -665,6 +682,7 @@ function calcOutdoorKitchen(
     equipHrs +
     sinkRowsHrs +
     (isSubTab ? 0 : structureHrs) +
+    counterInstallHrs +
     counterFormHrs +
     counterPourHrs +
     counterBroomHrs +
@@ -731,6 +749,7 @@ function calcOutdoorKitchen(
     rebarLF,
     fillCY,
     counterCY,
+    counterInstallHrs,
     // section breakdowns
     structureMat: blockMat + rebarMat + footingMat + fillMat,
     counterMat: counterConcMat + counterPolishMat,
@@ -795,6 +814,7 @@ function makeTab(src = {}) {
     footingWidthIn: src.footingWidthIn ?? '12',
     footingDepthIn: src.footingDepthIn ?? '12',
     counterSF: src.counterSF ?? '',
+    counterType: src.counterType ?? 'Concrete',
     counterFinish: src.counterFinish ?? 'Broom Finish',
     equipmentRows: src.equipmentRows ?? [EQUIP_ROW(), EQUIP_ROW(), EQUIP_ROW()],
     sinkRows: src.sinkRows ?? [SINK_ROW()],
@@ -935,6 +955,8 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
   const setFootingDepthIn = setField('footingDepthIn')
   const counterSF = cur.counterSF
   const setCounterSF = setField('counterSF')
+  const counterType = cur.counterType || 'Concrete'
+  const setCounterType = setField('counterType')
   const counterFinish = cur.counterFinish
   const setCounterFinish = setField('counterFinish')
   const equipmentRows = cur.equipmentRows
@@ -1277,35 +1299,69 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
 
       {/* ── Countertop ── */}
       <div>
-        <SectionHeader title="Concrete Countertop" />
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Area (SF)</label>
-            <NumInput value={counterSF} onChange={setCounterSF} placeholder="0" />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Finish</label>
-            <select
-              className="input text-sm py-1.5"
-              value={counterFinish}
-              onChange={e => setCounterFinish(e.target.value)}
+        <SectionHeader title="Countertop" />
+        {/* Material sub-tabs. Only Concrete is priced today (install labor + the
+            Concrete Finish sub-section below); Tile / Stone / Granite come later. */}
+        <div className="flex rounded-lg border border-gray-200 overflow-hidden w-fit mb-3">
+          {COUNTERTOP_TYPES.map(t => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setCounterType(t)}
+              className={`px-3 py-1.5 text-xs font-medium ${
+                counterType === t ? 'bg-green-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
             >
-              {COUNTER_FINISHES.map(f => (
-                <option key={f}>{f}</option>
-              ))}
-            </select>
-          </div>
+              {t}
+            </button>
+          ))}
         </div>
-        {n(counterSF) > 0 && (
-          <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-gray-600 flex gap-4">
-            <span>
-              Counter CY: <strong>{calc.counterCY.toFixed(3)}</strong>
-            </span>
-            <span>
-              Material: <strong>${calc.counterMat.toFixed(2)}</strong>
-            </span>
+
+        {/* Countertop Installation (Concrete tab). One labor rate: hrs per Sq Ft. */}
+        {counterType === 'Concrete' ? (
+          <>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Countertop Installation</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Area (Sq Ft)</label>
+                <NumInput value={counterSF} onChange={setCounterSF} placeholder="0" />
+              </div>
+            </div>
+            {n(counterSF) > 0 && (
+              <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-gray-600 flex gap-4 flex-wrap">
+                <span>Install: <strong>{calc.counterInstallHrs.toFixed(2)} hrs</strong></span>
+                <span>Counter CY: <strong>{calc.counterCY.toFixed(3)}</strong></span>
+                <span>Material: <strong>${calc.counterMat.toFixed(2)}</strong></span>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-xs text-gray-400 italic bg-gray-50 border border-gray-200 rounded-lg px-3 py-4">
+            {counterType} countertop pricing will be defined later.
           </div>
         )}
+
+        {/* ── Concrete Finish (greys out unless the Concrete tab is active) ── */}
+        <div
+          className={`mt-4 ${counterType === 'Concrete' ? '' : 'opacity-50 pointer-events-none select-none'}`}
+        >
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Concrete Finish</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Finish</label>
+              <select
+                className="input text-sm py-1.5"
+                value={counterFinish}
+                onChange={e => setCounterFinish(e.target.value)}
+                disabled={counterType !== 'Concrete'}
+              >
+                {COUNTER_FINISHES.map(f => (
+                  <option key={f}>{f}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* ── Appliances ── */}
