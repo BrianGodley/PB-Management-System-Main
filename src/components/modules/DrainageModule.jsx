@@ -1333,6 +1333,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-2 font-medium w-16"></th>
                 <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Type</th>
                 <th className="text-center pb-1 pr-2 font-medium w-20">Qty</th>
@@ -1369,8 +1370,8 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
                 const opts = drainTypeOptions(sec.cat, {}, materialRows, row.vendor)
                 return (
                   <tr key={sec.label} className="border-b border-gray-100">
-                    <td className="py-1 pr-2 align-top">
-                      <div className="text-[11px] text-gray-500 mb-0.5">{sec.label}</div>
+                    <td className="py-1 pr-2 text-xs text-gray-600 whitespace-nowrap">{sec.label}</td>
+                    <td className="py-1 pr-2">
                       <select
                         className="input text-sm py-1 w-full"
                         value={row.vendor || ''}

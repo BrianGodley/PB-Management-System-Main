@@ -1921,3 +1921,8 @@ navigation 8, smoke 1, walls 7 = 36. Six consecutive clean, fully-exercised runs
   across the whole estimator, not a subset.
 - concrete.spec.js "live edit reflects" now GREEN (fillField fix for the readonly autofill guard).
 - Water Features NOT in the spec — it's a registered-but-unbuilt module stub (task #440).
+
+## 2026-08-24 — View Rates scope fix (Paver + Concrete)
+- Run: **149 passed / 0 failed / 0 skipped / 0 flaky**.
+- New coverage tests GREEN: pavers.spec "View Rates lists paver materials AND labor" + concrete.spec "View Rates lists concrete materials AND labor" — both opened the popup on live prod and found a material row + a non-Base-Prep labor row present.
+- Confirms PAVER_RATE_SCOPE / CONCRETE_RATE_SCOPE fix: the Base-Prep-only rateScope that hid all paver/concrete materials + labor from View Rates is resolved. Commit e125f1e.
