@@ -142,6 +142,11 @@ export function calcGroundTreatments(
     // but kept as 'null-vendor' so every catalogOptions call in this file uses
     // the one sourcing mode — Standard elsewhere reads the same null-vendor rows.
     const opts = catalogOptions(materialRows, cat, vsel, { standardRows: 'null-vendor' }).map(o => ({
+      // ref_key MUST be carried: the picker stores the selection as the material's
+      // frozen ref_key, so without it resolveType can't match and falls through to
+      // options[0] — every product on a real vendor priced as the first one (the
+      // "GT price won't change" bug). Mirrors mergedGtOpts (the Standard branch).
+      ref_key: o.row.ref_key || null,
       label: o.row.name.replace(new RegExp('^' + cat + ' - '), '').replace(/^.*? - /, ''),
       dbName: o.row.name,
       fallback: parseFloat(o.row.unit_cost) || 0,

@@ -99,6 +99,23 @@ test('DG value: material = CY × $/CY; labor = CY × method rate + SF × cleanup
   near(r.dgLab, cy * 0.5 + 100 * 0.01) // method rate × CY + cleanup (swell + placement removed)
 })
 
+test('vendor branch resolves the PICKED material by ref_key (not stuck on the first) — GT price-change regression', () => {
+  const V = 'vendor-1'
+  const rows = [
+    row('DG Gold', 'DG', 40, V, 'MAT-901-dg-gold'),
+    row('DG Brown', 'DG', 70, V, 'MAT-902-dg-brown'),
+  ]
+  const pick = ref =>
+    run(
+      { dgRows: [{ sf: '100', depth: '2', type: ref, method: 'Machine', cement: 'No', weedFabric: 'No', vendor: V }] },
+      { 'DG - Machine Labor Rate': 0.5, 'GT - DG Cleanup Coverage': 0 },
+      rows
+    )
+  const cy = CY(100, 2)
+  near(pick('MAT-901-dg-gold').dgMat, cy * 40)
+  near(pick('MAT-902-dg-brown').dgMat, cy * 70) // must be 70 (picked), not 40 (first option)
+})
+
 test('gravel value: material = CY × $/CY (no fabric); labor = CY × swell × machine rate', () => {
   const r = run(
     { gravelRows: [{ sf: '100', depthIn: '3', type: '3/4 Gravel', method: 'Machine', weedFabric: 'No' }] },
