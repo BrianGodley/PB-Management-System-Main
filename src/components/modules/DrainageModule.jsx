@@ -91,7 +91,7 @@ const FIXTURE_LABOR_RATE_NAME = {
 // Additional items — identity only. Labor hours come from labor_rates
 // (ADD_ITEM_LABOR_RATE_NAME) and material cost from materialPrices[dbName].
 const ADD_ITEM_RATES = {
-  sumpPump: { label: 'Sump Pump', dbName: 'Sump Pump' },
+  // Sump Pump moved to its own Sump Pumps section (Vendor/Type/Qty rows).
   // Curb Core / Hydrocut are pure labor now (2 hrs each) — no material fee.
   curbCore: { label: 'Curb Core', dbName: 'Curb Core', laborOnly: true },
   hydrocut: { label: 'Hydrocut Under Hardscape', dbName: 'Hydrocut Under Hardscape', laborOnly: true },
@@ -100,7 +100,6 @@ const ADD_ITEM_RATES = {
 // Labor-coefficient lookup for Additional Items — matches names seeded in
 // supabase-drainage-labor-coefficients.sql so the popover edits the right row.
 const ADD_ITEM_LABOR_RATE_NAME = {
-  sumpPump: 'Drainage Sump Pump Labor',
   // Shared Basic Labor rate — same curb-core labor row every module uses.
   curbCore: 'Basic Labor - Curb Core',
   hydrocut: 'Drainage Hydrocut Under Hardscape Labor',
@@ -129,7 +128,7 @@ const n = v => parseFloat(v) || 0
 // The Type still sets the item's labor (per-type coefficient, unchanged) AND its
 // Standard material price. A vendor only overrides the MATERIAL price for the same
 // item (matched by name in the vendor's catalog); it never affects labor.
-const DRAIN_CAT = { pipe: 'Drain Pipe', french: 'French Drain Pipe', fixture: 'Drain Fixtures' }
+const DRAIN_CAT = { pipe: 'Drain Pipe', french: 'French Drain Pipe', fixture: 'Drain Fixtures', sump: 'Sump Pump', housing: 'Catch Basin Housing' }
 function drainMatCost(cat, row, TYPES, materialRows, catDefaults, mp) {
   const t = TYPES[row.type]
   let dbName = t?.dbName
@@ -267,7 +266,9 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   useEffect(() => {
     let alive = true
     Promise.all([
-      fetchModuleCatalog(['Drainage']),
+      // Basic Materials holds the concrete hand mix (MAT-052) the Concrete Catch
+      // Basin housing prices its material from (1 Cu Yd × live hand-mix $).
+      fetchModuleCatalog(['Drainage', 'Basic Materials']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
@@ -366,6 +367,9 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   const [frenchFabric, setFrenchFabric] = useState(initialData?.frenchFabric ?? 'None')
   const [frenchGravel, setFrenchGravel] = useState(initialData?.frenchGravel ?? 'None')
   const [fixtureRows, setFixtureRows] = useState(initialData?.fixtureRows ?? DEFAULT_FIXTURE_ROWS)
+  // Sump Pumps section (In-House): a Pump row + a Housing row (Vendor/Type/Qty).
+  const [sumpRows, setSumpRows] = useState(initialData?.sumpRows ?? [{ type: '', qty: '', vendor: '' }])
+  const [housingRows, setHousingRows] = useState(initialData?.housingRows ?? [{ type: '', qty: '', vendor: '' }])
   const [additionalItems, setAdditionalItems] = useState(
     initialData?.additionalItems ?? DEFAULT_ADDITIONAL
   )
@@ -427,6 +431,8 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
       trenchRows,
       pipeRows,
       fixtureRows,
+      sumpRows,
+      housingRows,
       frenchRows,
       frenchFabric,
       frenchGravel,
@@ -507,6 +513,8 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         subTrenchRows,
         pipeRows,
         fixtureRows,
+        sumpRows,
+        housingRows,
         frenchRows,
         frenchFabric,
         frenchGravel,
@@ -1315,6 +1323,99 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         </div>
       </div>
 
+      )}
+
+      {/* ── Sump Pumps (In-House): Pump + Housing rows ── */}
+      {!isSub && (
+      <div>
+        <SectionHeader title="Sump Pumps" />
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
+                <th className="text-center pb-1 pr-2 font-medium">Type</th>
+                <th className="text-center pb-1 pr-2 font-medium w-20">Qty</th>
+                <th className="text-center pb-1 pr-2 font-medium text-gray-400">$/Ea</th>
+                <th className="text-center pb-1 pr-2 font-medium text-gray-400">Material $</th>
+                <th className="text-center pb-1 font-medium text-gray-400">Labor Hrs</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { label: 'Pump', cat: DRAIN_CAT.sump, rows: sumpRows, set: setSumpRows },
+                { label: 'Housing', cat: DRAIN_CAT.housing, rows: housingRows, set: setHousingRows },
+              ].map(sec => {
+                const row = sec.rows[0] || { type: '', qty: '', vendor: '' }
+                const set = (field, val) =>
+                  sec.set(rs => {
+                    const c = rs && rs.length ? [...rs] : [{ type: '', qty: '', vendor: '' }]
+                    c[0] = { ...c[0], [field]: val }
+                    return c
+                  })
+                const { cost, row: vrow } = drainMatCost(sec.cat, row, {}, materialRows, catDefaults, materialPrices)
+                const meta = vrow?.calc_meta || {}
+                const handMix = n(
+                  (materialRows || []).find(
+                    r => r.ref_key === 'MAT-052-concrete-hand-mix' || r.name === 'Concrete - Hand Mix'
+                  )?.unit_cost
+                )
+                // Concrete Catch Basin material = concrete_cuyd × live hand-mix $.
+                const perEa = meta.concrete_cuyd ? n(meta.concrete_cuyd) * handMix : cost
+                const mat = n(row.qty) * perEa
+                const laborName =
+                  row.laborType || meta.labor_rate || (sec.cat === DRAIN_CAT.sump ? 'Drainage Sump Pump Labor' : '')
+                const laborHrs = n(row.qty) * n(materialPrices[laborName])
+                const opts = drainTypeOptions(sec.cat, {}, materialRows, row.vendor)
+                return (
+                  <tr key={sec.label} className="border-b border-gray-100">
+                    <td className="py-1 pr-2 align-top">
+                      <div className="text-[11px] text-gray-500 mb-0.5">{sec.label}</div>
+                      <select
+                        className="input text-sm py-1 w-full"
+                        value={row.vendor || ''}
+                        onChange={e => set('vendor', e.target.value)}
+                        title="Vendor"
+                      >
+                        {!row.vendor && <option value="">Select</option>}
+                        {row.vendor && row.vendor !== 'Standard' &&
+                          !vendorsForCategory(sec.cat).some(v => v.id === row.vendor) && (
+                            <option value={row.vendor}>{vendorNames[row.vendor] || row.vendor}</option>
+                          )}
+                        {vendorsForCategory(sec.cat).map(v => (
+                          <option key={v.id} value={v.id}>{v.name}</option>
+                        ))}
+                        <option value="Standard">Standard</option>
+                      </select>
+                    </td>
+                    <td className="py-1 pr-2">
+                      <select
+                        className="input text-sm py-1 w-full"
+                        value={row.type || ''}
+                        onChange={e => set('type', e.target.value)}
+                      >
+                        {!row.type && <option value="">Select {sec.label.toLowerCase()}</option>}
+                        {row.type && !opts.some(o => o.value === row.type || o.label === row.type) && (
+                          <option value={row.type}>{matName(row.type)}</option>
+                        )}
+                        {opts.map(o => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1 pr-2">
+                      <NumInput value={row.qty} onChange={v => set('qty', v)} className="w-full text-center" />
+                    </td>
+                    <td className="py-1 text-center text-gray-400 text-xs pr-2">{perEa > 0 ? `$${perEa.toFixed(2)}` : '—'}</td>
+                    <td className="py-1 text-center text-gray-600 text-xs pr-2">{mat > 0 ? `$${mat.toFixed(2)}` : '—'}</td>
+                    <td className="py-1 text-center text-gray-600 text-xs">{laborHrs > 0 ? laborHrs.toFixed(2) : '—'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
       )}
 
       {/* ── Additional Items (In-House) ── */}

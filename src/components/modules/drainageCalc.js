@@ -116,7 +116,7 @@ const FIXTURE_LABOR_RATE_NAME = {
 // Additional items — identity only. Labor hours come from labor_rates
 // (ADD_ITEM_LABOR_RATE_NAME) and material cost from materialPrices[dbName].
 const ADD_ITEM_RATES = {
-  sumpPump: { label: 'Sump Pump', dbName: 'Sump Pump', ref: MAT.SUMP_PUMP },
+  // Sump Pump moved out to its own Sump Pumps section (Vendor/Type/Qty rows).
   // Curb Core / Hydrocut are pure labor now (2 hrs each) — no material fee.
   curbCore: { label: 'Curb Core', dbName: 'Curb Core', laborOnly: true },
   hydrocut: { label: 'Hydrocut Under Hardscape', dbName: 'Hydrocut Under Hardscape', laborOnly: true },
@@ -125,7 +125,6 @@ const ADD_ITEM_RATES = {
 // Labor-coefficient lookup for Additional Items — matches names seeded in
 // supabase-drainage-labor-coefficients.sql so the popover edits the right row.
 const ADD_ITEM_LABOR_RATE_NAME = {
-  sumpPump: 'Drainage Sump Pump Labor',
   // Curb Core labor is a SHARED Basic Labor rate (Hrs per Each) read by every
   // module that cores a curb — Drainage + Utilities. One row, one source.
   curbCore: BAS.CURB_CORE,
@@ -154,7 +153,12 @@ const frenchRate = (mp, name) => n(mp[name])
 // The Type still sets the item's labor (per-type coefficient, unchanged) AND its
 // Standard material price. A vendor only overrides the MATERIAL price for the same
 // item (matched by name in the vendor's catalog); it never affects labor.
-const DRAIN_CAT = { pipe: 'Drain Pipe', french: 'French Drain Pipe', fixture: 'Drain Fixtures' }
+const DRAIN_CAT = { pipe: 'Drain Pipe', french: 'French Drain Pipe', fixture: 'Drain Fixtures', sump: 'Sump Pump', housing: 'Catch Basin Housing' }
+// Concrete Catch Basin housing: material = concrete_cuyd × live hand-mix ($/Cu Yd,
+// MAT-052) resolved from the catalog rows, not a stored price.
+const HAND_MIX_REF = 'MAT-052-concrete-hand-mix'
+const handMixPrice = materialRows =>
+  n((materialRows || []).find(r => r.ref_key === HAND_MIX_REF || r.name === 'Concrete - Hand Mix')?.unit_cost)
 function drainMatCost(cat, row, TYPES, materialRows, catDefaults, mp) {
   const t = TYPES[row.type]
   let dbName = t?.dbName
@@ -366,6 +370,37 @@ export function calcDrainage(
     }
   })
 
+  // ── Sump Pumps section (In-House): Pump rows + Housing rows ──────────────────
+  // Pump: material = qty × price (Home Depot), labor = qty × its calc_meta.labor_rate
+  // ('Drainage Sump Pump Labor'). Housing: MAT-071 prices normally; the Concrete
+  // Catch Basin's material = qty × concrete_cuyd × live hand-mix $ (MAT-052), labor
+  // = qty × its calc_meta.labor_rate (Drainage Concrete Catch Basin Labor, 10/ea).
+  let sumpHrs = 0, sumpMat = 0, housingHrs = 0, housingMat = 0
+  const hmPrice = handMixPrice(materialRows)
+  ;(state.sumpRows || []).forEach(r => {
+    const qty = n(r.qty)
+    if (qty > 0 && r.type) {
+      const { cost, row: vrow } = drainMatCost(DRAIN_CAT.sump, r, {}, materialRows, catDefaults, materialPrices)
+      sumpMat += qty * cost
+      const laborName = r.laborType || vrow?.calc_meta?.labor_rate || 'Drainage Sump Pump Labor'
+      const laborRate = n(materialPrices[laborName])
+      if (laborRate <= 0) laborUnset.push({ kind: 'labor', name: laborName, label: vrow?.name || r.type, category: 'Drainage', unit: null })
+      sumpHrs += qty * laborRate
+    }
+  })
+  ;(state.housingRows || []).forEach(r => {
+    const qty = n(r.qty)
+    if (qty > 0 && r.type) {
+      const { cost, row: vrow } = drainMatCost(DRAIN_CAT.housing, r, {}, materialRows, catDefaults, materialPrices)
+      const meta = vrow?.calc_meta || {}
+      housingMat += meta.concrete_cuyd ? qty * n(meta.concrete_cuyd) * hmPrice : qty * cost
+      const laborName = r.laborType || meta.labor_rate
+      const laborRate = n(materialPrices[laborName])
+      if (laborName && laborRate <= 0) laborUnset.push({ kind: 'labor', name: laborName, label: vrow?.name || r.type, category: 'Drainage', unit: null })
+      housingHrs += qty * laborRate
+    }
+  })
+
   let addHrs = 0,
     addMat = 0
   Object.entries(ADD_ITEM_RATES).forEach(([key, rate]) => {
@@ -405,13 +440,13 @@ export function calcDrainage(
     n(sa.curbCoreQty) * subCurbCoreRate +
     n(sa.hydrocutLF) * subHydrocutRate
 
-  const baseHrs = (isSub ? 0 : trenchHrs + pipeHrs + fixHrs + addHrs + frenchHrs) + manHrs
+  const baseHrs = (isSub ? 0 : trenchHrs + pipeHrs + fixHrs + addHrs + frenchHrs + sumpHrs + housingHrs) + manHrs
   const diffMod = 1 + n(difficulty) / 100
   const _preWalkHrs = baseHrs * diffMod + (parseFloat(hoursAdj) || 0)
   const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
   const totalHrs = _preWalkHrs + walkHrs
   const manDays = totalHrs / 8
-  const totalMat = (isSub ? 0 : pipeMat + fixMat + addMat + frenchMat) + manMat
+  const totalMat = (isSub ? 0 : pipeMat + fixMat + addMat + frenchMat + sumpMat + housingMat) + manMat
   const laborCost = totalHrs * laborRatePerHour
   const burden = laborCost * n(laborBurdenPct)
   const subCost = manSub + subDrainCost + (isSub ? subFixtureCost + subAdditionalCost : 0)
@@ -455,6 +490,10 @@ export function calcDrainage(
     walkHrs,
     addHrs,
     addMat,
+    sumpMat,
+    sumpHrs,
+    housingMat,
+    housingHrs,
     frenchMat,
     frenchHrs,
     totalFrenchLF,
