@@ -584,6 +584,10 @@ export default function MasterRates({ only } = {}) {
   const [labCategory, setLabCategory] = useState('All')
   const [subCategory, setSubCategory] = useState('All')
   const [subCompany, setSubCompany] = useState('All')
+  // Text search for the Labor / Basic Labor / Subcontractor tabs (mirrors materials).
+  const [labQ, setLabQ] = useState('')
+  const [basicQ, setBasicQ] = useState('')
+  const [subQ, setSubQ] = useState('')
 
   // Unassigned material rates show as "Unspecified". The permanent Unspecified
   // vendor record is filtered OUT of the explicit vendor list so the picker
@@ -1015,14 +1019,23 @@ export default function MasterRates({ only } = {}) {
     if (matVendor !== 'All') return m.vendor_id === matVendor
     return true
   })
-  const visibleLabor =
+  // Text search (name / label / category / sub-category, + company/trade for subs).
+  const rateMatch = (r, q, extra = []) => {
+    const s = q.trim().toLowerCase()
+    if (!s) return true
+    return [r.name, r.label, r.category, r.sub_category, ...extra]
+      .some(v => String(v || '').toLowerCase().includes(s))
+  }
+  const visibleLabor = (
     labCategory === 'All'
       ? labor.filter(r => r.category !== 'Archived') // hide archived from the default view
       : labor.filter(r => r.category === labCategory) // selecting 'Archived' still shows them
-  const visibleBasic =
+  ).filter(r => rateMatch(r, labQ))
+  const visibleBasic = (
     basicCategory === 'All'
       ? basicLabor.filter(r => r.category !== 'Archived')
       : basicLabor.filter(r => r.category === basicCategory)
+  ).filter(r => rateMatch(r, basicQ))
   const visibleSubs = subs.filter(r => {
     // Archived is its own view; hide archived rows from every other category/All.
     if (subCategory === 'Archived') {
@@ -1032,7 +1045,7 @@ export default function MasterRates({ only } = {}) {
       if (subCategory !== 'All' && r.category !== subCategory) return false
     }
     if (subCompany !== 'All' && (r.company_name || '') !== subCompany) return false
-    return true
+    return rateMatch(r, subQ, [r.company_name, r.trade, r.item_key])
   })
 
   const filterSelect = 'border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-green-400'
@@ -1209,6 +1222,13 @@ export default function MasterRates({ only } = {}) {
             addLabel="Add Labor Rate"
             count={visibleLabor.length}
             filters={
+              <>
+                <input
+                  value={labQ}
+                  onChange={e => setLabQ(e.target.value)}
+                  placeholder="Search rate / category…"
+                  className={filterSelect + ' w-56'}
+                />
               <div className="flex items-center gap-1.5">
                 <label className="text-xs text-gray-500">Category</label>
                 <select value={labCategory} onChange={e => setLabCategory(e.target.value)} className={filterSelect}>
@@ -1219,6 +1239,7 @@ export default function MasterRates({ only } = {}) {
                   ))}
                 </select>
               </div>
+              </>
             }
             columns={laborColumns}
             rows={visibleLabor}
@@ -1247,6 +1268,13 @@ export default function MasterRates({ only } = {}) {
             addLabel="Add Basic Labor Rate"
             count={visibleBasic.length}
             filters={
+              <>
+                <input
+                  value={basicQ}
+                  onChange={e => setBasicQ(e.target.value)}
+                  placeholder="Search rate / category…"
+                  className={filterSelect + ' w-56'}
+                />
               <div className="flex items-center gap-1.5">
                 <label className="text-xs text-gray-500">Category</label>
                 <select value={basicCategory} onChange={e => setBasicCategory(e.target.value)} className={filterSelect}>
@@ -1257,6 +1285,7 @@ export default function MasterRates({ only } = {}) {
                   ))}
                 </select>
               </div>
+              </>
             }
             columns={basicColumns}
             rows={visibleBasic}
@@ -1279,6 +1308,12 @@ export default function MasterRates({ only } = {}) {
             count={visibleSubs.length}
             filters={
               <>
+                <input
+                  value={subQ}
+                  onChange={e => setSubQ(e.target.value)}
+                  placeholder="Search rate / company / category…"
+                  className={filterSelect + ' w-56'}
+                />
                 <div className="flex items-center gap-1.5">
                   <label className="text-xs text-gray-500">Subcontractor</label>
                   <select value={subCompany} onChange={e => setSubCompany(e.target.value)} className={filterSelect}>
