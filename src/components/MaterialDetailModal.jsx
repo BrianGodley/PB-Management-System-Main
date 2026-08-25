@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
-import { materialUsage, archiveMaterial, restoreMaterial, setMaterialPrice } from '../lib/materialCatalog'
+import { materialUsage, materialEstimateUsage, archiveMaterial, restoreMaterial, setMaterialPrice } from '../lib/materialCatalog'
+import { useNavigate } from 'react-router-dom'
 import UnitSelect from './UnitSelect'
 import PriceInput from './PriceInput'
 
@@ -19,6 +20,7 @@ const isStandardName = s => ['standard', 'unspecified'].includes((s || '').trim(
 
 export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }) {
   const m = row.m
+  const navigate = useNavigate()
   const [moveCopy, setMoveCopy] = useState(null) // 'move' | 'copy' → opens the matching modal
   // Source descriptor consumed by Move/Copy modals — mirrors sourceFromRow(r)
   // in MasterMaterialRates.
@@ -44,6 +46,9 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
   const [confirmDel, setConfirmDel] = useState(false)
   const [usage, setUsage] = useState(null) // { priceCount, refCount } once loaded
   const [archived, setArchived] = useState(!!m.archived_at)
+  // Estimates that reference this product (null = loading, [] = none). Drives the
+  // "Estimates" section + gates the archived Delete button (delete only when []).
+  const [estUsage, setEstUsage] = useState(null)
   const [form, setForm] = useState({
     category_id: m.category_id,
     subcategory_id: m.subcategory_id,
@@ -66,6 +71,16 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
       setLabs(l.data || [])
     })
   }, [])
+
+  // Load the estimates that reference this product (for the Estimates list + the
+  // archived delete gate). Runs once; refreshed by re-opening the modal.
+  useEffect(() => {
+    let alive = true
+    setEstUsage(null)
+    materialEstimateUsage({ id: m.id, ref_key: m.ref_key, description: m.description })
+      .then(list => alive && setEstUsage(list))
+    return () => { alive = false }
+  }, [m.id])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const subsForCat = useMemo(
@@ -161,6 +176,27 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
     onClose?.()
   }
 
+  // Open an estimate at the referencing module (deep link read by EstimateDetail).
+  const openEstimate = (estimateId, moduleId) => {
+    onClose?.()
+    navigate(`/estimates/${estimateId}?module=${moduleId}`)
+  }
+
+  // Group the flat usage rows by estimate → one line per estimate, a link per module.
+  const estGroups = useMemo(() => {
+    const g = new Map()
+    ;(estUsage || []).forEach(r => {
+      if (!g.has(r.estimate_id))
+        g.set(r.estimate_id, { id: r.estimate_id, name: r.estimate_name, modules: [] })
+      g.get(r.estimate_id).modules.push(r)
+    })
+    return [...g.values()]
+  }, [estUsage])
+
+  // Archived items can be permanently deleted ONLY when no estimate references them.
+  const canDeleteArchived = estUsage != null && estGroups.length === 0
+  const [confirmArchDel, setConfirmArchDel] = useState(false)
+
   const catName = id => cats.find(c => c.id === id)?.name || '—'
   const subName = id => subs.find(s => s.id === id)?.name || '—'
 
@@ -201,6 +237,31 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
               {row.vName && <Field label="Vendor" value={row.vName} />}
               <Field label={row.vName ? 'Vendor Price' : 'Standard Price'} value={money(row.price)} />
               {m.collection && <Field label="Collection / Style" value={m.collection} />}
+              <div className="pt-2 border-t border-gray-100">
+                <div className="text-xs font-semibold text-gray-500 mb-1">Estimates</div>
+                {estUsage == null ? (
+                  <div className="text-xs text-gray-400">Checking where this product is used…</div>
+                ) : estGroups.length === 0 ? (
+                  <div className="text-xs text-gray-400">Not used in any estimate.</div>
+                ) : (
+                  <ul className="space-y-1 max-h-40 overflow-y-auto pr-1">
+                    {estGroups.map(g => (
+                      <li key={g.id} className="text-sm flex flex-wrap items-baseline gap-x-2">
+                        <span className="text-gray-700">{g.name || 'Untitled estimate'}</span>
+                        {g.modules.map(md => (
+                          <button
+                            key={md.module_id}
+                            onClick={() => openEstimate(g.id, md.module_id)}
+                            className="text-xs text-green-700 hover:text-green-900 underline"
+                          >
+                            {md.module_name || md.module_type || 'Open'}
+                          </button>
+                        ))}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </>
           ) : (
             <>
@@ -315,13 +376,29 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
           {mode === 'view' ? (
             <>
               {archived ? (
-                <button
-                  onClick={restore}
-                  disabled={busy}
-                  className="text-sm text-green-700 hover:text-green-900 font-medium disabled:opacity-50"
-                >
-                  {busy ? 'Restoring…' : '↩ Restore'}
-                </button>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={restore}
+                    disabled={busy}
+                    className="text-sm text-green-700 hover:text-green-900 font-medium disabled:opacity-50"
+                  >
+                    {busy ? 'Restoring…' : '↩ Restore'}
+                  </button>
+                  <button
+                    onClick={() => setConfirmArchDel(true)}
+                    disabled={busy || !canDeleteArchived}
+                    title={
+                      estUsage == null
+                        ? 'Checking estimate usage…'
+                        : canDeleteArchived
+                          ? 'Permanently delete this product'
+                          : 'Still used in an estimate — cannot delete'
+                    }
+                    className="text-sm text-red-600 hover:text-red-800 font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Delete
+                  </button>
+                </div>
               ) : (
                 <button
                   onClick={openConfirm}
@@ -459,6 +536,44 @@ export default function MaterialDetailModal({ row, onClose, onSaved, onDeleted }
                   </div>
                 </>
               )}
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {confirmArchDel &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center p-4"
+            onClick={() => setConfirmArchDel(false)}
+          >
+            <div
+              className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-5"
+              onClick={e => e.stopPropagation()}
+            >
+              <h4 className="font-bold text-gray-900 mb-1">Delete this product permanently?</h4>
+              <p className="text-sm text-gray-600 mb-4">
+                “{m.description}” is archived and isn’t referenced by any estimate, so it can be
+                permanently removed along with its price history. This can’t be undone.
+              </p>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setConfirmArchDel(false)}
+                  className="text-sm text-gray-500 px-3 py-1.5"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    await del()
+                    setConfirmArchDel(false)
+                  }}
+                  disabled={busy}
+                  className="text-sm bg-red-600 text-white px-4 py-1.5 rounded-lg font-semibold disabled:opacity-50"
+                >
+                  {busy ? 'Deleting…' : 'Delete'}
+                </button>
+              </div>
             </div>
           </div>,
           document.body

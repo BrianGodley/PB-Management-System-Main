@@ -652,6 +652,29 @@ export async function materialUsage(materialId, name) {
   }
 }
 
+// Full list of estimates + modules that reference a material (for the archived-item
+// modal's "Estimates" section and its delete gate). Matches the material's id,
+// ref_key, AND description inside each estimate_modules.data — estimates freeze
+// whichever the picker stored at save time. Returns
+//   [{ estimate_id, estimate_name, module_id, module_type, module_name }, ...]
+export async function materialEstimateUsage(material) {
+  if (!material) return []
+  const p_id = material.id != null ? String(material.id) : null
+  const p_ref_key = material.ref_key || null
+  const p_name = material.description || null
+  if (!p_id && !p_ref_key && !p_name) return []
+  const { data, error } = await supabase.rpc('material_estimate_usage', {
+    p_id,
+    p_ref_key,
+    p_name,
+  })
+  if (error) {
+    console.warn('materialEstimateUsage:', error.message)
+    return []
+  }
+  return data || []
+}
+
 // Reversible soft-delete: hide from every module picker / selection browser but
 // keep the product row + its whole price ledger intact.
 export async function archiveMaterial(id) {

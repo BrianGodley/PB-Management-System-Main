@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -120,6 +120,26 @@ export default function EstimateDetail() {
   // Selection state
   const [selectedProject, setSelectedProject] = useState(null)
   const [selectedModule, setSelectedModule] = useState(null)
+
+  // Deep link from the archived-material modal: /estimates/:id?module=<moduleId>
+  // focuses the referencing module once the projects have loaded.
+  const focusedModuleRef = useRef(false)
+  useEffect(() => {
+    if (focusedModuleRef.current) return
+    const focusModId = searchParams.get('module')
+    if (!focusModId || !projects.length) return
+    const proj = projects.find(p =>
+      (p.estimate_modules || []).some(mm => String(mm.id) === String(focusModId))
+    )
+    if (!proj) return
+    const mod = (proj.estimate_modules || []).find(
+      mm => String(mm.id) === String(focusModId)
+    )
+    setSelectedProject(proj)
+    setSelectedModule(mod || null)
+    setEditMode(true)
+    focusedModuleRef.current = true
+  }, [projects, searchParams])
 
   // Add project
   const [showAddProject, setShowAddProject] = useState(false)
