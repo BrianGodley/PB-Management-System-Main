@@ -63,19 +63,22 @@ test('paver edit-reflects: raising the form labor rate raises labor proportional
   assert.equal(b.laborCost, a.laborCost * 2, 'rate ×2 → labor ×2')
 })
 
-test('brick/tile steps price at their OWN form rate (read by code), not the paver rate', () => {
+test('brick/tile steps price off their OWN straight base rate; Curved = +20% form multiplier', () => {
+  // Brick straight: base 1.5 × formMult 1 (unset) = 150.
   const brick = run(
     { brickRows: [{ vendor: 'Standard', type: 'X', form: 'Straight', sf: 100 }] },
     { 'LAB-434-steps-brick-straight': 1.5, 'LAB-425-steps-paver-straight': 0.6667 },
     {}, []
   )
-  assert.equal(brick.totalHrs, 150, `brick 100 LF × 1.5 = 150 (not the paver 0.6667); got ${brick.totalHrs}`)
+  assert.equal(brick.totalHrs, 150, `brick 100 × 1.5 × 1 = 150 (own straight rate, not paver); got ${brick.totalHrs}`)
+  // Tile CURVED: base straight rate 3 × the shared curved multiplier 1.2 = 360 —
+  // Curved is a modifier, no standalone curved rate.
   const tile = run(
     { tileRows: [{ vendor: 'Standard', type: 'X', form: 'Curved', sf: 100 }] },
-    { 'LAB-437-steps-tile-curved': 3, 'LAB-419-steps-paver-curved': 1 },
+    { 'LAB-436-steps-tile-straight': 3, 'LAB-413-steps-conc-form-curved': 1.2 },
     {}, []
   )
-  assert.equal(tile.totalHrs, 300, `tile 100 LF × 3 = 300 (not the paver rate); got ${tile.totalHrs}`)
+  assert.equal(tile.totalHrs, 360, `tile 100 × 3 × 1.2 (curved modifier) = 360; got ${tile.totalHrs}`)
 })
 
 test('concrete step value: labor = LF × (type + finish) × formMult; material = LF × (typeMat + finishMat)', () => {

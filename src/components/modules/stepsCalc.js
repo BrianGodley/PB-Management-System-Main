@@ -129,14 +129,20 @@ function matStepRowCalc(r, laborRates, materialRows, cat = PAVER_STEP_CAT, price
   // Route through R (guarded by sf) so an unset form-labor rate surfaces in the
   // fix-it banner only for a step row actually entered. Value identical to
   // n(laborRates[ref]); an unknown form → kPaverForm('') = '' → R records nothing.
-  const ref = formFn(r.form)
-  const rate =
+  // Base install rate is the STRAIGHT/base rate; Curved is no longer a separate rate
+  // — it's a modifier applied via the shared step form multiplier (Straight ×1,
+  // Curved ×1.2). formFn('Straight') always yields the base install ref.
+  const ref = formFn('Straight')
+  const baseRate =
     sf > 0
       ? R
-        ? R.labor(ref, { category: 'Steps', unit: 'Hrs per Ln Ft', label: 'Step Install — ' + (r.form || '') + ' Form' })
+        ? R.labor(ref, { category: 'Steps', unit: 'Hrs per Ln Ft', label: 'Step Install' })
         : n(laborRates[ref])
       : 0
-  const hrs = sf * rate
+  // Form multiplier (shared with concrete steps): Straight = 1, Curved = +20%.
+  // Unset → identity (1), so a step never zeroes out for a missing modifier.
+  const formMult = n(laborRates[CONC_FORM_REF[r.form]]) || 1
+  const hrs = sf * baseRate * formMult
   let price = 0
   let sfPerPallet = 0
   // Standard resolves to the item's null-vendor catalog price; a real vendor to
@@ -174,7 +180,8 @@ function concRowCalc(r, laborRates, materialRates, R = null) {
         ? R.labor(finishRef, { category: 'Steps', unit: 'Hrs per Ln Ft', label: 'Concrete Finish — ' + (r.finish || '') })
         : n(laborRates[finishRef])
       : 0
-  const formMult = n(laborRates[kConcForm(r.form)])
+  // Curved = +20% modifier (shared with the material steps); unset → identity (1).
+  const formMult = n(laborRates[kConcForm(r.form)]) || 1
   const hrs = lf * (typeHrs + finishHrs) * formMult
   const typeMat = n(materialRates[kConcTypeMat(r.type)])
   const finishMat = n(materialRates[kFinishMat(r.finish)])

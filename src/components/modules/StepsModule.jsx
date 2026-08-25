@@ -69,13 +69,11 @@ const concBaseType = t => (t || '').replace(/\s*Colored$/i, '')
 // concrete / basic-materials catalogs the module fetches. Verify completeness with
 // `npm run test:steps-coverage` after any change here.
 const STEPS_RATE_SCOPE = [
-  { category: 'Steps' }, // step type/finish/form-install labor + misc $/SF + sub $/LF
+  { category: 'Steps' }, // step type/finish/form-install labor + $/SF concrete/finish misc + $/LF sub
   { category: 'Paver', sub: 'Paver Material' }, // paver step catalog materials
-  { category: 'Concrete', sub: 'Concrete Mix' }, // concrete step vendor mix
   { category: 'Basic Materials', sub: 'Brick' }, // brick step materials
-  { category: 'Basic Materials', sub: 'Tile' }, // tiled step materials
-  { category: 'Basic Materials', sub: 'Flagstone' }, // flagstone step materials
-  { category: 'Basic Materials', sub: 'Aggregate & Concrete' }, // base material (Class II / mix)
+  { category: 'Pool', sub: 'Tile' }, // tiled step materials (shared Tile catalog lives under Pool)
+  // Flagstone step materials have no subcategory yet (pending product setup) — nothing to scope.
 ]
 
 const CONC_FINISHES = ['Smooth', 'Broom', 'Sanded', 'Salted', 'Exposed Aggregate']
@@ -137,10 +135,12 @@ function matStepRowCalc(r, laborRates, materialRows, cat = PAVER_STEP_CAT, price
   if (!r.type) return { sf: n(r.sf), hrs: 0, mat: 0, price: 0, pallets: 0 }
   const sf = n(r.sf)
   // hrs-per-unit: rate is hours per Ln Ft (was LF/hr; standardized 2026-08-18).
-  // formKey selects the labor rate family: Paver/Flagstone share 'Steps - <form>';
-  // Brick/Tile have their own per-form rates ('Steps - Brick/Tile <form>').
-  const rate = n(laborRates[formKey(r.form)])
-  const hrs = sf * rate
+  // formKey selects the labor rate family (Paver/Flag share 'Steps - <form>';
+  // Brick/Tile own 'Steps - Brick/Tile <form>'). Base = STRAIGHT rate; Curved is a
+  // +20% form multiplier (shared with concrete), not a separate rate.
+  const baseRate = n(laborRates[formKey('Straight')])
+  const formMult = n(laborRates[kConcForm(r.form)]) || 1
+  const hrs = sf * baseRate * formMult
   let price = 0
   let sfPerPallet = 0
   // Standard resolves to the item's null-vendor catalog price; a real vendor to
@@ -163,7 +163,7 @@ function concRowCalc(r, laborRates, materialRates) {
   const lf = n(r.sf)
   const typeHrs = n(laborRates[kConcTypeHrs(concBaseType(r.type))])
   const finishHrs = n(laborRates[kFinishHrs(r.finish)])
-  const formMult = n(laborRates[kConcForm(r.form)])
+  const formMult = n(laborRates[kConcForm(r.form)]) || 1 // Curved = +20%; unset → identity
   const hrs = lf * (typeHrs + finishHrs) * formMult
   const typeMat = n(materialRates[kConcTypeMat(r.type)])
   const finishMat = n(materialRates[kFinishMat(r.finish)])
