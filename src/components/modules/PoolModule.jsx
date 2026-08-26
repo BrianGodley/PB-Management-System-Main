@@ -219,6 +219,21 @@ const WATER_FEATURE_TYPES = ['Sheer Descents', 'Fire/Water Bowls', 'Deck Jets', 
 const BASIC_CATEGORY = 'Basic Materials'
 const REINFORCEMENT_SUBCAT = 'Reinforcement'
 const POOL_STEEL_LABOR = 'Steel - Install'
+
+// View Rates scope (mirrors WALLS_RATE_SCOPE): the exact (category, sub) pairs the
+// Pool calc consumes, so buildViewRates surfaces ONLY those instead of dumping the
+// whole borrowed Utilities category. Own category 'Pool' covers all tile/spillway/
+// coping/raised/water-feature/equipment catalog materials + every Pool labor/misc/
+// subcontractor rate. Borrowed: whole Utilities (E&P material + '<item> - Labor Rate'
+// labor + trench excavation misc), the shared Skid excavation rate, rebar, and the
+// shared Concrete Mix catalog (In-House shotcrete material).
+const POOL_RATE_SCOPE = [
+  { category: 'Pool' },
+  { category: 'Utilities' }, // E&P materials + per-item labor rates + trench excavation coeffs
+  { category: 'Demo', sub: 'Skid Steer', only: ['Skid - Soil'] }, // shared excavation hrs per Cu Yd
+  { category: 'Basic Materials', sub: 'Reinforcement' }, // rebar #3–#8 (steel material)
+  { category: 'Concrete', sub: 'Concrete Mix' }, // In-House shotcrete mix material
+]
 function poolStdOptions(materialRows, subcat, vendorSel = 'Standard') {
   return catalogOptions(materialRows, subcat, vendorSel, {
     standardRows: 'null-vendor',
@@ -758,7 +773,9 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       // dual-keyed (name + ref_key) + basic_labor_rates. 'Demo' for shared excavation.
       fetchLaborRateMap(['Pool', 'Utilities', 'Finishes', 'Demo']),
       supabase.from('subcontractor_rates').select('company_name,trade,rate,unit').eq('category', 'Pool'),
-      fetchModuleCatalog(['Utilities', 'Pool', 'Basic Materials']),
+      // 'Concrete' loads the shared 'Concrete Mix' catalog (In-House shotcrete
+      // material) — without it the shotcrete Type picker resolves $0.
+      fetchModuleCatalog(['Utilities', 'Pool', 'Basic Materials', 'Concrete']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
@@ -1081,6 +1098,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             onCrewTypeChange={v => updShared('crewType', v)}
             title="Pool"
             moduleType="Pool"
+            rateScope={POOL_RATE_SCOPE}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
           />
