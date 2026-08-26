@@ -1224,7 +1224,7 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             <div className="col-span-2">
               <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap">
                 Forming Complexity (0–100)
-                <span className="text-gray-400">— +{calc.complexityPctPerUnit}% labor / point</span>
+                <span className="text-gray-400">— +{+(calc.complexityFactorPerUnit * 100).toFixed(2)}% labor / point</span>
               </label>
               <NumInput
                 value={formingComplexity}

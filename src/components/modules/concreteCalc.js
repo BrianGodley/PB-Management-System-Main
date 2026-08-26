@@ -149,7 +149,7 @@ export function calcConcrete(
   const sealerNaturalSFPerHr = n(lr[LAB.CONC_SEALER_NATURAL])
   const sealerWetSFPerHr = n(lr[LAB.CONC_SEALER_WET])
   const vaporBarrierSFPerHr = n(lr[LAB.CONC_VAPOR_BARRIER])
-  const complexityPctPerUnit = n(lr[LAB.CONC_FORMING_COMPLEXITY])
+  const complexityFactorPerUnit = n(lr[LAB.CONC_FORMING_COMPLEXITY])
   // Finish add-on labor — hrs per Sq Ft, editable via labor_rates. (Vars keep
   // the legacy *SFPerHr names but now hold hrs-per-SF; standardized 2026-08-18.)
   const sandFinishSFPerHr = n(lr[LAB.CONC_SAND_FINISH])
@@ -158,9 +158,10 @@ export function calcConcrete(
   const seededAggSFPerHr = n(lr[LAB.CONC_SEEDED_AGG])
   const stampedSFPerHr = n(lr[LAB.CONC_STAMPED_FINISH])
   // Hand Mix takes more labor to produce than truck-delivered mix. Applied as a
-  // % uplift to that tier's pour & finish hours. Tunable coefficient — lives in
-  // labor_rates (View Rates), read live with no hardcoded fallback.
-  const handMixUpliftPct = n(lr[LAB.CONC_HAND_MIX_UPLIFT])
+  // FACTOR (multiplier) on that tier's pour & finish hours — e.g. 1.3 = +30%.
+  // Tunable — lives in labor_rates (View Rates), read live. An unset/0 factor
+  // means "no uplift" (×1), never zero out the labor.
+  const handMixFactor = n(lr[LAB.CONC_HAND_MIX_UPLIFT]) || 1
 
   // ── Material unit costs (material_rates) ─────────────────────────────────
   // Material $ come ONLY from the catalog (no hardcoded fallbacks). A name with
@@ -260,7 +261,7 @@ export function calcConcrete(
     // Hand Mix uplift: producing mix by hand adds labor to this tier. Detect from
     // the RESOLVED mix item's name (the stored value is now a ref_key, not the name).
     const mixItem = rowOpt('Concrete Mix', { vendor: installTierVendor[t.key], type: installTierType[t.key] })
-    if (/hand\s*mix/i.test(mixItem.dbName || '')) hrs *= 1 + handMixUpliftPct / 100
+    if (/hand\s*mix/i.test(mixItem.dbName || '')) hrs *= handMixFactor
     return s + hrs
   }, 0)
   // Concrete mix material + volume — per size-tier: each tier's SF × its own
@@ -385,12 +386,13 @@ export function calcConcrete(
   })
 
   // ── Totals ───────────────────────────────────────────────────────────────
-  // ── Forming complexity — a 1-to-1% labor modifier. Each point of the
-  //    0–100 input adds complexityPctPerUnit % (default 1%) to EVERY labor
-  //    hour, so 100 points ⇒ +100% ⇒ the job's labor doubles.
+  // ── Forming complexity — a labor modifier keyed by a FACTOR-per-point rate
+  //    (0.01 = +1% labor per point). Each point of the 0–100 input adds
+  //    baseLaborHrs × factor, so at 0.01 a 100-point job ⇒ +100% ⇒ labor
+  //    doubles. Unset factor ⇒ 0 ⇒ no complexity added.
   const baseLaborHrs = preComplexHrs + finishHrs + vaporHrs + sealerHrs + manHrs
   const complexityHrs =
-    (baseLaborHrs * n(state.formingComplexity) * complexityPctPerUnit) / 100
+    baseLaborHrs * n(state.formingComplexity) * complexityFactorPerUnit
   const preAdjHrs = baseLaborHrs + complexityHrs
   const diffHrs = preAdjHrs * diffPct
   const _preWalkHrs = preAdjHrs + diffHrs + hoursAdj
@@ -434,8 +436,8 @@ export function calcConcrete(
     layoutHrs,
     travelHrs,
     complexityHrs,
-    complexityPctPerUnit,
-    handMixUpliftPct,
+    complexityFactorPerUnit,
+    handMixFactor,
     installHrs,
     rebarHrs,
     formHrs,
