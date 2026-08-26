@@ -28,6 +28,10 @@ import UnpricedItemModal from '../UnpricedItemModal'
 // ─────────────────────────────────────────────────────────────────────────────
 
 const FINISHES_CATEGORY = 'Finishes'
+// View Rates scope: Finishes is self-contained (finish materials + surface-finish
+// labor + misc all under 'Finishes' — it's the SHARED provider other modules borrow
+// FROM, but reads nothing itself). Explicit for architecture parity.
+const FINISHES_RATE_SCOPE = [{ category: FINISHES_CATEGORY }]
 
 // Identity-only: each entry carries just the DB rate name (`db`). Every price /
 // labor coefficient is read LIVE from the rate map — no hardcoded fallbacks. A
@@ -978,6 +982,7 @@ export default function FinishesModule({ onSave, onBack, saving, initialData }) 
             onCrewTypeChange={setCrewType}
             title="Finishes"
             moduleType="Finishes"
+            rateScope={FINISHES_RATE_SCOPE}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
           />

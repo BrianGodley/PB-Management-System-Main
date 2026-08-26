@@ -207,6 +207,15 @@ const UTIL_CAT = {
   sewerLine: 'Sewer Pipe',
 }
 
+// View Rates scope (mirrors WALLS_RATE_SCOPE): own 'Utilities' covers all material
+// subs (6 above), every '<item> - Labor Rate' row (filed under Gas/Electrical/Sewer/
+// Excavation subs), the trench/hand excavation coefficients, and the Sub Trench misc.
+// Borrowed: the shared curb-core basic-labor rate only.
+const UTILITIES_RATE_SCOPE = [
+  { category: 'Utilities' },
+  { category: 'Basic Labor', sub: 'Curb Core', only: ['Basic Labor - Curb Core'] },
+]
+
 // Type list = the Master Rates catalog (Items in Category 'Utilities' + this
 // Sub-category, Standard/null-vendor). Whatever is in the catalog IS the dropdown,
 // so renaming / adding / deleting an Item in Master Rates flows straight through
@@ -822,6 +831,7 @@ export default function UtilitiesModule({ onSave, onBack, saving, initialData })
             onCrewTypeChange={setCrewType}
             title="Utilities"
             moduleType="Utilities"
+            rateScope={UTILITIES_RATE_SCOPE}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
           />

@@ -41,6 +41,10 @@ import UnpricedItemModal from '../UnpricedItemModal'
 // ─────────────────────────────────────────────────────────────────────────────
 
 const PLANTING_CATEGORY = 'Planting'
+// View Rates scope: Planting is self-contained (all plant/amendment/tool materials
+// + per-plant labor + misc live under 'Planting'). Explicit so it's on the same
+// architecture as every other module — ready for a borrowed sub if one is ever added.
+const PLANTING_RATE_SCOPE = [{ category: PLANTING_CATEGORY }]
 
 // Plant-type catalogs — identity ONLY (which Items are "small" vs "large"). Every
 // per-hour install rate (labor_rates) and unit price (material / misc_rates) is
@@ -1026,6 +1030,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
             onCrewTypeChange={setCrewType}
             title="Planting"
             moduleType="Planting"
+            rateScope={PLANTING_RATE_SCOPE}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
           />

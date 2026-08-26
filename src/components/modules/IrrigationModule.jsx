@@ -40,6 +40,9 @@ import { ZONE_TYPES, zoneMeta, ZONE_OPTIONS, makeBomPrice, zoneMatUnit, computeZ
 import { calcIrrigation } from './irrigationCalc'
 
 const IRRIGATION_CATEGORY = 'Irrigation'
+// View Rates scope: Irrigation is self-contained (all material subs + labor + misc
+// under 'Irrigation'). Explicit for architecture parity with the other modules.
+const IRRIGATION_RATE_SCOPE = [{ category: IRRIGATION_CATEGORY }]
 
 // ── Zone definitions ──────────────────────────────────────────────────────────
 // Zone assemblies (labels, per-zone Trench/Hand labor keys, bill-of-materials) live
@@ -524,6 +527,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
             onCrewTypeChange={setCrewType}
             title="Irrigation"
             moduleType="Irrigation"
+            rateScope={IRRIGATION_RATE_SCOPE}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
           />

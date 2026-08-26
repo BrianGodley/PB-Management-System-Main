@@ -16,6 +16,16 @@ import UnpricedItemModal from '../UnpricedItemModal'
 // The taxonomy sub-category name equals each section's marker except D.G., whose
 // sub-category is named "Decomposed Granite" — remap it back to the "DG" marker.
 const GT_MARKER_REMAP = { 'Decomposed Granite': 'DG' }
+
+// View Rates scope (mirrors WALLS_RATE_SCOPE): own 'Ground Treatments' covers every
+// GT material sub + all GT labor/misc/sub rates (incl. DG Cement Mix, which stays in
+// GT). Borrowed from Basic Materials: the shared Decomposed Granite base materials
+// (remapped to the DG picker) and the single shared Weed Fabric barrier.
+const GT_RATE_SCOPE = [
+  { category: 'Ground Treatments' },
+  { category: 'Basic Materials', sub: 'Decomposed Granite' }, // shared DG base ($/Cu Yd)
+  { category: 'Basic Materials', sub: 'Barriers', only: ['Weed Fabric'] }, // shared weed fabric ($/SF)
+]
 async function fetchGtRows() {
   // DG base materials were consolidated company-wide into Basic Materials →
   // 'Decomposed Granite' (priced per Cu Yd) and MOVED out of Ground Treatments.
@@ -754,6 +764,7 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             onCrewTypeChange={setCrewType}
             title="Ground Treatments"
             moduleType="Ground Treatments"
+            rateScope={GT_RATE_SCOPE}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
           />

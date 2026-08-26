@@ -203,6 +203,7 @@ export default function WeedAbatementModule({ onSave, onBack, saving, initialDat
             onCrewTypeChange={setCrewType}
             title="Weed Abatement"
             moduleType="Weed Abatement"
+            rateScope={[{ category: 'Weed Abatement' }]}
             refreshAllRates={refreshRates}
             showInlineToggle={false}
           />

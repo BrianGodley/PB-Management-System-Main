@@ -16,6 +16,17 @@ import { calcDrainage } from './drainageCalc'
 // item's null-vendor catalog record — options AND price come from the same row.
 const CATALOG_OPTS = { standardRows: 'null-vendor', stripPrefix: true }
 
+// View Rates scope (mirrors WALLS_RATE_SCOPE): own 'Drainage' covers every drain
+// material sub (pipe/french/fixtures/sump/catch-basin) + all Drainage labor
+// (trench/pipe/fixture/sump/catch-basin/hydrocut), misc (fabric/gravel-bed), and
+// sub rates. Borrowed: the shared concrete hand mix (catch-basin housing) and the
+// shared curb-core basic-labor rate.
+const DRAINAGE_RATE_SCOPE = [
+  { category: 'Drainage' },
+  { category: 'Basic Materials', sub: 'Concrete Mix', only: ['Concrete - Hand Mix'] }, // catch-basin concrete (MAT-052)
+  { category: 'Basic Labor', sub: 'Curb Core', only: ['Basic Labor - Curb Core'] }, // shared curb-core labor
+]
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Drainage Module — fields and calculations from Excel estimator
 // Material prices are fetched live from material_rates (category='Drainage')

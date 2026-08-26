@@ -41,6 +41,19 @@ const DEMO_ROWS = [
   { key: 'lawn', label: 'Lawn', dumpKey: 'Dump Fee - Green Waste' },
 ]
 
+// View Rates scope (mirrors WALLS_RATE_SCOPE): own 'Artificial Turf' covers turf +
+// base materials, all demo/install labor, every Turf - * misc coefficient, and the
+// Turf Sub - * rates. Borrowed: the three shared base-prep material layers from
+// Basic Materials, and the three dump fees from Demo (only those, not the whole
+// Demo category). NOTE: turf demo-METHOD labor is own-category, not borrowed.
+const TURF_RATE_SCOPE = [
+  { category: 'Artificial Turf' },
+  { category: 'Basic Materials', sub: 'Base Material' }, // Roadbase layer (Class II)
+  { category: 'Basic Materials', sub: 'Decomposed Granite' }, // DG base layer
+  { category: 'Basic Materials', sub: 'Barriers' }, // weed-barrier layer
+  { category: 'Demo', sub: 'Disposal', only: ['Dump Fee - Concrete', 'Dump Fee - Dirt', 'Dump Fee - Green Waste'] },
+]
+
 // Turf brands are no longer a hardcoded list — they live in the catalog as
 // products (category 'Artificial Turf', sub_category 'Turf Material'). See
 // turfBrandOptions / turfBrandRow below.
@@ -858,6 +871,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
             onCrewTypeChange={v => set('crewType', v)}
             title="Artificial Turf"
             moduleType="Artificial Turf"
+            rateScope={TURF_RATE_SCOPE}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
           />
