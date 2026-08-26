@@ -142,6 +142,26 @@ const CONCRETE_CATEGORY = 'Concrete'
 // Grout fill priced at the concrete ready-mix rate (shared Basic Materials).
 const GROUT_CONCRETE = { dbName: 'Concrete - Ready Mix (Truck)' } // $/CY
 
+// View Rates scope (mirrors WALLS_RATE_SCOPE): the exact (category, sub) rate
+// slices the Columns calc consumes across its 4 type tabs, so buildViewRates
+// surfaces only those instead of dumping whole borrowed categories. Own 'Columns'
+// = per-tab Installation labor + the 7 Sub-SF flat finish rates. Block pickers
+// borrow the Walls block subs (Wall Block / Modular Wall / Brick) which also carry
+// the shared brick-lay + PIP-form labor; rebar + grout/PIP ready-mix come from
+// Basic Materials; finishes from the shared Finishes category.
+const COLUMNS_RATE_SCOPE = [
+  { category: 'Columns' }, // per-tab Installation labor + Sub-SF finish flats (misc)
+  { category: 'Walls', sub: 'Wall Block' }, // CMU column block products
+  { category: 'Walls', sub: 'Modular Wall' }, // Modular column block products
+  { category: 'Walls', sub: 'Brick' }, // Brick products + shared 'Wall Brick Lay Labor'
+  { category: 'Walls', sub: 'Poured In Place', only: ['Wall PIP Install Labor'] }, // shared PIP form labor only
+  { category: 'Basic Materials', sub: 'Reinforcement' }, // rebar #3–#8
+  { category: 'Basic Materials', sub: 'Concrete Mix' }, // PIP concrete-mix picker + truck-mix grout (post Concrete Mix move)
+  { category: 'Basic Materials', sub: 'Aggregate & Concrete', only: ['Concrete - Ready Mix (Truck)'] }, // grout fill if filed here
+  { category: 'Finishes', sub: 'Finish Material' }, // shared finish materials
+  { category: 'Finishes', sub: 'Surface Finishes' }, // shared finish labor
+]
+
 const colMatPrice = resolveMaterialPrice
 
 // Catalog sub-category the Column Finishes live under (Category 'Columns').
@@ -968,6 +988,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
               onCrewTypeChange={setCrewType}
               title="Columns"
               moduleType="Columns"
+              rateScope={COLUMNS_RATE_SCOPE}
               refreshAllRates={refreshAllRates}
               showInlineToggle={false}
             />

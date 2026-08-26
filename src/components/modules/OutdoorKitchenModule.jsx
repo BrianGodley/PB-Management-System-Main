@@ -309,6 +309,26 @@ const ELEC_TYPE_ARR = Object.entries(ELECTRICAL_FIXTURE_TYPES).map(([label, t]) 
 const UTIL_CAT = { line: 'Utility Lines', gas: 'Gas Fixtures', elec: 'Electrical Fixtures' }
 // Trenching for utility lines (machine trench, min/cf; from the Utilities schedule).
 const OK_TRENCH_RATE_NAME = 'Utilities Trench Excavation'
+
+// View Rates scope: the exact (category, sub) slices the OK calc consumes. Own
+// 'Outdoor Kitchen' = structure/countertop/appliance/sink materials + all BBQ
+// labor + misc coefficients. Utilities needs SIX entries because its line-item
+// labor rows are filed under different subs ('Gas' / 'Electrical' / 'Excavation')
+// than the materials ('Utility Lines' / 'Gas Fixtures' / 'Electrical Fixtures').
+// Finishes are the shared finish material + labor; rebar is Basic Materials.
+const OK_RATE_SCOPE = [
+  { category: 'Outdoor Kitchen' },
+  { category: 'Utilities', sub: UTIL_CAT.line }, // Utility Lines materials
+  { category: 'Utilities', sub: UTIL_CAT.gas }, // Gas Fixtures materials
+  { category: 'Utilities', sub: UTIL_CAT.elec }, // Electrical Fixtures materials
+  { category: 'Utilities', sub: 'Gas' }, // gas pipe/fixture '- Labor Rate' rows
+  { category: 'Utilities', sub: 'Electrical' }, // conduit/electrical fixture '- Labor Rate' rows
+  { category: 'Utilities', sub: 'Excavation', only: [OK_TRENCH_RATE_NAME] }, // trench excavation coeff
+  { category: 'Finishes', sub: 'Finish Material' }, // shared finish materials
+  { category: 'Finishes', sub: 'Surface Finishes' }, // shared finish labor
+  { category: 'Basic Materials', sub: 'Reinforcement' }, // rebar #3–#8
+]
+const OK_RATE_SCOPE_CATS = [...new Set(OK_RATE_SCOPE.map(s => s.category))]
 const EP_LINE_ROW = () => ({ type: 'PVC Conduit with Electrical', lf: '', vendor: 'Standard' })
 const EP_GAS_ROW = () => ({ type: '12" Single Gas Ring', qty: '', vendor: 'Standard' })
 const EP_ELEC_ROW = () => ({ type: 'GFCI Protected Receptacles', qty: '', vendor: 'Standard' })
@@ -862,12 +882,15 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
     // Utility Lines/Gas/Electrical Fixtures, all unchanged names) from the shared
     // Outdoor Kitchen / Utilities / Fire Pit / Walls categories.
     const [matMap, labRes, rows, venRes] = await Promise.all([
-      fetchStandardRateMap(['Outdoor Kitchen', 'Utilities', 'Finishes']),
+      // Categories come straight from OK_RATE_SCOPE so pricing + View Rates can't
+      // drift. Adds 'Basic Materials' (rebar 'Rebar #N' was resolving $0 without
+      // it) and drops the unused 'Walls' borrow.
+      fetchStandardRateMap(OK_RATE_SCOPE_CATS),
       supabase
         .from('labor_rates')
         .select('name, rate')
-        .in('category', ['Outdoor Kitchen', 'Utilities', 'Finishes']),
-      fetchModuleCatalog(['Outdoor Kitchen', 'Utilities', 'Walls', 'Finishes']),
+        .in('category', OK_RATE_SCOPE_CATS),
+      fetchModuleCatalog(OK_RATE_SCOPE_CATS),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
@@ -1151,6 +1174,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
             onCrewTypeChange={setCrewType}
             title="Outdoor Kitchen"
             moduleType="Outdoor Kitchen"
+            rateScope={OK_RATE_SCOPE}
             refreshAllRates={refreshAllRates}
             showInlineToggle={false}
           />

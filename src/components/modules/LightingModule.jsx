@@ -40,6 +40,13 @@ const CATALOG_OPTS = { standardRows: 'null-vendor', stripPrefix: false }
 const LIGHTING_CATEGORY = 'Lighting'
 const LIGHT_CAT = { fixture: 'Light Fixture', transformer: 'Transformer', wire: 'Wire' }
 
+// View Rates scope: Lighting is self-contained — every material (Light Fixture /
+// Transformer / Wire), every install-labor rate (Fixture/Transformer/Wire/Bistro,
+// item-driven via calc_meta), and the material-markup misc all live under the one
+// 'Lighting' category. Declaring it explicitly (rather than relying on the
+// module_category_map fallback) locks View Rates to exactly this category.
+const LIGHTING_RATE_SCOPE = [{ category: LIGHTING_CATEGORY }]
+
 // Material markup applied to all fixture / transformer / wire materials. Read
 // live from the price list (misc_rates 'Lighting - Material Markup', category
 // 'Lighting'), stored as a fraction (0.15 = 15%). No hardcoded fallback: a
@@ -449,7 +456,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
               <tr className="text-xs text-gray-500 border-b border-gray-200">
                 <th className="text-center pb-1 pr-2 font-medium w-40">Vendor</th>
                 <th className="text-center pb-1 pr-2 font-medium">Item</th>
-                <th className="text-center pb-1 pr-2 font-medium w-20">Qty</th>
+                <th className="text-center pb-1 pr-2 font-medium w-24">{subcat === LIGHT_CAT.wire ? 'Linear Feet' : 'Qty'}</th>
                 <th className="text-center pb-1 pr-2 font-medium text-gray-400 w-16">Watts</th>
                 <th className="text-center pb-1 pr-2 font-medium text-gray-400 w-24">
                   {isSub ? 'Price (each)' : 'Labor Hrs'}
@@ -648,6 +655,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
             onCrewTypeChange={setCrewType}
             title="Lighting"
             moduleType="Lighting"
+            rateScope={LIGHTING_RATE_SCOPE}
             refreshAllRates={refreshCatalog}
             showInlineToggle={false}
           />
@@ -810,9 +818,9 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
         setRows: setTransformerRows,
       })}
 
-      {/* ── Wire & Other ── */}
+      {/* ── Low Voltage Wire ── */}
       {renderSection({
-        title: 'Wire & Other',
+        title: 'Low Voltage Wire',
         subcat: LIGHT_CAT.wire,
         rows: wireRows,
         setRows: setWireRows,
