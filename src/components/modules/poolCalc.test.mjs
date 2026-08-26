@@ -228,3 +228,13 @@ test('steel/rebar In-House: no ReferenceError; rebar mat = shell SF × LF/SF × 
   assert.ok(Math.abs(r.steelMat - 150 * 0.9) < 1e-9, 'rebar material = LF × $/LF')
   assert.ok(Math.abs(r.steelHrs - 150 * 0.02) < 1e-9, 'steel hours = LF × install rate')
 })
+
+test('trench section (POOL_TRENCH_LABOR) does not throw and prices hrs = Cu Ft × rate', () => {
+  // Regression: the pure calc must define POOL_TRENCH_LABOR (was only in PoolModule),
+  // else entering a trench depth threw ReferenceError and crashed the whole section.
+  const mp = { 'Utilities Trench Excavation': 0.1, 'Utilities Hand Excavation': 0.2 }
+  // 10 LF × (12/12) × (12/12) = 10 Cu Ft × 0.1 hrs/CF = 1 hr.
+  const r = run({ epTrenchRows: [{ equipment: 'Trench', lf: '10', width: '12', depth: '12' }] }, mp)
+  finiteNums(r)
+  assert.ok(r.totalHrs >= 1 - 1e-9, `trench hrs should include 10 CF × 0.1 = 1; got totalHrs ${r.totalHrs}`)
+})

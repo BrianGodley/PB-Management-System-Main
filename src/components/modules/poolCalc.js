@@ -99,6 +99,9 @@ const RAISED_SUBCAT = 'Raised Surface'
 export const WATER_FEATURE_SUBCAT = 'Water Features'
 const WATER_FEATURE_TYPES = ['Sheer Descents', 'Fire/Water Bowls', 'Deck Jets', 'Water Slides']
 const UTIL_CAT = { line: 'Electrical Pipe', gasPipe: 'Gas Pipe', wire: 'Electrical Wiring', elec: 'Electrical Fixtures' }
+// Utility trenching method → the hrs-per-Cu-Ft misc rate (mirrors PoolModule; the
+// pure calc must define every const it uses or the trench loop throws ReferenceError).
+const POOL_TRENCH_LABOR = { Trench: 'Utilities Trench Excavation', Hand: 'Utilities Hand Excavation' }
 
 function poolStdOptions(materialRows, subcat, vendorSel = 'Standard') {
   return catalogOptions(materialRows, subcat, vendorSel, {
