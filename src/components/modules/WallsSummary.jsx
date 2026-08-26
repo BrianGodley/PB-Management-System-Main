@@ -189,13 +189,19 @@ function computeCapRow(row, mp, materialRows) {
 
 function computeWpRow(row, mp, materialRows) {
   const sf = n(row?.sf)
+  // Valid = any real WP selection (catalog product OR legacy named type), not
+  // 'None'. Mirrors WallsModule — a catalog product outside the legacy WP_KEY map
+  // must NOT zero material/labor.
   const k = WP_KEY[row?.type]
+  const valid = !!row?.type && row.type !== 'None'
   let mat = 0,
     hrs = 0,
     subUnit = 0
-  if (sf > 0 && k) {
-    const pr = wallMatPrice(WALL_RATES[k].db, row.vendor, materialRows, mp)
-    // Per-type install labor (hrs/SF), matching WallsModule — no hardcoded 200.
+  if (sf > 0 && valid) {
+    // Legacy named types resolve via their canonical WALL_RATES row; catalog
+    // products resolve by their own name.
+    const pr = wallMatPrice(k ? WALL_RATES[k].db : row.type, row.vendor, materialRows, mp)
+    // Per-type install labor (hrs/SF) for legacy types; generic wpLabor otherwise.
     const labKey = WP_LABOR_KEY[row?.type]
     const wpRate = labKey ? n(mp?.[WALL_RATES[labKey].db]) : n(mp?.[WALL_RATES.wpLabor.db])
     mat = sf * pr

@@ -757,8 +757,12 @@ function computeCapRow(row, mp, materialRows, R = null, rec = null) {
 //    material price is vendor-resolved.
 function computeWpRow(row, mp, materialRows, R = null, rec = null) {
   // Math lives in the pure, unit-tested wallsCalc.js; here we resolve validity
-  // (type maps to a real WP key), the catalog $/SF, and the per-type install labor.
-  const valid = !!WP_KEY[row?.type]
+  // (any real WP selection — a catalog product or a legacy named type — not
+  // 'None'), the catalog $/SF, and the install labor (per-type key when the type
+  // is a known legacy name, else the generic 'wpLabor' rate). Previously `valid`
+  // was gated on the legacy WP_KEY map, so a catalog waterproofing product whose
+  // name wasn't one of the four legacy types zeroed BOTH material and labor.
+  const valid = !!row?.type && row.type !== 'None'
   const catP = catalogItemPrice(materialRows, WALL_WP_SUBCAT, row?.type, row?.vendor)
   const labKey = WP_LABOR_KEY[row?.type] || 'wpLabor'
   const sf = n(row?.sf)

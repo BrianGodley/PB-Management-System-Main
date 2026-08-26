@@ -1253,12 +1253,12 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
         </>
       )}
 
-      {/* ── BBQ Structure ── */}
+      {/* ── Outdoor Kitchen Structure ── */}
       <div>
-        <SectionHeader title="BBQ Structure" />
+        <SectionHeader title="Outdoor Kitchen Structure" />
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">BBQ Wall Length (LF)</label>
+            <label className="block text-xs text-gray-500 mb-1">Structure Wall Length (LF)</label>
             <NumInput value={bbqLengthLF} onChange={setBbqLengthLF} placeholder="0" />
           </div>
           <div>
@@ -1268,7 +1268,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
           {!isSub && (
             <>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">BBQ Wall Height (inches)</label>
+                <label className="block text-xs text-gray-500 mb-1">Structure Wall Height (inches)</label>
                 <NumInput value={bbqHeightIn} onChange={setBbqHeightIn} placeholder="48" />
               </div>
               <div>
