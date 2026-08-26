@@ -645,6 +645,10 @@ function MoveCopyBody({ mode, title, source, onClose, onDone }) {
   const [unit, setUnit] = useState(source.unit || '')
   const [catId, setCatId] = useState('')
   const [subId, setSubId] = useState('')
+  // Recategorize-on-move: default to the material's current category/sub so a plain
+  // vendor move keeps it, but the user can pick a different (category, sub-category).
+  const [moveCatId, setMoveCatId] = useState(source.categoryId || '')
+  const [moveSubId, setMoveSubId] = useState(source.subcategoryId || '')
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
@@ -675,6 +679,7 @@ function MoveCopyBody({ mode, title, source, onClose, onDone }) {
     [vendors]
   )
   const subOpts = subs.filter(s => s.category_id === catId)
+  const moveSubOpts = subs.filter(s => s.category_id === moveCatId)
   const amount = fromMaterial ? source.price : source.rate
 
   async function submit() {
@@ -695,6 +700,18 @@ function MoveCopyBody({ mode, title, source, onClose, onDone }) {
           const destVendor = dest === 'standard' ? null : destVendorId
           const destVendorResolved = dest === 'standard' ? stdId : destVendorId
           await setMaterialPrice(source.materialId, destVendor, Number(amount ?? 0))
+          // Recategorize the material if the user picked a different (category, sub).
+          // Move only — a Copy must not relocate the original product.
+          if (
+            mode === 'move' &&
+            moveCatId &&
+            (moveCatId !== source.categoryId || (moveSubId || null) !== (source.subcategoryId || null))
+          ) {
+            await supabase
+              .from('material')
+              .update({ category_id: moveCatId, subcategory_id: moveSubId || null })
+              .eq('id', source.materialId)
+          }
           // Move = remove the source price, unless it IS the destination row.
           if (mode === 'move' && source.priceId && destVendorResolved !== source.vendorId)
             await supabase.from('material_price').delete().eq('id', source.priceId)
@@ -778,6 +795,25 @@ function MoveCopyBody({ mode, title, source, onClose, onDone }) {
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">Misc Category</label>
               <input value={miscCategory} onChange={e => setMiscCategory(e.target.value)} className={inputCls} placeholder="e.g. Walls" />
+            </div>
+          )}
+
+          {fromMaterial && (dest === 'standard' || dest === 'vendor') && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Category</label>
+                <select value={moveCatId} onChange={e => { setMoveCatId(e.target.value); setMoveSubId('') }} className={inputCls}>
+                  <option value="">Select…</option>
+                  {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Sub-Category</label>
+                <select value={moveSubId} onChange={e => setMoveSubId(e.target.value)} className={inputCls} disabled={!moveCatId}>
+                  <option value="">Select…</option>
+                  {moveSubOpts.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
             </div>
           )}
 
