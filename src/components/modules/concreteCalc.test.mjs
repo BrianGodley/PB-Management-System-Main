@@ -47,6 +47,21 @@ test('hand-mix factor unset → ×1 (never zeroes the labor)', () => {
   assert.ok(Math.abs(r.installHrs - 540 * 0.1) < 0.001, `unset factor → ×1: expected 54, got ${r.installHrs}`)
 })
 
+test('forming complexity is a FACTOR-per-point: complexityHrs = base × points × factor (0.01 = +1%/pt)', () => {
+  const base = { baseRows: [{ method: 'Skid Steer', sf: 108, depth: 4 }] }
+  const lr = { 'BAS-004-import-base-skid-steer-good': 0.5, 'LAB-071-concrete-forming-complexity-per-unit': 0.01 }
+  const none = run({ ...base, formingComplexity: 0 }, { lr })
+  const fifty = run({ ...base, formingComplexity: 50 }, { lr })
+  const hundred = run({ ...base, formingComplexity: 100 }, { lr })
+  assert.equal(none.complexityHrs, 0, 'no complexity points → 0 added hours')
+  // 50 pts × 0.01 = 0.5 × base labor; 100 pts = full base labor (doubles labor).
+  assert.ok(fifty.complexityHrs > 0, 'complexity adds hours')
+  assert.ok(Math.abs(hundred.complexityHrs - 2 * fifty.complexityHrs) < 1e-9, 'points scale linearly')
+  // Doubling the factor doubles the added hours.
+  const fiftyDouble = run({ ...base, formingComplexity: 50 }, { lr: { ...lr, 'LAB-071-concrete-forming-complexity-per-unit': 0.02 } })
+  assert.ok(Math.abs(fiftyDouble.complexityHrs - 2 * fifty.complexityHrs) < 1e-9, 'factor ×2 → complexity hrs ×2')
+})
+
 test('value: base prep labor = Cu Ft × rate (108 SF × 4in/12 = 36 Cu Ft × 0.5 = 18 hrs → $1350)', () => {
   const sf = 108, depth = 4, rate = 0.5
   const r = run({ baseRows: [{ method: 'Skid Steer', sf, depth }] }, { lr: { 'BAS-004-import-base-skid-steer-good': rate } })
