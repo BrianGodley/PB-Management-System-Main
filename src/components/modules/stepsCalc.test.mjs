@@ -81,6 +81,25 @@ test('brick/tile steps price off their OWN straight base rate; Curved = +20% for
   assert.equal(tile.totalHrs, 360, `tile 100 × 3 × 1.2 (curved modifier) = 360; got ${tile.totalHrs}`)
 })
 
+test('flagstone steps price off their OWN rate (2 hrs/LF); Curved = +20% form modifier', () => {
+  const FLAG = { id: 'f1', name: 'Arizona Flagstone', sub_category: 'Flagstone', vendor_id: null, unit_cost: 6, ref_key: 'MAT-098-flagstone-flatwork' }
+  // Straight: base 2 × formMult 1 (unset) = 200 hrs over 100 LF.
+  const straight = run(
+    { flagRows: [{ vendor: 'Standard', type: 'Arizona Flagstone', form: 'Straight', sf: 100 }] },
+    { 'LAB-438-steps-flagstone': 2 },
+    {}, [FLAG]
+  )
+  assert.equal(straight.totalHrs, 200, `flag 100 × 2 × 1 = 200 (own rate, not paver); got ${straight.totalHrs}`)
+  assert.equal(straight.stepMat, 600, `100 SF × $6 = $600; got ${straight.stepMat}`)
+  // Curved: base 2 × the shared curved multiplier 1.2 = 240 — no standalone curved rate.
+  const curved = run(
+    { flagRows: [{ vendor: 'Standard', type: 'Arizona Flagstone', form: 'Curved', sf: 100 }] },
+    { 'LAB-438-steps-flagstone': 2, 'LAB-413-steps-conc-form-curved': 1.2 },
+    {}, [FLAG]
+  )
+  assert.equal(curved.totalHrs, 240, `flag 100 × 2 × 1.2 (curved modifier) = 240; got ${curved.totalHrs}`)
+})
+
 test('concrete step value: labor = LF × (type + finish) × formMult; material = LF × (typeMat + finishMat)', () => {
   const r = run(
     { concRows: [{ type: 'Standard', form: 'Straight', sf: 100, finish: 'Smooth' }] },

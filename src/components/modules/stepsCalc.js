@@ -63,8 +63,12 @@ const STEP_FORM_REF = { Straight: LAB.STEPS_FORM_STRAIGHT, Curved: LAB.STEPS_FOR
 // shared paver rate). Paver + Flagstone share STEP_FORM_REF.
 const BRICK_FORM_REF = { Straight: LAB.STEPS_BRICK_FORM_STRAIGHT, Curved: LAB.STEPS_BRICK_FORM_CURVED }
 const TILE_FORM_REF = { Straight: LAB.STEPS_TILE_FORM_STRAIGHT, Curved: LAB.STEPS_TILE_FORM_CURVED }
+// Flagstone has its OWN single install rate (base 2). Curved is the shared +20%
+// form modifier, so only Straight is read — both forms resolve the same base ref.
+const FLAG_FORM_REF = { Straight: LAB.STEPS_FLAG_FORM_STRAIGHT, Curved: LAB.STEPS_FLAG_FORM_STRAIGHT }
 const kBrickForm = form => BRICK_FORM_REF[form] || ''
 const kTileForm = form => TILE_FORM_REF[form] || ''
+const kFlagForm = form => FLAG_FORM_REF[form] || ''
 const CONC_TYPE_HRS_REF = { Standard: LAB.STEPS_CONC_STANDARD_HRS, Cantilevered: LAB.STEPS_CONC_CANTILEVERED_HRS }
 const FINISH_HRS_REF = {
   Smooth: LAB.STEPS_FINISH_SMOOTH_HRS, Broom: LAB.STEPS_FINISH_BROOM_HRS,
@@ -100,7 +104,7 @@ const MAT_SECTIONS = [
   { key: 'paver', title: 'Paver Steps', matWord: 'Paver', cat: 'Paver Material', rowsKey: 'paverRows', subKey: 'subPaverRows', baseKey: kSubPaverBase, formFn: kPaverForm },
   { key: 'brick', title: 'Brick Steps', matWord: 'Brick', cat: 'Brick', rowsKey: 'brickRows', subKey: 'subBrickRows', baseKey: 'Steps - Sub Brick Base', formFn: kBrickForm },
   { key: 'tile', title: 'Tiled Steps', matWord: 'Tile', cat: 'Tile', rowsKey: 'tileRows', subKey: 'subTileRows', baseKey: 'Steps - Sub Tile Base', formFn: kTileForm },
-  { key: 'flag', title: 'Flagstone Steps', matWord: 'Flagstone', cat: 'Flagstone', rowsKey: 'flagRows', subKey: 'subFlagRows', baseKey: 'Steps - Sub Flagstone Base', formFn: kPaverForm },
+  { key: 'flag', title: 'Flagstone Steps', matWord: 'Flagstone', cat: 'Flagstone', rowsKey: 'flagRows', subKey: 'subFlagRows', baseKey: 'Steps - Sub Flagstone Base', formFn: kFlagForm },
 ]
 
 // ── Vendor-catalog helpers (mirror ConcreteModule.sectionOptions) ────────────

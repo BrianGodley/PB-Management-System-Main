@@ -73,7 +73,7 @@ const STEPS_RATE_SCOPE = [
   { category: 'Paver', sub: 'Paver Material' }, // paver step catalog materials
   { category: 'Basic Materials', sub: 'Brick' }, // brick step materials
   { category: 'Basic Materials', sub: 'Tile' }, // tiled step materials (shared Tile — MAT-107 tile flatwork)
-  // Flagstone step materials have no subcategory yet (pending product setup) — nothing to scope.
+  { category: 'Basic Materials', sub: 'Flagstone' }, // flagstone step materials (MAT-098 flagstone flatwork)
 ]
 
 const CONC_FINISHES = ['Smooth', 'Broom', 'Sanded', 'Salted', 'Exposed Aggregate']
@@ -82,6 +82,7 @@ const CONC_FINISHES = ['Smooth', 'Broom', 'Sanded', 'Salted', 'Exposed Aggregate
 const kPaverForm = form => `Steps - ${form}` // labor hrs per Ln Ft (Paver/Flagstone share)
 const kBrickForm = form => `Steps - Brick ${form}` // Brick step labor, hrs per Ln Ft (base 1.5)
 const kTileForm = form => `Steps - Tile ${form}` // Tiled step labor, hrs per Ln Ft (base 3)
+const kFlagForm = () => `Steps - Flagstone` // Flagstone step labor, hrs per Ln Ft (base 2); single rate, Curved = +20% modifier
 const kConcTypeHrs = t => `Steps - Conc ${t} Hrs per Sq Ft` // labor hrs per Sq Ft
 const kConcTypeMat = t => `Steps - Conc ${t} $ per Sq Ft` // material $ per Sq Ft
 const kFinishHrs = f => `Steps - Finish ${f} Hrs per Sq Ft` // labor +hrs per Sq Ft
@@ -109,7 +110,7 @@ const MAT_SECTIONS = [
   { key: 'paver', title: 'Paver Steps', matWord: 'Paver', cat: 'Paver Material', rowsKey: 'paverRows', subKey: 'subPaverRows', baseKey: kSubPaverBase, formKey: kPaverForm },
   { key: 'brick', title: 'Brick Steps', matWord: 'Brick', cat: 'Brick', rowsKey: 'brickRows', subKey: 'subBrickRows', baseKey: 'Steps - Sub Brick Base', formKey: kBrickForm },
   { key: 'tile', title: 'Tiled Steps', matWord: 'Tile', cat: 'Tile', rowsKey: 'tileRows', subKey: 'subTileRows', baseKey: 'Steps - Sub Tile Base', formKey: kTileForm },
-  { key: 'flag', title: 'Flagstone Steps', matWord: 'Flagstone', cat: 'Flagstone', rowsKey: 'flagRows', subKey: 'subFlagRows', baseKey: 'Steps - Sub Flagstone Base', formKey: kPaverForm },
+  { key: 'flag', title: 'Flagstone Steps', matWord: 'Flagstone', cat: 'Flagstone', rowsKey: 'flagRows', subKey: 'subFlagRows', baseKey: 'Steps - Sub Flagstone Base', formKey: kFlagForm },
 ]
 
 // ── Vendor-catalog helpers (mirror ConcreteModule.sectionOptions) ────────────

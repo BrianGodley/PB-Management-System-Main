@@ -44,6 +44,9 @@ export const LAB = {
   STEPS_BRICK_FORM_CURVED: 'LAB-435-steps-brick-curved',
   STEPS_TILE_FORM_STRAIGHT: 'LAB-436-steps-tile-straight',
   STEPS_TILE_FORM_CURVED: 'LAB-437-steps-tile-curved',
+  // Flagstone step install labor (hrs per Ln Ft) — its OWN rate (base 2). Single
+  // straight rate; Curved is the shared +20% form modifier, not a separate rate.
+  STEPS_FLAG_FORM_STRAIGHT: 'LAB-438-steps-flagstone',
   // Concrete step type labor (hrs per Ln Ft — steps price by linear feet), keyed by
   // BASE type (color→material only). Rows live under category 'Steps'.
   STEPS_CONC_STANDARD_HRS: 'LAB-416-steps-conc-standard',
