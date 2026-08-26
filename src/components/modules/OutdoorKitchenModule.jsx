@@ -81,7 +81,8 @@ const OK_RATES = {
   fillBlockFactor: { dbName: 'Kitchen Fill Block Factor' }, // was 80/75
   counterFormLfPerSf: { dbName: 'Kitchen Counter Form LF per SF' }, // was 2
   sfPerBlock: { dbName: 'Kitchen SF per Block' }, // was 0.888
-  rebarLfPerLf: { dbName: 'Kitchen Rebar LF per LF' }, // was 4
+  rebarLfPerLf: { dbName: 'Kitchen Rebar LF per LF' }, // legacy (retired by the Walls-style rebar model)
+  footingRebarWaste: { dbName: 'Kitchen Footing Rebar Waste' }, // +10% overlap on footing bars (default 1.1)
   counterThicknessFt: { dbName: 'Kitchen Counter Thickness Ft' }, // was 0.33
   gasTrenchCfPerLf: { dbName: 'Kitchen Gas Trench CF per LF' }, // was (6/12)*(24/12)=1.0
 }
@@ -479,7 +480,14 @@ function calcOutdoorKitchen(
     counterSF,
     counterType,
     counterFinish,
-    rebarSize,
+    // Rebar (Walls-style model): spacing-derived verticals + horizontal runs +
+    // footing bars, each stream priced by its own size ('Rebar #N', Basic Materials).
+    rebarSpIn,
+    wallRebarSize,
+    wallHorizBars,
+    wallHorizRebarSize,
+    footingRebarSize,
+    horizBars,
     applianceCount,
     gficCount,
     sinkYN,
@@ -565,7 +573,22 @@ function calcOutdoorKitchen(
 
   const footingAreaSF = (n(footingWidthIn) * n(footingDepthIn)) / 144 // SF cross-section
   const footingCY = (totalLF * footingAreaSF) / 27
-  const rebarLF = totalLF * p(OK_RATES.rebarLfPerLf.dbName)
+  // ── Rebar (mirrors the Walls CMU model) ─────────────────────────────────────
+  // Verticals from spacing (per structure segment: main wall + backsplash),
+  // horizontal runs across the total length, and footing bars (× waste). Each
+  // stream is priced by ITS OWN size from Basic Materials → 'Rebar #N'. Labor
+  // stays on the Kitchen Rebar Labor Rate, driven by total rebar LF.
+  const rebarSpacing = n(rebarSpIn)
+  const vertBarsFor = segLF => (rebarSpacing > 0 ? Math.ceil((n(segLF) * 12) / rebarSpacing) : 0)
+  const wallVertLF =
+    vertBarsFor(bbqLengthLF) * (n(bbqHeightIn) / 12) +
+    vertBarsFor(backLengthLF) * (n(backHeightIn) / 12)
+  const wallHorizLF = n(wallHorizBars) * totalLF
+  // Footing rebar waste (+10% overlap) — DB-editable coefficient, default 1.1.
+  const footingRebarWaste = n(p(OK_RATES.footingRebarWaste.dbName)) || 1.1
+  const footingRebarLF = totalLF * n(horizBars) * footingRebarWaste
+  const rebarLF = wallVertLF + wallHorizLF + footingRebarLF
+  const rebarPrice = size => p('Rebar ' + (size || '#4')) // $/LF from Basic Materials → Reinforcement
   // Grout fill = block count × cu-ft/block ÷ 27 (standardized CMU model, 8x8x16
   // = 0.5 cu ft), priced at the concrete rate below.
   const fillCY = (blockRaw * groutCuFtPerBlock(8, 8)) / 27
@@ -661,7 +684,12 @@ function calcOutdoorKitchen(
 
   // ── Material Costs ──────────────────────────────────────────────────────────
   const blockMat = blockOrdered * p(OK_RATES.bbqBlock.dbName, OK_RATES.bbqBlock.ref)
-  const rebarMat = rebarLF * p('Rebar ' + (rebarSize || '#4'), OK_RATES.bbqRebar.fallback)
+  // Each rebar stream priced by its own size (mirrors Walls): verticals @ wall
+  // size, horizontals @ horiz size, footing @ footing size.
+  const rebarMat =
+    wallVertLF * rebarPrice(wallRebarSize) +
+    wallHorizLF * rebarPrice(wallHorizRebarSize) +
+    footingRebarLF * rebarPrice(footingRebarSize)
   const footingMat = footingCY * p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.ref)
   const fillMat = fillCY * p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.ref)
   const counterConcMat = isConcreteCounter ? counterCY * p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.ref) : 0
@@ -859,7 +887,13 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
   const [commissionRate, setCommissionRate] = useState(initialData?.commissionRate ?? null)
   // User-selectable rebar size (size-based canonical catalog). Shared across the
   // In-House/Sub tabs — rebar lives only on the In-House structural side.
-  const [rebarSize, setRebarSize] = useState(initialData?.rebarSize ?? '#4')
+  // Rebar (Walls-style): spacing + per-stream sizes + bar counts.
+  const [rebarSpIn, setRebarSpIn] = useState(initialData?.rebarSpIn ?? '16')
+  const [wallRebarSize, setWallRebarSize] = useState(initialData?.wallRebarSize ?? initialData?.rebarSize ?? '#4')
+  const [wallHorizBars, setWallHorizBars] = useState(initialData?.wallHorizBars ?? '')
+  const [wallHorizRebarSize, setWallHorizRebarSize] = useState(initialData?.wallHorizRebarSize ?? '#4')
+  const [footingRebarSize, setFootingRebarSize] = useState(initialData?.footingRebarSize ?? '#4')
+  const [horizBars, setHorizBars] = useState(initialData?.horizBars ?? '2')
 
   // Free-text notes for this module — Sam writes auto-generated
   // takeoffs here via create_estimate_from_takeoff, and the user can
@@ -1016,7 +1050,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
   // read from the estimate) so newly-added catalog items (e.g. appliances) stay
   // visible. handleSave persists only a slim id/ref_key/name snapshot, read solely
   // by the summary to resolve a stored ref_key back to the item name (rename-safe).
-  const state = { crewType, subType, subGpMarkupRate, commissionRate, ...cur, rebarSize }
+  const state = { crewType, subType, subGpMarkupRate, commissionRate, ...cur, rebarSpIn, wallRebarSize, wallHorizBars, wallHorizRebarSize, footingRebarSize, horizBars }
   const calcRaw = calcOutdoorKitchen(
     state,
     laborRatePerHour,
@@ -1058,7 +1092,6 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
         walkAccess,
         laborRatePerHour,
         laborBurdenPct,
-        rebarSize,
         gpmd,
         materialPrices,
         // Slim catalog snapshot: appliance/sink/gas rows store a frozen material
@@ -1286,18 +1319,33 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                 <NumInput value={footingDepthIn} onChange={setFootingDepthIn} placeholder="12" />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Rebar Size</label>
-                <select
-                  className="input text-sm py-1.5 w-full"
-                  value={rebarSize}
-                  onChange={e => setRebarSize(e.target.value)}
-                  title="Rebar size"
-                >
-                  {REBAR_SIZES.map(s => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
+                <label className="block text-xs text-gray-500 mb-1">Rebar Spacing (in)</label>
+                <NumInput value={rebarSpIn} onChange={setRebarSpIn} placeholder="16" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Horiz. Bars in Footing</label>
+                <NumInput value={horizBars} onChange={setHorizBars} placeholder="2" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Wall Rebar Size</label>
+                <select className="input text-sm py-1.5 w-full" value={wallRebarSize || '#4'} onChange={e => setWallRebarSize(e.target.value)} title="Wall (vertical) rebar size">
+                  {REBAR_SIZES.map(s => (<option key={s} value={s}>{s}</option>))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Footing Rebar Size</label>
+                <select className="input text-sm py-1.5 w-full" value={footingRebarSize || '#4'} onChange={e => setFootingRebarSize(e.target.value)} title="Footing rebar size">
+                  {REBAR_SIZES.map(s => (<option key={s} value={s}>{s}</option>))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Wall Horizontal Bars</label>
+                <NumInput value={wallHorizBars} onChange={setWallHorizBars} placeholder="0" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Wall Horiz. Rebar Size</label>
+                <select className="input text-sm py-1.5 w-full" value={wallHorizRebarSize || '#4'} onChange={e => setWallHorizRebarSize(e.target.value)} title="Wall horizontal rebar size">
+                  {REBAR_SIZES.map(s => (<option key={s} value={s}>{s}</option>))}
                 </select>
               </div>
             </>
