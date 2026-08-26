@@ -54,7 +54,7 @@ const WALLS_RATE_SCOPE = [
   { category: 'Basic Materials', sub: 'Aggregate & Concrete' }, // footing / wall concrete
   { category: 'Basic Materials', sub: 'Grout' }, // grout material
   { category: 'Basic Materials', sub: 'Reinforcement' }, // rebar #3–#8
-  { category: 'Concrete', sub: 'Concrete Mix' }, // Poured-in-Place mix
+  { category: 'Basic Materials', sub: 'Concrete Mix' }, // Poured-in-Place mix — shared, moved to Basic Materials
   { category: 'Drainage', sub: 'French Drain Pipe' }, // drain pipe / sock / gravel / fabric material
   { category: 'Drainage', sub: 'French Drain' }, // drain install labor
   // Walls borrows only a handful of rates from each fat Demo method sub (Slope

@@ -29,7 +29,7 @@ export const MAT = {
   // exists under the Paver category (MAT-426); Pavers reads the Basic Materials one.
   BEDDING_SAND: 'MAT-017-bedding-sand',
 
-  // ── Concrete (Concrete Mix category) ────────────────────────────────────────
+  // ── Concrete Mix (shared — Basic Materials / Concrete Mix) ──────────────────
   CONC_HAND_MIX: 'MAT-052-concrete-hand-mix',
   CONC_READY_MIX: 'MAT-053-concrete-ready-mix-truck',
 

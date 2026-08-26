@@ -315,7 +315,7 @@ const RATE_SCOPE = [
   // Borrowed footing pour labor (hand) — surfaces as one editable line; edits the
   // same shared Walls rate. `only` keeps the rest of Walls 'Structure' out.
   { category: 'Walls', sub: 'Structure', only: ['Wall Hand Pour Footing Labor Rate'] },
-  { category: 'Concrete', sub: CONC_MIX_SUBCAT }, // Concrete Mix (PIP)
+  { category: 'Basic Materials', sub: CONC_MIX_SUBCAT }, // Concrete Mix (PIP) — shared, moved to Basic Materials
   { category: 'Utilities', sub: UTIL_CAT.line }, // Gas Pipe
   { category: 'Utilities', sub: UTIL_CAT.gas }, // Gas Fixtures
   { category: 'Basic Materials', sub: 'Reinforcement' }, // Rebar

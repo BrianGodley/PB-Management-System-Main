@@ -39,9 +39,10 @@ import { BAS } from '../../lib/basicLaborRefs'
 //       stamp SUBCONTRACTOR rates.
 //   • Basic Materials / Reinforcement → shared rebar #3–#8 (priced by ref_key).
 //   • Basic Materials / Aggregate & Concrete → the shared Class II Roadbase base
-//       material + the two concrete mixes; `only` keeps Paver's Bedding Sand
-//       (same sub) out. (The mixes also surface via the full 'Concrete' scope if
-//       they live under Concrete/Concrete Mix — listing them here is harmless.)
+//       material; `only` keeps Paver's Bedding Sand (same sub) out.
+//   • Basic Materials / Concrete Mix → the two shared concrete mixes (Hand /
+//       Ready Mix Truck), moved here from the Concrete category so every module
+//       that pours a mix shares one home.
 //   • Basic Labor / Base Prep → the shared base-prep labor (3 methods, hrs/Cu Ft).
 const CONCRETE_RATE_SCOPE = [
   { category: 'Concrete' },
@@ -49,8 +50,9 @@ const CONCRETE_RATE_SCOPE = [
   {
     category: 'Basic Materials',
     sub: 'Aggregate & Concrete',
-    only: ['Class II Roadbase', 'Concrete - Ready Mix (Truck)', 'Concrete - Hand Mix'],
+    only: ['Class II Roadbase'],
   },
+  { category: 'Basic Materials', sub: 'Concrete Mix' },
   { category: 'Basic Labor', sub: 'Base Prep' },
 ]
 

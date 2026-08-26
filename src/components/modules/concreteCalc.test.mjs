@@ -21,8 +21,8 @@ const finiteNums = obj => {
 }
 
 test('PARITY (M5): install-tier mix selected by material ref_key — price resolves by key AND hand-mix uplift fires via the RESOLVED name (not the raw key)', () => {
-  const stdMix = { id: 'm1', ref_key: 'MAT-050-standard-mix', name: 'Standard Mix', sub_category: 'Concrete Mix', category: 'Concrete', vendor_id: null, unit_cost: 200, calc_meta: {} }
-  const handMix = { id: 'm2', ref_key: 'MAT-051-hand-mix', name: 'Hand Mix', sub_category: 'Concrete Mix', category: 'Concrete', vendor_id: null, unit_cost: 200, calc_meta: {} }
+  const stdMix = { id: 'm1', ref_key: 'MAT-050-standard-mix', name: 'Standard Mix', sub_category: 'Concrete Mix', category: 'Basic Materials', vendor_id: null, unit_cost: 200, calc_meta: {} }
+  const handMix = { id: 'm2', ref_key: 'MAT-051-hand-mix', name: 'Hand Mix', sub_category: 'Concrete Mix', category: 'Basic Materials', vendor_id: null, unit_cost: 200, calc_meta: {} }
   const mk = mixRef =>
     run(
       { installTiers: { s300_600: 540 }, installTierVendor: { s300_600: 'Standard' }, installTierType: { s300_600: mixRef }, installTierDepth: { s300_600: 4 } },

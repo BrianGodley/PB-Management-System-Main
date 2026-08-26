@@ -232,7 +232,7 @@ const POOL_RATE_SCOPE = [
   { category: 'Utilities' }, // E&P materials + per-item labor rates + trench excavation coeffs
   { category: 'Demo', sub: 'Skid Steer', only: ['Skid - Soil'] }, // shared excavation hrs per Cu Yd
   { category: 'Basic Materials', sub: 'Reinforcement' }, // rebar #3–#8 (steel material)
-  { category: 'Concrete', sub: 'Concrete Mix' }, // In-House shotcrete mix material
+  { category: 'Basic Materials', sub: 'Concrete Mix' }, // In-House shotcrete mix material (shared, in Basic Materials)
 ]
 function poolStdOptions(materialRows, subcat, vendorSel = 'Standard') {
   return catalogOptions(materialRows, subcat, vendorSel, {
@@ -773,9 +773,9 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       // dual-keyed (name + ref_key) + basic_labor_rates. 'Demo' for shared excavation.
       fetchLaborRateMap(['Pool', 'Utilities', 'Finishes', 'Demo']),
       supabase.from('subcontractor_rates').select('company_name,trade,rate,unit').eq('category', 'Pool'),
-      // 'Concrete' loads the shared 'Concrete Mix' catalog (In-House shotcrete
-      // material) — without it the shotcrete Type picker resolves $0.
-      fetchModuleCatalog(['Utilities', 'Pool', 'Basic Materials', 'Concrete']),
+      // Basic Materials holds the shared 'Concrete Mix' catalog (In-House
+      // shotcrete material) alongside rebar; Pool no longer needs 'Concrete'.
+      fetchModuleCatalog(['Utilities', 'Pool', 'Basic Materials']),
       supabase
         .from('subs_vendors')
         .select('id, company_name')
