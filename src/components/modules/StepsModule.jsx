@@ -72,7 +72,7 @@ const STEPS_RATE_SCOPE = [
   { category: 'Steps' }, // step type/finish/form-install labor + $/SF concrete/finish misc + $/LF sub
   { category: 'Paver', sub: 'Paver Material' }, // paver step catalog materials
   { category: 'Basic Materials', sub: 'Brick' }, // brick step materials
-  { category: 'Pool', sub: 'Tile' }, // tiled step materials (shared Tile catalog lives under Pool)
+  { category: 'Basic Materials', sub: 'Tile' }, // tiled step materials (shared Tile — MAT-107 tile flatwork)
   // Flagstone step materials have no subcategory yet (pending product setup) — nothing to scope.
 ]
 
