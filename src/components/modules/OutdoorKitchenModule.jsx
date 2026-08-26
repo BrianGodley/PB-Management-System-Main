@@ -29,14 +29,14 @@ const OK_RATES = {
   // (rename-safe), dbName as fallback. Entries without a ref (BBQ Rebar / Sink
   // Plumbing / Gas Pipe) are misc rates, not catalog materials — they stay name-keyed.
   bbqBlock: { dbName: 'BBQ Block', ref: MAT.BBQ_BLOCK }, // $/block
-  bbqRebar: { dbName: 'BBQ Rebar' }, // $/LF
+  bbqRebar: { dbName: 'Kitchen Rebar' }, // $/LF (dead for pricing — calc reads 'Rebar #N')
   bbqConcrete: { dbName: 'BBQ Concrete', ref: MAT.BBQ_CONCRETE }, // $/CY (footing & counter)
-  bbqSubWallLF: { dbName: 'BBQ Sub Wall LF' }, // $/LF flat sub price (BBQ wall)
-  bbqSubBackLF: { dbName: 'BBQ Sub Backsplash LF' }, // $/LF flat sub price (backsplash)
+  bbqSubWallLF: { dbName: 'Kitchen Sub Wall LF' }, // $/LF flat sub price (kitchen wall)
+  bbqSubBackLF: { dbName: 'Kitchen Sub Backsplash LF' }, // $/LF flat sub price (backsplash)
   applianceHardware: { dbName: 'BBQ Appliance Hardware', ref: MAT.BBQ_APPLIANCE_HARDWARE }, // $/appliance (misc hardware)
   gficOutlet: { dbName: 'GFIC Outlet - BBQ', ref: MAT.GFIC_OUTLET_BBQ }, // $/outlet
-  sinkPlumbing: { dbName: 'Sink Plumbing - BBQ' }, // $ flat
-  gasPipe: { dbName: 'Gas Pipe - BBQ' }, // $/LF
+  sinkPlumbing: { dbName: 'Sink Plumbing - Kitchen' }, // $ flat
+  gasPipe: { dbName: 'Gas Pipe - Kitchen' }, // $/LF
   sandStucco: { dbName: 'Sand Stucco - Finishes', ref: MAT.SAND_STUCCO }, // shared $/Sq Ft (Finishes)
   smoothStucco: { dbName: 'Smooth Stucco - Finishes', ref: MAT.SMOOTH_STUCCO }, // shared $/Sq Ft (Finishes)
   ledgerstone: { dbName: 'Ledgerstone - Finishes', ref: MAT.LEDGERSTONE }, // shared $/Sq Ft (Finishes)
@@ -76,14 +76,14 @@ const OK_RATES = {
   flagstoneLab: { dbName: 'Real Flagstone - Finishes Labor Rate' },
   realStoneLab: { dbName: 'Real Stone - Finishes Labor Rate' },
   // Material: polished-counter supply, $/SF (moved off a hardcoded $1/SF).
-  counterPolishMat: { dbName: 'BBQ Counter Polish Supply' },
+  counterPolishMat: { dbName: 'Kitchen Counter Polish Supply' },
   // Tunable geometry / quantity coefficients (moved off hardcoded numbers, misc_rates).
-  fillBlockFactor: { dbName: 'BBQ Fill Block Factor' }, // was 80/75
-  counterFormLfPerSf: { dbName: 'BBQ Counter Form LF per SF' }, // was 2
-  sfPerBlock: { dbName: 'BBQ SF per Block' }, // was 0.888
-  rebarLfPerLf: { dbName: 'BBQ Rebar LF per LF' }, // was 4
-  counterThicknessFt: { dbName: 'BBQ Counter Thickness Ft' }, // was 0.33
-  gasTrenchCfPerLf: { dbName: 'BBQ Gas Trench CF per LF' }, // was (6/12)*(24/12)=1.0
+  fillBlockFactor: { dbName: 'Kitchen Fill Block Factor' }, // was 80/75
+  counterFormLfPerSf: { dbName: 'Kitchen Counter Form LF per SF' }, // was 2
+  sfPerBlock: { dbName: 'Kitchen SF per Block' }, // was 0.888
+  rebarLfPerLf: { dbName: 'Kitchen Rebar LF per LF' }, // was 4
+  counterThicknessFt: { dbName: 'Kitchen Counter Thickness Ft' }, // was 0.33
+  gasTrenchCfPerLf: { dbName: 'Kitchen Gas Trench CF per LF' }, // was (6/12)*(24/12)=1.0
 }
 
 const DEFAULTS = {
@@ -104,7 +104,7 @@ const REBAR_SIZES = ['#3', '#4', '#5', '#6', '#8']
 // Fixed equipment list for the Appliances table. Each priced from an editable
 // master material rate `BBQ Equip - <type>` (category 'Outdoor Kitchen',
 // default 0). Client-provided equipment zeroes material but keeps labor.
-const applianceRateName = type => `BBQ Equip - ${type}`
+const applianceRateName = type => `Kitchen Equip - ${type}`
 const EQUIP_ROW = () => ({ vendor: 'Standard', type: '', qty: '0', unitCost: '', clientProvided: false, hours: '' })
 const SINK_ROW = () => ({ vendor: 'Standard', type: '', qty: '0', unitCost: '', clientProvided: false, hours: '' })
 

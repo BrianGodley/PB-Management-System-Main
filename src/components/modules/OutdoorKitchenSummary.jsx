@@ -23,7 +23,7 @@ function buildSections(t = {}, { sub = false, materialRows = [] } = {}) {
   }
   const structure = []
   if (n(t.bbqLengthLF) > 0)
-    structure.push({ label: 'BBQ Wall', value: `${n(t.bbqLengthLF)} Ln Ft × ${n(t.bbqHeightIn) || 48}"` })
+    structure.push({ label: 'Structure Wall', value: `${n(t.bbqLengthLF)} Ln Ft × ${n(t.bbqHeightIn) || 48}"` })
   if (n(t.backLengthLF) > 0)
     structure.push({
       label: 'Backsplash',
