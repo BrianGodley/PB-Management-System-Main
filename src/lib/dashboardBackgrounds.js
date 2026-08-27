@@ -130,7 +130,6 @@ export const MENU_ITEMS = [
   { path: '/accounting', label: 'Accounting' },
   { path: '/collections', label: 'Weekly FP' },
   { path: '/design', label: 'Design' },
-  { path: '/bids', label: 'Bids' },
   { path: '/jobs', label: 'Jobs' },
   { path: '/equipment-tracking', label: 'Equipment' },
   { path: '/x/formulas', label: 'Formulas' },

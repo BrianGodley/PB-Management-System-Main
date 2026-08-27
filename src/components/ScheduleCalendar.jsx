@@ -1778,24 +1778,26 @@ export default function ScheduleCalendar({
       `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     let startOf = fmt(visStart)
     let endOf = fmt(visEnd)
-    // In the continuous month view, widen the query to the whole loaded week
-    // window so every rendered week has its items (string dates compare safely).
+    // Continuous month view: fetch EXACTLY the loaded week window. (Don't union
+    // with the fixed month grid — that range grows without bound as you scroll
+    // away and can blow past the 1000-row cap, silently dropping visible items.)
     if (viewMode === 'month' && infiniteRangeRef.current) {
-      const r = infiniteRangeRef.current
-      if (r.startOf < startOf) startOf = r.startOf
-      if (r.endOf > endOf) endOf = r.endOf
+      startOf = infiniteRangeRef.current.startOf
+      endOf = infiniteRangeRef.current.endOf
     }
 
-    let q = supabase
-      .from('schedule_items')
-      .select('*')
-      .lte('start_date', endOf)
-      .gte('end_date', startOf)
-      .order('start_date')
-
-    if (selectedJob !== 'all') q = q.eq('job_id', selectedJob)
-
-    const { data, error } = await q
+    const buildQuery = () => {
+      let q = supabase
+        .from('schedule_items')
+        .select('*')
+        .lte('start_date', endOf)
+        .gte('end_date', startOf)
+        .order('start_date')
+      if (selectedJob !== 'all') q = q.eq('job_id', selectedJob)
+      return q
+    }
+    // Page past the 1000-row PostgREST cap (16k+ schedule items live in prod).
+    const { data, error } = await fetchAllPaginated(buildQuery)
     if (error) console.error('schedule fetch:', error)
     let rows = data || []
     // All-jobs view: keep only items whose job matches the Open/Closed filter.
