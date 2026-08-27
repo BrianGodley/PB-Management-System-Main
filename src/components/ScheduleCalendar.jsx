@@ -2790,7 +2790,7 @@ export default function ScheduleCalendar({
                 day: 'numeric',
               })}
             </div>
-          ) : (
+          ) : viewMode === 'week' ? (
             <div
               className="grid border-l border-t border-gray-200"
               style={{ gridTemplateColumns: GRID_COLS }}
@@ -2804,7 +2804,7 @@ export default function ScheduleCalendar({
                 </div>
               ))}
             </div>
-          )}
+          ) : null /* month view: the day-name header is sticky INSIDE the scroll container */}
         </div>
 
         {/* Week rows — keep the existing grid mounted during refetches so
@@ -2891,9 +2891,24 @@ export default function ScheduleCalendar({
           <div
             ref={calGridRef}
             onScroll={onInfiniteScroll}
-            className="border-l border-gray-200 overflow-y-auto overscroll-contain"
+            className="border-l border-t border-gray-200 overflow-y-auto overscroll-contain relative"
             style={{ maxHeight: 'calc(100vh - 230px)' }}
           >
+            {/* Sticky Sun→Sat header — lives INSIDE the scroll area so nothing
+                scrolls above it; the month divider pins just beneath it. */}
+            <div
+              className="sticky top-0 z-30 grid bg-white"
+              style={{ gridTemplateColumns: GRID_COLS }}
+            >
+              {DAY_NAMES.map(d => (
+                <div
+                  key={d}
+                  className="text-center text-xs font-bold text-gray-600 h-7 flex items-center justify-center border-r border-b border-gray-200 bg-white"
+                >
+                  {d}
+                </div>
+              ))}
+            </div>
             {weekStarts.map(ws => {
               const weekDays = Array.from({ length: 7 }, (_, i) => addDaysD(ws, i))
               const firstOfMonth = weekDays.find(d => d.getDate() === 1)
@@ -2903,7 +2918,8 @@ export default function ScheduleCalendar({
                   {firstOfMonth && (
                     <div
                       data-month-start={`${firstOfMonth.getFullYear()}-${firstOfMonth.getMonth()}`}
-                      className="sticky top-0 z-20 px-3 py-1 bg-gray-100/95 backdrop-blur border-y border-gray-300 text-xs font-bold text-gray-600"
+                      className="sticky z-20 px-3 py-1 bg-gray-100 border-y border-gray-300 text-xs font-bold text-gray-600"
+                      style={{ top: '1.75rem' }}
                     >
                       {MONTH_NAMES[firstOfMonth.getMonth()]} {firstOfMonth.getFullYear()}
                     </div>
