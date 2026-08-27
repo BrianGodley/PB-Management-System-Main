@@ -352,7 +352,11 @@ function WeekRow({
       const e = new Date(item.end_date + 'T00:00:00').getTime()
       return s <= weekMaxMs && e >= weekMinMs
     })
-    .sort((a, b) => (a.title || '').localeCompare(b.title || ''))
+    .sort((a, b) =>
+      (a.crewTag || a.title || '').localeCompare(b.crewTag || b.title || '', undefined, {
+        numeric: true,
+      })
+    )
 
   // ── Lane assignment: alpha-preserving packer ──────────────────────────
   // Goal: keep titles in alphabetical order TOP TO BOTTOM on every day
@@ -409,42 +413,48 @@ function WeekRow({
       overallStart: segments[0].startCol,
       overallEnd:   segments[segments.length - 1].endCol,
       title:        item.title || '',
+      // Vertical order key = the colored chip (crew tag A, A1, A2, B…); items
+      // without a chip fall back to their title so they still sort sensibly.
+      sortKey:      item.crewTag || item.title || '',
       isItemStart:  firstSegDate && firstSegDate.getTime() === iStart.getTime(),
       isItemEnd:    lastSegDate && lastSegDate.getTime() === iEnd.getTime(),
     }
   })
 
-  // Pass 2: union per-title date ranges (multi-segment items of the same
-  // title share a lane, so we treat them as one block for placement).
-  const titleRanges = {}
+  // Pass 2: union per-key date ranges (segments sharing a sort key share a
+  // lane, so we treat them as one block for placement).
+  const keyRanges = {}
   for (const id of Object.keys(perItem)) {
-    const { title, overallStart, overallEnd } = perItem[id]
-    if (!titleRanges[title]) {
-      titleRanges[title] = { start: overallStart, end: overallEnd }
+    const { sortKey, overallStart, overallEnd } = perItem[id]
+    if (!keyRanges[sortKey]) {
+      keyRanges[sortKey] = { start: overallStart, end: overallEnd }
     } else {
-      titleRanges[title].start = Math.min(titleRanges[title].start, overallStart)
-      titleRanges[title].end   = Math.max(titleRanges[title].end,   overallEnd)
+      keyRanges[sortKey].start = Math.min(keyRanges[sortKey].start, overallStart)
+      keyRanges[sortKey].end   = Math.max(keyRanges[sortKey].end,   overallEnd)
     }
   }
 
-  // Pass 3: alpha-order placement with safe packing.
-  const sortedTitles = Object.keys(titleRanges).sort((a, b) => a.localeCompare(b))
-  const lanes = []           // lanes[L] = [{ start, end, title }, ...]
-  const laneByTitle = {}
+  // Pass 3: place in crew-chip (alphanumeric) order with safe packing, so bars
+  // read top→bottom as A, A1, A2, B, B1 … on every day regardless of drag order.
+  const sortedKeys = Object.keys(keyRanges).sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true })
+  )
+  const lanes = []           // lanes[L] = [{ start, end, key }, ...]
+  const laneByKey = {}
 
   function overlaps(a, b) {
     // Inclusive overlap on column indices.
     return !(a.end < b.start || a.start > b.end)
   }
 
-  for (const title of sortedTitles) {
-    const range = titleRanges[title]
+  for (const key of sortedKeys) {
+    const range = keyRanges[key]
     let chosen = lanes.length
     for (let L = 0; L <= lanes.length; L++) {
       // (a) conflict in this lane?
       const here = lanes[L] || []
       if (here.some(r => overlaps(r, range))) continue
-      // (b) any earlier-alpha title in a lane below L overlapping this range?
+      // (b) any earlier-order key in a lane below L overlapping this range?
       let blocked = false
       for (let lower = L + 1; lower < lanes.length; lower++) {
         for (const r of (lanes[lower] || [])) {
@@ -457,17 +467,17 @@ function WeekRow({
       break
     }
     if (!lanes[chosen]) lanes[chosen] = []
-    lanes[chosen].push({ ...range, title })
-    laneByTitle[title] = chosen
+    lanes[chosen].push({ ...range, key })
+    laneByKey[key] = chosen
   }
 
-  // Pass 4: build itemInfo for the renderer (each item gets its title's lane).
+  // Pass 4: build itemInfo for the renderer (each item gets its sort key's lane).
   const itemInfo = {}
   for (const id of Object.keys(perItem)) {
     const p = perItem[id]
     itemInfo[id] = {
       segments: p.segments,
-      lane: laneByTitle[p.title],
+      lane: laneByKey[p.sortKey],
       isItemStart: p.isItemStart,
       isItemEnd:   p.isItemEnd,
     }
@@ -3095,7 +3105,7 @@ export default function ScheduleCalendar({
               filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))',
             }}
           >
-            <path d="M9 0 h6 v14 h5 l-8 10 l-8 -10 h5 z" />
+            <path d="M12 0 l8 10 h-5 v14 h-6 v-14 h-5 z" />
           </svg>
           <div
             className="flex items-center gap-2 px-3 py-2.5 rounded-lg shadow-xl text-base font-semibold leading-snug max-w-[300px]"
