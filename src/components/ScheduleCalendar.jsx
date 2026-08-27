@@ -637,10 +637,10 @@ function WeekRow({
                       onBarPointerDown(e, item, 'resize-r')
                     }}
                     onClick={e => e.stopPropagation()}
-                    style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 16, cursor: 'ew-resize', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 1 }}
+                    style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 14, cursor: 'ew-resize', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 1 }}
                     title="Drag to change end date"
                   >
-                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 20, background: '#dbeafe', border: '2px solid #2563eb', borderRadius: 4, color: '#1d4ed8', fontSize: 13, lineHeight: 1, fontWeight: 700 }}>›</span>
+                    <span style={{ color: '#93c5fd', fontSize: 20, lineHeight: 1, fontWeight: 800, textShadow: '0 0 2px #1d4ed8, 0 0 1px #1d4ed8' }}>›</span>
                   </div>
                 )}
                 {isFirst && (
