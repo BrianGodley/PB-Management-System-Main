@@ -249,7 +249,7 @@ function fmtDate(ds) {
 const EMPTY_FORM = {
   title: '',
   display_color: '#15803d',
-  assignee_color: '',
+  assignee_color: '#000000',
   assignees: '',
   start_date: '',
   end_date: '',
@@ -659,7 +659,9 @@ function WeekRow({
                           zIndex: 3,
                           backgroundColor: item.needs_crew
                             ? 'rgba(255,255,255,0.22)'
-                            : item.assignee_color || item.display_color || '#15803d',
+                            : item.sub_id || (item.assignee_color || '').toLowerCase() === '#000000'
+                              ? '#000000'
+                              : item.assignee_color || item.display_color || '#15803d',
                           backgroundImage:
                             'linear-gradient(rgba(255,255,255,0.22),rgba(255,255,255,0.22))',
                         }}
@@ -679,11 +681,15 @@ function WeekRow({
                           <path d="M10 10.5V6a2 2 0 0 0-4 0v8" />
                           <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
                         </svg>
-                        {item.crewTag && (
+                        {item.crewTag ? (
                           <span className="text-black text-[12px] font-semibold leading-none">
                             {item.crewTag}
                           </span>
-                        )}
+                        ) : item.sub_id ||
+                          (item.assignee_color || '').toLowerCase() === '#000000' ? (
+                          // Subcontractor chip: black with the hand, "Sub" in white.
+                          <span className="text-white text-[12px] font-semibold leading-none">Sub</span>
+                        ) : null}
                       </span>
                     )}
                     <span className="min-w-0 break-words">
@@ -3115,7 +3121,7 @@ export default function ScheduleCalendar({
               color: '#1e3a8a',
             }}
           >
-            {ghostItem.crewTag && (
+            {ghostItem.crewTag ? (
               <span
                 className="flex-shrink-0 rounded-md px-1.5 py-0.5 border border-blue-300 text-black text-[13px] font-semibold leading-none"
                 style={{
@@ -3126,7 +3132,12 @@ export default function ScheduleCalendar({
               >
                 {ghostItem.crewTag}
               </span>
-            )}
+            ) : ghostItem.sub_id ||
+              (ghostItem.assignee_color || '').toLowerCase() === '#000000' ? (
+              <span className="flex-shrink-0 rounded-md px-1.5 py-0.5 border border-white/40 text-white text-[13px] font-semibold leading-none bg-black">
+                Sub
+              </span>
+            ) : null}
             <span className="truncate">
               {jobMap[ghostItem.job_id]
                 ? `${ghostItem.title} (${jobMap[ghostItem.job_id]})`
@@ -3722,6 +3733,7 @@ export default function ScheduleCalendar({
               <button
                 onClick={() => {
                   setSchedType('crew_type')
+                  setEntryMode('crew')
                   setPhase('details')
                 }}
                 className="w-full flex items-start gap-3 p-3.5 rounded-xl border-2 border-gray-200 hover:border-green-500 hover:bg-green-50 text-left transition-colors group"
@@ -3732,7 +3744,25 @@ export default function ScheduleCalendar({
                     Install Crew Type
                   </p>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    Manually set dates, crew, and details — standard scheduling flow.
+                    Manually set dates and assign In House crews.
+                  </p>
+                </div>
+              </button>
+              <button
+                onClick={() => {
+                  setSchedType('crew_type')
+                  setEntryMode('sub')
+                  setPhase('details')
+                }}
+                className="w-full flex items-start gap-3 p-3.5 rounded-xl border-2 border-gray-200 hover:border-gray-800 hover:bg-gray-50 text-left transition-colors group"
+              >
+                <span className="text-xl mt-0.5">🧑‍🔧</span>
+                <div>
+                  <p className="text-sm font-bold text-gray-800 group-hover:text-black">
+                    Subcontractor
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Manually set dates and assign sub contractors.
                   </p>
                 </div>
               </button>
@@ -4688,7 +4718,9 @@ export default function ScheduleCalendar({
             </div>
 
             <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
-              {/* ── Mode selector ── */}
+              {/* ── Mode selector (hidden when Subcontractor was chosen at the
+                  scheduling-type menu — the mode is already set) ── */}
+              {entryMode !== 'sub' && (
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                   Select Entry Type
@@ -4696,7 +4728,6 @@ export default function ScheduleCalendar({
                 <div className="flex gap-2">
                   {[
                     { key: 'crew', label: 'Crew' },
-                    { key: 'sub', label: 'Subcontractor' },
                     { key: 'custom', label: 'Custom' },
                   ].map(opt => (
                     <button
@@ -4718,6 +4749,7 @@ export default function ScheduleCalendar({
                   ))}
                 </div>
               </div>
+              )}
 
               {/* ── Crew searchable dropdown ── */}
               {entryMode === 'crew' &&
@@ -4821,7 +4853,8 @@ export default function ScheduleCalendar({
                       secondary: s.divisions?.join(' · ') || '',
                       searchText:
                         `${s.company_name} ${(s.divisions || []).join(' ')}`.toLowerCase(),
-                      autoTitle: `S - ${s.company_name}`,
+                      // Name only — the "Sub" chip carries the identity now.
+                      autoTitle: s.company_name,
                     }))}
                     selectedId={form.sub_id}
                     onSelect={opt => {
