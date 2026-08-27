@@ -614,7 +614,7 @@ function WeekRow({
                     ? { opacity: 0.35, outline: '2px dashed rgba(0,0,0,0.35)', outlineOffset: '-2px' }
                     : null),
                 }}
-                className="flex items-start gap-1.5 px-2 pt-1.5 pb-1.5 text-white text-sm font-normal cursor-pointer hover:opacity-80 leading-snug"
+                className="flex items-start gap-1.5 px-2 pt-1.5 pb-1.5 text-white text-sm font-normal cursor-pointer hover:opacity-80 hover:ring-2 hover:ring-inset hover:ring-blue-500 leading-snug"
                 title={item.needs_crew ? `${displayText} — Crew not assigned` : displayText}
               >
                 {onBarPointerDown && roundLeft && (
@@ -624,9 +624,11 @@ function WeekRow({
                       onBarPointerDown(e, item, 'resize-l')
                     }}
                     onClick={e => e.stopPropagation()}
-                    style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 8, cursor: 'ew-resize', zIndex: 2 }}
+                    style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 16, cursor: 'ew-resize', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', paddingLeft: 1 }}
                     title="Drag to change start date"
-                  />
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 20, background: '#dbeafe', border: '2px solid #2563eb', borderRadius: 4, color: '#1d4ed8', fontSize: 13, lineHeight: 1, fontWeight: 700 }}>‹</span>
+                  </div>
                 )}
                 {onBarPointerDown && roundRight && (
                   <div
@@ -635,9 +637,11 @@ function WeekRow({
                       onBarPointerDown(e, item, 'resize-r')
                     }}
                     onClick={e => e.stopPropagation()}
-                    style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 8, cursor: 'ew-resize', zIndex: 2 }}
+                    style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 16, cursor: 'ew-resize', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 1 }}
                     title="Drag to change end date"
-                  />
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 20, background: '#dbeafe', border: '2px solid #2563eb', borderRadius: 4, color: '#1d4ed8', fontSize: 13, lineHeight: 1, fontWeight: 700 }}>›</span>
+                  </div>
                 )}
                 {isFirst && (
                   <>
@@ -2984,7 +2988,7 @@ export default function ScheduleCalendar({
                           ? '#3b82f6'
                           : item.display_color || '#15803d',
                     }}
-                    className="flex items-center gap-1.5 px-2 py-1.5 rounded text-white text-sm cursor-pointer hover:opacity-80 leading-snug"
+                    className="flex items-center gap-1.5 px-2 py-1.5 rounded text-white text-sm cursor-pointer hover:opacity-80 hover:ring-2 hover:ring-inset hover:ring-blue-500 leading-snug"
                     title={item.title}
                   >
                     {item.assignee_color && !item.needs_crew && (
