@@ -103,7 +103,7 @@ function SpecialSwatch({ label, color, selected, onClick, clear }) {
 // Emoji icons for the menu preview (mirror Layout's nav icons closely enough
 // for a visual sample).
 const PREVIEW_ICONS = {
-  '/': '🏠', '/org-chart': '🏢', '/hr': '👥', '/training': '🎓',
+  '/': '🏠', '/org-chart': '🏢', '/hr': '👥', '/rewards': '🏆', '/training': '🎓',
   '/contacts': '📇', '/clients': '💡', '/edocuments': '📄', '/accounting': '🧮',
   '/collections': '💰', '/design': '📐', '/bids': '📋', '/jobs': '🏡',
   '/equipment-tracking': '🚜', '/portal/subs': '🧑‍🔧', '/portal/vendors': '🛒', '/statistics': '📈',

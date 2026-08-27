@@ -117,6 +117,7 @@ export const MENU_ITEMS = [
   { path: '/', label: 'Dashboard' },
   { path: '/org-chart', label: 'Org Chart' },
   { path: '/hr', label: 'HR' },
+  { path: '/rewards', label: 'Rewards' },
   { path: '/training', label: 'Training' },
   { path: '/contacts', label: 'Marketing' },
   { path: '/clients', label: 'Sales' },
