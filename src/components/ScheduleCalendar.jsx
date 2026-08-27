@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { fetchAllPaginated } from '../lib/fetchAll'
 import { COLOR_PALETTE } from '../lib/colors'
@@ -129,6 +129,38 @@ function addCalDays(ds, n) {
 }
 function calDayDelta(a, b) {
   return Math.round((toLocalDateStr(b).getTime() - toLocalDateStr(a).getTime()) / MS_DAY)
+}
+
+// ── Continuous (infinite) month-scroll helpers ───────────────────────────────
+// The Sunday that begins the week containing `d`.
+function sundayOf(d) {
+  const x = new Date(d)
+  x.setHours(0, 0, 0, 0)
+  x.setDate(x.getDate() - x.getDay())
+  return x
+}
+function addDaysD(d, n) {
+  const x = new Date(d)
+  x.setDate(x.getDate() + n)
+  return x
+}
+// The month/year that owns the majority of a Sun→Sat week (used for the sticky
+// month divider label + the toolbar's scroll-following month readout).
+function majorityMonth(weekStart) {
+  const counts = {}
+  for (let i = 0; i < 7; i++) {
+    const d = addDaysD(weekStart, i)
+    const k = d.getFullYear() * 12 + d.getMonth()
+    counts[k] = (counts[k] || 0) + 1
+  }
+  let best = null,
+    bestC = -1
+  for (const k in counts)
+    if (counts[k] > bestC) {
+      bestC = counts[k]
+      best = +k
+    }
+  return { year: Math.floor(best / 12), month: best % 12 }
 }
 
 // Returns true if the date counts as a working day given exceptions + per-item weekend flags
@@ -303,6 +335,7 @@ function WeekRow({
   onBarPointerDown,
   liftedId = null,
   dropTargetDay = null,
+  infinite = false,
   exceptions = [],
 }) {
   // weekDays is now an array of 7 Date objects (incl. prev/next-month spillover).
@@ -445,7 +478,7 @@ function WeekRow({
       {/* ── Layer 1: day cell backgrounds + click targets (absolute, fills full row height) ── */}
       <div className="absolute inset-0 grid" style={{ gridTemplateColumns: GRID_COLS }}>
         {weekDays.map((cellDate, col) => {
-          const inMonth = cellDate.getMonth() === month
+          const inMonth = infinite || cellDate.getMonth() === month
           const isExcept = isCellException(cellDate, exceptions)
           const isDrop = dropTargetDay && dateStr(cellDate) === dropTargetDay
           return (
@@ -477,7 +510,7 @@ function WeekRow({
         {weekDays.map((cellDate, col) => {
           const ds = `${cellDate.getFullYear()}-${String(cellDate.getMonth() + 1).padStart(2, '0')}-${String(cellDate.getDate()).padStart(2, '0')}`
           const isToday = ds === todayStr
-          const inMonth = cellDate.getMonth() === month
+          const inMonth = infinite || cellDate.getMonth() === month
           const exLabel = cellExceptionLabel(cellDate, exceptions)
           return (
             <div key={col} className="pt-1 px-1 flex items-center gap-1 min-w-0 overflow-hidden">
@@ -1296,6 +1329,18 @@ export default function ScheduleCalendar({
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
 
+  // ── Continuous (infinite) month scroll ───────────────────────────────────
+  // Month view renders a growing list of consecutive Sun→Sat weeks that flow
+  // month-into-month. Scrolling near either end auto-extends the list; the
+  // toolbar month label tracks whichever month is topmost.
+  const INF_CHUNK = 6 // weeks added each time we extend
+  const [weekStarts, setWeekStarts] = useState([]) // Date[] of consecutive Sundays (ascending)
+  const [labelYM, setLabelYM] = useState({ year: today.getFullYear(), month: today.getMonth() })
+  const infiniteRangeRef = useRef(null) // { startOf, endOf } currently loaded (widens fetch)
+  const prependAnchorRef = useRef(null) // distance-from-bottom to restore after a prepend
+  const scrollRafRef = useRef(0)
+  const pendingScrollYMRef = useRef(null) // "y-m" to scroll to once rendered (Today / far jump)
+
   const [phase, setPhase] = useState(null)
   const [clickedDate, setClickedDate] = useState(null)
   const [editItem, setEditItem] = useState(null)
@@ -1728,8 +1773,15 @@ export default function ScheduleCalendar({
     const visEnd = new Date(year, month, 1 - firstDow + (totalCells - 1))
     const fmt = d =>
       `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    const startOf = fmt(visStart)
-    const endOf = fmt(visEnd)
+    let startOf = fmt(visStart)
+    let endOf = fmt(visEnd)
+    // In the continuous month view, widen the query to the whole loaded week
+    // window so every rendered week has its items (string dates compare safely).
+    if (viewMode === 'month' && infiniteRangeRef.current) {
+      const r = infiniteRangeRef.current
+      if (r.startOf < startOf) startOf = r.startOf
+      if (r.endOf > endOf) endOf = r.endOf
+    }
 
     let q = supabase
       .from('schedule_items')
@@ -1750,6 +1802,127 @@ export default function ScheduleCalendar({
     }
     setItems(rows)
     setLoading(false)
+  }
+
+  // ── Continuous month scroll: seed, extend, anchor, label ──────────────────
+  // Build a window of consecutive weeks centered on `center`'s month.
+  function seedInfinite(center) {
+    const base = sundayOf(new Date(center.getFullYear(), center.getMonth(), 1))
+    const before = 8,
+      after = 12
+    const start = addDaysD(base, -7 * before)
+    const list = Array.from({ length: before + after }, (_, i) => addDaysD(start, i * 7))
+    setWeekStarts(list)
+    setLabelYM({ year: center.getFullYear(), month: center.getMonth() })
+    pendingScrollYMRef.current = `${center.getFullYear()}-${center.getMonth()}`
+  }
+
+  // Seed once when the month view first mounts (or is returned to empty).
+  useEffect(() => {
+    if (viewMode === 'month' && weekStarts.length === 0) seedInfinite(new Date(year, month, 1))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode])
+
+  // Keep the loaded range ref in sync + refetch whenever the window grows.
+  useEffect(() => {
+    if (viewMode !== 'month' || weekStarts.length === 0) return
+    infiniteRangeRef.current = {
+      startOf: dateStr(weekStarts[0]),
+      endOf: dateStr(addDaysD(weekStarts[weekStarts.length - 1], 6)),
+    }
+    fetchItems()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekStarts, viewMode, selectedJob, statusFilter])
+
+  // After a prepend, restore scroll position (anchor to distance-from-bottom) so
+  // the view doesn't jump; after a seed/jump, scroll to the requested month.
+  useLayoutEffect(() => {
+    const el = calGridRef.current
+    if (!el) return
+    if (prependAnchorRef.current != null) {
+      el.scrollTop = el.scrollHeight - prependAnchorRef.current
+      prependAnchorRef.current = null
+    }
+    if (pendingScrollYMRef.current) {
+      const node = el.querySelector(`[data-month-start="${pendingScrollYMRef.current}"]`)
+      if (node) node.scrollIntoView({ block: 'start' })
+      pendingScrollYMRef.current = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekStarts])
+
+  function updateLabelFromScroll(el) {
+    const top = el.getBoundingClientRect().top
+    const nodes = el.querySelectorAll('[data-week-start]')
+    for (const n of nodes) {
+      const r = n.getBoundingClientRect()
+      if (r.bottom > top + 12) {
+        const ws = new Date(n.getAttribute('data-week-start') + 'T00:00:00')
+        const ym = majorityMonth(ws)
+        setLabelYM(prev => (prev.year === ym.year && prev.month === ym.month ? prev : ym))
+        break
+      }
+    }
+  }
+
+  function onInfiniteScroll() {
+    const el = calGridRef.current
+    if (!el || scrollRafRef.current) return
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = 0
+      const { scrollTop, scrollHeight, clientHeight } = el
+      updateLabelFromScroll(el)
+      if (scrollTop + clientHeight > scrollHeight - 500) {
+        setWeekStarts(prev => {
+          const last = prev[prev.length - 1]
+          const add = Array.from({ length: INF_CHUNK }, (_, i) => addDaysD(last, 7 * (i + 1)))
+          return [...prev, ...add]
+        })
+      }
+      if (scrollTop < 400) {
+        prependAnchorRef.current = scrollHeight - scrollTop
+        setWeekStarts(prev => {
+          const first = prev[0]
+          const add = Array.from({ length: INF_CHUNK }, (_, i) =>
+            addDaysD(first, -7 * (INF_CHUNK - i))
+          )
+          return [...add, ...prev]
+        })
+      }
+    })
+  }
+
+  // Smooth-scroll the continuous view to a given month; extend + retry if the
+  // target isn't in the loaded window yet.
+  function scrollToMonthYM(y, m, tries = 0) {
+    const el = calGridRef.current
+    if (!el) return
+    const node = el.querySelector(`[data-month-start="${y}-${m}"]`)
+    if (node) {
+      node.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      setLabelYM({ year: y, month: m })
+      return
+    }
+    if (tries >= 4) {
+      seedInfinite(new Date(y, m, 1))
+      return
+    }
+    const targetT = new Date(y, m, 1).getTime()
+    const firstT = weekStarts[0]?.getTime() ?? targetT
+    setWeekStarts(prev => {
+      if (targetT < firstT) {
+        prependAnchorRef.current = el.scrollHeight - el.scrollTop
+        const first = prev[0]
+        const add = Array.from({ length: INF_CHUNK }, (_, i) =>
+          addDaysD(first, -7 * (INF_CHUNK - i))
+        )
+        return [...add, ...prev]
+      }
+      const last = prev[prev.length - 1]
+      const add = Array.from({ length: INF_CHUNK }, (_, i) => addDaysD(last, 7 * (i + 1)))
+      return [...prev, ...add]
+    })
+    requestAnimationFrame(() => scrollToMonthYM(y, m, tries + 1))
   }
 
   function prevMonth() {
@@ -1970,9 +2143,14 @@ export default function ScheduleCalendar({
       if (dir !== autoPageRef.current.dir) {
         stopAutoPage()
         if (dir) {
-          const page = () => (dir === 'up' ? prevMonth() : nextMonth())
-          page() // flip immediately, then repeat while the cursor stays at the edge
-          autoPageRef.current = { dir, timer: setInterval(page, 650) }
+          // Continuous view: auto-scroll the calendar container while held at the
+          // edge (the scroll handler extends the window as needed).
+          const page = () => {
+            const c = calGridRef.current
+            if (c) c.scrollTop += dir === 'up' ? -22 : 22
+          }
+          page()
+          autoPageRef.current = { dir, timer: setInterval(page, 16) }
         }
       }
     } else if (autoPageRef.current.dir) {
@@ -2337,27 +2515,34 @@ export default function ScheduleCalendar({
     setYear(d.getFullYear())
   }
   function goPrev() {
-    if (viewMode === 'month') prevMonth()
-    else {
+    if (viewMode === 'month') {
+      const m = (labelYM.month + 11) % 12
+      const y = labelYM.month === 0 ? labelYM.year - 1 : labelYM.year
+      scrollToMonthYM(y, m)
+    } else {
       const d = new Date(cursorDate)
       d.setDate(d.getDate() - (viewMode === 'week' ? 7 : 1))
       syncFromDate(d)
     }
   }
   function goNext() {
-    if (viewMode === 'month') nextMonth()
-    else {
+    if (viewMode === 'month') {
+      const m = (labelYM.month + 1) % 12
+      const y = labelYM.month === 11 ? labelYM.year + 1 : labelYM.year
+      scrollToMonthYM(y, m)
+    } else {
       const d = new Date(cursorDate)
       d.setDate(d.getDate() + (viewMode === 'week' ? 7 : 1))
       syncFromDate(d)
     }
   }
   function goTodayView() {
-    syncFromDate(new Date(today))
+    if (viewMode === 'month') seedInfinite(new Date(today))
+    else syncFromDate(new Date(today))
   }
   const navLabel =
     viewMode === 'month'
-      ? `${MONTH_NAMES[month]} ${year}`
+      ? `${MONTH_NAMES[labelYM.month]} ${labelYM.year}`
       : viewMode === 'week'
         ? `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${weekDaysArr[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
         : cursorDate.toLocaleDateString('en-US', {
@@ -2368,13 +2553,13 @@ export default function ScheduleCalendar({
           })
   const navIsCurrent =
     viewMode === 'month'
-      ? month === today.getMonth() && year === today.getFullYear()
+      ? labelYM.month === today.getMonth() && labelYM.year === today.getFullYear()
       : cursorStr === todayStr
 
   // Month navigation header (shared between mobile and desktop)
   // Compact group of controls centered together: << < Month Year [Today] > >>
   const MonthNav = ({ compact = false, inline = false } = {}) => {
-    const isCurrent = month === today.getMonth() && year === today.getFullYear()
+    const isCurrent = navIsCurrent
     const btn = compact
       ? 'p-1 rounded hover:bg-gray-100 text-gray-600'
       : 'p-1.5 rounded-lg hover:bg-gray-100 text-gray-600'
@@ -2680,26 +2865,68 @@ export default function ScheduleCalendar({
               )}
             </div>
           </div>
-        ) : (
+        ) : viewMode === 'week' ? (
           <div className="border-l border-gray-200" ref={calGridRef}>
-            {(viewMode === 'week' ? [weekDaysArr] : weeks).map((weekDays, idx) => (
-              <WeekRow
-                key={idx}
-                weekDays={weekDays}
-                year={year}
-                month={month}
-                items={renderItems}
-                selectedJob={selectedJob}
-                jobMap={jobMap}
-                todayStr={todayStr}
-                onDayClick={handleDayClick}
-                onItemClick={handleItemClick}
-                onBarPointerDown={onBarPointerDown}
-                liftedId={liftedId}
-                dropTargetDay={dropTargetDay}
-                exceptions={exceptions}
-              />
-            ))}
+            <WeekRow
+              key="wk"
+              weekDays={weekDaysArr}
+              year={year}
+              month={month}
+              items={renderItems}
+              selectedJob={selectedJob}
+              jobMap={jobMap}
+              todayStr={todayStr}
+              onDayClick={handleDayClick}
+              onItemClick={handleItemClick}
+              onBarPointerDown={onBarPointerDown}
+              liftedId={liftedId}
+              dropTargetDay={dropTargetDay}
+              exceptions={exceptions}
+            />
+          </div>
+        ) : (
+          // Continuous (infinite) month: consecutive weeks flow month-into-month.
+          // Scrolling near either end auto-extends the window; a sticky divider
+          // marks where each new month begins.
+          <div
+            ref={calGridRef}
+            onScroll={onInfiniteScroll}
+            className="border-l border-gray-200 overflow-y-auto overscroll-contain"
+            style={{ maxHeight: 'calc(100vh - 230px)' }}
+          >
+            {weekStarts.map(ws => {
+              const weekDays = Array.from({ length: 7 }, (_, i) => addDaysD(ws, i))
+              const firstOfMonth = weekDays.find(d => d.getDate() === 1)
+              const maj = majorityMonth(ws)
+              return (
+                <div key={dateStr(ws)} data-week-start={dateStr(ws)}>
+                  {firstOfMonth && (
+                    <div
+                      data-month-start={`${firstOfMonth.getFullYear()}-${firstOfMonth.getMonth()}`}
+                      className="sticky top-0 z-20 px-3 py-1 bg-gray-100/95 backdrop-blur border-y border-gray-300 text-xs font-bold text-gray-600"
+                    >
+                      {MONTH_NAMES[firstOfMonth.getMonth()]} {firstOfMonth.getFullYear()}
+                    </div>
+                  )}
+                  <WeekRow
+                    weekDays={weekDays}
+                    year={maj.year}
+                    month={maj.month}
+                    infinite
+                    items={renderItems}
+                    selectedJob={selectedJob}
+                    jobMap={jobMap}
+                    todayStr={todayStr}
+                    onDayClick={handleDayClick}
+                    onItemClick={handleItemClick}
+                    onBarPointerDown={onBarPointerDown}
+                    liftedId={liftedId}
+                    dropTargetDay={dropTargetDay}
+                    exceptions={exceptions}
+                  />
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
