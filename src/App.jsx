@@ -65,6 +65,7 @@ const Profile = lazy(() => import('./pages/Profile'))
 const SubsVendors = lazy(() => import('./pages/SubsVendors'))
 const LMS = lazy(() => import('./pages/LMS'))
 const HR = lazy(() => import('./pages/HR'))
+const Rewards = lazy(() => import('./pages/Rewards'))
 const EmployeeDetail = lazy(() => import('./pages/EmployeeDetail'))
 const ApplicantDetail = lazy(() => import('./pages/ApplicantDetail'))
 const ApplyForm = lazy(() => import('./pages/ApplyForm'))
@@ -226,6 +227,7 @@ function AppRoutes() {
           <Route path="portal/vendors" element={<SubsVendors mode="vendor" />} />
           <Route path="training" element={<LMS />} />
           <Route path="hr" element={<HR />} />
+          <Route path="rewards" element={<Rewards />} />
           <Route path="hr/employee/:id" element={<EmployeeDetail />} />
           <Route path="hr/applicant/:id" element={<ApplicantDetail />} />
           <Route path="accounting" element={<Accounting />} />

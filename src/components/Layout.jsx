@@ -44,6 +44,7 @@ const navItems = [
   { path: '/', label: 'Dashboard', icon: <DashboardIcon /> },
   { path: '/org-chart', label: 'Org Chart', icon: <OrgChartIcon /> },
   { path: '/hr', label: 'HR', icon: <HRIcon /> },
+  { path: '/rewards', label: 'Rewards', icon: '🏆' },
   { path: '/training', label: 'Training', icon: '🎓' },
   { path: '/contacts', label: 'Marketing', icon: <ContactsIcon /> },
   { path: '/clients', label: 'Sales', icon: <OpportunitiesIcon /> },
@@ -103,6 +104,7 @@ const SCREEN_TITLES = [
   ['/jobs', 'Jobs'],
   ['/info', 'Job Info'],
   ['/hr', 'Employees'],
+  ['/rewards', 'Rewards'],
   ['/org-chart', 'Org Chart'],
   ['/training', 'Training'],
   ['/accounting', 'Accounting'],
@@ -228,6 +230,7 @@ export default function Layout() {
     { path: '/portal/sub-leads', label: 'Subcontractor Leads', icon: '🕵️' },
     { path: '/portal/vendors', label: 'Vendors', icon: '🛒' },
     { path: '/hr', label: 'Employees', icon: '🏢' },
+    { path: '/rewards', label: 'Rewards', icon: '🏆' },
   ]
   const [showMainMenu, setShowMainMenu] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState(null)
