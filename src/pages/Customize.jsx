@@ -754,8 +754,8 @@ export default function Customize() {
         </p>
         <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6">
           <div className="grid md:grid-cols-5 gap-5">
-            {/* editor — narrower (2/5) so Placement gets the wider 3/5 pane */}
-            <div className="space-y-3 md:col-span-2">
+            {/* editor — narrow (1/5) so Placement gets the wider 4/5 pane */}
+            <div className="space-y-3 md:col-span-1">
               {menuGroups.length === 0 && (
                 <p className="text-sm text-gray-400">No groups yet — add one to start grouping menu items.</p>
               )}
@@ -826,7 +826,7 @@ export default function Customize() {
             </div>
             {/* placement — reflects the chosen bar (vertical for Left/Right,
                 horizontal for Top/Bottom) and lets you drag the order. */}
-            <div className="md:col-span-3">
+            <div className="md:col-span-4">
               <div className="flex items-center justify-between mb-1.5">
                 <p className="text-xs font-semibold text-gray-500">
                   Placement{' '}
