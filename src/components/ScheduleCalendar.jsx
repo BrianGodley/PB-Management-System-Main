@@ -301,6 +301,8 @@ function WeekRow({
   onDayClick,
   onItemClick,
   onBarPointerDown,
+  liftedId = null,
+  dropTargetDay = null,
   exceptions = [],
 }) {
   // weekDays is now an array of 7 Date objects (incl. prev/next-month spillover).
@@ -445,6 +447,7 @@ function WeekRow({
         {weekDays.map((cellDate, col) => {
           const inMonth = cellDate.getMonth() === month
           const isExcept = isCellException(cellDate, exceptions)
+          const isDrop = dropTargetDay && dateStr(cellDate) === dropTargetDay
           return (
             <div
               key={col}
@@ -452,12 +455,15 @@ function WeekRow({
               onClick={() => onDayClick(cellDate)}
               className={`border-r border-gray-200
                 ${
-                  !inMonth
-                    ? 'bg-gray-50 cursor-pointer hover:bg-green-50'
-                    : isExcept
-                      ? 'bg-gray-100 cursor-pointer'
-                      : 'bg-white hover:bg-green-50 cursor-pointer'
+                  isDrop
+                    ? 'bg-green-100'
+                    : !inMonth
+                      ? 'bg-gray-50 cursor-pointer hover:bg-green-50'
+                      : isExcept
+                        ? 'bg-gray-100 cursor-pointer'
+                        : 'bg-white hover:bg-green-50 cursor-pointer'
                 }`}
+              style={isDrop ? { boxShadow: 'inset 0 0 0 2px #15803d' } : undefined}
             />
           )
         })}
@@ -559,6 +565,11 @@ function WeekRow({
                     : item.scheduling_type === 'yard_check'
                       ? '2px dashed rgba(147,197,253,0.8)'
                       : 'none',
+                  // Lifted state: the source bar dims and dashes while its ghost
+                  // floats with the cursor during a move-drag.
+                  ...(item.id === liftedId
+                    ? { opacity: 0.35, outline: '2px dashed rgba(0,0,0,0.35)', outlineOffset: '-2px' }
+                    : null),
                 }}
                 className="flex items-start gap-1.5 px-2 pt-1.5 pb-1.5 text-white text-sm font-normal cursor-pointer hover:opacity-80 leading-snug"
                 title={item.needs_crew ? `${displayText} — Crew not assigned` : displayText}
@@ -1912,7 +1923,8 @@ export default function ScheduleCalendar({
   // left/right edge) and saves straight to schedule_items. Day hit-testing uses
   // the `data-cal-day` attribute on each calendar cell + elementFromPoint, so it
   // works across week rows and both the month and week views uniformly.
-  const [dragPreview, setDragPreview] = useState(null) // { id, start_date, end_date }
+  const [dragPreview, setDragPreview] = useState(null) // { id, start_date, end_date, mode }
+  const [dragPos, setDragPos] = useState(null) // { x, y } cursor position for the floating ghost
   const dragRef = useRef(null)
   const dragPreviewRef = useRef(null)
   const suppressBarClickRef = useRef(false)
@@ -1933,6 +1945,9 @@ export default function ScheduleCalendar({
     if (!d) return
     if (!d.moved && Math.abs(e.clientX - d.downX) < 4 && Math.abs(e.clientY - d.downY) < 4) return
     d.moved = true
+    // Track the cursor so the floating ghost (move mode) follows it in any
+    // direction, even between days where no cell is directly under the pointer.
+    setDragPos({ x: e.clientX, y: e.clientY })
     const day = dayFromPoint(e.clientX, e.clientY)
     if (!day) return
     let ns = d.origStart,
@@ -1953,7 +1968,7 @@ export default function ScheduleCalendar({
     } else if (d.mode === 'resize-r') {
       ne = calDayDelta(d.origStart, day) >= 0 ? day : d.origStart
     }
-    const preview = { id: d.item.id, start_date: ns, end_date: ne }
+    const preview = { id: d.item.id, start_date: ns, end_date: ne, mode: d.mode }
     dragPreviewRef.current = preview
     setDragPreview(preview)
   }
@@ -1966,6 +1981,7 @@ export default function ScheduleCalendar({
     const preview = dragPreviewRef.current
     dragPreviewRef.current = null
     setDragPreview(null)
+    setDragPos(null)
     if (!d || !d.moved || !preview) return
     // Suppress the click-to-open-modal that fires right after a drag.
     suppressBarClickRef.current = true
@@ -2238,22 +2254,33 @@ export default function ScheduleCalendar({
   const jobMap = Object.fromEntries(jobs.map(j => [j.id, j.name || j.client_name]))
   const todayStr = dateStr(today)
 
-  // While a bar is being dragged/resized, override the dragged item's dates so
-  // the bar renders live at its new position before the save round-trips.
-  const previewItems = dragPreview
+  // Drag behaviour splits by mode:
+  //  • RESIZE keeps a live in-grid preview — the bar visibly extends/shrinks as
+  //    the edge is dragged, so we override its dates in place.
+  //  • MOVE lifts the bar: the source bar dims where it sits and a floating
+  //    "ghost" follows the cursor (see the drag-ghost render at the root). We do
+  //    NOT re-snap the bar in the grid during a move — it snaps only on release.
+  const dragMode = dragPreview?.mode
+  const applyPreview = dragPreview && dragMode !== 'move'
+  const previewItems = applyPreview
     ? items.map(it =>
         it.id === dragPreview.id
           ? { ...it, start_date: dragPreview.start_date, end_date: dragPreview.end_date }
           : it
       )
     : items
-  // Attach crew-overlap tags (G1 / G2 …) computed off the live (preview) dates,
-  // so dragging a bar into/out of a same-crew overlap re-numbers immediately.
+  // Attach crew-overlap tags (G1 / G2 …). On resize we use the live preview
+  // dates so tags re-number immediately; on move they settle on release.
   const crewLabelMap = Object.fromEntries(crews.map(c => [c.id, (c.label || '').trim()]))
-  const crewTags = computeCrewTags(previewItems, crewLabelMap, dragPreview?.id)
+  const crewTags = computeCrewTags(previewItems, crewLabelMap, applyPreview ? dragPreview.id : null)
   const renderItems = previewItems.map(it =>
     crewTags[it.id] ? { ...it, crewTag: crewTags[it.id] } : it
   )
+  // During a MOVE: which bar is lifted (dimmed) + which day is the drop target.
+  const liftedId = dragMode === 'move' ? dragPreview?.id : null
+  const dropTargetDay = dragMode === 'move' ? dragPreview?.start_date : null
+  // The floating ghost's label (source item captured at drag start).
+  const ghostItem = dragMode === 'move' ? dragRef.current?.item : null
 
   // ── Week / Day view helpers ─────────────────────────────────
   const weekStart = (() => {
@@ -2636,12 +2663,59 @@ export default function ScheduleCalendar({
                 onDayClick={handleDayClick}
                 onItemClick={handleItemClick}
                 onBarPointerDown={onBarPointerDown}
+                liftedId={liftedId}
+                dropTargetDay={dropTargetDay}
                 exceptions={exceptions}
               />
             ))}
           </div>
         )}
       </div>
+
+      {/* ── Floating drag ghost: follows the cursor during a move-drag and is
+             pointer-transparent so day hit-testing still sees the cells. ── */}
+      {dragPos && ghostItem && (
+        <div
+          style={{
+            position: 'fixed',
+            left: dragPos.x + 14,
+            top: dragPos.y + 14,
+            zIndex: 9999,
+            pointerEvents: 'none',
+          }}
+        >
+          <div
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md shadow-xl text-white text-sm font-medium leading-snug max-w-[240px]"
+            style={{
+              backgroundColor: ghostItem.needs_crew
+                ? '#b45309'
+                : ghostItem.scheduling_type === 'yard_check'
+                  ? '#3b82f6'
+                  : ghostItem.display_color || '#15803d',
+              opacity: 0.96,
+              transform: 'rotate(-1.5deg)',
+            }}
+          >
+            {ghostItem.crewTag && (
+              <span
+                className="flex-shrink-0 rounded px-1 py-0.5 border border-white/50 text-black text-[11px] font-extrabold leading-none"
+                style={{
+                  backgroundColor: ghostItem.assignee_color || ghostItem.display_color || '#15803d',
+                  backgroundImage:
+                    'linear-gradient(rgba(255,255,255,0.22),rgba(255,255,255,0.22))',
+                }}
+              >
+                {ghostItem.crewTag}
+              </span>
+            )}
+            <span className="truncate">
+              {jobMap[ghostItem.job_id]
+                ? `${ghostItem.title} (${jobMap[ghostItem.job_id]})`
+                : ghostItem.title}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* ── Modals (shared by both mobile and desktop) ────────── */}
 
