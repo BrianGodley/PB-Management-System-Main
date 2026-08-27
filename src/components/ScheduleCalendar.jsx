@@ -628,10 +628,11 @@ function WeekRow({
                       onBarPointerDown(e, item, 'resize-l')
                     }}
                     onClick={e => e.stopPropagation()}
+                    className="group/resize"
                     style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 14, cursor: 'ew-resize', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', paddingLeft: 1 }}
                     title="Drag to change start date"
                   >
-                    <span style={{ color: '#93c5fd', fontSize: 20, lineHeight: 1, fontWeight: 800, textShadow: '0 0 2px #1d4ed8, 0 0 1px #1d4ed8' }}>‹</span>
+                    <span className="opacity-0 group-hover/resize:opacity-100 transition-opacity" style={{ color: '#93c5fd', fontSize: 15, lineHeight: 1, fontWeight: 800, textShadow: '0 0 2px #1d4ed8, 0 0 1px #1d4ed8' }}>↔</span>
                   </div>
                 )}
                 {onBarPointerDown && roundRight && (
@@ -641,10 +642,11 @@ function WeekRow({
                       onBarPointerDown(e, item, 'resize-r')
                     }}
                     onClick={e => e.stopPropagation()}
+                    className="group/resize"
                     style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 14, cursor: 'ew-resize', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 1 }}
                     title="Drag to change end date"
                   >
-                    <span style={{ color: '#93c5fd', fontSize: 20, lineHeight: 1, fontWeight: 800, textShadow: '0 0 2px #1d4ed8, 0 0 1px #1d4ed8' }}>›</span>
+                    <span className="opacity-0 group-hover/resize:opacity-100 transition-opacity" style={{ color: '#93c5fd', fontSize: 20, lineHeight: 1, fontWeight: 800, textShadow: '0 0 2px #1d4ed8, 0 0 1px #1d4ed8' }}>›</span>
                   </div>
                 )}
                 {isFirst && (
@@ -3730,7 +3732,7 @@ export default function ScheduleCalendar({
                 <span className="text-xl mt-0.5">🏗️</span>
                 <div>
                   <p className="text-sm font-bold text-gray-800 group-hover:text-green-800">
-                    Install Work Order
+                    By Work Order
                   </p>
                   <p className="text-xs text-gray-500 mt-0.5">
                     Schedule by pending work orders. Auto-calculates work days from man-days ÷ crew
@@ -3749,7 +3751,7 @@ export default function ScheduleCalendar({
                 <span className="text-xl mt-0.5">👷</span>
                 <div>
                   <p className="text-sm font-bold text-gray-800 group-hover:text-green-800">
-                    Install Crew Type
+                    By Crew
                   </p>
                   <p className="text-xs text-gray-500 mt-0.5">
                     Manually set dates and assign In House crews.
@@ -3767,7 +3769,7 @@ export default function ScheduleCalendar({
                 <span className="text-xl mt-0.5">🧑‍🔧</span>
                 <div>
                   <p className="text-sm font-bold text-gray-800 group-hover:text-black">
-                    Subcontractor
+                    By Subcontractor
                   </p>
                   <p className="text-xs text-gray-500 mt-0.5">
                     Manually set dates and assign sub contractors.
@@ -3783,7 +3785,7 @@ export default function ScheduleCalendar({
                 <span className="text-xl mt-0.5">🌿</span>
                 <div>
                   <p className="text-sm font-bold text-gray-800 group-hover:text-teal-800">
-                    Yard Check & Maintenance
+                    By Yard Check & Maintenance
                   </p>
                   <p className="text-xs text-gray-500 mt-0.5">
                     Schedule recurring yard checks for this job. Set start date and how many checks
@@ -3801,7 +3803,7 @@ export default function ScheduleCalendar({
                 <span className="text-xl mt-0.5">🛡️</span>
                 <div>
                   <p className="text-sm font-bold text-gray-800 group-hover:text-blue-800">
-                    Warranty
+                    By Warranty
                   </p>
                   <p className="text-xs text-gray-500 mt-0.5">
                     Schedule warranty follow-up visits. Set dates, crew, and details manually.
