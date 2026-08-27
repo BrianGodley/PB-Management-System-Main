@@ -646,7 +646,7 @@ function WeekRow({
                     style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 14, cursor: 'ew-resize', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 1 }}
                     title="Drag to change end date"
                   >
-                    <span className="opacity-0 group-hover/resize:opacity-100 transition-opacity" style={{ color: '#93c5fd', fontSize: 20, lineHeight: 1, fontWeight: 800, textShadow: '0 0 2px #1d4ed8, 0 0 1px #1d4ed8' }}>›</span>
+                    <span className="opacity-0 group-hover/resize:opacity-100 transition-opacity" style={{ color: '#93c5fd', fontSize: 15, lineHeight: 1, fontWeight: 800, textShadow: '0 0 2px #1d4ed8, 0 0 1px #1d4ed8' }}>↔</span>
                   </div>
                 )}
                 {isFirst && (
