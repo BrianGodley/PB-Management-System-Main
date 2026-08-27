@@ -116,6 +116,12 @@ function dateStr(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+// Custom resize cursor: a styled blue double-headed arrow that REPLACES the OS
+// ew-resize cursor on the bar edges (falls back to ew-resize where unsupported).
+// White underlay stroke keeps it visible on any crew color.
+const RESIZE_CURSOR =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Cpath d='M3 13h20M3 13l5-5M3 13l5 5M23 13l-5-5M23 13l-5 5' stroke='white' stroke-width='5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M3 13h20M3 13l5-5M3 13l5 5M23 13l-5-5M23 13l-5 5' stroke='%231d4ed8' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\") 13 13, ew-resize"
+
 // Calendar-day (not working-day) helpers for drag/resize math on 'YYYY-MM-DD' strings.
 const MS_DAY = 86400000
 function toLocalDateStr(ds) {
@@ -628,12 +634,9 @@ function WeekRow({
                       onBarPointerDown(e, item, 'resize-l')
                     }}
                     onClick={e => e.stopPropagation()}
-                    className="group/resize"
-                    style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 12, cursor: 'ew-resize', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 8, cursor: RESIZE_CURSOR, zIndex: 2 }}
                     title="Drag to change start date"
-                  >
-                    <span className="opacity-0 group-hover/resize:opacity-100 transition-opacity" style={{ color: '#fff', fontSize: 18, lineHeight: 1, fontWeight: 900, textShadow: '0 0 3px #1d4ed8, 0 0 2px #1d4ed8' }}>↔</span>
-                  </div>
+                  />
                 )}
                 {onBarPointerDown && roundRight && (
                   <div
@@ -642,12 +645,9 @@ function WeekRow({
                       onBarPointerDown(e, item, 'resize-r')
                     }}
                     onClick={e => e.stopPropagation()}
-                    className="group/resize"
-                    style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 12, cursor: 'ew-resize', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 8, cursor: RESIZE_CURSOR, zIndex: 2 }}
                     title="Drag to change end date"
-                  >
-                    <span className="opacity-0 group-hover/resize:opacity-100 transition-opacity" style={{ color: '#fff', fontSize: 18, lineHeight: 1, fontWeight: 900, textShadow: '0 0 3px #1d4ed8, 0 0 2px #1d4ed8' }}>↔</span>
-                  </div>
+                  />
                 )}
                 {isFirst && (
                   <>
