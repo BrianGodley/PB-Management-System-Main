@@ -1336,6 +1336,9 @@ export default function ScheduleCalendar({
   const INF_CHUNK = 6 // weeks added each time we extend
   const [weekStarts, setWeekStarts] = useState([]) // Date[] of consecutive Sundays (ascending)
   const [labelYM, setLabelYM] = useState({ year: today.getFullYear(), month: today.getMonth() })
+  const [calMaxH, setCalMaxH] = useState('70vh') // inner scroller height, fitted to the viewport
+  const [showMonthPicker, setShowMonthPicker] = useState(false) // Jan–Dec month/year picker popover
+  const [pickerYear, setPickerYear] = useState(today.getFullYear())
   const infiniteRangeRef = useRef(null) // { startOf, endOf } currently loaded (widens fetch)
   const prependAnchorRef = useRef(null) // distance-from-bottom to restore after a prepend
   const scrollRafRef = useRef(0)
@@ -1823,6 +1826,32 @@ export default function ScheduleCalendar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewMode])
 
+  // Size the scroll container to end exactly at the viewport bottom, so the page
+  // itself never overflows — the calendar's own scrollbar is the ONLY one.
+  useLayoutEffect(() => {
+    if (viewMode !== 'month') return
+    function fit() {
+      const el = calGridRef.current
+      if (!el) return
+      const top = el.getBoundingClientRect().top
+      setCalMaxH(Math.max(260, Math.floor(window.innerHeight - top - 8)) + 'px')
+    }
+    fit()
+    window.addEventListener('resize', fit)
+    return () => window.removeEventListener('resize', fit)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, weekStarts.length === 0])
+
+  // Scroll ONLY the calendar container to bring `node` to its top (never bubbles
+  // to ancestors the way Element.scrollIntoView does, which was shifting the page
+  // and hiding the toolbar).
+  function scrollNodeToTop(node, smooth) {
+    const el = calGridRef.current
+    if (!el || !node) return
+    const delta = node.getBoundingClientRect().top - el.getBoundingClientRect().top
+    el.scrollTo({ top: el.scrollTop + delta, behavior: smooth ? 'smooth' : 'auto' })
+  }
+
   // Keep the loaded range ref in sync + refetch whenever the window grows.
   useEffect(() => {
     if (viewMode !== 'month' || weekStarts.length === 0) return
@@ -1845,7 +1874,7 @@ export default function ScheduleCalendar({
     }
     if (pendingScrollYMRef.current) {
       const node = el.querySelector(`[data-month-start="${pendingScrollYMRef.current}"]`)
-      if (node) node.scrollIntoView({ block: 'start' })
+      if (node) scrollNodeToTop(node, false)
       pendingScrollYMRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1899,7 +1928,7 @@ export default function ScheduleCalendar({
     if (!el) return
     const node = el.querySelector(`[data-month-start="${y}-${m}"]`)
     if (node) {
-      node.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      scrollNodeToTop(node, true)
       setLabelYM({ year: y, month: m })
       return
     }
@@ -2583,24 +2612,88 @@ export default function ScheduleCalendar({
             <span className="px-2.5 py-1 border-l">Today</span>
           </span>
         )}
-        <button onClick={goPrev} className={btn} title="Previous">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-        </button>
-        <h3 className="text-sm font-bold text-gray-800 min-w-[7rem] text-center px-1 whitespace-nowrap">
-          {navLabel}
-        </h3>
-        <button onClick={goNext} className={btn} title="Next">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
+        {viewMode === 'month' ? (
+          // Month view has unlimited scroll — no ‹ › arrows. The label is a
+          // button that opens a Jan–Dec picker with ◀ year ▶ to jump anywhere.
+          <div className="relative">
+            <button
+              onClick={() => {
+                setPickerYear(labelYM.year)
+                setShowMonthPicker(v => !v)
+              }}
+              title="Pick a month"
+              className="text-sm font-bold text-gray-800 min-w-[7rem] text-center px-2 py-0.5 rounded-md hover:bg-gray-100 whitespace-nowrap inline-flex items-center justify-center gap-1"
+            >
+              {navLabel}
+              <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {showMonthPicker && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowMonthPicker(false)} />
+                <div className="absolute z-50 mt-1 left-1/2 -translate-x-1/2 bg-white border border-gray-200 rounded-xl shadow-xl p-3 w-56">
+                  <div className="flex items-center justify-between mb-2">
+                    <button
+                      onClick={() => setPickerYear(y => y - 1)}
+                      className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-gray-100 text-gray-600"
+                      title="Previous year"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    <span className="text-sm font-bold text-gray-800 tabular-nums">{pickerYear}</span>
+                    <button
+                      onClick={() => setPickerYear(y => y + 1)}
+                      className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-gray-100 text-gray-600"
+                      title="Next year"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    {MONTH_NAMES.map((mn, idx) => {
+                      const active = labelYM.year === pickerYear && labelYM.month === idx
+                      return (
+                        <button
+                          key={mn}
+                          onClick={() => {
+                            scrollToMonthYM(pickerYear, idx)
+                            setShowMonthPicker(false)
+                          }}
+                          className={`text-xs font-medium rounded-md py-1.5 ${
+                            active ? 'bg-green-700 text-white' : 'text-gray-700 hover:bg-green-50'
+                          }`}
+                        >
+                          {mn.slice(0, 3)}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <>
+            <button onClick={goPrev} className={btn} title="Previous">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <h3 className="text-sm font-bold text-gray-800 min-w-[7rem] text-center px-1 whitespace-nowrap">
+              {navLabel}
+            </h3>
+            <button onClick={goNext} className={btn} title="Next">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </>
+        )}
         {inline ? (
           <div className="ml-2 inline-flex items-center rounded-md border border-gray-300 overflow-hidden text-[11px] font-semibold flex-shrink-0">
             {['month', 'week', 'day'].map(v => (
@@ -2892,7 +2985,7 @@ export default function ScheduleCalendar({
             ref={calGridRef}
             onScroll={onInfiniteScroll}
             className="border-l border-t border-gray-200 overflow-y-auto overscroll-contain relative"
-            style={{ maxHeight: 'calc(100vh - 230px)' }}
+            style={{ height: calMaxH }}
           >
             {/* Sticky Sun→Sat header — lives INSIDE the scroll area so nothing
                 scrolls above it; the month divider pins just beneath it. */}
